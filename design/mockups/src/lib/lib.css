@@ -1,0 +1,193 @@
+/* The mocked components. Every length is a token in the page's own CSS pixels, which are device
+   pixels (`main.ts` zooms the page by the display's ratio), so a length rounded to `1px` is
+   rounded to a device pixel. */
+
+/* Text: as wide as its advances, rounded up to a device pixel, a hair under one counting as that
+   pixel (`Look.snapUp`), and its style's line tall. iced lays plain ASCII out unkerned and with
+   no ligatures, and shapes anything else. */
+.k-text {
+  display: block;
+  flex: none;
+  width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+  height: var(--t-line);
+  font-family: var(--t-family);
+  font-size: var(--t-size);
+  font-weight: var(--t-weight);
+  line-height: var(--t-line);
+  font-feature-settings: var(--t-features);
+  font-kerning: none;
+  font-variant-ligatures: none;
+  text-rendering: geometricPrecision;
+  white-space: pre;
+}
+
+.k-text[data-shaped] {
+  font-kerning: normal;
+  font-variant-ligatures: normal;
+}
+
+/* A symbol: 2 of its 24 units, scaled to its size in device pixels, rounded half up and never
+   under one, then given back in its drawing's units. */
+.k-icon {
+  display: block;
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  --device-stroke: max(1, round(nearest, calc(var(--icon-size) / 1px * var(--stroke-symbol) / 24), 1));
+  stroke-width: calc(var(--device-stroke) * 24 / (var(--icon-size) / 1px));
+}
+
+/* An icon beside a label: a box as wide as the icon and the label's line tall, the icon centred
+   down it on a whole device pixel, half a pixel rounding down the box (`Look.snap`). */
+.k-icon-line {
+  display: block;
+  flex: none;
+  position: relative;
+  width: var(--icon-size);
+  height: var(--line);
+}
+
+.k-icon-line > .k-icon {
+  position: absolute;
+  left: 0;
+  top: round(nearest, calc((var(--line) - var(--icon-size)) / 2), 1px);
+}
+
+.k-row,
+.k-stack {
+  display: flex;
+  flex: none;
+  gap: var(--gap);
+}
+
+.k-stack {
+  flex-direction: column;
+}
+
+.k-row[data-align="start"] { align-items: flex-start; }
+.k-row[data-align="end"] { align-items: flex-end; }
+.k-stack[data-align="start"] { align-items: flex-start; }
+.k-stack[data-align="end"] { align-items: flex-end; }
+
+/* A button: its height, its label's line in the middle of it, its padding at the sides. */
+.k-button {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  height: var(--height);
+  padding: calc((var(--height) - var(--line)) / 2) var(--padding);
+  border-radius: var(--radius-control);
+  background: var(--fill);
+  --shown: var(--content);
+  cursor: pointer;
+}
+
+.k-button:disabled {
+  cursor: default;
+  --shown: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+.k-button:disabled:not([data-kind="Text"]) {
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+}
+
+/* The state layer: the content colour over the fill as the pointer comes onto it or presses it,
+   fading over `micro` (`kubaos_ui::component::layered`). A disabled control has none. */
+.k-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--content);
+  opacity: 0;
+  transition: opacity var(--motion-micro) var(--easing-standard);
+  pointer-events: none;
+}
+
+.k-button:not(:disabled):hover > .k-layer,
+.k-button:not(:disabled)[data-pinned="hovered"] > .k-layer {
+  opacity: var(--opacity-hover);
+}
+
+.k-button:not(:disabled):active > .k-layer,
+.k-button:not(:disabled)[data-pinned="pressed"] > .k-layer {
+  opacity: var(--opacity-press);
+}
+
+/* The focus ring. It lights as focus arrives: struck on through the neon sign's stutter over
+   `medium`, or faded in over `short` with the stutter off or motion reduced; it fades out over
+   `short`. A control pinned focused is lit at once, since nothing moved. */
+.k-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--corner);
+  pointer-events: none;
+  --lit: 0;
+  --inset: 0px;
+  transition: --lit var(--motion-short) var(--easing-standard);
+}
+
+.k-ring[data-filled] {
+  --inset: max(1px, round(nearest, var(--stroke-thin), 1px));
+}
+
+:not(:disabled):focus-visible > .k-ring {
+  --lit: 1;
+}
+
+[data-stutter] :not(:disabled):focus-visible > .k-ring {
+  animation: k-strike var(--motion-medium) step-end;
+}
+
+:not(:disabled)[data-pinned="focused"] > .k-ring {
+  --lit: 1;
+  transition: none;
+}
+
+@keyframes k-strike {
+  0% { --lit: var(--neon-strike-0); }
+  10% { --lit: var(--neon-strike-1); }
+  20% { --lit: var(--neon-strike-2); }
+  30% { --lit: var(--neon-strike-3); }
+  40% { --lit: var(--neon-strike-4); }
+  50% { --lit: var(--neon-strike-5); }
+  60% { --lit: var(--neon-strike-6); }
+  70% { --lit: var(--neon-strike-7); }
+  80% { --lit: var(--neon-strike-8); }
+  90% { --lit: var(--neon-strike-9); }
+  100% { --lit: 1; }
+}
+
+/* The glow: the focus colour through its mask, which `lib/focus.ts` works out per device pixel. */
+.k-glow {
+  position: absolute;
+  inset: calc(-1 * (var(--inset) + var(--glow-reach)));
+  --glow-reach: round(up, calc(var(--focus-far) - 0.001px), 1px);
+  background: var(--color-primary);
+  opacity: var(--lit);
+  mask-size: 100% 100%;
+}
+
+/* The tube on the control's edge; on a fill, the core just outside it. */
+.k-tube {
+  position: absolute;
+  inset: 0;
+  border: max(1px, round(nearest, var(--focus-tube), 1px)) solid rgb(from var(--color-primary) r g b / var(--lit));
+  border-radius: var(--corner);
+}
+
+.k-ring[data-filled] > .k-tube {
+  inset: calc(-1 * var(--inset));
+  border: var(--inset) solid rgb(from var(--color-primary_core) r g b / var(--lit));
+  border-radius: calc(var(--corner) + var(--inset));
+}
+
+/* Lit by a motion player: focus arriving on a button no key focused. */
+[data-lit] > .k-ring {
+  --lit: 1;
+}
+
+[data-stutter] [data-lit] > .k-ring {
+  animation: k-strike var(--motion-medium) step-end;
+}
