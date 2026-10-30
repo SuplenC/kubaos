@@ -35,7 +35,7 @@ function check(ok: boolean, what: string): void {
 /** What one player shows held at a time: per ball, its progress, where it sits, and what plays. */
 interface Held {
   time: number;
-  balls: { part: string; progress: number; cy: number; want: number; played: number[]; alone: number[] }[];
+  balls: { part: string; progress: number; cy: number; want: number; onCurve: boolean; played: number[]; alone: number[] }[];
   head: number;
   cx: number[];
 }
@@ -50,14 +50,26 @@ async function held(page: Page, index: number): Promise<Held> {
     const alone = [...player.querySelectorAll(".page-part-stage")];
     const time = Number(player.querySelector(".page-player-stage")!.getAnimations({ subtree: true })[0]?.currentTime ?? 0);
     const value = (element: Element, property: string) => Number(getComputedStyle(element).getPropertyValue(property));
+    const curves = [...plot.querySelectorAll<SVGPathElement>(".page-plot-curve")];
+    const undashed = (curve: SVGPathElement, test: (curve: SVGPathElement) => boolean) => {
+      const dash = curve.style.strokeDasharray;
+      curve.style.strokeDasharray = "none";
+      const result = test(curve);
+      curve.style.strokeDasharray = dash;
+      return result;
+    };
     const balls = [...plot.querySelectorAll<SVGCircleElement>(".page-plot-ball")].map((ball, i) => {
       const target = ball.dataset.target!;
       const progress = Number(ball.dataset.progress);
+      const centre = new DOMPoint(Number(ball.getAttribute("cx")), Number(ball.getAttribute("cy")));
       return {
         part: target,
         progress,
         cy: Number(ball.getAttribute("cy")),
         want: Number(y0) + (Number(y1) - Number(y0)) * progress,
+        // On the curve as drawn, not only where the plot's formula says: on its whole stroke, a
+        // dash of it or a gap between two.
+        onCurve: undashed(curves[i]!, (curve) => curve.isPointInStroke(centre)),
         played: [...stage.querySelectorAll(target)].map((element) => value(element, "opacity")),
         alone: alone[i] ? [...alone[i]!.querySelectorAll(target)].map((element) => value(element, "opacity")) : [],
       };
@@ -118,6 +130,9 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
   await page.goto(`${origin}/index.html?${query}#/${level}/${slug}`);
   await page.evaluate(() => window.kubaos.ready);
   await page.waitForFunction((want) => document.getElementById("page")?.dataset.page === want, slug);
+  // Every glow on the page, the players' parts alone among them, is drawn: masked, never a block.
+  const bare = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".k-glow")].filter((glow) => !glow.style.maskImage).length);
+  check(bare === 0, `${slug} (${query}): ${bare} glows drawn without their mask`);
   const values = await ranges(page);
   const names = await page.locator(".page-player-words > :first-child").allTextContents();
   for (const [index, name] of names.entries()) {
@@ -132,6 +147,7 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
         const range = tracks[i]!;
         const playing = ball.played.map((v) => (v - range.from) / (range.to - range.from));
         check(Math.abs(ball.cy - ball.want) <= PIXEL, `${where} at ${shown.time} ms: ${ball.part}'s ball at y ${ball.cy}, its progress ${ball.progress} is drawn at ${ball.want}`);
+        check(ball.onCurve, `${where} at ${shown.time} ms: ${ball.part}'s ball is off its curve`);
         check(Math.abs(shown.cx[i]! - shown.head) <= 1, `${where} at ${shown.time} ms: ${ball.part}'s ball isn't on the playhead`);
         for (const p of playing) {
           check(Math.abs(p - ball.progress) <= PROGRESS, `${where} at ${shown.time} ms: ${ball.part} plays at ${p}, its ball says ${ball.progress}`);
@@ -160,27 +176,53 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
     const back = await held(page, index);
     check(Math.abs(back.time - Math.max(0, frame - 10) * FRAME) < 1e-6, `${where}: Shift+← held ${back.time} ms`);
 
-    // Pointing at a part alone picks it everywhere: its row, its curve, its ball, its stage, and
-    // an outline of its layers on the whole.
+    // Pointing at a part, by its stage, its curve, its legend key or its row, picks it everywhere:
+    // its row, its curve, its ball, its stage, and an outline of its layers on the whole.
     const player = page.locator(".page-player").nth(index);
     const alone = player.locator(".page-part-alone");
+    const pointers = (i: number) => [
+      alone.nth(i),
+      player.locator(".page-plot-legend .page-plot-key").nth(i),
+      player.locator(`tr[data-pick="${i}"][data-pick-set="${set}"]`).first(),
+    ];
     for (let i = 0; i < (await alone.count()); i++) {
-      await alone.nth(i).hover();
-      const picked = await player.evaluate((element, i) => {
-        const of = (selector: string) => [...element.querySelectorAll(`${selector}[data-picked]`)].map((item) => item.getAttribute("data-pick"));
-        return {
-          curves: of(".page-plot-curve"),
-          balls: of(".page-plot-ball"),
-          stages: of(".page-part-alone"),
-          rows: of("tr"),
-          outlines: element.querySelectorAll(".page-player-outline").length,
-          want: String(i),
-        };
-      }, i);
-      const one = (list: (string | null)[]) => list.length === 1 && list[0] === picked.want;
-      check(one(picked.curves) && one(picked.balls) && one(picked.stages) && one(picked.rows) && picked.outlines > 0, `${where}: part ${i} picked ${JSON.stringify(picked)}`);
+      for (const pointer of pointers(i)) {
+        if ((await pointer.count()) === 0) continue;
+        await pointer.hover();
+        const picked = await player.evaluate((element, i) => {
+          const of = (selector: string) => [...element.querySelectorAll(`${selector}[data-picked]`)].map((item) => item.getAttribute("data-pick"));
+          return {
+            curves: of(".page-plot-curve"),
+            balls: of(".page-plot-ball"),
+            stages: of(".page-part-alone"),
+            rows: of("tr"),
+            outlines: element.querySelectorAll(".page-player-outline").length,
+            want: String(i),
+          };
+        }, i);
+        const one = (list: (string | null)[]) => list.length === 1 && list[0] === picked.want;
+        check(one(picked.curves) && one(picked.balls) && one(picked.stages) && one(picked.rows) && picked.outlines > 0, `${where}: part ${i} picked ${JSON.stringify(picked)}`);
+        await page.mouse.move(0, 0);
+      }
     }
-    await page.mouse.move(0, 0);
+    // A curve is found by the pointer too: the last track's, drawn over any it shares a curve with.
+    if ((await alone.count()) > 0) {
+      await player.locator(".page-plot").scrollIntoViewIfNeeded();
+      const spot = await player.evaluate((element) => {
+        const hit = [...element.querySelectorAll<SVGPathElement>(".page-plot-curve-hit")].at(-1)!;
+        const plot = hit.ownerSVGElement!;
+        const length = hit.getTotalLength();
+        // Along the curve, at its middle: inside the move, away from the axes.
+        const point = hit.getPointAtLength(length / 2);
+        const box = plot.getBoundingClientRect();
+        const zoom = box.width / plot.clientWidth;
+        return { x: box.left + point.x * zoom, y: box.top + point.y * zoom, want: hit.getAttribute("data-pick") };
+      });
+      await page.mouse.move(spot.x, spot.y);
+      const curve = await player.evaluate((element) => element.querySelector(".page-plot-curve[data-picked]")?.getAttribute("data-pick") ?? null);
+      check(curve === spot.want, `${where}: hovering curve ${spot.want} picked ${curve}`);
+      await page.mouse.move(0, 0);
+    }
   }
 }
 
@@ -195,16 +237,17 @@ async function main(): Promise<void> {
     const page = await context.newPage();
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    const base = "mode=dark&scale=1&text=short&window=Default";
-    await page.goto(`${origin}/index.html?${base}&speed=1&reduced=off&stutter=on`);
+    const base = "text=short&window=Default";
+    await page.goto(`${origin}/index.html?${base}&mode=dark&scale=1&speed=1&reduced=off&stutter=on`);
     await page.evaluate(() => window.kubaos.ready);
     const pages = (await page.evaluate(() => window.kubaos.pages)).filter((p) => named.length === 0 || named.includes(p.slug));
     for (const { level, slug } of pages) {
       for (const [settings, set] of [
-        ["speed=1&reduced=off&stutter=on", "tracks"],
-        ["speed=2&reduced=off&stutter=on", "tracks"],
-        ["speed=1&reduced=on&stutter=on", "reduced"],
-        ["speed=1&reduced=off&stutter=off", "unstuttered"],
+        ["mode=dark&scale=1&speed=1&reduced=off&stutter=on", "tracks"],
+        ["mode=light&scale=1.5&speed=1&reduced=off&stutter=on", "tracks"],
+        ["mode=dark&scale=1&speed=2&reduced=off&stutter=on", "tracks"],
+        ["mode=dark&scale=1&speed=1&reduced=on&stutter=on", "reduced"],
+        ["mode=dark&scale=1&speed=1&reduced=off&stutter=off", "unstuttered"],
       ] as const) {
         await testPage(page, origin, level, slug, `${base}&${settings}`, set);
       }

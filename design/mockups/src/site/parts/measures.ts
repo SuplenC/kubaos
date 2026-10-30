@@ -103,14 +103,16 @@ function overlaid(sample: Element): HTMLElement {
 
 /**
  * Lifts each of `names` a line at a time until it comes no nearer than `apart` to a name before
- * it, paddings first and then gaps, so two names never meet however narrow the box; and gives `holder` room above for
- * the lines used. Whether that room changed.
+ * it, paddings first and then gaps, so two names never meet however narrow the box; and gives
+ * `holder` room for the lines used. Whether that room changed.
  */
 function stack(holder: HTMLElement, names: readonly HTMLElement[], rise: number, apart: number): boolean {
   const placed: DOMRect[] = [];
   let lines = 1;
-  for (const name of names) {
-    const box = name.getBoundingClientRect();
+  // Every box read before any line is written: one layout, not one a name.
+  const boxes = names.map((name) => name.getBoundingClientRect());
+  for (const [i, name] of names.entries()) {
+    const box = boxes[i]!;
     let line = 0;
     const at = (n: number) => new DOMRect(box.left, box.top - n * rise, box.width, box.height);
     const meets = (a: DOMRect) => placed.some((b) => a.left < b.right + apart && b.left < a.right + apart && a.top < b.bottom && b.top < a.bottom);
