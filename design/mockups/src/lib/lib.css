@@ -202,7 +202,11 @@
 .k-tube {
   position: absolute;
   inset: 0;
-  border: var(--line) solid var(--tube);
+  /* Apart, not the `border` shorthand: a button sets no `--tube` of its own, and an unset colour
+     would throw out the width with it. */
+  border-width: var(--line);
+  border-style: solid;
+  border-color: var(--tube);
   border-radius: var(--corner);
   opacity: var(--lit);
 }
