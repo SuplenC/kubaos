@@ -167,7 +167,10 @@ async function rasterise(lit: HTMLElement, context: CanvasRenderingContext2D, re
     const picture = new Image();
     picture.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(copy.outerHTML)}`;
     await picture.decode();
-    context.drawImage(picture, reach + left, reach + top + Number.parseFloat(style.top), size, size);
+    // Where the symbol sits in its slot: a slot beside a label holds it at its left edge, an icon
+    // button's centres it.
+    const inset = (value: string) => Number.parseFloat(value) || 0;
+    context.drawImage(picture, reach + left + inset(style.left), reach + top + inset(style.top), size, size);
   }
 }
 

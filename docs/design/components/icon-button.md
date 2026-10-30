@@ -6,7 +6,18 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `button::icon_button(glyph, label)`; QML `IconButton`.
 
-**States:** resting, hovered, pressed, focused and disabled, in every kind and size; its hint shows while the pointer or the keyboard is on it.
+**Kinds:** `Filled`, `Tonal`, `Text` and `Danger`, each with its [Button](button.md) kind's colours: at night Filled rests on the unlit fill (`primary_fill`) with an `on_primary_fill` symbol, Tonal on `secondary_container` with a dimmed symbol, Text with no fill and its symbol the tone unlit (`primary_rest`), and Danger burns on `burn_error`.
+
+**States** are the button's (`docs/DESIGN.md`, "States"), in every kind and size, with no state layer:
+
+- **Rest:** unlit at night, as above.
+- **Lit:** hovered or focused from the keyboard, one state, and its hint shows. Signs on, at night while the lights burn, the line inside the circle's edge burns (the core, `stroke.thin` wide, on Filled and Danger; the tube, `primary` at `focus.tube`, on Tonal and Text) with the glow outside it, the only thing past the circle, and the symbol brightens as its kind's label does: Filled's with a tiny glow, Text's burning as the core with the content glow. Signs off, by day always and at night while a power change has the lights out, the same line is glass (`primary_fill_glass`, `primary_glass`, `burn_error_glass`) with no glow and the symbol at rest.
+- **Pressed:** overdriven and lit: Filled's and Tonal's fill lifts 0.035 at night (0.04 darker by day), Text's tube runs to the core (by day the tone under it at `opacity.press_tint`), Danger's lit fill goes 8% further toward white; the glow is `focus.pressed_glow` times the lit one.
+- **Disabled:** grey, with no tone, no line and no glow; no action and no focus. Its hint still shows while the pointer is over it.
+
+**Motion.** Lighting up, going back to rest and pressing are fades (`short`, and `micro` for the press); the hint fades in and out over `short`. The flicker is for power changes only: in a theme change and dark ⇄ light a lit icon button flickers to its signs-off look and back, and one at rest just recolours.
+
+*Not built yet: the libraries draw hover and press as state layers, strike focus and light `Danger` in the accent on `error`; the mockups' IconButton page (`design/mockups/src/pages/atoms/icon-button.ts`) draws the rule.*
 
 ## `Hint`
 
