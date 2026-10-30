@@ -31,6 +31,8 @@ A sketch answers "is this the right idea?": the layout, the hierarchy, the behav
 
 A mockup is the thing itself, complete, in the mockup site: `design/mockups/`, served with hot reload by `just mockups`. Its values come from `design/tokens.toml` alone, so a mockup can't leave the scale. Kuba can open it, touch it and adjust it himself.
 
+`design/mockups/README.md` says how a page is added: its required parts, and where it is listed.
+
 A mockup page is **exhaustive**. It shows and describes every one of these that applies, live, next to its written description:
 
 - **Variants and sizes,** and which is for what.
