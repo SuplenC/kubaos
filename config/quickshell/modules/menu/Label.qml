@@ -6,8 +6,9 @@ import KubaOS.Components as K
 // Kotodama's lit matches.
 //
 // HAZARD: keep the Results' rows on Qt's own text. Made headless, a keystroke's fourteen fresh
-// rows of three texts take 1.5 ms in `K.Text` against 0.5 ms here, and the rows on `K.Text` took
-// the menu's keystroke-to-frame median from 9 ms to 12 ms (the e2e `menu` check, five runs).
+// rows of three texts take 1.1 ms in `K.Text` against 0.65 ms here, and the Results as
+// `K.ListRow`s took the menu's keystroke-to-frame median from 9 ms to 14 ms (the e2e `menu` check,
+// nine interleaved runs).
 Text {
     id: root
 

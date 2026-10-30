@@ -25,6 +25,19 @@ TestCase {
     }
 
     Component {
+        id: unfolding
+
+        // As a notification's card unfolds: as many lines as the words wrap to.
+        K.Text {
+            id: unfolded
+
+            style: K.Tokens.type.body
+            room: 120
+            maximumLines: Math.max(unfolded.laid.length, 1)
+        }
+    }
+
+    Component {
         id: hints
 
         K.KeyHints {
@@ -62,6 +75,56 @@ TestCase {
         compare(K.Advances.widths.size, before);
     }
 
+    function test_texts_in_one_style_draw_in_the_one_font_made_from_it() {
+        createTemporaryObject(text, suite, {
+            text: "First"
+        });
+        const styles = K.Advances.styles.size;
+
+        const second = createTemporaryObject(text, suite, {
+            text: "Second"
+        });
+
+        compare(K.Advances.styles.size, styles);
+        const font = second.children[0].font;
+        compare(font.family, K.Tokens.type.body_strong.family);
+        compare(font.weight, K.Tokens.type.body_strong.weight);
+        compare(font.pixelSize, K.Tokens.type.body_strong.size);
+        compare(font.kerning, false);
+        compare(font.preferShaping, false);
+        compare(font.hintingPreference, Font.PreferNoHinting);
+    }
+
+    function test_words_past_ascii_and_tabular_figures_draw_shaped() {
+        const accented = createTemporaryObject(text, suite, {
+            text: "Zażółć"
+        });
+        const figures = createTemporaryObject(text, suite, {
+            text: "12:30",
+            style: K.Tokens.type.label_number
+        });
+
+        compare(accented.children[0].font.kerning, true);
+        compare(accented.children[0].font.preferShaping, true);
+        compare(figures.children[0].font.preferShaping, true);
+        compare(figures.children[0].font.features, {
+            "tnum": 1
+        });
+    }
+
+    function test_a_text_draws_on_the_surface_colour_unless_given_one() {
+        const plain = createTemporaryObject(text, suite, {
+            text: "Plain"
+        });
+        const coloured = createTemporaryObject(text, suite, {
+            text: "Coloured",
+            color: K.Tokens.color.primary
+        });
+
+        compare(plain.children[0].color, K.Tokens.color.on_surface);
+        compare(coloured.children[0].color, K.Tokens.color.primary);
+    }
+
     function test_a_text_measures_as_its_words_do_rounded_up_to_a_pixel() {
         const made = createTemporaryObject(text, suite, {
             text: "Firefox Web Browser"
@@ -79,6 +142,16 @@ TestCase {
 
         verify(made.lit);
         compare(made.implicitWidth, K.Look.snapUp(K.Advances.of(K.Tokens.type.body_strong, false, "Firefox"), 1));
+    }
+
+    function test_a_text_can_keep_as_many_lines_as_its_words_wrap_to() {
+        const made = createTemporaryObject(unfolding, suite, {
+            text: "Words enough to wrap onto a few lines in the room"
+        });
+
+        verify(made.laid.length > 1);
+        compare(made.measured.lines, made.laid.length);
+        verify(!made.cut);
     }
 
     function test_a_word_wider_than_the_room_is_cut_on_its_one_line() {

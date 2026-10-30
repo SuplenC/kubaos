@@ -131,7 +131,7 @@ TestCase {
 
         card.unfolded = true;
 
-        compare(body.lines.length, body.laid.length);
+        compare(body.measured.lines, body.laid.length);
         verify(!body.cut);
     }
 

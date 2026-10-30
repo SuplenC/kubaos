@@ -173,7 +173,7 @@ TestCase {
         verify(line !== null);
         compare(line.height, K.Tokens.type.mono.line);
         const label = suite.find(line, it => it.cut !== undefined);
-        compare(label.lines.length, 1);
+        compare(label.measured.lines, 1);
         verify(!label.cut);
         const button = suite.find(readings, it => it.label === "Why the size is unknown");
         verify(button.visible);
