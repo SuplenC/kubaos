@@ -558,6 +558,9 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
                 }
                 out.line(format!("        readonly property color {role}: tokens.role({role:?})"));
             }
+            out.line("        // The state model's derived roles (OKLCH lightness and chroma, gamut and contrast");
+            out.line("        // fitting, a recipe for each mode) aren't built here yet: only the mockups' CSS");
+            out.line("        // computes them.");
             for (role, derived) in &colors.derived {
                 let Some((toward, t)) = derived.toward() else { continue };
                 let function = match toward {
@@ -566,13 +569,13 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
                 };
                 out.line(format!(
                     "        // `{}` taken {} of the way to {}, whatever its colour.",
-                    derived.mix,
+                    derived.tone(),
                     number(t),
                     toward.name()
                 ));
                 out.line(format!(
                     "        readonly property color {role}: tokens.{function}(tokens.color.{}, {})",
-                    derived.mix,
+                    derived.tone(),
                     number(t)
                 ));
             }

@@ -22,6 +22,7 @@ use std::fmt::Write as _;
 use std::io;
 use std::path::Path;
 
+use crate::contrast::Mode;
 use crate::model::Family;
 use crate::model::Need;
 use crate::model::Rgb;
@@ -70,11 +71,11 @@ impl Target for CssTokens {
         out.close();
         out.blank();
         out.open(":root,\n[data-mode=\"dark\"]");
-        mode(&mut out, tokens, &tokens.color.dark, false);
+        mode(&mut out, tokens, &tokens.color.dark, Mode::Dark);
         out.close();
         out.blank();
         out.open("[data-mode=\"light\"]");
-        mode(&mut out, tokens, &tokens.color.light, true);
+        mode(&mut out, tokens, &tokens.color.light, Mode::Light);
         out.close();
         out.blank();
         out.open(":root");
@@ -166,6 +167,9 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
     out.comment("Content drawn in its tone, lit: a faint near glow only.");
     out.length("focus-content_near", focus.content_near);
     out.var("focus-content_glow", number(focus.content_glow));
+    out.length("focus-label_near", focus.label_near);
+    out.var("focus-label_glow", number(focus.label_glow));
+    out.var("focus-pressed_glow", number(focus.pressed_glow));
     out.length("focus-offset", focus.offset);
     out.var("focus-glass", number(focus.glass));
     for (name, shadow) in &tokens.shadow {
@@ -235,28 +239,87 @@ fn motion(out: &mut Css, tokens: &Tokens) {
 }
 
 /// The colour roles of one palette, and the shadows' opacities in that mode.
-fn mode(out: &mut Css, tokens: &Tokens, palette: &BTreeMap<String, Rgb>, light: bool) {
+fn mode(out: &mut Css, tokens: &Tokens, palette: &BTreeMap<String, Rgb>, mode: Mode) {
     out.comment("The colour roles: the fallback palette, matugen's colours for the default wallpaper.");
     for (role, rgb) in palette {
         out.var(&format!("color-{role}"), format!("{rgb:?}"));
     }
-    out.comment("The derived roles, computed from their tone wherever it is set, so they follow it.");
+    out.comment("The derived roles that are a tone mixed toward white or black, computed from their tone wherever");
+    out.comment("it is set, so they follow it.");
     for (role, derived) in &tokens.color.derived {
         let Some((toward, t)) = derived.toward() else { continue };
         let percent = number(t * 100.0);
         out.var(
             &format!("color-{role}"),
-            format!("color-mix(in srgb, var(--color-{}), {} {percent}%)", derived.mix, toward.name()),
+            format!(
+                "color-mix(in srgb, var(--color-{}), {} {percent}%)",
+                derived.tone(),
+                toward.name()
+            ),
         );
+    }
+    out.comment("The derived roles CSS can't compute (OKLCH, gamut and contrast fitting), for this palette. A page");
+    out.comment("painted in another computes them again from `--derived-dark` or `--derived-light`.");
+    let computed = tokens.color.with_derived(palette, mode);
+    for (role, derived) in &tokens.color.derived {
+        if derived.toward().is_some() {
+            continue;
+        }
+        if let Some(rgb) = computed.get(role) {
+            out.var(&format!("color-{role}"), format!("{rgb:?}"));
+        }
     }
     out.comment("The `shadow` role's opacity for each shadow.");
     for (name, shadow) in &tokens.shadow {
-        let opacity = match (light, shadow.light_opacity) {
-            (true, Some(opacity)) => opacity,
+        let opacity = match (mode, shadow.light_opacity) {
+            (Mode::Light, Some(opacity)) => opacity,
             _ => shadow.opacity,
         };
         out.var(&format!("shadow-{name}-opacity"), number(opacity));
     }
+}
+
+/// Every derived role's recipe in `mode`, as JSON: what the mockups compute a palette's derived
+/// roles from (`design/mockups/src/site/derive.ts`).
+fn recipes(tokens: &Tokens, mode: Mode) -> String {
+    let list = |names: &[String]| {
+        names
+            .iter()
+            .map(|name| format!("{name:?}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    let mut entries = Vec::new();
+    for (role, derived) in &tokens.color.derived {
+        let recipe = derived.in_mode(mode);
+        let mut fields = Vec::new();
+        if let Some(mix) = &recipe.mix {
+            fields.push(format!("\"mix\":{mix:?}"));
+        }
+        if let Some(from) = &recipe.from {
+            fields.push(format!("\"from\":{from:?}"));
+        }
+        let numbers = [
+            ("white", recipe.white),
+            ("black", recipe.black),
+            ("lightness", recipe.lightness),
+            ("at_lightness", recipe.at_lightness),
+            ("lighter", recipe.lighter),
+            ("darker", recipe.darker),
+            ("chroma", recipe.chroma),
+        ];
+        for (name, value) in numbers {
+            if let Some(value) = value {
+                fields.push(format!("\"{name}\":{}", number(value)));
+            }
+        }
+        if let Some(on) = &recipe.text_on {
+            fields.push(format!("\"text_on\":[{}]", list(on)));
+        }
+        fields.push(format!("\"formula\":{}", derived.toward().is_some()));
+        entries.push(format!("{role:?}:{{{}}}", fields.join(",")));
+    }
+    format!("{{{}}}", entries.join(","))
 }
 
 /// What each type style, duration and curve is for, where each colour role comes from, and every
@@ -289,6 +352,9 @@ fn words(out: &mut Css, tokens: &Tokens) {
         out.var(&format!("contrast-{index}-use"), string(&pair.purpose));
     }
     out.var("contrast-pairs", tokens.contrast.pairs.len().to_string());
+    out.comment("Every derived role's recipe in each mode, as JSON.");
+    out.var("derived-dark", string(&recipes(tokens, Mode::Dark)));
+    out.var("derived-light", string(&recipes(tokens, Mode::Light)));
     out.comment("The roles drawn only as decoration, which need no contrast.");
     out.var("contrast-decorative", string(&tokens.contrast.decorative.join(" ")));
 }

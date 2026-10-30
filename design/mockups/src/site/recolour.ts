@@ -8,6 +8,7 @@
 // plot is exactly the colour that plays there, and the derived roles (the cores) follow their
 // tone through it.
 
+import { derived, forgetRecipes } from "./derive.ts";
 import { THEMES } from "./themes.ts";
 import type { Mode } from "./settings.ts";
 
@@ -134,8 +135,9 @@ function fallback(mode: Mode): Palette {
   probe.hidden = true;
   document.body.append(probe);
   const style = getComputedStyle(probe);
-  // Every role any rule names, read as the mode's box computes it: a derived role computes to its
-  // formula, so only the roles with a value of their own are kept.
+  // Every role any rule names, read as the mode's box computes it: a role that is a formula
+  // computes to it, so only the roles with a value are kept, the derived ones `palette` works out
+  // again among them.
   const found: Record<string, string> = {};
   for (const sheet of document.styleSheets) {
     for (const rule of sheet.cssRules) {
@@ -152,15 +154,20 @@ function fallback(mode: Mode): Palette {
   return found;
 }
 
-/** Forgets the fallback palettes read: the tokens changed. */
+/** Forgets the fallback palettes and the recipes read: the tokens changed. */
 export function forgetPalettes(): void {
   read.clear();
+  forgetRecipes();
 }
 
-/** The palette theme `slug` paints in `mode`: the tokens' fallback, with the theme's matugen roles. */
+/**
+ * The palette theme `slug` paints in `mode`: the tokens' fallback, with the theme's matugen roles,
+ * and the derived roles CSS can't compute worked out from them.
+ */
 export function palette(slug: string, mode: Mode): Palette {
   const theme = THEMES.find((each) => each.slug === slug) ?? THEMES[0]!;
-  return { ...fallback(mode), ...(theme[mode] ?? {}) };
+  const roles = { ...fallback(mode), ...(theme[mode] ?? {}) };
+  return { ...roles, ...derived(roles, mode) };
 }
 
 /** A theme's name. */

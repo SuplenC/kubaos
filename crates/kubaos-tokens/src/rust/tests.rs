@@ -147,8 +147,15 @@ fn a_core_is_written_as_its_tone_and_how_far_to_white() {
 }
 
 #[test]
-fn an_unlit_core_is_written_as_its_tone_and_how_far_to_black() {
+fn a_state_model_recipe_is_not_built_into_the_module_yet() {
     let module = module();
 
-    assert!(module.contains("pub const PRIMARY_UNLIT: Darkened = Darkened { tone: Role::Primary, black: 0.35 };"));
+    assert!(
+        !module.contains("PRIMARY_UNLIT"),
+        "an OKLCH recipe isn't a `Derived` or `Darkened`"
+    );
+    assert!(
+        !module.contains("    primary_unlit: "),
+        "nor a fixed value in a palette"
+    );
 }
