@@ -136,7 +136,7 @@ export type Curve = Easing | "neon.strike";
 export type Value = number | { readonly opacity: string } | { readonly color: string } | { readonly length: string };
 
 /** One part's change in a move: what it is, the property, its values and its timing. */
-export interface Track {
+export interface Track<C extends Curve = Curve> {
   /** The part, as a library names it: the state layer, the tube, the glow, the core. */
   readonly part: string;
   /** Which of the sample's variants it is on: every kind, Tonal and Text. */
@@ -150,7 +150,7 @@ export interface Track {
   readonly duration: Duration;
   /** How long after the move starts this part does; a part with none starts with it. */
   readonly cue?: Duration;
-  readonly curve: Curve;
+  readonly curve: C;
 }
 
 /**
@@ -158,22 +158,38 @@ export interface Track {
  * from this same object and shows it as the move's recipe, so what plays and what a library reads
  * never disagree. The player loops it: the first state held, the move, the last state held, back.
  */
-export interface Move {
+export type Move = MoveWords & (Eased | Struck);
+
+interface MoveWords {
   readonly name: string;
   readonly what: string;
-  readonly tracks: NonEmpty<Track>;
+  /** The sample the move plays on, at rest: the player moves its parts. */
+  readonly sample: () => Element;
+}
+
+/** A move on easing curves alone. */
+interface Eased {
+  readonly tracks: NonEmpty<Track<Easing>>;
   /** What plays with reduced motion: the same tracks, or the ones it turns them into. */
-  readonly reduced: "same" | NonEmpty<Track>;
-  /** What plays with the focus stutter off, which a move that strikes must say. */
-  readonly unstuttered?: NonEmpty<Track>;
+  readonly reduced: "same" | NonEmpty<Track<Easing>>;
+  readonly unstuttered?: never;
   /**
    * How the loop goes back to the first state: the move `plays` backwards where that is the same
    * move reversed (a hover leaving), or it `cuts` back where going back is a move of its own
    * (focus leaving after focus arriving), which its own player shows.
    */
   readonly back: "plays" | "cuts";
-  /** The sample the move plays on, at rest: the player moves its parts. */
-  readonly sample: () => Element;
+}
+
+/**
+ * A move that strikes as a neon tube does. Reduced motion and the stutter off each turn a strike
+ * into a fade, so it names both; a strike is never played backwards, so its loop cuts back.
+ */
+interface Struck {
+  readonly tracks: NonEmpty<Track>;
+  readonly reduced: NonEmpty<Track<Easing>>;
+  readonly unstuttered: NonEmpty<Track<Easing>>;
+  readonly back: "cuts";
 }
 
 /** How the part arrives, leaves and moves between its states. */

@@ -2,8 +2,8 @@
 // tube with the tone's core outside it.
 
 import { toneColour } from "../../lib/focus.ts";
-import type { NonEmpty, Tube } from "../page.ts";
 import { el, label, prose } from "../dom.ts";
+import type { NonEmpty, Tube } from "../page.ts";
 
 /** What `tube` looks like, in words. */
 function described(tube: Tube): string {

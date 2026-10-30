@@ -12,7 +12,9 @@ export const FRAME = 1000 / 60;
 /** How long the player holds each end of a move: long enough to see the state. */
 export const HOLD: Duration = "scene";
 
-/** A duration token in milliseconds, as the tokens write it; the browser hands it back in seconds. */
+/**
+ * A duration token in milliseconds, as the tokens write it; the browser hands it back in seconds.
+ */
 export function milliseconds(duration: Duration): number {
   const value = raw(`duration-${duration}`);
   const amount = Number.parseFloat(value);
@@ -67,15 +69,8 @@ export function tracksOf(move: Move, set: TrackSet): NonEmpty<Track> | null {
   return move.unstuttered ?? null;
 }
 
-/**
- * The set the settings picked play. A move that strikes says what reduced motion and the stutter
- * off make of it, as both turn a strike into a fade.
- */
+/** The set the settings picked play. */
 export function playing(move: Move): TrackSet {
-  const strikes = (list: readonly Track[]) => list.some((track) => track.curve === "neon.strike");
-  if (strikes(move.tracks) && (move.reduced === "same" || !move.unstuttered)) {
-    throw new Error(`${move.name} strikes, so it names its reduced and its unstuttered tracks`);
-  }
   const { reduced, stutter } = settings();
   if (reduced) return move.reduced === "same" ? "tracks" : "reduced";
   if (!stutter && move.unstuttered) return "unstuttered";
@@ -151,13 +146,13 @@ export function keyframes(timed: Timed, total: number): Keyframe[] {
   const to = css(track.to);
   const stops: { at: number; value: number | string; easing: string }[] = [];
   const at = (ms: number, value: number | string, easing = "linear") => stops.push({ at: ms, value, easing });
-  const segment = (span: Span, a: number | string, b: number | string, forward: boolean) => {
+  // A strike only ever plays forward: a move that strikes cuts back (`page.ts`, `Struck`).
+  const segment = (span: Span, a: number | string, b: number | string) => {
     at(span.start, a);
     if (track.curve === "neon.strike") {
       const count = strikeSteps().length;
       strikeSteps().forEach((step, i) => {
-        const value = between(track, forward ? step : 1 - step);
-        at(span.start + (i * (span.end - span.start)) / count, value, "step-end");
+        at(span.start + (i * (span.end - span.start)) / count, between(track, step), "step-end");
       });
     } else {
       at(span.start, a, `cubic-bezier(${bezier(track.curve).join(", ")})`);
@@ -165,9 +160,9 @@ export function keyframes(timed: Timed, total: number): Keyframe[] {
     at(span.end, b);
   };
   at(0, from);
-  segment(timed.forward, from, to, true);
+  segment(timed.forward, from, to);
   if (timed.back) {
-    segment(timed.back, to, from, false);
+    segment(timed.back, to, from);
     at(total, from);
   } else {
     // Cut back: the last state holds to the end, and the loop starts again on the first.
@@ -218,6 +213,10 @@ export function recipe(move: Move): Record<string, unknown> {
     reduced: move.reduced === "same" ? "same" : move.reduced.map(trackJson),
     ...(move.unstuttered ? { unstuttered: move.unstuttered.map(trackJson) } : {}),
     speed: "every duration and cue divided by the speed setting, 0.5 to 2",
-    back: move.back,
+    player: {
+      hold: { token: `duration.${HOLD}`, ms: milliseconds(HOLD) },
+      loop: "hold the first state, the move, hold the last state, then back",
+      back: move.back,
+    },
   };
 }

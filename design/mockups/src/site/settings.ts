@@ -125,7 +125,8 @@ export function change(patch: Partial<Settings>): void {
   const url = new URL(location.href);
   for (const [key, value] of Object.entries(values)) url.searchParams.set(key, value);
   history.replaceState(null, "", url);
-  for (const listener of listeners) listener(current, changed);
+  // A copy: a listener may stop listening while it is called.
+  for (const listener of [...listeners]) listener(current, changed);
 }
 
 /** Calls `listener` on every change, until the function it returns is called. */
