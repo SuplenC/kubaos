@@ -140,7 +140,7 @@ const ON_TONE: Record<Tone, string> = {
   success: "surface",
   warning: "surface",
   sharing: "surface",
-  burn_danger: "on_burn_danger",
+  burn_error: "on_burn_error",
   burn_success: "on_burn_success",
   burn_warning: "on_burn_warning",
 };
@@ -236,7 +236,7 @@ const FOCUS_FOR: Record<string, string> = {
   "focus-label_near": "How far the tiny glow round a lit label on a fill (a Filled button's, at night) reaches.",
   "focus-label_glow": "That glow's opacity at the letters' edge.",
   "focus-pressed_glow": "A pressed control's glow: the lit glow this many times brighter.",
-  "focus-glass": "The signs-off tube of a control not filled with its tone and with no glass role of its own (a field, a checkbox, a chip): the tone's `_unlit` at this opacity over the control's own container. A button's glass is a solid role of its kind (`primary_glass`, `primary_fill_glass`, `burn_danger_glass`).",
+  "focus-glass": "The signs-off tube of a control not filled with its tone and with no glass role of its own (a field, a checkbox, a chip): the tone's `_unlit` at this opacity over the control's own container. A button's glass is a solid role of its kind (`primary_glass`, `primary_fill_glass`, `burn_error_glass`).",
 };
 
 /** A focus token's value as the tokens write it: a length in logical pixels, or a number. */
@@ -264,7 +264,7 @@ const TONE_LIGHTS: Record<Tone, string> = {
   success: "A control in the success tone.",
   warning: "A control in the warning tone.",
   sharing: "A control marking what is shared off the machine.",
-  burn_danger: "A Danger button, burning.",
+  burn_error: "A Danger button, burning.",
   burn_success: "A Success button, burning.",
   burn_warning: "A Warning button, burning.",
 };

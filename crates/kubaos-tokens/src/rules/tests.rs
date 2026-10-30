@@ -291,13 +291,13 @@ fn a_scale_out_of_order_is_refused() {
 #[test]
 fn a_colour_role_missing_from_a_mode_is_refused() {
     let found = violations(|t| {
-        table(t, &["color", "light"]).remove("warning");
+        table(t, &["color", "light"]).remove("logo_core_warm");
     });
 
     assert_eq!(
         found,
         [Violation::RoleMissing {
-            role: "warning".into(),
+            role: "logo_core_warm".into(),
             table: "light"
         }]
     );
@@ -648,7 +648,7 @@ fn an_unlit_tone_is_deeper_at_the_same_hue() {
 
     for (tone, unlit) in [
         ("primary", "primary_unlit"),
-        ("error", "error_unlit"),
+        ("burn_error", "error_unlit"),
         ("cold", "cold_unlit"),
     ] {
         let (tone, unlit) = (Oklch::of(dark[tone]), Oklch::of(dark[unlit]));
@@ -694,8 +694,8 @@ fn a_label_fitted_on_its_fills_holds_on_every_one() {
         for (label, fills) in [
             ("on_primary_fill", &["primary_fill", "primary_fill_pressed"][..]),
             (
-                "on_burn_danger",
-                &["burn_danger", "burn_danger_lit", "burn_danger_pressed"][..],
+                "on_burn_error",
+                &["burn_error", "burn_error_lit", "burn_error_pressed"][..],
             ),
             (
                 "on_burn_warning",
@@ -714,7 +714,7 @@ fn a_label_fitted_on_its_fills_holds_on_every_one() {
 fn a_fixed_tone_written_in_oklch_is_fitted_into_srgb() {
     let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
 
-    let danger = Oklch::of(tokens.color.dark["burn_danger"]);
+    let danger = Oklch::of(tokens.color.dark["burn_error"]);
 
     assert!(
         (danger.l - 0.66).abs() < 0.005 && (danger.h - 27.0).abs() < 1.0,

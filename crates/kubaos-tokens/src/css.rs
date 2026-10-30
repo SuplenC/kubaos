@@ -241,7 +241,10 @@ fn motion(out: &mut Css, tokens: &Tokens) {
 /// The colour roles of one palette, and the shadows' opacities in that mode.
 fn mode(out: &mut Css, tokens: &Tokens, palette: &BTreeMap<String, Rgb>, mode: Mode) {
     out.comment("The colour roles: the fallback palette, matugen's colours for the default wallpaper.");
-    for (role, rgb) in palette {
+    for (role, rgb) in palette
+        .iter()
+        .filter(|(role, _)| !tokens.color.derived.contains_key(*role))
+    {
         out.var(&format!("color-{role}"), format!("{rgb:?}"));
     }
     out.comment("The derived roles that are a tone mixed toward white or black, computed from their tone wherever");

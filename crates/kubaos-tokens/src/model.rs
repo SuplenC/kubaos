@@ -364,10 +364,13 @@ pub struct Symbol {
 pub struct Colors {
     /// The matugen colour each role is read from; empty for a role of our own.
     pub source: BTreeMap<String, String>,
+    /// The fallback palettes. A role of our own given by a recipe has its value here too once the
+    /// tokens are read ([`Colors::fill_recipes`]).
     pub dark: BTreeMap<String, Rgb>,
     pub light: BTreeMap<String, Rgb>,
     /// The roles computed from another role, whatever its value in a palette: never a fixed value,
-    /// so they follow the wallpaper.
+    /// so they follow the wallpaper. A role of our own may be one of them instead of a value in
+    /// each palette.
     #[serde(default)]
     pub derived: BTreeMap<String, Derived>,
 }
@@ -535,6 +538,33 @@ impl Derived {
 }
 
 impl Colors {
+    /// Whether `role` is one of ours given by a recipe rather than by a value in each palette.
+    #[must_use]
+    pub fn by_recipe(&self, role: &str) -> bool {
+        self.source.get(role).is_some_and(String::is_empty) && self.derived.contains_key(role)
+    }
+
+    /// Puts each role of ours given by a recipe into both fallback palettes, computed from them,
+    /// so the outputs that draw a palette as values (iced, QML, the terminals) have it.
+    pub fn fill_recipes(&mut self) {
+        let dark = self.with_derived(&self.dark, Mode::Dark);
+        let light = self.with_derived(&self.light, Mode::Light);
+        let roles: Vec<String> = self
+            .source
+            .keys()
+            .filter(|role| self.by_recipe(role))
+            .cloned()
+            .collect();
+        for role in roles {
+            if let Some(&rgb) = dark.get(&role) {
+                self.dark.insert(role.clone(), rgb);
+            }
+            if let Some(&rgb) = light.get(&role) {
+                self.light.insert(role, rgb);
+            }
+        }
+    }
+
     /// `palette`, the colours of `mode`, with the derived roles computed from its own values. A
     /// derived role whose roles the palette lacks, or that reads itself, is left out; `rules`
     /// refuses either.

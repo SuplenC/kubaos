@@ -702,7 +702,8 @@ plymouth_2x_from = 1600
 # (`scripts/dot-theme`, `scheme-fidelity`); these are the fallback, matugen's
 # output for the default wallpaper, `shinjuku/kubaos-neon-sign.jpg`, in each
 # mode. Each role names the matugen colour it comes from; a role with no
-# source is ours and keeps its value whatever the wallpaper.
+# source is ours and keeps its value whatever the wallpaper: a value in each
+# palette, or a recipe in `[color.derived]` over one of ours.
 [color.source]
 primary = "primary"
 on_primary = "on_primary"
@@ -723,10 +724,6 @@ cold = "tertiary"
 on_cold = "on_tertiary"
 cold_container = "tertiary_container"
 on_cold_container = "on_tertiary_container"
-error = "error"
-on_error = "on_error"
-error_container = "error_container"
-on_error_container = "on_error_container"
 surface = "surface"
 on_surface = "on_surface"
 surface_variant = "surface_variant"
@@ -745,31 +742,40 @@ scrim = "scrim"
 inverse_surface = "inverse_surface"
 inverse_on_surface = "inverse_on_surface"
 inverse_primary = "inverse_primary"
-# Amber, between fine and the error colour: a reading close to its limit.
-# Material 3 has no such role.
+# The fixed palette: ours, the same whatever the wallpaper, so one meaning has one colour on
+# every desktop. Each meaning has a burning tone, decided in OKLCH and fitted into sRGB at its hue
+# and lightness: neon-bright at night, deeper by day. A Danger, Success or Warning button burns on
+# its tone, always lit, so it can't be taken for any wallpaper's accent, even one of the same hue
+# (`docs/DESIGN.md`, "States"). Every other role carrying the meaning is a recipe over the tone
+# (`[color.derived]`): its text role, its core and its unlit form.
+#
+# Red: something failed, or the action that destroys something. Material 3's error is the same
+# pastel for every wallpaper, which reads rose beside the Danger button's red and is a red
+# wallpaper's primary's twin, so the error family is ours too.
+burn_error = ""
+error = ""
+on_error = ""
+error_container = ""
+on_error_container = ""
+# Green: done and installed.
+burn_success = ""
+success = ""
+# Amber, between fine and an error: a reading close to its limit, an action with a cost.
+burn_warning = ""
 warning = ""
-# Violet: anything shared off the machine, the screen above all. Its tube marks
-# what is being shared, with `sharing_core` along its middle as `primary_core`
-# runs along the accent's.
+# Violet: anything shared off the machine, the screen above all. Its tube marks what is being
+# shared, with `sharing_core` along its middle as `primary_core` runs along the accent's.
+burn_sharing = ""
 sharing = ""
+# The privacy dots: a microphone that is listening, in an orange clear of the warning's amber and
+# the error's red, and a camera that is watching, in done's green.
+burn_microphone = ""
+microphone = ""
+camera = ""
 # The logo's own cores, along the middles of the クバ mark's warm and cold tubes
 # (`[neon.mark]`): brand art, paler than a control's, and the same in both modes.
 logo_core_warm = ""
 logo_core_cold = ""
-# The privacy dots: a microphone that is listening, a camera that is watching.
-# Each keeps its colour whatever the wallpaper, so the dot means the same on
-# every desktop.
-microphone = ""
-camera = ""
-# Done and installed: the camera's green, one value for both.
-success = ""
-# The burning kinds' fixed tones: a Danger, Success or Warning button's fill,
-# always lit, so it can't be taken for any wallpaper's accent, even one of the
-# same hue (`docs/DESIGN.md`, "States"). Decided in OKLCH and fitted into sRGB
-# at their hue and lightness.
-burn_danger = ""
-burn_success = ""
-burn_warning = ""
 
 [color.dark]
 primary = "#ffb779"
@@ -788,10 +794,6 @@ cold = "#85cfff"
 on_cold = "#00344c"
 cold_container = "#0f9ad6"
 on_cold_container = "#000000"
-error = "#ffb4ab"
-on_error = "#690005"
-error_container = "#93000a"
-on_error_container = "#ffdad6"
 surface = "#19120b"
 on_surface = "#f0dfd4"
 surface_variant = "#544436"
@@ -810,18 +812,15 @@ scrim = "#000000"
 inverse_surface = "#f0dfd4"
 inverse_on_surface = "#382f27"
 inverse_primary = "#8e4e00"
-warning = "#f2c14e"
-sharing = "#c9a7ff"
 logo_core_warm = "#ffe6cf"
 logo_core_cold = "#dcf1ff"
-microphone = "#ff9f45"
-camera = "#5fd27a"
-success = "#5fd27a"
-# Bright neon at night. Success's chroma is a step under the 0.21 that read
-# too loud.
-burn_danger = "oklch(0.66 0.25 27)"
+# The fixed palette's tones at night: neon-bright. Success's chroma is a step
+# under the 0.21 that read too loud.
+burn_error = "oklch(0.66 0.25 27)"
 burn_success = "oklch(0.74 0.18 150)"
 burn_warning = "oklch(0.85 0.17 88)"
+burn_sharing = "oklch(0.68 0.21 300)"
+burn_microphone = "oklch(0.74 0.19 55)"
 
 [color.light]
 primary = "#8b4c00"
@@ -840,10 +839,6 @@ cold = "#00628b"
 on_cold = "#ffffff"
 cold_container = "#007caf"
 on_cold_container = "#ffffff"
-error = "#ba1a1a"
-on_error = "#ffffff"
-error_container = "#ffdad6"
-on_error_container = "#410002"
 surface = "#fff8f5"
 on_surface = "#221a13"
 surface_variant = "#f7decc"
@@ -862,20 +857,15 @@ scrim = "#000000"
 inverse_surface = "#382f27"
 inverse_on_surface = "#ffeee2"
 inverse_primary = "#ffb779"
-# Amber dark enough for text on the light surfaces (6.1:1 on `surface`).
-warning = "#7a5900"
-# Dark enough for text on every light surface, the highest container the
-# narrowest: sharing 5.2:1 there, microphone and camera 4.7:1.
-sharing = "#6b3fc4"
 logo_core_warm = "#ffe6cf"
 logo_core_cold = "#dcf1ff"
-microphone = "#a04a00"
-camera = "#1b7131"
-success = "#1b7131"
-# By day: deeper, so a fill reads on the light surfaces with nothing glowing.
-burn_danger = "oklch(0.56 0.21 27)"
+# The fixed palette's tones by day: deeper, so a fill reads on the light
+# surfaces with nothing glowing.
+burn_error = "oklch(0.56 0.21 27)"
 burn_success = "oklch(0.62 0.16 150)"
 burn_warning = "oklch(0.84 0.16 85)"
+burn_sharing = "oklch(0.52 0.22 300)"
+burn_microphone = "oklch(0.70 0.18 55)"
 
 # The roles computed from a tone, whichever palette is drawn. None is a fixed
 # value: each is a recipe over the live tone, the wallpaper's where it sets one,
@@ -893,8 +883,10 @@ burn_warning = "oklch(0.84 0.16 85)"
 #
 # A role that is only a `mix`, the same in both modes, is a formula every
 # output computes (`color-mix` in CSS, `Tokens.towardWhite` in QML,
-# `color::derived` in iced). The rest are the state model's: the mockups' CSS
-# computes them; the iced and QML outputs don't build them yet.
+# `color::derived` in iced). A role of ours given by a recipe reaches iced and
+# QML as a value, computed from the fallback palettes. The rest are the state
+# model's: the mockups' CSS computes them; the iced and QML outputs don't build
+# them yet.
 #
 # The states (`docs/DESIGN.md`, "States"): rest, lit (hovered or focused, one
 # state), pressed and disabled. At night a control rests unlit and lights up;
@@ -904,23 +896,42 @@ burn_warning = "oklch(0.84 0.16 85)"
 # glow and the label at its rest colour. Each `_glass` role is by day the
 # daylight lit line, so the signs-off look and daylight lit are one look.
 [color.derived]
+# The fixed palette's text roles: each burning tone, its lightness moved only as
+# far as it takes to hold 4.5:1 on every surface text sits on. By night the
+# neon tones mostly hold as they are; by day each darkens at its own hue.
+error = { from = "burn_error", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
+success = { from = "burn_success", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
+warning = { from = "burn_warning", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
+sharing = { from = "burn_sharing", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
+microphone = { from = "burn_microphone", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
+# The watching camera's dot is done's green: one green for the palette.
+camera = { from = "success" }
+# The rest of the error family, from the same tone: a container that is the
+# tone deep at night and pale by day, and the labels fitted to the error and
+# to its container.
+on_error = { dark = { from = "burn_error", lightness = 0.25, text_on = ["error"] }, light = { mix = "burn_error", white = 1.0 } }
+error_container = { dark = { from = "burn_error", lightness = 0.5, chroma = 1.2 }, light = { from = "burn_error", at_lightness = 0.93 } }
+on_error_container = { dark = { mix = "burn_error", white = 0.85, text_on = ["error_container"] }, light = { from = "burn_error", lightness = 0.4, text_on = ["error_container"] } }
+
 # A tone's core, the white-hot line along the middle of a lit tube: half way
 # to white.
 primary_core = { mix = "primary", white = 0.5 }
 cold_core = { mix = "cold", white = 0.5 }
-error_core = { mix = "error", white = 0.5 }
-success_core = { mix = "success", white = 0.5 }
-warning_core = { mix = "warning", white = 0.5 }
-sharing_core = { mix = "sharing", white = 0.5 }
+error_core = { mix = "burn_error", white = 0.5 }
+success_core = { mix = "burn_success", white = 0.5 }
+warning_core = { mix = "burn_warning", white = 0.5 }
+sharing_core = { mix = "burn_sharing", white = 0.5 }
+microphone_core = { mix = "burn_microphone", white = 0.5 }
 # A tone unlit: deep, not pale, at 60% of its lightness and 1.2 times its
 # chroma, as far as sRGB holds it. On hues already at the gamut's edge there
 # (cyan, green, yellow) that is the most saturated fill the lightness allows.
 primary_unlit = { from = "primary", lightness = 0.6, chroma = 1.2 }
 cold_unlit = { from = "cold", lightness = 0.6, chroma = 1.2 }
-error_unlit = { from = "error", lightness = 0.6, chroma = 1.2 }
-success_unlit = { from = "success", lightness = 0.6, chroma = 1.2 }
-warning_unlit = { from = "warning", lightness = 0.6, chroma = 1.2 }
-sharing_unlit = { from = "sharing", lightness = 0.6, chroma = 1.2 }
+error_unlit = { from = "burn_error", lightness = 0.6, chroma = 1.2 }
+success_unlit = { from = "burn_success", lightness = 0.6, chroma = 1.2 }
+warning_unlit = { from = "burn_warning", lightness = 0.6, chroma = 1.2 }
+sharing_unlit = { from = "burn_sharing", lightness = 0.6, chroma = 1.2 }
+microphone_unlit = { from = "burn_microphone", lightness = 0.6, chroma = 1.2 }
 
 # Filled. At night the fill stays unlit, resting, lit and pressed, and the
 # letters light: near white, tinted 18% with the tone at rest and 8% lit. Lit
@@ -960,11 +971,11 @@ primary_lit = { dark = { from = "primary_core", text_on = ["surface", "surface_c
 # 0.035 darker with a dark line inside the edge, the tone at 60% of its
 # lightness, and pressed is 0.06 darker. With the signs off the line is the
 # tone unlit, glass on the bright fill.
-burn_danger_lit = { dark = { mix = "burn_danger", white = 0.25 }, light = { from = "burn_danger", darker = 0.035 } }
-burn_danger_pressed = { dark = { mix = "burn_danger_lit", white = 0.08 }, light = { from = "burn_danger", darker = 0.06 } }
-burn_danger_line = { dark = { mix = "burn_danger", white = 0.5 }, light = { from = "burn_danger", lightness = 0.6 } }
-burn_danger_glass = { dark = { from = "burn_danger", lightness = 0.6, chroma = 1.2 }, light = { from = "burn_danger_line" } }
-on_burn_danger = { from = "burn_danger", lightness = 0.25, text_on = ["burn_danger", "burn_danger_lit", "burn_danger_pressed"] }
+burn_error_lit = { dark = { mix = "burn_error", white = 0.25 }, light = { from = "burn_error", darker = 0.035 } }
+burn_error_pressed = { dark = { mix = "burn_error_lit", white = 0.08 }, light = { from = "burn_error", darker = 0.06 } }
+burn_error_line = { dark = { mix = "burn_error", white = 0.5 }, light = { from = "burn_error", lightness = 0.6 } }
+burn_error_glass = { dark = { from = "burn_error", lightness = 0.6, chroma = 1.2 }, light = { from = "burn_error_line" } }
+on_burn_error = { from = "burn_error", lightness = 0.25, text_on = ["burn_error", "burn_error_lit", "burn_error_pressed"] }
 burn_success_lit = { dark = { mix = "burn_success", white = 0.25 }, light = { from = "burn_success", darker = 0.035 } }
 burn_success_pressed = { dark = { mix = "burn_success_lit", white = 0.08 }, light = { from = "burn_success", darker = 0.06 } }
 burn_success_line = { dark = { mix = "burn_success", white = 0.5 }, light = { from = "burn_success", lightness = 0.6 } }
@@ -1019,9 +1030,9 @@ pairs = [
   { fg = "primary_lit", bg = "surface_container_low", need = "text", use = "A Text button's label lit or pressed, in a well" },
   { fg = "primary_lit", bg = "surface_container", need = "text", use = "A Text button's label lit or pressed, on a panel" },
   { fg = "primary_lit", bg = "surface_container_high", need = "text", use = "A Text button's label lit or pressed, in a card or a dialog" },
-  { fg = "on_burn_danger", bg = "burn_danger", need = "text", use = "A Danger button's label at rest" },
-  { fg = "on_burn_danger", bg = "burn_danger_lit", need = "text", use = "A Danger button's label, lit" },
-  { fg = "on_burn_danger", bg = "burn_danger_pressed", need = "text", use = "A Danger button's label, pressed" },
+  { fg = "on_burn_error", bg = "burn_error", need = "text", use = "A Danger button's label at rest" },
+  { fg = "on_burn_error", bg = "burn_error_lit", need = "text", use = "A Danger button's label, lit" },
+  { fg = "on_burn_error", bg = "burn_error_pressed", need = "text", use = "A Danger button's label, pressed" },
   { fg = "on_burn_success", bg = "burn_success", need = "text", use = "A Success button's label at rest" },
   { fg = "on_burn_success", bg = "burn_success_lit", need = "text", use = "A Success button's label, lit" },
   { fg = "on_burn_success", bg = "burn_success_pressed", need = "text", use = "A Success button's label, pressed" },
@@ -1128,10 +1139,10 @@ pairs = [
 # focus core, the line inside a filled control's edge; the unlit tones
 # (`primary_unlit` and the rest), a tube at rest; and a lit control's line by
 # day and night, signs on or off (`primary_fill_line`, `primary_fill_glass`,
-# `primary_glass`, `burn_danger_line`, `burn_danger_glass` and the rest), which
+# `primary_glass`, `burn_error_line`, `burn_error_glass` and the rest), which
 # marks the state its fill and label already show. `kubaos-design contrast`
 # fails on a role drawn with that is in no pair and not here.
-decorative = ["burn_danger_glass", "burn_danger_line", "burn_success_glass", "burn_success_line", "burn_warning_glass", "burn_warning_line", "cold_container", "cold_core", "cold_unlit", "error_core", "error_unlit", "logo_core_cold", "logo_core_warm", "outline_variant", "primary_core", "primary_fill_glass", "primary_fill_line", "primary_glass", "primary_unlit", "scrim", "shadow", "sharing_core", "sharing_unlit", "success_core", "success_unlit", "surface_bright", "warning_core", "warning_unlit"]
+decorative = ["burn_error_glass", "burn_error_line", "burn_success_glass", "burn_success_line", "burn_warning_glass", "burn_warning_line", "cold_container", "cold_core", "cold_unlit", "error_core", "error_unlit", "logo_core_cold", "logo_core_warm", "microphone_core", "microphone_unlit", "outline_variant", "primary_core", "primary_fill_glass", "primary_fill_line", "primary_glass", "primary_unlit", "scrim", "shadow", "sharing_core", "sharing_unlit", "success_core", "success_unlit", "surface_bright", "warning_core", "warning_unlit"]
 
 # The terminals, Ghostty and foot, and every TUI drawn in them: tmux, Neovim,
 # btop, lazygit, bat, fzf, oh-my-posh, fastfetch. `kubaos-tokens` writes
