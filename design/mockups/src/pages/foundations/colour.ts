@@ -98,7 +98,7 @@ const PALETTE: readonly {
     text: "recording",
     core: "recording_core",
     unlit: "recording_unlit",
-    for: "Crimson, a step cooler and darker than the error's red: the privacy dot of anything recording, the camera watching or the screen being recorded, and its words.",
+    for: "Pure red at night, the REC light, a step deeper and purer than the error's red: the privacy dot of anything recording, the camera watching or the screen being recorded, and its words.",
     shows: "Recording",
   },
 ];
