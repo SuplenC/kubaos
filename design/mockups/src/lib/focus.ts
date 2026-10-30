@@ -29,7 +29,7 @@ const rings = new Set<HTMLElement>();
  * The tone a focus tube lights in: the control's own, or the accent for one with none; a burning
  * kind's is its fixed tone (`docs/DESIGN.md`, "States").
  */
-export type Tone = "accent" | "cold" | "error" | "success" | "warning" | "sharing" | "burn_danger" | "burn_success" | "burn_warning";
+export type Tone = "accent" | "cold" | "error" | "success" | "warning" | "sharing" | "burn_error" | "burn_success" | "burn_warning";
 
 /**
  * The colour role a tone's tube and glow are drawn in; its core is the role's `_core` with the signs

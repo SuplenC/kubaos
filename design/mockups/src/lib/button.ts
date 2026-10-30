@@ -101,7 +101,7 @@ export const COLOURS: Record<Kind, Colours> = {
     line: "primary",
     lineOff: "primary_glass",
   },
-  Danger: burning("burn_danger"),
+  Danger: burning("burn_error"),
   Success: burning("burn_success"),
   Warning: burning("burn_warning"),
 };
@@ -126,7 +126,7 @@ export const TONES: Record<Kind, Tone> = {
   Filled: "accent",
   Tonal: "accent",
   Text: "accent",
-  Danger: "burn_danger",
+  Danger: "burn_error",
   Success: "burn_success",
   Warning: "burn_warning",
 };

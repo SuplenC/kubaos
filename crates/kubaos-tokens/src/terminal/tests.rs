@@ -44,7 +44,7 @@ fn a_role_of_our_own_is_written_out_for_each_mode() {
 
     let text = template(&tokens, role("warning"), Mode::Current, Form::Bare);
 
-    assert_eq!(text, "<* if {{ is_dark_mode }} *>f2c14e<* else *>7a5900<* endif *>");
+    assert_eq!(text, "<* if {{ is_dark_mode }} *>fcc618<* else *>806000<* endif *>");
 }
 
 #[test]
