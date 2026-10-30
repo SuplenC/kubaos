@@ -51,7 +51,7 @@ fn roles(c: &Colors) -> Vec<(&'static str, Color)> {
         ("success", c.success),
         ("sharing", c.sharing),
         ("microphone", c.microphone),
-        ("camera", c.camera),
+        ("recording", c.recording),
         ("surface", c.surface),
         ("on_surface", c.on_surface),
         ("on_surface_variant", c.on_surface_variant),

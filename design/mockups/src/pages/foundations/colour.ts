@@ -93,13 +93,13 @@ const PALETTE: readonly {
     shows: "Microphone on",
   },
   {
-    meaning: "Camera",
-    tone: "burn_success",
-    text: "camera",
-    core: "success_core",
-    unlit: "success_unlit",
-    for: "The privacy dot of a camera that is watching, and its words: done's green, one green for the palette.",
-    shows: "Camera on",
+    meaning: "Recording",
+    tone: "burn_recording",
+    text: "recording",
+    core: "recording_core",
+    unlit: "recording_unlit",
+    for: "Crimson, a step cooler and darker than the error's red: the privacy dot of anything recording, the camera watching or the screen being recorded, and its words.",
+    shows: "Recording",
   },
 ];
 
@@ -485,7 +485,7 @@ export default foundation({
   live: () => painted(settings().theme, settings().mode, scene()),
   description: [
     "Code names a role (`primary`, `on_surface`, `surface_container_high`), never a colour. Matugen sets every role it has a source for from the wallpaper (`scheme-fidelity`), so `primary` and `cold` and everything around them are dynamic: the hex values here are a theme's, never the role's. The tokens' palettes are matugen's for the default wallpaper, the Neon sign theme; the toolbar paints the page in three others matugen made from seed colours, so nothing is judged in one accent alone.",
-    "The fixed palette is ours and keeps its colours whatever the wallpaper, so a meaning has one colour on every desktop: error, success, warning, sharing, the microphone and the camera. Each meaning has a burning tone, decided in OKLCH and fitted into sRGB at its hue and lightness, neon-bright at night and deeper by day, and the Danger, Success and Warning buttons burn on theirs. Every role carrying the meaning is a recipe over the tone: its text role (`error`, `success` and the rest) the tone with its lightness moved only as far as it takes to hold 4.5:1 on every surface, its core (`_core`) and its unlit form (`_unlit`). The error family's labels and container follow from its tone too, so Material 3's pastel error, the same for every wallpaper, never reaches the screen. The camera's green is success's. The logo keeps its own cores, fixed values only its mark draws.",
+    "The fixed palette is ours and keeps its colours whatever the wallpaper, so a meaning has one colour on every desktop: error, success, warning, sharing, the microphone and recording. Each meaning has a burning tone, decided in OKLCH and fitted into sRGB at its hue and lightness, neon-bright at night and deeper by day, and the Danger, Success and Warning buttons burn on theirs. Every role carrying the meaning is a recipe over the tone: its text role (`error`, `success` and the rest) the tone with its lightness moved only as far as it takes to hold 4.5:1 on every surface, its core (`_core`) and its unlit form (`_unlit`). The error family's labels and container follow from its tone too, so Material 3's pastel error, the same for every wallpaper, never reaches the screen. The logo keeps its own cores, fixed values only its mark draws.",
     "Everything that follows from a tone is a derived role (`[color.derived]`), a recipe over the live tone, never a value, so it follows the wallpaper. A lit tube's core is its tone 50% toward white (`_core`); the tone unlit is its OKLCH lightness × 0.6 and chroma × 1.2 (`_unlit`), a deep, rich colour, not a greyed one. Each button kind's fills, labels and lines build on them: Filled's unlit fill is `primary_unlit`, its pressed fill 0.035 lighter, its signs-off glass 0.12 lighter; by day its fill is the tone at lightness 0.80. A recipe that moves lightness or chroma is fitted back into sRGB by lowering its chroma alone, so the hue and lightness hold, and a label's recipe fits its lightness until it holds 4.5:1 on every fill it sits on. `primary`, and so every role built on it, comes from the wallpaper: here each is drawn in every theme the toolbar paints in.",
     "An opacity lays a role over another: the state layers, disabled content, scrims, glass. A component never picks its own alpha. Every foreground drawn on a background is a listed pair that holds WCAG 2.1 AA: 4.5:1 for text, 3:1 for large text and for marks that carry meaning.",
   ],

@@ -108,8 +108,8 @@ fn the_fallback_palettes_meet_the_contrast_minimums() {
                 Contrast::Text,
             ),
             (
-                "camera on surface_container_highest",
-                c.camera,
+                "recording on surface_container_highest",
+                c.recording,
                 c.surface_container_highest,
                 Contrast::Text,
             ),
