@@ -80,14 +80,6 @@
   padding: calc((var(--height) - var(--line)) / 2) var(--padding);
   border-radius: var(--radius-control);
   cursor: pointer;
-  --lit-fill: color-mix(in srgb, var(--fill-off), var(--fill-lit) calc(var(--signs) * 100%));
-  background: color-mix(
-    in srgb,
-    color-mix(in srgb, var(--fill), var(--lit-fill) calc(var(--lit) * 100%)),
-    var(--fill-pressed) calc(var(--press) * 100%)
-  );
-  --lit-label: color-mix(in srgb, var(--label-off), var(--label-lit) calc(var(--signs) * 100%));
-  --shown: color-mix(in srgb, var(--label), var(--lit-label) calc(var(--lit) * 100%));
 }
 
 /* An icon button: a circle as tall as the label button of its size, its symbol centred on a whole
@@ -451,6 +443,101 @@
 
 .k-check:disabled .k-check-box::before {
   opacity: 0;
+}
+
+/* A chip (`lib/chip.ts`): `size.chip` tall at the control radius, a pill; its label starts where
+   the curve ends, an icon sits closer in, and a close button ends it with no padding after. Its
+   content is centred down it: every part is an even number of device pixels shorter than the chip
+   at every scale. Its colours are its kind's (`.k-kind`); pressed by day, a chip with no fill of
+   its tone's own takes its tone as a faint tint, as a Text button does. Disabled, it is grey. */
+.k-chip {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  box-sizing: border-box;
+  height: var(--size-chip);
+  padding: 0 var(--space-s12);
+  border-radius: var(--radius-control);
+  outline: none;
+  --tint: rgb(from var(--tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+.k-chip > .k-row {
+  align-items: center;
+}
+
+.k-chip[data-icon] {
+  padding-left: var(--space-s8);
+}
+
+.k-chip[data-removable] {
+  padding-right: 0;
+}
+
+.k-chip.k-control {
+  cursor: pointer;
+}
+
+.k-chip.k-control[data-hot] {
+  background-image: linear-gradient(var(--tint), var(--tint));
+}
+
+.k-chip[aria-disabled="true"] {
+  cursor: default;
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --shown: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+/* Its close button: a circle as tall as the chip, its symbol `space.s4` in, which lights as a Text
+   icon button does in the chip's tone: the tube inside its edge, whose curve is the chip's own, or
+   the core on a Filled chip. Over it, the pointer lights the close button alone. */
+.k-chip-close {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--size-chip);
+  height: var(--size-chip);
+  padding: var(--space-s4);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  --tint: rgb(from var(--tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: var(--tint);
+}
+
+.k-chip-close:disabled {
+  cursor: default;
+}
+
+.k-chip.k-control:has(.k-chip-close:is(:hover, :active)):not(:focus-visible, [data-pinned]) {
+  --lit: 0;
+  --press: 0;
+}
+
+/* The same in the check's row, so a label and its box are centred on each other. */
+.k-check > .k-row {
+  align-items: center;
+}
+
+/* A control painted in its kind's roles (a button, an icon button, a chip): its fill and label at
+   rest (`--fill`, `--label`), lit with the signs on (`--fill-lit`, `--label-lit`) and off
+   (`--fill-off`, `--label-off`), and pressed (`--fill-pressed`), crossfaded as it lights, as the
+   signs go off and on, and as it is pressed. `--shown` is the label's colour now. A chip that is
+   no control rests: its signs don't matter. */
+.k-kind {
+  --lit-fill: color-mix(in srgb, var(--fill-off), var(--fill-lit) calc(var(--signs) * 100%));
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--fill), var(--lit-fill) calc(var(--lit) * 100%)),
+    var(--fill-pressed) calc(var(--press) * 100%)
+  );
+  --lit-label: color-mix(in srgb, var(--label-off), var(--label-lit) calc(var(--signs) * 100%));
+  --shown: color-mix(in srgb, var(--label), var(--lit-label) calc(var(--lit) * 100%));
+}
+
+:where(.k-kind:not(.k-control)) {
+  --signs: 0;
 }
 
 /* A control in the state model (`docs/DESIGN.md`, "States"): a button, an icon button, a switch,

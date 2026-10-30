@@ -31,7 +31,7 @@ export function iconButton(options: IconButtonOptions): HTMLButtonElement {
   const size = options.size ?? "Md";
   const style = METRICS[size].label;
   const element = document.createElement("button");
-  element.className = "k-button k-control";
+  element.className = "k-button k-kind k-control";
   element.type = "button";
   element.dataset.iconOnly = "";
   element.disabled = options.disabled ?? false;
