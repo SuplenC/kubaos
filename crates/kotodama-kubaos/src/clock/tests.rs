@@ -40,6 +40,15 @@ fn a_date_query_is_answered_in_the_top_row() {
 }
 
 #[test]
+fn the_answer_is_found_by_its_question_so_it_ranks_above_the_calculators() {
+    let (_dir, mut dates) = dates("");
+
+    let result = dates.live("  days until christmas ", &now()).expect("an answer");
+
+    assert_eq!(result.item.keywords, ["days until christmas"]);
+}
+
+#[test]
 fn other_queries_and_lone_words_are_left_to_the_search() {
     let (_dir, mut dates) = dates("");
 

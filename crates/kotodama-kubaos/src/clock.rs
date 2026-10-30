@@ -123,7 +123,11 @@ fn live_result(query: &str, answer: &Answer) -> LiveResult {
             subtitle: Some(answer.detail.clone()),
             icon: Some("x-office-calendar".into()),
             keyword: None,
-            keywords: vec![],
+            // Kotodama's calculator answers date queries too, its answer found by the question in
+            // its subtitle, a match inside a word. The question as a keyword is a word start, a
+            // Tier above, so of the two answers the clock's, which knows the countdowns and the
+            // popup's holidays, takes the top row.
+            keywords: vec![query.to_owned()],
             hidden: false,
             app_only: false,
             weak_keywords: Vec::new(),
