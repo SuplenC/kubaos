@@ -1,6 +1,6 @@
 // The neon focus on a control: `kubaos-ui`'s `focus_ring` and `focus_ring_on_fill`. The tube is the
-// control's own edge, drawn inside its box; a control filled with the focus colour shows the tube's
-// hot core just outside its fill instead. The glow is `glow` at the middle of every device pixel
+// control's own edge, drawn inside its box, in the control's tone, and the glow is that tone too; a
+// control filled with its tone's colour shows the tone's hot core just outside its fill instead. The glow is `glow` at the middle of every device pixel
 // out from the edge, as `kubaos_ui::focus::rings` lays its bands to give. Nothing of it takes
 // layout room.
 //
@@ -13,6 +13,17 @@ import { settings } from "../site/settings.ts";
 import { length, number } from "./tokens.ts";
 
 const rings = new Set<HTMLElement>();
+
+/**
+ * The tone a focus tube lights in: the control's own, or the accent for one with none
+ * (`docs/DESIGN.md`, "Focus").
+ */
+export type Tone = "accent" | "cold" | "error" | "success" | "warning" | "sharing";
+
+/** The colour role a tone's tube and glow are drawn in; its core is the role's `_core`. */
+export function toneColour(tone: Tone): string {
+  return tone === "accent" ? "primary" : tone;
+}
 
 /** The glow's opacity `d` logical pixels outside the tube: the near glow and the far one. */
 export function glow(d: number): number {
@@ -65,14 +76,16 @@ function draw(ring: HTMLElement, scale: number): void {
 }
 
 /**
- * Adds the focus ring to `control`, whose corner is the radius token `corner`; `filled` for a
- * control filled with the focus colour. Its glow is drawn once the control is laid out.
+ * Adds the focus ring in `tone` to `control`, whose corner is the radius token `corner`; `filled`
+ * for a control filled with its tone's colour. Its glow is drawn once the control is laid out.
  */
-export function focusRing(control: HTMLElement, corner: string, filled: boolean): void {
+export function focusRing(control: HTMLElement, corner: string, tone: Tone, filled: boolean): void {
   const ring = document.createElement("span");
   ring.className = "k-ring";
   ring.toggleAttribute("data-filled", filled);
   ring.style.setProperty("--corner", `var(--radius-${corner})`);
+  ring.style.setProperty("--tube", `var(--color-${toneColour(tone)})`);
+  ring.style.setProperty("--core", `var(--color-${toneColour(tone)}_core)`);
   ring.setAttribute("aria-hidden", "true");
   const glowing = document.createElement("span");
   glowing.className = "k-glow";

@@ -10,6 +10,7 @@ import { matrix } from "./parts/matrix.ts";
 import { measures } from "./parts/measures.ts";
 import { motion } from "./parts/motion.ts";
 import { partOr, section, subheading } from "./parts/section.ts";
+import { tubes } from "./parts/tubes.ts";
 import { variants } from "./parts/variants.ts";
 
 export function render(page: Page): HTMLElement[] {
@@ -28,7 +29,7 @@ export function render(page: Page): HTMLElement[] {
       subheading("Sizes"),
       partOr(page.sizes, variants),
     ),
-    section("States", matrix(page.states)),
+    section("States", matrix(page.states), subheading("The focus tube"), partOr(page.focus, tubes)),
     section("Content", content(page.content)),
     section("Motion", motion(page.motion)),
     section("Keyboard", partOr(page.keyboard, keyboard)),

@@ -2,7 +2,7 @@
 // by what it is for, three sizes; an optional icon leads the label, or trails it on a button that
 // goes forward. Its measures are the specimens' (`docs/design/components/button.md`).
 
-import { focusRing } from "./focus.ts";
+import { focusRing, type Tone, toneColour } from "./focus.ts";
 import { icon } from "./icon.ts";
 import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe, variant } from "./probe.ts";
@@ -41,6 +41,22 @@ export const COLOURS: Record<Kind, { fill: string | null; content: string }> = {
   Text: { fill: null, content: "primary" },
   Danger: { fill: "error", content: "on_error" },
 };
+
+/** The tone each kind's focus tube lights in: a Danger button's is red, the others the accent. */
+export const TONES: Record<Kind, Tone> = {
+  Filled: "accent",
+  Tonal: "accent",
+  Text: "accent",
+  Danger: "error",
+};
+
+/**
+ * Whether a kind is filled with its tone's colour, so its fill is the tube and the tone's core
+ * rides outside it.
+ */
+export function filledWithTone(kind: Kind): boolean {
+  return COLOURS[kind].fill === toneColour(TONES[kind]);
+}
 
 export interface ButtonOptions {
   readonly label: string;
@@ -86,7 +102,7 @@ export function button(options: ButtonOptions): HTMLButtonElement {
   const layer = document.createElement("span");
   layer.className = "k-layer";
   element.append(layer, row(m.gap, "start", ...children));
-  focusRing(element, "control", kind === "Filled");
+  focusRing(element, "control", TONES[kind], filledWithTone(kind));
   const placement = !options.icon ? "" : options.trailing ? "trailing-icon" : "leading-icon";
   return probe(element, { role: "component", name: "Button", variant: variant(kind, size, placement), fixed: FIXED_HEIGHT });
 }

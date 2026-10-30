@@ -707,6 +707,12 @@ warning = ""
 # logo's own (branding/make.py). Light is emitted, so it is the same in both modes.
 primary_core = ""
 cold_core = ""
+# The cores of the tubes in the other tones, which a focus tube takes on a control of that
+# tone: each its tone's dark value 65% of the way to white, as `primary_core` is of the dark
+# `primary`, so every core is as white-hot as the logo's.
+error_core = ""
+success_core = ""
+warning_core = ""
 # Violet: anything shared off the machine, the screen above all. Its tube marks
 # what is being shared, with `sharing_core` along its middle as `primary_core`
 # runs along the accent's.
@@ -762,6 +768,9 @@ inverse_primary = "#8e4e00"
 warning = "#f2c14e"
 primary_core = "#ffe6cf"
 cold_core = "#dcf1ff"
+error_core = "#ffe5e2"
+success_core = "#c7efd0"
+warning_core = "#fae9c1"
 sharing = "#c9a7ff"
 sharing_core = "#e9dbff"
 microphone = "#ff9f45"
@@ -811,6 +820,9 @@ inverse_primary = "#ffb779"
 warning = "#7a5900"
 primary_core = "#ffe6cf"
 cold_core = "#dcf1ff"
+error_core = "#ffe5e2"
+success_core = "#c7efd0"
+warning_core = "#fae9c1"
 # Dark enough for text on every light surface, the highest container the
 # narrowest: sharing 5.2:1 there, microphone and camera 4.7:1.
 sharing = "#6b3fc4"
@@ -943,11 +955,12 @@ pairs = [
 # them: no pair is needed. `outline_variant`, dividers and soft edges;
 # `shadow` and `scrim`;
 # `cold_container` and `surface_bright`, the segments of Kōbō's partition bar,
-# which its legend names; `primary_core`, `cold_core` and `sharing_core`, the
-# hot middle of a neon tube, drawn on the tube, and the focus core outside a
-# filled control, beside the fill it lights. `kubaos-design contrast` fails on
+# which its legend names; the cores (`primary_core`, `cold_core`, `sharing_core`,
+# `error_core`, `success_core`, `warning_core`), the hot middle of a neon tube,
+# drawn on the tube, and the focus core outside a filled control, beside the fill
+# it lights. `kubaos-design contrast` fails on
 # a role drawn with that is in no pair and not here.
-decorative = ["cold_container", "cold_core", "outline_variant", "primary_core", "scrim", "shadow", "sharing_core", "surface_bright"]
+decorative = ["cold_container", "cold_core", "error_core", "outline_variant", "primary_core", "scrim", "shadow", "sharing_core", "success_core", "surface_bright", "warning_core"]
 
 # The terminals, Ghostty and foot, and every TUI drawn in them: tmux, Neovim,
 # btop, lazygit, bat, fzf, oh-my-posh, fastfetch. `kubaos-tokens` writes

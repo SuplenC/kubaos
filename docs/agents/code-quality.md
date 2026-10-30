@@ -70,7 +70,7 @@ KubaOS isn't translated yet, but its text is written so it can be, in every lang
 - **One message per thing said, with placeholders**, never a sentence glued together from pieces: `"{count} snapshots · size unknown"` as one string, not `count + " snapshots" + " · " + "size unknown"`. Word order differs between languages.
 - **A count's word is part of the message**, chosen by the count, never `"snapshot" + (n > 1 ? "s" : "")`: other languages have more than two plural forms.
 - **No text in pictures or icons**, and no meaning carried by a string's position alone.
-- **Text can grow**: translations run up to a third longer, so text fits by wrapping, eliding or the layout giving it room, never by a fixed width chosen for the English string.
+- **Text can grow**: translations run up to 40% longer, so text fits by wrapping, eliding or the layout giving it room, never by a fixed width chosen for the English string.
 - **Dates, times and numbers go through the locale's formatting** (`Qt.formatDateTime`, `Number.toLocaleString`, chrono's formatting in Rust), never assembled by hand.
 
 ## Performance comes before style
