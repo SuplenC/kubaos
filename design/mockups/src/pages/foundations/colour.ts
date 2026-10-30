@@ -4,6 +4,7 @@
 
 import { button, KINDS, type Kind } from "../../lib/button.ts";
 import { row, stack } from "../../lib/layout.ts";
+import { nested, role as corner } from "../../lib/radius.ts";
 import { text } from "../../lib/text.ts";
 import { declared, names, number, words } from "../../lib/tokens.ts";
 import { decorative, type Pair, pairs, ratioIn } from "../../site/contrast.ts";
@@ -292,6 +293,7 @@ function opacities(): HTMLElement {
       const short = name.slice("opacity-".length);
       const use = OPACITY_FOR[short];
       const layer = el("div", "f-layer", el("div", "", el("div", "")));
+      layer.style.setProperty("--nested", nested(corner("control"), "s8").css);
       layer.style.setProperty("--under", `var(--color-${use?.under ?? "surface"})`);
       layer.style.setProperty("--over", `var(--color-${use?.over ?? "on_surface"})`);
       layer.style.setProperty("--alpha", `var(--${name})`);
