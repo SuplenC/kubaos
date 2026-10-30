@@ -17,6 +17,7 @@ use std::path::Path;
 use crate::model::Family;
 use crate::model::Rgb;
 use crate::model::Tokens;
+use crate::model::Toward;
 use crate::model::TypeStyle;
 use crate::model::Weight;
 use crate::target::Kept;
@@ -167,6 +168,9 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
     out.line("/// room (a wallpaper thumbnail in its grid cell), in logical pixels. A scroll is not held to it:");
     out.line("/// it reaches past its box as far as the far glow.");
     out.line(format!("pub const FOCUS_OFFSET: u16 = {};", focus.offset));
+    out.blank();
+    out.line("/// In daylight, the opacity of an unlit tube's glass over its control's container.");
+    out.line(format!("pub const FOCUS_GLASS: f32 = {:?};", focus.glass));
     out.blank();
     out.line("/// A neon tube striking: its brightness, 0 to 1, through even steps over `medium`.");
     out.line(format!(
@@ -783,14 +787,26 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
     out.line("    pub tone: Role,");
     out.line("    pub white: f32,");
     out.line("}");
+    out.blank();
+    out.line("/// A role computed from another role of whichever palette is drawn, so it follows the wallpaper:");
+    out.line("/// `tone` taken `black` of the way to black.");
+    out.line("#[derive(Debug, Clone, Copy, PartialEq)]");
+    out.line("pub struct Darkened {");
+    out.line("    pub tone: Role,");
+    out.line("    pub black: f32,");
+    out.line("}");
     for (role, derived) in &colors.derived {
+        let Some((toward, t)) = derived.toward() else { continue };
+        let (kind, field) = match toward {
+            Toward::White => ("Derived", "white"),
+            Toward::Black => ("Darkened", "black"),
+        };
         out.blank();
-        out.line(format!("/// `{}` taken {:?} of the way to white.", derived.mix, derived.white));
+        out.line(format!("/// `{}` taken {t:?} of the way to {field}.", derived.mix));
         out.line(format!(
-            "pub const {}: Derived = Derived {{ tone: Role::{}, white: {:?} }};",
+            "pub const {}: {kind} = {kind} {{ tone: Role::{}, {field}: {t:?} }};",
             role.to_uppercase(),
             camel(&derived.mix),
-            derived.white
         ));
     }
 }

@@ -145,3 +145,10 @@ fn a_core_is_written_as_its_tone_and_how_far_to_white() {
     assert!(module.contains("pub const PRIMARY_CORE: Derived = Derived { tone: Role::Primary, white: 0.5 };"));
     assert!(!module.contains("    primary_core: "), "no palette holds a fixed core");
 }
+
+#[test]
+fn an_unlit_core_is_written_as_its_tone_and_how_far_to_black() {
+    let module = module();
+
+    assert!(module.contains("pub const PRIMARY_UNLIT: Darkened = Darkened { tone: Role::Primary, black: 0.35 };"));
+}

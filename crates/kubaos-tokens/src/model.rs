@@ -90,6 +90,8 @@ pub struct Focus {
     /// The band a picture keeps round itself inside its own box where its neighbours leave no
     /// more room, in logical pixels.
     pub offset: u16,
+    /// In daylight, the opacity of an unlit tube's glass over its control's container.
+    pub glass: f32,
 }
 
 /// A scale of lengths, smallest first.
@@ -354,15 +356,49 @@ pub struct Colors {
     pub derived: BTreeMap<String, Derived>,
 }
 
-/// A role computed from another: `mix` taken `white` of the way to white, each channel rounded
-/// half up.
+/// A role computed from another: `mix` taken `white` of the way to white, or `black` of the way to
+/// black, each channel rounded half up. `rules` refuses one with both or neither.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Derived {
     /// The role it is computed from, one of `source`.
     pub mix: String,
     /// How far toward white, 0 to 1.
-    pub white: f32,
+    #[serde(default)]
+    pub white: Option<f32>,
+    /// How far toward black, 0 to 1.
+    #[serde(default)]
+    pub black: Option<f32>,
+}
+
+/// Which way a derived role moves from its tone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Toward {
+    White,
+    Black,
+}
+
+impl Toward {
+    /// Its name, as the tokens and the outputs write it.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Toward::White => "white",
+            Toward::Black => "black",
+        }
+    }
+}
+
+impl Derived {
+    /// Which way it moves and how far, or `None` for one that names both or neither.
+    #[must_use]
+    pub fn toward(&self) -> Option<(Toward, f32)> {
+        match (self.white, self.black) {
+            (Some(t), None) => Some((Toward::White, t)),
+            (None, Some(t)) => Some((Toward::Black, t)),
+            _ => None,
+        }
+    }
 }
 
 impl Colors {
@@ -371,8 +407,12 @@ impl Colors {
     pub fn with_derived(&self, palette: &BTreeMap<String, Rgb>) -> BTreeMap<String, Rgb> {
         let mut out = palette.clone();
         for (role, derived) in &self.derived {
-            if let Some(&tone) = palette.get(&derived.mix) {
-                out.insert(role.clone(), tone.toward_white(derived.white));
+            if let (Some(&tone), Some((toward, t))) = (palette.get(&derived.mix), derived.toward()) {
+                let rgb = match toward {
+                    Toward::White => tone.toward_white(t),
+                    Toward::Black => tone.toward_black(t),
+                };
+                out.insert(role.clone(), rgb);
             }
         }
         out
@@ -428,6 +468,25 @@ impl Rgb {
                 reason = "Clamped to 0..=255 and rounded first."
             )]
             let byte = (c + (255.0 - c) * t + 0.5).floor().clamp(0.0, 255.0) as u8;
+            byte
+        };
+        Rgb {
+            r: channel(self.r),
+            g: channel(self.g),
+            b: channel(self.b),
+        }
+    }
+
+    /// This colour mixed `t` of the way to black, each channel rounded half up.
+    #[must_use]
+    pub fn toward_black(self, t: f32) -> Rgb {
+        let channel = |c: u8| {
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "Clamped to 0..=255 and rounded first."
+            )]
+            let byte = (f32::from(c) * (1.0 - t) + 0.5).floor().clamp(0.0, 255.0) as u8;
             byte
         };
         Rgb {
