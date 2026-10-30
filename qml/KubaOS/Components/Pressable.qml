@@ -8,6 +8,8 @@ Item {
 
     // Pressed by a click, Enter or Space.
     signal activated
+    // The pointer came onto it, or moved over it, at (x, y) in it.
+    signal pointed(real x, real y)
 
     // A state shown whatever the pointer does, `hovered` or `pressed`: the specimen's view of them.
     property string preview: ""
@@ -51,6 +53,8 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        onEntered: root.pointed(pointer.mouseX, pointer.mouseY)
+        onPositionChanged: mouse => root.pointed(mouse.x, mouse.y)
         onClicked: root.activated()
     }
 }
