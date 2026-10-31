@@ -39,10 +39,10 @@ function caps(): HTMLElement {
 const DESCRIBED =
   "The `keycap` type (Geist Mono 11, medium) in `on_surface_variant` on `surface_container_highest`, a hairline edge in `outline_variant` with a second hairline at the foot so the key stands on the page, at the small radius (`radius.small`). It never lights: no line, no glow.";
 
-const DIFFERENCES = [
-  "Question for Kuba, lit: a keycap never lights. It is a picture of a key, not a control, so it has no line and no glow, by night or by day, and a power change only recolours it. Recommended.",
-  "Question for Kuba, pressed: a keycap doesn't go down when its key is pressed (the Command menu's footer could show it). Recommended: leave it still; what the key does shows the press.",
-  "Question for Kuba, a room in iced: QML's `KeyHints` leaves out a hint that would pass its `room`, with every one after it; iced's `key_hints` has no room and is cut by its container. Recommended: give iced the same room.",
+const DECIDED = [
+  "Decided, lit: a keycap never lights. It is a picture of a key, not a control, so it has no line and no glow, by night or by day, and a power change only recolours it.",
+  "Decided, pressed: a keycap doesn't go down when its key is pressed (the Command menu's footer could show it); it stays still, and what the key does shows the press.",
+  "Decided, a room in iced: QML's `KeyHints` leaves out a hint that would pass its `room`, with every one after it, and iced's `key_hints` takes the same room. Today iced's has none and is cut by its container.",
 ];
 
 export default page({
@@ -56,7 +56,7 @@ export default page({
     DESCRIBED,
     "`KeyHints` puts keys and what each does side by side, `space.s16` apart: a combination's keys as keycaps `space.s4` apart, one keycap per key (`Ctrl+K` is Ctrl and K; a modifier's or an arrow's glyph is a key of its own however it is written, so `⌃K` is ⌃ and K and `← →` two arrows; a `+` alone is the plus key), then what it does in `caption`, `on_surface_variant`, `space.s8` after them. QML also reads Kotodama's form, `↵ Open · Tab Enter app · ⌃K Actions`. Given a room, a hint that would pass it is left out whole, with every hint after it, so none is cut through a keycap: the Command menu's footer and detail pane.",
     "Every key named on screen is a keycap: the Command menu's footer, its Action panel and its detail pane, Kōbō's rail, footers and screens, the control center, the wallpaper picker, the clock. The one exception is a `Hint` bubble, a single line of `label` text, which names a key in words. In a sentence, a keycap sits in a row centred on the line, `space.s4` from the words.",
-    ...DIFFERENCES,
+    ...DECIDED,
   ],
   variants: [
     { name: "Keycap", for: "One key, alone or among others: Esc, Tab, ↵, a letter.", sample: caps },

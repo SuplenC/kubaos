@@ -26,6 +26,7 @@ pub struct Tokens {
     pub rules: Rules,
     pub stroke: Stroke,
     pub focus: Focus,
+    pub caret: Caret,
     pub space: Steps,
     pub radius: Radii,
     pub icon: IconSizes,
@@ -106,6 +107,20 @@ pub struct Focus {
     /// The band a picture keeps round itself inside its own box where its neighbours leave no
     /// more room, in logical pixels.
     pub offset: u16,
+}
+
+/// A field's caret: its shape and the glow round it while you type.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Caret {
+    /// Its height in logical pixels, centred on the value's line.
+    pub height: u16,
+    /// How far it sits past the letter before it, in logical pixels.
+    pub gap: u16,
+    /// The glow's reach outside the caret, in logical pixels.
+    pub near: u16,
+    /// The glow's opacity at the caret's edge.
+    pub glow: f32,
 }
 
 /// A scale of lengths, smallest first.
