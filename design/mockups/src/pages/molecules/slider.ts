@@ -120,7 +120,7 @@ const NUMBER: Move = {
 };
 
 const DESCRIBED =
-  "A pill as wide as its room, `size.slider` (36) tall, or `size.slider_compact` (28) for a dense panel. The track is `surface_container_highest` at `opacity.track`. The fill is the value: from the start to its round end, whose circle's centre is the value, on a whole device pixel, so at 0 it is the circle behind the icon and at 1 it reaches the far end. It is `primary`, or `secondary` for a level something else picked (Auto brightness), and its content is `on_primary` (`on_secondary`). The icon, `label`'s (16), is centred in the circle at the fill's start, always on the fill. The value sits `space.s12` in from the far end: a percentage in `label_number`, through the locale's formatting, or a name in `label`, in `on_surface` over the track and the fill's content colour over the fill, split where the fill ends. A number's box is as wide as its widest (100%, or 150% for a boosted volume), so it ends in one place.";
+  "A pill as wide as its room, `size.slider` (28) tall, or `size.slider_compact` (24) for a dense panel. The track is `surface_container_highest` at `opacity.track`. The fill is the value: from the start to its round end, whose circle's centre is the value, on a whole device pixel, so at 0 it is the circle behind the icon and at 1 it reaches the far end. It is `primary`, or `secondary` for a level something else picked (Auto brightness), and its content is `on_primary` (`on_secondary`). The icon, `label`'s (16), is centred in the circle at the fill's start, always on the fill. The value sits `space.s12` in from the far end: a percentage in `label_number`, through the locale's formatting, or a name in `label`, in `on_surface` over the track and the fill's content colour over the fill, split where the fill ends. A number's box is as wide as its widest (100%, or 150% for a boosted volume), so it ends in one place.";
 
 const STEPS =
   "A slider with stops shows a dot, `size.slider_stop` (6), at each: in the fill's content colour at `opacity.subdued` where the fill has passed it, `on_surface_variant` ahead. The stop the value rests on is solid instead, `size.slider_anchor` (10, 8 compact) in the fill's content colour, popping in over `short` on `pop` once the fill has arrived; while a drag moves between stops there is none. No dot is drawn under the icon or the label, `space.s4` clear of each, nor astride the fill's end. A sticky point (a volume boost to 150% holding at 100%) holds a drag within `size.slider_hold` (12) of it and shows its anchor while the value rests there.";
@@ -146,8 +146,8 @@ export default page({
     { name: "Soft", for: "A level something else picked, in the softer, desaturated accent: brightness on Auto, the sensor's level.", sample: () => boxed(auto()) },
   ],
   sizes: [
-    { name: "Regular", for: "`size.slider`, 36: a panel's or a page's slider.", sample: () => boxed(volume()) },
-    { name: "Compact", for: "`size.slider_compact`, 28: a dense panel (the control center, the system monitor), as tall as a compact row. Its number shows only lit or held.", sample: () => boxed(volume("Compact")) },
+    { name: "Regular", for: "`size.slider`, 28: a panel's or a page's slider, as tall as a compact row.", sample: () => boxed(volume()) },
+    { name: "Compact", for: "`size.slider_compact`, 24: a dense panel (the control center, the system monitor), as tall as a chip. Its number shows only lit or held.", sample: () => boxed(volume("Compact")) },
   ],
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],
