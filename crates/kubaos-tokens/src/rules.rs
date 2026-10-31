@@ -370,6 +370,8 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     on_grid("focus.offset".into(), tokens.focus.offset);
     on_grid("focus.near".into(), tokens.focus.near);
     on_grid("focus.far".into(), tokens.focus.far);
+    on_grid("caret.height".into(), tokens.caret.height);
+    on_grid("caret.near".into(), tokens.caret.near);
     let radius = &tokens.radius;
     for (role, value) in [
         ("small", radius.small),
@@ -437,6 +439,7 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     check_opacity("focus.far_opacity".into(), tokens.focus.far_opacity, found);
     check_opacity("focus.content_glow".into(), tokens.focus.content_glow, found);
     check_opacity("focus.label_glow".into(), tokens.focus.label_glow, found);
+    check_opacity("caret.glow".into(), tokens.caret.glow, found);
     let edge = 1.0 - (1.0 - tokens.focus.near_opacity) * (1.0 - tokens.focus.far_opacity);
     check_opacity(
         "focus.pressed_glow, at the edge".into(),

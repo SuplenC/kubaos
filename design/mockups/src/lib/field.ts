@@ -7,18 +7,23 @@
 // It is a control in the state model (`.k-control` in `lib.css`): hovered or with the keyboard in
 // it, it is lit, the tube over its hairline in its tone (the accent, or the error's on an invalid
 // field) with the glow outside. With the keyboard in it, it also shows the caret, or the selection.
-// A read-only or disabled field takes no input and never lights.
+// A read-only field lights and selects but never edits; a disabled one takes no input and never
+// lights.
+//
+// The caret is a core line, steady, never blinking. It strikes on as the keyboard comes in, and at
+// night a faint glow in the tone shows round it while you type, then fades once the keys stop.
 //
 // The field owns its value and its caret here, as the app does in both libraries: keys and the
 // pointer edit them, and the field draws them again, scrolled sideways to keep the caret in view.
 
 import { settings } from "../site/settings.ts";
 import { pin, type Pinned } from "./control.ts";
-import { focusRing } from "./focus.ts";
+import { focusRing, glowMask } from "./focus.ts";
 import { icon } from "./icon.ts";
 import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
 import { advance, text, wrapped } from "./text.ts";
+import { length, number, raw } from "./tokens.ts";
 
 /** How a field shows its value: editable, wrong, read-only, or not usable now. */
 export const FIELD_STATES = ["Normal", "Invalid", "Locked", "Disabled"] as const;
@@ -29,13 +34,6 @@ export interface Caret {
   readonly pos: number;
   readonly anchor: number;
 }
-
-/**
- * How long the caret shows, then hides, while nothing moves it: `kubaos_ui::field::BLINK`. It is
- * behaviour, not motion, so it is no duration token, and it is solid for one of these after it
- * moves, so it never blinks away while you type.
- */
-const BLINK_MS = 530;
 
 export interface FieldOptions {
   readonly value?: string;
@@ -99,16 +97,114 @@ function wordStep(words: string, pos: number, by: -1 | 1): number {
   return at;
 }
 
+/** The duration token `name` in milliseconds under the speed setting. */
+function motion(name: string): number {
+  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+}
+
+/** The scale `part` is drawn at: the page's, or that of a box drawn at a scale of its own. */
+function scaleOf(part: HTMLElement): number {
+  return Number.parseFloat(getComputedStyle(part).getPropertyValue("--scale")) || settings().scale;
+}
+
+// The caret's glow is a mask round its own rounded line, worked out per device pixel as a ring's
+// is, so it is drawn again whenever the caret's size changes: shown, or at another scale.
+const caretSized = new ResizeObserver((entries) => {
+  for (const entry of entries) drawCaretGlow(entry.target as HTMLElement);
+});
+
+/** Draws the glow round `caret` for its size now: `caret.glow` at its edge, out to `caret.near`. */
+function drawCaretGlow(caret: HTMLElement): void {
+  const glowing = caret.firstElementChild as HTMLElement | null;
+  const width = caret.offsetWidth;
+  const height = caret.offsetHeight;
+  if (!glowing || width === 0 || height === 0) return;
+  const scale = scaleOf(caret);
+  const reach = Math.max(0, Math.ceil(length("caret-near") * scale - 1e-3));
+  const key = `${width}x${height}+${reach}@${scale}`;
+  if (glowing.dataset.drawn === key) return;
+  glowing.dataset.drawn = key;
+  glowing.style.inset = `${-reach}px`;
+  const near = length("caret-near");
+  const peak = number("caret-glow");
+  const at = (d: number) => (d / scale >= near ? 0 : peak * (1 - d / scale / near) ** 2);
+  glowing.style.maskImage = glowMask(width, height, width / 2, reach, at);
+}
+
+/**
+ * The caret, with its glow inside it so a strike moves both: one element for the field's life, so
+ * a glow fading carries on through every key.
+ */
+function caretMark(): HTMLElement {
+  const mark = document.createElement("span");
+  mark.className = "k-field-caret";
+  const glowing = document.createElement("span");
+  glowing.className = "k-field-caret-glow";
+  // Nothing shows until the mask is drawn for the caret's size.
+  glowing.style.maskImage = "linear-gradient(transparent, transparent)";
+  mark.append(glowing);
+  caretSized.observe(mark);
+  return mark;
+}
+
+/**
+ * The glow round `caret` coming in at once and holding through `held` milliseconds, then fading
+ * over `caret_fade`: from its glow now, so a key mid-fade brings it back without a jump. With
+ * reduced motion it shows and hides at once.
+ */
+function glowFor(caret: HTMLElement, held: number): void {
+  const glowing = caret.firstElementChild as HTMLElement | null;
+  if (!glowing) return;
+  const now = Number.parseFloat(getComputedStyle(glowing).opacity) || 0;
+  for (const running of glowing.getAnimations()) running.cancel();
+  if (settings().reduced) {
+    glowing.animate([{ opacity: 1 }, { opacity: 1 }], { duration: held });
+    return;
+  }
+  const rise = motion("caret_glow");
+  const fade = motion("caret_fade");
+  const total = rise + held + fade;
+  const curve = raw("easing-standard");
+  glowing.animate(
+    [
+      { offset: 0, opacity: now, easing: curve },
+      { offset: rise / total, opacity: 1, easing: "linear" },
+      { offset: (rise + held) / total, opacity: 1, easing: curve },
+      { offset: 1, opacity: 0 },
+    ],
+    { duration: total },
+  );
+}
+
+/**
+ * `caret` striking on as the keyboard comes in: through `neon.strike`'s even steps over `medium`,
+ * a fade over `short` with the flicker off, at once with reduced motion. Returns how long it takes.
+ */
+function strike(caret: HTMLElement): number {
+  for (const running of caret.getAnimations()) running.cancel();
+  if (settings().reduced) return 0;
+  if (!settings().flicker) {
+    const duration = motion("short");
+    caret.animate([{ opacity: 0 }, { opacity: 1 }], { duration, easing: raw("easing-standard") });
+    return duration;
+  }
+  const count = number("neon-strike-steps");
+  const steps = Array.from({ length: count }, (_, i) => ({ offset: i / count, opacity: number(`neon-strike-${i}`), easing: "step-end" }));
+  const duration = motion("medium");
+  caret.animate([...steps, { offset: 1, opacity: number(`neon-strike-${count - 1}`) }], { duration });
+  return duration;
+}
+
 /** A field, live: hover lights it, a press puts the caret where it lands, and keys edit it. */
 export function field(options: FieldOptions = {}): HTMLElement {
   const state = options.state ?? "Normal";
-  const inert = state === "Locked" || state === "Disabled";
+  const inert = state === "Disabled";
+  const locked = state === "Locked";
   const element = document.createElement("span");
   element.className = "k-field";
   element.dataset.state = state;
   element.setAttribute("role", "textbox");
   element.style.setProperty("--invalid", state === "Invalid" ? "1" : "0");
-  element.style.setProperty("--blink", `${BLINK_MS}ms`);
   if (state === "Disabled") element.setAttribute("aria-disabled", "true");
   if (state === "Locked") element.setAttribute("aria-readonly", "true");
   if (options.icon) {
@@ -130,17 +226,19 @@ export function field(options: FieldOptions = {}): HTMLElement {
   const length = () => chars(value).length;
   let caret: Caret = options.caret ?? { pos: length(), anchor: length() };
   const shownText = () => (secret ? "•".repeat(length()) : value);
+  const caretShown = caretMark();
+  element.append(caretShown);
 
   const draw = () => {
     const shown = shownText();
     const [from, to] = [Math.min(caret.pos, caret.anchor), Math.max(caret.pos, caret.anchor)];
     element.toggleAttribute("data-selecting", from !== to);
-    room.style.setProperty("--caret-at", String(upTo(shown, caret.pos)));
+    element.style.setProperty("--caret-at", String(upTo(shown, caret.pos)));
     if (shown === "") {
       const placeholder = text(options.placeholder ?? "", "body_large");
       placeholder.style.color = "var(--placeholder)";
       placeholder.classList.add("k-field-placeholder");
-      room.replaceChildren(...(options.placeholder ? [placeholder] : []), caretMark());
+      room.replaceChildren(...(options.placeholder ? [placeholder] : []));
       return;
     }
     const line = document.createElement("span");
@@ -152,14 +250,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
     const words = text(shown, "body_large");
     words.style.color = "var(--value)";
     line.append(selection, words);
-    room.replaceChildren(line, caretMark());
-  };
-
-  /** The caret, made again on every move so its blink starts over solid. */
-  const caretMark = () => {
-    const mark = document.createElement("span");
-    mark.className = "k-field-caret";
-    return mark;
+    room.replaceChildren(line);
   };
 
   const move = (pos: number, extend: boolean) => {
@@ -174,6 +265,12 @@ export function field(options: FieldOptions = {}): HTMLElement {
     const at = from + chars(inserted).length;
     caret = { pos: at, anchor: at };
     draw();
+    glowFor(caretShown, motion("caret_hold"));
+  };
+
+  const copy = (from: number, to: number) => {
+    if (from === to || secret) return;
+    void navigator.clipboard?.writeText(chars(value).slice(from, to).join("")).catch(() => undefined);
   };
 
   const edit = (event: KeyboardEvent) => {
@@ -186,13 +283,17 @@ export function field(options: FieldOptions = {}): HTMLElement {
       move(pos, event.shiftKey);
     } else if (event.key === "Home" || event.key === "End") {
       move(event.key === "Home" ? 0 : length(), event.shiftKey);
+    } else if (event.ctrlKey && event.key.toLowerCase() === "a") {
+      caret = { pos: length(), anchor: 0 };
+      draw();
+    } else if (event.ctrlKey && event.key.toLowerCase() === "c") {
+      copy(from, to);
+    } else if (locked) {
+      return;
     } else if (event.key === "Backspace" || event.key === "Delete") {
       if (from !== to) replace("", from, to);
       else if (event.key === "Backspace") replace("", word ? wordStep(value, from, -1) : Math.max(0, from - 1), from);
       else replace("", from, word ? wordStep(value, from, 1) : Math.min(length(), from + 1));
-    } else if (event.ctrlKey && event.key.toLowerCase() === "a") {
-      caret = { pos: length(), anchor: 0 };
-      draw();
     } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
       replace(event.key, from, to);
     } else {
@@ -218,6 +319,11 @@ export function field(options: FieldOptions = {}): HTMLElement {
     ring.style.setProperty("--core-unlit", tone("primary_unlit", "error_unlit"));
     if (!options.pinned) {
       element.addEventListener("keydown", edit);
+      // A read-only field's caret strikes on but never glows: nothing is typed into it.
+      element.addEventListener("focus", () => {
+        const struck = strike(caretShown);
+        if (!locked) glowFor(caretShown, struck + motion("caret_hold"));
+      });
       element.addEventListener("mousedown", (event) => {
         // The pointer in logical pixels from the text's start: the page is zoomed, so its client
         // pixels are the room's drawn width over its laid-out one, and a logical pixel is a scale.

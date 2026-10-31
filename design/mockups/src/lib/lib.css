@@ -679,8 +679,8 @@
    hairline inside its edge in `outline_variant`, or `error` while invalid. Lit, hovered or with the
    keyboard in it, its fill rises to the highest container (an invalid one keeps its own) and its
    tube is drawn over the hairline. Its value is clipped to its room, `space.s12` in at each side
-   (or past the icon and `space.s8` more), and a caret's width past it, so a caret at either end
-   shows whole; with the keyboard in it, the text scrolls left to keep the caret in view. */
+   (or past the icon and `space.s8` more); with the keyboard in it, the text scrolls left to keep
+   the caret, `caret.gap` past the letter before it, inside the room. */
 .k-field {
   position: relative;
   display: block;
@@ -705,7 +705,10 @@
   --value: var(--color-on_surface);
   --placeholder: rgb(from var(--color-on_surface_variant) r g b / var(--opacity-placeholder_text));
   --mark: var(--color-on_surface_variant);
-  --caret: color-mix(in srgb, var(--color-primary), var(--color-error) calc(var(--invalid) * 100%));
+  --caret-tone: color-mix(in srgb, var(--color-primary), var(--color-error) calc(var(--invalid) * 100%));
+  --caret-core: color-mix(in srgb, var(--color-primary_core), var(--color-error_core) calc(var(--invalid) * 100%));
+  --caret-glass: color-mix(in srgb, var(--color-primary_glass), var(--color-error_glass) calc(var(--invalid) * 100%));
+  --caret-reach: calc(var(--caret-gap) + var(--thin));
 }
 
 .k-field[data-icon] {
@@ -729,10 +732,11 @@
   --lit: 1;
 }
 
-/* Read-only: dimmed, never lit. */
+/* Read-only: dimmed, lit and lit fill alike. It lights and selects as any field does, but it
+   never edits. */
 .k-field[data-state="Locked"] {
-  cursor: default;
   --rest-fill: rgb(from var(--color-surface_container_high) r g b / var(--opacity-locked));
+  --lit-fill: rgb(from var(--color-surface_container_highest) r g b / var(--opacity-locked));
   --edge-line: rgb(from var(--color-outline_variant) r g b / var(--opacity-locked));
   --value: var(--color-on_surface_variant);
 }
@@ -756,20 +760,20 @@
 
 .k-field-clip {
   position: absolute;
-  left: calc(var(--start) - var(--thin));
-  right: calc(var(--space-s12) - var(--thin));
+  left: var(--start);
+  right: var(--space-s12);
   top: calc((var(--size-control_md) - var(--type-body_large-line)) / 2);
   height: var(--type-body_large-line);
   overflow: hidden;
 }
 
 /* The room the value has. `--shift` scrolls the line left until the caret, `--caret-at` logical
-   pixels into it, ends inside the room. A percentage in a custom property is resolved where it is
-   used, so in the line and the caret alike it is the room's width. */
+   pixels into it and `--caret-reach` past that, ends inside the room. A percentage in a custom
+   property is resolved where it is used, so in the line it is the room's width. */
 .k-field-room {
   position: absolute;
-  inset: 0 var(--thin);
-  --shift: min(0px, calc(100% - var(--caret-at) * var(--px) - var(--thin)));
+  inset: 0;
+  --shift: min(0px, calc(100% - var(--caret-at) * var(--px) - var(--caret-reach)));
 }
 
 .k-field:not(:focus, [data-keyboard]) .k-field-room {
@@ -803,33 +807,53 @@
   background: rgb(from var(--color-primary) r g b / var(--opacity-selection));
 }
 
-/* The caret: the thin stroke wide, centred on its place on a whole device pixel, in the field's
-   tone. It blinks while the keyboard is in the field, solid for a blink after it moves. */
+/* The caret: one core line the thin stroke wide with rounded ends, `caret.height` tall and centred
+   down the field, its left edge `caret.gap` past the letter before it on a whole device pixel. It
+   sits on the field, outside the text's clip, so its glow is never cut; its place is the room's
+   scroll worked out against the field's width, the room being the field less its insets. At night
+   it is the tone's core with the signs on and its glass with them off; by day, the tone. It is
+   steady: it strikes on with focus (`lib/field.ts`) and never blinks. */
 .k-field-caret {
   display: none;
   position: absolute;
-  top: 0;
-  height: 100%;
+  top: round(nearest, calc((var(--size-control_md) - var(--caret-height)) / 2), 1px);
+  height: var(--caret-height);
   width: var(--thin);
-  left: round(nearest, calc(var(--shift) + var(--caret-at) * var(--px) - var(--thin) / 2), 1px);
-  background: var(--caret);
+  left: round(
+    nearest,
+    calc(
+      var(--start) +
+        min(var(--caret-at) * var(--px), 100% - var(--start) - var(--space-s12) - var(--caret-reach)) +
+        var(--caret-gap)
+    ),
+    1px
+  );
+  border-radius: calc(var(--thin) / 2);
+  background: color-mix(
+    in srgb,
+    var(--caret-tone),
+    color-mix(in srgb, var(--caret-glass), var(--caret-core) calc(var(--signs) * 100%)) calc((1 - var(--day)) * 100%)
+  );
 }
 
 .k-field:is(:focus, [data-keyboard]):not([data-selecting]) .k-field-caret {
   display: block;
 }
 
-.k-field:focus:not([data-pinned]) .k-field-caret {
-  animation: k-field-blink calc(2 * var(--blink)) step-end var(--blink) infinite;
+/* The glow round the caret while you type: the tone through its mask, which `lib/field.ts` works
+   out per device pixel round the caret's rounded line. Its opacity is how much of it shows, moved
+   from script; with the signs off, by day always, it is out. */
+.k-field-caret-glow {
+  position: absolute;
+  background: var(--caret-tone);
+  opacity: 0;
+  filter: opacity(var(--signs));
+  mask-size: 100% 100%;
+  pointer-events: none;
 }
 
 .k-field:not(:focus, [data-keyboard]) .k-field-selection {
   display: none;
-}
-
-@keyframes k-field-blink {
-  0% { opacity: 0; }
-  50% { opacity: 1; }
 }
 
 /* A field under its label, with its note: one column as wide as its room. */

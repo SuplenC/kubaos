@@ -96,6 +96,26 @@ pressed_glow = 1.25
 # of the page beside it, so it never cuts a resting control's glow.
 offset = 4
 
+# A field's caret: one core line `stroke.thin` wide with rounded ends, steady,
+# never blinking. At night it is its tone's core, and while you type a faint
+# glow in the tone shows round it, then fades; by day it is the tone, with no
+# glow.
+[caret]
+# Its height in logical pixels, centred on the value's 20 pixel line: 2 short
+# at each end, so it reads as a mark between letters, not a rule as tall as
+# the text.
+height = 16
+# How far its left edge sits past the end of the letter before it, in logical
+# pixels: clear enough that the core and its glow never touch the letter. It
+# is a gap between a letter and a stroke, not a length on the grid, and the
+# caret is placed on a whole device pixel.
+gap = 3
+# The glow round it while you type: its reach outside the caret in logical
+# pixels, and its opacity at the caret's edge, fading to nothing at the reach.
+# Fainter than a control's near glow: it sits among the letters.
+near = 4
+glow = 0.25
+
 # The spacing scale: gaps, paddings and insets.
 [space]
 values = [4, 8, 12, 16, 20, 24, 32, 40, 48, 64]
@@ -488,6 +508,21 @@ use = "The dark beat in the new colours after a theme change's colours change, b
 ms = 600
 use = "Every light striking on together at the end of a theme change or a switch to dark."
 
+# The caret's glow while you type: it comes in at once on a key, holds while
+# keys follow, and fades out once they stop, so it shows that typing is going
+# on without pulsing under every key.
+[duration.caret_glow]
+ms = 80
+use = "The caret's glow coming in on a key: quick enough to keep up with typing."
+
+[duration.caret_hold]
+ms = 500
+use = "How long the caret's glow holds after the last key before it fades: a pause between words keeps it."
+
+[duration.caret_fade]
+ms = 800
+use = "The caret's glow fading after typing stops, down to nothing."
+
 # Easing curves, as CSS cubic béziers (x1, y1, x2, y2).
 [easing.standard]
 curve = [0.2, 0.0, 0.0, 1.0]
@@ -651,8 +686,9 @@ opacity = 0.55
 # A tube striking: its brightness through ten even steps over `medium`. It
 # stutters, then catches. Only a power change flickers this way: the theme
 # change and dark and light switching their lights, a surface or a window
-# appearing, a definite off. Hover, focus and focus moving light up with a
-# fade instead.
+# appearing, a definite off, and one light of a control's: a field's caret
+# striking on as the keyboard comes in. Hover, focus and focus moving light
+# up with a fade instead.
 strike = [0.6, 0.0, 0.9, 0.2, 0.0, 1.0, 0.4, 1.0, 0.8, 1.0]
 
 # The クバ mark: its strokes in the order a hand writes them (ク's tick and
