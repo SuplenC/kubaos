@@ -202,7 +202,7 @@ export default page({
     {
       name: "Disabled",
       for: "A field not usable now, with a note saying what turns it on.",
-      sample: () => fieldRoom(ROOM, labelled("Proxy", field({ placeholder: "proxy.example.com:3128", icon: "lan", state: "Disabled" }), { note: "Turn the proxy on to set it." })),
+      sample: () => fieldRoom(ROOM, labelled("Proxy", field({ value: "proxy.example.com:3128", icon: "lan", state: "Disabled" }), { note: "Turn the proxy on to set it." })),
     },
   ],
   sizes: doesntApply("a field has one size, `size.control_md` tall, as tall as a regular button; its width is its room's."),
