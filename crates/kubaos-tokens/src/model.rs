@@ -28,6 +28,7 @@ pub struct Tokens {
     pub focus: Focus,
     pub caret: Caret,
     pub spinner: Spinner,
+    pub tabs: Tabs,
     pub space: Steps,
     pub radius: Radii,
     pub icon: IconSizes,
@@ -119,6 +120,16 @@ pub struct Spinner {
     pub turn: u32,
     /// The arc's length, as a share of the ring.
     pub arc: f32,
+}
+
+/// Tabs: the rail of neon along their well's bottom edge.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Tabs {
+    /// The rail's thickness at night, in logical pixels, rounded half up to whole device pixels.
+    pub rail: u16,
+    /// The rail's thickness by day, in logical pixels, rounded half up to whole device pixels.
+    pub rail_day: u16,
 }
 
 /// A field's caret: its shape and the glow round it while you type.

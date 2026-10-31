@@ -463,6 +463,11 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
         edge * tokens.focus.pressed_glow,
         found,
     );
+    if tokens.tabs.rail > tokens.tabs.rail_day {
+        found.push(Violation::NotAscending {
+            token: "tabs.rail, tabs.rail_day".into(),
+        });
+    }
     if tokens.focus.near >= tokens.focus.far {
         found.push(Violation::NotAscending {
             token: "focus.near, focus.far".into(),
