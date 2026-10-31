@@ -74,12 +74,11 @@ function outside(x: number, y: number, hw: number, hh: number, r: number): numbe
 }
 
 /**
- * The glow's mask round a box `width` by `height` device pixels with corner `corner`, at `scale`,
- * `boost` times as strong: a pressable control's mask holds its pressed glow, and its lit glow
- * shows it at `1 / boost`.
+ * A glow's mask round a box `width` by `height` device pixels with corner `corner`, reaching
+ * `reach` device pixels past it: each pixel outside the box at `opacity` of its distance from the
+ * box's edge in device pixels. A control's ring and a field's caret glow through one of these.
  */
-function mask(width: number, height: number, corner: number, scale: number, boost: number): string {
-  const reach = Math.max(0, Math.ceil(length("focus-far") * scale - 1e-3));
+export function glowMask(width: number, height: number, corner: number, reach: number, opacity: (d: number) => number): string {
   const canvas = document.createElement("canvas");
   canvas.width = width + 2 * reach;
   canvas.height = height + 2 * reach;
@@ -91,11 +90,21 @@ function mask(width: number, height: number, corner: number, scale: number, boos
     for (let px = 0; px < canvas.width; px++) {
       const d = outside(px + 0.5 - canvas.width / 2, py + 0.5 - canvas.height / 2, width / 2, height / 2, r);
       if (d <= 0) continue;
-      image.data[(py * canvas.width + px) * 4 + 3] = Math.round(Math.min(1, glow(d / scale) * boost) * 255);
+      image.data[(py * canvas.width + px) * 4 + 3] = Math.round(Math.min(1, opacity(d)) * 255);
     }
   }
   context.putImageData(image, 0, 0);
   return `url(${canvas.toDataURL()})`;
+}
+
+/**
+ * The ring's glow mask round a box `width` by `height` device pixels with corner `corner`, at
+ * `scale`, `boost` times as strong: a pressable control's mask holds its pressed glow, and its lit
+ * glow shows it at `1 / boost`.
+ */
+function mask(width: number, height: number, corner: number, scale: number, boost: number): string {
+  const reach = Math.max(0, Math.ceil(length("focus-far") * scale - 1e-3));
+  return glowMask(width, height, corner, reach, (d) => glow(d / scale) * boost);
 }
 
 /**

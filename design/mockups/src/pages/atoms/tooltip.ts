@@ -45,12 +45,12 @@ function shownOver(): HTMLElement {
 const DESCRIBED =
   "A popover `size.menu` wide: `surface_container`, a soft hairline inside its edge (`outline_variant` at `opacity.outline_soft`), the surface radius (`radius.surface`), `space.s12` inside, and the panel's shadow (`shadow.panel`). Its title is `body_strong` in `on_surface`, its body `small` in `on_surface_variant` `space.s4` under it, both breaking between words in the card's width, and what it holds `space.s8` below. It is never lit: no line, no glow.";
 
-const DIFFERENCES = [
-  "Question for Kuba, its motion: a tooltip isn't a light, so it never flickers, even though it is a surface appearing: it fades in over `short` with its control lighting up and out over `short` as the control goes back to rest, as a `Hint` does, and as today. Recommended.",
-  "Question for Kuba, leaving: it fades out over `short`, as today, not over a panel's `medium`: it goes with the pointer, many times a minute. Recommended.",
-  "Question for Kuba, over a disabled control: it still shows under the pointer, as a `Hint` does, so a control that can't be used now still says what it does. Today it shows only when the app asks. Recommended.",
-  "Question for Kuba, its shadow by day: as today, the card casts the panel's shadow, `shadow.panel` at 0.55, by day as by night; the tucked card's shadow is the only one lighter by day. Recommended: keep it, since a tooltip floats over the page as a panel does.",
-  "Question for Kuba, a delay: it shows as its control lights, with no wait, as a `Hint` does and as today. Recommended: no wait, since a tooltip is for the few controls whose words can't say enough.",
+const DECIDED = [
+  "Decided, its motion: a tooltip isn't a light, so it never flickers, even though it is a surface appearing: it fades in over `short` with its control lighting up and out over `short` as the control goes back to rest, as a `Hint` does, and as today.",
+  "Decided, leaving: it fades out over `short`, as today, not over a panel's `medium`: it goes with the pointer, many times a minute.",
+  "Decided, over a disabled control: it still shows under the pointer, as a `Hint` does, so a control that can't be used now still says what it does. Today it shows only when the app asks.",
+  "Decided, its shadow by day: the card casts the panel's shadow, `shadow.panel` at 0.55, by day as by night, as today, since a tooltip floats over the page as a panel does; the tucked card's shadow is the only one lighter by day.",
+  "Decided, a delay: it shows as its control lights, with no wait, as a `Hint` does and as today, since a tooltip is for the few controls whose words can't say enough.",
 ];
 
 export default page({
@@ -65,7 +65,7 @@ export default page({
     DESCRIBED,
     "It floats `space.s8` above its control, starting where the control starts, on whole device pixels: above, since the controls it explains sit in a toolbar at a panel's foot, and from the control's start, since a card centred on a chip at a toolbar's start would hang past the panel. Where there is no room above (a button in a header at the window's top), it opens `space.s8` below instead, still from the control's start. It is held inside the window, or inside a panel in QML (`within`): a control at the window's end has its card's end on the window's.",
     "It floats over everything: no part of the layout, so it moves nothing as it comes and goes. It never takes the pointer. It shows only while its control shows whole: a control a scroll has cut, or taken out of view, takes its card with it.",
-    ...DIFFERENCES,
+    ...DECIDED,
   ],
   variants: [
     { name: "Above", for: "Every tooltip with room above its control: the card `space.s8` over it, from the control's start.", sample: () => explained({ shown: true }) },
