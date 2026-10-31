@@ -21,6 +21,16 @@
   white-space: pre;
 }
 
+/* Text that breaks between words in the room it is given, as iced's text does: as wide as its
+   longest line, and as tall as its lines. */
+.k-text[data-wrapped] {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
 .k-text[data-shaped] {
   font-kerning: normal;
   font-variant-ligatures: normal;
@@ -548,12 +558,13 @@
   --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
   --on: calc(var(--lit) * var(--signs));
   --line-shown: var(--lit);
-  /* Hover, focus, press and turning on or picking are fades, never the flicker, which is for power
-     changes. */
+  /* Hover, focus, press, turning on or picking and a field turning invalid are fades, never the
+     flicker, which is for power changes. */
   transition:
     --lit var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard),
-    --checked var(--motion-short) var(--easing-standard);
+    --checked var(--motion-short) var(--easing-standard),
+    --invalid var(--motion-short) var(--easing-standard);
 }
 
 .k-control:not(:disabled, [aria-disabled="true"]):is(:hover, :focus-visible, [data-pinned]) {
@@ -662,4 +673,184 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* A field (`lib/field.ts`): `size.control_md` tall at the control radius, filling its room, a
+   hairline inside its edge in `outline_variant`, or `error` while invalid. Lit, hovered or with the
+   keyboard in it, its fill rises to the highest container (an invalid one keeps its own) and its
+   tube is drawn over the hairline. Its value is clipped to its room, `space.s12` in at each side
+   (or past the icon and `space.s8` more), and a caret's width past it, so a caret at either end
+   shows whole; with the keyboard in it, the text scrolls left to keep the caret in view. */
+.k-field {
+  position: relative;
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--size-control_md);
+  border-radius: var(--radius-control);
+  outline: none;
+  cursor: text;
+  --lit: 0;
+  --start: var(--space-s12);
+  --thin: max(1px, round(nearest, var(--stroke-thin), 1px));
+  --rest-fill: var(--color-surface_container_high);
+  --lit-fill: color-mix(
+    in srgb,
+    var(--color-surface_container_highest),
+    var(--color-surface_container_high) calc(var(--invalid) * 100%)
+  );
+  background: color-mix(in srgb, var(--rest-fill), var(--lit-fill) calc(var(--lit) * 100%));
+  --edge-line: color-mix(in srgb, var(--color-outline_variant), var(--color-error) calc(var(--invalid) * 100%));
+  --value: var(--color-on_surface);
+  --placeholder: rgb(from var(--color-on_surface_variant) r g b / var(--opacity-placeholder_text));
+  --mark: var(--color-on_surface_variant);
+  --caret: color-mix(in srgb, var(--color-primary), var(--color-error) calc(var(--invalid) * 100%));
+}
+
+.k-field[data-icon] {
+  --start: calc(var(--space-s12) + var(--type-body_large-icon) + var(--space-s8));
+}
+
+.k-field::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid var(--edge-line);
+  border-radius: inherit;
+}
+
+/* A field takes no press of its own: a press puts the caret where it lands, and the field is lit. */
+.k-field.k-control:not([aria-disabled="true"]):is(:active, [data-pinned]) {
+  --press: 0;
+}
+
+.k-field.k-control:focus {
+  --lit: 1;
+}
+
+/* Read-only: dimmed, never lit. */
+.k-field[data-state="Locked"] {
+  cursor: default;
+  --rest-fill: rgb(from var(--color-surface_container_high) r g b / var(--opacity-locked));
+  --edge-line: rgb(from var(--color-outline_variant) r g b / var(--opacity-locked));
+  --value: var(--color-on_surface_variant);
+}
+
+/* Disabled: grey, with no tone, no line and no glow. */
+.k-field[data-state="Disabled"] {
+  cursor: default;
+  --rest-fill: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --edge-line: var(--rest-fill);
+  --value: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --placeholder: var(--value);
+  --mark: var(--value);
+}
+
+/* The icon `space.s12` in, centred down the field on a whole device pixel. */
+.k-field-mark {
+  position: absolute;
+  left: var(--space-s12);
+  top: round(nearest, calc((var(--size-control_md) - var(--type-body_large-icon)) / 2), 1px);
+}
+
+.k-field-clip {
+  position: absolute;
+  left: calc(var(--start) - var(--thin));
+  right: calc(var(--space-s12) - var(--thin));
+  top: calc((var(--size-control_md) - var(--type-body_large-line)) / 2);
+  height: var(--type-body_large-line);
+  overflow: hidden;
+}
+
+/* The room the value has. `--shift` scrolls the line left until the caret, `--caret-at` logical
+   pixels into it, ends inside the room. A percentage in a custom property is resolved where it is
+   used, so in the line and the caret alike it is the room's width. */
+.k-field-room {
+  position: absolute;
+  inset: 0 var(--thin);
+  --shift: min(0px, calc(100% - var(--caret-at) * var(--px) - var(--thin)));
+}
+
+.k-field:not(:focus, [data-keyboard]) .k-field-room {
+  --shift: 0px;
+}
+
+.k-field-line,
+.k-field-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.k-field-line {
+  left: var(--shift);
+  height: 100%;
+}
+
+.k-field-line > .k-text {
+  position: relative;
+}
+
+/* The selected text's highlight: the accent at `opacity.selection`, at the small radius. */
+.k-field-selection {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  left: calc(var(--from) * var(--px));
+  width: calc((var(--to) - var(--from)) * var(--px));
+  border-radius: var(--radius-small);
+  background: rgb(from var(--color-primary) r g b / var(--opacity-selection));
+}
+
+/* The caret: the thin stroke wide, centred on its place on a whole device pixel, in the field's
+   tone. It blinks while the keyboard is in the field, solid for a blink after it moves. */
+.k-field-caret {
+  display: none;
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: var(--thin);
+  left: round(nearest, calc(var(--shift) + var(--caret-at) * var(--px) - var(--thin) / 2), 1px);
+  background: var(--caret);
+}
+
+.k-field:is(:focus, [data-keyboard]):not([data-selecting]) .k-field-caret {
+  display: block;
+}
+
+.k-field:focus:not([data-pinned]) .k-field-caret {
+  animation: k-field-blink calc(2 * var(--blink)) step-end var(--blink) infinite;
+}
+
+.k-field:not(:focus, [data-keyboard]) .k-field-selection {
+  display: none;
+}
+
+@keyframes k-field-blink {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+/* A field under its label, with its note: one column as wide as its room. */
+.k-labelled {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
+  width: 100%;
+}
+
+.k-labelled-head {
+  width: 100%;
+  height: var(--size-control_sm);
+}
+
+.k-fill {
+  flex: 1;
+}
+
+.k-field-box {
+  display: block;
+  flex: none;
+  width: var(--room);
 }

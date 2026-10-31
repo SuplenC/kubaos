@@ -1,6 +1,7 @@
 /* What the motion settings do besides the durations the tokens' CSS works out: reduce motion caps
    them at `short`, and `--lit`, how lit a control or a focus tube is, `--press`, how far a control
-   is pressed, and `--checked`, how far it is on, animate as numbers. */
+   is pressed, `--checked`, how far it is on, and `--invalid`, how far a field is wrong, animate as
+   numbers. */
 @property --lit {
   syntax: "<number>";
   inherits: true;
@@ -16,6 +17,14 @@
 /* How far a control is on or picked, 0 to 1 (a switch, a checkbox, a radio, a chip): its fill and
    content fade between their two looks as it turns, and a switch's knob moves. */
 @property --checked {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far a field is invalid, 0 to 1: its hairline, tube, glow and caret fade from the accent's
+   tone to the error's as it turns. */
+@property --invalid {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;
