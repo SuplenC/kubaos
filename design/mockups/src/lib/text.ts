@@ -90,3 +90,13 @@ export function text(words: string, style: TypeStyle, color = "on_surface"): HTM
   element.toggleAttribute("data-shaped", shaped(words));
   return element;
 }
+
+/**
+ * `words` in `style`, in the colour role `color`, broken between words onto as many lines as the
+ * room they are given needs, each the style's line tall: a note, a tooltip's body.
+ */
+export function wrapped(words: string, style: TypeStyle, color = "on_surface"): HTMLElement {
+  const element = text(words, style, color);
+  element.dataset.wrapped = "";
+  return element;
+}
