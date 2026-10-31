@@ -6,4 +6,4 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `progress::spinner`; QML `Spinner`.
 
-Work that doesn't know: an icon size (16, 20 or 24 beside text; 32 and 48 for a page's one spinner), a thin arc over a faint full ring. The caller passes the time; the arc turns and breathes with it.
+Work that doesn't know: an icon size (16, 20 or 24 beside text; 32 and 48 for a page's one spinner), a lit stretch of neon running round an unlit glass ring. The ring is the tone at `opacity.spinner_track`; the arc, `spinner.arc` of it with round ends, is the tone's core at night with the content glow round it, and the tone by day with no glow. It turns once every `spinner.turn` at one length, never breathing. The caller passes the time.

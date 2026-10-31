@@ -111,6 +111,13 @@ height = 16
 near = 4
 glow = 0.25
 
+# The spinner: a lit stretch of neon running round an unlit glass ring, at a
+# steady pace. `turn` is one turn in milliseconds, `arc` the lit stretch's
+# share of the ring. It never breathes: a tube is lit or not.
+[spinner]
+turn = 1100
+arc = 0.28
+
 # The spacing scale: gaps, paddings and insets.
 [space]
 values = [4, 8, 12, 16, 20, 24, 32, 40, 48, 64]

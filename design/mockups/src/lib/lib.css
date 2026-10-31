@@ -1092,28 +1092,26 @@
   height: var(--t-line);
 }
 
-/* How far the spinner's clock is, in seconds of its loop. */
+/* How far round the spinner's arc has run, in turns. */
 @property --spin {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;
 }
 
-/* A spinner: a faint full ring and an arc over it, `stroke.thin` rounded half up to whole device
-   pixels, the ring's middle a stroke in from the box. The arc turns 0.8 of a turn a second and
-   breathes between 0.45 and 1.05 of a half turn, 0.6 breaths a second, so its loop is 5 s, four
-   turns and three breaths: the builds' own clock (`progress::spinner`, `Spinner.qml`), which
-   runs in real time and isn't a motion token. A shot holds it 0.7 s in, as the specimens do. */
+/* A spinner: a lit stretch of neon running round an unlit glass ring, `stroke.thin` rounded half
+   up to whole device pixels, the ring's middle a stroke in from the box. The ring is the tone at
+   `opacity.spinner_track`; the arc, `spinner.arc` of the ring with round ends, is the tone's core
+   at night with the content glow round it, and the tone by day with none, as any lit line. It
+   turns once every `spinner.turn` on `linear` and never breathes: a tube is lit or it isn't. A
+   shot holds it 0.7 of a turn in. */
 .k-spinner {
   display: block;
   flex: none;
   width: var(--spinner-size);
   height: var(--spinner-size);
   --thin: max(1px, round(nearest, var(--stroke-thin), 1px));
-  --turns: 0.8;
-  --breaths: 0.6;
-  --cycle: 5s;
-  animation: k-spin calc(var(--cycle) / var(--speed) * var(--slow)) linear infinite;
+  animation: k-spin calc(var(--spinner-turn) / var(--speed) * var(--slow)) linear infinite;
 }
 
 .k-spinner[data-held] {
@@ -1133,24 +1131,25 @@
   cy: 50%;
   r: calc(var(--spinner-size) / 2 - var(--thin));
   fill: none;
-  stroke: currentColor;
   stroke-width: var(--thin);
 }
 
 .k-spinner-ring {
-  stroke-opacity: var(--opacity-spinner_track);
+  stroke: rgb(from var(--tone) r g b / var(--opacity-spinner_track));
 }
 
 .k-spinner-arc {
+  stroke: color-mix(in srgb, var(--tone), var(--core) calc((1 - var(--day)) * 100%));
   stroke-linecap: round;
-  stroke-dasharray: calc(180 * (0.45 + 0.6 * (0.5 + 0.5 * sin(var(--spin) * var(--breaths) * 1turn)))) 360;
+  stroke-dasharray: calc(360 * var(--spinner-arc)) 360;
   transform-origin: 50% 50%;
-  transform: rotate(calc(var(--spin) * var(--turns) * 1turn));
+  transform: rotate(calc(var(--spin) * 1turn));
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--tone) r g b / calc(var(--focus-content_glow) * (1 - var(--day)))));
 }
 
 @keyframes k-spin {
   from { --spin: 0; }
-  to { --spin: 5; }
+  to { --spin: 1; }
 }
 
 /* How far the skeleton's sheen has come across it: its middle, 0 at the left edge and 1 at the

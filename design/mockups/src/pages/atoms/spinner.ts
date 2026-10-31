@@ -34,7 +34,7 @@ function specimen(): HTMLElement {
 }
 
 const DESCRIBED =
-  "A faint full ring, its colour at `opacity.spinner_track`, and over it an arc in the colour with round ends, both the thin stroke (`stroke.thin`, rounded half up to whole device pixels: 2, 3, 3, 4 at 1, 1.25, 1.5 and 2), the ring's middle a stroke in from the box. The arc turns 0.8 of a turn a second, on `linear`, and breathes between 0.45 and 1.05 of a half turn, 0.6 breaths a second, so its shortest arc still reads as a spinner and its loop comes round every 5 s without a jump.";
+  "A lit stretch of neon running round an unlit glass ring. The ring is the tone at `opacity.spinner_track`; the arc, `spinner.arc` of the ring with round ends, is the tone's core at night (`primary_core`, `error_core`) with the content glow round it (`focus.content_glow` fading out over `focus.content_near`), and the tone by day with no glow, as any lit line. Both are the thin stroke (`stroke.thin`, rounded half up to whole device pixels: 2, 3, 3, 4 at 1, 1.25, 1.5 and 2), the ring's middle a stroke in from the box. The arc turns once every `spinner.turn` (1.1 s) on `linear`, at one length: it never breathes, since a tube is lit or it isn't.";
 
 export default page<"loading">({
   level: "atoms",
@@ -75,7 +75,7 @@ export default page<"loading">({
       loading: `Turning. ${DESCRIBED} By day the same, in the day's accent and red.`,
     },
   },
-  focus: doesntApply("a spinner isn't a control and isn't neon: it has no line and no glow, by night or by day."),
+  focus: doesntApply("a spinner isn't a control: it takes no focus. Its arc is always lit, glowing at night."),
   content: {
     text: [{ name: "What is going on", words: DOING, sample: (words: string) => doing(words) }],
     missingPicture: doesntApply("a spinner is drawn."),
