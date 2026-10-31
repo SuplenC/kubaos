@@ -1152,34 +1152,29 @@
   to { --spin: 1; }
 }
 
-/* How far the skeleton's sheen has come across it: its middle, 0 at the left edge and 1 at the
-   right. */
-@property --sweep {
+/* How warm the skeleton's glass is: 0 at rest, 1 at its breath's peak. */
+@property --hum {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
 }
 
-/* A skeleton: the placeholder colour, with a sheen of the highest container whose middle is at
-   `--sweep` and which fades to nothing `--band` of the width either side, as QML's gradient does.
-   The sheen is the shape's own fill, so its corners cut it. It sweeps over `slow` on `standard`,
-   rests for `slow`, three times, then holds still; with reduce motion it holds still from the
-   start. */
+/* A skeleton: glass of the accent warming up, as a sign's gas does before it lights. Its fill is
+   `primary` at `opacity.skeleton` (`skeleton_light` by day), breathing to `skeleton_peak` and back
+   over `hum` each way on `standard`, every bone together, for as long as it shows; at night a faint
+   glow comes in with the peak, `skeleton_glow` fading out over `focus.near`. It has no edge. With
+   reduce motion it holds still at rest. */
 .k-skeleton {
   display: block;
   flex: none;
   align-self: stretch;
   height: var(--height);
   border-radius: var(--corner);
-  --band: 0.4;
-  --sweep: calc(-1 * var(--band));
-  background: linear-gradient(
-    to right,
-    var(--color-surface_container_high) calc((var(--sweep) - var(--band)) * 100%),
-    var(--color-surface_container_highest) calc(var(--sweep) * 100%),
-    var(--color-surface_container_high) calc((var(--sweep) + var(--band)) * 100%)
-  );
-  animation: k-sheen calc(2 * var(--motion-slow)) var(--easing-standard) 3;
+  --rest: calc(var(--opacity-skeleton) * (1 - var(--day)) + var(--opacity-skeleton_light) * var(--day));
+  --peak: calc(var(--opacity-skeleton_peak) * (1 - var(--day)) + var(--opacity-skeleton_light_peak) * var(--day));
+  background: rgb(from var(--color-primary) r g b / calc(var(--rest) + (var(--peak) - var(--rest)) * var(--hum)));
+  box-shadow: 0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--opacity-skeleton_glow) * var(--hum) * (1 - var(--day))));
+  animation: k-hum var(--motion-hum) var(--easing-standard) infinite alternate;
 }
 
 .k-row > .k-skeleton:not([data-bone="circle"]) {
@@ -1197,10 +1192,9 @@
   animation: none;
 }
 
-@keyframes k-sheen {
-  0% { --sweep: calc(-1 * var(--band)); }
-  50% { --sweep: calc(1 + var(--band)); }
-  100% { --sweep: calc(1 + var(--band)); }
+@keyframes k-hum {
+  from { --hum: 0; }
+  to { --hum: 1; }
 }
 
 /* A room of a set width, whatever its children hold: a skeleton's or a divider's room. */

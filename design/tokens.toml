@@ -525,6 +525,10 @@ use = "How long the caret's glow holds after the last key before it fades: a pau
 ms = 800
 use = "The caret's glow fading after typing stops, down to nothing."
 
+[duration.hum]
+ms = 1200
+use = "Half a skeleton's breath: its glass warming from rest to its peak, or cooling back."
+
 # Easing curves, as CSS cubic béziers (x1, y1, x2, y2).
 [easing.standard]
 curve = [0.2, 0.0, 0.0, 1.0]
@@ -612,6 +616,15 @@ danger_edge = 0.60
 # A progress bar's track, and a spinner's faint full ring.
 track = 0.90
 spinner_track = 0.18
+# A skeleton, glass of the accent warming up: its fill at rest and at its
+# breath's peak, at night and by day, and at night the faint glow that comes
+# in at the peak, fading out over `focus.near`. Subtle: it stands back from
+# the text round it.
+skeleton = 0.06
+skeleton_peak = 0.09
+skeleton_light = 0.05
+skeleton_light_peak = 0.08
+skeleton_glow = 0.08
 # An error's surface (of the error container) and hairline (of the error).
 error_fill = 0.30
 error_edge = 0.45
