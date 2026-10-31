@@ -6,6 +6,13 @@
 // track and the fill's over the fill. Regular (`size.slider`) or compact (`size.slider_compact`);
 // a compact slider shows a number only lit or held, and a name always.
 //
+// A continuous slider may have a toggle, which makes its icon a button: a second state, Toggled
+// (volume muted, brightness on Auto), the icon turns on and off. Toggled, the fill fades to the
+// softer accent (`secondary`, its content `on_secondary`) over `short`, the icon is the toggled
+// one and the value reads as a name; the fill stays where the value is (a muted volume's level,
+// the sensor's on Auto). Moving the value (a drag, a key, the wheel) leaves Toggled from where it
+// is. On a slider with stops the icon steps through them instead.
+//
 // Steps show as dots on both sides of the fill, each in its side's colour; the mark the value rests
 // on, a stop or a sticky point it holds at, turns solid and pops in. No dot is drawn under the icon
 // or the label, `space.s4` clear of each.
@@ -13,12 +20,14 @@
 // It is a control in the state model (`.k-control` in `lib.css`): lit under the pointer or with the
 // keyboard on it, its fill brightening by `opacity.press` toward the palette's bright end, the tube
 // inside its edge with the glow outside; held (pressed or dragged), the fill brightens by
-// `opacity.held`. It owns its value here, as the app does in both libraries: the pointer, the keys
-// and the wheel move it, and it draws itself again.
+// `opacity.held`. Its icon's button lights as an icon button does on the fill, and while it is lit
+// the slider isn't. It owns its value here, as the app does in both libraries: the pointer, the
+// keys and the horizontal wheel move it, and it draws itself again.
 
 import { settings } from "../site/settings.ts";
 import { pin, type Pinned } from "./control.ts";
 import { focusRing } from "./focus.ts";
+import { withHint } from "./hint.ts";
 import { icon } from "./icon.ts";
 import { probe, variant } from "./probe.ts";
 import { advance, shaped, text, type TypeStyle, typeset } from "./text.ts";
@@ -47,34 +56,41 @@ export interface SliderOptions {
   readonly index?: number;
   /** Each stop's name, the one nearest the value shown. */
   readonly names?: readonly string[];
-  /** A name shown in place of the value, always: "Muted", "Auto · 55%". */
-  readonly words?: string;
   /** The number shown in place of the percentage, as the owner reads the value. */
   readonly number?: (value: number) => string;
   /** The widest the number reads, so the number ends in one place: "100%" unless given. */
   readonly widest?: string;
-  /** The fill in the softer, desaturated accent: a level something else picked (Auto brightness). */
-  readonly soft?: boolean;
   /** A sticky point, a fraction along the track, the value holds at within `size.slider_hold`. */
   readonly sticky?: number;
-  /** What a press on the icon does; with none, the icon of a continuous slider isn't a button. */
-  readonly onIcon?: (control: SliderControl) => void;
+  /** The toggle its icon turns on and off, on a continuous slider; with none, its icon is no button. */
+  readonly toggle?: SliderToggle;
   readonly disabled?: boolean;
   readonly pinned?: Pinned;
+  /** A state the icon's button is pinned in, where the icon is one. */
+  readonly pinnedIcon?: Pinned;
   /** Held, as a press or a drag holds it: the specimens' view of the state. */
   readonly held?: boolean;
   /** Drawn still, as a player's sample is: no pop, nothing eased. */
   readonly still?: boolean;
 }
 
-/** What a slider's owner can do to it once it is drawn: what its icon's press reaches. */
-export interface SliderControl {
-  readonly element: HTMLElement;
-  /** Moves a continuous slider to `value`, easing the fill there. */
-  set(value: number): void;
-  /** Shows `words` in place of the value, or the value again with none. */
-  name(words: string | undefined): void;
-  readonly value: number;
+/**
+ * A continuous slider's second state, Toggled, which its icon turns on and off: a volume muted, a
+ * brightness on Auto. Its labels name what a press does, in the icon's hint and as its name.
+ */
+export interface SliderToggle {
+  /** The icon while toggled: `volume_off`, the Auto symbol. */
+  readonly icon: string;
+  /** The value's name while toggled, always shown: "Muted", "Auto · 55%". */
+  readonly words: string;
+  /** What a press does while it isn't toggled: "Mute". */
+  readonly label: string;
+  /** What a press does while it is: "Unmute". */
+  readonly toggledLabel: string;
+  /** Whether it starts toggled. */
+  readonly on?: boolean;
+  /** Told each time Toggled turns on or off, by the icon or by the value moving. */
+  readonly changed?: (on: boolean) => void;
 }
 
 /** The duration token `name` in milliseconds under the speed setting, none with reduce motion. */
@@ -95,7 +111,8 @@ export function slider(options: SliderOptions): HTMLElement {
   const sticky = options.sticky;
   let index = Math.max(0, Math.min(last, options.index ?? 0));
   let value = Math.max(0, Math.min(1, options.value ?? 0));
-  let words = options.words;
+  const toggle = stepping ? undefined : options.toggle;
+  let toggled = toggle?.on ?? false;
   let direction: -1 | 1 = -1;
   let dragging = false;
   let shown = stepping ? index / last : value;
@@ -107,7 +124,6 @@ export function slider(options: SliderOptions): HTMLElement {
   root.setAttribute("aria-valuemin", "0");
   root.setAttribute("aria-valuemax", stepping ? String(last) : "100");
   root.toggleAttribute("data-compact", compact);
-  root.toggleAttribute("data-soft", options.soft ?? false);
   root.toggleAttribute("data-held", options.held ?? false);
   root.toggleAttribute("data-still", options.still ?? false);
   if (options.disabled) root.setAttribute("aria-disabled", "true");
@@ -129,8 +145,7 @@ export function slider(options: SliderOptions): HTMLElement {
   overFill.style.color = "var(--on-fill)";
   const glyph = document.createElement("span");
   glyph.className = "k-slider-icon";
-  glyph.append(icon(options.icon, "var(--type-label-icon)", "var(--on-fill)"));
-  onFill.append(glyph, overFill);
+  onFill.append(overFill);
   const dots = document.createElement("span");
   dots.className = "k-slider-dots";
   const points = stepping ? Array.from({ length: stops }, (_, i) => i / last) : sticky !== undefined ? [sticky] : [];
@@ -145,25 +160,54 @@ export function slider(options: SliderOptions): HTMLElement {
   anchor.className = "k-slider-anchor";
   root.append(track, underTrack, fill, dots, anchor);
 
-  const pressesIcon = !options.disabled && (stepping || options.onIcon !== undefined);
-  if (pressesIcon) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "k-slider-icon-button";
-    button.tabIndex = -1;
-    button.setAttribute("aria-label", stepping ? "Step" : "Mute");
-    button.addEventListener("pointerdown", (event) => event.stopPropagation());
-    button.addEventListener("click", () => pressIcon());
-    root.append(button);
-  }
+  const button = !options.disabled && (stepping || toggle) ? iconButton() : undefined;
+  // The icon is drawn in its button where it has one, so the button's circle lies under it.
+  (button ?? onFill).prepend(glyph);
   focusRing(root, "full", "accent", false).dataset.pressable = "";
 
+  /**
+   * The icon's button: the circle at the fill's start, no stop for Tab of its own. It lights as an
+   * icon button does on the fill, with its hint naming what a press does.
+   */
+  function iconButton(): HTMLButtonElement {
+    const made = document.createElement("button");
+    made.type = "button";
+    made.className = "k-slider-icon-button k-control";
+    made.tabIndex = -1;
+    pin(made, options.pinnedIcon);
+    focusRing(made, "full", "accent", false).dataset.pressable = "";
+    made.addEventListener("pointerdown", (event) => event.stopPropagation());
+    made.addEventListener("click", () => pressIcon());
+    root.append(made);
+    return made;
+  }
+
+  /** Draws what Toggled changes: the fill's tone, the icon, and the button's name and hint. */
+  function drawToggle(): void {
+    root.style.setProperty("--toggled", toggled ? "1" : "0");
+    glyph.replaceChildren(icon(toggled && toggle ? toggle.icon : options.icon, "var(--type-label-icon)", "var(--on-fill)"));
+    if (!button) return;
+    const said = !toggle ? "Step" : toggled ? toggle.toggledLabel : toggle.label;
+    button.setAttribute("aria-label", said);
+    if (toggle) button.setAttribute("aria-pressed", String(toggled));
+    button.querySelector(":scope > .k-hint")?.remove();
+    withHint(button, said);
+  }
+
+  function setToggled(on: boolean): void {
+    if (!toggle || on === toggled) return;
+    toggled = on;
+    drawToggle();
+    draw();
+    toggle.changed?.(on);
+  }
+
   function numeric(): boolean {
-    return words === undefined && !(stepping && options.names !== undefined && options.names.length > 0);
+    return !toggled && !(stepping && options.names !== undefined && options.names.length > 0);
   }
 
   function label(): string {
-    if (words !== undefined) return words;
+    if (toggled && toggle) return toggle.words;
     if (stepping && options.names && options.names.length > 0) return options.names[Math.max(0, Math.min(last, Math.round(shown * last)))] ?? "";
     const at = stepping ? index / last : value;
     return options.number ? options.number(at) : PERCENT.format(at);
@@ -268,9 +312,10 @@ export function slider(options: SliderOptions): HTMLElement {
     return sticky !== undefined && Math.abs(fraction - sticky) <= reach ? sticky : fraction;
   }
 
+  /** Moves a continuous slider's value to `fraction`, out of Toggled, from where it is. */
   function moveTo(fraction: number): void {
     value = Math.max(0, Math.min(1, fraction));
-    words = options.words === undefined ? undefined : words;
+    setToggled(false);
     settle();
   }
 
@@ -280,27 +325,15 @@ export function slider(options: SliderOptions): HTMLElement {
   }
 
   // The icon's press: on a slider with stops it steps from high to low and back, turning at either
-  // end; on a continuous one it does what its owner says.
+  // end; on a continuous one it turns Toggled on or off.
   function pressIcon(): void {
     if (!stepping) {
-      options.onIcon?.(control);
+      setToggled(!toggled);
       return;
     }
     if (index + direction < 0 || index + direction > last) direction = direction === 1 ? -1 : 1;
     stepTo(index + direction);
   }
-
-  const control: SliderControl = {
-    element: root,
-    set: moveTo,
-    name(next) {
-      words = next;
-      draw();
-    },
-    get value() {
-      return value;
-    },
-  };
 
   if (!options.disabled) {
     root.addEventListener("pointerdown", (event) => {
@@ -312,6 +345,7 @@ export function slider(options: SliderOptions): HTMLElement {
       root.dataset.dragging = "";
       shown = fractionAt(event.offsetX);
       if (!stepping) value = shown;
+      setToggled(false);
       draw();
     });
     root.addEventListener("pointermove", (event) => {
@@ -345,12 +379,15 @@ export function slider(options: SliderOptions): HTMLElement {
       }
       event.preventDefault();
     });
+    // Only the horizontal wheel steps it, a tilt or Shift with the wheel, wheel right raising it: the
+    // vertical wheel scrolls the page past it, as everywhere else.
     let turned = 0;
     root.addEventListener(
       "wheel",
       (event) => {
+        if (event.deltaX === 0) return;
         event.preventDefault();
-        turned -= event.deltaY;
+        turned += event.deltaX;
         const notches = Math.trunc(turned / NOTCH);
         if (notches === 0) return;
         turned -= notches * NOTCH;
@@ -363,6 +400,7 @@ export function slider(options: SliderOptions): HTMLElement {
 
   // Drawn once it is laid out, and again whenever its width or the scale changes it.
   new ResizeObserver(() => draw()).observe(root);
+  drawToggle();
   draw();
   return probe(root, { role: "component", name: "Slider", variant: variant(compact ? "compact" : "regular", stepping && "stepped"), fixed: { width: false, height: true } });
 }
