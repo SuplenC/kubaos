@@ -25,6 +25,16 @@ import { length, number } from "./tokens.ts";
 
 const rings = new Set<HTMLElement>();
 
+// A ring drawn whenever its control's box changes, so a control put on the page after it settled
+// (a Show action swapped for Hide) or one that grows never shows a glow without its mask, which
+// would paint the whole glow box in the tone.
+const resized = new ResizeObserver((entries) => {
+  for (const entry of entries) {
+    const ring = entry.target as HTMLElement;
+    if (ring.isConnected) draw(ring, scaleOf(ring));
+  }
+});
+
 /**
  * The tone a focus tube lights in: the control's own, or the accent for one with none; a burning
  * kind's is its fixed tone (`docs/DESIGN.md`, "States").
@@ -300,6 +310,8 @@ export function focusRing(control: HTMLElement, corner: string, tone: Tone, fill
   ring.setAttribute("aria-hidden", "true");
   const glowing = document.createElement("span");
   glowing.className = "k-glow";
+  // Nothing shows until the mask is drawn for the control's size.
+  glowing.style.maskImage = "linear-gradient(transparent, transparent)";
   const tube = document.createElement("span");
   tube.className = "k-tube";
   ring.append(glowing, tube);
@@ -312,11 +324,13 @@ export function focusRing(control: HTMLElement, corner: string, tone: Tone, fill
     burning.dataset.glow = lit.glow ?? "content";
     const around = document.createElement("span");
     around.className = "k-lit-glow";
+    around.style.maskImage = "linear-gradient(transparent, transparent)";
     burning.append(around, copy);
     ring.append(burning);
   }
   control.append(ring);
   rings.add(ring);
+  resized.observe(ring);
   return ring;
 }
 
@@ -325,6 +339,9 @@ export function focusRing(control: HTMLElement, corner: string, tone: Tone, fill
 export function redrawRings(): void {
   for (const ring of rings) {
     if (ring.isConnected) draw(ring, scaleOf(ring));
-    else rings.delete(ring);
+    else {
+      rings.delete(ring);
+      resized.unobserve(ring);
+    }
   }
 }
