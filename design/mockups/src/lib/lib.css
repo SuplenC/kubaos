@@ -1408,10 +1408,152 @@
   --press: 0;
 }
 
-/* Tabs (`lib/tabs.ts`): their row of small buttons, as wide as the buttons. */
+/* How far a choice of the tabs is picked, 0 to 1: its words fade between their two colours. */
+@property --picked {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far the tabs' lit stretch has travelled to the pick: `--lead` its leading edge, `--trail`
+   its trailing one. At rest both are there. Each is the stretch's own, so a player moves it alone. */
+@property --lead {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+@property --trail {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+/* How far the tabs' lit stretch is through its flash as it lands, 0 at its colour, 1 at its peak. */
+@property --flash {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* Tabs (`lib/tabs.ts`): one well, a pill `size.control_sm` tall in the highest container at
+   `opacity.track`, as the slider's track is, `space.s4` round its choices. An unlit rail runs along
+   its bottom edge across the flat part between the round ends, half the well's height in from each
+   side: the tone at the spinner's ring's `opacity.spinner_track`. The picked choice's stretch of it
+   is lit, under its words, square at both ends: the core at night with the content glow round it,
+   as the spinner's arc, the tone by day with none, and solid glass (`primary_glass`) while the
+   signs are off. The rail is `tabs.rail` thick at night and `tabs.rail_day` by day, in whole device
+   pixels. The focus tube is the whole well's edge, drawn under the rail. Disabled, every part is at
+   `opacity.disabled_content`, with no glow. */
 .k-tabs {
-  display: block;
+  position: relative;
+  display: inline-flex;
   flex: none;
+  box-sizing: border-box;
+  height: var(--size-control_sm);
+  padding: var(--space-s4);
+  border-radius: var(--radius-full);
+  --dim: 1;
+  --rail-signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  --rail: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
+  background: rgb(from var(--color-surface_container_highest) r g b / calc(var(--opacity-track) * var(--dim)));
+}
+
+.k-tabs:is([data-pinned="signs-off"], [aria-disabled="true"]) {
+  --rail-signs: 0;
+}
+
+.k-tabs[aria-disabled="true"] {
+  --dim: var(--opacity-disabled_content);
+}
+
+.k-tabs:has(> .k-tab:focus-visible) > .k-ring {
+  --lit: 1;
+}
+
+.k-tabs[aria-disabled="true"] > .k-ring {
+  display: none;
+}
+
+.k-tabs-rail,
+.k-tabs-lit {
+  position: absolute;
+  bottom: 0;
+  height: var(--rail);
+  pointer-events: none;
+}
+
+.k-tabs-rail {
+  left: calc(var(--size-control_sm) / 2);
+  right: calc(var(--size-control_sm) / 2);
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-spinner_track) * var(--dim)));
+}
+
+/* The lit stretch between where it was and the pick: travelling right its right edge leads, left
+   its left one. Each edge lands on a whole device pixel. At its flash the core goes toward
+   `primary_flash` and its glow swells to `focus.pressed_glow` times its own, overdriven. */
+.k-tabs-lit {
+  --left-at: var(--trail);
+  --right-at: var(--lead);
+  --left: round(nearest, calc(var(--from-left, 0px) + (var(--to-left, 0px) - var(--from-left, 0px)) * var(--left-at)), 1px);
+  --right: round(nearest, calc(var(--from-right, 0px) + (var(--to-right, 0px) - var(--from-right, 0px)) * var(--right-at)), 1px);
+  left: var(--left);
+  width: max(0px, calc(var(--right) - var(--left)));
+  --colour: color-mix(in srgb, var(--color-primary_glass), var(--color-primary_core) calc(var(--rail-signs) * 100%));
+  --flashed: color-mix(in srgb, var(--colour), var(--color-primary_flash) calc(var(--flash) * 100%));
+  background: rgb(from var(--flashed) r g b / var(--dim));
+  --glow: calc(var(--focus-content_glow) * var(--rail-signs) * (1 + (var(--focus-pressed_glow) - 1) * var(--flash)));
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / var(--glow)));
+}
+
+.k-tabs[data-toward="left"] > .k-tabs-lit {
+  --left-at: var(--lead);
+  --right-at: var(--trail);
+}
+
+/* A choice: as tall as the well less its padding, `space.s12` inside its sides, its words
+   `button_small` with an optional symbol `space.s4` before them. Not picked, the words are
+   `on_surface_variant`, brightening to `on_surface` under the pointer (`--lit`); picked, they are
+   `primary_lit` (the core at night, fitted to the well; the tone by day), at night with the label
+   glow round them while the signs are on. Pressed, a choice's words go to the picked colour over
+   `micro`, before letting go picks it. The pick fades the words over `short`. */
+.k-tab {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: calc(var(--size-control_sm) - 2 * var(--space-s4));
+  padding: 0 var(--space-s12);
+  cursor: pointer;
+  --rest-words: color-mix(in srgb, var(--color-on_surface_variant), var(--color-on_surface) calc(var(--lit) * 100%));
+  --picked-words: color-mix(in srgb, var(--rest-words), var(--color-primary_lit) calc(max(var(--picked), var(--press)) * 100%));
+  --words: rgb(from var(--picked-words) r g b / var(--dim));
+}
+
+.k-tab[aria-selected="true"] {
+  --picked: 1;
+}
+
+.k-tab:disabled {
+  cursor: default;
+}
+
+.k-tab.k-control {
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard),
+    --picked var(--motion-short) var(--easing-standard);
+}
+
+.k-tab.k-control[data-pinned],
+[data-sequence] .k-tab.k-control {
+  transition: none;
+}
+
+.k-tab-words {
+  filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--picked) * var(--rail-signs))));
 }
 
 /* A menu (`lib/menu.ts`): its items one under the other across its popover. Past `--most` small

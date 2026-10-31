@@ -1,6 +1,6 @@
-// The Tabs page: `docs/design/components/tabs.md`. One of a few views or values, picked from a row
-// of small buttons, the picked one Tonal and the rest Text; the same row is the segmented control.
-// Its choices are Button atoms, so their states and moves are the Button page's.
+// The Tabs page: `docs/design/components/tabs.md`. One of a few views or values, picked along a
+// rail of neon in one well; the same well is the segmented control. The pick's lit stretch travels
+// to the new choice and flashes as it lands.
 
 import type { Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
@@ -8,7 +8,7 @@ import { stack } from "../../lib/layout.ts";
 import { type Tab, tabs } from "../../lib/tabs.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
 
 const SECTIONS: readonly Tab[] = [{ label: "Wi-Fi" }, { label: "Bluetooth" }, { label: "Output" }, { label: "Keyboard" }];
 const TOOLS: readonly Tab[] = [
@@ -39,63 +39,95 @@ function sections(): HTMLElement {
 }
 
 const ROWS = [
-  { name: "Sections", choices: SECTIONS, picked: 0 },
+  { name: "Views", choices: SECTIONS, picked: 0 },
   { name: "With symbols", choices: TOOLS, picked: 1 },
-  { name: "A segmented control", choices: MOTION, picked: 1 },
+  { name: "Segmented control", choices: MOTION, picked: 1 },
 ] as const;
 
 type MatrixState = "rest" | "lit" | "pressed" | "disabled";
 
-const ON = "the picked choice";
+const STRETCH = "the lit stretch";
+const NEW = "the choice picked";
+const OLD = "the choice it leaves";
+
+/** The pick's tracks: the stretch's two edges, its flash, and the words of the two choices. */
+function picking(reduced: boolean): NonEmpty<Track<Easing>> {
+  const edge = (part: string, property: string, travel: "short" | "medium", cue?: "micro"): Track<Easing> =>
+    reduced
+      ? { part, on: STRETCH, target: ".k-tabs-lit", property, from: 0, to: 1, duration: "instant", curve: "linear" }
+      : { part, on: STRETCH, target: ".k-tabs-lit", property, from: 0, to: 1, duration: travel, ...(cue ? { cue } : {}), curve: "emphasized_decel" };
+  return [
+    edge("leading edge", "--lead", "short"),
+    edge("trailing edge", "--trail", "medium", "micro"),
+    { part: "flash", on: STRETCH, target: ".k-tabs-lit", property: "--flash", from: 0, to: 1, duration: "micro", curve: "standard" },
+    { part: "flash", on: STRETCH, target: ".k-tabs-lit", property: "--flash", from: 1, to: 0, duration: reduced ? "short" : "long", cue: "micro", curve: "standard" },
+    { part: "words", on: NEW, target: '.k-tab[aria-selected="true"]', property: "--picked", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "words", on: OLD, target: ".k-tab[data-was]", property: "--picked", from: 1, to: 0, duration: "short", curve: "standard" },
+  ];
+}
+
+/** A pick from choice `from` to `to` of the sections, as a move. */
+function pickMove(name: string, what: string, from: number, to: number): Move {
+  return {
+    name,
+    what,
+    tracks: picking(false),
+    reduced: picking(true),
+    back: "cuts",
+    // The player moves parts inside its sample, so the well sits in a box of its own.
+    sample: () => stack(0, "start", tabs({ choices: SECTIONS, picked: to, from })),
+  };
+}
+
+const PICK_WHAT =
+  "The lit stretch travels from the old choice to the new one and stretches as it goes: its leading edge, the one toward the new choice, gets there over `short` on `emphasized_decel` (`--lead`, 0 to 1), and its trailing edge follows a `micro` later over `medium` on the same curve (`--trail`), catching up. As the pick switches its core flashes: up to `primary_flash` over `micro` on `standard` (`--flash`, 0 to 1), at night most of the way to white with its glow swelling to `focus.pressed_glow` times its own, by day a brighter tint of the tone; then back to its colour over `long`. The words cross-fade over `short` on `standard` (`--picked`), the new choice's to the picked colour as the old one's go back. A pick made while the stretch is still travelling starts from where it is. With reduced motion the stretch is on the new choice at once, and the flash and the words still fade, the flash settling over `short`.";
 
 export default page({
   level: "molecules",
   slug: "tabs",
   title: "Tabs",
-  summary: "One of a few views or values, picked from a row of small buttons: the picked one tonal, the rest text.",
+  summary: "One of a few views or values, picked along a rail of neon in one well: the pick's stretch of the rail lit, its words the accent.",
   live: () => stack("s24", "start", sections(), row(TOOLS, 1), row(MOTION, 1)),
   description: [
     "Rust `tabs::tabs`, QML `Tabs`. Click a choice, or Tab to a row and use ← and →: the view under the sections follows the pick.",
-    "A row of small (sm) buttons `space.s4` apart, as tall as `size.control_sm`: the picked one `Tonal`, the rest `Text`, each with an optional symbol before its label. It picks one of a few views (the control center's sections, the clock's tools, the wallpaper picker's folders, the system monitor's order) or one of a setting's few values side by side, as the segmented control (the wallpaper's motion: Always, On AC, Never).",
-    "Each choice is a `Button`, with the Button page's states and moves: a choice lights under the pointer as any Text or Tonal button does. The row is one stop for Tab, on the picked choice, so the tube and its glow light the picked one while the row has the keyboard; ← and → pick the neighbour and the keyboard moves with the pick. A pick is at once: the picked choice turns `Tonal` and the one before `Text` on the same frame, the light moving with the keyboard as a fade, and the view it shows changes as its own surface says.",
-    "Disabled, every choice is dimmed as a disabled button is, the picked one still tonal, so the setting still reads; the row takes no press and is no stop for Tab.",
+    "The choices sit side by side in one well: a pill (`radius.full`) in `surface_container_highest` at `opacity.track`, as a slider's track is, `size.control_sm` tall with `space.s4` round the choices. Each choice is as tall as the well less that padding, `space.s12` inside its sides, its words `button_small` with an optional symbol `space.s4` before them in the words' colour. There is no fill behind the picked one. It picks one of a few views (the control center's sections, the clock's tools, the wallpaper picker's folders, the system monitor's order) or one of a setting's few values side by side, as the segmented control (the wallpaper's motion: Always, On AC, Never).",
+    "An unlit rail of neon runs straight along the well's bottom edge, on the edge with nothing below it, across the flat part between the round ends: the tone at the spinner's ring's `opacity.spinner_track`. The picked choice's stretch of it is lit, under its words (inset `space.s12` from its sides), square at both ends: at night the core with the content glow round it, as the spinner's arc; by day the tone, with no glow. It is `tabs.rail` thick at night and `tabs.rail_day` by day, whole device pixels. The picked words are `primary_lit`, the core at night with the label glow round them and the tone by day, with no change of weight, so nothing shifts; the rest are `on_surface_variant`.",
+    "A choice under the pointer brightens its words toward `on_surface`; pressed, its words go to the picked colour, and letting go picks it. The row is one stop for Tab, on the picked choice, and while it has the keyboard the focus tube lights the whole well's edge with its glow; the lit stretch already says which choice is picked. ← and → pick the neighbour, and the keyboard moves with the pick.",
+    "Disabled, every part is at `opacity.disabled_content` with no glow, the pick still shown, so the setting still reads; the row takes no press and is no stop for Tab.",
   ],
   variants: [
     { name: "Views", for: "One of a few views of one thing: the control center's sections.", sample: () => row(SECTIONS, 0) },
     { name: "With symbols", for: "Choices a symbol helps tell apart: the clock's Timer and Alarm.", sample: () => row(TOOLS, 1) },
     { name: "Segmented control", for: "One of a setting's few values side by side, where radio rows would take a line each.", sample: () => row(MOTION, 1) },
   ],
-  sizes: doesntApply("its choices are always small buttons (sm, `size.control_sm`): a row of tabs sits among small controls, and a view's tabs are no louder than the view."),
+  sizes: doesntApply("the well is always a small control's height (`size.control_sm`): a row of tabs sits among small controls, and a view's tabs are no louder than the view."),
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],
     absent: {
-      selected: "the picked choice is its Tonal button, in every row here.",
+      selected: "the pick is the lit stretch and the accent words, in every row here.",
       loading: "a pick is at once; a view still loading shows its own skeleton under the row.",
       empty: "a row always has a pick: a row of one choice isn't tabs.",
       error: "it has no wrong pick.",
     },
     rows: nonEmpty(ROWS.map(({ name, choices, picked }) => ({ name, cell: (state: MatrixState) => row(choices, picked, state) }))),
     described: {
-      rest: "The picked choice a resting `Tonal` button, its label dimmed on `secondary_container`; the rest resting `Text` buttons, their labels the accent unlit. By day the container and the accent in daylight colours.",
-      lit: "The row with the keyboard on it, here with the signs on: the picked choice lit as a Tonal button is, its label to `on_secondary_container`, the tube inside its edge and the glow outside. A choice under the pointer lights the same way, as its own kind. By day the line with no glow.",
-      pressed: "The picked choice pressed: its container lifts 0.035, the glow to `focus.pressed_glow` times the lit one. A Text choice pressed burns its tube white-hot; letting go picks it.",
-      disabled: "Every choice dimmed as a disabled button is, the picked one still on its container: no line, no glow, no press, no stop for Tab.",
+      rest: "The well on its surface, the unlit rail along its bottom edge and the pick's stretch of it lit: at night the core with its glow, the picked words the core with the label glow, the rest `on_surface_variant`. By day the stretch and the picked words are the tone, with no glow, and the stretch a pixel thicker.",
+      lit: "The row with the keyboard on it, here with the signs on: the focus tube burns round the whole well's edge with the glow outside, under the rail, and the pick is as at rest. A choice under the pointer lights only its words, from `on_surface_variant` to `on_surface`; the rail stays as it is. By day the tube with no glow.",
+      pressed: "The choice after the pick held under the pointer: its words go to the picked colour over `micro`, before letting go picks it and the stretch travels there. The well doesn't light: a press is the pointer's.",
+      disabled: "Every part at `opacity.disabled_content` (the well, the rail, the lit stretch and the words), with no glow, the pick still shown: no press, no stop for Tab.",
     },
   },
   focus: {
-    tubes: [
-      { name: "The picked choice", tone: "accent", filled: false, content: false },
-      { name: "A choice under the pointer", tone: "accent", filled: false, content: true },
-    ],
+    tubes: [{ name: "The well, with the keyboard on the row", tone: "accent", filled: false, content: false }],
     looks: {
-      lit: "At night at rest, the signs burn: the picked choice's tube inside its edge with the glow outside, its label brightening; a Text choice under the pointer burns its label as a tube as well.",
-      signsOff: "Still lit, the neon unpowered: by day always, and at night while a power change has the lights out. The tube is solid glass, `primary_glass`, no glow, the label at rest.",
+      lit: "At night at rest, the signs burn: the focus tube round the well's edge with the glow outside it, the lit stretch the core with its glow and the picked words with theirs.",
+      signsOff: "Still lit, the neon unpowered: by day always, and at night while a power change has the lights out. The tube round the well and the lit stretch are solid glass, `primary_glass`, with no glow; the picked words keep `primary_lit`, so the pick still reads, with no glow round them.",
     },
     signsOff: (index: number) => row(ROWS[index]!.choices, ROWS[index]!.picked, "signs-off"),
   },
   content: {
-    text: [{ name: "A choice's label", words: LONG, sample: (words: string) => row([{ label: "Always" }, { label: words }, { label: "Never" }], 1) }],
-    missingPicture: doesntApply("a symbol is optional: a choice without one is its label alone, and a row's choices all have one or none."),
+    text: [{ name: "A choice's words", words: LONG, sample: (words: string) => row([{ label: "Always" }, { label: words }, { label: "Never" }], 1) }],
+    missingPicture: doesntApply("a symbol is optional: a choice without one is its words alone, and a row's choices all have one or none."),
     counts: [
       { name: "Two", for: "The fewest: two views.", sample: () => row(TOOLS, 0) },
       { name: "Four", for: "The control center's sections.", sample: () => row(SECTIONS, 2) },
@@ -110,21 +142,31 @@ export default page({
     arrives: doesntApply("a row of tabs comes with the surface it is on."),
     leaves: doesntApply("it goes with the surface it is on."),
     between: [
+      pickMove("Picking, to the right", `${PICK_WHAT} Here from Wi-Fi to Output: the right edge leads.`, 0, 2),
+      pickMove("Picking, to the left", `${PICK_WHAT} Here from Keyboard back to Wi-Fi, the longest way: the left edge leads.`, 3, 0),
       {
         name: "The keyboard comes to the row",
-        what: "The row takes the keyboard: the picked choice lights up over `short` on `standard`, as any button does. A pick moving with ← or → is at once: the new choice turns Tonal and the old one Text on the same frame, and the keyboard moving with it lights the new one up over `short` as the old one goes back to rest, as focus moving between controls does.",
-        tracks: lights('[aria-selected="true"]', ON, 0, 1),
+        what: "The row takes the keyboard: the focus tube round the well lights up over `short` on `standard`, as any control does. A pick with ← or → moves only the lit stretch and the words, as above; the tube stays on the well.",
+        tracks: lights(".k-tabs > .k-ring", "the well", 0, 1),
         reduced: "same",
         back: "cuts",
         sample: () => row(TOOLS, 1),
       },
       {
-        name: "Pressed",
-        what: "A lit choice pressed: over `micro`, and back as it comes up; letting go picks it.",
-        tracks: press('[aria-selected="true"]', ON),
+        name: "A choice under the pointer",
+        what: "The pointer comes to a choice that isn't picked: its words brighten from `on_surface_variant` to `on_surface` over `short` on `standard`, and back as it leaves. Nothing else lights.",
+        tracks: lights('.k-tab[aria-selected="false"]', "the choice not picked", 0, 1),
         reduced: "same",
         back: "plays",
-        sample: () => row(TOOLS, 1, "lit"),
+        sample: () => row(TOOLS, 1),
+      },
+      {
+        name: "Pressed",
+        what: "A choice that isn't picked, pressed: its words go to the picked colour over `micro`, and back if the pointer leaves before letting go; letting go picks it.",
+        tracks: press('.k-tab[aria-selected="false"]', "the choice not picked"),
+        reduced: "same",
+        back: "plays",
+        sample: () => row(TOOLS, 1),
       },
       ...powerMoves(() => row(TOOLS, 1, "lit")),
     ],
@@ -141,17 +183,19 @@ export default page({
   },
   measures: {
     samples: nonEmpty([
-      { name: "With symbols", for: "Each button's height, padding, symbol and the gap between them.", sample: () => row(TOOLS, 1) },
-      { name: "Sections", for: "The row as wide as its buttons.", sample: () => row(SECTIONS, 0) },
+      { name: "With symbols", for: "The well, its padding, each choice's height and padding, the symbol and its gap, and the rail.", sample: () => row(TOOLS, 1) },
+      { name: "Views", for: "The well as wide as its choices, and the lit stretch under the pick's words.", sample: () => row(SECTIONS, 0) },
     ]),
     measures: [
-      { what: "Each choice's height, a small button's.", token: "size-control_sm" },
-      { what: "The gap between choices.", token: "space-s4" },
-      { what: "Inside each choice's sides.", token: "space-s12" },
-      { what: "The gap between a symbol and its label.", token: "space-s4" },
-      { what: "Each choice's label, `button_small`'s line.", token: "type-button_small-line" },
-      { what: "Each choice's corners.", token: "radius-control" },
+      { what: "The well's height, a small control's.", token: "size-control_sm" },
+      { what: "The well's padding round its choices.", token: "space-s4" },
+      { what: "Inside each choice's sides, and the lit stretch's inset from them.", token: "space-s12" },
+      { what: "The gap between a symbol and its words.", token: "space-s4" },
+      { what: "Each choice's words, `button_small`'s line.", token: "type-button_small-line" },
+      { what: "The well's corners.", token: "radius-full" },
+      { what: "The rail's and the lit stretch's thickness at night.", token: "tabs-rail" },
+      { what: "The rail's and the lit stretch's thickness by day.", token: "tabs-rail_day" },
     ],
-    reflow: doesntApply("a row of tabs is as wide as its buttons at every window size: it never stretches, wraps or scrolls. A row that would run past its room is a Select (Counts, above)."),
+    reflow: doesntApply("a row of tabs is as wide as its choices at every window size: it never stretches, wraps or scrolls. A row that would run past its room is a Select (Counts, above)."),
   },
 });
