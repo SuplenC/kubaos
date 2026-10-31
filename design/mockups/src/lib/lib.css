@@ -680,7 +680,7 @@
    keyboard in it, its fill rises to the highest container (an invalid one keeps its own) and its
    tube is drawn over the hairline. Its value is clipped to its room, `space.s12` in at each side
    (or past the icon and `space.s8` more); with the keyboard in it, the text scrolls left to keep
-   the caret, `caret.gap` past the letter before it, inside the room. */
+   the caret inside the room. */
 .k-field {
   position: relative;
   display: block;
@@ -708,7 +708,7 @@
   --caret-tone: color-mix(in srgb, var(--color-primary), var(--color-error) calc(var(--invalid) * 100%));
   --caret-core: color-mix(in srgb, var(--color-primary_core), var(--color-error_core) calc(var(--invalid) * 100%));
   --caret-glass: color-mix(in srgb, var(--color-primary_glass), var(--color-error_glass) calc(var(--invalid) * 100%));
-  --caret-reach: calc(var(--caret-gap) + var(--thin));
+  --caret-reach: calc(var(--thin) / 2);
 }
 
 .k-field[data-icon] {
@@ -808,9 +808,10 @@
 }
 
 /* The caret: one core line the thin stroke wide with rounded ends, `caret.height` tall and centred
-   down the field, its left edge `caret.gap` past the letter before it on a whole device pixel. It
-   sits on the field, outside the text's clip, so its glow is never cut; its place is the room's
-   scroll worked out against the field's width, the room being the field less its insets. At night
+   down the field, and centred across the boundary between the letters either side, on a whole
+   device pixel. It sits on the field, outside the text's clip, so its glow is never cut; its place
+   is the room's scroll worked out against the field's width, the room being the field less its
+   insets. At night
    it is the tone's core with the signs on and its glass with them off; by day, the tone. It is
    steady: it strikes on with focus (`lib/field.ts`) and never blinks. */
 .k-field-caret {
@@ -823,8 +824,8 @@
     nearest,
     calc(
       var(--start) +
-        min(var(--caret-at) * var(--px), 100% - var(--start) - var(--space-s12) - var(--caret-reach)) +
-        var(--caret-gap)
+        min(var(--caret-at) * var(--px), 100% - var(--start) - var(--space-s12) - var(--caret-reach)) -
+        var(--thin) / 2
     ),
     1px
   );

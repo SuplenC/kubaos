@@ -105,11 +105,6 @@ offset = 4
 # at each end, so it reads as a mark between letters, not a rule as tall as
 # the text.
 height = 16
-# How far its left edge sits past the end of the letter before it, in logical
-# pixels: clear enough that the core and its glow never touch the letter. It
-# is a gap between a letter and a stroke, not a length on the grid, and the
-# caret is placed on a whole device pixel.
-gap = 3
 # The glow round it while you type: its reach outside the caret in logical
 # pixels, and its opacity at the caret's edge, fading to nothing at the reach.
 # Fainter than a control's near glow: it sits among the letters.

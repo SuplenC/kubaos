@@ -115,8 +115,6 @@ pub struct Focus {
 pub struct Caret {
     /// Its height in logical pixels, centred on the value's line.
     pub height: u16,
-    /// How far it sits past the letter before it, in logical pixels.
-    pub gap: u16,
     /// The glow's reach outside the caret, in logical pixels.
     pub near: u16,
     /// The glow's opacity at the caret's edge.
