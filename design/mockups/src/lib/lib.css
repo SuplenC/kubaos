@@ -691,6 +691,9 @@
   border-radius: var(--radius-control);
   outline: none;
   cursor: text;
+  /* The field draws its own selection, so the browser's never shows: not even a drag across a
+     disabled one, which selects nothing. */
+  user-select: none;
   --lit: 0;
   --start: var(--space-s12);
   --thin: max(1px, round(nearest, var(--stroke-thin), 1px));
