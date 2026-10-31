@@ -673,6 +673,38 @@ y = 0
 blur = 12
 opacity = 0.55
 
+# The ladder a part rises on inside its plane, a window or a shell panel, restarting from the
+# plane's own surface (step 0) in each, so a card looks the same in a window as in a panel. Step 1
+# is a card or a tucked notification, 2 a menu, a popover or a lifted notification, 3 a dialog
+# inside an app or a panel, 4 a tooltip. Each step casts one shadow, measured from the plane's
+# surface rather than from whatever it lies on, in two layers of the `shadow` role: a tight contact
+# layer the same at every step, and an ambient one that falls further and softer with each step,
+# `y` and `blur` plus the step times `y_step` and `blur_step`, on the grid at every step.
+#
+# The night's surfaces are dark enough to swallow a shadow, so the layers are stronger there and a
+# raised part also takes the container role `lighter_at_night` steps above its day one. Every
+# raised part draws a rim inside its edge, a hairline of `on_surface` at `rim`: by night it is
+# what shows the edge, by day it keeps a pale part off a pale surface.
+[elevation]
+steps = 4
+lighter_at_night = 1
+rim = 0.08
+light_rim = 0.06
+
+[elevation.contact]
+y = 0
+blur = 4
+opacity = 0.70
+light_opacity = 0.24
+
+[elevation.ambient]
+y = 0
+blur = 0
+y_step = 4
+blur_step = 16
+opacity = 0.80
+light_opacity = 0.28
+
 # The neon sign. The boot splash switches the sign on a group of tubes at a
 # time, and Kōbō's done screen writes the クバ mark in as lit tubes: one
 # stutter and one drawing, so the first and the last thing an install shows

@@ -2,21 +2,22 @@
 // `kubaos-ui`'s `tooltip::tooltip` and `tooltip::with_tooltip`, `KubaOS.Components`' `Tooltip`
 // (`docs/design/components/tooltip.md`). A title in `body_strong`, the body in `small` and
 // `on_surface_variant` `space.s4` under it, and what it holds `space.s8` below (its keys, as
-// `KeyHints`), on a popover `size.menu` wide: `surface_container`, a soft hairline, the surface
-// radius, `space.s12` inside and the panel's shadow.
+// `KeyHints`), on a popover `size.menu` wide: `surface_container`, the surface radius, `space.s12`
+// inside, raised to the ladder's top step, a tooltip's (`lib/elevation.ts`).
 //
 // It isn't neon: no line, no glow and no states of its own. It floats `space.s8` above its control,
 // starting where the control starts, or below where there is no room above, and fades in and out
 // with its control's lit state. It never takes the pointer.
 
+import { raise, type Step } from "./elevation.ts";
 import { stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { wrapped } from "./text.ts";
 
-/** `content` on a popover `size.menu` wide: `kubaos-ui`'s `menu::popover`. */
-export function popover(...content: Element[]): HTMLElement {
-  const card = document.createElement("span");
-  card.className = "k-popover";
+/** `content` on a popover `size.menu` wide, raised to `step`: `kubaos-ui`'s `menu::popover`. */
+export function popover(step: Step, ...content: Element[]): HTMLElement {
+  const card = raise(document.createElement("span"), step);
+  card.classList.add("k-popover");
   card.append(...content);
   return probe(card, { role: "component", name: "Popover", variant: "", fixed: { width: false, height: false, holds: true } });
 }
@@ -26,7 +27,7 @@ export function tooltip(title: string, body: string, extra?: Element): HTMLEleme
   const words = stack("s4", "start", wrapped(title, "body_strong"), ...(body === "" ? [] : [wrapped(body, "small", "on_surface_variant")]));
   const card = document.createElement("span");
   card.className = "k-tooltip";
-  card.append(popover(stack("s8", "start", words, ...(extra ? [extra] : []))));
+  card.append(popover(4, stack("s8", "start", words, ...(extra ? [extra] : []))));
   return probe(card, { role: "component", name: "Tooltip", variant: "", fixed: { width: true, height: false } });
 }
 

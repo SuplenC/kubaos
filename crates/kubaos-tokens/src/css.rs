@@ -180,6 +180,16 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
         out.length(&format!("shadow-{name}-y"), shadow.y);
         out.length(&format!("shadow-{name}-blur"), shadow.blur);
     }
+    let elevation = &tokens.elevation;
+    out.comment("The ladder inside a plane: each step's contact and ambient layer, down and blurred.");
+    out.var("elevation-steps", elevation.steps.to_string());
+    for step in elevation.raised() {
+        for (layer, values) in [("contact", &elevation.contact), ("ambient", &elevation.ambient)] {
+            let (y, blur) = values.at(step);
+            out.length(&format!("elevation-{step}-{layer}-y"), y);
+            out.length(&format!("elevation-{step}-{layer}-blur"), blur);
+        }
+    }
 }
 
 fn weight(weight: Weight) -> u16 {
@@ -284,6 +294,17 @@ fn mode(out: &mut Css, tokens: &Tokens, palette: &BTreeMap<String, Rgb>, mode: M
         };
         out.var(&format!("shadow-{name}-opacity"), number(opacity));
     }
+    let elevation = &tokens.elevation;
+    out.comment("The ladder's layers' opacities of `shadow`, its rim's of `on_surface`, and how many container");
+    out.comment("roles above its day one a raised part sits.");
+    out.var("elevation-contact-opacity", number(elevation.contact.opacity_in(mode)));
+    out.var("elevation-ambient-opacity", number(elevation.ambient.opacity_in(mode)));
+    out.var("elevation-rim", number(elevation.rim_in(mode)));
+    let lighter = match mode {
+        Mode::Dark => elevation.lighter_at_night,
+        Mode::Light => 0,
+    };
+    out.var("elevation-lighter", lighter.to_string());
 }
 
 /// Every derived role's recipe in `mode`, as JSON: what the mockups compute a palette's derived
