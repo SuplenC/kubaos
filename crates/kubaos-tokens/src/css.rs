@@ -172,9 +172,8 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
     out.var("focus-pressed_glow", number(focus.pressed_glow));
     out.length("focus-offset", focus.offset);
     let caret = &tokens.caret;
-    out.comment("A field's caret: its height, its gap past the letter before it, and its glow's reach and opacity.");
+    out.comment("A field's caret: its height, and its glow's reach and opacity.");
     out.length("caret-height", caret.height);
-    out.length("caret-gap", caret.gap);
     out.length("caret-near", caret.near);
     out.var("caret-glow", number(caret.glow));
     for (name, shadow) in &tokens.shadow {
