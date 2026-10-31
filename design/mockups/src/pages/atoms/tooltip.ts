@@ -43,13 +43,13 @@ function shownOver(): HTMLElement {
 }
 
 const DESCRIBED =
-  "A popover `size.menu` wide: `surface_container`, a soft hairline inside its edge (`outline_variant` at `opacity.outline_soft`), the surface radius (`radius.surface`), `space.s12` inside, and the panel's shadow (`shadow.panel`). Its title is `body_strong` in `on_surface`, its body `small` in `on_surface_variant` `space.s4` under it, both breaking between words in the card's width, and what it holds `space.s8` below. It is never lit: no line, no glow.";
+  "A popover `size.menu` wide: `surface_container` (`surface_container_high` at night), the surface radius (`radius.surface`), `space.s12` inside, raised to the ladder's top step, a tooltip's: step 4's contact and ambient shadow and the rim inside its edge (`[elevation]`). Its title is `body_strong` in `on_surface`, its body `small` in `on_surface_variant` `space.s4` under it, both breaking between words in the card's width, and what it holds `space.s8` below. It is never lit: no line, no glow.";
 
 const DECIDED = [
   "Decided, its motion: a tooltip isn't a light, so it never flickers, even though it is a surface appearing: it fades in over `short` with its control lighting up and out over `short` as the control goes back to rest, as a `Hint` does, and as today.",
   "Decided, leaving: it fades out over `short`, as today, not over a panel's `medium`: it goes with the pointer, many times a minute.",
   "Decided, over a disabled control: it still shows under the pointer, as a `Hint` does, so a control that can't be used now still says what it does. Today it shows only when the app asks.",
-  "Decided, its shadow by day: the card casts the panel's shadow, `shadow.panel` at 0.55, by day as by night, as today, since a tooltip floats over the page as a panel does; the tucked card's shadow is the only one lighter by day.",
+  "Decided, its shadow: a tooltip is the ladder's top step, 4, over the window or the panel it is in, the same in both, with the ladder's lighter layers and fainter rim by day (Foundations, Elevation).",
   "Decided, a delay: it shows as its control lights, with no wait, as a `Hint` does and as today, since a tooltip is for the few controls whose words can't say enough.",
 ];
 
@@ -96,7 +96,7 @@ export default page({
       { name: "A title alone", cell: () => tooltip(shown(TITLE), "") },
     ],
     described: {
-      rest: `Shown, while its control is lit. ${DESCRIBED} By day the same roles in daylight colours, with the same shadow.`,
+      rest: `Shown, while its control is lit. ${DESCRIBED} By day the same roles in daylight colours, with the day's lighter shadow and fainter rim.`,
     },
   },
   focus: doesntApply("a tooltip isn't a control and isn't neon: it has no line and no glow, by night or by day. Its control lights as its own page says."),
@@ -152,13 +152,14 @@ export default page({
       { what: "Its width, a menu's.", token: "size-menu" },
       { what: "Its padding.", token: "space-s12" },
       { what: "Its corners.", token: "radius-surface" },
-      { what: "The soft hairline inside its edge: one device pixel.", token: "stroke-hairline_device_px" },
+      { what: "The rim inside its edge: one device pixel.", token: "stroke-hairline_device_px" },
       { what: "The title's line.", token: "type-body_strong-line" },
       { what: "The body's line.", token: "type-small-line" },
       { what: "The gap between the title and the body.", token: "space-s4" },
       { what: "The gap between its words and its keys, between lines of keys, and between the card and its control.", token: "space-s8" },
-      { what: "Its shadow's drop.", token: "shadow-panel-y" },
-      { what: "Its shadow's blur.", token: "shadow-panel-blur" },
+      { what: "Its shadow's contact layer: its blur.", token: "elevation-4-contact-blur" },
+      { what: "Its shadow's ambient layer: its drop.", token: "elevation-4-ambient-y" },
+      { what: "Its shadow's ambient layer: its blur.", token: "elevation-4-ambient-blur" },
     ],
     reflow: doesntApply("a tooltip is `size.menu` wide at every window size, its words wrapping inside; at the window's edge it moves back to stay inside."),
   },

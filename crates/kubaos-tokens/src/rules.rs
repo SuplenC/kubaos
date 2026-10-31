@@ -399,6 +399,14 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
         on_grid(format!("shadow.{name}.y"), shadow.y);
         on_grid(format!("shadow.{name}.blur"), shadow.blur);
     }
+    let elevation = &tokens.elevation;
+    for (layer, values) in [("contact", &elevation.contact), ("ambient", &elevation.ambient)] {
+        for step in elevation.raised() {
+            let (y, blur) = values.at(step);
+            on_grid(format!("elevation.{layer}.y at step {step}"), y);
+            on_grid(format!("elevation.{layer}.blur at step {step}"), blur);
+        }
+    }
     for (name, style) in &tokens.types {
         on_grid(format!("type.{name}.line"), style.line);
     }
@@ -435,6 +443,13 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     for (name, &value) in &tokens.opacity {
         check_opacity(format!("opacity.{name}"), value, found);
     }
+    let elevation = &tokens.elevation;
+    for (layer, values) in [("contact", &elevation.contact), ("ambient", &elevation.ambient)] {
+        check_opacity(format!("elevation.{layer}.opacity"), values.opacity, found);
+        check_opacity(format!("elevation.{layer}.light_opacity"), values.light_opacity, found);
+    }
+    check_opacity("elevation.rim".into(), elevation.rim, found);
+    check_opacity("elevation.light_rim".into(), elevation.light_rim, found);
     check_opacity("focus.near_opacity".into(), tokens.focus.near_opacity, found);
     check_opacity("focus.far_opacity".into(), tokens.focus.far_opacity, found);
     check_opacity("focus.content_glow".into(), tokens.focus.content_glow, found);
