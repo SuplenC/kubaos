@@ -70,6 +70,11 @@ mockups/spinner     design/mockups/src/pages/atoms/spinner.ts
 mockups/divider     design/mockups/src/pages/atoms/divider.ts
 mockups/skeleton    design/mockups/src/pages/atoms/skeleton.ts
 mockups/figure      design/mockups/src/pages/atoms/figure.ts
+mockups/slider      design/mockups/src/pages/molecules/slider.ts
+mockups/tabs        design/mockups/src/pages/molecules/tabs.ts
+mockups/select      design/mockups/src/pages/molecules/select.ts
+mockups/popover     design/mockups/src/pages/molecules/popover.ts
+mockups/menu        design/mockups/src/pages/molecules/menu.ts
 mockups/colour      design/mockups/src/pages/foundations/colour.ts
 mockups/type        design/mockups/src/pages/foundations/type.ts
 mockups/space       design/mockups/src/pages/foundations/space.ts
