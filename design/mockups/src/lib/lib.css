@@ -854,3 +854,43 @@
   flex: none;
   width: var(--room);
 }
+
+/* A keycap (`lib/keycap.ts`): `size.keycap` tall, as wide as its key and `space.s4` either side
+   (the key rounded up to a device pixel), never narrower than tall. Its edge fills the whole key
+   and its face stands on it one hairline short of the foot, so the edge shows a hairline at the
+   top and the sides and two at the foot. The key is centred across it on a whole device pixel. */
+.k-keycap {
+  position: relative;
+  display: block;
+  flex: none;
+  --inner: calc(round(up, calc(var(--natural) * var(--px) - 0.001px), 1px) + 2 * var(--space-s4));
+  width: max(var(--size-keycap), var(--inner));
+  height: var(--size-keycap);
+  border-radius: var(--radius-small);
+  background: var(--color-outline_variant);
+}
+
+.k-keycap::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 var(--stroke-hairline_device_px);
+  box-sizing: border-box;
+  border: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  border-radius: inherit;
+  background: var(--color-surface_container_highest);
+}
+
+.k-keycap-label {
+  position: relative;
+  padding: 0 var(--space-s4);
+  margin-left: round(nearest, calc((max(var(--size-keycap), var(--inner)) - var(--inner)) / 2), 1px);
+}
+
+/* Key hints given a room: a hint past it wraps onto a line of its own, which is cut away, and so
+   does every hint after it, so none is cut through a keycap. */
+.k-key-hints[data-room] {
+  flex-wrap: wrap;
+  max-width: var(--room);
+  height: var(--size-keycap);
+  overflow: hidden;
+}
