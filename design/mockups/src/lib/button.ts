@@ -154,7 +154,7 @@ export interface ButtonOptions {
 }
 
 /** A symbol in a box as wide as itself and as tall as the label's line beside it. */
-function iconInLine(name: string, style: TypeStyle, color: string): HTMLElement {
+export function iconInLine(name: string, style: TypeStyle, color: string): HTMLElement {
   const slot = document.createElement("span");
   slot.className = "k-icon-line";
   slot.style.setProperty("--line", `var(--type-${style}-line)`);
