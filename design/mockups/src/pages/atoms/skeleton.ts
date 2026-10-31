@@ -1,6 +1,6 @@
 // The Skeleton page: `docs/design/components/skeleton.md`. The shape of what is loading, held in
-// its place in the placeholder colour, so what arrives moves nothing. In QML a sheen sweeps across
-// it three times as it shows, then it holds still; it isn't a control and isn't neon.
+// its place, so what arrives moves nothing: faint glass of the accent that breathes while it shows,
+// warming up as a sign's gas does. It isn't a control.
 
 import { filling, row, stack, within } from "../../lib/layout.ts";
 import { type Bone, skeleton } from "../../lib/skeleton.ts";
@@ -25,30 +25,32 @@ function block(still = false): HTMLElement {
   return within("var(--size-menu)", skeleton(BLOCK, { still }));
 }
 
-/** The sweep: the sheen's middle from a band clear of the left edge to a band clear of the right. */
-const SHEEN: Move = {
-  name: "Sweeps as it shows",
-  what: "As it shows, a sheen of `surface_container_highest` sweeps across it from left to right over `slow` on `standard`, then it rests for `slow`; three times, then it holds still in the plain placeholder colour, so a long wait draws no frames. The sheen's middle runs from 0.4 of the width before the left edge to 0.4 past the right, fading to the placeholder colour 0.4 of the width either side of it.",
-  tracks: [{ part: "sheen", on: "every bone", target: ".k-skeleton", property: "--sweep", from: -0.4, to: 1.4, duration: "slow", curve: "standard" }],
-  tail: "slow",
-  reduced: [{ part: "sheen", on: "every bone", target: ".k-skeleton", property: "--sweep", from: -0.4, to: -0.4, duration: "instant", curve: "linear" }],
+/** One breath: the glass warming from rest to its peak, then cooling back. */
+const HUM: Move = {
+  name: "Breathes while it shows",
+  what: "Glass of the accent warming up, as a sign's gas does before it lights: every bone's fill rises from `opacity.skeleton` to `skeleton_peak` over `hum` on `standard`, then falls back over `hum`, together, for as long as it shows. At night a faint glow comes in with the peak, `skeleton_glow` fading out over `focus.near`, and goes with it. By day the fill breathes between `skeleton_light` and `skeleton_light_peak`, with no glow.",
+  tracks: [
+    { part: "glass", on: "every bone", target: ".k-skeleton", property: "--hum", from: 0, to: 1, duration: "hum", curve: "standard" },
+    { part: "glass", on: "every bone", target: ".k-skeleton", property: "--hum", from: 1, to: 0, duration: "hum", cue: "hum", curve: "standard" },
+  ],
+  reduced: [{ part: "glass", on: "every bone", target: ".k-skeleton", property: "--hum", from: 0, to: 0, duration: "instant", curve: "linear" }],
   back: "cuts",
   sample: () => stack("s24", "start", scanning(true), block(true)),
 };
 
 const DESCRIBED =
-  "In the placeholder colour a `Media` box holds, `surface_container_high`. A `line` is as wide as its room and its style's line tall, at the small radius; a `circle` is an icon size across; a `block` is as wide as its room and a size tall, at a radius role.";
+  "Glass of the accent, `primary` at `opacity.skeleton` (`skeleton_light` by day), with no edge: subtle, so it stands back from the text round it. A `line` is as wide as its room and its style's line tall, at the small radius; a `circle` is an icon size across; a `block` is as wide as its room and a size tall, at a radius role.";
 
 export default page<"loading">({
   level: "atoms",
   slug: "skeleton",
   title: "Skeleton",
-  summary: "The shape of what is loading, held in its place in the placeholder colour, so what arrives moves nothing.",
+  summary: "The shape of what is loading, held in its place in faint glass of the accent that breathes like gas warming up, so what arrives moves nothing.",
   live: () => stack("s24", "start", scanning(), block()),
   description: [
     "Rust `skeleton::skeleton(look, bone)`, QML `Skeleton` (`bone`, `style`, `size`, `radius`). It keeps the room of what is on its way: a Wi-Fi or Bluetooth scan with nothing found yet shows skeleton rows, the system monitor shows skeleton lines for the readings a detailed sample brings, and a `Media` box's placeholder is a block skeleton of its own.",
     DESCRIBED,
-    "In QML a sheen of `surface_container_highest` sweeps across it, left to right, over `slow` on `standard`, then rests for `slow`, three times as it shows, then it holds still. The sheen is the shape's own fill, so its corners cut it. With reduce motion it holds still from the start, and a picture that failed or has no source keeps its placeholder still. iced's skeleton holds still.",
+    "It breathes while it shows, the glass warming up as a sign's gas does before it lights: every bone's fill rises to `opacity.skeleton_peak` over `hum` and falls back over `hum`, on `standard`, together; at night a faint glow (`skeleton_glow`, out over `focus.near`) comes and goes with the peak. With reduce motion it holds still at rest, and a picture that failed or has no source keeps its placeholder still.",
   ],
   variants: [
     { name: "Line", for: "A line of text on its way, in the style it will be: as wide as its room, its line tall.", sample: () => within("var(--size-menu)", skeleton(LINE)) },
@@ -79,7 +81,7 @@ export default page<"loading">({
       { name: "A row being scanned", cell: () => scanning() },
     ],
     described: {
-      loading: `${DESCRIBED} The sheen sweeps three times as it shows, then it holds still. By day the same roles in daylight colours: a pale grey shape, its sheen a step paler.`,
+      loading: `${DESCRIBED} It breathes while it shows. By day the same glass, a touch fainter, with no glow.`,
     },
   },
   focus: doesntApply("a skeleton isn't a control and isn't neon: it has no line and no glow, by night or by day."),
@@ -92,7 +94,7 @@ export default page<"loading">({
     ],
   },
   motion: {
-    arrives: [SHEEN],
+    arrives: [HUM],
     leaves: doesntApply("what it stands for takes its place on the frame it arrives, in the room the skeleton kept; a live list's new row fades in over `slow`, as `LiveList` says."),
     between: powerMoves(() => stack("s24", "start", scanning(true), block(true))),
   },

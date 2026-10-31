@@ -140,7 +140,7 @@ export interface Content {
 }
 
 /** A duration token's name. */
-export type Duration = "instant" | "micro" | "short" | "medium" | "long" | "slow" | "scene" | "recolour" | "settle" | "strike" | "caret_glow" | "caret_hold" | "caret_fade";
+export type Duration = "instant" | "micro" | "short" | "medium" | "long" | "slow" | "scene" | "recolour" | "settle" | "strike" | "caret_glow" | "caret_hold" | "caret_fade" | "hum";
 /** An easing token's name. */
 export type Easing =
   | "standard"

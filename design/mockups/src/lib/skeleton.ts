@@ -1,7 +1,7 @@
 // The shape of what is loading, held in its place: `kubaos-ui`'s `skeleton::skeleton`,
-// `KubaOS.Components`' `Skeleton` (`docs/design/components/skeleton.md`). In the placeholder
-// colour, `surface_container_high`; QML's sweeps a sheen of `surface_container_highest` across it
-// three times as it shows, then holds still (`.k-skeleton` in `lib.css`).
+// `KubaOS.Components`' `Skeleton` (`docs/design/components/skeleton.md`). Faint glass of the
+// accent that breathes while it shows, warming up as a sign's gas does (`.k-skeleton` in
+// `lib.css`).
 
 import type { TypeStyle } from "./text.ts";
 import { probe } from "./probe.ts";
