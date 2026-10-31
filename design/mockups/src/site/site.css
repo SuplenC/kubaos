@@ -999,48 +999,218 @@ body {
   background: var(--color-secondary_container);
 }
 
-/* Shapes casting a shadow, with the room below them the shadow falls into. */
-.f-shadows {
+/* The elevation scene (`pages/foundations/elevation.ts`): a desktop an app's window wide and as
+   tall as its minimum, the shell's bar along its top. Every place in it is a sum of tokens. */
+.f-elev-scenes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s24);
+}
+
+.f-elev-desktop {
+  position: relative;
+  flex: none;
+  width: var(--size-app_width);
+  height: var(--size-app_min_height);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_lowest);
+  overflow: clip;
+}
+
+/* A window: its constant neutral shadow, the shell panel's drop and blur in `shadow` at
+   `opacity.window_shadow`, and its neutral border, Hyprland's `border_size`, under any glow. */
+.f-elev-window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  box-sizing: border-box;
+  padding: var(--space-s16);
+  border-radius: var(--corner);
+  background: var(--color-surface);
+  box-shadow:
+    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
+    0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
+}
+
+.f-elev-window[data-window="back"] {
+  left: var(--space-s32);
+  top: calc(var(--size-bar) + var(--space-s32));
+  width: var(--size-panel);
+  height: var(--size-thumbnail_width);
+}
+
+.f-elev-window[data-window="front"] {
+  left: calc(3 * var(--space-s64));
+  top: calc(var(--size-bar) + var(--space-s64));
+  width: var(--size-app_min_width);
+  bottom: var(--space-s32);
+}
+
+.f-elev-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
+  box-sizing: border-box;
+  width: var(--size-thumbnail_width);
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+}
+
+/* The open menu, the button its tooltip is over and the tooltip, placed in the front window from
+   its padding: the menu beside the card, the button at the bottom with its card `space.s8` above. */
+.f-elev-menu {
+  position: absolute;
+  left: calc(var(--space-s16) + var(--size-thumbnail_width) + var(--space-s16));
+  top: calc(var(--space-s16) + var(--type-body_strong-line) + var(--space-s16));
+}
+
+.f-elev-menu-row {
+  display: flex;
+  align-items: center;
+  height: var(--size-row_compact);
+}
+
+.f-elev-sort {
+  position: absolute;
+  left: var(--space-s16);
+  bottom: var(--space-s16);
+}
+
+.f-elev-tip {
+  position: absolute;
+  left: var(--space-s16);
+  bottom: calc(var(--space-s16) + var(--size-control_sm) + var(--space-s8));
+}
+
+/* The shell: the bar along the top and a panel growing out of it `space.s8` in from the edge,
+   both glass at `opacity.frame`, casting `shadow.panel` over the window and the wallpaper alike. */
+.f-elev-bar,
+.f-elev-panel {
+  position: absolute;
+  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
+  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
+}
+
+.f-elev-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  inset: 0 0 auto;
+  height: var(--size-bar);
+  padding-inline: var(--space-s16);
+}
+
+.f-elev-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  right: var(--space-s8);
+  top: calc(var(--size-bar) + var(--space-s8));
+  width: var(--size-panel);
+  box-sizing: border-box;
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+}
+
+/* The planes from the side: each plane a row, its name beside its slabs. */
+.f-elev-planes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s32);
+  padding-bottom: var(--space-s32);
+}
+
+.f-elev-plane {
+  display: grid;
+  grid-template-columns: var(--size-rail) var(--size-column);
+  gap: var(--space-s24);
+  align-items: end;
+}
+
+.f-elev-slabs {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--space-s48);
+  align-items: flex-end;
+  gap: var(--space-s8);
+}
+
+.f-elev-slab {
+  display: flex;
+  align-items: center;
+  height: var(--size-chip);
+  padding-inline: var(--space-s8);
+  border-radius: var(--radius-small);
+  background: var(--color-surface_container);
+  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
+}
+
+.f-elev-slab-lock {
+  flex: 1;
+  background: var(--color-surface_container_highest);
+  box-shadow: none;
+}
+
+.f-elev-slab-panel,
+.f-elev-slab-prompt {
+  width: var(--size-thumbnail_height);
+}
+
+.f-elev-slab-window {
+  width: var(--size-thumbnail_width);
+  background: var(--color-surface);
+  box-shadow:
+    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
+    0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
+}
+
+.f-elev-slab-wallpaper {
+  flex: 1 0 100%;
+  background: var(--color-surface_container_lowest);
+  box-shadow: none;
+}
+
+/* A step's sample on the plane's surface, and the steps side by side with the room their shadows
+   fall into. */
+.f-elev-step:not(.k-raised) {
+  background: var(--color-surface);
+}
+
+.f-elev-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control_lg);
+  height: var(--size-control_lg);
+  border-radius: var(--radius-control);
+}
+
+.f-elev-steps {
+  display: flex;
+  gap: var(--space-s24);
   padding: var(--space-s16) var(--space-s16) var(--space-s64);
 }
 
-.f-raised {
-  width: var(--size-thumbnail_height);
-  height: var(--size-row_two_line);
-  border-radius: var(--radius-surface);
-  background: var(--color-surface_container_high);
-  box-shadow: 0 var(--y) var(--blur) rgb(from var(--cast) r g b / var(--alpha));
-}
-
-.f-track {
+.f-elev-hosts {
   display: flex;
-  width: var(--size-thumbnail_height);
-  height: var(--size-progress);
-  border-radius: var(--radius-full);
-  background: var(--color-surface_container_highest);
+  flex-wrap: wrap;
+  gap: var(--space-s24);
 }
 
-/* A reading of the bar, not a measure: the fill part of the way along. */
-.f-fill {
-  width: 60%;
-  border-radius: inherit;
-  background: var(--cast);
-  box-shadow: 0 var(--y) var(--blur) rgb(from var(--cast) r g b / var(--alpha));
-}
-
-/* The surface containers, each holding the one above it, a step in. */
-.f-rung {
+.f-elev-host {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-s8);
-  padding: var(--space-s16);
+  gap: var(--space-s16);
+  padding: var(--space-s24) var(--space-s24) var(--space-s48);
   border-radius: var(--radius-surface);
-  background: var(--rung);
+}
+
+.f-elev-host-window {
+  background: var(--color-surface);
+}
+
+.f-elev-host-panel {
+  background: var(--color-surface_container);
 }
 
 /* Hairlines: one device pixel, at every scale. */

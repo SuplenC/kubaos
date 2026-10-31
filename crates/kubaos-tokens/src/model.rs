@@ -43,6 +43,7 @@ pub struct Tokens {
     /// Opacities laid over a colour role, by name.
     pub opacity: BTreeMap<String, f32>,
     pub shadow: BTreeMap<String, Shadow>,
+    pub elevation: Elevation,
     pub neon: Neon,
     pub boot: Boot,
     pub color: Colors,
@@ -301,6 +302,64 @@ pub struct Shadow {
     /// surfaces; `opacity` in both modes when absent.
     #[serde(default)]
     pub light_opacity: Option<f32>,
+}
+
+/// The ladder a part rises on inside its plane: steps 1 to `steps` over the plane's surface, each
+/// casting a contact layer and an ambient one, with a rim inside its edge.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Elevation {
+    pub steps: u16,
+    /// How many container roles above its day one a raised part sits at night.
+    pub lighter_at_night: u16,
+    /// The rim's opacity of `on_surface`, at night and by day.
+    pub rim: f32,
+    pub light_rim: f32,
+    pub contact: Layer,
+    pub ambient: Layer,
+}
+
+impl Elevation {
+    /// Every step a part rises to, the plane's own surface (0) left out.
+    pub fn raised(&self) -> std::ops::RangeInclusive<u16> {
+        1..=self.steps
+    }
+
+    pub fn rim_in(&self, mode: Mode) -> f32 {
+        match mode {
+            Mode::Dark => self.rim,
+            Mode::Light => self.light_rim,
+        }
+    }
+}
+
+/// One layer of every step's shadow, in the `shadow` role.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Layer {
+    pub y: u16,
+    pub blur: u16,
+    /// What each step adds to the offset and the blur.
+    #[serde(default)]
+    pub y_step: u16,
+    #[serde(default)]
+    pub blur_step: u16,
+    pub opacity: f32,
+    pub light_opacity: f32,
+}
+
+impl Layer {
+    /// The offset down and the blur at `step`.
+    pub fn at(&self, step: u16) -> (u16, u16) {
+        (self.y + step * self.y_step, self.blur + step * self.blur_step)
+    }
+
+    pub fn opacity_in(&self, mode: Mode) -> f32 {
+        match mode {
+            Mode::Dark => self.opacity,
+            Mode::Light => self.light_opacity,
+        }
+    }
 }
 
 /// The neon sign: how a tube strikes, and the クバ mark drawn as tubes.
