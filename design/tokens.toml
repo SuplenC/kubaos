@@ -215,10 +215,10 @@ thumbnail_width = 256
 thumbnail_height = 160
 # A slider is a pill: the fill is the pill, its round end marks the value, the
 # icon sits in the circle at its start and the value or its name at its end.
-# Regular, and compact for a dense panel (the control center, the system
-# monitor): as tall as a compact row.
-slider = 36
-slider_compact = 28
+# Regular, as tall as a compact row, and compact for a dense panel (the control
+# center, the system monitor), as tall as a chip.
+slider = 28
+slider_compact = 24
 # The dot of each step, on either side of the fill.
 slider_stop = 6
 # The solid dot of the mark the value rests on: a step, or a sticky point
