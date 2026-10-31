@@ -45,6 +45,7 @@ export default page<"loading">({
   description: [
     "Rust `progress::spinner(look, size, seconds, color)`, QML `Spinner` (`size`, `color`, `running`). It is for work that can't say how far it has got; work that can is a progress bar. Only such work spins: a running animation makes every frame wait on the screen's refresh, typing's included, so a job that can say how far it is shows that instead.",
     DESCRIBED,
+    "Reduce motion leaves it turning, at the same pace: it is the one move reduce motion keeps, since a spinner standing still reads as work that has hung.",
     "The caller passes the time: Rust takes the seconds since the work began, QML runs its own clock while `running` and visible, so a spinner nobody sees costs no frames. It is `primary`, or `error` for work that destroys something (a danger action going down).",
   ],
   variants: [
