@@ -455,6 +455,8 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     check_opacity("focus.content_glow".into(), tokens.focus.content_glow, found);
     check_opacity("focus.label_glow".into(), tokens.focus.label_glow, found);
     check_opacity("caret.glow".into(), tokens.caret.glow, found);
+    // Not an opacity, but a share of the ring held to the same 0 to 1.
+    check_opacity("spinner.arc".into(), tokens.spinner.arc, found);
     let edge = 1.0 - (1.0 - tokens.focus.near_opacity) * (1.0 - tokens.focus.far_opacity);
     check_opacity(
         "focus.pressed_glow, at the edge".into(),

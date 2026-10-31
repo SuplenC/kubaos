@@ -176,6 +176,10 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
     out.length("caret-height", caret.height);
     out.length("caret-near", caret.near);
     out.var("caret-glow", number(caret.glow));
+    let spinner = &tokens.spinner;
+    out.comment("The spinner: one turn of its lit arc, and the arc's share of the ring.");
+    out.var("spinner-turn", format!("{}ms", spinner.turn));
+    out.var("spinner-arc", number(spinner.arc));
     for (name, shadow) in &tokens.shadow {
         out.length(&format!("shadow-{name}-y"), shadow.y);
         out.length(&format!("shadow-{name}-blur"), shadow.blur);

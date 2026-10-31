@@ -27,6 +27,7 @@ pub struct Tokens {
     pub stroke: Stroke,
     pub focus: Focus,
     pub caret: Caret,
+    pub spinner: Spinner,
     pub space: Steps,
     pub radius: Radii,
     pub icon: IconSizes,
@@ -108,6 +109,16 @@ pub struct Focus {
     /// The band a picture keeps round itself inside its own box where its neighbours leave no
     /// more room, in logical pixels.
     pub offset: u16,
+}
+
+/// The spinner: a lit arc running round its unlit ring.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Spinner {
+    /// One turn of the arc, in milliseconds.
+    pub turn: u32,
+    /// The arc's length, as a share of the ring.
+    pub arc: f32,
 }
 
 /// A field's caret: its shape and the glow round it while you type.
