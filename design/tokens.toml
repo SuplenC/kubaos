@@ -1051,6 +1051,8 @@ error_glass = { dark = { from = "error_unlit" }, light = { from = "error" } }
 success_glass = { dark = { from = "success_unlit" }, light = { from = "success" } }
 warning_glass = { dark = { from = "warning_unlit" }, light = { from = "warning" } }
 sharing_glass = { dark = { from = "sharing_unlit" }, light = { from = "sharing" } }
+microphone_glass = { dark = { from = "microphone_unlit" }, light = { from = "microphone" } }
+recording_glass = { dark = { from = "recording_unlit" }, light = { from = "recording" } }
 primary_lit = { dark = { from = "primary_core", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "primary", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
 
 # The burning kinds, Danger, Success and Warning: always lit, the bright fixed
