@@ -180,6 +180,10 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
     out.comment("The spinner: one turn of its lit arc, and the arc's share of the ring.");
     out.var("spinner-turn", format!("{}ms", spinner.turn));
     out.var("spinner-arc", number(spinner.arc));
+    let tabs = &tokens.tabs;
+    out.comment("Tabs: their rail's thickness at night and by day, rounded half up to device pixels.");
+    out.length("tabs-rail", tabs.rail);
+    out.length("tabs-rail_day", tabs.rail_day);
     for (name, shadow) in &tokens.shadow {
         out.length(&format!("shadow-{name}-y"), shadow.y);
         out.length(&format!("shadow-{name}-blur"), shadow.blur);
