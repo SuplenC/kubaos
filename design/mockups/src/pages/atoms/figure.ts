@@ -18,12 +18,21 @@ const SPECIMEN: readonly (readonly [string, TypeStyle])[] = [
 
 const TIME: Words = { short: "0:09", long: "1:02:11.4" };
 
-/** Tenths of a second as a stopwatch shows them: m:ss.t, or h:mm:ss.t from an hour. */
+// The locale's digits and separators: a time is never padded by hand. `en-GB` is the mockups'
+// locale, so a shot reads the same on every machine.
+const WHOLE = new Intl.NumberFormat("en-GB", { minimumIntegerDigits: 2, useGrouping: false });
+const TENTHS = new Intl.NumberFormat("en-GB", { minimumIntegerDigits: 2, minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false });
+const LEADING = new Intl.NumberFormat("en-GB", { useGrouping: false });
+
+/**
+ * Tenths of a second as a stopwatch shows them, m:ss.t, or h:mm:ss.t from an hour: each part
+ * through the locale's number formatting, as `Intl.DurationFormat`'s digital style lays them out.
+ */
 function stopwatch(tenths: number): string {
   const seconds = Math.floor(tenths / 10);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const [h, m, s] = [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60];
-  return `${h > 0 ? `${h}:${pad(m)}` : m}:${pad(s)}.${tenths % 10}`;
+  const [h, m] = [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60];
+  const s = TENTHS.format((tenths % 600) / 10);
+  return h > 0 ? `${LEADING.format(h)}:${WHOLE.format(m)}:${s}` : `${LEADING.format(m)}:${s}`;
 }
 
 /**
@@ -68,6 +77,7 @@ export default page({
     "QML `Figure`: the clock popup's times, its timer and its stopwatch, on the QML specimen's \"Shell only\" page. `kubaos-ui` gets one with the first app that shows a ticking number.",
     "Geist's figures are proportional, so a ticking number in a plain `Text` changes width with its digits and jitters whatever sits beside it, as the second line above does. A `Figure` holds its box at its widest.",
     DESCRIBED,
+    "Its words go through the locale's formatting (`Qt.formatDateTime` and `Number.toLocaleString` in QML, `Intl` here, chrono's in Rust), never padded or put together by hand: the locale picks the digits, the separators and where each part goes, and the box holds whatever shape it gives.",
     "A number that changes in place but doesn't tick (a slider's value) takes `label_number`, whose figures are tabular, instead.",
   ],
   variants: nonEmpty(

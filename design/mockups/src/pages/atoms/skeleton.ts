@@ -2,8 +2,10 @@
 // its place, so what arrives moves nothing: faint glass of the accent that breathes while it shows,
 // warming up as a sign's gas does. It isn't a control.
 
+import { icon } from "../../lib/icon.ts";
 import { filling, row, stack, within } from "../../lib/layout.ts";
 import { type Bone, skeleton } from "../../lib/skeleton.ts";
+import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
@@ -24,6 +26,55 @@ function scanning(still = false): HTMLElement {
 function block(still = false): HTMLElement {
   return within("var(--size-menu)", skeleton(BLOCK, { still }));
 }
+
+/** The row the scan found, in the skeleton's places: a 24 symbol, its title and its subtitle. */
+function found(): HTMLElement {
+  return within(
+    "var(--size-column)",
+    row("s12", "centre", icon("wifi", "var(--icon-s24)", "var(--color-on_surface_variant)"), filling(stack("s4", "start", text("Home network", "body_strong"), text("Secured · strong signal", "small", "on_surface_variant")))),
+  );
+}
+
+/** The skeleton row and the row that takes its place, one over the other in the same room. */
+function arriving(): HTMLElement {
+  const before = scanning(true);
+  before.classList.add("k-arrive-skeleton");
+  const after = found();
+  after.classList.add("k-arrive-content");
+  const room = document.createElement("span");
+  room.className = "k-arrive";
+  room.append(before, after);
+  return room;
+}
+
+const ARRIVAL = "what arrived, in the skeleton's place";
+
+/**
+ * What the skeleton stands for arriving: a power change, so at night it strikes on in the
+ * skeleton's place; by day, with reduced motion and with the flicker off, it is there at once.
+ */
+const STRIKES_ON: Move = {
+  name: "What it stands for arrives: it strikes on",
+  what: "What the skeleton held the room for arrives: the skeleton goes on that frame, and at night what arrived strikes on in its place through `neon.strike`'s steps over `medium`, as a surface appearing does, since something switching on is a power change. By day it is there at once, as nothing is lit by day; with reduced motion or the flicker off it is there at once too. Nothing moves: it takes exactly the room the skeleton kept.",
+  tracks: [
+    { part: "skeleton", on: "the row being scanned", target: ".k-arrive-skeleton", property: "opacity", from: 1, to: 0, duration: "instant", curve: "linear" },
+    { part: "what arrived", on: ARRIVAL, target: ".k-arrive-content", property: "opacity", from: 0, to: 1, duration: "medium", curve: "neon.strike" },
+  ],
+  daylight: [
+    { part: "skeleton", on: "the row being scanned", target: ".k-arrive-skeleton", property: "opacity", from: 1, to: 0, duration: "instant", curve: "linear" },
+    { part: "what arrived", on: ARRIVAL, target: ".k-arrive-content", property: "opacity", from: 0, to: 1, duration: "instant", curve: "linear" },
+  ],
+  reduced: [
+    { part: "skeleton", on: "the row being scanned", target: ".k-arrive-skeleton", property: "opacity", from: 1, to: 0, duration: "instant", curve: "linear" },
+    { part: "what arrived", on: ARRIVAL, target: ".k-arrive-content", property: "opacity", from: 0, to: 1, duration: "instant", curve: "linear" },
+  ],
+  unflickered: [
+    { part: "skeleton", on: "the row being scanned", target: ".k-arrive-skeleton", property: "opacity", from: 1, to: 0, duration: "instant", curve: "linear" },
+    { part: "what arrived", on: ARRIVAL, target: ".k-arrive-content", property: "opacity", from: 0, to: 1, duration: "instant", curve: "linear" },
+  ],
+  back: "cuts",
+  sample: arriving,
+};
 
 /** One breath: the glass warming from rest to its peak, then cooling back. */
 const HUM: Move = {
@@ -50,6 +101,7 @@ export default page<"loading">({
   description: [
     "Rust `skeleton::skeleton(look, bone)`, QML `Skeleton` (`bone`, `style`, `size`, `radius`). It keeps the room of what is on its way: a Wi-Fi or Bluetooth scan with nothing found yet shows skeleton rows, the system monitor shows skeleton lines for the readings a detailed sample brings, and a `Media` box's placeholder is a block skeleton of its own.",
     DESCRIBED,
+    "When what it stands for arrives, the skeleton goes and what arrived takes its room: at night it strikes on through `neon.strike` over `medium`, a power change, as a surface appearing does; by day, with reduced motion and with the flicker off it is there at once. Nothing round it moves.",
     "It breathes while it shows, the glass warming up as a sign's gas does before it lights: every bone's fill rises to `opacity.skeleton_peak` over `hum` and falls back over `hum`, on `standard`, together; at night a faint glow (`skeleton_glow`, out over `focus.near`) comes and goes with the peak. With reduce motion it holds still at rest, and a picture that failed or has no source keeps its placeholder still.",
   ],
   variants: [
@@ -66,7 +118,7 @@ export default page<"loading">({
   states: {
     shown: ["loading"],
     absent: {
-      rest: "a skeleton shows only while what it stands for is on its way; when it arrives, it takes the skeleton's place.",
+      rest: "a skeleton shows only while what it stands for is on its way; when it arrives, it strikes on in the skeleton's place (Motion).",
       lit: "it takes no pointer and no focus, and isn't neon.",
       pressed: "it takes no press: a loading row can't be picked.",
       disabled: "it has nothing to disable.",
@@ -95,7 +147,7 @@ export default page<"loading">({
   },
   motion: {
     arrives: [HUM],
-    leaves: doesntApply("what it stands for takes its place on the frame it arrives, in the room the skeleton kept; a live list's new row fades in over `slow`, as `LiveList` says."),
+    leaves: [STRIKES_ON],
     between: powerMoves(() => stack("s24", "start", scanning(true), block(true))),
   },
   keyboard: doesntApply("a skeleton takes no focus and no key."),
