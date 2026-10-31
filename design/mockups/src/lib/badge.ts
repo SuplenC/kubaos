@@ -3,7 +3,9 @@
 // (`docs/design/components/badge.md`). A count in a pill `size.badge` tall in `label` type, a
 // circle for one digit and `space.s4` either side for more, 99+ past 99; or a dot, `size.badge_dot`.
 // In `error` with `on_error` on it, or in `primary` with `on_primary` where it marks something
-// unread. It has no states: it is a mark, not a control.
+// unread. In a fixed meaning (success, warning, sharing, microphone, recording) it is only a dot:
+// those meanings have no `on_*` role a count could be drawn in. It has no states: it is a mark, not
+// a control.
 
 import { icon } from "./icon.ts";
 import { FIXED_HEIGHT, probe, variant } from "./probe.ts";
@@ -12,12 +14,24 @@ import { advance, text } from "./text.ts";
 /** The most a badge counts to; past it, it reads as this and a plus. */
 export const MOST = 99;
 
-export interface BadgeOptions {
-  /** How many, or none for a dot. */
-  readonly count?: number;
-  /** In the accent: something unread rather than something wrong. */
-  readonly accent?: boolean;
-}
+/** The fixed meanings a badge can be in besides the error's, each only as a dot. */
+export const MEANINGS = ["success", "warning", "sharing", "microphone", "recording"] as const;
+export type Meaning = (typeof MEANINGS)[number];
+
+export type BadgeOptions =
+  | {
+      /** How many, or none for a dot. */
+      readonly count?: number;
+      /** In the accent: something unread rather than something wrong. */
+      readonly accent?: boolean;
+      readonly meaning?: never;
+    }
+  | {
+      /** A dot in a fixed meaning's colour: a meaning with no `on_*` role holds no count. */
+      readonly meaning: Meaning;
+      readonly count?: never;
+      readonly accent?: never;
+    };
 
 /** What a badge with `count` says: the count, 99+ past 99. */
 export function badgeWords(count: number): string {
@@ -40,7 +54,8 @@ export function badge(options: BadgeOptions = {}): HTMLElement {
   pill.className = "k-badge";
   pill.toggleAttribute("data-accent", options.accent ?? false);
   pill.style.setProperty("--badge-width", badgeWidth(options.count));
-  const tone = options.accent ? "accent" : undefined;
+  if (options.meaning) pill.style.setProperty("--badge-tone", `var(--color-${options.meaning})`);
+  const tone = options.accent ? "accent" : options.meaning;
   if (options.count === undefined) {
     pill.dataset.dot = "";
     return probe(pill, { role: "component", name: "Badge", variant: variant("dot", tone), fixed: FIXED_HEIGHT });

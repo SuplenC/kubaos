@@ -1048,7 +1048,7 @@
   height: var(--size-badge);
   padding-left: round(down, calc((var(--badge-width) - round(up, calc(var(--natural, 0) * var(--px) - 0.001px), 1px)) / 2), 1px);
   border-radius: var(--radius-full);
-  background: var(--color-error);
+  background: var(--badge-tone, var(--color-error));
 }
 
 .k-badge[data-accent] {
@@ -1195,6 +1195,20 @@
 @keyframes k-hum {
   from { --hum: 0; }
   to { --hum: 1; }
+}
+
+/* A skeleton and what takes its place, one over the other in the same room, so what arrives
+   moves nothing: until it arrives it is out. */
+.k-arrive {
+  display: grid;
+}
+
+.k-arrive > * {
+  grid-area: 1 / 1;
+}
+
+.k-arrive > .k-arrive-content {
+  opacity: 0;
 }
 
 /* A room of a set width, whatever its children hold: a skeleton's or a divider's room. */

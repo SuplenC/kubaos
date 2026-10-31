@@ -1,8 +1,9 @@
 // The Badge page, with BadgedIcon: `docs/design/components/badge.md`. What is new about something,
-// over its icon's top right corner: a count in a pill, or a dot, in `error`, or in `primary` where
-// it marks something unread. A mark, not a control: it rests, by night and by day, and never lights.
+// centred on its icon's top right corner: a count in a pill, or a dot, in `error`, or in `primary`
+// where it marks something unread; in another fixed meaning, only a dot. A mark, not a control: it
+// rests, by night and by day, and never lights.
 
-import { badge, badgedIcon } from "../../lib/badge.ts";
+import { badge, badgedIcon, MEANINGS } from "../../lib/badge.ts";
 import { row } from "../../lib/layout.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
@@ -19,6 +20,11 @@ function bar(): HTMLElement {
   );
 }
 
+/** A dot in each fixed meaning, which holds no count. */
+function meanings(): HTMLElement {
+  return row("s16", "centre", ...MEANINGS.map((meaning) => badge({ meaning })));
+}
+
 /** Every badge alone: counts, a dot, and the same in the accent. */
 function badges(): HTMLElement {
   return row("s24", "centre", badge({ count: 3 }), badge({ count: 128 }), badge(), badge({ count: 3, accent: true }), badge({ accent: true }));
@@ -31,18 +37,22 @@ export default page({
   level: "atoms",
   slug: "badge",
   title: "Badge and BadgedIcon",
-  summary: "What is new about something, over its icon's top right corner: a count, or a dot, in the error colour or the accent.",
-  live: () => row("s48", "centre", bar(), badges()),
+  summary: "What is new about something, centred on its icon's top right corner: a count or a dot in the error colour or the accent, or a dot in a fixed meaning.",
+  live: () => row("s48", "centre", bar(), badges(), meanings()),
   description: [
     "Rust `badge::badge` and `badge::accent_badge`, QML `Badge` (`count`, 0 for a dot; `accent`). It says what is new about something: waiting updates, a proxy that failed, an unread notification.",
     DESCRIBED,
     "The error badge says something wants attention: updates waiting, something wrong. The accent badge marks something unread rather than something wrong (an unread notification's dot on its app's tile), since red there would make every new message look like a failure.",
+    "A badge in one of the other fixed meanings (`success`, `warning`, `sharing`, `microphone`, `recording`) is only a dot, in that meaning's role: none of them has an `on_*` role a count could be drawn in and still read, so none holds a count until it has one.",
     "`BadgedIcon` is the bar's: QML only, on the QML specimen's \"Shell only\" page. A 16 symbol in `on_surface_variant` with a badge centred on its top right corner while `badged`: a count, or a dot when `count` is 0. Its box is the symbol's height, and the badge hangs past its top; while the badge shows, the box takes the half of the badge past the symbol as room on both sides, so the badge keeps the row's gap to the symbol beside it and the symbol stays centred in a pill of its own.",
+    "Its place is `BadgedIcon`'s in every library: the badge's centre on the symbol's top right corner. The iced specimen's helper sets the badge in the top right corner of a small control's box round a 24 symbol instead; it takes `BadgedIcon`'s place when the bar's parts move to `kubaos-ui`.",
+    "A badge comes and goes at once, on the frame its count arrives or ends. A row of symbols with badges has no vertical divider between them.",
   ],
   variants: [
     { name: "Count", for: "How many: security updates waiting.", sample: () => row("s16", "centre", badge({ count: 3 }), badge({ count: 42 }), badge({ count: 128 })) },
     { name: "Dot", for: "Something is new or wrong, with no number to give: a release waiting, a proxy that failed.", sample: () => badge() },
     { name: "Accent", for: "Something unread, not wrong: an unread notification.", sample: () => row("s16", "centre", badge({ count: 3, accent: true }), badge({ accent: true })) },
+    { name: "In a meaning", for: "Something new in a fixed meaning (a share running, the microphone in use, a recording): a dot in `success`, `warning`, `sharing`, `microphone` or `recording`, never a count.", sample: meanings },
     { name: "BadgedIcon", for: "The bar's symbol with its badge on the corner: QML only.", sample: bar },
   ],
   sizes: [
@@ -67,10 +77,11 @@ export default page({
       { name: "Dot", cell: () => badge() },
       { name: "Accent, one digit", cell: () => badge({ count: 3, accent: true }) },
       { name: "Accent dot", cell: () => badge({ accent: true }) },
+      ...MEANINGS.map((meaning) => ({ name: `${meaning[0]!.toUpperCase()}${meaning.slice(1)} dot`, cell: () => badge({ meaning }) })),
       { name: "BadgedIcon, a count", cell: () => badgedIcon({ name: "notifications", badged: true, count: 3 }) },
     ],
     described: {
-      rest: `Always. ${DESCRIBED} By day the same roles in daylight colours: the day's red and accent with white on them.`,
+      rest: `Always. ${DESCRIBED} By day the same roles in daylight colours: the day's red and accent with white on them, and each meaning's day colour.`,
     },
   },
   focus: doesntApply("a badge isn't a control and isn't neon: it has no line and no glow, by night or by day."),
@@ -79,7 +90,7 @@ export default page({
     missingPicture: doesntApply("a badge is drawn; `BadgedIcon`'s symbol is an `Icon`, whose page shows a name with no drawing."),
     counts: [
       { name: "None", for: "Nothing new: no badge, and `BadgedIcon`'s box is the symbol's own.", sample: () => badgedIcon({ name: "notifications" }) },
-      { name: "A dot", for: "Something new with no number: `count` 0.", sample: () => badgedIcon({ name: "system_update_alt", badged: true }) },
+      { name: "A dot", for: "Something new with no number: `count` 0. A badge in a fixed meaning is always this.", sample: () => badgedIcon({ name: "system_update_alt", badged: true }) },
       { name: "One", for: "One digit: a circle.", sample: () => badgedIcon({ name: "notifications", badged: true, count: 1 }) },
       { name: "Many", for: "Two digits: the pill grows, `space.s4` either side.", sample: () => badgedIcon({ name: "notifications", badged: true, count: 99 }) },
       { name: "Past 99", for: "99+: the widest a badge gets.", sample: () => badgedIcon({ name: "notifications", badged: true, count: 128 }) },
@@ -88,7 +99,7 @@ export default page({
   motion: {
     arrives: doesntApply("a badge shows at once, on the frame its count arrives: nothing moves, and the `BadgedIcon`'s box takes its room at once."),
     leaves: doesntApply("a badge goes at once, when nothing is new."),
-    between: powerMoves(() => row("s24", "centre", bar(), badge({ count: 3, accent: true }))),
+    between: powerMoves(() => row("s24", "centre", bar(), badge({ count: 3, accent: true }), meanings())),
   },
   keyboard: doesntApply("a badge takes no focus and no key: what it sits on is read out with its count."),
   measures: {
