@@ -1,12 +1,14 @@
 // The Slider page: `docs/design/components/slider.md`, in the state model (`docs/DESIGN.md`,
 // "States"). A value or one of a few stops as a pill whose fill is the value, regular and compact:
-// dragged, stepped, snapping onto its stops, held at a sticky point, the fill brightening lit and
-// more while held, by night and by day.
+// dragged, stepped, snapping onto its stops, held at a sticky point, toggled by its icon (muted, on
+// Auto), the fill brightening lit and more while held, and its icon's button lit and pressed, by
+// night and by day.
 
 import { shown, type Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
+import { hintRoom } from "../../lib/hint.ts";
 import { stack, within } from "../../lib/layout.ts";
-import { type SliderOptions, type SliderSize, slider } from "../../lib/slider.ts";
+import { type SliderOptions, type SliderSize, type SliderToggle, slider } from "../../lib/slider.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
@@ -26,19 +28,22 @@ function boxed(options: SliderOptions): HTMLElement {
   return within(ROOM, slider(options));
 }
 
+/** Volume's toggle: muted, its fill kept at the level it comes back to. */
+const MUTE: SliderToggle = { icon: "volume_off", words: "Muted", label: "Mute", toggledLabel: "Unmute" };
+
+/** Brightness's toggle, on Auto: the sensor's level, named. */
+function autoToggle(words: string = shown(AUTO)): SliderToggle {
+  return { icon: "motion_photos_auto", words, label: "Auto brightness", toggledLabel: "Manual brightness", on: true };
+}
+
 /** Volume at 62%, whose icon mutes it and unmutes it back to where it was. */
 function volume(size: SliderSize = "Regular", extra: Partial<SliderOptions> = {}): SliderOptions {
-  return {
-    icon: "volume_up",
-    size,
-    value: 0.62,
-    onIcon: (control) => {
-      const muted = control.element.dataset.muted !== undefined;
-      control.element.toggleAttribute("data-muted", !muted);
-      control.name(muted ? undefined : "Muted");
-    },
-    ...extra,
-  };
+  return { icon: "volume_up", size, value: 0.62, toggle: MUTE, ...extra };
+}
+
+/** Volume muted at 62%: the softer fill at the level it unmutes to. */
+function muted(size: SliderSize = "Regular", extra: Partial<SliderOptions> = {}): SliderOptions {
+  return volume(size, { toggle: { ...MUTE, on: true }, ...extra });
 }
 
 /** The power profiles: five stops, resting on Balanced, the icon stepping from high to low. */
@@ -51,27 +56,46 @@ function boosted(size: SliderSize = "Regular", extra: Partial<SliderOptions> = {
   return { icon: "volume_up", size, value: 2 / 3, sticky: 2 / 3, number: (at) => PERCENT.format(at * 1.5), widest: "150%", ...extra };
 }
 
-/** Brightness on Auto: the sensor's level in the softer accent, named. */
+/** Brightness on Auto at 55%: the sensor's level in the softer accent, named; its icon goes manual. */
 function auto(size: SliderSize = "Regular", extra: Partial<SliderOptions> = {}): SliderOptions {
-  return { icon: "motion_photos_auto", size, value: 0.55, words: shown(AUTO), soft: true, ...extra };
+  return { icon: "brightness_medium", size, value: 0.55, toggle: autoToggle(), ...extra };
 }
 
-/** The rows the matrix shows, each a slider in either size. */
-const ROWS = [
+type Options = (size: SliderSize, extra?: Partial<SliderOptions>) => SliderOptions;
+
+/** The rows the matrix shows, each a slider in either size: the slider in each state, then its icon's button. */
+const ROWS: readonly { readonly name: string; readonly options: Options; readonly icon?: boolean }[] = [
   { name: "Volume, 62%", options: volume },
-  { name: "Muted", options: (size: SliderSize, extra: Partial<SliderOptions> = {}) => ({ icon: "volume_off", size, value: 0, words: "Muted", ...extra }) },
-  { name: "Auto brightness", options: auto },
+  { name: "Volume toggled (Muted)", options: muted },
+  { name: "Brightness toggled (Auto)", options: auto },
   { name: "Five stops", options: profiles },
   { name: "Sticky at 100% of 150%", options: boosted },
-] as const;
+  { name: "Volume, its icon", options: volume, icon: true },
+  { name: "Muted, its icon", options: muted, icon: true },
+  { name: "Five stops, its icon", options: profiles, icon: true },
+];
 
 type MatrixState = "rest" | "lit" | "pressed" | "disabled";
 
 /** A row's slider in `state`, regular above compact. */
-function cell(options: (size: SliderSize, extra?: Partial<SliderOptions>) => SliderOptions, state: Shown): HTMLElement {
+function cell(options: Options, state: Shown): HTMLElement {
   const held = state === "pressed";
   const pinned = held ? { pinned: "pressed" as const, held: true } : stateOptions(state);
   return within(ROOM, stack("s8", "start", slider(options("Regular", pinned)), slider(options("Compact", pinned))));
+}
+
+/**
+ * A row's slider with its icon's button in `state`, regular above compact, each with the room its
+ * hint floats in.
+ */
+function iconCell(options: Options, state: Shown): HTMLElement {
+  const { pinned, disabled } = stateOptions(state);
+  const each = (size: SliderSize) => {
+    const made = slider(options(size, { ...(disabled ? { disabled } : {}), ...(pinned ? { pinnedIcon: pinned } : {}) }));
+    const words = made.querySelector(".k-slider-icon-button")?.getAttribute("aria-label") ?? "";
+    return hintRoom(made, words, ROOM);
+  };
+  return within(ROOM, stack(0, "start", each("Regular"), each("Compact")));
 }
 
 /** The specimens' samples: a regular and a compact volume, the profiles and Auto. */
@@ -110,6 +134,24 @@ const EASES: Move = {
   sample: pair(),
 };
 
+const TOGGLES: Move = {
+  name: "Toggled",
+  what: "The icon pressed on a slider with a toggle, here muting the volume: `--toggled` from 0 to 1 over `short` on `standard`. The fill's tone fades from `primary` to the softer `secondary` and its content from `on_primary` to `on_secondary`; the fill stays where it is, at the level (62%) it unmutes to. The icon (`volume_off`) and the value's name (Muted) change at once. Pressed again, or the value moved by a drag, a key or the wheel, it plays backwards. Reduced motion plays it the same: a fade of colour, with nothing moving.",
+  tracks: [{ part: "fill", on: ON, target: ".k-slider", property: "--toggled", from: 0, to: 1, duration: "short", curve: "standard" }],
+  reduced: "same",
+  back: "plays",
+  sample: pair(),
+};
+
+const ICON: Move = {
+  name: "Its icon lights",
+  what: "The pointer over the icon's button lights the button and not the slider, as an icon button lights, over `short` on `standard`: its circle lifts by `opacity.press` toward the bright end, its tube and glow fade in, and its hint fades in under it. It goes back to rest the same way as the pointer leaves.",
+  tracks: lights(".k-slider-icon-button", "the icon's button", 0, 1),
+  reduced: "same",
+  back: "plays",
+  sample: pair(),
+};
+
 const NUMBER: Move = {
   name: "A compact slider's number shows",
   what: "A compact slider's percentage shows only lit or held: it fades in over `micro` on `standard` as the slider lights up, and out the same as it goes back to rest. A name (Muted, Auto · 55%, a stop's) always shows.",
@@ -120,7 +162,10 @@ const NUMBER: Move = {
 };
 
 const DESCRIBED =
-  "A pill as wide as its room, `size.slider` (28) tall, or `size.slider_compact` (24) for a dense panel. The track is `surface_container_highest` at `opacity.track`. The fill is the value: from the start to its round end, whose circle's centre is the value, on a whole device pixel, so at 0 it is the circle behind the icon and at 1 it reaches the far end. It is `primary`, or `secondary` for a level something else picked (Auto brightness), and its content is `on_primary` (`on_secondary`). The icon, `label`'s (16), is centred in the circle at the fill's start, always on the fill. The value sits `space.s12` in from the far end: a percentage in `label_number`, through the locale's formatting, or a name in `label`, in `on_surface` over the track and the fill's content colour over the fill, split where the fill ends. A number's box is as wide as its widest (100%, or 150% for a boosted volume), so it ends in one place.";
+  "A pill as wide as its room, `size.slider` (28) tall, or `size.slider_compact` (24) for a dense panel. The track is `surface_container_highest` at `opacity.track`. The fill is the value: from the start to its round end, whose circle's centre is the value, on a whole device pixel, so at 0 it is the circle behind the icon and at 1 it reaches the far end. It is `primary`, its content `on_primary`; toggled, the softer `secondary`, its content `on_secondary`. The icon, `label`'s (16), is centred in the circle at the fill's start, always on the fill. The value sits `space.s12` in from the far end: a percentage in `label_number`, through the locale's formatting, or a name in `label`, in `on_surface` over the track and the fill's content colour over the fill, split where the fill ends. A number's box is as wide as its widest (100%, or 150% for a boosted volume), so it ends in one place.";
+
+const TOGGLED =
+  "A continuous slider may have a toggle, which makes its icon a button and gives it a second state, Toggled: volume's icon mutes it, brightness's switches Auto on, where a light sensor and a service driving the backlight from it exist. Toggled, the fill fades to the softer accent over `short` on `standard`, the icon is the toggled one (`volume_off`, the Auto symbol) and the value reads as a name (Muted, Auto · 55%). The fill stays at a level: muted, the one unmuting comes back to; on Auto, the sensor's, as it changes. Pressing the icon again goes back. Moving the value, by a drag, a key or the wheel, leaves Toggled from where the value is: a drag on a muted volume unmutes it and the value follows the pointer, and on Auto it goes manual at the dragged value. The owner is told each time it turns. A slider with stops has no toggle: its icon steps.";
 
 const STEPS =
   "A slider with stops shows a dot, `size.slider_stop` (6), at each: in the fill's content colour at `opacity.subdued` where the fill has passed it, `on_surface_variant` ahead. The stop the value rests on is solid instead, `size.slider_anchor` (10, 8 compact) in the fill's content colour, popping in over `short` on `pop` once the fill has arrived; while a drag moves between stops there is none. No dot is drawn under the icon or the label, `space.s4` clear of each, nor astride the fill's end. A sticky point (a volume boost to 150% holding at 100%) holds a drag within `size.slider_hold` (12) of it and shows its anchor while the value rests there.";
@@ -132,18 +177,23 @@ export default page({
   summary: "A value from 0 to 1, or one of a few stops, as a pill whose fill is the value: drag it, step it, or press its icon.",
   live: specimen,
   description: [
-    "Rust `slider::slider`, QML `Slider`. Drag any of these, use ← and → on them, or turn the wheel over them. The volume's icon mutes it and unmutes it back to where it was; the profiles' icon steps from high to low and back.",
+    "Rust `slider::slider`, QML `Slider`. Drag any of these, use ← and → on them, or tilt the wheel (or turn it with Shift) over them. The volume's icon mutes it and unmutes it back to where it was; the brightness's turns Auto off and on; the profiles' icon steps from high to low and back.",
     DESCRIBED,
+    TOGGLED,
     STEPS,
     "It takes effect as it moves, so it carries a live value. A drag follows the pointer, the pointer mapping to the fill's end circle's centre; on a slider with stops it moves freely and settles on the nearest stop when let go, over `short` on `standard_decel`. A value set from elsewhere eases there over `short` on `standard`. A compact slider shows its number only lit or held, fading over `micro`; a name always shows.",
-    "Its states follow the neon (`docs/DESIGN.md`, \"States\"): rest, lit (under the pointer or with the keyboard on it, one state), held and disabled. Lit, the fill brightens by `opacity.press` toward the palette's bright end (`on_surface` at night, `surface` by day), and the tube burns inside its edge, `primary` at `focus.tube`, with the glow outside at night. Held, pressed or dragged, the fill brightens by `opacity.held`, and the glow by `focus.pressed_glow`. The icon, where it is a button, takes the fill's content colour as a state layer under the pointer and pressed, and the slider isn't lit while the pointer is on it.",
+    "Its states follow the neon (`docs/DESIGN.md`, \"States\"): rest, lit (under the pointer or with the keyboard on it, one state), held and disabled. Lit, the fill brightens by `opacity.press` toward the palette's bright end (`on_surface` at night, `surface` by day), and the tube burns inside its edge, `primary` at `focus.tube`, with the glow outside at night. Held, pressed or dragged, the fill brightens by `opacity.held`, and the glow by `focus.pressed_glow`.",
+    "The icon, where it is a button, shows nothing of it at rest: it is the icon on the fill. Under the pointer it lights as a Filled icon button in the fill's tone: its circle lifts by `opacity.press` toward the bright end, as the fill does, the tube burns inside the circle's edge with the glow outside at night (the tube with no glow by day), and its hint names what a press does: Mute or Unmute, Auto brightness or Manual brightness, Step. Pressed, the circle lifts by `opacity.held` and the glow by `focus.pressed_glow`. While the icon's button is lit the slider isn't. It is no stop for Tab: the keys move the value.",
   ],
   variants: [
     { name: "Continuous", for: "Any value from 0 to 1: volume, brightness. Its value reads as a percentage.", sample: () => boxed(volume()) },
     { name: "With stops", for: "One of a few named choices in order: the power profiles. The stop's name shows; the icon steps from high to low and back.", sample: () => boxed(profiles()) },
     { name: "With a sticky point", for: "A value that goes past where it normally ends: a volume boost to 150%, holding at 100% as a drag passes.", sample: () => boxed(boosted()) },
-    { name: "Named", for: "A value that is better said: Muted, Auto · 55%. The name always shows.", sample: () => boxed(volume("Regular", { value: 0, icon: "volume_off", words: "Muted" })) },
-    { name: "Soft", for: "A level something else picked, in the softer, desaturated accent: brightness on Auto, the sensor's level.", sample: () => boxed(auto()) },
+    {
+      name: "Toggled",
+      for: "With a toggle: a second state the icon turns on and off, in the softer accent with the value named. Volume mutes, keeping its level; brightness goes on Auto, the fill the sensor's level. Moving the value leaves it.",
+      sample: () => within(ROOM, stack("s16", "start", slider(volume()), slider(auto()))),
+    },
   ],
   sizes: [
     { name: "Regular", for: "`size.slider`, 28: a panel's or a page's slider, as tall as a compact row.", sample: () => boxed(volume()) },
@@ -152,32 +202,38 @@ export default page({
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],
     absent: {
-      selected: "its value is the fill, and a stop it rests on is its anchor, both in every row here.",
+      selected: "its value is the fill, and a stop it rests on is its anchor, both in every row here; Toggled has its own rows.",
       loading: "it moves at once; a value still on its way leaves the slider where it was.",
-      empty: "it always has a value: at 0 the fill is the circle behind the icon (Muted, here).",
+      empty: "it always has a value: at 0 the fill is the circle behind the icon. Muted isn't empty: it keeps the level it comes back to.",
       error: "it has no wrong value; a value that failed to apply eases back.",
     },
-    rows: nonEmpty(ROWS.map(({ name, options }) => ({ name, cell: (state: MatrixState) => cell(options, state) }))),
+    rows: nonEmpty(ROWS.map(({ name, options, icon }) => ({ name, cell: (state: MatrixState) => (icon ? iconCell(options, state) : cell(options, state)) }))),
     described: {
-      rest: "The fill `primary` (`secondary` soft), its content `on_primary`; the track `surface_container_highest` at `opacity.track`, its words `on_surface`. A compact slider hides its number. By day the same roles in daylight colours.",
-      lit: "Under the pointer or with the keyboard on it, here with the signs on: the fill brightens by `opacity.press` toward `on_surface`, the tube burns inside the pill's edge, `primary` at `focus.tube`, with the glow outside, and a compact slider shows its number. By day the fill brightens toward `surface`, and the line is the tube by day with no glow.",
-      pressed: "Held, pressed or dragged, so lit as well: the fill brightens by `opacity.held`, plainly, and the glow is `focus.pressed_glow` times the lit one. Letting go of a slider with stops settles it on the nearest.",
-      disabled: "Every part at `opacity.disabled_content`, where its value puts it, so its value still reads: no line, no glow, no pointer, no keys, and no stop for Tab.",
+      rest: "The fill `primary`, its content `on_primary`; toggled, `secondary` and `on_secondary`, at the level it keeps, the icon the toggled one and the value named. The track `surface_container_highest` at `opacity.track`, its words `on_surface`. A compact slider hides its number. The icon's button shows nothing: the icon on the fill. By day the same roles in daylight colours.",
+      lit: "Under the pointer or with the keyboard on it, here with the signs on: the fill brightens by `opacity.press` toward `on_surface`, the tube burns inside the pill's edge, `primary` at `focus.tube`, with the glow outside, and a compact slider shows its number. In the icon's rows the icon's button is lit instead, and the slider isn't: its circle lifts by `opacity.press`, its tube burns inside the circle's edge with the glow outside, and its hint shows what a press does. By day the fill and the circle brighten toward `surface`, and the line is the tube by day with no glow.",
+      pressed: "Held, pressed or dragged, so lit as well: the fill brightens by `opacity.held`, plainly, and the glow is `focus.pressed_glow` times the lit one. Letting go of a slider with stops settles it on the nearest. In the icon's rows the icon's button is pressed: its circle lifts by `opacity.held` and its glow is `focus.pressed_glow` times the lit one.",
+      disabled: "Every part at `opacity.disabled_content`, where its value puts it, so its value still reads, a toggled one in its softer fill with its name: no line, no glow, no pointer, no keys, and no stop for Tab. Its icon is no button.",
     },
   },
   focus: {
-    tubes: [{ name: "Every slider", tone: "accent", filled: false, content: false }],
+    tubes: [
+      { name: "Every slider", tone: "accent", filled: false, content: false },
+      { name: "The icon's button", tone: "accent", filled: false, content: false },
+    ],
     looks: {
       lit: "At night at rest, the signs burn: the tube inside the pill's edge, over the fill and the track alike, with the glow outside, all that reaches past the pill. The fill brightens by `opacity.press`.",
       signsOff: "The same slider still lit with the neon unpowered: by day always, and at night while a theme change or dark ⇄ light has the lights out. The tube is solid glass, `primary_glass`, with no glow; the fill keeps its lit brightness, since a fill isn't a light.",
     },
-    signsOff: (index: number) => cell(ROWS[index]!.options, "signs-off"),
+    signsOff: (index: number) => {
+      const row = ROWS[index]!;
+      return row.icon ? iconCell(row.options, "signs-off") : cell(row.options, "signs-off");
+    },
   },
   content: {
     text: [
       { name: "A stop's name", words: PROFILES, sample: (words: string) => boxed({ icon: "balance", stops: 5, index: 4, names: NAMES.map((name, i) => (i === 4 ? words : name)) }) },
-      { name: "A name for the value", words: AUTO, sample: (words: string) => boxed(auto("Regular", { words })) },
-      { name: "In a compact slider", words: AUTO, sample: (words: string) => boxed(auto("Compact", { words })) },
+      { name: "A toggled value's name", words: AUTO, sample: (words: string) => boxed(auto("Regular", { toggle: autoToggle(words) })) },
+      { name: "In a compact slider", words: AUTO, sample: (words: string) => boxed(auto("Compact", { toggle: autoToggle(words) })) },
     ],
     missingPicture: doesntApply("its icon is a symbol its owner names; a name with no drawing is the Icon page's."),
     counts: [
@@ -194,6 +250,8 @@ export default page({
       { name: "Focus arrives", what: "Under the pointer or with the keyboard on it, it lights up over `short` on `standard`, never the flicker: the fill brightens by `opacity.press`, the tube and the glow fade in.", tracks: lights(".k-slider", ON, 0, 1), reduced: "same", back: "cuts", sample: pair() },
       { name: "Focus leaves", what: "The pointer leaves or focus moves on: it fades back to rest over `short` on `standard`.", tracks: lights(".k-slider", ON, 1, 0), reduced: "same", back: "cuts", sample: pair("lit") },
       { name: "Held", what: "A lit slider pressed or dragged: the fill brightens on to `opacity.held` and the glow to `focus.pressed_glow` times the lit one, over `micro`, and back as it is let go.", tracks: press(".k-slider", ON), reduced: "same", back: "plays", sample: pair("lit") },
+      TOGGLES,
+      ICON,
       NUMBER,
       EASES,
       SETTLES,
@@ -202,13 +260,13 @@ export default page({
   },
   keyboard: {
     keys: [
-      { keys: ["←", "h"], does: "A twentieth lower (5%), or one stop lower." },
-      { keys: ["→", "l"], does: "A twentieth higher, or one stop higher." },
+      { keys: ["←", "h"], does: "A twentieth lower (5%), or one stop lower. Toggled, it leaves Toggled from the level it keeps." },
+      { keys: ["→", "l"], does: "A twentieth higher, or one stop higher, leaving Toggled the same way." },
       { keys: ["Home"], does: "To 0, or the first stop." },
       { keys: ["End"], does: "To 1, or the last stop. A boosted volume's end is 150%." },
       { keys: ["Tab", "Shift+Tab"], does: "To the slider, or on to the next or previous control. The icon's button is no stop of its own: the keys move the value." },
     ],
-    order: "One stop in the surface's reading order; a disabled one is skipped. The wheel over it steps as the arrows do, a notch at a time.",
+    order: "One stop in the surface's reading order; a disabled one is skipped. The horizontal wheel over it steps as the arrows do, a notch at a time, right raising it: a tilted wheel, or a turn of the wheel with Shift held. The vertical wheel scrolls the page past it, and doesn't move it.",
     lands: "It takes focus when the surface gives it: the control center lands on its first control, never on a slider.",
   },
   measures: {

@@ -49,7 +49,7 @@ export function hintRoom(control: Element, words: string, side: string, held: He
   room.className = "k-hint-room";
   if (held === "end") room.dataset.held = "end";
   room.style.setProperty("--natural", String(advance("label", words)));
-  room.style.setProperty("--side", side);
+  room.style.setProperty("--control-side", side);
   room.append(control);
   return room;
 }

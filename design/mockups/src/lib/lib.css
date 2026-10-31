@@ -278,16 +278,16 @@
 .k-hint-room {
   --bubble: calc(round(up, calc(var(--natural) * var(--px) - 0.001px), 1px) + 2 * var(--space-s8));
   display: block;
-  width: max(var(--side), var(--bubble));
+  width: max(var(--control-side), var(--bubble));
   padding-bottom: calc(var(--space-s8) + var(--type-label-line) + 2 * var(--space-s4));
 }
 
 .k-hint-room > * {
-  margin-left: max(0px, round(down, calc((var(--bubble) - var(--side)) / 2), 1px));
+  margin-left: max(0px, round(down, calc((var(--bubble) - var(--control-side)) / 2), 1px));
 }
 
 .k-hint-room[data-held="end"] > * {
-  margin-left: max(0px, calc(var(--bubble) - var(--side)));
+  margin-left: max(0px, calc(var(--bubble) - var(--control-side)));
 }
 
 /* A switch (`lib/switch.ts`): its track, a circle at each end, and its knob, both following
@@ -558,12 +558,13 @@
   --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
   --on: calc(var(--lit) * var(--signs));
   --line-shown: var(--lit);
-  /* Hover, focus, press, turning on or picking and a field turning invalid are fades, never the
-     flicker, which is for power changes. */
+  /* Hover, focus, press, turning on or picking, a slider toggling and a field turning invalid
+     are fades, never the flicker, which is for power changes. */
   transition:
     --lit var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard),
     --checked var(--motion-short) var(--easing-standard),
+    --toggled var(--motion-short) var(--easing-standard),
     --invalid var(--motion-short) var(--easing-standard);
 }
 
@@ -1231,10 +1232,11 @@
 
 /* A slider (`lib/slider.ts`): a pill as wide as its room, `size.slider` tall or `slider_compact`.
    The track is the highest container at `opacity.track`; the fill, from the start to the value's
-   round end on a whole device pixel, is the accent (`secondary` when soft), lifting toward the
-   palette's bright end (`on_surface` at night, `surface` by day) by `opacity.press` while lit and
-   by `opacity.held` while held. Its content is the fill's content colour on the fill and
-   `on_surface` on the track. Disabled, every part is at `opacity.disabled_content`. */
+   round end on a whole device pixel, is the accent, fading to the softer `secondary` as
+   `--toggled` goes to 1, and lifts toward the palette's bright end (`on_surface` at night,
+   `surface` by day) by `opacity.press` while lit and by `opacity.held` while held. Its content is
+   the fill's content colour on the fill and `on_surface` on the track. Disabled, every part is at
+   `opacity.disabled_content`. */
 .k-slider {
   position: relative;
   display: block;
@@ -1251,8 +1253,8 @@
   --side: var(--size-slider);
   --anchor: var(--size-slider_anchor);
   --dim: 1;
-  --tone: var(--color-primary);
-  --on-tone: var(--color-on_primary);
+  --tone: color-mix(in srgb, var(--color-primary), var(--color-secondary) calc(var(--toggled) * 100%));
+  --on-tone: color-mix(in srgb, var(--color-on_primary), var(--color-on_secondary) calc(var(--toggled) * 100%));
   --bright: color-mix(in srgb, var(--color-on_surface), var(--color-surface) calc(var(--day) * 100%));
   --lift: calc(var(--lit) * var(--opacity-press) + var(--press) * (var(--opacity-held) - var(--opacity-press)));
   --on-fill: rgb(from var(--on-tone) r g b / var(--dim));
@@ -1266,11 +1268,6 @@
 .k-slider[data-compact] {
   --side: var(--size-slider_compact);
   --anchor: var(--size-slider_anchor_compact);
-}
-
-.k-slider[data-soft] {
-  --tone: var(--color-secondary);
-  --on-tone: var(--color-on_secondary);
 }
 
 .k-slider:is([data-held], [data-dragging]):not([aria-disabled="true"]) {
@@ -1387,8 +1384,11 @@
   visibility: visible;
 }
 
-/* The icon's button, where the icon steps or mutes: the circle at the fill's start, its state
-   layer the fill's content colour under the pointer and pressed. */
+/* The icon's button, where the icon steps or toggles: the circle at the fill's start, holding the
+   icon. At rest nothing shows it is a button. Lit, it is a Filled icon button in the fill's tone:
+   its circle lifts toward the bright end as the fill does, by `opacity.press` lit and
+   `opacity.held` pressed, and its tube burns inside the circle's edge. The circle shows only as
+   far as it is lit, so at rest the fill shows through it. */
 .k-slider-icon-button {
   all: unset;
   position: absolute;
@@ -1398,19 +1398,14 @@
   height: var(--side);
   border-radius: var(--radius-full);
   cursor: pointer;
+  --lift: calc(var(--lit) * var(--opacity-press) + var(--press) * (var(--opacity-held) - var(--opacity-press)));
+  background: rgb(from color-mix(in srgb, var(--tone), var(--bright) calc(var(--lift) * 100%)) r g b / var(--lit));
 }
 
-.k-slider-icon-button:hover {
-  background: rgb(from var(--on-tone) r g b / var(--opacity-hover));
-}
-
-.k-slider-icon-button:active {
-  background: rgb(from var(--on-tone) r g b / var(--opacity-press));
-}
-
-/* Under the pointer the icon's button is what is lit, not the slider. */
-.k-slider:has(.k-slider-icon-button:hover):not(:focus-visible, [data-pinned], [data-held], [data-dragging]) {
+/* Under the pointer or pinned, the icon's button is what is lit and pressed, not the slider. */
+.k-slider:has(.k-slider-icon-button:is(:hover, :active, [data-pinned])):not(:focus-visible, [data-pinned], [data-held], [data-dragging]) {
   --lit: 0;
+  --press: 0;
 }
 
 /* Tabs (`lib/tabs.ts`): their row of small buttons, as wide as the buttons. */
