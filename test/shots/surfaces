@@ -63,6 +63,13 @@ mockups/chip        design/mockups/src/pages/atoms/chip.ts
 mockups/field       design/mockups/src/pages/atoms/field.ts
 mockups/keycap      design/mockups/src/pages/atoms/keycap.ts
 mockups/tooltip     design/mockups/src/pages/atoms/tooltip.ts
+mockups/text        design/mockups/src/pages/atoms/text.ts
+mockups/icon        design/mockups/src/pages/atoms/icon.ts
+mockups/badge       design/mockups/src/pages/atoms/badge.ts
+mockups/spinner     design/mockups/src/pages/atoms/spinner.ts
+mockups/divider     design/mockups/src/pages/atoms/divider.ts
+mockups/skeleton    design/mockups/src/pages/atoms/skeleton.ts
+mockups/figure      design/mockups/src/pages/atoms/figure.ts
 mockups/colour      design/mockups/src/pages/foundations/colour.ts
 mockups/type        design/mockups/src/pages/foundations/type.ts
 mockups/space       design/mockups/src/pages/foundations/space.ts
