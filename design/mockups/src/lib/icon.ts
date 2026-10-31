@@ -35,3 +35,14 @@ export function icon(name: string, size: string, color: string): SVGElement {
   drawing.style.color = color;
   return probe(drawing, { role: "icon", name });
 }
+
+/**
+ * A name with no drawing, as QML's `Icon` draws one: its box, empty, so nothing beside it moves.
+ * Rust names a symbol by its enum, so it can't name one that isn't there.
+ */
+export function missingIcon(name: string, size: string): HTMLElement {
+  const box = document.createElement("span");
+  box.className = "k-icon";
+  box.style.setProperty("--icon-size", size);
+  return probe(box, { role: "icon", name });
+}

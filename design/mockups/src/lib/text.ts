@@ -6,6 +6,7 @@
 // rounding is under a thousandth of a pixel, in logical pixels, which the box scales.
 
 import { probe } from "./probe.ts";
+import { length, names } from "./tokens.ts";
 
 /** A type style, by its name in `design/tokens.toml`. */
 export type TypeStyle =
@@ -100,3 +101,77 @@ export function wrapped(words: string, style: TypeStyle, color = "on_surface"): 
   element.dataset.wrapped = "";
   return element;
 }
+
+/**
+ * `words` in `style` kept to `lines` lines in the room they are given, the last one ending in an
+ * ellipsis where the words don't fit: `kubaos-ui`'s `text::line` for one, QML's `maximumLines`.
+ */
+export function clamped(words: string, style: TypeStyle, color = "on_surface", lines = 1): HTMLElement {
+  const element = text(words, style, color);
+  element.dataset.clamped = lines === 1 ? "line" : "lines";
+  element.style.setProperty("--lines", String(lines));
+  return element;
+}
+
+/** A run of a text's characters, from `start` up to `end`, drawn in another colour. */
+export interface Run {
+  readonly start: number;
+  readonly end: number;
+}
+
+/**
+ * `words` with `runs` in the colour role `marked`: the characters a Command menu query matched, as
+ * QML's `markup`. The runs are drawn over the measured words, so the box is the plain text's.
+ */
+export function marked(words: string, style: TypeStyle, color: string, runs: readonly Run[], marked = "primary"): HTMLElement {
+  const element = text(words, style, color);
+  const characters = [...words];
+  let at = 0;
+  const parts: Node[] = [];
+  for (const run of [...runs].sort((a, b) => a.start - b.start)) {
+    if (run.start > at) parts.push(document.createTextNode(characters.slice(at, run.start).join("")));
+    const span = document.createElement("span");
+    span.textContent = characters.slice(run.start, run.end).join("");
+    span.style.color = `var(--color-${marked})`;
+    parts.push(span);
+    at = run.end;
+  }
+  if (at < characters.length) parts.push(document.createTextNode(characters.slice(at).join("")));
+  element.replaceChildren(...parts);
+  return element;
+}
+
+/** Every type style, largest first, then by its line. */
+export function styles(): TypeStyle[] {
+  const measure = (style: TypeStyle) => [length(`type-${style}-size`), length(`type-${style}-line`)] as const;
+  return names("type-")
+    .filter((name) => name.endsWith("-size"))
+    .map((name) => name.slice("type-".length, -"-size".length) as TypeStyle)
+    .sort((a, b) => measure(b)[0] - measure(a)[0] || measure(b)[1] - measure(a)[1]);
+}
+
+/** Real words for each style, as the surfaces that use it show them. */
+export const STYLE_WORDS: Record<TypeStyle, string> = {
+  clock: "21:47",
+  hero: "Welcome",
+  hero_number: "64%",
+  display: "That's it",
+  title: "Pick a disk",
+  headline: "Erase the disk?",
+  heading: "Network",
+  subheading: "Couldn't connect",
+  body_large: "Everything on this disk will be erased.",
+  body: "KubaOS takes the whole disk and encrypts it.",
+  body_strong: "Samsung 990 Pro",
+  button_large: "Install",
+  button: "Continue",
+  button_small: "Show log",
+  label: "Passphrase",
+  label_number: "72%",
+  small: "At least 12 characters",
+  caption: "Version 0.4",
+  accent: "ようこそ",
+  mono: "/dev/nvme0n1p2",
+  keycap: "Ctrl",
+  mono_large: "kubaos update",
+};
