@@ -42,7 +42,7 @@ function arriving(): HTMLElement {
   const after = found();
   after.classList.add("k-arrive-content");
   const room = document.createElement("span");
-  room.className = "k-arrive";
+  room.className = "k-overlap";
   room.append(before, after);
   return room;
 }

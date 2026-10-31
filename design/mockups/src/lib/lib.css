@@ -968,7 +968,7 @@
   display: block;
   flex: none;
   box-sizing: border-box;
-  width: var(--size-menu);
+  width: var(--popover-width, var(--size-menu));
   padding: var(--space-s12);
   border-radius: var(--radius-surface);
   --fill: var(--color-surface_container);
@@ -1197,17 +1197,18 @@
   to { --hum: 1; }
 }
 
-/* A skeleton and what takes its place, one over the other in the same room, so what arrives
-   moves nothing: until it arrives it is out. */
-.k-arrive {
+/* Parts one over the other in the same room: a skeleton and what takes its place, so what arrives
+   moves nothing; a popover over the surface it floats on. */
+.k-overlap {
   display: grid;
 }
 
-.k-arrive > * {
+.k-overlap > * {
   grid-area: 1 / 1;
 }
 
-.k-arrive > .k-arrive-content {
+/* What takes a skeleton's place: out until it arrives. */
+.k-arrive-content {
   opacity: 0;
 }
 
@@ -1218,4 +1219,381 @@
 
 .k-within > * {
   align-self: stretch;
+}
+
+/* How far along its track a slider's fill shows, 0 to 1: it eases as a value is set from
+   elsewhere and onto a stop after a drag. */
+@property --shown {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A slider (`lib/slider.ts`): a pill as wide as its room, `size.slider` tall or `slider_compact`.
+   The track is the highest container at `opacity.track`; the fill, from the start to the value's
+   round end on a whole device pixel, is the accent (`secondary` when soft), lifting toward the
+   palette's bright end (`on_surface` at night, `surface` by day) by `opacity.press` while lit and
+   by `opacity.held` while held. Its content is the fill's content colour on the fill and
+   `on_surface` on the track. Disabled, every part is at `opacity.disabled_content`. */
+.k-slider {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  align-self: stretch;
+  min-width: 0;
+  height: var(--side);
+  border-radius: var(--radius-full);
+  container-type: inline-size;
+  outline: none;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  --side: var(--size-slider);
+  --anchor: var(--size-slider_anchor);
+  --dim: 1;
+  --tone: var(--color-primary);
+  --on-tone: var(--color-on_primary);
+  --bright: color-mix(in srgb, var(--color-on_surface), var(--color-surface) calc(var(--day) * 100%));
+  --lift: calc(var(--lit) * var(--opacity-press) + var(--press) * (var(--opacity-held) - var(--opacity-press)));
+  --on-fill: rgb(from var(--on-tone) r g b / var(--dim));
+  --on-track: rgb(from var(--color-on_surface) r g b / var(--dim));
+}
+
+.k-row > .k-slider {
+  flex: 1 1 0;
+}
+
+.k-slider[data-compact] {
+  --side: var(--size-slider_compact);
+  --anchor: var(--size-slider_anchor_compact);
+}
+
+.k-slider[data-soft] {
+  --tone: var(--color-secondary);
+  --on-tone: var(--color-on_secondary);
+}
+
+.k-slider:is([data-held], [data-dragging]):not([aria-disabled="true"]) {
+  --lit: 1;
+  --press: 1;
+}
+
+.k-slider[aria-disabled="true"] {
+  cursor: default;
+  --dim: var(--opacity-disabled_content);
+}
+
+.k-slider-track {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(from var(--color-surface_container_highest) r g b / calc(var(--opacity-track) * var(--dim)));
+}
+
+.k-slider-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(100%, round(nearest, calc(var(--side) + (100% - var(--side)) * var(--shown)), 1px));
+  overflow: hidden;
+  border-radius: inherit;
+  background: rgb(from color-mix(in srgb, var(--tone), var(--bright) calc(var(--lift) * 100%)) r g b / var(--dim));
+}
+
+/* What the fill shows, laid out across the whole slider and cut where the fill ends. */
+.k-slider-on-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100cqw;
+  height: 100%;
+}
+
+/* The icon, `label`'s, centred in the circle at the fill's start on a whole device pixel. */
+.k-slider-icon {
+  position: absolute;
+  display: block;
+  left: round(nearest, calc((var(--side) - var(--type-label-icon)) / 2), 1px);
+  top: round(nearest, calc((var(--side) - var(--type-label-icon)) / 2), 1px);
+  width: var(--type-label-icon);
+  height: var(--type-label-icon);
+}
+
+.k-slider-icon > .k-icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* The value or its name, `space.s12` in from the far end, once over the track and once over the
+   fill, the same place: the fill cuts the one over it where it ends. */
+.k-slider-label {
+  position: absolute;
+  right: var(--space-s12);
+  top: round(nearest, calc((var(--side) - var(--t-line)) / 2), 1px);
+  transition: opacity var(--motion-micro) var(--easing-standard);
+}
+
+/* A compact slider's number shows only lit or held; a name always shows. */
+.k-slider[data-compact][data-numeric] .k-slider-label {
+  opacity: 0;
+}
+
+.k-slider[data-compact][data-numeric]:is(:hover, :focus-visible, [data-pinned], [data-held], [data-dragging]) .k-slider-label {
+  opacity: 1;
+}
+
+.k-slider-dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* A step's dot, `size.slider_stop`, centred on its point: in the fill's content colour at
+   `opacity.subdued` where the fill has passed it, `on_surface_variant` ahead. */
+.k-slider-dot {
+  position: absolute;
+  width: var(--size-slider_stop);
+  height: var(--size-slider_stop);
+  left: calc(var(--side) / 2 + (100% - var(--side)) * var(--at) - var(--size-slider_stop) / 2);
+  top: calc((var(--side) - var(--size-slider_stop)) / 2);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-on_surface_variant) r g b / var(--dim));
+}
+
+.k-slider-dot[data-passed] {
+  background: rgb(from var(--on-tone) r g b / calc(var(--opacity-subdued) * var(--dim)));
+}
+
+.k-slider-dot[data-hidden] {
+  visibility: hidden;
+}
+
+/* The mark the value rests on, solid in the fill's content colour, popping in over `short`. */
+.k-slider-anchor {
+  position: absolute;
+  width: var(--anchor);
+  height: var(--anchor);
+  left: calc(var(--side) / 2 + (100% - var(--side)) * var(--at, 0) - var(--anchor) / 2);
+  top: calc((var(--side) - var(--anchor)) / 2);
+  border-radius: var(--radius-full);
+  background: var(--on-fill);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.k-slider-anchor[data-shown] {
+  visibility: visible;
+}
+
+/* The icon's button, where the icon steps or mutes: the circle at the fill's start, its state
+   layer the fill's content colour under the pointer and pressed. */
+.k-slider-icon-button {
+  all: unset;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--side);
+  height: var(--side);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.k-slider-icon-button:hover {
+  background: rgb(from var(--on-tone) r g b / var(--opacity-hover));
+}
+
+.k-slider-icon-button:active {
+  background: rgb(from var(--on-tone) r g b / var(--opacity-press));
+}
+
+/* Under the pointer the icon's button is what is lit, not the slider. */
+.k-slider:has(.k-slider-icon-button:hover):not(:focus-visible, [data-pinned], [data-held], [data-dragging]) {
+  --lit: 0;
+}
+
+/* Tabs (`lib/tabs.ts`): their row of small buttons, as wide as the buttons. */
+.k-tabs {
+  display: block;
+  flex: none;
+}
+
+/* A menu (`lib/menu.ts`): its items one under the other across its popover. Past `--most` small
+   controls it scrolls, with no bar of its own, as the libraries' do. */
+.k-menu {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  max-height: calc(var(--size-control_sm) * var(--most, 1000));
+  overflow-y: auto;
+  scrollbar-width: none;
+  outline: none;
+}
+
+/* A menu's item: `size.control_sm` tall, `space.s12` inside, its corners concentric inside the
+   popover's. Lit (the keyboard on it, which the pointer moves), it fades onto `secondary_container`
+   with its words, symbol and check `on_secondary_container`, over `short`; pressed, the container
+   lifts to `secondary_container_pressed` over `micro`. At rest its content is `on_surface`, or
+   `error` on a danger item; disabled, `on_surface` at `opacity.disabled_content`. */
+.k-menu-item {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--size-control_sm);
+  padding: 0 var(--space-s12);
+  border-radius: var(--corner);
+  cursor: pointer;
+  --lit: 0;
+  --press: 0;
+  --rest-ink: var(--color-on_surface);
+  --ink: color-mix(in srgb, var(--rest-ink), var(--color-on_secondary_container) calc(var(--lit) * 100%));
+  --container: color-mix(in srgb, var(--color-secondary_container), var(--color-secondary_container_pressed) calc(var(--press) * 100%));
+  background: color-mix(in srgb, transparent, var(--container) calc(var(--lit) * 100%));
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+.k-menu-item[data-danger] {
+  --rest-ink: var(--color-error);
+}
+
+.k-menu-item:is([data-current], [data-pinned]) {
+  --lit: 1;
+}
+
+.k-menu-item:is(:active, [data-pinned="pressed"]):not([aria-disabled="true"]) {
+  --press: 1;
+}
+
+.k-menu-item[data-pinned],
+[data-sequence] .k-menu-item {
+  transition: none;
+}
+
+.k-menu-item[aria-disabled="true"] {
+  cursor: default;
+  --lit: 0;
+  --ink: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+.k-menu-words {
+  display: block;
+}
+
+/* The check's room, a `body` symbol's, kept when unchecked so the items' ends line up. */
+.k-menu-check {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--type-body-icon);
+  height: var(--type-body-icon);
+}
+
+.k-menu-check > .k-icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* The hairline between two groups, `space.s4` clear of each. */
+.k-menu-separator {
+  align-self: stretch;
+  padding: var(--space-s4) 0;
+}
+
+/* A select (`lib/select.ts`): a field's look, `size.control_md` tall at the control radius,
+   filling its room, `surface_container_high` with a hairline of `outline_variant` inside its edge,
+   `space.s12` inside. Lit, as a field is, its fill rises to the highest container and its tube is
+   drawn over the hairline; pressed, the glow brightens. Open, its fill is the highest container,
+   its hairline the accent, and it shows no tube: the keyboard is in its menu. */
+.k-select {
+  appearance: none;
+  margin: 0;
+  border: none;
+  font: inherit;
+  text-align: start;
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  align-self: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--size-control_md);
+  padding: 0 var(--space-s12);
+  border-radius: var(--radius-control);
+  outline: none;
+  cursor: pointer;
+  --rest-fill: var(--color-surface_container_high);
+  background: color-mix(in srgb, var(--rest-fill), var(--color-surface_container_highest) calc(var(--lit) * 100%));
+  --edge-line: var(--color-outline_variant);
+  --value: var(--color-on_surface);
+  --mark: var(--color-on_surface_variant);
+}
+
+.k-select::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid var(--edge-line);
+  border-radius: inherit;
+}
+
+.k-select[data-placeholder] {
+  --value: var(--color-on_surface_variant);
+}
+
+.k-select[data-open] {
+  --rest-fill: var(--color-surface_container_highest);
+  --edge-line: var(--color-primary);
+}
+
+.k-select[data-open] > .k-ring {
+  visibility: hidden;
+}
+
+.k-select:disabled {
+  cursor: default;
+  --rest-fill: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --edge-line: var(--rest-fill);
+  --value: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --mark: var(--value);
+}
+
+.k-select-value {
+  display: block;
+}
+
+/* A select and its menu: the menu floats `space.s4` under it, as wide as it, over what is below.
+   It fades in over `short` on `emphasized_decel` as it opens and out over `micro` on
+   `emphasized_accel` as it closes. A sample of the open state lays the menu out under it instead. */
+.k-select-room {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  align-self: stretch;
+  gap: var(--space-s4);
+}
+
+.k-select-room:not([data-shown]) > .k-popover {
+  position: absolute;
+  top: calc(100% + var(--space-s4));
+  left: 0;
+  z-index: 10;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--motion-micro) var(--easing-emphasized_accel),
+    visibility 0s linear var(--motion-micro);
+}
+
+.k-select-room:not([data-shown])[data-open] > .k-popover {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--motion-short) var(--easing-emphasized_decel);
 }
