@@ -894,3 +894,43 @@
   height: var(--size-keycap);
   overflow: hidden;
 }
+
+/* A popover (`lib/tooltip.ts`): `size.menu` wide, `space.s12` inside, at the surface radius, on
+   `surface_container` with a soft hairline (`outline_variant` at `opacity.outline_soft`) inside its
+   edge and the panel's shadow under it. */
+.k-popover {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--size-menu);
+  padding: var(--space-s12);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container);
+  box-shadow:
+    inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft)),
+    0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
+}
+
+/* A tooltip's card over its control: shown while the control is lit, fading in and out over
+   `short`, never flickering; the pointer never takes it. */
+.k-tooltip {
+  display: block;
+  flex: none;
+}
+
+.k-tip-room > .k-tooltip {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+/* Over a disabled control it still shows under the pointer, so the control still says what it does. */
+.k-tip-room:has(> .k-control:is(:hover, :focus-visible, [data-pinned])) > .k-tooltip,
+.k-tip-room > .k-tooltip[data-shown] {
+  opacity: 1;
+}
+
+.k-tip-room:has(> .k-control[data-pinned]) > .k-tooltip,
+.k-tip-room > .k-tooltip[data-shown] {
+  transition: none;
+}
