@@ -5,47 +5,12 @@ import { button, METRICS, SIZES } from "../../lib/button.ts";
 import { translated } from "../../lib/content.ts";
 import { icon } from "../../lib/icon.ts";
 import { row, stack } from "../../lib/layout.ts";
-import { type TypeStyle, text, typeset } from "../../lib/text.ts";
+import { STYLE_WORDS as WORDS, styles, type TypeStyle, text, typeset } from "../../lib/text.ts";
 import { length, names, raw, words } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
 import { doesntApply, foundation } from "../../site/page.ts";
 import { atScale, MODES, modeName, painted, table, token } from "../../site/parts/swatches.ts";
 import { SCALES, settings } from "../../site/settings.ts";
-
-/** Every type style, largest first, then by its line. */
-function styles(): TypeStyle[] {
-  const measure = (style: TypeStyle) => [length(`type-${style}-size`), length(`type-${style}-line`)] as const;
-  return names("type-")
-    .filter((name) => name.endsWith("-size"))
-    .map((name) => name.slice("type-".length, -"-size".length) as TypeStyle)
-    .sort((a, b) => measure(b)[0] - measure(a)[0] || measure(b)[1] - measure(a)[1]);
-}
-
-/** Real words for each style, as the surfaces that use it show them. */
-const WORDS: Record<TypeStyle, string> = {
-  clock: "21:47",
-  hero: "Welcome",
-  hero_number: "64%",
-  display: "That's it",
-  title: "Pick a disk",
-  headline: "Erase the disk?",
-  heading: "Network",
-  subheading: "Couldn't connect",
-  body_large: "Everything on this disk will be erased.",
-  body: "KubaOS takes the whole disk and encrypts it.",
-  body_strong: "Samsung 990 Pro",
-  button_large: "Install",
-  button: "Continue",
-  button_small: "Show log",
-  label: "Passphrase",
-  label_number: "72%",
-  small: "At least 12 characters",
-  caption: "Version 0.4",
-  accent: "ようこそ",
-  mono: "/dev/nvme0n1p2",
-  keycap: "Ctrl",
-  mono_large: "kubaos update",
-};
 
 /** A weight's name, as the tokens write it. */
 const WEIGHTS: Record<string, string> = { "300": "light", "400": "regular", "500": "medium", "600": "semibold" };

@@ -998,3 +998,217 @@
 .k-tip-room > .k-tooltip[data-shown] {
   transition: none;
 }
+
+/* One line, or `--lines`, in the room the text is given, the last ending in an ellipsis where the
+   words don't fit; never wider than its words. */
+.k-text[data-clamped] {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.k-text[data-clamped="lines"] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines);
+  width: auto;
+  height: auto;
+  max-height: calc(var(--lines) * var(--t-line));
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Room that takes what is left along its row, or the whole width across its stack. */
+.k-row > [data-fill] {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-stack > [data-fill] {
+  align-self: stretch;
+}
+
+/* A hairline across all the room it is given, in the soft outline: one device pixel at every
+   scale. */
+.k-divider {
+  display: block;
+  flex: none;
+  align-self: stretch;
+  height: var(--stroke-hairline_device_px);
+  background: rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
+}
+
+/* A badge: a pill `size.badge` tall, as wide as `--badge-width` works out, its count's text
+   centred on a whole device pixel, an odd spare pixel after it (`centre_x`). */
+.k-badge {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--badge-width);
+  height: var(--size-badge);
+  padding-left: round(down, calc((var(--badge-width) - round(up, calc(var(--natural, 0) * var(--px) - 0.001px), 1px)) / 2), 1px);
+  border-radius: var(--radius-full);
+  background: var(--color-error);
+}
+
+.k-badge[data-accent] {
+  background: var(--color-primary);
+}
+
+.k-badge[data-dot] {
+  height: var(--size-badge_dot);
+  padding: 0;
+}
+
+/* A symbol with a badge centred on its top right corner: the box takes the half of the badge past
+   the symbol on both sides while it shows. The badge hangs past the box's top. */
+.k-badged {
+  display: block;
+  flex: none;
+  position: relative;
+  --overhang: 0px;
+  padding: 0 var(--overhang);
+}
+
+.k-badged[data-badged] {
+  --overhang: round(up, calc(var(--badge-width) / 2), 1px);
+}
+
+.k-badged > .k-badge {
+  position: absolute;
+  left: round(nearest, calc(var(--overhang) + var(--icon-s16) - var(--badge-width) / 2), 1px);
+  top: round(nearest, calc(var(--size-badge) / -2), 1px);
+}
+
+.k-badged > .k-badge[data-dot] {
+  top: round(nearest, calc(var(--size-badge_dot) / -2), 1px);
+}
+
+/* A ticking number: as wide as the same text with every digit a 0, its text at the left. */
+.k-figure {
+  display: block;
+  flex: none;
+  width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+  height: var(--t-line);
+}
+
+/* How far the spinner's clock is, in seconds of its loop. */
+@property --spin {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A spinner: a faint full ring and an arc over it, `stroke.thin` rounded half up to whole device
+   pixels, the ring's middle a stroke in from the box. The arc turns 0.8 of a turn a second and
+   breathes between 0.45 and 1.05 of a half turn, 0.6 breaths a second, so its loop is 5 s, four
+   turns and three breaths: the builds' own clock (`progress::spinner`, `Spinner.qml`), which
+   runs in real time and isn't a motion token. A shot holds it 0.7 s in, as the specimens do. */
+.k-spinner {
+  display: block;
+  flex: none;
+  width: var(--spinner-size);
+  height: var(--spinner-size);
+  --thin: max(1px, round(nearest, var(--stroke-thin), 1px));
+  --turns: 0.8;
+  --breaths: 0.6;
+  --cycle: 5s;
+  animation: k-spin calc(var(--cycle) / var(--speed) * var(--slow)) linear infinite;
+}
+
+.k-spinner[data-held] {
+  animation: none;
+  --spin: 0.7;
+}
+
+.k-spinner > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.k-spinner circle {
+  cx: 50%;
+  cy: 50%;
+  r: calc(var(--spinner-size) / 2 - var(--thin));
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--thin);
+}
+
+.k-spinner-ring {
+  stroke-opacity: var(--opacity-spinner_track);
+}
+
+.k-spinner-arc {
+  stroke-linecap: round;
+  stroke-dasharray: calc(180 * (0.45 + 0.6 * (0.5 + 0.5 * sin(var(--spin) * var(--breaths) * 1turn)))) 360;
+  transform-origin: 50% 50%;
+  transform: rotate(calc(var(--spin) * var(--turns) * 1turn));
+}
+
+@keyframes k-spin {
+  from { --spin: 0; }
+  to { --spin: 5; }
+}
+
+/* How far the skeleton's sheen has come across it: its middle, 0 at the left edge and 1 at the
+   right. */
+@property --sweep {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* A skeleton: the placeholder colour, with a sheen of the highest container whose middle is at
+   `--sweep` and which fades to nothing `--band` of the width either side, as QML's gradient does.
+   The sheen is the shape's own fill, so its corners cut it. It sweeps over `slow` on `standard`,
+   rests for `slow`, three times, then holds still; with reduce motion it holds still from the
+   start. */
+.k-skeleton {
+  display: block;
+  flex: none;
+  align-self: stretch;
+  height: var(--height);
+  border-radius: var(--corner);
+  --band: 0.4;
+  --sweep: calc(-1 * var(--band));
+  background: linear-gradient(
+    to right,
+    var(--color-surface_container_high) calc((var(--sweep) - var(--band)) * 100%),
+    var(--color-surface_container_highest) calc(var(--sweep) * 100%),
+    var(--color-surface_container_high) calc((var(--sweep) + var(--band)) * 100%)
+  );
+  animation: k-sheen calc(2 * var(--motion-slow)) var(--easing-standard) 3;
+}
+
+.k-row > .k-skeleton:not([data-bone="circle"]) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-skeleton[data-bone="circle"] {
+  width: var(--height);
+  align-self: auto;
+}
+
+[data-reduced] .k-skeleton,
+.k-skeleton[data-still] {
+  animation: none;
+}
+
+@keyframes k-sheen {
+  0% { --sweep: calc(-1 * var(--band)); }
+  50% { --sweep: calc(1 + var(--band)); }
+  100% { --sweep: calc(1 + var(--band)); }
+}
+
+/* A room of a set width, whatever its children hold: a skeleton's or a divider's room. */
+.k-within {
+  width: var(--room);
+}
+
+.k-within > * {
+  align-self: stretch;
+}
