@@ -26,8 +26,13 @@ import motion from "./foundations/motion.ts";
 import radii from "./foundations/radii.ts";
 import space from "./foundations/space.ts";
 import type from "./foundations/type.ts";
+import menu from "./molecules/menu.ts";
+import popover from "./molecules/popover.ts";
+import select from "./molecules/select.ts";
+import slider from "./molecules/slider.ts";
+import tabs from "./molecules/tabs.ts";
 
-export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure];
+export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, slider, tabs, select, popover, menu];
 
 export function pagesOf(level: Level): AnyPage[] {
   return PAGES.filter((page) => page.level === level);
