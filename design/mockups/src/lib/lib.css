@@ -691,8 +691,7 @@
   border-radius: var(--radius-control);
   outline: none;
   cursor: text;
-  /* The field draws its own selection, so the browser's never shows: not even a drag across a
-     disabled one, which selects nothing. */
+  /* The field draws its own selection, so the browser's never shows. */
   user-select: none;
   --lit: 0;
   --start: var(--space-s12);
@@ -744,9 +743,9 @@
   --value: var(--color-on_surface_variant);
 }
 
-/* Disabled: grey, with no tone, no line and no glow. */
+/* Disabled: grey, with no tone, no line and no glow. Its value can still be selected, so the
+   pointer stays the text one. */
 .k-field[data-state="Disabled"] {
-  cursor: default;
   --rest-fill: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
   --edge-line: var(--rest-fill);
   --value: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
@@ -840,7 +839,7 @@
   );
 }
 
-.k-field:is(:focus, [data-keyboard]):not([data-selecting]) .k-field-caret {
+.k-field:is(:focus, [data-keyboard]):not([data-selecting], [data-state="Disabled"]) .k-field-caret {
   display: block;
 }
 

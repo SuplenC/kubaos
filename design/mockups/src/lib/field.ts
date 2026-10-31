@@ -7,8 +7,8 @@
 // It is a control in the state model (`.k-control` in `lib.css`): hovered or with the keyboard in
 // it, it is lit, the tube over its hairline in its tone (the accent, or the error's on an invalid
 // field) with the glow outside. With the keyboard in it, it also shows the caret, or the selection.
-// A read-only field lights and selects but never edits; a disabled one takes no input and never
-// lights.
+// A read-only field lights and selects but never edits; a disabled one never lights or edits, and
+// shows no caret, but still selects and copies.
 //
 // The caret is a core line, steady, never blinking. It strikes on as the keyboard comes in, and at
 // night a faint glow in the tone shows round it while you type, then fades once the keys stop.
@@ -288,7 +288,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
       draw();
     } else if (event.ctrlKey && event.key.toLowerCase() === "c") {
       copy(from, to);
-    } else if (locked) {
+    } else if (locked || inert) {
       return;
     } else if (event.key === "Backspace" || event.key === "Delete") {
       if (from !== to) replace("", from, to);
@@ -318,38 +318,44 @@ export function field(options: FieldOptions = {}): HTMLElement {
     ring.style.setProperty("--tube-unlit", tone("primary_glass", "error_glass"));
     ring.style.setProperty("--core-unlit", tone("primary_unlit", "error_unlit"));
     if (!options.pinned) {
-      element.addEventListener("keydown", edit);
       // A read-only field's caret strikes on but never glows: nothing is typed into it.
       element.addEventListener("focus", () => {
         const struck = strike(caretShown);
         if (!locked) glowFor(caretShown, struck + motion("caret_hold"));
       });
-      element.addEventListener("mousedown", (event) => {
-        // The pointer in logical pixels from the text's start: the page is zoomed, so its client
-        // pixels are the room's drawn width over its laid-out one, and a logical pixel is a scale.
-        const box = room.getBoundingClientRect();
-        const start = room.querySelector(".k-field-line")?.getBoundingClientRect().left ?? box.left;
-        const ratio = box.width / room.offsetWidth || 1;
-        const at = (x: number) => nearest(shownText(), (x - start) / ratio / settings().scale);
-        const pos = at(event.clientX);
-        element.focus();
-        event.preventDefault();
-        if (event.detail === 2) caret = wordAt(value, pos);
-        else if (event.detail >= 3) caret = { pos: length(), anchor: 0 };
-        else {
-          move(pos, event.shiftKey);
-          const drag = (moved: MouseEvent) => move(at(moved.clientX), true);
-          const stop = () => {
-            window.removeEventListener("mousemove", drag);
-            window.removeEventListener("mouseup", stop);
-          };
-          window.addEventListener("mousemove", drag);
-          window.addEventListener("mouseup", stop);
-          return;
-        }
-        draw();
-      });
     }
+  } else {
+    // Off, it still selects and copies, since its value can be worth taking, but the keyboard
+    // never comes to it by Tab and it shows no caret.
+    element.tabIndex = -1;
+  }
+  if (!options.pinned) {
+    element.addEventListener("keydown", edit);
+    element.addEventListener("mousedown", (event) => {
+      // The pointer in logical pixels from the text's start: the page is zoomed, so its client
+      // pixels are the room's drawn width over its laid-out one, and a logical pixel is a scale.
+      const box = room.getBoundingClientRect();
+      const start = room.querySelector(".k-field-line")?.getBoundingClientRect().left ?? box.left;
+      const ratio = box.width / room.offsetWidth || 1;
+      const at = (x: number) => nearest(shownText(), (x - start) / ratio / settings().scale);
+      const pos = at(event.clientX);
+      element.focus();
+      event.preventDefault();
+      if (event.detail === 2) caret = wordAt(value, pos);
+      else if (event.detail >= 3) caret = { pos: length(), anchor: 0 };
+      else {
+        move(pos, event.shiftKey);
+        const drag = (moved: MouseEvent) => move(at(moved.clientX), true);
+        const stop = () => {
+          window.removeEventListener("mousemove", drag);
+          window.removeEventListener("mouseup", stop);
+        };
+        window.addEventListener("mousemove", drag);
+        window.addEventListener("mouseup", stop);
+        return;
+      }
+      draw();
+    });
   }
   // A Show or Hide action beside the field's label turns its bullets into the value and back.
   element.addEventListener("secret", (event) => {
