@@ -7,6 +7,7 @@ import chip from "./atoms/chip.ts";
 import field from "./atoms/field.ts";
 import hint from "./atoms/hint.ts";
 import iconButton from "./atoms/icon-button.ts";
+import keycap from "./atoms/keycap.ts";
 import radio from "./atoms/radio.ts";
 import toggle from "./atoms/switch.ts";
 import colour from "./foundations/colour.ts";
@@ -18,7 +19,7 @@ import radii from "./foundations/radii.ts";
 import space from "./foundations/space.ts";
 import type from "./foundations/type.ts";
 
-export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, button, iconButton, hint, toggle, checkbox, radio, chip, field];
+export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap];
 
 export function pagesOf(level: Level): AnyPage[] {
   return PAGES.filter((page) => page.level === level);

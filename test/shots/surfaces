@@ -61,6 +61,7 @@ mockups/checkbox    design/mockups/src/pages/atoms/checkbox.ts
 mockups/radio       design/mockups/src/pages/atoms/radio.ts
 mockups/chip        design/mockups/src/pages/atoms/chip.ts
 mockups/field       design/mockups/src/pages/atoms/field.ts
+mockups/keycap      design/mockups/src/pages/atoms/keycap.ts
 mockups/colour      design/mockups/src/pages/foundations/colour.ts
 mockups/type        design/mockups/src/pages/foundations/type.ts
 mockups/space       design/mockups/src/pages/foundations/space.ts
