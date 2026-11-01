@@ -38,11 +38,17 @@ function placeholder(still: boolean): HTMLElement {
   return shape;
 }
 
-/** Shows the picture in `box` where `arrival` says it is, and listens for it to fail. */
+/** Shows the picture in `box` where `arrival` says it is. */
 function arrive(box: HTMLElement, picture: HTMLImageElement | null, arrival: Arrival): void {
   box.dataset.arrival = arrival;
   box.querySelector(".k-media-placeholder")?.toggleAttribute("data-still", arrival === "broken");
   if (picture) picture.hidden = arrival !== "loaded";
+}
+
+/** Shows `room`, a media's, where `arrival` says its picture is: a sample that loads again. */
+export function settle(room: HTMLElement, arrival: Arrival): void {
+  const box = room.querySelector<HTMLElement>(".k-media-box");
+  if (box) arrive(box, box.querySelector("img"), arrival);
 }
 
 export function media(options: MediaOptions): HTMLElement {
