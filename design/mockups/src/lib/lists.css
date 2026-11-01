@@ -358,3 +358,57 @@
   flex: none;
   width: var(--size-control_md);
 }
+
+/* A table (`lib/table.ts`): its header and its rows on the same columns, `--columns` the shares of
+   the width in whole device pixels, `space.s12` apart and `space.s12` in from the ends. */
+.k-table {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-self: stretch;
+  outline: none;
+}
+
+.k-table-header,
+.k-table-row {
+  display: grid;
+  grid-template-columns: var(--columns, 1fr);
+  column-gap: var(--space-s12);
+  align-items: center;
+  box-sizing: border-box;
+  padding: var(--space-s4) var(--space-s12);
+}
+
+.k-table-cell {
+  display: flex;
+  min-width: 0;
+}
+
+.k-table-cell[data-numeric] {
+  justify-content: flex-end;
+}
+
+/* A row: `size.row_compact` tall at the control radius, no fill, its words `on_surface` and its
+   numbers `on_surface_variant`. Lit, its tube; pressed by day the tone tints it, as under a Text
+   button. Picked, `secondary_container`, its words `on_secondary_container` and its numbers that at
+   `opacity.subdued_text`; pressed, the container lifts. */
+.k-table-row {
+  position: relative;
+  height: var(--size-row_compact);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  --ink: var(--color-on_surface);
+  --muted: var(--color-on_surface_variant);
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: linear-gradient(var(--tint), var(--tint)), transparent;
+}
+
+.k-table-row[data-picked] {
+  --ink: var(--color-on_secondary_container);
+  --muted: rgb(from var(--color-on_secondary_container) r g b / var(--opacity-subdued_text));
+  background: color-mix(in srgb, var(--color-secondary_container), var(--color-secondary_container_pressed) calc(var(--press) * 100%));
+}
+
+.k-table-row.k-control[data-current] {
+  --lit: 1;
+}
