@@ -12,11 +12,13 @@ Rows in a well: the surface radius (24), padding 12, rows 4 apart, so the rows t
 
 ## `ScrollingList`
 
-Rust `list::scrolling_list`; QML `ScrollingList`.
+Rust `list::scrolling_list`; QML `ScrollingList`. Its mockup page is the source of truth: Molecules, ScrollingList, in `design/mockups/`.
 
 A `List` whose rows scroll inside its well, as tall as its place makes it. The rows scroll right up to the well's edge and are cut by its own rounded shape; the 12 above the first row and below the last is the scroll's padding (`DESIGN.md`, "Rules every component keeps"). The well's hairline and focus tube are drawn over the rows. In QML it holds a `ListRows` (or a `LiveList`) beside whatever else the well holds (a toolbar at its foot, a form that takes the list's place), 12 in at the sides and down its whole height, and the view's `topMargin` and `bottomMargin` are the 12.
 
 **States:** resting, and focused: the tube on the well's edge while the list has the keyboard.
+
+*Not built yet: QML's well shows no thumb, and iced's runs its thumb the well's whole height, where the corners cut it; neither keeps the row the keys reach the well's padding clear of its edge, and a wheel's notch scrolls each toolkit's own distance. The mockup floats the thumb `space.s4` in, along the rows' room `space.s12` clear of the top and bottom, and scrolls a row and its gap a notch.*
 
 ## `ListRows`
 
