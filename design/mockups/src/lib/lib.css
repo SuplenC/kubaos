@@ -2276,3 +2276,261 @@
   left: var(--space-s24);
   top: var(--space-s24);
 }
+
+/* How far a calendar's new month still is from its place, 1 to 0, in `space.s64`s toward the side
+   it came from (`--from`, 1 the next month, -1 the last). */
+@property --slide {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far a calendar shows its year rather than its month, 0 to 1. */
+@property --year {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A calendar (`lib/calendar.ts`): a week number's column `size.control_sm` wide and seven days
+   `size.control_md` each, the header `space.s8` over the month. The month and the year cross-fade
+   over `short` on `emphasized_decel`. */
+.k-calendar {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-s8);
+  width: calc(var(--size-control_sm) + 7 * var(--size-control_md));
+  transition: --year var(--motion-short) var(--easing-emphasized_decel);
+}
+
+.k-calendar[data-year] {
+  --year: 1;
+}
+
+[data-sequence] .k-calendar {
+  transition: none;
+}
+
+/* The arrows at either end and the title in the middle, a small control tall. */
+.k-cal-head {
+  position: relative;
+  display: block;
+  height: var(--size-control_sm);
+}
+
+.k-cal-head > .k-row {
+  width: 100%;
+}
+
+/* Words centred in their box on whole device pixels, the odd one after them. */
+.k-cal-centred {
+  position: absolute;
+  left: round(down, calc((100% - round(up, calc(var(--natural) * var(--px) - 0.001px), 1px)) / 2), 1px);
+  top: round(nearest, calc((100% - var(--t-line)) / 2), 1px);
+}
+
+/* The title: a pill a small control tall, `space.s12` inside, its words `subheading` in
+   `on_surface`; open on the year, Tonal: `secondary_container` with `on_secondary_container`. Lit,
+   its tube; pressed by day, the tone's tint. */
+.k-cal-title {
+  appearance: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--size-control_sm);
+  margin: 0;
+  padding: 0 var(--space-s12);
+  border: 0;
+  border-radius: var(--radius-full);
+  font: inherit;
+  cursor: pointer;
+  outline: none;
+  --words: var(--color-on_surface);
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: linear-gradient(var(--tint), var(--tint)), transparent;
+}
+
+.k-cal-head .k-cal-title {
+  position: absolute;
+  top: 0;
+}
+
+.k-cal-title[data-open] {
+  --words: var(--color-on_secondary_container);
+  background: linear-gradient(var(--tint), var(--tint)), var(--color-secondary_container);
+}
+
+.k-cal-body {
+  position: relative;
+  display: block;
+  height: calc(var(--space-s24) + 6 * var(--size-control_md));
+}
+
+/* A new month slides in under the names, cut at the month's edge while it moves. */
+.k-cal-body[data-sliding] {
+  overflow: clip;
+}
+
+.k-cal-grid {
+  display: block;
+  outline: none;
+  opacity: calc(1 - var(--year));
+}
+
+.k-cal-names,
+.k-cal-week {
+  display: flex;
+}
+
+.k-cal-name {
+  position: relative;
+  flex: none;
+  width: var(--size-control_md);
+  height: var(--space-s24);
+}
+
+.k-cal-name:first-child,
+.k-cal-week-number {
+  position: relative;
+  flex: none;
+  width: var(--size-control_sm);
+}
+
+.k-cal-week-number {
+  height: var(--size-control_md);
+}
+
+.k-cal-weeks {
+  display: block;
+  translate: round(nearest, calc(var(--slide) * var(--from, 1) * var(--space-s64)), 1px) 0;
+}
+
+/* A day: a regular control holding a small control's disc, a pill, `space.s4` in. Its number is
+   `body` in `on_surface`, a weekend's `on_surface_variant`, a holiday's `tertiary`; the months
+   around dim theirs to `opacity.disabled_content`. Today's disc is `primary`, its number
+   `body_strong` in `on_primary`. The picked day's disc is ringed in `primary`, the thin stroke
+   wide, fading in on `--picked`. A holiday's `tertiary` dot sits `space.s4` above the disc's foot. */
+.k-cal-day {
+  position: relative;
+  flex: none;
+  display: block;
+  width: var(--size-control_md);
+  height: var(--size-control_md);
+  cursor: pointer;
+  --dim: 1;
+  --num-rest: var(--color-on_surface);
+  --num: rgb(from var(--num-rest) r g b / calc(alpha * var(--dim)));
+  --dot: var(--color-tertiary);
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard),
+    --picked var(--motion-short) var(--easing-standard);
+}
+
+.k-cal-day[data-pinned],
+[data-sequence] .k-cal-day {
+  transition: none;
+}
+
+.k-cal-day[data-weekend] {
+  --num-rest: var(--color-on_surface_variant);
+}
+
+.k-cal-day[data-holiday] {
+  --num-rest: var(--color-tertiary);
+}
+
+.k-cal-day[data-picked] {
+  --picked: 1;
+}
+
+.k-cal-day[data-other] {
+  --dim: var(--opacity-disabled_content);
+}
+
+.k-cal-day[data-today] {
+  --num-rest: var(--color-on_primary);
+  --dot: var(--color-on_primary);
+}
+
+/* The keyboard's day, while the month has the keyboard: lit, with its holiday's hint. */
+.k-cal-grid:focus-visible .k-cal-day[data-current] {
+  --lit: 1;
+}
+
+.k-cal-grid:focus-visible .k-cal-day[data-current] > .k-hint {
+  opacity: 1;
+}
+
+.k-cal-disc {
+  position: absolute;
+  left: var(--space-s4);
+  top: var(--space-s4);
+  width: var(--size-control_sm);
+  height: var(--size-control_sm);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+.k-cal-day[data-today] > .k-cal-disc {
+  background: var(--color-primary);
+}
+
+.k-cal-disc::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: max(1px, round(nearest, var(--stroke-thin), 1px)) solid var(--color-primary);
+  border-radius: inherit;
+  opacity: var(--picked);
+}
+
+.k-cal-dot {
+  position: absolute;
+  left: round(down, calc((100% - var(--space-s4)) / 2), 1px);
+  top: calc(100% - 2 * var(--space-s4));
+  width: var(--space-s4);
+  height: var(--space-s4);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--dot) r g b / calc(alpha * var(--dim)));
+}
+
+/* The year: twelve months three to a row, `space.s8` apart, in the middle of the month's room,
+   its columns differing by a device pixel at most. */
+.k-cal-year {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  --across: calc(100% - 2 * var(--space-s8));
+  --first: round(down, calc(var(--across) / 3), 1px);
+  grid-template-columns: var(--first) round(down, calc((var(--across) - var(--first)) / 2), 1px) 1fr;
+  grid-auto-rows: var(--size-control_md);
+  gap: var(--space-s8);
+  align-content: center;
+  outline: none;
+  opacity: var(--year);
+}
+
+/* A month of the year: `size.control_md` tall at the control radius, `surface_container_high`
+   with its name `body_strong` in `on_surface`; the one shown `primary` with `on_primary`. */
+.k-cal-month {
+  position: relative;
+  display: block;
+  height: var(--size-control_md);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  --num: var(--color-on_surface);
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: linear-gradient(var(--tint), var(--tint)), var(--color-surface_container_high);
+}
+
+.k-cal-month[data-shown] {
+  --num: var(--color-on_primary);
+  background: var(--color-primary);
+}
+
+.k-cal-year:focus-visible .k-cal-month[data-current] {
+  --lit: 1;
+}
