@@ -35,7 +35,7 @@ pub struct Tokens {
     /// Fixed dimensions of components, by name.
     pub size: BTreeMap<String, u16>,
     pub container: Container,
-    /// Aspect ratios a picture's box keeps, width to height, by name.
+    /// Aspect ratios, width to height, by name: a picture's box's, a surface's at its shortest.
     pub aspect: BTreeMap<String, [u16; 2]>,
     pub font: Font,
     #[serde(rename = "type")]
