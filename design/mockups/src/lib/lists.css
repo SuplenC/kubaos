@@ -1,0 +1,293 @@
+/* Lists, tables and the scrolls they sit in: `lib/list.ts`, `lib/live-list.ts`, `lib/table.ts`,
+   `lib/description.ts` and `lib/scroll.ts`. Every length is a token in the page's own CSS pixels,
+   which are device pixels, as in `lib.css`. */
+
+/* How much of its room a live row has, 0 while it arrives or leaves, and how far a moved row
+   still is from its new place, 1 to 0, in its own distance (`--from-y`). */
+@property --grow {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --glide {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How far the Command menu's selection has slid toward the next row, 0 to 1, in `--step`s. */
+@property --along {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How much a header fade shows, 0 at rest to 1 scrolled. */
+@property --faded {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* A list's well (`lib/list.ts`): a surface at the surface radius, `surface_container_low` at
+   `opacity.well`, `space.s12` inside, its hairline in the soft outline and its focus tube drawn
+   over what it holds, so a row at its edge never covers them. The tube lights while the list has
+   the keyboard. */
+.k-list {
+  position: relative;
+  display: block;
+  flex: none;
+  align-self: stretch;
+  box-sizing: border-box;
+  padding: var(--space-s12);
+  border-radius: var(--radius-surface);
+  background: rgb(from var(--color-surface_container_low) r g b / var(--opacity-well));
+  outline: none;
+}
+
+.k-list-edge {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: var(--stroke-hairline_device_px) solid rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.k-list > .k-ring {
+  z-index: 2;
+}
+
+.k-list-rows {
+  position: relative;
+  align-self: stretch;
+}
+
+/* A well its rows scroll in, `--height` tall: they run right up to its edge and are cut by its own
+   rounded shape, the `space.s12` above the first and below the last its scroll padding. There is
+   no bar of the browser's; the thumb is the well's own. */
+.k-list[data-scrolls] {
+  height: var(--height);
+  padding: 0;
+}
+
+.k-list-pane {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  border-radius: inherit;
+}
+
+.k-list-pane > .k-list-rows,
+.k-list-pane > .k-live-rows {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-s12);
+}
+
+/* The thumb: `size.scrollbar` wide, a pill in the outline variant (the outline under the pointer
+   and while dragged), floating `space.s4` in from the well's end across its padding, so it never
+   covers a row. It runs along the rows' room, `space.s12` clear of the well's top and bottom, where
+   the well's corners would cut it. It shows only while the rows are taller than the well. */
+.k-list-thumb {
+  position: absolute;
+  z-index: 1;
+  top: var(--top);
+  right: var(--space-s4);
+  display: none;
+  width: var(--size-scrollbar);
+  height: var(--tall);
+  border-radius: var(--radius-full);
+  background: var(--color-outline_variant);
+  cursor: default;
+  transition: background-color var(--motion-micro) var(--easing-standard);
+}
+
+.k-list-thumb[data-shown] {
+  display: block;
+}
+
+.k-list-thumb:is(:hover, [data-dragged], [data-pinned]) {
+  background: var(--color-outline);
+}
+
+/* A row (`lib/list.ts`): `size.row` tall with one line, `size.row_two_line` with two, `space.s12`
+   inside, its corners concentric in the well's (`radius.surface` − `space.s12`). Lit (the keyboard
+   on it, which the pointer moves) it fades onto `secondary_container` over `short`, its content to
+   `on_secondary_container` and its subtitle and facts to that at `opacity.subdued_text`, its
+   keycaps' keys and edges to `primary`; pressed, the container lifts to
+   `secondary_container_pressed` over `micro`. A danger row's content is `error`, and lit it fades
+   onto `error` itself, its content `on_error`. Picked, its tick and title are `primary_lit`, with
+   the label glow round the title at night while the signs are on. Disabled, all of it is
+   `on_surface` at `opacity.disabled_content`. */
+.k-list-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: none;
+  align-items: center;
+  align-self: stretch;
+  box-sizing: border-box;
+  height: var(--size-row);
+  padding: 0 var(--space-s12);
+  border-radius: calc(var(--radius-surface) - var(--space-s12));
+  cursor: pointer;
+  --lit: 0;
+  --press: 0;
+  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  --rest-ink: var(--color-on_surface);
+  --rest-muted: var(--color-on_surface_variant);
+  --rest-title: var(--rest-ink);
+  --lit-ink: var(--color-on_secondary_container);
+  --ink: color-mix(in srgb, var(--rest-ink), var(--lit-ink) calc(var(--lit) * 100%));
+  --muted: color-mix(in srgb, var(--rest-muted), rgb(from var(--lit-ink) r g b / var(--opacity-subdued_text)) calc(var(--lit) * 100%));
+  --title: color-mix(in srgb, var(--rest-title), var(--lit-ink) calc(var(--lit) * 100%));
+  --tick: var(--title);
+  --container: color-mix(in srgb, var(--color-secondary_container), var(--color-secondary_container_pressed) calc(var(--press) * 100%));
+  background: color-mix(in srgb, transparent, var(--container) calc(var(--lit) * 100%));
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+.k-list-row[data-lines="two"] {
+  height: var(--size-row_two_line);
+}
+
+.k-list-row[data-danger] {
+  --rest-ink: var(--color-error);
+  --rest-muted: var(--color-error);
+  --lit-ink: var(--color-on_error);
+  --container: color-mix(in srgb, var(--color-error), var(--color-error_pressed) calc(var(--press) * 100%));
+}
+
+.k-list-row[data-picked] {
+  --rest-title: var(--color-primary_lit);
+}
+
+.k-list-row[data-picked] .k-list-title {
+  filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--signs) * (1 - var(--lit)))));
+}
+
+.k-list-row:is([data-current], [data-pinned]) {
+  --lit: 1;
+}
+
+.k-list-row:is(:active, [data-pinned="pressed"], [data-keyed]):not([aria-disabled="true"], [data-loading]) {
+  --press: 1;
+}
+
+.k-list-row[data-pinned],
+[data-sequence] .k-list-row {
+  transition: none;
+}
+
+.k-list-row:is([aria-disabled="true"], [data-loading]) {
+  cursor: default;
+  --lit: 0;
+  --rest-ink: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --rest-muted: var(--rest-ink);
+  --rest-title: var(--rest-ink);
+}
+
+.k-list-row[aria-disabled="true"] :is(.k-keycap, .k-icon-tile, .k-chip) {
+  opacity: var(--opacity-disabled_content);
+}
+
+/* The Command menu's: the selection is the list's, so the rows draw none of their own and only
+   take its colours. */
+.k-list[data-slides] .k-list-row {
+  background: none;
+}
+
+.k-list-row > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-list-row[data-clear] .k-list-lead {
+  margin-inline-end: calc(var(--space-s16) - var(--space-s12));
+}
+
+.k-list-detail {
+  flex: 0 1 auto;
+}
+
+.k-list-row:not([data-danger]) .k-list-keys .k-keycap {
+  --key-ink: color-mix(in srgb, var(--color-on_surface_variant), var(--color-primary) calc(var(--lit) * 100%));
+  --key-edge: color-mix(in srgb, var(--color-outline_variant), var(--color-primary) calc(var(--lit) * 100%));
+}
+
+.k-list-switch {
+  pointer-events: none;
+}
+
+/* The tick's room, `body_strong`'s symbol, kept when unticked so the rows' ends line up. */
+.k-list-check {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--type-body_strong-icon);
+  height: var(--type-body_strong-icon);
+}
+
+.k-list-check > .k-icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* A loading row's lines: their share of the words' room, on whole device pixels. */
+.k-list-bone-line {
+  width: round(down, calc(100% * var(--share)), 1px);
+}
+
+/* The Command menu's selection: one shape behind the rows, sliding between them over `short` on
+   `standard` as the keyboard moves; it is on its row at once as it arrives. */
+.k-list-highlight {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--top) + var(--along) * var(--step, 0px));
+  z-index: 0;
+  display: none;
+  height: var(--height);
+  border-radius: calc(var(--radius-surface) - var(--space-s12));
+  background: var(--color-secondary_container);
+  transition: top var(--motion-short) var(--easing-standard);
+}
+
+/* A sample of the slide, which a player moves a row and its gap at a time. */
+.k-list-highlight[data-stepped] {
+  --step: calc(var(--size-row_two_line) + var(--space-s4));
+}
+
+.k-list-highlight[data-shown] {
+  display: block;
+}
+
+.k-list-highlight[data-danger] {
+  background: var(--color-error);
+}
+
+.k-list-highlight[data-still],
+[data-reduced] .k-list-highlight,
+[data-sequence] .k-list-highlight {
+  transition: none;
+}
+
+/* An empty well's line, centred on whole device pixels, `space.s12` above and below inside the
+   well's own padding. */
+.k-list-empty {
+  display: flex;
+  padding: var(--space-s12) 0;
+}
+
+.k-list-empty-words {
+  margin-inline-start: max(0px, round(down, calc((100% - round(up, calc(var(--natural) * var(--px) - 0.001px), 1px)) / 2), 1px));
+}
