@@ -23,6 +23,14 @@
   initial-value: 0;
 }
 
+/* How far a sample of a held row's list has scrolled to follow a room opening above it, 0 to 1, in
+   rooms. */
+@property --scrolled {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 /* How much a header fade shows, 0 at rest to 1 scrolled. */
 @property --faded {
   syntax: "<number>";
@@ -290,4 +298,57 @@
 
 .k-list-empty-words {
   margin-inline-start: max(0px, round(down, calc((100% - round(up, calc(var(--natural) * var(--px) - 0.001px), 1px)) / 2), 1px));
+}
+
+/* A live list's rows (`lib/live-list.ts`): each in a room of its own, the row and the `space.s4`
+   after it, so a row leaving gives its gap back with it; the list's padding under its last room is
+   the well's less that gap. A room opens from nothing over `medium` on `standard_decel` as its row
+   fades in over `slow`, and closes over `medium` on `standard_accel` as it fades, cutting its row
+   while it moves; a row moved glides from where it was over `medium` on `standard_decel`. With
+   reduced motion a room opens and closes at once, its row fading over `short`, and nothing glides. */
+.k-list-pane > .k-live-rows {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--space-s8);
+}
+
+.k-live-row {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  height: calc((var(--row-height) + var(--space-s4)) * var(--grow));
+  transform: translateY(calc(var(--glide) * var(--from-y, 0px)));
+  transition:
+    --grow var(--motion-medium) var(--easing-standard_decel),
+    opacity var(--motion-slow) var(--easing-standard_decel),
+    --glide var(--motion-medium) var(--easing-standard_decel);
+}
+
+.k-live-row:is([data-arriving], [data-leaving]) {
+  --grow: 0;
+  opacity: 0;
+}
+
+.k-live-row:is([data-arriving], [data-leaving], [data-opening]) {
+  overflow: clip;
+}
+
+.k-live-row[data-leaving] {
+  pointer-events: none;
+  transition:
+    --grow var(--motion-medium) var(--easing-standard_accel),
+    opacity var(--motion-medium) var(--easing-standard_accel);
+}
+
+.k-live-row:is([data-arriving], [data-still]) {
+  transition: none;
+}
+
+[data-reduced] .k-live-row:not([data-arriving]) {
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+/* A sample of the list following a room that opens above the held row: the scroll, as a move. */
+.k-live-rows[data-held] {
+  transform: translateY(calc(-1 * var(--scrolled) * (var(--size-row_two_line) + var(--space-s4))));
 }
