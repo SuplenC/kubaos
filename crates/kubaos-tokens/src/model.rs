@@ -156,11 +156,13 @@ pub struct Steps {
 pub struct Radii {
     /// Marks inside controls.
     pub small: u16,
-    /// Everything clicked or typed in.
+    /// A row inside a small or a content box.
+    pub row: u16,
+    /// Everything clicked or typed in, and the small floating things.
     pub control: u16,
-    /// A dialog.
-    pub dialog: u16,
-    /// Everything that holds content.
+    /// A content box inside a window or a panel.
+    pub content: u16,
+    /// The shell's big surfaces.
     pub surface: u16,
     /// Whether there is a pill radius, half the shape's shorter side.
     pub full: bool,
