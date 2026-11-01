@@ -111,24 +111,29 @@ export function tabs(options: TabsOptions): HTMLElement {
   }
 
   // Where a choice's stretch of the rail runs is its words' width, which only layout knows: the
-  // choice's box less its label padding on each side, read back from the laid-out well.
+  // choice's box less its label padding on each side, read back from the laid-out well. The page's
+  // box is zoomed to the display's ratio, so a box read in the viewport's pixels is brought back to
+  // the well's own by its width over its layout width.
+  /** `part`'s edges in the well's own CSS pixels from its padding edge. */
+  function within(part: Element): Edges {
+    const outer = well.getBoundingClientRect();
+    const box = part.getBoundingClientRect();
+    const ratio = well.offsetWidth / Math.max(1, outer.width);
+    const origin = outer.left;
+    return { left: (box.left - origin) * ratio - well.clientLeft, right: (box.right - origin) * ratio - well.clientLeft };
+  }
+
   /** The lit stretch's edges under choice `index`: its box less the label padding either side. */
   function under(index: number): Edges {
     const each = buttons[index]!;
-    const box = each.getBoundingClientRect();
-    const origin = well.getBoundingClientRect().left + well.clientLeft;
+    const box = within(each);
     const style = getComputedStyle(each);
-    return {
-      left: box.left - origin + Number.parseFloat(style.paddingLeft),
-      right: box.right - origin - Number.parseFloat(style.paddingRight),
-    };
+    return { left: box.left + Number.parseFloat(style.paddingLeft), right: box.right - Number.parseFloat(style.paddingRight) };
   }
 
   /** Where the lit stretch is drawn now, mid-flight or at rest. */
   function where(): Edges {
-    const box = lit.getBoundingClientRect();
-    const origin = well.getBoundingClientRect().left + well.clientLeft;
-    return { left: box.left - origin, right: box.right - origin };
+    return within(lit);
   }
 
   /** Sets the stretch's travel, from `start` to `end`, its leading edge the one in the way of travel. */

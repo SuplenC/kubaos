@@ -304,6 +304,14 @@ export function slider(options: SliderOptions): HTMLElement {
   }
 
   /** The fraction under `x` (the pointer's, in the slider's box), held on the sticky point near it. */
+  // The page's box is zoomed to the display's ratio, so the pointer's viewport pixels are not the
+  // slider's own: its box's width over its layout width converts one to the other.
+  /** How far along the slider `event` is, in its own CSS pixels from its left edge. */
+  function along(event: PointerEvent): number {
+    const box = root.getBoundingClientRect();
+    return ((event.clientX - box.left) * root.offsetWidth) / Math.max(1, box.width);
+  }
+
   function fractionAt(x: number): number {
     const side = root.offsetHeight;
     const span = Math.max(1, root.offsetWidth - side);
@@ -343,15 +351,14 @@ export function slider(options: SliderOptions): HTMLElement {
       delete root.dataset.settling;
       dragging = true;
       root.dataset.dragging = "";
-      shown = fractionAt(event.offsetX);
+      shown = fractionAt(along(event));
       if (!stepping) value = shown;
       setToggled(false);
       draw();
     });
     root.addEventListener("pointermove", (event) => {
       if (!dragging) return;
-      const box = root.getBoundingClientRect();
-      shown = fractionAt(event.clientX - box.left);
+      shown = fractionAt(along(event));
       if (!stepping) value = shown;
       draw();
     });
