@@ -80,6 +80,13 @@ mockups/tile        design/mockups/src/pages/molecules/tile.ts
 mockups/collapsible design/mockups/src/pages/molecules/collapsible.ts
 mockups/dialog      design/mockups/src/pages/molecules/dialog.ts
 mockups/toast       design/mockups/src/pages/molecules/toast.ts
+mockups/card        design/mockups/src/pages/molecules/card.ts
+mockups/choice-card design/mockups/src/pages/molecules/choice-card.ts
+mockups/media       design/mockups/src/pages/molecules/media.ts
+mockups/picture-choice design/mockups/src/pages/molecules/picture-choice.ts
+mockups/icon-tile   design/mockups/src/pages/molecules/icon-tile.ts
+mockups/badged-icon design/mockups/src/pages/molecules/badged-icon.ts
+mockups/pill        design/mockups/src/pages/molecules/pill.ts
 mockups/colour      design/mockups/src/pages/foundations/colour.ts
 mockups/type        design/mockups/src/pages/foundations/type.ts
 mockups/space       design/mockups/src/pages/foundations/space.ts
