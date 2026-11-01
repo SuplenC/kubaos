@@ -116,7 +116,7 @@ fn radius_roles_grow_from_small_to_surface() {
     assert_eq!(
         found,
         [Violation::NotAscending {
-            token: "radius.small, control, surface".into()
+            token: "radius.small, control, dialog, surface".into()
         }]
     );
 }

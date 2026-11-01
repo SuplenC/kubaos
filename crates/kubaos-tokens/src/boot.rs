@@ -236,6 +236,7 @@ fn length(tokens: &Tokens, parts: &[&str]) -> Option<u16> {
         ["size", name] => tokens.size.get(*name).copied(),
         ["radius", "small"] => Some(tokens.radius.small),
         ["radius", "control"] => Some(tokens.radius.control),
+        ["radius", "dialog"] => Some(tokens.radius.dialog),
         ["radius", "surface"] => Some(tokens.radius.surface),
         ["focus", "offset"] => Some(tokens.focus.offset),
         ["stroke", "thin"] => Some(tokens.stroke.thin),

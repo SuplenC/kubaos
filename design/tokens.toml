@@ -143,8 +143,13 @@ small = 4
 # Everything you click or type in: buttons, fields, list rows, menu items,
 # chips.
 control = 12
-# Everything that holds content: cards, dialogs, popups, panels, list wells,
-# the screen frame.
+# A dialog: the largest raised surface, a step softer than the controls' and
+# the popover's 12 it holds and stands over, and well under a card's or a
+# panel's 24, so a box that big over the screen reads as a question, not a
+# panel.
+dialog = 16
+# Everything that holds content: cards, popups, panels, list wells, the
+# screen frame.
 surface = 24
 # Pills and circles: switches, icon buttons, sliders, avatars,
 # badges.
@@ -344,7 +349,7 @@ line = 32
 icon = 32
 weight = "semibold"
 family = "sans"
-use = "A dialog's title, a big number."
+use = "A big number."
 
 [type.heading]
 size = 20
@@ -352,7 +357,7 @@ line = 28
 icon = 24
 weight = "semibold"
 family = "sans"
-use = "A section's title inside a page."
+use = "A section's title inside a page; a dialog's title."
 
 [type.subheading]
 size = 16

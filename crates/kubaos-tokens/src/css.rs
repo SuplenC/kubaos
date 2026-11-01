@@ -129,6 +129,7 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
     out.comment("Corner radii by role; a pill's is longer than any side, which a corner clamps to half.");
     out.length("radius-small", radius.small);
     out.length("radius-control", radius.control);
+    out.length("radius-dialog", radius.dialog);
     out.length("radius-surface", radius.surface);
     if radius.full {
         out.var("radius-full", "9999px");

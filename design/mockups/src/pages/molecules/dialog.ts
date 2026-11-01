@@ -132,7 +132,7 @@ const LEAVES: Move = {
 };
 
 const DESCRIBED =
-  "`size.dialog` (500) wide, `space.s32` inside, at the surface radius (`radius.surface`, 24), raised to the ladder's step 3, a dialog's: `surface_container_high` by day and `surface_container_highest` at night, the step's contact and ambient layers of `shadow`, and the rim, a hairline of `on_surface` inside its edge at `elevation.rim`. A 32 symbol (`headline`'s) in `primary` and the title in `headline`, `on_surface`, `space.s12` apart; the body in `body`, `on_surface_variant`, `space.s12` under them; what it asks for `space.s16` under the body; and the buttons `space.s32` under the last, `space.s8` apart, all regular (`md`). Its words wrap in its width.";
+  "`size.dialog` (500) wide, `space.s24` inside on every side, under its buttons too, at the dialog radius (`radius.dialog`, 16), raised to the ladder's step 3, a dialog's: `surface_container_high` by day and `surface_container_highest` at night, the step's contact and ambient layers of `shadow`, and the rim, a hairline of `on_surface` inside its edge at `elevation.rim`. A 24 symbol (`heading`'s) in `primary` and the title in `heading`, `on_surface`, `space.s12` apart; the body in `body`, `on_surface_variant`, `space.s12` under the title and in line with it, beside the symbol; what it asks for `space.s16` under the body, in line with it too; and its button bar `space.s24` under the last, across its whole width. Its words wrap in its width.";
 
 export default page({
   level: "molecules",
@@ -143,7 +143,7 @@ export default page({
   description: [
     "Rust `dialog::dialog`, `dialog::prompt` and `dialog::scrim`, QML `Dialog` and `Scrim`. Press one of the window's buttons: its dialog opens over the scrim with the keyboard in it. Tab goes round it, Esc or Cancel closes it, and the keyboard is back on the button.",
     DESCRIBED,
-    "The buttons: the dismiss button, Cancel, a Text button, at the start; the actions at the end, the one Enter presses last: the screen's one Filled button, a Tonal one for another way out before it (Shut down beside Restart). A Danger dialog asks before a step that destroys something: the warning sign in `error` instead of the symbol, an edge of `error` at `opacity.danger_edge` over the rim, and its one action a Danger button naming what it does (Erase and install). A prompt asks for what only you can type (a password): a labelled field `space.s16` under the body, Enter in it doing what its action does; a wrong answer is the field's Invalid state and its note, and the dialog stays.",
+    "The buttons are a button bar (Molecules, Button bar): the dismiss button, Cancel, a Text button, at the start; the actions at the end, the one Enter presses last: the screen's one Filled button, a Tonal one for another way out before it (Shut down beside Restart), `space.s8` apart, all regular (`md`). A Danger dialog asks before a step that destroys something: the warning sign in `error` instead of the symbol, an edge of `error` at `opacity.danger_edge` over the rim, and its one action a Danger button naming what it does (Erase and install). A prompt asks for what only you can type (a password): a labelled field `space.s16` under the body, Enter in it doing what its action does; a wrong answer is the field's Invalid state and its note, and the dialog stays.",
     "The scrim is everything behind the dialog, dimmed: `scrim` at `opacity.scrim` over all of the window or the screen. It takes every press, hover and scroll, so none reaches what is behind, and a press on it does nothing: Esc or Cancel closes the dialog, so a stray press never loses what was typed.",
     "Opening, the keyboard goes into the dialog: onto what it asks for, else onto Cancel on a Danger dialog, so Enter twice never destroys anything, else onto the last action. Tab and Shift+Tab go round its field and buttons and never leave it. Esc does what Cancel does. Closing puts the keyboard back on what opened it.",
   ],
@@ -204,19 +204,19 @@ export default page({
   },
   measures: {
     samples: nonEmpty([
-      { name: "A prompt", for: "Its width, padding, the symbol and title, the gaps between the body, the field and the buttons.", sample: () => still(prompt()) },
+      { name: "A prompt", for: "Its width, padding, the symbol and title, the gaps between the title, the body, the field and the buttons.", sample: () => still(prompt()) },
       { name: "A question", for: "Two actions at the end and Cancel at the start.", sample: () => still(QUESTION) },
     ]),
     measures: [
       { what: "Its width.", token: "size-dialog" },
-      { what: "Inside its edges, and above the buttons.", token: "space-s32" },
-      { what: "Between the symbol and the title, and above the body.", token: "space-s12" },
+      { what: "Inside its edges on every side, under the buttons too, and above the buttons.", token: "space-s24" },
+      { what: "Between the symbol and the title, and between the title and the body.", token: "space-s12" },
       { what: "Above what it asks for.", token: "space-s16" },
       { what: "Between buttons.", token: "space-s8" },
-      { what: "The symbol, `headline`'s.", token: "type-headline-icon" },
-      { what: "The title's line.", token: "type-headline-line" },
+      { what: "The symbol, `heading`'s.", token: "type-heading-icon" },
+      { what: "The title's line.", token: "type-heading-line" },
       { what: "A button's height.", token: "size-control_md" },
-      { what: "Its corners.", token: "radius-surface" },
+      { what: "Its corners.", token: "radius-dialog" },
       { what: "The rim inside its edge: one device pixel.", token: "stroke-hairline_device_px" },
       { what: "Its shadow's ambient layer: its drop.", token: "elevation-3-ambient-y" },
       { what: "Its shadow's ambient layer: its blur.", token: "elevation-3-ambient-blur" },

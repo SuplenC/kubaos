@@ -1,33 +1,26 @@
 // A question over a dimmed screen: `kubaos-ui`'s `dialog::dialog`, `dialog::prompt` and
 // `dialog::scrim`, `KubaOS.Components`' `Dialog` and `Scrim` (`docs/design/components/dialog.md`).
 //
-// The dialog is `size.dialog` wide, `space.s32` inside, at the surface radius, raised to the
-// ladder's step 3 (`lib/elevation.ts`). A 32 symbol and a `headline` title, the `body` `space.s12`
-// under them, what it asks for (a labelled field) `space.s16` under that, and the buttons
-// `space.s32` under the last: the dismiss button (Cancel, a Text button) at the start, the actions at
-// the end, the one Enter presses last. A Danger dialog shows the warning sign in `error` with an
-// edge of `error`, and its action is a Danger button.
+// The dialog is `size.dialog` wide, `space.s24` inside on every side, at the dialog radius, raised
+// to the ladder's step 3 (`lib/elevation.ts`). A 24 symbol (`heading`'s) beside a `heading` title,
+// the `body` `space.s12` under the title and in line with it, what it asks for (a labelled field)
+// `space.s16` under the body, in line with it too, and its button bar (`lib/button-bar.ts`)
+// `space.s24` under the last, across its whole width. A Danger dialog shows the warning sign in
+// `error` with an edge of `error`, and its action is a Danger button.
 //
 // The scrim dims everything behind it and takes every press, which does nothing; the dialog sits
 // in its middle on whole device pixels. Opening, the keyboard goes into the dialog, onto what it
 // asks for, else Cancel on a Danger dialog, else the last action; Tab and Shift+Tab go round it
 // and never leave; Esc is its dismiss button; closing gives the keyboard back to what opened it.
 
-import { button, type Kind } from "./button.ts";
+import { iconInLine } from "./button.ts";
+import { type Action, buttonBar, type Tone } from "./button-bar.ts";
 import { raise } from "./elevation.ts";
-import { icon } from "./icon.ts";
 import { filling, row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { wrapped } from "./text.ts";
 
-export type Tone = "Normal" | "Danger";
-
-export interface Action {
-  readonly label: string;
-  readonly kind?: Kind;
-  readonly icon?: string;
-  readonly disabled?: boolean;
-}
+export type { Action, Tone } from "./button-bar.ts";
 
 export interface DialogOptions {
   readonly tone?: Tone;
@@ -68,24 +61,22 @@ export function dialog(options: DialogOptions): Dialog {
   surface.setAttribute("aria-modal", "true");
   surface.toggleAttribute("data-danger", danger);
   const tint = danger ? "error" : "primary";
-  const symbol = icon(danger ? "warning" : (options.icon ?? "info"), "var(--type-headline-icon)", `var(--color-${tint})`);
-  const head = row("s12", "centre", symbol, filling(wrapped(options.title, "headline")));
+  const symbol = iconInLine(danger ? "warning" : (options.icon ?? "info"), "heading", `var(--color-${tint})`);
   const body = wrapped(options.body, "body", "on_surface_variant");
-  const dismiss = options.dismiss ? button({ label: options.dismiss, kind: "Text" }) : null;
-  const actions = options.actions.map((each) =>
-    button({ label: each.label, kind: each.kind ?? "Filled", ...(each.icon ? { icon: each.icon } : {}), ...(each.disabled ? { disabled: true } : {}) }),
-  );
-  const spacer = probe(document.createElement("span"), { role: "spacer", fill: true });
-  spacer.className = "k-fill";
-  const buttons = row("s8", "centre", ...(dismiss ? [dismiss] : []), spacer, ...actions);
-  buttons.classList.add("k-dialog-buttons");
-  const parts: Element[] = [head, body];
-  if (options.asks) parts.push(options.asks);
-  parts.push(buttons);
-  const column = stack(0, "start", ...parts);
-  column.classList.add("k-dialog-column");
   body.classList.add("k-dialog-body");
-  options.asks?.classList.add("k-dialog-asks");
+  const words: Element[] = [wrapped(options.title, "heading"), body];
+  if (options.asks) {
+    options.asks.classList.add("k-dialog-asks");
+    words.push(options.asks);
+  }
+  const said = stack(0, "start", ...words);
+  said.classList.add("k-dialog-said");
+  const head = row("s12", "start", symbol, filling(said));
+  const bar = buttonBar({ ...(options.dismiss ? { dismiss: options.dismiss } : {}), actions: options.actions, tone: options.tone ?? "Normal" });
+  const { dismiss, actions } = bar;
+  bar.element.classList.add("k-dialog-buttons");
+  const column = stack(0, "start", head, bar.element);
+  column.classList.add("k-dialog-column");
   surface.append(column);
 
   const result: Dialog = { element: surface, land, onAnswer: () => undefined };

@@ -99,8 +99,8 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 | `hero_number` | 64 / 72 | light | Numbers at the hero size: the install percent, the clock popup's time. Light, so a big figure doesn't shout. |
 | `display` | 48 / 56 | semibold | The heading of a full-screen moment other than Kōbō's welcome and done screens. |
 | `title` | 32 / 40 | semibold | A screen's or page's title. |
-| `headline` | 24 / 32 | semibold | A dialog's title, a big number. |
-| `heading` | 20 / 28 | semibold | A section's title inside a page. |
+| `headline` | 24 / 32 | semibold | A big number. |
+| `heading` | 20 / 28 | semibold | A section's title inside a page; a dialog's title. |
 | `subheading` | 16 / 24 | semibold | A card's or an error's first line. |
 | `body_large` | 16 / 24 | regular | A lede under a display line; the text in a field. |
 | `body` | 14 / 20 | regular | Running text, explanations, toasts. |
@@ -150,7 +150,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | Scale | Tokens |
 |---|---|
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
-| Radii (`[radius]`) | three roles, small 4, control 12, surface 24, and `full`; below |
+| Radii (`[radius]`) | four roles, small 4, control 12, dialog 16, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
 | Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 28, compact 24, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; a collapsible's rail's strip 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236 (Kōbō's); an app's sidebar 264; an app's window 1120 × 720, at least 720 × 480; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160; sparkline 48; the mockups' motion plot, from 0 to 1, 160 |
 | Container padding (`[container]`) | 16 under 640, 24 from 640, 32 from 1024 |
@@ -173,7 +173,7 @@ Every page and every panel's body is padded by the container at its sides, so th
 - **Sides only, as Tailwind's is.** Above and below, the content keeps the spacing steps it is laid out with at its natural height: a `Page` 32 below its top and 24 above its foot, where a footer's buttons sit; a toolbar band a small control's 16 above and below; a panel its own step (the clock 20; the control center, the notifications panel and the system monitor 16).
 - **On the 4 px grid**: every padding is a spacing step and every breakpoint a multiple of 4, which `kubaos-tokens` checks.
 - **A container inside a container** doesn't pad again: a card or a list inside a page keeps its own padding (16, 12), and the page's padding is the only one around them.
-- **A panel whose body is something else keeps that thing's own padding**: one list (the power menu's rows and Kōbō's rail, 12 in so their corners are concentric with the panel's), a dialog (polkit, 32), a stack of cards (the notification popups, 8 in), the OSD's one bar.
+- **A panel whose body is something else keeps that thing's own padding**: one list (the power menu's rows and Kōbō's rail, 12 in so their corners are concentric with the panel's), a dialog (polkit, 24), a stack of cards (the notification popups, 8 in), the OSD's one bar.
 - The geometry check's `container-padding` rule holds every `Page` and `Container` to it (see "Checks").
 
 ### No wasted space
@@ -188,13 +188,14 @@ Dense, never cramped (principle 8): room that holds nothing is a bug, as an edge
 
 ### Radii by role
 
-Every radius means something: what the shape is. There are three, plus full, and a component takes the one its role names. A radius that isn't a role only ever comes out of nesting.
+Every radius means something: what the shape is. There are four, plus full, and a component takes the one its role names. A radius that isn't a role only ever comes out of nesting.
 
 | Role | `Radius` | px | For |
 |---|---|---|---|
 | Small | `Small` | 4 | Marks inside controls: the checkbox, a hint, focus details, inline tags. |
 | Control | `Control` | 12 | Everything you click or type in: buttons, fields, list rows, menu items, chips; and a popover (a menu's, a tooltip's) or a select's open list, raised over the control that opened it. |
-| Surface | `Surface` | 24 | Everything that holds content: cards, dialogs, popups, toasts, panels, list wells, the screen frame. |
+| Dialog | `Dialog` | 16 | A dialog: the largest raised surface, a step softer than the control radius of the buttons, fields and popovers it holds and stands over, and well under a card's or a panel's 24, so a box that big over the screen reads as a question, not a panel. |
+| Surface | `Surface` | 24 | Everything that holds content: cards, popups, toasts, panels, list wells, the screen frame. |
 | Full | `Full` | half the shorter side | Pills and circles: switches, icon buttons, radios, progress bars, sliders, avatars, badges. |
 
 - **Nesting is derived, never picked.** A shape that fills another less an inset takes the outer radius minus the inset, so both corners share a centre: `nested(outer, inset)`, which refuses an inset that reaches the outer radius (in a `const`, that stops the build). A pill in a pill is a pill.
@@ -204,7 +205,7 @@ Every radius means something: what the shape is. There are three, plus full, and
   - The screen frame is a surface, 24. A window sits 8 inside it, so the window's outer edge is 24 − 8 = 16: Hyprland's `rounding = 14` plus its 2 px border.
   - Every raised list (a popover's menu, a select's open list) is built one way: the surface at the control radius, 12, with 4 inside, so its rows, 32 (`control_sm`) tall, take 12 − 4 = 8 and run parallel to it; a row is 8 inside, so its words start 12 from the surface's edge, and a hairline between groups is inset to the words. A popover holding words of its own is 12 inside, at the same 12.
   - The focus tube takes its control's own corner, 12 on a button, 24 on a card; each ring of its glow is concentric with it, its radius the control's plus its distance out. A pill's glow is a pill.
-- **8, 16 and 20 aren't choices.** They appear only where nesting produces them. A control placed inside content (a button in a card, a field in a dialog) isn't filling its parent, so it keeps its role; nesting is for a shape that fills one less an inset.
+- **8 and 20 aren't choices, nor 16 anywhere but a dialog.** They appear only where nesting produces them. A control placed inside content (a button in a card, a field in a dialog) isn't filling its parent, so it keeps its role; nesting is for a shape that fills one less an inset.
 - **Why roles:** six radii with no reason to pick one over another meant every surface picked its own, and nothing told a 16 card from a 16 button. A role says what the shape is, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.
 - The lint fails on a radius written as a number, a shell radius that isn't a role (`Theme.rounding.lg`), and a radius derived by hand (`outer - inset`); see "Checks".
 
@@ -317,7 +318,7 @@ Everything a person sees is built from a few levels, each made only from the one
 |---|---|---|---|
 | **Tokens** | Every value: colour, length, type, duration, curve | `control_md`, `primary`, `short` | `design/tokens.toml` |
 | **Atoms** | The smallest parts, which don't split further | `Text`, `Icon`, `Button`, `Switch`, `Field`, `Chip`, `Divider`, `Keycap`, `Spinner` | The library |
-| **Molecules** | A few atoms doing one job together | `ListRow`, `Step`, `Tile`, `Slider`, `Select`, `Tabs`, `Toast`, `EmptyState`, `ErrorBlock` | The library; an app-only one in its app |
+| **Molecules** | A few atoms doing one job together | `ListRow`, `Step`, `Tile`, `Slider`, `Select`, `Tabs`, `ButtonBar`, `Toast`, `EmptyState`, `ErrorBlock` | The library; an app-only one in its app |
 | **Organisms** | A part of a screen, from molecules and atoms, doing one of the app's jobs | Wi-Fi's network list, a notification group, a page of settings | The app |
 | **Templates** | A screen's layout, empty: its regions, how it reflows as its window resizes, and how it moves between its pages | a sidebar beside a page, a step rail beside a page (Kōbō), a panel | The library |
 | **Apps and surfaces** | A template filled with organisms and real data | Kōbō, Screens; the control center | An app's own crate; a surface's shell module |
@@ -367,7 +368,7 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Meter` | none | height | full |
 | `Sparkline` | none | height | none |
 | `Sheet` | none | none, holds content | surface |
-| `Dialog` | tone `Normal`, `Danger` | width | surface |
+| `Dialog` | tone `Normal`, `Danger` | width | dialog |
 | `Banner` | tone `Info`, `Warning`, `Danger` | none | surface |
 | `Step` | `todo`, `current`, `done` or `action`; `icon`; `mark` | none | control, nested 12 in a surface |
 | `DescriptionList` | none | none | none |
@@ -396,6 +397,7 @@ Each component has a page of its own under `design/components/`: its constructor
 **Buttons**
 
 - [Button](design/components/button.md)
+- [Button bar](design/components/button-bar.md)
 - [IconButton and Hint](design/components/icon-button.md)
 - [Tooltip](design/components/tooltip.md)
 
