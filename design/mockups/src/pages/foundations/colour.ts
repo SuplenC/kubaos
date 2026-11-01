@@ -124,7 +124,7 @@ const OPACITY_FOR: Record<string, { for: string; over: string; under: string }> 
   disabled_content: { for: "A disabled control's content, of `on_surface`.", over: "on_surface", under: "surface" },
   disabled_container: { for: "A disabled control's container, of `on_surface`.", over: "on_surface", under: "surface" },
   well: { for: "A well's surface over the panel.", over: "surface_container_low", under: "surface_container" },
-  outline_soft: { for: "A soft hairline.", over: "outline", under: "surface" },
+  outline_soft: { for: "The soft hairline: a well's or a scroll panel's sunken edge, a divider.", over: "outline_variant", under: "surface" },
   placeholder: { for: "A shape that is only a suggestion of one: a workspace's ghost, a scroller at rest under the pointer.", over: "on_surface_variant", under: "surface" },
   selection: { for: "Selected text's highlight.", over: "primary", under: "surface" },
   locked: { for: "A read-only field's outline and surface.", over: "outline", under: "surface" },

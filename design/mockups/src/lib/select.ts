@@ -57,7 +57,7 @@ export function select(options: SelectOptions): HTMLElement {
   room.style.setProperty("--rows", String(Math.max(1, Math.min(MOST, options.options.length))));
 
   const surface = raise(document.createElement("span"), 2);
-  surface.classList.add("k-select", "k-control");
+  surface.classList.add("k-select", "k-sunken", "k-control");
   surface.setAttribute("role", "combobox");
   surface.setAttribute("aria-haspopup", "listbox");
   surface.setAttribute("aria-controls", `${id}-list`);

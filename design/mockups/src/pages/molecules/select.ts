@@ -95,7 +95,7 @@ const PICKS: Move = {
 };
 
 const DESCRIBED =
-  "Shut, a field's look: `size.control_md` (40) tall at the control radius, filling its room, `surface_container_high` with a hairline of `outline_variant` inside its edge, `space.s12` inside. The picked option is `body_large` in `on_surface` on one line, ending in an ellipsis where it doesn't fit; an optional `body_large` symbol (20) leads it and a chevron (`expand_more`) ends it, both `on_surface_variant`, `space.s8` from the words. With nothing picked it shows its placeholder in `on_surface_variant`.";
+  "Shut, a field's look: `size.control_md` (40) tall at the control radius, filling its room, `surface_container_high` with a field's sunken edge, a hairline of `outline` at full inside its edge, `space.s12` inside. The picked option is `body_large` in `on_surface` on one line, ending in an ellipsis where it doesn't fit; an optional `body_large` symbol (20) leads it and a chevron (`expand_more`) ends it, both `on_surface_variant`, `space.s8` from the words. With nothing picked it shows its placeholder in `on_surface_variant`.";
 
 export default page({
   level: "molecules",

@@ -10,7 +10,9 @@ Rust `select::select`; QML `Select`.
 
 One of a list too long for radio rows or tabs. A row of tabs that would run past its room is a Select instead. The clock's holidays.
 
-**Shut**, it has a field's look: 40 (`control_md`) tall at the control radius, filling its room, `surface_container_high` with a hairline of `outline_variant` inside its edge, 12 inside. The pick is `body_large` in `on_surface` on one line, ending in an ellipsis where it doesn't fit; an optional 20 symbol (`icon`) leads it and a chevron ends it, both `on_surface_variant`, 8 from the words. With nothing picked it shows its placeholder in `on_surface_variant`.
+**Shut**, it has a field's look: 40 (`control_md`) tall at the control radius, filling its room, `surface_container_high` with a field's sunken edge, a hairline of `outline` inside its edge, 12 inside. The pick is `body_large` in `on_surface` on one line, ending in an ellipsis where it doesn't fit; an optional 20 symbol (`icon`) leads it and a chevron ends it, both `on_surface_variant`, 8 from the words. With nothing picked it shows its placeholder in `on_surface_variant`.
+
+*Not built yet: both libraries draw the shut select's hairline in `outline_variant`, and its edge open in `primary`; the mockup draws the rule.*
 
 **Open**, the select's own box grows into its list: one surface, no gap and no second popover.
 

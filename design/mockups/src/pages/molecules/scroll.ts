@@ -37,7 +37,7 @@ function content(lines: readonly string[] = LINES, first?: string): HTMLElement 
 /** The notifications panel: its header, then its content in a scroll, a header fade between them. */
 function panel(options: Partial<ScrollOptions> = {}, held = content()): HTMLElement {
   const box = document.createElement("span");
-  box.className = "k-scroll-panel";
+  box.className = "k-scroll-panel k-sunken";
   const header = row("s8", "centre", text("Notifications", "heading"));
   const { box: scrolled } = scroll(held, { height: TALL, above: "s16", below: "s16", fade: "s16", ...options });
   box.append(header, scrolled);
