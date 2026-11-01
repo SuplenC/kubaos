@@ -3,6 +3,9 @@
 // or a picture on a tinted square of one size at the control radius, so a list of apps reads as
 // one set whatever each vendor drew. The symbol is centred on a whole device pixel, the odd one
 // after it, as `kubaos_ui::snap::centre` places it.
+//
+// The symbol shows until the picture has loaded and stays when it can't be read, so a row keeps
+// the room a picture takes whether or not one arrives.
 
 import { icon } from "./icon.ts";
 import { probe, variant } from "./probe.ts";
@@ -28,13 +31,20 @@ export interface TileOptions {
   readonly accent?: boolean;
   /** On the error colour: a critical notification's. */
   readonly danger?: boolean;
+  /** The picture held on its way, whatever its address does: the symbol shows meanwhile. */
+  readonly pending?: boolean;
 }
 
-function image(source: string, className: string): HTMLImageElement {
+/** The picture at `source`, shown once it has loaded; one that can't be read is taken away. */
+function image(source: string, className: string, pending: boolean): HTMLImageElement {
   const picture = document.createElement("img");
   picture.className = className;
-  picture.src = source;
   picture.alt = "";
+  if (!pending) {
+    picture.addEventListener("load", () => picture.toggleAttribute("data-loaded", true));
+    picture.addEventListener("error", () => picture.remove());
+    picture.src = source;
+  }
   return picture;
 }
 
@@ -47,8 +57,9 @@ export function iconTile(options: TileOptions): HTMLElement {
   const tint = options.danger ? "error" : "surface_container_highest";
   const ink = options.danger ? "on_error" : options.accent ? "primary" : "on_surface_variant";
   tile.style.setProperty("--tint", `var(--color-${tint})`);
-  if (options.photo) tile.append(image(options.photo, "k-icon-tile-photo"));
-  else if (options.picture) tile.append(image(options.picture, "k-icon-tile-picture"));
-  else tile.append(icon(options.glyph, "var(--icon)", `var(--color-${ink})`));
+  tile.append(icon(options.glyph, "var(--icon)", `var(--color-${ink})`));
+  const pending = options.pending ?? false;
+  if (options.photo) tile.append(image(options.photo, "k-icon-tile-photo", pending));
+  else if (options.picture) tile.append(image(options.picture, "k-icon-tile-picture", pending));
   return probe(tile, { role: "component", name: "IconTile", variant: variant(options.size), fixed: { width: true, height: true } });
 }

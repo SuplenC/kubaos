@@ -659,7 +659,7 @@
 }
 
 /* An icon tile (`lib/icon-tile.ts`): its symbol or an app's picture centred on a whole device pixel, the
-   odd one after it; a photo covering the tile. */
+   odd one after it; a photo covering the tile. The symbol shows until the picture has loaded. */
 .k-icon-tile {
   position: relative;
   display: block;
@@ -687,6 +687,11 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.k-icon-tile > img:not([data-loaded]),
+.k-icon-tile:has(> img[data-loaded]) > .k-icon {
+  visibility: hidden;
 }
 
 /* A card (`lib/card.ts`): raised one step at the surface radius, `space.s16` inside, as wide as its
