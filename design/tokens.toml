@@ -1051,9 +1051,9 @@ primary_fill_glass = { dark = { from = "primary_fill", lighter = 0.12 }, light =
 # container a little at night and darkens it a little by day.
 on_secondary_container_rest = { dark = { from = "on_secondary_container", lightness = 0.8, text_on = ["secondary_container"] }, light = { from = "on_secondary_container" } }
 secondary_container_pressed = { dark = { from = "secondary_container", lighter = 0.035 }, light = { from = "secondary_container", darker = 0.04 } }
-# A danger menu item's container, pressed: the error container lifted or
-# darkened as the Tonal one is.
-error_container_pressed = { dark = { from = "error_container", lighter = 0.035 }, light = { from = "error_container", darker = 0.04 } }
+# A danger menu item lit fills with the error itself; pressed, it lifts at
+# night and darkens by day as the Tonal container does.
+error_pressed = { dark = { from = "error", lighter = 0.035 }, light = { from = "error", darker = 0.04 } }
 
 # Text: a label in the tone, with no fill. At night it rests unlit, the tone's
 # `_unlit` lifted only as far as it reads, and lights to the core; by day it is
@@ -1154,7 +1154,8 @@ pairs = [
   { fg = "on_error", bg = "error", need = "text", opacity = "subdued_text", use = "A selected danger row's subtitle" },
   { fg = "error", bg = "surface", need = "text", use = "An invalid field's note, a failure" },
   { fg = "on_error_container", bg = "error_container", need = "text", use = "A critical notification" },
-  { fg = "on_error_container", bg = "error_container_pressed", need = "text", use = "A danger menu item's label, pressed" },
+  { fg = "on_error", bg = "error", need = "text", use = "A danger menu item's label, lit" },
+  { fg = "on_error", bg = "error_pressed", need = "text", use = "A danger menu item's label, pressed" },
   { fg = "on_error_container", bg = "error_container", need = "text", opacity = "subdued_text", use = "A critical notification's body" },
   { fg = "cold", bg = "surface", need = "text", use = "A holiday in the calendar, a cold chip's label" },
   { fg = "on_cold", bg = "cold", need = "text", use = "Text on the cold accent" },
