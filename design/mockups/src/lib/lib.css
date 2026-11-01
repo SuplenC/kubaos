@@ -689,6 +689,166 @@
   object-fit: cover;
 }
 
+/* A card (`lib/card.ts`): raised one step at the surface radius, `space.s16` inside, as wide as its
+   room. Its fill is the step's: `surface_container_high` by day, `surface_container_highest` at
+   night, with the rim inside its edge. */
+.k-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  align-self: stretch;
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+  outline: none;
+  --fill: var(--color-surface_container_high);
+  --fill-night: var(--color-surface_container_highest);
+}
+
+.k-card[data-pressable],
+.k-choice-card {
+  cursor: pointer;
+}
+
+/* Pressed by day, the tone tints a pressable card as it does a Text button: by night its tube runs
+   white-hot instead. */
+.k-card.k-control {
+  --tint-tone: var(--color-primary);
+  background-image: linear-gradient(
+    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press))),
+    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)))
+  );
+}
+
+.k-card[aria-disabled="true"] {
+  cursor: default;
+}
+
+/* Disabled, the card keeps its resting surface and what it holds dims. */
+.k-card[aria-disabled="true"]:not(.k-choice-card) > .k-card-content {
+  opacity: var(--opacity-disabled_content);
+}
+
+/* A choice card's title and symbol: `on_surface`, the accent's words (`primary_lit`) while it is
+   picked or pressed, fading over `short`, with the label glow round them at night while the signs
+   are on. Its mark is the checkbox's and the radio's own box, lit and pressed with the card. */
+.k-choice-card {
+  --tint-tone: var(--color-cold);
+  --title-colour: color-mix(in srgb, var(--color-on_surface), var(--color-primary_lit) calc(max(var(--picked), var(--press)) * 100%));
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard),
+    --checked var(--motion-short) var(--easing-standard),
+    --picked var(--motion-short) var(--easing-standard);
+}
+
+.k-choice-card[data-pinned],
+[data-sequence] .k-choice-card {
+  transition: none;
+}
+
+.k-choice-card .k-card-title-line > :not(.k-choice-mark) {
+  filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--picked) * var(--signs))));
+}
+
+/* The mark centred on the title's first line, on a whole device pixel. */
+.k-choice-mark {
+  margin-top: round(down, calc((var(--type-subheading-line) - var(--size-check)) / 2), 1px);
+  cursor: inherit;
+}
+
+.k-choice-mark .k-check-mark {
+  opacity: var(--checked);
+}
+
+.k-choice-card[role="radio"] .k-choice-mark .k-check-tick,
+.k-choice-card[role="checkbox"] .k-choice-mark .k-check-dot {
+  display: none;
+}
+
+/* Disabled: grey, with no tone, on the resting surface: the words, the symbol and the mark at
+   `opacity.disabled_content` of `on_surface`, the mark's box at `opacity.disabled_container`. */
+.k-choice-card[aria-disabled="true"] {
+  --title-colour: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --subtitle-colour: var(--title-colour);
+}
+
+.k-choice-card[aria-disabled="true"] .k-card-title-line > * {
+  filter: none;
+}
+
+.k-choice-card[aria-disabled="true"] .k-check {
+  --box: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --mark: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+.k-choice-card[aria-disabled="true"] .k-check-box::before {
+  opacity: 0;
+}
+
+/* A set of choice cards: `--columns` across, `space.s16` apart, each column as wide as the room
+   split in device pixels, the cards of a row one height. */
+.k-choice-group {
+  display: grid;
+  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
+  gap: var(--space-s16);
+  align-self: stretch;
+}
+
+/* A picture's box (`lib/media.ts`): as wide as its room and as tall as `--aspect` makes it, down
+   to the 4 px grid, cut at `--corner`. The placeholder fills it until the picture covers it; a
+   caption sits `space.s8` under it. */
+.k-media {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  flex: none;
+  align-self: stretch;
+  container-type: inline-size;
+}
+
+.k-media-box {
+  position: relative;
+  display: block;
+  width: 100cqw;
+  height: round(down, calc(100cqw / (var(--aspect))), var(--grid));
+  border-radius: var(--corner);
+  overflow: hidden;
+}
+
+.k-media-box > .k-media-placeholder {
+  position: absolute;
+  inset: 0;
+  height: auto;
+  border-radius: inherit;
+}
+
+.k-media-box[data-arrival="loaded"] > .k-media-placeholder {
+  visibility: hidden;
+}
+
+.k-media-picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.k-media[data-dimmed] .k-media-placeholder {
+  animation: none;
+  box-shadow: none;
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+}
+
+.k-media[data-dimmed] .k-media-picture {
+  opacity: var(--opacity-disabled_content);
+}
+
+.k-media[data-dimmed] {
+  --caption-colour: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
 /* A field (`lib/field.ts`): `size.control_md` tall at the control radius, filling its room, a
    hairline inside its edge in `outline_variant`, or `error` while invalid. Lit, hovered or with the
    keyboard in it, its fill rises to the highest container (an invalid one keeps its own) and its
