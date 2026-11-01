@@ -3,7 +3,7 @@
 // no glow and no states of its own, and fades in and out with its control's lit state.
 
 import { fixed, shown, type Words } from "../../lib/content.ts";
-import { hint, hintRoom, withHint } from "../../lib/hint.ts";
+import { type Held, hint, hintRoom, withHint } from "../../lib/hint.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { row } from "../../lib/layout.ts";
 import { powerMoves } from "../../site/moves.ts";
@@ -12,7 +12,7 @@ import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 const NAME: Words = { short: "Close", long: "Close the panel and go back to the desktop" };
 
 /** A Text icon button at md, lit, its hint under it held as `held` says. */
-function lit(words: string, held: "centred" | "end" = "centred"): HTMLElement {
+function lit(words: string, held: Held = "centred"): HTMLElement {
   const control = iconButton({ icon: "close", label: words, kind: "Text", size: "Md", pinned: "lit", hint: false });
   withHint(control, words, { held });
   return hintRoom(control, words, "var(--size-control_md)", held);
@@ -40,11 +40,16 @@ export default page({
   description: [
     "A hint names a control that shows no words: an icon button's label, or a pressable chip's `tooltip`. It shows while the pointer is over the control or the keyboard is on it, which is the control's lit state, so the bubble comes and goes as the control lights up and goes back to rest, fading over `short`. Over a disabled control it still shows while the pointer is there, so a disabled icon still says what it is.",
     DESCRIBED,
-    "It sits `space.s8` under its control, centred on it, on whole device pixels: half the difference in width, rounded to the nearest device pixel. It is as wide as its words, rounded up to a device pixel, and its padding, and never wraps. A control near the window's edge keeps its bubble whole: the bubble moves aside only as far as it must to stay inside the window.",
+    "It sits `space.s8` under its control, centred on it, on whole device pixels: half the difference in width, rounded to the nearest device pixel. It is as wide as its words, rounded up to a device pixel, and its padding, and never wraps. A control at the start of something wider, a slider's icon, holds its bubble to its start instead: the bubble's left edge on the control's, so a long name never hangs past the slider's edge. A control near the window's edge keeps its bubble whole: the bubble moves aside only as far as it must to stay inside the window.",
     "It floats over everything: no part of the layout, so it moves nothing as it comes and goes, and a surface leaves it room below its controls. It never takes the pointer. It shows only while its control shows whole: a control a scroll has cut, or taken out of view, takes its bubble with it. A control a `Tooltip` explains shows that card instead (`explained`), which already says its name.",
   ],
   variants: [
     { name: "Centred", for: "Under its control, centred on it: every hint whose bubble fits inside the window there.", sample: () => lit(shown(NAME)) },
+    {
+      name: "Held to its start",
+      for: "A control at the start of something wider, a slider's icon at the slider's left edge, whose centred bubble would hang past that edge: the bubble's left edge lines up with the control's.",
+      sample: () => lit(shown(NAME), "start"),
+    },
     {
       name: "Held inside the window",
       for: "A control at the window's end, whose centred bubble would hang past it: the bubble moves aside until its end is the window's, here the end of the sample, and no further.",

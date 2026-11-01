@@ -229,8 +229,9 @@
 }
 
 /* A hint (`lib/hint.ts`): the bubble floats `space.s8` under its control, centred on it on a whole
-   device pixel, as wide as its words rounded up to a device pixel and its padding. It shows while
-   the pointer is over the control, or the control is lit from the keyboard or pinned lit, and
+   device pixel or held to its start, as wide as its words rounded up to a device pixel and its padding. It shows while
+   the pointer is over the control, or the control is lit from the keyboard, pressed by a key or
+   pinned lit, and
    fades in and out over `short`. The pointer never takes it. */
 .k-hint {
   position: absolute;
@@ -262,7 +263,13 @@
   right: 0;
 }
 
-.k-hinted:is(:hover, :focus-visible, [data-pinned]) > .k-hint,
+/* A control at the start of something wider (a slider's icon): its bubble starts where it does, so
+   a long name never hangs past that edge. */
+.k-hint[data-held="start"] {
+  left: 0;
+}
+
+.k-hinted:is(:hover, :focus-visible, [data-pinned], [data-keyed]) > .k-hint,
 .k-hint[data-shown] {
   opacity: 1;
 }
@@ -284,6 +291,10 @@
 
 .k-hint-room > * {
   margin-left: max(0px, round(down, calc((var(--bubble) - var(--control-side)) / 2), 1px));
+}
+
+.k-hint-room[data-held="start"] > * {
+  margin-left: 0;
 }
 
 .k-hint-room[data-held="end"] > * {
@@ -568,11 +579,13 @@
     --invalid var(--motion-short) var(--easing-standard);
 }
 
-.k-control:not(:disabled, [aria-disabled="true"]):is(:hover, :focus-visible, [data-pinned]) {
+.k-control:not(:disabled, [aria-disabled="true"]):is(:hover, :focus-visible, [data-pinned], [data-keyed]) {
   --lit: 1;
 }
 
-.k-control:not(:disabled, [aria-disabled="true"]):is(:active, [data-pinned="pressed"]) {
+/* `data-keyed`: held by a key that another control has the focus for, as Space on a slider holds
+   its icon's button. */
+.k-control:not(:disabled, [aria-disabled="true"]):is(:active, [data-pinned="pressed"], [data-keyed]) {
   --press: 1;
 }
 
@@ -1414,6 +1427,12 @@
 
 /* Under the pointer or pinned, the icon's button is what is lit and pressed, not the slider. */
 .k-slider:has(.k-slider-icon-button:is(:hover, :active, [data-pinned])):not(:focus-visible, [data-pinned], [data-held], [data-dragging]) {
+  --lit: 0;
+  --press: 0;
+}
+
+/* Held by Space, the icon's button is lit and pressed instead of the focused slider. */
+.k-slider:has(> .k-slider-icon-button[data-keyed]) {
   --lit: 0;
   --press: 0;
 }
