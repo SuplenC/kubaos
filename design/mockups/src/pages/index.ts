@@ -28,6 +28,8 @@ import space from "./foundations/space.ts";
 import type from "./foundations/type.ts";
 import buttonBar from "./molecules/button-bar.ts";
 import calendar from "./molecules/calendar.ts";
+import card from "./molecules/card.ts";
+import choiceCard from "./molecules/choice-card.ts";
 import collapsible from "./molecules/collapsible.ts";
 import dialog from "./molecules/dialog.ts";
 import menu from "./molecules/menu.ts";
@@ -38,7 +40,7 @@ import tabs from "./molecules/tabs.ts";
 import tile from "./molecules/tile.ts";
 import toast from "./molecules/toast.ts";
 
-export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, slider, tabs, select, popover, menu, calendar, tile, collapsible, buttonBar, dialog, toast];
+export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, slider, tabs, select, popover, menu, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard];
 
 export function pagesOf(level: Level): AnyPage[] {
   return PAGES.filter((page) => page.level === level);
