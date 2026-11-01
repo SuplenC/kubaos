@@ -1,17 +1,24 @@
 // A titled part that opens to show more: `kubaos-ui`'s `collapsible::collapsible`,
 // `KubaOS.Components`' `Collapsible` (`docs/design/components/collapsible.md`). The header is a
-// control as tall as a row (`size.row`) at the control radius, `space.s12` inside: its title in
-// `body_strong` and a chevron at its end that turns from down to up as it opens. Open, what it
-// holds sits `space.s8` under the header, `space.s12` in at the sides, in line with the title.
+// control as tall as a row (`size.row`) at the control radius, `space.s12` inside: a chevron at its
+// start, pointing right while it is shut and down while it is open, then its title in
+// `body_strong`, and at its end an optional summary in `label`, there open or shut. Open, what it
+// holds sits `space.s8` under the header, in line with the title, and an unlit rail of neon runs
+// down its start side under the chevron's centre.
 //
 // The header is a control in the state model (`.k-control` in `lib.css`) with nothing filled under
 // its line, so lit it draws the tube and pressed the tube runs white-hot. The room under it eases
 // from nothing to what it holds over `medium` on `standard_decel` and back over `short` on
-// `standard_accel`, the chevron turning with it; with reduce motion it opens at once and what it
-// holds fades in.
+// `standard_accel`, the chevron turning and the rail growing with it; with reduce motion it opens
+// at once, what it holds fades in and the chevron jumps.
+//
+// The rail is a control too, for the pointer alone: under it the rail lights, a hint beside it
+// follows the pointer, and a press closes the part, scrolling the header back into view where it
+// has scrolled out. It is no stop for Tab; the keyboard has the header.
 
 import { type Pinned, pin } from "./control.ts";
 import { focusRing } from "./focus.ts";
+import { withHint } from "./hint.ts";
 import { icon } from "./icon.ts";
 import { filling, row } from "./layout.ts";
 import { probe, variant } from "./probe.ts";
@@ -21,10 +28,14 @@ export interface CollapsibleOptions {
   readonly title: string;
   /** What it shows open. */
   readonly content: Element;
+  /** A line at the header's end saying what it holds, open or shut: "12 · 4.1 GB". */
+  readonly summary?: string;
   readonly open?: boolean;
-  /** No toggle: the header dims and takes no press and no stop for Tab. */
+  /** No toggle: the header dims and takes no press and no stop for Tab, and the rail none either. */
   readonly disabled?: boolean;
   readonly pinned?: Pinned;
+  /** The rail pinned lit or pressed, its hint shown: a sample of it under the pointer. */
+  readonly railPinned?: Pinned;
 }
 
 let made = 0;
@@ -44,11 +55,17 @@ export function collapsible(options: CollapsibleOptions): HTMLElement {
   header.disabled = disabled;
   header.setAttribute("aria-controls", id);
   pin(header, options.pinned);
-  const title = clamped(options.title, "body_strong");
-  title.style.color = "var(--title)";
   const chevron = icon("expand_more", "var(--type-body_strong-icon)", "var(--mark)");
   chevron.classList.add("k-collapsible-chevron");
-  const line = row("s12", "centre", filling(title), chevron);
+  const title = clamped(options.title, "body_strong");
+  title.style.color = "var(--title)";
+  const line = row("s12", "centre", chevron, filling(title));
+  if (options.summary !== undefined) {
+    const summary = clamped(options.summary, "label");
+    summary.classList.add("k-collapsible-summary");
+    summary.style.color = "var(--mark)";
+    line.append(summary);
+  }
   header.append(line);
   focusRing(header, "control", "accent", false).dataset.pressable = "";
 
@@ -58,9 +75,42 @@ export function collapsible(options: CollapsibleOptions): HTMLElement {
   body.setAttribute("role", "region");
   const content = document.createElement("span");
   content.className = "k-collapsible-content";
-  content.append(options.content);
+  content.append(options.content, rail());
   body.append(content);
   part.append(header, body);
+
+  /** The rail down what it holds: its line, and a strip round it that takes the pointer. */
+  function rail(): HTMLElement {
+    const strip = document.createElement("span");
+    strip.className = "k-collapsible-rail k-control";
+    strip.setAttribute("aria-hidden", "true");
+    if (disabled) strip.setAttribute("aria-disabled", "true");
+    pin(strip, options.railPinned);
+    const drawn = document.createElement("span");
+    drawn.className = "k-collapsible-line";
+    strip.append(drawn);
+    withHint(strip, `Close ${options.title}`);
+    // The hint follows the pointer down the rail. The page's box is zoomed to the display's ratio,
+    // so the pointer's height in the viewport's pixels is brought back to the strip's own by its
+    // height over its layout height.
+    strip.addEventListener("pointermove", (event) => {
+      const box = strip.getBoundingClientRect();
+      const ratio = strip.offsetHeight / Math.max(1, box.height);
+      strip.style.setProperty("--at", `${(event.clientY - box.top) * ratio}px`);
+    });
+    strip.addEventListener("click", () => {
+      if (disabled || !open) return;
+      toggle();
+      bringBack();
+    });
+    return strip;
+  }
+
+  /** Scrolls the header back into its scroll view where closing from the rail left it out of sight. */
+  function bringBack(): void {
+    const reduced = part.closest("[data-reduced]") !== null;
+    header.scrollIntoView({ block: "nearest", inline: "nearest", behavior: reduced ? "instant" : "smooth" });
+  }
 
   // The room eases between nothing and what it holds, which only layout knows: its height in the
   // part's own CSS pixels, kept as it changes.
@@ -79,16 +129,18 @@ export function collapsible(options: CollapsibleOptions): HTMLElement {
     part.toggleAttribute("data-settled", open);
   }
 
-  part.addEventListener("transitionend", (event) => {
-    if (event.target === part && event.propertyName === "--open") settle();
-  });
-  header.addEventListener("click", () => {
+  function toggle(): void {
     open = !open;
     part.removeAttribute("data-settled");
     show();
     // With nothing to play (reduced motion) the room is where it ends at once.
     if (getComputedStyle(part).transitionDuration.split(",").every((each) => Number.parseFloat(each) === 0)) settle();
+  }
+
+  part.addEventListener("transitionend", (event) => {
+    if (event.target === part && event.propertyName === "--open") settle();
   });
+  header.addEventListener("click", toggle);
   // Enter and Space press it once per press, never on key repeat.
   header.addEventListener("keydown", (event) => {
     if ((event.key === "Enter" || event.key === " ") && event.repeat) event.preventDefault();
