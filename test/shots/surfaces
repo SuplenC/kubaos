@@ -76,6 +76,7 @@ mockups/tabs        design/mockups/src/pages/molecules/tabs.ts
 mockups/select      design/mockups/src/pages/molecules/select.ts
 mockups/popover     design/mockups/src/pages/molecules/popover.ts
 mockups/menu        design/mockups/src/pages/molecules/menu.ts
+mockups/collapsible design/mockups/src/pages/molecules/collapsible.ts
 mockups/colour      design/mockups/src/pages/foundations/colour.ts
 mockups/type        design/mockups/src/pages/foundations/type.ts
 mockups/space       design/mockups/src/pages/foundations/space.ts
