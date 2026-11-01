@@ -158,6 +158,8 @@ pub struct Radii {
     pub small: u16,
     /// Everything clicked or typed in.
     pub control: u16,
+    /// A dialog.
+    pub dialog: u16,
     /// Everything that holds content.
     pub surface: u16,
     /// Whether there is a pill radius, half the shape's shorter side.

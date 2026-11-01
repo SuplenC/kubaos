@@ -1,7 +1,9 @@
-// The Radii foundation: the three radius roles and full, each shown as it is used, and the
+// The Radii foundation: the four radius roles and full, each shown as it is used, and the
 // nesting that derives every other corner, worked (`docs/DESIGN.md`, "Radii by role").
 
 import { button } from "../../lib/button.ts";
+import { buttonBar } from "../../lib/button-bar.ts";
+import { raise } from "../../lib/elevation.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { type Corner, concentric, nested, role } from "../../lib/radius.ts";
 import { text } from "../../lib/text.ts";
@@ -11,14 +13,15 @@ import { doesntApply, foundation } from "../../site/page.ts";
 import { atScale, table, token } from "../../site/parts/swatches.ts";
 import { SCALES } from "../../site/settings.ts";
 
-const ROLES = ["small", "control", "surface", "full"] as const;
+const ROLES = ["small", "control", "dialog", "surface", "full"] as const;
 type Role = (typeof ROLES)[number];
 
 /** What each role is for. */
 const FOR: Record<Role, string> = {
   small: "Marks inside controls: the checkbox, a hint, focus details, inline tags.",
-  control: "Everything you click or type in: buttons, fields, list rows, menu items, chips.",
-  surface: "Everything that holds content: cards, dialogs, popups, toasts, panels, list wells, the screen frame.",
+  control: "Everything you click or type in: buttons, fields, list rows, menu items, chips; and a popover or an open select, raised over the control that opened it.",
+  dialog: "A dialog: the largest raised surface, a step softer than the controls and the popover it holds and stands over, and well under a card's or a panel's 24, so a box that big over the screen reads as a question.",
+  surface: "Everything that holds content: cards, popups, toasts, panels, list wells, the screen frame.",
   full: "Pills and circles: switches, icon buttons, radios, progress bars, sliders, avatars, badges. Half the shorter side.",
 };
 
@@ -29,13 +32,15 @@ function shape(corner: Corner, kind: string): HTMLElement {
   return box;
 }
 
-/** Each role as it is used: a checkbox's box, a button, a card, a switch's track. */
+/** Each role as it is used: a checkbox's box, a button, a dialog, a card, a switch's track. */
 function inUse(name: Role): HTMLElement {
   switch (name) {
     case "small":
       return shape(role("small"), "f-shape-check");
     case "control":
       return button({ label: "Continue", kind: "Filled", size: "Md" });
+    case "dialog":
+      return raise(el("div", "f-card-box f-dialog-box", stack("s4", "start", text("A dialog", "heading", "on_surface"), text("Its corner says it asks", "body", "on_surface_variant"))), 3);
     case "surface":
       return el("div", "f-card-box", stack("s4", "start", text("A card", "subheading", "on_surface"), text("Its corner says it holds content", "body", "on_surface_variant")));
     case "full":
@@ -98,7 +103,7 @@ function placedInside(): HTMLElement {
   return el(
     "div",
     "f-card-box",
-    stack("s16", "start", text("Erase the disk?", "subheading", "on_surface"), row("s8", "start", button({ label: "Cancel", kind: "Tonal", size: "Md" }), button({ label: "Erase", kind: "Danger", size: "Md" }))),
+    stack("s16", "start", text("Erase the disk?", "subheading", "on_surface"), buttonBar({ dismiss: "Cancel", actions: [{ label: "Erase" }], tone: "Danger" }).element),
   );
 }
 
@@ -125,7 +130,7 @@ export default foundation({
   level: "foundations",
   slug: "radii",
   title: "Radii",
-  summary: "Three corner radii by what a shape is, and full for pills; every other corner is derived by nesting, never picked.",
+  summary: "Four corner radii by what a shape is, and full for pills; every other corner is derived by nesting, never picked.",
   live: () =>
     el(
       "div",
@@ -138,14 +143,14 @@ export default foundation({
       }),
     ),
   description: [
-    "Every radius says what the shape is: small for marks inside controls, control for everything you click or type in, surface for everything that holds content, and full for pills and circles. A component takes the one its role names, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.",
-    "Any other radius comes out of nesting: a shape that fills another less an inset takes the outer radius less the inset, so both corners share a centre. 8, 16 and 20 are never chosen; they appear only where nesting makes them. A control placed in content (a button in a card) isn't filling it, so it keeps its own role.",
+    "Every radius says what the shape is: small for marks inside controls, control for everything you click or type in, dialog for a dialog, surface for everything that holds content, and full for pills and circles. A component takes the one its role names, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.",
+    "Any other radius comes out of nesting: a shape that fills another less an inset takes the outer radius less the inset, so both corners share a centre. 8 and 20 are never chosen, nor 16 anywhere but a dialog; they appear only where nesting makes them. A control placed in content (a button in a card) isn't filling it, so it keeps its own role.",
     "The live list is a well, a surface, with its rows 12 in: they take 24 less 12, the control radius, so a row is concentric with the well and a control at once.",
   ],
   tokens: [
     {
       name: "The roles",
-      described: "Each role's radius, its corner on a plain shape, and the role in use: a checkbox's box, a button, a card, a switch's track.",
+      described: "Each role's radius, its corner on a plain shape, and the role in use: a checkbox's box, a button, a dialog, a card, a switch's track.",
       sample: roles,
     },
   ],
@@ -157,7 +162,7 @@ export default foundation({
     },
     {
       name: "A control in content keeps its role",
-      described: "A dialog's buttons sit inside its surface without filling it, so they keep the control radius; nesting is only for a shape that fills another less an inset.",
+      described: "A card's buttons sit inside it without filling it, so they keep the control radius; nesting is only for a shape that fills another less an inset.",
       sample: placedInside,
     },
     {

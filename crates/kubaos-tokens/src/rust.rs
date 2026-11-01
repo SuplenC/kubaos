@@ -276,8 +276,13 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             format!("Some({})", r.control),
         ),
         (
+            "Dialog".into(),
+            Some("A dialog: the largest raised surface, softer than a control and well under a surface.".into()),
+            format!("Some({})", r.dialog),
+        ),
+        (
             "Surface".into(),
-            Some("Everything that holds content: cards, dialogs, popups, panels, list wells.".into()),
+            Some("Everything that holds content: cards, popups, panels, list wells.".into()),
             format!("Some({})", r.surface),
         ),
     ];
