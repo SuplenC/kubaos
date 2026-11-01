@@ -15,8 +15,8 @@ export interface Corner {
   readonly words: string;
 }
 
-/** A radius role's corner: `small`, `control`, `dialog`, `surface` or `full`. */
-export function role(name: "small" | "control" | "dialog" | "surface" | "full"): Corner {
+/** A radius role's corner: `small`, `row`, `control`, `content`, `surface` or `full`. */
+export function role(name: "small" | "row" | "control" | "content" | "surface" | "full"): Corner {
   return {
     css: `var(--radius-${name})`,
     px: name === "full" ? null : length(`radius-${name}`),

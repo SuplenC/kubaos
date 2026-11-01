@@ -82,7 +82,7 @@ export default page({
   live,
   description: [
     "Rust `card::choice_card`, QML `ChoiceCard`. A choice that needs a sentence to say what it means (Kōbō's disk modes, the software to install) is a card of its own, side by side with the others in a grid, `space.s16` apart. A choice a word says is a `Radio`, a `Checkbox` or `Tabs`.",
-    "It is a `Card`: raised one step, `surface_container_high` by day and `surface_container_highest` at night, at the surface radius (24), `space.s16` inside. Its header is the card's: a symbol at `subheading`'s 24, its title in `subheading` `space.s8` after it, and its line in `small`, `on_surface_variant`, `space.s4` below. Its mark ends the title's first line, centred on it: a radio's disc for one of a set, a checkbox's box for any of it, both `size.check` across and drawn as their atoms draw them.",
+    "It is a `Card`: raised one step, `surface_container_high` by day and `surface_container_highest` at night, at the content radius (16), `space.s16` inside. Its header is the card's: a symbol at `subheading`'s 24, its title in `subheading` `space.s8` after it, and its line in `small`, `on_surface_variant`, `space.s4` below. Its mark ends the title's first line, centred on it: a radio's disc for one of a set, a checkbox's box for any of it, both `size.check` across and drawn as their atoms draw them.",
     "Picked, it says so as every pick does: in the accent's words. Its title and symbol are `primary_lit` (the core at night, the tone by day), with the label glow round them at night while the signs are on (`focus.label_glow` over `focus.label_near`), and its mark is filled with the accent, the disc's dot or the box's tick on it. Its surface doesn't change: a big surface takes few effects. Picking fades its words and its mark over `short`.",
     "Its states follow the neon, as a card's do. Lit, its tube burns inside its edge at its own corner with the glow outside at night, cold (`cold` at `focus.tube`), since the accent already means picked here; its mark lights with it. Pressed, the tube runs white-hot, the glow brightens, by day the cold tone tints it (`opacity.press_tint`), and its title goes to the picked words over `micro` before letting go picks it. Disabled (a choice that can't be had: no room left to install alongside), it keeps its resting surface and dims what it holds: its words, symbol and mark at `opacity.disabled_content` of `on_surface`, the mark's box at `opacity.disabled_container`, picked or not; no line, no glow, no press, and the keyboard passes it by.",
   ],
@@ -115,7 +115,7 @@ export default page({
       { name: "Picked", tone: "cold", filled: false, content: false },
     ],
     looks: {
-      lit: "At night at rest the sign burns: the cold tube inside the card's edge at `radius.surface`, the glow outside it. A picked card's words keep their label glow; nothing else in it lights.",
+      lit: "At night at rest the sign burns: the cold tube inside the card's edge at `radius.content`, the glow outside it. A picked card's words keep their label glow; nothing else in it lights.",
       signsOff: "Still lit with the neon unpowered, by day always and at night while a power change has the lights out: the tube is `cold_glass`, with no glow, and a picked card's words have no glow.",
     },
     signsOff: (index: number) => boxed(ROWS[index]!.options, "signs-off"),
@@ -172,7 +172,7 @@ export default page({
     ]),
     measures: [
       { what: "Inside its edge, and between two cards across and down.", token: "space-s16" },
-      { what: "Its corners.", token: "radius-surface" },
+      { what: "Its corners.", token: "radius-content" },
       { what: "The symbol, `subheading`'s.", token: "type-subheading-icon" },
       { what: "Between the symbol, the title and the mark.", token: "space-s8" },
       { what: "The title's line.", token: "type-subheading-line" },

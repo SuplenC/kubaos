@@ -29,7 +29,7 @@ function bubbles(): HTMLElement {
 }
 
 const DESCRIBED =
-  "The inverse colours: `on_surface` under `surface` letters, the `label` style, `space.s8` at its sides and `space.s4` above and below, at the small radius (`radius.small`). By night that is a pale bubble with dark letters, by day a dark one with light letters; it reads on every surface a control sits on, in both modes. It is never lit: no line, no glow.";
+  "The inverse colours: `on_surface` under `surface` letters, the `label` style, `space.s8` at its sides and `space.s4` above and below, at the row radius (`radius.row`, 8). By night that is a pale bubble with dark letters, by day a dark one with light letters; it reads on every surface a control sits on, in both modes. It is never lit: no line, no glow.";
 
 export default page({
   level: "atoms",
@@ -119,7 +119,7 @@ export default page({
       { what: "Its words' line.", token: "type-label-line" },
       { what: "Its padding at the sides, and its gap under the control.", token: "space-s8" },
       { what: "Its padding above and below.", token: "space-s4" },
-      { what: "Its corners.", token: "radius-small" },
+      { what: "Its corners.", token: "radius-row" },
     ],
     reflow: doesntApply("a hint is as wide as its words at every window size and never wraps; at the window's edge it moves aside to stay inside."),
   },

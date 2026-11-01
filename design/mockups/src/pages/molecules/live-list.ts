@@ -12,8 +12,8 @@ import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { WELL_ROOM } from "./list.ts";
 
 /** Five two-line rows and their gaps, inside the well's padding. */
-const FIVE = "calc(5 * var(--size-row_two_line) + 4 * var(--space-s4) + 2 * var(--space-s12))";
-const THREE = "calc(3 * var(--size-row_two_line) + 2 * var(--space-s4) + 2 * var(--space-s12))";
+const FIVE = "calc(5 * var(--size-row_two_line) + 4 * var(--space-s4) + 2 * var(--space-s8))";
+const THREE = "calc(3 * var(--size-row_two_line) + 2 * var(--space-s4) + 2 * var(--space-s8))";
 
 /** A network as a scan finds it, its signal from 0 to 4 bars. */
 function network(title: string, bars: number, secured = true, connected = false): LiveRowSpec {
@@ -206,7 +206,7 @@ export default page({
   description: [
     "QML `LiveList`, its delegates `LiveRow`s; iced has none yet. Play a scan with the buttons. Rest the pointer on a row, or Tab in and pick one with the keys, and play them again: that row doesn't move. The control center's Wi-Fi and Bluetooth tabs.",
     "A ScrollingList whose rows (each with a `key`, a network's name, a device's address) are kept in step by key, with the fewest removes, inserts and moves, so only what changed changes: a row whose facts change (its signal) is redrawn in place, and the rest stay the same rows.",
-    "A row that arrives opens its room from nothing over `medium` on `standard_decel` and fades in over `slow`; one that leaves fades and gives its room back, its `space.s4` gap with it, over `medium` on `standard_accel`, taking no press while it goes; one that changes place glides there over `medium` on `standard_decel`. Each row's room is the row and the gap after it, so the list's padding under its last row is the well's `space.s12` less that `space.s4`. Only while the list shows: an update nobody sees is in place when it next shows.",
+    "A row that arrives opens its room from nothing over `medium` on `standard_decel` and fades in over `slow`; one that leaves fades and gives its room back, its `space.s4` gap with it, over `medium` on `standard_accel`, taking no press while it goes; one that changes place glides there over `medium` on `standard_decel`. Each row's room is the row and the gap after it, so the list's padding under its last row is the well's `space.s8` less that `space.s4`. Only while the list shows: an update nobody sees is in place when it next shows.",
     "**It never jumps.** The row under the pointer, or the one the keyboard is on while the list has it, is held still. An update that would move it, a row arriving or leaving above it, plays with the list scrolling by the same amount as their rooms open and close, so the held row stays where it is on screen. Where the list can't scroll that far (it fits its well, or is at its top) or the held row would itself change place in a re-sort, the update waits, and plays once the pointer leaves and the keyboard does. Nothing else scrolls it: it moves only when the person scrolls it or moves with the keys.",
     "With reduced motion a row arrives in its room and fades in over `short`, leaves by fading over `short` and giving its room back at once, and changes place at once. The held row's rule is the same.",
   ],
@@ -272,8 +272,8 @@ export default page({
     measures: [
       { what: "A row's room: the row and the gap after it.", token: "size-row_two_line" },
       { what: "The gap each row's room carries.", token: "space-s4" },
-      { what: "The padding above the first row; under the last, it less the last room's gap.", token: "space-s12" },
-      { what: "The well's corners.", token: "radius-surface" },
+      { what: "The padding above the first row; under the last, it less the last room's gap.", token: "space-s8" },
+      { what: "The well's corners.", token: "radius-content" },
     ],
     reflow: {
       described: "As a ScrollingList: it fills its place, showing more rows in a taller one.",

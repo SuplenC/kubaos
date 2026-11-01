@@ -68,7 +68,7 @@ export default page({
   description: [
     "Rust `table::table` and `table::table_row`, QML `Table` and `TableRow`. Press a row, or Tab in and use ↑ ↓ and Enter, to pick it. The system monitor's processes.",
     "A header in `label`, `on_surface_variant`, `space.s4` above and below, then a row per entry: a line of `body` with `space.s4` above and below (`size.row_compact`, 28), so many fit, with no gap between rows. Columns take set shares of the width (the name 2, each number 1), `space.s12` apart and `space.s12` in from the row's ends, split in whole device pixels so no two differ by more than one past their shares. Words sit at their column's start on one line, `on_surface`, ending in an ellipsis where they don't fit; numbers sit at their column's end in `mono_large`, `on_surface_variant`, so their digits line up, as their header does.",
-    "The whole row is one control at the control radius, lit as a Text button is: the pointer on it, or the keyboard on it, lights its tube inside its edge, `primary` at `focus.tube`, with the glow outside at night; pressed, the tube runs white-hot and the glow brightens, and by day the tone tints it. The pointer moving onto a row puts the keyboard on it, so one row is lit at a time. The picked row (the process whose details show) is `secondary_container`, its words `on_secondary_container` and its numbers that at `opacity.subdued_text`; lit, its tube burns on that fill, as a Tonal button's; pressed, the container lifts to `secondary_container_pressed`.",
+    "The whole row is one control at the row radius (`radius.row`, 8), lit as a Text button is: the pointer on it, or the keyboard on it, lights its tube inside its edge, `primary` at `focus.tube`, with the glow outside at night; pressed, the tube runs white-hot and the glow brightens, and by day the tone tints it. The pointer moving onto a row puts the keyboard on it, so one row is lit at a time. The picked row (the process whose details show) is `secondary_container`, its words `on_secondary_container` and its numbers that at `opacity.subdued_text`; lit, its tube burns on that fill, as a Tonal button's; pressed, the container lifts to `secondary_container_pressed`.",
     "It doesn't sort: the system monitor orders its processes by CPU itself. The table is one stop for Tab; the keys move the lit row and Enter picks it.",
   ],
   variants: [
@@ -98,7 +98,7 @@ export default page({
       { name: "The picked row", tone: "accent", filled: false, content: false },
     ],
     looks: {
-      lit: "At night at rest, the signs burn: the tube inside the row's edge at the control radius, the glow outside it, over the rows round it.",
+      lit: "At night at rest, the signs burn: the tube inside the row's edge at the row radius, the glow outside it, over the rows round it.",
       signsOff: "By day always, and at night while a power change has the lights out: the tube is solid glass, `primary_glass`, with no glow.",
     },
     signsOff: (index: number) => cell(MATRIX[index]!.spec, "signs-off"),
@@ -139,7 +139,7 @@ export default page({
       { what: "A row's words, `body`'s line.", token: "type-body-line" },
       { what: "A number's line, `mono_large`'s.", token: "type-mono_large-line" },
       { what: "The header's line, `label`'s.", token: "type-label-line" },
-      { what: "A row's corners.", token: "radius-control" },
+      { what: "A row's corners.", token: "radius-row" },
     ],
     reflow: {
       described: "A table fills its place at every window size, its columns that width's shares: wider, the names show whole; narrow, they end in an ellipsis and the numbers keep their place at their columns' ends. Here as wide as the window, then in half a panel.",
