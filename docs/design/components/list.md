@@ -40,9 +40,11 @@ A row still being found (`loading`) keeps the place of the tiled two-line row th
 
 ## `LiveList` and `LiveRow`
 
-QML `LiveList`, its delegates `LiveRow`s; *iced has no live list yet, and the rule applies to it as it gets one. It is on the QML specimen's "Shell only" page, which the parity check leaves out.*
+QML `LiveList`, its delegates `LiveRow`s (its mockup page is the source of truth: Molecules, LiveList and LiveRow, in `design/mockups/`); *iced has no live list yet, and the rule applies to it as it gets one. It is on the QML specimen's "Shell only" page, which the parity check leaves out.*
 
 A list a scan updates while it shows, which never jumps (`DESIGN.md`, "Motion"): a `ListRows` whose rows (`rows`, each with a `key`) are kept in step by key (`Keyed`, the fewest removes, inserts and moves), so only what changed changes. A row that arrives opens its room over `medium` (`standard_decel`) and fades in over `slow`; one that leaves fades and gives its room back over `medium` (`standard_accel`), taking no press while it goes; one that changes place glides there over `medium` (`standard_decel`). Only while the list shows: an update nobody sees draws nothing. It scrolls only when the person scrolls it or moves with the keys, so a re-sort never carries the rows they were looking at out of sight. The `folded` rows at its end are a drawer under a disclosure line, open while `unfolded`: its edge slides over `medium` and its rows fade in together a `micro` after, or at once with reduced motion. The keys pass over rows that are neither a `row` nor a `disclosure`, and a closed drawer.
+
+*Not built yet: a row arriving or leaving above the row under the pointer or the keyboard moves it; the mockup holds that row still, the list scrolling with the rooms above it, or the update waiting until the pointer and the keyboard let go. The mockup has no drawer yet.*
 
 ## `EmptyList`
 
