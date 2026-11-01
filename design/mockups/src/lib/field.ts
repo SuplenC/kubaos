@@ -201,7 +201,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
   const inert = state === "Disabled";
   const locked = state === "Locked";
   const element = document.createElement("span");
-  element.className = "k-field";
+  element.className = "k-field k-sunken";
   element.dataset.state = state;
   element.setAttribute("role", "textbox");
   element.style.setProperty("--invalid", state === "Invalid" ? "1" : "0");
