@@ -4,7 +4,7 @@
 import { icon, symbols } from "../../lib/icon.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { type TypeStyle, text } from "../../lib/text.ts";
-import { iconTile, TILE_MEASURES, TILE_SIZES } from "../../lib/tile.ts";
+import { iconTile, TILE_MEASURES, TILE_SIZES } from "../../lib/icon-tile.ts";
 import { length, names, number } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
 import { doesntApply, foundation } from "../../site/page.ts";

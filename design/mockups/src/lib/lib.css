@@ -658,9 +658,9 @@
   mask-size: 100% 100%;
 }
 
-/* An icon tile (`lib/tile.ts`): its symbol or an app's picture centred on a whole device pixel, the
+/* An icon tile (`lib/icon-tile.ts`): its symbol or an app's picture centred on a whole device pixel, the
    odd one after it; a photo covering the tile. */
-.k-tile {
+.k-icon-tile {
   position: relative;
   display: block;
   flex: none;
@@ -671,8 +671,8 @@
   overflow: hidden;
 }
 
-.k-tile > .k-icon,
-.k-tile > .k-tile-picture {
+.k-icon-tile > .k-icon,
+.k-icon-tile > .k-icon-tile-picture {
   position: absolute;
   left: round(down, calc((var(--side) - var(--icon)) / 2), 1px);
   top: round(down, calc((var(--side) - var(--icon)) / 2), 1px);
@@ -681,7 +681,7 @@
   object-fit: contain;
 }
 
-.k-tile > .k-tile-photo {
+.k-icon-tile > .k-icon-tile-photo {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1991,4 +1991,79 @@
 
 [data-reduced] .k-collapsible[data-open] > .k-collapsible-body > .k-collapsible-content {
   animation: k-fade-in var(--motion-short) var(--easing-standard);
+}
+
+/* A tile (`lib/tile.ts`): `size.row_two_line` tall at the control radius, `space.s12` inside,
+   filling its room. Off, `surface_container_high`, rising to the highest container lit, as a
+   select's fill does; its title `on_surface`, its symbol and status line `on_surface_variant`; by
+   day the tone tints it pressed. On, filled with the accent: at night the unlit fill
+   (`primary_fill`), every part of its content `on_primary_fill`, brightening to
+   `on_primary_fill_lit` with the signs on, as a Filled button's label does; pressed, the fill
+   lifts. It fades between the two over `short` on `--checked`; its line is the tube off and the
+   core on (`--edge`). */
+.k-tile {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--size-row_two_line);
+  padding: 0 var(--space-s12);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  outline: none;
+  --off-fill: color-mix(in srgb, var(--color-surface_container_high), var(--color-surface_container_highest) calc(var(--lit) * 100%));
+  --on-fill: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--press) * 100%));
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press) * (1 - var(--checked))));
+  background:
+    linear-gradient(var(--tint), var(--tint)),
+    color-mix(in srgb, var(--off-fill), var(--on-fill) calc(var(--checked) * 100%));
+  --on-ink: color-mix(in srgb, var(--color-on_primary_fill), var(--color-on_primary_fill_lit) calc(var(--on) * 100%));
+  --title: color-mix(in srgb, var(--color-on_surface), var(--on-ink) calc(var(--checked) * 100%));
+  --muted: color-mix(in srgb, var(--color-on_surface_variant), var(--on-ink) calc(var(--checked) * 100%));
+  --glyph: var(--muted);
+  --edge: color-mix(in srgb, var(--color-primary), var(--color-primary_fill_line) calc(var(--checked) * 100%));
+  --edge-off: color-mix(in srgb, var(--color-primary_glass), var(--color-primary_fill_glass) calc(var(--checked) * 100%));
+}
+
+.k-tile > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* The words end before the detail arrow and its inset. */
+.k-tile[data-detail] {
+  padding-right: calc(2 * var(--space-s12) + var(--size-control_sm));
+}
+
+.k-tile[aria-disabled="true"] {
+  cursor: default;
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --title: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --muted: var(--title);
+}
+
+/* While the pointer is on the detail arrow, the tile gives way to it: only the arrow is lit. */
+.k-tile.k-control:has(.k-tile-detail:is(:hover, :active, [data-pinned])):not(:focus-visible, [data-pinned]) {
+  --lit: 0;
+  --press: 0;
+}
+
+/* The detail arrow: a circle `size.control_sm` across, `space.s12` from the tile's end and centred
+   down it on a whole device pixel, no fill; pressed by day the tone tints it. */
+.k-tile-detail {
+  position: absolute;
+  right: var(--space-s12);
+  top: round(nearest, calc((var(--size-row_two_line) - var(--size-control_sm)) / 2), 1px);
+  display: block;
+  width: var(--size-control_sm);
+  height: var(--size-control_sm);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+.k-tile[aria-disabled="true"] > .k-tile-detail {
+  pointer-events: none;
+  --lit: 0;
+  --press: 0;
 }
