@@ -228,6 +228,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `recolour` | 700 | Every colour role changing together in a theme change or the dark ⇄ light switch. |
 | `settle` | 400 | The dark beat in the new colours after a theme change's colours change, before the lights strike. |
 | `strike` | 600 | Every light striking on together at the end of a theme change or a switch to dark. |
+| `toast` | 3600 | A toast staying once it has arrived, long enough to read its line twice. Not a move: reduce motion doesn't cap it. |
 
 | Curve (`[easing.*]`) | Bézier | For |
 |---|---|---|
