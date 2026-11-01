@@ -105,7 +105,7 @@ Do not disturb holds the popups back, all but critical ones (a battery about to 
 
 ## Wi-Fi
 
-"Wi-Fi networks" in the Command menu, or `SUPER + CTRL + W`, opens the control center's Wi-Fi tab. Saved networks in range are under Known, the one in use first and checked ("Connected · 5 GHz"); the others in range are under Nearby, strongest first, a lock on the secured ones. While the tab shows it scans about every 30 seconds, and a network out of range drops off the list.
+"Wi-Fi networks" in the Command menu, or `SUPER + CTRL + W`, opens the control center's Wi-Fi tab. Saved networks in range are under Known, the one in use first and checked ("Connected · 5 GHz"); the others in range are under Nearby, strongest first, a lock on the secured ones. While the tab shows, its connection form included, it scans about every 10 seconds, and a network out of range drops off the list.
 
 A press on a known network connects to it; the × that shows under the pointer, or Delete, forgets one that isn't in use. A nearby network turns the list into its form: type the password and press Enter (or Connect), or Esc (or Cancel) to go back. A wrong password keeps the form open with the error; once connected, the network moves up into Known. A saved password that stops working opens the form too.
 

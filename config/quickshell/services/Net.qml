@@ -23,6 +23,8 @@ Singleton {
     property string band: ""
     // Whether the Wi-Fi tab has NetworkManager scanning.
     readonly property bool scanning: wifiDevice?.scannerEnabled ?? false
+    // Whether the scanner was turned on too recently for its first scan to have found anything.
+    readonly property bool searching: scanning && firstScan.running
     readonly property string icon: {
         if (wired)
             return "lan";
@@ -87,7 +89,8 @@ Singleton {
     }
 
     // Quickshell's networks carry no frequency: `nmcli` reads the one in use, read-only, without a
-    // rescan, each time it changes, and after each scan, which sees a roam between bands.
+    // rescan, each time it changes, and as often as a scan comes while scanning, which sees a roam
+    // between bands.
     function readBand(): void {
         frequency.running = false;
         if (root.active)
@@ -98,8 +101,23 @@ Singleton {
         root.band = "";
         root.readBand();
     }
-    onScanningChanged: if (!root.scanning)
-        root.readBand()
+    onScanningChanged: if (root.scanning)
+        firstScan.restart()
+
+    // As long as NetworkManager's scan takes.
+    Timer {
+        id: firstScan
+
+        interval: 5000
+    }
+
+    // As often as Quickshell asks for a scan.
+    Timer {
+        interval: 10000
+        repeat: true
+        running: root.scanning && root.active !== null
+        onTriggered: root.readBand()
+    }
 
     Process {
         id: frequency

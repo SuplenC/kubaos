@@ -117,7 +117,7 @@ RadioTab {
         if (Net.nearby.length > 0) {
             for (const network of Net.nearby)
                 out.push(root.networkRow(network));
-        } else if (Net.networks.length === 0 && Net.scanning) {
+        } else if (Net.networks.length === 0 && Net.searching) {
             // A scan that hasn't found anything yet: the rows it finds take these places.
             for (const n of [0, 1, 2])
                 out.push(root.line("skeleton", `skeleton:${n}`, ""));
