@@ -18,6 +18,7 @@ QtObject {
     readonly property var active: networks.find(n => n.connected) ?? null
     property string band: "5 GHz"
     property bool scanning: false
+    readonly property bool searching: scanning
     readonly property bool wired: false
     property bool wifiEnabled: true
     readonly property string icon: wired ? "lan" : !wifiEnabled ? "wifi_off" : !active ? "signal_wifi_0_bar" : strengthIcon(active.signalStrength)
