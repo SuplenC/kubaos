@@ -1652,6 +1652,11 @@
   --ink: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
 }
 
+/* A disabled item's keys dim with its words, so the shortcut doesn't read as working. */
+.k-menu-item[aria-disabled="true"] .k-keycap {
+  opacity: var(--opacity-disabled_content);
+}
+
 /* The item's parts across all of it, its words taking what the rest leave, so its keys sit at its end. */
 .k-menu-item > .k-row {
   flex: 1 1 0;
