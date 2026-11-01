@@ -70,7 +70,7 @@ export interface TableOptions {
  * Splits `width` device pixels less the gaps into `weights`' shares, in whole device pixels, the
  * spare ones to the first columns, so no two differ by more than one past their shares.
  */
-function split(width: number, gap: number, weights: readonly number[]): number[] {
+export function split(width: number, gap: number, weights: readonly number[]): number[] {
   const room = Math.max(0, width - gap * (weights.length - 1));
   const sum = weights.reduce((total, each) => total + each, 0) || 1;
   const widths = weights.map((each) => Math.floor((room * each) / sum));
