@@ -1368,12 +1368,59 @@
 
 .k-badged > .k-badge {
   position: absolute;
-  left: round(nearest, calc(var(--overhang) + var(--icon-s16) - var(--badge-width) / 2), 1px);
+  left: round(nearest, calc(var(--overhang) + var(--glyph) - var(--badge-width) / 2), 1px);
   top: round(nearest, calc(var(--size-badge) / -2), 1px);
 }
 
 .k-badged > .k-badge[data-dot] {
   top: round(nearest, calc(var(--size-badge_dot) / -2), 1px);
+}
+
+/* How far a pill has eased from its old width to its new, 0 to 1. */
+@property --grown {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* A pill (`lib/pill.ts`): `size.control_sm` tall at the full radius on its fill, its content a row
+   centred on device pixels, `space.s12` at each end, `space.s8` round a lone symbol. While its
+   content changes width it is `--from` wide easing to `--to`, its content cut at its edge. An
+   interactive one pressed by day takes its tone's tint, as a Text button does. */
+.k-pill {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  box-sizing: border-box;
+  height: var(--size-control_sm);
+  border-radius: var(--radius-full);
+  --end: var(--space-s12);
+  background:
+    linear-gradient(rgb(from var(--ink) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press, 0))), rgb(from var(--ink) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press, 0)))),
+    var(--fill);
+  color: var(--ink);
+}
+
+.k-pill[data-lone] {
+  --end: var(--space-s8);
+}
+
+.k-pill[style*="--from"] {
+  width: round(up, calc(var(--from) + (var(--to) - var(--from)) * var(--grown)), 1px);
+}
+
+.k-pill.k-control {
+  cursor: pointer;
+}
+
+.k-pill-clip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0 var(--end);
+  border-radius: inherit;
+  overflow: clip;
 }
 
 /* A ticking number: as wide as the same text with every digit a 0, its text at the left. */

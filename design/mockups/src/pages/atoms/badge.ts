@@ -44,8 +44,7 @@ export default page({
     DESCRIBED,
     "The error badge says something wants attention: updates waiting, something wrong. The accent badge marks something unread rather than something wrong (an unread notification's dot on its app's tile), since red there would make every new message look like a failure.",
     "A badge in one of the other fixed meanings (`success`, `warning`, `sharing`, `microphone`, `recording`) is only a dot, in that meaning's role: none of them has an `on_*` role a count could be drawn in and still read, so none holds a count until it has one.",
-    "`BadgedIcon` is the bar's: QML only, on the QML specimen's \"Shell only\" page. A 16 symbol in `on_surface_variant` with a badge centred on its top right corner while `badged`: a count, or a dot when `count` is 0. Its box is the symbol's height, and the badge hangs past its top; while the badge shows, the box takes the half of the badge past the symbol as room on both sides, so the badge keeps the row's gap to the symbol beside it and the symbol stays centred in a pill of its own.",
-    "Its place is `BadgedIcon`'s in every library: the badge's centre on the symbol's top right corner. The iced specimen's helper sets the badge in the top right corner of a small control's box round a 24 symbol instead; it takes `BadgedIcon`'s place when the bar's parts move to `kubaos-ui`.",
+    "`BadgedIcon`, a symbol with a badge centred on its top right corner, has its own page under Molecules; it is shown here as the place a badge is drawn.",
     "A badge comes and goes at once, on the frame its count arrives or ends. A row of symbols with badges has no vertical divider between them.",
   ],
   variants: [
