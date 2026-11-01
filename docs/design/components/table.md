@@ -10,4 +10,4 @@ Readings in columns: a header in `label`, then a row per entry, each a line of b
 
 **States:** a row resting, hovered, pressed and picked (the secondary container).
 
-*Not built yet: both libraries light a row with a state layer, take no keys and put a numeric column's header at its start; the mockup lights a row with its tube as a Text button, moves it with the keys and Enter picks it, splits the columns in whole device pixels and puts a number's header at its column's end.*
+*Not built yet: both libraries light a row with a state layer, and take no keys; the mockup lights a row with its tube as a Text button, moves it with the keys, and Enter picks it.*
