@@ -4,7 +4,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 ## `List`
 
-Rust `list::list`; QML `List`.
+Rust `list::list`; QML `List`. Its mockup page is the source of truth, with `ListRow` and `ListRows`: Molecules, List, ListRow and ListRows, in `design/mockups/`.
 
 Rows in a well: the surface radius (24), padding 12, rows 4 apart, so the rows take 24 − 12 = 12, the control radius (concentric). The focus tube lights the well's edge; the row shows where the keyboard is.
 
@@ -33,6 +33,8 @@ Rust `list::list_row(title)`; QML `ListRow`.
 A row still being found (`loading`) keeps the place of the tiled two-line row that will take it: its tile and its two lines as `Skeleton`s, the lines as much of the words' room as `share` says, so rows one under another don't read as one block, and it takes no press. A Wi-Fi or Bluetooth scan with nothing found yet shows them. *QML only: iced's `list_row` has no loading state yet. It is on the QML specimen's "Shell only" page, which the parity check leaves out.*
 
 **States:** resting, hovered, pressed, selected (the secondary container, or the error colour when `danger`), checked, and loading (QML only, as above).
+
+*Not built yet: both libraries light a row with a state layer under the pointer and fill only the selected row, draw a danger row's content in `on_surface` at rest, tick a checked row in its content colour with a plain title, keep a dimmed row selectable, and have no keycaps, switch or chevron at a row's end; the mockup lights the row the keyboard is on (which the pointer moves) on the secondary container as a menu item, picks in `primary_lit`, and passes over a disabled row.*
 
 ## `LiveList` and `LiveRow`
 
