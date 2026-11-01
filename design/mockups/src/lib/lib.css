@@ -1902,3 +1902,93 @@
   top: auto;
   bottom: var(--size-control_md);
 }
+
+/* A collapsible (`lib/collapsible.ts`): its header, then the room for what it holds, which eases
+   from nothing to the content's height (`--content-height`) as `--open` goes to 1: over `medium`
+   on `standard_decel` opening, and over `short` on `standard_accel` closing, the chevron turning
+   with it. Moving, the room cuts what it holds; fully open it doesn't, so a lit control inside
+   keeps its glow. With reduce motion it opens and closes at once, and what it holds fades in over
+   `short`. */
+.k-collapsible {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-self: stretch;
+  --content-height: 0px;
+  transition: --open var(--motion-short) var(--easing-standard_accel);
+}
+
+.k-collapsible[data-open] {
+  --open: 1;
+  transition: --open var(--motion-medium) var(--easing-standard_decel);
+}
+
+[data-reduced] .k-collapsible,
+[data-sequence] .k-collapsible {
+  transition: none;
+}
+
+/* The header: `size.row` tall at the control radius, `space.s12` inside, no fill. Its title is
+   `on_surface` and its chevron `on_surface_variant`; lit it draws the tube, pressed by day the
+   tone tints it as under a Text button. Disabled, both are at `opacity.disabled_content`. */
+.k-collapsible-header {
+  appearance: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--size-row);
+  margin: 0;
+  padding: 0 var(--space-s12);
+  border: 0;
+  border-radius: var(--radius-control);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+  --title: var(--color-on_surface);
+  --mark: var(--color-on_surface_variant);
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+.k-collapsible-header > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-collapsible-header:disabled {
+  cursor: default;
+  --title: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --mark: var(--title);
+}
+
+.k-collapsible-chevron {
+  transform: rotate(calc(var(--open) * 180deg));
+}
+
+.k-collapsible-body {
+  display: block;
+  height: calc(var(--content-height) * var(--open));
+  overflow: clip;
+}
+
+.k-collapsible[data-settled] > .k-collapsible-body {
+  overflow: visible;
+}
+
+/* What it holds: `space.s8` under the header, `space.s12` in at the sides, in line with the title. */
+.k-collapsible-content {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-s8) var(--space-s12) 0;
+}
+
+@keyframes k-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+[data-reduced] .k-collapsible[data-open] > .k-collapsible-body > .k-collapsible-content {
+  animation: k-fade-in var(--motion-short) var(--easing-standard);
+}
