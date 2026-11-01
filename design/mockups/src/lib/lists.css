@@ -430,3 +430,100 @@
   gap: var(--space-s4);
   min-width: 0;
 }
+
+/* A scroll (`lib/scroll.ts`): its box in the layout, and the view that reaches past it, `focus.far`
+   at the sides and `--above` and `--below` into the room above and below, its content that far in
+   and `space.s16` more at its end, the thumb's room. */
+.k-scroll {
+  position: relative;
+  display: block;
+  flex: none;
+  align-self: stretch;
+  height: var(--height);
+}
+
+.k-scroll-view {
+  position: absolute;
+  top: calc(-1 * var(--above));
+  bottom: calc(-1 * var(--below));
+  left: calc(-1 * var(--focus-far));
+  right: calc(-1 * var(--focus-far));
+  display: block;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.k-scroll-body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--above) calc(var(--focus-far) + var(--space-s16)) var(--below) var(--focus-far);
+}
+
+/* The thumb: on the box's end, along the whole room the view shows, floating over the content. */
+.k-scroll-thumb {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  top: calc(var(--top) - var(--above));
+  display: none;
+  width: var(--size-scrollbar);
+  height: var(--tall);
+  border-radius: var(--radius-full);
+  background: var(--color-outline_variant);
+  transition: background-color var(--motion-micro) var(--easing-standard);
+}
+
+.k-scroll-thumb[data-shown] {
+  display: block;
+}
+
+.k-scroll-thumb:is(:hover, [data-dragged], [data-pinned]) {
+  background: var(--color-outline);
+}
+
+/* A header fade: over the gap above the scroll, the gap in `surface`, then `space.s16` fading to
+   nothing, across the scroll's box but the thumb's width at its end. It fades in and out over
+   `micro` as the content leaves its top and comes back. */
+.k-header-fade {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: var(--size-scrollbar);
+  top: calc(-1 * var(--gap));
+  display: block;
+  height: calc(var(--gap) + var(--space-s16));
+  background: linear-gradient(var(--color-surface) var(--gap), rgb(from var(--color-surface) r g b / 0));
+  opacity: var(--faded);
+  pointer-events: none;
+  transition: --faded var(--motion-micro) var(--easing-standard);
+}
+
+.k-scroll[data-scrolled] > .k-header-fade,
+.k-header-fade[data-pinned] {
+  --faded: 1;
+}
+
+.k-header-fade[data-pinned],
+[data-sequence] .k-header-fade {
+  transition: none;
+}
+
+/* A shell panel as the samples show a scroll in: `surface` at the surface radius, the container's
+   `space.s16` inside, its own edge cutting whatever passes it. */
+.k-scroll-panel {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-s16);
+  box-sizing: border-box;
+  width: var(--size-panel);
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+  overflow: clip;
+}
