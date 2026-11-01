@@ -2233,16 +2233,21 @@
   max-width: calc(100% - 2 * var(--space-s24));
 }
 
-/* A dialog (`lib/dialog.ts`): `size.dialog` wide, `space.s32` inside, at the surface radius, raised
+/* A dialog (`lib/dialog.ts`): `size.dialog` wide, `space.s24` inside, at the dialog radius, raised
    to the ladder's step 3: `surface_container_high` by day, the highest container at night, the
    step's shadow and the rim. A Danger dialog's edge is `error` at `opacity.danger_edge`, over the
-   rim. It arrives rising `space.s16` into place a whole device pixel at a time (`--rise`). */
+   rim. It is at least `aspect.dialog` of its width tall, on the grid, and at most its room less
+   `space.s48` above and below. It arrives rising `space.s16` into place a whole device pixel at a
+   time (`--rise`). */
 .k-dialog {
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   flex: none;
   box-sizing: border-box;
   width: var(--size-dialog);
+  min-height: round(nearest, calc(var(--size-dialog) / (var(--aspect-dialog))), var(--grid));
+  max-height: calc(100% - 2 * var(--space-s48));
   padding: var(--space-s24);
   border-radius: var(--radius-dialog);
   --fill: var(--color-surface_container_high);
@@ -2259,24 +2264,84 @@
   pointer-events: none;
 }
 
+/* The title, the middle and the buttons, filling the dialog's height and shrinking with it, the
+   middle alone below its own height. */
+.k-dialog > .k-dialog-column {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .k-dialog-column > * {
   align-self: stretch;
 }
 
-.k-dialog-said > * {
-  align-self: stretch;
-}
-
-.k-dialog-said > .k-dialog-body {
+/* The middle, `space.s12` under the title, its scroller clipped at its edges with a rule on each. */
+.k-dialog-middle {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   margin-top: var(--space-s12);
 }
 
-.k-dialog-said > .k-dialog-asks {
+.k-dialog-column > .k-dialog-middle {
+  flex: 0 1 auto;
+}
+
+/* The body and what follows it, in line with the title, scrolling with no bar of its own. It
+   reaches out to the dialog's edges, so a field's glow inside it isn't cut, and holds
+   `space.s12` under its end, where the rest of the gap above the buttons is the spare room's.
+   Tab scrolls what it lands on `space.s12` clear of the edges. */
+.k-dialog-middle > .k-dialog-scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+  margin-inline: calc(-1 * var(--space-s24));
+  padding: 0 var(--space-s24) var(--space-s12) calc(var(--space-s24) + var(--type-heading-icon) + var(--space-s12));
+  overflow-y: auto;
+  scrollbar-width: none;
+  scroll-padding-block: var(--space-s12);
+  outline: none;
+}
+
+.k-dialog-column[data-bare] .k-dialog-scroll {
+  padding-bottom: 0;
+}
+
+.k-dialog-scroll > * {
+  align-self: stretch;
+}
+
+.k-dialog-scroll > .k-dialog-follows {
   margin-top: var(--space-s16);
 }
 
-.k-dialog-column > .k-dialog-buttons {
-  margin-top: var(--space-s24);
+/* The room the dialog's least height leaves over, at least `space.s12`: with the middle's own, the
+   `space.s24` above the buttons. */
+.k-dialog-column > .k-dialog-spare {
+  flex: 1 0 var(--space-s12);
+}
+
+/* A divider at the middle's top or bottom edge, across the dialog's padding, the middle scrolling
+   under it: there while more is that way, fading over `short` on `standard` as that end comes. */
+.k-dialog-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.k-dialog-rule[data-at="above"] {
+  top: 0;
+}
+
+.k-dialog-rule[data-at="below"] {
+  bottom: 0;
+}
+
+.k-dialog-middle[data-above] > .k-dialog-rule[data-at="above"],
+.k-dialog-middle[data-below] > .k-dialog-rule[data-at="below"] {
+  opacity: 1;
 }
 
 /* The button bar: as wide as the room its surface gives it, with no padding of its own. */
@@ -2323,6 +2388,14 @@
   border-radius: var(--radius-surface);
   background: var(--color-surface_container_low);
   overflow: hidden;
+}
+
+/* A room as short as `--tall`, the dialog in its middle and capped by it. */
+.k-dialog-room[data-tall] {
+  display: flex;
+  align-items: center;
+  height: var(--tall);
+  padding-block: 0;
 }
 
 .k-dialog-room[data-live] {

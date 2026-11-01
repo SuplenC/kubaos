@@ -2,7 +2,7 @@
 // pixels, a component's padding and a layout's gaps shaded and labelled with the tokens they come
 // from; beside it the measures by their tokens, then the reflow in a window of the toolbar's size.
 
-import { length } from "../../lib/tokens.ts";
+import { length, raw } from "../../lib/tokens.ts";
 import { settings, windowSize } from "../settings.ts";
 import type { Measures } from "../page.ts";
 import { el, label, mockCell, prose } from "../dom.ts";
@@ -139,7 +139,9 @@ export function measures(spec: Measures): HTMLElement {
   for (const measure of spec.measures) {
     const token = measure.token.replace(/^--/, "");
     const name = token.replaceAll("-", ".");
-    table.append(el("dt", "", el("code", "page-code", `${name} = ${round(length(token))}`)), el("dd", "", prose(measure.what)));
+    // An aspect ratio is two numbers, not a length: shown as written.
+    const value = token.startsWith("aspect-") ? raw(token) : round(length(token));
+    table.append(el("dt", "", el("code", "page-code", `${name} = ${value}`)), el("dd", "", prose(measure.what)));
   }
   const reflow = partOr(spec.reflow, (r) => {
     const size = windowSize();

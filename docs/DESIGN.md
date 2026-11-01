@@ -154,7 +154,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
 | Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 28, compact 24, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; a collapsible's rail's strip 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236 (Kōbō's); an app's sidebar 264; an app's window 1120 × 720, at least 720 × 480; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160; sparkline 48; the mockups' motion plot, from 0 to 1, 160 |
 | Container padding (`[container]`) | 16 under 640, 24 from 640, 32 from 1024 |
-| Aspect ratios (`[aspect]`) | wallpaper 16:10 |
+| Aspect ratios (`[aspect]`) | wallpaper 16:10, dialog 5:2 (its least height) |
 
 - **An app's window** (`app_width` × `app_height`, 1120 × 720) opens centred and floating at that size. Tiled, it takes its tile, and never goes below its minimum (`app_min_width` × `app_min_height`, 720 × 480), so its layout is built to hold at the minimum. Its sidebar (`sidebar`, 264), its list of pages, is wider than Kōbō's step rail (`rail`, 236), since it lists settings' names, not a step's few words. *Not enforced yet: no app opens at these sizes, and no window rule places or limits an app's window yet.*
 
