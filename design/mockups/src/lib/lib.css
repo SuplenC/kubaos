@@ -926,13 +926,15 @@
 /* A part raised inside its plane (`lib/elevation.ts`, `[elevation]`): its step's contact and
    ambient layers of `shadow`, and the rim, a hairline of `on_surface` inside its edge. Its fill is
    its day role (`--fill`) by day and the role above it (`--fill-night`) at night, where
-   `--elevation-lighter` is 1. */
+   `--elevation-lighter` is 1. A part that rises as it opens (a select) names how far it is up as
+   `--raised`, 0 to 1, which its shadow and rim come up with. */
 .k-raised {
+  --raised-by: var(--raised, 1);
   background: color-mix(in srgb, var(--fill), var(--fill-night) calc(var(--elevation-lighter) * 100%));
   box-shadow:
-    inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-on_surface) r g b / var(--elevation-rim)),
-    0 var(--contact-y) var(--contact-blur) rgb(from var(--color-shadow) r g b / var(--elevation-contact-opacity)),
-    0 var(--ambient-y) var(--ambient-blur) rgb(from var(--color-shadow) r g b / var(--elevation-ambient-opacity));
+    inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-on_surface) r g b / calc(var(--elevation-rim) * var(--raised-by))),
+    0 var(--contact-y) var(--contact-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-contact-opacity) * var(--raised-by))),
+    0 var(--ambient-y) var(--ambient-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-ambient-opacity) * var(--raised-by)));
 }
 
 .k-raised[data-step="1"] {
@@ -1642,34 +1644,88 @@
   padding: var(--space-s4) 0;
 }
 
-/* A select (`lib/select.ts`): a field's look, `size.control_md` tall at the control radius,
-   filling its room, `surface_container_high` with a hairline of `outline_variant` inside its edge,
-   `space.s12` inside. Lit, as a field is, its fill rises to the highest container and its tube is
-   drawn over the hairline; pressed, the glow brightens. Open, its fill is the highest container,
-   its hairline the accent, and it shows no tube: the keyboard is in its menu. */
-.k-select {
-  appearance: none;
-  margin: 0;
-  border: none;
-  font: inherit;
-  text-align: start;
+
+/* How far a select is open, 0 to 1: its surface grows, rises and lifts its fill, its hairline goes
+   and its chevron turns, all together. */
+@property --open {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A select's room (`lib/select.ts`): a shut select's height in the flow, whatever the select does.
+   Its list's visible part, `--drop`, is `--rows` small controls and the list's padding. It opens
+   over `medium` on `emphasized_decel` and folds over `short` on `emphasized_accel`; a pick folds it
+   a `micro` later, once the option has shown pressed. With reduced motion it opens and folds at
+   once. A sample of the open state takes the open surface's height in the flow. */
+.k-select-room {
   position: relative;
-  display: flex;
+  display: block;
   flex: none;
-  align-items: center;
   align-self: stretch;
-  box-sizing: border-box;
-  width: 100%;
   height: var(--size-control_md);
-  padding: 0 var(--space-s12);
+  --drop: calc(var(--rows) * var(--size-control_sm) + 2 * var(--space-s4));
+  transition: --open var(--motion-short) var(--easing-emphasized_accel);
+}
+
+.k-select-room[data-open] {
+  --open: 1;
+  transition: --open var(--motion-medium) var(--easing-emphasized_decel);
+}
+
+.k-select-room[data-taken] {
+  transition: --open var(--motion-short) var(--easing-emphasized_accel) var(--motion-micro);
+}
+
+.k-select-room[data-shown] {
+  height: calc(var(--size-control_md) + var(--drop));
+}
+
+.k-select-room[data-shown],
+[data-reduced] .k-select-room {
+  transition: none;
+}
+
+/* The select: shut, a field's look, `size.control_md` tall at the control radius,
+   `surface_container_high` with a hairline of `outline_variant` inside its edge. Lit, as a field
+   is, its fill rises to the highest container and its tube burns inside its edge; pressed, the
+   glow brightens. Open, the same box grows by its list into a surface raised to step 2: the step's
+   shadow and rim, `surface_container_high` by day and the highest container at night; its hairline
+   goes and so does its tube. It grows down from where it is, or up where `data-up` says. */
+.k-select {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: block;
+  box-sizing: border-box;
+  height: calc(var(--size-control_md) + var(--drop) * var(--open));
   border-radius: var(--radius-control);
   outline: none;
   cursor: pointer;
+  --raised: var(--open);
   --rest-fill: var(--color-surface_container_high);
-  background: color-mix(in srgb, var(--rest-fill), var(--color-surface_container_highest) calc(var(--lit) * 100%));
+  --shut-fill: color-mix(in srgb, var(--rest-fill), var(--color-surface_container_highest) calc(var(--lit) * 100%));
+  --fill: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_high) calc(var(--open) * 100%));
+  --fill-night: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_highest) calc(var(--open) * 100%));
   --edge-line: var(--color-outline_variant);
   --value: var(--color-on_surface);
   --mark: var(--color-on_surface_variant);
+}
+
+.k-select-room[data-up] > .k-select {
+  top: auto;
+  bottom: 0;
+}
+
+.k-select-room:is([data-open], [data-folding]) > .k-select {
+  z-index: 10;
+}
+
+/* Open or folding, nothing lights it: the keyboard is in its list. */
+.k-select-room:is([data-open], [data-folding]) > .k-select.k-control {
+  --lit: 0;
+  --press: 0;
 }
 
 .k-select::before {
@@ -1678,22 +1734,15 @@
   inset: 0;
   border: var(--stroke-hairline_device_px) solid var(--edge-line);
   border-radius: inherit;
+  opacity: calc(1 - var(--open));
+  pointer-events: none;
 }
 
 .k-select[data-placeholder] {
   --value: var(--color-on_surface_variant);
 }
 
-.k-select[data-open] {
-  --rest-fill: var(--color-surface_container_highest);
-  --edge-line: var(--color-primary);
-}
-
-.k-select[data-open] > .k-ring {
-  visibility: hidden;
-}
-
-.k-select:disabled {
+.k-select[aria-disabled="true"] {
   cursor: default;
   --rest-fill: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
   --edge-line: var(--rest-fill);
@@ -1701,36 +1750,105 @@
   --mark: var(--value);
 }
 
+/* The value row, a shut select's box at the surface's top (its bottom, growing up): `space.s12`
+   inside, its ring the box's own, so the glow is never cut by the list's clip. */
+.k-select-head {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--size-control_md);
+  padding: 0 var(--space-s12);
+  border-radius: var(--radius-control);
+}
+
+.k-select-room[data-up] .k-select-head {
+  top: auto;
+  bottom: 0;
+}
+
+.k-select-head > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .k-select-value {
   display: block;
 }
 
-/* A select and its menu: the menu floats `space.s4` under it, as wide as it, over what is below.
-   It fades in over `short` on `emphasized_decel` as it opens and out over `micro` on
-   `emphasized_accel` as it closes. A sample of the open state lays the menu out under it instead. */
-.k-select-room {
-  position: relative;
+/* The chevron turns up with the surface. */
+.k-select-chevron {
+  transform: rotate(calc(var(--open) * 180deg));
+}
+
+/* What the surface clips as it grows: the list, held at its visible height beside the value row,
+   so the clip cuts it at the surface's edge and scrolling it never moves the row. A clip, not a
+   hidden overflow: nothing can scroll the pane, so a shut list never shows past the row. */
+.k-select-pane {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  border-radius: inherit;
+}
+
+.k-select-room[data-folding] .k-select-pane {
+  pointer-events: none;
+}
+
+/* The options: menu items `space.s4` inside, eight in view, then it scrolls with no bar of its own,
+   as a menu does. Their words line up with the value row's start, `space.s12` in. */
+.k-select-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--size-control_md);
   display: flex;
   flex-direction: column;
-  flex: none;
-  align-self: stretch;
-  gap: var(--space-s4);
+  box-sizing: border-box;
+  height: var(--drop);
+  padding: var(--space-s4);
+  overflow-y: auto;
+  scrollbar-width: none;
 }
 
-.k-select-room:not([data-shown]) > .k-popover {
+.k-select-room[data-up] .k-select-list {
+  top: auto;
+  bottom: var(--size-control_md);
+}
+
+.k-select-list > .k-menu-item {
+  padding: 0 var(--space-s8);
+}
+
+.k-select-list > .k-menu-item[data-taken] {
+  --press: 1;
+}
+
+/* The picked option's words are `primary_lit`, as a picked tab's, with the label glow round them at
+   night while the signs are on; highlighted, they take the highlight's colours. */
+.k-select-list > .k-menu-item[data-picked] {
+  --rest-ink: var(--color-primary_lit);
+}
+
+.k-select-list > .k-menu-item[data-picked] .k-menu-words {
+  filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--signs) * (1 - var(--lit)))));
+}
+
+/* The rule between the value row and the list, `space.s12` in from the sides: a divider's soft
+   outline, at the list's edge, so the options scroll away under it. */
+.k-select-rule {
   position: absolute;
-  top: calc(100% + var(--space-s4));
-  left: 0;
-  z-index: 10;
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity var(--motion-micro) var(--easing-emphasized_accel),
-    visibility 0s linear var(--motion-micro);
+  left: var(--space-s12);
+  right: var(--space-s12);
+  top: var(--size-control_md);
+  height: var(--stroke-hairline_device_px);
+  background: rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
 }
 
-.k-select-room:not([data-shown])[data-open] > .k-popover {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity var(--motion-short) var(--easing-emphasized_decel);
+.k-select-room[data-up] .k-select-rule {
+  top: auto;
+  bottom: var(--size-control_md);
 }

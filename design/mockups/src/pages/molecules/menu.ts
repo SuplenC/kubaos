@@ -1,6 +1,7 @@
 // The Menu page, with MenuItem: `docs/design/components/menu.md`. A few actions or choices one
-// under the other on a popover: a tray icon's menu, a select's list. The item the keyboard is on is
-// lit on the secondary container; the pointer moving onto an item puts the keyboard on it.
+// under the other on a popover: a tray icon's menu. A select's options are menu items too, on its
+// own grown surface. The item the keyboard is on is lit on the secondary container; the pointer
+// moving onto an item puts the keyboard on it.
 
 import { shown, type Words } from "../../lib/content.ts";
 import { stack, within } from "../../lib/layout.ts";
@@ -23,7 +24,7 @@ const ACTIONS: readonly MenuEntry[] = [
   { label: "Quit", icon: "logout", danger: true },
 ];
 
-/** A select's list: the holidays' countries, one checked. */
+/** A few choices: the holidays' countries, one checked. */
 const COUNTRIES = ["None", "Germany", "Italy", "Poland"];
 
 function choices(picked: number): MenuEntry[] {
@@ -35,7 +36,7 @@ function onPopover(entries: readonly MenuEntry[], current = 0, pinned?: ItemPinn
   return popover(2, menu(entries, { current, ...(pinned ? { pinned } : {}) }));
 }
 
-/** `content` on a popover as wide as its room, as a select's menu takes its select's width. */
+/** `content` on a popover as wide as its room. */
 function filled(content: HTMLElement): HTMLElement {
   const card = popover(2, content);
   card.style.setProperty("--popover-width", "100%");
@@ -79,14 +80,14 @@ export default page({
   live: () => stack("s24", "start", onPopover(ACTIONS), onPopover(choices(3), 3)),
   description: [
     "Rust `menu::menu`, `menu::menu_item` and `menu::menu_separator`, QML `Menu` and `MenuItem`. Tab into a menu here and use ↑ and ↓, or move the pointer over it.",
-    "A menu holds a few actions (a tray icon's app menu) or choices (a select's list), one under the other on a `Popover` as wide as `size.menu` or its select. It is for what doesn't fit the surface: a surface's own actions are its buttons.",
+    "A menu holds a few actions (a tray icon's app menu) or choices, one under the other on a `Popover` as wide as `size.menu`. A select's options are menu items too, on the select's own surface as it grows into its list (the Select page). It is for what doesn't fit the surface: a surface's own actions are its buttons.",
     DESCRIBED,
     "The item the keyboard is on is lit: it fades onto `secondary_container` over `short`, its content to `on_secondary_container`, a danger item's too; pressed, the container lifts to `secondary_container_pressed` over `micro`. The pointer moving onto an item puts the keyboard on it, so one item is lit at a time, by the pointer and the keys alike. An item that can't be taken now is dimmed, `on_surface` at `opacity.disabled_content`, and the keys pass over it. Items aren't neon: no tube, no glow, the popover's own edge their room.",
-    "A menu taller than its room (a select's eight items, the room under a tray icon) scrolls, with no bar, the item the keyboard is on kept in view. In the tray's menus a submenu opens in place, with a Back item at its top; Esc steps back one level before it closes.",
+    "A menu taller than its room (the room under a tray icon) scrolls, with no bar, the item the keyboard is on kept in view. In the tray's menus a submenu opens in place, with a Back item at its top; Esc steps back one level before it closes.",
   ],
   variants: [
     { name: "Actions", for: "What can be done to one thing: a tray app's menu, with symbols, keys and groups.", sample: () => onPopover(ACTIONS) },
-    { name: "Choices", for: "One of a list, checked: a select's list. Every item keeps the check's room.", sample: () => onPopover(choices(3), 3) },
+    { name: "Choices", for: "One of a few, checked, in a tray app's menu. Every item keeps the check's room.", sample: () => onPopover(choices(3), 3) },
     { name: "MenuItem, with keys", for: "An action with a shortcut: its keys as keycaps at its end.", sample: () => alone({ label: "Copy path", icon: "content_paste", keys: "Ctrl+C" }) },
     { name: "MenuItem, danger", for: "An action that destroys something: in `error`.", sample: () => alone({ label: "Quit", icon: "logout", danger: true }) },
   ],
@@ -114,7 +115,7 @@ export default page({
     counts: [
       { name: "One", for: "A single action: still a menu, as a tray app with only Quit has.", sample: () => onPopover([{ label: "Quit", icon: "logout", danger: true }]) },
       { name: "A few, in groups", for: "Groups apart by hairlines.", sample: () => onPopover(ACTIONS) },
-      { name: "Past eight", for: "A list of twelve under a select: eight show and the rest scroll, the keyboard's item in view.", sample: long },
+      { name: "Past eight", for: "A list of twelve held to eight: eight show and the rest scroll, the keyboard's item in view.", sample: long },
     ],
   },
   motion: {
@@ -152,7 +153,7 @@ export default page({
       { keys: ["Esc"], does: "Leaves the menu, or steps back out of a submenu first; the keyboard goes back to what opened it." },
     ],
     order: "A menu is one stop: the keys move inside it. Disabled items and the hairlines are passed over.",
-    lands: "As it opens, on the picked choice of a select's list, or on its first item that can be taken.",
+    lands: "As it opens, on its checked choice, or on its first item that can be taken.",
   },
   measures: {
     samples: nonEmpty([
@@ -171,7 +172,7 @@ export default page({
       { what: "A menu's width, a popover's.", token: "size-menu" },
     ],
     reflow: {
-      described: "A menu is as wide as its popover (\`size.menu\`, or its select's width) at every window size, and as tall as its items up to its room, then it scrolls. An item's words end in an ellipsis where they don't fit: here on a popover held to a third of the window.",
+      described: "A menu is as wide as its popover (\`size.menu\`, or its room's width) at every window size, and as tall as its items up to its room, then it scrolls. An item's words end in an ellipsis where they don't fit: here on a popover held to a third of the window.",
       sample: () => within("33%", stack("s8", "start", filled(menu([{ label: shown(ACTION), icon: "folder_open", keys: "Enter" }], { current: -1 })), text("A popover a third of the window wide.", "small", "on_surface_variant"))),
     },
   },
