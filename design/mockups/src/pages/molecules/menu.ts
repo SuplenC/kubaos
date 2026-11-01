@@ -82,7 +82,7 @@ export default page({
     "Rust `menu::menu`, `menu::menu_item` and `menu::menu_separator`, QML `Menu` and `MenuItem`. Tab into a menu here and use ↑ and ↓, or move the pointer over it.",
     "A menu holds a few actions (a tray icon's app menu) or choices, one under the other on a `Popover` as wide as `size.menu`. A select's options are menu items too, on the select's own surface as it grows into its list (the Select page). It is for what doesn't fit the surface: a surface's own actions are its buttons.",
     DESCRIBED,
-    "The item the keyboard is on is lit: it fades onto `secondary_container` over `short`, its content to `on_secondary_container`, a danger item's too, and its keycaps' keys and edges to `primary` with it, a danger item's keycaps staying as they are; pressed, the container lifts to `secondary_container_pressed` over `micro`. The pointer moving onto an item puts the keyboard on it, so one item is lit at a time, by the pointer and the keys alike. An item that can't be taken now is dimmed, `on_surface` at `opacity.disabled_content`, and the keys pass over it. Items aren't neon: no tube, no glow, the popover's own edge their room.",
+    "The item the keyboard is on is lit: it fades onto `secondary_container` over `short`, its content to `on_secondary_container`, and its keycaps' keys and edges to `primary` with it; a danger item fades onto `error_container` instead, its content to `on_error_container`, its keycaps staying as they are. Pressed, the container lifts to `secondary_container_pressed` (`error_container_pressed`) over `micro`. The pointer moving onto an item puts the keyboard on it, so one item is lit at a time, by the pointer and the keys alike. An item that can't be taken now is dimmed, `on_surface` at `opacity.disabled_content`, and the keys pass over it. Items aren't neon: no tube, no glow, the popover's own edge their room.",
     "A menu taller than its room (the room under a tray icon) scrolls, with no bar, the item the keyboard is on kept in view. In the tray's menus a submenu opens in place, with a Back item at its top; Esc steps back one level before it closes.",
   ],
   variants: [
@@ -103,8 +103,8 @@ export default page({
     rows: nonEmpty(ITEMS.map(({ name, spec }) => ({ name, cell: (state: MatrixState) => cell(spec, state) }))),
     described: {
       rest: "No fill; its content `on_surface`, a danger item's `error`. By day the same roles in daylight colours.",
-      lit: "The keyboard on it, which the pointer moves: `secondary_container` behind it, its content `on_secondary_container`, a danger item's too; its keycaps' keys and edges `primary`, a danger item's keycaps unchanged. No line and no glow, by night or by day.",
-      pressed: "Lit and pressed: the container lifts to `secondary_container_pressed`, 0.035 lighter at night and 0.04 darker by day. Letting go takes it.",
+      lit: "The keyboard on it, which the pointer moves: `secondary_container` behind it, its content `on_secondary_container`, its keycaps' keys and edges `primary`; a danger item's `error_container`, its content `on_error_container`, its keycaps unchanged. No line and no glow, by night or by day.",
+      pressed: "Lit and pressed: the container lifts to `secondary_container_pressed` (a danger item's to `error_container_pressed`), 0.035 lighter at night and 0.04 darker by day. Letting go takes it.",
       disabled: "Dimmed: `on_surface` at `opacity.disabled_content`, a danger item's too, never lit, and passed over by the keys.",
     },
   },
