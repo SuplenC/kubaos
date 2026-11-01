@@ -385,7 +385,7 @@ fn container(out: &mut Writer, tokens: &Tokens) {
     scale(
         out,
         &Scale {
-            doc: "An aspect ratio a picture's box keeps before and after it loads.",
+            doc: "An aspect ratio, a picture's box's before and after it loads or a surface's at its shortest.",
             name: "Aspect",
             variants: tokens
                 .aspect

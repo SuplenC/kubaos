@@ -3,22 +3,32 @@
 //
 // The dialog is `size.dialog` wide, `space.s24` inside on every side, at the dialog radius, raised
 // to the ladder's step 3 (`lib/elevation.ts`). A 24 symbol (`heading`'s) beside a `heading` title,
-// the `body` `space.s12` under the title and in line with it, what it asks for (a labelled field)
-// `space.s16` under the body, in line with it too, and its button bar (`lib/button-bar.ts`)
+// the `body` `space.s12` under the title and in line with it, what it lists or asks for (a labelled
+// field) `space.s16` under the body, in line with it too, and its button bar (`lib/button-bar.ts`)
 // `space.s24` under the last, across its whole width. A Danger dialog shows the warning sign in
 // `error` with an edge of `error`, and its action is a Danger button.
+//
+// It is never shorter than `aspect.dialog` of its width: a dialog that asks little gains the room
+// above its buttons, which stay at its foot, and its words stay at the top. It is never taller
+// than its room less `space.s48` above and below, so the dimmed screen shows round it; past that
+// only the middle, the body and what follows it, scrolls, with no bar of its own, between the
+// title and the buttons, which stay. While more of it is above or below, a soft hairline across
+// the dialog's padding marks that edge.
 //
 // The scrim dims everything behind it and takes every press, which does nothing; the dialog sits
 // in its middle on whole device pixels. Opening, the keyboard goes into the dialog, onto what it
 // asks for, else Cancel on a Danger dialog, else the last action; Tab and Shift+Tab go round it
-// and never leave; Esc is its dismiss button; closing gives the keyboard back to what opened it.
+// and never leave, scrolling what they land on into view; the arrows and the page keys scroll a
+// middle too tall to show whole; Esc is its dismiss button; closing gives the keyboard back to
+// what opened it.
 
 import { iconInLine } from "./button.ts";
 import { type Action, buttonBar, type Tone } from "./button-bar.ts";
 import { raise } from "./elevation.ts";
-import { filling, row, stack } from "./layout.ts";
+import { divider, filling, row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
-import { wrapped } from "./text.ts";
+import { text, wrapped } from "./text.ts";
+import { length } from "./tokens.ts";
 
 export type { Action, Tone } from "./button-bar.ts";
 
@@ -27,11 +37,14 @@ export interface DialogOptions {
   readonly icon?: string;
   readonly title: string;
   readonly body: string;
+  /** What it is about, a line each under the body: the files it deletes. */
+  readonly lists?: readonly string[];
   /** What it asks for, between the body and the buttons: a labelled field. */
   readonly asks?: HTMLElement;
   /** The button that backs out, at the start: Cancel. */
   readonly dismiss?: string;
-  /** The buttons at the end, the one Enter presses last. */
+  /** The buttons at the end, the one Enter presses last; none, with no dismiss, for a dialog with
+   *  nothing to answer (a progress). */
   readonly actions: readonly Action[];
   /** Drawn with the keyboard on the control it lands on, as a picture of it open. */
   readonly landed?: boolean;
@@ -45,6 +58,9 @@ export interface Dialog {
   /** Called with the button's label, or "Esc", when the dialog is answered. */
   onAnswer: (answer: string) => void;
 }
+
+/** The keys that scroll the middle, and which way. */
+const SCROLLS: Readonly<Record<string, number>> = { ArrowUp: -1, ArrowDown: 1, PageUp: -1, PageDown: 1 };
 
 /** The controls Tab stops on inside `element`, in reading order. */
 function stops(element: HTMLElement): HTMLElement[] {
@@ -63,21 +79,45 @@ export function dialog(options: DialogOptions): Dialog {
   const tint = danger ? "error" : "primary";
   const symbol = iconInLine(danger ? "warning" : (options.icon ?? "info"), "heading", `var(--color-${tint})`);
   const body = wrapped(options.body, "body", "on_surface_variant");
-  body.classList.add("k-dialog-body");
-  const words: Element[] = [wrapped(options.title, "heading"), body];
-  if (options.asks) {
-    options.asks.classList.add("k-dialog-asks");
-    words.push(options.asks);
+  const middle: Element[] = [body];
+  if (options.lists) {
+    const listed = stack(0, "start", ...options.lists.map((each) => text(each, "body")));
+    listed.classList.add("k-dialog-follows");
+    middle.push(listed);
   }
-  const said = stack(0, "start", ...words);
-  said.classList.add("k-dialog-said");
-  const head = row("s12", "start", symbol, filling(said));
-  const bar = buttonBar({ ...(options.dismiss ? { dismiss: options.dismiss } : {}), actions: options.actions, tone: options.tone ?? "Normal" });
-  const { dismiss, actions } = bar;
-  bar.element.classList.add("k-dialog-buttons");
-  const column = stack(0, "start", head, bar.element);
+  if (options.asks) {
+    options.asks.classList.add("k-dialog-follows");
+    middle.push(options.asks);
+  }
+  const scroller = stack(0, "start", ...middle);
+  scroller.classList.add("k-dialog-scroll");
+  const above = divider();
+  above.classList.add("k-dialog-rule");
+  above.dataset.at = "above";
+  const below = divider();
+  below.classList.add("k-dialog-rule");
+  below.dataset.at = "below";
+  const room = document.createElement("span");
+  room.className = "k-dialog-middle";
+  room.append(scroller, above, below);
+  const head = row("s12", "start", symbol, filling(wrapped(options.title, "heading")));
+  const answered = options.dismiss !== undefined || options.actions.length > 0;
+  const bar = answered
+    ? buttonBar({ ...(options.dismiss ? { dismiss: options.dismiss } : {}), actions: options.actions, tone: options.tone ?? "Normal" })
+    : undefined;
+  const dismiss = bar?.dismiss ?? null;
+  const actions = bar?.actions ?? [];
+  const column = stack(0, "start", head, room);
   column.classList.add("k-dialog-column");
+  if (bar) {
+    // What the dialog's least height leaves over goes here, above its buttons.
+    const spare = probe(document.createElement("span"), { role: "spacer", fill: true });
+    spare.className = "k-dialog-spare";
+    bar.element.classList.add("k-dialog-buttons");
+    column.append(spare, bar.element);
+  } else column.dataset.bare = "";
   surface.append(column);
+  showEdges(scroller, room);
 
   const result: Dialog = { element: surface, land, onAnswer: () => undefined };
 
@@ -113,6 +153,12 @@ export function dialog(options: DialogOptions): Dialog {
     } else if (event.key === "Enter" && options.asks?.contains(event.target as Node)) {
       // Enter in the field does what its action does.
       if (!event.repeat) [...actions].reverse().find((each) => !each.disabled)?.click();
+    } else if (event.key in SCROLLS && !options.asks?.contains(event.target as Node) && scroller.scrollHeight > scroller.clientHeight) {
+      // From its buttons, the arrows and the page keys scroll a middle too tall to show whole.
+      const line = length("type-body-line");
+      const by = SCROLLS[event.key]! * (event.key.startsWith("Page") ? scroller.clientHeight - line : line);
+      const reduced = surface.closest("[data-reduced]") !== null;
+      scroller.scrollBy({ top: by, behavior: reduced ? "instant" : "smooth" });
     } else return;
     event.preventDefault();
     event.stopPropagation();
@@ -120,6 +166,22 @@ export function dialog(options: DialogOptions): Dialog {
 
   probe(surface, { role: "component", name: "Dialog", variant: options.tone ?? "Normal", fixed: { width: true, height: false } });
   return result;
+}
+
+/**
+ * Marks `room` while `scroller` has more above (`data-above`) or below (`data-below`) than it
+ * shows, as it scrolls and whenever it or what it holds changes size.
+ */
+function showEdges(scroller: HTMLElement, room: HTMLElement): void {
+  const mark = () => {
+    // A zoomed page scrolls by fractions of a pixel, and its end can be one short of the height.
+    room.toggleAttribute("data-above", scroller.scrollTop >= 1);
+    room.toggleAttribute("data-below", scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - 1);
+  };
+  scroller.addEventListener("scroll", mark, { passive: true });
+  const sizes = new ResizeObserver(mark);
+  sizes.observe(scroller);
+  for (const each of scroller.children) sizes.observe(each);
 }
 
 /** Everything behind a dialog, dimmed: it fills its room and takes every press, which does nothing. */

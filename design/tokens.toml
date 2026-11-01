@@ -276,11 +276,15 @@ from = [0, 640, 1024]
 # The padding inside every edge at that width and up, from `[space]`.
 padding = [16, 24, 32]
 
-# Aspect ratios, width to height, a picture's box keeps before and after it
-# loads, so nothing around it moves when it arrives.
+# Aspect ratios, width to height: the shape a picture's box keeps before and
+# after it loads, so nothing around it moves when it arrives, and a surface's
+# at its shortest.
 [aspect]
 # A wallpaper: 16:10, as the screens it is picked for are.
 wallpaper = [16, 10]
+# A dialog at its shortest: 5:2 of its width, so a dialog that asks little
+# stands as a card, not a strip; the room it gains goes above its buttons.
+dialog = [5, 2]
 
 # Type families. Nothing else draws text; symbols are drawn, see [symbols].
 [font.family]
