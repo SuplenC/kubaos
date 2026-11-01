@@ -77,7 +77,7 @@ export interface MenuOptions {
   readonly current?: number;
   /** The current item pinned in a state, whatever the pointer does. */
   readonly pinned?: ItemPinned;
-  /** The most items it shows before it scrolls: a select's eight. */
+  /** The most items it shows before it scrolls. */
   readonly most?: number;
   /** What taking an item does, by its index among the entries. */
   readonly onTake?: (index: number) => void;
