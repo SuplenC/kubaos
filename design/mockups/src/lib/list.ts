@@ -249,56 +249,74 @@ function rowStack(rows: readonly HTMLElement[]): HTMLElement {
   return column;
 }
 
+/** Where a list's keyboard and pointer are, for an owner whose rows change under them. */
+export interface Rows {
+  /** The row the keyboard is on, if any. */
+  readonly current: () => HTMLElement | null;
+  /** Whether the pointer is over the list. */
+  readonly pointed: () => boolean;
+  /** Shows the current row again, after the rows changed. */
+  readonly refresh: () => void;
+  /** `fresh` takes `old`'s place, and the keyboard with it if it was there. */
+  readonly swap: (old: HTMLElement, fresh: HTMLElement) => void;
+}
+
 /**
- * The keys and the pointer on `rows` in `box`, which takes the keyboard (`ListRows`): ↑ ↓ (j k,
- * Ctrl+J/K/N/P) move over the rows that can be taken, round from either end; Home and End go to
- * the first and the last; Page Up and Down by as many rows as show whole, held at the ends; Enter
- * takes one, once per press. The pointer moving onto a row puts the keyboard on it. `pane` is
- * what scrolls, if anything: the row reached is kept in view, the well's padding clear of its edge.
+ * The keys and the pointer on the rows `rowsOf` gives, in `box`, which takes the keyboard
+ * (`ListRows`): ↑ ↓ (j k, Ctrl+J/K/N/P) move over the rows that can be taken, round from either end;
+ * Home and End go to the first and the last; Page Up and Down by as many rows as show whole, held at
+ * the ends; Enter takes one, once per press. The pointer moving onto a row puts the keyboard on it.
+ * `pane` is what scrolls, if anything: the row reached is kept in view, the well's padding clear of
+ * its edge. The keyboard stays on its row, not its place, as the rows change.
  */
-function listRows(box: HTMLElement, pane: HTMLElement | null, rows: readonly HTMLElement[], options: ListOptions): void {
+export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () => readonly HTMLElement[], options: ListOptions): Rows {
   box.tabIndex = 0;
   box.setAttribute("role", "listbox");
-  let current = options.current ?? -1;
+  let at: HTMLElement | null = rowsOf()[options.current ?? -1] ?? null;
   let pointer = false;
-  const highlight = options.slides ? slider(box, rows) : null;
+  const highlight = options.slides ? slider(box, rowsOf()) : null;
+  const index = () => (at ? rowsOf().indexOf(at) : -1);
 
   /** Shows the current row lit while the list has the keyboard or the pointer. */
   function show(): void {
     const shown = pointer || box.matches(":focus") || options.current !== undefined;
-    rows.forEach((each, index) => each.toggleAttribute("data-current", shown && index === current));
-    highlight?.(shown ? current : -1);
+    for (const each of rowsOf()) each.toggleAttribute("data-current", shown && each === at);
+    highlight?.(shown ? index() : -1);
   }
 
-  function move(index: number): void {
-    current = index;
+  function move(to: number): void {
+    const item = rowsOf()[to];
+    if (!item) return;
+    at = item;
     show();
-    const item = rows[index];
-    if (!item || !pane) return;
+    if (!pane) return;
     const inset = length("space-s12") * scaleOf(box);
-    const top = item.offsetTop - inset;
-    const bottom = item.offsetTop + item.offsetHeight + inset;
+    const top = offsetIn(item, pane) - inset;
+    const bottom = offsetIn(item, pane) + item.offsetHeight + inset;
     if (top < pane.scrollTop) pane.scrollTop = top;
     else if (bottom > pane.scrollTop + pane.clientHeight) pane.scrollTop = bottom - pane.clientHeight;
   }
 
   function step(by: 1 | -1): void {
+    const rows = rowsOf();
     for (let i = 1; i <= rows.length; i++) {
-      const index = (((current + by * i) % rows.length) + rows.length) % rows.length;
-      if (takes(rows[index])) return move(index);
+      const to = (((index() + by * i) % rows.length) + rows.length) % rows.length;
+      if (takes(rows[to])) return move(to);
     }
   }
 
-  /** To row `index` held to the ends, or the nearest after it that can be taken, else before. */
-  function jump(index: number): void {
-    const at = Math.max(0, Math.min(rows.length - 1, index));
-    for (let i = at; i < rows.length; i++) if (takes(rows[i])) return move(i);
-    for (let i = at - 1; i >= 0; i--) if (takes(rows[i])) return move(i);
+  /** To row `to` held to the ends, or the nearest after it that can be taken, else before. */
+  function jump(to: number): void {
+    const rows = rowsOf();
+    const from = Math.max(0, Math.min(rows.length - 1, to));
+    for (let i = from; i < rows.length; i++) if (takes(rows[i])) return move(i);
+    for (let i = from - 1; i >= 0; i--) if (takes(rows[i])) return move(i);
   }
 
   /** As many rows as show whole in the room the rows scroll in, at least one. */
   function page(): number {
-    const item = rows[Math.max(0, current)];
+    const rows = rowsOf();
+    const item = rows[Math.max(0, index())];
     if (!item || !pane) return rows.length;
     const gap = length("space-s4") * scaleOf(box);
     const room = pane.clientHeight - 2 * length("space-s12") * scaleOf(box);
@@ -306,23 +324,27 @@ function listRows(box: HTMLElement, pane: HTMLElement | null, rows: readonly HTM
   }
 
   function take(): void {
-    const item = rows[current];
-    if (!takes(item)) return;
+    if (!takes(at ?? undefined) || !at) return;
+    const item = at;
     item.dataset.keyed = "";
     setTimeout(() => delete item.dataset.keyed, 100);
     item.click();
-    options.onTake?.(current);
   }
 
-  rows.forEach((item, index) => {
-    if (!takes(item)) return;
-    item.addEventListener("pointermove", () => {
-      pointer = true;
-      if (current !== index) move(index);
-    });
-    item.addEventListener("click", (event) => {
-      if (event.isTrusted) options.onTake?.(index);
-    });
+  /** The row of the list under `event`, if it can be taken. */
+  function rowAt(event: Event): HTMLElement | null {
+    const item = (event.target as Element).closest<HTMLElement>(".k-list-row");
+    return item && takes(item) && rowsOf().includes(item) ? item : null;
+  }
+
+  box.addEventListener("pointermove", (event) => {
+    pointer = true;
+    const item = rowAt(event);
+    if (item && item !== at) move(rowsOf().indexOf(item));
+  });
+  box.addEventListener("click", (event) => {
+    const item = rowAt(event);
+    if (item) options.onTake?.(rowsOf().indexOf(item));
   });
   box.addEventListener("pointerleave", () => {
     pointer = false;
@@ -336,23 +358,28 @@ function listRows(box: HTMLElement, pane: HTMLElement | null, rows: readonly HTM
     if (event.key === "ArrowDown" || (plain && key === "j") || (ctrl && (key === "j" || key === "n"))) step(1);
     else if (event.key === "ArrowUp" || (plain && key === "k") || (ctrl && (key === "k" || key === "p"))) step(-1);
     else if (!options.fieldKeys && event.key === "Home") jump(0);
-    else if (!options.fieldKeys && event.key === "End") jump(rows.length - 1);
-    else if (event.key === "PageDown") jump(current + page());
-    else if (event.key === "PageUp") jump(Math.max(0, current) - page());
+    else if (!options.fieldKeys && event.key === "End") jump(rowsOf().length - 1);
+    else if (event.key === "PageDown") jump(index() + page());
+    else if (event.key === "PageUp") jump(Math.max(0, index()) - page());
     else if (event.key === "Enter") {
       if (!event.repeat) take();
     } else return;
     event.preventDefault();
   });
   box.addEventListener("focus", () => {
-    if (!takes(rows[current])) {
-      const picked = rows.findIndex((each) => each.hasAttribute("data-picked"));
+    if (!takes(at ?? undefined) || !rowsOf().includes(at!)) {
+      const picked = rowsOf().findIndex((each) => each.hasAttribute("data-picked"));
       jump(picked >= 0 ? picked : 0);
-    } else move(current);
+    } else move(index());
   });
   box.addEventListener("blur", show);
   if (options.focused) box.dataset.pinned = "lit";
-  requestAnimationFrame(() => (current >= 0 ? move(current) : show()));
+  requestAnimationFrame(() => (at ? move(index()) : show()));
+  const swap = (old: HTMLElement, fresh: HTMLElement) => {
+    if (at === old) at = fresh;
+    show();
+  };
+  return { current: () => at, pointed: () => pointer, refresh: show, swap };
 }
 
 /**
@@ -382,6 +409,16 @@ function slider(box: HTMLElement, rows: readonly HTMLElement[]): (index: number)
   };
 }
 
+/**
+ * `item`'s top in `pane`'s content, in the page's pixels: a live row's room is transformed, which
+ * makes it the row's offset parent, so the offsets are added up to the pane.
+ */
+function offsetIn(item: HTMLElement, pane: HTMLElement): number {
+  let top = 0;
+  for (let at: HTMLElement | null = item; at && at !== pane; at = at.offsetParent as HTMLElement | null) top += at.offsetTop;
+  return top;
+}
+
 /** The page's scale at `element`: its CSS pixels, which are device pixels, per logical pixel. */
 export function scaleOf(element: Element): number {
   return Number.parseFloat(getComputedStyle(element).getPropertyValue("--scale")) || settings().scale;
@@ -391,7 +428,7 @@ export function scaleOf(element: Element): number {
 export function list(specs: readonly ListRowSpec[], options: ListOptions = {}): HTMLElement {
   const rows = specs.map((spec, index) => listRow(spec, index === options.current, index === options.current ? options.pinned : undefined));
   const box = well("List", rowStack(rows));
-  listRows(box, null, rows, options);
+  listRows(box, null, () => rows, options);
   return box;
 }
 
@@ -412,7 +449,7 @@ export interface ScrollingOptions extends ListOptions {
 export function scrollingList(specs: readonly ListRowSpec[], options: ScrollingOptions): HTMLElement {
   const rows = specs.map((spec, index) => listRow(spec, index === options.current, index === options.current ? options.pinned : undefined));
   const { pane, thumb, box } = scrolled("ScrollingList", rowStack(rows), options);
-  listRows(box, pane, rows, options);
+  listRows(box, pane, () => rows, options);
   if (options.down !== undefined) {
     const down = options.down;
     requestAnimationFrame(() => {
