@@ -38,8 +38,8 @@
   initial-value: 0;
 }
 
-/* A list's well (`lib/list.ts`): a surface at the surface radius, `surface_container_low` at
-   `opacity.well`, `space.s12` inside, its hairline in the soft outline and its focus tube drawn
+/* A list's well (`lib/list.ts`): a content box at the content radius, `surface_container_low` at
+   `opacity.well`, `space.s8` inside, its hairline in the soft outline and its focus tube drawn
    over what it holds, so a row at its edge never covers them. The tube lights while the list has
    the keyboard. */
 .k-list {
@@ -48,8 +48,8 @@
   flex: none;
   align-self: stretch;
   box-sizing: border-box;
-  padding: var(--space-s12);
-  border-radius: var(--radius-surface);
+  padding: var(--space-s8);
+  border-radius: var(--radius-content);
   background: rgb(from var(--color-surface_container_low) r g b / var(--opacity-well));
   outline: none;
 }
@@ -73,7 +73,7 @@
 }
 
 /* A well its rows scroll in, `--height` tall: they run right up to its edge and are cut by its own
-   rounded shape, the `space.s12` above the first and below the last its scroll padding. There is
+   rounded shape, the `space.s8` above the first and below the last its scroll padding. There is
    no bar of the browser's; the thumb is the well's own. */
 .k-list[data-scrolls] {
   height: var(--height);
@@ -95,12 +95,12 @@
 .k-list-pane > .k-live-rows {
   box-sizing: border-box;
   width: 100%;
-  padding: var(--space-s12);
+  padding: var(--space-s8);
 }
 
 /* The thumb: `size.scrollbar` wide, a pill in the outline variant (the outline under the pointer
    and while dragged), floating `space.s4` in from the well's end across its padding, so it never
-   covers a row. It runs along the rows' room, `space.s12` clear of the well's top and bottom, where
+   covers a row. It runs along the rows' room, `space.s8` clear of the well's top and bottom, where
    the well's corners would cut it. It shows only while the rows are taller than the well. */
 .k-list-thumb {
   position: absolute;
@@ -124,8 +124,9 @@
   background: var(--color-outline);
 }
 
-/* A row (`lib/list.ts`): `size.row` tall with one line, `size.row_two_line` with two, `space.s12`
-   inside, its corners concentric in the well's (`radius.surface` − `space.s12`). Lit (the keyboard
+/* A row (`lib/list.ts`): `size.row` tall with one line, `size.row_two_line` with two, `space.s16`
+   inside, so its words start `space.s24` from the well's edge, at the row radius, concentric in the
+   well's (`radius.content` − `space.s8`). Lit (the keyboard
    on it, which the pointer moves) it fades onto `secondary_container` over `short`, its content to
    `on_secondary_container` and its subtitle and facts to that at `opacity.subdued_text`, its
    keycaps' keys and edges to `primary`; pressed, the container lifts to
@@ -142,8 +143,8 @@
   align-self: stretch;
   box-sizing: border-box;
   height: var(--size-row);
-  padding: 0 var(--space-s12);
-  border-radius: calc(var(--radius-surface) - var(--space-s12));
+  padding: 0 var(--space-s16);
+  border-radius: var(--radius-row);
   cursor: pointer;
   --lit: 0;
   --press: 0;
@@ -265,7 +266,7 @@
   z-index: 0;
   display: none;
   height: var(--height);
-  border-radius: calc(var(--radius-surface) - var(--space-s12));
+  border-radius: var(--radius-row);
   background: var(--color-secondary_container);
   transition: top var(--motion-short) var(--easing-standard);
 }
@@ -289,11 +290,11 @@
   transition: none;
 }
 
-/* An empty well's line, centred on whole device pixels, `space.s12` above and below inside the
-   well's own padding. */
+/* An empty well's line, centred on whole device pixels, `space.s16` above and below inside the
+   well's own padding, so it sits `space.s24` from the well's edges as a row's words do. */
 .k-list-empty {
   display: flex;
-  padding: var(--space-s12) 0;
+  padding: var(--space-s16) 0;
 }
 
 .k-list-empty-words {
@@ -309,7 +310,7 @@
 .k-list-pane > .k-live-rows {
   display: flex;
   flex-direction: column;
-  padding-bottom: var(--space-s8);
+  padding-bottom: var(--space-s4);
 }
 
 .k-live-row {
@@ -388,14 +389,14 @@
   justify-content: flex-end;
 }
 
-/* A row: `size.row_compact` tall at the control radius, no fill, its words `on_surface` and its
+/* A row: `size.row_compact` tall at the row radius, no fill, its words `on_surface` and its
    numbers `on_surface_variant`. Lit, its tube; pressed by day the tone tints it, as under a Text
    button. Picked, `secondary_container`, its words `on_secondary_container` and its numbers that at
    `opacity.subdued_text`; pressed, the container lifts. */
 .k-table-row {
   position: relative;
   height: var(--size-row_compact);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-row);
   cursor: pointer;
   --ink: var(--color-on_surface);
   --muted: var(--color-on_surface_variant);
@@ -510,8 +511,8 @@
   transition: none;
 }
 
-/* A shell panel as the samples show a scroll in: `surface` at the surface radius, the container's
-   `space.s16` inside, its own edge cutting whatever passes it. */
+/* A shell panel as the samples show a scroll in: `surface` at the content radius, `space.s16`
+   inside, its own edge cutting whatever passes it. */
 .k-scroll-panel {
   position: relative;
   display: flex;
@@ -521,7 +522,7 @@
   box-sizing: border-box;
   width: var(--size-panel);
   padding: var(--space-s16);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-content);
   background: var(--color-surface);
   outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
   outline-offset: calc(-1 * var(--stroke-hairline_device_px));

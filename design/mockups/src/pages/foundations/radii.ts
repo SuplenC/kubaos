@@ -1,11 +1,11 @@
-// The Radii foundation: the four radius roles and full, each shown as it is used, and the
-// nesting that derives every other corner, worked (`docs/DESIGN.md`, "Radii by role").
+// The Radii foundation: the five radius roles and full, each shown as it is used, the padding
+// each box takes, and the nesting that derives a row's corner from its box's, worked (`docs/DESIGN.md`, "Radii by role").
 
 import { button } from "../../lib/button.ts";
 import { buttonBar } from "../../lib/button-bar.ts";
 import { raise } from "../../lib/elevation.ts";
 import { row, stack } from "../../lib/layout.ts";
-import { type Corner, concentric, nested, role } from "../../lib/radius.ts";
+import { type Corner, concentric, role } from "../../lib/radius.ts";
 import { text } from "../../lib/text.ts";
 import { length } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
@@ -13,15 +13,16 @@ import { doesntApply, foundation } from "../../site/page.ts";
 import { atScale, table, token } from "../../site/parts/swatches.ts";
 import { SCALES } from "../../site/settings.ts";
 
-const ROLES = ["small", "control", "dialog", "surface", "full"] as const;
+const ROLES = ["small", "row", "control", "content", "surface", "full"] as const;
 type Role = (typeof ROLES)[number];
 
 /** What each role is for. */
 const FOR: Record<Role, string> = {
-  small: "Marks inside controls: the checkbox, a hint, focus details, inline tags.",
-  control: "Everything you click or type in: buttons, fields, list rows, menu items, chips; and a popover or an open select, raised over the control that opened it.",
-  dialog: "A dialog: the largest raised surface, a step softer than the controls and the popover it holds and stands over, and well under a card's or a panel's 24, so a box that big over the screen reads as a question.",
-  surface: "Everything that holds content: cards, popups, toasts, panels, list wells, the screen frame.",
+  small: "Marks inside controls: the checkbox, a keycap, a skeleton's line, a field's selection.",
+  row: "A row inside a small or a content box, the box's corner less its padding: a menu's or a select's items, a list well's rows, a table's rows; and a hint.",
+  control: "Everything you click or type in: buttons, fields, chips, a calendar's months and title; and the small floating things, raised over what opened them: a popover, a menu, a select's open list, a toast.",
+  content: "A content box inside a window or a panel: a card, a list well, a scroll panel, a dialog. A step under a surface, so a box inside reads as a part of what holds it.",
+  surface: "The shell's big surfaces alone: a panel, a window, the screen frame.",
   full: "Pills and circles: switches, icon buttons, radios, progress bars, sliders, avatars, badges. Half the shorter side.",
 };
 
@@ -32,17 +33,19 @@ function shape(corner: Corner, kind: string): HTMLElement {
   return box;
 }
 
-/** Each role as it is used: a checkbox's box, a button, a dialog, a card, a switch's track. */
+/** Each role as it is used: a checkbox's box, a row, a button, a dialog, a panel, a switch's track. */
 function inUse(name: Role): HTMLElement {
   switch (name) {
     case "small":
       return shape(role("small"), "f-shape-check");
+    case "row":
+      return wellRow("Wi-Fi", true);
     case "control":
       return button({ label: "Continue", kind: "Filled", size: "Md" });
-    case "dialog":
-      return raise(el("div", "f-card-box f-dialog-box", stack("s4", "start", text("A dialog", "heading", "on_surface"), text("Its corner says it asks", "body", "on_surface_variant"))), 3);
+    case "content":
+      return raise(el("div", "f-card-box f-dialog-box", stack("s4", "start", text("A dialog", "heading", "on_surface"), text("A box inside the window", "body", "on_surface_variant"))), 3);
     case "surface":
-      return el("div", "f-card-box", stack("s4", "start", text("A card", "subheading", "on_surface"), text("Its corner says it holds content", "body", "on_surface_variant")));
+      return el("div", "f-card-box f-surface-box", stack("s4", "start", text("A panel", "subheading", "on_surface"), text("The shell's own surface", "body", "on_surface_variant")));
     case "full":
       return shape(role("full"), "f-shape-switch");
   }
@@ -83,18 +86,39 @@ function nesting(outer: Corner, inset: string, what: string): HTMLElement {
   return el("div", "f-swatch-cell f-nest-cell", box, token(sum), ...(what ? [prose(what, "body", inner ? "on_surface" : "error")] : []));
 }
 
-/** The worked examples: a well's rows, a card in a surface, a window in the frame, a pill in a pill, one refused. */
+/** The worked examples: a well's rows, a menu's items, a window in the frame, a pill in a pill, one refused. */
 function worked(): HTMLElement {
-  const sixteen = nested(role("surface"), "s8");
   return el(
     "div",
     "f-row",
-    nesting(role("surface"), "s12", "A list well's rows: 24 less 12 is 12, the control radius, so a row is both concentric and a control."),
-    nesting(role("surface"), "s8", "A card filling a surface 8 in."),
-    nesting(sixteen, "s4", "4 in from that 16."),
+    nesting(role("content"), "s8", "A list well's rows: 16 less 8 is 8, the row radius."),
+    nesting(role("control"), "s4", "A menu's or a select's items: 12 less 4 is 8, the row radius too."),
     nesting(role("surface"), "s8", "A window 8 inside the screen frame: its outer edge is 16, Hyprland's rounding 14 plus its 2 border."),
     nesting(role("full"), "s4", "A pill in a pill is a pill."),
-    nesting(role("control"), "s12", "An inset that reaches the radius: `nested` refuses it, and in a `const` the build stops."),
+    nesting(role("content"), "s16", "A picture filling a card less its 16: nothing is left to round, so `nested` refuses it, and the picture takes the row radius, 8."),
+  );
+}
+
+/** A list well's row, at the row radius, lit when `lit`. */
+function wellRow(name: string, lit: boolean): HTMLElement {
+  const rowBox = el("div", "f-well-row", text(name, "body_strong", lit ? "on_secondary_container" : "on_surface"));
+  rowBox.style.setProperty("--corner", role("row").css);
+  rowBox.toggleAttribute("data-selected", lit);
+  return rowBox;
+}
+
+/** The padding each box takes, by what it holds. */
+function paddings(): HTMLElement {
+  const steps: readonly [string, string, string][] = [
+    ["space.s4", "4", "Around rows in a floating box: a menu, a select's open list."],
+    ["space.s8", "8", "Around rows in a content box: a list well."],
+    ["space.s12", "12", "Around words in a small floating thing: a popover holding words, a toast. A hint, the smallest, is 8 by 4."],
+    ["space.s16", "16", "Around content in a content box: a card, a scroll panel."],
+    ["space.s24", "24", "Around a dialog's content, the dialog alone."],
+  ];
+  return table(
+    ["Padding", "px", "For"],
+    steps.map(([name, px, what]) => [token(name), label(px, "mono", "on_surface"), prose(what)]),
   );
 }
 
@@ -130,22 +154,13 @@ export default foundation({
   level: "foundations",
   slug: "radii",
   title: "Radii",
-  summary: "Four corner radii by what a shape is, and full for pills; every other corner is derived by nesting, never picked.",
-  live: () =>
-    el(
-      "div",
-      "f-well",
-      ...["Wi-Fi", "Bluetooth", "Sound"].map((name, i) => {
-        const rowBox = el("div", "f-well-row", text(name, "body_strong", i === 0 ? "on_secondary_container" : "on_surface"));
-        rowBox.style.setProperty("--corner", nested(role("surface"), "s12").css);
-        rowBox.toggleAttribute("data-selected", i === 0);
-        return rowBox;
-      }),
-    ),
+  summary: "Five corner radii by what a shape is, and full for pills: one ladder of boxes, and rows that follow the box they sit in.",
+  live: () => el("div", "f-well", ...["Wi-Fi", "Bluetooth", "Sound"].map((name, i) => wellRow(name, i === 0))),
   description: [
-    "Every radius says what the shape is: small for marks inside controls, control for everything you click or type in, dialog for a dialog, surface for everything that holds content, and full for pills and circles. A component takes the one its role names, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.",
-    "Any other radius comes out of nesting: a shape that fills another less an inset takes the outer radius less the inset, so both corners share a centre. 8 and 20 are never chosen, nor 16 anywhere but a dialog; they appear only where nesting makes them. A control placed in content (a button in a card) isn't filling it, so it keeps its own role.",
-    "The live list is a well, a surface, with its rows 12 in: they take 24 less 12, the control radius, so a row is concentric with the well and a control at once.",
+    "Every radius says what the shape is, on one ladder of boxes: small for marks inside controls; row for the rows of a box; control for everything you click or type in and the small floating things (a popover, a menu, a toast); content for a box inside a window (a card, a list well, a scroll panel, a dialog); surface for the shell's big surfaces alone (a panel, a window, the screen frame); and full for pills and circles. A component takes the one its role names, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.",
+    "A row follows the box it sits in: its corner is the box's corner less the box's padding, so both corners share a centre. A menu is 12 with 4 inside and a list well 16 with 8 inside, so both rows are 8, the row radius. A control placed in content (a button in a card) isn't filling it, so it keeps its own role.",
+    "A box's padding goes with what it holds: 4 around rows in a floating box, 8 around rows in a content box, 12 around words in a small floating thing, 16 around content in a content box, and 24 in a dialog.",
+    "The live list is a well, a content box at 16, with its rows 8 in: they take 16 less 8, the row radius.",
   ],
   tokens: [
     {
@@ -156,8 +171,13 @@ export default foundation({
   ],
   rules: [
     {
-      name: "Nesting is derived",
-      described: "Each shape fills the one round it less a spacing step; its corner is the outer's less the step, and the dot is the centre both corners share. An inset that reaches the radius leaves nothing to round, and the nesting is refused.",
+      name: "Padding goes with the box",
+      described: "Each box's padding, by what it holds. A row's corner is the box's less this padding.",
+      sample: paddings,
+    },
+    {
+      name: "A row follows its box",
+      described: "Each shape fills the box round it less the box's padding; its corner is the box's less the padding, and the dot is the centre both corners share. A well's rows and a menu's items both come to 8, the row radius. An inset that reaches the radius leaves nothing to round, and the nesting is refused.",
       sample: worked,
     },
     {
@@ -181,8 +201,8 @@ export default foundation({
     },
     {
       name: "The same nesting at every scale",
-      described: "A well's rows 12 in, drawn at each scale: the corners stay concentric, on whole device pixels.",
-      sample: () => el("div", "f-scroll", el("div", "f-row", ...SCALES.map((scale) => atScale(scale, nesting(role("surface"), "s12", ""))))),
+      described: "A well's rows 8 in, drawn at each scale: the corners stay concentric, on whole device pixels.",
+      sample: () => el("div", "f-scroll", el("div", "f-row", ...SCALES.map((scale) => atScale(scale, nesting(role("content"), "s8", ""))))),
     },
   ],
   content: doesntApply("a corner doesn't change with the words inside: a pill stays a pill however long its label."),

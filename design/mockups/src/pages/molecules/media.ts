@@ -8,7 +8,7 @@ import { card } from "../../lib/card.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { row, stack, within } from "../../lib/layout.ts";
 import { type Arrival, type MediaOptions, media, settle } from "../../lib/media.ts";
-import { nested, role } from "../../lib/radius.ts";
+import { role } from "../../lib/radius.ts";
 import { raw } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
@@ -75,7 +75,7 @@ export default page({
   description: [
     "Rust `media::media(look, picture, aspect, corner)`, QML `Media`. Every picture KubaOS shows is one: a wallpaper's thumbnail, a picture in a card. Press Load again and the placeholder breathes until the picture covers it.",
     "Its box is as wide as its room and as tall as an `[aspect]` token makes it (a wallpaper's, 16:10), rounded down to the 4 px grid, so it lands on device pixels at every scale and boxes side by side whose widths differ by a device pixel come out one height, their feet in line. The picture covers the box, cut to fill it at its middle and clipped at its corner.",
-    "Its corner is its place's, never its own: `radius.control` (12) in a picker, where a picture is something you press; nested in what holds it where it fills it less a padding (a card's 24 less `space.s16`, 8).",
+    "Its corner is its place's, never its own: `radius.control` (12) in a picker, where a picture is something you press; the row radius (`radius.row`, 8) where it fills a card less its `space.s16`, since the card's 16 less 16 would leave no corner.",
     "Until the picture has loaded the box holds a block `Skeleton` of its own shape, breathing, so the box is the same before and after the load and nothing around it moves. A picture that can't be read leaves the placeholder where it is, held still: the box keeps its room and says no more. Dimmed, inside a disabled `PictureChoice`, the picture is at `opacity.disabled_content` and the placeholder is the disabled container, `on_surface` at `opacity.disabled_container`, still.",
     "A caption, where its place gives it one, sits `space.s8` under the box in `small`, `on_surface_variant`, breaking between words in the box's width.",
   ],
@@ -85,8 +85,8 @@ export default page({
     { name: "In a picker", for: "Something you press: the control's corner, 12.", sample: () => picture() },
     {
       name: "In a card",
-      for: "Filling a card less its padding: the corner nested in the card's, 8.",
-      sample: () => within(HALF, card({ header: { title: "Wallpaper" }, body: [media({ source: photo, corner: nested(role("surface"), "s16") })] })),
+      for: "Filling a card less its padding: the row radius, 8. The card's 16 less its 16 would leave no corner.",
+      sample: () => within(HALF, card({ header: { title: "Wallpaper" }, body: [media({ source: photo, corner: role("row") })] })),
     },
   ],
   sizes: [
@@ -131,7 +131,7 @@ export default page({
   measures: {
     samples: nonEmpty([
       { name: "With a caption", for: "The box, its corner, and the caption under it.", sample: () => picture({ caption: shown(CAPTION) }) },
-      { name: "In a card", for: "The nested corner, `space.s16` in.", sample: () => within(HALF, card({ header: { title: "Wallpaper" }, body: [media({ source: photo, corner: nested(role("surface"), "s16") })] })) },
+      { name: "In a card", for: "The row radius, `space.s16` in.", sample: () => within(HALF, card({ header: { title: "Wallpaper" }, body: [media({ source: photo, corner: role("row") })] })) },
     ]),
     measures: [
       { what: "Its width to its height.", token: "aspect-wallpaper" },

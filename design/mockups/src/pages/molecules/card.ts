@@ -9,7 +9,7 @@ import { shown, type Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { row, stack, within } from "../../lib/layout.ts";
 import { media } from "../../lib/media.ts";
-import { nested, role } from "../../lib/radius.ts";
+import { role } from "../../lib/radius.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
@@ -44,11 +44,11 @@ function log(state: Shown = "rest", onPress: () => void = () => undefined): HTML
   return card({ header: { glyph: "terminal", title: "Install log", subtitle: "312 lines · 2 warnings" }, onPress, ...stateOptions(state) });
 }
 
-/** A card holding a picture, `space.s16` in, its corner nested in the card's. */
+/** A card holding a picture, `space.s16` in, at the row radius. */
 function pictured(): HTMLElement {
   return card({
     header: { title: "Wallpaper", subtitle: "Shinjuku, night · 3840 × 2400" },
-    body: [media({ source: photo, corner: nested(role("surface"), "s16") })],
+    body: [media({ source: photo, corner: role("row") })],
   });
 }
 
@@ -80,7 +80,7 @@ function cell(options: CardOptions, state: Shown): HTMLElement {
 }
 
 const DESCRIBED =
-  "A surface raised one step on the ladder (`[elevation]`, `docs/DESIGN.md`, \"Elevation\"): `surface_container_high` by day, `surface_container_highest` at night, step 1's contact and ambient shadow, and the rim inside its edge (`elevation.rim`, `light_rim` by day). Its corners are the surface radius, `radius.surface` (24): a card holds content, as a panel and a well do, and isn't a control you click, so it takes neither the control's 12 nor the dialog's 16. `space.s16` inside, as wide as its room; as tall as what it holds, or, in a grid, as its row, so cards side by side end together.";
+  "A surface raised one step on the ladder (`[elevation]`, `docs/DESIGN.md`, \"Elevation\"): `surface_container_high` by day, `surface_container_highest` at night, step 1's contact and ambient shadow, and the rim inside its edge (`elevation.rim`, `light_rim` by day). Its corners are the content radius, `radius.content` (16): a card is a box of content inside a window or a panel, as a list well and a dialog are, a step under the window's or the panel's own 24. `space.s16` inside, as wide as its room; as tall as what it holds, or, in a grid, as its row, so cards side by side end together.";
 
 export default page({
   level: "molecules",
@@ -93,12 +93,12 @@ export default page({
     DESCRIBED,
     "What it holds runs top to bottom, `space.s16` apart: a header, then the body, then a button bar at its foot (`ButtonBar`), each as wide as the card's padding leaves. The header is its title in `subheading` (`on_surface`), breaking between words, after a symbol at the title's icon size (`subheading`'s 24) `space.s8` before it; and a line under it in `small`, `on_surface_variant`, `space.s4` below, from the card's padding. The button bar is the surface's: the card's action Tonal, since a page's one Filled action is the page's, not a card's.",
     "A plain card takes no input and has no states: its controls are each a stop of their own. A pressable card is one press target as a whole (a log, a device to open): it lights as any control does, its tube (`primary` at `focus.tube`) inside its edge at its own corner with the glow outside at night; pressed, its tube runs white-hot and the glow brightens, and by day the tone tints it (`opacity.press_tint`). It holds no controls of its own, since a press anywhere on it is its press. Disabled, it keeps its resting surface and what it holds dims to `opacity.disabled_content`, with no line, no glow and no stop for Tab.",
-    "Nesting: a card or a well is never inside another; the container's padding is the only padding round it (`docs/DESIGN.md`, \"The container\"). A control in a card keeps its own role's corner (a button's 12). A shape that fills the card less its padding takes the nested corner: a picture `space.s16` in takes `radius.surface` less `space.s16`, 8.",
+    "Nesting: a card or a well is never inside another; the container's padding is the only padding round it (`docs/DESIGN.md`, \"The container\"). A control in a card keeps its own role's corner (a button's 12). A picture filling the card less its `space.s16` takes the row radius, `radius.row` (8): the card's 16 less its 16 would leave no corner.",
   ],
   variants: [
     { name: "A header and a body", for: "Facts that belong together: the disk, what installing on it does.", sample: () => within(COLUMN, card(DISK)) },
     { name: "With a button bar", for: "Something to do about what it holds, at its foot.", sample: () => within(COLUMN, card(withActions())) },
-    { name: "Holding a picture", for: "A picture `space.s16` in, at the nested corner.", sample: () => within(HALF, pictured()) },
+    { name: "Holding a picture", for: "A picture `space.s16` in, at the row radius.", sample: () => within(HALF, pictured()) },
     { name: "Pressable", for: "One press target as a whole: a log, a device to open.", sample: () => within(COLUMN, log()) },
   ],
   sizes: doesntApply("a card has one padding and one corner, and is as wide as the room it is given: a column, a cell of a grid, a panel's body."),
@@ -121,7 +121,7 @@ export default page({
   focus: {
     tubes: [{ name: "Pressable card", tone: "accent", filled: false, content: false }],
     looks: {
-      lit: "At night at rest the sign burns: the tube inside the card's edge at `radius.surface`, the glow outside it, every ring concentric with the corner. What it holds doesn't light.",
+      lit: "At night at rest the sign burns: the tube inside the card's edge at `radius.content`, the glow outside it, every ring concentric with the corner. What it holds doesn't light.",
       signsOff: "Still lit with the neon unpowered, by day always and at night while a power change has the lights out: the tube is `primary_glass`, with no glow.",
     },
     signsOff: (index: number) => cell(ROWS[index]!.options, "signs-off"),
@@ -160,11 +160,11 @@ export default page({
   measures: {
     samples: nonEmpty([
       { name: "With a button bar", for: "Its padding, the header's symbol, title and line, the gaps between its parts, and the bar.", sample: () => within(COLUMN, card(withActions())) },
-      { name: "Holding a picture", for: "The picture's nested corner, `space.s16` in.", sample: () => within(HALF, pictured()) },
+      { name: "Holding a picture", for: "The picture's corner, the row radius, `space.s16` in.", sample: () => within(HALF, pictured()) },
     ]),
     measures: [
       { what: "Inside its edge, and between its header, body and button bar.", token: "space-s16" },
-      { what: "Its corners.", token: "radius-surface" },
+      { what: "Its corners.", token: "radius-content" },
       { what: "The header's symbol, `subheading`'s.", token: "type-subheading-icon" },
       { what: "The title's line.", token: "type-subheading-line" },
       { what: "Between the symbol and the title.", token: "space-s8" },

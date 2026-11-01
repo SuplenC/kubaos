@@ -70,7 +70,7 @@ function cell(spec: MenuItemSpec, state: MatrixState): HTMLElement {
 }
 
 const DESCRIBED =
-  "The popover is `space.s4` inside round a menu. An item is `size.control_sm` (32) tall, `space.s8` inside, so its words start `space.s12` from the popover's edge, its corners concentric inside the popover's (`radius.control` − `space.s4`, 8): an optional symbol, 16 (`icon.s16`), its words in `body` on one line, ending in an ellipsis where they don't fit, the keys that do the same as keycaps `space.s4` apart at the item's end, and a 16 check whose room is kept when unchecked so every item's end lines up; `space.s8` between each. Its content is `on_surface`, or `error` on an item that destroys something (Quit, Delete). A hairline `space.s4` clear of each side separates groups, inset `space.s8` so it lines up with the words. A select's open list is built the same: one build for every raised list.";
+  "The popover is `space.s4` inside round a menu. An item is `size.control_sm` (32) tall, `space.s8` inside, so its words start `space.s12` from the popover's edge, at the row radius (`radius.row`, 8), concentric inside the popover's (`radius.control` − `space.s4`): an optional symbol, 16 (`icon.s16`), its words in `body` on one line, ending in an ellipsis where they don't fit, the keys that do the same as keycaps `space.s4` apart at the item's end, and a 16 check whose room is kept when unchecked so every item's end lines up; `space.s8` between each. Its content is `on_surface`, or `error` on an item that destroys something (Quit, Delete). A hairline `space.s4` clear of each side separates groups, inset `space.s8` so it lines up with the words. A select's open list is built the same: one build for every raised list.";
 
 export default page({
   level: "molecules",
@@ -168,7 +168,8 @@ export default page({
       { what: "An item's words, `body`'s line.", token: "type-body-line" },
       { what: "A keycap.", token: "size-keycap" },
       { what: "The hairline between groups: one device pixel.", token: "stroke-hairline_device_px" },
-      { what: "The popover's corners, which an item's nest in.", token: "radius-control" },
+      { what: "The popover's corners.", token: "radius-control" },
+      { what: "An item's corners: the popover's less its padding.", token: "radius-row" },
       { what: "A menu's width, a popover's.", token: "size-menu" },
     ],
     reflow: {

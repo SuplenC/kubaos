@@ -164,7 +164,7 @@ const LEAVES: Move = {
 };
 
 const DESCRIBED =
-  "`size.dialog` (500) wide, `space.s24` inside on every side, under its buttons too, at the dialog radius (`radius.dialog`, 16), raised to the ladder's step 3, a dialog's: `surface_container_high` by day and `surface_container_highest` at night, the step's contact and ambient layers of `shadow`, and the rim, a hairline of `on_surface` inside its edge at `elevation.rim`. A 24 symbol (`heading`'s) in `primary` and the title in `heading`, `on_surface`, `space.s12` apart; the body in `body`, `on_surface_variant`, `space.s12` under the title and in line with it, beside the symbol; what it asks for `space.s16` under the body, in line with it too; and its button bar `space.s24` under the last, across its whole width. Its words wrap in its width.";
+  "`size.dialog` (500) wide, `space.s24` inside on every side, under its buttons too, at the content radius (`radius.content`, 16), raised to the ladder's step 3, a dialog's: `surface_container_high` by day and `surface_container_highest` at night, the step's contact and ambient layers of `shadow`, and the rim, a hairline of `on_surface` inside its edge at `elevation.rim`. A 24 symbol (`heading`'s) in `primary` and the title in `heading`, `on_surface`, `space.s12` apart; the body in `body`, `on_surface_variant`, `space.s12` under the title and in line with it, beside the symbol; what it asks for `space.s16` under the body, in line with it too; and its button bar `space.s24` under the last, across its whole width. Its words wrap in its width.";
 
 const HEIGHTS =
   "It is never shorter than `aspect.dialog`, 5:2, of its width: 200, on the grid. A dialog that asks little, one line and its buttons, would be a strip; it stands as a card instead, its words at the top and its buttons at its foot, `space.s24` from the bottom as always, with the room it gains between them. A dialog with no buttons (a progress) keeps it too, its words at the top. Taller than that, it is as tall as what it holds. It is never taller than its room (the screen, or the window it opens over) less `space.s48` above and below, so the dimmed screen always shows round it. Past that only the middle scrolls, the body and what it lists or asks for, with no bar of its own: the symbol and title stay at the top and the buttons at the foot. While more is below, a hairline in the soft outline, a divider's, crosses the dialog's padding above the buttons, the middle scrolling under it; while more is above, the same one under the title. Each fades over `short` on `standard` as you reach its end.";
@@ -263,7 +263,7 @@ export default page({
       { what: "The symbol, `heading`'s.", token: "type-heading-icon" },
       { what: "The title's line.", token: "type-heading-line" },
       { what: "A button's height.", token: "size-control_md" },
-      { what: "Its corners.", token: "radius-dialog" },
+      { what: "Its corners.", token: "radius-content" },
       { what: "The rim inside its edge: one device pixel.", token: "stroke-hairline_device_px" },
       { what: "Its shadow's ambient layer: its drop.", token: "elevation-3-ambient-y" },
       { what: "Its shadow's ambient layer: its blur.", token: "elevation-3-ambient-blur" },

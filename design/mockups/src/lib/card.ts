@@ -1,6 +1,6 @@
 // A card: `kubaos-ui`'s `card::card` and `card::choice_card`, `KubaOS.Components`' `Card` and
 // `ChoiceCard` (`docs/design/components/card.md`). A surface inside the page, raised one step on the
-// ladder (`lib/elevation.ts`), at the surface radius, `space.s16` inside: what it holds is a header,
+// ladder (`lib/elevation.ts`), at the content radius, `space.s16` inside: what it holds is a header,
 // a body and a button bar at its foot, `space.s16` apart.
 //
 // A plain card is a surface and takes no input. A pressable one is a control in the state model
@@ -59,7 +59,7 @@ export interface CardOptions {
   readonly pinned?: Pinned;
 }
 
-/** A card's surface: raised one step, at the surface radius, `space.s16` inside. */
+/** A card's surface: raised one step, at the content radius, `space.s16` inside. */
 function surface(className: string): HTMLElement {
   const element = raise(document.createElement("span"), 1);
   element.className = `${element.className} k-card ${className}`.trim();
@@ -87,7 +87,7 @@ export function card(options: CardOptions): HTMLElement {
     element.setAttribute("role", "button");
     if (!disabled) element.tabIndex = 0;
     pin(element, options.pinned);
-    focusRing(element, "surface", "accent", false).dataset.pressable = "";
+    focusRing(element, "content", "accent", false).dataset.pressable = "";
     element.addEventListener("click", () => {
       if (!disabled) press();
     });
@@ -161,7 +161,7 @@ export function choiceCard(options: ChoiceCardOptions): HTMLElement {
     ...(options.subtitle === undefined ? {} : { subtitle: options.subtitle }),
   });
   element.append(held([header]));
-  focusRing(element, "surface", "cold", false).dataset.pressable = "";
+  focusRing(element, "content", "cold", false).dataset.pressable = "";
   setPicked(element, options.picked ?? false);
   return probe(element, { role: "component", name: "ChoiceCard", variant: "", fixed: { width: false, height: false, holds: true } });
 }

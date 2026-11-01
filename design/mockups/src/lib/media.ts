@@ -20,7 +20,7 @@ export interface MediaOptions {
   readonly source?: string;
   /** Where the picture is, whatever its address does: a sample held loading or broken. */
   readonly arrival?: Arrival;
-  /** The corner its place gives it: the control radius in a picker, nested in a card. */
+  /** The corner its place gives it: the control radius in a picker, the row radius in a card. */
   readonly corner: Corner;
   /** The `[aspect]` token its box keeps. */
   readonly aspect?: "wallpaper";

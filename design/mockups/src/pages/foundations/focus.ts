@@ -62,7 +62,7 @@ function buttonControl(kind: Kind, size: Size = "Md"): Control {
 /** A shape's measures and fill, each a token's custom property. */
 interface ShapeSpec {
   readonly shape: string;
-  readonly corner: "small" | "control" | "surface" | "full";
+  readonly corner: "small" | "row" | "control" | "content" | "surface" | "full";
   readonly width?: string;
   readonly height?: string;
   readonly padBlock?: string;
@@ -123,7 +123,7 @@ const CHIP: ShapeSpec = {
 
 const CARD: ShapeSpec = {
   shape: "card",
-  corner: "surface",
+  corner: "content",
   width: "var(--size-menu)",
   padBlock: "var(--space-s16)",
   padInline: "var(--space-s16)",

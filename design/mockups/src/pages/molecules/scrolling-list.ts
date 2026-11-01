@@ -11,10 +11,10 @@ import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { WELL_ROOM } from "./list.ts";
 
 /** Five two-line rows and their gaps, inside the well's padding: the control center's Wi-Fi tab. */
-const FIVE = "calc(5 * var(--size-row_two_line) + 4 * var(--space-s4) + 2 * var(--space-s12))";
+const FIVE = "calc(5 * var(--size-row_two_line) + 4 * var(--space-s4) + 2 * var(--space-s8))";
 
 /** Three, for a well in a short room. */
-const THREE = "calc(3 * var(--size-row_two_line) + 2 * var(--space-s4) + 2 * var(--space-s12))";
+const THREE = "calc(3 * var(--size-row_two_line) + 2 * var(--space-s4) + 2 * var(--space-s8))";
 
 const NAMES = ["Hoshi 5G", "Kissa", "Station Free Wi-Fi", "Pierogarnia", "DIRECT-7Q-Printer", "Neko Guest", "Library", "Tram 12", "Kawa i Herbata", "Orange_Swiatlowod_4F2A", "Mieszkanie 3", "eduroam"];
 const BARS = ["wifi", "network_wifi_3_bar", "network_wifi_3_bar", "network_wifi_2_bar", "network_wifi_2_bar", "network_wifi_2_bar", "network_wifi_1_bar", "network_wifi_1_bar", "network_wifi_1_bar", "network_wifi_1_bar", "network_wifi_1_bar", "network_wifi_1_bar"];
@@ -51,10 +51,10 @@ function cell(down: number, state: MatrixState | "signs-off"): HTMLElement {
 }
 
 const DESCRIBED =
-  "A List whose rows are taller than its room: the well is as tall as its place makes it, and the rows scroll inside it, right up to its edge, cut by its own rounded shape (`radius.surface`), not by a rectangle inside its padding, as a select's options are cut by the select's own surface. The `space.s12` above the first row and below the last is the scroll's padding: at rest they sit where a List puts them, and scrolled, a row passes the well's edge and its corners round it off. The well's hairline and its focus tube are drawn over the rows, so a row scrolled to the edge never covers them.";
+  "A List whose rows are taller than its room: the well is as tall as its place makes it, and the rows scroll inside it, right up to its edge, cut by its own rounded shape (`radius.content`), not by a rectangle inside its padding, as a select's options are cut by the select's own surface. The `space.s8` above the first row and below the last is the scroll's padding: at rest they sit where a List puts them, and scrolled, a row passes the well's edge and its corners round it off. The well's hairline and its focus tube are drawn over the rows, so a row scrolled to the edge never covers them.";
 
 const THUMB =
-  "The thumb is `size.scrollbar` (4) wide, a pill in `outline_variant`, `outline` under the pointer and while it is dragged, floating `space.s4` in from the well's end across its padding, so it never covers a row. It runs along the rows' room, `space.s12` clear of the well's top and bottom, where the corners would cut it, its length the share of the rows the well shows. It shows only while the rows are taller than the well; dragging it scrolls them.";
+  "The thumb is `size.scrollbar` (4) wide, a pill in `outline_variant`, `outline` under the pointer and while it is dragged, floating `space.s4` in from the well's end across its padding, so it never covers a row. It runs along the rows' room, `space.s8` clear of the well's top and bottom, where the corners would cut it, its length the share of the rows the well shows. It shows only while the rows are taller than the well; dragging it scrolls them.";
 
 export default page({
   level: "molecules",
@@ -142,8 +142,8 @@ export default page({
       { name: "Scrolled", for: "The thumb's rail clear of the corners, rows cut by the edge.", sample: () => scrolling({ down: 0.5 }) },
     ]),
     measures: [
-      { what: "The well's corners, which cut the rows.", token: "radius-surface" },
-      { what: "The scroll's padding above the first row and below the last; the thumb's rail clear of the top and bottom.", token: "space-s12" },
+      { what: "The well's corners, which cut the rows.", token: "radius-content" },
+      { what: "The scroll's padding above the first row and below the last; the thumb's rail clear of the top and bottom.", token: "space-s8" },
       { what: "Between rows; the thumb in from the well's end.", token: "space-s4" },
       { what: "The thumb's width.", token: "size-scrollbar" },
       { what: "A row, and so a notch of the wheel with its gap.", token: "size-row_two_line" },

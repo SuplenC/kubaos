@@ -2,7 +2,7 @@
 // (`docs/design/components/toast.md`). One `body` line saying what just happened, in the inverse
 // colours (`on_surface` behind `surface`) so it reads over anything, an optional symbol
 // (`body`'s 20) `space.s12` before it and the keys that undo it as key hints `space.s16` after it,
-// `space.s16` by `space.s12` inside at the surface radius, which on one line is a pill.
+// `space.s12` inside at the control radius.
 //
 // Its room is the surface it confirms in: it shows at the room's bottom, centred on a whole device
 // pixel, `space.s24` above the edge. It arrives over `short`, rising `space.s32` into place a whole

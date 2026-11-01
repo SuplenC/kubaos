@@ -6,13 +6,13 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `card::card`; QML `Card`. Its mockup page is the source of truth: Molecules, Card, in `design/mockups/`.
 
-A surface inside the page holding a group that belongs together but isn't a list, raised one step on the ladder (`docs/DESIGN.md`, "Elevation"): `surface_container_high` by day, `surface_container_highest` at night, step 1's shadow and the rim inside its edge. Its corners are the surface radius (24): it holds content, as a panel and a well do. `space.s16` inside, as wide as its room; in a grid it takes its row's height, so cards side by side end together.
+A surface inside the page holding a group that belongs together but isn't a list, raised one step on the ladder (`docs/DESIGN.md`, "Elevation"): `surface_container_high` by day, `surface_container_highest` at night, step 1's shadow and the rim inside its edge. Its corners are the content radius (16, `radius.content`): a box of content inside a window or a panel, as a list well and a dialog are. `space.s16` inside, as wide as its room; in a grid it takes its row's height, so cards side by side end together.
 
-What it holds runs top to bottom `space.s16` apart: a header (a symbol at `subheading`'s 24, its title in `subheading` `space.s8` after it, a `small` line in `on_surface_variant` `space.s4` below), the body, and a `ButtonBar` at its foot, its action `Tonal`. A card or a well is never inside another; a control in a card keeps its own corner, and a shape filling the card less its padding takes the nested corner (a picture `space.s16` in, 8).
+What it holds runs top to bottom `space.s16` apart: a header (a symbol at `subheading`'s 24, its title in `subheading` `space.s8` after it, a `small` line in `on_surface_variant` `space.s4` below), the body, and a `ButtonBar` at its foot, its action `Tonal`. A card or a well is never inside another; a control in a card keeps its own corner, and a picture filling the card less its padding takes the row radius (8, `radius.row`), since the card's 16 less its 16 would leave no corner.
 
 **States:** a plain card takes no input and has none. A pressable card is one press target as a whole and holds no controls: rest, lit (the accent's tube inside its edge, the glow outside at night), pressed (the tube white-hot, the glow brighter, by day `opacity.press_tint` of the accent) and disabled (its resting surface kept, what it holds at `opacity.disabled_content`, no line, no stop for Tab).
 
-*Not built yet: both libraries draw a card on the well's surface (`surface_container_low` at `opacity.well`) with a soft hairline and no shadow, and neither has a pressable card.*
+*Not built yet: both libraries draw a card at the surface radius (24) on the well's surface (`surface_container_low` at `opacity.well`) with a soft hairline and no shadow, and neither has a pressable card.*
 
 ## `ChoiceCard`
 
