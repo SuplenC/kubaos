@@ -295,13 +295,15 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
         Some("Corner radii by role. A radius between them comes from `Look.nested`, never a number."),
         "radius",
         |out| {
-            out.line("        // Marks inside controls: the checkbox, a hint, focus details, inline tags.");
+            out.line("        // Marks inside controls: the checkbox, a keycap, focus details, inline tags.");
             out.line(format!("        readonly property int small: {}", r.small));
-            out.line("        // Everything clicked or typed in: buttons, fields, list rows, menu items, chips.");
+            out.line("        // A row inside a small or a content box, the box's corner less its padding.");
+            out.line(format!("        readonly property int row: {}", r.row));
+            out.line("        // Everything clicked or typed in, and the small floating things: popovers, menus, toasts.");
             out.line(format!("        readonly property int control: {}", r.control));
-            out.line("        // A dialog: the largest raised surface, softer than a control and well under a surface.");
-            out.line(format!("        readonly property int dialog: {}", r.dialog));
-            out.line("        // Everything that holds content: cards, popups, panels, list wells.");
+            out.line("        // A content box inside a window or a panel: a card, a list well, a scroll panel, a dialog.");
+            out.line(format!("        readonly property int content: {}", r.content));
+            out.line("        // The shell's big surfaces: panels, the window, the screen frame.");
             out.line(format!("        readonly property int surface: {}", r.surface));
             if r.full {
                 out.comment(

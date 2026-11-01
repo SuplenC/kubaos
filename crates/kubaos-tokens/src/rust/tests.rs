@@ -51,12 +51,17 @@ fn radii_are_roles_not_numbers() {
 
     for role in [
         "Radius::Small => Some(4),",
+        "Radius::Row => Some(8),",
         "Radius::Control => Some(12),",
+        "Radius::Content => Some(16),",
         "Radius::Surface => Some(24),",
     ] {
         assert!(module.contains(role), "{role}");
     }
-    assert!(!module.contains("Radius::R"));
+    let numbered = module
+        .match_indices("Radius::R")
+        .any(|(at, found)| module[at + found.len()..].starts_with(|c: char| c.is_ascii_digit()));
+    assert!(!numbered);
 }
 
 #[test]
