@@ -237,6 +237,9 @@ slider_anchor = 10
 slider_anchor_compact = 8
 # How near a drag holds on a sticky point before it pulls free.
 slider_hold = 12
+# The strip round a collapsible's rail that takes the pointer, centred on the drawn line: wide
+# enough to hit, narrow enough to stay off what it holds.
+collapsible_rail = 12
 # A scrollbar's thumb, a pill: thin, since the keyboard and the wheel do the scrolling and the
 # thumb only says where you are.
 scrollbar = 4
