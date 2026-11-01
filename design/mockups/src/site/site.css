@@ -1065,12 +1065,6 @@ body {
   top: calc(var(--space-s16) + var(--type-body_strong-line) + var(--space-s16));
 }
 
-.f-elev-menu-row {
-  display: flex;
-  align-items: center;
-  height: var(--size-row_compact);
-}
-
 .f-elev-sort {
   position: absolute;
   left: var(--space-s16);

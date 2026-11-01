@@ -37,7 +37,7 @@ function caps(): HTMLElement {
 }
 
 const DESCRIBED =
-  "The `keycap` type (Geist Mono 11, medium) in `on_surface_variant` on `surface_container_highest`, a hairline edge in `outline_variant` with a second hairline at the foot so the key stands on the page, at the small radius (`radius.small`). It never lights: no line, no glow.";
+  "The `keycap` type (Geist Mono 11, medium) in `on_surface_variant` on `surface_container_highest`, a hairline edge in `outline_variant` with a second hairline at the foot so the key stands on the page, at the small radius (`radius.small`). It never lights: no line, no glow. On a lit menu item its key and its edge take the item's light, in `primary` (the Menu page).";
 
 const DECIDED = [
   "Decided, lit: a keycap never lights. It is a picture of a key, not a control, so it has no line and no glow, by night or by day, and a power change only recolours it.",

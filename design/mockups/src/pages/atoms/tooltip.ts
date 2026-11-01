@@ -43,7 +43,7 @@ function shownOver(): HTMLElement {
 }
 
 const DESCRIBED =
-  "A popover `size.menu` wide: `surface_container` (`surface_container_high` at night), the surface radius (`radius.surface`), `space.s12` inside, raised to the ladder's top step, a tooltip's: step 4's contact and ambient shadow and the rim inside its edge (`[elevation]`). Its title is `body_strong` in `on_surface`, its body `small` in `on_surface_variant` `space.s4` under it, both breaking between words in the card's width, and what it holds `space.s8` below. It is never lit: no line, no glow.";
+  "A popover `size.menu` wide: `surface_container` (`surface_container_high` at night), the control radius (`radius.control`), `space.s12` inside, raised to the ladder's top step, a tooltip's: step 4's contact and ambient shadow and the rim inside its edge (`[elevation]`). Its title is `body_strong` in `on_surface`, its body `small` in `on_surface_variant` `space.s4` under it, both breaking between words in the card's width, and what it holds `space.s8` below. It is never lit: no line, no glow.";
 
 const DECIDED = [
   "Decided, its motion: a tooltip isn't a light, so it never flickers, even though it is a surface appearing: it fades in over `short` with its control lighting up and out over `short` as the control goes back to rest, as a `Hint` does, and as today.",
@@ -151,7 +151,7 @@ export default page({
     measures: [
       { what: "Its width, a menu's.", token: "size-menu" },
       { what: "Its padding.", token: "space-s12" },
-      { what: "Its corners.", token: "radius-surface" },
+      { what: "Its corners.", token: "radius-control" },
       { what: "The rim inside its edge: one device pixel.", token: "stroke-hairline_device_px" },
       { what: "The title's line.", token: "type-body_strong-line" },
       { what: "The body's line.", token: "type-small-line" },

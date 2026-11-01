@@ -4,8 +4,8 @@
 // `on_surface_variant` on the highest container, a hairline edge in `outline_variant` with a second
 // at its foot, the small radius, `space.s4` either side of the key and never narrower than tall.
 //
-// A keycap is a picture of a key, not a control: it has no states, never lights and takes no
-// focus.
+// A keycap is a picture of a key, not a control: it has no states of its own and takes no focus.
+// On a lit menu item its key and its edge take the item's light, in `primary`.
 
 import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
@@ -16,7 +16,9 @@ export function keycap(key: string): HTMLElement {
   const cap = document.createElement("span");
   cap.className = "k-keycap";
   cap.style.setProperty("--natural", String(advance("keycap", key)));
-  const label = row(0, "start", text(key, "keycap", "on_surface_variant"));
+  const words = text(key, "keycap");
+  words.style.color = "var(--key-ink)";
+  const label = row(0, "start", words);
   label.classList.add("k-keycap-label");
   cap.append(label);
   return probe(cap, { role: "component", name: "Keycap", variant: "", fixed: FIXED_HEIGHT });

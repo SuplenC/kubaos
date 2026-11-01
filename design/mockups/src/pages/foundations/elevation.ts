@@ -7,6 +7,7 @@ import { raise, type Step } from "../../lib/elevation.ts";
 import { focusRing, windowRing } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
 import { stack } from "../../lib/layout.ts";
+import { menu } from "../../lib/menu.ts";
 import { nested, role } from "../../lib/radius.ts";
 import { text } from "../../lib/text.ts";
 import { popover, tooltip } from "../../lib/tooltip.ts";
@@ -73,10 +74,9 @@ function card(): HTMLElement {
   return raised(el("div", "f-elev-card", text("Projects", "body_strong", "on_surface"), text("12 folders · 3.4 GB", "small", "on_surface_variant")), 1);
 }
 
-/** An open menu at step 2: the library's popover holding a few rows. */
-function menu(): HTMLElement {
-  const rows = ["Open", "Rename", "Move to trash"].map((words) => el("div", "f-elev-menu-row", text(words, "body", "on_surface")));
-  const open = popover(2, stack(0, "start", ...rows));
+/** An open menu at step 2: the library's popover holding a few items. */
+function openMenu(): HTMLElement {
+  const open = popover(2, menu([{ label: "Open" }, { label: "Rename" }, { label: "Move to trash" }], { current: -1 }));
   open.classList.add("f-elev-menu");
   return open;
 }
@@ -110,7 +110,7 @@ function scene(theme: string, mode: Mode): HTMLElement {
   tip.classList.add("f-elev-tip");
   const sort = button({ label: "Sort", kind: "Tonal", size: "Sm" });
   sort.classList.add("f-elev-sort");
-  const front = appWindow("front", "Files", true, card(), menu(), tip, sort);
+  const front = appWindow("front", "Files", true, card(), openMenu(), tip, sort);
   const back = appWindow("back", "Terminal", false, text("~/Projects/kubaos", "small", "on_surface_variant"));
   const bar = el("div", "f-elev-bar", text("14:05", "label", "on_surface"));
   const panel = el("div", "f-elev-panel", text("Recent", "subheading", "on_surface"), card());

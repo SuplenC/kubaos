@@ -6,7 +6,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `keycap::keycap(look, key)`; QML `Keycap`.
 
-A key drawn as a key: 20 tall (`keycap`), as a line of body text, so it sits inline with body and caption text without making the line taller. The `keycap` type (Geist Mono 11, medium) in `on_surface_variant` on `surface_container_highest`, a hairline edge in `outline_variant` with a second hairline at the bottom, so the key stands on the page, the small radius (4), 4 either side of the key and never narrower than tall, so a one-letter key is square; the key is centred across it on a whole device pixel. A keycap is a picture of a key, not a control: it has no states, never lights and takes no focus, and a power change only recolours it.
+A key drawn as a key: 20 tall (`keycap`), as a line of body text, so it sits inline with body and caption text without making the line taller. The `keycap` type (Geist Mono 11, medium) in `on_surface_variant` on `surface_container_highest`, a hairline edge in `outline_variant` with a second hairline at the bottom, so the key stands on the page, the small radius (4), 4 either side of the key and never narrower than tall, so a one-letter key is square; the key is centred across it on a whole device pixel. A keycap is a picture of a key, not a control: it has no states of its own, never lights and takes no focus, and a power change only recolours it. On a lit menu item its key and its edge take the item's light, in `primary` (`menu.md`).
 
 ## `KeyHints`
 

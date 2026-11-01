@@ -2,12 +2,14 @@
 // `menu::menu_separator`, `KubaOS.Components`' `Menu` and `MenuItem` (`docs/design/components/
 // menu.md`), on a `Popover` (`lib/tooltip.ts`) raised to the ladder's step 2.
 //
-// An item is `size.control_sm` tall, `space.s12` inside, its corners concentric inside the
-// popover's: an optional `body` symbol, its words in `body` on one line, the keys that do the same
-// as keycaps, and a check whose room is kept when unchecked. A hairline `space.s4` clear of each
-// side separates groups. The item the keyboard is on is lit, on `secondary_container`; the pointer
-// moving onto an item puts the keyboard on it, so one item is lit at a time. One that destroys
-// something is in `error`; one that can't be taken is dimmed and is passed over.
+// It is built as every raised list is, a select's open list too: the popover `space.s4` inside, an
+// item `size.control_sm` tall with its corners concentric inside the popover's and `space.s8` inside,
+// so its words start `space.s12` from the popover's edge. An item holds an optional symbol, 16, its
+// words in `body` on one line, the keys that do the same as keycaps at its end, and a check whose
+// room is kept when unchecked. A hairline, inset to the words and `space.s4` clear of each side,
+// separates groups. The item the keyboard is on is lit, on `secondary_container`, its keycaps in
+// `primary`; the pointer moving onto an item puts the keyboard on it, so one item is lit at a time.
+// One that destroys something is in `error`; one that can't be taken is dimmed and is passed over.
 
 import { icon } from "./icon.ts";
 import { keycap, keys } from "./keycap.ts";
@@ -43,29 +45,33 @@ export function menuItem(spec: MenuItemSpec, current = false, pinned?: ItemPinne
   item.toggleAttribute("data-current", current && !spec.disabled);
   if (pinned && !spec.disabled) item.dataset.pinned = pinned;
   if (spec.disabled) item.setAttribute("aria-disabled", "true");
-  item.style.setProperty("--corner", nested(role("surface"), "s12").css);
+  item.style.setProperty("--corner", nested(role("control"), "s4").css);
   const ink = "var(--ink)";
   const words = clamped(spec.label, "body");
   words.style.color = ink;
   const parts: Element[] = [];
-  if (spec.icon) parts.push(icon(spec.icon, "var(--type-body-icon)", ink));
+  if (spec.icon) parts.push(icon(spec.icon, "var(--icon-s16)", ink));
   const room = document.createElement("span");
   room.className = "k-menu-words";
   room.append(words);
   parts.push(filling(room));
-  if (spec.keys) parts.push(row("s4", "centre", ...keys(spec.keys).map(keycap)));
+  if (spec.keys) {
+    const caps = row("s4", "centre", ...keys(spec.keys).map(keycap));
+    caps.classList.add("k-menu-keys");
+    parts.push(caps);
+  }
   if (spec.checked !== undefined) {
     const check = document.createElement("span");
     check.className = "k-menu-check";
-    if (spec.checked) check.append(icon("check", "var(--type-body-icon)", ink));
+    if (spec.checked) check.append(icon("check", "var(--icon-s16)", ink));
     parts.push(check);
   }
-  item.append(filling(row("s12", "centre", ...parts)));
+  item.append(filling(row("s8", "centre", ...parts)));
   const words_ = variant(spec.icon && "icon", spec.checked !== undefined && "check", spec.danger && "danger");
   return probe(item, { role: "component", name: "MenuItem", variant: words_, fixed: FIXED_HEIGHT });
 }
 
-/** The hairline between two groups, `space.s4` clear of each. */
+/** The hairline between two groups, `space.s4` clear of each and inset to the items' words. */
 export function menuSeparator(): HTMLElement {
   const rule = stack(0, "start", divider());
   rule.classList.add("k-menu-separator");
