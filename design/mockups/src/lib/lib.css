@@ -1926,9 +1926,10 @@
 }
 
 /* A menu's item, a select's option too: `size.control_sm` tall, `space.s8` inside, at the row
-   radius, concentric inside its surface's (`radius.control` − `space.s4`). Lit (the keyboard on it, which the pointer moves),
-   it fades onto `secondary_container` with its words, symbol and check `on_secondary_container`, and
-   its keycaps' keys and edges `primary`, over `short`; pressed, the container lifts to
+   radius, concentric inside its surface's (`radius.control` − `space.s4`). Lit (the keyboard on
+   it, which the pointer moves), it fades onto `secondary_container` with its words, symbol and
+   check `on_secondary_container`, and its keycaps' keys and edges `primary`, over `short`;
+   pressed, the container lifts to
    `secondary_container_pressed` over `micro`. At rest its content is `on_surface`, or `error` on a
    danger item, whose keycaps keep their own colours; disabled, `on_surface` at
    `opacity.disabled_content`. */

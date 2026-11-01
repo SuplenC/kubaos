@@ -3,11 +3,11 @@
 //
 // Between two arrows (Text icon buttons, sm) the title, `subheading` at the control radius, opens
 // the year: the twelve months three to a row. Under them the weekdays' names (`label`, weekends in
-// `tertiary`) and six weeks: a week number (`caption`) in a column a small control wide, then seven days, each a
-// regular control (`size.control_md`) with a small one's disc (`size.control_sm`), a pill. Today is
-// filled with `primary`; the picked day is ringed with it in the thin stroke; a holiday has a
-// `tertiary` dot under its number and its name in a hint; the days of the months around are dimmed
-// to `opacity.disabled_content`. The first weekday is the owner's.
+// `tertiary`) and six weeks: a week number (`caption`) in a column a small control wide, then seven
+// days, each a regular control (`size.control_md`) with a small one's disc (`size.control_sm`), a
+// pill. Today is filled with `primary`; the picked day is ringed with it in the thin stroke; a
+// holiday has a `tertiary` dot under its number and its name in a hint; the days of the months
+// around are dimmed to `opacity.disabled_content`. The first weekday is the owner's.
 //
 // A day is a control in the state model (`.k-control` in `lib.css`): lit, its tube burns inside its
 // disc's edge, today's core inside its fill. The month grid is one stop for Tab: the arrows move a
