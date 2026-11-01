@@ -11,7 +11,7 @@
 // softer accent (`secondary`, its content `on_secondary`) over `short`, the icon is the toggled
 // one and the value reads as a name; the fill stays where the value is (a muted volume's level,
 // the sensor's on Auto). Moving the value (a drag, a key, the wheel) leaves Toggled from where it
-// is. On a slider with stops the icon steps through them instead.
+// is. On a slider with stops the icon steps through them instead, its name the stop it goes to.
 //
 // Steps show as dots on both sides of the fill, each in its side's colour; the mark the value rests
 // on, a stop or a sticky point it holds at, turns solid and pops in. No dot is drawn under the icon
@@ -21,7 +21,7 @@
 // keyboard on it, its fill brightening by `opacity.press` toward the palette's bright end, the tube
 // inside its edge with the glow outside; held (pressed or dragged), the fill brightens by
 // `opacity.held`. Its icon's button lights as an icon button does on the fill, and while it is lit
-// the slider isn't. It owns its value here, as the app does in both libraries: the pointer, the
+// the slider isn't; Space presses it, as a click does. It owns its value here, as the app does in both libraries: the pointer, the
 // keys and the horizontal wheel move it, and it draws itself again.
 
 import { settings } from "../site/settings.ts";
@@ -167,7 +167,7 @@ export function slider(options: SliderOptions): HTMLElement {
 
   /**
    * The icon's button: the circle at the fill's start, no stop for Tab of its own. It lights as an
-   * icon button does on the fill, with its hint naming what a press does.
+   * icon button does on the fill, with its hint, from the slider's start, naming what a press does.
    */
   function iconButton(): HTMLButtonElement {
     const made = document.createElement("button");
@@ -186,12 +186,21 @@ export function slider(options: SliderOptions): HTMLElement {
   function drawToggle(): void {
     root.style.setProperty("--toggled", toggled ? "1" : "0");
     glyph.replaceChildren(icon(toggled && toggle ? toggle.icon : options.icon, "var(--type-label-icon)", "var(--on-fill)"));
+    if (toggle && button) button.setAttribute("aria-pressed", String(toggled));
+    nameIcon();
+  }
+
+  /**
+   * Names the icon's button, as its accessible name and in its hint, for what a press does: the
+   * toggle's label, or on a slider with stops the stop the press goes to.
+   */
+  function nameIcon(): void {
     if (!button) return;
-    const said = !toggle ? "Step" : toggled ? toggle.toggledLabel : toggle.label;
+    const said = !toggle ? stopName(nextStop()) : toggled ? toggle.toggledLabel : toggle.label;
+    if (button.getAttribute("aria-label") === said) return;
     button.setAttribute("aria-label", said);
-    if (toggle) button.setAttribute("aria-pressed", String(toggled));
     button.querySelector(":scope > .k-hint")?.remove();
-    withHint(button, said);
+    withHint(button, said, { held: "start" });
   }
 
   function setToggled(on: boolean): void {
@@ -202,6 +211,22 @@ export function slider(options: SliderOptions): HTMLElement {
     toggle.changed?.(on);
   }
 
+  /** The stop the icon's next press goes to: one on in the direction, or back at either end. */
+  function nextStop(): number {
+    const ahead = index + direction;
+    return ahead < 0 || ahead > last ? index - direction : ahead;
+  }
+
+  /** Stop `at`'s name, or with none, its value as the label reads one. */
+  function stopName(at: number): string {
+    return options.names?.[at] ?? reading(at / last);
+  }
+
+  /** A value, 0 to 1, as the label reads a number: the owner's reading, or the locale's percentage. */
+  function reading(at: number): string {
+    return options.number ? options.number(at) : PERCENT.format(at);
+  }
+
   function numeric(): boolean {
     return !toggled && !(stepping && options.names !== undefined && options.names.length > 0);
   }
@@ -209,8 +234,7 @@ export function slider(options: SliderOptions): HTMLElement {
   function label(): string {
     if (toggled && toggle) return toggle.words;
     if (stepping && options.names && options.names.length > 0) return options.names[Math.max(0, Math.min(last, Math.round(shown * last)))] ?? "";
-    const at = stepping ? index / last : value;
-    return options.number ? options.number(at) : PERCENT.format(at);
+    return reading(stepping ? index / last : value);
   }
 
   /**
@@ -329,6 +353,7 @@ export function slider(options: SliderOptions): HTMLElement {
 
   function stepTo(to: number): void {
     index = Math.max(0, Math.min(last, to));
+    nameIcon();
     settle();
   }
 
@@ -367,10 +392,27 @@ export function slider(options: SliderOptions): HTMLElement {
       dragging = false;
       delete root.dataset.dragging;
       if (stepping) index = Math.round(shown * last);
+      nameIcon();
       settle();
     };
     root.addEventListener("pointerup", release);
     root.addEventListener("pointercancel", release);
+    // Space presses the icon's button as it would a focused button: pressed while the key is down,
+    // acting as it comes up, never on key repeat; the focus leaving lets it go without a press.
+    // With no button, Space is left to the page.
+    root.addEventListener("keydown", (event) => {
+      if (event.key !== " " || !button) return;
+      event.preventDefault();
+      if (!event.repeat) button.dataset.keyed = "";
+    });
+    root.addEventListener("keyup", (event) => {
+      if (event.key !== " " || !button?.hasAttribute("data-keyed")) return;
+      delete button.dataset.keyed;
+      pressIcon();
+    });
+    root.addEventListener("blur", () => {
+      if (button) delete button.dataset.keyed;
+    });
     root.addEventListener("keydown", (event) => {
       const back = event.key === "ArrowLeft" || event.key === "h";
       const forward = event.key === "ArrowRight" || event.key === "l";
