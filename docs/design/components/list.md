@@ -48,6 +48,6 @@ A list a scan updates while it shows, which never jumps (`DESIGN.md`, "Motion"):
 
 ## `EmptyList`
 
-Rust `list::empty_list`; QML `EmptyList`.
+Rust `list::empty_list`; QML `EmptyList`. Its mockup page is the source of truth: Molecules, EmptyList, in `design/mockups/`.
 
 The well with nothing in it: one centred line.

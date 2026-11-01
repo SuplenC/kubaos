@@ -251,7 +251,7 @@
 }
 
 /* A loading row's lines: their share of the words' room, on whole device pixels. */
-.k-list-bone-line {
+.k-skeleton.k-list-bone-line {
   width: round(down, calc(100% * var(--share)), 1px);
 }
 
@@ -351,4 +351,10 @@
 /* A sample of the list following a room that opens above the held row: the scroll, as a move. */
 .k-live-rows[data-held] {
   transform: translateY(calc(-1 * var(--scrolled) * (var(--size-row_two_line) + var(--space-s4))));
+}
+
+/* A loading row's tile: an md tile's square, as the row that takes its place will have. */
+.k-row > .k-skeleton.k-list-bone-tile {
+  flex: none;
+  width: var(--size-control_md);
 }
