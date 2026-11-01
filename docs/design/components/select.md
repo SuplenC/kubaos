@@ -2,10 +2,28 @@
 
 Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#components) has the rules every component keeps, its variant words and the fixed measures the geometry check holds it to.
 
+The mockup's Select page (`design/mockups/src/pages/molecules/select.ts`) is the source of truth; this page sums it up.
+
 ## `Select`
 
 Rust `select::select`; QML `Select`.
 
-One of a list too long for radio rows or tabs: a field's look (40, the control radius, a hairline, `surface_container_high`), the picked option in `body_large`, an optional 20 symbol before it and a chevron at its end. Enter, Space or a click opens its menu on a popover 4 under it, as wide as it, the picked option checked and the keyboard on it; open, its hairline takes the accent and its chevron turns up. ↑ ↓ and Enter pick, Esc or a click elsewhere closes it, and so does whatever closes or hides what holds the select (its panel closed by any route, its page swapped out): in QML the owner calls `dismiss()` as its panel goes, and a select hidden closes its menu itself. In iced the app opens the menu and draws it. The clock's holidays.
+One of a list too long for radio rows or tabs. A row of tabs that would run past its room is a Select instead. The clock's holidays.
 
-**States:** resting, hovered, pressed, focused, open (its menu showing, the picked option checked) and disabled (no action, `enabled: false`).
+**Shut**, it has a field's look: 40 (`control_md`) tall at the control radius, filling its room, `surface_container_high` with a hairline of `outline_variant` inside its edge, 12 inside. The pick is `body_large` in `on_surface` on one line, ending in an ellipsis where it doesn't fit; an optional 20 symbol (`icon`) leads it and a chevron ends it, both `on_surface_variant`, 8 from the words. With nothing picked it shows its placeholder in `on_surface_variant`.
+
+**Open**, the select's own box grows into its list: one surface, no gap and no second popover.
+
+- The box rises to the ladder's step 2, a menu's (`DESIGN.md`, "Elevation"): the step's shadow and rim, `surface_container_high` by day and `surface_container_highest` at night. Its hairline goes, its tube goes out and the chevron turns up.
+- The value row stays where it was, at the top, and the list is under it. A rule in a divider's soft outline (`outline_variant` at `opacity.outline_soft`), 12 in from the sides, separates them.
+- The options are menu items (`menu.md`): 32 (`control_sm`) tall, 4 inside the surface, their words `body`, lined up with the value row's start, 12 in, and their corners the control radius less 4. There is no check.
+- The highlighted row is a lit menu item, `secondary_container` with `on_secondary_container`, fading over `short`. The pointer moving onto a row and the keyboard move one highlight.
+- The picked option's words are `primary_lit`, a picked tab's, with the label glow round them at night while the signs are on. Highlighted, the pick takes the highlight's colours.
+- Past eight options the list scrolls, with no bar of its own. The surface is the value row and the list's visible part, never the whole list; the value row never scrolls. It opens scrolled so the pick has three rows above it where the list allows, and the highlight keeps itself in view, 4 clear of the list's edge.
+- Too near the bottom of the room that clips it, or of the window, for its list, it grows upward: the value row stays put and the list opens above it, the rule between them.
+
+**Motion.** It opens over `medium` on `emphasized_decel`: the surface grows from the shut box to its open height, clipped to it, while its shadow, rim and fill come up and the chevron turns. It folds back over `short` on `emphasized_accel`. A pick shows the value at once and the row pressed over `micro`, then the surface folds. With reduced motion it opens and shuts at once, the chevron with it.
+
+**Keys.** Shut: Enter, Space, ↓ or ↑ opens it with the highlight on the pick. Open: ↑ ↓ move the highlight, stopping at either end; Home and End go to the first and the last; a letter jumps to the next option starting with it; Enter or Space picks; Esc closes without picking; Tab closes and moves on. A press outside closes it. The keyboard stays on the select throughout: the list is no stop of its own. Whatever closes or hides what holds the select (its panel closed by any route, its page swapped out) closes it too: in QML the owner calls `dismiss()` as its panel goes, and a select hidden closes itself. In iced the app opens the select and draws its list.
+
+**States:** rest, lit (hovered or with the keyboard on it: the fill rises to `surface_container_highest` and the tube burns over the hairline, with the glow at night), pressed (the glow at `focus.pressed_glow`), open, and disabled (grey as a disabled field, no action, `enabled: false`).

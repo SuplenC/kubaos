@@ -53,11 +53,12 @@ export interface Variant {
   readonly sample: Sample;
 }
 
-/** Every state the mockup skill names. */
+/** Every state the mockup skill names, and open, which only a part that opens has. */
 export const STATES = [
   "rest",
   "lit",
   "pressed",
+  "open",
   "disabled",
   "selected",
   "loading",
@@ -65,11 +66,14 @@ export const STATES = [
   "error",
 ] as const;
 export type State = (typeof STATES)[number];
+/** The states only some parts have: a page without one leaves it out with no word on why. */
+type Optional = "open";
 
 export const STATE_NAMES: Record<State, string> = {
   rest: "Rest",
   lit: "Lit",
   pressed: "Pressed",
+  open: "Open",
   disabled: "Disabled",
   selected: "Selected",
   loading: "Loading",
@@ -84,7 +88,7 @@ export const STATE_NAMES: Record<State, string> = {
  */
 export interface States<S extends State> {
   readonly shown: readonly S[];
-  readonly absent: Record<Exclude<State, S>, string>;
+  readonly absent: Record<Exclude<State, S | Optional>, string>;
   readonly rows: NonEmpty<{ readonly name: string; readonly cell: (state: S) => Element }>;
   /** What each state looks like and does, in words, by night and by day. */
   readonly described: Record<S, string>;
