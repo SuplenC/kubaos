@@ -93,7 +93,7 @@ function iconCell(options: Options, state: Shown): HTMLElement {
   const each = (size: SliderSize) => {
     const made = slider(options(size, { ...(disabled ? { disabled } : {}), ...(pinned ? { pinnedIcon: pinned } : {}) }));
     const words = made.querySelector(".k-slider-icon-button")?.getAttribute("aria-label") ?? "";
-    return hintRoom(made, words, ROOM);
+    return hintRoom(made, words, ROOM, "start");
   };
   return within(ROOM, stack(0, "start", each("Regular"), each("Compact")));
 }
@@ -165,7 +165,7 @@ const DESCRIBED =
   "A pill as wide as its room, `size.slider` (28) tall, or `size.slider_compact` (24) for a dense panel. The track is `surface_container_highest` at `opacity.track`. The fill is the value: from the start to its round end, whose circle's centre is the value, on a whole device pixel, so at 0 it is the circle behind the icon and at 1 it reaches the far end. It is `primary`, its content `on_primary`; toggled, the softer `secondary`, its content `on_secondary`. The icon, `label`'s (16), is centred in the circle at the fill's start, always on the fill. The value sits `space.s12` in from the far end: a percentage in `label_number`, through the locale's formatting, or a name in `label`, in `on_surface` over the track and the fill's content colour over the fill, split where the fill ends. A number's box is as wide as its widest (100%, or 150% for a boosted volume), so it ends in one place.";
 
 const TOGGLED =
-  "A continuous slider may have a toggle, which makes its icon a button and gives it a second state, Toggled: volume's icon mutes it, brightness's switches Auto on, where a light sensor and a service driving the backlight from it exist. Toggled, the fill fades to the softer accent over `short` on `standard`, the icon is the toggled one (`volume_off`, the Auto symbol) and the value reads as a name (Muted, Auto · 55%). The fill stays at a level: muted, the one unmuting comes back to; on Auto, the sensor's, as it changes. Pressing the icon again goes back. Moving the value, by a drag, a key or the wheel, leaves Toggled from where the value is: a drag on a muted volume unmutes it and the value follows the pointer, and on Auto it goes manual at the dragged value. The owner is told each time it turns. A slider with stops has no toggle: its icon steps.";
+  "A continuous slider may have a toggle, which makes its icon a button and gives it a second state, Toggled: volume's icon mutes it, brightness's switches Auto on, where a light sensor and a service driving the backlight from it exist. Toggled, the fill fades to the softer accent over `short` on `standard`, the icon is the toggled one (`volume_off`, the Auto symbol) and the value reads as a name (Muted, Auto · 55%). The fill stays at a level: muted, the one unmuting comes back to; on Auto, the sensor's, as it changes. Pressing the icon again goes back. Moving the value, by a drag, a key or the wheel, leaves Toggled from where the value is: a drag on a muted volume unmutes it and the value follows the pointer, and on Auto it goes manual at the dragged value. The owner is told each time it turns. A slider with stops has no toggle: its icon steps one stop from high to low and back, turning at either end.";
 
 const STEPS =
   "A slider with stops shows a dot, `size.slider_stop` (6), at each: in the fill's content colour at `opacity.subdued` where the fill has passed it, `on_surface_variant` ahead. The stop the value rests on is solid instead, `size.slider_anchor` (10, 8 compact) in the fill's content colour, popping in over `short` on `pop` once the fill has arrived; while a drag moves between stops there is none. No dot is drawn under the icon or the label, `space.s4` clear of each, nor astride the fill's end. A sticky point (a volume boost to 150% holding at 100%) holds a drag within `size.slider_hold` (12) of it and shows its anchor while the value rests there.";
@@ -177,13 +177,13 @@ export default page({
   summary: "A value from 0 to 1, or one of a few stops, as a pill whose fill is the value: drag it, step it, or press its icon.",
   live: specimen,
   description: [
-    "Rust `slider::slider`, QML `Slider`. Drag any of these, use ← and → on them, or tilt the wheel (or turn it with Shift) over them. The volume's icon mutes it and unmutes it back to where it was; the brightness's turns Auto off and on; the profiles' icon steps from high to low and back.",
+    "Rust `slider::slider`, QML `Slider`. Drag any of these, use ← and → on them, or tilt the wheel (or turn it with Shift) over them. The volume's icon mutes it and unmutes it back to where it was; the brightness's turns Auto off and on; the profiles' icon steps from high to low and back. With the keyboard on one, Space presses its icon.",
     DESCRIBED,
     TOGGLED,
     STEPS,
     "It takes effect as it moves, so it carries a live value. A drag follows the pointer, the pointer mapping to the fill's end circle's centre; on a slider with stops it moves freely and settles on the nearest stop when let go, over `short` on `standard_decel`. A value set from elsewhere eases there over `short` on `standard`. A compact slider shows its number only lit or held, fading over `micro`; a name always shows.",
     "Its states follow the neon (`docs/DESIGN.md`, \"States\"): rest, lit (under the pointer or with the keyboard on it, one state), held and disabled. Lit, the fill brightens by `opacity.press` toward the palette's bright end (`on_surface` at night, `surface` by day), and the tube burns inside its edge, `primary` at `focus.tube`, with the glow outside at night. Held, pressed or dragged, the fill brightens by `opacity.held`, and the glow by `focus.pressed_glow`.",
-    "The icon, where it is a button, shows nothing of it at rest: it is the icon on the fill. Under the pointer it lights as a Filled icon button in the fill's tone: its circle lifts by `opacity.press` toward the bright end, as the fill does, the tube burns inside the circle's edge with the glow outside at night (the tube with no glow by day), and its hint names what a press does: Mute or Unmute, Auto brightness or Manual brightness, Step. Pressed, the circle lifts by `opacity.held` and the glow by `focus.pressed_glow`. While the icon's button is lit the slider isn't. It is no stop for Tab: the keys move the value.",
+    "The icon, where it is a button, shows nothing of it at rest: it is the icon on the fill. Under the pointer it lights as a Filled icon button in the fill's tone: its circle lifts by `opacity.press` toward the bright end, as the fill does, the tube burns inside the circle's edge with the glow outside at night (the tube with no glow by day), and its hint names what a press does: Mute or Unmute, Auto brightness or Manual brightness, or on a slider with stops the stop the press goes to (Power Saver, from Balanced heading down; at the low end, where it turns, the stop above). A slider with stops and no names says the stop's value instead, as the label reads it (75%). The hint starts at the slider's start, so a long one never hangs past its edge. Pressed, the circle lifts by `opacity.held` and the glow by `focus.pressed_glow`. While the icon's button is lit the slider isn't. It is no stop for Tab: the keys move the value, and Space presses it, lit and pressed while the key is down, its hint showing, and acting as the key comes up.",
   ],
   variants: [
     { name: "Continuous", for: "Any value from 0 to 1: volume, brightness. Its value reads as a percentage.", sample: () => boxed(volume()) },
@@ -264,6 +264,10 @@ export default page({
       { keys: ["→", "l"], does: "A twentieth higher, or one stop higher, leaving Toggled the same way." },
       { keys: ["Home"], does: "To 0, or the first stop." },
       { keys: ["End"], does: "To 1, or the last stop. A boosted volume's end is 150%." },
+      {
+        keys: ["Space"],
+        does: "Presses the icon, where it is a button: it toggles (mutes and unmutes, Auto on and off), or on a slider with stops steps one stop as a press does. While the key is down the icon's button shows pressed and its hint shows, and the slider isn't lit; it acts as the key comes up, never on key repeat. On a slider whose icon is no button it does nothing, and the page has it.",
+      },
       { keys: ["Tab", "Shift+Tab"], does: "To the slider, or on to the next or previous control. The icon's button is no stop of its own: the keys move the value." },
     ],
     order: "One stop in the surface's reading order; a disabled one is skipped. The horizontal wheel over it steps as the arrows do, a notch at a time, right raising it: a tilted wheel, or a turn of the wheel with Shift held. The vertical wheel scrolls the page past it, and doesn't move it.",
