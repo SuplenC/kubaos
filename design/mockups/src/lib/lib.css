@@ -849,6 +849,109 @@
   --caption-colour: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
 }
 
+/* A picture to pick (`lib/picture-choice.ts`): the tile, its picture edge to edge at the control
+   radius, and its name `space.s8` under it, in `small`, `on_surface_variant`, `on_surface` while
+   picked. Picked, the accent's line burns inside its edge with the glow outside at night, fading
+   in and out over `short`; lit, the cold tube takes its place. */
+.k-picture-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  align-self: stretch;
+  --name-colour: color-mix(in srgb, var(--color-on_surface_variant), var(--color-on_surface) calc(var(--checked) * 100%));
+  transition: --checked var(--motion-short) var(--easing-standard);
+}
+
+[data-sequence] .k-picture-choice {
+  transition: none;
+}
+
+.k-picture-tile {
+  position: relative;
+  display: block;
+  align-self: stretch;
+  border-radius: var(--radius-control);
+  outline: none;
+  cursor: pointer;
+}
+
+/* The pick fades on the whole choice, name and tile together, which the tile takes as it is. */
+.k-picture-tile.k-control {
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+.k-picture-tile.k-control[data-pinned],
+[data-sequence] .k-picture-tile.k-control {
+  transition: none;
+}
+
+.k-picture-tile .k-picked-ring {
+  --line-shown: calc(var(--checked) * (1 - var(--lit)));
+  --on: calc(var(--line-shown) * var(--signs));
+}
+
+.k-picture-tile[aria-disabled="true"] {
+  cursor: default;
+}
+
+.k-picture-tile[aria-disabled="true"] .k-picked-ring {
+  display: none;
+}
+
+/* Pressed by day, the cold tone tints the picture, as it does a Text button. */
+.k-picture-tint {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: rgb(from var(--color-cold) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+/* Its name over its foot: light on the scrim darkening from nothing 40% down the tile to the
+   backdrop's opacity at its foot, whatever the mode, since it is on a photo; `space.s12` in. */
+.k-picture-scrim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(rgb(from var(--color-scrim) r g b / 0) 40%, rgb(from var(--color-scrim) r g b / var(--opacity-backdrop)));
+}
+
+.k-picture-name-over {
+  position: absolute;
+  left: var(--space-s12);
+  right: var(--space-s12);
+  bottom: var(--space-s12);
+}
+
+.k-picture-tile[aria-disabled="true"] .k-picture-scrim,
+.k-picture-tile[aria-disabled="true"] .k-picture-name-over {
+  opacity: var(--opacity-disabled_content);
+}
+
+.k-picture-choice:has(> .k-picture-tile[aria-disabled="true"]) {
+  --name-colour: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+/* A chip over a corner, `space.s8` in: a badge at the top left, the mark at the top right, showing
+   while it is picked. */
+.k-picture-tag {
+  position: absolute;
+  top: var(--space-s8);
+  display: flex;
+}
+
+.k-picture-tag[data-side="start"] {
+  left: var(--space-s8);
+}
+
+.k-picture-tag[data-side="end"] {
+  right: var(--space-s8);
+  opacity: var(--checked);
+}
+
 /* A field (`lib/field.ts`): `size.control_md` tall at the control radius, filling its room, a
    hairline inside its edge in `outline_variant`, or `error` while invalid. Lit, hovered or with the
    keyboard in it, its fill rises to the highest container (an invalid one keeps its own) and its

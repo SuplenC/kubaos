@@ -186,57 +186,72 @@ function step(key: string, columns: number): number | null {
   }
 }
 
+/** How a set's cells are picked and focused, where a cell isn't the card itself (a picture). */
+export interface GroupOptions {
+  /** The element in a cell the keyboard is on and that takes the press: the cell by default. */
+  readonly target?: (cell: HTMLElement) => HTMLElement;
+  /** Shows whether a cell is picked: a choice card's `setPicked` by default. */
+  readonly set?: (cell: HTMLElement, picked: boolean) => void;
+  /** Whether the arrows pick as they move in a set of one, as radios do: yes by default. */
+  readonly arrowsPick?: boolean;
+}
+
 /**
- * `cards` as one set, `columns` across `space.s16` apart, one stop for Tab. Picking one of `one`
- * unpicks the rest, and the arrows pick as they move; of `many`, the arrows move the keyboard and
- * Space or Enter turns the card it is on. A disabled card is skipped and takes no press.
+ * `cells` as one set, `columns` across `space.s16` apart, one stop for Tab. Picking one of `one`
+ * unpicks the rest, and the arrows pick as they move unless `arrowsPick` is off; of `many`, the
+ * arrows move the keyboard and Space or Enter turns the cell it is on. A disabled cell is skipped
+ * and takes no press.
  */
-export function choiceGroup(picks: Picks, columns: number, cards: readonly HTMLElement[]): HTMLElement {
+export function choiceGroup(picks: Picks, columns: number, cells: readonly HTMLElement[], options: GroupOptions = {}): HTMLElement {
+  const target = options.target ?? ((cell: HTMLElement) => cell);
+  const set = options.set ?? setPicked;
+  const arrowsPick = picks === "one" && (options.arrowsPick ?? true);
   const grid = document.createElement("span");
   grid.className = "k-choice-group";
   grid.style.setProperty("--columns", String(columns));
   grid.setAttribute("role", picks === "one" ? "radiogroup" : "group");
-  grid.append(...cards);
-  const usable = (card: HTMLElement) => card.getAttribute("aria-disabled") !== "true";
-  const isPicked = (card: HTMLElement) => card.getAttribute("aria-checked") === "true";
-  const stop = cards.find((card) => usable(card) && (picks === "many" || isPicked(card))) ?? cards.find(usable);
-  if (stop) stop.tabIndex = 0;
+  grid.append(...cells);
+  const targets = cells.map(target);
+  const usable = (at: number) => targets[at]!.getAttribute("aria-disabled") !== "true";
+  const isPicked = (at: number) => cells[at]!.getAttribute("aria-checked") === "true";
+  const indices = cells.map((_, at) => at);
+  const stop = indices.find((at) => usable(at) && (picks === "many" || isPicked(at))) ?? indices.find(usable);
+  if (stop !== undefined) targets[stop]!.tabIndex = 0;
 
-  function choose(card: HTMLElement): void {
-    if (picks === "one") for (const other of cards) setPicked(other, other === card);
-    else setPicked(card, !isPicked(card));
+  function choose(at: number): void {
+    if (picks === "one") for (const other of indices) set(cells[other]!, other === at);
+    else set(cells[at]!, !isPicked(at));
   }
 
-  function focusOn(card: HTMLElement): void {
-    for (const each of cards) each.tabIndex = each === card ? 0 : -1;
-    card.focus();
+  function focusOn(at: number): void {
+    for (const other of indices) targets[other]!.tabIndex = other === at ? 0 : -1;
+    targets[at]!.focus();
   }
 
-  for (const [index, card] of cards.entries()) {
-    card.addEventListener("click", () => {
-      if (!usable(card)) return;
-      choose(card);
-      for (const each of cards) each.tabIndex = each === card ? 0 : -1;
+  for (const at of indices) {
+    const element = targets[at]!;
+    element.addEventListener("click", () => {
+      if (!usable(at)) return;
+      choose(at);
+      for (const other of indices) targets[other]!.tabIndex = other === at ? 0 : -1;
     });
-    card.addEventListener("keydown", (event) => {
-      if (!usable(card)) return;
+    element.addEventListener("keydown", (event) => {
+      if (!usable(at)) return;
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        if (!event.repeat) choose(card);
+        if (!event.repeat) choose(at);
         return;
       }
-      const ends = event.key === "Home" ? 0 : event.key === "End" ? cards.length - 1 : null;
+      const ends = event.key === "Home" ? 0 : event.key === "End" ? cells.length - 1 : null;
       const by = step(event.key, columns);
       if (ends === null && by === null) return;
       event.preventDefault();
-      let at = ends ?? index;
       const toward = by ?? (ends === 0 ? 1 : -1);
-      if (ends === null) at += toward;
-      while (at >= 0 && at < cards.length && !usable(cards[at]!)) at += Math.sign(toward);
-      const next = cards[at];
-      if (!next) return;
+      let next = ends ?? at + toward;
+      while (next >= 0 && next < cells.length && !usable(next)) next += Math.sign(toward);
+      if (next < 0 || next >= cells.length) return;
       focusOn(next);
-      if (picks === "one") choose(next);
+      if (arrowsPick) choose(next);
     });
   }
   return probe(grid, { role: "grid", columns, gap: length("space-s16"), align: "start" });
