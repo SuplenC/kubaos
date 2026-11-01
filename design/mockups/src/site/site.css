@@ -752,7 +752,7 @@ body {
   align-items: flex-start;
   gap: var(--space-s16);
   padding: var(--space-s24);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-content);
   background: var(--color-surface_container_high);
 }
 
@@ -926,15 +926,19 @@ body {
   align-self: flex-start;
   display: flex;
   padding: var(--space-s16);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-content);
   background: var(--color-surface_container_high);
 }
 
-/* A dialog in small, raised to its step, at the dialog radius. */
+/* A dialog in small, raised to its step. */
 .f-dialog-box {
   --fill: var(--color-surface_container_high);
   --fill-night: var(--color-surface_container_highest);
-  border-radius: var(--radius-dialog);
+}
+
+/* A panel in small, at the surface radius. */
+.f-surface-box {
+  border-radius: var(--radius-surface);
 }
 
 /* A plain shape with a corner, at the sizes the radii page draws it. */
@@ -1000,13 +1004,13 @@ body {
   background: var(--color-cold);
 }
 
-/* A list well: a surface with its rows 12 in, their corners nested from it. */
+/* A list well: a content box with its rows 8 in, at the row radius. */
 .f-well {
   display: flex;
   flex-direction: column;
   width: var(--size-panel);
-  padding: var(--space-s12);
-  border-radius: var(--radius-surface);
+  padding: var(--space-s8);
+  border-radius: var(--radius-content);
   background: var(--color-surface_container_low);
 }
 
@@ -1014,7 +1018,7 @@ body {
   display: flex;
   align-items: center;
   height: var(--size-row);
-  padding-inline: var(--space-s12);
+  padding-inline: var(--space-s16);
   border-radius: var(--corner);
 }
 
@@ -1077,7 +1081,7 @@ body {
   box-sizing: border-box;
   width: var(--size-thumbnail_width);
   padding: var(--space-s16);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-content);
 }
 
 /* The open menu, the button its tooltip is over and the tooltip, placed in the front window from
@@ -1237,7 +1241,7 @@ body {
   gap: var(--space-s12);
   width: var(--size-rail);
   padding: var(--space-s12) var(--space-s16);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-content);
   background: var(--color-surface_container_low);
   outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
   outline-offset: calc(-1 * var(--stroke-hairline_device_px));
@@ -1393,7 +1397,7 @@ body {
   align-items: flex-start;
   gap: var(--space-s8);
   padding: var(--space-s16);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-content);
   background: var(--color-surface_container_high);
   box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
   overflow: clip;

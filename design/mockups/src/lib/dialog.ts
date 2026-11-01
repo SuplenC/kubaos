@@ -1,7 +1,7 @@
 // A question over a dimmed screen: `kubaos-ui`'s `dialog::dialog`, `dialog::prompt` and
 // `dialog::scrim`, `KubaOS.Components`' `Dialog` and `Scrim` (`docs/design/components/dialog.md`).
 //
-// The dialog is `size.dialog` wide, `space.s24` inside on every side, at the dialog radius, raised
+// The dialog is `size.dialog` wide, `space.s24` inside on every side, at the content radius, raised
 // to the ladder's step 3 (`lib/elevation.ts`). A 24 symbol (`heading`'s) beside a `heading` title,
 // the `body` `space.s12` under the title and in line with it, what it lists or asks for (a labelled
 // field) `space.s16` under the body, in line with it too, and its button bar (`lib/button-bar.ts`)

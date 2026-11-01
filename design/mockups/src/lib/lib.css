@@ -243,7 +243,7 @@
   box-sizing: border-box;
   width: var(--width);
   padding: var(--space-s4) var(--space-s8);
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-row);
   background: var(--color-on_surface);
   pointer-events: none;
   opacity: 0;
@@ -694,7 +694,7 @@
   visibility: hidden;
 }
 
-/* A card (`lib/card.ts`): raised one step at the surface radius, `space.s16` inside, as wide as its
+/* A card (`lib/card.ts`): raised one step at the content radius, `space.s16` inside, as wide as its
    room. Its fill is the step's: `surface_container_high` by day, `surface_container_highest` at
    night, with the rim inside its edge. */
 .k-card {
@@ -704,7 +704,7 @@
   box-sizing: border-box;
   align-self: stretch;
   padding: var(--space-s16);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-content);
   outline: none;
   --fill: var(--color-surface_container_high);
   --fill-night: var(--color-surface_container_highest);
@@ -1912,8 +1912,8 @@
   outline: none;
 }
 
-/* A menu's item, a select's option too: `size.control_sm` tall, `space.s8` inside, its corners
-   concentric inside its surface's (`--corner`). Lit (the keyboard on it, which the pointer moves),
+/* A menu's item, a select's option too: `size.control_sm` tall, `space.s8` inside, at the row
+   radius, concentric inside its surface's (`radius.control` − `space.s4`). Lit (the keyboard on it, which the pointer moves),
    it fades onto `secondary_container` with its words, symbol and check `on_secondary_container`, and
    its keycaps' keys and edges `primary`, over `short`; pressed, the container lifts to
    `secondary_container_pressed` over `micro`. At rest its content is `on_surface`, or `error` on a
@@ -1927,7 +1927,7 @@
   box-sizing: border-box;
   height: var(--size-control_sm);
   padding: 0 var(--space-s8);
-  border-radius: var(--corner);
+  border-radius: var(--radius-row);
   cursor: pointer;
   --lit: 0;
   --press: 0;
@@ -2453,16 +2453,16 @@
   initial-value: 0;
 }
 
-/* A toast (`lib/toast.ts`): the inverse colours, `on_surface` behind `surface`, `space.s16` by
-   `space.s12` inside at the surface radius, as wide as what it says up to its room, then its
+/* A toast (`lib/toast.ts`): the inverse colours, `on_surface` behind `surface`, `space.s12`
+   inside at the control radius, as wide as what it says up to its room, then its
    words wrap. It rises into place a whole device pixel at a time. */
 .k-toast {
   display: block;
   flex: none;
   box-sizing: border-box;
   max-width: 100%;
-  padding: var(--space-s12) var(--space-s16);
-  border-radius: var(--radius-surface);
+  padding: var(--space-s12);
+  border-radius: var(--radius-control);
   background: var(--color-on_surface);
   translate: 0 round(nearest, calc(var(--rise) * var(--space-s32)), 1px);
 }
@@ -2548,7 +2548,7 @@
   max-width: calc(100% - 2 * var(--space-s24));
 }
 
-/* A dialog (`lib/dialog.ts`): `size.dialog` wide, `space.s24` inside, at the dialog radius, raised
+/* A dialog (`lib/dialog.ts`): `size.dialog` wide, `space.s24` inside, at the content radius, raised
    to the ladder's step 3: `surface_container_high` by day, the highest container at night, the
    step's shadow and the rim. A Danger dialog's edge is `error` at `opacity.danger_edge`, over the
    rim. It is at least `aspect.dialog` of its width tall, on the grid, and at most its room less
@@ -2564,7 +2564,7 @@
   min-height: round(nearest, calc(var(--size-dialog) / (var(--aspect-dialog))), var(--grid));
   max-height: calc(100% - 2 * var(--space-s48));
   padding: var(--space-s24);
-  border-radius: var(--radius-dialog);
+  border-radius: var(--radius-content);
   --fill: var(--color-surface_container_high);
   --fill-night: var(--color-surface_container_highest);
   translate: 0 round(nearest, calc(var(--rise) * var(--space-s16)), 1px);
@@ -2806,7 +2806,8 @@
   top: round(nearest, calc((100% - var(--t-line)) / 2), 1px);
 }
 
-/* The title: a pill a small control tall, `space.s12` inside, its words `subheading` in
+/* The title: a small control tall at the control radius, as the year's months are, `space.s12`
+   inside, its words `subheading` in
    `on_surface`; open on the year, Tonal: `secondary_container` with `on_secondary_container`. Lit,
    its tube; pressed by day, the tone's tint. */
 .k-cal-title {
@@ -2819,7 +2820,7 @@
   margin: 0;
   padding: 0 var(--space-s12);
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-control);
   font: inherit;
   cursor: pointer;
   outline: none;

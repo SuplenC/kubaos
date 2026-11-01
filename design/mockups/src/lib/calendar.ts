@@ -1,9 +1,9 @@
 // A month as six weeks, each led by its ISO week number: `kubaos-ui`'s `calendar::calendar`,
 // `KubaOS.Components`' `Calendar` (`docs/design/components/calendar.md`). The clock popup's.
 //
-// Between two arrows (Text icon buttons, sm) the title, a `subheading` pill, opens the year: the
-// twelve months three to a row. Under them the weekdays' names (`label`, weekends in `tertiary`) and
-// six weeks: a week number (`caption`) in a column a small control wide, then seven days, each a
+// Between two arrows (Text icon buttons, sm) the title, `subheading` at the control radius, opens
+// the year: the twelve months three to a row. Under them the weekdays' names (`label`, weekends in
+// `tertiary`) and six weeks: a week number (`caption`) in a column a small control wide, then seven days, each a
 // regular control (`size.control_md`) with a small one's disc (`size.control_sm`), a pill. Today is
 // filled with `primary`; the picked day is ringed with it in the thin stroke; a holiday has a
 // `tertiary` dot under its number and its name in a hint; the days of the months around are dimmed
@@ -179,7 +179,7 @@ export function monthCell(name: string, current: boolean, pinned?: Pinned): HTML
   return cell;
 }
 
-/** The title: a `subheading` pill that opens the year, Tonal while it is open. */
+/** The title: `subheading` at the control radius, opening the year, Tonal while it is open. */
 export function titlePill(words: string, open: boolean, pinned?: Pinned): HTMLElement {
   const title = document.createElement("button");
   title.type = "button";
@@ -191,7 +191,7 @@ export function titlePill(words: string, open: boolean, pinned?: Pinned): HTMLEl
   const words_ = text(words, "subheading");
   words_.style.color = "var(--words)";
   title.append(words_);
-  focusRing(title, "full", "accent", false).dataset.pressable = "";
+  focusRing(title, "control", "accent", false).dataset.pressable = "";
   return title;
 }
 

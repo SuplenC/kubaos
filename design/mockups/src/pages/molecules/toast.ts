@@ -94,7 +94,7 @@ const REPLACED: Move = {
 };
 
 const DESCRIBED =
-  "One `body` line saying what just happened, in `surface` on `on_surface`, the inverse colours, so it reads over anything; an optional symbol (`body`'s 20) `space.s12` before the words; `space.s16` by `space.s12` inside; the surface radius (`radius.surface`, 24), which on one line is a pill. It is as wide as what it says, rounded up to a device pixel, up to its room less `space.s24` at either side; past that its words wrap and its corners stay the surface's.";
+  "One `body` line saying what just happened, in `surface` on `on_surface`, the inverse colours, so it reads over anything; an optional symbol (`body`'s 20) `space.s12` before the words; `space.s12` inside; the control radius (`radius.control`, 12), a small floating thing's, as a popover's. It is as wide as what it says, rounded up to a device pixel, up to its room less `space.s24` at either side; past that its words wrap and its corners stay the same.";
 
 export default page({
   level: "molecules",
@@ -131,7 +131,7 @@ export default page({
       { name: "With keys", cell: () => over(FORGOT) },
     ],
     described: {
-      rest: "Showing: `on_surface` behind its words, symbol and key hints' words in `surface`, the keycaps their own colours. By day the same roles in daylight colours: a dark pill on a light surface, where at night it is a light one on a dark surface.",
+      rest: "Showing: `on_surface` behind its words, symbol and key hints' words in `surface`, the keycaps their own colours. By day the same roles in daylight colours: a dark box on a light surface, where at night it is a light one on a dark surface.",
     },
   },
   focus: doesntApply("a toast never takes the keyboard and isn't neon: it has no line and no glow."),
@@ -160,17 +160,17 @@ export default page({
       { name: "With keys", for: "The key hints after the words.", sample: () => over(FORGOT) },
     ]),
     measures: [
-      { what: "Inside its sides, and between the words and the key hints.", token: "space-s16" },
-      { what: "Above and below its words, and between the symbol and the words.", token: "space-s12" },
+      { what: "Between the words and the key hints.", token: "space-s16" },
+      { what: "Inside it all round, and between the symbol and the words.", token: "space-s12" },
       { what: "Its words, `body`'s line.", token: "type-body-line" },
       { what: "The symbol, `body`'s.", token: "type-body-icon" },
       { what: "A keycap.", token: "size-keycap" },
-      { what: "Its corners.", token: "radius-surface" },
+      { what: "Its corners.", token: "radius-control" },
       { what: "Above the surface's bottom edge, and the least room at either side.", token: "space-s24" },
       { what: "How far under its place it starts as it arrives.", token: "space-s32" },
     ],
     reflow: {
-      described: "A toast is as wide as what it says, up to its surface less `space.s24` at either side, and centred across it at every window size; past that its words wrap onto more lines, the pill becoming a rounded box.",
+      described: "A toast is as wide as what it says, up to its surface less `space.s24` at either side, and centred across it at every window size; past that its words wrap onto more lines, its corners the same.",
       sample: () => within("100%", stack("s8", "start", onSurface("100%", SHORT, toast({ words: shown(SAID), icon: "check" })), text("A toast in a window as wide as this one.", "small", "on_surface_variant"))),
     },
   },

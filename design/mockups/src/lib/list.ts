@@ -2,10 +2,9 @@
 // `list::empty_list`, `KubaOS.Components`' `List`, `ListRow`, `ListRows`, `ScrollingList` and
 // `EmptyList` (`docs/design/components/list.md`). Its look is `lists.css`.
 //
-// The well is a surface, at the surface radius, `space.s12` inside, its rows `space.s4` apart, so a
-// row's corners are concentric inside it at the control radius. It is built as every raised list is,
-// at the scale of its role: a row's room is its corner, `space.s12` in, so its words start
-// `space.s24` from the well's edge as a menu item's start `space.s12` from its popover's.
+// The well is a content box, at the content radius, `space.s8` inside, its rows `space.s4` apart,
+// so a row's corners are concentric inside it at the row radius. A row is `space.s16` in, so its
+// words start `space.s24` from the well's edge.
 //
 // A row is `size.row` tall with one line and `size.row_two_line` with two: a leading symbol or
 // tile, the title over its subtitle, then at its end the facts and controls it carries, `space.s12`
@@ -15,7 +14,7 @@
 // passed over.
 //
 // A scrolling list's rows scroll right up to the well's edge, cut by its rounded shape, the
-// `space.s12` above the first row and below the last its scroll padding, and its thumb floats in
+// `space.s8` above the first row and below the last its scroll padding, and its thumb floats in
 // the well's padding at its end.
 
 import "./lists.css";
@@ -238,7 +237,7 @@ function well(name: string, ...content: Element[]): HTMLElement {
   const edge = document.createElement("span");
   edge.className = "k-list-edge";
   box.append(edge);
-  focusRing(box, "surface", "accent", false);
+  focusRing(box, "content", "accent", false);
   return probe(box, { role: "component", name, variant: "", fixed: { width: false, height: false } });
 }
 
@@ -290,7 +289,7 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
     at = item;
     show();
     if (!pane) return;
-    const inset = length("space-s12") * scaleOf(box);
+    const inset = length("space-s8") * scaleOf(box);
     const top = offsetIn(item, pane) - inset;
     const bottom = offsetIn(item, pane) + item.offsetHeight + inset;
     if (top < pane.scrollTop) pane.scrollTop = top;
@@ -319,7 +318,7 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
     const item = rows[Math.max(0, index())];
     if (!item || !pane) return rows.length;
     const gap = length("space-s4") * scaleOf(box);
-    const room = pane.clientHeight - 2 * length("space-s12") * scaleOf(box);
+    const room = pane.clientHeight - 2 * length("space-s8") * scaleOf(box);
     return Math.max(1, Math.floor((room + gap) / (item.offsetHeight + gap)));
   }
 
@@ -480,7 +479,7 @@ export function scrolled(name: string, content: HTMLElement, options: { readonly
     const overflow = pane.scrollHeight - pane.clientHeight;
     rail.toggleAttribute("data-shown", overflow > 1);
     if (overflow <= 1) return;
-    const inset = length("space-s12") * scaleOf(box);
+    const inset = length("space-s8") * scaleOf(box);
     const room = pane.clientHeight - 2 * inset;
     const tall = Math.max(Math.round((room * pane.clientHeight) / pane.scrollHeight), Math.round(length("space-s24") * scaleOf(box)));
     const top = Math.round(inset + ((room - tall) * pane.scrollTop) / overflow);
@@ -533,7 +532,7 @@ function drag(thumb: HTMLElement, pane: HTMLElement, box: HTMLElement): void {
     const ratio = box.offsetHeight / Math.max(1, box.getBoundingClientRect().height);
     const from = event.clientY;
     const start = pane.scrollTop;
-    const room = pane.clientHeight - 2 * length("space-s12") * scaleOf(box) - thumb.offsetHeight;
+    const room = pane.clientHeight - 2 * length("space-s8") * scaleOf(box) - thumb.offsetHeight;
     const travel = pane.scrollHeight - pane.clientHeight;
     const follow = (moved: PointerEvent) => {
       pane.scrollTop = start + (((moved.clientY - from) * ratio) / Math.max(1, room)) * travel;

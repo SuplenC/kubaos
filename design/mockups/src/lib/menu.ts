@@ -3,8 +3,8 @@
 // menu.md`), on a `Popover` (`lib/tooltip.ts`) raised to the ladder's step 2.
 //
 // It is built as every raised list is, a select's open list too: the popover `space.s4` inside, an
-// item `size.control_sm` tall with its corners concentric inside the popover's and `space.s8` inside,
-// so its words start `space.s12` from the popover's edge. An item holds an optional symbol, 16, its
+// item `size.control_sm` tall at the row radius, concentric inside the popover's (`radius.control`
+// − `space.s4`), and `space.s8` inside, so its words start `space.s12` from the popover's edge. An item holds an optional symbol, 16, its
 // words in `body` on one line, the keys that do the same as keycaps at its end, and a check whose
 // room is kept when unchecked. A hairline, inset to the words and `space.s4` clear of each side,
 // separates groups. The item the keyboard is on is lit, on `secondary_container`, its keycaps in
@@ -15,7 +15,6 @@ import { icon } from "./icon.ts";
 import { keycap, keys } from "./keycap.ts";
 import { divider, filling, row, stack } from "./layout.ts";
 import { FIXED_HEIGHT, probe, variant } from "./probe.ts";
-import { nested, role } from "./radius.ts";
 import { clamped } from "./text.ts";
 
 export interface MenuItemSpec {
@@ -45,7 +44,6 @@ export function menuItem(spec: MenuItemSpec, current = false, pinned?: ItemPinne
   item.toggleAttribute("data-current", current && !spec.disabled);
   if (pinned && !spec.disabled) item.dataset.pinned = pinned;
   if (spec.disabled) item.setAttribute("aria-disabled", "true");
-  item.style.setProperty("--corner", nested(role("control"), "s4").css);
   const ink = "var(--ink)";
   const words = clamped(spec.label, "body");
   words.style.color = ink;

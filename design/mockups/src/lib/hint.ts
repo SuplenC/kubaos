@@ -1,6 +1,6 @@
 // A control's name in a small bubble under it, while the pointer is over it or the keyboard is on
 // it: `kubaos-ui`'s `hint::hint`, `KubaOS.Components`' `Hint`. The inverse colours, `label` type,
-// `space.s8` by `space.s4` inside, the small radius, `space.s8` below the control, centred under
+// `space.s8` by `space.s4` inside, the row radius, `space.s8` below the control, centred under
 // it or held to its start or the window's end, on whole device pixels (`docs/design/components/icon-button.md`). It floats: no part of the
 // layout, and it never takes the pointer.
 

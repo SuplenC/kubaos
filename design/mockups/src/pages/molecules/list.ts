@@ -101,10 +101,10 @@ function picking(specs: readonly ListRowSpec[], options: ListOptions = {}): HTML
 }
 
 const DESCRIBED =
-  "The well is a surface at the surface radius (`radius.surface`, 24), `surface_container_low` at `opacity.well` with a hairline in the soft outline, `space.s12` inside, its rows `space.s4` apart, so each row's corners are concentric inside it: 24 − 12, the control radius. It is every raised list's build at a window list's scale: a menu's popover is 12 round with 4 inside and rows 32 tall with 8 corners and 8 inside, so words start 12 from its edge; a well is 24 round with 12 inside and rows 44 or 56 tall with 12 corners and 12 inside, so words start 24 from its edge.";
+  "The well is a content box at the content radius (`radius.content`, 16), `surface_container_low` at `opacity.well` with a hairline in the soft outline, `space.s8` inside, its rows `space.s4` apart, so each row's corners are concentric inside it: 16 − 8, the row radius (`radius.row`, 8). A row follows the box it sits in, as a menu's items do: a menu's popover is 12 round with 4 inside and items 32 tall at 8 and 8 inside, so words start 12 from its edge; a well is 16 round with 8 inside and rows 44 or 56 tall at 8 and 16 inside, so words start 24 from its edge.";
 
 const ROW_DESCRIBED =
-  "A row is `size.row` (44) tall with one line and `size.row_two_line` (56) with two, `space.s12` inside: a leading symbol, `body_strong`'s 20 beside one line and `icon.two_line`'s 24 beside two, so it spans both, or the symbol on an icon tile, sm beside one line and md beside two; then its title in `body_strong` over its subtitle in `small`, `space.s4` apart, each one line ending in an ellipsis, the subtitle optionally after a 16 symbol `space.s4` from its words (the lock of a secured network). At its end, `space.s12` apart: chips for facts that matter at a glance, a detail in `mono`, the keys that take it as keycaps `space.s4` apart, a switch, a chevron for a row that opens more, and a tick whose room is kept when unticked so the rows' ends line up. Every part is centred on the row's height, so a chip moves nothing else.";
+  "A row is `size.row` (44) tall with one line and `size.row_two_line` (56) with two, `space.s16` inside its sides: a leading symbol, `body_strong`'s 20 beside one line and `icon.two_line`'s 24 beside two, so it spans both, or the symbol on an icon tile, sm beside one line and md beside two; then its title in `body_strong` over its subtitle in `small`, `space.s4` apart, each one line ending in an ellipsis, the subtitle optionally after a 16 symbol `space.s4` from its words (the lock of a secured network). At its end, `space.s12` apart: chips for facts that matter at a glance, a detail in `mono`, the keys that take it as keycaps `space.s4` apart, a switch, a chevron for a row that opens more, and a tick whose room is kept when unticked so the rows' ends line up. Every part is centred on the row's height, so a chip moves nothing else.";
 
 const OPTIONS =
   "The Command menu's Results take three options: `tall`, always two lines tall with an md tile, a title alone included, so every row's words start in one column; `clear`, `space.s16` after the tile instead of `space.s12`, so the words stand clear of an app's own icon; and `tight`, the subtitle right under the title. Their titles light the query's matches in `primary`. Their selection is the list's: one shape behind the rows that slides between them over `short` on `standard`, the rows only taking its colours.";
@@ -144,7 +144,7 @@ export default page({
     ROW_DESCRIBED,
     "The row the keyboard is on is lit: it fades onto `secondary_container` over `short` on `standard`, its title and symbol to `on_secondary_container`, its subtitle and facts to that at `opacity.subdued_text`, and its keycaps' keys and edges to `primary`. Pressed, the container lifts to `secondary_container_pressed` over `micro`. The pointer moving onto a row puts the keyboard on it, so one row is lit at a time, by the pointer and the keys alike; with neither on the list, no row is lit. A row whose action can't be taken back (Shut down) is `error` at rest and lights on `error` itself, its content `on_error`. Rows aren't neon: no tube and no glow.",
     "A picked row (the layout in use, the network you're on) shows its tick, and its title and tick are `primary_lit`, a picked tab's and a select's picked option's colour, with the label glow round the title at night while the signs are on; lit, it takes the lit row's colours. A row that can't be taken now is dimmed, `on_surface` at `opacity.disabled_content`, its tile, chips and keycaps with it, and the keys pass over it. A row still being found (loading) keeps a tiled two-line row's place, its tile and its two lines as skeletons, the title a share of the words' room and the subtitle that share of it again, so rows one under another don't read as one block; it takes no press.",
-    "The well's focus tube lights while the list has the keyboard: `primary` inside its edge, at the surface radius, with the glow outside at night. The pointer lights a row, never the well. The list is one stop for Tab; the row it is on shows where the keyboard is.",
+    "The well's focus tube lights while the list has the keyboard: `primary` inside its edge, at the content radius, with the glow outside at night. The pointer lights a row, never the well. The list is one stop for Tab; the row it is on shows where the keyboard is.",
     OPTIONS,
   ],
   variants: [
@@ -181,7 +181,7 @@ export default page({
   focus: {
     tubes: [{ name: "The well", tone: "accent", filled: false, content: false }],
     looks: {
-      lit: "At night at rest, the signs burn: the tube inside the well's edge at the surface radius, `primary` at `focus.tube`, the glow outside it, while the list has the keyboard. The row it is on is lit on the secondary container, which is no light: it is the same with the signs on or off. A picked row's title glows faintly.",
+      lit: "At night at rest, the signs burn: the tube inside the well's edge at the content radius, `primary` at `focus.tube`, the glow outside it, while the list has the keyboard. The row it is on is lit on the secondary container, which is no light: it is the same with the signs on or off. A picked row's title glows faintly.",
       signsOff: "Still lit with the neon unpowered: by day always, and at night while a power change has the lights out. The well's tube is solid glass, `primary_glass`, with no glow; the lit row is as it was, and a picked title has no glow.",
     },
     signsOff: (index: number) => cell(ROWS[index]!.spec, "signs-off"),
@@ -194,7 +194,7 @@ export default page({
     ],
     missingPicture: [
       { name: "An app with no icon", for: "Its tile shows the placeholder symbol it names, at its place, so nothing moves when the icon comes.", sample: () => well([{ title: "Obscure tool", subtitle: "No icon of its own", icon: "deployed_code", tile: true, tall: true, clear: true, tight: true }]) },
-      { name: "No symbol", for: "A row may have none: its words start `space.s12` in. A list's rows all have one or none.", sample: () => well([{ title: "English (US)", checked: true }, { title: "Polish", checked: false }]) },
+      { name: "No symbol", for: "A row may have none: its words start `space.s16` in. A list's rows all have one or none.", sample: () => well([{ title: "English (US)", checked: true }, { title: "Polish", checked: false }]) },
       { name: "A symbol that isn't there", for: "QML draws a name with no drawing as its empty box, keeping its room; Rust names symbols by their enum and can't.", sample: () => well([{ title: "Unknown device", icon: "missing" }]) },
     ],
     counts: [
@@ -263,9 +263,10 @@ export default page({
     measures: [
       { what: "A one-line row's height.", token: "size-row" },
       { what: "A two-line row's height, and a tall one's.", token: "size-row_two_line" },
-      { what: "The well's padding; inside a row's sides and between its parts.", token: "space-s12" },
+      { what: "The well's padding.", token: "space-s8" },
+      { what: "Inside a row's sides; after a tile on a `clear` row.", token: "space-s16" },
+      { what: "Between a row's parts.", token: "space-s12" },
       { what: "Between rows; between a title and its subtitle, a subtitle's symbol and its words, and keycaps.", token: "space-s4" },
-      { what: "After a tile on a `clear` row.", token: "space-s16" },
       { what: "A symbol beside one line, a chevron and the tick.", token: "type-body_strong-icon" },
       { what: "A symbol beside two lines.", token: "icon-two_line" },
       { what: "A subtitle's symbol.", token: "type-small-icon" },
@@ -275,7 +276,8 @@ export default page({
       { what: "A chip's height.", token: "size-chip" },
       { what: "A keycap.", token: "size-keycap" },
       { what: "A switch.", token: "size-switch_width" },
-      { what: "The well's corners; a row's are them less its padding.", token: "radius-surface" },
+      { what: "The well's corners.", token: "radius-content" },
+      { what: "A row's corners: the well's less its padding.", token: "radius-row" },
       { what: "The well's hairline: one device pixel.", token: "stroke-hairline_device_px" },
     ],
     reflow: {

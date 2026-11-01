@@ -150,7 +150,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | Scale | Tokens |
 |---|---|
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
-| Radii (`[radius]`) | four roles, small 4, control 12, dialog 16, surface 24, and `full`; below |
+| Radii (`[radius]`) | five roles, small 4, row 8, control 12, content 16, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
 | Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 28, compact 24, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; a collapsible's rail's strip 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236 (Kōbō's); an app's sidebar 264; an app's window 1120 × 720, at least 720 × 480; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160; sparkline 48; the mockups' motion plot, from 0 to 1, 160 |
 | Container padding (`[container]`) | 16 under 640, 24 from 640, 32 from 1024 |
@@ -172,7 +172,7 @@ Every page and every panel's body is padded by the container at its sides, so th
 - **The padding is Tailwind's container** (`px-4 sm:px-6 lg:px-8`) on Tailwind's default breakpoints: 16 under 640, 24 from 640, 32 from 1024 (`[container]`). It goes by the container's own width, not the screen's, so a 384 panel takes 16 on any screen and Kōbō's content pane beside its rail takes 32 on a 1080p screen and 24 on a 1280 one. A panel as wide as its content takes the padding its padded width reaches (`Tokens.containerPaddingAround`).
 - **Sides only, as Tailwind's is.** Above and below, the content keeps the spacing steps it is laid out with at its natural height: a `Page` 32 below its top and 24 above its foot, where a footer's buttons sit; a toolbar band a small control's 16 above and below; a panel its own step (the clock 20; the control center, the notifications panel and the system monitor 16).
 - **On the 4 px grid**: every padding is a spacing step and every breakpoint a multiple of 4, which `kubaos-tokens` checks.
-- **A container inside a container** doesn't pad again: a card or a list inside a page keeps its own padding (16, 12), and the page's padding is the only one around them.
+- **A container inside a container** doesn't pad again: a card or a list inside a page keeps its own padding (16, 8), and the page's padding is the only one around them.
 - **A panel whose body is something else keeps that thing's own padding**: one list (the power menu's rows and Kōbō's rail, 12 in so their corners are concentric with the panel's), a dialog (polkit, 24), a stack of cards (the notification popups, 8 in), the OSD's one bar.
 - The geometry check's `container-padding` rule holds every `Page` and `Container` to it (see "Checks").
 
@@ -188,26 +188,39 @@ Dense, never cramped (principle 8): room that holds nothing is a bug, as an edge
 
 ### Radii by role
 
-Every radius means something: what the shape is. There are four, plus full, and a component takes the one its role names. A radius that isn't a role only ever comes out of nesting.
+Every radius means something: what the shape is. There are five, plus full, on one ladder of boxes, and a component takes the one its role names.
 
 | Role | `Radius` | px | For |
 |---|---|---|---|
-| Small | `Small` | 4 | Marks inside controls: the checkbox, a hint, focus details, inline tags. |
-| Control | `Control` | 12 | Everything you click or type in: buttons, fields, list rows, menu items, chips; and a popover (a menu's, a tooltip's) or a select's open list, raised over the control that opened it. |
-| Dialog | `Dialog` | 16 | A dialog: the largest raised surface, a step softer than the control radius of the buttons, fields and popovers it holds and stands over, and well under a card's or a panel's 24, so a box that big over the screen reads as a question, not a panel. |
-| Surface | `Surface` | 24 | Everything that holds content: cards, popups, toasts, panels, list wells, the screen frame. |
-| Full | `Full` | half the shorter side | Pills and circles: switches, icon buttons, radios, progress bars, sliders, avatars, badges. |
+| Small | `Small` | 4 | Marks inside controls: the checkbox, a keycap, a skeleton's line, a field's selection, focus details. |
+| Row | `Row` | 8 | A row inside a small or a content box, the box's corner less its padding: a menu's and a select's items, a list well's rows, a table's rows; and a hint. |
+| Control | `Control` | 12 | Everything you click or type in: buttons, fields, chips, tiles, a calendar's title and months; and the small floating things, raised over what opened them: a popover, a menu, a select's open list, a toast. |
+| Content | `Content` | 16 | A content box inside a window or a panel: a card, a list well, a scroll panel, a dialog. A step under a surface, so a box inside reads as a part of what holds it, not a second window. |
+| Surface | `Surface` | 24 | The shell's big surfaces alone: a panel, a window, the screen frame. |
+| Full | `Full` | half the shorter side | Pills and circles: switches, icon buttons, radios, progress bars, sliders, the tabs' well, avatars, badges. |
 
-- **Nesting is derived, never picked.** A shape that fills another less an inset takes the outer radius minus the inset, so both corners share a centre: `nested(outer, inset)`, which refuses an inset that reaches the outer radius (in a `const`, that stops the build). A pill in a pill is a pill.
+- **A row follows the box it sits in.** A row's corner is the box's corner less the box's padding, so both corners share a centre: `nested(outer, inset)`, which refuses an inset that reaches the outer radius (in a `const`, that stops the build). The rows of the small and the content boxes all come to 8, `radius.row`. A pill in a pill is a pill.
+- **A box's padding goes with what it holds:**
+
+  | Padding | Round | In |
+  |---|---|---|
+  | 4 (`space.s4`) | rows in a floating box | a menu, a select's open list |
+  | 8 (`space.s8`) | rows in a content box | a list well |
+  | 12 (`space.s12`) | words in a small floating thing | a popover holding words, a toast |
+  | 16 (`space.s16`) | content in a content box | a card, a scroll panel |
+  | 24 (`space.s24`) | a dialog's content | the dialog alone |
+
+  A hint, the smallest floating thing, keeps 8 by 4: at 12 a one-line hint would be 44 tall, too heavy for a name.
 - **Worked examples:**
-  - A list well is a surface, 24, with 12 inside: its rows take 24 − 12 = 12, the control radius, so a row is both concentric and a control.
-  - A card filling a surface 8 in takes 24 − 8 = 16; 12 in, 12; 4 in from that 16, 12.
-  - The screen frame is a surface, 24. A window sits 8 inside it, so the window's outer edge is 24 − 8 = 16: Hyprland's `rounding = 14` plus its 2 px border.
+  - A list well is a content box, 16, with 8 inside: its rows take 16 − 8 = 8, the row radius, and are 16 inside their sides, so their words start 24 from the well's edge.
   - Every raised list (a popover's menu, a select's open list) is built one way: the surface at the control radius, 12, with 4 inside, so its rows, 32 (`control_sm`) tall, take 12 − 4 = 8 and run parallel to it; a row is 8 inside, so its words start 12 from the surface's edge, and a hairline between groups is inset to the words. A popover holding words of its own is 12 inside, at the same 12.
-  - The focus tube takes its control's own corner, 12 on a button, 24 on a card; each ring of its glow is concentric with it, its radius the control's plus its distance out. A pill's glow is a pill.
-- **8 and 20 aren't choices, nor 16 anywhere but a dialog.** They appear only where nesting produces them. A control placed inside content (a button in a card, a field in a dialog) isn't filling its parent, so it keeps its role; nesting is for a shape that fills one less an inset.
-- **Why roles:** six radii with no reason to pick one over another meant every surface picked its own, and nothing told a 16 card from a 16 button. A role says what the shape is, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.
+  - The screen frame is a surface, 24. A window sits 8 inside it, so the window's outer edge is 24 − 8 = 16: Hyprland's `rounding = 14` plus its 2 px border.
+  - A picture filling a card less its 16 would take 16 − 16, nothing: `nested` refuses it, and the picture takes the row radius, 8.
+  - The focus tube takes its control's own corner, 12 on a button, 16 on a card; each ring of its glow is concentric with it, its radius the control's plus its distance out. A pill's glow is a pill.
+- **A control placed inside content keeps its role.** A button in a card or a field in a dialog isn't filling its parent, so it keeps the control radius; nesting is for a shape that fills one less an inset. The marks (a checkbox, a keycap) keep the small radius wherever they are.
+- **Why roles:** radii with no reason to pick one over another meant every surface picked its own, and nothing told a 16 card from a 16 button. A role says what the shape is, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.
 - The lint fails on a radius written as a number, a shell radius that isn't a role (`Theme.rounding.lg`), and a radius derived by hand (`outer - inset`); see "Checks".
+- *Not built yet: `kubaos-ui` and `KubaOS.Components` still draw a card, a list well, a toast and a dialog at the surface radius (24), a well 12 inside with its rows at 12, a table's rows at 12 and a hint at 4; the mockups draw the ladder.*
 
 ## Motion
 
@@ -334,7 +347,7 @@ Everything a person sees is built from a few levels, each made only from the one
 
 ### What the geometry check compares
 
-Each component reports its shared name, its variant (the words below that apply, in this order, joined by spaces) and the measures it fixes. The corner column is its radius role; the `Hint`, which isn't probed, is small. The `identical` rule holds every instance of one name and variant to the same fixed measures, at every scale, with its icons and label in the same place along them. A measure a component doesn't fix follows its content or its parent. `KubaOS.Components` reports the same names, words and measures. `kubaos-specimen`'s tests fail when this table and the code disagree.
+Each component reports its shared name, its variant (the words below that apply, in this order, joined by spaces) and the measures it fixes. The corner column is its radius role; the `Hint`, which isn't probed, is row. The `identical` rule holds every instance of one name and variant to the same fixed measures, at every scale, with its icons and label in the same place along them. A measure a component doesn't fix follows its content or its parent. `KubaOS.Components` reports the same names, words and measures. `kubaos-specimen`'s tests fail when this table and the code disagree.
 
 <!-- variants:start -->
 | Name | Variant words | Fixed | Corner |
@@ -345,15 +358,15 @@ Each component reports its shared name, its variant (the words below that apply,
 | `IconTile` | size `Sm`, `Md`, `Lg` | both | control |
 | `Badge` | `count` or `dot`; `accent` | height | full |
 | `Skeleton` | `line`, `circle` or `block` | none | small, full, or the caller's |
-| `ListRow` | `one-line` or `two-line`; `icon` or `tile` | height | control, nested 12 in a surface |
+| `ListRow` | `one-line` or `two-line`; `icon` or `tile` | height | row, nested 8 in a content box |
 | `Field` | `icon` | height | control |
 | `Select` | `icon` | height | control |
 | `Popover` | none | none, holds content | control |
 | `Tooltip` | none | width | control, its popover's |
 | `Menu` | none | none | none |
-| `MenuItem` | `icon`, `check`, `danger` | height | control, nested 4 in a popover |
+| `MenuItem` | `icon`, `check`, `danger` | height | row, nested 4 in a popover |
 | `Table` | none | none | none |
-| `TableRow` | none | height | control |
+| `TableRow` | none | height | row |
 | `Collapsible` | `open` | none, holds content | control, its header |
 | `Spinner` | size `16`, `20`, `24`, `32`, `48` | both | none |
 | `Switch` | none | both | full |
@@ -364,19 +377,21 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Keycap` | none | height | small |
 | `Tabs` | none | height | control |
 | `Tile` | `detail` | height | control |
-| `Calendar` | `year` | both | full, its days and title; control, its months |
+| `Calendar` | `year` | both | full, its days; control, its title and months |
 | `Meter` | none | height | full |
 | `Sparkline` | none | height | none |
 | `Sheet` | none | none, holds content | surface |
-| `Dialog` | tone `Normal`, `Danger` | width | dialog |
+| `Dialog` | tone `Normal`, `Danger` | width | content |
 | `Banner` | tone `Info`, `Warning`, `Danger` | none | surface |
 | `Step` | `todo`, `current`, `done` or `action`; `icon`; `mark` | none | control, nested 12 in a surface |
 | `DescriptionList` | none | none | none |
 | `ErrorBlock` | `long` | none | surface |
-| `List`, `EmptyList`, `Toast`, `Log` | none | none | surface |
-| `Media` | none | none | the caller's: control in a picker, nested in a card |
+| `List`, `EmptyList` | none | none | content |
+| `Toast` | none | none | control |
+| `Log` | none | none | surface |
+| `Media` | none | none | the caller's: control in a picker, row in a card |
 | `PictureChoice` | `name-over` or `name-under` | none, holds content | control |
-| `Card`, `ChoiceCard` | none | none, holds content | surface |
+| `Card`, `ChoiceCard` | none | none, holds content | content |
 | `Page`, `Container`, `Section` | none | none, holds content | none |
 | `Header`, `Divider`, `Labelled`, `Note`, `EmptyState`, `KeyHints` | none | none | none |
 <!-- variants:end -->

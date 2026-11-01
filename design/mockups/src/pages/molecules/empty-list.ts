@@ -41,7 +41,7 @@ export default page({
   live: () => stack("s16", "start", empty(shown(LINE)), loading()),
   description: [
     "Rust `list::empty_list`, QML `EmptyList`. The control center's Bluetooth tab with no devices nearby, and its Wi-Fi tab while a scan has found nothing yet.",
-    "The well of a List, as a List draws it (`radius.surface`, `surface_container_low` at `opacity.well`, its soft hairline, `space.s12` inside), holding one line in `body`, `on_surface_variant`, centred across it on whole device pixels, the odd one after it, `space.s12` above and below inside the well's padding: 24 from its edge, where a row's words would start. The line says what is missing and, where it can, what to do: never a bare \"No items\". Too long for the well, it ends in an ellipsis.",
+    "The well of a List, as a List draws it (`radius.content`, `surface_container_low` at `opacity.well`, its soft hairline, `space.s8` inside), holding one line in `body`, `on_surface_variant`, centred across it on whole device pixels, the odd one after it, `space.s16` above and below inside the well's padding: 24 from its edge, where a row's words would start. The line says what is missing and, where it can, what to do: never a bare \"No items\". Too long for the well, it ends in an ellipsis.",
     "While the rows are still being found (a scan that has found nothing yet) the well holds loading rows instead: each a tiled two-line row's place, its tile and its two lines as skeletons, their words a different share of the room each, so they don't read as one block. A row found takes a loading row's place, and nothing moves. A scan that ends with nothing found shows the line.",
     "It isn't a stop for Tab: there is nothing in it to move through. A place with nothing in it that isn't a list (a page, a panel) is an EmptyState, with a symbol, a title and an action.",
   ],
@@ -91,11 +91,12 @@ export default page({
       { name: "Still being found", for: "A loading row's tile, lines and their shares.", sample: () => loading(1) },
     ]),
     measures: [
-      { what: "The well's padding, and the line's room above and below inside it.", token: "space-s12" },
+      { what: "The well's padding.", token: "space-s8" },
+      { what: "The line's room above and below inside it.", token: "space-s16" },
       { what: "The line, `body`'s.", token: "type-body-line" },
       { what: "A loading row: a two-line row's height.", token: "size-row_two_line" },
       { what: "A loading row's tile.", token: "size-control_md" },
-      { what: "The well's corners.", token: "radius-surface" },
+      { what: "The well's corners.", token: "radius-content" },
     ],
     reflow: {
       described: "It fills its place's width at every window size, its line centred in it, ending in an ellipsis where the well is narrower than it.",

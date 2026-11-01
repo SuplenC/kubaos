@@ -54,7 +54,7 @@ export function tableRow(columns: readonly Column[], spec: TableRowSpec, pinned?
   item.toggleAttribute("data-hot", !spec.picked);
   if (pinned) item.dataset.pinned = pinned;
   item.append(...columns.map((column, index) => cell(spec.cells[index] ?? "", column, false)));
-  focusRing(item, "control", "accent", false).dataset.pressable = "";
+  focusRing(item, "row", "accent", false).dataset.pressable = "";
   return probe(item, { role: "component", name: "TableRow", variant: "", fixed: FIXED_HEIGHT });
 }
 
