@@ -1,5 +1,6 @@
-// The Radii foundation: the five radius roles and full, each shown as it is used, the padding
-// each box takes, and the nesting that derives a row's corner from its box's, worked (`docs/DESIGN.md`, "Radii by role").
+// The Radii foundation: the five radius roles and full, each shown as it is used, the padding each
+// box takes, and the nesting that derives a row's corner from its box's, worked (`docs/DESIGN.md`,
+// "Radii by role").
 
 import { button } from "../../lib/button.ts";
 import { buttonBar } from "../../lib/button-bar.ts";
