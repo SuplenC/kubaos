@@ -1625,8 +1625,12 @@
     --press var(--motion-micro) var(--easing-standard);
 }
 
+/* A danger item lights in the error's container, not the accent's, so it still reads as what it
+   is under the pointer and the keyboard. */
 .k-menu-item[data-danger] {
   --rest-ink: var(--color-error);
+  --ink: color-mix(in srgb, var(--rest-ink), var(--color-on_error_container) calc(var(--lit) * 100%));
+  --container: color-mix(in srgb, var(--color-error_container), var(--color-error_container_pressed) calc(var(--press) * 100%));
 }
 
 .k-menu-item:is([data-current], [data-pinned]) {
