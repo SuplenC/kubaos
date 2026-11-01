@@ -2243,8 +2243,8 @@
   flex: none;
   box-sizing: border-box;
   width: var(--size-dialog);
-  padding: var(--space-s32);
-  border-radius: var(--radius-surface);
+  padding: var(--space-s24);
+  border-radius: var(--radius-dialog);
   --fill: var(--color-surface_container_high);
   --fill-night: var(--color-surface_container_highest);
   translate: 0 round(nearest, calc(var(--rise) * var(--space-s16)), 1px);
@@ -2263,16 +2263,41 @@
   align-self: stretch;
 }
 
-.k-dialog-column > .k-dialog-body {
+.k-dialog-said > * {
+  align-self: stretch;
+}
+
+.k-dialog-said > .k-dialog-body {
   margin-top: var(--space-s12);
 }
 
-.k-dialog-column > .k-dialog-asks {
+.k-dialog-said > .k-dialog-asks {
   margin-top: var(--space-s16);
 }
 
 .k-dialog-column > .k-dialog-buttons {
-  margin-top: var(--space-s32);
+  margin-top: var(--space-s24);
+}
+
+/* The button bar: as wide as the room its surface gives it, with no padding of its own. */
+.k-button-bar {
+  display: block;
+  flex: none;
+  align-self: stretch;
+}
+
+/* Stacked, the one Enter presses on top and the dismiss button at the bottom, each full width. */
+.k-button-bar[data-stacked] > .k-row {
+  flex-direction: column-reverse;
+  align-items: stretch;
+}
+
+.k-button-bar[data-stacked] > .k-row > .k-fill {
+  display: none;
+}
+
+.k-button-bar[data-stacked] .k-button {
+  justify-content: center;
 }
 
 /* The scrim: `scrim` at `opacity.scrim` over everything behind a dialog, filling its room. */

@@ -299,7 +299,9 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             out.line(format!("        readonly property int small: {}", r.small));
             out.line("        // Everything clicked or typed in: buttons, fields, list rows, menu items, chips.");
             out.line(format!("        readonly property int control: {}", r.control));
-            out.line("        // Everything that holds content: cards, dialogs, popups, panels, list wells.");
+            out.line("        // A dialog: the largest raised surface, softer than a control and well under a surface.");
+            out.line(format!("        readonly property int dialog: {}", r.dialog));
+            out.line("        // Everything that holds content: cards, popups, panels, list wells.");
             out.line(format!("        readonly property int surface: {}", r.surface));
             if r.full {
                 out.comment(
