@@ -4,12 +4,13 @@
 //
 // It is built as every raised list is, a select's open list too: the popover `space.s4` inside, an
 // item `size.control_sm` tall at the row radius, concentric inside the popover's (`radius.control`
-// − `space.s4`), and `space.s8` inside, so its words start `space.s12` from the popover's edge. An item holds an optional symbol, 16, its
-// words in `body` on one line, the keys that do the same as keycaps at its end, and a check whose
-// room is kept when unchecked. A hairline, inset to the words and `space.s4` clear of each side,
-// separates groups. The item the keyboard is on is lit, on `secondary_container`, its keycaps in
-// `primary`; the pointer moving onto an item puts the keyboard on it, so one item is lit at a time.
-// One that destroys something is in `error`; one that can't be taken is dimmed and is passed over.
+// − `space.s4`), and `space.s8` inside, so its words start `space.s12` from the popover's edge. An
+// item holds an optional symbol, 16, its words in `body` on one line, the keys that do the same as
+// keycaps at its end, and a check whose room is kept when unchecked. A hairline, inset to the words
+// and `space.s4` clear of each side, separates groups. The item the keyboard is on is lit, on
+// `secondary_container`, its keycaps in `primary`; the pointer moving onto an item puts the
+// keyboard on it, so one item is lit at a time. One that destroys something is in `error`; one that
+// can't be taken is dimmed and is passed over.
 
 import { icon } from "./icon.ts";
 import { keycap, keys } from "./keycap.ts";
