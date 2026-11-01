@@ -39,7 +39,7 @@
 }
 
 /* A list's well (`lib/list.ts`): a content box at the content radius, `surface_container_low` at
-   `opacity.well`, `space.s8` inside, its hairline in the soft outline and its focus tube drawn
+   `opacity.well`, `space.s8` inside, its sunken edge (`.k-sunken`) and its focus tube drawn
    over what it holds, so a row at its edge never covers them. The tube lights while the list has
    the keyboard. */
 .k-list {
@@ -58,7 +58,7 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  border: var(--stroke-hairline_device_px) solid rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
+  border: var(--stroke-hairline_device_px) solid var(--sunken-line);
   border-radius: inherit;
   pointer-events: none;
 }
@@ -512,7 +512,7 @@
 }
 
 /* A shell panel as the samples show a scroll in: `surface` at the content radius, `space.s16`
-   inside, its own edge cutting whatever passes it. */
+   inside, its sunken edge (`.k-sunken`) cutting whatever passes it. */
 .k-scroll-panel {
   position: relative;
   display: flex;
@@ -524,7 +524,7 @@
   padding: var(--space-s16);
   border-radius: var(--radius-content);
   background: var(--color-surface);
-  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline: var(--stroke-hairline_device_px) solid var(--sunken-line);
   outline-offset: calc(-1 * var(--stroke-hairline_device_px));
   overflow: clip;
 }
