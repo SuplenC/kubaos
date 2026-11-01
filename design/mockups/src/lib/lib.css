@@ -2067,3 +2067,105 @@
   --lit: 0;
   --press: 0;
 }
+
+/* How far under its place a toast still is as it arrives, 1 to 0, in `space.s32`s. */
+@property --rise {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A toast (`lib/toast.ts`): the inverse colours, `on_surface` behind `surface`, `space.s16` by
+   `space.s12` inside at the surface radius, as wide as what it says up to its room, then its
+   words wrap. It rises into place a whole device pixel at a time. */
+.k-toast {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: var(--space-s12) var(--space-s16);
+  border-radius: var(--radius-surface);
+  background: var(--color-on_surface);
+  translate: 0 round(nearest, calc(var(--rise) * var(--space-s32)), 1px);
+}
+
+.k-toast > .k-row,
+.k-toast-said {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.k-toast-words {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Where a surface's toasts show: along its bottom, `space.s24` above the edge and `space.s24` in
+   from its sides, each centred across it by `lib/toast.ts`. A toast arrives over `short` on
+   `emphasized_decel`, rising as it fades in, and leaves over `medium` on `standard_accel`, or over
+   `micro` when a new one takes its place. With reduce motion it doesn't rise. */
+.k-toast-room {
+  position: absolute;
+  left: var(--space-s24);
+  right: var(--space-s24);
+  bottom: var(--space-s24);
+  pointer-events: none;
+}
+
+.k-toast-room > .k-toast {
+  position: absolute;
+  bottom: 0;
+  pointer-events: auto;
+  transition:
+    opacity var(--motion-short) var(--easing-emphasized_decel),
+    --rise var(--motion-short) var(--easing-emphasized_decel);
+
+  @starting-style {
+    opacity: 0;
+    --rise: 1;
+  }
+}
+
+[data-reduced] .k-toast-room > .k-toast {
+  @starting-style {
+    --rise: 0;
+  }
+}
+
+.k-toast-room > .k-toast[data-leaving] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-medium) var(--easing-standard_accel);
+}
+
+.k-toast-room > .k-toast[data-leaving="micro"] {
+  transition-duration: var(--motion-micro);
+}
+
+/* A surface a toast shows over, for a sample: a window's or a panel's own room. */
+.k-toast-surface {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: var(--room);
+  height: var(--tall);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_low);
+  overflow: hidden;
+}
+
+.k-toast-surface > .k-toast-still {
+  position: absolute;
+  bottom: var(--space-s24);
+}
+
+/* What a sample surface holds besides its toasts, `space.s24` in from its edges. */
+.k-toast-inside {
+  position: absolute;
+  left: var(--space-s24);
+  top: var(--space-s24);
+}
+
+.k-toast-surface > .k-toast-still {
+  max-width: calc(100% - 2 * var(--space-s24));
+}
