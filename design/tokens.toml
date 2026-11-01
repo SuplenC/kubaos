@@ -546,6 +546,12 @@ use = "The caret's glow fading after typing stops, down to nothing."
 ms = 1200
 use = "Half a skeleton's breath: its glass warming from rest to its peak, or cooling back."
 
+# How long a toast stays once it has arrived, before it leaves. Not a move: reduce motion doesn't
+# cap it, since the words must still be read.
+[duration.toast]
+ms = 3600
+use = "A toast staying once it has arrived: long enough to read its line twice."
+
 # Easing curves, as CSS cubic béziers (x1, y1, x2, y2).
 [easing.standard]
 curve = [0.2, 0.0, 0.0, 1.0]
