@@ -1111,6 +1111,8 @@ pairs = [
   { fg = "on_surface_variant", bg = "surface_container", need = "text", use = "Secondary text on a container" },
   { fg = "on_surface_variant", bg = "surface_container_high", need = "text", use = "Secondary text on a card" },
   { fg = "on_surface_variant", bg = "surface_container_highest", need = "text", use = "A keycap's key" },
+  { fg = "primary", bg = "surface_container_highest", need = "text", use = "A keycap's key on a lit menu item" },
+  { fg = "primary", bg = "secondary_container", need = "graphic", use = "A keycap's edge on a lit menu item" },
   { fg = "on_surface_variant", bg = "surface", need = "text", opacity = "placeholder_text", use = "A field's placeholder" },
   { fg = "on_surface_variant", bg = "surface_container_high", need = "text", opacity = "placeholder_text", use = "A field's placeholder in its resting fill" },
   { fg = "on_surface_variant", bg = "surface_container_highest", need = "text", opacity = "placeholder_text", use = "A field's placeholder while it is focused or hovered" },

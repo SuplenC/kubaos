@@ -193,7 +193,7 @@ Every radius means something: what the shape is. There are three, plus full, and
 | Role | `Radius` | px | For |
 |---|---|---|---|
 | Small | `Small` | 4 | Marks inside controls: the checkbox, a hint, focus details, inline tags. |
-| Control | `Control` | 12 | Everything you click or type in: buttons, fields, list rows, menu items, chips. |
+| Control | `Control` | 12 | Everything you click or type in: buttons, fields, list rows, menu items, chips; and a popover (a menu's, a tooltip's) or a select's open list, raised over the control that opened it. |
 | Surface | `Surface` | 24 | Everything that holds content: cards, dialogs, popups, toasts, panels, list wells, the screen frame. |
 | Full | `Full` | half the shorter side | Pills and circles: switches, icon buttons, radios, progress bars, sliders, avatars, badges. |
 
@@ -202,6 +202,7 @@ Every radius means something: what the shape is. There are three, plus full, and
   - A list well is a surface, 24, with 12 inside: its rows take 24 − 12 = 12, the control radius, so a row is both concentric and a control.
   - A card filling a surface 8 in takes 24 − 8 = 16; 12 in, 12; 4 in from that 16, 12.
   - The screen frame is a surface, 24. A window sits 8 inside it, so the window's outer edge is 24 − 8 = 16: Hyprland's `rounding = 14` plus its 2 px border.
+  - Every raised list (a popover's menu, a select's open list) is built one way: the surface at the control radius, 12, with 4 inside, so its rows, 32 (`control_sm`) tall, take 12 − 4 = 8 and run parallel to it; a row is 8 inside, so its words start 12 from the surface's edge, and a hairline between groups is inset to the words. A popover holding words of its own is 12 inside, at the same 12.
   - The focus tube takes its control's own corner, 12 on a button, 24 on a card; each ring of its glow is concentric with it, its radius the control's plus its distance out. A pill's glow is a pill.
 - **8, 16 and 20 aren't choices.** They appear only where nesting produces them. A control placed inside content (a button in a card, a field in a dialog) isn't filling its parent, so it keeps its role; nesting is for a shape that fills one less an inset.
 - **Why roles:** six radii with no reason to pick one over another meant every surface picked its own, and nothing told a 16 card from a 16 button. A role says what the shape is, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.
@@ -345,10 +346,10 @@ Each component reports its shared name, its variant (the words below that apply,
 | `ListRow` | `one-line` or `two-line`; `icon` or `tile` | height | control, nested 12 in a surface |
 | `Field` | `icon` | height | control |
 | `Select` | `icon` | height | control |
-| `Popover` | none | none, holds content | surface |
-| `Tooltip` | none | width | surface, its popover's |
+| `Popover` | none | none, holds content | control |
+| `Tooltip` | none | width | control, its popover's |
 | `Menu` | none | none | none |
-| `MenuItem` | `icon`, `check`, `danger` | height | control, nested 12 in a popover |
+| `MenuItem` | `icon`, `check`, `danger` | height | control, nested 4 in a popover |
 | `Table` | none | none | none |
 | `TableRow` | none | height | control |
 | `Collapsible` | `open` | none, holds content | control, its header |
