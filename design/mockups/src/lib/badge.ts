@@ -66,9 +66,19 @@ export function badge(options: BadgeOptions = {}): HTMLElement {
   return probe(pill, { role: "component", name: "Badge", variant: variant("count", tone), fixed: FIXED_HEIGHT });
 }
 
+/** The symbol sizes a badged symbol comes in: the bar's 16, and a row's 20 and 24. */
+export const BADGED_SIZES = ["s16", "s20", "s24"] as const;
+export type BadgedSize = (typeof BADGED_SIZES)[number];
+
 export interface BadgedOptions {
   /** The symbol, by its name. */
   readonly name: string;
+  /** The symbol's size, an `[icon]` token's name: the bar's 16 by default. */
+  readonly size?: BadgedSize;
+  /** The symbol's colour role: `on_surface_variant` by default. */
+  readonly color?: string;
+  /** The badge in the accent: something unread rather than wrong. */
+  readonly accent?: boolean;
   /** Whether the badge shows. */
   readonly badged?: boolean;
   /** How many, or none for a dot. */
@@ -76,18 +86,21 @@ export interface BadgedOptions {
 }
 
 /**
- * The bar's symbol, 16 in `on_surface_variant`, with a badge centred on its top right corner while
- * `badged`: QML's `BadgedIcon`. While it shows, the box takes the half of the badge past the
- * symbol on both sides, so the badge keeps the row's gap and the symbol stays centred.
+ * A symbol, the bar's 16 in `on_surface_variant` by default, with a badge centred on its top right
+ * corner while `badged`: QML's `BadgedIcon`. While it shows, the box takes the half of the badge
+ * past the symbol on both sides, so the badge keeps the row's gap and the symbol stays centred.
  */
 export function badgedIcon(options: BadgedOptions): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-badged";
-  box.append(icon(options.name, "var(--icon-s16)", "var(--color-on_surface_variant)"));
+  const size = `var(--icon-${options.size ?? "s16"})`;
+  box.style.setProperty("--glyph", size);
+  box.append(icon(options.name, size, `var(--color-${options.color ?? "on_surface_variant"})`));
   if (options.badged) {
     box.dataset.badged = "";
     box.style.setProperty("--badge-width", badgeWidth(options.count));
-    box.append(badge(options.count === undefined ? {} : { count: options.count }));
+    const accent = options.accent ?? false;
+    box.append(badge(options.count === undefined ? { accent } : { count: options.count, accent }));
   }
-  return box;
+  return probe(box, { role: "component", name: "BadgedIcon", variant: variant(options.badged && (options.count === undefined ? "dot" : "count")), fixed: { width: false, height: true } });
 }
