@@ -2169,3 +2169,110 @@
 .k-toast-surface > .k-toast-still {
   max-width: calc(100% - 2 * var(--space-s24));
 }
+
+/* A dialog (`lib/dialog.ts`): `size.dialog` wide, `space.s32` inside, at the surface radius, raised
+   to the ladder's step 3: `surface_container_high` by day, the highest container at night, the
+   step's shadow and the rim. A Danger dialog's edge is `error` at `opacity.danger_edge`, over the
+   rim. It arrives rising `space.s16` into place a whole device pixel at a time (`--rise`). */
+.k-dialog {
+  position: relative;
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--size-dialog);
+  padding: var(--space-s32);
+  border-radius: var(--radius-surface);
+  --fill: var(--color-surface_container_high);
+  --fill-night: var(--color-surface_container_highest);
+  translate: 0 round(nearest, calc(var(--rise) * var(--space-s16)), 1px);
+}
+
+.k-dialog[data-danger]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid rgb(from var(--color-error) r g b / var(--opacity-danger_edge));
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.k-dialog-column > * {
+  align-self: stretch;
+}
+
+.k-dialog-column > .k-dialog-body {
+  margin-top: var(--space-s12);
+}
+
+.k-dialog-column > .k-dialog-asks {
+  margin-top: var(--space-s16);
+}
+
+.k-dialog-column > .k-dialog-buttons {
+  margin-top: var(--space-s32);
+}
+
+/* The scrim: `scrim` at `opacity.scrim` over everything behind a dialog, filling its room. */
+.k-scrim {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: inherit;
+  background: rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
+}
+
+/* A window's room a dialog opens in: `surface_container_low` with what it holds, the scrim over
+   all of it and the dialog in its middle. Drawn still, the dialog sits `space.s32` in from its
+   edges. Live, the scrim fades in over `long` on `emphasized_decel` as the dialog fades in and
+   rises; both fade out over `medium` on `emphasized_accel` as it closes. With reduce motion they
+   fade, capped at `short`, with no rise. */
+.k-dialog-room {
+  position: relative;
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  padding: var(--space-s32);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_low);
+  overflow: hidden;
+}
+
+.k-dialog-room[data-live] {
+  width: var(--room);
+  height: var(--tall);
+  padding: 0;
+}
+
+.k-dialog-room[data-live] > .k-dialog {
+  position: absolute;
+}
+
+.k-dialog-room[data-live] > :is(.k-scrim, .k-dialog) {
+  transition:
+    opacity var(--motion-long) var(--easing-emphasized_decel),
+    --rise var(--motion-long) var(--easing-emphasized_decel);
+
+  @starting-style {
+    opacity: 0;
+    --rise: 1;
+  }
+}
+
+[data-reduced] .k-dialog-room[data-live] > .k-dialog {
+  @starting-style {
+    --rise: 0;
+  }
+}
+
+.k-dialog-room[data-live] > [data-leaving] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+/* What the window holds behind the scrim, `space.s24` in from its edges. */
+.k-dialog-behind {
+  position: absolute;
+  left: var(--space-s24);
+  top: var(--space-s24);
+}
