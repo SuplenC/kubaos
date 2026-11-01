@@ -138,18 +138,19 @@ values = [4, 8, 12, 16, 20, 24, 32, 40, 48, 64]
 # the corners share a centre (`kubaos_ui::look::nested`, which refuses a
 # nesting that doesn't resolve). A surface's content 8 in takes 16; 12 in, 12.
 [radius]
-# Marks inside controls: the checkbox, a hint, focus details, inline tags.
+# Marks inside controls: the checkbox, a keycap, focus details, inline tags.
 small = 4
-# Everything you click or type in: buttons, fields, list rows, menu items,
-# chips.
+# A row inside a small or a content box, the box's corner less its padding:
+# a menu's, a select's or a list well's rows, a table's rows, a hint.
+row = 8
+# Everything you click or type in: buttons, fields, chips; and the small
+# floating things: a popover, a menu, a select's open list, a toast.
 control = 12
-# A dialog: the largest raised surface, a step softer than the controls' and
-# the popover's 12 it holds and stands over, and well under a card's or a
-# panel's 24, so a box that big over the screen reads as a question, not a
-# panel.
-dialog = 16
-# Everything that holds content: cards, popups, panels, list wells, the
-# screen frame.
+# A content box inside a window or a panel: a card, a list well, a scroll
+# panel, a dialog. A step softer than a surface's 24, so a box inside reads as
+# a part of what holds it, not a second window.
+content = 16
+# The shell's big surfaces alone: a panel, a window, the screen frame.
 surface = 24
 # Pills and circles: switches, icon buttons, sliders, avatars,
 # badges.

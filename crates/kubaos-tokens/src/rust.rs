@@ -267,22 +267,27 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
     let mut radii: Vec<(String, Option<String>, String)> = vec![
         (
             "Small".into(),
-            Some("Marks inside controls: the checkbox, a hint, focus details, inline tags.".into()),
+            Some("Marks inside controls: the checkbox, a keycap, focus details, inline tags.".into()),
             format!("Some({})", r.small),
         ),
         (
+            "Row".into(),
+            Some("A row inside a small or a content box, the box's corner less its padding.".into()),
+            format!("Some({})", r.row),
+        ),
+        (
             "Control".into(),
-            Some("Everything clicked or typed in: buttons, fields, list rows, menu items, chips.".into()),
+            Some("Everything clicked or typed in, and the small floating things: popovers, menus, toasts.".into()),
             format!("Some({})", r.control),
         ),
         (
-            "Dialog".into(),
-            Some("A dialog: the largest raised surface, softer than a control and well under a surface.".into()),
-            format!("Some({})", r.dialog),
+            "Content".into(),
+            Some("A content box inside a window or a panel: a card, a list well, a scroll panel, a dialog.".into()),
+            format!("Some({})", r.content),
         ),
         (
             "Surface".into(),
-            Some("Everything that holds content: cards, popups, panels, list wells.".into()),
+            Some("The shell's big surfaces: panels, the window, the screen frame.".into()),
             format!("Some({})", r.surface),
         ),
     ];

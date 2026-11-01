@@ -375,8 +375,9 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     let radius = &tokens.radius;
     for (role, value) in [
         ("small", radius.small),
+        ("row", radius.row),
         ("control", radius.control),
-        ("dialog", radius.dialog),
+        ("content", radius.content),
         ("surface", radius.surface),
     ] {
         on_grid(format!("radius.{role}"), value);
@@ -424,10 +425,10 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
         }
     }
 
-    let roles = [radius.small, radius.control, radius.dialog, radius.surface];
+    let roles = [radius.small, radius.row, radius.control, radius.content, radius.surface];
     for (table, values) in [
         ("space.values", &tokens.space.values),
-        ("radius.small, control, dialog, surface", &roles.to_vec()),
+        ("radius.small, row, control, content, surface", &roles.to_vec()),
         ("icon.sizes", &tokens.icon.sizes),
         ("rules.font_sizes", &tokens.rules.font_sizes),
     ] {
