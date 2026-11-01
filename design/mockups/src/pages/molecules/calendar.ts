@@ -67,7 +67,7 @@ function sliding(name: string, from: 1 | -1, shown: { year: number; month: numbe
   const side = from === 1 ? "right" : "left";
   return {
     name,
-    what: `An arrow, the wheel, Page ${from === 1 ? "Down" : "Up"} or the keyboard's day crossing into it: the new month's weeks slide in from the ${side}, \`space.s64\` to their place, as they fade in, over \`short\` on \`emphasized_decel\`, cut at the month's edge. The names, the header and the arrows stay; the title changes at once. With reduced motion the weeks fade in where they are.`,
+    what: `An arrow, a sideways turn of the wheel, Page ${from === 1 ? "Down" : "Up"} or the keyboard's day crossing into it: the new month's weeks slide in from the ${side}, \`space.s64\` to their place, as they fade in, over \`short\` on \`emphasized_decel\`, cut at the month's edge. The names, the header and the arrows stay; the title changes at once. With reduced motion the weeks fade in where they are.`,
     tracks: [
       { part: "the weeks' slide", on: "the month", target: ".k-cal-weeks", property: "--slide", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
       { part: "the weeks' fade", on: "the month", target: ".k-cal-weeks", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
@@ -88,7 +88,7 @@ export default page({
   summary: "A month as six weeks led by their week numbers: today filled, the picked day ringed, holidays dotted, the months around dimmed.",
   live: () => stack("s8", "start", month(), text("Tab into the month: the arrows move a day or a week.", "small", "on_surface_variant")),
   description: [
-    "Rust `calendar::calendar`, QML `Calendar`. Press a day, an arrow or the title; or Tab to the month and use the arrow keys, Page Up and Page Down, Home and End, Enter. The wheel moves a month. The clock popup's.",
+    "Rust `calendar::calendar`, QML `Calendar`. Press a day, an arrow or the title; or Tab to the month and use the arrow keys, Page Up and Page Down, Home and End, Enter. A sideways turn of the wheel (Shift and the wheel, or a touchpad's sideways swipe) moves a month, a notch at a time; a turn up or down scrolls the page past it. The clock popup's.",
     "The header, a small control tall: the arrows at either end, Text icon buttons (sm, `chevron_left` and `chevron_right`, hinted Last month and Next month), and between them the title, the month and year in `subheading`, `on_surface`, on a pill `space.s12` inside, centred on whole device pixels. The title opens the year; the month is `space.s8` under the header.",
     DESCRIBED,
     "Today's disc is filled with `primary` and its number is `body_strong` in `on_primary`. The picked day's disc is ringed with `primary` in the thin stroke (`stroke.thin`, whole device pixels), its number as it was; picking today shows today. A holiday has a `tertiary` dot, `space.s4` across, `space.s4` above the disc's foot (`on_primary` on today), and its name in a hint under the day while it is lit. The first weekday is the clock's setting, Monday by default as ISO 8601 has it, and the names are the locale's.",

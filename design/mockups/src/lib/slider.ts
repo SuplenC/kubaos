@@ -25,7 +25,7 @@
 // keys and the horizontal wheel move it, and it draws itself again.
 
 import { settings } from "../site/settings.ts";
-import { pin, type Pinned } from "./control.ts";
+import { pin, type Pinned, sideways } from "./control.ts";
 import { focusRing } from "./focus.ts";
 import { withHint } from "./hint.ts";
 import { icon } from "./icon.ts";
@@ -38,9 +38,6 @@ export type SliderSize = (typeof SLIDER_SIZES)[number];
 
 /** A step of a continuous slider from an arrow key or a wheel's notch: a twentieth. */
 const NUDGE = 0.05;
-
-/** A wheel's notch, as the toolkits count it: Qt's `angleDelta` and a browser's line of 100. */
-const NOTCH = 100;
 
 // The locale's percentage: a value is never put together from a number and a sign by hand.
 const PERCENT = new Intl.NumberFormat("en-GB", { style: "percent", maximumFractionDigits: 0 });
@@ -428,23 +425,12 @@ export function slider(options: SliderOptions): HTMLElement {
       }
       event.preventDefault();
     });
-    // Only the horizontal wheel steps it, a tilt or Shift with the wheel, wheel right raising it: the
-    // vertical wheel scrolls the page past it, as everywhere else.
-    let turned = 0;
-    root.addEventListener(
-      "wheel",
-      (event) => {
-        if (event.deltaX === 0) return;
-        event.preventDefault();
-        turned += event.deltaX;
-        const notches = Math.trunc(turned / NOTCH);
-        if (notches === 0) return;
-        turned -= notches * NOTCH;
-        if (stepping) stepTo(index + notches);
-        else moveTo(value + notches * NUDGE);
-      },
-      { passive: false },
-    );
+    // Only a sideways turn of the wheel steps it, wheel right raising it: the vertical wheel scrolls
+    // the page past it, as everywhere else.
+    sideways(root, (notches) => {
+      if (stepping) stepTo(index + notches);
+      else moveTo(value + notches * NUDGE);
+    });
   }
 
   // Drawn once it is laid out, and again whenever its width or the scale changes it.

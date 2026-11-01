@@ -15,7 +15,7 @@
 // moving onto a day puts the keyboard there, so one day is lit at a time. A new month slides in from
 // the side it lies on over `short` on `emphasized_decel`.
 
-import { type Pinned, pin } from "./control.ts";
+import { type Pinned, pin, sideways } from "./control.ts";
 import { focusRing } from "./focus.ts";
 import { withHint } from "./hint.ts";
 import { iconButton } from "./icon-button.ts";
@@ -431,16 +431,12 @@ export function calendar(options: CalendarOptions): HTMLElement {
     event.stopPropagation();
   });
 
-  body.addEventListener(
-    "wheel",
-    (event) => {
-      if (event.deltaY === 0) return;
-      event.preventDefault();
-      if (yearView) yearBy(Math.sign(event.deltaY));
-      else goTo(shiftMonth({ ...shown, day: 1 }, Math.sign(event.deltaY)));
-    },
-    { passive: false },
-  );
+  // Only a sideways turn of the wheel leafs the months: a turn up or down scrolls the page past
+  // the calendar, as everywhere else.
+  sideways(body, (notches) => {
+    if (yearView) yearBy(notches);
+    else goTo(shiftMonth({ ...shown, day: 1 }, notches));
+  });
 
   drawNames();
   drawWeeks();
