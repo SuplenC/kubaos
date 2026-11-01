@@ -1906,9 +1906,9 @@
 /* A collapsible (`lib/collapsible.ts`): its header, then the room for what it holds, which eases
    from nothing to the content's height (`--content-height`) as `--open` goes to 1: over `medium`
    on `standard_decel` opening, and over `short` on `standard_accel` closing, the chevron turning
-   with it. Moving, the room cuts what it holds; fully open it doesn't, so a lit control inside
-   keeps its glow. With reduce motion it opens and closes at once, and what it holds fades in over
-   `short`. */
+   and the rail growing with it. Moving, the room cuts what it holds; fully open it doesn't, so a
+   lit control inside keeps its glow. With reduce motion it opens and closes at once, the chevron
+   jumps, and what it holds fades in over `short`. */
 .k-collapsible {
   display: flex;
   flex: none;
@@ -1929,8 +1929,9 @@
 }
 
 /* The header: `size.row` tall at the control radius, `space.s12` inside, no fill. Its title is
-   `on_surface` and its chevron `on_surface_variant`; lit it draws the tube, pressed by day the
-   tone tints it as under a Text button. Disabled, both are at `opacity.disabled_content`. */
+   `on_surface`, its chevron and summary `on_surface_variant`; lit it draws the tube, pressed by
+   day the tone tints it as under a Text button. Disabled, all three are at
+   `opacity.disabled_content`. */
 .k-collapsible-header {
   appearance: none;
   position: relative;
@@ -1962,8 +1963,17 @@
   --mark: var(--title);
 }
 
+/* Shut it points right, a quarter turn back from open, where it points down. */
 .k-collapsible-chevron {
-  transform: rotate(calc(var(--open) * 180deg));
+  transform: rotate(calc((var(--open) - 1) * 90deg));
+}
+
+/* The summary takes its words' width, up to half the line; past that, and where the title needs
+   the room, it ends in an ellipsis. */
+.k-collapsible-summary {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
 }
 
 .k-collapsible-body {
@@ -1976,11 +1986,13 @@
   overflow: visible;
 }
 
-/* What it holds: `space.s8` under the header, `space.s12` in at the sides, in line with the title. */
+/* What it holds: `space.s8` under the header, `space.s12` in at the end, and at the start in line
+   with the title, past the chevron and its gap. */
 .k-collapsible-content {
+  position: relative;
   display: flex;
   flex-direction: column;
-  padding: var(--space-s8) var(--space-s12) 0;
+  padding: var(--space-s8) var(--space-s12) 0 calc(2 * var(--space-s12) + var(--type-body_strong-icon));
 }
 
 @keyframes k-fade-in {
@@ -1991,6 +2003,57 @@
 
 [data-reduced] .k-collapsible[data-open] > .k-collapsible-body > .k-collapsible-content {
   animation: k-fade-in var(--motion-short) var(--easing-standard);
+}
+
+/* The rail: a strip `size.collapsible_rail` wide down what it holds, from its top to its foot
+   inside its padding, centred under the chevron, that takes the pointer; the line drawn down its
+   middle, `tabs.rail` thick at night and `tabs.rail_day` by day in whole device pixels, as the
+   tabs' rail is. At rest the line is the tone at the spinner's ring's `opacity.spinner_track`; lit
+   under the pointer it fades over `short` to the core with the content glow round it at night, the
+   tone by day, and solid glass (`primary_glass`) with the signs off. Pressed, at night the core
+   goes toward `primary_flash` and the glow swells to `focus.pressed_glow` times its own; by day the
+   tone tints the strip at `opacity.press_tint`. Disabled, the line is at
+   `opacity.disabled_content` and the strip takes no pointer. */
+.k-collapsible-rail {
+  position: absolute;
+  top: var(--space-s8);
+  bottom: 0;
+  left: round(nearest, calc(var(--space-s12) + (var(--type-body_strong-icon) - var(--size-collapsible_rail)) / 2), 1px);
+  width: var(--size-collapsible_rail);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  --dim: 1;
+  --rail: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+.k-collapsible-rail[aria-disabled="true"] {
+  pointer-events: none;
+  --dim: var(--opacity-disabled_content);
+}
+
+.k-collapsible-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: round(nearest, calc((var(--size-collapsible_rail) - var(--rail)) / 2), 1px);
+  width: var(--rail);
+  --unlit: rgb(from var(--color-primary) r g b / var(--opacity-spinner_track));
+  --colour: color-mix(in srgb, var(--color-primary_glass), var(--color-primary_core) calc(var(--signs) * 100%));
+  --flashed: color-mix(in srgb, var(--colour), var(--color-primary_flash) calc(var(--press) * var(--signs) * 100%));
+  background: color-mix(in srgb, var(--unlit), var(--flashed) calc(var(--lit) * 100%));
+  opacity: var(--dim);
+  --glow: calc(var(--focus-content_glow) * var(--on) * (1 + (var(--focus-pressed_glow) - 1) * var(--press)));
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / var(--glow)));
+}
+
+/* Its hint, "Close" and the title, beside the rail at the pointer's height (`--at`, the middle
+   when pinned), `space.s8` past the strip's end as a hint is under its control, kept within the
+   rail's length on whole device pixels. */
+.k-collapsible-rail > .k-hint {
+  --tall: calc(var(--type-label-line) + 2 * var(--space-s4));
+  top: clamp(0px, round(nearest, calc(var(--at, 50%) - var(--tall) / 2), 1px), calc(100% - var(--tall)));
+  left: calc(100% + var(--space-s8));
 }
 
 /* A tile (`lib/tile.ts`): `size.row_two_line` tall at the control radius, `space.s12` inside,

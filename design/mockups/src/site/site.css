@@ -621,6 +621,22 @@ body {
   white-space: nowrap;
 }
 
+/* A scroll view for a sample: a panel's body, six rows tall, that scrolls with no bar of its own.
+   Its outline is the edge the scroll cuts at, and its padding is the panel's, so a lit control
+   inside keeps its glow until it scrolls past that edge. */
+.page-scroll-view {
+  display: block;
+  box-sizing: border-box;
+  width: var(--size-panel);
+  height: calc(6 * var(--size-row));
+  padding: var(--space-s16) var(--container-0-padding);
+  overflow-y: auto;
+  scrollbar-width: none;
+  border-radius: var(--radius-surface);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
 .page-window {
   margin-top: var(--space-s16);
   border: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
