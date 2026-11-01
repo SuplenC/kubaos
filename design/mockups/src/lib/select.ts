@@ -17,7 +17,6 @@ import { icon } from "./icon.ts";
 import { filling, row } from "./layout.ts";
 import { menuItem } from "./menu.ts";
 import { probe, variant } from "./probe.ts";
-import { nested, role } from "./radius.ts";
 import { clamped } from "./text.ts";
 
 /** The most options in view before the list scrolls. */
@@ -85,12 +84,10 @@ export function select(options: SelectOptions): HTMLElement {
   list.setAttribute("role", "listbox");
   // A scrolling box takes Tab of its own in Chromium; the keyboard stays on the select instead.
   list.tabIndex = -1;
-  const corner = nested(role("control"), "s4").css;
   const items = options.options.map((label, index) => {
     const item = menuItem({ label });
     item.id = `${id}-${index}`;
     item.setAttribute("role", "option");
-    item.style.setProperty("--corner", corner);
     return item;
   });
   list.append(...items);

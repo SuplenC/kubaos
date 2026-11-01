@@ -16,7 +16,7 @@ One of a list too long for radio rows or tabs. A row of tabs that would run past
 
 - The box rises to the ladder's step 2, a menu's (`DESIGN.md`, "Elevation"): the step's shadow and rim, `surface_container_high` by day and `surface_container_highest` at night. Its hairline goes, its tube goes out and the chevron turns up.
 - The value row stays where it was, at the top, and the list is under it. A rule in a divider's soft outline (`outline_variant` at `opacity.outline_soft`), 12 in from the sides, separates them.
-- The options are menu items (`menu.md`): 32 (`control_sm`) tall, 4 inside the surface, their words `body`, lined up with the value row's start, 12 in, and their corners the control radius less 4. There is no check.
+- The options are menu items (`menu.md`): 32 (`control_sm`) tall, 4 inside the surface, their words `body`, lined up with the value row's start, 12 in, and their corners the control radius less 4. There is no check. The open list is built as a popover's menu is, the one rule for every raised list.
 - The highlighted row is a lit menu item, `secondary_container` with `on_secondary_container`, fading over `short`. The pointer moving onto a row and the keyboard move one highlight.
 - The picked option's words are `primary_lit`, a picked tab's, with the label glow round them at night while the signs are on. Highlighted, the pick takes the highlight's colours.
 - Past eight options the list scrolls, with no bar of its own. The surface is the value row and the list's visible part, never the whole list; the value row never scrolls. It opens scrolled so the pick has three rows above it where the list allows, and the highlight keeps itself in view, 4 clear of the list's edge.

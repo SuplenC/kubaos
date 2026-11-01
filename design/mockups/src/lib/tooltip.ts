@@ -2,7 +2,7 @@
 // `kubaos-ui`'s `tooltip::tooltip` and `tooltip::with_tooltip`, `KubaOS.Components`' `Tooltip`
 // (`docs/design/components/tooltip.md`). A title in `body_strong`, the body in `small` and
 // `on_surface_variant` `space.s4` under it, and what it holds `space.s8` below (its keys, as
-// `KeyHints`), on a popover `size.menu` wide: `surface_container`, the surface radius, `space.s12`
+// `KeyHints`), on a popover `size.menu` wide: `surface_container`, the control radius, `space.s12`
 // inside, raised to the ladder's top step, a tooltip's (`lib/elevation.ts`).
 //
 // It isn't neon: no line, no glow and no states of its own. It floats `space.s8` above its control,
@@ -14,7 +14,10 @@ import { stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { wrapped } from "./text.ts";
 
-/** `content` on a popover `size.menu` wide, raised to `step`: `kubaos-ui`'s `menu::popover`. */
+/**
+ * `content` on a popover `size.menu` wide, raised to `step`, at the control radius: `space.s4`
+ * inside round a menu, `space.s12` round anything else. `kubaos-ui`'s `menu::popover`.
+ */
 export function popover(step: Step, ...content: Element[]): HTMLElement {
   const card = raise(document.createElement("span"), step);
   card.classList.add("k-popover");

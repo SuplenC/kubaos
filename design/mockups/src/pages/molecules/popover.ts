@@ -63,7 +63,7 @@ const CLOSES: Move = {
 };
 
 const DESCRIBED =
-  "`surface_container`, `surface_container_high` at night (a raised part takes the container role one above its day one), at the surface radius (`radius.surface`, 24), `space.s12` inside, so the items in it take 24 − 12 = 12, the control radius. It is raised to the ladder's step 2 over the plane it is in: the contact layer, 4 blur, and the ambient layer, 8 down and 32 blur, both of `shadow`, stronger at night; and the rim, a hairline of `on_surface` inside its edge at `elevation.rim` (`light_rim` by day). It is `size.menu` (240) wide.";
+  "`surface_container`, `surface_container_high` at night (a raised part takes the container role one above its day one), at the control radius (`radius.control`, 12), whatever it holds. Holding a menu it is `space.s4` inside, so the items take 12 − 4 = 8 and their curves run parallel to its own, and their words start `space.s12` from its edge; holding words of its own it is `space.s12` inside. A popover's menu and a select's open list measure the same: one build for every raised list. It is raised to the ladder's step 2 over the plane it is in: the contact layer, 4 blur, and the ambient layer, 8 down and 32 blur, both of `shadow`, stronger at night; and the rim, a hairline of `on_surface` inside its edge at `elevation.rim` (`light_rim` by day). It is `size.menu` (240) wide.";
 
 export default page({
   level: "molecules",
@@ -125,13 +125,14 @@ export default page({
   },
   measures: {
     samples: nonEmpty([
-      { name: "A menu's", for: "Its width, padding, corners and shadow.", sample: card },
-      { name: "Words", for: "Its padding round what it holds.", sample: () => words() },
+      { name: "A menu's", for: "Its width, padding round a menu, corners and shadow.", sample: card },
+      { name: "Words", for: "Its padding round words of its own.", sample: () => words() },
     ]),
     measures: [
       { what: "Its width, a menu's.", token: "size-menu" },
-      { what: "Its padding.", token: "space-s12" },
-      { what: "Its corners.", token: "radius-surface" },
+      { what: "Its padding round a menu.", token: "space-s4" },
+      { what: "Its padding round words of its own.", token: "space-s12" },
+      { what: "Its corners.", token: "radius-control" },
       { what: "The rim inside its edge: one device pixel.", token: "stroke-hairline_device_px" },
       { what: "Its shadow's contact layer: its blur.", token: "elevation-2-contact-blur" },
       { what: "Its shadow's ambient layer: its drop.", token: "elevation-2-ambient-y" },

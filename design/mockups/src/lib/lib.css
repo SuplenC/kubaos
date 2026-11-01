@@ -891,11 +891,13 @@
   position: relative;
   display: block;
   flex: none;
+  --key-ink: var(--color-on_surface_variant);
+  --key-edge: var(--color-outline_variant);
   --inner: calc(round(up, calc(var(--natural) * var(--px) - 0.001px), 1px) + 2 * var(--space-s4));
   width: max(var(--size-keycap), var(--inner));
   height: var(--size-keycap);
   border-radius: var(--radius-small);
-  background: var(--color-outline_variant);
+  background: var(--key-edge);
 }
 
 .k-keycap::before {
@@ -903,7 +905,7 @@
   position: absolute;
   inset: 0 0 var(--stroke-hairline_device_px);
   box-sizing: border-box;
-  border: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  border: var(--stroke-hairline_device_px) solid var(--key-edge);
   border-radius: inherit;
   background: var(--color-surface_container_highest);
 }
@@ -965,17 +967,23 @@
   --ambient-blur: var(--elevation-4-ambient-blur);
 }
 
-/* A popover (`lib/tooltip.ts`): `size.menu` wide, `space.s12` inside, at the surface radius,
-   raised on `surface_container` (`surface_container_high` at night). */
+/* A popover (`lib/tooltip.ts`): `size.menu` wide, at the control radius, raised on
+   `surface_container` (`surface_container_high` at night). Holding words it is `space.s12` inside;
+   holding a menu, `space.s4`, as a select's open list is, so the items' corners run parallel to its
+   own and their words still start `space.s12` from its edge. */
 .k-popover {
   display: block;
   flex: none;
   box-sizing: border-box;
   width: var(--popover-width, var(--size-menu));
   padding: var(--space-s12);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-control);
   --fill: var(--color-surface_container);
   --fill-night: var(--color-surface_container_high);
+}
+
+.k-popover:has(> .k-menu) {
+  padding: var(--space-s4);
 }
 
 /* A tooltip's card over its control: shown while the control is lit, fading in and out over
@@ -1570,11 +1578,13 @@
   outline: none;
 }
 
-/* A menu's item: `size.control_sm` tall, `space.s12` inside, its corners concentric inside the
-   popover's. Lit (the keyboard on it, which the pointer moves), it fades onto `secondary_container`
-   with its words, symbol and check `on_secondary_container`, over `short`; pressed, the container
-   lifts to `secondary_container_pressed` over `micro`. At rest its content is `on_surface`, or
-   `error` on a danger item; disabled, `on_surface` at `opacity.disabled_content`. */
+/* A menu's item, a select's option too: `size.control_sm` tall, `space.s8` inside, its corners
+   concentric inside its surface's (`--corner`). Lit (the keyboard on it, which the pointer moves),
+   it fades onto `secondary_container` with its words, symbol and check `on_secondary_container`, and
+   its keycaps' keys and edges `primary`, over `short`; pressed, the container lifts to
+   `secondary_container_pressed` over `micro`. At rest its content is `on_surface`, or `error` on a
+   danger item, whose keycaps keep their own colours; disabled, `on_surface` at
+   `opacity.disabled_content`. */
 .k-menu-item {
   position: relative;
   display: flex;
@@ -1582,7 +1592,7 @@
   align-items: center;
   box-sizing: border-box;
   height: var(--size-control_sm);
-  padding: 0 var(--space-s12);
+  padding: 0 var(--space-s8);
   border-radius: var(--corner);
   cursor: pointer;
   --lit: 0;
@@ -1619,17 +1629,32 @@
   --ink: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
 }
 
+/* The item's parts across all of it, its words taking what the rest leave, so its keys sit at its end. */
+.k-menu-item > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .k-menu-words {
   display: block;
 }
 
-/* The check's room, a `body` symbol's, kept when unchecked so the items' ends line up. */
+.k-menu-keys {
+  margin-inline-start: auto;
+}
+
+.k-menu-item:not([data-danger]) .k-keycap {
+  --key-ink: color-mix(in srgb, var(--color-on_surface_variant), var(--color-primary) calc(var(--lit) * 100%));
+  --key-edge: color-mix(in srgb, var(--color-outline_variant), var(--color-primary) calc(var(--lit) * 100%));
+}
+
+/* The check's room, the symbol's, kept when unchecked so the items' ends line up. */
 .k-menu-check {
   position: relative;
   display: block;
   flex: none;
-  width: var(--type-body-icon);
-  height: var(--type-body-icon);
+  width: var(--icon-s16);
+  height: var(--icon-s16);
 }
 
 .k-menu-check > .k-icon {
@@ -1638,10 +1663,11 @@
   top: 0;
 }
 
-/* The hairline between two groups, `space.s4` clear of each. */
+/* The hairline between two groups, `space.s4` clear of each, inset as the items' words are, so it
+   starts and ends `space.s12` from the popover's edge, as a select's rule does. */
 .k-menu-separator {
   align-self: stretch;
-  padding: var(--space-s4) 0;
+  padding: var(--space-s4) var(--space-s8);
 }
 
 
@@ -1817,10 +1843,6 @@
 .k-select-room[data-up] .k-select-list {
   top: auto;
   bottom: var(--size-control_md);
-}
-
-.k-select-list > .k-menu-item {
-  padding: 0 var(--space-s8);
 }
 
 .k-select-list > .k-menu-item[data-taken] {
