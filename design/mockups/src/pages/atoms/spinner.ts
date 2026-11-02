@@ -1,5 +1,5 @@
 // The Spinner page: `docs/design/components/spinner.md`. Work that doesn't know how far it is: a
-// thin arc that turns and breathes over a faint full ring, an icon size across. It isn't a
+// lit stretch of neon turning round an unlit glass ring, an icon size across. It isn't a
 // control and isn't neon: it turns while the work runs, and a power change only recolours it.
 
 import { shown, type Words } from "../../lib/content.ts";
@@ -40,7 +40,7 @@ export default page<"loading">({
   level: "atoms",
   slug: "spinner",
   title: "Spinner",
-  summary: "Work that doesn't know how far it is: a thin arc that turns and breathes over a faint full ring, an icon size across.",
+  summary: "Work that doesn't know how far it is: a lit stretch of neon turning round an unlit glass ring, an icon size across.",
   live: () => stack("s32", "start", specimen(), row("s32", "centre", spinner("s32"), spinner("s48"), spinner("s20", "error"))),
   description: [
     "Rust `progress::spinner(look, size, seconds, color)`, QML `Spinner` (`size`, `color`, `running`). It is for work that can't say how far it has got; work that can is a progress bar. Only such work spins: a running animation makes every frame wait on the screen's refresh, typing's included, so a job that can say how far it is shows that instead.",
