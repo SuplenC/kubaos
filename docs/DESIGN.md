@@ -221,7 +221,7 @@ Every radius means something: what the shape is. There are five, plus full, on o
 - **A control placed inside content keeps its role.** A button in a card or a field in a dialog isn't filling its parent, so it keeps the control radius; nesting is for a shape that fills one less an inset. The marks (a checkbox, a keycap) keep the small radius wherever they are.
 - **Why roles:** radii with no reason to pick one over another meant every surface picked its own, and nothing told a 16 card from a 16 button. A role says what the shape is, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.
 - The lint fails on a radius written as a number, a shell radius that isn't a role (`Theme.rounding.lg`), and a radius derived by hand (`outer - inset`); see "Checks".
-- *Not built yet: `kubaos-ui` and `KubaOS.Components` still draw a card, a list well, a toast and a dialog at the surface radius (24), a well 12 inside with its rows at 12, a table's rows at 12 and a hint at 4; the mockups draw the ladder.*
+- *Not built yet: `kubaos-ui` and `KubaOS.Components` still draw a card, a list well, a toast and a dialog at the surface radius (24), a well 12 inside with its rows at 12, a table's rows at 12, a banner, an error block and a log at 24, a step at 12 in a well, and a hint at 4; the mockups draw the ladder.*
 
 ## Motion
 
@@ -244,6 +244,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `settle` | 400 | The dark beat in the new colours after a theme change's colours change, before the lights strike. |
 | `strike` | 600 | Every light striking on together at the end of a theme change or a switch to dark. |
 | `toast` | 3600 | A toast staying once it has arrived, long enough to read its line twice. Not a move: reduce motion doesn't cap it. |
+| `hold` | 1100 | A held button held until it acts, its timed bar filling meanwhile: Kōbō's Install, the hold that erases a disk. Not a move: reduce motion doesn't cap it. *Not built yet: Kōbō times its hold with a constant of its own.* |
 
 | Curve (`[easing.*]`) | Bézier | For |
 |---|---|---|
@@ -567,7 +568,7 @@ A new surface implements the whole map, not the keys it happens to need. Today n
   | Sharing | `sharing` | `sharing_core` | `sharing_unlit` | A control marking what is shared off the machine. |
 
   *Not built yet: the libraries light a `Danger` button in `error`, and a `Danger` icon button and a `Cold` chip in the accent. No control has the success, warning or sharing tone yet.*
-- **Fixed signals are always lit,** so they stand out against the unlit accent controls. A status message's lit edge is the box's own left edge, tapering into both corners over the same length and ending in round tips, drawn as the core with the tone's glow. *Not built yet: no status message draws it; its component's mockup will.*
+- **Fixed signals are always lit,** so they stand out against the unlit accent controls. A status message's lit edge is the box's own left edge, tapering into both corners over the same length and ending in round tips, drawn as the core with the tone's glow: a `Banner`'s and an `ErrorBlock`'s. *Not built yet: no library draws it; the mockups do, tapering it into the corners without its round tips.*
 - **The contrast check holds the tube** against every surface it is drawn on: the page, a well, a panel, a card or a dialog, a field's fill, a picked card's, in the accent, the cold accent and the error colour (`[contrast]`).
 - **Focus is a state of the control**, as CSS's `focus:` is: drawn as part of the control, it follows the control's rules. The glow is always its full size, never shrunk to fit; whatever clips the control clips the glow, at rest or while scrolling, so a focused field scrolled half out of view shows its glow trimmed where the scroll cuts it. It sits in the control's place in the draw order: what is drawn after the control (the next tile in a grid) covers its glow, and what is drawn before shows under it.
 - **The glow is cut only at an edge you can see**: a well's or a card's outline, a menu's or a log's edge, the panel's or the window's own edge. A scroll with no visible edge of its own (a page's, a panel's) reaches out past its box, so it never cuts a resting control's glow (see `Scroll`); a panel's room that holds its content without scrolling (the control center's tab) doesn't clip at all, so the panel's edge cuts the glow; one that scrolls on a short screen (the Keyboard tab) scrolls in a `Scroll`.

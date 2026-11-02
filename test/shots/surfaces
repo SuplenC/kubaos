@@ -91,6 +91,16 @@ mockups/picture-choice design/mockups/src/pages/molecules/picture-choice.ts
 mockups/icon-tile   design/mockups/src/pages/molecules/icon-tile.ts
 mockups/badged-icon design/mockups/src/pages/molecules/badged-icon.ts
 mockups/pill        design/mockups/src/pages/molecules/pill.ts
+mockups/progress-bar design/mockups/src/pages/molecules/progress-bar.ts
+mockups/progress-panel design/mockups/src/pages/molecules/progress-panel.ts
+mockups/spinner-in-context design/mockups/src/pages/molecules/spinner-in-context.ts
+mockups/empty-state design/mockups/src/pages/molecules/empty-state.ts
+mockups/error-block design/mockups/src/pages/molecules/error-block.ts
+mockups/log         design/mockups/src/pages/molecules/log.ts
+mockups/meter       design/mockups/src/pages/molecules/meter.ts
+mockups/sparkline   design/mockups/src/pages/molecules/sparkline.ts
+mockups/banner      design/mockups/src/pages/molecules/banner.ts
+mockups/step        design/mockups/src/pages/molecules/step.ts
 mockups/colour      design/mockups/src/pages/foundations/colour.ts
 mockups/type        design/mockups/src/pages/foundations/type.ts
 mockups/space       design/mockups/src/pages/foundations/space.ts
