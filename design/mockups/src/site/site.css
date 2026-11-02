@@ -628,7 +628,9 @@ body {
 }
 
 .page-window {
+  box-sizing: border-box;
   margin-top: var(--space-s16);
+  padding: var(--space-s24);
   border: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
   border-radius: var(--radius-surface);
   overflow: hidden;
