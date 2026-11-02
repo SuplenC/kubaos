@@ -186,6 +186,10 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
     out.comment("Tabs: their rail's thickness at night and by day, rounded half up to device pixels.");
     out.length("tabs-rail", tabs.rail);
     out.length("tabs-rail_day", tabs.rail_day);
+    let banner = &tokens.banner;
+    out.comment("A banner's rail: its thickness at night and by day, rounded half up to device pixels.");
+    out.length("banner-rail", banner.rail);
+    out.length("banner-rail_day", banner.rail_day);
     let icon_tile = &tokens.icon_tile;
     out.comment("An icon tile's app icon: the alphas its drawing is measured at, and what makes it a plate.");
     out.var("icon_tile-ink", number(icon_tile.ink));

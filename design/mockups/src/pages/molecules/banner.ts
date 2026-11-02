@@ -108,7 +108,7 @@ function plain(options: BannerOptions): HTMLElement {
 }
 
 const DESCRIBED =
-  "A status message lying flat in the page as a card does: `surface_container` on a window's `surface`, the sunken soft hairline inside its edge, `radius.content` and `space.s16` inside. Its tone is a rail of neon down its start side, from the top padding to the bottom one with round ends: the tabs' and the collapsible's rail, `tabs.rail` at night and `tabs.rail_day` by day, centred in a lane `space.s4` wide `space.s12` in, so the words start `space.s12` past the lane, 28 in. In it the symbol in the tone at `subheading`'s 24 on the title's first line, `space.s16` from a `subheading` title in `on_surface` over a `body` line and any paragraphs more in `on_surface_variant`, `space.s4` apart, all wrapping; its button bar `space.s16` under the words, across their width; an optional foot `space.s16` under the rest.";
+  "A status message lying flat in the page as a card does: `surface_container` on a window's `surface`, the sunken soft hairline inside its edge, `radius.content` and `space.s16` inside. Its tone is a rail of neon down its start side, from the top padding to the bottom one with round ends: the tabs' and the collapsible's rail made thicker, `banner.rail` at night and `banner.rail_day` by day, filling a lane `space.s4` wide `space.s12` in, so the words start `space.s12` past the lane, 28 in. In it the symbol in the tone at `subheading`'s 24 on the title's first line, `space.s16` from a `subheading` title in `on_surface` over a `body` line and any paragraphs more in `on_surface_variant`, `space.s4` apart, all wrapping; its button bar `space.s16` under the words, across their width; an optional foot `space.s16` under the rest.";
 
 export default page<"rest">({
   level: "molecules",
@@ -186,8 +186,8 @@ export default page<"rest">({
       { what: "Inside it at the top, the end and the foot, the rail's ends in from its top and foot, between the symbol and the words, between the words and the button bar, and above the foot.", token: "space-s16" },
       { what: "The rail's lane in from its start edge, and the words past the lane.", token: "space-s12" },
       { what: "The rail's lane, the rail centred in it.", token: "space-s4" },
-      { what: "The rail, at night, before it is rounded to whole device pixels.", token: "tabs-rail" },
-      { what: "The rail by day.", token: "tabs-rail_day" },
+      { what: "The rail, at night, before it is rounded to whole device pixels.", token: "banner-rail" },
+      { what: "The rail by day.", token: "banner-rail_day" },
       { what: "Between the button bar's buttons.", token: "space-s8" },
       { what: "Between the title, the body and each paragraph.", token: "space-s4" },
       { what: "The symbol, `subheading`'s.", token: "type-subheading-icon" },

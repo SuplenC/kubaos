@@ -66,7 +66,7 @@ const OPENS: Move = {
 };
 
 const DESCRIBED =
-  "A status message lying flat in the page: `error_container` at `opacity.error_fill`, the sunken soft hairline inside its edge, `radius.content` and `space.s16` inside. Down its start side runs a rail of neon in `error`, from the top padding to the bottom one with round ends: the tabs' and the collapsible's rail, `tabs.rail` at night and `tabs.rail_day` by day, centred in a lane `space.s4` wide `space.s12` in, so the words start `space.s12` past the lane, 28 in; `error_core` with the content glow round it at night while the signs are on, glass while they are off, `error` by day. In it the `error` symbol at `subheading`'s 24, `space.s16` from the message in `subheading` over the hint in `body`, `on_surface_variant`, `space.s4` under it; the symbol is centred down the words, and the words wrap.";
+  "A status message lying flat in the page: `error_container` at `opacity.error_fill`, the sunken soft hairline inside its edge, `radius.content` and `space.s16` inside. Down its start side runs a rail of neon in `error`, from the top padding to the bottom one with round ends: the tabs' and the collapsible's rail made thicker, `banner.rail` at night and `banner.rail_day` by day, filling a lane `space.s4` wide `space.s12` in, so the words start `space.s12` past the lane, 28 in; `error_core` with the content glow round it at night while the signs are on, glass while they are off, `error` by day. In it the `error` symbol at `subheading`'s 24, `space.s16` from the message in `subheading` over the hint in `body`, `on_surface_variant`, `space.s4` under it; the symbol is centred down the words, and the words wrap.";
 
 export default page<"error">({
   level: "molecules",
@@ -129,8 +129,8 @@ export default page<"error">({
       { what: "Inside it at the top, the end and the foot, the rail's ends in from its top and foot, between the symbol and the words, and between it, the log and the actions.", token: "space-s16" },
       { what: "The rail's lane in from its start edge, and the words past the lane.", token: "space-s12" },
       { what: "The rail's lane, the rail centred in it.", token: "space-s4" },
-      { what: "The rail, at night, before it is rounded to whole device pixels.", token: "tabs-rail" },
-      { what: "The rail by day.", token: "tabs-rail_day" },
+      { what: "The rail, at night, before it is rounded to whole device pixels.", token: "banner-rail" },
+      { what: "The rail by day.", token: "banner-rail_day" },
       { what: "Between the message and the hint.", token: "space-s4" },
       { what: "The symbol, `subheading`'s.", token: "type-subheading-icon" },
       { what: "The message's line, `subheading`'s.", token: "type-subheading-line" },
