@@ -1,0 +1,32 @@
+/* PanelPage (`lib/panel-page.ts`): a column `size.panel` wide, `space.s16` inside at its top and its
+   foot, its bands and body `space.s16` apart, as tall as its content up to the screen's room inside
+   the frame (`--sheet-room`), past which only the body shrinks and scrolls. */
+.k-panel-page {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-s16);
+  box-sizing: border-box;
+  width: var(--size-panel);
+  max-height: var(--sheet-room, none);
+  padding: var(--space-s16) 0;
+}
+
+.k-panel-page[data-sized] {
+  width: max-content;
+}
+
+.k-panel-page > .k-panel-band {
+  flex: none;
+}
+
+/* The body: the one part that gives up height, its scroll as tall as what it holds until then. */
+.k-panel-page > .k-panel-body {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.k-panel-page > .k-panel-body > .k-scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+}
