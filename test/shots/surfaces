@@ -54,6 +54,10 @@ plymouth            system/files/plymouth system/files/fonts system/files/initra
 grub                system/files/grub system/files/fonts test/shots/boot/grub
 cursor              crates/kubaos-cursor crates/kubaos-cli/src/cursor.rs crates/kubaos-cli/src/main.rs test/shots/boot/cursor test/shots/boot/cursor-palette.py test/shots/boot/cursor-sheet.py
 mockups             design/mockups test/shots/mockups
+mockups/page        design/mockups/src/pages/layout/page.ts
+mockups/header      design/mockups/src/pages/layout/header.ts
+mockups/stack       design/mockups/src/pages/layout/stack.ts
+mockups/grid        design/mockups/src/pages/layout/grid.ts
 mockups/button      design/mockups/src/pages/atoms/button.ts
 mockups/icon-button design/mockups/src/pages/atoms/icon-button.ts
 mockups/hint        design/mockups/src/pages/atoms/hint.ts

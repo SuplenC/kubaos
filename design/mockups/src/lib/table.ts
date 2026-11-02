@@ -13,6 +13,7 @@
 import "./lists.css";
 import { focusRing } from "./focus.ts";
 import { scaleOf } from "./list.ts";
+import { split } from "./layout.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
 import { clamped, text } from "./text.ts";
 import { length } from "./tokens.ts";
@@ -64,19 +65,6 @@ export interface TableOptions {
   readonly pinned?: TablePinned;
   /** Picking a row: the owner draws it picked. */
   readonly onPick?: (index: number) => void;
-}
-
-/**
- * Splits `width` device pixels less the gaps into `weights`' shares, in whole device pixels, the
- * spare ones to the first columns, so no two differ by more than one past their shares.
- */
-export function split(width: number, gap: number, weights: readonly number[]): number[] {
-  const room = Math.max(0, width - gap * (weights.length - 1));
-  const sum = weights.reduce((total, each) => total + each, 0) || 1;
-  const widths = weights.map((each) => Math.floor((room * each) / sum));
-  let spare = room - widths.reduce((total, each) => total + each, 0);
-  for (let index = 0; spare > 0; index = (index + 1) % widths.length, spare--) widths[index]! += 1;
-  return widths;
 }
 
 export function table(columns: readonly Column[], rows: readonly TableRowSpec[], options: TableOptions = {}): HTMLElement {

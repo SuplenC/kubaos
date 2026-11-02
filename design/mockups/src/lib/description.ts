@@ -7,9 +7,9 @@
 // never narrower than a label's longest word.
 
 import "./lists.css";
+import { split } from "./layout.ts";
 import { scaleOf } from "./list.ts";
 import { probe } from "./probe.ts";
-import { split } from "./table.ts";
 import { clamped, wrapped } from "./text.ts";
 import { length } from "./tokens.ts";
 
