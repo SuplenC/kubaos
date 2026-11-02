@@ -222,6 +222,15 @@ rail = 236
 # An app's sidebar, its list of pages beside the page: wider than Kōbō's rail,
 # since it lists settings' names, not a step's few words.
 sidebar = 264
+# SidebarPage's find box, floating in a page's top-right corner: a field wide enough for a
+# setting's name, and its "n of m" beside it, that covers no more of the page than it must.
+find = 320
+# CanvasPage's settings beside its canvas once the page is wide enough for both: a well of rows
+# with a value or a small control at the end, and no wider.
+canvas_settings = 400
+# The page width from which CanvasPage puts its settings beside the canvas: under it, the canvas
+# takes the page's width and the settings go below it.
+canvas_wide = 1000
 # An app's window: it opens centred and floating at its default, 1120 × 720,
 # and tiled it takes its tile but never goes below its minimum, 720 × 480.
 app_width = 1120
@@ -299,6 +308,9 @@ wallpaper = [16, 10]
 # A dialog at its shortest: 5:2 of its width, so a dialog that asks little
 # stands as a card, not a strip; the room it gains goes above its buttons.
 dialog = [5, 2]
+# CanvasPage's canvas on a page under `size.canvas_wide`: 42% of its width tall, room for a row of
+# screens and a laptop under them, capped so the settings' heading under it stays in view.
+canvas = [50, 21]
 
 # Type families. Nothing else draws text; symbols are drawn, see [symbols].
 [font.family]
@@ -697,6 +709,9 @@ frame = 0.94
 # A list behind what floats over it, turned toward the surface so it sits back
 # in either mode: the notifications under a group's fanned cards.
 recede = 0.60
+# A row that doesn't match what SidebarPage's find box searches for: it stays in its place, so
+# the page doesn't move, and stands back so the matches read.
+miss = 0.45
 # What darkens the desktop behind an open panel, lighter than a dialog's scrim:
 # a panel sits beside the windows rather than over a question.
 panel_scrim = 0.20
