@@ -2,7 +2,8 @@
 // (`docs/design/components/toast.md`). One `body` line saying what just happened, in the inverse
 // colours (`on_surface` behind `surface`) so it reads over anything, an optional symbol
 // (`body`'s 20) `space.s12` before it and the keys that undo it as key hints `space.s16` after it,
-// `space.s12` inside at the control radius.
+// `space.s12` inside at the control radius. It floats over its room, raised to the ladder's step 2
+// (`lib/elevation.ts`) as a popover is, its rim in `surface`.
 //
 // Its room is the surface it confirms in: it shows at the room's bottom, centred on a whole device
 // pixel, `space.s24` above the edge. It arrives over `short`, rising `space.s32` into place a whole
@@ -10,6 +11,7 @@
 // `medium`, fading (`standard_accel`). One shows at a time: a new one takes the place of the one
 // showing, which goes over `micro`. The pointer on it holds it; it never takes the keyboard.
 
+import { raise } from "./elevation.ts";
 import { icon } from "./icon.ts";
 import { keyHints } from "./keycap.ts";
 import { row } from "./layout.ts";
@@ -26,8 +28,8 @@ export interface ToastOptions {
 }
 
 export function toast(options: ToastOptions): HTMLElement {
-  const box = document.createElement("span");
-  box.className = "k-toast";
+  const box = raise(document.createElement("span"), 2);
+  box.classList.add("k-toast");
   box.setAttribute("role", "status");
   const words = wrapped(options.words, "body", "surface");
   words.classList.add("k-toast-words");

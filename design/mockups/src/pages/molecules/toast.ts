@@ -58,7 +58,7 @@ const TOAST = "a toast";
 
 const ARRIVES: Move = {
   name: "Arriving",
-  what: "It fades in over `short` on `emphasized_decel` as it rises `space.s32` into its place, a whole device pixel at a time, so its edges stay sharp. A toast isn't a light: it never flickers. With reduced motion it fades in where it stays, with no rise.",
+  what: "It fades in over `short` on `emphasized_decel` as it rises `space.s32` into its place, a whole device pixel at a time, so its edges stay sharp; its shadow fades in with it. A toast isn't a light: it never flickers. With reduced motion it fades in where it stays, with no rise.",
   tracks: [
     { part: "its fade", on: TOAST, target: ".k-toast", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
     { part: "its rise", on: TOAST, target: ".k-toast", property: "--rise", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
@@ -70,7 +70,7 @@ const ARRIVES: Move = {
 
 const LEAVES: Move = {
   name: "Leaving",
-  what: "After `duration.toast` (3.6 s, long enough to read its line twice; held while the pointer is on it, and counted again once it leaves), it fades out where it is over `medium` on `standard_accel`, something small leaving for good. With reduced motion the fade is capped at `short`; the stay isn't, since the words must still be read.",
+  what: "After `duration.toast` (3.6 s, long enough to read its line twice; held while the pointer is on it, and counted again once it leaves), it fades out where it is over `medium` on `standard_accel`, its shadow with it, something small leaving for good. With reduced motion the fade is capped at `short`; the stay isn't, since the words must still be read.",
   tracks: [{ part: "its fade", on: TOAST, target: ".k-toast", property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_accel" }],
   reduced: [{ part: "its fade", on: TOAST, target: ".k-toast", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" }],
   back: "cuts",
@@ -94,7 +94,7 @@ const REPLACED: Move = {
 };
 
 const DESCRIBED =
-  "One `body` line saying what just happened, in `surface` on `on_surface`, the inverse colours, so it reads over anything; an optional symbol (`body`'s 20) `space.s12` before the words; `space.s12` inside; the control radius (`radius.control`, 12), a small floating thing's, as a popover's. It is as wide as what it says, rounded up to a device pixel, up to its room less `space.s24` at either side; past that its words wrap and its corners stay the same.";
+  "One `body` line saying what just happened, in `surface` on `on_surface`, the inverse colours, so it reads over anything; an optional symbol (`body`'s 20) `space.s12` before the words; `space.s12` inside; the control radius (`radius.control`, 12), a small floating thing's, as a popover's. It floats over its window or panel, so it is raised to the ladder's step 2 with the popover and the menu (`[elevation]`, `docs/DESIGN.md`, \"Elevation\"): step 2's contact and ambient shadow, and the rim in `surface`, the colour of its words, since a rim of `on_surface` would be its own fill. It is as wide as what it says, rounded up to a device pixel, up to its room less `space.s24` at either side; past that its words wrap and its corners stay the same.";
 
 export default page({
   level: "molecules",
@@ -131,7 +131,7 @@ export default page({
       { name: "With keys", cell: () => over(FORGOT) },
     ],
     described: {
-      rest: "Showing: `on_surface` behind its words, symbol and key hints' words in `surface`, the keycaps their own colours. By day the same roles in daylight colours: a dark box on a light surface, where at night it is a light one on a dark surface.",
+      rest: "Showing, raised to step 2: `on_surface` behind its words, symbol and key hints' words in `surface`, the keycaps their own colours, the rim in `surface` and step 2's shadow under it. By day the same roles in daylight colours: a dark box on a light surface, where at night it is a light one on a dark surface.",
     },
   },
   focus: doesntApply("a toast never takes the keyboard and isn't neon: it has no line and no glow."),
@@ -166,6 +166,10 @@ export default page({
       { what: "The symbol, `body`'s.", token: "type-body-icon" },
       { what: "A keycap.", token: "size-keycap" },
       { what: "Its corners.", token: "radius-control" },
+      { what: "Its rim, inside its edge.", token: "stroke-hairline_device_px" },
+      { what: "Its shadow's contact layer: its blur.", token: "elevation-2-contact-blur" },
+      { what: "Its shadow's ambient layer: its drop.", token: "elevation-2-ambient-y" },
+      { what: "Its shadow's ambient layer: its blur.", token: "elevation-2-ambient-blur" },
       { what: "Above the surface's bottom edge, and the least room at either side.", token: "space-s24" },
       { what: "How far under its place it starts as it arrives.", token: "space-s32" },
     ],
