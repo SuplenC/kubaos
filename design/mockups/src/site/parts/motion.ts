@@ -243,9 +243,13 @@ function marks(playing: Loop): Mark[] {
 const SPREAD = "s48";
 
 /**
- * Lays each layout in `sample` (itself included) whose children carry a focus ring out as a grid,
- * `SPREAD` apart both ways: a row as one row of columns, a stack as one column. A layout inside a
- * control keeps its own gap.
+ * Spreads each layout in `sample` (itself included) whose children carry a focus ring `SPREAD`
+ * apart: a row as one row of columns, a stack as one column, probed as that grid. A layout inside
+ * a control keeps its own gap.
+ *
+ * HAZARD: only the gap changes; the layout stays the row or stack it is. Drawn as a CSS grid, a
+ * child that stretches across a stack (a `within`'s, a slider) shrinks to its content, and a list's
+ * well, whose only content is its scrolling pane out of the flow, to nothing.
  */
 function spread(sample: Element): void {
   const layouts = [sample, ...sample.querySelectorAll("[data-layout]")].filter(
@@ -255,9 +259,7 @@ function spread(sample: Element): void {
     const columns = layout.classList.contains("k-row") ? layout.children.length : 1;
     // `layout()` writes its align as one of `Align`'s words.
     const align = (layout.dataset.align ?? "start") as Align;
-    layout.dataset.playerGrid = "";
     layout.style.setProperty("--gap", `var(--space-${SPREAD})`);
-    layout.style.setProperty("--columns", String(columns));
     probe(layout, { role: "grid", columns, gap: length(`space-${SPREAD}`), align });
   }
 }
