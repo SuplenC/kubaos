@@ -29,6 +29,7 @@ pub struct Tokens {
     pub caret: Caret,
     pub spinner: Spinner,
     pub tabs: Tabs,
+    pub icon_tile: IconTile,
     pub space: Steps,
     pub radius: Radii,
     pub icon: IconSizes,
@@ -130,6 +131,20 @@ pub struct Tabs {
     pub rail: u16,
     /// The rail's thickness by day, in logical pixels, rounded half up to whole device pixels.
     pub rail_day: u16,
+}
+
+/// An icon tile's app icon: what its measured drawing must be to fill the tile as a plate.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IconTile {
+    /// The alpha above which a pixel is part of the drawing's box, 0 to 1.
+    pub ink: f32,
+    /// The alpha above which a pixel counts as covering the box, 0 to 1.
+    pub opaque: f32,
+    /// The least share of its long side the box's short side has for a plate.
+    pub square: f32,
+    /// The least share of the box its opaque pixels cover for a plate.
+    pub plate: f32,
 }
 
 /// A field's caret: its shape and the glow round it while you type.
