@@ -483,16 +483,13 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Backdrop](design/components/backdrop.md)
 - [StepRailPage](design/components/step-rail-page.md)
 - [ListDetail](design/components/list-detail.md)
+- [SidebarPage and SidebarRow](design/components/sidebar-page.md)
+- [CanvasPage, Canvas and CanvasObject](design/components/canvas-page.md)
 
 **Panels and the bar**
 
 - [Sheet](design/components/sheet.md)
 - [Pill](design/components/pill.md)
-
-**Templates**
-
-- [SidebarPage and SidebarRow](design/components/sidebar-page.md)
-- [CanvasPage, Canvas and CanvasObject](design/components/canvas-page.md)
 
 ### Rules every component keeps
 
