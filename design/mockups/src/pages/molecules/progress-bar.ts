@@ -1,6 +1,6 @@
 // The ProgressBar page: `docs/design/components/progress-bar.md`. Work that knows how far it is: a
 // pill across its room, its fill following the work and glowing in its own colour at night; the
-// danger kind on a danger banner's red; the timed kind a held button draws.
+// danger kind in a Danger banner; the timed kind a held button draws.
 
 import { button } from "../../lib/button.ts";
 import { shown, type Words } from "../../lib/content.ts";
@@ -74,7 +74,7 @@ const FOLLOWS: Move = {
 
 const DANGER_FOLLOWS: Move = {
   name: "Following the work, danger",
-  what: "The same on a danger banner's red: the `error` fill eases to the new fraction over `short` on `linear`.",
+  what: "The same in a Danger banner: the `error` fill eases to the new fraction over `short` on `linear`.",
   tracks: [{ part: "the fill", on: "a danger bar", target: ".k-progress", property: "--progress", from: 0.3, to: 0.7, duration: "short", curve: "linear" }],
   reduced: "same",
   back: "cuts",
@@ -94,13 +94,13 @@ export default page<"empty" | "loading">({
     "Rust `progress::bar(look, fraction)`, `danger_bar`, `timed_bar` and `danger_timed_bar`; QML `ProgressBar` (`value`, `danger`). Press Fetch a chunk: the fill follows each chunk, and the percent beside it ticks in place.",
     DESCRIBED,
     "The fill follows the work over `short` on `linear`, the curve of a real quantity; a bar that shows up already part full starts there, never growing from nothing. A timed bar is drawn where it is given: the app already times the fraction against the clock (how long a held button has been held, `progress::timed_bar`), so no easing trails behind it. Kōbō's install bar is timed too: the app eases its percent on every tick.",
-    "On a danger banner's red the fill is `error` on a track of `on_error_container` at `opacity.tint`, so the hold that erases a disk on Kōbō's Last chance reads as red all the way. The bar has no words of its own: what is going on and how far sit beside it as the page's text, a `label` line above it with the percent at its end as a figure that holds its width, or a `small` count `space.s4` under it.",
+    "In a Danger banner the fill is `error` on a track of `on_error_container` at `opacity.tint`, so the hold that erases a disk on Kōbō's Last chance reads as red all the way. The bar has no words of its own: what is going on and how far sit beside it as the page's text, a `label` line above it with the percent at its end as a figure that holds its width, or a `small` count `space.s4` under it.",
     "It is for work that can say how far it has got. Work that can't, yet, shows a spinner and its words in the bar's place, since a running animation makes every frame wait on the screen's refresh; once the work can tell, the bar takes its place.",
   ],
   variants: [
     { name: "Following", for: "Work that reports how far it is: a download, an update, a copy.", sample: () => labelled("Downloading the system image", 0.42) },
     { name: "Timed", for: "A fraction the app times itself: how long a held button has been held. Drawn where it is given.", sample: () => within(ROOM, progressBar({ fraction: 0.6, timed: true })) },
-    { name: "Danger", for: "On a danger banner's red: the hold that erases a disk.", sample: () => labelled("Erasing the disk", 0.42, true) },
+    { name: "Danger", for: "In a Danger banner: the hold that erases a disk.", sample: () => labelled("Erasing the disk", 0.42, true) },
     { name: "With a count", for: "Steps of a whole: the slots of a key touched, `space.s4` over its `small` count.", sample: () => counted(3, 5) },
     { name: "In a row", for: "A running job in the Command menu: its state and words, the bar in the last quarter of the row.", sample: () => jobRow(0.62) },
     { name: "Can't tell yet", for: "Work that can't say how far it is shows a spinner and its words where the bar will be.", sample: cantTell },

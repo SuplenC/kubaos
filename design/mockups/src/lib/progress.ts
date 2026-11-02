@@ -14,7 +14,7 @@ import { probe } from "./probe.ts";
 export interface ProgressOptions {
   /** How far the work is, 0 to 1. */
   readonly fraction: number;
-  /** On a danger banner's red: the fill in `error` on a track of `on_error_container`'s tint. */
+  /** In a Danger banner: the fill in `error` on a track of `on_error_container`'s tint. */
   readonly danger?: boolean;
   /** Drawn where it is given, with no easing of its own to trail behind it. */
   readonly timed?: boolean;
