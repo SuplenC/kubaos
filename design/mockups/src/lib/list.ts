@@ -235,7 +235,7 @@ export interface ListOptions {
 }
 
 /** A list's well: the rows' room, with its hairline and focus tube drawn over what it holds. */
-function well(name: string, ...content: Element[]): HTMLElement {
+export function well(name: string, ...content: Element[]): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-list k-sunken";
   box.append(...content);
