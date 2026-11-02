@@ -1,5 +1,5 @@
-/* The feedback parts: a progress bar and its panel, an empty state, a status message's box and lit
-   edge (a banner, an error block), the log, a meter and a sparkline, and a step. Every length is a
+/* The feedback parts: a progress bar and its panel, an empty state, a status message's box and its
+   rail (a banner, an error block), the log, a meter and a sparkline, and a step. Every length is a
    token in the page's own CSS pixels, which are device pixels (`main.ts`). */
 
 /* How far a progress bar is filled, 0 to 1: it eases as the work moves on. */
@@ -28,7 +28,7 @@
    fraction of the width, rounded up to a device pixel, in `primary`, with `shadow.glow` under it in
    its own colour while the signs are on: a light, so it is out by day and flickers with the signs
    in a power change. It follows the work over `short` on `linear`; a timed bar is drawn where it is
-   given. On a danger banner's red the fill is `error` on a track of `on_error_container` at
+   given. In a Danger banner the fill is `error` on a track of `on_error_container` at
    `opacity.tint`. */
 .k-progress {
   position: relative;
@@ -113,37 +113,41 @@
 }
 
 /* A status message (`lib/status.ts`): it lies flat in the page, a fill with the sunken soft
-   hairline inside its edge, at the content radius, `space.s16` inside. */
+   hairline inside its edge, at the content radius, `space.s16` inside. At its start the padding
+   holds the rail's lane, `space.s4` wide `space.s12` in, and `space.s12` past it, so what it holds
+   starts 28 in, on the 4 px grid. */
 .k-status {
   position: relative;
   display: flex;
   flex: none;
   align-self: stretch;
   box-sizing: border-box;
-  padding: var(--space-s16);
+  padding: var(--space-s16) var(--space-s16) var(--space-s16) calc(2 * var(--space-s12) + var(--space-s4));
   border-radius: var(--radius-content);
   background: var(--status-fill);
   box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--sunken-line);
   --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
 }
 
-.k-status > :not(.k-status-edge) {
+.k-status > :not(.k-status-rail) {
   flex: 1 1 0;
   min-width: 0;
 }
 
-/* Its lit edge: the box's own left edge, the thin stroke in whole device pixels, drawn as a left
-   border at the box's corner, which tapers it into both corners over the corner's length. At
-   night it is the tone's core with the tone's near glow round it while the signs are on, and
-   glass, the tone, while they are off; by day the tone, with no glow. */
-.k-status-edge {
+/* Its rail: down its lane from the top padding to the bottom one, centred in the lane on whole
+   device pixels, with round ends, `tabs.rail` thick at night and `tabs.rail_day` by day, as the
+   tabs' and the collapsible's rail is. At night it is the tone's core with the content glow round
+   it while the signs are on, and glass while they are off; by day the tone, with no glow. */
+.k-status-rail {
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  border-style: solid;
-  border-width: 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px));
-  border-color: color-mix(in srgb, var(--status-tone), var(--status-core) calc(var(--signs) * 100%));
-  filter: drop-shadow(0 0 calc(var(--focus-near) / 2) rgb(from var(--status-tone) r g b / calc(var(--focus-near_opacity) * var(--signs))));
+  top: var(--space-s16);
+  bottom: var(--space-s16);
+  --rail: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
+  left: calc(var(--space-s12) + round(nearest, calc((var(--space-s4) - var(--rail)) / 2), 1px));
+  width: var(--rail);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--status-glass), var(--status-core) calc(var(--signs) * 100%));
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--status-tone) r g b / calc(var(--focus-content_glow) * var(--signs))));
   pointer-events: none;
 }
 
