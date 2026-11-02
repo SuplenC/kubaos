@@ -571,6 +571,12 @@ use = "Half a skeleton's breath: its glass warming from rest to its peak, or coo
 ms = 3600
 use = "A toast staying once it has arrived: long enough to read its line twice."
 
+# How long a held button is held before it acts, its timed bar filling meanwhile: long enough that
+# a press can't erase a disk by accident. Not a move: reduce motion doesn't cap it.
+[duration.hold]
+ms = 1100
+use = "A held button held until it acts: Kōbō's Install, the hold that erases a disk."
+
 # Easing curves, as CSS cubic béziers (x1, y1, x2, y2).
 [easing.standard]
 curve = [0.2, 0.0, 0.0, 1.0]
