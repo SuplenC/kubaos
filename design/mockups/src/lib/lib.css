@@ -658,8 +658,9 @@
   mask-size: 100% 100%;
 }
 
-/* An icon tile (`lib/icon-tile.ts`): its symbol or an app's picture centred on a whole device pixel, the
-   odd one after it; a photo covering the tile. The symbol shows until the picture has loaded. */
+/* An icon tile (`lib/icon-tile.ts`): its symbol centred on a whole device pixel, the odd one after
+   it; an app's picture placed by its measured drawing; a photo covering the tile. The symbol shows
+   until the picture has loaded. */
 .k-icon-tile {
   position: relative;
   display: block;
@@ -671,14 +672,32 @@
   overflow: hidden;
 }
 
-.k-icon-tile > .k-icon,
-.k-icon-tile > .k-icon-tile-picture {
+.k-icon-tile > .k-icon {
   position: absolute;
   left: round(down, calc((var(--side) - var(--icon)) / 2), 1px);
   top: round(down, calc((var(--side) - var(--icon)) / 2), 1px);
   width: var(--icon);
   height: var(--icon);
-  object-fit: contain;
+}
+
+/* An app's picture, scaled so its drawing's box fits `--fit` whole, the box snapped to whole
+   device pixels and centred as the symbol is; the picture's own margin runs past the box, and the
+   tile clips it. The shares (`--box-*`, `--picture-*`, of the box's long side) are its
+   measurement's. A shape fits `space.s4` inside the tile; a plate fills it, so the tile's corners
+   cut it and the two make one edge. */
+.k-icon-tile > .k-icon-tile-picture {
+  --fit: calc(var(--side) - 2 * var(--space-s4));
+  --drawn-width: round(calc(var(--fit) * var(--box-width)), 1px);
+  --drawn-height: round(calc(var(--fit) * var(--box-height)), 1px);
+  position: absolute;
+  left: calc(round(down, calc((var(--side) - var(--drawn-width)) / 2), 1px) - var(--fit) * var(--box-x));
+  top: calc(round(down, calc((var(--side) - var(--drawn-height)) / 2), 1px) - var(--fit) * var(--box-y));
+  width: calc(var(--fit) * var(--picture-width));
+  height: calc(var(--fit) * var(--picture-height));
+}
+
+.k-icon-tile > .k-icon-tile-picture[data-plate] {
+  --fit: var(--side);
 }
 
 .k-icon-tile > .k-icon-tile-photo {

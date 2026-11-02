@@ -11,6 +11,8 @@ import { doesntApply, foundation } from "../../site/page.ts";
 import { atScale, MODES, modeName, painted, table, themes, token } from "../../site/parts/swatches.ts";
 import { SCALES, settings } from "../../site/settings.ts";
 import appIcon from "../../../../../branding/png/kubaos-icon-128.png?url";
+// An app's icon with no plate, a star: a shape on its tile (`site/app-icons.ts`).
+import glyph from "../../assets/icon-tile/star.svg?url";
 import photo from "../../../../../branding/photo/neon-sign-front.png?url";
 
 /** The symbols drawn by us where Tabler has none, how each is drawn, and its Tabler relatives in the set. */
@@ -153,7 +155,7 @@ function roles(): HTMLElement {
   );
 }
 
-/** Every kind of tile: each size with a symbol, the accent's, a critical one, an app's icon and a photo. */
+/** Every kind of tile: each size with a symbol, the accent's, a critical one, app icons as a plate and as a shape, and a photo. */
 function tiles(): HTMLElement {
   const tile = (words: string, made: HTMLElement) => el("div", "f-swatch-cell", label(words, "label"), made);
   return el(
@@ -162,7 +164,8 @@ function tiles(): HTMLElement {
     ...TILE_SIZES.map((size) => tile(size.toLowerCase(), iconTile({ glyph: "terminal", size }))),
     tile("accent", iconTile({ glyph: "star_filled", size: "Md", accent: true })),
     tile("danger", iconTile({ glyph: "warning", size: "Md", danger: true })),
-    tile("an app's icon", iconTile({ glyph: "terminal", size: "Md", picture: appIcon })),
+    tile("an app's icon, a plate", iconTile({ glyph: "terminal", size: "Md", picture: appIcon })),
+    tile("an app's icon, a shape", iconTile({ glyph: "terminal", size: "Md", picture: glyph })),
     tile("a photo", iconTile({ glyph: "notifications", size: "Md", photo })),
   );
 }
@@ -248,7 +251,7 @@ export default foundation({
     },
     {
       name: "Apps as uniform tiles",
-      described: "An `IconTile` at sm 32 beside one line (a 20 symbol), md 40 beside a title over a subtitle (24) and lg 48 over a `headline` name (32), at the control radius, on `surface_container_highest`; its symbol `on_surface_variant`, or `primary` on the one tile of a list that comes first, and on `error` for a critical notification. An app's icon is inset at the symbol's size, keeping its own margins; a photo covers the tile.",
+      described: "An `IconTile` at sm 32 beside one line (a 20 symbol), md 40 beside a title over a subtitle (24) and lg 48 over a `headline` name (32), at the control radius, on `surface_container_highest`; its symbol `on_surface_variant`, or `primary` on the one tile of a list that comes first, and on `error` for a critical notification. An app's icon is measured once when it loads: the box of what it draws, without its theme's margin, fills the tile when it is a plate (square, and covering at least `icon_tile.plate` of the box), cut by the tile's corners, and otherwise sits as a shape `space.s4` inside it, kept whole either way. A photo covers the tile.",
       sample: tiles,
     },
   ],
