@@ -482,6 +482,8 @@ Each component has a page of its own under `design/components/`: its constructor
 
 **Templates**
 
+- [PanelPage](design/components/panel-page.md)
+- [Backdrop](design/components/backdrop.md)
 - [StepRailPage](design/components/step-rail-page.md)
 - [ListDetail](design/components/list-detail.md)
 
@@ -489,11 +491,6 @@ Each component has a page of its own under `design/components/`: its constructor
 
 - [Sheet](design/components/sheet.md)
 - [Pill](design/components/pill.md)
-
-**Templates**
-
-- [PanelPage](design/components/panel-page.md)
-- [Backdrop](design/components/backdrop.md)
 
 ### Rules every component keeps
 
