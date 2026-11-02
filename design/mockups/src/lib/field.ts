@@ -50,6 +50,8 @@ export interface FieldOptions {
   readonly pointer?: boolean;
   /** The caret, while the keyboard is in the field; at the end of the value unless given. */
   readonly caret?: Caret;
+  /** What the value changing does besides: a search's results following what is typed. */
+  readonly onInput?: (value: string) => void;
 }
 
 /** `words`' characters, so a position counts what a person sees, not UTF-16 units. */
@@ -266,6 +268,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
     caret = { pos: at, anchor: at };
     draw();
     glowFor(caretShown, motion("caret_hold"));
+    options.onInput?.(value);
   };
 
   const copy = (from: number, to: number) => {
@@ -358,6 +361,12 @@ export function field(options: FieldOptions = {}): HTMLElement {
     });
   }
   // A Show or Hide action beside the field's label turns its bullets into the value and back.
+  // The value set from outside, as an app sets its field's: a query carried over, a field cleared.
+  element.addEventListener("value", (event) => {
+    value = (event as CustomEvent<string>).detail;
+    caret = { pos: length(), anchor: length() };
+    draw();
+  });
   element.addEventListener("secret", (event) => {
     secret = (event as CustomEvent<boolean>).detail;
     draw();
@@ -369,6 +378,11 @@ export function field(options: FieldOptions = {}): HTMLElement {
 /** Shows `field`'s value as bullets, or as itself. */
 export function setSecret(field: HTMLElement, secret: boolean): void {
   field.dispatchEvent(new CustomEvent("secret", { detail: secret }));
+}
+
+/** Sets `field`'s value, the caret at its end, as an app sets it: it says nothing back. */
+export function setValue(field: HTMLElement, value: string): void {
+  field.dispatchEvent(new CustomEvent("value", { detail: value }));
 }
 
 /** The line under a field, in `small`: muted, or in the error colour when the value is wrong. */

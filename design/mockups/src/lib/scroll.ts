@@ -21,9 +21,17 @@ import { probe } from "./probe.ts";
 export interface ScrollOptions {
   /** Its height, a length's CSS. */
   readonly height: string;
-  /** The room above it it reaches into, up to the part there: a spacing token's name. */
-  readonly above?: string;
-  readonly below?: string;
+  /**
+   * The room above it it reaches into, up to the part there: a spacing token's name, or 0 where
+   * its box's edge is the window's, which would cut a thumb reaching past it.
+   */
+  readonly above?: string | 0;
+  readonly below?: string | 0;
+  /**
+   * No `space.s16` kept at the content's end for the thumb: content that keeps a padding of its
+   * own at its end (a page's, a sidebar's), which the thumb floats in.
+   */
+  readonly noGutter?: boolean;
   /** Scrolled this share of the way down, as a sample of it scrolled. */
   readonly down?: number;
   /** The thumb pinned as under the pointer. */
@@ -39,8 +47,10 @@ export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTM
   const box = document.createElement("span");
   box.className = "k-scroll";
   box.style.setProperty("--height", options.height);
-  box.style.setProperty("--above", options.above ? `var(--space-${options.above})` : "var(--focus-far)");
-  box.style.setProperty("--below", options.below ? `var(--space-${options.below})` : "var(--focus-far)");
+  const reach = (room: string | 0 | undefined) => (room === 0 ? "0px" : room ? `var(--space-${room})` : "var(--focus-far)");
+  box.style.setProperty("--above", reach(options.above));
+  box.style.setProperty("--below", reach(options.below));
+  box.toggleAttribute("data-no-gutter", options.noGutter ?? false);
   const view = document.createElement("span");
   view.className = "k-scroll-view";
   const body = document.createElement("span");

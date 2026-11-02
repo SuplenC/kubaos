@@ -1,0 +1,203 @@
+/* CanvasPage (`lib/canvas-page.ts`): the canvas and the selected object's settings, in a
+   SidebarPage page. */
+
+@property --fit {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* Under `size.canvas_wide` the settings follow the canvas down the page, which scrolls them; from
+   it they are a column `size.canvas_settings` wide beside it, scrolling on their own, `space.s32`
+   apart from it as the page's parts are. */
+.k-cvp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s32);
+  align-self: stretch;
+}
+
+.k-cvp[data-layout="wide"] {
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.k-cvp[data-layout="wide"] > .k-cv {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-cvp[data-layout="wide"] > .k-cvp-column {
+  flex: none;
+  align-self: flex-start;
+  width: var(--size-canvas_settings);
+}
+
+.k-cvp[data-layout="narrow"] > .k-cvp-column {
+  height: auto;
+}
+
+.k-cvp[data-layout="narrow"] > .k-cvp-column > .k-scroll-view {
+  position: static;
+  overflow: visible;
+}
+
+.k-cvp[data-layout="narrow"] > .k-cvp-column > .k-scroll-view > .k-scroll-body {
+  padding: 0;
+}
+
+.k-cvp[data-layout="narrow"] > .k-cvp-column > .k-scroll-thumb {
+  display: none;
+}
+
+.k-cvp-settings {
+  width: 100%;
+}
+
+/* The canvas: a well in `surface_container_lowest` at the content radius, its sunken hairline and
+   focus tube drawn over what it holds, a dot on every `space.s16` of its grid in the soft outline:
+   one device pixel each, the canvas's own corner the grid's start. */
+.k-cv {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-self: stretch;
+  border-radius: var(--radius-content);
+  background-color: var(--color-surface_container_lowest);
+  outline: none;
+  overflow: clip;
+  overflow-clip-margin: var(--focus-far);
+}
+
+.k-cv::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(to right, var(--sunken-line) var(--stroke-hairline_device_px), transparent var(--stroke-hairline_device_px)) 0 0 / var(--space-s16) 100%;
+  mask: linear-gradient(to bottom, black var(--stroke-hairline_device_px), transparent var(--stroke-hairline_device_px)) 0 0 / 100% var(--space-s16);
+  pointer-events: none;
+}
+
+.k-cv-edge {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: var(--stroke-hairline_device_px) solid var(--sunken-line);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.k-cv > .k-ring {
+  z-index: 4;
+}
+
+/* The toolbar along its top and the key hints along its bottom: bands `space.s12` in. */
+.k-cv-band {
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+  align-self: stretch;
+  padding: var(--space-s12);
+}
+
+/* The objects' room between the bands: they are fitted to it less `space.s24` all round. */
+.k-cv-stage {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* An object: drawn to scale in `surface_container_high` at the control radius, its sunken hairline
+   round it, its number in `headline` and its size in `mono` under it, centred; the size left out
+   where it doesn't fit. It lights as a control does under the pointer, and the selected one burns
+   the neon tube inside its edge. It glides to its new box over `medium` on `standard_decel` when the
+   arrangement fits again; while dragged it follows the pointer every frame, with nothing easing it.
+   A screen plugged in fades in over `medium`, one unplugged fades out. */
+.k-cv-screen {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
+  cursor: grab;
+  touch-action: none;
+  opacity: 1;
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard),
+    opacity var(--motion-medium) var(--easing-standard);
+}
+
+.k-cv-screen[aria-selected="true"] {
+  --lit: 1;
+  z-index: 2;
+}
+
+.k-cv[data-dragging] .k-cv-screen {
+  cursor: grabbing;
+}
+
+.k-cv[data-refit] .k-cv-screen {
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    opacity var(--motion-medium) var(--easing-standard),
+    left var(--motion-medium) var(--easing-standard_decel),
+    top var(--motion-medium) var(--easing-standard_decel),
+    width var(--motion-medium) var(--easing-standard_decel),
+    height var(--motion-medium) var(--easing-standard_decel);
+}
+
+.k-cv-screen:is([data-arriving], [data-leaving]) {
+  opacity: 0;
+}
+
+[data-sequence] .k-cv-screen {
+  transition: none;
+}
+
+/* A motion player's sample of a fit: each box between where it was and where it goes, by `--fit`. */
+.k-cv[data-fitting] .k-cv-screen {
+  left: round(nearest, calc(var(--from-left) + (var(--to-left) - var(--from-left)) * var(--fit)), 1px) !important;
+  top: round(nearest, calc(var(--from-top) + (var(--to-top) - var(--from-top)) * var(--fit)), 1px) !important;
+  width: round(nearest, calc(var(--from-width) + (var(--to-width) - var(--from-width)) * var(--fit)), 1px) !important;
+  height: round(nearest, calc(var(--from-height) + (var(--to-height) - var(--from-height)) * var(--fit)), 1px) !important;
+}
+
+.k-cv-size[hidden] {
+  display: none;
+}
+
+/* A snap's guide: a hairline of `primary` across the stage where an edge or the centre meets a
+   neighbour's, while the snap holds; it takes no pointer. */
+.k-cv-guide {
+  position: absolute;
+  z-index: 3;
+  display: none;
+  background: var(--color-primary);
+  pointer-events: none;
+}
+
+.k-cv-guide[data-shown] {
+  display: block;
+}
+
+.k-cv-guide[data-axis="x"] {
+  top: 0;
+  bottom: 0;
+  left: var(--guide);
+  width: var(--stroke-hairline_device_px);
+}
+
+.k-cv-guide[data-axis="y"] {
+  left: 0;
+  right: 0;
+  top: var(--guide);
+  height: var(--stroke-hairline_device_px);
+}

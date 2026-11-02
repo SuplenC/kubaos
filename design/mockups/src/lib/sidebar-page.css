@@ -1,0 +1,285 @@
+/* SidebarPage (`lib/sidebar-page.ts`): the sidebar band beside the page, in the room it is given,
+   a window's. */
+
+@property --rise {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --at {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --shown {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --landed {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.k-sp {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-surface);
+}
+
+/* The sidebar: `size.sidebar` wide, full height, in `surface_container_low`, its rows
+   `space.s12` in. Its rows scroll on their own when they run past the window, the band's padding
+   their scroll's padding and the thumb's room. */
+.k-sp-side {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: var(--size-sidebar);
+  height: 100%;
+  background: var(--color-surface_container_low);
+}
+
+.k-sp-side > .k-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.k-sp-rows {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-s12);
+}
+
+/* The hairline under Home: `space.s8` clear of the rows on either side, with the rows' own
+   `space.s4` gap. */
+.k-sp-rule {
+  display: flex;
+  align-self: stretch;
+  padding: var(--space-s4) 0;
+}
+
+.k-sp-rule > .k-divider {
+  flex: 1;
+}
+
+/* A row of the sidebar (`SidebarRow`): a section's `size.row` tall, its symbol `body`'s and
+   `space.s12` before its words, `space.s12` inside its sides, at the control radius, concentric
+   with the window's corner `space.s12` out (`radius.surface` less `space.s12`); a sub-section's
+   `size.control_sm` tall in `small`, its words where a section's start. At rest its words are
+   `on_surface_variant`; current, `on_surface`, and a current section is filled in
+   `surface_container_high`, its symbol `primary`. Lit, hovered or with the keyboard on it, it
+   lights as a Text button does: the tube inside its edge, the glow outside at night, its words
+   `on_surface`; pressed, the tube runs white-hot. */
+.k-sp-row {
+  all: unset;
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  align-items: center;
+  align-self: stretch;
+  height: var(--size-row);
+  padding: 0 var(--space-s12);
+  min-width: 0;
+  max-width: 100%;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  --words: color-mix(in srgb, var(--color-on_surface_variant), var(--color-on_surface) calc(var(--lit) * 100%));
+  --glyph: var(--words);
+  background: transparent;
+}
+
+.k-sp-row > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-sp-row[data-kind="sub"] {
+  height: var(--size-control_sm);
+  padding-left: calc(var(--space-s12) + var(--type-body-icon) + var(--space-s12));
+}
+
+.k-sp-row[data-current] {
+  --words: var(--color-on_surface);
+}
+
+.k-sp-row[data-kind="section"][data-current] {
+  --glyph: var(--color-primary);
+  background: var(--color-surface_container_high);
+}
+
+/* The current sub-section's bar: a short stretch of neon, `type.small`'s line tall, centred in the
+   symbols' column, the tabs' rail thick (whole device pixels, a pixel more by day); at night the
+   core with the content glow round it, by day the tone's glass with none. It glides from row to row
+   over `medium` on `standard` (`--at`, from `--bar-from` to `--bar-to`). */
+.k-sp-subs {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+
+.k-sp-bar {
+  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  --rail: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
+  position: absolute;
+  z-index: 2;
+  left: round(nearest, calc(var(--space-s12) + (var(--type-body-icon) - var(--rail)) / 2), 1px);
+  top: round(nearest, calc(var(--bar-from, 0px) + (var(--bar-to, 0px) - var(--bar-from, 0px)) * var(--at) + (var(--size-control_sm) - var(--type-small-line)) / 2), 1px);
+  width: var(--rail);
+  height: var(--type-small-line);
+  background: color-mix(in srgb, var(--color-primary_glass), var(--color-primary_core) calc(var(--signs) * 100%));
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / calc(var(--focus-content_glow) * var(--signs))));
+  pointer-events: none;
+  transition: --at var(--motion-medium) var(--easing-standard);
+}
+
+.k-sp-bar[data-still],
+[data-sequence] .k-sp-bar {
+  transition: none;
+}
+
+/* The page beside the sidebar: all the room left, its content scrolling, the thumb in the page's
+   own padding at its end. */
+.k-sp-pane {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+}
+
+.k-sp-pane > .k-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.k-sp-pane .k-scroll-body {
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+/* A change of section: the page fades in and rises `space.s8` over `short` on `emphasized_decel`
+   (`--rise`, 0 to 1). With reduced motion it is a plain swap. */
+.k-sp-rise {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  opacity: var(--rise);
+  translate: 0 calc((1 - var(--rise)) * var(--space-s8));
+  transition: --rise var(--motion-short) var(--easing-emphasized_decel);
+}
+
+.k-sp-rise > .k-page {
+  flex: 1 0 auto;
+  height: auto;
+}
+
+[data-reduced] .k-sp-rise,
+[data-sequence] .k-sp-rise {
+  transition: none;
+}
+
+/* Home: a centred column `size.column` wide at most. */
+.k-sp-column {
+  align-self: center;
+  width: 100%;
+  max-width: var(--size-column);
+}
+
+.k-sp-answers {
+  display: flex;
+  flex-direction: column;
+}
+
+.k-sp-none {
+  display: flex;
+  justify-content: center;
+}
+
+/* A row of the page as the find box shows it: a match keeps its letters lit, a miss stands back at
+   `opacity.miss`, and the current match, like the row Home's search lands on, takes the landed
+   highlight, the accent at `opacity.tint` laid over the row; landed, it fades over `slow`. */
+.k-sp-pane .k-list-row {
+  --landed-tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-tint) * var(--landed)));
+  background-image: linear-gradient(var(--landed-tint), var(--landed-tint));
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard),
+    opacity var(--motion-short) var(--easing-standard);
+}
+
+.k-sp-pane .k-list-row[data-found="miss"] {
+  opacity: var(--opacity-miss);
+}
+
+.k-sp-pane .k-list-row[data-found="current"] {
+  --landed: 1;
+}
+
+.k-sp-pane .k-list-row[data-landed] {
+  animation: k-sp-landed var(--motion-slow) var(--easing-standard) forwards;
+}
+
+@keyframes k-sp-landed {
+  from {
+    --landed: 1;
+  }
+  to {
+    --landed: 0;
+  }
+}
+
+/* The find box: a popover `size.find` wide floating `space.s16` below the page's top and the
+   container's padding in from its end, over the content, taking no layout. It arrives and goes with
+   a fade and a `space.s8` drop over `short` on `standard` (`--shown`); with reduced motion only the
+   fade. */
+.k-sp-find {
+  position: absolute;
+  z-index: 3;
+  top: var(--space-s16);
+  right: var(--padding, var(--space-s16));
+  --popover-width: var(--size-find);
+  opacity: var(--shown);
+  translate: 0 calc((var(--shown) - 1) * var(--space-s8));
+  transition: --shown var(--motion-short) var(--easing-standard);
+}
+
+.k-sp-find[data-shown] {
+  --shown: 1;
+}
+
+[data-reduced] .k-sp-find {
+  translate: none;
+}
+
+[data-sequence] .k-sp-find {
+  transition: none;
+}
+
+.k-sp-find .k-field {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
+.k-sp-count {
+  flex: none;
+}
+
+/* With no match, the hint under the field offers Home's search; otherwise it takes no room. */
+.k-sp-note {
+  display: none;
+}
+
+.k-sp-find[data-none] .k-sp-note {
+  display: flex;
+}

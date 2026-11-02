@@ -1,18 +1,19 @@
 // The worked example every layout page shows: Settings' Appearance page, built from the layout
-// primitives and the library's parts alone, in a window of the toolbar's size. The sidebar beside it
-// is SidebarPage's, a template with pages of its own; here it is only the room it takes.
+// primitives and the library's parts alone, in a window of the toolbar's size, beside the sidebar of
+// SidebarPage, the template it sits in.
 
 import "./layout.css";
 import photo from "../../../../../branding/photo/neon-sign-front@2x.jpg?url";
 import { button } from "../../lib/button.ts";
 import { chip } from "../../lib/chip.ts";
 import { shown, type Words } from "../../lib/content.ts";
-import { fill, filling, flow, grid, header, page, row, section, splitColumns, stack } from "../../lib/layout.ts";
+import { fill, filling, flow, grid, header, row, section, splitColumns, stack } from "../../lib/layout.ts";
 import { list } from "../../lib/list.ts";
 import { media } from "../../lib/media.ts";
 import { role } from "../../lib/radius.ts";
+import { sidebarPage } from "../../lib/sidebar-page.ts";
 import { text, wrapped } from "../../lib/text.ts";
-import { el, label } from "../../site/dom.ts";
+import { outline } from "../templates/settings.ts";
 
 export const TITLE: Words = { short: "Appearance", long: "Appearance, wallpapers and the colours they bring" };
 export const SUBTITLE: Words = {
@@ -62,13 +63,16 @@ export function textSection(): HTMLElement {
   return section("Text", undefined, facts, fonts);
 }
 
-/** The page itself, at its top: what runs past the window's foot is scrolled to. */
-export function appearancePage(): HTMLElement {
-  return page(stack("s32", "start", ...[appearanceHeader(), themeSection(), wallpaperSection(), textSection()].map(filling)));
-}
-
-/** Settings at the toolbar's window size: the sidebar's room, then the page beside it. */
+/** Settings at the toolbar's window size, on Appearance: SidebarPage, the page its region. */
 export function settingsWindow(): HTMLElement {
-  const sidebar = el("div", "l-sidebar", label("SidebarPage's sidebar, on its own page", "small"));
-  return el("div", "l-window", sidebar, el("div", "l-pane", appearancePage()));
+  const sections = [...outline().sections];
+  const appearance = sections[0]!;
+  sections[0] = {
+    ...appearance,
+    title: shown(TITLE),
+    lede: shown(SUBTITLE),
+    subs: ["Theme", "Wallpaper", "Text"].map((title) => ({ title, wells: [] })),
+    region: () => stack("s32", "start", ...[themeSection(), wallpaperSection(), textSection()].map(filling)),
+  };
+  return sidebarPage({ outline: { ...outline(), sections }, section: 0 });
 }

@@ -462,6 +462,11 @@
   padding: var(--above) calc(var(--focus-far) + var(--space-s16)) var(--below) var(--focus-far);
 }
 
+/* Content with a padding of its own at its end keeps no room for the thumb, which floats in it. */
+.k-scroll[data-no-gutter] > .k-scroll-view > .k-scroll-body {
+  padding-right: var(--focus-far);
+}
+
 /* The thumb: on the box's end, along the whole room the view shows, floating over the content. */
 .k-scroll-thumb {
   position: absolute;

@@ -102,6 +102,8 @@ mockups/meter       design/mockups/src/pages/molecules/meter.ts
 mockups/sparkline   design/mockups/src/pages/molecules/sparkline.ts
 mockups/banner      design/mockups/src/pages/molecules/banner.ts
 mockups/step        design/mockups/src/pages/molecules/step.ts
+mockups/sidebar-page design/mockups/src/pages/templates/sidebar-page.ts
+mockups/canvas-page design/mockups/src/pages/templates/canvas-page.ts
 mockups/colour      design/mockups/src/pages/foundations/colour.ts
 mockups/type        design/mockups/src/pages/foundations/type.ts
 mockups/space       design/mockups/src/pages/foundations/space.ts
