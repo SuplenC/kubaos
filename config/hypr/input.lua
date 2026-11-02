@@ -113,7 +113,7 @@ hl.config({
 
     touchpad = {
       natural_scroll = true,
-      tap_to_click = true,
+      tap_to_click = false, -- a press clicks; a touch alone never does
       disable_while_typing = true,
       clickfinger_behavior = true, -- two-finger click = right click, like macOS
       scroll_factor = 0.5,
