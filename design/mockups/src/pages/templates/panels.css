@@ -1,0 +1,7 @@
+/* The templates' pages' own boxes. A reflow's window holds one whole screen to its edges: no
+   padding, and its hairline drawn outside it, so the screen is the window's size exactly. */
+.page-window:has(> .k-screen) {
+  padding: 0;
+  border: none;
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
