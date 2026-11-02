@@ -32,7 +32,7 @@ export const TITLES: Record<"system" | "notifications" | "control" | "clock", Wo
   system: { short: "System", long: "System monitor and every process eating your machine" },
   notifications: { short: "Notifications", long: "Notifications from every app that thinks it matters" },
   control: { short: "Control center", long: "Control center and every setting worth a shortcut" },
-  clock: { short: "Tuesday, 2 November", long: "Tuesday, the second of November, two thousand and twenty-six" },
+  clock: { short: "Monday, 2 November", long: "Monday, the second of November, two thousand and twenty-six" },
 };
 
 /** What a body shows: its content, nothing yet, still being found, or what broke. */

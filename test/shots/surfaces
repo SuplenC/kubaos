@@ -113,3 +113,4 @@ mockups/icons       design/mockups/src/pages/foundations/icons.ts
 mockups/step-rail-page  design/mockups/src/pages/templates/step-rail-page.ts design/mockups/src/pages/templates/step-rail-page.css
 mockups/list-detail     design/mockups/src/pages/templates/list-detail.ts design/mockups/src/pages/templates/list-detail-page.css
 mockups/panel-page  design/mockups/src/pages/templates/panel-page.ts
+mockups/backdrop    design/mockups/src/pages/templates/backdrop.ts

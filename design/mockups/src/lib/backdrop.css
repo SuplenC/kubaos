@@ -1,0 +1,115 @@
+/* A Backdrop (`lib/backdrop.ts`): the picture, its scrim and one thing in its middle. */
+
+/* How far the thing has still to rise into place, or has risen on its way off, in `space.s24`s. */
+@property --backdrop-rise {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.k-backdrop {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--backdrop-width);
+  height: var(--backdrop-height);
+  overflow: hidden;
+  background: var(--color-surface_container_lowest);
+}
+
+.k-backdrop-layers {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.k-backdrop-picture {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.k-backdrop-scrim {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.k-backdrop-scrim[data-scrim="dim"] {
+  background: rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
+}
+
+/* The band behind words: from `space.s64` above the thing to `space.s64` below it, solid behind
+   it and fading to nothing over the `space.s64` either side. */
+.k-backdrop-scrim[data-scrim="band"] {
+  inset: auto 0;
+  top: calc(var(--thing-y, 0px) - var(--backdrop-lift) - var(--space-s64));
+  height: calc(var(--thing-height, 0px) + 2 * var(--space-s64));
+  background: linear-gradient(
+    rgb(from var(--color-surface) r g b / 0),
+    rgb(from var(--color-surface) r g b / var(--opacity-backdrop)) var(--space-s64),
+    rgb(from var(--color-surface) r g b / var(--opacity-backdrop)) calc(100% - var(--space-s64)),
+    rgb(from var(--color-surface) r g b / 0)
+  );
+}
+
+.k-backdrop-thing {
+  position: absolute;
+  left: var(--thing-x, 0px);
+  top: calc(var(--thing-y, 0px) - var(--backdrop-lift));
+  display: flex;
+  translate: 0 round(nearest, calc(var(--backdrop-rise) * var(--space-s24)), 1px);
+}
+
+/* A part that has given way to a short room, with the gap after it. */
+.k-backdrop-thing [data-gone],
+.k-backdrop-thing [data-gone] + .k-gap {
+  display: none;
+}
+
+/* The words of a thing in the middle are centred under one another. */
+.k-backdrop-thing .k-text[data-wrapped] {
+  text-align: center;
+}
+
+/* A glass panel fills the screen less its margin, no wider than a rail and two columns with
+   `space.s40` beside each, centred on whole device pixels. */
+.k-backdrop-thing:has(> .k-glass-panel) {
+  --panel-width: min(calc(100% - 2 * var(--panel-margin, var(--space-s32))), calc(var(--size-rail) + 2 * var(--space-s40) + 2 * var(--size-column)));
+  left: round(down, calc((100% - var(--panel-width)) / 2), 1px);
+  top: var(--panel-margin, var(--space-s32));
+  width: var(--panel-width);
+  height: calc(100% - 2 * var(--panel-margin, var(--space-s32)));
+}
+
+.k-glass-panel {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  overflow: hidden;
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
+  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
+}
+
+/* The blurred picture, as large as the screen and lying where it lies, seen through the panel. */
+.k-glass-picture {
+  position: absolute;
+  left: calc(-1 * var(--panel-left, 0px));
+  top: calc(-1 * var(--panel-margin, var(--space-s32)));
+  width: var(--backdrop-width);
+  height: var(--backdrop-height);
+  object-fit: cover;
+}
+
+.k-glass-body {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  border-radius: inherit;
+  background: rgb(from var(--color-surface) r g b / var(--opacity-glass));
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--sunken-line);
+}
