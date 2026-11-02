@@ -1,0 +1,48 @@
+/* The layout pages' own boxes: the worked example's window, which fills the reflow's window to its
+   edges, the sidebar's room in it, and the outlined boxes of a sample that shows a layout's room. */
+
+.page-window:has(> .l-window) {
+  padding: 0;
+}
+
+.l-window {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.l-sidebar {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: var(--size-sidebar);
+  padding: var(--space-s16);
+  background: var(--color-surface_container_low);
+}
+
+/* The page beside it, at least the window's height, its foot cut by the window's edge where it is
+   taller: a page at its top, scrolled to the rest. */
+.l-pane {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.l-pane > .k-page {
+  flex: 1 0 auto;
+  height: auto;
+}
+
+/* A sample's room, so a layout's boxes show where nothing is drawn: a dashed outline in the soft
+   outline, taking no room. */
+.l-room {
+  outline: var(--stroke-hairline_device_px) dashed rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
+}
+
+/* A clear page's own surface under it, as Kōbō's glass panel is. */
+.l-room[data-glass] {
+  background: var(--color-surface_container_low);
+}
