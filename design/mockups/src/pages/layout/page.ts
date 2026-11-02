@@ -137,7 +137,7 @@ export default mockPage({
     ],
     reflow: {
       described:
-        "Settings' Appearance page in a window of the toolbar's size, beside the room of its sidebar. The page takes what the sidebar leaves: 456 at the 720 minimum, padded 16; 856 at the 1120 default, 24; 1016 on a 1280 laptop, still 24; 1656 on a 1080p screen, 32. Its content scrolls when it is taller than the window; nothing in it is a fixed width but the wallpapers' shape.",
+        "Settings' Appearance page in a window of the toolbar's size, beside SidebarPage's sidebar. The page takes what the sidebar leaves: 456 at the 720 minimum, padded 16; 856 at the 1120 default, 24; 1016 on a 1280 laptop, still 24; 1656 on a 1080p screen, 32. Its content scrolls when it is taller than the window; nothing in it is a fixed width but the wallpapers' shape.",
       sample: settingsWindow,
     },
   },
