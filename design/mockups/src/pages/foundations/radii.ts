@@ -23,7 +23,7 @@ const FOR: Record<Role, string> = {
   small: "Marks inside controls: the checkbox, a keycap, a skeleton's line, a field's selection.",
   row: "A row inside a small or a content box, the box's corner less its padding: a menu's or a select's items, a list well's rows, a table's rows; and a hint.",
   control: "Everything you click or type in: buttons, fields, chips, a calendar's months and title; and the small floating things, raised over what opened them: a popover, a menu, a select's open list, a toast.",
-  content: "A content box inside a window or a panel: a card, a list well, a scroll panel, a dialog. A step under a surface, so a box inside reads as a part of what holds it.",
+  content: "A content box inside a window or a panel: a card, a list well, a dialog. A step under a surface, so a box inside reads as a part of what holds it.",
   surface: "The shell's big surfaces alone: a panel, a window, the screen frame.",
   full: "Pills and circles: switches, icon buttons, radios, progress bars, sliders, avatars, badges. Half the shorter side.",
 };
@@ -115,7 +115,7 @@ function paddings(): HTMLElement {
     ["space.s4", "4", "Around rows in a floating box: a menu, a select's open list."],
     ["space.s8", "8", "Around rows in a content box: a list well."],
     ["space.s12", "12", "Around words in a small floating thing: a popover holding words, a toast. A hint, the smallest, is 8 by 4."],
-    ["space.s16", "16", "Around content in a content box: a card, a scroll panel."],
+    ["space.s16", "16", "Around content in a content box: a card; or in a shell panel."],
     ["space.s24", "24", "Around a dialog's content, the dialog alone."],
   ];
   return table(
@@ -155,7 +155,7 @@ export default foundation({
   summary: "Five corner radii by what a shape is, and full for pills: one ladder of boxes, and rows that follow the box they sit in.",
   live: () => el("div", "f-well", ...["Wi-Fi", "Bluetooth", "Sound"].map((name, i) => wellRow(name, i === 0))),
   description: [
-    "Every radius says what the shape is, on one ladder of boxes: small for marks inside controls; row for the rows of a box; control for everything you click or type in and the small floating things (a popover, a menu, a toast); content for a box inside a window (a card, a list well, a scroll panel, a dialog); surface for the shell's big surfaces alone (a panel, a window, the screen frame); and full for pills and circles. A component takes the one its role names, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.",
+    "Every radius says what the shape is, on one ladder of boxes: small for marks inside controls; row for the rows of a box; control for everything you click or type in and the small floating things (a popover, a menu, a toast); content for a box inside a window (a card, a list well, a dialog); surface for the shell's big surfaces alone (a panel, a window, the screen frame); and full for pills and circles. A component takes the one its role names, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.",
     "A row follows the box it sits in: its corner is the box's corner less the box's padding, so both corners share a centre. A menu is 12 with 4 inside and a list well 16 with 8 inside, so both rows are 8, the row radius. A control placed in content (a button in a card) isn't filling it, so it keeps its own role.",
     "A box's padding goes with what it holds: 4 around rows in a floating box, 8 around rows in a content box, 12 around words in a small floating thing, 16 around content in a content box, and 24 in a dialog.",
     "The live list is a well, a content box at 16, with its rows 8 in: they take 16 less 8, the row radius.",

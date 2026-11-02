@@ -511,7 +511,7 @@
   transition: none;
 }
 
-/* A shell panel as the samples show a scroll in: `surface` at the content radius, `space.s16`
+/* A shell panel as the samples show a scroll in: `surface` at the surface radius, as every shell panel, `space.s16`
    inside, its sunken edge (`.k-sunken`) cutting whatever passes it. */
 .k-scroll-panel {
   position: relative;
@@ -522,7 +522,7 @@
   box-sizing: border-box;
   width: var(--size-panel);
   padding: var(--space-s16);
-  border-radius: var(--radius-content);
+  border-radius: var(--radius-surface);
   background: var(--color-surface);
   outline: var(--stroke-hairline_device_px) solid var(--sunken-line);
   outline-offset: calc(-1 * var(--stroke-hairline_device_px));

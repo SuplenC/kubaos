@@ -146,8 +146,8 @@ row = 8
 # Everything you click or type in: buttons, fields, chips; and the small
 # floating things: a popover, a menu, a select's open list, a toast.
 control = 12
-# A content box inside a window or a panel: a card, a list well, a scroll
-# panel, a dialog. A step softer than a surface's 24, so a box inside reads as
+# A content box inside a window or a panel: a card, a list well, a dialog.
+# A step softer than a surface's 24, so a box inside reads as
 # a part of what holds it, not a second window.
 content = 16
 # The shell's big surfaces alone: a panel, a window, the screen frame.
@@ -622,7 +622,7 @@ press_tint = 0.10
 disabled_content = 0.38
 disabled_container = 0.10
 # A well's surface over the panel; and the soft hairline, `outline_variant` at
-# it: the sunken edge of a well or a scroll panel, and a divider.
+# it: the sunken edge of a well or a shell panel, and a divider.
 well = 0.75
 outline_soft = 0.55
 # A shape that is only a suggestion of one: a workspace's ghost, a scroller

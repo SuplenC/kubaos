@@ -196,7 +196,7 @@ Every radius means something: what the shape is. There are five, plus full, on o
 | Small | `Small` | 4 | Marks inside controls: the checkbox, a keycap, a skeleton's line, a field's selection, focus details. |
 | Row | `Row` | 8 | A row inside a small or a content box, the box's corner less its padding: a menu's and a select's items, a list well's rows, a table's rows; and a hint. |
 | Control | `Control` | 12 | Everything you click or type in: buttons, fields, chips, tiles, a calendar's title and months; and the small floating things, raised over what opened them: a popover, a menu, a select's open list, a toast. |
-| Content | `Content` | 16 | A content box inside a window or a panel: a card, a list well, a scroll panel, a dialog. A step under a surface, so a box inside reads as a part of what holds it, not a second window. |
+| Content | `Content` | 16 | A content box inside a window or a panel: a card, a list well, a dialog. A step under a surface, so a box inside reads as a part of what holds it, not a second window. |
 | Surface | `Surface` | 24 | The shell's big surfaces alone: a panel, a window, the screen frame. |
 | Full | `Full` | half the shorter side | Pills and circles: switches, icon buttons, radios, progress bars, sliders, the tabs' well, avatars, badges. |
 
@@ -208,7 +208,7 @@ Every radius means something: what the shape is. There are five, plus full, on o
   | 4 (`space.s4`) | rows in a floating box | a menu, a select's open list |
   | 8 (`space.s8`) | rows in a content box | a list well |
   | 12 (`space.s12`) | words in a small floating thing | a popover holding words, a toast |
-  | 16 (`space.s16`) | content in a content box | a card, a scroll panel |
+  | 16 (`space.s16`) | content in a content box, or in a panel | a card, a shell panel |
   | 24 (`space.s24`) | a dialog's content | the dialog alone |
 
   A hint, the smallest floating thing, keeps 8 by 4: at 12 a one-line hint would be 44 tall, too heavy for a name.
