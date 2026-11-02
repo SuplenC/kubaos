@@ -26,9 +26,16 @@ const LAYOUTS: readonly ListRowSpec[] = [
 
 /** The control center's Wi-Fi networks. */
 const NETWORKS: readonly ListRowSpec[] = [
-  { title: "Hoshi 5G", subtitle: "Connected · WPA2", subtitleIcon: "lock", icon: "wifi", opens: true, checked: true },
-  { title: "Kissa", subtitle: "Secured · WPA3", subtitleIcon: "lock", icon: "network_wifi_3_bar", opens: true, checked: false },
-  { title: "Station Free Wi-Fi", subtitle: "Open", icon: "network_wifi_1_bar", opens: true, checked: false },
+  { title: "Hoshi 5G", subtitle: "Connected · WPA2", subtitleIcon: "lock", icon: "wifi", checked: true },
+  { title: "Kissa", subtitle: "Secured · WPA3", subtitleIcon: "lock", icon: "network_wifi_3_bar", checked: false },
+  { title: "Station Free Wi-Fi", subtitle: "Open", icon: "network_wifi_1_bar", checked: false },
+];
+
+/** A settings app's pages: each row opens a page of its own, so it ends in a chevron and never ticks. */
+const PAGES: readonly ListRowSpec[] = [
+  { title: "Wi-Fi", subtitle: "Hoshi 5G", icon: "wifi", opens: true },
+  { title: "Bluetooth", subtitle: "2 connected", icon: "bluetooth", opens: true },
+  { title: "Displays", subtitle: "2 screens", icon: "desktop_windows", opens: true },
 ];
 
 /** The Command menu's Results: tall, tiled, the query's matches lit, keys on the current one. */
@@ -49,7 +56,7 @@ const POWER: readonly ListRowSpec[] = [
 /** The rows of the state matrix, each the option it shows. */
 const ROWS: readonly { readonly name: string; readonly spec: ListRowSpec }[] = [
   { name: "One line, a symbol and a tick", spec: { title: "Polish", icon: "keyboard", checked: false } },
-  { name: "Two lines, a chevron", spec: { title: "Kissa", subtitle: "Secured · WPA3", subtitleIcon: "lock", icon: "network_wifi_3_bar", opens: true } },
+  { name: "Two lines, a chevron", spec: PAGES[1]! },
   { name: "A tile, tall, with keys", spec: RESULTS[0]! },
   { name: "Chips and a detail", spec: { title: "Samsung 990 Pro", subtitle: "2 TB · NVMe", icon: "hard_drive", chips: [{ kind: "Accent", label: "Default" }], detail: "nvme0n1", checked: false } },
   { name: "A switch", spec: { title: "Bluetooth", subtitle: "2 connected", icon: "bluetooth", toggle: true } },
@@ -66,7 +73,7 @@ function well(specs: readonly ListRowSpec[], options: ListOptions = {}): HTMLEle
 /** One row alone in its well, in `state`; the well lit as the list with the keyboard when it is. */
 function cell(spec: ListRowSpec, state: MatrixState | "signs-off"): HTMLElement {
   if (state === "disabled") return well([{ ...spec, disabled: true }]);
-  if (state === "selected") return well([{ ...spec, ...(spec.checked !== undefined ? { checked: true } : {}) }]);
+  if (state === "selected") return well([spec.opens || spec.checked === undefined ? spec : { ...spec, checked: true }]);
   if (state === "rest") return well([spec]);
   const pinned: RowPinned = state === "pressed" ? "pressed" : "lit";
   const box = well([spec], { current: 0, pinned, focused: true });
@@ -104,7 +111,7 @@ const DESCRIBED =
   "The well is a content box at the content radius (`radius.content`, 16), `surface_container_low` at `opacity.well` with its sunken edge, a hairline of `outline_variant` at `opacity.outline_soft` inside it, `space.s8` inside, its rows `space.s4` apart, so each row's corners are concentric inside it: 16 − 8, the row radius (`radius.row`, 8). A row follows the box it sits in, as a menu's items do: a menu's popover is 12 round with 4 inside and items 32 tall at 8 and 8 inside, so words start 12 from its edge; a well is 16 round with 8 inside and rows 44 or 56 tall at 8 and 16 inside, so words start 24 from its edge.";
 
 const ROW_DESCRIBED =
-  "A row is `size.row` (44) tall with one line and `size.row_two_line` (56) with two, `space.s16` inside its sides: a leading symbol, `body_strong`'s 20 beside one line and `icon.two_line`'s 24 beside two, so it spans both, or the symbol on an icon tile, sm beside one line and md beside two; then its title in `body_strong` over its subtitle in `small`, `space.s4` apart, each one line ending in an ellipsis, the subtitle optionally after a 16 symbol `space.s4` from its words (the lock of a secured network). At its end, `space.s12` apart: chips for facts that matter at a glance, a detail in `mono`, the keys that take it as keycaps `space.s4` apart, a switch, a chevron for a row that opens more, and a tick whose room is kept when unticked so the rows' ends line up. Every part is centred on the row's height, so a chip moves nothing else.";
+  "A row is `size.row` (44) tall with one line and `size.row_two_line` (56) with two, `space.s16` inside its sides: a leading symbol, `body_strong`'s 20 beside one line and `icon.two_line`'s 24 beside two, so it spans both, or the symbol on an icon tile, sm beside one line and md beside two; then its title in `body_strong` over its subtitle in `small`, `space.s4` apart, each one line ending in an ellipsis, the subtitle optionally after a 16 symbol `space.s4` from its words (the lock of a secured network). At its end, `space.s12` apart: chips for facts that matter at a glance, a detail in `mono`, the keys that take it as keycaps `space.s4` apart, a switch, and last a chevron or a tick, never both: a chevron when the row opens a page of its own, a tick (its room kept when unticked, so the rows' ends line up) when it is picked, and neither when taking it simply does something. Every part is centred on the row's height, so a chip moves nothing else.";
 
 const OPTIONS =
   "The Command menu's Results take three options: `tall`, always two lines tall with an md tile, a title alone included, so every row's words start in one column; `clear`, `space.s16` after the tile instead of `space.s12`, so the words stand clear of an app's own icon; and `tight`, the subtitle right under the title. Their titles light the query's matches in `primary`. Their selection is the list's: one shape behind the rows that slides between them over `short` on `standard`, the rows only taking its colours.";
@@ -149,7 +156,8 @@ export default page({
   ],
   variants: [
     { name: "Ticks, on tiles", for: "One of a few of a kind, picked: the keyboard layouts. Every row keeps the tick's room; the default's star is in the accent.", sample: () => well(LAYOUTS) },
-    { name: "Two lines, chevrons", for: "Things that open more: the networks, a fact about each before its subtitle.", sample: () => well(NETWORKS) },
+    { name: "Two lines, ticks", for: "Picked from a few: the networks, the one you're on ticked, a fact about each before its subtitle.", sample: () => well(NETWORKS) },
+    { name: "Two lines, chevrons", for: "Rows that open a page of their own: a settings app's pages. A row that opens never ticks.", sample: () => well(PAGES) },
     { name: "Actions, one line", for: "A list of what can be done, the last one danger: the power menu.", sample: () => well(POWER) },
     { name: "Switches", for: "Settings the row turns: the row is the control, its switch shows the setting.", sample: () => well([{ title: "Bluetooth", subtitle: "2 connected", icon: "bluetooth", toggle: true }, { title: "Do not disturb", icon: "notifications_off", toggle: false }]) },
     { name: "Chips and a detail", for: "Facts at a glance, then a machine's name for it: the disks.", sample: () => well([{ title: "Samsung 990 Pro", subtitle: "2 TB · NVMe", icon: "hard_drive", chips: [{ kind: "Accent", label: "Default" }], detail: "nvme0n1" }, { title: "WD Blue", subtitle: "500 GB · SATA", icon: "hard_drive", chips: [{ kind: "Neutral", label: "Too small" }], detail: "sda" }]) },
@@ -174,7 +182,7 @@ export default page({
       rest: "No fill; the title and symbol `on_surface`, the subtitle and facts `on_surface_variant`, a danger row's all `error`. The well at rest, unlit. By day the same roles in daylight colours.",
       lit: "The keyboard on it, which the pointer moves: `secondary_container` behind it, its title and symbol `on_secondary_container`, its subtitle and facts that at `opacity.subdued_text`, its keycaps' keys and edges `primary`; a danger row on `error`, its content `on_error`. Here with the keyboard in the list too, the well's tube lit. The row has no line and no glow, by night or by day.",
       pressed: "Lit and pressed: the container lifts to `secondary_container_pressed` (a danger row's to `error_pressed`), 0.035 lighter at night and 0.04 darker by day. Letting go takes it.",
-      selected: "Picked, on a row that can be: its tick shows, and its title and tick are `primary_lit`, with the label glow round the title at night while the signs are on. A row with no tick (a network's chevron, a switch, an action) has no picked look: it shows as at rest.",
+      selected: "Picked, on a row that can be: its tick shows, and its title and tick are `primary_lit`, with the label glow round the title at night while the signs are on. A row with no tick (a chevron, a switch, an action) has no picked look: it shows as at rest.",
       disabled: "Dimmed: `on_surface` at `opacity.disabled_content`, its tile, chips, switch and keycaps with it; never lit, and passed over by the keys.",
     },
   },
@@ -189,7 +197,7 @@ export default page({
   content: {
     text: [
       { name: "A title", words: TITLE, sample: (words: string) => well([{ title: words, icon: "keyboard", checked: false }, ROWS[0]!.spec]) },
-      { name: "A subtitle", words: SUBTITLE, sample: (words: string) => well([{ title: "Hoshi 5G", subtitle: words, subtitleIcon: "lock", icon: "wifi", opens: true }]) },
+      { name: "A subtitle", words: SUBTITLE, sample: (words: string) => well([{ title: "Hoshi 5G", subtitle: words, subtitleIcon: "lock", icon: "wifi" }]) },
       { name: "A title beside chips and a detail", words: TITLE, sample: (words: string) => well([{ title: words, subtitle: "2 TB · NVMe", icon: "hard_drive", chips: [{ kind: "Accent", label: "Default" }], detail: "nvme0n1" }]) },
     ],
     missingPicture: [
@@ -255,7 +263,7 @@ export default page({
   },
   measures: {
     samples: nonEmpty([
-      { name: "A well of two-line rows", for: "The well's padding, the rows' gap, each row's height, padding, symbol, words, chevron and tick.", sample: () => well(NETWORKS) },
+      { name: "A well of two-line rows", for: "The well's padding, the rows' gap, each row's height, padding, symbol, words and tick.", sample: () => well(NETWORKS) },
       { name: "One-line rows", for: "A one-line row's height, its 20 symbol and its keycaps.", sample: () => well(POWER) },
       { name: "The Command menu's", for: "A tall row's md tile, `space.s16` after it, its tight words and its keycaps.", sample: () => well(RESULTS) },
       { name: "Chips and a detail", for: "A chip, a detail and the tick's room at the row's end.", sample: () => well([ROWS[3]!.spec]) },
@@ -267,7 +275,7 @@ export default page({
       { what: "Inside a row's sides; after a tile on a `clear` row.", token: "space-s16" },
       { what: "Between a row's parts.", token: "space-s12" },
       { what: "Between rows; between a title and its subtitle, a subtitle's symbol and its words, and keycaps.", token: "space-s4" },
-      { what: "A symbol beside one line, a chevron and the tick.", token: "type-body_strong-icon" },
+      { what: "A symbol beside one line, a chevron or a tick.", token: "type-body_strong-icon" },
       { what: "A symbol beside two lines.", token: "icon-two_line" },
       { what: "A subtitle's symbol.", token: "type-small-icon" },
       { what: "A tile beside one line; beside two, `size.control_md`.", token: "size-control_sm" },

@@ -37,7 +37,16 @@ export interface RowChip {
   readonly label: string;
 }
 
-export interface ListRowSpec {
+/**
+ * How taking a row ends, one of three: it opens a page of its own (a chevron at its end), it is
+ * picked (a tick, whose room is kept when unticked), or something simply happens (neither). A
+ * row never has both a chevron and a tick: each says what pressing it does.
+ */
+export type RowTaking =
+  | { readonly opens: true; readonly checked?: never }
+  | { readonly opens?: false; readonly checked?: boolean };
+
+export type ListRowSpec = RowTaking & {
   readonly title: string;
   /** The characters of the title a query matched, lit in `primary`: the Command menu's. */
   readonly matched?: readonly Run[];
@@ -66,10 +75,6 @@ export interface ListRowSpec {
   readonly keys?: string;
   /** A switch at its end, on or off: a setting the row turns. */
   readonly toggle?: boolean;
-  /** It opens more: a chevron at its end. */
-  readonly opens?: boolean;
-  /** Whether it shows a tick, and whether it is ticked, picked; none for a row that never does. */
-  readonly checked?: boolean;
   /** Its action can't be taken back: Shut down. */
   readonly danger?: boolean;
   readonly disabled?: boolean;
@@ -77,7 +82,7 @@ export interface ListRowSpec {
   readonly loading?: boolean;
   /** How much of its words' room a loading row's title takes; its subtitle that much of it again. */
   readonly share?: number;
-}
+};
 
 /** A state a row is pinned in, as the specimens pin them: the keyboard on it, or pressed. */
 export type RowPinned = "lit" | "pressed";
@@ -126,7 +131,7 @@ function words(spec: ListRowSpec): HTMLElement {
   return filling(stack(spec.tight ? 0 : "s4", "start", ...lines));
 }
 
-/** The parts at a row's end, in order: chips, the detail, keys, a switch, a chevron, the tick. */
+/** The parts at a row's end, in order: chips, the detail, keys, a switch, then a chevron or a tick. */
 function ends(spec: ListRowSpec): Element[] {
   const parts: Element[] = [];
   for (const each of spec.chips ?? []) parts.push(chip({ label: each.label, kind: each.kind }));
@@ -149,7 +154,7 @@ function ends(spec: ListRowSpec): Element[] {
     parts.push(toggle);
   }
   if (spec.opens) parts.push(icon("chevron_right", "var(--type-body_strong-icon)", "var(--muted)"));
-  if (spec.checked !== undefined) {
+  else if (spec.checked !== undefined) {
     const room = document.createElement("span");
     room.className = "k-list-check";
     if (spec.checked) room.append(icon("check", "var(--type-body_strong-icon)", "var(--tick)"));

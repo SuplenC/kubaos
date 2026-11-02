@@ -19,7 +19,7 @@ const THREE = "calc(3 * var(--size-row_two_line) + 2 * var(--space-s4) + 2 * var
 function network(title: string, bars: number, secured = true, connected = false): LiveRowSpec {
   const glyph = bars >= 4 ? "wifi" : `network_wifi_${Math.max(1, bars)}_bar`;
   const subtitle = connected ? "Connected · WPA2" : secured ? "Secured · WPA2" : "Open";
-  return { key: title, title, subtitle, ...(secured ? { subtitleIcon: "lock" } : {}), icon: glyph, opens: true, checked: connected };
+  return { key: title, title, subtitle, ...(secured ? { subtitleIcon: "lock" } : {}), icon: glyph, checked: connected };
 }
 
 const FOUND: readonly LiveRowSpec[] = [
