@@ -48,6 +48,16 @@ import menu from "./molecules/menu.ts";
 import pictureChoice from "./molecules/picture-choice.ts";
 import pill from "./molecules/pill.ts";
 import popover from "./molecules/popover.ts";
+import progressBar from "./molecules/progress-bar.ts";
+import progressPanel from "./molecules/progress-panel.ts";
+import spinnerInContext from "./molecules/spinner-in-context.ts";
+import emptyState from "./molecules/empty-state.ts";
+import errorBlock from "./molecules/error-block.ts";
+import logPage from "./molecules/log.ts";
+import meter from "./molecules/meter.ts";
+import sparkline from "./molecules/sparkline.ts";
+import banner from "./molecules/banner.ts";
+import step from "./molecules/step.ts";
 import scroll from "./molecules/scroll.ts";
 import select from "./molecules/select.ts";
 import slider from "./molecules/slider.ts";
@@ -56,7 +66,7 @@ import tabs from "./molecules/tabs.ts";
 import tile from "./molecules/tile.ts";
 import toast from "./molecules/toast.ts";
 
-export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, slider, tabs, select, popover, menu, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, media, pictureChoice, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll];
+export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, slider, tabs, select, popover, menu, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, media, pictureChoice, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll, progressBar, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step];
 
 export function pagesOf(level: Level): AnyPage[] {
   return PAGES.filter((page) => page.level === level);
