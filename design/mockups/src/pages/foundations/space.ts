@@ -3,6 +3,7 @@
 // (`docs/DESIGN.md`, "Space and shape").
 
 import { button } from "../../lib/button.ts";
+import { card } from "../../lib/card.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
 import { length, names, raw } from "../../lib/tokens.ts";
@@ -196,11 +197,11 @@ function rows(): HTMLElement {
 
 /** A card inside a page: the page's padding is the only one round it. */
 function nestedContainer(): HTMLElement {
-  const card = el("div", "f-card-box", content("A card", "Its own padding inside, none added outside"));
+  const inside = card({ body: [content("A card", "Its own padding inside, none added outside")] });
   return el(
     "div",
     "f-swatch-cell",
-    padded("container-0-padding", null, card),
+    padded("container-0-padding", null, inside),
     token(`page: ${stepName("container-0-padding")} at its sides; the card: its own, inside it`),
   );
 }

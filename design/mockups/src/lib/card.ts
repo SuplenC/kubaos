@@ -1,7 +1,8 @@
 // A card: `kubaos-ui`'s `card::card` and `card::choice_card`, `KubaOS.Components`' `Card` and
-// `ChoiceCard` (`docs/design/components/card.md`). A surface inside the page, raised one step on the
-// ladder (`lib/elevation.ts`), at the content radius, `space.s16` inside: what it holds is a header,
-// a body and a button bar at its foot, `space.s16` apart.
+// `ChoiceCard` (`docs/design/components/card.md`). A region of the page, flat on it: one container
+// role above what it sits on, with the sunken soft hairline for its edge, at the content radius,
+// `space.s16` inside. What it holds is a header, a body and a button bar at its foot, `space.s16`
+// apart.
 //
 // A plain card is a surface and takes no input. A pressable one is a control in the state model
 // (`.k-control` in `lib.css`): the whole card is one press target, lit with the accent's tube
@@ -11,7 +12,6 @@
 // and dims what it holds.
 
 import { pin, type Pinned } from "./control.ts";
-import { raise } from "./elevation.ts";
 import { focusRing } from "./focus.ts";
 import { icon } from "./icon.ts";
 import { filling, row, stack } from "./layout.ts";
@@ -59,10 +59,10 @@ export interface CardOptions {
   readonly pinned?: Pinned;
 }
 
-/** A card's surface: raised one step, at the content radius, `space.s16` inside. */
+/** A card's surface: flat, with the sunken edge, at the content radius, `space.s16` inside. */
 function surface(className: string): HTMLElement {
-  const element = raise(document.createElement("span"), 1);
-  element.className = `${element.className} k-card ${className}`.trim();
+  const element = document.createElement("span");
+  element.className = `k-card k-sunken ${className}`.trim();
   return element;
 }
 
