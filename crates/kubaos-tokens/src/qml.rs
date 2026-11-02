@@ -68,6 +68,7 @@ impl Target for QmlTokens {
         out.line("    // alone.");
         out.line("    property var matugen: null");
         rules(&mut out, tokens);
+        icon_tile(&mut out, tokens);
         lengths(&mut out, tokens);
         container(&mut out, tokens);
         types(&mut out, tokens);
@@ -276,6 +277,35 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
             steps.join(", ")
         ));
     });
+}
+
+/// The icon tile's measures for an app icon.
+fn icon_tile(out: &mut Writer, tokens: &Tokens) {
+    let icon_tile = &tokens.icon_tile;
+    out.group(
+        "    ",
+        Some("An icon tile's app icon, measured once when it loads: a plate fills the tile, a shape sits inside it."),
+        "icon_tile",
+        |out| {
+            out.line("        // The alpha above which a pixel is part of the drawing's box.");
+            out.line(format!("        readonly property real ink: {}", number(icon_tile.ink)));
+            out.line("        // The alpha above which a pixel counts as covering the box.");
+            out.line(format!(
+                "        readonly property real opaque: {}",
+                number(icon_tile.opaque)
+            ));
+            out.line("        // The least share of its long side the box's short side has for a plate.");
+            out.line(format!(
+                "        readonly property real square: {}",
+                number(icon_tile.square)
+            ));
+            out.line("        // The least share of the box its opaque pixels cover for a plate.");
+            out.line(format!(
+                "        readonly property real plate: {}",
+                number(icon_tile.plate)
+            ));
+        },
+    );
 }
 
 fn lengths(out: &mut Writer, tokens: &Tokens) {

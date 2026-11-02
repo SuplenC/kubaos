@@ -16,6 +16,7 @@ use crate::contrast;
 use crate::contrast::Mode;
 use crate::model::Derived;
 use crate::model::Family;
+use crate::model::IconTile;
 use crate::model::Need;
 use crate::model::Tokens;
 
@@ -188,6 +189,7 @@ pub fn check(tokens: &Tokens) -> Vec<Violation> {
     let mut found = Vec::new();
     check_rules(tokens, &mut found);
     check_lengths(tokens, &mut found);
+    check_icon_tile(&tokens.icon_tile, &mut found);
     check_container(tokens, &mut found);
     check_types(tokens, &mut found);
     check_motion(tokens, &mut found);
@@ -510,6 +512,15 @@ fn check_frame_blur(tokens: &Tokens, found: &mut Vec<Violation>) {
     if cutoff <= shade || cutoff >= glass {
         found.push(Violation::FrameBlurOffGlass { cutoff, shade, glass });
     }
+}
+
+/// The icon tile's alphas and shares, which aren't opacities laid over a role but are held to
+/// the same 0 to 1.
+fn check_icon_tile(icon_tile: &IconTile, found: &mut Vec<Violation>) {
+    check_opacity("icon_tile.ink".into(), icon_tile.ink, found);
+    check_opacity("icon_tile.opaque".into(), icon_tile.opaque, found);
+    check_opacity("icon_tile.square".into(), icon_tile.square, found);
+    check_opacity("icon_tile.plate".into(), icon_tile.plate, found);
 }
 
 fn check_opacity(token: String, value: f32, found: &mut Vec<Violation>) {
