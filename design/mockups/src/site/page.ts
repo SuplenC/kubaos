@@ -34,9 +34,13 @@ export function nonEmpty<T>(list: readonly T[]): NonEmpty<T> {
 /** Something live on the page: drawn again whenever the words or the page change. */
 export type Sample = () => Element;
 
-/** The levels, in the navigation's order (`docs/DESIGN.md`, "Levels and where they live"). */
+/**
+ * The levels (`docs/DESIGN.md`, "Levels and where they live"), and the layout primitives beside
+ * them, in the navigation's order.
+ */
 export const LEVELS = [
   { slug: "foundations", title: "Foundations" },
+  { slug: "layout", title: "Layout" },
   { slug: "atoms", title: "Atoms" },
   { slug: "molecules", title: "Molecules" },
   { slug: "templates", title: "Templates" },
