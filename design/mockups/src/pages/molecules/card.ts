@@ -1,5 +1,5 @@
-// The Card page: `docs/design/components/card.md`, the plain card. A surface inside the page,
-// raised one step on the ladder, holding a header, a body and a button bar; plain, it takes no
+// The Card page: `docs/design/components/card.md`, the plain card. A region of the page, flat on
+// it, holding a header, a body and a button bar; plain, it takes no
 // input, and pressable, the whole card is one press target in the state model.
 
 import photo from "../../../../../branding/photo/neon-sign-front@2x.jpg?url";
@@ -80,7 +80,7 @@ function cell(options: CardOptions, state: Shown): HTMLElement {
 }
 
 const DESCRIBED =
-  "A surface raised one step on the ladder (`[elevation]`, `docs/DESIGN.md`, \"Elevation\"): `surface_container_high` by day, `surface_container_highest` at night, step 1's contact and ambient shadow, and the rim inside its edge (`elevation.rim`, `light_rim` by day). Its corners are the content radius, `radius.content` (16): a card is a box of content inside a window or a panel, as a list well and a dialog are, a step under the window's or the panel's own 24. `space.s16` inside, as wide as its room; as tall as what it holds, or, in a grid, as its row, so cards side by side end together.";
+  "A region of the page, so flat on it, with no shadow and no rim: elevation means floating above the page, and a card is part of it (`docs/DESIGN.md`, \"Elevation\"). Its fill is one container role above the surface it sits on: `surface_container` on a window's `surface`, `surface_container_high` on a panel's `surface_container`. Its edge is the sunken soft hairline (`outline_variant` at `opacity.outline_soft`), the list well's line, so the edge holds by day where the two tones are close. Being dragged is the one time a card is raised. Its corners are the content radius, `radius.content` (16): a card is a box of content inside a window or a panel, as a list well and a dialog are, a step under the window's or the panel's own 24. `space.s16` inside, as wide as its room; as tall as what it holds, or, in a grid, as its row, so cards side by side end together.";
 
 export default page({
   level: "molecules",
@@ -92,7 +92,7 @@ export default page({
     "Rust `card::card`, QML `Card`. A group of controls or facts that belong together but aren't a list (a disk and what installing on it does, a proxy's details) sits in a card; a list of like items sits in a well (`List`), and the panel's own controls sit on the panel with nothing round them.",
     DESCRIBED,
     "What it holds runs top to bottom, `space.s16` apart: a header, then the body, then a button bar at its foot (`ButtonBar`), each as wide as the card's padding leaves. The header is its title in `subheading` (`on_surface`), breaking between words, after a symbol at the title's icon size (`subheading`'s 24) `space.s8` before it; and a line under it in `small`, `on_surface_variant`, `space.s4` below, from the card's padding. The button bar is the surface's: the card's action Tonal, since a page's one Filled action is the page's, not a card's.",
-    "A plain card takes no input and has no states: its controls are each a stop of their own. A pressable card is one press target as a whole (a log, a device to open): it lights as any control does, its tube (`primary` at `focus.tube`) inside its edge at its own corner with the glow outside at night; pressed, its tube runs white-hot and the glow brightens, and by day the tone tints it (`opacity.press_tint`). It holds no controls of its own, since a press anywhere on it is its press. Disabled, it keeps its resting surface and what it holds dims to `opacity.disabled_content`, with no line, no glow and no stop for Tab.",
+    "A plain card takes no input and has no states: its controls are each a stop of their own. A pressable card is one press target as a whole (a log, a device to open): it lights as any control does, its tube (`primary` at `focus.tube`) inside its edge at its own corner with the glow outside at night; pressed, its tube runs white-hot and the glow brightens, and by day the tone tints its fill (`opacity.press_tint`). It holds no controls of its own, since a press anywhere on it is its press. Disabled, it keeps its resting surface and what it holds dims to `opacity.disabled_content`, with no line, no glow and no stop for Tab.",
     "Nesting: a card or a well is never inside another; the container's padding is the only padding round it (`docs/DESIGN.md`, \"The container\"). A control in a card keeps its own role's corner (a button's 12). A picture filling the card less its `space.s16` takes the row radius, `radius.row` (8): the card's 16 less its 16 would leave no corner.",
   ],
   variants: [
@@ -112,10 +112,10 @@ export default page({
     },
     rows: nonEmpty(ROWS.map(({ name, options }) => ({ name, cell: (state: MatrixState) => cell(options, state) }))),
     described: {
-      rest: "Raised one step: `surface_container_highest` at night, `surface_container_high` by day, the rim inside its edge and step 1's shadow. A plain card is always this.",
+      rest: "Flat on the page: `surface_container` on the window's `surface`, its edge the soft hairline, with no shadow and no rim. A plain card is always this.",
       lit: "Under the pointer or with the keyboard on it, here with the signs on: the tube, `primary` at `focus.tube`, inside its edge at its own corner, the glow outside. The fill and what it holds don't change. By day the tube with no glow.",
-      pressed: "Lit and pressed: the tube runs white-hot, to the core (`primary_core`), and the glow is `focus.pressed_glow` times the lit one; by day the tone tints it at `opacity.press_tint`. Letting go does what it does.",
-      disabled: "Its resting surface, the rim and shadow kept; what it holds at `opacity.disabled_content`. No line, no glow, no press, no stop for Tab.",
+      pressed: "Lit and pressed: the tube runs white-hot, to the core (`primary_core`), and the glow is `focus.pressed_glow` times the lit one; by day the tone tints its fill at `opacity.press_tint`. Letting go does what it does.",
+      disabled: "Its resting fill and edge kept; what it holds at `opacity.disabled_content`. No line, no glow, no press, no stop for Tab.",
     },
   },
   focus: {
@@ -165,6 +165,7 @@ export default page({
     measures: [
       { what: "Inside its edge, and between its header, body and button bar.", token: "space-s16" },
       { what: "Its corners.", token: "radius-content" },
+      { what: "Its edge, the soft hairline.", token: "stroke-hairline_device_px" },
       { what: "The header's symbol, `subheading`'s.", token: "type-subheading-icon" },
       { what: "The title's line.", token: "type-subheading-line" },
       { what: "Between the symbol and the title.", token: "space-s8" },

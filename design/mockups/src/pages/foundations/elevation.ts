@@ -3,6 +3,7 @@
 // each in device pixels at every scale (`docs/DESIGN.md`, "Space and shape" and "Iconography").
 
 import { button } from "../../lib/button.ts";
+import { card as libraryCard } from "../../lib/card.ts";
 import { raise, type Step } from "../../lib/elevation.ts";
 import { focusRing, windowRing } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
@@ -56,8 +57,8 @@ function steps(): Step[] {
 
 /** What stands at each step, and its container role by day; at night it takes the role above. */
 const STEP_FOR: Record<Step, { what: string; day: string; night: string }> = {
-  1: { what: "A card; a notification tucked under another.", day: "surface_container_high", night: "surface_container_highest" },
-  2: { what: "A menu, a popover; a notification lifted over the list.", day: "surface_container", night: "surface_container_high" },
+  1: { what: "A notification tucked under another; a card being dragged, the one time a card is raised.", day: "surface_container_high", night: "surface_container_highest" },
+  2: { what: "A menu, a popover, a toast; a notification lifted over the list.", day: "surface_container", night: "surface_container_high" },
   3: { what: "A dialog inside an app or a panel.", day: "surface_container_high", night: "surface_container_highest" },
   4: { what: "A tooltip.", day: "surface_container", night: "surface_container_high" },
 };
@@ -69,16 +70,16 @@ function raised<E extends HTMLElement>(element: E, step: Step): E {
   return raise(element, step);
 }
 
-/** A card at step 1: what the scene puts in a window and in a panel alike. */
+/** A card, flat on the surface it is in: the library's, a container role above that surface. */
 function card(): HTMLElement {
-  return raised(el("div", "f-elev-card", text("Projects", "body_strong", "on_surface"), text("12 folders · 3.4 GB", "small", "on_surface_variant")), 1);
+  const flat = libraryCard({ body: [stack("s4", "start", text("Projects", "body_strong", "on_surface"), text("12 folders · 3.4 GB", "small", "on_surface_variant"))] });
+  flat.classList.add("f-elev-card");
+  return flat;
 }
 
 /** An open menu at step 2: the library's popover holding a few items. */
 function openMenu(): HTMLElement {
-  const open = popover(2, menu([{ label: "Open" }, { label: "Rename" }, { label: "Move to trash" }], { current: -1 }));
-  open.classList.add("f-elev-menu");
-  return open;
+  return popover(2, menu([{ label: "Open" }, { label: "Rename" }, { label: "Move to trash" }], { current: -1 }));
 }
 
 /** The window's border: Hyprland's `border_size`, drawn the thin stroke wide. */
@@ -110,7 +111,9 @@ function scene(theme: string, mode: Mode): HTMLElement {
   tip.classList.add("f-elev-tip");
   const sort = button({ label: "Sort", kind: "Tonal", size: "Sm" });
   sort.classList.add("f-elev-sort");
-  const front = appWindow("front", "Files", true, card(), openMenu(), tip, sort);
+  const open = openMenu();
+  open.classList.add("f-elev-menu");
+  const front = appWindow("front", "Files", true, card(), open, tip, sort);
   const back = appWindow("back", "Terminal", false, text("~/Projects/kubaos", "small", "on_surface_variant"));
   const bar = el("div", "f-elev-bar", text("14:05", "label", "on_surface"));
   const panel = el("div", "f-elev-panel", text("Recent", "subheading", "on_surface"), card());
@@ -207,11 +210,11 @@ function shadowTable(): HTMLElement {
   );
 }
 
-/** The same card in a window and in a panel: the ladder restarts in each, so they are one. */
+/** The same open menu in a window and in a panel: the ladder restarts in each, so they are one. */
 function sameInBoth(): HTMLElement {
   const { theme, mode } = settings();
-  const inWindow = el("div", "f-elev-host f-elev-host-window", label("In a window", "label"), card());
-  const inPanel = el("div", "f-elev-host f-elev-host-panel", label("In a panel", "label"), card());
+  const inWindow = el("div", "f-elev-host f-elev-host-window", label("In a window", "label"), openMenu());
+  const inPanel = el("div", "f-elev-host f-elev-host-panel", label("In a panel", "label"), openMenu());
   return painted(theme, mode, el("div", "f-elev-hosts", inWindow, inPanel));
 }
 
@@ -292,9 +295,9 @@ export default foundation({
   live: () => scene(settings().theme, settings().mode),
   description: [
     "Every surface lies on a plane. The desktop plane is the wallpaper and the windows: every window casts one constant neutral shadow, and the active window's glow is the focus family's, laid over it, never changing it. The shell plane is the bar and the frame, the panels, the notifications, the OSD and the system dialogs (the password prompt, the share-screen prompt): always above every window, so it casts the same shadow over a window as over the wallpaper. The lock screen is above everything and casts nothing.",
-    "Inside every window and every panel a part rises on the ladder, which restarts from 0 in each, so a card in a window and a card in a panel are one: 0 the window's or the panel's own surface, 1 a card or a tucked notification, 2 a menu, a popover or a lifted notification, 3 a dialog inside an app or a panel, 4 a tooltip. Each step casts one shadow measured from the plane's surface, not from what it lies on, in two layers of `shadow`: a tight contact layer, 4 blur at every step, and an ambient one 4 down and 16 blur per step (`[elevation]`). A menu or a tooltip that reaches past its window's edge keeps its step's shadow.",
-    "At night the layers are stronger (0.70 and 0.80) and a raised part takes the container role one above its day one, a card `surface_container_highest` where by day it is `surface_container_high`; by day they are 0.24 and 0.28. Every raised part draws a rim, a hairline of `on_surface` inside its edge, 8 % at night and 6 % by day. The surfaces come from the wallpaper, so the roles are named, never a colour.",
-    "A hairline is one device pixel at every scale (`stroke.hairline_device_px`): dividers, the outlines of cards, fields and wells, a switch's track, the rim. It is the one length not on the grid.",
+    "Inside every window and every panel a part rises on the ladder, which restarts from 0 in each, so a menu in a window and a menu in a panel are one: 0 the window's or the panel's own surface, 1 a tucked notification or a card being dragged, 2 a menu, a popover, a toast or a lifted notification, 3 a dialog inside an app or a panel, 4 a tooltip. Only what floats above the page rises: a card is part of the page, so it lies flat on it, one container role above it with a soft hairline for its edge, and being dragged is the one time it is raised. Each step casts one shadow measured from the plane's surface, not from what it lies on, in two layers of `shadow`: a tight contact layer, 4 blur at every step, and an ambient one 4 down and 16 blur per step (`[elevation]`). A menu or a tooltip that reaches past its window's edge keeps its step's shadow.",
+    "At night the layers are stronger (0.70 and 0.80) and a raised part takes the container role one above its day one, a dialog `surface_container_highest` where by day it is `surface_container_high`; a toast keeps its inverse fill in both. By day they are 0.24 and 0.28. Every raised part draws a rim, a hairline inside its edge in the colour of its words, 8 % at night and 6 % by day: `on_surface`, or `surface` on a toast's inverse fill, where `on_surface` would be the fill itself. The surfaces come from the wallpaper, so the roles are named, never a colour.",
+    "A hairline is one device pixel at every scale (`stroke.hairline_device_px`): dividers, the edges of cards, fields and wells, a switch's track, the rim. It is the one length not on the grid.",
     "The thin stroke, 2, is drawn as whole device pixels rounded half up: a spinner's arc, a field's caret, a partial checkbox's dash, the line where a dragged row will land. A symbol's stroke is 2 of its 24 units scaled to its size, rounded half up and never under one, so no line of an icon falls between device pixels.",
   ],
   tokens: [
@@ -305,7 +308,7 @@ export default foundation({
     },
     {
       name: "The ladder's opacities",
-      described: "The contact and ambient layers' opacities of `shadow` and the rim's of `on_surface`, at night and by day.",
+      described: "The contact and ambient layers' opacities of `shadow` and the rim's of the colour of its words (`on_surface`; `surface` on a toast), at night and by day.",
       sample: opacityTable,
     },
     {
@@ -337,14 +340,14 @@ export default foundation({
     },
     {
       name: "The ladder restarts in every window and panel",
-      described: "The same card at step 1 in a window and in a panel: its shadow is measured from the surface it rises from, so it is the same in both.",
+      described: "The same open menu at step 2 in a window and in a panel: its shadow is measured from the surface it rises from, so it is the same in both.",
       sample: sameInBoth,
     },
   ],
   modes: [
     {
       name: "The desktop, night and day",
-      described: "Two windows on the wallpaper, the front one active, its glow over its constant shadow; in it a card (1), an open menu (2) and a tooltip over its button (4); the bar along the top and a panel over the window, the same card in it. At night the parts sit a role lighter, with stronger layers and a brighter rim.",
+      described: "Two windows on the wallpaper, the front one active, its glow over its constant shadow; in it a card flat on the window, an open menu (2) and a tooltip over its button (4); the bar along the top and a panel over the window, the same card in it, a container role above the panel's. At night the raised parts sit a role lighter, with stronger layers and a brighter rim.",
       sample: () => el("div", "f-elev-scenes", ...MODES.map((mode) => scene(settings().theme, mode))),
     },
   ],

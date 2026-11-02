@@ -4,8 +4,9 @@
 
 import { button } from "../../lib/button.ts";
 import { buttonBar } from "../../lib/button-bar.ts";
+import { card } from "../../lib/card.ts";
 import { raise } from "../../lib/elevation.ts";
-import { row, stack } from "../../lib/layout.ts";
+import { row, stack, within } from "../../lib/layout.ts";
 import { type Corner, concentric, role } from "../../lib/radius.ts";
 import { text } from "../../lib/text.ts";
 import { length } from "../../lib/tokens.ts";
@@ -125,11 +126,7 @@ function paddings(): HTMLElement {
 
 /** A button inside a card keeps the control radius: it isn't filling the card. */
 function placedInside(): HTMLElement {
-  return el(
-    "div",
-    "f-card-box",
-    stack("s16", "start", text("Erase the disk?", "subheading", "on_surface"), buttonBar({ dismiss: "Cancel", actions: [{ label: "Erase" }], tone: "Danger" }).element),
-  );
+  return within("var(--size-column)", card({ header: { title: "Erase the disk?" }, actions: buttonBar({ dismiss: "Cancel", actions: [{ label: "Erase" }], tone: "Danger" }).element }));
 }
 
 /** The focus tube at its control's corner, its glow concentric with it. */

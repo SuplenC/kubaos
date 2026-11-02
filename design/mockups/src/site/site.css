@@ -1074,14 +1074,10 @@ body {
   bottom: var(--space-s32);
 }
 
-.f-elev-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-s4);
-  box-sizing: border-box;
+/* The scene's card, the library's, a thumbnail wide. */
+.k-card.f-elev-card {
+  align-self: flex-start;
   width: var(--size-thumbnail_width);
-  padding: var(--space-s16);
-  border-radius: var(--radius-content);
 }
 
 /* The open menu, the button its tooltip is over and the tooltip, placed in the front window from
@@ -1122,7 +1118,9 @@ body {
   padding-inline: var(--space-s16);
 }
 
+/* The panel's body is `surface_container`, so a card on it takes the role above. */
 .f-elev-panel {
+  --card-fill: var(--color-surface_container_high);
   display: flex;
   flex-direction: column;
   gap: var(--space-s16);
