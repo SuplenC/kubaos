@@ -1,0 +1,139 @@
+/* The ListDetail template (`list-detail.ts`): the Command menu's panel and Kōbō's setup window. */
+
+/* How far the Command menu still has to drop in, 1 where it starts `space.s8` up and 0 in place. */
+@property --drop {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How far a pushed View still has to slide, 1 where it starts `space.s24` off and 0 in place. */
+@property --push {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How far a card's page still has to rise, 1 where it starts `space.s16` low and 0 in place. */
+@property --rise {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* The Command menu's panel: the frame's glass, which Hyprland blurs behind, in the soft hairline. */
+.k-menu {
+  position: relative;
+  display: flex;
+  box-sizing: border-box;
+  padding: var(--space-s12);
+  border-radius: var(--radius-surface);
+  outline: none;
+  background: rgb(from var(--color-surface) r g b / var(--opacity-frame));
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
+  translate: 0 calc(round(nearest, var(--drop) * var(--space-s8), 1px) * -1);
+}
+
+.k-menu > .k-stack {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-menu-body {
+  translate: round(nearest, var(--push) * var(--space-s24), 1px) 0;
+}
+
+/* The hairline over the footer runs across the whole panel, at the top of the gap above it. */
+.k-menu-rule {
+  display: block;
+  align-self: stretch;
+  height: 0;
+  margin: 0 calc(-1 * var(--space-s12));
+}
+
+.k-menu-footer {
+  height: var(--size-control_sm);
+}
+
+/* The pane: a card as tall as the body, both contents filling it and crossfading in place. */
+.k-menu-pane {
+  flex: none;
+  align-self: stretch;
+}
+
+.k-menu-pane > .k-card-content,
+.k-menu-pane-room {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.k-menu-pane-room {
+  display: grid;
+}
+
+.k-menu-pane-content {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.k-menu-pane-content[data-empty] {
+  align-self: center;
+}
+
+.k-menu-empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* A screen the menu opens on, its panel placed by script. */
+.k-menu-screen {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-surface_container_lowest);
+}
+
+.k-menu-screen > .k-menu {
+  position: absolute;
+}
+
+/* Kōbō's setup: the window is one solid surface, the side on the well's fill. */
+.k-setup {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  background: var(--color-surface);
+}
+
+.k-setup-side {
+  display: flex;
+  flex: none;
+  min-height: 0;
+  background: rgb(from var(--color-surface_container_low) r g b / var(--opacity-well));
+}
+
+.k-setup-detail {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.k-setup-room {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  translate: 0 round(nearest, var(--rise) * var(--space-s16), 1px);
+}
+
+/* The detail's words keep `space.s16` clear of the scroll's thumb at their end. */
+.k-setup-words {
+  padding-right: var(--space-s16);
+}

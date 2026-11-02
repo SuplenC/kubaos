@@ -1,0 +1,149 @@
+/* The StepRailPage template (`step-rail.ts`): the rail beside the page, in an app's window or in
+   Kōbō's glass panel over the wallpaper and its scrim. */
+
+/* How far a page still has to slide, 1 where it starts `space.s32` off and 0 in place. */
+@property --slide {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How strongly a blocker's reason burns in `error` as Enter is refused, 1 at once, 0 at rest. */
+@property --nudge {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.k-step-rail-page {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  outline: none;
+}
+
+.k-step-rail-page[data-host="window"] {
+  background: var(--color-surface);
+}
+
+/* The rail: its own well's fill, `space.s16` in above and below and `space.s12` at its sides. */
+.k-rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: var(--size-rail);
+  height: 100%;
+  padding: var(--space-s16) var(--space-s12);
+  background: rgb(from var(--color-surface_container_low) r g b / var(--opacity-well));
+}
+
+/* In Kōbō the rail's outer corners are the panel's. */
+.k-step-rail-page[data-host="kobo"] .k-rail {
+  border-radius: var(--radius-surface) 0 0 var(--radius-surface);
+}
+
+.k-rail > .k-stack {
+  height: 100%;
+}
+
+.k-rail > .k-stack > [data-fill-height] {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* The page's side: what the page slides inside, cut at its edges. */
+.k-step-side {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.k-step-room {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  translate: calc(round(nearest, var(--slide) * var(--space-s32), 1px) * var(--toward, 1)) 0;
+}
+
+/* A page going on comes in from the right; one going back from the left. */
+.k-step-room[data-from="start"] {
+  --toward: -1;
+}
+
+.k-step-blocker {
+  --nudge-ink: color-mix(in srgb, var(--color-on_surface_variant), var(--color-error) calc(var(--nudge) * 100%));
+}
+
+/* Kōbō's lockup: the mark a symbol tall, its drawing keeping room for its glow, beside the wordmark
+   a line of title text. */
+.k-lockup-mark,
+.k-lockup-word {
+  display: flex;
+}
+
+.k-lockup-mark > svg {
+  width: var(--icon-s32);
+  height: var(--icon-s32);
+}
+
+.k-lockup-word > svg {
+  width: auto;
+  height: var(--icon-s24);
+}
+
+/* Kōbō's screen: the wallpaper, the scrim over it, and the glass panel placed by script. */
+.k-kobo {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--color-surface_container_lowest);
+  background-position: center;
+  background-size: cover;
+}
+
+.k-kobo::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
+}
+
+.k-kobo-panel {
+  position: absolute;
+  display: flex;
+  overflow: hidden;
+  border-radius: var(--radius-surface);
+  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
+}
+
+/* The glass: the blurred wallpaper under the surface at `opacity.glass`, in the soft hairline. */
+.k-kobo-panel::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  content: "";
+  background: rgb(from var(--color-surface) r g b / var(--opacity-glass));
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
+  pointer-events: none;
+}
+
+.k-kobo-glass {
+  position: absolute;
+  object-fit: cover;
+}
+
+.k-kobo-panel > .k-step-rail-page {
+  position: relative;
+  z-index: 1;
+}
