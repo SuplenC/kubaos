@@ -475,6 +475,11 @@ Each component has a page of its own under `design/components/`: its constructor
 - [DescriptionList](design/components/description-list.md)
 - [FocusRing](design/components/focus-ring.md)
 
+**Templates**
+
+- [StepRailPage](design/components/step-rail-page.md)
+- [ListDetail](design/components/list-detail.md)
+
 **Panels and the bar**
 
 - [Sheet](design/components/sheet.md)

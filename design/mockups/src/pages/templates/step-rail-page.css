@@ -1,0 +1,12 @@
+/* The StepRailPage page: its windows and Kōbō's screen fill the reflow's frame edge to edge. */
+
+.page-window:has(> .k-step-rail-page, > .k-kobo) {
+  padding: 0;
+}
+
+/* A sample's window: the template fills the box it is shown in. */
+.t-frame > .k-step-rail-page,
+.t-frame > .k-kobo {
+  flex: 1 1 0;
+  min-height: 0;
+}
