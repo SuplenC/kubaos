@@ -136,8 +136,8 @@
 
 /* Its rail: down its lane from the top padding to the bottom one, centred in the lane on whole
    device pixels, with round ends, `banner.rail` thick at night and `banner.rail_day` by day: the
-   tabs' and the collapsible's rail made thick enough to fill its lane. At night it is the tone's core with the content glow round
-   it while the signs are on, and glass while they are off; by day the tone, with no glow. */
+   tabs' and the collapsible's rail made thick enough to fill its lane. At night it is the tone's core with a lit control's glow round
+   it, near and far, while the signs are on, and glass while they are off; by day the tone, with no glow. */
 .k-status-rail {
   position: absolute;
   top: var(--space-s16);
@@ -147,7 +147,9 @@
   width: var(--rail);
   border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--status-glass), var(--status-core) calc(var(--signs) * 100%));
-  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--status-tone) r g b / calc(var(--focus-content_glow) * var(--signs))));
+  filter:
+    drop-shadow(0 0 var(--focus-near) rgb(from var(--status-tone) r g b / calc(var(--focus-near_opacity) * var(--signs))))
+    drop-shadow(0 0 var(--focus-far) rgb(from var(--status-tone) r g b / calc(var(--focus-far_opacity) * var(--signs))));
   pointer-events: none;
 }
 
