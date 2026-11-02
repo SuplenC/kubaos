@@ -29,6 +29,7 @@ pub struct Tokens {
     pub caret: Caret,
     pub spinner: Spinner,
     pub tabs: Tabs,
+    pub banner: Banner,
     pub icon_tile: IconTile,
     pub space: Steps,
     pub radius: Radii,
@@ -127,6 +128,16 @@ pub struct Spinner {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Tabs {
+    /// The rail's thickness at night, in logical pixels, rounded half up to whole device pixels.
+    pub rail: u16,
+    /// The rail's thickness by day, in logical pixels, rounded half up to whole device pixels.
+    pub rail_day: u16,
+}
+
+/// A banner's and an error block's rail of neon down their start side.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Banner {
     /// The rail's thickness at night, in logical pixels, rounded half up to whole device pixels.
     pub rail: u16,
     /// The rail's thickness by day, in logical pixels, rounded half up to whole device pixels.
