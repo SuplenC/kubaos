@@ -267,6 +267,8 @@ function spread(sample: Element): void {
 function player(move: Move): HTMLElement {
   const sample = move.sample();
   spread(sample);
+  // The sample shows only the move: no hover, no press, no focus to change it under the pointer.
+  sample.setAttribute("inert", "");
   const stage = el("div", "page-player-stage mock", sample);
   const whole = el("div", "page-player");
   let playing = loop(move);
