@@ -129,7 +129,10 @@ body {
 
 /* The page: its parts at the page's scale. Its sides take the container's padding for its width,
    which `site/settle.ts` picks. */
+/* The page is a layer of its own: a part that lifts itself inside it (a lit list's ring, an open
+   select) stays under the toolbar and the navigation as the page scrolls past them. */
 .page {
+  isolation: isolate;
   flex: 1;
   min-width: 0;
   padding: var(--space-s32) var(--page-padding, var(--container-0-padding)) var(--space-s48);
