@@ -1,0 +1,311 @@
+/* A screen with its frame and the sheets growing out of it (`lib/sheet.ts`). The frame is the bar
+   along the top, `size.bar` tall, and `space.s8` down the sides and along the bottom, its inner
+   corners at the surface radius. The frame and the sheets' surfaces are opaque `surface` inside one
+   layer at `opacity.frame`, which casts `shadow.panel` once; what sits on them is in the layer above
+   at full opacity. While a panel is open the desktop under the layer is dimmed by `scrim` at
+   `opacity.panel_scrim`, fading over `medium` on `standard`. */
+
+/* How far a sheet is open, 0 to 1: its depth is this share of its content's. */
+@property --reveal {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+/* How far a sheet's content is moved sideways in a twin swap, in `space.s24`s, and how much of it
+   shows. */
+@property --swap-shift {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --swap-presence {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --panel-dim {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.k-screen {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--screen-width);
+  height: var(--screen-height);
+  overflow: hidden;
+  background: var(--color-surface_container_lowest);
+  --frame-top: var(--size-bar);
+  --frame-side: var(--space-s8);
+  /* The room a sheet hanging from the bar has before it reaches the frame's bottom edge. */
+  --sheet-room: calc(var(--screen-height) - var(--frame-top) - var(--frame-side));
+}
+
+.k-screen-wallpaper {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.k-screen-dim {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: rgb(from var(--color-scrim) r g b / calc(var(--opacity-panel_scrim) * var(--panel-dim)));
+  transition: --panel-dim var(--motion-medium) var(--easing-standard);
+}
+
+.k-screen[data-open] > .k-screen-dim {
+  --panel-dim: 1;
+}
+
+.k-screen-glass {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: var(--opacity-frame);
+  filter: drop-shadow(0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity)));
+  pointer-events: none;
+}
+
+.k-screen-over {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.k-screen-over > * {
+  pointer-events: auto;
+}
+
+/* The frame: the screen less a rounded inner rectangle, the bar at its top. The hole is a box with
+   its corners at the surface radius, and the frame its spread, which follows those corners. */
+.k-frame {
+  position: absolute;
+  inset: var(--frame-top) var(--frame-side) var(--frame-side);
+  display: block;
+  border-radius: var(--radius-surface);
+  box-shadow: 0 0 0 calc(var(--screen-width) + var(--screen-height)) var(--color-surface);
+}
+
+.k-bar {
+  position: absolute;
+  top: 0;
+  left: var(--frame-side);
+  right: var(--frame-side);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-s8);
+  height: var(--frame-top);
+}
+
+/* A sheet's surface and its content's box: as wide and as deep as each other, its depth `--reveal`
+   of its content's. The fillets and the far corners shrink with the depth: a base fillet to half
+   of it, one into a perpendicular edge to all of it, a far corner to half of it and of its span. */
+.k-sheet-part {
+  position: absolute;
+  display: block;
+  box-sizing: border-box;
+  --sheet-open: calc(var(--reveal) * var(--sheet-depth, 0px));
+  --sheet-flare: var(--radius-surface);
+  --sheet-base: min(var(--sheet-flare), var(--sheet-open) / 2);
+  --sheet-into: min(var(--sheet-flare), var(--sheet-open));
+  --sheet-far: min(var(--radius-surface), var(--sheet-open) / 2, var(--sheet-span, 0px) / 2);
+}
+
+.k-sheet-part[data-edge="right"] {
+  top: var(--frame-top);
+  right: var(--frame-side);
+  width: var(--sheet-open);
+  height: var(--sheet-span, 0px);
+}
+
+.k-sheet-part[data-edge="top"] {
+  top: var(--frame-top);
+  left: round(down, calc((100% - var(--sheet-span, 0px)) / 2), 1px);
+  width: var(--sheet-span, 0px);
+  height: var(--sheet-open);
+}
+
+.k-sheet-part[data-edge="bottom"] {
+  bottom: var(--frame-side);
+  left: round(down, calc((100% - var(--sheet-span, 0px)) / 2), 1px);
+  width: var(--sheet-span, 0px);
+  height: var(--sheet-open);
+}
+
+.k-sheet-surface {
+  background: var(--color-surface);
+}
+
+.k-sheet-surface[data-edge="right"] {
+  border-radius: 0 0 0 var(--sheet-far);
+}
+
+.k-sheet-surface[data-edge="right"][data-flush-end] {
+  border-radius: 0;
+}
+
+.k-sheet-surface[data-edge="top"] {
+  border-radius: 0 0 var(--sheet-far) var(--sheet-far);
+}
+
+.k-sheet-surface[data-edge="bottom"] {
+  border-radius: var(--sheet-far) var(--sheet-far) 0 0;
+}
+
+/* The fillets, each a corner of `surface` with a concave curve: the room outside an ellipse
+   centred at the corner away from both edges it meets. */
+.k-sheet-surface::before,
+.k-sheet-surface::after {
+  content: "";
+  position: absolute;
+  display: block;
+  background: var(--color-surface);
+}
+
+/* A right-edge sheet meets the bar at its start: it curves into it beyond its far side. */
+.k-sheet-surface[data-edge="right"]::before {
+  top: 0;
+  right: 100%;
+  width: var(--sheet-into);
+  height: var(--sheet-flare);
+  mask: radial-gradient(var(--sheet-into) var(--sheet-flare) at 0 100%, transparent 100%, #000 calc(100% + 1px));
+}
+
+/* Its end, short of the frame's bottom: a base fillet into the right edge, under it. */
+.k-sheet-surface[data-edge="right"]::after {
+  top: 100%;
+  right: 0;
+  width: var(--sheet-base);
+  height: var(--sheet-flare);
+  mask: radial-gradient(var(--sheet-base) var(--sheet-flare) at 0 100%, transparent 100%, #000 calc(100% + 1px));
+}
+
+/* Its end, flush with the frame's bottom edge: it curves into it beyond its far side. */
+.k-sheet-surface[data-edge="right"][data-flush-end]::after {
+  top: auto;
+  bottom: 0;
+  right: 100%;
+  width: var(--sheet-into);
+  height: var(--sheet-flare);
+  mask: radial-gradient(var(--sheet-into) var(--sheet-flare) at 0 0, transparent 100%, #000 calc(100% + 1px));
+}
+
+/* A sheet on the top edge: a base fillet into it at either end. */
+.k-sheet-surface[data-edge="top"]::before {
+  top: 0;
+  right: 100%;
+  width: var(--sheet-flare);
+  height: var(--sheet-base);
+  mask: radial-gradient(var(--sheet-flare) var(--sheet-base) at 0 100%, transparent 100%, #000 calc(100% + 1px));
+}
+
+.k-sheet-surface[data-edge="top"]::after {
+  top: 0;
+  left: 100%;
+  width: var(--sheet-flare);
+  height: var(--sheet-base);
+  mask: radial-gradient(var(--sheet-flare) var(--sheet-base) at 100% 100%, transparent 100%, #000 calc(100% + 1px));
+}
+
+/* A sheet on the bottom edge, the same turned over. */
+.k-sheet-surface[data-edge="bottom"]::before {
+  bottom: 0;
+  right: 100%;
+  width: var(--sheet-flare);
+  height: var(--sheet-base);
+  mask: radial-gradient(var(--sheet-flare) var(--sheet-base) at 0 0, transparent 100%, #000 calc(100% + 1px));
+}
+
+.k-sheet-surface[data-edge="bottom"]::after {
+  bottom: 0;
+  left: 100%;
+  width: var(--sheet-flare);
+  height: var(--sheet-base);
+  mask: radial-gradient(var(--sheet-flare) var(--sheet-base) at 100% 0, transparent 100%, #000 calc(100% + 1px));
+}
+
+/* The content's box cuts what isn't out yet; its content rides on the far edge, so it slides out
+   from under the frame, and fades in a beat after the surface moves: from a fifth of the way open
+   to three quarters. */
+.k-sheet {
+  overflow: hidden;
+}
+
+.k-sheet-rider {
+  position: absolute;
+  display: flex;
+  opacity: calc(clamp(0, (var(--reveal) - 0.2) / 0.55, 1));
+}
+
+.k-sheet[data-edge="right"] > .k-sheet-rider {
+  top: 0;
+  left: 0;
+}
+
+.k-sheet[data-edge="top"] > .k-sheet-rider {
+  bottom: 0;
+  left: 0;
+}
+
+.k-sheet[data-edge="bottom"] > .k-sheet-rider {
+  top: 0;
+  left: 0;
+}
+
+/* The content in a twin swap: moved `--swap-shift` of `space.s24` sideways, `--swap-presence` of it shown. */
+.k-sheet-rider > * {
+  translate: round(nearest, calc(var(--swap-shift) * var(--space-s24)), 1px) 0;
+  opacity: var(--swap-presence);
+}
+
+/* A live sheet: shut until shown. It opens over `long` on `emphasized_decel` and shuts over
+   `medium` on `emphasized_accel`; once open, a change of its content's size settles over `medium`
+   on `standard_decel`, as a list reordering does. */
+@property --sheet-span {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --sheet-depth {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.k-sheet-part[data-live] {
+  --reveal: 0;
+  transition: --reveal var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.k-sheet-part[data-live][data-shown] {
+  --reveal: 1;
+  transition: --reveal var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.k-sheet-part[data-live][data-shown][data-settled] {
+  transition:
+    --reveal var(--motion-long) var(--easing-emphasized_decel),
+    --sheet-span var(--motion-medium) var(--easing-standard_decel),
+    --sheet-depth var(--motion-medium) var(--easing-standard_decel);
+}
+
+/* The content leaving in a swap: laid over the arriving one, taking no press. */
+.k-sheet-rider > [data-leaving] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}

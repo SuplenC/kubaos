@@ -553,6 +553,18 @@ use = "The dark beat in the new colours after a theme change's colours change, b
 ms = 600
 use = "Every light striking on together at the end of a theme change or a switch to dark."
 
+# A twin panel taking the surface over (`docs/design/components/sheet.md`): the content leaving
+# goes over `micro`, the arriving one starts moving in half a `micro` later over `short`, and
+# fades in from when the leaving one is gone until it lands, so the two are never drawn over
+# each other.
+[duration.swap_lag]
+ms = 50
+use = "How long after a twin panel's content starts leaving the arriving one starts moving in: half a micro."
+
+[duration.swap_fade]
+ms = 150
+use = "The arriving twin panel's content fading in, from when the leaving one is gone until it lands: short less swap_lag."
+
 # The caret's glow while you type: it comes in at once on a key, holds while
 # keys follow, and fades out once they stop, so it shows that typing is going
 # on without pulsing under every key.
