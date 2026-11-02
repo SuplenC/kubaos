@@ -1,0 +1,33 @@
+/* The Backdrop page's own boxes: Kōbō's sign and mark at their sizes, the room StepRailPage fills,
+   and the lock's field shaking, `--jolt` steps of `space.s4` sideways. */
+@property --jolt {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.k-lock-field {
+  translate: round(nearest, calc(var(--jolt) * var(--space-s4)), 1px) 0;
+}
+
+.k-backdrop-sign {
+  display: block;
+  width: var(--size-column);
+}
+
+.k-backdrop-mark {
+  display: block;
+  width: var(--size-neon_mark);
+  height: var(--size-neon_mark);
+}
+
+.k-backdrop-host > .k-glass-body {
+  align-items: center;
+  justify-content: center;
+}
+
+.page-window:has(> .k-backdrop) {
+  padding: 0;
+  border: none;
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
