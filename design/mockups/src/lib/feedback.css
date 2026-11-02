@@ -1,0 +1,337 @@
+/* The feedback parts: a progress bar and its panel, an empty state, a status message's box and lit
+   edge (a banner, an error block), the log, a meter and a sparkline, and a step. Every length is a
+   token in the page's own CSS pixels, which are device pixels (`main.ts`). */
+
+/* How far a progress bar is filled, 0 to 1: it eases as the work moves on. */
+@property --progress {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far a log's room is open, 0 to 1. */
+@property --log-open {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+/* Where a meter's part ends along its bar, 0 to 1: it eases to a new reading. */
+@property --reach {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* A progress bar (`lib/progress.ts`): a pill `size.progress` tall across its room, the track
+   `surface_container_highest` at `opacity.track`. The fill runs from the left edge to the work's
+   fraction of the width, rounded up to a device pixel, in `primary`, with `shadow.glow` under it in
+   its own colour while the signs are on: a light, so it is out by day and flickers with the signs
+   in a power change. It follows the work over `short` on `linear`; a timed bar is drawn where it is
+   given. On a danger banner's red the fill is `error` on a track of `on_error_container` at
+   `opacity.tint`. */
+.k-progress {
+  position: relative;
+  display: block;
+  flex: none;
+  align-self: stretch;
+  height: var(--size-progress);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-surface_container_highest) r g b / var(--opacity-track));
+  --progress-fill: var(--color-primary);
+  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  transition: --progress var(--motion-short) var(--easing-linear);
+}
+
+.k-row > .k-progress {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-progress[data-danger] {
+  background: rgb(from var(--color-on_error_container) r g b / var(--opacity-tint));
+  --progress-fill: var(--color-error);
+}
+
+.k-progress[data-timed],
+[data-sequence] .k-progress {
+  transition: none;
+}
+
+.k-progress-row {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+/* A fill of no width draws nothing, its glow included: the build skips it. */
+.k-progress-fill {
+  display: block;
+  width: round(up, calc(var(--progress) * 100% - 0.001px), 1px);
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--progress-fill);
+  box-shadow: 0 var(--shadow-glow-y) var(--shadow-glow-blur) rgb(from var(--progress-fill) r g b / calc(var(--shadow-glow-opacity) * var(--signs)));
+  opacity: clamp(0, calc(var(--progress) * 1000000), 1);
+}
+
+/* A progress panel (`lib/progress-panel.ts`): its column `size.column` wide at most, centred in its
+   room on whole device pixels, the odd one after it. */
+.k-progress-panel {
+  display: flex;
+  flex: none;
+  align-self: stretch;
+  justify-content: center;
+  align-items: center;
+  min-height: var(--room-height, auto);
+}
+
+.k-progress-panel-column {
+  width: min(100%, var(--size-column));
+}
+
+.k-progress-panel-column > .k-progress {
+  align-self: stretch;
+}
+
+.k-progress-panel-words,
+.k-empty-words {
+  text-align: center;
+}
+
+/* An empty state (`lib/empty-state.ts`): centred across its room, its column `size.column` wide at
+   most. */
+.k-empty-state {
+  display: flex;
+  flex: none;
+  align-self: stretch;
+  justify-content: center;
+}
+
+.k-empty-column {
+  max-width: min(100%, var(--size-column));
+}
+
+/* A status message (`lib/status.ts`): it lies flat in the page, a fill with the sunken soft
+   hairline inside its edge, at the content radius, `space.s16` inside. */
+.k-status {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-self: stretch;
+  box-sizing: border-box;
+  padding: var(--space-s16);
+  border-radius: var(--radius-content);
+  background: var(--status-fill);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--sunken-line);
+  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+}
+
+.k-status > :not(.k-status-edge) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Its lit edge: the box's own left edge, the thin stroke in whole device pixels, drawn as a left
+   border at the box's corner, which tapers it into both corners over the corner's length. At
+   night it is the tone's core with the tone's near glow round it while the signs are on, and
+   glass, the tone, while they are off; by day the tone, with no glow. */
+.k-status-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border-style: solid;
+  border-width: 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px));
+  border-color: color-mix(in srgb, var(--status-tone), var(--status-core) calc(var(--signs) * 100%));
+  filter: drop-shadow(0 0 calc(var(--focus-near) / 2) rgb(from var(--status-tone) r g b / calc(var(--focus-near_opacity) * var(--signs))));
+  pointer-events: none;
+}
+
+/* A log (`lib/log.ts`): the scrolling well on `surface_container_lowest` at `opacity.log`, its
+   lines `space.s16` in at the sides and `space.s12` above and below, selectable as text. */
+.k-list.k-log {
+  background: rgb(from var(--color-surface_container_lowest) r g b / var(--opacity-log));
+}
+
+.k-list-pane > .k-log-lines {
+  box-sizing: border-box;
+  min-width: 100%;
+  padding: var(--space-s12) var(--space-s16);
+  user-select: text;
+  cursor: text;
+}
+
+.k-log[data-unwrapped] .k-list-pane {
+  overflow-x: auto;
+}
+
+.k-log[data-unwrapped] .k-log-lines {
+  width: max-content;
+}
+
+.k-log-lines > .k-log-line {
+  align-self: stretch;
+}
+
+.k-log[data-unwrapped] .k-log-lines > .k-log-line {
+  align-self: flex-start;
+}
+
+.k-log-line::selection {
+  background: rgb(from var(--color-primary) r g b / var(--opacity-selection));
+}
+
+/* A log's room opening under what it explains: `size.log` and the gap above it times how open it
+   is, rounded to a device pixel, cutting the log as it goes. */
+.k-log-room {
+  display: block;
+  flex: none;
+  align-self: stretch;
+  --log-gap: 0px;
+  height: round(nearest, calc(var(--log-open) * (var(--size-log) + var(--log-gap))), 1px);
+  overflow: hidden;
+  transition: --log-open var(--motion-medium) var(--easing-emphasized_decel);
+}
+
+.k-log-room > .k-log {
+  margin-top: var(--log-gap);
+}
+
+[data-sequence] .k-log-room,
+[data-reduced] .k-log-room {
+  transition: none;
+}
+
+/* A meter (`lib/meter.ts`): a progress bar's track and shape, each part from the left edge to where
+   it ends, rounded up to a device pixel, easing to a new reading over `short` on `linear`. */
+.k-meter {
+  position: relative;
+  display: block;
+  flex: none;
+  align-self: stretch;
+  height: var(--size-progress);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-surface_container_highest) r g b / var(--opacity-track));
+}
+
+.k-row > .k-meter {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-meter[data-compact] {
+  flex: none;
+  align-self: auto;
+  width: var(--size-control_sm);
+}
+
+.k-meter-part {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: round(up, calc(var(--reach) * 100% - 0.001px), 1px);
+  height: 100%;
+  border-radius: var(--radius-full);
+  opacity: clamp(0, calc(var(--reach) * 1000000), 1);
+  transition: --reach var(--motion-short) var(--easing-linear);
+}
+
+[data-sequence] .k-meter-part {
+  transition: none;
+}
+
+/* A sparkline: as wide as its room and `size.sparkline` tall, or inline a line of small text tall
+   and a small control wide. The line is the thin stroke with round joins, its area under it its
+   colour at `opacity.tint`; the second reading is `tertiary`, unfilled. */
+.k-sparkline {
+  display: block;
+  flex: none;
+  align-self: stretch;
+  height: var(--size-sparkline);
+}
+
+.k-sparkline[data-inline] {
+  align-self: auto;
+  width: var(--size-control_sm);
+  height: var(--type-small-line);
+}
+
+.k-sparkline > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.k-sparkline path {
+  fill: none;
+  stroke-linejoin: round;
+}
+
+.k-sparkline .k-sparkline-area {
+  fill: rgb(from var(--line-colour) r g b / var(--opacity-tint));
+}
+
+.k-sparkline-line {
+  stroke: var(--line-colour);
+}
+
+.k-sparkline-second {
+  stroke: var(--color-tertiary);
+}
+
+/* A step (`lib/step.ts`): `size.row` tall with one line; with a subtitle `space.s8` above and below,
+   so `size.row_two_line` with its first line; `space.s12` in at the sides. Its corner is its box's
+   less the box's padding: a list well's, `radius.row`; Kōbō's rail's, `radius.surface` less
+   `space.s12`. Selected (the current step), it is on `secondary_container`, its words
+   `on_secondary_container` and its subtitle that at `opacity.subdued_text`. */
+.k-step {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-self: stretch;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--size-row);
+  padding: 0 var(--space-s12);
+  border-radius: var(--step-corner);
+  outline: none;
+  --step-corner: var(--radius-row);
+  --step-ink: var(--color-on_surface);
+  --step-muted: var(--color-on_surface_variant);
+  --tint-tone: var(--color-primary);
+  background-image: linear-gradient(
+    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press, 0))),
+    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press, 0)))
+  );
+}
+
+.k-step > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-step[data-box="rail"] {
+  --step-corner: calc(var(--radius-surface) - var(--space-s12));
+}
+
+.k-step[data-lines="two"] {
+  padding: var(--space-s8) var(--space-s12);
+}
+
+.k-step[data-selected] {
+  background-color: var(--color-secondary_container);
+  --step-ink: var(--color-on_secondary_container);
+  --step-muted: rgb(from var(--color-on_secondary_container) r g b / var(--opacity-subdued_text));
+}
+
+.k-step.k-control {
+  cursor: pointer;
+}
+
+.k-step-mark-room {
+  display: block;
+  flex: none;
+  width: var(--type-body_strong-icon);
+  height: var(--type-body_strong-icon);
+}
