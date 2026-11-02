@@ -3,7 +3,8 @@
 // the other, `space.s8` apart: each label in `small`, `on_surface_variant`, a quarter of the width,
 // its value in `body` the rest, `space.s8` from it, wrapping, and an optional `mono` line
 // `space.s4` under the value for a path, an email or a version, on one line ending in an ellipsis,
-// since those break badly wrapped mid-token. The quarter is split in whole device pixels.
+// since those break badly wrapped mid-token. The quarter is split in whole device pixels, and
+// never narrower than a label's longest word.
 
 import "./lists.css";
 import { scaleOf } from "./list.ts";
@@ -32,7 +33,8 @@ export function descriptionList(facts: readonly Fact[]): HTMLElement {
   new ResizeObserver(() => {
     const scale = scaleOf(box);
     const widths = split(box.clientWidth, length("space-s8") * scale, [1, 3]);
-    box.style.setProperty("--columns", widths.map((each) => `${each}px`).join(" "));
+    // A label never narrower than its longest word, so a narrow list wraps it between words.
+    box.style.setProperty("--columns", `minmax(min-content, ${widths[0]}px) minmax(0, 1fr)`);
   }).observe(box);
   return probe(box, { role: "component", name: "DescriptionList", variant: "", fixed: { width: false, height: false } });
 }

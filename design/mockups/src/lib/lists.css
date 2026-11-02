@@ -420,7 +420,7 @@
   display: grid;
   flex: none;
   align-self: stretch;
-  grid-template-columns: var(--columns, 1fr 3fr);
+  grid-template-columns: var(--columns, minmax(min-content, 1fr) 3fr);
   gap: var(--space-s8);
   align-items: start;
 }

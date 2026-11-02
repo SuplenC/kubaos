@@ -6,4 +6,4 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `description::description_list`; QML `DescriptionList`. Its mockup page is the source of truth: Molecules, DescriptionList, in `design/mockups/`.
 
-Facts beside their labels, 8 apart: each label in `small` a quarter of the width, its value in `body` the rest, wrapping, and an optional `mono` line under the value for a path, an email or a version, which break badly wrapped mid-token. Kōbō's Last chance cards.
+Facts beside their labels, 8 apart: each label in `small` a quarter of the width (never narrower than its longest word, so it wraps between words), its value in `body` the rest, wrapping, and an optional `mono` line under the value for a path, an email or a version, which break badly wrapped mid-token. Kōbō's Last chance cards.
