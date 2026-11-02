@@ -188,7 +188,7 @@ function rail(): HTMLElement {
 /** A curve's player: the ball from one end of the rail to the other over its duration. */
 function curveMove(curve: Easing): Move {
   const duration = PLAYED_OVER[curve];
-  const track = (over: Duration) => ({ part: "ball", on: "the rail", target: ".f-ball", property: "--along", from: 0, to: 1, duration: over, curve });
+  const track = (over: Duration) => ({ part: "ball", on: "the rail", target: ".f-ball", property: "--ridden", from: 0, to: 1, duration: over, curve });
   const capped = milliseconds(duration) > milliseconds("short");
   return {
     name: `easing.${curve}`,

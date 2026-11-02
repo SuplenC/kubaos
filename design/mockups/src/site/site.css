@@ -1480,9 +1480,9 @@ body {
   background: var(--color-primary);
 }
 
-/* A curve's rail: the ball rides it from one end to the other as `--along` goes 0 to 1, past the
+/* A curve's rail: the ball rides it from one end to the other as `--ridden` goes 0 to 1, past the
    end and back on a curve that overshoots. */
-@property --along {
+@property --ridden {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;
@@ -1504,7 +1504,7 @@ body {
   height: var(--space-s16);
   border-radius: var(--radius-full);
   background: var(--color-primary);
-  translate: calc(var(--along) * (var(--size-panel) - var(--space-s16))) 0;
+  translate: calc(var(--ridden) * (var(--size-panel) - var(--space-s16))) 0;
 }
 
 /* A curve drawn small: its progress over its duration, the room past 0 and 1 where it overshoots. */
