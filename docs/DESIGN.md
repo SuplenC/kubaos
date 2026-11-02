@@ -493,6 +493,7 @@ Each component has a page of its own under `design/components/`: its constructor
 **Templates**
 
 - [PanelPage](design/components/panel-page.md)
+- [Backdrop](design/components/backdrop.md)
 
 ### Rules every component keeps
 
