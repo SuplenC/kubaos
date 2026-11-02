@@ -168,6 +168,16 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
     out.line("/// room (a wallpaper thumbnail in its grid cell), in logical pixels. A scroll is not held to it:");
     out.line("/// it reaches past its box as far as the far glow.");
     out.line(format!("pub const FOCUS_OFFSET: u16 = {};", focus.offset));
+    let icon_tile = &tokens.icon_tile;
+    out.blank();
+    out.line("/// An icon tile's app icon, measured once when it loads: its drawing's box is its pixels more");
+    out.line("/// opaque than `ICON_TILE_INK`; it is a plate, filling the tile, when the box's short side is at");
+    out.line("/// least `ICON_TILE_SQUARE` of its long one and its pixels more opaque than `ICON_TILE_OPAQUE`");
+    out.line("/// cover at least `ICON_TILE_PLATE` of it, and a shape fitted inside the tile otherwise.");
+    out.line(format!("pub const ICON_TILE_INK: f32 = {:?};", icon_tile.ink));
+    out.line(format!("pub const ICON_TILE_OPAQUE: f32 = {:?};", icon_tile.opaque));
+    out.line(format!("pub const ICON_TILE_SQUARE: f32 = {:?};", icon_tile.square));
+    out.line(format!("pub const ICON_TILE_PLATE: f32 = {:?};", icon_tile.plate));
     out.blank();
     out.line("/// A neon tube striking: its brightness, 0 to 1, through even steps over `medium`.");
     out.line(format!(
