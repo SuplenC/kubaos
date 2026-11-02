@@ -25,7 +25,6 @@ const NETWORKS: readonly ListRowSpec[] = NAMES.map((title, index) => ({
   subtitle: index === 0 ? "Connected · WPA2" : index % 3 === 2 ? "Open" : "Secured · WPA2",
   ...(index % 3 === 2 ? {} : { subtitleIcon: "lock" }),
   icon: BARS[index]!,
-  opens: true,
   checked: index === 0,
 }));
 

@@ -15,10 +15,10 @@
 import { type ListOptions, type ListRowSpec, listRow, listRows, scaleOf, scrolled, twoLines } from "./list.ts";
 import { length } from "./tokens.ts";
 
-export interface LiveRowSpec extends ListRowSpec {
+export type LiveRowSpec = ListRowSpec & {
   /** What the row stands for across updates: a network's name, a device's address. */
   readonly key: string;
-}
+};
 
 export interface LiveOptions extends ListOptions {
   /** The well's height, a length's CSS. */
