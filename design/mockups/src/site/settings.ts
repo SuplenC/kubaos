@@ -13,6 +13,13 @@
  */
 export const CHROME = new URLSearchParams(location.search).get("chrome") !== "off";
 
+/**
+ * Whether every choice is drawn. `?all` draws each stage's choices one under another and every move
+ * in a player of its own, so the shots and the checks see each case the switchers and the motion
+ * lists otherwise show one at a time.
+ */
+export const ALL = new URLSearchParams(location.search).has("all");
+
 import { THEMES } from "./themes.ts";
 
 export type Mode = "dark" | "light";

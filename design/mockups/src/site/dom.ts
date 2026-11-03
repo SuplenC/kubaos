@@ -16,7 +16,7 @@ export function el<K extends keyof HTMLElementTagNameMap>(
 
 /** A grid cell holding a mock, which `settle` centres down its row on a whole device pixel. */
 export function mockCell(mock: Element): HTMLElement {
-  const cell = el("div", "page-cell", mock);
+  const cell = sampleBox(el("div", "page-cell", mock));
   cell.dataset.mock = "";
   return cell;
 }
@@ -44,4 +44,23 @@ export function prose(words: string, style: TypeStyle = "body", color = "on_surf
 /** `words` with each `backticked` span set as code. */
 function inline(words: string): (Node | string)[] {
   return words.split(/(`[^`]+`)/).map((part) => (part.startsWith("`") ? el("code", "page-code", part.slice(1, -1)) : part));
+}
+
+/**
+ * Tells the page that what is drawn in `from` changed its layout (a stage picked another sample, a
+ * player another move), so what script lays out is laid out again (`site/settle.ts`).
+ */
+export function relayout(from: Element): void {
+  from.dispatchEvent(new Event(RELAYOUT, { bubbles: true }));
+}
+
+export const RELAYOUT = "page-relayout";
+
+/**
+ * Marks `box` as holding a live sample: a wheel over it scrolls the page until the reader clicks
+ * into it (`site/scroll.ts`).
+ */
+export function sampleBox<E extends HTMLElement>(box: E): E {
+  box.dataset.sample = "";
+  return box;
 }

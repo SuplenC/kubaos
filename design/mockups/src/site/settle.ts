@@ -1,7 +1,7 @@
-// What is laid out in script once the page's CSS has laid it out: the page's padding for its
-// width, the sample grids' bands for it, each mock centred down its row on a whole device pixel,
-// the focus rings' glows for their controls' sizes, then the measures overlays drawn over the
-// result. CSS centres by half the spare room, which is half a device pixel whenever that is odd; a
+// What is laid out in script once the page's CSS has laid it out: the page's container and its
+// padding for the viewport, the sample grids' bands for it, the samples wider than it let out of
+// it, each mock centred down its row on a whole device pixel, the focus rings' glows for their
+// controls' sizes, then the measures overlays drawn over the result. CSS centres by half the spare room, which is half a device pixel whenever that is odd; a
 // mock is placed as the builds place a child, the odd device pixel after it (`kubaos-ui`'s
 // `centre`).
 
@@ -30,22 +30,82 @@ function centreMocks(page: HTMLElement): void {
 }
 
 /**
- * Gives `page` the container's padding at its width in logical pixels: the padding of the widest
- * step its width reaches (`[container]` in the tokens, `Tokens.containerPadding`).
+ * The widest the page's container grows from each viewport width up, in logical pixels: Tailwind's
+ * `container` steps. They frame the site's pages, not KubaOS's surfaces, so they aren't tokens.
  */
-function padPage(page: HTMLElement): void {
-  const width = page.offsetWidth / settings().scale;
+const CONTAINER_STEPS = [640, 768, 1024, 1280, 1536];
+
+/**
+ * Gives `page`'s container its widest for the viewport, the step it reaches, then its padding at
+ * the width it takes in logical pixels: the padding of the widest step of `[container]` in the
+ * tokens it reaches (`Tokens.containerPadding`).
+ */
+function fitContainer(page: HTMLElement): void {
+  const container = page.querySelector<HTMLElement>(":scope > .page-container");
+  if (!container) return;
+  const scale = settings().scale;
+  const viewport = (innerWidth * devicePixelRatio) / scale;
+  const reached = CONTAINER_STEPS.filter((step) => viewport >= step).at(-1);
+  container.style.setProperty("--page-container", reached === undefined ? "none" : `calc(${reached} * var(--px))`);
+  const width = container.offsetWidth / scale;
   let step = 0;
   for (let i = 0; raw(`container-${i}-from`) !== ""; i++) {
     if (width >= Number(raw(`container-${i}-from`))) step = i;
   }
-  page.style.setProperty("--page-padding", `var(--container-${step}-padding)`);
+  container.style.setProperty("--page-padding", `var(--container-${step}-padding)`);
+}
+
+/** Puts every sample's box back in the container, to be measured there again. */
+function keepIn(page: HTMLElement): void {
+  for (const view of page.querySelectorAll<HTMLElement>(".page-view")) {
+    view.style.width = "";
+    view.style.marginLeft = "";
+    view.removeAttribute("data-scrolls");
+  }
+}
+
+/**
+ * Lets each sample's box wider than the container out of it, centred on it as far as the page's
+ * padding allows, on a whole device pixel; one wider than that scrolls inside its own box. The
+ * page never scrolls sideways.
+ */
+function breakOut(page: HTMLElement): void {
+  const container = page.querySelector<HTMLElement>(":scope > .page-container");
+  if (!container) return;
+  const views = [...page.querySelectorAll<HTMLElement>(".page-view")];
+  // Every box is read, then every one placed: one layout, not one a box.
+  const perViewport = page.offsetWidth / page.getBoundingClientRect().width || 1;
+  const box = container.getBoundingClientRect();
+  const padding = Number.parseFloat(getComputedStyle(container).paddingLeft) / perViewport;
+  const left = box.left + padding;
+  const right = box.right - padding;
+  const pageBox = page.getBoundingClientRect();
+  const roomLeft = pageBox.left + padding;
+  const roomRight = pageBox.right - padding;
+  // A sample's width is its own box's, not what overflows it: a lit control's glow reaches past it.
+  const widthOf = (view: HTMLElement) => Math.max(0, ...[...view.children].map((child) => (child as HTMLElement).offsetWidth ?? 0));
+  const placed = views
+    .filter((view) => view.offsetParent !== null && widthOf(view) > view.clientWidth)
+    .map((view) => {
+      const natural = widthOf(view) / perViewport;
+      const want = Math.min(natural, roomRight - roomLeft);
+      const at = Math.min(Math.max((left + right) / 2 - want / 2, roomLeft), roomRight - want);
+      return { view, want, by: at - view.getBoundingClientRect().left, scrolls: natural > roomRight - roomLeft };
+    });
+  for (const { view, want, by, scrolls } of placed) {
+    view.style.width = `${Math.floor(want * perViewport)}px`;
+    view.style.marginLeft = `${Math.round(by * perViewport)}px`;
+    view.toggleAttribute("data-scrolls", scrolls);
+  }
 }
 
 /** Lays out what script lays out on `page`, after its CSS has. */
 export function settle(page: HTMLElement): void {
-  padPage(page);
+  fitContainer(page);
+  keepIn(page);
+  // A grid of bands is split for the container's room before a box is let out for what it holds.
   reflowBands(page);
+  breakOut(page);
   centreMocks(page);
   redrawRings();
   // An overlay that took another line of names above its sample is taller: centre again.

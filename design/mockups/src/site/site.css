@@ -127,16 +127,25 @@ body {
   color: var(--color-on_secondary_container);
 }
 
-/* The page: its parts at the page's scale. Its sides take the container's padding for its width,
-   which `site/settle.ts` picks. */
-/* The page is a layer of its own: a part that lifts itself inside it (a lit list's ring, an open
-   select) stays under the toolbar and the navigation as the page scrolls past them. */
+/* The page: its parts at the page's scale, in a container centred on it. The page is a layer of
+   its own: a part that lifts itself inside it (a lit list's ring, an open select) stays under the
+   toolbar and the navigation as the page scrolls past them. It never scrolls sideways: a sample
+   wider than its room scrolls in its own box (`site/settle.ts`). */
 .page {
   isolation: isolate;
   flex: 1;
   min-width: 0;
-  padding: var(--space-s32) var(--page-padding, var(--container-0-padding)) var(--space-s48);
+  overflow-x: clip;
+  padding: var(--space-s32) 0 var(--space-s48);
   background: var(--color-surface);
+}
+
+/* As wide as the viewport's step lets it (`--page-container`) and its padding for the width it
+   takes (`--page-padding`), both picked by `site/settle.ts`. */
+.page-container {
+  max-width: var(--page-container, none);
+  margin-inline: auto;
+  padding-inline: var(--page-padding, var(--container-0-padding));
   display: flex;
   flex-direction: column;
   gap: var(--space-s48);
@@ -145,6 +154,32 @@ body {
 .page-header {
   display: flex;
   flex-direction: column;
+  gap: var(--space-s8);
+}
+
+/* The page's contents, pinned under the toolbar, a hairline under them as under the toolbar: on
+   the page's own surface across the page's whole width, cut at the page's edges, so what scrolls
+   under them is hidden; a lit chip's glow reaches past the band. */
+.page-contents {
+  position: sticky;
+  top: var(--page-pinned-top, 0px);
+  z-index: 1;
+  margin-block: calc(-1 * var(--space-s32));
+  padding-block: var(--space-s12);
+}
+
+.page-contents::before {
+  content: "";
+  position: absolute;
+  inset: 0 -100vmax;
+  z-index: -1;
+  background: var(--color-surface);
+  border-bottom: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.page-picker {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-s8);
 }
 
@@ -170,10 +205,12 @@ body {
   color: var(--color-on_surface_variant);
 }
 
-/* The description: the thing itself, live, beside its words. */
+/* The description: the thing itself, live, its words beside it while a text column fits there,
+   under it, from the left, when one doesn't. */
 .page-description {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: var(--space-s32);
 }
 
@@ -184,9 +221,108 @@ body {
 }
 
 .page-description-words {
+  flex: 1 1 var(--size-column);
+  max-width: var(--size-column);
   display: flex;
   flex-direction: column;
   gap: var(--space-s16);
+}
+
+/* A sample's own box on a stage or beside a description: as wide as the sample, the container's
+   width at most, unless `site/settle.ts` lets it out; one wider than the page scrolls inside. */
+.page-view {
+  flex: none;
+  display: flex;
+  max-width: 100%;
+}
+
+.page-view[data-scrolls] {
+  overflow-x: auto;
+}
+
+/* Where the shelf measures its samples (`site/parts/shelf.ts`): each at its own width, unseen. */
+.page-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+}
+
+.page-measure-item {
+  display: flex;
+}
+
+.page-measure-column {
+  width: var(--size-column);
+}
+
+/* Small samples: a grid of cards, as many a row as fit at the widest sample's width, each the
+   sample over its name and words. The card is a hairline on the
+   page's own surface, so every sample is seen on the surface it is drawn for; its padding is past
+   the focus glow's reach. */
+.page-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(var(--size-rail), calc(var(--widest) + 2 * var(--space-s24)))), 1fr));
+  gap: var(--space-s16);
+}
+
+.page-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  padding: var(--space-s24);
+  border-radius: var(--radius-surface);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.page-card-sample {
+  display: flex;
+  align-items: flex-start;
+}
+
+.page-card-words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
+}
+
+/* A window-sized sample's stage: its switcher's rows of chips, then the one picked at its real
+   size, its name and words beside it while `size.rail` fits there, under it when it doesn't. */
+.page-stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s24);
+}
+
+.page-stage-switch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+.page-stage-switch > [hidden],
+.page-stage-item[hidden] {
+  display: none;
+}
+
+.page-stage-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-s16) var(--space-s32);
+}
+
+.page-stage-words {
+  flex: 1 1 var(--size-rail);
+  max-width: var(--size-column);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
 }
 
 .page-heading,
@@ -217,12 +353,6 @@ body {
   gap: var(--space-s24) var(--space-s32);
 }
 
-.page-variants {
-  display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr);
-  gap: var(--space-s24) var(--space-s32);
-}
-
 /* A cell of the page's own words is centred down its row; one holding a mock starts at its top,
    and `site/settle.ts` centres the mock on a whole device pixel. */
 .page-cell {
@@ -234,23 +364,6 @@ body {
 
 .page-cell[data-mock] {
   justify-content: flex-start;
-}
-
-.page-variants > .page-prose {
-  align-self: center;
-}
-
-/* Too narrow for words beside the samples (`site/parts/variants.ts`): each row's words go under its
-   sample, a line's length wide at most, `space.s12` below it. */
-.page-variants[data-stacked] {
-  grid-template-columns: max-content minmax(0, 1fr);
-}
-
-.page-variants[data-stacked] > .page-prose {
-  grid-column: 2;
-  align-self: start;
-  max-width: var(--size-column);
-  margin-top: calc(var(--space-s12) - var(--space-s24));
 }
 
 .page-list {
