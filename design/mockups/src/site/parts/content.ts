@@ -2,30 +2,32 @@
 // whatever the toolbar's length, then a missing picture, and none, one and many.
 
 import { translated } from "../../lib/content.ts";
-import type { Content } from "../page.ts";
-import { el, mockCell } from "../dom.ts";
+import { applies, type Content } from "../page.ts";
+import { mockCell } from "../dom.ts";
 import { bandedGrid } from "./bands.ts";
-import { partOr, subheading } from "./section.ts";
+import type { Group, Item } from "./shelf.ts";
 import { variants } from "./variants.ts";
 
-export function content(spec: Content): HTMLElement {
-  const text = partOr(spec.text, (rows) =>
-    bandedGrid(
-      ["Shortest", "Longest", "Translated, 40% longer"],
-      rows.map((row) => ({
-        name: row.name,
-        cells: [mockCell(row.sample(row.words.short)), mockCell(row.sample(row.words.long)), mockCell(row.sample(translated(row.words.long)))],
-      })),
-    ),
-  );
-  return el(
-    "div",
-    "page-part",
-    subheading("Text"),
-    text,
-    subheading("A missing icon or picture"),
-    partOr(spec.missingPicture, variants),
-    subheading("None, one and many"),
-    partOr(spec.counts, variants),
-  );
+const LENGTHS = ["Shortest", "Longest", "Translated, 40% longer"] as const;
+
+/** The content's groups for a shelf: the text at each length, a missing picture, the counts. */
+export function content(spec: Content): Group[] {
+  const text: Group = {
+    title: "Text",
+    items: applies(spec.text)
+      ? spec.text.flatMap((row) =>
+          [row.words.short, row.words.long, translated(row.words.long)].map((words, i): Item => ({
+            name: `${row.name} · ${LENGTHS[i]!}`,
+            sample: row.sample(words),
+            at: [row.name, LENGTHS[i]!],
+          })),
+        )
+      : spec.text,
+    small: (items) =>
+      bandedGrid(
+        [...LENGTHS],
+        applies(spec.text) ? spec.text.map((row, r) => ({ name: row.name, cells: [0, 1, 2].map((i) => mockCell(items[r * 3 + i]!.sample)) })) : [],
+      ),
+  };
+  return [text, variants("A missing icon or picture", spec.missingPicture), variants("None, one and many", spec.counts)];
 }
