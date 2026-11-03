@@ -240,6 +240,19 @@ body {
   align-self: center;
 }
 
+/* Too narrow for words beside the samples (`site/parts/variants.ts`): each row's words go under its
+   sample, a line's length wide at most, `space.s12` below it. */
+.page-variants[data-stacked] {
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.page-variants[data-stacked] > .page-prose {
+  grid-column: 2;
+  align-self: start;
+  max-width: var(--size-column);
+  margin-top: calc(var(--space-s12) - var(--space-s24));
+}
+
 .page-list {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
