@@ -78,7 +78,11 @@ export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTM
   }
 
   view.addEventListener("scroll", place, { passive: true });
-  new ResizeObserver(place).observe(body);
+  // Either side can change what overflows: the content growing, or the room it shows in, which a
+  // panel placed by script sizes after the scroll is drawn.
+  const resized = new ResizeObserver(place);
+  resized.observe(body);
+  resized.observe(view);
   thumb.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     thumb.setPointerCapture(event.pointerId);

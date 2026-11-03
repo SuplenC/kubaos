@@ -30,6 +30,7 @@ pub struct Tokens {
     pub spinner: Spinner,
     pub tabs: Tabs,
     pub banner: Banner,
+    pub step_rail: StepRail,
     pub icon_tile: IconTile,
     pub space: Steps,
     pub radius: Radii,
@@ -142,6 +143,16 @@ pub struct Banner {
     pub rail: u16,
     /// The rail's thickness by day, in logical pixels, rounded half up to whole device pixels.
     pub rail_day: u16,
+}
+
+/// A step rail's progress: the wire down its steps' symbols, and the disc each symbol sits on.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StepRail {
+    /// The wire's thickness, in logical pixels, rounded half up to whole device pixels.
+    pub wire: u16,
+    /// How far a symbol's disc reaches past the symbol on every side, in logical pixels.
+    pub bead: u16,
 }
 
 /// An icon tile's app icon: what its measured drawing must be to fill the tile as a plate.

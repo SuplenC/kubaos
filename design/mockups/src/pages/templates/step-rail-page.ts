@@ -90,25 +90,17 @@ const UPDATER: readonly RailPage[] = [
   { step: { title: "Reboot", icon: "restart_alt" }, body: body("再起動", "Reboot", "Reboot when it suits you. The new version starts then."), next: "Reboot" },
 ];
 
-/** The keys each of Kōbō's pages takes, as its rail lists them. */
+/**
+ * The keys Kōbō's rail lists: the ones nothing on the page shows. Enter and Esc go, since Continue
+ * and Back show them; the running install, with no buttons, says what Enter does there.
+ */
 function koboHints(index: number): readonly KeyHint[] {
-  const go: KeyHint[] = [["Enter", "continue"], ["Esc", "back"]];
-  const by: Record<number, readonly KeyHint[]> = {
-    0: [["A–Z", "search"], ["↑ ↓", "pick"], ["Tab", "next field"], ...go],
-    1: [["A–Z", "search"], ["↑ ↓", "pick"], ["Tab", "next field"], ...go],
-    2: [["↑ ↓", "pick"], ["Tab", "next field"], ...go],
-    3: [["Tab", "next field"], ...go],
-    4: [["↑ ↓", "pick a disk"], ["← →", "keep or erase"], ["Space", "switch"], ["Tab", "next field"], ...go],
-    5: [["Tab", "next field"], ...go],
-    6: [["Space", "pick or drop"], ["← ↑ ↓ →", "move"], ["Tab", "next set"], ...go],
-    7: [["Enter", "hold to install"], ["Esc", "back"]],
-    8: [["Enter", "show the log"]],
-  };
-  return by[index] ?? go;
+  return index === 8 ? [["Enter", "show the log"]] : [["↑ ↓", "pick"], ["Tab", "next field"]];
 }
 
+/** The updater's: only the running install's Enter, which no button shows. */
 function updaterHints(index: number): readonly KeyHint[] {
-  return index === 3 ? [["Enter", "show the log"]] : [["Enter", "continue"], ["Esc", "back"]];
+  return index === 3 ? [["Enter", "show the log"]] : [];
 }
 
 /** The template in Kōbō: its lockup, the flow, the power button and the battery. */
@@ -164,12 +156,20 @@ function arriving(on: string): readonly [Track<"emphasized_decel">, Track<"empha
   ];
 }
 
+/** The wire's light moving from step `from` to `to`, then the symbol it reaches lighting as it arrives. */
+function travelling(from: number, to: number): readonly [Track<"emphasized_decel">, Track<"standard">] {
+  return [
+    { part: "wire", on: "the rail", target: ".k-rail-wire-lit", property: "--wire-lit", from, to, duration: "long", curve: "emphasized_decel" },
+    { part: "symbol", on: "the step arrived at", target: `.k-rail-steps > .k-step:nth-child(${to + 1}) .k-step-bead`, property: "--bead-glow", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
+  ];
+}
+
 const FADE_ONLY = (on: string): Track<"emphasized_decel"> => ({ part: "fade", on, target: ROOM, property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" });
 
 const ON: Move = {
   name: "Continue: the next page arrives",
-  what: "Continue or Enter: the rail moves on at once (the step left is done, the next one current) and the new page slides `space.s32` in from the right, the direction of travel, and fades in, both over `long` on `emphasized_decel`; its offset lands on whole device pixels as it goes. The page left goes at once: nothing slides out. The footer band moves with its page. With reduced motion the page only fades in, over `short`.",
-  tracks: [...arriving("the page")],
+  what: "Continue or Enter: the rail's rows move on at once (the step left is done, the next one current, its quiet fill with it). The wire's lit length grows from the step left down to the next symbol over `long` on `emphasized_decel`, its end on whole device pixels; that symbol lights (`primary`, and its glow at night) over `short` from `medium` in, as the light arrives at its bead, and the symbol left loses its glow as the light sets off. The new page slides `space.s32` in from the right, the direction of travel, and fades in, both over `long` on `emphasized_decel`; its offset lands on whole device pixels as it goes. The page left goes at once: nothing slides out. The footer band moves with its page. With reduced motion the wire and the symbols change at once and the page only fades in, over `short`.",
+  tracks: [...arriving("the page"), ...travelling(1, 2)],
   reduced: [FADE_ONLY("the page")],
   back: "cuts",
   sample: () => framed(updater({ current: 2, arriving: { forward: true, shown: 1 } }), undefined, SAMPLE_HEIGHT),
@@ -177,8 +177,8 @@ const ON: Move = {
 
 const BACK: Move = {
   name: "Back: the page before arrives",
-  what: "Back, Esc or a done step pressed: the same move from the left, the page coming back the way it went. The rail moves at once: the step gone back to is current, the steps after it show to do again, and those already reached still take a press, so Continue's way forward can be retraced from the rail.",
-  tracks: [...arriving("the page")],
+  what: "Back, Esc or a done step pressed: the same move from the left, the page coming back the way it went. The rail's rows move at once: the step gone back to is current, the steps after it show to do again, and those already reached still take a press, so Continue's way forward can be retraced from the rail. The wire retracts the same way, over `long` on `emphasized_decel`: each symbol it leaves goes out as the light leaves its bead, and the one gone back to glows as the light arrives. Gone back several steps, the light passes each on the way.",
+  tracks: [...arriving("the page"), ...travelling(2, 1)],
   reduced: [FADE_ONLY("the page")],
   back: "cuts",
   sample: () => framed(updater({ current: 1, arriving: { forward: false, shown: 1 } }), undefined, SAMPLE_HEIGHT),
@@ -212,7 +212,10 @@ const PRESS: Move = {
 };
 
 const DESCRIBED =
-  "The rail is `size.rail` (236) wide, `space.s16` in above and below and `space.s12` at its sides, on the well's fill (`surface_container_low` at `opacity.well`). Down it: the brand (Kōbō's lockup over its version line, `space.s4` under it) or the window's title over its line, `space.s12` in so it lines up with the steps' symbols; `space.s20`; the steps back to back, each a `Step` in its rail box with a mark at its end, its corners `radius.surface` less `space.s12`, concentric with the panel's; then room, and at its foot the keys the page takes, a keycap column beside what each does, `space.s4` apart; in Kōbō `space.s16` under them the power button (a sm `Text` button) and the battery at the far end.";
+  "The rail is `size.rail` (236) wide, `space.s16` in above and below and `space.s12` at its sides, on the well's fill (`surface_container_low` at `opacity.well`). Down it: the brand (Kōbō's lockup over its version line, `space.s4` under it) or the window's title over its line, `space.s12` in so it lines up with the steps' symbols; `space.s20`; the steps back to back, each a `Step` in its rail box across the rail's whole inner width, a mark at its end, its corners `radius.surface` less `space.s12`, concentric with the panel's; then room, `space.s16` at least, and at its foot the keys nothing on the page shows, each a line of `KeyHints` (its words `space.s8` after its keys), `space.s4` apart; in Kōbō `space.s16` under them the power button (a sm `Text` button, its symbol on the steps' symbols' edge) and the battery at the far end. Where the steps don't fit they scroll between the brand and the hints, cut at their own box.";
+
+const WIRE =
+  "A wire runs down the steps' symbols: one tube `step_rail.wire` (3) thick, centred on them on whole device pixels, from the first symbol's centre to the last's. Unlit it is `outline_variant`; lit, from the first symbol down to the current one's, it is `primary`, with a lit control's glow round it at night (`focus.near` and `focus.far`, while the signs are on) and none by day. Each symbol is a bead on it: the wire and its glow are cut away in a disc `step_rail.bead` (3) wider than the symbol on every side, so the wire passes behind the symbol and whatever is under it (the rail's fill, the current row's) shows round it. A done step's symbol and the current one's are `primary`, the current one glowing at night as the wire does; a step not reached keeps its ink. While the current step runs (Install) its symbol hums, down to `opacity.hum` and back over `hum` each way.";
 
 export default page<"rest" | "lit" | "pressed" | "disabled" | "selected" | "loading" | "error">({
   level: "templates",
@@ -223,8 +226,9 @@ export default page<"rest" | "lit" | "pressed" | "disabled" | "selected" | "load
   description: [
     "One template with two hosts. In an app's window (the updater) the rail and the page fill the window, on `surface`. In Kōbō they are its glass panel over the wallpaper and the scrim: `surface` at `opacity.glass` over the blurred wallpaper, in the soft hairline at `radius.surface`, casting `shadow.panel`. Kōbō keeps its look and stops drawing its own fills (`crates/kubaos-kobo/src/view.rs`). Press a done step, Back, Continue, or Tab in and use Enter and Esc; on You, Enter flashes why Continue waits.",
     DESCRIBED,
-    "A done step shows the `check` mark and takes a press to go back to its page, as far back as the first step after one that can't be undone (the install), and none while a step runs. The current step is the selected row, on `secondary_container`. Steps not reached take no press and are passed over. A step that failed shows `error` in its symbol's place (`Step`).",
-    "The page beside the rail is a clear `Page`: the container padding at its sides by its own width, `space.s32` above, `space.s24` below. Its body takes the height left; then `space.s16` and the footer band, which has **no hairline**: the page runs into it. The band is Back (`Text`, `arrow_back`) on the left and the one `Filled` button on the right (Continue, Skip, Take it, with `arrow_forward` after its label), `space.s16` apart, and a note in `small` just before it: 12 of 40 picked; or, while something blocks Continue, its reason after the `error` symbol, Continue disabled, the reason flashing in `error` when Enter is refused. A page whose action is in its body (Last chance's held button) or that runs (Install) has no band.",
+    WIRE,
+    "A done step shows the `check` mark and takes a press to go back to its page, as far back as the first step after one that can't be undone (the install), and none while a step runs. The current step is a quiet fill, `on_surface` at `opacity.hover`, its symbol lit; Continue stays the only loud thing. Steps not reached take no press and are passed over. A step that failed shows `error` in its symbol's place, with no glow (`Step`).",
+    "The page beside the rail is a clear `Page`: the container padding at its sides by its own width, `space.s32` above, `space.s24` below. Its body takes the height left; then `space.s16` and the footer band, which has **no hairline**: the page runs into it. The band is Back (`Text`, `arrow_back`) on the left, its symbol on the page's text edge, its own padding reaching past it, and the one `Filled` button on the right (Continue, Skip, Take it, with `arrow_forward` after its label), `space.s16` apart, and a note in `small` just before it: 12 of 40 picked; or, while something blocks Continue, its reason after the `error` symbol, Continue disabled, the reason flashing in `error` when Enter is refused. A page whose action is in its body (Last chance's held button) or that runs (Install) has no band.",
     "Kōbō's panel sits `space.s32` in from the screen's edges where the screen holds two columns of text side by side (2 × `size.column`), `space.s16` on a smaller one, centred, and never wider than the rail beside two columns with `space.s40` either side, so lines stay short on a big screen. In a window the template is the window: it grows with it, the rail keeping its width.",
   ],
   variants: [
@@ -244,7 +248,8 @@ export default page<"rest" | "lit" | "pressed" | "disabled" | "selected" | "load
       {
         name: "A rail step",
         cell: (state) => {
-          if (state === "selected" || state === "loading") return railStep({ title: "Disk", icon: "hard_drive", state: { is: "current" } });
+          if (state === "selected") return railStep({ title: "Disk", icon: "hard_drive", state: { is: "current" } });
+          if (state === "loading") return railStep({ title: "Install", icon: "download", state: { is: "current" }, running: true });
           if (state === "error") return railStep({ title: "Install", icon: "download", state: { is: "current" }, failed: true });
           if (state === "disabled") return railStep({ title: "Network", icon: "wifi", state: { is: "done" } });
           if (state === "rest") return railStep({ title: "Account", icon: "person", state: { is: "todo" } });
@@ -268,9 +273,9 @@ export default page<"rest" | "lit" | "pressed" | "disabled" | "selected" | "load
       lit: "A done step under the pointer or the keyboard: the accent's tube inside its edge, the glow outside at night. A lit Continue: the core inside the fill's edge and the glow; by day the line alone.",
       pressed: "Overdriven: the step's tube white-hot at night, the tone's tint by day; Continue's fill a touch brighter and its glow stronger.",
       disabled: "A done step behind one that can't be undone, or any step while one runs, takes no press: it keeps its check and is passed over. Continue while something blocks it: disabled, its reason in `small` with the `error` symbol before it.",
-      selected: "The current step: the selected row, on `secondary_container`, its words `on_secondary_container`. The band with a note before Continue.",
-      loading: "The current step running (Install): the selected row, and no step takes a press until it ends; its page has no band.",
-      error: "The current step failed: its symbol is `error`, in `error`. The band's blocker as Enter is refused: its reason and symbol in `error`, settling back over `slow`.",
+      selected: "The current step: a quiet fill, `on_surface` at `opacity.hover`, its words as they rest and its symbol `primary`, glowing at night. The band with a note before Continue.",
+      loading: "The current step running (Install): its symbol hums, down to `opacity.hum` and back over `hum` each way (still with reduce motion), and no step takes a press until it ends; its page has no band.",
+      error: "The current step failed: its symbol is `error`, in `error`, with no glow. The band's blocker as Enter is refused: its reason and symbol in `error`, settling back over `slow`.",
     },
   },
   focus: {
@@ -322,10 +327,13 @@ export default page<"rest" | "lit" | "pressed" | "disabled" | "selected" | "load
     ]),
     measures: [
       { what: "The rail's width.", token: "size-rail" },
-      { what: "The rail's padding above and below; between the body and the footer band; between the band's parts.", token: "space-s16" },
+      { what: "The rail's padding above and below; the least room above the hints; between the body and the footer band; between the band's parts.", token: "space-s16" },
       { what: "The rail's padding at its sides, and the brand's and hints' inset, so they line up with the steps' symbols.", token: "space-s12" },
       { what: "Between the brand and the steps.", token: "space-s20" },
-      { what: "Between a key and what it does, and between hints; under the lockup.", token: "space-s4" },
+      { what: "Between a key and what it does.", token: "space-s8" },
+      { what: "Between hints; under the lockup.", token: "space-s4" },
+      { what: "The wire's thickness, before it is rounded to whole device pixels.", token: "step_rail-wire" },
+      { what: "How far a symbol's bead reaches past the symbol: the wire stops that far short of it.", token: "step_rail-bead" },
       { what: "The page's room above; how far a page slides in; Kōbō's panel's inset on a screen two columns wide.", token: "space-s32" },
       { what: "The page's room below, where the band sits.", token: "space-s24" },
       { what: "The band's buttons.", token: "size-control_md" },
