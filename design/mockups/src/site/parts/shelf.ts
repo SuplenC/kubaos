@@ -22,6 +22,11 @@ export interface Item {
    * state); its name alone when it has none.
    */
   readonly at?: readonly string[];
+  /**
+   * It fills the room it has, as a foundation's table of bands or grid of symbols does: it is drawn
+   * across the stage, as wide as the page.
+   */
+  readonly fluid?: boolean;
   /** What it stands in on a stage: a state's cell in its mode's painted box. */
   readonly frame?: (sample: Element) => Element;
 }
@@ -35,18 +40,21 @@ export interface Group {
 }
 
 /**
- * Whether a sample `width` wide, in the page's CSS pixels, is as big as a window: wider than a text
- * column, it would leave no room beside it, and a grid of such could hold only one a row.
+ * Whether `item`, `width` wide in the page's CSS pixels, is as big as a window: wider than a text
+ * column, it would leave no room beside it, and a grid of such could hold only one a row. A whole
+ * screen or template (`[data-whole]`, a shell panel on its screen among them) is one whatever its
+ * width, and one that fills whatever room it has is drawn as wide as the page, so it is one too.
  */
-function windowSized(width: number, column: number): boolean {
-  return width > column;
+function windowSized(item: Item, width: number, column: number): boolean {
+  const whole = item.sample.matches("[data-whole]") || item.sample.querySelector("[data-whole]") !== null;
+  return width > column || whole || (item.fluid ?? false);
 }
 
 /**
- * Each group's widest sample as drawn at its own width, in the page's CSS pixels, and a column's
+ * Each group's samples' widths as drawn at their own, in the page's CSS pixels, and a column's
  * width: the samples are laid out once, together, in a box of no width of its own on the page.
  */
-function measure(groups: readonly (readonly Item[])[]): { widths: number[]; column: number } {
+function measure(groups: readonly (readonly Item[])[]): { widths: number[][]; column: number } {
   const page = document.getElementById("page") ?? document.body;
   const host = el("div", "page-measure");
   const column = el("div", "page-measure-column");
@@ -55,7 +63,7 @@ function measure(groups: readonly (readonly Item[])[]): { widths: number[]; colu
   page.append(host);
   // The page is zoomed so its CSS pixels are device pixels: a box is read back in them.
   const zoom = page.offsetWidth / page.getBoundingClientRect().width || 1;
-  const widths = boxes.map((list) => Math.max(0, ...list.map((box) => box.getBoundingClientRect().width * zoom)));
+  const widths = boxes.map((list) => list.map((box) => box.getBoundingClientRect().width * zoom));
   const columnWidth = column.getBoundingClientRect().width * zoom;
   host.remove();
   return { widths, column: columnWidth };
@@ -70,8 +78,8 @@ export function shelves(...parts: readonly (Group | Element)[]): Element[] {
   const groups = parts.filter((part): part is Group => !(part instanceof Element));
   const drawn = groups.filter((group): group is Group & { items: readonly Item[] } => applies(group.items) && group.items.length > 0);
   const { widths, column } = measure(drawn.map((group) => group.items));
-  const big = new Set<Group>(drawn.filter((_, i) => windowSized(widths[i]!, column)));
-  const widest = new Map<Group, number>(drawn.map((group, i) => [group, widths[i]!]));
+  const big = new Set<Group>(drawn.filter((group, i) => group.items.some((item, j) => windowSized(item, widths[i]![j]!, column))));
+  const widest = new Map<Group, number>(drawn.map((group, i) => [group, Math.max(0, ...widths[i]!)]));
   const staged = drawn.filter((group) => big.has(group));
   const out: Element[] = [];
   for (const part of parts) {
@@ -117,14 +125,19 @@ export function cards(items: readonly Item[], widest: number): HTMLElement {
   return grid;
 }
 
-/** An item on a stage: it at its real size in a box of its own, its name and words beside or under it. */
+/**
+ * An item on a stage: it at its real size in a box of its own, its name and words beside or under
+ * it; one that fills its room, across the stage, its words under it.
+ */
 function shown(item: Item): HTMLElement {
-  return el(
+  const body = el(
     "div",
     "page-stage-item",
     sampleBox(el("div", "page-view", item.frame ? item.frame(item.sample) : item.sample)),
     el("div", "page-stage-words", label(item.name, "body_strong", "on_surface"), ...(item.words ? [prose(item.words)] : [])),
   );
+  body.toggleAttribute("data-fluid", item.fluid ?? false);
+  return body;
 }
 
 /**
