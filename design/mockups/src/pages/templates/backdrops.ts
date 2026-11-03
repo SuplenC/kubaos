@@ -93,7 +93,7 @@ export function liveLock(width: string = SAMPLE.width, height: string = SAMPLE.h
     const next = lockField(moment);
     room.replaceChildren(next);
     status().replaceWith(lockStatus(moment, LOCK_ERROR.short));
-    requestAnimationFrame(() => next.focus({ focusVisible: true } as FocusOptions));
+    requestAnimationFrame(() => next.focus({ focusVisible: true, preventScroll: true } as FocusOptions));
     return next;
   };
   room.addEventListener("keydown", (event) => {

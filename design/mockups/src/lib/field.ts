@@ -342,7 +342,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
       const ratio = box.width / room.offsetWidth || 1;
       const at = (x: number) => nearest(shownText(), (x - start) / ratio / settings().scale);
       const pos = at(event.clientX);
-      element.focus();
+      element.focus({ preventScroll: true });
       event.preventDefault();
       if (event.detail === 2) caret = wordAt(value, pos);
       else if (event.detail >= 3) caret = { pos: length(), anchor: 0 };

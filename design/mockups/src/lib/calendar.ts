@@ -380,7 +380,7 @@ export function calendar(options: CalendarOptions): HTMLElement {
     yearView = true;
     drawYear();
     show();
-    year.focus({ focusVisible: true } as FocusOptions);
+    year.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
   }
 
   function leaveYear(month: number): void {
@@ -388,7 +388,7 @@ export function calendar(options: CalendarOptions): HTMLElement {
     current = shiftMonth({ ...current, year: shown.year }, month - current.month);
     goTo({ year: shown.year, month });
     show();
-    grid.focus({ focusVisible: true } as FocusOptions);
+    grid.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
   }
 
   prev.addEventListener("click", () => (yearView ? yearBy(-1) : goTo(shiftMonth({ ...shown, day: 1 }, -1))));

@@ -122,7 +122,7 @@ function live(): HTMLElement {
           if (event.propertyName === "opacity") each.remove();
         });
       }
-      opener.focus({ focusVisible: true } as FocusOptions);
+      opener.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
     };
   }
 

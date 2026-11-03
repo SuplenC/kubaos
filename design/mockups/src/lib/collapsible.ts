@@ -106,10 +106,22 @@ export function collapsible(options: CollapsibleOptions): HTMLElement {
     return strip;
   }
 
-  /** Scrolls the header back into its scroll view where closing from the rail left it out of sight. */
+  /**
+   * Scrolls the header back into its scroll view where closing from the rail left it out of sight:
+   * that view alone, never the page round it, as `scrollIntoView` would.
+   */
   function bringBack(): void {
+    let view = part.parentElement;
+    while (view && !/auto|scroll/.test(getComputedStyle(view).overflowY)) view = view.parentElement;
+    if (!view) return;
+    const box = view.getBoundingClientRect();
+    const at = header.getBoundingClientRect();
+    // The view's pixels are the page's, which its zoom shrinks in the viewport's.
+    const zoom = view.clientHeight / box.height || 1;
+    const by = at.top < box.top ? at.top - box.top : at.bottom > box.bottom ? at.bottom - box.bottom : 0;
+    if (by === 0) return;
     const reduced = part.closest("[data-reduced]") !== null;
-    header.scrollIntoView({ block: "nearest", inline: "nearest", behavior: reduced ? "instant" : "smooth" });
+    view.scrollBy({ top: by * zoom, behavior: reduced ? "instant" : "smooth" });
   }
 
   // The room eases between nothing and what it holds, which only layout knows: its height in the
