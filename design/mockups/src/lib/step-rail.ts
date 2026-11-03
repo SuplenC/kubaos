@@ -5,18 +5,20 @@
 //
 // The rail is `size.rail` wide, `space.s16` in above and below and `space.s12` at its sides, so its
 // steps' corners are concentric with its own: the brand or the title, `space.s20`, the steps back
-// to back (`Step`, each a mark at its end), then at its foot the key hints and, in Kōbō, the power
-// button and the battery. The page beside it is a clear `Page`: its body, then `space.s16` above the
-// footer band, which has no hairline: Back on the left, the one Filled button on the right, and a
-// note just before it.
+// to back across its width (`Step`, each a mark at its end), scrolling where they don't fit, then
+// `space.s16` and at its foot the key hints and, in Kōbō, the power button and the battery. A wire
+// runs down the steps' symbols, lit down to the current one; each symbol is a bead on it. The page
+// beside it is a clear `Page`: its body, then `space.s16` above the footer band, which has no
+// hairline: Back on the left, the one Filled button on the right, and a note just before it.
 
 import "./step-rail.css";
 import { button } from "./button.ts";
 import type { Pinned } from "./control.ts";
 import { icon } from "./icon.ts";
-import { keycap, keys, type KeyHint } from "./keycap.ts";
-import { fill, filling, fillingHeight, gap, inset, page, row, splitColumns, stack } from "./layout.ts";
+import { keyHints, type KeyHint } from "./keycap.ts";
+import { fill, filling, fillingHeight, gap, inset, page, row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
+import { scroll } from "./scroll.ts";
 import { step, type StepOptions, type StepState } from "./step.ts";
 import { text } from "./text.ts";
 import { cubic, length, raw } from "./tokens.ts";
@@ -100,10 +102,9 @@ function backTo(pages: readonly RailPage[], current: number, locked: boolean): n
   return first;
 }
 
-/** Key hints one under the other, the keycaps in a column of their own so what each does lines up. */
+/** Key hints one under the other, `space.s4` apart: each a line of `KeyHints`, its words right after its keys. */
 export function hintColumn(hints: readonly KeyHint[]): HTMLElement {
-  const cells = hints.flatMap(([combination, does]) => [row("s4", "centre", ...keys(combination).map(keycap)), text(does, "caption", "on_surface_variant")]);
-  return splitColumns([1, 1], "s4", cells, { centred: true });
+  return stack("s4", "start", ...hints.map((hint) => keyHints([hint])));
 }
 
 /** The battery: its symbol and the percent, muted, in `label`. */
@@ -112,7 +113,7 @@ function battery(percent: number): HTMLElement {
   return row("s4", "centre", icon("battery_full", "var(--icon-s16)", "var(--color-on_surface_variant)"), text(words, "label", "on_surface_variant"));
 }
 
-/** The rail: the brand, `space.s20`, the steps, then the hints and the foot at its bottom. */
+/** The rail: the brand, `space.s20`, the steps on their wire, then the hints and the foot at its bottom. */
 function rail(options: StepRailOptions, current: number, reached: number, go: (to: number) => void): HTMLElement {
   const first = backTo(options.pages, current, options.locked ?? false);
   const steps = options.pages.map((each, index) => {
@@ -121,6 +122,7 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
       ...each.step,
       state: stateOf(index, current),
       ...(index === current && options.failed ? { failed: true } : {}),
+      ...(index === current && options.locked ? { running: true } : {}),
       box: "rail",
       mark: true,
       pressable,
@@ -137,11 +139,21 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
     return element;
   });
   arrows(steps);
-  const parts: Element[] = [inset(options.brand, 0, "s12"), gap("s20"), stack(0, "start", ...steps), fillingHeight(document.createElement("span"))];
-  parts.push(inset(hintColumn(options.hints(current)), 0, "s12"));
+  const column = stack(0, "start", ...steps, wire(steps.length, current));
+  column.classList.add("k-rail-steps");
+  // Cut at its own box: the brand's `space.s20` and the hints' `space.s16` stay clear of the steps
+  // scrolling between them.
+  const { box: scroller } = scroll(column, { height: "100%", above: 0, below: 0, noGutter: true });
+  const parts: Element[] = [inset(options.brand, 0, "s12"), gap("s20"), fillingHeight(scroller)];
+  const hints = options.hints(current);
+  if (hints.length > 0) parts.push(gap("s16"), inset(hintColumn(hints), 0, "s12"));
   if (options.foot) {
     const foot: Element[] = [];
-    if (options.foot.power) foot.push(button({ label: "Power", kind: "Text", size: "Sm", icon: "power_settings_new" }));
+    if (options.foot.power) {
+      const power = button({ label: "Power", kind: "Text", size: "Sm", icon: "power_settings_new" });
+      power.classList.add("k-rail-power");
+      foot.push(power);
+    }
     foot.push(fill());
     if (options.foot.battery !== undefined) foot.push(battery(options.foot.battery));
     parts.push(gap("s16"), inset(row("s8", "centre", ...foot), 0, "s12"));
@@ -150,6 +162,63 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
   box.className = "k-rail";
   box.append(fillingHeight(stack(0, "start", ...parts)));
   return probe(box, { role: "component", name: "StepRail", variant: options.host, fixed: { width: true, height: false } });
+}
+
+/**
+ * The progress wire down the steps' symbols, from the first to the last, lit down to `current`.
+ * Each symbol is a bead on it: the wire is cut away round each, so whatever is under the bead (the
+ * rail's fill, or the current row's) shows there, glass and all.
+ */
+function wire(count: number, current: number): HTMLElement {
+  const box = document.createElement("span");
+  box.className = "k-rail-wire";
+  box.style.setProperty("--count", String(count));
+  const cut = (index: number) => `radial-gradient(circle at var(--wire-x) calc(${index} * var(--size-row) + var(--wire-top)), transparent var(--bead-r), black var(--bead-r))`;
+  box.style.maskImage = Array.from({ length: count }, (_, index) => cut(index)).join(", ");
+  const track = document.createElement("span");
+  track.className = "k-rail-wire-track";
+  const lit = document.createElement("span");
+  lit.className = "k-rail-wire-lit";
+  lit.style.setProperty("--wire-lit", String(current));
+  box.append(track, lit);
+  return box;
+}
+
+/** How far through a move on `token`'s curve it is when the curve has come `share` of the way. */
+function reaching(token: string, share: number): number {
+  const [x1 = 0, y1 = 0, x2 = 1, y2 = 1] = cubic(`easing-${token}`);
+  const along = (a: number, b: number, t: number) => 3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
+  let low = 0;
+  let high = 1;
+  for (let round = 0; round < 40; round++) {
+    const middle = (low + high) / 2;
+    if (along(y1, y2, middle) < share) low = middle;
+    else high = middle;
+  }
+  return along(x1, x2, low);
+}
+
+/**
+ * The wire's light moving from step `from` to `to`: its lit length grows (or retracts) to the new
+ * current symbol over `long` on `emphasized_decel`, and each symbol it reaches lights over `short`
+ * as the light gets there (one it leaves goes out as the light leaves it); the new current one
+ * lights `medium` in, as the light arrives at its bead. With reduced motion it is the state change
+ * alone.
+ */
+function travel(steps: HTMLElement, from: number, to: number, failed: boolean): void {
+  if (settings().reduced || from === to) return;
+  const long = timed("long");
+  steps.querySelector(".k-rail-wire-lit")?.animate([{ "--wire-lit": from }, { "--wire-lit": to }], { duration: long, easing: curve("emphasized_decel") });
+  const rows = [...steps.querySelectorAll<HTMLElement>(":scope > .k-step")];
+  const look = (index: number, at: number, fails: boolean) => ({ "--bead-lit": index <= at ? 1 : 0, "--bead-glow": index === at && !fails ? 1 : 0 });
+  rows.forEach((each, index) => {
+    const before = look(index, from, false);
+    const after = look(index, to, failed);
+    if (before["--bead-lit"] === after["--bead-lit"] && before["--bead-glow"] === after["--bead-glow"]) return;
+    const passed = to > from ? (index - from) / (to - from) : (from - index) / (from - to);
+    const delay = index === to ? timed("medium") : reaching("emphasized_decel", Math.max(0, passed)) * long;
+    each.querySelector(".k-step-bead")?.animate([before, after], { duration: timed("short"), delay, easing: curve("standard"), fill: "backwards" });
+  });
 }
 
 /** ↑ and ↓ (k and j) move the keyboard between the steps that take a press. */
@@ -179,6 +248,7 @@ export interface FooterPins {
  */
 export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: () => void = () => {}, pinned: FooterPins = {}): { band: HTMLElement; nudge: HTMLElement | null } {
   const back = button({ label: "Back", kind: "Text", icon: "arrow_back", ...(pinned.back ? { pinned: pinned.back } : {}) });
+  back.classList.add("k-step-back");
   back.addEventListener("click", onBack);
   const parts: Element[] = [back, fill()];
   let nudge: HTMLElement | null = null;
@@ -256,11 +326,13 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-step-rail-page";
   box.dataset.host = options.host;
+  // A whole surface: a motion player draws it as it is laid out.
+  box.dataset.whole = "";
   box.tabIndex = -1;
   // The blocker of the page showing, which Enter refused flashes.
   const shown: { nudge: HTMLElement | null } = { nudge: null };
 
-  const draw = (forward: boolean | null) => {
+  const draw = (from: number | null) => {
     const spec = options.pages[current];
     if (!spec) return;
     const made = pageRoom(spec, () => go(current - 1), next);
@@ -268,16 +340,21 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
     const side = document.createElement("span");
     side.className = "k-step-side";
     side.append(made.room);
+    const scrolled = box.querySelector(".k-rail .k-scroll-view")?.scrollTop ?? 0;
     box.replaceChildren(rail(options, current, reached, go), side);
-    if (forward !== null) arrive(made.room, forward);
+    const steps = box.querySelector<HTMLElement>(".k-rail-steps");
+    if (steps) keepInView(steps, current, scrolled);
+    if (from === null) return;
+    arrive(made.room, current > from);
+    if (steps) travel(steps, from, current, options.failed ?? false);
   };
 
   function go(to: number): void {
     if (to < backTo(options.pages, current, options.locked ?? false) || to < 0 || to >= options.pages.length || to === current) return;
-    const forward = to > current;
+    const from = current;
     current = to;
     reached = Math.max(reached, current);
-    draw(forward);
+    draw(from);
   }
 
   function next(): void {
@@ -310,6 +387,29 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   }
   const framed = options.host === "kobo" && options.backdrop ? koboPanel(box, options.backdrop) : box;
   return probe(framed, { role: "component", name: "StepRailPage", variant: options.host, fixed: { width: false, height: false, holds: true } });
+}
+
+/**
+ * The rail's steps scrolled where they were before it was drawn again, then as little more as puts
+ * the current step in view.
+ */
+function keepInView(steps: HTMLElement, current: number, scrolled: number): void {
+  const view = steps.closest<HTMLElement>(".k-scroll-view");
+  const scroller = steps.closest<HTMLElement>(".k-scroll");
+  const row = steps.querySelectorAll<HTMLElement>(":scope > .k-step")[current];
+  if (!view || !scroller || !row) return;
+  // The template is drawn before it is placed; it is in place by the next frame.
+  if (!scroller.isConnected) {
+    requestAnimationFrame(() => scroller.isConnected && keepInView(steps, current, scrolled));
+    return;
+  }
+  view.scrollTop = scrolled;
+  const room = scroller.getBoundingClientRect();
+  const shown = row.getBoundingClientRect();
+  // A sample may be drawn scaled down; the scroll moves in the box's own pixels.
+  const ratio = scroller.offsetHeight / Math.max(1, room.height);
+  if (shown.top < room.top) view.scrollTop -= Math.ceil((room.top - shown.top) * ratio);
+  else if (shown.bottom > room.bottom) view.scrollTop += Math.ceil((shown.bottom - room.bottom) * ratio);
 }
 
 /**

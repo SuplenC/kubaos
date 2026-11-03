@@ -290,7 +290,8 @@
    so `size.row_two_line` with its first line; `space.s12` in at the sides. Its corner is its box's
    less the box's padding: a list well's, `radius.row`; Kōbō's rail's, `radius.surface` less
    `space.s12`. Selected (the current step), it is on `secondary_container`, its words
-   `on_secondary_container` and its subtitle that at `opacity.subdued_text`. */
+   `on_secondary_container` and its subtitle that at `opacity.subdued_text`; in a rail, a quiet fill
+   (below). */
 .k-step {
   position: relative;
   display: flex;
@@ -333,6 +334,52 @@
 
 .k-step.k-control {
   cursor: pointer;
+}
+
+/* In a rail the current step is a quiet fill, the state layer's `on_surface` at `opacity.hover`,
+   its words staying as they rest: the lit symbol says it is current, and Continue stays the only
+   loud thing. */
+.k-step[data-box="rail"][data-selected] {
+  background-color: rgb(from var(--color-on_surface) r g b / var(--opacity-hover));
+  --step-ink: var(--color-on_surface);
+  --step-muted: var(--color-on_surface_variant);
+}
+
+/* A rail step's symbol, a bead on the rail's progress wire (`lib/step-rail.css`). Once its step is
+   reached it is `primary`; the current one glows at night with a lit control's glow, near and far,
+   while the signs are on, and by day has none. A step that failed keeps its `error` symbol, with
+   no glow. */
+.k-step-bead {
+  display: flex;
+  flex: none;
+  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  --bead-ink: color-mix(in srgb, var(--step-ink), var(--color-primary) calc(var(--bead-lit) * 100%));
+  filter:
+    drop-shadow(0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--bead-glow) * var(--signs))))
+    drop-shadow(0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * var(--bead-glow) * var(--signs))));
+}
+
+.k-step:is([data-state="done"], [data-state="current"]) > .k-row > .k-step-bead {
+  --bead-lit: 1;
+}
+
+.k-step[data-state="current"]:not([data-failed]) > .k-row > .k-step-bead {
+  --bead-glow: 1;
+}
+
+/* While the current step runs its symbol hums: down to `opacity.hum` and back over `hum` each way
+   on `standard`, for as long as it runs. With reduce motion it holds still. */
+.k-step[data-running] > .k-row > .k-step-bead {
+  animation: k-bead-hum var(--motion-hum) var(--easing-standard) infinite alternate;
+}
+
+[data-reduced] .k-step-bead {
+  animation: none;
+}
+
+@keyframes k-bead-hum {
+  from { opacity: 1; }
+  to { opacity: var(--opacity-hum); }
 }
 
 .k-step-mark-room {

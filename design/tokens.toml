@@ -135,6 +135,16 @@ rail_day = 3
 rail = 4
 rail_day = 4
 
+# A step rail's progress: a wire down its steps' symbols, from the first to the
+# last, lit down to the current one. `wire` is its thickness in logical pixels,
+# rounded half up to whole device pixels (3, 4, 5, 6 at 1, 1.25, 1.5, 2), at
+# night and by day alike. `bead` is how far the disc each symbol sits on
+# reaches past the symbol on every side, in logical pixels: the wire stops
+# that far short of the symbol, so it reads as passing behind it.
+[step_rail]
+wire = 3
+bead = 3
+
 # An icon tile's app icon, measured once when it loads. The drawing's box is
 # its pixels more opaque than `ink`, so the margin an icon theme leaves round
 # it drops away. The drawing is a plate, filling the tile, when that box is
@@ -705,6 +715,9 @@ skeleton_peak = 0.09
 skeleton_light = 0.05
 skeleton_light_peak = 0.08
 skeleton_glow = 0.08
+# A running step's symbol at the low of its breath, which it hums down to and
+# back over `hum` each way while its step runs.
+hum = 0.45
 # An error's surface (of the error container) and hairline (of the error).
 error_fill = 0.30
 error_edge = 0.45
