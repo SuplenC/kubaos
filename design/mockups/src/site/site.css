@@ -326,10 +326,15 @@ body {
   gap: var(--space-s16) var(--space-s32);
 }
 
-/* A sample that fills its room is laid out across the stage, as a column's one child. */
+/* A sample that fills its room is laid out across the stage, as a column's one child, under its
+   words, which say what to read in it. */
 .page-stage-item[data-fluid] > .page-view {
   flex: 1 1 100%;
   flex-direction: column;
+}
+
+.page-stage-item[data-fluid] > .page-stage-words {
+  order: -1;
 }
 
 .page-stage-words {
