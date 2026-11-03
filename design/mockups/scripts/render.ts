@@ -7,8 +7,8 @@
 // OUT gets PAGE-MODE-SCALEx.png and, for the geometry check, PAGE-MODE-SCALEx.json; with --shots
 // or --frames, only those. With --motion it gets PAGE.json alone, every move's recipe on the page
 // (`site/recipe.ts`), which hold the same in either mode and at any scale; the build writes them
-// into `dist/motion/`. A page is drawn alone (`?chrome=off`), 1280 logical pixels wide as the
-// specimen's are, at a device pixel ratio of 1, so the shot's pixels are the page's device pixels.
+// into `dist/motion/`. A page is drawn alone (`?chrome=off`) with every sample its stages and
+// motion lists hold (`?all`), 1280 logical pixels wide as the specimen's are, at a device pixel ratio of 1, so the shot's pixels are the page's device pixels.
 // The browser is nixpkgs' Playwright Chromium (`PLAYWRIGHT_BROWSERS_PATH`, set by `nix develop`
 // and `just shots`). An error the page throws or logs fails the run.
 
@@ -75,7 +75,8 @@ async function main(): Promise<void> {
         const failOnErrors = () => {
           if (errors.length > 0) throw new Error(`the page failed: ${errors.join("; ")}`);
         };
-        const query = `chrome=off&mode=${mode}&scale=${scale}&text=short&reduced=off&speed=1&flicker=on&window=Default`;
+        // `all` draws every sample a stage or a motion list shows one at a time.
+        const query = `chrome=off&all&mode=${mode}&scale=${scale}&text=short&reduced=off&speed=1&flicker=on&window=Default`;
         await page.goto(`${origin}/index.html?${query}`);
         await page.evaluate(() => window.kubaos.ready);
         failOnErrors();

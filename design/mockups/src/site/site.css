@@ -144,7 +144,8 @@ body {
    takes (`--page-padding`), both picked by `site/settle.ts`. */
 .page-container {
   max-width: var(--page-container, none);
-  margin-inline: auto;
+  margin-left: var(--page-left, auto);
+  margin-right: auto;
   padding-inline: var(--page-padding, var(--container-0-padding));
   display: flex;
   flex-direction: column;
@@ -268,12 +269,13 @@ body {
 }
 
 /* Small samples: a grid of cards, as many a row as fit at the widest sample's width, each the
-   sample over its name and words. The card is a hairline on the
+   sample over its name and words. Every card is that one width, a whole number of device pixels,
+   so every sample starts on one. The card is a hairline on the
    page's own surface, so every sample is seen on the surface it is drawn for; its padding is past
    the focus glow's reach. */
 .page-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(var(--size-rail), calc(var(--widest) + 2 * var(--space-s24)))), 1fr));
+  grid-template-columns: repeat(auto-fill, min(100%, max(var(--size-rail), calc(var(--widest) + 2 * var(--space-s24)))));
   gap: var(--space-s16);
 }
 
@@ -428,7 +430,9 @@ body {
   flex: none;
 }
 
+/* The sample in it is laid out as on the stage itself: a flex row's one item, at its own width. */
 .page-fit-inner {
+  display: flex;
   width: max-content;
   transform-origin: 0 0;
 }
@@ -468,11 +472,17 @@ body {
 }
 
 /* Each part alone under the legend, in the legend's order, as many a row as fit a dialog's width,
-   each on its own stage, its sample scaled down to fit it. */
+   each on its own stage, its sample scaled down to fit it. With `?all`, as the checks draw it, one
+   full row each at the sample's own size, so every box is the one the page draws elsewhere. */
 .page-parts {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--size-dialog)), 1fr));
   gap: var(--space-s16);
+}
+
+[data-all] .page-parts {
+  display: flex;
+  flex-direction: column;
 }
 
 .page-parts:empty {

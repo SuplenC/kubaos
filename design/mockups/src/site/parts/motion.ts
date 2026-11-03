@@ -331,7 +331,8 @@ function player(move: Move): Player {
   sample.setAttribute("inert", "");
   const stage = sampleBox(el("div", "page-player-stage mock"));
   const fits: Fit[] = [fitIn(stage, sample)];
-  let oneToOne = false;
+  // The checks hold every box to its twin's, so `?all` draws each sample at its own size.
+  let oneToOne = ALL;
   const whole = el("div", "page-player");
   let playing = loop(move);
   let animations: Animation[] = [];
@@ -634,7 +635,7 @@ function player(move: Move): Player {
     });
   });
 
-  const sizeControl = control("1:1", false, () => {
+  const sizeControl = control("1:1", oneToOne, () => {
     oneToOne = !oneToOne;
     sizeControl.setAttribute("aria-pressed", String(oneToOne));
     fit();
