@@ -127,7 +127,7 @@ export function cards(items: readonly Item[], widest: number): HTMLElement {
 
 /**
  * An item on a stage: it at its real size in a box of its own, its name and words beside or under
- * it; one that fills its room, across the stage, its words under it.
+ * it; one that fills its room, across the stage, under its words.
  */
 function shown(item: Item): HTMLElement {
   const body = el(
