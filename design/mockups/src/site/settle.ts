@@ -47,6 +47,8 @@ function fitContainer(page: HTMLElement): void {
   const viewport = (innerWidth * devicePixelRatio) / scale;
   const reached = CONTAINER_STEPS.filter((step) => viewport >= step).at(-1);
   container.style.setProperty("--page-container", reached === undefined ? "none" : `calc(${reached} * var(--px))`);
+  // Centred by half the spare room, the odd device pixel after it, so every sample starts on one.
+  container.style.setProperty("--page-left", `${Math.floor((page.clientWidth - container.offsetWidth) / 2)}px`);
   const width = container.offsetWidth / scale;
   let step = 0;
   for (let i = 0; raw(`container-${i}-from`) !== ""; i++) {

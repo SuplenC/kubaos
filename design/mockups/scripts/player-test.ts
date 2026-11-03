@@ -152,7 +152,7 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
     for (const t of await moments(page, index)) {
       await seek(page, index, t);
       const shown = await held(page, index);
-      check((await page.locator(".page-player .site-control").nth(index * 4).textContent()) === "Play", `${where}: seeking didn't pause`);
+      check((await page.locator(".page-player").nth(index).locator(".page-player-controls .site-control").first().textContent()) === "Play", `${where}: seeking didn't pause`);
       shown.balls.forEach((ball, i) => {
         const range = tracks[i]!;
         const playing = ball.played.map((v) => (v - range.from) / (range.to - range.from));
@@ -273,7 +273,8 @@ async function main(): Promise<void> {
     const page = await context.newPage();
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    const base = "text=short&window=Default";
+    // `all` draws every move in a player of its own, at its sample's own size.
+    const base = "all&text=short&window=Default";
     await page.goto(`${origin}/index.html?${base}&mode=dark&scale=1&speed=1&reduced=off&flicker=on`);
     await page.evaluate(() => window.kubaos.ready);
     const pages = (await page.evaluate(() => window.kubaos.pages)).filter((p) => named.length === 0 || named.includes(p.slug));

@@ -164,6 +164,7 @@ export function apply(page: HTMLElement): void {
   page.style.setProperty("--speed", String(current.speed));
   page.toggleAttribute("data-reduced", current.reduced);
   page.toggleAttribute("data-flicker", current.flicker && !current.reduced);
+  page.toggleAttribute("data-all", ALL);
 }
 
 /** The window size picked, by its name. */
