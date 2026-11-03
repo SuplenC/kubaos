@@ -181,7 +181,7 @@ export function tabs(options: TabsOptions): HTMLElement {
   }
 
   function pick(index: number, focus: boolean): void {
-    if (focus) buttons[index]?.focus({ focusVisible: true } as FocusOptions);
+    if (focus) buttons[index]?.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
     if (index === picked) return;
     const start = where();
     picked = index;

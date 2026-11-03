@@ -37,7 +37,7 @@ function picking(width = WELL_ROOM): HTMLElement {
       onPick: (index) => draw(rows.map((row, at) => ({ ...row, picked: at === index })), index),
     });
     room.replaceChildren(shown);
-    if (had) shown.focus({ focusVisible: true } as FocusOptions);
+    if (had) shown.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
   };
   draw(PROCESSES);
   return room;

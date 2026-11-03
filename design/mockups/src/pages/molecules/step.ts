@@ -63,7 +63,7 @@ function arrows(steps: readonly HTMLElement[]): void {
       const next = pressable[index + by];
       if (by === 0 || !next) return;
       event.preventDefault();
-      next.focus();
+      next.focus({ preventScroll: true });
     });
   });
 }

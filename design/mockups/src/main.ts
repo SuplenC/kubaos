@@ -21,6 +21,7 @@ import { type AnyPage, applies, isFoundation } from "./site/page.ts";
 import { recipes, stopPlayers } from "./site/parts/motion.ts";
 import { render } from "./site/render.ts";
 import { apply, CHROME, onChange, settings } from "./site/settings.ts";
+import { holdWheel, releaseWheel } from "./site/scroll.ts";
 import { settle } from "./site/settle.ts";
 import { toolbar, updateToolbar } from "./site/toolbar.ts";
 
@@ -74,6 +75,7 @@ function draw(): void {
   const page = picked();
   apply(pageBox);
   stopPlayers();
+  releaseWheel();
   // The page measures its samples as it draws them, so its box is on the document first.
   if (!pageBox.isConnected) site.append(pageBox);
   pageBox.replaceChildren(...(page ? render(page) : [el("p", "page-prose", "No pages yet.")]));
@@ -97,6 +99,7 @@ let painted: Painted = { theme: settings().theme, mode: settings().mode };
 async function start(): Promise<void> {
   await Promise.all([...document.fonts].map((face) => face.load()));
   fitDevicePixels();
+  holdWheel();
   draw();
   paintPage([document.documentElement, pageBox], painted);
   addEventListener("hashchange", draw);
