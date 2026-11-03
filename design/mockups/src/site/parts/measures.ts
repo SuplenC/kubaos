@@ -5,9 +5,10 @@
 import { length, raw } from "../../lib/tokens.ts";
 import { settings, windowSize } from "../settings.ts";
 import type { Measures } from "../page.ts";
-import { el, label, mockCell, prose } from "../dom.ts";
-import { partOr, subheading } from "./section.ts";
-import { stackWhenNarrow } from "./variants.ts";
+import { el, prose } from "../dom.ts";
+import { applies } from "../page.ts";
+import { subheading } from "./section.ts";
+import type { Group } from "./shelf.ts";
 
 const overlays = new Set<() => boolean>();
 
@@ -131,12 +132,12 @@ function round(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
 
-export function measures(spec: Measures): HTMLElement {
-  const samples = el("div", "page-variants");
-  for (const sample of spec.samples) {
-    samples.append(el("div", "page-cell", label(sample.name, "label")), mockCell(overlaid(sample.sample())), prose(sample.for));
-  }
-  stackWhenNarrow(samples);
+/** The measures' parts: the samples outlined, every measure by its token, then the reflow. */
+export function measures(spec: Measures): (Group | Element)[] {
+  const samples: Group = {
+    title: "",
+    items: spec.samples.map((sample) => ({ name: sample.name, words: sample.for, sample: overlaid(sample.sample()) })),
+  };
   const table = el("dl", "page-list");
   for (const measure of spec.measures) {
     const token = measure.token.replace(/^--/, "");
@@ -145,12 +146,21 @@ export function measures(spec: Measures): HTMLElement {
     const value = token.startsWith("aspect-") ? raw(token) : round(length(token));
     table.append(el("dt", "", el("code", "page-code", `${name} = ${value}`)), el("dd", "", prose(measure.what)));
   }
-  const reflow = partOr(spec.reflow, (r) => {
-    const size = windowSize();
-    const frame = el("div", "page-window", r.sample());
-    frame.style.width = size.width;
-    frame.style.height = size.height;
-    return el("div", "", prose(r.described), frame);
-  });
-  return el("div", "page-part", samples, subheading("By token"), table, subheading("Reflow"), reflow);
+  const size = windowSize();
+  const reflow: Group = {
+    title: "Reflow",
+    items: applies(spec.reflow)
+      ? [{ name: `In a window of the toolbar's size, ${size.name}`, words: spec.reflow.described, sample: windowed(spec.reflow.sample()) }]
+      : spec.reflow,
+  };
+  return [samples, subheading("By token"), table, reflow];
+}
+
+/** `sample` in a window of the toolbar's size. */
+function windowed(sample: Element): HTMLElement {
+  const size = windowSize();
+  const frame = el("div", "page-window", sample);
+  frame.style.width = size.width;
+  frame.style.height = size.height;
+  return frame;
 }

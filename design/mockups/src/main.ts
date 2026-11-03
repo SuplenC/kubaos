@@ -14,7 +14,7 @@ import { forgetLengths } from "./lib/tokens.ts";
 import { type Painted, paintPage, playChange } from "./site/change.ts";
 import { forgetPalettes } from "./site/recolour.ts";
 import { PAGES } from "./pages/index.ts";
-import { el } from "./site/dom.ts";
+import { el, RELAYOUT } from "./site/dom.ts";
 import { type Frame, frame } from "./site/frame.ts";
 import { nav } from "./site/nav.ts";
 import { type AnyPage, applies, isFoundation } from "./site/page.ts";
@@ -66,12 +66,16 @@ function refit(): void {
 const toolbarHeight = new ResizeObserver(([entry]) => {
   const height = entry?.borderBoxSize[0]?.blockSize ?? 0;
   document.documentElement.style.setProperty("--site-toolbar-height", `${height}px`);
+  // The page's contents stick under it, inside the page's box, whose zoom shrinks its pixels.
+  pageBox.style.setProperty("--page-pinned-top", `${height * devicePixelRatio}px`);
 });
 
 function draw(): void {
   const page = picked();
   apply(pageBox);
   stopPlayers();
+  // The page measures its samples as it draws them, so its box is on the document first.
+  if (!pageBox.isConnected) site.append(pageBox);
   pageBox.replaceChildren(...(page ? render(page) : [el("p", "page-prose", "No pages yet.")]));
   if (CHROME) {
     const hasWindow = page !== undefined && !isFoundation(page) && applies(page.measures.reflow);
@@ -97,6 +101,7 @@ async function start(): Promise<void> {
   paintPage([document.documentElement, pageBox], painted);
   addEventListener("hashchange", draw);
   addEventListener("resize", () => settle(pageBox));
+  pageBox.addEventListener(RELAYOUT, () => settle(pageBox));
   // A change to the tokens reaches the page as new CSS; what script measured from the old CSS is
   // measured again.
   import.meta.hot?.on("vite:afterUpdate", () => {
