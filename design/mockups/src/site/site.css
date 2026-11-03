@@ -228,6 +228,13 @@ body {
   gap: var(--space-s16);
 }
 
+/* A sample clicked into, which takes the wheel until Esc or a click outside lets it go
+   (`site/scroll.ts`): its box's edge, a hairline. */
+[data-sample][data-engaged] {
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
 /* A sample's own box on a stage or beside a description: as wide as the sample, the container's
    width at most, unless `site/settle.ts` lets it out; one wider than the page scrolls inside. */
 .page-view {

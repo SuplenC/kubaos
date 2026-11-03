@@ -225,7 +225,7 @@ export function choiceGroup(picks: Picks, columns: number, cells: readonly HTMLE
 
   function focusOn(at: number): void {
     for (const other of indices) targets[other]!.tabIndex = other === at ? 0 : -1;
-    targets[at]!.focus();
+    targets[at]!.focus({ preventScroll: true });
   }
 
   for (const at of indices) {

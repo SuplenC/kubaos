@@ -129,7 +129,7 @@ export function dialog(options: DialogOptions): Dialog {
   }
 
   function land(): void {
-    landing()?.focus({ focusVisible: true } as FocusOptions);
+    landing()?.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
   }
 
   if (options.landed) {
@@ -149,7 +149,7 @@ export function dialog(options: DialogOptions): Dialog {
       if (round.length === 0) return;
       const at = round.indexOf(document.activeElement as HTMLElement);
       const next = at < 0 ? 0 : (at + (event.shiftKey ? -1 : 1) + round.length) % round.length;
-      round[next]!.focus({ focusVisible: true } as FocusOptions);
+      round[next]!.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
     } else if (event.key === "Enter" && options.asks?.contains(event.target as Node)) {
       // Enter in the field does what its action does.
       if (!event.repeat) [...actions].reverse().find((each) => !each.disabled)?.click();

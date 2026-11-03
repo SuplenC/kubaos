@@ -98,7 +98,7 @@ function picking(specs: readonly ListRowSpec[], options: ListOptions = {}): HTML
           rows.map((row, at) => (row.checked === undefined ? row : { ...row, checked: at === index })),
           index,
         );
-        if (had) room.querySelector<HTMLElement>(".k-list")?.focus({ focusVisible: true } as FocusOptions);
+        if (had) room.querySelector<HTMLElement>(".k-list")?.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
       },
     });
     room.replaceChildren(shownList);
