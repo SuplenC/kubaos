@@ -326,6 +326,12 @@ body {
   gap: var(--space-s16) var(--space-s32);
 }
 
+/* A sample that fills its room is laid out across the stage, as a column's one child. */
+.page-stage-item[data-fluid] > .page-view {
+  flex: 1 1 100%;
+  flex-direction: column;
+}
+
 .page-stage-words {
   flex: 1 1 var(--size-rail);
   max-width: var(--size-column);
