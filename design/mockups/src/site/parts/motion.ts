@@ -1,14 +1,18 @@
-// The motion player: each move live on its sample, looping (its first state held, the move, its
-// last state held, then back), with pause, restart and slow motion, a plot of its tracks' curves
-// over the loop to seek it on frame by frame, each part alone, and its recipe beside it: every
-// part, property, value, timing, curve and keyframe, what reduced motion and the speed make of it,
-// as tables and as JSON. The sample is animated with the
-// Web Animations API from the move's own data (`site/recipe.ts`), so a frame seeked to is exactly
-// the frame that plays, and the recipe shown is what plays.
+// The motion player: a section's moves listed by when they play (arriving, leaving, between
+// states), the one picked live on its sample, looping (its first state held, the move, its last
+// state held, then back), with pause, restart and slow motion, a plot of its tracks' curves over
+// the loop to seek it on frame by frame, each part alone, and its recipe under it: every part,
+// property, value, timing, curve and keyframe, what reduced motion and the speed make of it, as
+// tables and as JSON. The sample is animated with the Web Animations API from the move's own data
+// (`site/recipe.ts`), so a frame seeked to is exactly the frame that plays, and the recipe shown is
+// what plays. `?all` draws every move in a player of its own, one under another.
+//
+// Motion is reviewed for its timing, not its pixels: a sample wider than its stage is drawn scaled
+// down to fit it, unless the player is at 1:1.
 
 import { type Align, probe } from "../../lib/probe.ts";
 import { length, number } from "../../lib/tokens.ts";
-import { el, label, prose } from "../dom.ts";
+import { el, label, prose, relayout, sampleBox } from "../dom.ts";
 import type { DoesntApply, Motion, Move, Track, Value } from "../page.ts";
 import { applies } from "../page.ts";
 import {
@@ -34,8 +38,9 @@ import {
   tokenOf,
   tracksOf,
 } from "../recipe.ts";
-import { CHROME, onChange, settings } from "../settings.ts";
+import { ALL, CHROME, onChange, settings } from "../settings.ts";
 import { key as keyOf, legend, type Mark, named, Plot } from "./plot.ts";
+import { picker } from "./picker.ts";
 import { partOr, subheading } from "./section.ts";
 
 /** How many times slower slow motion plays. */
@@ -266,12 +271,67 @@ function spread(sample: Element): void {
   }
 }
 
-function player(move: Move): HTMLElement {
+/** A sample in a box of its own, and the box it is scaled in to fit its stage. */
+interface Fit {
+  readonly stage: HTMLElement;
+  /** As big as the sample is drawn, scaled or not: what the stage lays out. */
+  readonly outer: HTMLElement;
+  /** The sample at its own size, scaled by a transform, which lays nothing out. */
+  readonly inner: HTMLElement;
+}
+
+/** `sample` in the boxes that scale it to fit `stage`, which holds them. */
+function fitIn(stage: HTMLElement, sample: Element): Fit {
+  const inner = el("div", "page-fit-inner", sample);
+  const outer = el("div", "page-fit", inner);
+  stage.append(outer);
+  return { stage, outer, inner };
+}
+
+/**
+ * Scales each of `fits` down to its stage's width where it is wider, or draws all at their own
+ * size when `oneToOne`. Whether one is wider than its stage.
+ */
+function refit(fits: readonly Fit[], oneToOne: boolean): boolean {
+  for (const { outer, inner } of fits) {
+    outer.style.width = "";
+    outer.style.height = "";
+    inner.style.transform = "";
+  }
+  // Every box is read, then every one sized: one layout, not one a box.
+  const read = fits.map(({ stage, inner }) => {
+    const style = getComputedStyle(stage);
+    const room = stage.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight);
+    return { width: inner.offsetWidth, height: inner.offsetHeight, room };
+  });
+  let wider = false;
+  fits.forEach(({ outer, inner }, i) => {
+    const { width, height, room } = read[i]!;
+    if (width <= room || room <= 0) return;
+    wider = true;
+    if (oneToOne) return;
+    const by = room / width;
+    inner.style.transform = `scale(${by})`;
+    outer.style.width = `${Math.floor(width * by)}px`;
+    outer.style.height = `${Math.floor(height * by)}px`;
+  });
+  return wider;
+}
+
+/** A player, and how to stop it before it is put away. */
+interface Player {
+  readonly element: HTMLElement;
+  readonly stop: () => void;
+}
+
+function player(move: Move): Player {
   const sample = move.sample();
   spread(sample);
   // The sample shows only the move: no hover, no press, no focus to change it under the pointer.
   sample.setAttribute("inert", "");
-  const stage = el("div", "page-player-stage mock", sample);
+  const stage = sampleBox(el("div", "page-player-stage mock"));
+  const fits: Fit[] = [fitIn(stage, sample)];
+  let oneToOne = false;
   const whole = el("div", "page-player");
   let playing = loop(move);
   let animations: Animation[] = [];
@@ -428,6 +488,7 @@ function player(move: Move): HTMLElement {
    * on the player's one clock, so the part and the whole never disagree.
    */
   function drawParts(): Animation[] {
+    fits.length = 1;
     const resting = restingIn(playing);
     if (playing.timed.length + resting.length < 2) {
       parts.replaceChildren();
@@ -453,7 +514,8 @@ function player(move: Move): HTMLElement {
         }
         spread(alone);
         added.push(...animate(alone, timed));
-        const box = el("div", "page-part-stage mock", alone);
+        const box = el("div", "page-part-stage mock");
+        fits.push(fitIn(box, alone));
         // A picture of the part, not more controls: no focus, no hover, nothing read out twice.
         box.inert = true;
         box.setAttribute("aria-hidden", "true");
@@ -495,7 +557,8 @@ function player(move: Move): HTMLElement {
   function restingPart(track: Track, room: string | undefined): HTMLElement {
     const alone = move.sample();
     spread(alone);
-    const box = el("div", "page-part-stage mock", alone);
+    const box = el("div", "page-part-stage mock");
+    fits.push(fitIn(box, alone));
     box.inert = true;
     box.setAttribute("aria-hidden", "true");
     return el("div", "page-part-resting", keyOf(null, restingWords(track), "on_surface_variant", room), box);
@@ -528,6 +591,13 @@ function player(move: Move): HTMLElement {
     const at = Math.min(t, playing.total - 1e-3);
     plot.draw(playing, marks(playing), at);
     go(at);
+    fit();
+  }
+
+  /** Fits the samples to their stages, and shows the 1:1 control while one is wider than its stage. */
+  function fit(): void {
+    if (!whole.isConnected) return;
+    sizeControl.hidden = !refit(fits, oneToOne);
   }
 
   const playControl = control("Pause", null, () => {
@@ -563,6 +633,14 @@ function player(move: Move): HTMLElement {
       }, milliseconds(HOLD));
     });
   });
+
+  const sizeControl = control("1:1", false, () => {
+    oneToOne = !oneToOne;
+    sizeControl.setAttribute("aria-pressed", String(oneToOne));
+    fit();
+    pick(null);
+  });
+  sizeControl.hidden = true;
 
   const seekTo = (event: PointerEvent) => pause(plot.timeAt(event.clientX));
   bar.addEventListener("pointerdown", (event) => {
@@ -615,7 +693,7 @@ function player(move: Move): HTMLElement {
   whole.append(
     el("div", "page-player-words", label(move.name, "body_strong", "on_surface"), prose(move.what)),
     stage,
-    el("div", "page-player-controls", playControl, restart, slowControl, copy),
+    el("div", "page-player-controls", playControl, restart, slowControl, copy, sizeControl),
     bar,
     readout,
     key,
@@ -628,12 +706,14 @@ function player(move: Move): HTMLElement {
     recipePart,
     loopPart,
   );
-  // The plot is as wide as the player: drawn again when that changes.
+  // The plot is as wide as the player, and the samples fit its stages: both again when that
+  // changes.
   let drawnWidth = 0;
   const resize = new ResizeObserver(() => {
     if (bar.clientWidth === drawnWidth) return;
     drawnWidth = bar.clientWidth;
     plot.draw(playing, marks(playing), current());
+    fit();
   });
   resize.observe(bar);
   // Only a player on screen runs: one scrolled away holds where it is.
@@ -642,31 +722,69 @@ function player(move: Move): HTMLElement {
     go(current());
   });
   watch.observe(whole);
-  players.add(() => {
+  const stop = (): void => {
     forget();
     watch.disconnect();
     resize.disconnect();
     cancelAnimationFrame(frame);
     for (const animation of animations) animation.cancel();
-  });
-  return whole;
+  };
+  players.add(stop);
+  return { element: whole, stop };
 }
+
+/** When a section's moves play, in the order they are listed. */
+const WHEN = [
+  ["Arriving", "arrives"],
+  ["Leaving", "leaves"],
+  ["Between states", "between"],
+] as const;
 
 function moves(list: readonly Move[]): HTMLElement {
-  return el("div", "page-players", ...list.map(player));
+  return el("div", "page-players", ...list.map((move) => player(move).element));
 }
 
+/** The section's moves: listed by when they play, the one picked in the player under the list. */
 export function motion(spec: Motion): HTMLElement {
-  return el(
-    "div",
-    "page-part",
-    subheading("Arriving"),
-    partOr(spec.arrives, moves),
-    subheading("Leaving"),
-    partOr(spec.leaves, moves),
-    subheading("Between states"),
-    partOr(spec.between, moves),
+  if (ALL) return el("div", "page-part", ...WHEN.flatMap(([title, key]) => [subheading(title), partOr(spec[key], moves)]));
+  const all = WHEN.flatMap(([, key]) => (applies(spec[key]) ? spec[key] : []));
+  if (all.length === 0) return el("div", "page-part", ...WHEN.map(([title, key]) => listed(title, spec[key], () => undefined)));
+  const slot = el("div", "page-motion-player");
+  let playing: Player | null = null;
+  const pickers: { readonly set: (index: number) => void; readonly list: readonly Move[] }[] = [];
+  const play = (move: Move): void => {
+    if (playing) {
+      playing.stop();
+      players.delete(playing.stop);
+    }
+    playing = player(move);
+    slot.replaceChildren(playing.element);
+    for (const each of pickers) each.set(each.list.indexOf(move));
+    if (slot.isConnected) relayout(slot);
+  };
+  const lists = WHEN.map(([title, key]) => listed(title, spec[key], play, pickers));
+  play(all[0]!);
+  return el("div", "page-part page-motion", el("div", "page-motion-list", ...lists), slot);
+}
+
+/** A row of the moves that play `title`'s way, or why none does; a press plays one. */
+function listed(
+  title: string,
+  list: readonly Move[] | DoesntApply,
+  play: (move: Move) => void,
+  pickers: { readonly set: (index: number) => void; readonly list: readonly Move[] }[] = [],
+): HTMLElement {
+  const name = el("div", "page-motion-when", label(title, "body_strong", "on_surface"));
+  if (!applies(list)) return el("div", "page-motion-group", name, prose(`Doesn't apply: ${list.doesntApply}`, "body", "on_surface_variant"));
+  if (list.length === 0) return el("div", "page-motion-group", name, prose("None.", "body", "on_surface_variant"));
+  const chips = picker(
+    list.map((move) => move.name),
+    -1,
+    (index) => play(list[index]!),
+    `The moves: ${title}`,
   );
+  pickers.push({ set: chips.set, list });
+  return el("div", "page-motion-group", name, chips.element);
 }
 
 /** Every move's recipe on a page, as JSON data: what `dist/motion/PAGE.json` holds. */

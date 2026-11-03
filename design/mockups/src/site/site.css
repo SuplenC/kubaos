@@ -415,6 +415,39 @@ body {
   overflow-x: auto;
 }
 
+/* A sample scaled to fit its stage: the outer box is as big as it is drawn, the inner one at the
+   sample's own size, scaled from its top left (`refit` in `site/parts/motion.ts`). */
+.page-fit {
+  flex: none;
+}
+
+.page-fit-inner {
+  width: max-content;
+  transform-origin: 0 0;
+}
+
+/* The section's moves, a row of chips for each time they play, over the one player. */
+.page-motion-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-s12) var(--space-s24);
+  align-items: start;
+}
+
+.page-motion-group {
+  display: contents;
+}
+
+.page-motion-when {
+  display: flex;
+  align-items: center;
+  min-height: var(--size-chip);
+}
+
+.page-player-controls > [hidden] {
+  display: none;
+}
+
 /* The picked part's layers, outlined on the whole sample. */
 .page-player-outlines {
   position: absolute;
@@ -427,11 +460,11 @@ body {
   outline: var(--stroke-hairline_device_px) dashed var(--color-on_surface);
 }
 
-/* Each part alone under the legend, one full row each in the legend's order, each on its own
-   stage at the page's scale. */
+/* Each part alone under the legend, in the legend's order, as many a row as fit a dialog's width,
+   each on its own stage, its sample scaled down to fit it. */
 .page-parts {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--size-dialog)), 1fr));
   gap: var(--space-s16);
 }
 
@@ -441,6 +474,7 @@ body {
 
 .page-part-alone,
 .page-part-resting {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-s8);
