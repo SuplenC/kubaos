@@ -7,6 +7,7 @@ import { settings, windowSize } from "../settings.ts";
 import type { Measures } from "../page.ts";
 import { el, label, mockCell, prose } from "../dom.ts";
 import { partOr, subheading } from "./section.ts";
+import { stackWhenNarrow } from "./variants.ts";
 
 const overlays = new Set<() => boolean>();
 
@@ -135,6 +136,7 @@ export function measures(spec: Measures): HTMLElement {
   for (const sample of spec.samples) {
     samples.append(el("div", "page-cell", label(sample.name, "label")), mockCell(overlaid(sample.sample())), prose(sample.for));
   }
+  stackWhenNarrow(samples);
   const table = el("dl", "page-list");
   for (const measure of spec.measures) {
     const token = measure.token.replace(/^--/, "");
