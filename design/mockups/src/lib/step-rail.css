@@ -8,6 +8,14 @@
   initial-value: 0;
 }
 
+/* How far down the steps the wire is lit, in steps: the current step's index, moving between two
+   as the light travels. */
+@property --wire-lit {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 /* How strongly a blocker's reason burns in `error` as Enter is refused, 1 at once, 0 at rest. */
 @property --nudge {
   syntax: "<number>";
@@ -53,6 +61,60 @@
 .k-rail > .k-stack > [data-fill-height] {
   flex: 1 1 0;
   min-height: 0;
+}
+
+/* The steps, each across the rail's inner width. */
+.k-rail-steps {
+  position: relative;
+  isolation: isolate;
+}
+
+/* The progress wire: one tube `step_rail.wire` thick down the steps' symbols, centred on them on
+   whole device pixels, from the first symbol's centre to the last's. Unlit it is `outline_variant`;
+   lit, down to the current symbol's bead, it is `primary`, with a lit control's glow round it,
+   near and far, at night while the signs are on, and none by day. Each symbol is a bead: the wire
+   and its glow are cut away in a disc `step_rail.bead` wider than the symbol on every side, so the
+   wire passes behind it whatever the fill under it. It lies over the rows and takes no pointer. */
+.k-rail-wire {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  --wire: max(1px, round(nearest, var(--step_rail-wire), 1px));
+  --wire-x: calc(var(--space-s12) + var(--type-body_strong-icon) / 2);
+  --wire-top: round(nearest, calc(var(--size-row) / 2), 1px);
+  --bead-r: calc(var(--type-body_strong-icon) / 2 + var(--step_rail-bead));
+  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  mask-composite: intersect;
+  mask-repeat: no-repeat;
+}
+
+.k-rail-wire-track,
+.k-rail-wire-lit {
+  position: absolute;
+  top: var(--wire-top);
+  left: calc(var(--space-s12) + round(nearest, calc((var(--type-body_strong-icon) - var(--wire)) / 2), 1px));
+  width: var(--wire);
+}
+
+.k-rail-wire-track {
+  height: calc((var(--count) - 1) * var(--size-row));
+  background: var(--color-outline_variant);
+}
+
+.k-rail-wire-lit {
+  height: max(0px, round(nearest, calc(var(--wire-lit) * var(--size-row) - var(--bead-r)), 1px));
+  background: var(--color-primary);
+  filter:
+    drop-shadow(0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--signs))))
+    drop-shadow(0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * var(--signs))));
+}
+
+/* The footer's Back and the rail's power button: their symbols on the content's edge, the
+   button's own padding reaching past it. */
+.k-step-back,
+.k-rail-power {
+  margin-inline-start: calc(-1 * var(--padding));
 }
 
 /* The page's side: what the page slides inside, cut at its edges. */

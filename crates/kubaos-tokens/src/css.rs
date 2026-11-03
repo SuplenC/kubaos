@@ -190,6 +190,10 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
     out.comment("A banner's rail: its thickness at night and by day, rounded half up to device pixels.");
     out.length("banner-rail", banner.rail);
     out.length("banner-rail_day", banner.rail_day);
+    let step_rail = &tokens.step_rail;
+    out.comment("A step rail's wire: its thickness, and how far each symbol's disc reaches past it.");
+    out.length("step_rail-wire", step_rail.wire);
+    out.length("step_rail-bead", step_rail.bead);
     let icon_tile = &tokens.icon_tile;
     out.comment("An icon tile's app icon: the alphas its drawing is measured at, and what makes it a plate.");
     out.var("icon_tile-ink", number(icon_tile.ink));

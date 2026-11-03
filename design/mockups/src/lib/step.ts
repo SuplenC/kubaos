@@ -8,9 +8,11 @@
 //
 // To do is a Neutral chip, done an Accent chip with a check (a Neutral one on the selected row,
 // where the accent's tint leaves its label under 4.5:1), an action a Filled chip with its symbol;
-// the current step is the selected row, on `secondary_container`. A pressable step is a control:
-// lit, the accent's tube inside its edge with the glow outside at night; pressed, the tube runs
-// white-hot by night and the tone tints its fill by day.
+// the current step is the selected row, on `secondary_container`. In a rail the symbol is a bead on
+// the rail's progress wire: lit in `primary` once its step is reached, the current one glowing at
+// night and humming while it runs, and the current row is a quiet fill. A pressable step is a
+// control: lit, the accent's tube inside its edge with the glow outside at night; pressed, the
+// tube runs white-hot by night and the tone tints its fill by day.
 
 import "./feedback.css";
 import { chip } from "./chip.ts";
@@ -46,6 +48,8 @@ export interface StepOptions {
   readonly selected?: boolean;
   /** It takes a press. */
   readonly pressable?: boolean;
+  /** The current step's work is running (the install): in a rail, its symbol hums. */
+  readonly running?: boolean;
   readonly box?: StepBox;
   readonly pinned?: Pinned;
 }
@@ -80,6 +84,14 @@ function stateMark(state: StepState): Element {
   return room;
 }
 
+/** A rail step's symbol, as a bead on the rail's progress wire: what lights and hums. */
+function bead(symbol: Element): HTMLElement {
+  const box = document.createElement("span");
+  box.className = "k-step-bead";
+  box.append(symbol);
+  return box;
+}
+
 export function step(options: StepOptions): HTMLElement {
   const state = options.state ?? { is: "todo" };
   const selected = (options.selected ?? false) || state.is === "current";
@@ -88,6 +100,9 @@ export function step(options: StepOptions): HTMLElement {
   element.className = "k-step";
   element.dataset.box = options.box ?? "well";
   element.dataset.lines = two ? "two" : "one";
+  element.dataset.state = state.is;
+  element.toggleAttribute("data-failed", options.failed ?? false);
+  element.toggleAttribute("data-running", options.running ?? false);
   element.toggleAttribute("data-selected", selected);
   const title = clamped(options.title, "body_strong");
   title.style.color = "var(--step-ink)";
@@ -100,7 +115,8 @@ export function step(options: StepOptions): HTMLElement {
   const parts: Element[] = [];
   if (options.icon || options.failed) {
     const size = two ? "var(--icon-two_line)" : "var(--type-body_strong-icon)";
-    parts.push(icon(options.failed ? "error" : options.icon!, size, options.failed ? "var(--color-error)" : "var(--step-ink)"));
+    const symbol = icon(options.failed ? "error" : options.icon!, size, options.failed ? "var(--color-error)" : "var(--bead-ink, var(--step-ink))");
+    parts.push(options.box === "rail" ? bead(symbol) : symbol);
   }
   parts.push(filling(stack("s4", "start", ...lines)));
   const end = options.mark ? stateMark(state) : stateChip(state, selected, options.words);
@@ -116,6 +132,6 @@ export function step(options: StepOptions): HTMLElement {
     ring.dataset.pressable = "";
     if (options.box === "rail") ring.style.setProperty("--corner", "var(--step-corner)");
   }
-  const named = variant(state.is, options.icon ? "icon" : "", options.mark ? "mark" : "", options.failed ? "failed" : "");
+  const named = variant(state.is, options.icon ? "icon" : "", options.mark ? "mark" : "", options.failed ? "failed" : "", options.running ? "running" : "");
   return probe(element, { role: "component", name: "Step", variant: named, fixed: { width: false, height: false } });
 }
