@@ -301,7 +301,13 @@
   /* While the clock flies above the frame it is still behind the city: the city's alpha, laid where
      the city stands on the screen as it pushes in, is taken out of the digits, so they are cut
      wherever the city stands in front of them, as they are when the clock stands behind it. Behind
-     the city it is nothing: the layer is no size. `--city` is unset without a cut-out. */
+     the city it is nothing: the layer is no size. `--city` is unset without a cut-out.
+     Chromium clips a mask to the border box even with `no-clip`, and the box is trimmed to the cap
+     height, which round digits overshoot: a line of padding each way, taken back by the margin,
+     gives the mask room, and the mask is laid from the unpadded box. */
+  padding-block: 1lh;
+  margin-block: -1lh;
+  mask-origin: content-box;
   mask-image: linear-gradient(var(--color-surface), var(--color-surface)), var(--city);
   mask-composite: subtract, add;
   mask-repeat: repeat, no-repeat;
