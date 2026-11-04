@@ -1,0 +1,186 @@
+/* The lock (`lib/lock.ts`): a screen with its frame, the wallpaper, its clock and its cut-out at
+   rest; the frame closed in, the picture blurred and dimmed, the clock lifted to the top and the
+   password's sheet up when awake. Three numbers move it, 0 at rest and 1 awake. */
+
+/* The frame, from out past the screen's edges (0) to where the shell draws it (1). */
+@property --framed {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* The picture's blur, from sharp (0) to `size.lock_blur` (1). */
+@property --wake {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* The clock, from its rest place in `type.clock_rest` (0) to near the top in `type.clock` (1). */
+@property --lift {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far the wrong password's shake has the field, in `space.s4`s sideways. */
+@property --jolt {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.k-screen.k-lock {
+  --frame-top: round(nearest, calc(var(--size-bar) * var(--framed)), 1px);
+  --frame-side: round(nearest, calc(var(--space-s8) * var(--framed)), 1px);
+}
+
+.k-lock[data-awake] {
+  --framed: 1;
+  --wake: 1;
+  --lift: 1;
+}
+
+/* The frame's inner corners grow with it, so a frame not yet in shows no corner. */
+.k-lock .k-frame {
+  border-radius: calc(var(--radius-surface) * var(--framed));
+}
+
+/* The picture's blur: what is under it, its edges held rather than faded, so the blurred picture
+   still reaches the screen's edges. */
+.k-lock-blur {
+  position: absolute;
+  inset: 0;
+  display: block;
+  backdrop-filter: blur(calc(var(--size-lock_blur) * var(--wake)));
+}
+
+/* The clock: the kicker over the digits, `space.s16` apart, its middle and its top moving from
+   the rest place to the awake one as `--lift` goes 0 to 1, and its digits from `type.clock_rest`
+   to `type.clock`. Its width is the kicker's or the digits', whichever is wider, and each is
+   centred in it on whole device pixels, the odd one after it. */
+.k-lock-clock {
+  position: absolute;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  --k: calc(1 + (var(--type-clock-size) / var(--type-clock_rest-size) - 1) * var(--lift));
+  --digits-width: round(up, calc(var(--digits-natural) * var(--px) * var(--k) - 0.001px), 1px);
+  --clock-width: max(var(--kicker-width, 0px), var(--digits-width));
+  --cx: calc(var(--rest-cx, 50%) + (50% - var(--rest-cx, 50%)) * var(--lift));
+  --awake-top: calc(var(--size-bar) + var(--space-s48));
+  left: round(down, calc(var(--cx) - var(--clock-width) / 2), 1px);
+  top: round(nearest, calc(var(--rest-top, 0px) + (var(--awake-top) - var(--rest-top, 0px)) * var(--lift)), 1px);
+  width: var(--clock-width);
+}
+
+.k-lock-clock > .k-lock-kicker {
+  width: max-content;
+  margin-left: round(down, calc((var(--clock-width) - var(--kicker-width, 0px)) / 2), 1px);
+}
+
+/* The digits' box is their cap height to their baseline, so the kicker's gap is to the digits'
+   tops and the place a wallpaper gives is their baseline. */
+.k-lock .k-lock-digits {
+  width: var(--digits-width);
+  height: auto;
+  margin-left: round(down, calc((var(--clock-width) - var(--digits-width)) / 2), 1px);
+  font-size: calc(var(--type-clock_rest-size) * var(--k));
+  line-height: var(--type-clock_rest-size);
+  text-box: trim-both cap alphabetic;
+}
+
+/* The shade behind the clock: `surface` at the least opacity that keeps its words at 4.5:1 over
+   this picture. It is an ellipse through the clock's corners (its box's sides times the square root
+   of two) and `space.s64` past them, blurred by `space.s32`, so it is whole behind every word and
+   fades out round the clock with no edge or corner of its own. */
+.k-lock-clock::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * (50% * (sqrt(2) - 1) + var(--space-s64)));
+  z-index: -1;
+  display: block;
+  --shade: calc(var(--shade-rest, 0) + (var(--shade-awake, 0) - var(--shade-rest, 0)) * var(--lift));
+  border-radius: 50%;
+  background: rgb(from var(--color-surface) r g b / var(--shade));
+  filter: blur(var(--space-s32));
+  pointer-events: none;
+}
+
+/* The foreground cut out of the picture, lying exactly over it and in front of the clock; it
+   blurs with the picture and is gone once the clock is in front. */
+.k-lock-cutout {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(calc(var(--size-lock_blur) * var(--wake)));
+  pointer-events: none;
+}
+
+.k-lock[data-awake] .k-lock-cutout {
+  opacity: 0;
+}
+
+/* The sheet's content: `size.panel` wide, `space.s16` inside at its top and its foot, the
+   container's padding at its sides, as a PanelPage is. */
+.k-lock-sheet {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: var(--size-panel);
+  padding: var(--space-s16) 0;
+}
+
+.k-lock-body {
+  width: 100%;
+}
+
+.k-lock-field {
+  align-self: stretch;
+  translate: round(nearest, calc(var(--jolt) * var(--space-s4)), 1px) 0;
+}
+
+/* Measures Geist Light's cap height: a digit in the rest clock's size, trimmed as the digits are. */
+.k-lock-meter {
+  position: absolute;
+  visibility: hidden;
+  width: max-content;
+  white-space: pre;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  font-family: var(--type-clock_rest-family);
+  font-size: var(--type-clock_rest-size);
+  font-weight: var(--type-clock_rest-weight);
+  line-height: var(--type-clock_rest-size);
+  text-box: trim-both cap alphabetic;
+}
+
+/* A live lock eases between its phases: waking on the sheet's opening, the clock settling over
+   `long` on `emphasized_decel`; going back to rest, the frame and the sheet leaving over `medium`
+   on `emphasized_accel`, the blur clearing over `long` and the cut-out coming back once the clock
+   is home. */
+.k-lock[data-live] {
+  transition:
+    --framed var(--motion-medium) var(--easing-emphasized_accel),
+    --wake var(--motion-long) var(--easing-standard),
+    --lift var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.k-lock[data-live][data-awake] {
+  transition:
+    --framed var(--motion-long) var(--easing-emphasized_decel),
+    --wake var(--motion-long) var(--easing-emphasized_decel),
+    --lift var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.k-lock[data-live] .k-lock-cutout {
+  transition: opacity var(--motion-short) var(--easing-standard) var(--motion-medium);
+}
+
+.k-lock[data-live][data-awake] .k-lock-cutout {
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
