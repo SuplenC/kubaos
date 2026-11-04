@@ -9,17 +9,18 @@
 //
 // Awake, the frame closes in round the picture, `space.s8` all round, the picture blurs
 // `size.lock_blur` and dims as a panel's desktop does, the clock lifts out from behind the cut-out
-// to `type.clock` near the top, and a Sheet rises from the middle of the bottom edge holding the
-// password's Field, the other way in, and the keys.
+// to `type.clock` near the top, its kicker stepping down to its awake styles, and a Sheet rises
+// from the middle of the bottom edge holding the password's Field, the other way in, and the keys.
 //
 // The lock and the desktop are one surface: locking and unlocking play on a still of the desktop
 // the lock captured as it locked, drawn inside the lock (its windows, and the bar's pills on the
-// frame), and the clock flies between the bar's clock and its own place.
+// frame), and the clock flies between the bar's clock and its own place. The picture and its cut-out
+// push in from the desktop's 1:1 to `scale.push` as the lock comes up, and ease back as it goes.
 //
 // Numbers move it, each a property a move animates, so a frame held on its plot is exactly what
 // plays: `--framed` (the frame closing in), `--barred` (its top edge from `space.s8` to the bar's),
 // `--wake` (the blur), `--lift` (the clock from rest to awake), `--dock` (the clock into the bar),
-// the sheet's own `--reveal` and the dim's `--panel-dim`.
+// `--push` (the picture pushing in), the sheet's own `--reveal` and the dim's `--panel-dim`.
 //
 // It always draws in the night scheme matugen derives from its wallpaper, whatever the mode.
 
@@ -33,7 +34,7 @@ import { pill } from "./pill.ts";
 import { probe, variant } from "./probe.ts";
 import { hang, type Screen, screen, type Sheet, sheet } from "./sheet.ts";
 import { advance, text } from "./text.ts";
-import { length } from "./tokens.ts";
+import { length, number } from "./tokens.ts";
 
 export type { NightScheme };
 
@@ -146,8 +147,9 @@ function sheetContent(moment: Moment, error: string, live: boolean): HTMLElement
 }
 
 /**
- * The kicker: the place and day in `clock_place`, then ` · ` and the date in `clock_date`. Its
- * colours are the CSS's, as the digits' are: the picture's tint at rest, its roles awake.
+ * The kicker: the place and day in `clock_place`, then ` · ` and the date in `clock_date`, each
+ * stepping down to its awake style as the clock lifts. Its sizes and colours are the CSS's, as the
+ * digits' are: the picture's tint at rest, its roles awake.
  */
 function kickerLine(kicker: Kicker): HTMLElement {
   const place = text(kicker.place, "clock_place");
@@ -201,13 +203,18 @@ export function lock(options: LockOptions): Lock {
   digits.classList.add("k-lock-digits");
   // The digits' colour is the CSS's: the picture's tint at rest, `on_surface` awake and in the bar.
   digits.style.removeProperty("color");
-  const kicker = kickerLine(options.kicker ?? KICKER);
+  const words = options.kicker ?? KICKER;
+  const kicker = kickerLine(words);
   const clock = document.createElement("span");
   clock.className = "k-lock-clock";
   clock.style.setProperty("--digits-natural", String(digitsWidth(time)));
   clock.style.setProperty("--cap-height", String(capHeight()));
   clock.style.setProperty("--bar-natural", String(advance("body", time)));
   clock.style.setProperty("--letters", String([...time].length));
+  const placeNatural = advance("clock_place", words.place);
+  const dateNatural = advance("clock_date", ` · ${words.date}`);
+  clock.style.setProperty("--place-natural", String(placeNatural));
+  clock.style.setProperty("--date-natural", String(dateNatural));
   clock.append(kicker, digits);
   windows.after(clock);
 
@@ -231,9 +238,10 @@ export function lock(options: LockOptions): Lock {
   hang(shown, rising);
 
   // The rest clock's place is the picture's, which only the picture's size and the screen's know:
-  // the screen crops the picture as `object-fit: cover` does, and the clock follows the city. The
-  // clock's tint is the picture's colour under the digits, read off the picture itself. The bar's
-  // clock is where the pill's layout puts its time, which only layout knows.
+  // the screen crops the picture as `object-fit: cover` does, the push scales that round the
+  // screen's middle, and the clock follows the city on the desktop's picture and the pushed one.
+  // The clock's tint is the picture's colour under the digits at rest, read off the picture
+  // itself. The bar's clock is where the pill's layout puts its time, which only layout knows.
   const place = () => {
     const width = element.clientWidth;
     const height = element.clientHeight;
@@ -243,35 +251,38 @@ export function lock(options: LockOptions): Lock {
     const px = pxOf(element);
     const token = (name: string) => length(name) * px;
     const scale = Math.max(width / seen.width, height / seen.height);
-    const cover = { scale, left: (width - seen.width * scale) / 2, top: (height - seen.height * scale) / 2 };
+    const flat = { scale, left: (width - seen.width * scale) / 2, top: (height - seen.height * scale) / 2 };
+    const pushed = pushedCover(flat, width, height, element.closest("[data-reduced]") ? 1 : number("scale-push"));
     const cap = capHeight();
-    const kickerHeight = kicker.offsetHeight;
-    const kickerWidth = kicker.offsetWidth;
+    const kickerWidth = Math.ceil(placeNatural * px - 0.001) + Math.ceil(dateNatural * px - 0.001);
     const natural = digitsWidth(time);
     const restDigits = Math.ceil(natural * px - 0.001);
     const margin = token("space-s32");
     const half = Math.max(kickerWidth, restDigits) / 2;
-    const cx = Math.min(width - margin - half, Math.max(margin + half, cover.left + wallpaper.clock.x * seen.width * scale));
-    const restBase = cover.top + wallpaper.clock.y * seen.height * scale;
-    const restTop = Math.round(restBase - cap * token("type-clock_rest-size"));
+    const restOn = (cover: Cover) => ({
+      cx: Math.min(width - margin - half, Math.max(margin + half, cover.left + wallpaper.clock.x * seen.width * cover.scale)),
+      top: Math.round(cover.top + wallpaper.clock.y * seen.height * cover.scale - cap * token("type-clock_rest-size")),
+    });
+    const restFlat = restOn(flat);
+    const rest = restOn(pushed);
     clock.style.setProperty("--digits-natural", String(natural));
     clock.style.setProperty("--cap-height", String(cap));
     clock.style.setProperty("--bar-natural", String(advance("body", time)));
-    clock.style.setProperty("--kicker-width", `${kickerWidth}px`);
-    clock.style.setProperty("--kicker-height", `${kickerHeight}px`);
-    clock.style.setProperty("--rest-cx", `${cx}px`);
-    clock.style.setProperty("--rest-top", `${restTop}px`);
+    clock.style.setProperty("--middle", `${width / 2}px`);
+    clock.style.setProperty("--rest-cx-flat", `${restFlat.cx}px`);
+    clock.style.setProperty("--rest-top-flat", `${restFlat.top}px`);
+    clock.style.setProperty("--rest-cx-pushed", `${rest.cx}px`);
+    clock.style.setProperty("--rest-top-pushed", `${rest.top}px`);
     placeBarTime(element, bar, clock);
 
-    const restDigitsBox = { x: cx - restDigits / 2, y: restTop, width: restDigits, height: cap * token("type-clock_rest-size") };
-    const tint = tintFor(picture, restDigitsBox, cover);
+    const restDigitsBox = { x: rest.cx - restDigits / 2, y: rest.top, width: restDigits, height: cap * token("type-clock_rest-size") };
+    const tint = tintFor(picture, restDigitsBox, pushed);
     if (tint) clock.style.setProperty("--digits-tint", tint);
     else clock.style.removeProperty("--digits-tint");
 
   };
   const watch = new ResizeObserver(place);
   watch.observe(element);
-  watch.observe(kicker);
   watch.observe(bar.pill);
   picture.addEventListener("load", place);
   void document.fonts.ready.then(place);
@@ -300,6 +311,18 @@ function placeBarTime(element: HTMLElement, bar: { pill: HTMLElement; time: HTML
   mark.remove();
   clock.style.setProperty("--bar-cx", `${((timeBox.left + timeBox.width / 2 - screenBox.left) * zoom).toFixed(3)}px`);
   clock.style.setProperty("--bar-base", `${((baseline - pillBox.top) * zoom).toFixed(3)}px`);
+}
+
+/** Where `object-fit: cover` draws a picture on a screen: its scale and its top left corner. */
+interface Cover {
+  readonly scale: number;
+  readonly left: number;
+  readonly top: number;
+}
+
+/** `cover` pushed in by `push` round the middle of a screen `width` by `height`, as the CSS scales it. */
+function pushedCover(cover: Cover, width: number, height: number, push: number): Cover {
+  return { scale: cover.scale * push, left: width / 2 + (cover.left - width / 2) * push, top: height / 2 + (cover.top - height / 2) * push };
 }
 
 /** The CSS pixels a logical pixel is in `element`'s box: its scale. */
