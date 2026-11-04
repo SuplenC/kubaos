@@ -10,7 +10,8 @@
 // Awake, the frame slides in round the picture, `space.s8` all round, the picture blurs
 // `size.lock_blur` and dims as a panel's desktop does, the clock lifts out from behind the cut-out
 // to `type.clock` near the top, its kicker stepping down to its awake styles, and a Sheet rises
-// from the middle of the bottom edge holding the password's Field, the other way in, and the keys.
+// from the middle of the bottom edge holding the password's Field alone, the reader's mark at its
+// end.
 //
 // The lock and the desktop are one surface: locking and unlocking play on a still of the desktop
 // the lock captured as it locked, drawn inside the lock (its windows, and the bar's pills on the
@@ -29,10 +30,9 @@
 
 import "./lock.css";
 import { type NightScheme, paintNight, tintFor } from "./lock-tint.ts";
-import { field, fieldRoom, note } from "./field.ts";
+import { field, fieldRoom } from "./field.ts";
 import { icon } from "./icon.ts";
-import { keyHints } from "./keycap.ts";
-import { container, gap, row, stack } from "./layout.ts";
+import { container, row } from "./layout.ts";
 import { pill } from "./pill.ts";
 import { probe, variant } from "./probe.ts";
 import { hang, type Screen, screen, type Sheet, sheet } from "./sheet.ts";
@@ -77,8 +77,11 @@ export interface Wallpaper {
  */
 export type Phase = "rest" | "awake" | "desktop";
 
-/** What the sheet shows: waiting for a password, checking one, or after a miss. */
-export type Moment = "rest" | "loading" | "error";
+/**
+ * What the sheet shows: waiting for a password or a finger, checking one, after a wrong password,
+ * or after a finger the reader doesn't know.
+ */
+export type Moment = "rest" | "loading" | "error" | "unknown";
 
 /** The kicker over the digits: where and which day, then the date. */
 export interface Kicker {
@@ -102,8 +105,10 @@ export interface LockOptions {
   /** Whether the time is a 12-hour clock's (1:00 to 12:59) or a 24-hour one's (00:00 to 23:59). */
   readonly twelveHour?: boolean;
   readonly kicker?: Kicker;
-  /** What the line under the field says after a miss. */
+  /** What the field's placeholder says after a miss: a wrong password, or an unknown finger. */
   readonly error?: string;
+  /** Whether the machine has a fingerprint reader: its mark ends the field. */
+  readonly reader?: boolean;
   /** Drawn to be moved by a person, not held still: its numbers ease as its phase changes. */
   readonly live?: boolean;
   /** The pills on the bar's right, as the desktop's bar draws them. */
@@ -116,7 +121,7 @@ export interface Lock {
   readonly element: HTMLElement;
   readonly screen: Screen;
   readonly sheet: Sheet;
-  /** The sheet's content, whose field and line a live lock swaps. */
+  /** The sheet's content, whose field a live lock swaps. */
   readonly content: HTMLElement;
 }
 
@@ -126,14 +131,18 @@ export const BAR_CLOCK: BarClock = { kanji: "月", date: "Mon 2 Nov" };
 
 /**
  * The password's field, as `moment` shows it: lit with the keyboard in it unless it is live. Its
- * `lock` has `lock_open` in `primary` laid over it, unseen, for the right password to turn to.
+ * `lock` has `lock_open` in `primary` laid over it, unseen, for the right password to turn to; with
+ * a reader, `fingerprint` ends it in `primary`, or in `error` once a finger is unknown. After a miss
+ * its placeholder is `error`, what went wrong, until something is typed.
  */
-export function lockField(moment: Moment, live = false): HTMLElement {
+export function lockField(moment: Moment, live = false, error = "", reader = true): HTMLElement {
   const busy = moment === "loading";
+  const missed = moment === "error" || moment === "unknown";
   const made = field({
     icon: busy ? "hourglass_top" : "lock",
-    placeholder: busy ? "Checking…" : "Password",
+    placeholder: busy ? "Checking…" : missed ? error : "Password",
     secret: true,
+    ...(reader ? { trailing: { icon: "fingerprint", color: moment === "unknown" ? "error" : "primary" } } : {}),
     ...(moment === "error" ? { state: "Invalid" as const } : {}),
     ...(live ? {} : { pinned: "lit" as const }),
   });
@@ -148,21 +157,13 @@ export function lockField(moment: Moment, live = false): HTMLElement {
   return made;
 }
 
-/** The line under the field: the other way in, or what went wrong. */
-export function lockLine(moment: Moment, error: string): HTMLElement {
-  if (moment === "error") return note(error, true);
-  return row("s8", "centre", icon("fingerprint", "var(--type-small-icon)", "var(--color-primary)"), text("Or touch the fingerprint reader", "small", "on_surface_variant"));
-}
-
-/** The sheet's content: the field, its line under it, and the keys, PanelPage's padding round them. */
-function sheetContent(moment: Moment, error: string, live: boolean): HTMLElement {
-  const room = fieldRoom("100%", lockField(moment, live));
+/** The sheet's content: the field alone, PanelPage's padding round it. */
+function sheetContent(moment: Moment, error: string, live: boolean, reader: boolean): HTMLElement {
+  const room = fieldRoom("100%", lockField(moment, live, error, reader));
   room.classList.add("k-lock-field");
-  const body = stack(0, "start", room, gap("s4"), lockLine(moment, error), gap("s16"), keyHints([["↵", "Unlock"], ["Esc", "Rest"]]));
-  body.classList.add("k-lock-body");
   const box = document.createElement("span");
   box.className = "k-lock-sheet";
-  box.append(container(body));
+  box.append(container(room));
   return box;
 }
 
@@ -252,7 +253,7 @@ export function lock(options: LockOptions): Lock {
   // The desktop's windows stand in front of the city: they are the still's top layer.
   (element.querySelector(".k-lock-cutout") ?? clock).after(windows);
 
-  const content = sheetContent(moment, options.error ?? "", options.live ?? false);
+  const content = sheetContent(moment, options.error ?? "", options.live ?? false, options.reader ?? true);
   const rising = sheet({ content, edge: "bottom", ...(options.live ? {} : { reveal: options.phase === "awake" ? 1 : 0 }) });
   if (options.live) {
     for (const part of rising.parts) {

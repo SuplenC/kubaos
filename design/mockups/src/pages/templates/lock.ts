@@ -5,7 +5,7 @@
 import { doesntApply, type Move, nonEmpty, page, type Track } from "../../site/page.ts";
 import type { Duration, Easing } from "../../site/page.ts";
 import { windowSize } from "../../site/settings.ts";
-import { DATES, kickerFor, LOCK_ERROR, liveLock, PURPLE_HOUR, SHIBUYA, still, TIMES, TOWER, twelveHour, twoScreens } from "./locks.ts";
+import { DATES, FINGER_ERROR, kickerFor, LOCK_ERROR, liveLock, PURPLE_HOUR, SHIBUYA, still, TIMES, TOWER, twelveHour, twoScreens } from "./locks.ts";
 
 /** A lock drawn still, wrapped so a move can reach its root: the frame's number is set there. */
 function held(phase: "rest" | "awake" | "desktop", wallpaper = PURPLE_HOUR): () => HTMLElement {
@@ -216,7 +216,7 @@ const TOUCHES: Move = {
 
 const SHAKE: Move = {
   name: "A wrong password",
-  what: "The field shakes its head: `space.s12` one way, `space.s8` back past its place, `space.s4` the first way, each over `micro` on `standard`, then home over `short` on `standard_decel`, a whole device pixel at a time; the field empties, turns Invalid, and the line under it says what went wrong in place of the reader's line. With reduce motion it stays still and only the line says so.",
+  what: "The field shakes its head: `space.s12` one way, `space.s8` back past its place, `space.s4` the first way, each over `micro` on `standard`, then home over `short` on `standard_decel`, a whole device pixel at a time; the field empties, turns Invalid, its tube the error's, and its placeholder says what went wrong until the next key. With reduce motion it stays still and only the field says so.",
   tracks: [
     { part: "the field's shake", on: ON, target: ".k-lock-field", property: "--jolt", from: 0, to: 3, duration: "micro", curve: "standard" },
     { part: "the field's shake", on: ON, target: ".k-lock-field", property: "--jolt", from: 3, to: -2, duration: "micro", cue: "micro", curve: "standard" },
@@ -230,6 +230,9 @@ const SHAKE: Move = {
 
 type Shown = "rest" | "loading" | "error";
 
+/** A state of the sheet after a finger: its miss is an unknown finger, not a wrong password. */
+const byFinger = (state: Shown) => (state === "error" ? "unknown" : state);
+
 function reflow(): HTMLElement {
   return liveLock(PURPLE_HOUR, windowSize());
 }
@@ -241,13 +244,13 @@ export default page({
   summary: "The lock screen: at rest the wallpaper and a clock the city stands in front of; awake, the frame closed in and the password's sheet up. Always in the wallpaper's own night scheme.",
   live: () => liveLock(),
   description: [
-    "QML `Lock`, a template of the shell's alone: only the shell locks. Click into it and type, or press it: it wakes, and what you type lands in the field. Enter with a password shakes its head and says so; Esc, or 20 s with nothing done, puts it back to rest.",
+    "QML `Lock`, a template of the shell's alone: only the shell locks. Click into it and type, or press it: it wakes, and what you type lands in the field. Enter with a password shakes its head and says so in its placeholder; Esc, or 20 s with nothing done, puts it back to rest.",
     "At rest the lock is the wallpaper and its clock, and nothing else: no frame, no bar, no field. The digits are `type.clock_rest`, Geist Light at 384, about 280 tall, under a kicker line `space.s16` above their tops: where and which day in `clock_place` (東京・月曜日, M PLUS 1), then ` · ` and the date in `clock_date` (Geist), both 20 on a 24 line, medium. The kicker and the digits are each centred on the clock's middle, on whole device pixels with the odd one after. The digits are a light tint of the picture behind them, so they read as part of it: the hue the picture shows most strongly under them (each pixel's OKLCH hue counted by its chroma squared, so the glow of a sky or a street's signs decide it, not its haze), at that chroma times 1.2, at lightness 0.84. They are large enough to read without a contrast of their own, so nothing shades them. The kicker takes the same colour, its date at `opacity.clock_date` (0.85) of it, so where and which day lead the line. Every screen of a setup shows rest, each with its own clock.",
     "Each wallpaper says where its clock stands: the middle of the digits' baseline as shares of the picture, so the clock keeps its place against the city however a screen crops the picture, kept `space.s32` inside the screen's edges. A wallpaper with depth has its city cut out (an alpha picture, the same size as the wallpaper) and a plate, the picture with the city painted out a little past its outline. The lock draws the picture and its plate, then the clock, then the city: the picture itself through the cut-out's alpha, so the towers stand in front of the clock: on Shinjuku the skyline covers the digits' feet, on Tokyo Tower the spire crosses the last digit. The place keeps the kicker clear of the city. At rest the picture and its plate stand pushed in to `scale.push` (1.025) and the city further, to `scale.near` (1.05), round the middle of the screen's bottom edge, so the city stands off the sky, and it holds still; the clock's place moves with the picture. A picture of your own has no depth: it pushes in alone, and the clock stands in front of it.",
     "Nothing stands behind the kicker: no capsule, no band. Round each letter lies a halo of `surface`, two text shadows, a tight one blurred by `size.halo_edge` (1) at `opacity.halo_edge` (0.50) that holds the strokes' edges and a soft one blurred by `size.halo` (6) at `opacity.halo` (0.35) round the word. It follows the glyphs, so no shape shows, and it is the same on every wallpaper: the clock matching its picture matters more than the kicker's contrast. On Shinjuku's pink sky the line holds about 2.5:1 round its letters, on Tokyo Tower's blue hour 4.4 to 5.4:1, and on Shibuya the place 12:1 over a dark awning while the date crosses lit signs. The digits have no halo, with a cut-out or without.",
     "Awake, on the screen with the pointer only, the shell's frame slides in round the picture, `surface` at `opacity.frame`, `space.s8` all round: the top edge is as thin as the others, and the bar slides down over it only as the lock gives way to the desktop. The picture blurs to `size.lock_blur` (8) and dims to `scrim` at `opacity.panel_scrim`. The city blurs and dims with the picture and stays where it is, and the clock rises out from behind it and settles at `type.clock` (80), above the dim, centred, its kicker's top `space.s48` under the frame's top edge, its digits going from the picture's tint to `on_surface` as it lifts. The kicker steps down to 16 with it (`clock_place_awake` and `clock_date_awake`, on the same 24 line, medium), so it is no wider than the 80 digits, and goes to its own roles, where and which day in `primary` and the date in `on_surface_variant`, over the frame and the blurred, dimmed picture as the digits are; its halo stays, lost in the dim.",
     "The lock and the desktop are one surface. Super+L locks the session in its first frame and captures a still of the desktop then; the lock draws that still inside its own surface (the windows, and the bar's pills on the frame) and plays its locking on it: the windows go, and the bar's clock grows out of the bar into the rest clock. Unlocking plays the same way back, the clock flying into the bar's clock, and the session unlocks as it ends. A lid close or an idle suspend skips the motion and goes straight to rest.",
-    "A Sheet rises from the middle of the bottom edge, curving into the frame through concave fillets of `radius.surface`, as the wallpaper picker does, `size.panel` (384) wide with a PanelPage's padding: `space.s16` at its top and foot, the container's 16 at its sides. It holds the md `Field` for the password, its lock symbol leading in the field's icon colour and lit with the keyboard in it; `space.s4` under it, as a field's note is, the line led by the `fingerprint` symbol in `primary`, Or touch the fingerprint reader; and `space.s16` under that the key hints, ↵ Unlock and Esc Rest. No avatar, no initial, no emoji: only KubaOS Symbols.",
+    "A Sheet rises from the middle of the bottom edge, curving into the frame through concave fillets of `radius.surface`, as the wallpaper picker does, `size.panel` (384) wide with a PanelPage's padding: `space.s16` at its top and foot, the container's 16 at its sides. It holds the md `Field` for the password and nothing else, so the sheet is the field and its padding: the field's lock symbol leads it in the field's icon colour, the `fingerprint` symbol ends it in `primary`, the same size and as far in from its end as the lock is from its start, and it is lit with the keyboard in it. On a machine without a fingerprint reader the field has no trailing mark. Enter and Esc need no hints: the field is the only thing on the sheet. No avatar, no initial, no emoji: only KubaOS Symbols.",
     "The lock ignores light and dark. It always draws in the night scheme matugen derives from its wallpaper (the same `scheme-fidelity` dot-theme uses, in dark), and its derived roles from those: Shinjuku's purple hour gives a lavender primary, Tokyo Tower's blue hour a pale blue one, Shibuya's rain a teal one. So the lock is the same in either mode, and its sheet and its awake kicker keep their contrast over the night picture.",
   ],
   variants: [
@@ -271,11 +274,14 @@ export default page({
       selected: "it holds no choice.",
       empty: "an empty field is its rest state: the placeholder says Password.",
     },
-    rows: nonEmpty([{ name: "Awake on Shinjuku", cell: (state: Shown) => still({ phase: "awake", moment: state }) }]),
+    rows: nonEmpty([
+      { name: "A password", cell: (state: Shown) => still({ phase: "awake", moment: state }) },
+      { name: "A finger", cell: (state: Shown) => still({ phase: "awake", moment: byFinger(state) }) },
+    ]),
     described: {
-      rest: "Awake and waiting: the field empty and lit, its placeholder Password, the reader's line under it. The same by night and by day: the lock draws in the wallpaper's night scheme in either mode.",
-      loading: "A password or a finger being checked: the field's symbol is the hourglass and its placeholder Checking…, the reader's line stays. Nothing moves to make room.",
-      error: "A wrong password or an unknown finger: the field shakes, empties and turns Invalid, its tube the error's, and the line under it says what went wrong in `error` in place of the reader's line. The next key clears it.",
+      rest: "Awake and waiting: the field empty and lit, its placeholder Password, the reader's `fingerprint` at its end in `primary`. The same by night and by day: the lock draws in the wallpaper's night scheme in either mode.",
+      loading: "A password or a finger being checked: the field's symbol is the hourglass and its placeholder Checking…; the reader's mark stays `primary`. Nothing moves to make room.",
+      error: "A wrong password: the field shakes, empties and turns Invalid, its tube the error's, and its placeholder says what went wrong; the reader's mark stays `primary`. An unknown finger: the field is the password's, its placeholder says what went wrong, and the reader's mark turns `error`, so the miss is told where the finger went; nothing shakes, since the field wasn't wrong. The next key, or the next touch, clears either.",
     },
   },
   focus: doesntApply("the template draws no line of its own; the field lights as its page says, by the night scheme's primary, or the error's after a miss."),
@@ -284,7 +290,8 @@ export default page({
       { name: "The date", words: DATES, sample: (words: string) => still({ phase: "rest", kicker: kickerFor(words) }) },
       { name: "The date, awake", words: DATES, sample: (words: string) => still({ phase: "awake", kicker: kickerFor(words) }) },
       { name: "The time", words: TIMES, sample: (words: string) => still({ phase: "rest", time: words }) },
-      { name: "What went wrong", words: LOCK_ERROR, sample: (words: string) => still({ phase: "awake", moment: "error", error: words }) },
+      { name: "A wrong password", words: LOCK_ERROR, sample: (words: string) => still({ phase: "awake", moment: "error", error: words }) },
+      { name: "An unknown finger", words: FINGER_ERROR, sample: (words: string) => still({ phase: "awake", moment: "unknown", error: words }) },
     ],
     missingPicture: [
       { name: "No picture yet", for: "Before the wallpaper has arrived: the screen is `surface_container_lowest` and the clock stands a little above the middle, as a picture with no place of its own puts it; the picture fades in over `slow` once it has.", sample: () => still({ phase: "rest", wallpaper: { ...SHIBUYA, picture: "" } }) },
@@ -311,7 +318,7 @@ export default page({
     samples: nonEmpty([
       { name: "At rest", for: "The rest clock's size, the kicker's gap above the digits, and the kicker's halo.", sample: () => still({ phase: "rest" }) },
       { name: "At rest, without a cut-out", for: "The kicker's halo over a street of signs, and the digits with none.", sample: () => still({ phase: "rest", wallpaper: SHIBUYA }) },
-      { name: "Awake", for: "The frame, the clock at the top, and the sheet: its width, its padding and the gaps inside it.", sample: () => still({ phase: "awake" }) },
+      { name: "Awake", for: "The frame, the clock at the top, and the sheet: its width, and its padding round the field.", sample: () => still({ phase: "awake" }) },
       { name: "The desktop's still", for: "The frame with the bar's height at the top, the bar's clock the clock flies to and from, and the windows.", sample: () => still({ phase: "desktop" }) },
     ]),
     measures: [
@@ -322,7 +329,7 @@ export default page({
       { what: "The kicker awake.", token: "type-clock_date_awake-size" },
       { what: "How far the kicker's halo is blurred at its letters' edges.", token: "size-halo_edge" },
       { what: "How far the kicker's halo is blurred round the word.", token: "size-halo" },
-      { what: "Between the kicker and the digits' tops; inside the sheet at its top and foot; between the reader's line and the key hints.", token: "space-s16" },
+      { what: "Between the kicker and the digits' tops; inside the sheet at its top and foot.", token: "space-s16" },
       { what: "The least room between the rest clock and the screen's edges.", token: "space-s32" },
       { what: "The bar's band, the frame's top edge on the desktop, which slides off and back with its pills; the bar's clock is centred in it.", token: "size-bar" },
       { what: "The bar's time, which the clock lands on and leaves from.", token: "type-body-size" },
@@ -330,7 +337,7 @@ export default page({
       { what: "The awake frame's edges, all four.", token: "space-s8" },
       { what: "The sheet's width.", token: "size-panel" },
       { what: "The field.", token: "size-control_md" },
-      { what: "Between the field and the reader's line.", token: "space-s4" },
+      { what: "The field's lock and the reader's mark, each from its end.", token: "space-s12" },
       { what: "The fillets into the frame and the sheet's far corners.", token: "radius-surface" },
       { what: "How far the awake picture blurs.", token: "size-lock_blur" },
     ],

@@ -993,8 +993,8 @@
    sunken edge in `outline` at full, or `error` while invalid. Lit, hovered or with the
    keyboard in it, its fill rises to the highest container (an invalid one keeps its own) and its
    tube is drawn over the hairline. Its value is clipped to its room, `space.s12` in at each side
-   (or past the icon and `space.s8` more); with the keyboard in it, the text scrolls left to keep
-   the caret inside the room. */
+   (or past the icon and `space.s8` more, and as far before a trailing one); with the keyboard in
+   it, the text scrolls left to keep the caret inside the room. */
 .k-field {
   position: relative;
   display: block;
@@ -1009,6 +1009,7 @@
   user-select: none;
   --lit: 0;
   --start: var(--space-s12);
+  --end: var(--space-s12);
   --thin: max(1px, round(nearest, var(--stroke-thin), 1px));
   --rest-fill: var(--color-surface_container_high);
   --lit-fill: color-mix(
@@ -1031,6 +1032,10 @@
 
 .k-field[data-icon] {
   --start: calc(var(--space-s12) + var(--type-body_large-icon) + var(--space-s8));
+}
+
+.k-field[data-trailing] {
+  --end: calc(var(--space-s12) + var(--type-body_large-icon) + var(--space-s8));
 }
 
 .k-field::before {
@@ -1067,6 +1072,7 @@
   --value: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
   --placeholder: var(--value);
   --mark: var(--value);
+  --trailing-mark: var(--value);
 }
 
 /* The icon `space.s12` in, centred down the field on a whole device pixel. */
@@ -1076,10 +1082,17 @@
   top: round(nearest, calc((var(--size-control_md) - var(--type-body_large-icon)) / 2), 1px);
 }
 
+/* The trailing icon, `space.s12` in from the far side, in its own role (`--trailing`) unless the
+   field is disabled. */
+.k-field-trailing {
+  left: auto;
+  right: var(--space-s12);
+}
+
 .k-field-clip {
   position: absolute;
   left: var(--start);
-  right: var(--space-s12);
+  right: var(--end);
   top: calc((var(--size-control_md) - var(--type-body_large-line)) / 2);
   height: var(--type-body_large-line);
   overflow: hidden;
@@ -1142,7 +1155,7 @@
     nearest,
     calc(
       var(--start) +
-        min(var(--caret-at) * var(--px), 100% - var(--start) - var(--space-s12) - var(--caret-reach)) -
+        min(var(--caret-at) * var(--px), 100% - var(--start) - var(--end) - var(--caret-reach)) -
         var(--thin) / 2
     ),
     1px
