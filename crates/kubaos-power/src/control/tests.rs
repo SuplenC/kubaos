@@ -473,3 +473,35 @@ fn a_device_that_never_goes_quiet_is_checked_after_5_seconds_at_most() {
 
     assert_eq!(checked, [50, 100]);
 }
+
+#[test]
+fn no_check_comes_while_the_machine_sleeps_and_one_comes_a_second_after_it_wakes() {
+    let start = Instant::now();
+    let mut recheck = Recheck::default();
+    recheck.ask(start);
+
+    recheck.sleep();
+    recheck.ask(start + Duration::from_millis(500));
+
+    assert!(recheck.asleep());
+    assert!(!recheck.due(start + Duration::from_mins(1)));
+    assert_eq!(recheck.wait(start + Duration::from_mins(1)), None);
+
+    let woke = start + Duration::from_hours(1);
+    recheck.wake(woke);
+
+    assert!(!recheck.asleep());
+    assert!(!recheck.due(woke + Duration::from_millis(500)));
+    assert!(recheck.due(woke + RECHECK));
+    assert!(!recheck.due(woke + Duration::from_secs(5)));
+}
+
+#[test]
+fn a_wake_without_a_sleep_heard_still_checks_the_stops_writes() {
+    let start = Instant::now();
+    let mut recheck = Recheck::default();
+
+    recheck.wake(start);
+
+    assert!(recheck.due(start + RECHECK));
+}
