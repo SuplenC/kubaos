@@ -2,10 +2,11 @@
 // `dialog::scrim`, `KubaOS.Components`' `Dialog` and `Scrim` (`docs/design/components/dialog.md`).
 //
 // The dialog is `size.dialog` wide, `space.s24` inside on every side, at the content radius, raised
-// to the ladder's step 3 (`lib/elevation.ts`). A 24 symbol (`heading`'s) beside a `heading` title,
-// the `body` `space.s12` under the title and in line with it, what it lists or asks for (a labelled
-// field) `space.s16` under the body, in line with it too, and its button bar (`lib/button-bar.ts`)
-// `space.s24` under the last, across its whole width. A Danger dialog shows the warning sign in
+// to the ladder's step 3 (`lib/elevation.ts`). Everything in it starts on that one content edge: a
+// 24 symbol (`heading`'s) beside a `heading` title on one row, the `body` `space.s12` under them,
+// what it lists or asks for (a labelled field) `space.s16` under the body, each across the whole
+// width, and its button bar (`lib/button-bar.ts`) `space.s24` under the last, Cancel's label on
+// the edge and the last button's box on the right one. A Danger dialog shows the warning sign in
 // `error` with an edge of `error`, and its action is a Danger button.
 //
 // It is never shorter than `aspect.dialog` of its width: a dialog that asks little gains the room

@@ -2646,8 +2646,8 @@
   flex: 0 1 auto;
 }
 
-/* The body and what follows it, in line with the title, scrolling with no bar of its own. It
-   reaches out to the dialog's edges and holds the whole `space.s24` above the buttons under its
+/* The body and what follows it, on the dialog's content edge under the symbol and the title,
+   scrolling with no bar of its own. It reaches out to the dialog's edges and holds the whole `space.s24` above the buttons under its
    end (`--foot`), so a lit field's glow inside it is never cut and never reads as more to scroll.
    While more is below, it shows only down to its rule, `--foot` above its end. Tab scrolls what
    it lands on `space.s12` clear of the edges it shows. */
@@ -2655,7 +2655,7 @@
   flex: 0 1 auto;
   min-height: 0;
   margin-inline: calc(-1 * var(--space-s24));
-  padding: 0 var(--space-s24) var(--foot) calc(var(--space-s24) + var(--type-heading-icon) + var(--space-s12));
+  padding: 0 var(--space-s24) var(--foot);
   overflow-y: auto;
   scrollbar-width: none;
   scroll-padding-block: var(--space-s12) calc(var(--foot) + var(--space-s12));
@@ -2715,10 +2715,33 @@
   align-self: stretch;
 }
 
-/* Stacked, the one Enter presses on top and the dismiss button at the bottom, each full width. */
+/* A row of buttons that ends a surface (`hangs` in `lib/button-bar.ts`): a Text button at its start
+   or end hangs its own padding outside it, so its label, or its leading symbol, is on the content's
+   edge, and its tube and press fill reach into the surface's padding. A surface whose padding has
+   no room for it sets `--hang` to 0, and the button's box stays on the edge. */
+[data-hangs] > .k-button[data-kind="Text"]:not([data-icon-only]):first-child {
+  margin-inline-start: calc(-1 * var(--hang, 1) * var(--padding));
+}
+
+[data-hangs] > .k-button[data-kind="Text"]:not([data-icon-only]):last-child {
+  margin-inline-end: calc(-1 * var(--hang, 1) * var(--padding));
+}
+
+/* A card's `space.s16` would leave a hung button 4 from its edge, and a banner's padding is its
+   rail's lane, which the button would meet. */
+:is(.k-card, .k-status) {
+  --hang: 0;
+}
+
+/* Stacked, the one Enter presses on top and the dismiss button at the bottom, each full width:
+   nothing hangs. */
 .k-button-bar[data-stacked] > .k-row {
   flex-direction: column-reverse;
   align-items: stretch;
+}
+
+.k-button-bar[data-stacked] > .k-row > .k-button {
+  margin-inline: 0;
 }
 
 .k-button-bar[data-stacked] > .k-row > .k-fill {
