@@ -29,6 +29,8 @@ export interface Item {
   readonly fluid?: boolean;
   /** What it stands in on a stage: a state's cell in its mode's painted box. */
   readonly frame?: (sample: Element) => Element;
+  /** What reads it, after its words: the measures' parts tree and spec list. */
+  readonly aside?: Element;
 }
 
 /** Samples shown together under a sub-heading. */
@@ -117,12 +119,20 @@ export function cards(items: readonly Item[], widest: number): HTMLElement {
         "div",
         "page-card",
         sampleBox(el("div", "page-card-sample", item.sample)),
-        el("div", "page-card-words", label(item.name, "label", "on_surface"), ...(item.words ? [prose(item.words, "body", "on_surface_variant")] : [])),
+        el("div", "page-card-words", label(item.name, "label", "on_surface"), ...(item.words ? [prose(item.words, "body", "on_surface_variant")] : []), ...(item.aside ? [item.aside] : [])),
       ),
     ),
   );
   grid.style.setProperty("--widest", `${Math.ceil(widest)}px`);
   return grid;
+}
+
+/**
+ * Small samples one under another, each beside its words as on a stage, or under them where it
+ * leaves no room: the measures', whose words hold each one's parts tree.
+ */
+export function besideWords(items: readonly Item[]): HTMLElement {
+  return el("div", "page-stage", ...items.map(shown));
 }
 
 /**
@@ -134,7 +144,7 @@ function shown(item: Item): HTMLElement {
     "div",
     "page-stage-item",
     sampleBox(el("div", "page-view", item.frame ? item.frame(item.sample) : item.sample)),
-    el("div", "page-stage-words", label(item.name, "body_strong", "on_surface"), ...(item.words ? [prose(item.words)] : [])),
+    el("div", "page-stage-words", label(item.name, "body_strong", "on_surface"), ...(item.words ? [prose(item.words)] : []), ...(item.aside ? [item.aside] : [])),
   );
   body.toggleAttribute("data-fluid", item.fluid ?? false);
   return body;

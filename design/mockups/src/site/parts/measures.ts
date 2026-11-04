@@ -1,174 +1,139 @@
-// The measures overlay: every probed box of a sample outlined and its size written in logical
-// pixels, a component's padding and a layout's gaps shaded and labelled with the tokens they come
-// from; beside it the measures by their tokens, then the reflow in a window of the toolbar's size.
+// A page's measures: its samples, each clean at rest with its parts tree and spec list beside it;
+// the measures by their tokens; then the reflow in a window of the toolbar's size. There are two
+// ways in, and the section draws one thing at a time across its samples: pointing at a part (in a
+// sample or its tree) inspects it, pointing at a token's row lights every place it is used. One
+// replaces the other. A click pins either; clicking it again or Esc lets it go.
+//
+// Pinning a part by clicking it in its sample is clicking into the sample, so the sample takes the
+// wheel as any clicked sample does (`site/scroll.ts`) and its lists scroll under the pinned part;
+// letting the pin go by a click lets the wheel go with it, and Esc lets both go.
 
 import { length, raw } from "../../lib/tokens.ts";
-import { settings, windowSize } from "../settings.ts";
+import { windowSize } from "../settings.ts";
 import type { Measures } from "../page.ts";
 import { el, prose } from "../dom.ts";
 import { applies } from "../page.ts";
+import { releaseWheel } from "../scroll.ts";
+import { inspector, type Inspector, type Lit, litWords, tokenName } from "./inspector.ts";
 import { subheading } from "./section.ts";
-import type { Group } from "./shelf.ts";
+import { besideWords, type Group } from "./shelf.ts";
 
-const overlays = new Set<() => boolean>();
+/** Each measures section's drawing, again: after a change of scale or of the window. */
+const sections = new Set<() => void>();
 
-/**
- * Lays every overlay on the page out again: after a change of scale, or of the window. Whether one
- * took another line of names above its sample, so the page's mocks are centred again.
- */
-export function redrawOverlays(): boolean {
-  let moved = false;
-  for (const draw of overlays) moved = draw() || moved;
-  return moved;
+/** Draws every measures section's layer again, as the page was laid out anew. */
+export function redrawOverlays(): void {
+  for (const draw of sections) draw();
 }
 
-function role(element: Element): string {
-  const probe = JSON.parse((element as HTMLElement).dataset.probe ?? "{}") as { role?: string };
-  return probe.role ?? "box";
-}
+/** Every section's pin, let go on Esc. */
+const unpins = new Set<() => void>();
 
-/** The token a custom property names, `var(--space-s24)` read as `space.s24`, or "". */
-function tokenOf(element: Element, property: string): string {
-  const value = (element as HTMLElement).style.getPropertyValue(property);
-  const name = /var\(--([a-z0-9_]+)-([a-z0-9_-]+)\)/.exec(value);
-  return name ? `${name[1]}.${name[2]!.replaceAll("-", ".")}` : "";
-}
+addEventListener("keydown", (event) => {
+  if (event.key === "Escape") for (const unpin of unpins) unpin();
+});
 
-/** `sample` with its boxes outlined over it, in a box the overlay is laid out in. */
-function overlaid(sample: Element): HTMLElement {
-  const marks = el("div", "page-overlay");
-  const holder = el("div", "page-measured", sample, marks);
-  const draw = (): boolean => {
-    marks.replaceChildren();
-    if (!holder.isConnected) {
-      overlays.delete(draw);
-      return false;
-    }
-    const origin = holder.getBoundingClientRect();
-    const zoom = holder.offsetWidth / origin.width || 1;
-    const scale = settings().scale;
-    const place = (mark: HTMLElement, left: number, top: number, width: number, height: number) => {
-      mark.style.left = `${(left - origin.left) * zoom}px`;
-      mark.style.top = `${(top - origin.top) * zoom}px`;
-      mark.style.width = `${width * zoom}px`;
-      mark.style.height = `${height * zoom}px`;
-      marks.append(mark);
-    };
-    const names: HTMLElement[] = [];
-    const band = (left: number, top: number, width: number, height: number, token: string, kind: string) => {
-      const name = el("span", "page-band-name", token);
-      const shade = el("div", "page-band", name);
-      shade.dataset.kind = kind;
-      place(shade, left, top, width, height);
-      names.push(name);
-    };
-    for (const element of holder.querySelectorAll("[data-probe]")) {
-      const box = shown(element, holder);
-      if (!box) continue;
-      const mark = el("div", "page-mark");
-      mark.dataset.role = role(element);
-      place(mark, box.left, box.top, box.width, box.height);
-      if (mark.dataset.role === "component") {
-        const height = tokenOf(element, "--height");
-        // Its size is its whole box's, however much of it a scroll shows.
-        const whole = element.getBoundingClientRect();
-        const size = `${round((whole.width * zoom) / scale)} × ${round((whole.height * zoom) / scale)}${height ? ` · ${height}` : ""}`;
-        mark.append(el("span", "page-mark-size", size));
-        const content = element.querySelector<HTMLElement>(":scope > [data-layout]");
-        const padding = tokenOf(element, "--padding");
-        if (content && padding) {
-          const inner = content.getBoundingClientRect();
-          band(box.left, box.top, inner.left - box.left, box.height, padding, "padding-start");
-          band(inner.right, box.top, box.right - inner.right, box.height, padding, "padding-end");
-        }
-      }
-      if (mark.dataset.role === "layout") {
-        const gap = tokenOf(element, "--gap");
-        // A row's gaps span the component it is in, so their names line up with its padding's.
-        const owner = element.parentElement?.closest<HTMLElement>("[data-probe]");
-        const span = owner && role(owner) === "component" ? (shown(owner, holder) ?? box) : box;
-        const kids = [...element.children].map((kid) => shown(kid, holder));
-        for (let i = 1; gap && i < kids.length; i++) {
-          const before = kids[i - 1];
-          const after = kids[i];
-          if (!before || !after) continue;
-          if (element.classList.contains("k-row")) band(before.right, span.top, after.left - before.right, span.height, gap, "gap");
-          else band(box.left, before.bottom, box.width, after.top - before.bottom, gap, "gap");
-        }
-      }
-    }
-    // A line of names and the gap above it, in the viewport's pixels.
-    const rise = ((length("type-mono-line") + length("space-s4")) * scale) / zoom;
-    // And the room kept between two names on a line, so they read as two.
-    const apart = (length("space-s8") * scale) / zoom;
-    return stack(holder, names, rise, apart);
-  };
-  overlays.add(draw);
-  return holder;
-}
-
-/**
- * Lifts each of `names` a line at a time until it comes no nearer than `apart` to a name before
- * it, paddings first and then gaps, so two names never meet however narrow the box; and gives
- * `holder` room for the lines used. Whether that room changed.
- */
-function stack(holder: HTMLElement, names: readonly HTMLElement[], rise: number, apart: number): boolean {
-  const placed: DOMRect[] = [];
-  let lines = 1;
-  // Every box read before any line is written: one layout, not one a name.
-  const boxes = names.map((name) => name.getBoundingClientRect());
-  for (const [i, name] of names.entries()) {
-    const box = boxes[i]!;
-    let line = 0;
-    const at = (n: number) => new DOMRect(box.left, box.top - n * rise, box.width, box.height);
-    const meets = (a: DOMRect) => placed.some((b) => a.left < b.right + apart && b.left < a.right + apart && a.top < b.bottom && b.top < a.bottom);
-    while (meets(at(line))) line++;
-    name.style.setProperty("--line", String(line));
-    placed.push(at(line));
-    lines = Math.max(lines, line + 1);
-  }
-  const before = holder.style.getPropertyValue("--lines");
-  holder.style.setProperty("--lines", String(lines));
-  return before !== String(lines);
-}
-
-/**
- * The part of `element`'s box its scrolling or clipping boxes inside `holder` let show, or null where
- * none of it does: a list's rows scrolled out of its well are measured where they are seen.
- */
-function shown(element: Element, holder: HTMLElement): DOMRect | null {
-  const box = element.getBoundingClientRect();
-  let { left, top, right, bottom } = box;
-  for (let at = element.parentElement; at && at !== holder; at = at.parentElement) {
-    if (getComputedStyle(at).overflow === "visible") continue;
-    const clip = at.getBoundingClientRect();
-    left = Math.max(left, clip.left);
-    top = Math.max(top, clip.top);
-    right = Math.min(right, clip.right);
-    bottom = Math.min(bottom, clip.bottom);
-  }
-  if (right - left < 1 || bottom - top < 1) return null;
-  return new DOMRect(left, top, right - left, bottom - top);
-}
+const AT_REST = "Point at a token to light every place the samples above use it; click to pin it.";
 
 function round(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
 
-/** The measures' parts: the samples outlined, every measure by its token, then the reflow. */
+/** The measures' parts: the samples with their trees, every measure by its token, then the reflow. */
 export function measures(spec: Measures): (Group | Element)[] {
+  const tokens = spec.measures.map((measure) => measure.token.replace(/^--/, ""));
+  let hovered: Lit | null = null;
+  let pinned: Lit | null = null;
+  const same = (a: Lit | null, b: Lit | null) =>
+    a !== null && b !== null && ("part" in a ? "part" in b && a.part === b.part : "token" in b && a.token === b.token);
+
+  const inspectors: Inspector[] = [];
+  const rows = new Map<string, { term: HTMLElement; words: HTMLElement }>();
+  const status = el("p", "page-token-status", AT_REST);
+
+  const draw = () => {
+    const lit = pinned ?? hovered;
+    let places = 0;
+    for (const each of inspectors) {
+      if (!each.holder.isConnected) continue;
+      places += each.draw(lit, lit !== null && lit === pinned);
+    }
+    const token = lit && "token" in lit ? lit.token : null;
+    for (const [each, row] of rows) {
+      for (const part of [row.term, row.words]) {
+        part.toggleAttribute("data-lit", each === token);
+        part.toggleAttribute("data-pinned", each === token && lit === pinned);
+      }
+    }
+    // The count is a line of its own over the table, so lighting a row never moves the table.
+    const unseen = token && places === 0 ? inspectors.filter((each) => each.uses(token)).map((each) => each.name) : [];
+    status.textContent = token ? litWords(token, places, unseen) : AT_REST;
+    status.toggleAttribute("data-lit", token !== null);
+  };
+  const point = (lit: Lit | null) => {
+    if (same(lit, hovered) || (lit === null && hovered === null)) return;
+    hovered = lit;
+    if (!pinned) draw();
+  };
+  const click = (lit: Lit) => {
+    if (same(lit, pinned)) {
+      pinned = null;
+      hovered = lit;
+      if ("part" in lit) releaseWheel();
+    } else pinned = lit;
+    draw();
+  };
+  const unpin = () => {
+    if (!pinned) return;
+    pinned = null;
+    draw();
+  };
+
+  const hands = {
+    tokens,
+    point: (part: Element | null, from: Inspector) => {
+      if (part) point({ part, in: from });
+      else if (hovered && "part" in hovered && hovered.in === from) point(null);
+    },
+    click: (part: Element, from: Inspector) => click({ part, in: from }),
+  };
   const samples: Group = {
     title: "",
-    items: spec.samples.map((sample) => ({ name: sample.name, words: sample.for, sample: overlaid(sample.sample()) })),
+    small: besideWords,
+    items: spec.samples.map((sample) => {
+      const each = inspector(sample.name, sample.sample(), hands);
+      inspectors.push(each);
+      return { name: sample.name, words: sample.for, sample: each.holder, aside: each.aside };
+    }),
   };
-  const table = el("dl", "page-list");
-  for (const measure of spec.measures) {
-    const token = measure.token.replace(/^--/, "");
-    const name = token.replaceAll("-", ".");
+
+  const table = el("dl", "page-list page-tokens");
+  for (const [i, measure] of spec.measures.entries()) {
+    const token = tokens[i]!;
     // An aspect ratio is two numbers, not a length: shown as written.
     const value = token.startsWith("aspect-") ? raw(token) : round(length(token));
-    table.append(el("dt", "", el("code", "page-code", `${name} = ${value}`)), el("dd", "", prose(measure.what)));
+    const term = el("dt", "", el("code", "page-code", `${tokenName(token)} = ${value}`));
+    const words = el("dd", "", prose(measure.what));
+    rows.set(token, { term, words });
+    for (const part of [term, words]) {
+      part.addEventListener("pointerenter", () => point({ token }));
+      part.addEventListener("pointerleave", () => point(null));
+      part.addEventListener("click", () => click({ token }));
+    }
+    table.append(term, words);
   }
+
+  const redraw = () => {
+    if (!inspectors.some((each) => each.holder.isConnected)) {
+      sections.delete(redraw);
+      unpins.delete(unpin);
+      return;
+    }
+    draw();
+  };
+  sections.add(redraw);
+  unpins.add(unpin);
+
   const size = windowSize();
   const reflow: Group = {
     title: "Reflow",
@@ -176,7 +141,7 @@ export function measures(spec: Measures): (Group | Element)[] {
       ? [{ name: `In a window of the toolbar's size, ${size.name}`, words: spec.reflow.described, sample: windowed(spec.reflow.sample()) }]
       : spec.reflow,
   };
-  return [samples, subheading("By token"), table, reflow];
+  return [samples, subheading("By token"), status, table, reflow];
 }
 
 /** `sample` in a window of the toolbar's size. */
