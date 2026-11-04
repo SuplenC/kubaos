@@ -20,6 +20,7 @@
 //! - The home-manager switch: `switch.rs`. Writing the records at install: `engine/install.rs`.
 //! - Rendering the events on a terminal: `kubaos-cli`'s `update/render.rs`.
 
+pub mod bitwarden;
 pub mod event;
 pub mod firmware;
 pub mod git;
@@ -27,8 +28,10 @@ pub mod hyprland;
 mod journal;
 pub mod machine;
 pub mod migrations;
+pub mod nix;
 pub mod notice;
 pub mod policy;
+pub mod programs;
 pub mod record;
 pub mod security;
 pub mod version;

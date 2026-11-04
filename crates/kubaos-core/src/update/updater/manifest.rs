@@ -172,6 +172,7 @@ impl<M: Machine> Updater<'_, M> {
             apt,
             inputs: Vec::new(),
             migrations: Vec::new(),
+            programs: Vec::new(),
             reloaded: Vec::new(),
             firmware: Firmware::default(),
             restart: Restart::None,

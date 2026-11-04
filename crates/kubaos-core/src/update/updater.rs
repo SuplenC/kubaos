@@ -6,9 +6,11 @@
 //! snapshot, the user's `flake.lock` saved and the update recorded in the history; apt; moving
 //! `release`; the Hyprland pin, the package manifest and the system migrations; `nix flake update`
 //! of the user flake; relinking what `system/` took from KubaOS's nixpkgs; the switch; the
-//! Bitwarden check; the user migrations; firmware through fwupd; and the new release record.
-//! Packages first, then migrations, which are written against the new packages. Firmware comes
-//! last: it never stops an update, and the question it may ask comes once the rest is done.
+//! Bitwarden check; Bitwarden desktop and the Nix daemon moved on within their series, each a
+//! phase whose failure is only a warning; the user migrations; firmware through fwupd; and the
+//! new release record. Packages first, then migrations, which are written against the new
+//! packages. Firmware comes last: it never stops an update, and the question it may ask comes
+//! once the rest is done.
 //!
 //! Each stage is a [`Phase`] of the progress stream (`event.rs`). Programs run with their output
 //! captured: every line goes to the run's log and to the stream, never to the terminal directly.
@@ -23,6 +25,8 @@
 //! - Running programs and the switch: `machine.rs` and `switch.rs`.
 //! - The package manifest's phase, its status and `kubaos packages enable|disable`:
 //!   `updater/manifest.rs`. The firmware phase: `updater/firmware.rs`.
+//! - The Bitwarden and Nix phases: `updater/bitwarden.rs`, `updater/nix.rs`, and what they share,
+//!   `updater/program.rs`.
 //! - The events and the log: `event.rs` and `journal.rs`.
 
 use std::collections::BTreeSet;
@@ -478,6 +482,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             apt: Vec::new(),
             inputs: Vec::new(),
             migrations: Vec::new(),
+            programs: Vec::new(),
             reloaded: self.j.reloaded.clone(),
             firmware: Firmware::default(),
             restart: Restart::None,
@@ -956,6 +961,10 @@ impl<'a, M: Machine> Updater<'a, M> {
             u.report_reloaded();
             Ok(())
         })?;
+        let programs: Vec<_> = [self.update_bitwarden(), self.update_nix()]
+            .into_iter()
+            .flatten()
+            .collect();
         if !opts.packages_only {
             migrations.extend(self.run_user_migrations()?);
         }
@@ -989,6 +998,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             apt,
             inputs: self.j.inputs.clone(),
             migrations,
+            programs,
             reloaded: self.j.reloaded.clone(),
             firmware,
             restart,
@@ -1330,7 +1340,8 @@ impl<'a, M: Machine> Updater<'a, M> {
         ))
     }
 
-    /// Reports newer Bitwarden releases, which are pinned downloads, not apt packages.
+    /// Reports newer releases of the bw CLI, a pinned download, not an apt package. Bitwarden
+    /// desktop has a phase of its own, so the script's line about it is left out.
     fn check_bitwarden(&mut self) {
         let script = self.sys.checkout().join("system/70-bitwarden.sh");
         if !script.is_file() {
@@ -1455,10 +1466,13 @@ fn count(n: usize, what: &str) -> String {
     }
 }
 
-/// A release `system/70-bitwarden.sh --check-updates` reports, from its `!!` lines: "bw CLI
-/// 2025.2.0 is out (pinned: 2025.1.0)".
+/// A release of the bw CLI `system/70-bitwarden.sh --check-updates` reports, from its `!!` lines:
+/// "bw CLI 2025.2.0 is out (pinned: 2025.1.0)".
 fn bitwarden_news(line: &str) -> Option<String> {
     let text = line.trim().strip_prefix("!!")?.trim();
+    if text.starts_with("Bitwarden desktop") {
+        return None;
+    }
     let text = text.split(". New pins").next().unwrap_or(text);
     Some(format!("Bitwarden: {text}"))
 }
@@ -1486,8 +1500,11 @@ fn write_user(path: &Path, text: &str) -> Result<(), UpdateError> {
     write_atomic(path, text).map_err(UpdateError::io(path))
 }
 
+mod bitwarden;
 mod firmware;
 mod manifest;
+mod nix;
+mod program;
 
 #[cfg(test)]
 mod tests;

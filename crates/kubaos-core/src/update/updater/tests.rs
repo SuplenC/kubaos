@@ -64,6 +64,9 @@ struct Fake {
     answers: Vec<(&'static str, i32, &'static str)>,
     /// A question starting with this is answered no, whatever `answer` says.
     no_to: Option<&'static str>,
+    /// Answers to the commands whose line contains the text, before `canned`: each answer once,
+    /// the last one again and again.
+    sequences: Vec<(&'static str, Vec<String>)>,
 }
 
 /// A machine's packages, for the package manifest's tests.
@@ -192,6 +195,23 @@ impl Fake {
             leave_fails: false,
             answers: Vec::new(),
             no_to: None,
+            sequences: Vec::new(),
+        }
+    }
+
+    /// Answers the commands whose line contains `needle` with `stdout`, in turn.
+    fn answering(mut self, needle: &'static str, stdout: &[&str]) -> Self {
+        self.sequences
+            .push((needle, stdout.iter().map(|&out| out.to_owned()).collect()));
+        self
+    }
+
+    fn answer_of(&mut self, line: &str) -> Option<String> {
+        let (_, outs) = self.sequences.iter_mut().find(|(needle, _)| line.contains(needle))?;
+        if outs.len() > 1 {
+            Some(outs.remove(0))
+        } else {
+            outs.first().cloned()
         }
     }
 
@@ -260,6 +280,9 @@ impl Fake {
             stdout,
             stderr: String::new(),
         };
+        if let Some(out) = self.answer_of(&cmd.display()) {
+            return Ok(canned(out));
+        }
         if let Some(out) = self.dpkg.as_mut().and_then(|d| d.answer(cmd)) {
             return Ok(canned(out));
         }
@@ -1281,3 +1304,4 @@ fn an_update_without_a_live_preview_has_no_such_phase() {
 
 mod firmware;
 mod manifest;
+mod programs;

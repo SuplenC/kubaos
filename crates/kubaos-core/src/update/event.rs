@@ -91,6 +91,10 @@ pub enum Phase {
     Inputs,
     /// The relink and the home-manager switch, and the running session following it.
     Home,
+    /// Bitwarden desktop moved to the newest release of its series, from GitHub.
+    Bitwarden,
+    /// The Nix daemon moved to the newest patch release of its minor, and restarted.
+    Nix,
     /// The release's new user migrations.
     UserMigrations,
     /// Firmware through fwupd: the updates that need no reboot, and those that do staged on a yes.
@@ -114,6 +118,8 @@ impl Phase {
             Self::SystemMigrations => "System migrations",
             Self::Inputs => "Nix inputs",
             Self::Home => "Home",
+            Self::Bitwarden => "Bitwarden",
+            Self::Nix => "Nix",
             Self::UserMigrations => "Your migrations",
             Self::Firmware => "Firmware",
         }
@@ -205,6 +211,52 @@ pub struct GroupChange {
     pub removed: Vec<String>,
 }
 
+/// A program an update keeps current outside apt and the user flake, in a phase of its own that
+/// the user can turn off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Program {
+    /// Bitwarden desktop, within its series: `2026.10.1` to `2026.12.0`, never to `2027.1.0`.
+    Bitwarden,
+    /// The Nix daemon, within its minor: `2.35.3` to `2.35.4`, never to `2.36.0`.
+    Nix,
+}
+
+impl Program {
+    /// The program's name, as people read it.
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::Bitwarden => "Bitwarden",
+            Self::Nix => "Nix",
+        }
+    }
+}
+
+/// What an update did to one [`Program`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgramChange {
+    pub program: Program,
+    #[serde(flatten)]
+    pub result: ProgramResult,
+    /// A newer release outside the installed series, which only a KubaOS update brings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiting: Option<String>,
+}
+
+/// How a [`Program`]'s phase ended, under `result` in the JSON.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "result", rename_all = "snake_case")]
+pub enum ProgramResult {
+    /// It moved from one version to another.
+    Updated { from: String, to: String },
+    /// It is at the newest release of its series.
+    Current { version: String },
+    /// The user turned its updates off.
+    Off,
+    /// The phase failed; the update went on. `error` is what the warning said.
+    Failed { error: String },
+}
+
 /// What a finished update, upgrade, rollback or `kubaos packages enable|disable` did.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Summary {
@@ -223,6 +275,9 @@ pub struct Summary {
     pub inputs: Vec<String>,
     /// The migrations that ran, system ones first.
     pub migrations: Vec<String>,
+    /// What the phases of the programs outside apt and the user flake did, in the order they ran.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub programs: Vec<ProgramChange>,
     /// What the running session reloaded or restarted after the switch (`scripts/dot-session`).
     pub reloaded: Vec<String>,
     /// What the firmware phase applied, staged, left waiting and failed at.

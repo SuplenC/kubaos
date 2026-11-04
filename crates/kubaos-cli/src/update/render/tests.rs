@@ -183,6 +183,7 @@ fn edge_update() -> Vec<UpdateEvent> {
             ],
             hyprland_pin: false,
             migrations: vec!["1792765570-backlight-rule.sh".into()],
+            programs: Vec::new(),
         }),
         UpdateEvent::Prompt {
             prompt: Prompt::Confirm {
