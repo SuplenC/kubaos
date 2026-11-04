@@ -16,7 +16,7 @@ import towerPlate from "../../assets/lock/tokyo-tower-blue-hour-plate.webp?url";
 import tower from "../../assets/lock/tokyo-tower-blue-hour.jpg?url";
 import type { Words } from "../../lib/content.ts";
 import { setValue } from "../../lib/field.ts";
-import { KICKER, type Kicker, type Lock, lock, lockField, lockLine, type Moment, type Phase, TIME, type Wallpaper } from "../../lib/lock.ts";
+import { KICKER, type Kicker, type Lock, lock, lockField, type Moment, type Phase, TIME, type Wallpaper } from "../../lib/lock.ts";
 import { stack } from "../../lib/layout.ts";
 import { nested, role } from "../../lib/radius.ts";
 import { text } from "../../lib/text.ts";
@@ -59,10 +59,11 @@ export const SHIBUYA: Wallpaper = {
 
 export const WALLPAPERS: readonly Wallpaper[] = [PURPLE_HOUR, TOWER, SHIBUYA];
 
-export const LOCK_ERROR: Words = {
-  short: "Wrong password. Fat fingers? Try again.",
-  long: "Fingerprint not recognised. Wrong finger? Try again or type your password",
-};
+/** What the field's placeholder says after a wrong password, short and long. */
+export const LOCK_ERROR: Words = { short: "Wrong password", long: "Wrong password, try again" };
+
+/** What it says after a finger the reader doesn't know, short and long. */
+export const FINGER_ERROR: Words = { short: "Finger not recognised", long: "Finger not recognised, try again" };
 
 /** The date in the kicker, at its shortest and its longest in English. */
 export const DATES: Words = { short: "Monday, 2 November", long: "Wednesday, 30 September" };
@@ -86,6 +87,7 @@ export interface Drawn {
   readonly twelveHour?: boolean;
   readonly kicker?: Kicker;
   readonly error?: string;
+  readonly reader?: boolean;
   readonly size?: { readonly width: string; readonly height: string };
 }
 
@@ -122,7 +124,8 @@ function lockOf(drawn: Drawn, live = false): Lock {
     time: drawn.time ?? TIME,
     twelveHour: drawn.twelveHour ?? false,
     kicker: drawn.kicker ?? KICKER,
-    error: drawn.error ?? LOCK_ERROR.short,
+    error: drawn.error ?? (drawn.moment === "unknown" ? FINGER_ERROR.short : LOCK_ERROR.short),
+    reader: drawn.reader ?? true,
     live,
     bar: barButtons(),
     windows: windows(),
@@ -159,8 +162,8 @@ function shakeFrames(): Keyframe[] {
 
 /**
  * The lock, live: a key, a press or the reader wakes it, a printable key landing in the field;
- * Enter with a password shakes the field and says so; Esc, or `lock_idle` with nothing done, puts
- * it back to rest.
+ * Enter with a password shakes the field and says so in its placeholder, until the next key; Esc,
+ * or `lock_idle` with nothing done, puts it back to rest.
  */
 export function liveLock(wallpaper: Wallpaper = PURPLE_HOUR, size = SCREEN): HTMLElement {
   const made = lockOf({ wallpaper, size }, true);
@@ -171,12 +174,12 @@ export function liveLock(wallpaper: Wallpaper = PURPLE_HOUR, size = SCREEN): HTM
   const current = () => room.querySelector<HTMLElement>(".k-field")!;
   const typed = () => room.querySelector(".k-field-room")?.textContent ?? "";
   const awake = () => element.dataset.phase === "awake";
-  const lineOf = () => room.nextElementSibling?.nextElementSibling as HTMLElement | undefined;
+  let missed = false;
 
   const fresh = (moment: Moment) => {
-    const next = lockField(moment, true);
+    const next = lockField(moment, true, LOCK_ERROR.short);
     room.replaceChildren(next);
-    lineOf()?.replaceWith(lockLine(moment, LOCK_ERROR.short));
+    missed = moment === "error";
     return next;
   };
   const keepAwake = () => {
@@ -202,6 +205,23 @@ export function liveLock(wallpaper: Wallpaper = PURPLE_HOUR, size = SCREEN): HTM
     element.focus({ preventScroll: true });
   }
 
+  // After a miss, the next key that types or deletes turns the field back from Invalid, that key
+  // its first, before the field takes it.
+  element.addEventListener(
+    "keydown",
+    (event) => {
+      if (!missed || !awake() || event.ctrlKey || event.metaKey || event.altKey) return;
+      const types = event.key.length === 1;
+      if (!types && event.key !== "Backspace" && event.key !== "Delete") return;
+      event.preventDefault();
+      event.stopPropagation();
+      keepAwake();
+      const next = fresh("rest");
+      if (types) setValue(next, event.key);
+      requestAnimationFrame(() => next.focus({ focusVisible: true, preventScroll: true } as FocusOptions));
+    },
+    true,
+  );
   element.addEventListener("keydown", (event) => {
     if (!awake()) {
       if (event.key === "Tab" || event.key === "Escape" || event.ctrlKey || event.metaKey || event.altKey) return;

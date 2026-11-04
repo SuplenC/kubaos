@@ -6,7 +6,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `field::field(value, placeholder)`; QML `Field`.
 
-One line of text, 40 tall (`control_md`), the control radius (12), filling the room it is given: `surface_container_high` with its sunken edge, a hairline of `outline` inside its edge, at full so its boundary holds 3:1 against what is round it ([DESIGN.md, "Space and shape"](../../DESIGN.md#space-and-shape)). `body_large` text in `on_surface`, 12 in from each side and centred down the field. An optional 20 icon (`body_large`'s) leads it 12 in, in `on_surface_variant`, the text starting 8 past it, at 40. A placeholder (`on_surface_variant` at `opacity.placeholder_text`) is a hint, never a value that looks typed. Passwords show one bullet per character.
+One line of text, 40 tall (`control_md`), the control radius (12), filling the room it is given: `surface_container_high` with its sunken edge, a hairline of `outline` inside its edge, at full so its boundary holds 3:1 against what is round it ([DESIGN.md, "Space and shape"](../../DESIGN.md#space-and-shape)). `body_large` text in `on_surface`, 12 in from each side and centred down the field. An optional 20 icon (`body_large`'s) leads it 12 in, in `on_surface_variant`, the text starting 8 past it, at 40. An optional trailing icon mirrors it: 20, 12 in from the far end, the text's room ending 8 before it, in a role the field is given (the lock's fingerprint reader is `primary`, `error` once a finger is unknown); it is a mark, not a button, and disabled it greys with the rest. A placeholder (`on_surface_variant` at `opacity.placeholder_text`) is a hint, never a value that looks typed. Passwords show one bullet per character.
 
 **States** follow the neon (`docs/DESIGN.md`, "States"), with no state layer:
 
@@ -28,7 +28,7 @@ The app owns the value and its editing: it keeps the `Caret` (where it is, what 
 
 **Motion.** Lighting up and going back to rest are fades over `short` on `standard`; turning invalid fades the tone from the accent to the error's over `short`. The caret moves and typed text appears at once. The flicker is for power changes, and for the caret: as the keyboard comes in it strikes on through `neon.strike`'s steps over `medium`, by night and by day, while the field's line lights up with its fade. At night its glow strikes with it, then holds and fades as after typing. With the flicker off the strike is a fade over `short`; with reduced motion the caret just shows, and its glow shows and hides at once.
 
-*Not built yet: both libraries draw the hairline in `outline_variant` at rest, hovering only darkens it to `outline` and the tube is the keyboard's alone, the hairline changes over `micro`, the tube strikes, a read-only field never lights and can't be selected, and the caret blinks, the line's full height in `primary`, tight against the letter, `primary` on an invalid field too; the mockups' Field page (`design/mockups/src/pages/atoms/field.ts`) draws the rule.*
+*Not built yet: both libraries draw the hairline in `outline_variant` at rest, hovering only darkens it to `outline` and the tube is the keyboard's alone, the hairline changes over `micro`, the tube strikes, a read-only field never lights and can't be selected, and the caret blinks, the line's full height in `primary`, tight against the letter, `primary` on an invalid field too; neither library has the trailing icon; the mockups' Field page (`design/mockups/src/pages/atoms/field.ts`) draws the rule.*
 
 ## `Labelled`
 

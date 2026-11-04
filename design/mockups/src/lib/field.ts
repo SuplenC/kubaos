@@ -2,7 +2,7 @@
 // `field::note`, `KubaOS.Components`' `Field`, `Labelled` and `Note` (`docs/design/components/
 // field.md`). A field is `size.control_md` tall at the control radius, a hairline inside its edge,
 // its value in `body_large` `space.s12` in, or past a leading `body_large` icon and `space.s8`
-// more, and it fills the room it is given.
+// more, and ending as far before a trailing one, and it fills the room it is given.
 //
 // It is a control in the state model (`.k-control` in `lib.css`): hovered or with the keyboard in
 // it, it is lit, the tube over its hairline in its tone (the accent, or the error's on an invalid
@@ -41,6 +41,11 @@ export interface FieldOptions {
   readonly placeholder?: string;
   /** A symbol before the text. */
   readonly icon?: string;
+  /**
+   * A symbol after the text, mirroring the leading one, in a role of its own: another way in, as
+   * the lock's fingerprint reader is.
+   */
+  readonly trailing?: { readonly icon: string; readonly color: string };
   /** One bullet per character instead of the value: a password. */
   readonly secret?: boolean;
   readonly state?: FieldState;
@@ -214,6 +219,14 @@ export function field(options: FieldOptions = {}): HTMLElement {
     const mark = document.createElement("span");
     mark.className = "k-field-mark";
     mark.append(icon(options.icon, "var(--type-body_large-icon)", "var(--mark)"));
+    element.append(mark);
+  }
+  if (options.trailing) {
+    element.dataset.trailing = "";
+    const mark = document.createElement("span");
+    mark.className = "k-field-mark k-field-trailing";
+    mark.style.setProperty("--trailing", `var(--color-${options.trailing.color})`);
+    mark.append(icon(options.trailing.icon, "var(--type-body_large-icon)", "var(--trailing-mark, var(--trailing))"));
     element.append(mark);
   }
   const clip = document.createElement("span");
