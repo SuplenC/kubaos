@@ -41,7 +41,9 @@ scales = [1.0, 1.25, 1.5, 2.0]
 # dot. Each is drawn centred on a point that moves with the slider's width and
 # value, so its edges land between device pixels whatever its size, and a size
 # on the grid would buy nothing.
-off_grid = ["size.slider_stop", "size.slider_anchor"]
+#
+# And the halo round the lock's kicker: a blur's radius has no edge to land on a device pixel.
+off_grid = ["size.slider_stop", "size.slider_anchor", "size.halo_edge", "size.halo"]
 
 # Lines thinner than the grid. Neither is a multiple of 4, so neither is a
 # length: each is drawn as whole device pixels at the scale it shows at.
@@ -270,6 +272,11 @@ bar_label = 160
 # deviation: enough that the city recedes behind the password's sheet, little
 # enough that it is still the same picture.
 lock_blur = 8
+# A halo of `surface` round each letter of words laid straight on a picture, the radius of its two
+# text shadows' blurs: a tight one that holds the strokes' edges, and a soft one round the word,
+# which follows the glyphs so no shape shows. The lock's kicker, at rest.
+halo_edge = 1
+halo = 6
 # A wallpaper's thumbnail in the shell's picker, 16:10 as the screens are.
 thumbnail_width = 256
 thumbnail_height = 160
@@ -374,6 +381,26 @@ icon = 48
 weight = "light"
 family = "sans"
 use = "The lock screen's clock at rest, with only the wallpaper round it: the city's cut-out may stand in front of its digits."
+
+# The kicker above the lock's clock, a step up from a page's accent so it holds its own over a
+# picture under digits 280 tall: one line in two families, where and which day in M PLUS 1, then
+# the date in Geist, each 20 on a 24 line, medium. Two styles, since a style has one family and
+# Geist draws no kanji.
+[type.clock_place]
+size = 20
+line = 24
+icon = 24
+weight = "medium"
+family = "jp"
+use = "Where and which day in Japanese, the first half of the kicker above the lock screen's clock."
+
+[type.clock_date]
+size = 20
+line = 24
+icon = 24
+weight = "medium"
+family = "sans"
+use = "The date, the second half of the kicker above the lock screen's clock, after where and which day."
 
 [type.hero]
 size = 64
@@ -771,6 +798,14 @@ glass = 0.80
 # white in dark. Kōbō's welcome and done screens, from the text's side; the lock screen, behind
 # its words.
 backdrop = 0.90
+# The date in the lock's kicker, at rest: the digits' colour a step down, so where and which day
+# lead the line.
+clock_date = 0.85
+# The halo round the lock's kicker (`size.halo_edge`, `size.halo`): `surface` at these in its tight
+# and its soft shadow, the same on every wallpaper. Strong enough to lift the letters off a busy
+# street, faint enough that no shape shows round them.
+halo_edge = 0.50
+halo = 0.35
 # An inactive window's border, the highest container over what is behind it,
 # and its neutral shadow, of the `shadow` role. The active window's tube and
 # glow strike on over these (config/hypr/focus.lua).
