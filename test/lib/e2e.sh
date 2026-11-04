@@ -2944,7 +2944,7 @@ c_suite_rust() {
   for t in rustup cargo rustc rust-analyzer bacon cargo-nextest sccache wild kubaos-rust-workspace; do
     has_bin "$t" || { echo "FAIL $t not on PATH"; return 1; }
   done
-  [[ $(readlink -f "$USER_HOME/.nix-profile/bin/rust-analyzer") == */rust-analyzer/bin/rust-analyzer ]] ||
+  [[ $(readlink -f "$USER_HOME/.nix-profile/bin/rust-analyzer") == /nix/store/*-rust-analyzer/bin/rust-analyzer ]] ||
     { echo "FAIL rust-analyzer is rustup's proxy, not the wrapper that adds the component"; return 1; }
   zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.cargo/bin" ||
     { echo "FAIL ~/.cargo/bin is not on PATH"; return 1; }
