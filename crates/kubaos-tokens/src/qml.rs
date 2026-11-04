@@ -549,6 +549,16 @@ fn surfaces(out: &mut Writer, tokens: &Tokens) {
     );
     out.group(
         "    ",
+        Some("Scale factors a surface is drawn at, round its middle, while it comes or goes."),
+        "scale",
+        |out| {
+            for (name, value) in &tokens.scale {
+                out.line(format!("        readonly property real {name}: {}", number(*value)));
+            }
+        },
+    );
+    out.group(
+        "    ",
         Some(
             "Shadows: how far down and how blurred, in logical pixels, and the `shadow` role's opacity, which follows `mode` where light mode has its own.",
         ),

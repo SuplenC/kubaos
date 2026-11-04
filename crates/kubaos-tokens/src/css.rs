@@ -269,6 +269,10 @@ fn motion(out: &mut Css, tokens: &Tokens) {
     for (name, &value) in &tokens.opacity {
         out.var(&format!("opacity-{name}"), number(value));
     }
+    out.comment("Scale factors a surface is drawn at while it comes or goes.");
+    for (name, &value) in &tokens.scale {
+        out.var(&format!("scale-{name}"), number(value));
+    }
     out.comment("A neon tube striking: its brightness, 0 to 1, through even steps over `medium`.");
     for (step, &value) in tokens.neon.strike.iter().enumerate() {
         out.var(&format!("neon-strike-{step}"), number(value));

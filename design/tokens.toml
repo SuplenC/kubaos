@@ -355,12 +355,17 @@ jp = "M PLUS 1"
 # width, for a number that changes in place. Off by default. iced's text has no
 # font features, so iced draws them proportional, and a component showing such
 # a number holds it in a box as wide as its widest value.
+# The lock's two clocks and the bar's time are one clock flying between them,
+# so all three take tabular figures: the flight lands on the bar's time with
+# every figure where the bar draws it, and a minute ticking over never moves
+# the others.
 [type.clock]
 size = 80
 line = 88
 icon = 48
 weight = "light"
 family = "sans"
+tabular = true
 use = "The lock screen's clock once it is awake, over the password's sheet: a step above the hero, light like every big figure. The clock popup's time stays the hero's number style."
 
 # The lock at rest is the wallpaper and its clock alone, the clock as large as
@@ -373,6 +378,7 @@ line = 384
 icon = 48
 weight = "light"
 family = "sans"
+tabular = true
 use = "The lock screen's clock at rest, with only the wallpaper round it: the city's cut-out may stand in front of its digits."
 
 [type.hero]
@@ -446,6 +452,17 @@ icon = 20
 weight = "regular"
 family = "sans"
 use = "Running text, explanations, toasts."
+
+# The bar's time: the body's style with tabular figures, so the time keeps
+# its width as it ticks, in the lock's clock's family, which lands on it.
+[type.body_number]
+size = 14
+line = 20
+icon = 20
+weight = "regular"
+family = "sans"
+tabular = true
+use = "A time or number that changes in place at the body's size: the bar's time."
 
 [type.body_strong]
 size = 14
@@ -783,6 +800,14 @@ backdrop = 0.90
 # glow strike on over these (config/hypr/focus.lua).
 window_border = 0.80
 window_shadow = 0.33
+
+# Scale factors a surface is drawn at, round its middle, while it comes or
+# goes: a share of its size, more than 0.
+[scale]
+# A surface stepping back behind what comes over it: the desktop's windows as
+# the lock comes up, shrinking to it as they fade, and growing from it as the
+# lock gives way.
+behind = 0.96
 
 # Shadows: offset down and blur in logical pixels, and the shadow's opacity
 # of the `shadow` role.

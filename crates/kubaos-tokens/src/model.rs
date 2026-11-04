@@ -47,6 +47,8 @@ pub struct Tokens {
     pub easing: BTreeMap<String, Easing>,
     /// Opacities laid over a colour role, by name.
     pub opacity: BTreeMap<String, f32>,
+    /// Scale factors a surface is drawn at while it comes or goes, by name.
+    pub scale: BTreeMap<String, f32>,
     pub shadow: BTreeMap<String, Shadow>,
     pub elevation: Elevation,
     pub neon: Neon,
