@@ -730,14 +730,23 @@ body {
   background: var(--color-surface_container_low);
 }
 
-/* The measures overlay: a hairline round every probed box, coloured by what it is. */
-/* Room above for the bands' token names, as many lines as they take, and as much below, where
-   the box's size is written: the room is part of the mock its cell centres, and the same on both
-   sides keeps the measured box on its row's middle, beside the row's name. */
+/* The measures (`site/parts/measures.ts`): a sample in its box, clean at rest, and the layer over
+   it drawing one part or one token's places at a time; beside it or under it, the parts tree and
+   the spec list. The colours are the spec list's legend: a box in the cold role, a padding in
+   success's, a gap or a margin in sharing's. */
+/* Room above and below a sample for a size tag, so even the whole sample's is outside it: the
+   room the layer reaches over, never laid out, so the sample lines up with its words. */
 .page-measured {
   position: relative;
   display: flex;
-  padding-block: calc(var(--lines, 1) * (var(--type-mono-line) + var(--space-s4)));
+  padding-block: calc(var(--type-mono-line) + var(--space-s4));
+  margin-block: calc(-1 * (var(--type-mono-line) + var(--space-s4)));
+}
+
+/* The sample's own layers (a list's sticky rows, a panel's frame) stack inside it, so the layer
+   drawn after it is over all of them. */
+.page-measured > :first-child {
+  isolation: isolate;
 }
 
 .page-overlay {
@@ -746,57 +755,229 @@ body {
   pointer-events: none;
 }
 
+/* The clone `site/parts/uses.ts` reads each token's places on: in the cascade, never drawn. */
+.page-uses {
+  display: none;
+}
+
+/* A box: a hairline inside its edge, so it stays on the box's own device pixels; a token's box is
+   tinted too, so a box among many reads as lit. */
 .page-mark {
   position: absolute;
-  outline: var(--stroke-hairline_device_px) solid var(--color-outline);
+  outline: var(--stroke-hairline_device_px) solid var(--color-cold);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
 }
 
-.page-mark[data-role="component"] {
-  outline-color: var(--color-cold);
-  background: rgb(from var(--color-cold) r g b / var(--opacity-hover));
+.page-mark[data-lit] {
+  background: rgb(from var(--color-cold) r g b / var(--opacity-tint));
 }
 
-.page-mark[data-role="layout"] {
-  outline-color: var(--color-warning);
-}
-
-.page-mark[data-role="text"],
-.page-mark[data-role="icon"] {
-  outline-color: var(--color-on_surface);
-}
-
-/* A padding or a gap, shaded, its token's name above the box, on the first line where it runs
-   into no other name (`stack` in measures.ts). */
+/* A padding, a gap or a margin: the space itself, tinted as a selection is. */
 .page-band {
   position: absolute;
-  background: rgb(from var(--color-warning) r g b / var(--opacity-press));
+  background: rgb(from var(--color-success) r g b / var(--opacity-selection));
 }
 
-.page-band-name {
+.page-band[data-kind="gap"] {
+  background: rgb(from var(--color-sharing) r g b / var(--opacity-selection));
+}
+
+/* A part's size, on a solid fill where `inspector.ts` puts it: outside the part's box. */
+.page-tag {
   position: absolute;
-  bottom: calc(100% + var(--space-s4) + var(--line, 0) * (var(--type-mono-line) + var(--space-s4)));
+  padding-inline: var(--space-s4);
+  border-radius: var(--radius-small);
+  background: var(--color-cold);
+  color: var(--color-on_cold);
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+  white-space: nowrap;
+}
+
+.page-inspect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  min-width: 0;
+}
+
+/* The parts tree: a line a part, indented by its depth, scrolling in a column's height at most. */
+.page-tree {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--size-column);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+}
+
+.page-tree-line {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-s4);
+  padding-inline: calc(var(--space-s4) + var(--depth) * var(--space-s12)) var(--space-s4);
+  border-radius: var(--radius-small);
+  color: var(--color-on_surface);
+  cursor: default;
+}
+
+.page-tree-line[data-lit] {
+  background: rgb(from var(--color-cold) r g b / var(--opacity-press));
+}
+
+.page-tree-line[data-pinned] {
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-cold);
+}
+
+.page-tree-words {
+  display: flex;
+  gap: var(--space-s8);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.page-tree-words > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Only a text's words give way to the room: a part's name and its count stay whole. */
+.page-tree-words > :not(.page-tree-detail) {
+  flex: none;
+}
+
+.page-tree-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-on_surface_variant);
+}
+
+.page-tree-count {
+  color: var(--color-on_surface_variant);
+}
+
+/* Each of a fold's alike parts, by its place: the one the line stands for now is filled. */
+.page-tree-chip {
+  padding-inline: var(--space-s4);
+  border-radius: var(--radius-small);
+  color: var(--color-on_surface_variant);
+}
+
+.page-tree-chip[data-shown] {
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-press));
+  color: var(--color-on_surface);
+}
+
+/* The spec list: each measure of the part inspected (its tree line names it), its swatch the
+   colour it is drawn in. It keeps the height of the most it says, seven measures a line each, so
+   pointing at a part or a token never moves what is under it. */
+.page-spec {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-auto-rows: var(--type-mono-line);
+  align-content: start;
+  gap: var(--space-s4) var(--space-s16);
+  height: calc(7 * var(--type-mono-line) + 6 * var(--space-s4));
+  overflow: hidden;
+  margin: 0;
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+}
+
+.page-spec > dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s8);
+  color: var(--color-on_surface_variant);
+}
+
+.page-spec > dt,
+.page-spec > dd {
+  white-space: nowrap;
+}
+
+.page-spec > dd {
+  display: flex;
+  gap: var(--space-s8);
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  color: var(--color-on_surface);
+}
+
+.page-spec > .page-spec-hint {
+  grid-column: 1 / -1;
+}
+
+/* The hint wraps down into the rows the measures would take. */
+.page-spec > .page-spec-hint {
+  display: block;
+  overflow: visible;
+  white-space: normal;
+  color: var(--color-on_surface_variant);
+}
+
+.page-swatch {
+  flex: none;
+  width: var(--space-s8);
+  height: var(--space-s8);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-cold);
+}
+
+.page-swatch[data-kind="padding"] {
+  background: var(--color-success);
+  box-shadow: none;
+}
+
+.page-swatch[data-kind="gap"] {
+  background: var(--color-sharing);
+  box-shadow: none;
+}
+
+.page-swatch[data-kind="none"] {
+  box-shadow: none;
+}
+
+/* The measures by token: what is lit, its count on the line over the table, and its row's token
+   filled; a pinned one outlined too. */
+.page-tokens > dt,
+.page-tokens > dd {
+  cursor: default;
+}
+
+.page-tokens > dt > .page-code {
+  padding-inline: var(--space-s4);
+  margin-inline: calc(-1 * var(--space-s4));
+  border-radius: var(--radius-small);
+}
+
+.page-tokens > dt[data-lit] > .page-code {
+  background: rgb(from var(--color-cold) r g b / var(--opacity-press));
+  color: var(--color-on_surface);
+}
+
+.page-tokens > dt[data-pinned] > .page-code {
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-cold);
+}
+
+.page-token-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--type-mono-family);
   font-size: var(--type-mono-size);
   line-height: var(--type-mono-line);
   color: var(--color-on_surface_variant);
-  white-space: nowrap;
 }
 
-.page-band[data-kind="padding-start"] > .page-band-name { left: 0; }
-.page-band[data-kind="padding-end"] > .page-band-name { right: 0; }
-
-.page-band[data-kind="gap"] > .page-band-name { left: 0; }
-
-.page-mark-size {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: var(--space-s4);
-  font-family: var(--type-mono-family);
-  font-size: var(--type-mono-size);
-  line-height: var(--type-mono-line);
-  color: var(--color-cold);
-  white-space: nowrap;
+.page-token-status[data-lit] {
+  color: var(--color-on_surface);
 }
 
 /* A scroll view for a sample: a panel's body, six rows tall, that scrolls with no bar of its own.

@@ -14,7 +14,7 @@ import { field } from "./field.ts";
 import { icon } from "./icon.ts";
 import { divider, fill, filling, fillingHeight, flow, gap, header, page, row, stack } from "./layout.ts";
 import { type ListRowSpec, scrolled, scrollingList } from "./list.ts";
-import { probe } from "./probe.ts";
+import { probe, workedOut } from "./probe.ts";
 import { scroll } from "./scroll.ts";
 import { step, type StepOptions } from "./step.ts";
 import { clamped, text, wrapped } from "./text.ts";
@@ -124,7 +124,7 @@ function pane(width: number): { box: HTMLElement; show: (result: Result | null, 
   room.className = "k-menu-pane-room";
   const box = card({ body: [room] });
   box.classList.add("k-menu-pane");
-  box.style.width = px(width);
+  workedOut(box, "size-rail").style.width = px(width);
   let shown: HTMLElement | null = null;
   const show = (result: Result | null, fade: boolean) => {
     const next = result ? paneContent(result) : emptyPane();
@@ -213,7 +213,7 @@ export function commandMenu(options: MenuOptions, measures: MenuMeasures): HTMLE
   const panel = document.createElement("span");
   panel.className = "k-menu";
   panel.tabIndex = 0;
-  panel.style.width = px(measures.width);
+  workedOut(panel, "size-column").style.width = px(measures.width);
   panel.append(stack("s12", "start", filling(search), filling(middle), rule, filling(foot)));
   if (shownPane) {
     let at = options.current ?? 0;
@@ -313,6 +313,7 @@ export function rise(room: HTMLElement): void {
  * compare with a length, so script sets it.
  */
 function sideWidth(side: HTMLElement, window: HTMLElement): void {
+  workedOut(side, "size-column");
   new ResizeObserver(() => {
     side.style.width = `${Math.round(Math.min(window.clientWidth / 3, length("size-column") * (Number.parseFloat(getComputedStyle(window).getPropertyValue("--scale")) || settings().scale)))}px`;
   }).observe(window);

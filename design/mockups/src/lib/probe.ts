@@ -27,6 +27,16 @@ export function probe<E extends HTMLElement | SVGElement>(element: E, role: Role
   return element;
 }
 
+/**
+ * Names the tokens script worked `element`'s box out from, which its styles hold only as a number:
+ * a menu between one column and two wide, a side a third of its window up to a column. The site's
+ * measures light the box for them (`site/parts/uses.ts`).
+ */
+export function workedOut<E extends HTMLElement>(element: E, ...tokens: string[]): E {
+  element.dataset.tokens = tokens.join(" ");
+  return element;
+}
+
 /** A component's variant: its words that apply, in order, joined by spaces. */
 export function variant(...words: (string | false | undefined)[]): string {
   return words.filter((word): word is string => typeof word === "string" && word !== "").join(" ");

@@ -283,7 +283,7 @@ export interface Measure {
 
 /** Every box, padding and gap by its token, and the reflow across window sizes. */
 export interface Measures {
-  /** The samples the measures overlay outlines, box by box. */
+  /** The samples the measures inspect, part by part and token by token. */
   readonly samples: NonEmpty<Variant>;
   readonly measures: NonEmpty<Measure>;
   /** The part in a window of the toolbar's size, from the minimum to a full screen. */

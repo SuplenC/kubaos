@@ -1,9 +1,9 @@
 // What is laid out in script once the page's CSS has laid it out: the page's container and its
 // padding for the viewport, the sample grids' bands for it, the samples wider than it let out of
 // it, each mock centred down its row on a whole device pixel, the focus rings' glows for their
-// controls' sizes, then the measures overlays drawn over the result. CSS centres by half the spare room, which is half a device pixel whenever that is odd; a
-// mock is placed as the builds place a child, the odd device pixel after it (`kubaos-ui`'s
-// `centre`).
+// controls' sizes, then what the measures draw over their samples. CSS centres by half the spare
+// room, which is half a device pixel whenever that is odd; a mock is placed as the builds place a
+// child, the odd device pixel after it (`kubaos-ui`'s `centre`).
 
 import { redrawRings } from "../lib/focus.ts";
 import { raw } from "../lib/tokens.ts";
@@ -110,9 +110,5 @@ export function settle(page: HTMLElement): void {
   breakOut(page);
   centreMocks(page);
   redrawRings();
-  // An overlay that took another line of names above its sample is taller: centre again.
-  if (redrawOverlays()) {
-    centreMocks(page);
-    redrawOverlays();
-  }
+  redrawOverlays();
 }
