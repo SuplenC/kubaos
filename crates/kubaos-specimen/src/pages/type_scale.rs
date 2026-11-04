@@ -25,6 +25,8 @@ fn sample(style: Type) -> &'static str {
     match style {
         Type::ClockRest => "21:47",
         Type::Clock => "21:47",
+        Type::ClockPlace => "東京・月曜日",
+        Type::ClockDate => "Monday, 2 November",
         Type::Hero => "Let's fix this shit.",
         Type::HeroNumber => "42%  09:41",
         Type::Display => "Done in 1m 42s.",
