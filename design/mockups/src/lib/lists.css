@@ -260,8 +260,8 @@
    `standard` as the keyboard moves; it is on its row at once as it arrives. */
 .k-list-highlight {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: var(--left);
+  width: var(--width);
   top: calc(var(--top) + var(--along) * var(--step, 0px));
   z-index: 0;
   display: none;
