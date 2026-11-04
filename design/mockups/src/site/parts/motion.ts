@@ -253,7 +253,8 @@ const SPREAD = "s48";
  * apart: a row as one row of columns, a stack as one column, probed as that grid. A layout inside
  * a control keeps its own gap.
  *
- * A whole surface (`[data-whole]`: a screen, a template) is drawn as it is laid out, never spread.
+ * A whole surface (`[data-whole]`: a screen, a template) is drawn as it is laid out, never spread,
+ * and so is a button bar, whose gap is its own and whose buttons stack when they don't fit.
  *
  * HAZARD: only the gap changes; the layout stays the row or stack it is. Drawn as a CSS grid, a
  * child that stretches across a stack (a `within`'s, a slider) shrinks to its content, and a list's
@@ -261,7 +262,7 @@ const SPREAD = "s48";
  */
 function spread(sample: Element): void {
   const layouts = [sample, ...sample.querySelectorAll("[data-layout]")].filter(
-    (layout): layout is HTMLElement => layout instanceof HTMLElement && layout.matches("[data-layout]:has(> * > .k-ring)") && !layout.closest("[data-whole]"),
+    (layout): layout is HTMLElement => layout instanceof HTMLElement && layout.matches("[data-layout]:has(> * > .k-ring)") && !layout.closest("[data-whole], .k-button-bar"),
   );
   for (const layout of layouts) {
     const columns = layout.classList.contains("k-row") ? layout.children.length : 1;

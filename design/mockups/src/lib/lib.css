@@ -2754,6 +2754,11 @@
   overflow: hidden;
 }
 
+/* Drawn still, the room is as tall as its dialog, so it has no height to cap the dialog by. */
+.k-dialog-room:not([data-tall], [data-live]) > .k-dialog {
+  max-height: none;
+}
+
 /* A room as short as `--tall`, the dialog in its middle and capped by it. */
 .k-dialog-room[data-tall] {
   display: flex;
