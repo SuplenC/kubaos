@@ -116,3 +116,4 @@ mockups/step-rail-page  design/mockups/src/pages/templates/step-rail-page.ts des
 mockups/list-detail     design/mockups/src/pages/templates/list-detail.ts design/mockups/src/pages/templates/list-detail-page.css
 mockups/panel-page  design/mockups/src/pages/templates/panel-page.ts
 mockups/backdrop    design/mockups/src/pages/templates/backdrop.ts
+mockups/lock        design/mockups/src/pages/templates/lock.ts design/mockups/src/pages/templates/locks.ts design/mockups/src/assets/lock
