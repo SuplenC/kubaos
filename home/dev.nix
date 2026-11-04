@@ -1,7 +1,7 @@
-# Rust helpers and PATH for tools installed outside Nix (rustup, proto, bun via proto).
+# Rust helpers and PATH for tools installed outside Nix (rustup, and the
+# user's own in ~/.local/bin).
 # clang and mold come from apt; wild comes from nixpkgs.
 {
-  config,
   lib,
   pkgs,
   ...
@@ -43,15 +43,8 @@ in
   # spare sets more in the user flake: home.sessionVariables.SCCACHE_CACHE_SIZE.
   home.sessionVariables.SCCACHE_CACHE_SIZE = lib.mkDefault "10G";
 
-  # proto's home, set rather than left to proto: newer versions pick the XDG
-  # data dir when ~/.proto doesn't exist, older ones ~/.proto, and the PATH
-  # below has to name the one it uses.
-  home.sessionVariables.PROTO_HOME = "${config.xdg.dataHome}/proto";
-
   home.sessionPath = [
     "$HOME/.cargo/bin"
-    "${config.xdg.dataHome}/proto/shims"
-    "${config.xdg.dataHome}/proto/bin"
     "$HOME/.local/bin"
   ];
 

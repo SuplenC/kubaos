@@ -20,13 +20,13 @@ use super::Suite;
 use super::Toolchain;
 
 /// The Suites KubaOS ships, by name.
-pub const SHIPPED: &[Suite] = &[NODE, PYTHON, PHP];
+pub const SHIPPED: &[Suite] = &[NODE, PYTHON, PHP, PROTO];
 
 /// Node and Bun. Its Nix module is `home/suites/node.nix`.
 const NODE: Suite = Suite {
     name: "node",
     title: "Node",
-    description: "Node and Bun, TypeScript's language server, eslint, prettier and the debugger, set up in Neovim.",
+    description: "Node and Bun, TypeScript's language server, eslint and the debugger, set up in Neovim.",
     versions: &["26", "24", "22"],
     extras: &[Extra {
         name: "bun",
@@ -79,7 +79,6 @@ const NODE: Suite = Suite {
         "typescript",
         "vtsls",
         "eslint",
-        "prettier",
     ],
 };
 
@@ -165,6 +164,29 @@ const PHP: Suite = Suite {
         "phpcs",
         "phpunit",
     ],
+};
+
+/// proto and moon. Its Nix module is `home/suites/proto.nix`. proto is a version manager itself, so
+/// the Suite has no versions and no Project pins: a project pins its tools, moon and proto among
+/// them, in its `.prototools`.
+const PROTO: Suite = Suite {
+    name: "proto",
+    title: "proto + moon",
+    description: "proto, the toolchain manager that pins each project's tools in its .prototools, and moon, the monorepo build system, which proto installs on first use.",
+    versions: &[],
+    extras: &[],
+    toolchain: Toolchain::Upstream { manager: "proto" },
+    caches: &[Cache {
+        path: ".local/share/proto",
+        description: "The tools, shims and plugins proto installed, moon among them.",
+    }],
+    scaffolders: &[Scaffolder {
+        id: "moon",
+        label: "New moon workspace",
+        argv: &["kubaos-moon-new", "{path}"],
+    }],
+    seeds: &[],
+    mentions: &["proto", "moon", "moonrepo", ".prototools", "moon.yml"],
 };
 
 /// A Suite with one of everything, for the test harness and the unit tests. Its Nix module is

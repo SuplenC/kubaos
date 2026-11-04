@@ -70,8 +70,6 @@ system/30-hardware.sh   # second run: confirms modules + power profiles
 # 2. Toolchains, outside Nix on purpose.
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 rustup component add rust-analyzer clippy
-bash <(curl -fsSL https://moonrepo.dev/install/proto.sh)
-proto install moon
 ```
 
 The MOK screen, the fingerprint enrollment and what to verify are in the hard way's sections 1, 7 and 8 below: same scripts, same steps.
@@ -445,8 +443,6 @@ Then, outside Nix on purpose:
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 rustup component add rust-analyzer clippy
-bash <(curl -fsSL https://moonrepo.dev/install/proto.sh)
-proto install moon
 ```
 
 ### 11. `system/70-bitwarden.sh`, then `kubaos bitwarden setup`

@@ -618,10 +618,10 @@ fn every_seed_says_which_suite_it_is_for() {
 }
 
 #[test]
-fn the_node_python_and_php_suites_are_shipped() {
+fn the_node_python_php_and_proto_suites_are_shipped() {
     let shipped: Vec<&str> = catalog::SHIPPED.iter().map(|s| s.name).collect();
 
-    for name in ["node", "python", "php"] {
+    for name in ["node", "python", "php", "proto"] {
         assert!(shipped.contains(&name), "{name} is not in SHIPPED");
     }
 }
@@ -635,6 +635,18 @@ fn a_suite_s_default_version_is_its_first() {
     assert_eq!(node.versions.first(), Some(&"26"));
     assert_eq!(php.versions.first(), Some(&"8.5"));
     assert!(python.versions.is_empty(), "uv picks a project's Python");
+}
+
+#[test]
+fn the_proto_suite_leaves_versions_to_proto() {
+    let proto = catalog::find("proto").expect("the proto + moon Suite");
+
+    assert!(proto.versions.is_empty(), "a project's .prototools pins its tools");
+    assert!(matches!(proto.toolchain, Toolchain::Upstream { manager: "proto" }));
+    assert_eq!(
+        proto.caches.iter().map(|c| c.path).collect::<Vec<_>>(),
+        [".local/share/proto"]
+    );
 }
 
 #[test]

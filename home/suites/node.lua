@@ -1,13 +1,14 @@
 -- The Node Suite's Neovim settings, part of the Defaults while the Suite is
--- installed (home/suites/node.nix): LazyVim's TypeScript extra, run on the
--- Suite's vtsls, eslint server, prettier and js-debug.
+-- installed (home/suites/node.nix): LazyVim's TypeScript and eslint extras,
+-- run on the Suite's vtsls, eslint server and js-debug.
 local tools = require("config.suite_tools")
 
 return {
   { import = "lazyvim.plugins.extras.lang.typescript" },
+  { import = "lazyvim.plugins.extras.linting.eslint" },
   tools.from_nix({
     servers = { "vtsls", "eslint" },
-    packages = { "js-debug-adapter", "prettier" },
+    packages = { "js-debug-adapter" },
   }),
   {
     "mfussenegger/nvim-dap",

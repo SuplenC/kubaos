@@ -30,7 +30,7 @@ fn actions(suites: &Installed, id: &str) -> Vec<String> {
 }
 
 /// The Item of every Suite in the catalog, none installed.
-const NOT_INSTALLED: [&str; 4] = ["suite:node", "suite:python", "suite:php", "suite:test"];
+const NOT_INSTALLED: [&str; 5] = ["suite:node", "suite:python", "suite:php", "suite:proto", "suite:test"];
 
 fn arguments(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
     pairs
@@ -293,6 +293,8 @@ fn ids_name_every_item_a_suite_may_have() {
             "suite:php",
             "suite-new:php:composer",
             "suite-new:php:laravel",
+            "suite:proto",
+            "suite-new:proto:moon",
             "suite:test",
             "suite-new:test:new",
         ]
