@@ -23,6 +23,7 @@ use crate::specimen::Message;
 /// What each style is shown saying: a line it would really carry.
 fn sample(style: Type) -> &'static str {
     match style {
+        Type::ClockRest => "21:47",
         Type::Clock => "21:47",
         Type::Hero => "Let's fix this shit.",
         Type::HeroNumber => "42%  09:41",
