@@ -1,12 +1,11 @@
-// A full-screen moment: the Backdrop template (`docs/design/components/backdrop.md`), what the
-// lock screen, polkit's prompt and Kōbō's welcome, done and step-rail screens are laid out on.
+// A full-screen moment: the Backdrop template (`docs/design/components/backdrop.md`), what
+// polkit's prompt and Kōbō's welcome, done and step-rail screens are laid out on.
 //
 // A picture, a scrim over it, and one thing in its middle on whole device pixels. The scrim is
 // one of two: behind words, a band of `surface` at `opacity.backdrop` across the screen, from
 // `space.s64` above the thing to `space.s64` below it, fading to nothing over those `space.s64`, so
 // the words keep 4.5:1 over any picture and the picture shows round them; behind a dialog or a
-// panel, `scrim` at `opacity.scrim` over all of it. The thing may stand `--backdrop-lift` above the
-// middle, the lock's optical centre.
+// panel, `scrim` at `opacity.scrim` over all of it.
 //
 // It arrives over `scene` on `emphasized_decel`, the picture and the scrim fading in and the thing
 // fading in as it rises `space.s24` into place, and lifts over `scene` on `emphasized_accel`, the
@@ -30,8 +29,6 @@ export interface BackdropOptions {
   readonly content: HTMLElement;
   /** What it lies over and lifts off: the desktop. */
   readonly under?: HTMLElement;
-  /** How far above the middle the thing stands, a spacing token's name: the lock's `s64`. */
-  readonly lift?: string;
 }
 
 export function backdrop(options: BackdropOptions): HTMLElement {
@@ -41,7 +38,6 @@ export function backdrop(options: BackdropOptions): HTMLElement {
   element.dataset.whole = "";
   element.style.setProperty("--backdrop-width", options.width);
   element.style.setProperty("--backdrop-height", options.height);
-  element.style.setProperty("--backdrop-lift", options.lift ? `var(--space-${options.lift})` : "0px");
   const layers = document.createElement("span");
   layers.className = "k-backdrop-layers";
   if (options.picture) {
