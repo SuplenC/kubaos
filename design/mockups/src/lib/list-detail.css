@@ -1,14 +1,14 @@
 /* The ListDetail template (`list-detail.ts`): the Command menu's panel and Kōbō's setup window. */
 
 /* How far the Command menu still has to drop in, 1 where it starts `space.s8` up and 0 in place. */
-@property --drop {
+@property --menu-drop {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
 }
 
 /* How far a pushed View still has to slide, 1 where it starts `space.s24` off and 0 in place. */
-@property --push {
+@property --view-push {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
@@ -31,7 +31,7 @@
   outline: none;
   background: rgb(from var(--color-surface) r g b / var(--opacity-frame));
   box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
-  translate: 0 calc(round(nearest, var(--drop) * var(--space-s8), 1px) * -1);
+  translate: 0 calc(round(nearest, var(--menu-drop) * var(--space-s8), 1px) * -1);
 }
 
 .k-menu > .k-stack {
@@ -40,7 +40,7 @@
 }
 
 .k-menu-body {
-  translate: round(nearest, var(--push) * var(--space-s24), 1px) 0;
+  translate: round(nearest, var(--view-push) * var(--space-s24), 1px) 0;
 }
 
 /* The hairline over the footer runs across the whole panel, at the top of the gap above it. */
