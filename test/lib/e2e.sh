@@ -670,7 +670,7 @@ c_shellcheck() {
       *.sh) files+=("$f") ;;
       *) head -1 "$f" | grep -qE '^#!.*\b(ba)?sh\b' && files+=("$f") ;;
     esac
-  done < <(as_user git -C "$REPO" ls-files scripts system migrations test config crates/self-imports .claude/hooks | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp)$')
+  done < <(as_user git -C "$REPO" ls-files scripts system migrations test config home/suites crates/self-imports .claude/hooks | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp)$')
   echo "     ${#files[@]} files"
   # Gate on warnings and errors; info and style notes are listed, not fatal.
   local out notes
@@ -3311,6 +3311,13 @@ c_user_layer() {
   zrun "'$REPO/test/user-layer-check' '$REPO'"
 }
 
+# The wallpaper-depth Suite's hook on its own, in a scratch home with
+# systemd-run, the tool and matugen stubbed: what kubaos-depth-queue starts,
+# when it skips, the wait for AC power, and when dot-theme calls it.
+c_wallpaper_depth() {
+  as_user bash "$REPO/test/wallpaper-depth-test" "$REPO" || { echo "FAIL test/wallpaper-depth-test"; return 1; }
+}
+
 # scripts/dot-config on its own, in a scratch home: seeding, the README
 # links, and moving a flat user layer into its groups without losing a file.
 # The Lua side of the same table (config/hypr/user_layer.lua) beside it, and
@@ -3962,7 +3969,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go dot_config warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go dot_config wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

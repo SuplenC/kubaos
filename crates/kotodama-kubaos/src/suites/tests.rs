@@ -30,13 +30,14 @@ fn actions(suites: &Installed, id: &str) -> Vec<String> {
 }
 
 /// The Item of every Suite in the catalog, none installed.
-const NOT_INSTALLED: [&str; 7] = [
+const NOT_INSTALLED: [&str; 8] = [
     "suite:rust",
     "suite:go",
     "suite:node",
     "suite:python",
     "suite:php",
     "suite:proto",
+    "suite:wallpaper-depth",
     "suite:test",
 ];
 
@@ -309,6 +310,7 @@ fn ids_name_every_item_a_suite_may_have() {
             "suite-new:php:laravel",
             "suite:proto",
             "suite-new:proto:moon",
+            "suite:wallpaper-depth",
             "suite:test",
             "suite-new:test:new",
         ]

@@ -373,6 +373,19 @@ reload_cursor() {
     hint "the pointer stays Bibata-Modern-Classic: ${err:-kubaos cursor apply failed}"
 }
 
+# The wallpaper-depth Suite's cut-out and clock place for a still of the
+# user's own (home/suites/wallpaper-depth.nix), queued when the Suite puts
+# kubaos-depth-queue on PATH. The sets ship theirs beside the picture, and a
+# cut-out of one frame doesn't hold over a moving picture.
+queue_depth() {
+  local file=$1 err
+  command -v kubaos-depth-queue >/dev/null || return 0
+  is_video "$file" && return 0
+  [[ $file == "$SETS_DIR"/* ]] && return 0
+  err=$(kubaos-depth-queue "$file" 2>&1 >/dev/null) ||
+    hint "no wallpaper depth for $file: ${err:-kubaos-depth-queue failed}"
+}
+
 reload_all() {
   reload_tmux &
   reload_ghostty &
@@ -512,6 +525,7 @@ set_wallpaper() {
     write_state "last-$folder" "$file"
   fi
   reload_all
+  queue_depth "$file"
 }
 
 # Step through the current folder: +1 or -1.
@@ -591,9 +605,11 @@ apply() {
     # Login runs this every time: skip matugen and the reloads when the last
     # run had the same inputs and its outputs are still there. The cursor
     # still runs: it skips what's up to date itself, and finishes a background
-    # render the last session ended before.
+    # render the last session ended before. So does the wallpaper's depth,
+    # whose job a logout may have stopped.
     if ((!force)) && up_to_date "$wp"; then
       reload_cursor
+      queue_depth "$wp"
       return 0
     fi
     set_wallpaper "$wp"

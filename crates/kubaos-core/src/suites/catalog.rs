@@ -20,7 +20,7 @@ use super::Suite;
 use super::Toolchain;
 
 /// The Suites KubaOS ships, by name.
-pub const SHIPPED: &[Suite] = &[RUST, GO, NODE, PYTHON, PHP, PROTO];
+pub const SHIPPED: &[Suite] = &[RUST, GO, NODE, PYTHON, PHP, PROTO, WALLPAPER_DEPTH];
 
 /// Node and Bun. Its Nix module is `home/suites/node.nix`.
 const NODE: Suite = Suite {
@@ -310,6 +310,24 @@ const RUST: Suite = Suite {
         "rustaceanvim",
         "sccache",
     ],
+};
+
+/// The cut-out the lock draws over its clock, for the user's own wallpapers. Its Nix module is
+/// `home/suites/wallpaper-depth.nix`.
+const WALLPAPER_DEPTH: Suite = Suite {
+    name: "wallpaper-depth",
+    title: "Wallpaper depth",
+    description: "Cuts the foreground out of each wallpaper of your own as you set it, so the lock's clock stands behind it; with its models, about 700 MB.",
+    versions: &[],
+    extras: &[],
+    toolchain: Toolchain::Nix,
+    caches: &[Cache {
+        path: ".cache/kubaos/wallpapers",
+        description: "The cut-outs and clock places made for your own wallpapers.",
+    }],
+    scaffolders: &[],
+    seeds: &[],
+    mentions: &["wallpaper-depth", "kubaos-depth", "cutout"],
 };
 
 /// A Suite with one of everything, for the test harness and the unit tests. Its Nix module is

@@ -47,6 +47,7 @@ fn always() -> Vec<String> {
                 "suite:python",
                 "suite:php",
                 "suite:proto",
+                "suite:wallpaper-depth",
                 "suite:test",
             ]
             .map(str::to_owned),

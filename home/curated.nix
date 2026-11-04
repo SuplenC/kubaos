@@ -54,7 +54,7 @@ rec {
   # The Proxy's command and service, the work network's switch (home/proxy.nix).
   kubaos-proxy = callCrate ../crates/kubaos-proxy/package.nix;
   # The wallpaper-depth Suite's tool: a wallpaper's cut-out and the lock
-  # clock's place and tint. No home installs it yet.
+  # clock's place and tint. The Suite installs it (home/suites/wallpaper-depth.nix).
   kubaos-depth = callCrate ../crates/kubaos-depth/package.nix;
   # The design specimen, the Command menu's "Design specimen" (home/desktop.nix).
   kubaos-specimen = callCrate ../crates/kubaos-specimen/package.nix;
