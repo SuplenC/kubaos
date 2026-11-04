@@ -42,6 +42,8 @@ pub enum Violation {
     CurveOutOfRange { token: String },
     /// An opacity outside 0..=1.
     OpacityOutOfRange { token: String, value: f32 },
+    /// A scale factor that isn't a finite number above 0.
+    ScaleNotPositive { token: String, value: f32 },
     /// A colour role missing from one of `source`, `dark` and `light`.
     RoleMissing { role: String, table: &'static str },
     /// A role both derived and given values of its own, or derived and read from matugen.
@@ -119,6 +121,9 @@ impl fmt::Display for Violation {
             Violation::OpacityOutOfRange { token, value } => {
                 write!(f, "{token} is {value}, outside 0..=1")
             }
+            Violation::ScaleNotPositive { token, value } => {
+                write!(f, "{token} is {value}, not a share of a size above 0")
+            }
             Violation::RoleMissing { role, table } => {
                 write!(f, "colour role {role} is missing from color.{table}")
             }
@@ -191,6 +196,7 @@ pub fn check(tokens: &Tokens) -> Vec<Violation> {
     check_lengths(tokens, &mut found);
     check_icon_tile(&tokens.icon_tile, &mut found);
     check_container(tokens, &mut found);
+    check_scales(tokens, &mut found);
     check_types(tokens, &mut found);
     check_motion(tokens, &mut found);
     check_colors(tokens, &mut found);
@@ -528,6 +534,17 @@ fn check_icon_tile(icon_tile: &IconTile, found: &mut Vec<Violation>) {
     check_opacity("icon_tile.plate".into(), icon_tile.plate, found);
 }
 
+fn check_scales(tokens: &Tokens, found: &mut Vec<Violation>) {
+    for (name, &value) in &tokens.scale {
+        if !(value.is_finite() && value > 0.0) {
+            found.push(Violation::ScaleNotPositive {
+                token: format!("scale.{name}"),
+                value,
+            });
+        }
+    }
+}
+
 fn check_opacity(token: String, value: f32, found: &mut Vec<Violation>) {
     if !(0.0..=1.0).contains(&value) {
         found.push(Violation::OpacityOutOfRange { token, value });
@@ -773,13 +790,14 @@ fn is_mark_path(path: &str) -> bool {
 
 /// Every name that becomes an identifier in an output, as `table.name`.
 fn names(tokens: &Tokens) -> Vec<String> {
-    let tables: [(&str, Vec<&String>); 10] = [
+    let tables: [(&str, Vec<&String>); 11] = [
         ("size", tokens.size.keys().collect()),
         ("aspect", tokens.aspect.keys().collect()),
         ("type", tokens.types.keys().collect()),
         ("duration", tokens.duration.keys().collect()),
         ("easing", tokens.easing.keys().collect()),
         ("opacity", tokens.opacity.keys().collect()),
+        ("scale", tokens.scale.keys().collect()),
         ("shadow", tokens.shadow.keys().collect()),
         ("color", tokens.color.source.keys().collect()),
         ("color", tokens.color.derived.keys().collect()),

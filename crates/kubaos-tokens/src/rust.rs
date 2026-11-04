@@ -701,6 +701,21 @@ fn surfaces(out: &mut Writer, tokens: &Tokens) {
             ty: "f32",
         },
     );
+    scale(
+        out,
+        &Scale {
+            doc: "A scale factor a surface is drawn at, round its middle, while it comes or goes.",
+            name: "ScaleFactor",
+            variants: tokens
+                .scale
+                .iter()
+                .map(|(name, value)| (camel(name), None, format!("{value:?}")))
+                .collect(),
+            getter_doc: "The share of the surface's size, above 0.",
+            getter: "value",
+            ty: "f32",
+        },
+    );
     out.blank();
     out.line("impl Opacity {");
     out.line("    /// The opacity's name in `design/tokens.toml`.");
