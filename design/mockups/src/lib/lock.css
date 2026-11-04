@@ -374,10 +374,6 @@
   padding: var(--space-s16) 0;
 }
 
-.k-lock-body {
-  width: 100%;
-}
-
 .k-lock-field {
   align-self: stretch;
   translate: round(nearest, calc(var(--jolt) * var(--space-s4)), 1px) 0;
