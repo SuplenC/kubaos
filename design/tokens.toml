@@ -402,6 +402,25 @@ weight = "medium"
 family = "sans"
 use = "The date, the second half of the kicker above the lock screen's clock, after where and which day."
 
+# The same kicker once the lock is awake, over the 80 clock: at 20 it would be wider than the
+# digits and outweigh them. A step down to 16 on the same 24 line and weight, so as the clock lifts
+# only its size moves, on the lift's own motion, and the line keeps its height.
+[type.clock_place_awake]
+size = 16
+line = 24
+icon = 24
+weight = "medium"
+family = "jp"
+use = "Where and which day in Japanese, the first half of the kicker above the awake lock screen's clock."
+
+[type.clock_date_awake]
+size = 16
+line = 24
+icon = 24
+weight = "medium"
+family = "sans"
+use = "The date, the second half of the kicker above the awake lock screen's clock, after where and which day."
+
 [type.hero]
 size = 64
 line = 72
@@ -826,6 +845,11 @@ window_shadow = 0.33
 # the lock comes up, shrinking to it as they fade, and growing from it as the
 # lock gives way.
 behind = 0.96
+# The wallpaper coming toward you as the lock comes up, and going back to 1:1 as it gives way: the
+# picture and its cut-out together, one transform, so the cut-out never uncovers the picture's own
+# city behind it. 2.5 %, so a 960 tall screen grows 12 at its top and its bottom, whole device
+# pixels at every scale; a gentle dolly, held still at rest and awake.
+push = 1.025
 
 # Shadows: offset down and blur in logical pixels, and the shadow's opacity
 # of the `shadow` role.

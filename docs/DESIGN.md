@@ -98,6 +98,8 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 | `clock` | 80 / 88 | light | The lock screen's clock once it is awake, over the password's sheet: a step above the hero, light like every big figure. The clock popup's time stays `hero_number`. |
 | `clock_place` | 20 / 24 | medium, M PLUS 1 | Where and which day in Japanese, the first half of the kicker above the lock screen's clock. |
 | `clock_date` | 20 / 24 | medium | The date, the kicker's second half after where and which day: one line with `clock_place`, a style each since Geist draws no kanji. |
+| `clock_place_awake` | 16 / 24 | medium, M PLUS 1 | `clock_place` once the lock is awake, over the 80 clock: as the clock lifts only the size moves, on the same line and weight. |
+| `clock_date_awake` | 16 / 24 | medium | `clock_date` once the lock is awake, with `clock_place_awake`. |
 | `hero` | 64 / 72 | semibold | Words at the hero size: Kōbō's welcome line and its done screen's headline, nothing else. The first and the last thing an install shows get the same size. |
 | `hero_number` | 64 / 72 | light | Numbers at the hero size: the install percent, the clock popup's time. Light, so a big figure doesn't shout. |
 | `display` | 48 / 56 | semibold | The heading of a full-screen moment other than Kōbō's welcome and done screens. |
@@ -132,7 +134,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 |---|---|
 | 16 | `caption`, `small`, `label`, `mono`, `keycap`, `accent`, `button_small` |
 | 20 | `body`, `body_strong`, `body_large`, `mono_large`, `button` |
-| 24 | `subheading`, `heading`, `button_large`, `clock_place`, `clock_date` |
+| 24 | `subheading`, `heading`, `button_large`, `clock_place`, `clock_date`, `clock_place_awake`, `clock_date_awake` |
 | 32 | `headline`, `title` |
 | 48 | `display`, `hero`, `hero_number`, `clock` |
 
@@ -264,7 +266,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `spring` | 0.34, 1.25, 0.64, 1 | Something gliding into place with a small overshoot, over `long`: the wallpaper carousel's step. *Not enforced yet: nothing moves on it.* |
 | `gather` | 0.11, 0, 0.5, 0 | A colour change gathering speed: the theme change and the dark ⇄ light switch. *Not built yet: only the mockups move on it.* |
 
-- **A surface that steps back shrinks to `scale.behind`** (0.96) round its middle as it fades, and grows back from it: the desktop's windows as the lock comes up and gives way. A scale factor is a token of `[scale]`, never a number of its own.
+- **A surface that steps back shrinks to `scale.behind`** (0.96) round its middle as it fades, and grows back from it: the desktop's windows as the lock comes up and gives way. A wallpaper that comes toward you grows to `scale.push` (1.025) round the middle of the screen, its cut-out with it on the same transform: the lock's picture as it comes up, back to 1:1 as it gives way. A scale factor is a token of `[scale]`, never a number of its own.
 - **Arriving is slower than leaving** (`long` in, `medium` out): you look at what arrives, and what leaves is already done with.
 - **A surface a key summons to act and go is one step quicker**: the Command menu arrives over `short` and leaves over `micro`, its Action panel the same, and its Views slide in over `medium`. A key opens and closes it many times an hour, and what it runs waits for it to be gone, so a panel's `long` and `medium` would be felt on every run.
 - **A panel swapped for its twin keeps its surface** (the system monitor, the notifications panel and the control center, `docs/design/components/sheet.md`): only the content moves, `space.s24` sideways. What leaves goes over `micro`, what arrives comes over `short` half a `micro` later (`swap_lag`, 50) and fades in over `swap_fade` (150) once the other is gone, about 250 ms in all, so switching straight from one to the other feels like one surface changing its mind, not two panels passing.
