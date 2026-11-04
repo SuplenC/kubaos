@@ -46,12 +46,14 @@ export function forgetRecipes(): void {
 /** How many halvings a fit searches by: far below an 8 bit channel's step. */
 const HALVINGS = 40;
 
-type Lch = { l: number; c: number; h: number };
+/** A colour in OKLCH: lightness 0 to 1, chroma, hue in degrees. */
+export type Lch = { l: number; c: number; h: number };
 
 const linear = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
 const encoded = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
 
-function toLch(hex: string): Lch {
+/** `#rrggbb` in OKLCH. */
+export function toLch(hex: string): Lch {
   const [r, g, b] = [1, 3, 5].map((at) => linear(Number.parseInt(hex.slice(at, at + 2), 16) / 255)) as [number, number, number];
   const long = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
   const medium = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
@@ -80,7 +82,7 @@ function linearOf({ l, c, h }: Lch): [number, number, number] {
 const inGamut = (lch: Lch) => linearOf(lch).every((v) => v >= -1e-9 && v <= 1 + 1e-9);
 
 /** `lch` in sRGB, `#rrggbb`, its chroma lowered at the same hue and lightness until it fits. */
-function toHex(lch: Lch): string {
+export function toHex(lch: Lch): string {
   const fitted = { ...lch, l: Math.min(1, Math.max(0, lch.l)), c: Math.max(0, lch.c) };
   if (!inGamut(fitted)) {
     let [inside, outside] = [0, fitted.c];

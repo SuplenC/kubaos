@@ -172,9 +172,9 @@ export type Curve = Easing | Strike;
 
 /**
  * A value an animated property takes: a plain number, or a token's, named so a library reads the
- * same token: an opacity, a colour role, a length.
+ * same token: an opacity, a scale factor, a colour role, a length.
  */
-export type Value = number | { readonly opacity: string } | { readonly color: string } | { readonly length: string };
+export type Value = number | { readonly opacity: string } | { readonly scale: string } | { readonly color: string } | { readonly length: string };
 
 /**
  * One part's change in a move: what it is, the property, its values and its timing. Tracks of one
