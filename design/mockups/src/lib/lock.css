@@ -4,14 +4,16 @@
    bar, which locking leaves and unlocking comes back to. Numbers move it, each 0 at rest but the
    push. */
 
-/* The frame, from out past the screen's edges (0) to where the shell draws it (1). */
+/* The frame, from out past the screen's edges (0) to where the shell draws it (1): each edge slides
+   in at its own thickness, its inner corners at `radius.surface` throughout. */
 @property --framed {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;
 }
 
-/* The frame's top edge, from `space.s8` like its other edges (0) to the bar's height (1). */
+/* The bar, from out above the screen (0) to the frame's top edge (1): a band `size.bar` tall
+   carrying the bar's pills, sliding in over the frame's thin top edge. */
 @property --barred {
   syntax: "<number>";
   inherits: true;
@@ -65,8 +67,12 @@
   --push: 1;
   --pushed: calc(1 + (var(--scale-push) - 1) * var(--push));
   --neared: calc(1 + (var(--scale-near) - 1) * var(--push));
-  --frame-side: round(nearest, calc(var(--space-s8) * var(--framed)), 1px);
-  --frame-top: round(nearest, calc((var(--space-s8) + (var(--size-bar) - var(--space-s8)) * var(--barred)) * var(--framed)), 1px);
+  /* Out, an edge is past the screen's edge by its own thickness and the fillet its inner corners
+     curve through, so neither the edge nor its corners leave a pixel on the screen. The top edge is
+     the thin edge or the bar, whichever reaches further in. */
+  --frame-side: round(nearest, calc(var(--space-s8) - (var(--space-s8) + var(--radius-surface)) * (1 - var(--framed))), 1px);
+  --bar-shift: round(nearest, calc(-1 * (var(--size-bar) + var(--radius-surface)) * (1 - var(--barred))), 1px);
+  --frame-top: max(var(--frame-side), var(--bar-shift) + var(--size-bar));
 }
 
 .k-lock[data-phase="awake"] {
@@ -109,9 +115,11 @@
   opacity: var(--push);
 }
 
-/* The frame's inner corners grow with it, so a frame not yet in shows no corner. */
-.k-lock .k-frame {
-  border-radius: calc(var(--radius-surface) * var(--framed));
+/* The frame's shadow goes with it, as strong as the frame is in. `shadow.panel` falls far past the
+   fillet: with the frame out by its thickness and fillet, a shadow at full strength still darkens
+   the screen's top rows by a fifth, and by a thirtieth with its drop and blur added to the slide. */
+.k-lock .k-screen-glass {
+  filter: drop-shadow(0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / calc(var(--shadow-panel-opacity) * var(--framed))));
 }
 
 /* The picture's blur: what is under it, its edges held rather than faded, so the blurred picture
@@ -157,14 +165,13 @@
     0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
 }
 
-/* The bar's contents ride in the middle of the frame's top edge, so as it thins they go up out of
-   the screen, and as it grows into the bar they come down with it. Only the desktop shows them. */
+/* The bar's pills ride on the bar's band, which slides straight up out of the screen and back:
+   they keep their place along it as the side edges slide out. */
 .k-lock .k-bar {
-  opacity: 0;
-}
-
-.k-lock[data-phase="desktop"] .k-bar {
-  opacity: 1;
+  top: var(--bar-shift);
+  left: var(--space-s8);
+  right: var(--space-s8);
+  height: var(--size-bar);
 }
 
 /* The bar's clock, centred on the screen as `modules/bar/Bar.qml` centres it, on whole device
@@ -225,7 +232,7 @@
   --date-width: round(up, calc(var(--date-natural, 0) * var(--date-k) * var(--px) - 0.001px), 1px);
   --kicker-width: calc(var(--place-width) + var(--date-width));
   --awake-top: calc(var(--space-s8) + var(--space-s48) + var(--kicker-height) + var(--space-s16));
-  --bar-top: calc((var(--frame-top) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-body-size));
+  --bar-top: calc(var(--bar-shift) + (var(--size-bar) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-body-size));
   /* The rest place moves with the picture as it pushes in: where the wallpaper puts the clock on
      the desktop's picture (0) and on the pushed one (1), each worked out from the picture. */
   --rest-cx: calc(var(--rest-cx-flat, var(--middle)) + (var(--rest-cx-pushed, var(--middle)) - var(--rest-cx-flat, var(--middle))) * var(--push));
@@ -413,4 +420,29 @@
 
 .k-lock[data-live] .k-lock-cutout {
   transition: --panel-dim var(--motion-medium) var(--easing-standard);
+}
+
+/* With reduce motion the live lock's frame doesn't slide: it stands in place while its glass fades,
+   in over `short` on waking and out over `short` going back to rest, then leaves at once. */
+[data-reduced] .k-lock[data-live] {
+  transition:
+    --framed 0s var(--motion-short),
+    --wake var(--motion-long) var(--easing-standard),
+    --lift var(--motion-long) var(--easing-emphasized_decel);
+}
+
+[data-reduced] .k-lock[data-live][data-phase="awake"] {
+  transition:
+    --framed 0s,
+    --wake var(--motion-long) var(--easing-emphasized_decel),
+    --lift var(--motion-long) var(--easing-emphasized_decel);
+}
+
+[data-reduced] .k-lock[data-live] .k-screen-glass {
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+[data-reduced] .k-lock[data-live][data-phase="awake"] .k-screen-glass {
+  opacity: var(--opacity-frame);
 }

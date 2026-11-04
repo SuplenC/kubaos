@@ -7,7 +7,7 @@
 // of the clock. The digits and the kicker are a light tint of the picture behind the digits, so
 // they read as part of it, the kicker lifted off it by a halo of `surface` round each letter.
 //
-// Awake, the frame closes in round the picture, `space.s8` all round, the picture blurs
+// Awake, the frame slides in round the picture, `space.s8` all round, the picture blurs
 // `size.lock_blur` and dims as a panel's desktop does, the clock lifts out from behind the cut-out
 // to `type.clock` near the top, its kicker stepping down to its awake styles, and a Sheet rises
 // from the middle of the bottom edge holding the password's Field, the other way in, and the keys.
@@ -20,7 +20,7 @@
 // fills in what the city uncovers. As the lock goes they ease back to 1:1.
 //
 // Numbers move it, each a property a move animates, so a frame held on its plot is exactly what
-// plays: `--framed` (the frame closing in), `--barred` (its top edge from `space.s8` to the bar's),
+// plays: `--framed` (the frame sliding in), `--barred` (the bar sliding in over its top edge),
 // `--wake` (the blur), `--lift` (the clock from rest to awake), `--dock` (the clock into the bar),
 // `--push` (the picture and its city pushing in), `--above` (the clock above the frame or behind
 // the city), the sheet's own `--reveal` and the dim's `--panel-dim`.
@@ -324,8 +324,8 @@ export function lock(options: LockOptions): Lock {
 
 /**
  * Where the bar's time is, for the clock to land on: its middle across the screen, and its
- * baseline under the pill's top, read off the pill's layout. The pill is centred in the frame's
- * top edge, so CSS places it from `--frame-top` as the edge grows.
+ * baseline under the pill's top, read off the pill's layout. The pill is centred on the bar's
+ * band, so CSS places it from `--bar-shift` as the band slides.
  */
 function placeBarTime(element: HTMLElement, bar: { pill: HTMLElement; time: HTMLElement }, clock: HTMLElement): void {
   bar.pill.style.setProperty("--pill-width", `${bar.pill.offsetWidth}px`);
