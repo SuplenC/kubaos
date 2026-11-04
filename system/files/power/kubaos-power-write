@@ -3,6 +3,7 @@
 # scheduler, as root.
 #
 #   kubaos-power-write KNOB=VALUE...
+#   kubaos-power-write --sleep-safe
 #   kubaos-power-write --help
 #
 #   cpu-max=KHZ|max                    every CPU policy's scaling_max_freq; max is the CPU's top
@@ -37,6 +38,14 @@
 # id) and audio devices are never set to autosuspend, whatever it is asked.
 # A knob that fails is said on stderr, named on stdout (`failed KNOB=VALUE`),
 # and the rest still run; the exit is 1 when any failed, 2 for a usage error.
+#
+# --sleep-safe takes back what keeps a suspend out of the hardware's deepest
+# sleep (s0i3 on AMD), whatever the stop: ASPM `performance` goes to
+# `default`, a GPU forced high to `auto`, and each USB device kept awake to
+# `auto`, input, security and audio devices still excepted. It says what it
+# changed in one line on stdout. systemd-sleep's hook runs it before every
+# suspend (system/files/power/kubaos-power-sleep), and the service puts the
+# stop back on resume.
 set -euo pipefail
 
 # KUBAOS_POWER_ROOT points the writes at a fake /sys (the tests,
@@ -259,9 +268,61 @@ LAVD_ARGS=$args"
   fi
 }
 
+# sleep_safe: the --sleep-safe values, each only where the stop left
+# something else. Saver stops' values stay: they already reach s0i3.
+#
+# ASPM goes to `default`, not `powersave`: `default` is the firmware's own
+# setup, L1 substates included, and the policy Balanced suspends from into
+# s0i3; `powersave` asks for L0s and L1 alone and turns off substates the
+# firmware had on. Wi-Fi power saving is left alone: it is how the card idles
+# while associated, and without Wake-on-WLAN mac80211 stops the card for a
+# suspend.
+sleep_safe() {
+  local file now dir changed=()
+  file="$SYS/module/pcie_aspm/parameters/policy"
+  if [[ -e $file ]] && now="$(read_value "$file")" && [[ " $now " == *" [performance] "* ]]; then
+    if printf '%s' default 2>/dev/null >"$file"; then
+      changed+=(aspm=default)
+    else
+      fail "the kernel refused ASPM policy default"
+    fi
+  fi
+  for file in "$SYS"/class/drm/card*/device/power_dpm_force_performance_level; do
+    [[ -e $file ]] || continue
+    now="$(read_value "$file")" || continue
+    [[ $now == high || $now == profile_* ]] || continue
+    dir="${file%/device/*}"
+    if printf '%s' auto 2>/dev/null >"$file"; then
+      changed+=("gpu-dpm=${dir##*/}:auto")
+    else
+      fail "the kernel refused auto for $file"
+    fi
+  done
+  for dir in "$SYS"/bus/usb/devices/*; do
+    [[ ${dir##*/} != *:* && -e $dir/power/control ]] || continue
+    [[ "$(read_value "$dir/power/control" || true)" == on ]] || continue
+    never_suspended "$dir" && continue
+    if printf '%s' auto 2>/dev/null >"$dir/power/control"; then
+      changed+=("usb=${dir##*/}:auto")
+    else
+      fail "the kernel refused autosuspend for USB device ${dir##*/}"
+    fi
+  done
+  if ((${#changed[@]})); then
+    echo "kubaos-power-write: sleep-safe: ${changed[*]}"
+  else
+    echo "kubaos-power-write: sleep-safe: nothing to change"
+  fi
+}
+
 if [[ ${1:-} == --help || ${1:-} == -h ]]; then
   usage
   exit 0
+fi
+if [[ ${1:-} == --sleep-safe ]]; then
+  (($# == 1)) || { usage >&2; exit 2; }
+  sleep_safe
+  exit "$failed"
 fi
 if (($# == 0)); then
   usage >&2
