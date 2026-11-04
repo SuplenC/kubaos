@@ -191,6 +191,12 @@ impl Registry {
         self.hide.contains(id)
     }
 
+    /// What a `terminal = true` action runs in: the program, then its arguments, the command
+    /// after them.
+    pub fn terminal(&self) -> &[String] {
+        &self.terminal
+    }
+
     /// The Items of the actions `hide` leaves in that show in `states`.
     pub fn items<'a>(&'a self, states: &'a States) -> impl Iterator<Item = Item> + 'a {
         self.actions

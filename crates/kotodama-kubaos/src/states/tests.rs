@@ -343,6 +343,23 @@ fn unfree_packages_are_on_until_the_user_flakes_setting_turns_them_off() {
 }
 
 #[test]
+fn a_suite_is_on_while_its_file_is_in_the_state_directory_and_unknown_when_it_does_not_read() {
+    let machine = Machine::new();
+    let file = "config/kubaos/home/kubaos.d/suites/test.toml";
+
+    let missing = machine.read();
+    machine.write(file, "version = \"2\"\n");
+    let installed = machine.read();
+    machine.write(file, "version = [");
+    let broken = machine.read();
+
+    assert_eq!(missing.get("kubaos.suites.test"), Some(&on(false)));
+    assert_eq!(installed.get("kubaos.suites.test"), Some(&on(true)));
+    assert_eq!(installed.suites().is_installed("test"), Some(true));
+    assert_eq!(broken.get("kubaos.suites.test"), None);
+}
+
+#[test]
 fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
     let machine = Machine::new();
     let places = Places {
@@ -371,6 +388,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         DND,
         PREVIEW,
         BLUETOOTH_UNNAMED,
+        "kubaos.suites.test",
     ] {
         assert_eq!(states.get(name), None, "{name}");
     }
@@ -394,6 +412,7 @@ fn every_file_a_state_is_read_from_is_watched() {
         "config/kubaos/desktop/phone/phone-link",
         "config/kubaos/desktop/power/power.toml",
         "config/kubaos/home/kubaos.d/nixpkgs.toml",
+        "config/kubaos/home/kubaos.d/suites/test.toml",
         "config/kubaos/desktop/network/proxy.toml",
         "run/kubaos-keep-awake.json",
         "run/kubaos-proxy.json",
@@ -415,6 +434,8 @@ fn a_state_name_is_one_of_the_probes_or_a_package_group() {
     assert_eq!(values(PREVIEW), Some(Values::Bool));
     assert_eq!(values(BLUETOOTH_UNNAMED), Some(Values::Bool));
     assert_eq!(values(SCHEDULER), Some(Values::Words(&["kernel", "lavd"])));
+    assert_eq!(values("kubaos.suites.test"), Some(Values::Bool));
+    assert_eq!(values("kubaos.suites.nope"), None);
     assert_eq!(values("packages."), None);
     assert_eq!(values("chrome"), None);
 }

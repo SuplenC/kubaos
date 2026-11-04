@@ -71,7 +71,8 @@ kind = "scripts"
 # `files.tidy-daily`, `files.automount`, `terminal.greeting`,
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
 # `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
-# `nix.unfree`, `kubaos.preview` and `bluetooth.unnamed`, true or false;
+# `nix.unfree`, `kubaos.preview`, `kubaos.suites.<name>` (the Suite is
+# installed) and `bluetooth.unnamed`, true or false;
 # `power.scheduler` ("kernel", "lavd") and `power.low-battery` ("power-saver",
 # "super-saver", "off"). While a state can't be read, the action shows.
 #
