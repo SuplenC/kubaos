@@ -19,6 +19,7 @@ pub mod suites;
 pub mod switch;
 pub mod unfree;
 pub mod update;
+pub mod wallpaper_depth;
 
 pub use kubaos_phone as phone;
 
