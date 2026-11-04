@@ -171,7 +171,7 @@ export interface MenuOptions {
   readonly results: readonly Result[];
   /** The screen it opens on, in logical pixels; the toolbar's window, where none is given. */
   readonly screen?: { readonly width: number; readonly height: number };
-  /** Rows shown, in place of what the screen gives: a sample of a few. */
+  /** Rows shown, in place of what the screen gives: a sample of a few, on a panel without the pane. */
   readonly rows?: number;
   /** What is typed in the field. */
   readonly query?: string;
@@ -187,9 +187,11 @@ export interface MenuOptions {
  * Enter to the list.
  */
 export function commandMenu(options: MenuOptions, measures: MenuMeasures): HTMLElement {
-  const rows = options.rows ?? measures.rows;
+  // A sample of a few rows only where the pane doesn't show: beside it the body keeps the screen's
+  // rows, eight at the least, which the pane's symbol, words, Actions and keys are drawn to fit.
+  const few = measures.pane > 0 ? undefined : options.rows;
   const pitch = length("size-row_two_line") + length("space-s4");
-  const body = options.rows ? rows * pitch - length("space-s4") : measures.body;
+  const body = few ? few * pitch - length("space-s4") : measures.body;
   const search = field({ placeholder: "Search apps, projects and windows. Sums work too", icon: "search", ...(options.query ? { value: options.query } : {}), pinned: "lit" });
   const list = scrollingList(
     options.results.map((each) => each.row),

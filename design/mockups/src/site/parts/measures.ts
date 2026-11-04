@@ -63,13 +63,16 @@ function overlaid(sample: Element): HTMLElement {
       names.push(name);
     };
     for (const element of holder.querySelectorAll("[data-probe]")) {
-      const box = element.getBoundingClientRect();
+      const box = shown(element, holder);
+      if (!box) continue;
       const mark = el("div", "page-mark");
       mark.dataset.role = role(element);
       place(mark, box.left, box.top, box.width, box.height);
       if (mark.dataset.role === "component") {
         const height = tokenOf(element, "--height");
-        const size = `${round((box.width * zoom) / scale)} × ${round((box.height * zoom) / scale)}${height ? ` · ${height}` : ""}`;
+        // Its size is its whole box's, however much of it a scroll shows.
+        const whole = element.getBoundingClientRect();
+        const size = `${round((whole.width * zoom) / scale)} × ${round((whole.height * zoom) / scale)}${height ? ` · ${height}` : ""}`;
         mark.append(el("span", "page-mark-size", size));
         const content = element.querySelector<HTMLElement>(":scope > [data-layout]");
         const padding = tokenOf(element, "--padding");
@@ -82,12 +85,13 @@ function overlaid(sample: Element): HTMLElement {
       if (mark.dataset.role === "layout") {
         const gap = tokenOf(element, "--gap");
         // A row's gaps span the component it is in, so their names line up with its padding's.
-        const holder = element.parentElement?.closest<HTMLElement>("[data-probe]");
-        const span = holder && role(holder) === "component" ? holder.getBoundingClientRect() : box;
-        const kids = [...element.children].map((kid) => kid.getBoundingClientRect());
+        const owner = element.parentElement?.closest<HTMLElement>("[data-probe]");
+        const span = owner && role(owner) === "component" ? (shown(owner, holder) ?? box) : box;
+        const kids = [...element.children].map((kid) => shown(kid, holder));
         for (let i = 1; gap && i < kids.length; i++) {
-          const before = kids[i - 1]!;
-          const after = kids[i]!;
+          const before = kids[i - 1];
+          const after = kids[i];
+          if (!before || !after) continue;
           if (element.classList.contains("k-row")) band(before.right, span.top, after.left - before.right, span.height, gap, "gap");
           else band(box.left, before.bottom, box.width, after.top - before.bottom, gap, "gap");
         }
@@ -126,6 +130,25 @@ function stack(holder: HTMLElement, names: readonly HTMLElement[], rise: number,
   const before = holder.style.getPropertyValue("--lines");
   holder.style.setProperty("--lines", String(lines));
   return before !== String(lines);
+}
+
+/**
+ * The part of `element`'s box its scrolling or clipping boxes inside `holder` let show, or null where
+ * none of it does: a list's rows scrolled out of its well are measured where they are seen.
+ */
+function shown(element: Element, holder: HTMLElement): DOMRect | null {
+  const box = element.getBoundingClientRect();
+  let { left, top, right, bottom } = box;
+  for (let at = element.parentElement; at && at !== holder; at = at.parentElement) {
+    if (getComputedStyle(at).overflow === "visible") continue;
+    const clip = at.getBoundingClientRect();
+    left = Math.max(left, clip.left);
+    top = Math.max(top, clip.top);
+    right = Math.min(right, clip.right);
+    bottom = Math.min(bottom, clip.bottom);
+  }
+  if (right - left < 1 || bottom - top < 1) return null;
+  return new DOMRect(left, top, right - left, bottom - top);
 }
 
 function round(value: number): string {
