@@ -55,7 +55,7 @@ function waking(): [Eased, ...Eased[]] {
     { part: FRAME, on: ON, target: ".k-lock", property: "--framed", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" },
-    { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--lift", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--clock-lift", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
   ];
 }
@@ -67,7 +67,7 @@ function wakingReduced(): [Eased, ...Eased[]] {
     { part: "the glass", on: ON, target: ".k-screen-glass", property: "opacity", from: 0, to: { opacity: "frame" }, duration: "short", curve: "standard" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--lift", from: 0, to: 1, duration: "instant", curve: "standard" },
+    { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--clock-lift", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: "the clock's fade", on: ON, target: ".k-lock-clock", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: "the sheet's fade", on: ON, target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -82,7 +82,7 @@ const RESTS: Move = {
     { part: FRAME, on: ON, target: ".k-lock", property: "--framed", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 1, to: 0, duration: "long", curve: "standard" },
-    { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--lift", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--clock-lift", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
   ],
   reduced: reducedRest(),
   back: "cuts",
@@ -97,7 +97,7 @@ function reducedRest(): [Eased, ...Eased[]] {
     { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the clock's fade", on: ON, target: ".k-lock-clock", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--lift", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
+    { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--clock-lift", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
     { part: "the clock's fade", on: ON, target: ".k-lock-clock", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ];
 }
@@ -110,7 +110,7 @@ function reducedRest(): [Eased, ...Eased[]] {
 function locking(on: string): [Eased, ...Eased[]] {
   const landed: Eased[] = [
     { part: KICKER_PART, on, target: ".k-lock-kicker", property: "opacity", from: 0, to: 1, duration: "short", cue: ["micro", "medium"], curve: "standard" },
-    { part: "the clock's depth", on, target: ".k-lock-clock", property: "--above", from: 1, to: 0, duration: "instant", cue: ["micro", "long"], curve: "standard" },
+    { part: "the clock's depth", on, target: ".k-lock-clock", property: "--clock-above", from: 1, to: 0, duration: "instant", cue: ["micro", "long"], curve: "standard" },
   ];
   return [
     { part: WINDOWS, on, target: ".k-lock-windows", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
@@ -132,7 +132,7 @@ function lockingReduced(on: string): [Eased, ...Eased[]] {
     { part: BAR, on, target: ".k-bar", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: GLASS, on, target: ".k-screen-glass", property: "opacity", from: { opacity: "frame" }, to: 0, duration: "short", curve: "standard" },
     { part: CLOCK, on, target: ".k-lock-clock", property: "--dock", from: 1, to: 0, duration: "instant", curve: "standard" },
-    { part: "the clock's depth", on, target: ".k-lock-clock", property: "--above", from: 1, to: 0, duration: "instant", curve: "standard" },
+    { part: "the clock's depth", on, target: ".k-lock-clock", property: "--clock-above", from: 1, to: 0, duration: "instant", curve: "standard" },
     { part: "the clock's fade", on, target: ".k-lock-clock", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: KICKER_PART, on, target: ".k-lock-kicker", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: FRAME, on, target: ".k-lock", property: "--framed", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
@@ -167,7 +167,7 @@ function intoTheBar(on: string, cue: Eased["cue"]): Eased[] {
   };
   const timed = (track: Omit<Eased, "cue">, when: Eased["cue"]): Eased => (when === undefined ? track : { ...track, cue: when });
   return [
-    timed({ part: "the clock's depth", on, target: ".k-lock-clock", property: "--above", from: 0, to: 1, duration: "instant", curve: "standard" }, at()),
+    timed({ part: "the clock's depth", on, target: ".k-lock-clock", property: "--clock-above", from: 0, to: 1, duration: "instant", curve: "standard" }, at()),
     timed({ part: CLOCK, on, target: ".k-lock-clock", property: "--dock", from: 0, to: 1, duration: "long", curve: "emphasized_decel" }, at()),
     timed({ part: TOP, on, target: ".k-lock", property: "--barred", from: 0, to: 1, duration: "long", curve: "emphasized_decel" }, at()),
     timed({ part: BAR_TIME, on, target: ".k-lock-bar-time", property: "opacity", from: 0, to: 1, duration: "micro", curve: "standard" }, at("long")),

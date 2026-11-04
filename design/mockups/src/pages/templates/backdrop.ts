@@ -50,7 +50,7 @@ const PROMPT: Move = {
   tracks: [
     { part: "the dim", on: "polkit", target: ".k-backdrop-layers", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: "the dialog's fade", on: "polkit", target: ".k-dialog", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "the dialog's rise", on: "polkit", target: ".k-dialog", property: "--rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: "the dialog's rise", on: "polkit", target: ".k-dialog", property: "--dialog-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
   ],
   reduced: [
     { part: "the dim", on: "polkit", target: ".k-backdrop-layers", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },

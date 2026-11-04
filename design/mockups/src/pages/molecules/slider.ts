@@ -112,13 +112,13 @@ const ON = "a regular and a compact slider";
 
 const SETTLES: Move = {
   name: "Settles on its stop",
-  what: "Let go between stops, the fill eases onto the nearest one over `short` on `standard_decel`, from where the drag left it: `--shown`, the fraction the fill shows, from 0.4 to its stop's 0.5. Only once it has arrived, the anchor pops in on the stop, from nothing to its size over `short` on `pop`, a little past it and back. With reduced motion the fill is on its stop and the anchor shows at once.",
+  what: "Let go between stops, the fill eases onto the nearest one over `short` on `standard_decel`, from where the drag left it: `--slider-shown`, the fraction the fill shows, from 0.4 to its stop's 0.5. Only once it has arrived, the anchor pops in on the stop, from nothing to its size over `short` on `pop`, a little past it and back. With reduced motion the fill is on its stop and the anchor shows at once.",
   tracks: [
-    { part: "fill", on: "five stops", target: ".k-slider", property: "--shown", from: 0.4, to: 0.5, duration: "short", curve: "standard_decel" },
+    { part: "fill", on: "five stops", target: ".k-slider", property: "--slider-shown", from: 0.4, to: 0.5, duration: "short", curve: "standard_decel" },
     { part: "anchor", on: "five stops", target: ".k-slider-anchor", property: "scale", from: 0, to: 1, duration: "short", cue: "short", curve: "pop" },
   ],
   reduced: [
-    { part: "fill", on: "five stops", target: ".k-slider", property: "--shown", from: 0.4, to: 0.5, duration: "instant", curve: "linear" },
+    { part: "fill", on: "five stops", target: ".k-slider", property: "--slider-shown", from: 0.4, to: 0.5, duration: "instant", curve: "linear" },
     { part: "anchor", on: "five stops", target: ".k-slider-anchor", property: "scale", from: 0, to: 1, duration: "instant", curve: "linear" },
   ],
   back: "cuts",
@@ -128,8 +128,8 @@ const SETTLES: Move = {
 const EASES: Move = {
   name: "A value set from elsewhere",
   what: "The value changes from outside (a volume key, another app): the fill eases from where it was to the new value over `short` on `standard`, here from 30% to 62%. The value's words show the new value at once. A drag never eases: the fill follows the pointer. With reduced motion it is there at once.",
-  tracks: [{ part: "fill", on: ON, target: ".k-slider", property: "--shown", from: 0.3, to: 0.62, duration: "short", curve: "standard" }],
-  reduced: [{ part: "fill", on: ON, target: ".k-slider", property: "--shown", from: 0.3, to: 0.62, duration: "instant", curve: "linear" }],
+  tracks: [{ part: "fill", on: ON, target: ".k-slider", property: "--slider-shown", from: 0.3, to: 0.62, duration: "short", curve: "standard" }],
+  reduced: [{ part: "fill", on: ON, target: ".k-slider", property: "--slider-shown", from: 0.3, to: 0.62, duration: "instant", curve: "linear" }],
   back: "cuts",
   sample: pair(),
 };

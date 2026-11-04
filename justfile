@@ -128,7 +128,7 @@ design-parity:
 mockups *args: _mockups-deps
     cd design/mockups && npx vite "$@"
 
-# The mockup site built static into design/mockups/dist, after the type check: open it from any static server.
+# The mockup site built static into design/mockups/dist, after the type check and the check of its registered custom properties (`scripts/property-check.ts`): open it from any static server.
 mockups-build: _mockups-deps
     cd design/mockups && npm run -s build
 

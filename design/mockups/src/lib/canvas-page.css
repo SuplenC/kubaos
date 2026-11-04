@@ -1,7 +1,7 @@
 /* CanvasPage (`lib/canvas-page.ts`): the canvas and the selected object's settings, in a
    SidebarPage page. */
 
-@property --fit {
+@property --canvas-fit {
   syntax: "<number>";
   inherits: false;
   initial-value: 1;
@@ -162,12 +162,13 @@
   transition: none;
 }
 
-/* A motion player's sample of a fit: each box between where it was and where it goes, by `--fit`. */
+/* A motion player's sample of a fit: each box between where it was and where it goes, by
+   `--canvas-fit`. */
 .k-cv[data-fitting] .k-cv-screen {
-  left: round(nearest, calc(var(--from-left) + (var(--to-left) - var(--from-left)) * var(--fit)), 1px) !important;
-  top: round(nearest, calc(var(--from-top) + (var(--to-top) - var(--from-top)) * var(--fit)), 1px) !important;
-  width: round(nearest, calc(var(--from-width) + (var(--to-width) - var(--from-width)) * var(--fit)), 1px) !important;
-  height: round(nearest, calc(var(--from-height) + (var(--to-height) - var(--from-height)) * var(--fit)), 1px) !important;
+  left: round(nearest, calc(var(--from-left) + (var(--to-left) - var(--from-left)) * var(--canvas-fit)), 1px) !important;
+  top: round(nearest, calc(var(--from-top) + (var(--to-top) - var(--from-top)) * var(--canvas-fit)), 1px) !important;
+  width: round(nearest, calc(var(--from-width) + (var(--to-width) - var(--from-width)) * var(--canvas-fit)), 1px) !important;
+  height: round(nearest, calc(var(--from-height) + (var(--to-height) - var(--from-height)) * var(--canvas-fit)), 1px) !important;
 }
 
 .k-cv-size[hidden] {

@@ -146,7 +146,7 @@ const ARRIVES: Move = {
   tracks: [
     { part: SCRIM, on: "a question", target: ".k-scrim", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: `${DIALOG}'s fade`, on: "a question", target: ".k-dialog", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: `${DIALOG}'s rise`, on: "a question", target: ".k-dialog", property: "--rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: `${DIALOG}'s rise`, on: "a question", target: ".k-dialog", property: "--dialog-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
   ],
   reduced: [
     { part: SCRIM, on: "a question", target: ".k-scrim", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
