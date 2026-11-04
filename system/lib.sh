@@ -651,6 +651,34 @@ retire_ubuntu_updaters() {
   done
 }
 
+# retire_packaged_hypridle: hypridle runs only as `kubaos-idle session` starts it from
+# `config/hypr/autostart.lua`, after writing its listeners. Ubuntu's hypridle package enables its
+# own user unit, hypridle.service, in /etc/systemd/user/graphical-session.target.wants, so every
+# Hyprland session (hyprland-session.target binds graphical-session.target) would start a second
+# hypridle on the same config, and every lock, screens-off and suspend would fire twice.
+#
+# The unit is disabled and masked for every user (/etc/systemd/user/hypridle.service ->
+# /dev/null): a mask holds across package upgrades, which only re-enable a unit that isn't masked,
+# and needs nothing from a user's home. A packaged hypridle running in a session now stops, leaving
+# the one kubaos-idle started. 50-hyprland.sh runs it, and a migration on machines installed
+# before it.
+retire_packaged_hypridle() {
+  local state user
+  state="$(systemctl --global is-enabled hypridle.service 2>/dev/null || true)"
+  if [[ "$state" == masked ]]; then
+    ok "hypridle.service is masked for every user"
+  else
+    [[ "$state" == enabled ]] && sudo_run systemctl --global disable hypridle.service
+    sudo_run systemctl --global mask hypridle.service
+  fi
+  ((!IMAGE_BUILD)) && has_systemd || return 0
+  for user in $(loginctl list-users --no-legend 2>/dev/null | awk '{print $2}'); do
+    as_root systemctl --user --machine="$user@" is-active -q hypridle.service 2>/dev/null || continue
+    sudo_run systemctl --user --machine="$user@" stop hypridle.service ||
+      warn "couldn't stop $user's packaged hypridle; it doesn't start again from the next login"
+  done
+}
+
 # install_shutdown_splash: the splash on poweroff and reboot shows every time
 # and gets to play out. Plymouth's shutdown units start once the sessions
 # have ended, so Hyprland no longer holds the screen, and

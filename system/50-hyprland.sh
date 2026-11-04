@@ -70,6 +70,10 @@ elif ((!DRY_RUN)); then
 fi
 
 # --------------------------------------------------------------------------
+step "hypridle only from kubaos-idle (the packaged user unit masked)"
+retire_packaged_hypridle
+
+# --------------------------------------------------------------------------
 step "Autologin on tty1 for $TARGET_USER"
 DROPIN=/etc/systemd/system/getty@tty1.service.d/autologin.conf
 if ((AUTOLOGIN)); then
