@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# kubaos-power-sleep: systemd-sleep's hook for the power stops. Before every
+# suspend or hibernation it puts sleep-safe values in place, whatever the stop.
+#
+#   kubaos-power-sleep pre|post suspend|hibernate|hybrid-sleep|suspend-then-hibernate
+#
+# Performance and Max Performance keep links and devices awake (ASPM
+# `performance`, USB autosuspend off, the GPU forced high), and a suspend from
+# them never reaches the hardware's deepest sleep (s0i3 on AMD): the battery
+# drains at a few percent an hour. `pre` runs `kubaos-power-write --sleep-safe`
+# (system/files/power/kubaos-power-write), which says what it changed, in the
+# journal under systemd-suspend.service. `post` does nothing: the power service
+# (`kubaos-power serve`) puts the stop back when logind says the machine woke,
+# so the stop of the power source after the resume applies, not the one before.
+#
+# Installed as /usr/lib/systemd/system-sleep/kubaos-power by install_power_helper
+# (system/lib.sh), the one folder systemd-sleep runs hooks from. It never fails
+# the suspend: a missing helper or a refused write is said and skipped.
+set -euo pipefail
+
+HELPER=/usr/local/libexec/kubaos-power-write
+
+[[ ${1:-} == pre ]] || exit 0
+if [[ ! -x $HELPER ]]; then
+  echo "kubaos-power-sleep: $HELPER isn't installed; suspending with the stop's settings" >&2
+  exit 0
+fi
+"$HELPER" --sleep-safe || true
