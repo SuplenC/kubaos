@@ -16,8 +16,11 @@ import type { Words } from "../../lib/content.ts";
 import { setValue } from "../../lib/field.ts";
 import { KICKER, type Kicker, type Lock, lock, lockField, lockLine, type Moment, type Phase, TIME, type Wallpaper } from "../../lib/lock.ts";
 import { stack } from "../../lib/layout.ts";
+import { nested, role } from "../../lib/radius.ts";
+import { text } from "../../lib/text.ts";
 import { raw } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
+import { barButtons } from "./panels.ts";
 
 /**
  * A screen the lock is drawn on: a 16:10 panel, 1536 by 960 logical pixels, a 2560 by 1600 laptop
@@ -83,6 +86,24 @@ export interface Drawn {
   readonly size?: { readonly width: string; readonly height: string };
 }
 
+/**
+ * The desktop's windows the lock's still shows: two tiled side by side, each the desktop plane's
+ * window with its name and a line.
+ */
+function windows(): HTMLElement[] {
+  const corner = nested(role("surface"), "s8");
+  return [
+    ["Files", "~/Projects/kubaos"],
+    ["Terminal", "cargo build --release"],
+  ].map(([title, line]) => {
+    const drawn = document.createElement("span");
+    drawn.className = "k-lock-window";
+    drawn.style.setProperty("--corner", corner.css);
+    drawn.append(text(title ?? "", "body_strong", "on_surface"), text(line ?? "", "small", "on_surface_variant"));
+    return drawn;
+  });
+}
+
 /** A lock drawn still, on a screen of `SCREEN`'s size unless given. */
 export function still(drawn: Drawn = {}): HTMLElement {
   return lockOf(drawn).element;
@@ -99,6 +120,8 @@ function lockOf(drawn: Drawn, live = false): Lock {
     kicker: drawn.kicker ?? KICKER,
     error: drawn.error ?? LOCK_ERROR.short,
     live,
+    bar: barButtons(),
+    windows: windows(),
   });
 }
 
@@ -143,7 +166,7 @@ export function liveLock(wallpaper: Wallpaper = PURPLE_HOUR, size = SCREEN): HTM
   let idle = 0;
   const current = () => room.querySelector<HTMLElement>(".k-field")!;
   const typed = () => room.querySelector(".k-field-room")?.textContent ?? "";
-  const awake = () => element.hasAttribute("data-awake");
+  const awake = () => element.dataset.phase === "awake";
   const lineOf = () => room.nextElementSibling?.nextElementSibling as HTMLElement | undefined;
 
   const fresh = (moment: Moment) => {
@@ -157,7 +180,7 @@ export function liveLock(wallpaper: Wallpaper = PURPLE_HOUR, size = SCREEN): HTM
     idle = window.setTimeout(rest, millis("lock_idle"));
   };
   const setAwake = (on: boolean) => {
-    element.toggleAttribute("data-awake", on);
+    element.dataset.phase = on ? "awake" : "rest";
     element.toggleAttribute("data-open", on);
     for (const part of made.sheet.parts) part.toggleAttribute("data-shown", on);
   };
