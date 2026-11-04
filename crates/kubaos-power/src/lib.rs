@@ -21,7 +21,8 @@
 //! # Not here
 //!
 //! - The service's loop, the bus and the command line: `main.rs`.
-//! - Writing as root: `system/files/power/kubaos-power-write`; running scx_lavd:
+//! - Writing as root: `system/files/power/kubaos-power-write`, and before a suspend
+//!   `system/files/power/kubaos-power-sleep`; running scx_lavd:
 //!   `system/files/systemd/kubaos-scx.service`. The panel's monitor rule:
 //!   `config/hypr/monitors.lua`.
 //! - The slider: `config/quickshell/services/Power.qml` and the control center. The menu's Items:
