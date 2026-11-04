@@ -4,9 +4,9 @@
 // At rest it is the wallpaper and its clock: the digits in `type.clock_rest` under a kicker line
 // (where and which day, then the date), placed on the picture where the wallpaper says, and the
 // picture's foreground cut-out, where it has one, drawn over the digits so the city stands in front
-// of the clock. Behind the words a shade of `surface` tight to them, as strong as this picture
-// needs for them to hold 4.5:1 and no stronger: behind the kicker alone where the digits stand in
-// the sky behind a cut-out, behind the whole clock where there is none.
+// of the clock. The digits are a light tint of the picture behind them, so they read as part of it.
+// Behind the kicker a shade of `surface` tight to it, as strong as this picture needs for its words
+// to hold 4.5:1 and no stronger.
 //
 // Awake, the frame closes in round the picture, `space.s8` all round, the picture blurs
 // `size.lock_blur` and dims as a panel's desktop does, the clock lifts out from behind the cut-out
@@ -25,7 +25,7 @@
 // It always draws in the night scheme matugen derives from its wallpaper, whatever the mode.
 
 import "./lock.css";
-import { backingCover, CLOCK_WORDS, KICKER_WORDS, type NightScheme, paintNight, shadeFor } from "./lock-shade.ts";
+import { backingCover, KICKER_WORDS, type NightScheme, paintNight, shadeFor, tintFor } from "./lock-shade.ts";
 import { field, fieldRoom, note } from "./field.ts";
 import { icon } from "./icon.ts";
 import { keyHints } from "./keycap.ts";
@@ -156,10 +156,10 @@ function kickerLine(kicker: Kicker): HTMLElement {
 /**
  * The bar's clock, as `modules/bar/Clock.qml` draws it: a pill centred on the bar holding the
  * weekday's kanji in `accent`, `tertiary`, the short date in `body`, `on_surface_variant`, and
- * the time in `mono_large`, `on_surface`.
+ * the time in `body_number`, `on_surface`.
  */
 function barClock(time: string, words: BarClock): { pill: HTMLElement; time: HTMLElement } {
-  const shown = text(time, "mono_large", "on_surface");
+  const shown = text(time, "body_number", "on_surface");
   shown.classList.add("k-lock-bar-time");
   const made = pill({ content: [text(words.kanji, "accent", "tertiary"), text(words.date, "body", "on_surface_variant"), shown], lone: false });
   made.classList.add("k-lock-bar-clock");
@@ -178,7 +178,6 @@ export function lock(options: LockOptions): Lock {
   element.dataset.phase = options.phase;
   element.toggleAttribute("data-open", options.phase === "awake");
   element.toggleAttribute("data-live", options.live ?? false);
-  element.toggleAttribute("data-cutout", wallpaper.cutout !== undefined);
 
   const picture = element.querySelector<HTMLImageElement>(".k-screen-wallpaper")!;
   const blur = document.createElement("span");
@@ -193,6 +192,8 @@ export function lock(options: LockOptions): Lock {
 
   const digits = text(time, "clock_rest");
   digits.classList.add("k-lock-digits");
+  // The digits' colour is the CSS's: the picture's tint at rest, `on_surface` awake and in the bar.
+  digits.style.removeProperty("color");
   const kicker = kickerLine(options.kicker ?? KICKER);
   const shade = document.createElement("span");
   shade.className = "k-lock-shade";
@@ -224,8 +225,9 @@ export function lock(options: LockOptions): Lock {
 
   // The rest clock's place is the picture's, which only the picture's size and the screen's know:
   // the screen crops the picture as `object-fit: cover` does, and the clock follows the city. The
-  // shade's strength is the picture's colours under the words it backs, read off the picture
-  // itself. The bar's clock is where the pill's layout puts its time, which only layout knows.
+  // digits' tint and the shade's strength are the picture's colours under the digits and the
+  // kicker, read off the picture itself. The bar's clock is where the pill's layout puts its time,
+  // which only layout knows.
   const place = () => {
     const width = element.clientWidth;
     const height = element.clientHeight;
@@ -240,9 +242,7 @@ export function lock(options: LockOptions): Lock {
     const kickerHeight = kicker.offsetHeight;
     const kickerWidth = kicker.offsetWidth;
     const natural = digitsWidth(time);
-    const ratio = length("type-clock-size") / length("type-clock_rest-size");
     const restDigits = Math.ceil(natural * px - 0.001);
-    const awakeDigits = Math.ceil(natural * ratio * px - 0.001);
     const margin = token("space-s32");
     const half = Math.max(kickerWidth, restDigits) / 2;
     const cx = Math.min(width - margin - half, Math.max(margin + half, cover.left + wallpaper.clock.x * seen.width * scale));
@@ -258,25 +258,19 @@ export function lock(options: LockOptions): Lock {
     clock.style.setProperty("--rest-top", `${restTop}px`);
     placeBarTime(element, bar, clock);
 
-    // With a cut-out the digits stand in the sky behind the city, and only the kicker is backed;
-    // with none the clock stands in front of the picture, and the whole of it is.
-    const words = wallpaper.cutout ? KICKER_WORDS : CLOCK_WORDS;
-    const backed = (top: number, digitsWidth: number, digitsHeight: number) => {
-      const wide = Math.max(kickerWidth, digitsWidth);
-      if (wallpaper.cutout) return { x: -kickerWidth / 2, y: top - above, width: kickerWidth, height: kickerHeight };
-      return { x: -wide / 2, y: top - above, width: wide, height: above + digitsHeight };
-    };
-    const at = (box: { x: number; y: number; width: number; height: number }, middle: number) => ({ ...box, x: middle + box.x });
-    const restBox = at(backed(restTop, restDigits, cap * token("type-clock_rest-size")), cx);
-    const awakeBox = at(backed(awakeTop, awakeDigits, cap * token("type-clock-size")), width / 2);
+    const restDigitsBox = { x: cx - restDigits / 2, y: restTop, width: restDigits, height: cap * token("type-clock_rest-size") };
+    const tint = tintFor(picture, restDigitsBox, cover);
+    if (tint) clock.style.setProperty("--digits-tint", tint);
+    else clock.style.removeProperty("--digits-tint");
+
+    const kickerBox = (top: number, middle: number) => ({ x: middle - kickerWidth / 2, y: top - above, width: kickerWidth, height: kickerHeight });
     const dimmed = { blur: token("size-lock_blur"), dim: number("opacity-panel_scrim") };
-    // The shade is a box blurred past the words, so its opacity is raised by what the blur leaves
-    // at their corners: the words hold 4.5:1 where it is weakest.
-    const spread = wallpaper.cutout ? { x: token("space-s16"), y: token("space-s12") } : { x: token("space-s32"), y: token("space-s32") };
-    const left = backingCover(spread, wallpaper.cutout ? token("space-s8") : token("space-s16"));
+    // The shade is a box blurred past the kicker, so its opacity is raised by what the blur leaves
+    // at the kicker's corners: the words hold 4.5:1 where it is weakest.
+    const left = backingCover({ x: token("space-s16"), y: token("space-s12") }, token("space-s8"));
     const shade = (needed: number) => String(Math.min(1, Math.ceil((needed / left) * 100) / 100));
-    clock.style.setProperty("--shade-rest", shade(shadeFor(picture, colours, words, restBox, cover)));
-    clock.style.setProperty("--shade-awake", shade(shadeFor(picture, colours, words, awakeBox, cover, dimmed)));
+    clock.style.setProperty("--shade-rest", shade(shadeFor(picture, colours, KICKER_WORDS, kickerBox(restTop, cx), cover)));
+    clock.style.setProperty("--shade-awake", shade(shadeFor(picture, colours, KICKER_WORDS, kickerBox(awakeTop, width / 2), cover, dimmed)));
   };
   const watch = new ResizeObserver(place);
   watch.observe(element);

@@ -75,6 +75,7 @@ function valueWords(value: Value): string {
   const token = tokenOf(value);
   if (typeof value === "number") return shown(value);
   if ("opacity" in value) return `\`${token}\` ${shown(number(`opacity-${value.opacity}`))}`;
+  if ("scale" in value) return `\`${token}\` ${shown(number(`scale-${value.scale}`))}`;
   return `\`${token}\``;
 }
 

@@ -3,7 +3,8 @@
 //
 // The advances are measured as iced lays text out: plain ASCII unkerned, with no ligatures, and
 // anything else shaped with kerning. They are measured at 64 times the size, where the canvas's
-// rounding is under a thousandth of a pixel, in logical pixels, which the box scales.
+// rounding is under a thousandth of a pixel, in logical pixels, which the box scales. A style with
+// tabular figures is measured laid out in the page, as the canvas has no font features.
 
 import { probe } from "./probe.ts";
 import { length, names } from "./tokens.ts";
@@ -11,7 +12,7 @@ import { length, names } from "./tokens.ts";
 /** A type style, by its name in `design/tokens.toml`. */
 export type TypeStyle =
   | "clock_rest" | "clock" | "hero" | "hero_number" | "display" | "title" | "headline" | "heading" | "subheading"
-  | "body_large" | "body" | "body_strong" | "button_large" | "button" | "button_small" | "label"
+  | "body_large" | "body" | "body_number" | "body_strong" | "button_large" | "button" | "button_small" | "label"
   | "label_number" | "small" | "caption" | "accent" | "mono" | "keycap" | "mono_large";
 
 const PRECISION = 64;
@@ -56,14 +57,39 @@ export function advance(style: TypeStyle, words: string): number {
   const key = `${style}|${words}`;
   const known = widths.get(key);
   if (known !== undefined) return known;
+  const shape = shaped(words);
+  const width = (tabular(style) ? laidOut(style, words, shape) : measured(style, words, shape)) / PRECISION;
+  widths.set(key, width);
+  return width;
+}
+
+/** Whether `style` draws its figures tabular (OpenType `tnum`). */
+function tabular(style: TypeStyle): boolean {
+  return getComputedStyle(document.documentElement).getPropertyValue(`--type-${style}-features`).trim() !== "normal";
+}
+
+/** `words`' advance at `PRECISION` times `style`'s size, measured on the canvas. */
+function measured(style: TypeStyle, words: string, shape: boolean): number {
   canvas ??= document.createElement("canvas").getContext("2d");
   if (!canvas) throw new Error("no 2D canvas to measure text with");
   canvas.font = font(style);
-  const shape = shaped(words);
   canvas.fontKerning = shape ? "normal" : "none";
   canvas.textRendering = shape ? "optimizeLegibility" : "optimizeSpeed";
-  const width = canvas.measureText(words).width / PRECISION;
-  widths.set(key, width);
+  return canvas.measureText(words).width;
+}
+
+/** `words`' advance at `PRECISION` times `style`'s size, laid out with the style's features. */
+function laidOut(style: TypeStyle, words: string, shape: boolean): number {
+  const meter = document.createElement("span");
+  meter.style.cssText = "position:absolute;visibility:hidden;white-space:pre";
+  meter.style.font = font(style);
+  meter.style.fontFeatureSettings = `var(--type-${style}-features)`;
+  meter.style.fontKerning = shape ? "normal" : "none";
+  meter.style.fontVariantLigatures = shape ? "normal" : "none";
+  meter.textContent = words;
+  document.documentElement.append(meter);
+  const width = meter.getBoundingClientRect().width;
+  meter.remove();
   return width;
 }
 
@@ -163,6 +189,7 @@ export const STYLE_WORDS: Record<TypeStyle, string> = {
   subheading: "Couldn't connect",
   body_large: "Everything on this disk will be erased.",
   body: "KubaOS takes the whole disk and encrypts it.",
+  body_number: "21:47",
   body_strong: "Samsung 990 Pro",
   button_large: "Install",
   button: "Continue",
