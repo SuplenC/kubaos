@@ -2634,6 +2634,7 @@
 
 /* The middle, `space.s12` under the title, its scroller clipped at its edges with a rule on each. */
 .k-dialog-middle {
+  --foot: var(--space-s24);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -2646,22 +2647,27 @@
 }
 
 /* The body and what follows it, in line with the title, scrolling with no bar of its own. It
-   reaches out to the dialog's edges, so a field's glow inside it isn't cut, and holds
-   `space.s12` under its end, where the rest of the gap above the buttons is the spare room's.
-   Tab scrolls what it lands on `space.s12` clear of the edges. */
+   reaches out to the dialog's edges and holds the whole `space.s24` above the buttons under its
+   end (`--foot`), so a lit field's glow inside it is never cut and never reads as more to scroll.
+   While more is below, it shows only down to its rule, `--foot` above its end. Tab scrolls what
+   it lands on `space.s12` clear of the edges it shows. */
 .k-dialog-middle > .k-dialog-scroll {
   flex: 0 1 auto;
   min-height: 0;
   margin-inline: calc(-1 * var(--space-s24));
-  padding: 0 var(--space-s24) var(--space-s12) calc(var(--space-s24) + var(--type-heading-icon) + var(--space-s12));
+  padding: 0 var(--space-s24) var(--foot) calc(var(--space-s24) + var(--type-heading-icon) + var(--space-s12));
   overflow-y: auto;
   scrollbar-width: none;
-  scroll-padding-block: var(--space-s12);
+  scroll-padding-block: var(--space-s12) calc(var(--foot) + var(--space-s12));
   outline: none;
 }
 
-.k-dialog-column[data-bare] .k-dialog-scroll {
-  padding-bottom: 0;
+.k-dialog-column[data-bare] > .k-dialog-middle {
+  --foot: 0px;
+}
+
+.k-dialog-middle[data-below] > .k-dialog-scroll {
+  clip-path: inset(0 0 var(--foot));
 }
 
 .k-dialog-scroll > * {
@@ -2672,10 +2678,10 @@
   margin-top: var(--space-s16);
 }
 
-/* The room the dialog's least height leaves over, at least `space.s12`: with the middle's own, the
-   `space.s24` above the buttons. */
+/* The room the dialog's least height leaves over, above the buttons and under the middle's own
+   `space.s24`. */
 .k-dialog-column > .k-dialog-spare {
-  flex: 1 0 var(--space-s12);
+  flex: 1 0 0;
 }
 
 /* A divider at the middle's top or bottom edge, across the dialog's padding, the middle scrolling
@@ -2692,8 +2698,9 @@
   top: 0;
 }
 
+/* No higher than the middle's top, where too short a room has squeezed it. */
 .k-dialog-rule[data-at="below"] {
-  bottom: 0;
+  bottom: min(var(--foot), 100%);
 }
 
 .k-dialog-middle[data-above] > .k-dialog-rule[data-at="above"],
