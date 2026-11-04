@@ -254,6 +254,7 @@ kubaos channel stable            # or edge
 kubaos upgrade                   # stable only: move to the next series (Upgrade to <codename> in the menu)
 kubaos packages status           # KubaOS's apt packages against the release: installed, missing, held, extra
 kubaos packages disable docker   # leave an optional group out for good (enable brings it back)
+kubaos firmware off              # leave firmware out of kubaos update (on brings it back)
 ```
 
 An update, in order:
@@ -264,10 +265,11 @@ An update, in order:
 4. Switches your home back to the release when it is a live preview ("Hacking on KubaOS", below). Takes a snapper snapshot, copies your `flake.lock` to `~/.local/state/kubaos/locks/`, and adds a line to `/var/lib/kubaos/update-history`.
 5. `apt-get upgrade`, then moves `/usr/share/kubaos`'s `release` branch.
 6. When the release's `system/files/apt/preferences.d/kubaos-hyprland` differs from the installed one (amd64): unholds the Hyprland stack, installs the pinned versions, holds it again.
-7. Brings the apt packages in line with the release's package manifest, `system/packages.toml` (below): installs what its groups list and the machine lacks, holds the held ones, and removes a package no group lists any more, but only one KubaOS installed and nothing else needs.
+7. Brings the apt packages in line with the release's package manifest, `system/packages.toml` (below): installs what its groups list and the machine lacks, holds the held ones, and removes a package no group lists any more, but only one KubaOS installed and nothing else needs. It does this on every run, so a package a release adds to the base system reaches a machine installed before it.
 8. Runs the release's new system migrations (`migrations/system/`, as root), each once.
 9. `nix flake update --flake ~/.config/kubaos/home`, `system/relink.sh` (the wallpaper, PAM and recorder links), and a switch.
-10. Runs the new user migrations (`migrations/user/`, as you), each once, and writes `/var/lib/kubaos/release`.
+10. Runs the new user migrations (`migrations/user/`, as you), each once.
+11. Updates firmware through fwupd (below), then writes `/var/lib/kubaos/release`.
 
 In a terminal each of these phases gets one line: a spinner and the program's latest line while it runs, then a tick, a cross or "skipped", its time and what it did. A warning is one dimmed line under its phase. sudo asks for your password only when its cached one has run out, on a clean line. The programs' own output doesn't scroll past: it goes to a log, `~/.local/state/kubaos/update/<date>-update.log` (the last 10 runs are kept). When a step fails you see its last 20 lines and the log's path. At the end a summary says what moved where, the changes, the packages, the migrations that ran, what the session reloaded, whether you need to log in again or reboot, and how to undo it:
 
@@ -283,6 +285,10 @@ In a terminal each of these phases gets one line: a spinner and the program's la
 ```
 
 Piped or in a log, the output is plain lines with no colour; `NO_COLOR=1` drops the colour in a terminal too. `--json` (on `update`, `upgrade` and `rollback`) prints one JSON event per line instead, for a program to show; the events are in [`docs/CONTRACTS.md`](CONTRACTS.md), "Updates and migrations". apt runs without questions and keeps your changed files under `/etc`, leaving the package's new version beside each as `.dpkg-dist`.
+
+### Firmware
+
+The last phase of an update refreshes fwupd's list from the LVFS and installs the firmware updates that need no reboot, a dock's or a receiver's. Firmware that installs only at the next boot (the system firmware, the Secure Boot lists) is named, and in a terminal the update asks "Stage it now?": yes hands it to fwupd, which installs it when you next reboot, and the summary says to reboot. Nothing reboots by itself. With `-y` or `--json` nobody is asked, so it only waits; the next `kubaos update` in a terminal offers it again, or run `sudo fwupdmgr update` yourself. A failure is a warning and the update goes on. "Firmware updates off" in the Command menu (or `kubaos firmware off`) leaves firmware out of the update, "Firmware updates on" brings it back; `kubaos firmware` says which. The switch is the flag file `~/.config/kubaos/desktop/update/no-firmware`.
 
 ### KubaOS's apt packages
 
