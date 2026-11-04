@@ -1,7 +1,7 @@
-// The full-screen moments the Backdrop page shows: the lock screen, polkit's prompt over the
-// desktop, Kōbō's welcome and done screens, and the glass panel Kōbō's step-rail screens hold. Their
-// words and parts are stand-ins from the library; each screen's own organisms (the done screen's
-// neon strokes, the lock's authentication) are its surface's pages.
+// The full-screen moments the Backdrop page shows: polkit's prompt over the desktop, Kōbō's welcome
+// and done screens, and the glass panel Kōbō's step-rail screens hold. Their words and parts are
+// stand-ins from the library; each screen's own organisms (the done screen's neon strokes) are its
+// surface's pages.
 
 import "./backdrops.css";
 import blurred from "../../../../../crates/kubaos-kobo/assets/wallpaper-blur.jpg?url";
@@ -12,15 +12,12 @@ import { backdrop, givesWay, glassPanel } from "../../lib/backdrop.ts";
 import { button } from "../../lib/button.ts";
 import type { Words } from "../../lib/content.ts";
 import { dialog } from "../../lib/dialog.ts";
-import { field, fieldRoom, labelled, note } from "../../lib/field.ts";
-import { icon } from "../../lib/icon.ts";
+import { field, labelled } from "../../lib/field.ts";
 import { keyHints } from "../../lib/keycap.ts";
 import { gap, row, stack } from "../../lib/layout.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { text, wrapped } from "../../lib/text.ts";
-import { raw } from "../../lib/tokens.ts";
 import { label } from "../../site/dom.ts";
-import { settings } from "../../site/settings.ts";
 import { desk } from "./panels.ts";
 
 /** The size a sample is drawn at: an app's least width, and its default height, so Kōbō's sign shows. */
@@ -28,11 +25,6 @@ export const SAMPLE: { readonly width: string; readonly height: string } = { wid
 
 /** What a screen shows: at rest, waiting on the machine, or after something went wrong. */
 export type Moment = "rest" | "loading" | "error";
-
-export const LOCK_ERROR: Words = {
-  short: "Wrong password. Fat fingers? Try again.",
-  long: "Fingerprint not recognised. Wrong finger? Try again or type your password",
-};
 
 export const HERO: Words = { short: "Let's fix this shit.", long: "Let's fix this shit, once and for all, properly this time." };
 
@@ -48,81 +40,6 @@ function column(width: string, ...parts: Element[]): HTMLElement {
   const box = stack(0, "centre", ...parts);
   box.style.width = width;
   return box;
-}
-
-/** The lock's field, `state`'s: waiting while the password is checked, wrong after a miss. */
-function lockField(moment: Moment): HTMLElement {
-  const busy = moment === "loading";
-  return field({ icon: busy ? "hourglass_top" : "lock", placeholder: busy ? "Checking…" : "Password", secret: true, ...(moment === "error" ? { state: "Invalid" as const } : {}) });
-}
-
-/** The line under the lock's field: the other ways in, or what went wrong. */
-function lockStatus(moment: Moment, error: string): HTMLElement {
-  if (moment === "error") return note(error, true);
-  return row("s8", "centre", icon("fingerprint", "var(--type-small-icon)", "var(--color-primary)"), text("Or touch the fingerprint reader", "small", "on_surface_variant"));
-}
-
-/** The lock's column: the accent, the clock, the date, the field and the line under it. */
-export function lockColumn(moment: Moment = "rest", error = LOCK_ERROR.short): HTMLElement {
-  const room = fieldRoom("var(--size-password)", lockField(moment));
-  room.classList.add("k-lock-field");
-  return column(
-    "var(--size-dialog)",
-    text("東京・月曜日", "accent", "primary"),
-    text("21:47", "clock"),
-    gap("s8"),
-    text("Monday, 2 November", "body_large", "on_surface_variant"),
-    gap("s48"),
-    room,
-    gap("s8"),
-    lockStatus(moment, error),
-  );
-}
-
-export function lock(moment: Moment = "rest", error?: string): HTMLElement {
-  return backdrop({ ...SAMPLE, picture: blurred, scrim: "band", content: lockColumn(moment, error), lift: "s64" });
-}
-
-/** The lock, live: Enter with a password shakes the field and says so; Esc clears it. */
-export function liveLock(width: string = SAMPLE.width, height: string = SAMPLE.height): HTMLElement {
-  const content = lockColumn();
-  const screen = backdrop({ width, height, picture: blurred, scrim: "band", content, lift: "s64" });
-  const room = content.querySelector<HTMLElement>(".k-lock-field")!;
-  const status = () => room.parentElement!.lastElementChild as HTMLElement;
-  const fresh = (moment: Moment) => {
-    const next = lockField(moment);
-    room.replaceChildren(next);
-    status().replaceWith(lockStatus(moment, LOCK_ERROR.short));
-    requestAnimationFrame(() => next.focus({ focusVisible: true, preventScroll: true } as FocusOptions));
-    return next;
-  };
-  room.addEventListener("keydown", (event) => {
-    const typed = room.querySelector(".k-field-room")?.textContent ?? "";
-    if (event.key === "Escape") fresh("rest");
-    if (event.key !== "Enter" || typed === "") return;
-    event.preventDefault();
-    fresh("error");
-    if (!settings().reduced) room.animate(shakeFrames(), { duration: 3 * millis("micro") + millis("short") });
-  });
-  return screen;
-}
-
-/** A duration token in milliseconds, as the toolbar's speed divides it. */
-function millis(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
-}
-
-/** The wrong password's shake: `space.s12`, back `space.s8`, `space.s4`, each over `micro`, then home over `short`. */
-function shakeFrames(): Keyframe[] {
-  const total = 3 * millis("micro") + millis("short");
-  const at = (n: number) => (n * millis("micro")) / total;
-  return [
-    { "--jolt": "0", offset: 0 },
-    { "--jolt": "3", offset: at(1) },
-    { "--jolt": "-2", offset: at(2) },
-    { "--jolt": "1", offset: at(3), easing: raw("easing-standard_decel") },
-    { "--jolt": "0", offset: 1 },
-  ];
 }
 
 /** Polkit's prompt over the desktop it asks on, the desktop dimmed under it. */
@@ -217,12 +134,10 @@ export function stepRailHost(width: string = SAMPLE.width, height: string = SAMP
   return backdrop({ width, height, picture: wallpaper, scrim: "dim", content: panel });
 }
 
-/** A screen at the toolbar's window size: each of the four moments, as the reflow shows them. */
-export function atSize(which: "lock" | "polkit" | "welcome" | "done" | "host", width: string, height: string): HTMLElement {
+/** A screen at the toolbar's window size: each of the moments, as the reflow shows them. */
+export function atSize(which: "polkit" | "welcome" | "done" | "host", width: string, height: string): HTMLElement {
   const size = { width, height };
   switch (which) {
-    case "lock":
-      return liveLock(width, height);
     case "polkit": {
       const { screen } = desk(width, height);
       return backdrop({ ...size, scrim: "dim", content: polkitDialog(), under: screen.element });
