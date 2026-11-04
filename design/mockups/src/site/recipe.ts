@@ -109,6 +109,7 @@ export function cuePhases(track: Track): readonly Duration[] {
 export function tokenOf(value: Value): string | null {
   if (typeof value === "number") return null;
   if ("opacity" in value) return `opacity.${value.opacity}`;
+  if ("scale" in value) return `scale.${value.scale}`;
   if ("color" in value) return `color.${value.color}`;
   return value.length.replace("-", ".");
 }
@@ -117,6 +118,7 @@ export function tokenOf(value: Value): string | null {
 export function css(value: Value): number | string {
   if (typeof value === "number") return value;
   if ("opacity" in value) return number(`opacity-${value.opacity}`);
+  if ("scale" in value) return number(`scale-${value.scale}`);
   if ("color" in value) return `var(--color-${value.color})`;
   return `var(--${value.length})`;
 }
@@ -345,6 +347,7 @@ function valueJson(value: Value): Record<string, unknown> {
   const token = tokenOf(value);
   if (typeof value === "number") return { value };
   if ("opacity" in value) return { token, value: number(`opacity-${value.opacity}`) };
+  if ("scale" in value) return { token, value: number(`scale-${value.scale}`) };
   if ("color" in value) return { token };
   return { token, logicalPx: length(value.length) };
 }

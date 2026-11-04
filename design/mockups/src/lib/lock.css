@@ -84,15 +84,15 @@
 }
 
 /* The desktop's windows, as the still shows them: tiled `space.s8` inside the frame as Hyprland's
-   `gaps_out` puts them, `space.s8` apart, the bar's height at the top. Locking shrinks them to 0.96
-   round the middle of the screen as they fade; at rest and awake they are gone. */
+   `gaps_out` puts them, `space.s8` apart, the bar's height at the top. Locking shrinks them to
+   `scale.behind` round the middle of the screen as they fade; at rest and awake they are gone. */
 .k-lock-windows {
   position: absolute;
   inset: calc(var(--size-bar) + var(--space-s8)) var(--space-s16) var(--space-s16);
   display: flex;
   gap: var(--space-s8);
   opacity: 0;
-  scale: 0.96;
+  scale: var(--scale-behind);
 }
 
 .k-lock[data-phase="desktop"] .k-lock-windows {
@@ -145,7 +145,7 @@
 /* The clock: the digits' box, their cap height down to their baseline, with the kicker
    `space.s16` above it. Its size and place mix three: the rest clock in `type.clock_rest` where
    the wallpaper puts it, the awake one in `type.clock` centred `space.s48` under the frame's top,
-   and the bar's time in `type.mono_large` where the pill puts it, as `--lift` and `--dock` say.
+   and the bar's time in `type.body_number` where the pill puts it, as `--lift` and `--dock` say.
    The box is on whole device pixels, and the kicker centred over it, the odd pixel after it.
    It stands behind the cut-out, and above the frame while it flies to or from the bar. */
 .k-lock-clock {
@@ -153,11 +153,11 @@
   z-index: var(--above);
   display: block;
   --k-awake: calc(1 + (var(--type-clock-size) / var(--type-clock_rest-size) - 1) * var(--lift));
-  --k: calc(var(--k-awake) * (1 - var(--dock)) + var(--type-mono_large-size) / var(--type-clock_rest-size) * var(--dock));
+  --k: calc(var(--k-awake) * (1 - var(--dock)) + var(--type-body_number-size) / var(--type-clock_rest-size) * var(--dock));
   --digits-width: round(up, calc(var(--digits-natural) * var(--px) * var(--k) - 0.001px), 1px);
   --digits-height: calc(var(--cap-height) * var(--type-clock_rest-size) * var(--k));
   --awake-top: calc(var(--space-s8) + var(--space-s48) + var(--kicker-height, 0px) + var(--space-s16));
-  --bar-top: calc((var(--frame-top) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-mono_large-size));
+  --bar-top: calc((var(--frame-top) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-body_number-size));
   --placed-cx: calc(var(--rest-cx, 50%) + (50% - var(--rest-cx, 50%)) * var(--lift));
   --placed-top: calc(var(--rest-top, 0px) + (var(--awake-top) - var(--rest-top, 0px)) * var(--lift));
   --cx: calc(var(--placed-cx) * (1 - var(--dock)) + var(--bar-cx, 50%) * var(--dock));
@@ -183,7 +183,11 @@
   opacity: 0;
 }
 
+/* The digits: at rest a light tint of the picture behind them (`--digits-tint`, worked out from the
+   picture), so they read as part of it; awake and in the bar `on_surface`, as the rest of the
+   lock's and the bar's words are. The tint gives way as the clock lifts or flies. */
 .k-lock .k-lock-digits {
+  --settled: calc(1 - (1 - var(--lift)) * (1 - var(--dock)));
   position: absolute;
   top: 0;
   left: 0;
@@ -192,39 +196,29 @@
   font-size: calc(var(--type-clock_rest-size) * var(--k));
   line-height: calc(var(--type-clock_rest-size) * var(--k));
   text-box: trim-both cap alphabetic;
+  color: color-mix(in oklab, var(--color-on_surface) calc(var(--settled) * 100%), var(--digits-tint, var(--color-on_surface)));
 }
 
-/* The shade: `surface` behind the words it backs, a box `--spread` past them blurred by `--soft`,
-   so it has no edge and no shape of its own, at the opacity that keeps them at 4.5:1 over this
-   picture where the blur leaves least of it. With a cut-out it backs the kicker alone, the digits
-   standing in the sky: `space.s16` past it across, `space.s12` down, blurred by `space.s8`. With
-   none it backs the whole clock, `space.s32` past it, blurred by `space.s16`. It fades as the
-   clock flies to the bar. */
+/* The shade: `surface` behind the kicker, a capsule `space.s16` past it across and `space.s12`
+   down, blurred by `space.s8`, so it has no edge and no shape of its own, at the opacity that keeps
+   the kicker's words at 4.5:1 over this picture where the blur leaves least of it. The digits have
+   none: they are large enough to read as the picture's own colour. It fades as the clock flies to
+   the bar. */
 .k-lock-shade {
   position: absolute;
   z-index: -1;
   display: block;
   --spread-x: var(--space-s16);
   --spread-y: var(--space-s12);
-  --backed: var(--kicker-width, 0px);
   --shade: calc((var(--shade-rest, 0) + (var(--shade-awake, 0) - var(--shade-rest, 0)) * var(--lift)) * (1 - var(--dock)));
-  left: calc(round(down, calc((var(--digits-width) - var(--backed)) / 2), 1px) - var(--spread-x));
+  left: calc(round(down, calc((var(--digits-width) - var(--kicker-width, 0px)) / 2), 1px) - var(--spread-x));
   top: calc(-1 * (var(--space-s16) + var(--kicker-height, 0px) + var(--spread-y)));
-  width: calc(var(--backed) + 2 * var(--spread-x));
+  width: calc(var(--kicker-width, 0px) + 2 * var(--spread-x));
   height: calc(var(--kicker-height, 0px) + 2 * var(--spread-y));
   border-radius: var(--radius-full);
   background: rgb(from var(--color-surface) r g b / var(--shade));
   filter: blur(var(--space-s8));
   pointer-events: none;
-}
-
-.k-lock:not([data-cutout]) .k-lock-shade {
-  --spread-x: var(--space-s32);
-  --spread-y: var(--space-s32);
-  --backed: max(var(--kicker-width, 0px), var(--digits-width));
-  height: calc(var(--kicker-height, 0px) + var(--space-s16) + var(--digits-height) + 2 * var(--spread-y));
-  border-radius: 0;
-  filter: blur(var(--space-s16));
 }
 
 /* The foreground cut out of the picture, lying exactly over it and in front of the clock; it
@@ -269,7 +263,8 @@
   translate: round(nearest, calc(var(--jolt) * var(--space-s4)), 1px) 0;
 }
 
-/* Measures Geist Light's cap height: a digit in the rest clock's size, trimmed as the digits are. */
+/* Measures the digits in the rest clock's style, its figures tabular, and Geist Light's cap height:
+   a digit in that size, trimmed as the digits are. */
 .k-lock-meter {
   position: absolute;
   visibility: hidden;
@@ -280,6 +275,7 @@
   font-family: var(--type-clock_rest-family);
   font-size: var(--type-clock_rest-size);
   font-weight: var(--type-clock_rest-weight);
+  font-feature-settings: var(--type-clock_rest-features);
   line-height: var(--type-clock_rest-size);
   text-box: trim-both cap alphabetic;
 }
