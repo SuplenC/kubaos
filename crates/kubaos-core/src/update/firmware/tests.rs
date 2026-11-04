@@ -1,10 +1,7 @@
 use super::Firmware;
 use super::FirmwareOutcome;
 use super::FirmwareUpdate;
-use super::NO_FIRMWARE;
-use super::Setting;
 use super::parse_updates;
-use crate::apt::Switch;
 
 /// `fwupdmgr get-updates --json` on a laptop whose Secure Boot dbx waits, trimmed.
 const REBOOT: &str = include_str!("reboot.json");
@@ -119,22 +116,4 @@ fn the_result_is_one_object_a_device_with_its_outcome() {
         r#"[{"device":"BIOS","id":"b","from":"1","to":"2","reboot":true,"outcome":"waiting"}]"#
     );
     assert_eq!(serde_json::from_str::<Firmware>(&json).unwrap(), waiting);
-}
-
-#[test]
-fn firmware_updates_are_on_until_the_flag_file_turns_them_off() {
-    let layer = tempfile::tempdir().unwrap();
-    let setting = Setting::in_layer(layer.path());
-    assert_eq!(setting.path(), layer.path().join("desktop/update").join(NO_FIRMWARE));
-    assert!(setting.is_on());
-
-    setting.set(Switch::Off).unwrap();
-    assert!(!setting.is_on());
-    setting.set(Switch::Off).unwrap();
-    assert!(!setting.is_on());
-
-    setting.set(Switch::On).unwrap();
-    assert!(setting.is_on());
-    setting.set(Switch::On).unwrap();
-    assert!(setting.is_on());
 }

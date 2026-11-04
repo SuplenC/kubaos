@@ -1,15 +1,16 @@
-//! The user's switches for the update's program phases: whether `kubaos update` moves Bitwarden
-//! desktop and Nix on within their series. Each is on unless its flag file is in the user layer's
-//! `desktop/update/` folder: `no-bitwarden`, `no-nix`, no contents.
+//! The user's switches for the parts of `kubaos update` that can be turned off: moving Bitwarden
+//! desktop and Nix on within their series, and firmware through fwupd. Each is on unless its flag
+//! file is in the user layer's `desktop/update/` folder: `no-bitwarden`, `no-nix`, `no-firmware`,
+//! no contents, so a user layer from before a switch keeps that part on.
 //!
 //! # Owns
 //!
-//! - Reading and writing the flag files ([`Switches`]).
+//! - [`Part`], and reading and writing the flag files ([`Switches`]).
 //!
 //! # Not here
 //!
-//! - The phases: `updater/bitwarden.rs` and `updater/nix.rs`. The menu's state: `kotodama-kubaos`'
-//!   `states.rs`.
+//! - The phases: `updater/bitwarden.rs`, `updater/nix.rs` and `updater/firmware.rs`. The menu's
+//!   states: `kotodama-kubaos`' `states.rs`. The command: `kubaos update --turn-on|--turn-off`.
 
 use std::fs;
 use std::io;
@@ -20,11 +21,34 @@ use kubaos_user_layer::App;
 
 use super::event::Program;
 
-/// The flag file that turns `program`'s updates off.
-pub fn flag(program: Program) -> &'static str {
-    match program {
-        Program::Bitwarden => "no-bitwarden",
-        Program::Nix => "no-nix",
+/// A part of the update the user can turn off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Part {
+    /// Bitwarden desktop, moved on within its series.
+    Bitwarden,
+    /// The Nix daemon, moved on within its minor.
+    Nix,
+    /// Firmware, through fwupd and the LVFS.
+    Firmware,
+}
+
+impl Part {
+    /// The flag file that turns it off.
+    pub fn flag(self) -> &'static str {
+        match self {
+            Self::Bitwarden => "no-bitwarden",
+            Self::Nix => "no-nix",
+            Self::Firmware => "no-firmware",
+        }
+    }
+}
+
+impl From<Program> for Part {
+    fn from(program: Program) -> Self {
+        match program {
+            Program::Bitwarden => Self::Bitwarden,
+            Program::Nix => Self::Nix,
+        }
     }
 }
 
@@ -43,36 +67,36 @@ impl Switches {
         }
     }
 
-    /// The flag file of `program`.
-    pub fn path(&self, program: Program) -> PathBuf {
-        self.dir.join(flag(program))
+    /// The flag file of `part`.
+    pub fn path(&self, part: Part) -> PathBuf {
+        self.dir.join(part.flag())
     }
 
-    /// Whether the update moves `program` on.
-    pub fn is_on(&self, program: Program) -> bool {
-        !self.path(program).exists()
+    /// Whether the update runs `part`.
+    pub fn is_on(&self, part: Part) -> bool {
+        !self.path(part).exists()
     }
 
-    /// Turns `program`'s updates on: its flag file goes.
+    /// Turns `part` on: its flag file goes.
     ///
     /// # Errors
     ///
     /// When the flag file is there and can't be removed.
-    pub fn turn_on(&self, program: Program) -> io::Result<()> {
-        match fs::remove_file(self.path(program)) {
+    pub fn turn_on(&self, part: Part) -> io::Result<()> {
+        match fs::remove_file(self.path(part)) {
             Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
             _ => Ok(()),
         }
     }
 
-    /// Turns `program`'s updates off: its flag file is made, with its folder.
+    /// Turns `part` off: its flag file is made, with its folder.
     ///
     /// # Errors
     ///
     /// When the folder or the file can't be made.
-    pub fn turn_off(&self, program: Program) -> io::Result<()> {
+    pub fn turn_off(&self, part: Part) -> io::Result<()> {
         fs::create_dir_all(&self.dir)?;
-        fs::write(self.path(program), "")
+        fs::write(self.path(part), "")
     }
 }
 

@@ -7,7 +7,6 @@ use super::phases;
 use super::summary;
 use super::warnings;
 use super::yes;
-use crate::apt::Switch;
 use crate::update::Confirm;
 use crate::update::UpdateOptions;
 use crate::update::event::Outcome;
@@ -16,7 +15,8 @@ use crate::update::event::Restart;
 use crate::update::event::UpdateEvent;
 use crate::update::firmware::Firmware;
 use crate::update::firmware::FirmwareOutcome;
-use crate::update::firmware::Setting;
+use crate::update::programs::Part;
+use crate::update::programs::Switches;
 use crate::update::record::Channel;
 
 /// A dock and a receiver that update at once, and system firmware that needs a reboot.
@@ -86,7 +86,7 @@ fn without_fwupd_the_update_warns_and_runs_no_firmware_phase() {
 #[test]
 fn turned_off_the_update_leaves_firmware_alone() {
     let w = with_fwupd();
-    Setting::in_layer(&w.user.user_layer()).set(Switch::Off).unwrap();
+    Switches::new(w.user.config_home()).turn_off(Part::Firmware).unwrap();
     let mut m = listing(MIXED);
     let mut events = Vec::new();
 

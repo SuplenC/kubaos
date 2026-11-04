@@ -11,7 +11,7 @@
 //!
 //! # Not here
 //!
-//! - fwupd's JSON, the phase's result and the switch: `update/firmware.rs`.
+//! - fwupd's JSON and the phase's result: `update/firmware.rs`. The switch: `update/programs.rs`.
 
 use super::Updater;
 use crate::update::event::Phase;
@@ -21,10 +21,11 @@ use crate::update::firmware::Firmware;
 use crate::update::firmware::FirmwareOutcome;
 use crate::update::firmware::FirmwareUpdate;
 use crate::update::firmware::NOTHING_TO_DO;
-use crate::update::firmware::Setting;
 use crate::update::machine::Cmd;
 use crate::update::machine::Machine;
 use crate::update::machine::MachineError;
+use crate::update::programs::Part;
+use crate::update::programs::Switches;
 
 /// fwupdmgr on the machine, which the fwupd package installs.
 const FWUPDMGR: &str = "usr/bin/fwupdmgr";
@@ -55,7 +56,7 @@ impl<M: Machine> Updater<'_, M> {
     /// Runs the firmware phase, unless the user turned it off or the machine has no fwupd; what it
     /// did.
     pub(super) fn update_firmware(&mut self, staging: Staging) -> Firmware {
-        if !Setting::in_layer(&self.user.user_layer()).is_on() {
+        if !Switches::new(self.user.config_home()).is_on(Part::Firmware) {
             return Firmware::default();
         }
         if !self.sys.root().join(FWUPDMGR).is_file() {

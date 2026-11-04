@@ -151,18 +151,6 @@ fn the_greeting_is_on_until_its_off_file_exists() {
 }
 
 #[test]
-fn firmware_updates_are_on_until_their_off_file_exists() {
-    let machine = Machine::new();
-
-    let before = machine.read();
-    machine.write("config/kubaos/desktop/update/no-firmware", "");
-    let after = machine.read();
-
-    assert_eq!(before.get(FIRMWARE), Some(&on(true)));
-    assert_eq!(after.get(FIRMWARE), Some(&on(false)));
-}
-
-#[test]
 fn the_phone_link_is_on_while_its_file_exists() {
     let machine = Machine::new();
 
@@ -175,17 +163,20 @@ fn the_phone_link_is_on_while_its_file_exists() {
 }
 
 #[test]
-fn each_program_of_the_update_is_on_until_its_off_file_exists() {
+fn each_part_of_the_update_is_on_until_its_off_file_exists() {
     let machine = Machine::new();
 
     let before = machine.read();
     machine.write("config/kubaos/desktop/update/no-nix", "");
+    machine.write("config/kubaos/desktop/update/no-firmware", "");
     let after = machine.read();
 
-    assert_eq!(before.get(UPDATE_BITWARDEN), Some(&on(true)));
-    assert_eq!(before.get(UPDATE_NIX), Some(&on(true)));
+    for state in [UPDATE_BITWARDEN, UPDATE_NIX, FIRMWARE] {
+        assert_eq!(before.get(state), Some(&on(true)), "{state}");
+    }
     assert_eq!(after.get(UPDATE_BITWARDEN), Some(&on(true)));
     assert_eq!(after.get(UPDATE_NIX), Some(&on(false)));
+    assert_eq!(after.get(FIRMWARE), Some(&on(false)));
 }
 
 #[test]

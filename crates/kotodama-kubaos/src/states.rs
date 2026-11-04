@@ -61,8 +61,7 @@ use kubaos_core::state::user_flake;
 use kubaos_core::suites::catalog;
 use kubaos_core::unfree::Setting as UnfreeSetting;
 use kubaos_core::unfree::Unfree;
-use kubaos_core::update::event::Program;
-use kubaos_core::update::firmware::Setting as FirmwareSetting;
+use kubaos_core::update::programs::Part;
 use kubaos_core::update::programs::Switches;
 use kubaos_core::update::record::SystemPaths;
 use kubaos_core::wallpaper_depth;
@@ -282,9 +281,9 @@ impl States {
         self.set(AUTOMOUNT, Reading::Bool(files.automount.automount()));
         self.set(GREETING, Reading::Bool(!files.no_greeting.exists()));
         self.set(PHONE_LINK, Reading::Bool(files.phone.is_on()));
-        self.set(FIRMWARE, Reading::Bool(files.firmware.is_on()));
-        self.set(UPDATE_BITWARDEN, Reading::Bool(files.updates.is_on(Program::Bitwarden)));
-        self.set(UPDATE_NIX, Reading::Bool(files.updates.is_on(Program::Nix)));
+        self.set(FIRMWARE, Reading::Bool(files.updates.is_on(Part::Firmware)));
+        self.set(UPDATE_BITWARDEN, Reading::Bool(files.updates.is_on(Part::Bitwarden)));
+        self.set(UPDATE_NIX, Reading::Bool(files.updates.is_on(Part::Nix)));
         if let Ok(keyboard) = keyboard_settings::Settings::load(&files.keyboard) {
             self.set(MAC_ACCENTS, Reading::Bool(keyboard.mac_accents));
         }
@@ -370,9 +369,9 @@ impl Places {
                 user_layer.automount.path().to_path_buf(),
                 user_layer.no_greeting,
                 user_layer.phone.path().to_path_buf(),
-                user_layer.firmware.path().to_path_buf(),
-                user_layer.updates.path(Program::Bitwarden),
-                user_layer.updates.path(Program::Nix),
+                user_layer.updates.path(Part::Firmware),
+                user_layer.updates.path(Part::Bitwarden),
+                user_layer.updates.path(Part::Nix),
                 user_layer.keyboard,
                 user_layer.power,
                 user_layer.state_dir.join(NIXPKGS_FILE),
@@ -402,8 +401,7 @@ struct Files {
     automount: kubaos_automount::settings::Settings,
     no_greeting: PathBuf,
     phone: kubaos_phone::setting::Setting,
-    firmware: FirmwareSetting,
-    /// The switches of the update's program phases, `U/desktop/update`.
+    /// The switches of the update's parts: Bitwarden, Nix and firmware, `U/desktop/update`.
     updates: Switches,
     keyboard: PathBuf,
     power: PathBuf,
@@ -420,7 +418,6 @@ impl Files {
             automount: kubaos_automount::settings::Settings::new(config),
             no_greeting: kubaos_user_layer::dir(config, App::Zsh).join(NO_GREETING),
             phone: kubaos_phone::setting::Setting::new(config),
-            firmware: FirmwareSetting::in_layer(&kubaos_user_layer::root(config)),
             updates: Switches::new(config),
             keyboard: keyboard_settings::path(config),
             power: kubaos_user_layer::dir(config, App::Power).join(kubaos_power::settings::FILE),

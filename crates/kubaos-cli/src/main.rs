@@ -23,7 +23,7 @@
 //! - Suites (`suite`): `suite.rs`.
 //! - Project pins (`pin`, `unpin`, `pins`): `pin.rs`.
 //! - Switch jobs (`switch`, `job`): `job.rs`.
-//! - Updates (`update`, `upgrade`, `rollback`, `channel`, `firmware`): `update.rs`.
+//! - Updates (`update`, `upgrade`, `rollback`, `channel`): `update.rs`.
 //! - The work itself: the `kubaos-core` crate.
 
 use std::fmt::Display;
@@ -115,8 +115,6 @@ enum Cmd {
     Rollback(update::RollbackArgs),
     /// Print the channel updates follow, or set it: stable or edge.
     Channel(update::ChannelArgs),
-    /// Print whether kubaos update updates firmware through fwupd, or turn that on or off.
-    Firmware(update::FirmwareArgs),
     /// The pointer in the wallpaper's colours: its style and size.
     Cursor {
         #[command(subcommand)]
@@ -184,7 +182,6 @@ fn main() -> ExitCode {
         Cmd::Upgrade(args) => update::upgrade(&args),
         Cmd::Rollback(args) => update::rollback(&args),
         Cmd::Channel(args) => update::channel(&args),
-        Cmd::Firmware(args) => update::firmware(&args),
         Cmd::Cursor { cmd } => cursor::main(cmd),
         Cmd::Depth { cmd } => depth::main(cmd),
         Cmd::Keyboard { cmd } => keyboard::main(cmd),

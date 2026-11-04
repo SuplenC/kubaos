@@ -24,6 +24,7 @@ use crate::update::event::ProgramResult;
 use crate::update::event::chain;
 use crate::update::machine::Machine;
 use crate::update::machine::MachineError;
+use crate::update::programs::Part;
 use crate::update::programs::Switches;
 use crate::update::version::Version;
 
@@ -102,7 +103,7 @@ impl<M: Machine> Updater<'_, M> {
     ) -> Option<ProgramChange> {
         let installed = installed?;
         self.j.phase_start(phase);
-        if !Switches::new(self.user.config_home()).is_on(program) {
+        if !Switches::new(self.user.config_home()).is_on(Part::from(program)) {
             self.j
                 .skip(format!("{installed}; its updates are off in your settings"));
             self.j.phase_end(true);

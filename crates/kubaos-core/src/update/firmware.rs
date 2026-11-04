@@ -1,33 +1,19 @@
 //! Firmware through fwupd and the LVFS: what `fwupdmgr get-updates --json` says is waiting, which
-//! of it can install now and which waits for a reboot, what the firmware phase of an update did,
-//! and the user's switch that turns the phase off.
-//!
-//! The switch is a flag file, `~/.config/kubaos/desktop/update/no-firmware`: the phase runs
-//! unless it exists, so a user layer from before the switch keeps firmware updates on.
+//! of it can install now and which waits for a reboot, and what the firmware phase of an update
+//! did.
 //!
 //! # Owns
 //!
 //! - Reading fwupd's list ([`parse_updates`]) and the phase's result ([`Firmware`]), one
 //!   [`FirmwareChange`] a device.
-//! - The switch ([`Setting`]).
 //!
 //! # Not here
 //!
-//! - Running fwupdmgr, asking and reporting: the updater's `firmware.rs`.
+//! - Running fwupdmgr, asking and reporting: the updater's `firmware.rs`. The switch that turns the
+//!   phase off: `update::programs`.
 
-use std::fs;
-use std::io;
-use std::path::Path;
-use std::path::PathBuf;
-
-use kubaos_user_layer::App;
 use serde::Deserialize;
 use serde::Serialize;
-
-use crate::apt::Switch;
-
-/// The flag file that turns the firmware phase off, in the update's folder of the user layer.
-pub const NO_FIRMWARE: &str = "no-firmware";
 
 /// The device flags with which fwupd says an update applies only after a reboot or a shutdown.
 const REBOOT_FLAGS: [&str; 2] = ["needs-reboot", "needs-shutdown"];
@@ -191,52 +177,6 @@ struct Device {
 #[serde(rename_all = "PascalCase")]
 struct Release {
     version: String,
-}
-
-/// Whether `kubaos update` updates firmware.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Setting {
-    file: PathBuf,
-}
-
-impl Setting {
-    /// The switch in the user layer `layer`, `~/.config/kubaos`.
-    #[must_use]
-    pub fn in_layer(layer: &Path) -> Self {
-        Self {
-            file: layer.join(App::Update.relative()).join(NO_FIRMWARE),
-        }
-    }
-
-    /// The flag file, which exists while the phase is off.
-    pub fn path(&self) -> &Path {
-        &self.file
-    }
-
-    /// Whether the phase runs.
-    pub fn is_on(&self) -> bool {
-        !self.file.exists()
-    }
-
-    /// Turns the phase on or off.
-    ///
-    /// # Errors
-    ///
-    /// When the flag file can't be made or removed.
-    pub fn set(&self, switch: Switch) -> io::Result<()> {
-        match switch {
-            Switch::On => match fs::remove_file(&self.file) {
-                Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
-                other => other,
-            },
-            Switch::Off => {
-                if let Some(dir) = self.file.parent() {
-                    fs::create_dir_all(dir)?;
-                }
-                fs::write(&self.file, "")
-            }
-        }
-    }
 }
 
 #[cfg(test)]

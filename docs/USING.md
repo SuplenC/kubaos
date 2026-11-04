@@ -248,14 +248,13 @@ kubaos update                    # the whole update, after showing what it bring
 kubaos update -y                 # without asking
 kubaos update --packages-only    # apt and your flake; KubaOS stays at its release
 kubaos update --check            # only look; writes ~/.local/state/kubaos/update-available
-kubaos update --turn-off nix     # updates leave Nix at its version (bitwarden too; --turn-on undoes it)
+kubaos update --turn-off nix     # updates leave Nix at its version (bitwarden, firmware too; --turn-on undoes it)
 kubaos rollback                  # undo the last update: KubaOS's release and your flake.lock
 kubaos channel                   # which channel this machine follows
 kubaos channel stable            # or edge
 kubaos upgrade                   # stable only: move to the next series (Upgrade to <codename> in the menu)
 kubaos packages status           # KubaOS's apt packages against the release: installed, missing, held, extra
 kubaos packages disable docker   # leave an optional group out for good (enable brings it back)
-kubaos firmware off              # leave firmware out of kubaos update (on brings it back)
 ```
 
 An update, in order:
@@ -290,7 +289,7 @@ Piped or in a log, the output is plain lines with no colour; `NO_COLOR=1` drops 
 
 ### Firmware
 
-The last phase of an update refreshes fwupd's list from the LVFS and installs the firmware updates that need no reboot, a dock's or a receiver's. Firmware that installs only at the next boot (the system firmware, the Secure Boot lists) is named, and in a terminal the update asks "Stage it now?": yes hands it to fwupd, which installs it when you next reboot, and the summary says to reboot. Nothing reboots by itself. With `-y` or `--json` nobody is asked, so it only waits; the next `kubaos update` in a terminal offers it again, or run `sudo fwupdmgr update` yourself. A failure is a warning and the update goes on. "Firmware updates off" in the Command menu (or `kubaos firmware off`) leaves firmware out of the update, "Firmware updates on" brings it back; `kubaos firmware` says which. The switch is the flag file `~/.config/kubaos/desktop/update/no-firmware`.
+The last phase of an update refreshes fwupd's list from the LVFS and installs the firmware updates that need no reboot, a dock's or a receiver's. Firmware that installs only at the next boot (the system firmware, the Secure Boot lists) is named, and in a terminal the update asks "Stage it now?": yes hands it to fwupd, which installs it when you next reboot, and the summary says to reboot. Nothing reboots by itself. With `-y` or `--json` nobody is asked, so it only waits; the next `kubaos update` in a terminal offers it again, or run `sudo fwupdmgr update` yourself. A failure is a warning and the update goes on. "Firmware updates off" in the Command menu (or `kubaos update --turn-off firmware`) leaves firmware out of the update, "Firmware updates on" (`--turn-on firmware`) brings it back. The switch is the flag file `~/.config/kubaos/desktop/update/no-firmware`.
 
 ### KubaOS's apt packages
 

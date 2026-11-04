@@ -13,6 +13,7 @@ use crate::update::event::Program;
 use crate::update::event::ProgramChange;
 use crate::update::event::ProgramResult;
 use crate::update::event::UpdateEvent;
+use crate::update::programs::Part;
 use crate::update::programs::Switches;
 use crate::update::record::Channel;
 
@@ -138,9 +139,7 @@ fn a_release_without_a_digest_installs_nothing() {
 #[test]
 fn a_program_turned_off_skips_its_phase_and_asks_nothing() {
     let w = World::new(Channel::Edge, true);
-    Switches::new(w.user.config_home())
-        .turn_off(Program::Bitwarden)
-        .unwrap();
+    Switches::new(w.user.config_home()).turn_off(Part::Bitwarden).unwrap();
     let mut m = with_bitwarden(DIGEST);
     let mut events = Vec::new();
 

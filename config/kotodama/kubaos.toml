@@ -1060,7 +1060,7 @@ title = "Firmware updates on"
 subtitle = "kubaos update installs firmware from the LVFS, and asks before staging what needs a reboot"
 icon = "system-software-update"
 keywords = ["firmware", "fwupd", "lvfs", "bios", "uefi", "dock", "update"]
-run = ["kubaos", "firmware", "on"]
+run = ["kubaos", "update", "--turn-on", "firmware"]
 shown_when = { state = "update.firmware", is = false }
 
 [extensions.kubaos.actions.firmware-off]
@@ -1068,7 +1068,7 @@ title = "Firmware updates off"
 subtitle = "kubaos update leaves firmware alone; sudo fwupdmgr update still does it by hand"
 icon = "system-software-update"
 keywords = ["firmware", "fwupd", "lvfs", "bios", "uefi", "dock", "update"]
-run = ["kubaos", "firmware", "off"]
+run = ["kubaos", "update", "--turn-off", "firmware"]
 shown_when = { state = "update.firmware", is = true }
 
 [extensions.kubaos.actions.rollback]
