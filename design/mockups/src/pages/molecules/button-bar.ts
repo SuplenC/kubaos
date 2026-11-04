@@ -54,6 +54,7 @@ export default page({
     "Rust `button_bar::button_bar`, QML `ButtonBar`. The row of buttons that ends a surface (a dialog, a form in a well), holding the rules of their order, kinds and spacing in one place, so every surface ends the same way.",
     "The dismiss button (Cancel, a Text button) at the start; the actions at the end, the one Enter presses last: Filled, the screen's one, and any other action before it Tonal (Shut down beside Restart). On a Danger surface that action is a Danger button naming what it does (Erase and install). An action alone sits at the end. Buttons are `space.s8` apart, regular (`md`) unless the surface's controls are small.",
     "It has no padding of its own: it sits in its surface's padding like any other content, as wide as the room its surface gives it, a step of the surface's own spacing under what is above it (`space.s24` in a dialog).",
+    "A Text button at its start or end hangs its own padding outside it (`space.s12` at sm and md, `space.s16` at lg), so its label sits on the content's edge like everything above it, and its tube and press fill reach into the surface's padding; every other button keeps its box on the edge. A card's padding and a banner's rail lane have no room for it, so there the box stays on the edge. Stacked, nothing hangs.",
     "Where its buttons don't fit on one line (a narrow room, a long translation), they stack `space.s8` apart, each the bar's full width: the one Enter presses on top, the dismiss button at the bottom. They lay out on one line again as soon as they fit.",
   ],
   variants: [
@@ -117,6 +118,7 @@ export default page({
     ]),
     measures: [
       { what: "Between buttons, side by side and stacked.", token: "space-s8" },
+      { what: "How far a Text button at the start or end hangs past the bar's edge, at sm and md: its own padding.", token: "space-s12" },
       { what: "A button's height, regular.", token: "size-control_md" },
       { what: "A button's height, small.", token: "size-control_sm" },
     ],

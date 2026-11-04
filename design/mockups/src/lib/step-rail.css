@@ -110,13 +110,6 @@
     drop-shadow(0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * var(--signs))));
 }
 
-/* The footer's Back and the rail's power button: their symbols on the content's edge, the
-   button's own padding reaching past it. */
-.k-step-back,
-.k-rail-power {
-  margin-inline-start: calc(-1 * var(--padding));
-}
-
 /* The page's side: what the page slides inside, cut at its edges. */
 .k-step-side {
   position: relative;

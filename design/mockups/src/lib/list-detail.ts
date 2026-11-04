@@ -6,6 +6,7 @@
 
 import "./list-detail.css";
 import { button } from "./button.ts";
+import { hangs } from "./button-bar.ts";
 import { card } from "./card.ts";
 import { chip, type ChipKind } from "./chip.ts";
 import { type KeyHint, keycap, keyHints, keys } from "./keycap.ts";
@@ -294,7 +295,7 @@ function setupDetail(spec: SetupCard): HTMLElement {
   const actions: Element[] = [button({ label: spec.skip, kind: "Text", icon: "arrow_forward", trailing: true }), fill()];
   if (spec.secondary) actions.push(button({ label: spec.secondary, kind: "Tonal" }));
   if (spec.primary) actions.push(button({ label: spec.primary, kind: "Filled" }));
-  const content = stack("s24", "start", filling(head), fillingHeight(filling(box)), filling(row("s12", "centre", ...actions)));
+  const content = stack("s24", "start", filling(head), fillingHeight(filling(box)), filling(hangs(row("s12", "centre", ...actions))));
   return page(fillingHeight(content), { clear: true });
 }
 

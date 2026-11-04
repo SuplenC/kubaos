@@ -5,6 +5,9 @@
 // presses last: Filled, or Danger on a Danger surface, and any other action before it Tonal.
 // Buttons are `space.s8` apart, regular unless the surface asks for small. It has no padding of its
 // own: it sits in its surface's padding like any other content, as wide as the room it is given.
+// A Text button at its start or end hangs its own padding outside it (`hangs`), so its label sits
+// on the content's edge like everything above it, its tube and press fill reaching into the
+// surface's padding.
 //
 // Where its buttons don't fit on one line, they stack `space.s8` apart, each the bar's full width,
 // the one Enter presses on top and the dismiss button at the bottom.
@@ -62,12 +65,22 @@ export function buttonBar(options: ButtonBarOptions): ButtonBar {
   );
   const spacer = probe(document.createElement("span"), { role: "spacer", fill: true });
   spacer.className = "k-fill";
-  const line = row("s8", "centre", ...(dismiss ? [dismiss] : []), spacer, ...actions);
+  const line = hangs(row("s8", "centre", ...(dismiss ? [dismiss] : []), spacer, ...actions));
   const bar = document.createElement("span");
   bar.className = "k-button-bar";
   bar.append(line);
   stackWhenCramped(bar, line);
   return { element: bar, dismiss, actions };
+}
+
+/**
+ * Marks `line`, a row of buttons that ends a surface, so a Text button at its start or end hangs
+ * its own horizontal padding outside it: its label, or its leading symbol, lands on the content's
+ * edge. A bar's line is one; so is a footer that holds a note between its buttons.
+ */
+export function hangs<T extends HTMLElement>(line: T): T {
+  line.dataset.hangs = "";
+  return line;
 }
 
 /**
@@ -82,13 +95,18 @@ function stackWhenCramped(bar: HTMLElement, line: HTMLElement): void {
     probe(bar, { role: "component", name: "ButtonBar", variant: variant(stacked && "stacked"), fixed: { width: false, height: false } });
     probe(line, { role: "layout", axis: stacked ? "y" : "x", gap, align: "centre" });
   };
-  // The buttons' own widths, not the line's scroll width: their glow reaches past their edges.
+  // The buttons' own widths, not the line's scroll width: their glow reaches past their edges. A
+  // hung Text button's margins are negative, the room it takes past the line's ends.
   const measure = () => {
     mark(false);
     const parts = [...line.children] as HTMLElement[];
     const buttons = parts.filter((each) => !each.classList.contains("k-fill"));
     const gaps = (parts.length - 1) * Number.parseFloat(getComputedStyle(line).columnGap);
-    mark(buttons.reduce((sum, each) => sum + each.offsetWidth, 0) + gaps > line.clientWidth);
+    const width = (each: HTMLElement) => {
+      const style = getComputedStyle(each);
+      return each.offsetWidth + Number.parseFloat(style.marginInlineStart) + Number.parseFloat(style.marginInlineEnd);
+    };
+    mark(buttons.reduce((sum, each) => sum + width(each), 0) + gaps > line.clientWidth);
   };
   mark(false);
   let width = -1;

@@ -29,6 +29,14 @@ const QUESTION: DialogOptions = {
   ],
 };
 
+/** An action whose name, as long as a translation can make it, leaves its buttons no room for one
+ *  line: they stack, Restart on top and Cancel at the foot. */
+const STACKED: DialogOptions = {
+  ...QUESTION,
+  body: BODY.long,
+  actions: [QUESTION.actions[0]!, { label: "Restart and install the updates", icon: "restart_alt" }],
+};
+
 /** One line and three buttons: shorter than its least height, which it keeps. */
 const SHORT: DialogOptions = { ...QUESTION, body: "Everything open closes." };
 
@@ -164,7 +172,7 @@ const LEAVES: Move = {
 };
 
 const DESCRIBED =
-  "`size.dialog` (500) wide, `space.s24` inside on every side, under its buttons too, at the content radius (`radius.content`, 16), raised to the ladder's step 3, a dialog's: `surface_container_high` by day and `surface_container_highest` at night, the step's contact and ambient layers of `shadow`, and the rim, a hairline of `on_surface` inside its edge at `elevation.rim`. A 24 symbol (`heading`'s) in `primary` and the title in `heading`, `on_surface`, `space.s12` apart; the body in `body`, `on_surface_variant`, `space.s12` under the title and in line with it, beside the symbol; what it asks for `space.s16` under the body, in line with it too; and its button bar `space.s24` under the last, across its whole width. Its words wrap in its width.";
+  "`size.dialog` (500) wide, `space.s24` inside on every side, under its buttons too, at the content radius (`radius.content`, 16), raised to the ladder's step 3, a dialog's: `surface_container_high` by day and `surface_container_highest` at night, the step's contact and ambient layers of `shadow`, and the rim, a hairline of `on_surface` inside its edge at `elevation.rim`. Everything in it starts on one content edge, its padding's: a 24 symbol (`heading`'s) in `primary` and the title in `heading`, `on_surface`, `space.s12` apart on one row; the body in `body`, `on_surface_variant`, `space.s12` under them; what it asks for `space.s16` under the body; each across its whole width, under the symbol as well as the title; and its button bar `space.s24` under the last, across the same width, Cancel's label on the content's edge, its own padding hanging into the dialog's, and the last button's box ending on the right edge. Its words wrap in its width.";
 
 const HEIGHTS =
   "It is never shorter than `aspect.dialog`, 5:2, of its width: 200, on the grid. A dialog that asks little, one line and its buttons, would be a strip; it stands as a card instead, its words at the top and its buttons at its foot, `space.s24` from the bottom as always, with the room it gains between them. A dialog with no buttons (a progress) keeps it too, its words at the top. Taller than that, it is as tall as what it holds. It is never taller than its room (the screen, or the window it opens over) less `space.s48` above and below, so the dimmed screen always shows round it. Past that only the middle scrolls, the body and what it lists or asks for, with no bar of its own: the symbol and title stay at the top and the buttons at the foot. While more is below, a hairline in the soft outline, a divider's, crosses the dialog's padding above the buttons, the middle scrolling under it; while more is above, the same one under the title. Each fades over `short` on `standard` as you reach its end.";
@@ -224,6 +232,7 @@ export default page({
     counts: [
       { name: "One action", for: "Cancel and the action: Authenticate.", sample: () => still(prompt()) },
       { name: "Two actions", for: "Another way out before the one Enter presses: Shut down, Restart.", sample: () => still(QUESTION) },
+      { name: "Stacked buttons", for: "Names too long for one line: the bar stacks, the one Enter presses on top and Cancel at the foot, each the dialog's full width, `space.s24` under the body as on one line.", sample: () => still(STACKED) },
       { name: "Forty lines", for: "What it lists, more than its room shows: its middle scrolls, at its top, half way and at its end.", sample: () => row("s16", "start", capped(LONG), capped(LONG, 0.5), capped(LONG, 1)) },
     ],
   },
@@ -256,7 +265,8 @@ export default page({
       { what: "Its least height: 5:2 of its width, 200.", token: "aspect-dialog" },
       { what: "Its most height: its room less this above and below.", token: "space-s48" },
       { what: "The rules at the middle's edges: one device pixel.", token: "stroke-hairline_device_px" },
-      { what: "Inside its edges on every side, under the buttons too, and above the buttons.", token: "space-s24" },
+      { what: "Inside its edges on every side, under the buttons too, and above the buttons: the content's edge, which the symbol, the body, the field and Cancel's label start on.", token: "space-s24" },
+      { what: "How far Cancel, a Text button, hangs its box past the content's edge: its own padding.", token: "space-s12" },
       { what: "Between the symbol and the title, and between the title and the body.", token: "space-s12" },
       { what: "Above what it asks for.", token: "space-s16" },
       { what: "Between buttons.", token: "space-s8" },
