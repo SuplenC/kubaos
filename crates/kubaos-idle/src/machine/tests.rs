@@ -39,6 +39,49 @@ fn a_machine_with_no_battery_is_plugged_in() {
     assert_eq!(power(&root.path().join("missing")), Power::Ac);
 }
 
+fn attr(root: &Path, name: &str, file: &str, value: &str) {
+    fs::write(root.join(name).join(file), format!("{value}\n")).expect(file);
+}
+
+#[test]
+fn the_battery_level_is_its_capacity_and_a_mouses_doesnt_count() {
+    let root = tempfile::tempdir().expect("a temp dir");
+    supply(root.path(), "BAT0", "Battery", None);
+    attr(root.path(), "BAT0", "capacity", "64");
+    supply(root.path(), "hidpp_battery_0", "Battery", None);
+    attr(root.path(), "hidpp_battery_0", "capacity", "5");
+    attr(root.path(), "hidpp_battery_0", "scope", "Device");
+
+    assert_eq!(battery(root.path()), Some(64));
+}
+
+#[test]
+fn two_batteries_combine_by_their_energy_or_else_average() {
+    let root = tempfile::tempdir().expect("a temp dir");
+    for (name, capacity, now, full) in [("BAT0", "100", "20000000", "20000000"), ("BAT1", "0", "0", "60000000")] {
+        supply(root.path(), name, "Battery", None);
+        attr(root.path(), name, "capacity", capacity);
+        attr(root.path(), name, "energy_now", now);
+        attr(root.path(), name, "energy_full", full);
+    }
+    assert_eq!(battery(root.path()), Some(25));
+
+    fs::remove_file(root.path().join("BAT1/energy_now")).expect("drop an energy");
+    assert_eq!(battery(root.path()), Some(50));
+}
+
+#[test]
+fn no_battery_or_an_empty_bay_has_no_level() {
+    let root = tempfile::tempdir().expect("a temp dir");
+    assert_eq!(battery(root.path()), None);
+    assert_eq!(battery(&root.path().join("missing")), None);
+
+    supply(root.path(), "BAT0", "Battery", None);
+    attr(root.path(), "BAT0", "capacity", "80");
+    attr(root.path(), "BAT0", "present", "0");
+    assert_eq!(battery(root.path()), None);
+}
+
 #[test]
 fn busctl_answers_read_as_the_lid_and_the_dock() {
     assert_eq!(
