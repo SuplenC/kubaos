@@ -255,6 +255,29 @@ A Project pin is a line in a folder's `.envrc`, `use suite <name> <version>` (`d
 - **Command menu.** "Proxy on", "Proxy off", "Allow local network through the Proxy" and "Block local network behind the Proxy" (`kubaos-proxy lan on|off`, shown by `proxy.local-network`), "Import VPN config…" (keyword `import-vpn`; in a terminal, for bw's prompt and an OpenVPN login's) and "Open proxy settings" (`proxy-on`, `proxy-off`, `proxy-local-network-on`, `proxy-local-network-off`, `proxy-import`, `proxy-settings`) in `config/kotodama/kubaos.toml`, and the Extension's own "Proxy status" (`proxy-status`, the rows as a List View, read live).
 - **Shell.** The control center's Proxy tile (shown once the profile has a part) switches it; its arrow opens the detail: the state, "VPN" (the type and the kind, `WireGuard, full tunnel, kill switch`), "Server", and an "Allow local network" switch, shown with a kill switch, which runs `kubaos-proxy lan on|off`. While it shows and the VPN is up, it reads `/sys/class/net/<the status's interface>/statistics` every 5 s (the bytes moved, and when the VPN last received), and a WireGuard handshake through `status --json --live` (pkexec) as it opens and then once a minute. The bar's `ProxyIndicator` shows while it is on.
 
+## Wallpaper depth (crates/kubaos-depth)
+
+What a wallpaper's depth is (ADR 0004): a foreground cut-out the lock draws over its rest clock, and the clock's place and tint on the picture. The same files come from two places: a shipped wallpaper carries them beside its picture, and the wallpaper-depth Suite writes them for the user's own pictures into a folder per picture under `~/.cache/kubaos/wallpapers/`. A picture without them gets the clock in front of it.
+
+- **The folder.** `depth.toml`, always, and `cutout.png` when a cut-out was kept. Each is written to a temporary name in the folder and renamed into place, so a reader never finds half of one; a run that keeps no cut-out removes an earlier `cutout.png`.
+- **`cutout.png`.** The picture's foreground: an 8-bit RGBA PNG at the picture's own size, the picture's colours where it stands in front and alpha 0 (colour black) where it doesn't. Drawn over the picture with the same crop and scale, it lines up pixel for pixel.
+- **`depth.toml`.** All keys required, no others:
+
+  ```toml
+  format = 1            # this layout; a reader refuses another
+  tool = "0.1.0"        # the kubaos-depth version that wrote it
+  method = "sky"        # the cut-out kept: "sky", "object", or "none" (no cutout.png)
+  score = 0.941         # the best candidate's score, kept or not (kept from 0.7)
+
+  [clock]
+  x = 0.5               # the middle of the rest digits' baseline, a share of the picture's width
+  y = 0.56              # the same, a share of its height from the top
+  tint = "#ffa9f1"      # the rest digits' and the kicker's colour, #rrggbb
+  ```
+
+  The place holds on any crop of the picture (the lock covers the screen with it, as `object-fit: cover` does). With a cut-out, the cut-out covers between 1 % and 45 % of the digits in `type.clock_rest` on a 1536 × 960 screen, and none of the kicker or its halo on 1536 × 960, 1920 × 1200, 1536 × 864, 1920 × 1080 and 2560 × 1440 screens; with none, the place is `x = 0.5`, `y = 0.56`. The tint is the Lock page's rule (`crates/kubaos-depth/src/tint.rs`) over the picture under the digits.
+- **The command.** `kubaos-depth run PICTURE --out DIR --models DIR` writes PICTURE's folder into DIR, at niceness 19, on the CPU. `--models` holds `depth-anything-v2-small.onnx`, `birefnet-lite.onnx`, `sam-vit-b-encoder.onnx` and `sam-vit-b-decoder.onnx` (their sources and licences: the crate's doc). It prints the method and score on stdout and logs each step on stderr (`KUBAOS_DEPTH_LOG=debug` for each candidate's numbers). Exit 2 is a usage error, 1 a failed run, with the reason on stderr. ONNX Runtime is loaded from `ORT_DYLIB_PATH`, else the nixpkgs one the package was built with. The choice of cut-out and its confidence rule are in the crate's doc (`crates/kubaos-depth/src/lib.rs`).
+
 ## The Command menu's KubaOS Extension (crates/kotodama-kubaos, config/kotodama/kubaos.toml)
 
 - **The registry.** `[extensions.kubaos.actions.<id>]` tables, KubaOS's in `config/kotodama/kubaos.toml` and the user's in `U/menu/kotodama/user.toml`, which the Daemon merges key by key; `hide` leaves ids out. An action is `title` and `run`, and optionally `subtitle`, `icon`, `keywords`, `keyword`, `arguments`, `terminal`, `confirm`, `delay_ms` and `shown_when` (`docs/USING.md`). A table the Extension can't use is left out and logged.

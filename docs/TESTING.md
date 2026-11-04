@@ -55,6 +55,14 @@ test/run shots run 'dot-theme set /usr/share/kubaos/wallpapers/japanese/tokyo-to
 test/run shots stop
 ```
 
+## The wallpaper-depth models in tests
+
+`kubaos-depth`'s unit tests run on synthetic pictures and masks, with no model. The models are too large for the repository (about 700 MB together), so the one test that runs them, `crates/kubaos-depth/tests/run.rs`, passes without doing anything unless `KUBAOS_DEPTH_MODELS` names a folder holding them under the names in `docs/CONTRACTS.md`, "Wallpaper depth". It also needs ONNX Runtime: the devshell sets `ORT_DYLIB_PATH` to nixpkgs' `onnxruntime`; outside it, set it to a `libonnxruntime.so` 1.24 or later.
+
+```sh
+KUBAOS_DEPTH_MODELS=~/.cache/kubaos-depth/models cargo nextest run -p kubaos-depth
+```
+
 ## What's cached where
 
 | Layer | Holds | Rebuilt when |

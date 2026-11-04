@@ -49,7 +49,8 @@ let
     let
       manifest = manifests.${crate};
       targetDeps = lib.concatMap (
-        target: lib.attrNames (target.dependencies or { }) ++ lib.attrNames (target.build-dependencies or { })
+        target:
+        lib.attrNames (target.dependencies or { }) ++ lib.attrNames (target.build-dependencies or { })
       ) (lib.attrValues (manifest.target or { }));
     in
     lib.filter (dep: manifests ? ${dep}) (
@@ -97,6 +98,11 @@ let
     # no machine installs.
     checks = [
       "kubaos-design"
+    ];
+    # The wallpaper-depth tool: `ort` and the image codecs no other tool
+    # needs, kept apart so the tools' dependencies build without them.
+    depth = [
+      "kubaos-depth"
     ];
     # The tokens' generator, which the Nix build of the token outputs runs
     # (design/package.nix): three small dependencies, kept apart so the
