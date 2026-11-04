@@ -17,19 +17,24 @@
 //! update offers to stage the firmware that installs at the next reboot only when it asks, so never
 //! with `-y` or `--json`. On a terminal they show a live view of each phase; elsewhere plain lines;
 //! with `--json` one event per line (`kubaos_core::update::event`), reading a prompt's answer from
-//! stdin. Programs' output goes to the run's log, `~/.local/state/kubaos/update/`. Exit codes: 0
-//! ok, 1 the update failed or was declined, 2 usage.
+//! stdin. Programs' output goes to the run's log, `~/.local/state/kubaos/update/`. An update,
+//! upgrade or rollback that nobody reads in a terminal and that isn't `--json` also sends its
+//! summary as a notification. Exit codes: 0 ok, 1 the update failed or was declined, 2 usage.
 //!
 //! # Owns
 //!
 //! - The command line of these commands, and the real machine the updater runs on.
-//! - Showing the updater's events: `update/render.rs`.
+//! - Showing the updater's events: `update/render.rs`; when the summary is also a notification.
 //!
 //! # Not here
 //!
 //! - The steps and the events: `kubaos_core::update`.
 
+use std::io;
+use std::io::IsTerminal;
+use std::process::Command;
 use std::process::ExitCode;
+use std::process::Stdio;
 use std::time::SystemTime;
 
 use clap::Args;
@@ -39,10 +44,13 @@ use kubaos_core::update::Confirm;
 use kubaos_core::update::UpdateError;
 use kubaos_core::update::UpdateOptions;
 use kubaos_core::update::Updater;
+use kubaos_core::update::event::Sink;
+use kubaos_core::update::event::UpdateEvent;
 use kubaos_core::update::programs::Part;
 use kubaos_core::update::programs::Switches;
 use kubaos_core::update::record::Channel;
 use kubaos_core::update::record::SystemPaths;
+use kubaos_core::update::summary::Notification;
 
 use crate::job;
 use crate::job::SwitchIn;
@@ -176,7 +184,7 @@ pub fn update(args: &UpdateArgs) -> ExitCode {
         Ok(m) => m,
         Err(code) => return code,
     };
-    let mut ui = Ui::new(Mode::detect(args.json));
+    let mut ui = Shown::new(args.json);
     let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
     if args.check {
         return done(&updater.check());
@@ -193,7 +201,7 @@ pub fn upgrade(args: &UpgradeArgs) -> ExitCode {
         Ok(m) => m,
         Err(code) => return code,
     };
-    let mut ui = Ui::new(Mode::detect(args.json));
+    let mut ui = Shown::new(args.json);
     let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
     done(&updater.upgrade())
 }
@@ -203,7 +211,7 @@ pub fn rollback(args: &RollbackArgs) -> ExitCode {
         Ok(m) => m,
         Err(code) => return code,
     };
-    let mut ui = Ui::new(Mode::detect(args.json));
+    let mut ui = Shown::new(args.json);
     let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
     done(&updater.rollback(confirm(args.yes)))
 }
@@ -231,6 +239,61 @@ pub fn channel(args: &ChannelArgs) -> ExitCode {
         },
         Err(e) => usage_error(e),
     }
+}
+
+/// The events shown in the [`Mode`] the run picks, and the summary sent as a notification when
+/// [`notifies`] says nobody else shows it.
+struct Shown {
+    ui: Ui,
+    notify: bool,
+}
+
+impl Shown {
+    fn new(json: bool) -> Self {
+        Self {
+            ui: Ui::new(Mode::detect(json)),
+            notify: notifies(json, io::stdout().is_terminal(), io::stderr().is_terminal()),
+        }
+    }
+}
+
+impl Sink for Shown {
+    fn event(&mut self, event: &UpdateEvent) {
+        self.ui.event(event);
+        if self.notify
+            && let UpdateEvent::Summary(summary) = event
+        {
+            send(&summary.notification());
+        }
+    }
+}
+
+/// Whether a run's summary goes to a notification: only when no one reads it where it ran. A
+/// terminal on stdout or stderr shows it (the Command menu's and the bar's terminals stay open
+/// after the run), and with `--json` the front end shows the `summary` event itself. What is
+/// left is a run in a systemd unit, a timer or a script with its output in a file.
+fn notifies(json: bool, stdout_terminal: bool, stderr_terminal: bool) -> bool {
+    !json && !stdout_terminal && !stderr_terminal
+}
+
+/// Sends `notification` through `notify-send`. A desktop without a notification daemon loses it,
+/// never the update: the summary is in the log too.
+fn send(notification: &Notification) {
+    let urgency = if notification.urgent {
+        "--urgency=normal"
+    } else {
+        "--urgency=low"
+    };
+    let mut cmd = Command::new("notify-send");
+    cmd.args(["--app-name=KubaOS", urgency, &notification.title]);
+    if !notification.body.is_empty() {
+        cmd.arg(&notification.body);
+    }
+    let _ = cmd
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
 }
 
 /// Turns `part` of the update on or off in the user layer.
@@ -261,3 +324,6 @@ fn turn(part: Part, on: bool) -> ExitCode {
     out!("{text}");
     ExitCode::SUCCESS
 }
+
+#[cfg(test)]
+mod tests;

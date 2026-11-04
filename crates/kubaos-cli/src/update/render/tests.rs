@@ -9,14 +9,20 @@ use std::time::Instant;
 use kubaos_core::update::event::Command;
 use kubaos_core::update::event::GroupChange;
 use kubaos_core::update::event::Outcome;
+use kubaos_core::update::event::PackageChange;
 use kubaos_core::update::event::Phase;
 use kubaos_core::update::event::Preview;
+use kubaos_core::update::event::Program;
+use kubaos_core::update::event::ProgramChange;
+use kubaos_core::update::event::ProgramResult;
 use kubaos_core::update::event::Prompt;
 use kubaos_core::update::event::Release;
 use kubaos_core::update::event::Restart;
 use kubaos_core::update::event::Summary;
 use kubaos_core::update::event::UpdateEvent;
 use kubaos_core::update::firmware::Firmware;
+use kubaos_core::update::firmware::FirmwareOutcome;
+use kubaos_core::update::firmware::FirmwareUpdate;
 use kubaos_core::update::record::Channel;
 
 use super::Json;
@@ -130,6 +136,37 @@ fn step(text: &str) -> UpdateEvent {
     UpdateEvent::Step { text: text.into() }
 }
 
+fn package(name: &str, from: Option<&str>, to: Option<&str>) -> PackageChange {
+    PackageChange {
+        name: name.into(),
+        from: from.map(Into::into),
+        to: to.map(Into::into),
+    }
+}
+
+/// The 12 apt packages the edge update upgrades.
+fn upgraded() -> Vec<PackageChange> {
+    let mut packages = vec![package("firefox", Some("130.0"), Some("131.0"))];
+    packages.extend((1..12).map(|n| package(&format!("lib{n}"), Some("1"), Some("2"))));
+    packages
+}
+
+/// The dock's firmware, applied without a reboot.
+fn applied_firmware() -> Firmware {
+    let mut firmware = Firmware::default();
+    firmware.push(
+        FirmwareUpdate {
+            device: "Dock".into(),
+            id: "d0c".into(),
+            from: "1.0".into(),
+            to: "1.1".into(),
+            reboot: false,
+        },
+        FirmwareOutcome::Applied,
+    );
+    firmware
+}
+
 const LOG: &str = "/home/kuba/.local/state/kubaos/update/2026-10-23T09-14-03-update.log";
 
 /// An edge update that asks, runs a migration and reloads the session, as the updater reports it.
@@ -183,6 +220,7 @@ fn edge_update() -> Vec<UpdateEvent> {
             ],
             hyprland_pin: false,
             migrations: vec!["1792765570-backlight-rule.sh".into()],
+            upgrades: upgraded(),
         }),
         UpdateEvent::Prompt {
             prompt: Prompt::Confirm {
@@ -229,6 +267,7 @@ fn edge_update() -> Vec<UpdateEvent> {
             channel: Channel::Edge,
             changes,
             packages: 12,
+            upgraded: upgraded(),
             apt: vec![
                 GroupChange {
                     group: "files".into(),
@@ -242,10 +281,30 @@ fn edge_update() -> Vec<UpdateEvent> {
                 },
             ],
             inputs: vec!["nixpkgs".into()],
+            nix_packages: Some(vec![
+                package("btop", Some("1.4.7"), Some("1.4.8")),
+                package("jq", None, Some("1.7.1")),
+            ]),
             migrations: vec!["1792765570-backlight-rule.sh".into()],
-            programs: Vec::new(),
+            programs: vec![
+                ProgramChange {
+                    program: Program::Bitwarden,
+                    result: ProgramResult::Updated {
+                        from: "2026.10.1".into(),
+                        to: "2026.12.0".into(),
+                    },
+                    waiting: None,
+                },
+                ProgramChange {
+                    program: Program::Nix,
+                    result: ProgramResult::Current {
+                        version: "2.35.4".into(),
+                    },
+                    waiting: Some("2.36.0".into()),
+                },
+            ],
             reloaded: vec!["reloaded Hyprland".into(), "restarting Quickshell".into()],
-            firmware: Firmware::default(),
+            firmware: applied_firmware(),
             restart: Restart::None,
             restart_reason: None,
             undo: Some("kubaos rollback".into()),
@@ -309,17 +368,23 @@ KubaOS update
   ✓ Nix inputs           18s  nixpkgs
   ✓ Home               1m05s  reloaded Hyprland, restarting Quickshell
 
-  Updated     Shinjuku 0.1.0 (1a2b3c4) → Shinjuku 0.1.1 (9f8e7d6), edge
-  Changes     fix(hypr): keep each screen's workspaces as a group
-              docs: describe workspace groups
-  Packages    12 apt packages, Nix inputs nixpkgs
-  Apt         files: installed loupe, showtime
-              tools: removed old-tool
-  Migrations  1792765570-backlight-rule.sh
-  Session     reloaded Hyprland, restarting Quickshell
-  Next        nothing, it's all running
-  Undo        kubaos rollback
-  Log         ~/.local/state/kubaos/update/2026-10-23T09-14-03-update.log";
+  Updated       Shinjuku 0.1.0 (1a2b3c4) → Shinjuku 0.1.1 (9f8e7d6), edge
+  Changes       fix(hypr): keep each screen's workspaces as a group
+                docs: describe workspace groups
+  Apt           12 upgraded: firefox, lib1, lib2, lib3, lib4, lib5, lib6, lib7, and 4 more
+                files: installed loupe, showtime
+                tools: removed old-tool
+  Nix packages  btop 1.4.7 → 1.4.8
+                jq 1.7.1, new
+  Nix inputs    nixpkgs
+  Bitwarden     2026.10.1 → 2026.12.0
+  Nix           2.35.4, the newest of its series; 2.36.0 waits for a KubaOS release
+  Firmware      Dock 1.0 → 1.1: applied
+  Migrations    1792765570-backlight-rule.sh
+  Session       reloaded Hyprland, restarting Quickshell
+  Next          nothing, it's all running
+  Undo          kubaos rollback
+  Log           ~/.local/state/kubaos/update/2026-10-23T09-14-03-update.log";
 
 #[test]
 fn the_live_view_leaves_each_phase_with_its_result_and_ends_on_the_summary() {
@@ -430,7 +495,7 @@ fn plain_output_is_one_line_per_fact_without_escapes_or_programs_output() {
     assert!(text.contains("  > System packages\n      apt-get upgrade\n  ✓ System packages      42s  12 packages\n"));
     assert!(text.contains("    ! no allowed_signers on this machine: main's head is taken unchecked\n"));
     assert!(text.contains("  Update now? [Y/n] yes\n"));
-    assert!(text.ends_with("  Log         ~/.local/state/kubaos/update/2026-10-23T09-14-03-update.log\n"));
+    assert!(text.ends_with("  Log           ~/.local/state/kubaos/update/2026-10-23T09-14-03-update.log\n"));
     assert!(err.text().is_empty());
 }
 
@@ -450,7 +515,7 @@ fn a_failure_shows_the_end_of_the_failing_output_and_the_log_on_stderr() {
     assert_eq!(
         err.text(),
         "\n  ✗ upgrading apt packages: `sudo apt-get upgrade` exited with code 100\n    │ E: Sub-process \
-         /usr/bin/dpkg returned an error code (1)\n  Log         \
+         /usr/bin/dpkg returned an error code (1)\n  Log           \
          ~/.local/state/kubaos/update/2026-10-23T09-14-03-update.log\n"
     );
     assert!(out.text().is_empty());
@@ -483,7 +548,7 @@ fn a_skipped_phase_says_why_and_a_needed_reboot_is_the_next_step() {
             "  – Hyprland pin        0.0s  skipped: Hyprland comes from KubaOS's nixpkgs on this architecture"
         )
     );
-    assert!(shown.contains("  Next        reboot: an updated package asks for it"));
+    assert!(shown.contains("  Next          reboot: an updated package asks for it"));
 }
 
 #[test]
@@ -511,10 +576,10 @@ fn turning_a_group_off_ends_on_what_it_changed_in_apt() {
 
     assert_eq!(
         terminal(&out.bytes()),
-        "KubaOS packages\n\n\n  Apt         u2f: removed libpam-u2f, pamu2fcfg\n  \
-         Log         ~/.local/state/kubaos/update/2026-10-23T09-14-03-update.log"
+        "KubaOS packages\n\n\n  Apt           u2f: removed libpam-u2f, pamu2fcfg\n  \
+         Log           ~/.local/state/kubaos/update/2026-10-23T09-14-03-update.log"
     );
-    assert!(terminal(&quiet_out.bytes()).contains("  Apt         nothing changed\n"));
+    assert!(terminal(&quiet_out.bytes()).contains("  Apt           nothing changed\n"));
 }
 
 #[test]
@@ -532,4 +597,119 @@ fn json_is_one_event_per_line() {
         .map(|line| UpdateEvent::from_json_line(line).unwrap())
         .collect();
     assert_eq!(read, edge_update());
+}
+
+/// The edge update's summary, as `change` leaves it, in the plain terminal style.
+fn summary_text(change: impl FnOnce(&mut Summary)) -> String {
+    let Some(UpdateEvent::Summary(mut summary)) = edge_update().pop() else {
+        panic!("the update ends on its summary");
+    };
+    change(&mut summary);
+    text(Style::PLAIN)
+        .lines(&UpdateEvent::Summary(summary))
+        .expect("a summary has lines")
+}
+
+/// `summary` with nothing in it moved: the release, the packages, the programs and firmware stay.
+fn unchanged(summary: &mut Summary) {
+    summary.to = summary.from.clone();
+    summary.changes.clear();
+    summary.packages = 0;
+    summary.upgraded.clear();
+    summary.apt.clear();
+    summary.inputs.clear();
+    summary.nix_packages = Some(Vec::new());
+    summary.migrations.clear();
+    summary.programs.clear();
+    summary.firmware = Firmware::default();
+}
+
+#[test]
+fn an_update_that_changed_nothing_says_so_in_one_line() {
+    let shown = summary_text(unchanged);
+
+    assert_eq!(
+        shown,
+        "\n  Nothing changed: KubaOS Shinjuku 0.1.0 (1a2b3c4), edge, and its packages are up to date.\n"
+    );
+}
+
+#[test]
+fn an_empty_list_says_none_and_an_unknown_one_is_left_out() {
+    let none = summary_text(|s| {
+        unchanged(s);
+        s.inputs = vec!["nixpkgs".into()];
+    });
+    let unknown = summary_text(|s| {
+        unchanged(s);
+        s.inputs = vec!["nixpkgs".into()];
+        s.nix_packages = None;
+    });
+
+    assert!(
+        none.contains("  KubaOS        unchanged at Shinjuku 0.1.0 (1a2b3c4), edge\n"),
+        "{none}"
+    );
+    assert!(
+        none.contains("  Apt           none\n  Nix packages  none\n  Nix inputs    nixpkgs\n"),
+        "{none}"
+    );
+    assert!(!unknown.contains("Nix packages"), "{unknown}");
+}
+
+#[test]
+fn a_long_nix_diff_names_the_first_and_counts_the_rest() {
+    let shown = summary_text(|s| {
+        s.nix_packages = Some(
+            (1..=9)
+                .map(|n| package(&format!("pkg{n}"), Some("1"), Some("2")))
+                .collect(),
+        );
+    });
+
+    assert!(shown.contains("  Nix packages  pkg1 1 → 2\n"));
+    assert!(
+        shown.contains("                pkg6 1 → 2\n                and 3 more\n"),
+        "{shown}"
+    );
+    assert!(!shown.contains("pkg7"));
+}
+
+#[test]
+fn a_failed_program_and_firmware_waiting_for_a_reboot_have_their_rows() {
+    let shown = summary_text(|s| {
+        s.programs.truncate(1);
+        s.programs[0].result = ProgramResult::Failed {
+            error: "the download's digest doesn't match GitHub's".into(),
+        };
+        s.programs[0].waiting = None;
+        s.firmware.push(
+            FirmwareUpdate {
+                device: "System Firmware".into(),
+                id: "a45d".into(),
+                from: "1.2.3".into(),
+                to: "1.3.0".into(),
+                reboot: true,
+            },
+            FirmwareOutcome::Waiting,
+        );
+    });
+
+    assert!(shown.contains("  Bitwarden     failed: the download's digest doesn't match GitHub's\n"));
+    assert!(shown.contains(
+        "  Firmware      Dock 1.0 → 1.1: applied\n                System Firmware 1.2.3 → 1.3.0: waiting for a reboot\n"
+    ));
+}
+
+#[test]
+fn a_needed_relogin_is_the_next_step_with_its_reason() {
+    let shown = summary_text(|s| {
+        unchanged(s);
+        s.restart = Restart::Relogin;
+        s.restart_reason = Some("Hyprland was updated, and the running one is the old version".into());
+    });
+
+    assert!(shown.contains(
+        "  Next          log out and back in: Hyprland was updated, and the running one is the old version\n"
+    ));
 }

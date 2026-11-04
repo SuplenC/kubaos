@@ -197,6 +197,35 @@ pub struct Preview {
     pub hyprland_pin: bool,
     /// The system migrations it will run.
     pub migrations: Vec<String>,
+    /// The apt packages to upgrade, by name, as apt's simulated upgrade lists them; `packages`
+    /// counts them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upgrades: Vec<PackageChange>,
+}
+
+/// One package that moved from one version to another, came in or went away.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PackageChange {
+    pub name: String,
+    /// The version before; none when the package is new. Several versions are joined with ", ".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    /// The version after; none when the package is gone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
+}
+
+impl PackageChange {
+    /// "firefox 130.0 → 131.0", "jq 1.7, new", "old-tool 2.1, removed", or the name alone when
+    /// apt doesn't say the versions.
+    pub fn describe(&self) -> String {
+        match (&self.from, &self.to) {
+            (Some(from), Some(to)) => format!("{} {from} → {to}", self.name),
+            (None, Some(to)) => format!("{} {to}, new", self.name),
+            (Some(from), None) => format!("{} {from}, removed", self.name),
+            (None, None) => self.name.clone(),
+        }
+    }
 }
 
 /// What the package manifest's phase changed in one group.
@@ -266,13 +295,21 @@ pub struct Summary {
     pub channel: Channel,
     /// The release's commits, `<short hash> <subject>`, newest first.
     pub changes: Vec<String>,
-    /// The apt packages upgraded.
+    /// How many apt packages `apt-get upgrade` upgraded or newly installed.
     pub packages: usize,
+    /// Those apt packages by name, with their versions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upgraded: Vec<PackageChange>,
     /// What the package manifest's phase installed and removed, by group.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub apt: Vec<GroupChange>,
     /// The user flake's inputs `nix flake update` moved.
     pub inputs: Vec<String>,
+    /// The Nix packages of the home that moved, came in or went away, from `nix store
+    /// diff-closures` of the home before and after the switch; none when there was no switch or
+    /// the diff couldn't be taken, empty when nothing moved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nix_packages: Option<Vec<PackageChange>>,
     /// The migrations that ran, system ones first.
     pub migrations: Vec<String>,
     /// What the phases of the programs outside apt and the user flake did, in the order they ran.

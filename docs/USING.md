@@ -272,18 +272,28 @@ An update, in order:
 11. Runs the new user migrations (`migrations/user/`, as you), each once.
 12. Updates firmware through fwupd (below), then writes `/var/lib/kubaos/release`.
 
-In a terminal each of these phases gets one line: a spinner and the program's latest line while it runs, then a tick, a cross or "skipped", its time and what it did. A warning is one dimmed line under its phase. sudo asks for your password only when its cached one has run out, on a clean line. The programs' own output doesn't scroll past: it goes to a log, `~/.local/state/kubaos/update/<date>-update.log` (the last 10 runs are kept). When a step fails you see its last 20 lines and the log's path. At the end a summary says what moved where, the changes, the packages, the migrations that ran, what the session reloaded, whether you need to log in again or reboot, and how to undo it:
+In a terminal each of these phases gets one line: a spinner and the program's latest line while it runs, then a tick, a cross or "skipped", its time and what it did. A warning is one dimmed line under its phase. sudo asks for your password only when its cached one has run out, on a clean line. The programs' own output doesn't scroll past: it goes to a log, `~/.local/state/kubaos/update/<date>-update.log` (the last 10 runs are kept). When a step fails you see its last 20 lines and the log's path. At the end a short summary says what changed: the KubaOS release from and to (or that it stayed), its changes, the apt packages upgraded (how many and their names) and what the package manifest installed or removed, your Nix packages that changed (from your home before the switch to after it, the way `nix store diff-closures` lists them), the Nix inputs that moved, Bitwarden and Nix, the firmware applied, staged, waiting or failed, the migrations that ran, what the session reloaded, whether you need to log in again or reboot and why, and how to undo it. A list with nothing in it says "none"; long ones name the first few and count the rest, and the log has them all. When nothing changed at all, the summary is one line saying so.
 
 ```text
-  ✓ Home               1m05s  reloaded Hyprland, restarting Quickshell
+  ✓ Firmware            3.1s  1 applied
 
-  Updated     Shinjuku 0.1.0 (1a2b3c4) → Shinjuku 0.1.1 (9f8e7d6), edge
-  Packages    12 apt packages, Nix inputs nixpkgs
-  Apt         files: installed loupe, showtime
-  Migrations  1792765570-backlight-rule.sh
-  Next        nothing, it's all running
-  Undo        kubaos rollback
+  Updated       Shinjuku 0.1.0 (1a2b3c4) → Shinjuku 0.1.1 (9f8e7d6), edge
+  Changes       fix(hypr): keep each screen's workspaces as a group
+  Apt           12 upgraded: firefox, libgtk-4-1, openssl, curl, git, libc6, tzdata, vim, and 4 more
+                files: installed loupe, showtime
+  Nix packages  btop 1.4.7 → 1.4.8
+                jq 1.7.1, new
+  Nix inputs    nixpkgs
+  Bitwarden     2026.10.1 → 2026.12.0
+  Nix           2.35.4, the newest of its series
+  Firmware      Dock 1.0 → 1.1: applied
+  Migrations    1792765570-backlight-rule.sh
+  Session       reloaded Hyprland, restarting Quickshell
+  Next          nothing, it's all running
+  Undo          kubaos rollback
 ```
+
+The menu's Update KubaOS and the bar's marker run the update in a terminal that stays open until you close it, so the summary is there to read. An update with no terminal to show it in (a script or a timer of your own, with its output going to a file) sends the summary as one notification instead: the reboot or log-in line first when there is one, then a line a part that changed. With `--json`, the program showing the events shows the summary itself, and no notification is sent.
 
 Piped or in a log, the output is plain lines with no colour; `NO_COLOR=1` drops the colour in a terminal too. `--json` (on `update`, `upgrade` and `rollback`) prints one JSON event per line instead, for a program to show; the events are in [`docs/CONTRACTS.md`](CONTRACTS.md), "Updates and migrations". apt runs without questions and keeps your changed files under `/etc`, leaving the package's new version beside each as `.dpkg-dist`.
 

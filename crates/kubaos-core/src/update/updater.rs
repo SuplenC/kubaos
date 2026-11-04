@@ -41,7 +41,9 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use self::firmware::Staging;
+use super::closure;
 use super::event::Command;
+use super::event::PackageChange;
 use super::event::Phase;
 use super::event::Preview;
 use super::event::Prompt;
@@ -445,16 +447,18 @@ impl<'a, M: Machine> Updater<'a, M> {
         if entry.from_commit != installed.commit {
             self.phase(Phase::Release, |u| u.move_release(&entry.from_commit))?;
         }
-        self.phase(Phase::Home, |u| {
+        let nix_packages = self.phase(Phase::Home, |u| {
             if let Some(lock) = &lock {
                 let dest = u.user.flake_lock();
                 u.j.step("Putting your flake.lock back");
                 fs::copy(lock, &dest).map_err(UpdateError::io(&dest))?;
             }
             u.relink()?;
+            let before = u.home_generation();
             u.switch()?;
+            let nix_packages = u.diff_home(before);
             u.report_reloaded();
-            Ok(())
+            Ok(nix_packages)
         })?;
         let refs = self.refs();
         let rolled_back = Installed {
@@ -479,8 +483,10 @@ impl<'a, M: Machine> Updater<'a, M> {
             channel: rolled_back.channel,
             changes: Vec::new(),
             packages: 0,
+            upgraded: Vec::new(),
             apt: Vec::new(),
             inputs: Vec::new(),
+            nix_packages,
             migrations: Vec::new(),
             programs: Vec::new(),
             reloaded: self.j.reloaded.clone(),
@@ -824,6 +830,28 @@ impl<'a, M: Machine> Updater<'a, M> {
         }
     }
 
+    /// The home-manager generation the home is on, from home-manager's GC root; none before the
+    /// first switch.
+    fn home_generation(&self) -> Option<PathBuf> {
+        fs::read_link(self.user.home_generation()).ok()
+    }
+
+    /// The Nix packages the switch moved, from `before` to the generation the home is on now:
+    /// empty when the switch kept the generation, none when either generation is unknown or the
+    /// diff fails, which only the log says.
+    fn diff_home(&mut self, before: Option<PathBuf>) -> Option<Vec<PackageChange>> {
+        let (before, after) = (before?, self.home_generation()?);
+        if before == after {
+            return Some(Vec::new());
+        }
+        self.j.step("Listing the Nix packages that changed");
+        let cmd = Cmd::user("nix")
+            .args(["store", "diff-closures"])
+            .arg(&before)
+            .arg(&after);
+        self.quiet(&cmd).ok().map(|out| closure::parse_diff(&out))
+    }
+
     /// Reports what the session reloaded after the switch as the running phase's result.
     fn report_reloaded(&mut self) {
         if !self.j.reloaded.is_empty() {
@@ -915,6 +943,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             u.review(installed, target)
         })?;
         let packages = preview.packages;
+        let upgraded = preview.upgrades.clone();
         let changes = preview.changes.clone();
         self.j.emit(&UpdateEvent::Preview(preview));
         // An upgrade always asks: it moves to a new Ubuntu-and-nixpkgs pairing.
@@ -954,12 +983,14 @@ impl<'a, M: Machine> Updater<'a, M> {
             migrations.extend(self.run_system_migrations()?);
         }
         self.phase(Phase::Inputs, |u| u.update_inputs(&flake))?;
-        self.phase(Phase::Home, |u| {
+        let nix_packages = self.phase(Phase::Home, |u| {
             u.relink()?;
+            let before = u.home_generation();
             u.switch()?;
+            let nix_packages = u.diff_home(before);
             u.check_bitwarden();
             u.report_reloaded();
-            Ok(())
+            Ok(nix_packages)
         })?;
         let programs: Vec<_> = [self.update_bitwarden(), self.update_nix()]
             .into_iter()
@@ -976,18 +1007,7 @@ impl<'a, M: Machine> Updater<'a, M> {
 
         let now = self.record(installed, target)?;
         self.clear_available(&now)?;
-        let (restart, restart_reason) = if self.sys.root().join("var/run/reboot-required").exists() {
-            (Restart::Reboot, Some("an updated package asks for it".to_owned()))
-        } else if firmware.with(FirmwareOutcome::Staged).next().is_some() {
-            (Restart::Reboot, Some("firmware is staged to install at it".to_owned()))
-        } else if relogin {
-            (
-                Restart::Relogin,
-                Some("Hyprland was updated, and the running one is the old version".to_owned()),
-            )
-        } else {
-            (Restart::None, None)
-        };
+        let (restart, restart_reason) = self.restart(&firmware, relogin);
         let summary = Summary {
             command: kind.command(),
             from: release_of(installed),
@@ -995,8 +1015,10 @@ impl<'a, M: Machine> Updater<'a, M> {
             channel: now.channel,
             changes,
             packages,
+            upgraded,
             apt,
             inputs: self.j.inputs.clone(),
+            nix_packages,
             migrations,
             programs,
             reloaded: self.j.reloaded.clone(),
@@ -1008,6 +1030,23 @@ impl<'a, M: Machine> Updater<'a, M> {
         };
         self.j.emit(&UpdateEvent::Summary(summary));
         Ok(())
+    }
+
+    /// What the user has to do for the update to apply in full, and why: a reboot when a package
+    /// or staged firmware asks for one, else a new login when the Hyprland pin moved.
+    fn restart(&self, firmware: &Firmware, relogin: bool) -> (Restart, Option<String>) {
+        if self.sys.root().join("var/run/reboot-required").exists() {
+            (Restart::Reboot, Some("an updated package asks for it".to_owned()))
+        } else if firmware.with(FirmwareOutcome::Staged).next().is_some() {
+            (Restart::Reboot, Some("firmware is staged to install at it".to_owned()))
+        } else if relogin {
+            (
+                Restart::Relogin,
+                Some("Hyprland was updated, and the running one is the old version".to_owned()),
+            )
+        } else {
+            (Restart::None, None)
+        }
     }
 
     /// What the update brings: the release's commits, the apt packages, whether the Hyprland pin
@@ -1025,6 +1064,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             apt: Vec::new(),
             hyprland_pin: false,
             migrations: Vec::new(),
+            upgrades: Vec::new(),
         };
         // The manifest the phase will read: the release's, once it is checked out.
         let mut manifest = Manifest::read(&self.sys.manifest()).ok().flatten();
@@ -1061,7 +1101,15 @@ impl<'a, M: Machine> Updater<'a, M> {
         let simulated = self
             .quiet(&Cmd::user("apt-get").args(["-s", "-q", "upgrade", "--with-new-pkgs"]))
             .unwrap_or_default();
-        preview.packages = simulated.lines().filter(|line| line.starts_with("Inst ")).count();
+        preview.upgrades = security::candidates(&simulated)
+            .into_iter()
+            .map(|c| PackageChange {
+                name: c.name,
+                from: c.installed,
+                to: Some(c.version),
+            })
+            .collect();
+        preview.packages = preview.upgrades.len();
         let mut detail = vec![count(preview.packages, "apt package")];
         if preview.to.is_some() {
             detail.push(count(preview.changes.len(), "commit"));

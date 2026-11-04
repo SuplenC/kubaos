@@ -249,6 +249,12 @@ impl Paths {
         self.state.join("downloads")
     }
 
+    /// home-manager's GC root to the generation it activated last,
+    /// `$XDG_STATE_HOME/home-manager/gcroots/current-home`, which home-manager keeps itself.
+    pub fn home_generation(&self) -> PathBuf {
+        self.state.with_file_name("home-manager").join("gcroots/current-home")
+    }
+
     /// The lock `kubaos update`, `upgrade` and `rollback` hold while they run.
     pub fn update_lock(&self) -> PathBuf {
         self.state.join("update.lock")
