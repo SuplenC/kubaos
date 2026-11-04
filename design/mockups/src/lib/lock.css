@@ -1,7 +1,7 @@
 /* The lock (`lib/lock.ts`): a screen with its frame, the wallpaper, its clock and its cut-out at
    rest; the frame closed in, the picture blurred and dimmed, the clock lifted to the top and the
    password's sheet up when awake; and the desktop's still, its windows and its bar, which locking
-   leaves and unlocking comes back to. Numbers move it, each 0 at rest. */
+   leaves and unlocking comes back to. Numbers move it, each 0 at rest but the push. */
 
 /* The frame, from out past the screen's edges (0) to where the shell draws it (1). */
 @property --framed {
@@ -31,6 +31,13 @@
   initial-value: 0;
 }
 
+/* The picture and its cut-out, from the desktop's 1:1 (0) to pushed in to `scale.push` (1). */
+@property --push {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 /* The clock, from its rest or its awake place (0) to the bar's clock (1). */
 @property --dock {
   syntax: "<number>";
@@ -53,6 +60,8 @@
 }
 
 .k-screen.k-lock {
+  --push: 1;
+  --pushed: calc(1 + (var(--scale-push) - 1) * var(--push));
   --frame-side: round(nearest, calc(var(--space-s8) * var(--framed)), 1px);
   --frame-top: round(nearest, calc((var(--space-s8) + (var(--size-bar) - var(--space-s8)) * var(--barred)) * var(--framed)), 1px);
 }
@@ -67,6 +76,22 @@
   --framed: 1;
   --barred: 1;
   --dock: 1;
+  --push: 0;
+}
+
+/* With reduce motion nothing pushes: the lock holds the desktop's 1:1 picture, and only fades. */
+[data-reduced] .k-lock[data-phase] {
+  --push: 0;
+}
+
+/* The picture and its cut-out push in together, one transform round the middle of the screen, a
+   whole device pixel: the cut-out grows exactly over the city it was cut from, so it never uncovers
+   the picture's own city behind it, and a picture with no cut-out pushes in alone. At 0 it is the
+   desktop's picture exactly; at rest and awake it holds still. */
+.k-lock .k-screen-wallpaper,
+.k-lock-cutout {
+  transform-origin: 50% 50%;
+  scale: var(--pushed);
 }
 
 /* The frame's inner corners grow with it, so a frame not yet in shows no corner. */
@@ -146,7 +171,8 @@
    `space.s16` above it. Its size and place mix three: the rest clock in `type.clock_rest` where
    the wallpaper puts it, the awake one in `type.clock` centred `space.s48` under the frame's top,
    and the bar's time in `type.body` where the pill puts it, as `--lift` and `--dock` say.
-   The box is on whole device pixels, and the kicker centred over it, the odd pixel after it.
+   The box is on whole device pixels, and the kicker centred on the same middle, each with the
+   odd pixel after it, so as the kicker's size moves its edges only ever move one way.
    It stands behind the cut-out, and above the frame while it flies to or from the bar. */
 .k-lock-clock {
   position: absolute;
@@ -162,11 +188,24 @@
   --spread: calc((var(--bar-natural, 0) - var(--digits-natural) * var(--type-body-size) / var(--type-clock_rest-size)) * var(--dock));
   --digits-width: round(up, calc((var(--digits-natural) * var(--k) + var(--spread)) * var(--px) - 0.001px), 1px);
   --digits-height: calc(var(--cap-height) * var(--type-clock_rest-size) * var(--k));
-  --awake-top: calc(var(--space-s8) + var(--space-s48) + var(--kicker-height, 0px) + var(--space-s16));
+  /* The kicker's line, the same at rest and awake: only its size moves. */
+  --kicker-height: max(var(--type-clock_place-line), var(--type-clock_date-line));
+  /* The kicker's two styles, from their rest sizes (0) to their awake ones (1) as the clock lifts,
+     and the words' widths at that size, each on whole device pixels as a text's box is. */
+  --place-k: calc(1 + (var(--type-clock_place_awake-size) / var(--type-clock_place-size) - 1) * var(--lift));
+  --date-k: calc(1 + (var(--type-clock_date_awake-size) / var(--type-clock_date-size) - 1) * var(--lift));
+  --place-width: round(up, calc(var(--place-natural, 0) * var(--place-k) * var(--px) - 0.001px), 1px);
+  --date-width: round(up, calc(var(--date-natural, 0) * var(--date-k) * var(--px) - 0.001px), 1px);
+  --kicker-width: calc(var(--place-width) + var(--date-width));
+  --awake-top: calc(var(--space-s8) + var(--space-s48) + var(--kicker-height) + var(--space-s16));
   --bar-top: calc((var(--frame-top) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-body-size));
-  --placed-cx: calc(var(--rest-cx, 50%) + (50% - var(--rest-cx, 50%)) * var(--lift));
-  --placed-top: calc(var(--rest-top, 0px) + (var(--awake-top) - var(--rest-top, 0px)) * var(--lift));
-  --cx: calc(var(--placed-cx) * (1 - var(--dock)) + var(--bar-cx, 50%) * var(--dock));
+  /* The rest place moves with the picture as it pushes in: where the wallpaper puts the clock on
+     the desktop's picture (0) and on the pushed one (1), each worked out from the picture. */
+  --rest-cx: calc(var(--rest-cx-flat, var(--middle)) + (var(--rest-cx-pushed, var(--middle)) - var(--rest-cx-flat, var(--middle))) * var(--push));
+  --rest-top: calc(var(--rest-top-flat, 0px) + (var(--rest-top-pushed, 0px) - var(--rest-top-flat, 0px)) * var(--push));
+  --placed-cx: calc(var(--rest-cx) + (var(--middle) - var(--rest-cx)) * var(--lift));
+  --placed-top: calc(var(--rest-top) + (var(--awake-top) - var(--rest-top)) * var(--lift));
+  --cx: calc(var(--placed-cx) * (1 - var(--dock)) + var(--bar-cx, var(--middle)) * var(--dock));
   left: round(down, calc(var(--cx) - var(--digits-width) / 2), 1px);
   top: round(nearest, calc(var(--placed-top) * (1 - var(--dock)) + var(--bar-top) * var(--dock)), 1px);
   width: var(--digits-width);
@@ -180,8 +219,8 @@
 
 .k-lock-clock > .k-lock-kicker {
   position: absolute;
-  top: calc(-1 * (var(--space-s16) + var(--kicker-height, 0px)));
-  left: round(down, calc((var(--digits-width) - var(--kicker-width, 0px)) / 2), 1px);
+  top: calc(-1 * (var(--space-s16) + var(--kicker-height)));
+  left: calc(round(down, calc(var(--cx) - var(--kicker-width) / 2), 1px) - round(down, calc(var(--cx) - var(--digits-width) / 2), 1px));
   width: max-content;
 }
 
@@ -202,11 +241,15 @@
     0 0 var(--size-halo) rgb(from var(--color-surface) r g b / var(--opacity-halo));
 }
 
-.k-lock-place {
+.k-lock .k-lock-place {
+  width: var(--place-width);
+  font-size: calc(var(--type-clock_place-size) * var(--place-k));
   color: color-mix(in oklab, var(--color-primary) calc(var(--settled) * 100%), var(--tint));
 }
 
-.k-lock-date {
+.k-lock .k-lock-date {
+  width: var(--date-width);
+  font-size: calc(var(--type-clock_date-size) * var(--date-k));
   color: color-mix(in oklab, var(--color-on_surface_variant) calc(var(--settled) * 100%), rgb(from var(--tint) r g b / var(--opacity-clock_date)));
 }
 
@@ -227,7 +270,8 @@
 }
 
 /* The foreground cut out of the picture, lying exactly over it and in front of the clock; it
-   blurs with the picture and is gone while the clock is out of it. */
+   blurs with the picture and is gone while the clock is out of it. Its blur is drawn before its
+   push, so it is divided by it, to blur as far as the picture under the frame's blur does. */
 .k-lock-cutout {
   position: absolute;
   inset: 0;
@@ -235,7 +279,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: blur(calc(var(--size-lock_blur) * var(--wake)));
+  filter: blur(calc(var(--size-lock_blur) * var(--wake) / var(--pushed)));
   pointer-events: none;
 }
 
