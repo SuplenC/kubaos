@@ -24,7 +24,6 @@ const CLOCK = "the clock";
 const CUTOUT = "the cut-out";
 const SHEET = "the sheet";
 const KICKER_PART = "the kicker";
-const SHADE = "the shade";
 const WINDOWS = "the windows";
 const BAR = "the bar's pills";
 const BAR_TIME = "the bar's time";
@@ -99,7 +98,6 @@ function reducedRest(): [Eased, ...Eased[]] {
 function locking(on: string, cutout: boolean): [Eased, ...Eased[]] {
   const landed: Eased[] = [
     { part: KICKER_PART, on, target: ".k-lock-kicker", property: "opacity", from: 0, to: 1, duration: "short", cue: ["micro", "medium"], curve: "standard" },
-    { part: SHADE, on, target: ".k-lock-shade", property: "opacity", from: 0, to: 1, duration: "short", cue: ["micro", "medium"], curve: "standard" },
     { part: "the clock's depth", on, target: ".k-lock-clock", property: "--above", from: 1, to: 0, duration: "instant", cue: ["micro", "long"], curve: "standard" },
     ...(cutout ? [{ part: CUTOUT, on, target: ".k-lock-cutout", property: "opacity", from: 0, to: 1, duration: "short", cue: ["micro", "long"], curve: "standard" } satisfies Eased] : []),
   ];
@@ -126,7 +124,6 @@ function lockingReduced(on: string, cutout: boolean): [Eased, ...Eased[]] {
     { part: "the clock's depth", on, target: ".k-lock-clock", property: "--above", from: 1, to: 0, duration: "instant", curve: "standard" },
     { part: "the clock's fade", on, target: ".k-lock-clock", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: KICKER_PART, on, target: ".k-lock-kicker", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: SHADE, on, target: ".k-lock-shade", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     ...(cutout ? [{ part: CUTOUT, on, target: ".k-lock-cutout", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" } satisfies Eased] : []),
     { part: TOP, on, target: ".k-lock", property: "--barred", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
   ];
@@ -134,7 +131,7 @@ function lockingReduced(on: string, cutout: boolean): [Eased, ...Eased[]] {
 
 const LOCKS: Move = {
   name: "Locking",
-  what: "Super+L. The session locks in the first frame; what follows plays on a still of the desktop the lock captured then, drawn inside the lock's own surface, so the lock and the desktop are one surface. The windows fade and shrink to `scale.behind` round the middle of the screen over `medium` on `emphasized_accel`, and the bar's pills fade out with them, riding up out of the screen in the middle of the frame's top edge as it thins. The bar's clock grows out of the bar: its time, Geist Regular, hands over to the lock's clock, Geist Light, where it stands over `micro`, the strokes thinning in place; from `micro` on the clock grows from the bar's time in `type.body` to `type.clock_rest` at its rest place over `long` on `emphasized_decel`, on whole device pixels, its digits taking the picture's tint, and the kicker and its shade fade in above it over `short` from `micro` and `medium` on. Meanwhile, from `micro` on, the frame's top edge thins from the bar's 40 to `space.s8` on the same curve, and from `short` on the whole frame fades out to the bare picture over `long` on `emphasized_decel`. The clock flies above the frame; once it has landed it drops behind the picture, and the cut-out fades in over its digits over `short`: the city steps in front. A lid close or an idle suspend skips all of it and goes straight to rest. With reduce motion the desktop fades out as the rest clock, its kicker, its shade and the cut-out fade in, over `short`.",
+  what: "Super+L. The session locks in the first frame; what follows plays on a still of the desktop the lock captured then, drawn inside the lock's own surface, so the lock and the desktop are one surface. The windows fade and shrink to `scale.behind` round the middle of the screen over `medium` on `emphasized_accel`, and the bar's pills fade out with them, riding up out of the screen in the middle of the frame's top edge as it thins. The bar's clock grows out of the bar: its time, Geist Regular, hands over to the lock's clock, Geist Light, where it stands over `micro`, the strokes thinning in place; from `micro` on the clock grows from the bar's time in `type.body` to `type.clock_rest` at its rest place over `long` on `emphasized_decel`, on whole device pixels, its digits taking the picture's tint, and the kicker fades in above it over `short` from `micro` and `medium` on. Meanwhile, from `micro` on, the frame's top edge thins from the bar's 40 to `space.s8` on the same curve, and from `short` on the whole frame fades out to the bare picture over `long` on `emphasized_decel`. The clock flies above the frame; once it has landed it drops behind the picture, and the cut-out fades in over its digits over `short`: the city steps in front. A lid close or an idle suspend skips all of it and goes straight to rest. With reduce motion the desktop fades out as the rest clock, its kicker and the cut-out fade in, over `short`.",
   tracks: locking(ON, true),
   reduced: lockingReduced(ON, true),
   back: "cuts",
@@ -143,7 +140,7 @@ const LOCKS: Move = {
 
 const LOCKS_BARE: Move = {
   name: "Locking, without a cut-out",
-  what: "The same on a picture with no cut-out, Shibuya's or one of your own: once the clock has landed it drops behind nothing, and no cut-out fades in: the tinted digits stand on the bare picture, only the kicker shaded.",
+  what: "The same on a picture with no cut-out, Shibuya's or one of your own: once the clock has landed it drops behind nothing, and no cut-out fades in: the tinted clock stands on the bare picture, only its kicker's letters haloed.",
   tracks: locking(ON_SHIBUYA, false),
   reduced: lockingReduced(ON_SHIBUYA, false),
   back: "cuts",
@@ -249,18 +246,18 @@ export default page({
   live: () => liveLock(),
   description: [
     "QML `Lock`, a template of the shell's alone: only the shell locks. Click into it and type, or press it: it wakes, and what you type lands in the field. Enter with a password shakes its head and says so; Esc, or 20 s with nothing done, puts it back to rest.",
-    "At rest the lock is the wallpaper and its clock, and nothing else: no frame, no bar, no field. The digits are `type.clock_rest`, Geist Light at 384, about 280 tall, under a kicker line `space.s16` above their tops: where and which day in `accent`, `primary` (東京・月曜日), then ` · ` and the date in `body_strong`, `on_surface_variant`. The kicker and the digits are each centred on the clock's middle, on whole device pixels with the odd one after. The digits are a light tint of the picture behind them, so they read as part of it: the hue the picture shows most strongly under them (each pixel's OKLCH hue counted by its chroma squared, so the glow of a sky or a street's signs decide it, not its haze), at that chroma times 1.2, at lightness 0.84. They are large enough to read without a contrast of their own, so nothing shades them. Every screen of a setup shows rest, each with its own clock.",
+    "At rest the lock is the wallpaper and its clock, and nothing else: no frame, no bar, no field. The digits are `type.clock_rest`, Geist Light at 384, about 280 tall, under a kicker line `space.s16` above their tops: where and which day in `clock_place` (東京・月曜日, M PLUS 1), then ` · ` and the date in `clock_date` (Geist), both 20 on a 24 line, medium. The kicker and the digits are each centred on the clock's middle, on whole device pixels with the odd one after. The digits are a light tint of the picture behind them, so they read as part of it: the hue the picture shows most strongly under them (each pixel's OKLCH hue counted by its chroma squared, so the glow of a sky or a street's signs decide it, not its haze), at that chroma times 1.2, at lightness 0.84. They are large enough to read without a contrast of their own, so nothing shades them. The kicker takes the same colour, its date at `opacity.clock_date` (0.85) of it, so where and which day lead the line. Every screen of a setup shows rest, each with its own clock.",
     "Each wallpaper says where its clock stands: the middle of the digits' baseline as shares of the picture, so the clock keeps its place against the city however a screen crops the picture, kept `space.s32` inside the screen's edges. A wallpaper with a foreground cut-out (an alpha picture of the city, the same size as the wallpaper) has it drawn over the digits, so the towers stand in front of the clock: on Shinjuku the skyline covers the digits' feet, on Tokyo Tower the spire crosses the last digit. The place keeps the kicker clear of the cut-out. A picture of your own has no cut-out, and the clock stands in front of it.",
-    "Behind the kicker, small text that keeps 4.5:1, lies a shade of `surface` tight to it: a capsule `space.s16` past it across and `space.s12` down, blurred by `space.s8` so it has no edge and no shape of its own, at the least opacity, in hundredths, that keeps its words at 4.5:1 over the brightest of the picture under them (its 98th percentile by luminance, read off the picture itself), raised by what the blur leaves at their corners so they hold it where it is weakest. A dark sky like Tokyo Tower's gets next to none, Shibuya's street of signs a lot. The digits have none, with a cut-out or without.",
-    "Awake, on the screen with the pointer only, the shell's frame closes in round the picture, `surface` at `opacity.frame`, `space.s8` all round: the top edge is as thin as the others, and grows to the bar's height only as the lock gives way to the desktop. The picture blurs to `size.lock_blur` (8) and dims to `scrim` at `opacity.panel_scrim`. The clock lifts out from behind the cut-out, which fades, and settles at `type.clock` (80), centred, its kicker's top `space.s48` under the frame's top edge, its digits going from the picture's tint to `on_surface` as it lifts; the kicker's shade follows it, worked out the same way over the blurred, dimmed picture.",
+    "Nothing stands behind the kicker: no capsule, no band. Round each letter lies a halo of `surface`, two text shadows, a tight one blurred by `size.halo_edge` (1) at `opacity.halo_edge` (0.50) that holds the strokes' edges and a soft one blurred by `size.halo` (6) at `opacity.halo` (0.35) round the word. It follows the glyphs, so no shape shows, and it is the same on every wallpaper: the clock matching its picture matters more than the kicker's contrast. On Shinjuku's pink sky the line holds about 2.5:1 round its letters, on Tokyo Tower's blue hour 4.4 to 5.4:1, and on Shibuya the place 12:1 over a dark awning while the date crosses lit signs. The digits have no halo, with a cut-out or without.",
+    "Awake, on the screen with the pointer only, the shell's frame closes in round the picture, `surface` at `opacity.frame`, `space.s8` all round: the top edge is as thin as the others, and grows to the bar's height only as the lock gives way to the desktop. The picture blurs to `size.lock_blur` (8) and dims to `scrim` at `opacity.panel_scrim`. The clock lifts out from behind the cut-out, which fades, and settles at `type.clock` (80), centred, its kicker's top `space.s48` under the frame's top edge, its digits going from the picture's tint to `on_surface` as it lifts. The kicker keeps its size and goes to its own roles with them, where and which day in `primary` and the date in `on_surface_variant`, over the frame and the blurred, dimmed picture as the digits are; its halo stays, lost in the dim.",
     "The lock and the desktop are one surface. Super+L locks the session in its first frame and captures a still of the desktop then; the lock draws that still inside its own surface (the windows, and the bar's pills on the frame) and plays its locking on it: the windows go, and the bar's clock grows out of the bar into the rest clock. Unlocking plays the same way back, the clock flying into the bar's clock, and the session unlocks as it ends. A lid close or an idle suspend skips the motion and goes straight to rest.",
     "A Sheet rises from the middle of the bottom edge, curving into the frame through concave fillets of `radius.surface`, as the wallpaper picker does, `size.panel` (384) wide with a PanelPage's padding: `space.s16` at its top and foot, the container's 16 at its sides. It holds the md `Field` for the password, its lock symbol leading in the field's icon colour and lit with the keyboard in it; `space.s4` under it, as a field's note is, the line led by the `fingerprint` symbol in `primary`, Or touch the fingerprint reader; and `space.s16` under that the key hints, ↵ Unlock and Esc Rest. No avatar, no initial, no emoji: only KubaOS Symbols.",
-    "The lock ignores light and dark. It always draws in the night scheme matugen derives from its wallpaper (the same `scheme-fidelity` dot-theme uses, in dark), and its derived roles from those: Shinjuku's purple hour gives a lavender primary, Tokyo Tower's blue hour a pale blue one, Shibuya's rain a teal one. So the lock is the same in either mode, and its kicker and its sheet keep their contrast over the night picture.",
+    "The lock ignores light and dark. It always draws in the night scheme matugen derives from its wallpaper (the same `scheme-fidelity` dot-theme uses, in dark), and its derived roles from those: Shinjuku's purple hour gives a lavender primary, Tokyo Tower's blue hour a pale blue one, Shibuya's rain a teal one. So the lock is the same in either mode, and its sheet and its awake kicker keep their contrast over the night picture.",
   ],
   variants: [
-    { name: "At rest, with a cut-out", for: "Shinjuku at purple hour: the skyline's towers stand in front of the digits' feet; the digits stand in the open sky in a pale pink drawn from the horizon behind them, and only the kicker has a soft shade behind it.", sample: () => still({ phase: "rest", wallpaper: PURPLE_HOUR }) },
-    { name: "At rest, with a cut-out, a dark sky", for: "Tokyo Tower at blue hour: the spire crosses the last digit; the digits are a pale blue drawn from the sky, and the sky is dark enough that the kicker's shade is next to none.", sample: () => still({ phase: "rest", wallpaper: TOWER }) },
-    { name: "At rest, without a cut-out", for: "Shibuya on a rainy night, as a picture of your own is: the clock in front, its digits a gold drawn from the lit storefronts behind them over the bare picture, and a soft shade behind the kicker alone, strong enough for 4.5:1 over the signs.", sample: () => still({ phase: "rest", wallpaper: SHIBUYA }) },
+    { name: "At rest, with a cut-out", for: "Shinjuku at purple hour: the skyline's towers stand in front of the digits' feet; the digits stand in the open sky in a pale pink drawn from the horizon behind them, and the kicker in the same pink stands off the sky on the halo round its letters alone.", sample: () => still({ phase: "rest", wallpaper: PURPLE_HOUR }) },
+    { name: "At rest, with a cut-out, a dark sky", for: "Tokyo Tower at blue hour: the spire crosses the last digit; the digits are a pale blue drawn from the sky, and the kicker in the same blue reads plainly on the dark sky.", sample: () => still({ phase: "rest", wallpaper: TOWER }) },
+    { name: "At rest, without a cut-out", for: "Shibuya on a rainy night, as a picture of your own is: the clock in front, its digits a gold drawn from the lit storefronts behind them over the bare picture, and the kicker in the same gold, its halo lifting the date where it crosses the signs.", sample: () => still({ phase: "rest", wallpaper: SHIBUYA }) },
     { name: "Awake", for: "The frame closed in, the picture blurred and dimmed, the clock at the top and the password's sheet up from the bottom edge.", sample: () => still({ phase: "awake", wallpaper: PURPLE_HOUR }) },
     { name: "Awake, without a cut-out", for: "The same on Shibuya, in its own night scheme.", sample: () => still({ phase: "awake", wallpaper: SHIBUYA }) },
     { name: "The 12-hour clock", for: "Where the locale or Settings ask for 12 hours: the digits without a meridiem (9:47), which takes its own slot at the kicker's end (· PM), so the digits keep one size and the clock its place.", sample: () => twelveHour("rest") },
@@ -316,22 +313,23 @@ export default page({
   },
   measures: {
     samples: nonEmpty([
-      { name: "At rest", for: "The rest clock's size, the kicker's gap above the digits, and the kicker's shade.", sample: () => still({ phase: "rest" }) },
-      { name: "At rest, without a cut-out", for: "The kicker's shade over a street of signs, and the digits with none.", sample: () => still({ phase: "rest", wallpaper: SHIBUYA }) },
+      { name: "At rest", for: "The rest clock's size, the kicker's gap above the digits, and the kicker's halo.", sample: () => still({ phase: "rest" }) },
+      { name: "At rest, without a cut-out", for: "The kicker's halo over a street of signs, and the digits with none.", sample: () => still({ phase: "rest", wallpaper: SHIBUYA }) },
       { name: "Awake", for: "The frame, the clock at the top, and the sheet: its width, its padding and the gaps inside it.", sample: () => still({ phase: "awake" }) },
       { name: "The desktop's still", for: "The frame with the bar's height at the top, the bar's clock the clock flies to and from, and the windows.", sample: () => still({ phase: "desktop" }) },
     ]),
     measures: [
       { what: "The rest clock's digits.", token: "type-clock_rest-size" },
       { what: "The awake clock's digits.", token: "type-clock-size" },
-      { what: "The kicker's line.", token: "type-accent-line" },
-      { what: "Between the kicker and the digits' tops; how far the kicker's shade reaches past it across; inside the sheet at its top and foot; between the reader's line and the key hints.", token: "space-s16" },
-      { what: "How far the kicker's shade reaches past it down.", token: "space-s12" },
+      { what: "The kicker's line.", token: "type-clock_date-line" },
+      { what: "How far the kicker's halo is blurred at its letters' edges.", token: "size-halo_edge" },
+      { what: "How far the kicker's halo is blurred round the word.", token: "size-halo" },
+      { what: "Between the kicker and the digits' tops; inside the sheet at its top and foot; between the reader's line and the key hints.", token: "space-s16" },
       { what: "The least room between the rest clock and the screen's edges.", token: "space-s32" },
       { what: "The frame's top edge on the desktop, which unlocking grows it to; the bar's clock is centred in it.", token: "size-bar" },
       { what: "The bar's time, which the clock lands on and leaves from.", token: "type-body-size" },
       { what: "Between the frame's top and the awake clock's kicker.", token: "space-s48" },
-      { what: "The awake frame's edges, all four; how far the kicker's shade is blurred.", token: "space-s8" },
+      { what: "The awake frame's edges, all four.", token: "space-s8" },
       { what: "The sheet's width.", token: "size-panel" },
       { what: "The field.", token: "size-control_md" },
       { what: "Between the field and the reader's line.", token: "space-s4" },

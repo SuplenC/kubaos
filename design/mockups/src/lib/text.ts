@@ -11,7 +11,7 @@ import { length, names } from "./tokens.ts";
 
 /** A type style, by its name in `design/tokens.toml`. */
 export type TypeStyle =
-  | "clock_rest" | "clock" | "hero" | "hero_number" | "display" | "title" | "headline" | "heading" | "subheading"
+  | "clock_rest" | "clock" | "clock_place" | "clock_date" | "hero" | "hero_number" | "display" | "title" | "headline" | "heading" | "subheading"
   | "body_large" | "body" | "body_strong" | "button_large" | "button" | "button_small" | "label"
   | "label_number" | "small" | "caption" | "accent" | "mono" | "keycap" | "mono_large";
 
@@ -180,6 +180,8 @@ export function styles(): TypeStyle[] {
 export const STYLE_WORDS: Record<TypeStyle, string> = {
   clock_rest: "21:47",
   clock: "21:47",
+  clock_place: "東京・月曜日",
+  clock_date: " · Monday, 2 November",
   hero: "Welcome",
   hero_number: "64%",
   display: "That's it",
