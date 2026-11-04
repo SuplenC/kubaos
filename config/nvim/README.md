@@ -8,10 +8,14 @@ config, so it wins.
 ## What ships
 
 - **LazyVim**, with these extras (`lua/config/lazy.lua`):
-  - languages: Rust, Docker, markdown, git, JSON, TOML and YAML, and prettier, which formats
-    markdown, JSON, YAML and the web languages (prettier itself comes from Nix, not Mason);
+  - languages: Docker, markdown, git, JSON, TOML, YAML and shell dotfiles, and prettier, which
+    formats markdown, JSON, YAML and the web languages;
   - editing: mini-surround, yanky, dial, inc-rename, mini-move, mini-hipatterns;
   - the snacks explorer and picker, aerial, dap and test.
+- **The extras' npm-based tools, from Nix** (`home/cli.nix`), so they work without the Node
+  Suite: prettier, markdownlint-cli2 and markdown-toc, and the JSON, YAML, Dockerfile, Docker
+  Compose and bash language servers. Mason leaves them out; it still installs the tools that
+  aren't npm packages (marksman, taplo, hadolint, shellcheck, lua-language-server, stylua, shfmt).
 - **Plugins** (`lua/plugins/`): diffview and fugitive for git, vim-tmux-navigator (`C-h/j/k/l`
   across Neovim splits and tmux panes), oil, vim-visual-multi, and the theme.
 - **The theme** (`lua/config/theme.lua`, `colors/matugen.lua`): the colours `dot-theme` makes from

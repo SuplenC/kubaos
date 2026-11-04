@@ -27,8 +27,6 @@ require("lazy").setup({
     { import = "lazyvim.plugins.extras.editor.snacks_explorer" },
     { import = "lazyvim.plugins.extras.editor.snacks_picker" },
     { import = "lazyvim.plugins.extras.formatting.prettier" },
-    -- prettier comes from Nix (home/cli.nix): Mason's needs npm.
-    require("config.suite_tools").from_nix({ packages = { "prettier" } }),
     { import = "lazyvim.plugins.extras.lang.docker" },
     { import = "lazyvim.plugins.extras.lang.git" },
     { import = "lazyvim.plugins.extras.lang.json" },
@@ -38,6 +36,12 @@ require("lazy").setup({
     { import = "lazyvim.plugins.extras.test.core" },
     { import = "lazyvim.plugins.extras.util.dot" },
     { import = "lazyvim.plugins.extras.util.mini-hipatterns" },
+    -- The extras' npm-based tools come from Nix (home/cli.nix): Mason installs
+    -- them with npm, which only the Node Suite brings.
+    require("config.suite_tools").from_nix({
+      servers = { "jsonls", "yamlls", "dockerls", "docker_compose_language_service", "bashls" },
+      packages = { "prettier", "markdownlint-cli2", "markdown-toc" },
+    }),
     -- The installed Suites' extras and settings (home/suites.nix writes the file).
     require("kubaos.suites"),
     -- KubaOS's plugins, then the user layer's plugins/*.lua

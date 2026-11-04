@@ -341,6 +341,29 @@ c_nvim() {
     fi
     echo "ok   nvim $f ($(grep -m1 '^FT=' <<<"$msgs")): no errors"
   done
+  nvim_tools_from_nix
+}
+
+# The shared extras' npm-based tools on a home with no Suite: each server
+# attaches and runs Nix's program, markdownlint-cli2 flags a broken file, and
+# Mason installs none of them (it would need npm, which only the Node Suite has).
+nvim_tools_from_nix() {
+  local out name bad=0 nix="$USER_HOME/.nix-profile/bin/"
+  out="$(zrun "cd ~/Projects/dotfiles && nvim --headless +'luafile test/nvim/tools.lua' +qa!" 2>&1 | tr -d '\r')"
+  grep -q '^MASON ' <<<"$out" &&
+    ! grep '^MASON ' <<<"$out" | grep -qwE 'prettier|markdownlint-cli2|markdown-toc' ||
+    { echo "FAIL Mason would install a tool Nix has: $(grep '^MASON ' <<<"$out")"; bad=1; }
+  for name in jsonls yamlls dockerls docker_compose_language_service bashls; do
+    grep -qF "SERVER $name false $nix" <<<"$out" ||
+      { echo "FAIL $name: want Mason off and Nix's server attached, got: $(grep "^SERVER $name " <<<"$out")"; bad=1; }
+  done
+  for name in prettier markdownlint-cli2 markdown-toc; do
+    grep -qxF "TOOL $name $nix$name" <<<"$out" || { echo "FAIL $name isn't Nix's: $(grep "^TOOL $name " <<<"$out")"; bad=1; }
+  done
+  grep -qE '^LINT markdownlint-cli2 [1-9]' <<<"$out" ||
+    { echo "FAIL markdownlint-cli2 flagged nothing: $(grep '^LINT ' <<<"$out")"; bad=1; }
+  if ((bad)); then printf '%s\n' "$out" | tail -20; return 1; fi
+  echo "ok   the extras' npm-based tools are Nix's: JSON, YAML, Dockerfile, Compose and bash servers attach, markdownlint-cli2 lints, Mason installs none"
 }
 
 GHOSTTY_UNIT=$USER_HOME/.config/systemd/user/app-com.mitchellh.ghostty.service
