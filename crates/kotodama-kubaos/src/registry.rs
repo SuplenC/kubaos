@@ -24,7 +24,9 @@
 //!
 //! `shown_when` sends an action only while the state it names reads as `is`, or as anything but
 //! `is_not`, so of an on/off pair only the half that applies shows. While the state can't be read
-//! the action shows all the same.
+//! the action shows all the same. A list of them sends it only while each holds:
+//! `shown_when = [{ state = "kubaos.suites.wallpaper-depth", is = true }, { state =
+//! "wallpapers.depth", is = false }]`.
 //!
 //! # Owns
 //!
@@ -103,7 +105,8 @@ struct Entry {
     terminal: bool,
     confirm: bool,
     delay: Duration,
-    shown_when: Option<ShownWhen>,
+    /// Every one must hold for the action to show.
+    shown_when: Vec<ShownWhen>,
 }
 
 /// The state an action is shown in.
@@ -201,7 +204,7 @@ impl Registry {
     pub fn items<'a>(&'a self, states: &'a States) -> impl Iterator<Item = Item> + 'a {
         self.actions
             .iter()
-            .filter(|entry| entry.shown_when.as_ref().is_none_or(|when| when.shows(states)))
+            .filter(|entry| entry.shown_when.iter().all(|when| when.shows(states)))
             .map(Entry::item)
     }
 
@@ -262,7 +265,9 @@ impl Entry {
             terminal: boolean(table, "terminal")?,
             confirm: boolean(table, "confirm")?,
             delay,
-            shown_when: table.get("shown_when").map(ShownWhen::from_value).transpose()?,
+            shown_when: table
+                .get("shown_when")
+                .map_or_else(|| Ok(Vec::new()), ShownWhen::list)?,
         })
     }
 
@@ -287,9 +292,18 @@ impl Entry {
 }
 
 impl ShownWhen {
+    /// One state, or a list of them that must all hold.
+    fn list(value: &Value) -> Result<Vec<ShownWhen>, String> {
+        match value {
+            Value::Array(list) if list.is_empty() => Err("`shown_when` is an empty list".to_owned()),
+            Value::Array(list) => list.iter().map(ShownWhen::from_value).collect(),
+            _ => Ok(vec![ShownWhen::from_value(value)?]),
+        }
+    }
+
     fn from_value(value: &Value) -> Result<ShownWhen, String> {
         let Value::Table(table) = value else {
-            return Err("`shown_when` should be a table of `state` and `is` or `is_not`".to_owned());
+            return Err("`shown_when` should be a table of `state` and `is` or `is_not`, or a list of them".to_owned());
         };
         if let Some(key) = table.keys().find(|key| !SHOWN_WHEN_KEYS.contains(&key.as_str())) {
             return Err(format!("`{key}` isn't a setting of `shown_when`"));

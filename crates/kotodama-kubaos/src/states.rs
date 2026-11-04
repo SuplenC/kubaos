@@ -20,6 +20,8 @@
 //! | `kubaos.preview` | on: the home is a live preview of a KubaOS checkout | `S/kubaos/preview.json` names one |
 //! | `kubaos.suites.<name>` | on: the catalog's Suite `<name>` is installed | `U/home/kubaos.d/suites/<name>.toml` exists |
 //! | `bluetooth.unnamed` | on: Bluetooth lists the devices that send no name | `S/quickshell/kubaos.json` |
+//! | `wallpapers.depth` | on: the wallpaper-depth Suite cuts out the user's own pictures | `U/desktop/wallpapers/depth.toml` |
+//! | `wallpapers.depth-skipped` | on: the current wallpaper is in depth's skip list | the same, and `~/.local/state/theme/wallpaper` |
 //!
 //! `U` is the user layer, `~/.config/kubaos`; `S` is `XDG_STATE_HOME`, `~/.local/state`. A state
 //! whose file can't be read has no reading, and an action that names it shows whatever it declares.
@@ -57,6 +59,7 @@ use kubaos_core::suites::catalog;
 use kubaos_core::unfree::Setting as UnfreeSetting;
 use kubaos_core::unfree::Unfree;
 use kubaos_core::update::record::SystemPaths;
+use kubaos_core::wallpaper_depth;
 use kubaos_user_layer::App;
 
 use crate::suites::Installed;
@@ -91,6 +94,10 @@ pub const UNFREE: &str = "nix.unfree";
 pub const PREVIEW: &str = "kubaos.preview";
 /// Whether the control center's Bluetooth tab lists the devices in range that send no name.
 pub const BLUETOOTH_UNNAMED: &str = "bluetooth.unnamed";
+/// Whether the wallpaper-depth Suite cuts out the user's own pictures.
+pub const DEPTH: &str = "wallpapers.depth";
+/// Whether the current wallpaper is in wallpaper depth's skip list.
+pub const DEPTH_SKIPPED: &str = "wallpapers.depth-skipped";
 
 /// What starts the state of an optional package group, `packages.chrome`.
 const PACKAGES: &str = "packages.";
@@ -158,6 +165,7 @@ impl States {
         states.read_packages(places);
         if let Some(config) = &places.config_home {
             states.read_user_layer(config);
+            states.read_depth(&wallpaper_depth::path(config), places.wallpaper.as_deref());
         }
         if let Some(active) = places.keep_awake.as_deref().and_then(kept_awake) {
             states.set(KEEP_AWAKE, Reading::Bool(active));
@@ -220,6 +228,20 @@ impl States {
         self.suites = suites;
     }
 
+    /// Depth's switch from its settings, and whether they skip the current wallpaper, as the
+    /// theme records it in `wallpaper`. Neither reads while the settings don't, and the second
+    /// not while the record doesn't.
+    fn read_depth(&mut self, settings: &Path, wallpaper: Option<&Path>) {
+        let Ok(depth) = wallpaper_depth::Settings::load(settings) else {
+            return;
+        };
+        self.set(DEPTH, Reading::Bool(depth.enabled));
+        if let Some(Ok(current)) = wallpaper.map(wallpaper_depth::current_wallpaper) {
+            let skipped = current.is_some_and(|picture| depth.skips(&picture));
+            self.set(DEPTH_SKIPPED, Reading::Bool(skipped));
+        }
+    }
+
     /// Each optional group the manifest lists, on or off by the user's choice or its default, and
     /// each group the user chose that the manifest can't tell about.
     fn read_packages(&mut self, places: &Places) {
@@ -273,7 +295,7 @@ pub fn values(name: &str) -> Option<Values> {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK
-        | DND | PANEL_POWER_SAVING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED => Some(Values::Bool),
+        | DND | PANEL_POWER_SAVING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,
@@ -299,6 +321,8 @@ pub struct Places {
     pub preview: Option<PathBuf>,
     /// What the shell's panels remember, `~/.local/state/quickshell/kubaos.json`.
     pub shell_state: Option<PathBuf>,
+    /// The theme's record of the current wallpaper, `~/.local/state/theme/wallpaper`.
+    pub wallpaper: Option<PathBuf>,
 }
 
 impl Places {
@@ -314,6 +338,9 @@ impl Places {
             dnd: kubaos_idle::runtime_dir().map(|runtime| runtime.join(DND_FILE)),
             preview: Paths::from_env().ok().map(|paths| paths.preview()),
             shell_state: Paths::from_env().ok().map(|paths| paths.shell_state()),
+            wallpaper: std::env::var_os("HOME")
+                .filter(|home| !home.is_empty())
+                .map(|home| wallpaper_depth::wallpaper_file(Path::new(&home))),
         }
     }
 
@@ -331,6 +358,7 @@ impl Places {
                 user_layer.power,
                 user_layer.state_dir.join(NIXPKGS_FILE),
                 user_layer.network.join(kubaos_proxy::paths::PROFILE),
+                wallpaper_depth::path(config),
             ]);
             let state_dir = StateDir::new(&user_layer.state_dir);
             files.extend(catalog::all().map(|suite| state_dir.suite_file(suite.name)));
@@ -342,6 +370,7 @@ impl Places {
                 .chain(&self.dnd)
                 .chain(&self.preview)
                 .chain(&self.shell_state)
+                .chain(&self.wallpaper)
                 .cloned(),
         );
         files
