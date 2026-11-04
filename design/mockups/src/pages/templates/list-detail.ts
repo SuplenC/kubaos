@@ -62,7 +62,7 @@ const OPENS: Move = {
   what: "Super+Space: the panel fades in and drops `space.s8` into place over `short` on `emphasized_decel`, one step quicker than a panel's `long`, since a key summons it many times an hour. Its Results are there in its first frame. With the setting \"fades\" or reduced motion it only fades.",
   tracks: [
     { part: "fade", on: "the panel", target: ".k-menu", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
-    { part: "drop", on: "the panel", target: ".k-menu", property: "--drop", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
+    { part: "drop", on: "the panel", target: ".k-menu", property: "--menu-drop", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
   ],
   reduced: [{ part: "fade", on: "the panel", target: ".k-menu", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
   back: "cuts",
@@ -74,7 +74,7 @@ const CLOSES: Move = {
   what: "Esc, or an Item run: the panel fades out and lifts `space.s8` over `micro` on `emphasized_accel`; what it runs waits for it to be gone.",
   tracks: [
     { part: "fade", on: "the panel", target: ".k-menu", property: "opacity", from: 1, to: 0, duration: "micro", curve: "emphasized_accel" },
-    { part: "drop", on: "the panel", target: ".k-menu", property: "--drop", from: 0, to: 1, duration: "micro", curve: "emphasized_accel" },
+    { part: "drop", on: "the panel", target: ".k-menu", property: "--menu-drop", from: 0, to: 1, duration: "micro", curve: "emphasized_accel" },
   ],
   reduced: [{ part: "fade", on: "the panel", target: ".k-menu", property: "opacity", from: 1, to: 0, duration: "micro", curve: "emphasized_accel" }],
   back: "cuts",
@@ -94,7 +94,7 @@ const PUSHED: Move = {
   name: "A View pushed",
   what: "An Item that opens a View (a list, a form, a detail): the body slides `space.s24` in from the right and settles from 0.4 to whole over `medium` on `emphasized_decel`, so a pushed list's rows read in its first frame. Back slides it in from the left. With \"fades\" or reduced motion it only settles.",
   tracks: [
-    { part: "slide", on: "the body", target: ".k-menu-body", property: "--push", from: 1, to: 0, duration: "medium", curve: "emphasized_decel" },
+    { part: "slide", on: "the body", target: ".k-menu-body", property: "--view-push", from: 1, to: 0, duration: "medium", curve: "emphasized_decel" },
     { part: "settle", on: "the body", target: ".k-menu-body", property: "opacity", from: 0.4, to: 1, duration: "medium", curve: "emphasized_decel" },
   ],
   reduced: [{ part: "settle", on: "the body", target: ".k-menu-body", property: "opacity", from: 0.4, to: 1, duration: "short", curve: "emphasized_decel" }],
