@@ -31,8 +31,9 @@
 grid = 4
 # The only font sizes. A type style with any other size is refused. 64 is the
 # hero's alone: semibold for words, light for numbers. 80 is the lock screen's
-# clock, the one thing that screen shows.
-font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64, 80]
+# clock once it is awake, and 384 the same clock at rest, when it and the
+# wallpaper are all the screen shows.
+font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64, 80, 384]
 # The scales every length is checked against: `grid` times each one must be a
 # whole number of device pixels.
 scales = [1.0, 1.25, 1.5, 2.0]
@@ -265,6 +266,10 @@ bar = 40
 # The widest a name the bar shows grows (a live preview's branch): past it, it
 # ends in an ellipsis, so the bar's right side never runs into the clock.
 bar_label = 160
+# How far the lock's wallpaper blurs once it is awake, a blur's standard
+# deviation: enough that the city recedes behind the password's sheet, little
+# enough that it is still the same picture.
+lock_blur = 8
 # A wallpaper's thumbnail in the shell's picker, 16:10 as the screens are.
 thumbnail_width = 256
 thumbnail_height = 160
@@ -356,7 +361,19 @@ line = 88
 icon = 48
 weight = "light"
 family = "sans"
-use = "The lock screen's clock, the one thing that screen shows: a step above the hero, light like every big figure. The clock popup's time stays the hero's number style."
+use = "The lock screen's clock once it is awake, over the password's sheet: a step above the hero, light like every big figure. The clock popup's time stays the hero's number style."
+
+# The lock at rest is the wallpaper and its clock alone, the clock as large as
+# a poster's: Geist Light's figures are 0.726 of the size tall, so 384 draws
+# digits about 280 tall, under a third of a 960 tall screen. Its line is its
+# size, so the digits sit on the grid wherever the lock places them.
+[type.clock_rest]
+size = 384
+line = 384
+icon = 48
+weight = "light"
+family = "sans"
+use = "The lock screen's clock at rest, with only the wallpaper round it: the city's cut-out may stand in front of its digits."
 
 [type.hero]
 size = 64
@@ -617,6 +634,12 @@ use = "A toast staying once it has arrived: long enough to read its line twice."
 [duration.hold]
 ms = 1100
 use = "A held button held until it acts: Kōbō's Install, the hold that erases a disk."
+
+# How long the awake lock waits for a key, a press or a touch of the reader
+# before it goes back to rest. Not a move: reduce motion doesn't cap it.
+[duration.lock_idle]
+ms = 20000
+use = "The awake lock left alone until it goes back to rest: time to find a key or a finger, short enough that an empty field doesn't sit lit."
 
 # Easing curves, as CSS cubic béziers (x1, y1, x2, y2).
 [easing.standard]
