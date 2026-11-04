@@ -406,7 +406,10 @@ function slider(box: HTMLElement, rows: readonly HTMLElement[]): (index: number)
     }
     // Arriving, it is on its row at once; only a move between rows slides.
     shape.toggleAttribute("data-still", !shown);
+    // The row's own box, so the shape keeps the inset the rows have from the well's edges.
     shape.style.setProperty("--top", `${item.offsetTop}px`);
+    shape.style.setProperty("--left", `${item.offsetLeft}px`);
+    shape.style.setProperty("--width", `${item.offsetWidth}px`);
     shape.style.setProperty("--height", `${item.offsetHeight}px`);
     shape.toggleAttribute("data-danger", item.hasAttribute("data-danger"));
     shown = true;
