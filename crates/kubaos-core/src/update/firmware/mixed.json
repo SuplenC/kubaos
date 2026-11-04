@@ -1,0 +1,79 @@
+{
+  "Devices": [
+    {
+      "Name": "USB-C Dock",
+      "DeviceId": "4d3b0f2c9a1e7b6a5c8d9e0f1a2b3c4d5e6f7a8b",
+      "Guid": [
+        "0b9e2a8c-1d3f-5e7a-9b0c-2d4e6f8a0b1c"
+      ],
+      "Summary": "Thunderbolt dock",
+      "Plugin": "thunderbolt",
+      "Flags": [
+        "updatable",
+        "supported",
+        "registered",
+        "usable-during-update"
+      ],
+      "Vendor": "Example",
+      "Version": "1.2.3",
+      "Releases": [
+        {
+          "AppstreamId": "com.example.dock.firmware",
+          "RemoteId": "lvfs",
+          "Name": "Dock",
+          "Version": "1.3.0",
+          "Flags": [
+            "trusted-metadata",
+            "is-upgrade"
+          ]
+        },
+        {
+          "AppstreamId": "com.example.dock.firmware",
+          "RemoteId": "lvfs",
+          "Name": "Dock",
+          "Version": "1.2.9",
+          "Flags": [
+            "trusted-metadata",
+            "is-upgrade"
+          ]
+        }
+      ]
+    },
+    {
+      "Name": "Unifying Receiver",
+      "DeviceId": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432",
+      "Flags": [
+        "updatable",
+        "supported"
+      ],
+      "Releases": [
+        {
+          "Version": "RQR12.11_B0032",
+          "Flags": [
+            "is-upgrade"
+          ]
+        }
+      ]
+    },
+    {
+      "Name": "System Firmware",
+      "DeviceId": "a45df35ac0e948ee180fe216a5f703f32dda163f",
+      "Flags": [
+        "internal",
+        "updatable",
+        "supported",
+        "needs-reboot",
+        "needs-shutdown"
+      ],
+      "Version": "0.1.2",
+      "Releases": [
+        {
+          "Version": "0.1.4",
+          "Flags": [
+            "is-upgrade"
+          ]
+        }
+      ]
+    }
+  ]
+}

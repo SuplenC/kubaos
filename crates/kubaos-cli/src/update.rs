@@ -1,20 +1,22 @@
-//! `kubaos update`, `upgrade`, `rollback` and `channel`: updating the installed KubaOS.
+//! `kubaos update`, `upgrade`, `rollback`, `channel` and `firmware`: updating the installed KubaOS.
 //!
 //!   kubaos update [-y] [--packages-only] [--foreground] [--json]
 //!   kubaos update --check [--json]
 //!   kubaos upgrade [--foreground] [--json]
 //!   kubaos rollback [-y] [--foreground] [--json]
 //!   kubaos channel [stable | edge]
+//!   kubaos firmware [on | off]
 //!
 //! They run as the desktop user and ask for sudo for the steps that need root. Once confirmed, an
 //! update, upgrade or rollback switches the home back to the release first when it is a live
 //! preview (`kubaos switch --from`). `--foreground`
 //! runs the home-manager switch in this process, for a session without a systemd user manager.
-//! `--check` is the daily notifier's: it only looks at origin. On a terminal they show a live
-//! view of each phase; elsewhere plain lines; with `--json` one event per line
-//! (`kubaos_core::update::event`), reading a prompt's answer from stdin. Programs' output goes to
-//! the run's log, `~/.local/state/kubaos/update/`. Exit codes: 0 ok, 1 the update failed or was
-//! declined, 2 usage.
+//! `--check` is the daily notifier's: it only looks at origin. An update offers to stage the
+//! firmware that installs at the next reboot only when it asks, so never with `-y` or `--json`. On
+//! a terminal they show a live view of each phase; elsewhere plain lines; with `--json` one event
+//! per line (`kubaos_core::update::event`), reading a prompt's answer from stdin. Programs' output
+//! goes to the run's log, `~/.local/state/kubaos/update/`. Exit codes: 0 ok, 1 the update failed or
+//! was declined, 2 usage.
 //!
 //! # Owns
 //!
@@ -29,11 +31,14 @@ use std::process::ExitCode;
 use std::time::SystemTime;
 
 use clap::Args;
+use clap::ValueEnum;
+use kubaos_core::apt::Switch;
 use kubaos_core::state::Paths;
 use kubaos_core::update::Confirm;
 use kubaos_core::update::UpdateError;
 use kubaos_core::update::UpdateOptions;
 use kubaos_core::update::Updater;
+use kubaos_core::update::firmware::Setting;
 use kubaos_core::update::record::Channel;
 use kubaos_core::update::record::SystemPaths;
 
@@ -47,6 +52,7 @@ mod system;
 use self::render::Mode;
 use self::render::Ui;
 use self::system::System;
+use crate::out::err;
 use crate::out::out;
 
 #[derive(Args)]
@@ -101,6 +107,18 @@ pub struct ChannelArgs {
     channel: Option<String>,
 }
 
+#[derive(Args)]
+pub struct FirmwareArgs {
+    /// `on` or `off`; without it, prints whether it is on.
+    switch: Option<OnOff>,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum OnOff {
+    On,
+    Off,
+}
+
 fn place(foreground: bool) -> SwitchIn {
     if foreground { SwitchIn::Process } else { SwitchIn::Unit }
 }
@@ -141,7 +159,10 @@ pub fn update(args: &UpdateArgs) -> ExitCode {
     if args.check {
         return done(&updater.check());
     }
-    let opts = UpdateOptions::new().confirm(confirm(args.yes));
+    let mut opts = UpdateOptions::new().confirm(confirm(args.yes));
+    if !args.json {
+        opts = opts.stage_firmware();
+    }
     done(&updater.update(if args.packages_only { opts.packages_only() } else { opts }))
 }
 
@@ -187,5 +208,31 @@ pub fn channel(args: &ChannelArgs) -> ExitCode {
             Err(e) => job::report(e),
         },
         Err(e) => usage_error(e),
+    }
+}
+
+pub fn firmware(args: &FirmwareArgs) -> ExitCode {
+    let paths = match Paths::from_env() {
+        Ok(paths) => paths,
+        Err(e) => return usage_error(e),
+    };
+    let setting = Setting::in_layer(&paths.user_layer());
+    let Some(switch) = args.switch else {
+        out!("{}", if setting.is_on() { Switch::On } else { Switch::Off });
+        return ExitCode::SUCCESS;
+    };
+    let switch = match switch {
+        OnOff::On => Switch::On,
+        OnOff::Off => Switch::Off,
+    };
+    match setting.set(switch) {
+        Ok(()) => {
+            out!("Firmware updates: {switch}. kubaos update follows it from its next run.");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            err!("kubaos: writing {}: {e}", setting.path().display());
+            ExitCode::FAILURE
+        }
     }
 }

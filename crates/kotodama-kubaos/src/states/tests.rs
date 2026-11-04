@@ -151,6 +151,18 @@ fn the_greeting_is_on_until_its_off_file_exists() {
 }
 
 #[test]
+fn firmware_updates_are_on_until_their_off_file_exists() {
+    let machine = Machine::new();
+
+    let before = machine.read();
+    machine.write("config/kubaos/desktop/update/no-firmware", "");
+    let after = machine.read();
+
+    assert_eq!(before.get(FIRMWARE), Some(&on(true)));
+    assert_eq!(after.get(FIRMWARE), Some(&on(false)));
+}
+
+#[test]
 fn the_phone_link_is_on_while_its_file_exists() {
     let machine = Machine::new();
 
@@ -429,6 +441,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         BLUETOOTH_UNNAMED,
         DEPTH,
         DEPTH_SKIPPED,
+        FIRMWARE,
         "kubaos.suites.test",
     ] {
         assert_eq!(states.get(name), None, "{name}");
@@ -451,6 +464,7 @@ fn every_file_a_state_is_read_from_is_watched() {
         "config/kubaos/terminal/zsh/no-greeting",
         "config/kubaos/desktop/keyboard/keyboard.toml",
         "config/kubaos/desktop/phone/phone-link",
+        "config/kubaos/desktop/update/no-firmware",
         "config/kubaos/desktop/power/power.toml",
         "config/kubaos/home/kubaos.d/nixpkgs.toml",
         "config/kubaos/home/kubaos.d/suites/test.toml",
@@ -476,6 +490,7 @@ fn a_state_name_is_one_of_the_probes_or_a_package_group() {
     assert_eq!(values(UNFREE), Some(Values::Bool));
     assert_eq!(values(PREVIEW), Some(Values::Bool));
     assert_eq!(values(BLUETOOTH_UNNAMED), Some(Values::Bool));
+    assert_eq!(values(FIRMWARE), Some(Values::Bool));
     assert_eq!(values(SCHEDULER), Some(Values::Words(&["kernel", "lavd"])));
     assert_eq!(values("kubaos.suites.test"), Some(Values::Bool));
     assert_eq!(values("kubaos.suites.nope"), None);

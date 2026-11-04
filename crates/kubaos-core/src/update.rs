@@ -5,8 +5,9 @@
 //! what the user flake builds. An update fetches `origin`, lets the channel's release policy pick
 //! the commit `release` moves to, upgrades apt, brings the apt packages in line with the release's
 //! package manifest (`crate::apt`), runs the system migrations not run yet, updates
-//! and switches the user flake, then runs the user migrations. `/var/lib/kubaos/release` records
-//! what is installed and `update-history` what each update changed, which `rollback` undoes.
+//! and switches the user flake, runs the user migrations, then updates firmware through fwupd.
+//! `/var/lib/kubaos/release` records what is installed and `update-history` what each update
+//! changed, which `rollback` undoes.
 //!
 //! # Owns
 //!
@@ -20,6 +21,7 @@
 //! - Rendering the events on a terminal: `kubaos-cli`'s `update/render.rs`.
 
 pub mod event;
+pub mod firmware;
 pub mod git;
 pub mod hyprland;
 mod journal;

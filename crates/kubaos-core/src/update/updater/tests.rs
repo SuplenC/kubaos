@@ -60,6 +60,10 @@ struct Fake {
     preview: Option<String>,
     /// Whether switching back from the preview fails.
     leave_fails: bool,
+    /// The answer to a command whose line starts with the prefix: its exit code and stdout.
+    answers: Vec<(&'static str, i32, &'static str)>,
+    /// A question starting with this is answered no, whatever `answer` says.
+    no_to: Option<&'static str>,
 }
 
 /// A machine's packages, for the package manifest's tests.
@@ -186,6 +190,8 @@ impl Fake {
             dpkg: None,
             preview: None,
             leave_fails: false,
+            answers: Vec::new(),
+            no_to: None,
         }
     }
 
@@ -233,6 +239,19 @@ impl Fake {
                 code: Some(100),
                 stdout: String::new(),
                 stderr: "failing (test)".to_owned(),
+            });
+        }
+        let line = cmd.display();
+        if let Some((_, code, stdout)) = self.answers.iter().find(|(prefix, ..)| line.starts_with(prefix)) {
+            return Ok(Ran {
+                ok: *code == 0,
+                code: Some(*code),
+                stdout: (*stdout).to_owned(),
+                stderr: if *code == 0 {
+                    String::new()
+                } else {
+                    "answered (test)".to_owned()
+                },
             });
         }
         let canned = |stdout: String| Ran {
@@ -308,9 +327,9 @@ impl Machine for Fake {
         Ok(())
     }
 
-    fn confirm(&mut self, _question: &str) -> bool {
+    fn confirm(&mut self, question: &str) -> bool {
         self.asked += 1;
-        self.answer
+        self.answer && !self.no_to.is_some_and(|prefix| question.starts_with(prefix))
     }
 
     fn needs_password(&mut self) -> bool {
@@ -1260,4 +1279,5 @@ fn an_update_without_a_live_preview_has_no_such_phase() {
     assert!(!m.ran.iter().any(|line| line == "leave preview"));
 }
 
+mod firmware;
 mod manifest;

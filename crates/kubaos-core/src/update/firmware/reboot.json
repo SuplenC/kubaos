@@ -1,0 +1,74 @@
+{
+  "Devices": [
+    {
+      "Name": "UEFI dbx",
+      "DeviceId": "362301da643102b9f38477387e2193e57abaa590",
+      "ParentDeviceId": "f7a476ea6f4386288f43f375aded5dd0cbc805f8",
+      "CompositeId": "f7a476ea6f4386288f43f375aded5dd0cbc805f8",
+      "InstanceIds": [
+        "UEFI\\CRT_3CD3F0309EDAE228767A976DD40D9F4AFFC4FBD5218F2E8CC3C9DD97E8AC6F9D&ARCH_X64"
+      ],
+      "Guid": [
+        "d07ff664-b0e1-5f4e-a723-d7fbcbfcb94f"
+      ],
+      "Summary": "UEFI revocation database",
+      "Plugin": "uefi_dbx",
+      "Protocols": [
+        "org.uefi.dbx2"
+      ],
+      "Flags": [
+        "internal",
+        "updatable",
+        "supported",
+        "needs-reboot",
+        "usable-during-update",
+        "only-version-upgrade",
+        "signed-payload",
+        "can-emulation-tag"
+      ],
+      "Checksums": [
+        "6b4328ebcbe46ed9118ff2d4472de329d70ba83016df7a6f50f8af923883bc54"
+      ],
+      "Vendor": "Microsoft",
+      "VendorIds": [
+        "UEFI:Microsoft"
+      ],
+      "Version": "20250507",
+      "VersionLowest": "20250507",
+      "VersionFormat": "number",
+      "Icons": [
+        "application-certificate"
+      ],
+      "InstallDuration": 1,
+      "Created": 1793523620,
+      "Releases": [
+        {
+          "AppstreamId": "com.microsoft.dbx.x64-kek2023.firmware",
+          "RemoteId": "lvfs",
+          "Name": "Secure Boot dbx",
+          "Summary": "UEFI Secure Boot Forbidden Signature Database",
+          "Version": "20260707",
+          "Flags": [
+            "trusted-metadata",
+            "is-upgrade"
+          ],
+          "Size": 17256,
+          "Created": 1783382400
+        },
+        {
+          "AppstreamId": "com.microsoft.dbx.x64.firmware",
+          "RemoteId": "lvfs",
+          "Name": "Secure Boot dbx",
+          "Summary": "UEFI Secure Boot Forbidden Signature Database",
+          "Version": "20260402",
+          "Flags": [
+            "trusted-metadata",
+            "is-upgrade"
+          ],
+          "Size": 24629,
+          "Created": 1756771200
+        }
+      ]
+    }
+  ]
+}

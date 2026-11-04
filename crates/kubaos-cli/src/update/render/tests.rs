@@ -16,6 +16,7 @@ use kubaos_core::update::event::Release;
 use kubaos_core::update::event::Restart;
 use kubaos_core::update::event::Summary;
 use kubaos_core::update::event::UpdateEvent;
+use kubaos_core::update::firmware::Firmware;
 use kubaos_core::update::record::Channel;
 
 use super::Json;
@@ -243,6 +244,7 @@ fn edge_update() -> Vec<UpdateEvent> {
             inputs: vec!["nixpkgs".into()],
             migrations: vec!["1792765570-backlight-rule.sh".into()],
             reloaded: vec!["reloaded Hyprland".into(), "restarting Quickshell".into()],
+            firmware: Firmware::default(),
             restart: Restart::None,
             restart_reason: None,
             undo: Some("kubaos rollback".into()),

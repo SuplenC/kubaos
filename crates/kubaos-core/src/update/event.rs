@@ -30,6 +30,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 
+use super::firmware::Firmware;
 use super::record::Channel;
 use super::record::capitalise;
 use super::record::short;
@@ -92,6 +93,8 @@ pub enum Phase {
     Home,
     /// The release's new user migrations.
     UserMigrations,
+    /// Firmware through fwupd: the updates that need no reboot, and those that do staged on a yes.
+    Firmware,
 }
 
 impl Phase {
@@ -112,6 +115,7 @@ impl Phase {
             Self::Inputs => "Nix inputs",
             Self::Home => "Home",
             Self::UserMigrations => "Your migrations",
+            Self::Firmware => "Firmware",
         }
     }
 }
@@ -163,7 +167,7 @@ pub enum Restart {
     None,
     /// Log out and back in: the running Hyprland is the old one.
     Relogin,
-    /// An updated package asks for a reboot.
+    /// An updated package asks for a reboot, or firmware is staged for one.
     Reboot,
 }
 
@@ -221,6 +225,9 @@ pub struct Summary {
     pub migrations: Vec<String>,
     /// What the running session reloaded or restarted after the switch (`scripts/dot-session`).
     pub reloaded: Vec<String>,
+    /// What the firmware phase applied, staged, left waiting and failed at.
+    #[serde(default, skip_serializing_if = "Firmware::is_empty")]
+    pub firmware: Firmware,
     pub restart: Restart,
     /// Why a restart is needed.
     #[serde(default, skip_serializing_if = "Option::is_none")]

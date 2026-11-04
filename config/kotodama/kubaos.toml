@@ -73,9 +73,9 @@ kind = "scripts"
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
 # `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
 # `nix.unfree`, `kubaos.preview`, `kubaos.suites.<name>` (the Suite is
-# installed), `bluetooth.unnamed`, `wallpapers.depth` (the wallpaper-depth
-# Suite cuts out your own pictures) and `wallpapers.depth-skipped` (the current
-# wallpaper is in its skip list), true or false;
+# installed), `bluetooth.unnamed`, `update.firmware`, `wallpapers.depth` (the
+# wallpaper-depth Suite cuts out your own pictures) and `wallpapers.depth-skipped`
+# (the current wallpaper is in its skip list), true or false;
 # `power.scheduler` ("kernel", "lavd") and `power.low-battery` ("power-saver",
 # "super-saver", "off"). While a state can't be read, the action shows.
 #
@@ -1049,6 +1049,26 @@ icon = "system-software-update"
 keywords = ["release", "codename", "do-release-upgrade"]
 run = ["kubaos", "upgrade"]
 terminal = true
+
+# Firmware through fwupd and the LVFS, the last phase of kubaos update: what
+# needs no reboot installs, what does is staged on a yes in the terminal. On by
+# default; off is the flag file desktop/update/no-firmware of the user layer.
+
+[extensions.kubaos.actions.firmware-on]
+title = "Firmware updates on"
+subtitle = "kubaos update installs firmware from the LVFS, and asks before staging what needs a reboot"
+icon = "system-software-update"
+keywords = ["firmware", "fwupd", "lvfs", "bios", "uefi", "dock", "update"]
+run = ["kubaos", "firmware", "on"]
+shown_when = { state = "update.firmware", is = false }
+
+[extensions.kubaos.actions.firmware-off]
+title = "Firmware updates off"
+subtitle = "kubaos update leaves firmware alone; sudo fwupdmgr update still does it by hand"
+icon = "system-software-update"
+keywords = ["firmware", "fwupd", "lvfs", "bios", "uefi", "dock", "update"]
+run = ["kubaos", "firmware", "off"]
+shown_when = { state = "update.firmware", is = true }
 
 [extensions.kubaos.actions.rollback]
 title = "Roll back last update"

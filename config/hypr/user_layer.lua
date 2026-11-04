@@ -23,6 +23,7 @@ M.apps = {
   phone = "desktop/phone",
   network = "desktop/network",
   workspaces = "desktop/workspaces",
+  update = "desktop/update",
   ghostty = "terminal/ghostty",
   foot = "terminal/foot",
   tmux = "terminal/tmux",

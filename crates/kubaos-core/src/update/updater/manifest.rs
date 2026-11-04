@@ -39,6 +39,7 @@ use crate::update::event::Phase;
 use crate::update::event::Restart;
 use crate::update::event::Summary;
 use crate::update::event::UpdateEvent;
+use crate::update::firmware::Firmware;
 use crate::update::machine::Cmd;
 use crate::update::machine::Machine;
 
@@ -172,6 +173,7 @@ impl<M: Machine> Updater<'_, M> {
             inputs: Vec::new(),
             migrations: Vec::new(),
             reloaded: Vec::new(),
+            firmware: Firmware::default(),
             restart: Restart::None,
             restart_reason: None,
             undo: None,

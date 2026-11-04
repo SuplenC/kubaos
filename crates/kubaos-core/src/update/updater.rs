@@ -6,8 +6,9 @@
 //! snapshot, the user's `flake.lock` saved and the update recorded in the history; apt; moving
 //! `release`; the Hyprland pin, the package manifest and the system migrations; `nix flake update`
 //! of the user flake; relinking what `system/` took from KubaOS's nixpkgs; the switch; the
-//! Bitwarden check; the user migrations; and the new release record. Packages first, then
-//! migrations, which are written against the new packages.
+//! Bitwarden check; the user migrations; firmware through fwupd; and the new release record.
+//! Packages first, then migrations, which are written against the new packages. Firmware comes
+//! last: it never stops an update, and the question it may ask comes once the rest is done.
 //!
 //! Each stage is a [`Phase`] of the progress stream (`event.rs`). Programs run with their output
 //! captured: every line goes to the run's log and to the stream, never to the terminal directly.
@@ -21,7 +22,7 @@
 //! - Which release to move to: `policy.rs`. The files' formats: `record.rs`, `notice.rs`.
 //! - Running programs and the switch: `machine.rs` and `switch.rs`.
 //! - The package manifest's phase, its status and `kubaos packages enable|disable`:
-//!   `updater/manifest.rs`.
+//!   `updater/manifest.rs`. The firmware phase: `updater/firmware.rs`.
 //! - The events and the log: `event.rs` and `journal.rs`.
 
 use std::collections::BTreeSet;
@@ -35,6 +36,7 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
+use self::firmware::Staging;
 use super::event::Command;
 use super::event::Phase;
 use super::event::Preview;
@@ -45,6 +47,8 @@ use super::event::Sink;
 use super::event::Summary;
 use super::event::UpdateEvent;
 use super::event::chain;
+use super::firmware::Firmware;
+use super::firmware::FirmwareOutcome;
 use super::git::GitRefs;
 use super::git::RemoteRefs;
 use super::hyprland;
@@ -204,6 +208,7 @@ pub enum Confirm {
 pub struct UpdateOptions {
     confirm: Confirm,
     packages_only: bool,
+    stage_firmware: bool,
 }
 
 impl UpdateOptions {
@@ -231,6 +236,20 @@ impl UpdateOptions {
     #[must_use]
     pub fn no_packages_only(mut self) -> Self {
         self.packages_only = false;
+        self
+    }
+
+    /// Offers to stage the firmware that installs at the next reboot, for a user at the terminal.
+    #[must_use]
+    pub fn stage_firmware(mut self) -> Self {
+        self.stage_firmware = true;
+        self
+    }
+
+    /// Only reports the firmware that waits for a reboot, as when nobody is there to answer.
+    #[must_use]
+    pub fn no_stage_firmware(mut self) -> Self {
+        self.stage_firmware = false;
         self
     }
 }
@@ -460,6 +479,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             inputs: Vec::new(),
             migrations: Vec::new(),
             reloaded: self.j.reloaded.clone(),
+            firmware: Firmware::default(),
             restart: Restart::None,
             restart_reason: None,
             undo: None,
@@ -939,11 +959,18 @@ impl<'a, M: Machine> Updater<'a, M> {
         if !opts.packages_only {
             migrations.extend(self.run_user_migrations()?);
         }
+        let firmware = self.update_firmware(if opts.stage_firmware && opts.confirm == Confirm::Ask {
+            Staging::Ask
+        } else {
+            Staging::Report
+        });
 
         let now = self.record(installed, target)?;
         self.clear_available(&now)?;
         let (restart, restart_reason) = if self.sys.root().join("var/run/reboot-required").exists() {
             (Restart::Reboot, Some("an updated package asks for it".to_owned()))
+        } else if firmware.with(FirmwareOutcome::Staged).next().is_some() {
+            (Restart::Reboot, Some("firmware is staged to install at it".to_owned()))
         } else if relogin {
             (
                 Restart::Relogin,
@@ -963,6 +990,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             inputs: self.j.inputs.clone(),
             migrations,
             reloaded: self.j.reloaded.clone(),
+            firmware,
             restart,
             restart_reason,
             undo: Some(UNDO.to_owned()),
@@ -1458,6 +1486,7 @@ fn write_user(path: &Path, text: &str) -> Result<(), UpdateError> {
     write_atomic(path, text).map_err(UpdateError::io(path))
 }
 
+mod firmware;
 mod manifest;
 
 #[cfg(test)]
