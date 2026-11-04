@@ -145,7 +145,7 @@
 /* The clock: the digits' box, their cap height down to their baseline, with the kicker
    `space.s16` above it. Its size and place mix three: the rest clock in `type.clock_rest` where
    the wallpaper puts it, the awake one in `type.clock` centred `space.s48` under the frame's top,
-   and the bar's time in `type.body_number` where the pill puts it, as `--lift` and `--dock` say.
+   and the bar's time in `type.body` where the pill puts it, as `--lift` and `--dock` say.
    The box is on whole device pixels, and the kicker centred over it, the odd pixel after it.
    It stands behind the cut-out, and above the frame while it flies to or from the bar. */
 .k-lock-clock {
@@ -153,11 +153,15 @@
   z-index: var(--above);
   display: block;
   --k-awake: calc(1 + (var(--type-clock-size) / var(--type-clock_rest-size) - 1) * var(--lift));
-  --k: calc(var(--k-awake) * (1 - var(--dock)) + var(--type-body_number-size) / var(--type-clock_rest-size) * var(--dock));
-  --digits-width: round(up, calc(var(--digits-natural) * var(--px) * var(--k) - 0.001px), 1px);
+  --k: calc(var(--k-awake) * (1 - var(--dock)) + var(--type-body-size) / var(--type-clock_rest-size) * var(--dock));
+  /* Geist Light's figures are a little narrower than Regular's, so as the clock lands its letters
+     spread by what the bar's time is wider, an even share after each: it lands as wide as the bar's
+     time, each figure within a fifth of a logical pixel of the bar's. */
+  --spread: calc((var(--bar-natural, 0) - var(--digits-natural) * var(--type-body-size) / var(--type-clock_rest-size)) * var(--dock));
+  --digits-width: round(up, calc((var(--digits-natural) * var(--k) + var(--spread)) * var(--px) - 0.001px), 1px);
   --digits-height: calc(var(--cap-height) * var(--type-clock_rest-size) * var(--k));
   --awake-top: calc(var(--space-s8) + var(--space-s48) + var(--kicker-height, 0px) + var(--space-s16));
-  --bar-top: calc((var(--frame-top) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-body_number-size));
+  --bar-top: calc((var(--frame-top) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-body-size));
   --placed-cx: calc(var(--rest-cx, 50%) + (50% - var(--rest-cx, 50%)) * var(--lift));
   --placed-top: calc(var(--rest-top, 0px) + (var(--awake-top) - var(--rest-top, 0px)) * var(--lift));
   --cx: calc(var(--placed-cx) * (1 - var(--dock)) + var(--bar-cx, 50%) * var(--dock));
@@ -195,6 +199,7 @@
   height: auto;
   font-size: calc(var(--type-clock_rest-size) * var(--k));
   line-height: calc(var(--type-clock_rest-size) * var(--k));
+  letter-spacing: calc(var(--spread) / var(--letters, 1) * var(--px));
   text-box: trim-both cap alphabetic;
   color: color-mix(in oklab, var(--color-on_surface) calc(var(--settled) * 100%), var(--digits-tint, var(--color-on_surface)));
 }
@@ -263,7 +268,7 @@
   translate: round(nearest, calc(var(--jolt) * var(--space-s4)), 1px) 0;
 }
 
-/* Measures the digits in the rest clock's style, its figures tabular, and Geist Light's cap height:
+/* Measures the digits in the rest clock's style, and Geist Light's cap height:
    a digit in that size, trimmed as the digits are. */
 .k-lock-meter {
   position: absolute;

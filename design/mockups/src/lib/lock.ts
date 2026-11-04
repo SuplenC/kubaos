@@ -33,7 +33,7 @@ import { container, gap, row, stack } from "./layout.ts";
 import { pill } from "./pill.ts";
 import { probe, variant } from "./probe.ts";
 import { hang, type Screen, screen, type Sheet, sheet } from "./sheet.ts";
-import { text } from "./text.ts";
+import { advance, text } from "./text.ts";
 import { length, number } from "./tokens.ts";
 
 export type { NightScheme };
@@ -156,10 +156,10 @@ function kickerLine(kicker: Kicker): HTMLElement {
 /**
  * The bar's clock, as `modules/bar/Clock.qml` draws it: a pill centred on the bar holding the
  * weekday's kanji in `accent`, `tertiary`, the short date in `body`, `on_surface_variant`, and
- * the time in `body_number`, `on_surface`.
+ * the time in `body`, `on_surface`.
  */
 function barClock(time: string, words: BarClock): { pill: HTMLElement; time: HTMLElement } {
-  const shown = text(time, "body_number", "on_surface");
+  const shown = text(time, "body", "on_surface");
   shown.classList.add("k-lock-bar-time");
   const made = pill({ content: [text(words.kanji, "accent", "tertiary"), text(words.date, "body", "on_surface_variant"), shown], lone: false });
   made.classList.add("k-lock-bar-clock");
@@ -201,6 +201,8 @@ export function lock(options: LockOptions): Lock {
   clock.className = "k-lock-clock";
   clock.style.setProperty("--digits-natural", String(digitsWidth(time)));
   clock.style.setProperty("--cap-height", String(capHeight()));
+  clock.style.setProperty("--bar-natural", String(advance("body", time)));
+  clock.style.setProperty("--letters", String([...time].length));
   clock.append(shade, kicker, digits);
   windows.after(clock);
 
@@ -252,6 +254,7 @@ export function lock(options: LockOptions): Lock {
     const awakeTop = token("space-s8") + token("space-s48") + above;
     clock.style.setProperty("--digits-natural", String(natural));
     clock.style.setProperty("--cap-height", String(cap));
+    clock.style.setProperty("--bar-natural", String(advance("body", time)));
     clock.style.setProperty("--kicker-width", `${kickerWidth}px`);
     clock.style.setProperty("--kicker-height", `${kickerHeight}px`);
     clock.style.setProperty("--rest-cx", `${cx}px`);

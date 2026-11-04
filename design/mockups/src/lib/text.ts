@@ -12,7 +12,7 @@ import { length, names } from "./tokens.ts";
 /** A type style, by its name in `design/tokens.toml`. */
 export type TypeStyle =
   | "clock_rest" | "clock" | "hero" | "hero_number" | "display" | "title" | "headline" | "heading" | "subheading"
-  | "body_large" | "body" | "body_number" | "body_strong" | "button_large" | "button" | "button_small" | "label"
+  | "body_large" | "body" | "body_strong" | "button_large" | "button" | "button_small" | "label"
   | "label_number" | "small" | "caption" | "accent" | "mono" | "keycap" | "mono_large";
 
 const PRECISION = 64;
@@ -189,7 +189,6 @@ export const STYLE_WORDS: Record<TypeStyle, string> = {
   subheading: "Couldn't connect",
   body_large: "Everything on this disk will be erased.",
   body: "KubaOS takes the whole disk and encrypts it.",
-  body_number: "21:47",
   body_strong: "Samsung 990 Pro",
   button_large: "Install",
   button: "Continue",
