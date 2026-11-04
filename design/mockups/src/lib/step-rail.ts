@@ -13,6 +13,7 @@
 
 import "./step-rail.css";
 import { button } from "./button.ts";
+import { hangs } from "./button-bar.ts";
 import type { Pinned } from "./control.ts";
 import { icon } from "./icon.ts";
 import { keyHints, type KeyHint } from "./keycap.ts";
@@ -151,12 +152,11 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
     const foot: Element[] = [];
     if (options.foot.power) {
       const power = button({ label: "Power", kind: "Text", size: "Sm", icon: "power_settings_new" });
-      power.classList.add("k-rail-power");
       foot.push(power);
     }
     foot.push(fill());
     if (options.foot.battery !== undefined) foot.push(battery(options.foot.battery));
-    parts.push(gap("s16"), inset(row("s8", "centre", ...foot), 0, "s12"));
+    parts.push(gap("s16"), inset(hangs(row("s8", "centre", ...foot)), 0, "s12"));
   }
   const box = document.createElement("span");
   box.className = "k-rail";
@@ -248,7 +248,6 @@ export interface FooterPins {
  */
 export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: () => void = () => {}, pinned: FooterPins = {}): { band: HTMLElement; nudge: HTMLElement | null } {
   const back = button({ label: "Back", kind: "Text", icon: "arrow_back", ...(pinned.back ? { pinned: pinned.back } : {}) });
-  back.classList.add("k-step-back");
   back.addEventListener("click", onBack);
   const parts: Element[] = [back, fill()];
   let nudge: HTMLElement | null = null;
@@ -264,7 +263,7 @@ export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: ()
   const next = button({ label: spec.next ?? "Continue", kind: "Filled", icon: "arrow_forward", trailing: true, ...(spec.blocker ? { disabled: true } : {}), ...(pinned.next ? { pinned: pinned.next } : {}) });
   next.addEventListener("click", onNext);
   parts.push(next);
-  const band = row("s16", "centre", ...parts);
+  const band = hangs(row("s16", "centre", ...parts));
   band.classList.add("k-step-footer");
   return { band, nudge };
 }
