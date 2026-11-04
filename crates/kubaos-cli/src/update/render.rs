@@ -32,13 +32,18 @@ use std::time::Instant;
 use kubaos_core::update::event::Command;
 use kubaos_core::update::event::GroupChange;
 use kubaos_core::update::event::Outcome;
+use kubaos_core::update::event::PackageChange;
 use kubaos_core::update::event::Phase;
 use kubaos_core::update::event::Preview;
+use kubaos_core::update::event::ProgramChange;
+use kubaos_core::update::event::ProgramResult;
 use kubaos_core::update::event::Prompt;
 use kubaos_core::update::event::Restart;
 use kubaos_core::update::event::Sink;
 use kubaos_core::update::event::Summary;
 use kubaos_core::update::event::UpdateEvent;
+use kubaos_core::update::firmware::Firmware;
+use kubaos_core::update::firmware::FirmwareOutcome;
 
 /// How often the spinner turns.
 const TICK: Duration = Duration::from_millis(80);
@@ -53,11 +58,17 @@ const TITLE_WIDTH: usize = 18;
 /// it from the name.
 const TIME_WIDTH: usize = 6;
 
-/// The width of the summary's labels: the longest, "Migrations", and two spaces.
-const LABEL_WIDTH: usize = 12;
+/// The width of the summary's labels: the longest, "Nix packages", and two spaces.
+const LABEL_WIDTH: usize = 14;
 
 /// How many of the release's commits the summary names.
 const CHANGES_SHOWN: usize = 5;
+
+/// How many upgraded apt packages the summary names on its line; the log has them all.
+const APT_SHOWN: usize = 8;
+
+/// How many of the home's changed Nix packages the summary names, one a line.
+const NIX_SHOWN: usize = 6;
 
 /// The width the live view assumes when the terminal doesn't say.
 const DEFAULT_WIDTH: usize = 80;
@@ -287,6 +298,13 @@ impl Text {
             }
             return out;
         }
+        if summary.changed_nothing() {
+            return format!(
+                "\n  Nothing changed: KubaOS {}, {}, and its packages are up to date.\n",
+                summary.to.describe(),
+                summary.channel
+            );
+        }
         let moved = summary.from.commit != summary.to.commit;
         let release = if moved {
             format!(
@@ -296,7 +314,7 @@ impl Text {
                 summary.channel
             )
         } else {
-            format!("stays at {}, {}", summary.to.describe(), summary.channel)
+            format!("unchanged at {}, {}", summary.to.describe(), summary.channel)
         };
         let label = match (summary.command, moved) {
             (_, false) => "KubaOS",
@@ -306,30 +324,37 @@ impl Text {
         };
         out.push_str(&row(label, &release));
         if !summary.changes.is_empty() {
-            let indent = " ".repeat(LABEL_WIDTH + 2);
-            let mut subjects = summary
+            let subjects = summary
                 .changes
                 .iter()
-                .take(CHANGES_SHOWN)
                 .map(|change| change.split_once(' ').map_or(change.as_str(), |(_, subject)| subject));
-            out.push_str(&row("Changes", subjects.next().unwrap_or_default()));
-            for subject in subjects {
-                let _ = writeln!(out, "{indent}{subject}");
-            }
-            let more = summary.changes.len().saturating_sub(CHANGES_SHOWN);
-            if more > 0 {
-                let _ = writeln!(out, "{indent}{}", s.dim(&format!("and {more} more")));
-            }
+            out.push_str(&self.rows("Changes", subjects, summary.changes.len(), CHANGES_SHOWN));
         }
         if summary.command != Command::Rollback {
-            let mut packages = count(summary.packages, "apt package");
-            if !summary.inputs.is_empty() {
-                let _ = write!(packages, ", Nix inputs {}", summary.inputs.join(", "));
-            }
-            out.push_str(&row("Packages", &packages));
+            out.push_str(&row("Apt", &upgraded(summary.packages, &summary.upgraded)));
             if !summary.apt.is_empty() {
-                out.push_str(&self.apt_rows(&summary.apt, ""));
+                let indent = " ".repeat(LABEL_WIDTH + 2);
+                for line in group_lines(&summary.apt) {
+                    let _ = writeln!(out, "{indent}{line}");
+                }
             }
+        }
+        if let Some(nix) = &summary.nix_packages {
+            if nix.is_empty() {
+                out.push_str(&row("Nix packages", "none"));
+            } else {
+                let lines = nix.iter().map(PackageChange::describe);
+                out.push_str(&self.rows("Nix packages", lines, nix.len(), NIX_SHOWN));
+            }
+        }
+        if !summary.inputs.is_empty() {
+            out.push_str(&row("Nix inputs", &summary.inputs.join(", ")));
+        }
+        for program in &summary.programs {
+            out.push_str(&row(program.program.title(), &self.program(program)));
+        }
+        if !summary.firmware.is_empty() {
+            out.push_str(&self.firmware_rows(&summary.firmware));
         }
         if !summary.migrations.is_empty() {
             out.push_str(&row("Migrations", &summary.migrations.join(", ")));
@@ -359,24 +384,66 @@ impl Text {
     /// The summary's `Apt` rows: one line a group the package manifest's phase changed, or
     /// `none` when it changed nothing.
     fn apt_rows(&self, apt: &[GroupChange], none: &str) -> String {
+        let mut lines = group_lines(apt);
+        let first = lines.next().unwrap_or_else(|| none.to_owned());
+        let n = apt.len().max(1);
+        self.rows("Apt", std::iter::once(first).chain(lines), n, n)
+    }
+
+    /// The row `label` with the first of `lines` on it and the rest under it, `shown` of the
+    /// `total` at most and how many more after them.
+    fn rows<'l>(
+        &self,
+        label: &str,
+        lines: impl IntoIterator<Item = impl AsRef<str> + 'l>,
+        total: usize,
+        shown: usize,
+    ) -> String {
         let s = self.style;
         let indent = " ".repeat(LABEL_WIDTH + 2);
-        let mut lines = apt.iter().map(|change| {
-            let mut parts = Vec::new();
-            if !change.installed.is_empty() {
-                parts.push(format!("installed {}", change.installed.join(", ")));
+        let mut out = String::new();
+        for (i, line) in lines.into_iter().take(shown).enumerate() {
+            if i == 0 {
+                let _ = writeln!(out, "  {}{}", s.dim(&format!("{label:<LABEL_WIDTH$}")), line.as_ref());
+            } else {
+                let _ = writeln!(out, "{indent}{}", line.as_ref());
             }
-            if !change.removed.is_empty() {
-                parts.push(format!("removed {}", change.removed.join(", ")));
-            }
-            format!("{}: {}", change.group, parts.join("; "))
-        });
-        let first = lines.next().unwrap_or_else(|| none.to_owned());
-        let mut out = format!("  {}{first}\n", s.dim(&format!("{:<LABEL_WIDTH$}", "Apt")));
-        for line in lines {
-            let _ = writeln!(out, "{indent}{line}");
+        }
+        let more = total.saturating_sub(shown);
+        if more > 0 {
+            let _ = writeln!(out, "{indent}{}", s.dim(&format!("and {more} more")));
         }
         out
+    }
+
+    /// The summary's `Firmware` rows: one line a device, with what became of its update.
+    fn firmware_rows(&self, firmware: &Firmware) -> String {
+        let lines = firmware.changes().iter().map(|change| {
+            let outcome = match change.outcome {
+                FirmwareOutcome::Applied => "applied",
+                FirmwareOutcome::Staged => "staged for the reboot",
+                FirmwareOutcome::Waiting => "waiting for a reboot",
+                FirmwareOutcome::Failed => "failed",
+            };
+            format!("{}: {outcome}", change.update.describe())
+        });
+        let n = firmware.changes().len();
+        self.rows("Firmware", lines, n, n)
+    }
+
+    /// What the phase of a program outside apt and the user flake did, on its row.
+    fn program(&self, change: &ProgramChange) -> String {
+        let s = self.style;
+        let mut text = match &change.result {
+            ProgramResult::Updated { from, to } => format!("{from} → {}", s.bold(to)),
+            ProgramResult::Current { version } => format!("{version}, the newest of its series"),
+            ProgramResult::Off => "updates off".to_owned(),
+            ProgramResult::Failed { error } => s.red(&format!("failed: {error}")),
+        };
+        if let Some(waiting) = &change.waiting {
+            let _ = write!(text, "; {waiting} waits for a KubaOS release");
+        }
+        text
     }
 
     fn failed(&self, error: &str, output: &[String], log: Option<&Path>) -> String {
@@ -440,6 +507,40 @@ fn count(n: usize, what: &str) -> String {
     } else {
         format!("{n} {what}s")
     }
+}
+
+/// The apt packages `apt-get upgrade` moved: their count and names, "none" without any.
+fn upgraded(packages: usize, upgraded: &[PackageChange]) -> String {
+    if packages == 0 {
+        return "none".to_owned();
+    }
+    let counted = if packages == 1 {
+        "1 upgraded".to_owned()
+    } else {
+        format!("{packages} upgraded")
+    };
+    if upgraded.is_empty() {
+        return counted;
+    }
+    let mut names: Vec<&str> = upgraded.iter().take(APT_SHOWN).map(|p| p.name.as_str()).collect();
+    let more = upgraded.len().saturating_sub(APT_SHOWN);
+    let more = (more > 0).then(|| format!("and {more} more"));
+    names.extend(more.as_deref());
+    format!("{counted}: {}", names.join(", "))
+}
+
+/// One line a group the package manifest's phase changed: "files: installed loupe; removed eog".
+fn group_lines(apt: &[GroupChange]) -> impl Iterator<Item = String> + '_ {
+    apt.iter().map(|change| {
+        let mut parts = Vec::new();
+        if !change.installed.is_empty() {
+            parts.push(format!("installed {}", change.installed.join(", ")));
+        }
+        if !change.removed.is_empty() {
+            parts.push(format!("removed {}", change.removed.join(", ")));
+        }
+        format!("{}: {}", change.group, parts.join("; "))
+    })
 }
 
 /// A finished phase's time: "0.4s", "42s", "3m05s".

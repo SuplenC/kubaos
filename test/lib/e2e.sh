@@ -3504,6 +3504,8 @@ c_update_edge() {
   ! grep -q $'\e' <<<"$out" || { echo "FAIL escape codes in the update's output off a terminal"; return 1; }
   grep -q '^  ✓ Home' <<<"$out" && grep -q '^  Undo  *kubaos rollback$' <<<"$out" ||
     { echo "FAIL the update's output has no Home phase or no summary:"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -q '^  Apt  ' <<<"$out" && grep -q '^  Nix packages  ' <<<"$out" ||
+    { echo "FAIL the summary has no Apt or no Nix packages row:"; printf '%s\n' "$out" | tail -20; return 1; }
   log="$(ls "$UPD_STATE"/update/*-update.log 2>/dev/null | tail -1)"
   [[ -n $log ]] && grep -q '2000000000-harness-user.sh' "$log" ||
     { echo "FAIL no update log in $UPD_STATE/update naming the migrations"; return 1; }
@@ -3521,6 +3523,9 @@ c_update_edge() {
     { echo "FAIL kubaos update --json, again"; printf '%s\n' "$out" | tail -30; return 1; }
   jq -e . >/dev/null <<<"$out" && [[ $(tail -1 <<<"$out" | jq -r .type) == summary ]] ||
     { echo "FAIL kubaos update --json isn't JSON lines ending in a summary:"; printf '%s\n' "$out" | tail -10; return 1; }
+  # The same home again: the switch keeps the generation, so the diff is known and empty.
+  tail -1 <<<"$out" | jq -e '.nix_packages == []' >/dev/null ||
+    { echo "FAIL the second update's summary doesn't say no Nix package changed:"; tail -1 <<<"$out"; return 1; }
   grep -q 'newest release of its channel' <<<"$out" && [[ $(release_of) == "$head" ]] ||
     { echo "FAIL the second update moved release or didn't say it is current"; printf '%s\n' "$out" | tail -20; return 1; }
   [[ $(lines "$UPD_SYSTEM_LOG") == 1 && $(lines "$UPD_USER_LOG") == 1 ]] ||

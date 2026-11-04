@@ -140,6 +140,11 @@ impl Paths {
         &self.home
     }
 
+    /// The config home, `XDG_CONFIG_HOME` or `~/.config`.
+    pub fn config_home(&self) -> &Path {
+        &self.config
+    }
+
     /// The user layer, `~/.config/kubaos`.
     pub fn user_layer(&self) -> PathBuf {
         kubaos_user_layer::root(&self.config)
@@ -236,6 +241,18 @@ impl Paths {
     /// `~/.local/state/kubaos/update/`.
     pub fn update_logs(&self) -> PathBuf {
         self.state.join("update")
+    }
+
+    /// Where an update downloads what it installs outside apt and Nix, as Bitwarden's `.deb`,
+    /// until it is installed.
+    pub fn update_downloads(&self) -> PathBuf {
+        self.state.join("downloads")
+    }
+
+    /// home-manager's GC root to the generation it activated last,
+    /// `$XDG_STATE_HOME/home-manager/gcroots/current-home`, which home-manager keeps itself.
+    pub fn home_generation(&self) -> PathBuf {
+        self.state.with_file_name("home-manager").join("gcroots/current-home")
     }
 
     /// The lock `kubaos update`, `upgrade` and `rollback` hold while they run.

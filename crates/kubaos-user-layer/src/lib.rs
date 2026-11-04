@@ -78,6 +78,8 @@ pub enum App {
     Network,
     /// The workspace groups: which screens are pinned to which group.
     Workspaces,
+    /// `kubaos update`'s switches: the firmware phase.
+    Update,
     Ghostty,
     Foot,
     Tmux,
@@ -94,7 +96,7 @@ pub enum App {
 }
 
 impl App {
-    pub const ALL: [App; 26] = [
+    pub const ALL: [App; 27] = [
         App::Hypr,
         App::Quickshell,
         App::Cursor,
@@ -108,6 +110,7 @@ impl App {
         App::Phone,
         App::Network,
         App::Workspaces,
+        App::Update,
         App::Ghostty,
         App::Foot,
         App::Tmux,
@@ -139,6 +142,7 @@ impl App {
             App::Phone => "phone",
             App::Network => "network",
             App::Workspaces => "workspaces",
+            App::Update => "update",
             App::Ghostty => "ghostty",
             App::Foot => "foot",
             App::Tmux => "tmux",
@@ -169,7 +173,8 @@ impl App {
             | App::Wallpapers
             | App::Phone
             | App::Network
-            | App::Workspaces => Group::Desktop,
+            | App::Workspaces
+            | App::Update => Group::Desktop,
             App::Ghostty | App::Foot | App::Tmux | App::Zsh | App::Fastfetch => Group::Terminal,
             App::Nvim => Group::Editor,
             App::Git | App::Lazygit | App::Yazi | App::Bat | App::Bacon | App::Fuzzel => Group::Tools,

@@ -94,10 +94,12 @@ and, when one is out, Upgrade to <codename>. The bar shows a marker while
 an update waits. `docs/USING.md` ("Updating") says what each step does and
 how to go back further.
 
-Each update also reports newer Bitwarden desktop and CLI releases
-(`system/70-bitwarden.sh --check-updates`) and prints the new version and
-sha256 lines. Paste them into `70-bitwarden.sh` on the dev machine and
-release them.
+Each update moves Bitwarden desktop to the newest release of its series and
+Nix to the newest patch release of its minor by itself (`docs/USING.md`,
+"Updating"). It reports a newer bw CLI and a new Bitwarden desktop series
+(`system/70-bitwarden.sh --check-updates`) with the new version and sha256
+lines: paste them into `70-bitwarden.sh` on the dev machine and release
+them. A new Nix minor is a bump of `system/60-nix.sh`'s pin.
 
 ## Troubleshooting
 
@@ -454,7 +456,8 @@ system/70-bitwarden.sh
 Installs the official Bitwarden desktop `.deb` and the standalone `bw` CLI
 from github.com/bitwarden/clients, both pinned to a version and checked
 against a sha256 in the script (no apt repo exists, and the app doesn't
-self-update on Linux). Then `libsecret-tools`, `libpam-u2f`, `pamu2fcfg`,
+self-update on Linux; `kubaos update` moves the desktop app on within its
+series). Then `libsecret-tools`, `libpam-u2f`, `pamu2fcfg`,
 `pamtester`, and the security key for sudo, polkit and the lock screen:
 
 - two lines above `@include common-auth` in `/etc/pam.d/sudo`, `sudo-i` and

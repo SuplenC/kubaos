@@ -57,6 +57,8 @@ impl CountError {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Candidate {
     pub name: String,
+    /// The version installed; none when the upgrade installs the package new.
+    pub installed: Option<String>,
     pub version: String,
     /// Whether the candidate version comes from a security pocket.
     pub security: bool,
@@ -102,15 +104,22 @@ pub fn candidates(simulated: &str) -> Vec<Candidate> {
     simulated.lines().filter_map(candidate_line).collect()
 }
 
-/// A candidate from an `Inst name [old] (new origin, origin [arch])` line; its origins are
+/// A candidate from an `Inst name [old] (new origin, origin [arch])` line, `[old]` missing for a
+/// package new to the machine; its origins are
 /// every pocket that carries the version (`noble-security`, `noble-updates`).
 fn candidate_line(line: &str) -> Option<Candidate> {
     let rest = line.strip_prefix("Inst ")?;
     let (name, rest) = rest.split_once(' ')?;
-    let (_, candidate) = rest.split_once('(')?;
+    let (before, candidate) = rest.split_once('(')?;
     let (version, origins) = candidate.split_once(' ')?;
+    let installed = before
+        .trim()
+        .strip_prefix('[')
+        .and_then(|old| old.strip_suffix(']'))
+        .map(str::to_owned);
     Some(Candidate {
         name: name.to_owned(),
+        installed,
         version: version.to_owned(),
         security: origins.split(", ").any(|origin| origin.contains("-security")),
     })

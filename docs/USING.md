@@ -241,13 +241,14 @@ After the laptop sleeps, or when the VPN drops while it is awake, it comes back 
 
 ## Updating and rolling back
 
-Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. Ubuntu's own updaters (unattended-upgrades and the apt-daily timers) are off: nothing runs apt but `kubaos update`, security updates included. It waits until you run it, or pick Update KubaOS in the menu (`SUPER + Space`), which opens a floating terminal running it. A daily timer runs `kubaos update --check`: it only looks, as you, never as root. When there is something new, a release or apt security updates, it sends one notification and puts a marker in the bar (a click runs `kubaos update`), and the menu's Update KubaOS says what is waiting.
+Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. Two programs outside apt and your flake move within their series on every `kubaos update`, unless you turn that off: Bitwarden desktop to the newest release of its year, and the Nix daemon to the newest patch release of its minor; a new series of either waits for a KubaOS release. Ubuntu's own updaters (unattended-upgrades and the apt-daily timers) are off: nothing runs apt but `kubaos update`, security updates included. It waits until you run it, or pick Update KubaOS in the menu (`SUPER + Space`), which opens a floating terminal running it. A daily timer runs `kubaos update --check`: it only looks, as you, never as root. When there is something new, a release or apt security updates, it sends one notification and puts a marker in the bar (a click runs `kubaos update`), and the menu's Update KubaOS says what is waiting.
 
 ```sh
 kubaos update                    # the whole update, after showing what it brings and asking
 kubaos update -y                 # without asking
 kubaos update --packages-only    # apt and your flake; KubaOS stays at its release
 kubaos update --check            # only look; writes ~/.local/state/kubaos/update-available
+kubaos update --turn-off nix     # updates leave Nix at its version (bitwarden, firmware too; --turn-on undoes it)
 kubaos rollback                  # undo the last update: KubaOS's release and your flake.lock
 kubaos channel                   # which channel this machine follows
 kubaos channel stable            # or edge
@@ -264,25 +265,41 @@ An update, in order:
 4. Switches your home back to the release when it is a live preview ("Hacking on KubaOS", below). Takes a snapper snapshot, copies your `flake.lock` to `~/.local/state/kubaos/locks/`, and adds a line to `/var/lib/kubaos/update-history`.
 5. `apt-get upgrade`, then moves `/usr/share/kubaos`'s `release` branch.
 6. When the release's `system/files/apt/preferences.d/kubaos-hyprland` differs from the installed one (amd64): unholds the Hyprland stack, installs the pinned versions, holds it again.
-7. Brings the apt packages in line with the release's package manifest, `system/packages.toml` (below): installs what its groups list and the machine lacks, holds the held ones, and removes a package no group lists any more, but only one KubaOS installed and nothing else needs.
+7. Brings the apt packages in line with the release's package manifest, `system/packages.toml` (below): installs what its groups list and the machine lacks, holds the held ones, and removes a package no group lists any more, but only one KubaOS installed and nothing else needs. It does this on every run, so a package a release adds to the base system reaches a machine installed before it.
 8. Runs the release's new system migrations (`migrations/system/`, as root), each once.
 9. `nix flake update --flake ~/.config/kubaos/home`, `system/relink.sh` (the wallpaper, PAM and recorder links), and a switch.
-10. Runs the new user migrations (`migrations/user/`, as you), each once, and writes `/var/lib/kubaos/release`.
+10. Moves Bitwarden desktop, when it is installed, to the newest release of its series on GitHub: the `.deb` is installed only when its sha256 is the digest GitHub publishes for it, and nothing is installed when it isn't or GitHub publishes none. Then moves the Nix daemon to the newest patch release of its minor (`nix upgrade-nix`, from Nix's signed binary cache) and restarts it. A newer series of either is named, never installed. Each is its own phase: when one fails, it warns and the update goes on. "Bitwarden updates off" and "Nix updates off" in the Command menu (`kubaos update --turn-off bitwarden|nix`) skip them; the setting is a flag file in `~/.config/kubaos/desktop/update/`.
+11. Runs the new user migrations (`migrations/user/`, as you), each once.
+12. Updates firmware through fwupd (below), then writes `/var/lib/kubaos/release`.
 
-In a terminal each of these phases gets one line: a spinner and the program's latest line while it runs, then a tick, a cross or "skipped", its time and what it did. A warning is one dimmed line under its phase. sudo asks for your password only when its cached one has run out, on a clean line. The programs' own output doesn't scroll past: it goes to a log, `~/.local/state/kubaos/update/<date>-update.log` (the last 10 runs are kept). When a step fails you see its last 20 lines and the log's path. At the end a summary says what moved where, the changes, the packages, the migrations that ran, what the session reloaded, whether you need to log in again or reboot, and how to undo it:
+In a terminal each of these phases gets one line: a spinner and the program's latest line while it runs, then a tick, a cross or "skipped", its time and what it did. A warning is one dimmed line under its phase. sudo asks for your password only when its cached one has run out, on a clean line. The programs' own output doesn't scroll past: it goes to a log, `~/.local/state/kubaos/update/<date>-update.log` (the last 10 runs are kept). When a step fails you see its last 20 lines and the log's path. At the end a short summary says what changed: the KubaOS release from and to (or that it stayed), its changes, the apt packages upgraded (how many and their names) and what the package manifest installed or removed, your Nix packages that changed (from your home before the switch to after it, the way `nix store diff-closures` lists them), the Nix inputs that moved, Bitwarden and Nix, the firmware applied, staged, waiting or failed, the migrations that ran, what the session reloaded, whether you need to log in again or reboot and why, and how to undo it. A list with nothing in it says "none"; long ones name the first few and count the rest, and the log has them all. When nothing changed at all, the summary is one line saying so.
 
 ```text
-  ✓ Home               1m05s  reloaded Hyprland, restarting Quickshell
+  ✓ Firmware            3.1s  1 applied
 
-  Updated     Shinjuku 0.1.0 (1a2b3c4) → Shinjuku 0.1.1 (9f8e7d6), edge
-  Packages    12 apt packages, Nix inputs nixpkgs
-  Apt         files: installed loupe, showtime
-  Migrations  1792765570-backlight-rule.sh
-  Next        nothing, it's all running
-  Undo        kubaos rollback
+  Updated       Shinjuku 0.1.0 (1a2b3c4) → Shinjuku 0.1.1 (9f8e7d6), edge
+  Changes       fix(hypr): keep each screen's workspaces as a group
+  Apt           12 upgraded: firefox, libgtk-4-1, openssl, curl, git, libc6, tzdata, vim, and 4 more
+                files: installed loupe, showtime
+  Nix packages  btop 1.4.7 → 1.4.8
+                jq 1.7.1, new
+  Nix inputs    nixpkgs
+  Bitwarden     2026.10.1 → 2026.12.0
+  Nix           2.35.4, the newest of its series
+  Firmware      Dock 1.0 → 1.1: applied
+  Migrations    1792765570-backlight-rule.sh
+  Session       reloaded Hyprland, restarting Quickshell
+  Next          nothing, it's all running
+  Undo          kubaos rollback
 ```
 
+The menu's Update KubaOS and the bar's marker run the update in a terminal that stays open until you close it, so the summary is there to read. An update with no terminal to show it in (a script or a timer of your own, with its output going to a file) sends the summary as one notification instead: the reboot or log-in line first when there is one, then a line a part that changed. With `--json`, the program showing the events shows the summary itself, and no notification is sent.
+
 Piped or in a log, the output is plain lines with no colour; `NO_COLOR=1` drops the colour in a terminal too. `--json` (on `update`, `upgrade` and `rollback`) prints one JSON event per line instead, for a program to show; the events are in [`docs/CONTRACTS.md`](CONTRACTS.md), "Updates and migrations". apt runs without questions and keeps your changed files under `/etc`, leaving the package's new version beside each as `.dpkg-dist`.
+
+### Firmware
+
+The last phase of an update refreshes fwupd's list from the LVFS and installs the firmware updates that need no reboot, a dock's or a receiver's. Firmware that installs only at the next boot (the system firmware, the Secure Boot lists) is named, and in a terminal the update asks "Stage it now?": yes hands it to fwupd, which installs it when you next reboot, and the summary says to reboot. Nothing reboots by itself. With `-y` or `--json` nobody is asked, so it only waits; the next `kubaos update` in a terminal offers it again, or run `sudo fwupdmgr update` yourself. A failure is a warning and the update goes on. "Firmware updates off" in the Command menu (or `kubaos update --turn-off firmware`) leaves firmware out of the update, "Firmware updates on" (`--turn-on firmware`) brings it back. The switch is the flag file `~/.config/kubaos/desktop/update/no-firmware`.
 
 ### KubaOS's apt packages
 

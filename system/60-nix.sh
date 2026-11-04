@@ -22,7 +22,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 # Pinned release of the official installer, checked against this hash before
 # it runs (the script then checks the Nix tarball's own hash). To bump: pick a
 # version from https://releases.nixos.org/?prefix=nix/ and copy its
-# install.sha256.
+# install.sha256. A new install starts from this pin; kubaos update moves an
+# installed machine to the newest patch release of its minor, so only a new
+# minor needs a bump here.
 NIX_VERSION="2.35.4"
 NIX_INSTALL_URL="https://releases.nixos.org/nix/nix-$NIX_VERSION/install"
 NIX_INSTALL_SHA256="118c3dfa04bdc946b3f577365b9a295607142c9b920e2c07b184e266d62b1ee1"

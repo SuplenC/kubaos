@@ -15,6 +15,7 @@ use super::Updater;
 use crate::state::Paths;
 use crate::update::event;
 use crate::update::event::Outcome;
+use crate::update::event::PackageChange;
 use crate::update::event::Phase;
 use crate::update::event::Prompt;
 use crate::update::event::Restart;
@@ -60,6 +61,15 @@ struct Fake {
     preview: Option<String>,
     /// Whether switching back from the preview fails.
     leave_fails: bool,
+    /// The answer to a command whose line starts with the prefix: its exit code and stdout.
+    answers: Vec<(&'static str, i32, &'static str)>,
+    /// A question starting with this is answered no, whatever `answer` says.
+    no_to: Option<&'static str>,
+    /// Answers to the commands whose line contains the text, before `canned`: each answer once,
+    /// the last one again and again.
+    sequences: Vec<(&'static str, Vec<String>)>,
+    /// home-manager's GC root and the generation a switch points it at.
+    generation: Option<(PathBuf, &'static str)>,
 }
 
 /// A machine's packages, for the package manifest's tests.
@@ -186,6 +196,26 @@ impl Fake {
             dpkg: None,
             preview: None,
             leave_fails: false,
+            answers: Vec::new(),
+            no_to: None,
+            sequences: Vec::new(),
+            generation: None,
+        }
+    }
+
+    /// Answers the commands whose line contains `needle` with `stdout`, in turn.
+    fn answering(mut self, needle: &'static str, stdout: &[&str]) -> Self {
+        self.sequences
+            .push((needle, stdout.iter().map(|&out| out.to_owned()).collect()));
+        self
+    }
+
+    fn answer_of(&mut self, line: &str) -> Option<String> {
+        let (_, outs) = self.sequences.iter_mut().find(|(needle, _)| line.contains(needle))?;
+        if outs.len() > 1 {
+            Some(outs.remove(0))
+        } else {
+            outs.first().cloned()
         }
     }
 
@@ -235,12 +265,28 @@ impl Fake {
                 stderr: "failing (test)".to_owned(),
             });
         }
+        let line = cmd.display();
+        if let Some((_, code, stdout)) = self.answers.iter().find(|(prefix, ..)| line.starts_with(prefix)) {
+            return Ok(Ran {
+                ok: *code == 0,
+                code: Some(*code),
+                stdout: (*stdout).to_owned(),
+                stderr: if *code == 0 {
+                    String::new()
+                } else {
+                    "answered (test)".to_owned()
+                },
+            });
+        }
         let canned = |stdout: String| Ran {
             ok: true,
             code: Some(0),
             stdout,
             stderr: String::new(),
         };
+        if let Some(out) = self.answer_of(&cmd.display()) {
+            return Ok(canned(out));
+        }
         if let Some(out) = self.dpkg.as_mut().and_then(|d| d.answer(cmd)) {
             return Ok(canned(out));
         }
@@ -288,6 +334,10 @@ impl Machine for Fake {
     fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError> {
         self.ran.push("switch".to_owned());
         self.switches += 1;
+        if let Some((root, after)) = &self.generation {
+            let _ = fs::remove_file(root);
+            std::os::unix::fs::symlink(after, root).unwrap();
+        }
         for line in &self.switch_output {
             on_line(line);
         }
@@ -308,9 +358,9 @@ impl Machine for Fake {
         Ok(())
     }
 
-    fn confirm(&mut self, _question: &str) -> bool {
+    fn confirm(&mut self, question: &str) -> bool {
         self.asked += 1;
-        self.answer
+        self.answer && !self.no_to.is_some_and(|prefix| question.starts_with(prefix))
     }
 
     fn needs_password(&mut self) -> bool {
@@ -643,6 +693,58 @@ fn the_summary_names_what_the_session_reloaded_and_the_inputs_that_moved() {
         e,
         UpdateEvent::PhaseFinished { phase: Phase::Home, detail: Some(d), .. } if d == "reloaded Hyprland"
     )));
+}
+
+#[test]
+fn the_summary_names_the_apt_packages_upgraded_and_the_nix_packages_the_switch_moved() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[("VERSION", "0.1.1\n")], true);
+    let root = w.user.home_generation();
+    fs::create_dir_all(root.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink("/nix/store/aaa-home-manager-generation", &root).unwrap();
+    let mut m = Fake::new().answering(
+        "diff-closures",
+        &["btop: 1.4.7 → 1.4.8, -68.3 KiB\nkubaos: -858.7 KiB\n"],
+    );
+    m.generation = Some((root, "/nix/store/bbb-home-manager-generation"));
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    let summary = summary(&events);
+    assert_eq!(
+        summary.upgraded,
+        [PackageChange {
+            name: "vim".into(),
+            from: Some("1".into()),
+            to: Some("2".into())
+        }]
+    );
+    assert_eq!(
+        summary.nix_packages,
+        Some(vec![PackageChange {
+            name: "btop".into(),
+            from: Some("1.4.7".into()),
+            to: Some("1.4.8".into())
+        }])
+    );
+    assert_eq!(
+        m.ran("nix store diff-closures /nix/store/aaa-home-manager-generation /nix/store/bbb-home-manager-generation"),
+        1
+    );
+}
+
+#[test]
+fn without_a_home_generation_to_compare_the_nix_packages_are_unknown() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[("VERSION", "0.1.1\n")], true);
+    let mut m = Fake::new();
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert_eq!(summary(&events).nix_packages, None);
+    assert_eq!(m.ran("nix store diff-closures"), 0);
 }
 
 #[test]
@@ -1260,4 +1362,6 @@ fn an_update_without_a_live_preview_has_no_such_phase() {
     assert!(!m.ran.iter().any(|line| line == "leave preview"));
 }
 
+mod firmware;
 mod manifest;
+mod programs;

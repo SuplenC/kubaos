@@ -30,6 +30,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 
+use super::firmware::Firmware;
 use super::record::Channel;
 use super::record::capitalise;
 use super::record::short;
@@ -90,8 +91,14 @@ pub enum Phase {
     Inputs,
     /// The relink and the home-manager switch, and the running session following it.
     Home,
+    /// Bitwarden desktop moved to the newest release of its series, from GitHub.
+    Bitwarden,
+    /// The Nix daemon moved to the newest patch release of its minor, and restarted.
+    Nix,
     /// The release's new user migrations.
     UserMigrations,
+    /// Firmware through fwupd: the updates that need no reboot, and those that do staged on a yes.
+    Firmware,
 }
 
 impl Phase {
@@ -111,7 +118,10 @@ impl Phase {
             Self::SystemMigrations => "System migrations",
             Self::Inputs => "Nix inputs",
             Self::Home => "Home",
+            Self::Bitwarden => "Bitwarden",
+            Self::Nix => "Nix",
             Self::UserMigrations => "Your migrations",
+            Self::Firmware => "Firmware",
         }
     }
 }
@@ -163,7 +173,7 @@ pub enum Restart {
     None,
     /// Log out and back in: the running Hyprland is the old one.
     Relogin,
-    /// An updated package asks for a reboot.
+    /// An updated package asks for a reboot, or firmware is staged for one.
     Reboot,
 }
 
@@ -187,6 +197,35 @@ pub struct Preview {
     pub hyprland_pin: bool,
     /// The system migrations it will run.
     pub migrations: Vec<String>,
+    /// The apt packages to upgrade, by name, as apt's simulated upgrade lists them; `packages`
+    /// counts them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upgrades: Vec<PackageChange>,
+}
+
+/// One package that moved from one version to another, came in or went away.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PackageChange {
+    pub name: String,
+    /// The version before; none when the package is new. Several versions are joined with ", ".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    /// The version after; none when the package is gone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
+}
+
+impl PackageChange {
+    /// "firefox 130.0 → 131.0", "jq 1.7, new", "old-tool 2.1, removed", or the name alone when
+    /// apt doesn't say the versions.
+    pub fn describe(&self) -> String {
+        match (&self.from, &self.to) {
+            (Some(from), Some(to)) => format!("{} {from} → {to}", self.name),
+            (None, Some(to)) => format!("{} {to}, new", self.name),
+            (Some(from), None) => format!("{} {from}, removed", self.name),
+            (None, None) => self.name.clone(),
+        }
+    }
 }
 
 /// What the package manifest's phase changed in one group.
@@ -201,6 +240,52 @@ pub struct GroupChange {
     pub removed: Vec<String>,
 }
 
+/// A program an update keeps current outside apt and the user flake, in a phase of its own that
+/// the user can turn off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Program {
+    /// Bitwarden desktop, within its series: `2026.10.1` to `2026.12.0`, never to `2027.1.0`.
+    Bitwarden,
+    /// The Nix daemon, within its minor: `2.35.3` to `2.35.4`, never to `2.36.0`.
+    Nix,
+}
+
+impl Program {
+    /// The program's name, as people read it.
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::Bitwarden => "Bitwarden",
+            Self::Nix => "Nix",
+        }
+    }
+}
+
+/// What an update did to one [`Program`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgramChange {
+    pub program: Program,
+    #[serde(flatten)]
+    pub result: ProgramResult,
+    /// A newer release outside the installed series, which only a KubaOS update brings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiting: Option<String>,
+}
+
+/// How a [`Program`]'s phase ended, under `result` in the JSON.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "result", rename_all = "snake_case")]
+pub enum ProgramResult {
+    /// It moved from one version to another.
+    Updated { from: String, to: String },
+    /// It is at the newest release of its series.
+    Current { version: String },
+    /// The user turned its updates off.
+    Off,
+    /// The phase failed; the update went on. `error` is what the warning said.
+    Failed { error: String },
+}
+
 /// What a finished update, upgrade, rollback or `kubaos packages enable|disable` did.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Summary {
@@ -210,17 +295,31 @@ pub struct Summary {
     pub channel: Channel,
     /// The release's commits, `<short hash> <subject>`, newest first.
     pub changes: Vec<String>,
-    /// The apt packages upgraded.
+    /// How many apt packages `apt-get upgrade` upgraded or newly installed.
     pub packages: usize,
+    /// Those apt packages by name, with their versions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upgraded: Vec<PackageChange>,
     /// What the package manifest's phase installed and removed, by group.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub apt: Vec<GroupChange>,
     /// The user flake's inputs `nix flake update` moved.
     pub inputs: Vec<String>,
+    /// The Nix packages of the home that moved, came in or went away, from `nix store
+    /// diff-closures` of the home before and after the switch; none when there was no switch or
+    /// the diff couldn't be taken, empty when nothing moved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nix_packages: Option<Vec<PackageChange>>,
     /// The migrations that ran, system ones first.
     pub migrations: Vec<String>,
+    /// What the phases of the programs outside apt and the user flake did, in the order they ran.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub programs: Vec<ProgramChange>,
     /// What the running session reloaded or restarted after the switch (`scripts/dot-session`).
     pub reloaded: Vec<String>,
+    /// What the firmware phase applied, staged, left waiting and failed at.
+    #[serde(default, skip_serializing_if = "Firmware::is_empty")]
+    pub firmware: Firmware,
     pub restart: Restart,
     /// Why a restart is needed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
