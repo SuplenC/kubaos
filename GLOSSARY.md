@@ -69,7 +69,7 @@ _Avoid_: Page, panel, mode
 ## Suites
 
 **Suite**:
-A complete, KubaOS-managed setup for one programming language or platform, covering toolchain, editor integration, environment and scaffolding, that the user can install, configure and later remove whole.
+An optional, KubaOS-managed setup that the user can install, configure and later remove whole: one programming language or platform, covering toolchain, editor integration, environment and scaffolding, or a feature heavy enough to be optional, such as wallpaper depth.
 _Avoid_: Toolchain, language pack, dev environment
 
 **Project pin**:
