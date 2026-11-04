@@ -21,10 +21,10 @@
 //
 // Numbers move it, each a property a move animates, so a frame held on its plot is exactly what
 // plays: `--framed` (the frame sliding in), `--barred` (the bar sliding in over its top edge),
-// `--wake` (the blur), `--lift` (waking: the clock's first step along its flight to the bar),
+// `--wake` (the blur), `--clock-lift` (waking: the clock's first step along its flight to the bar),
 // `--dock` (the rest of its flight, into the bar), `--push` (the picture and its city pushing in),
-// `--above` (the clock above the frame or behind the city), the sheet's own `--reveal` and the
-// dim's `--panel-dim`.
+// `--clock-above` (the clock above the frame or behind the city), the sheet's own `--reveal` and
+// the dim's `--panel-dim`.
 //
 // It always draws in the night scheme matugen derives from its wallpaper, whatever the mode.
 

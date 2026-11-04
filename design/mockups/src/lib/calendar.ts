@@ -344,7 +344,7 @@ export function calendar(options: CalendarOptions): HTMLElement {
     const easing = raw("easing-emphasized_decel");
     rows.style.setProperty("--from", String(Math.sign(by)));
     body.dataset.sliding = "";
-    const frames = reduced ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, "--slide": "1" }, { opacity: 1, "--slide": "0" }];
+    const frames = reduced ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, "--cal-slide": "1" }, { opacity: 1, "--cal-slide": "0" }];
     const played = rows.animate(frames, { duration: duration("short"), easing });
     played.onfinish = played.oncancel = () => delete body.dataset.sliding;
   }

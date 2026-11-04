@@ -1611,7 +1611,7 @@
 
 /* How far along its track a slider's fill shows, 0 to 1: it eases as a value is set from
    elsewhere and onto a stop after a drag. */
-@property --shown {
+@property --slider-shown {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;
@@ -1679,7 +1679,7 @@
   top: 0;
   bottom: 0;
   left: 0;
-  width: min(100%, round(nearest, calc(var(--side) + (100% - var(--side)) * var(--shown)), 1px));
+  width: min(100%, round(nearest, calc(var(--side) + (100% - var(--side)) * var(--slider-shown)), 1px));
   overflow: hidden;
   border-radius: inherit;
   background: rgb(from color-mix(in srgb, var(--tone), var(--bright) calc(var(--lift) * 100%)) r g b / var(--dim));
@@ -2066,7 +2066,7 @@
 
 /* How far a select is open, 0 to 1: its surface grows, rises and lifts its fill, its hairline goes
    and its chevron turns, all together. */
-@property --open {
+@property --select-open {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;
@@ -2084,16 +2084,16 @@
   align-self: stretch;
   height: var(--size-control_md);
   --drop: calc(var(--rows) * var(--size-control_sm) + 2 * var(--space-s4));
-  transition: --open var(--motion-short) var(--easing-emphasized_accel);
+  transition: --select-open var(--motion-short) var(--easing-emphasized_accel);
 }
 
 .k-select-room[data-open] {
-  --open: 1;
-  transition: --open var(--motion-medium) var(--easing-emphasized_decel);
+  --select-open: 1;
+  transition: --select-open var(--motion-medium) var(--easing-emphasized_decel);
 }
 
 .k-select-room[data-taken] {
-  transition: --open var(--motion-short) var(--easing-emphasized_accel) var(--motion-micro);
+  transition: --select-open var(--motion-short) var(--easing-emphasized_accel) var(--motion-micro);
 }
 
 .k-select-room[data-shown] {
@@ -2118,15 +2118,15 @@
   top: 0;
   display: block;
   box-sizing: border-box;
-  height: calc(var(--size-control_md) + var(--drop) * var(--open));
+  height: calc(var(--size-control_md) + var(--drop) * var(--select-open));
   border-radius: var(--radius-control);
   outline: none;
   cursor: pointer;
-  --raised: var(--open);
+  --raised: var(--select-open);
   --rest-fill: var(--color-surface_container_high);
   --shut-fill: color-mix(in srgb, var(--rest-fill), var(--color-surface_container_highest) calc(var(--lit) * 100%));
-  --fill: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_high) calc(var(--open) * 100%));
-  --fill-night: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_highest) calc(var(--open) * 100%));
+  --fill: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_high) calc(var(--select-open) * 100%));
+  --fill-night: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_highest) calc(var(--select-open) * 100%));
   --sunken-tone: var(--color-outline);
   --sunken-strength: 1;
   --edge-line: var(--sunken-line);
@@ -2155,7 +2155,7 @@
   inset: 0;
   border: var(--stroke-hairline_device_px) solid var(--edge-line);
   border-radius: inherit;
-  opacity: calc(1 - var(--open));
+  opacity: calc(1 - var(--select-open));
   pointer-events: none;
 }
 
@@ -2202,7 +2202,7 @@
 
 /* The chevron turns up with the surface. */
 .k-select-chevron {
-  transform: rotate(calc(var(--open) * 180deg));
+  transform: rotate(calc(var(--select-open) * 180deg));
 }
 
 /* What the surface clips as it grows: the list, held at its visible height beside the value row,
@@ -2270,11 +2270,19 @@
   bottom: var(--size-control_md);
 }
 
+/* How far a collapsible is open, 0 to 1. */
+@property --collapsible-open {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 /* A collapsible (`lib/collapsible.ts`): its header, then the room for what it holds, which eases
-   from nothing to the content's height (`--content-height`) as `--open` goes to 1: over `medium`
-   on `standard_decel` opening, and over `short` on `standard_accel` closing, the chevron turning
-   and the rail growing with it. Moving, the room cuts what it holds; fully open it doesn't, so a
-   lit control inside keeps its glow. With reduce motion it opens and closes at once, the chevron
+   from nothing to the content's height (`--content-height`) as `--collapsible-open` goes to 1:
+   over `medium` on `standard_decel` opening, and over `short` on `standard_accel` closing, the
+   chevron turning and the rail growing with it. A shut one sets its own 0, so one inside an open
+   one doesn't inherit its parent's. Moving, the room cuts what it holds; fully open it doesn't, so
+   a lit control inside keeps its glow. With reduce motion it opens and closes at once, the chevron
    jumps, and what it holds fades in over `short`. */
 .k-collapsible {
   display: flex;
@@ -2282,12 +2290,13 @@
   flex-direction: column;
   align-self: stretch;
   --content-height: 0px;
-  transition: --open var(--motion-short) var(--easing-standard_accel);
+  --collapsible-open: 0;
+  transition: --collapsible-open var(--motion-short) var(--easing-standard_accel);
 }
 
 .k-collapsible[data-open] {
-  --open: 1;
-  transition: --open var(--motion-medium) var(--easing-standard_decel);
+  --collapsible-open: 1;
+  transition: --collapsible-open var(--motion-medium) var(--easing-standard_decel);
 }
 
 [data-reduced] .k-collapsible,
@@ -2332,7 +2341,7 @@
 
 /* Shut it points right, a quarter turn back from open, where it points down. */
 .k-collapsible-chevron {
-  transform: rotate(calc((var(--open) - 1) * 90deg));
+  transform: rotate(calc((var(--collapsible-open) - 1) * 90deg));
 }
 
 /* The summary takes its words' width, up to half the line; past that, and where the title needs
@@ -2345,7 +2354,7 @@
 
 .k-collapsible-body {
   display: block;
-  height: calc(var(--content-height) * var(--open));
+  height: calc(var(--content-height) * var(--collapsible-open));
   overflow: clip;
 }
 
@@ -2499,7 +2508,7 @@
 }
 
 /* How far under its place a toast still is as it arrives, 1 to 0, in `space.s32`s. */
-@property --rise {
+@property --toast-rise {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;
@@ -2519,7 +2528,7 @@
   --fill: var(--color-on_surface);
   --fill-night: var(--color-on_surface);
   --rim-tone: var(--color-surface);
-  translate: 0 round(nearest, calc(var(--rise) * var(--space-s32)), 1px);
+  translate: 0 round(nearest, calc(var(--toast-rise) * var(--space-s32)), 1px);
 }
 
 .k-toast > .k-row,
@@ -2551,17 +2560,17 @@
   pointer-events: auto;
   transition:
     opacity var(--motion-short) var(--easing-emphasized_decel),
-    --rise var(--motion-short) var(--easing-emphasized_decel);
+    --toast-rise var(--motion-short) var(--easing-emphasized_decel);
 
   @starting-style {
     opacity: 0;
-    --rise: 1;
+    --toast-rise: 1;
   }
 }
 
 [data-reduced] .k-toast-room > .k-toast {
   @starting-style {
-    --rise: 0;
+    --toast-rise: 0;
   }
 }
 
@@ -2603,12 +2612,19 @@
   max-width: calc(100% - 2 * var(--space-s24));
 }
 
+/* How far under its place a dialog still is as it arrives, 1 to 0, in `space.s16`s. */
+@property --dialog-rise {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 /* A dialog (`lib/dialog.ts`): `size.dialog` wide, `space.s24` inside, at the content radius, raised
    to the ladder's step 3: `surface_container_high` by day, the highest container at night, the
    step's shadow and the rim. A Danger dialog's edge is `error` at `opacity.danger_edge`, over the
    rim. It is at least `aspect.dialog` of its width tall, on the grid, and at most its room less
    `space.s48` above and below. It arrives rising `space.s16` into place a whole device pixel at a
-   time (`--rise`). */
+   time (`--dialog-rise`). */
 .k-dialog {
   position: relative;
   display: flex;
@@ -2622,7 +2638,7 @@
   border-radius: var(--radius-content);
   --fill: var(--color-surface_container_high);
   --fill-night: var(--color-surface_container_highest);
-  translate: 0 round(nearest, calc(var(--rise) * var(--space-s16)), 1px);
+  translate: 0 round(nearest, calc(var(--dialog-rise) * var(--space-s16)), 1px);
 }
 
 .k-dialog[data-danger]::after {
@@ -2816,17 +2832,17 @@
 .k-dialog-room[data-live] > :is(.k-scrim, .k-dialog) {
   transition:
     opacity var(--motion-long) var(--easing-emphasized_decel),
-    --rise var(--motion-long) var(--easing-emphasized_decel);
+    --dialog-rise var(--motion-long) var(--easing-emphasized_decel);
 
   @starting-style {
     opacity: 0;
-    --rise: 1;
+    --dialog-rise: 1;
   }
 }
 
 [data-reduced] .k-dialog-room[data-live] > .k-dialog {
   @starting-style {
-    --rise: 0;
+    --dialog-rise: 0;
   }
 }
 
@@ -2845,7 +2861,7 @@
 
 /* How far a calendar's new month still is from its place, 1 to 0, in `space.s64`s toward the side
    it came from (`--from`, 1 the next month, -1 the last). */
-@property --slide {
+@property --cal-slide {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;
@@ -2971,7 +2987,7 @@
 
 .k-cal-weeks {
   display: block;
-  translate: round(nearest, calc(var(--slide) * var(--from, 1) * var(--space-s64)), 1px) 0;
+  translate: round(nearest, calc(var(--cal-slide) * var(--from, 1) * var(--space-s64)), 1px) 0;
 }
 
 /* A day: a regular control holding a small control's disc, a pill, `space.s4` in. Its number is

@@ -29,7 +29,7 @@
 
 /* Waking, for the clock: from rest (0) to awake (1), where it stands `scale.clock_awake` of the way
    along its flight to the bar's clock. */
-@property --lift {
+@property --clock-lift {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;
@@ -51,7 +51,7 @@
 }
 
 /* Whether the clock flies above the frame (1) or stands behind the cut-out (0). */
-@property --above {
+@property --clock-above {
   syntax: "<integer>";
   inherits: false;
   initial-value: 0;
@@ -79,7 +79,7 @@
 .k-lock[data-phase="awake"] {
   --framed: 1;
   --wake: 1;
-  --lift: 1;
+  --clock-lift: 1;
 }
 
 .k-lock[data-phase="desktop"] {
@@ -205,16 +205,16 @@
    `space.s16` above it. It flies one path, from the rest clock in `type.clock_rest` where the
    wallpaper puts it to the bar's time in `type.body` where the pill puts it, its size, its place
    and its colour moving together: `--flown` is how far along it stands. Waking takes it
-   `scale.clock_awake` of the way (`--lift`) and docking the rest from there (`--dock`), so an
+   `scale.clock_awake` of the way (`--clock-lift`) and docking the rest from there (`--dock`), so an
    unlock from awake goes on from where waking stopped.
    The box is on whole device pixels, and the kicker centred on the same middle, each with the
    odd pixel after it. It stands in front of the picture and behind the city, and above everything
    while it flies to or from the bar. */
 .k-lock-clock {
   position: absolute;
-  z-index: var(--above);
+  z-index: var(--clock-above);
   display: block;
-  --woken: calc(var(--lift) * var(--scale-clock_awake));
+  --woken: calc(var(--clock-lift) * var(--scale-clock_awake));
   --flown: calc(var(--woken) + (1 - var(--woken)) * var(--dock));
   --k: calc(1 + (var(--type-body-size) / var(--type-clock_rest-size) - 1) * var(--flown));
   /* Geist Light's figures are a little narrower than Regular's, so as the clock flies its letters
@@ -235,8 +235,8 @@
   --rest-cx: calc(var(--rest-cx-flat, var(--middle)) + (var(--rest-cx-pushed, var(--middle)) - var(--rest-cx-flat, var(--middle))) * var(--push));
   --rest-top: calc(var(--rest-top-flat, 0px) + (var(--rest-top-pushed, 0px) - var(--rest-top-flat, 0px)) * var(--push));
   --cx: calc(var(--rest-cx) + (var(--bar-cx, var(--middle)) - var(--rest-cx)) * var(--flown));
-  /* `--above` for the digits, which don't inherit it. */
-  --city-cut: var(--above);
+  /* `--clock-above` for the digits, which don't inherit it. */
+  --city-cut: var(--clock-above);
   --clock-left: round(down, calc(var(--cx) - var(--digits-width) / 2), 1px);
   --clock-top: round(nearest, calc(var(--rest-top) + (var(--bar-top) - var(--rest-top)) * var(--flown)), 1px);
   left: var(--clock-left);
@@ -246,7 +246,7 @@
 }
 
 .k-lock[data-phase="desktop"] .k-lock-clock {
-  --above: 1;
+  --clock-above: 1;
   opacity: 0;
 }
 
@@ -406,14 +406,14 @@
   transition:
     --framed var(--motion-medium) var(--easing-emphasized_accel),
     --wake var(--motion-long) var(--easing-standard),
-    --lift var(--motion-long) var(--easing-emphasized_decel);
+    --clock-lift var(--motion-long) var(--easing-emphasized_decel);
 }
 
 .k-lock[data-live][data-phase="awake"] {
   transition:
     --framed var(--motion-long) var(--easing-emphasized_decel),
     --wake var(--motion-long) var(--easing-emphasized_decel),
-    --lift var(--motion-long) var(--easing-emphasized_decel);
+    --clock-lift var(--motion-long) var(--easing-emphasized_decel);
 }
 
 .k-lock[data-live] .k-lock-cutout {
@@ -426,14 +426,14 @@
   transition:
     --framed 0s var(--motion-short),
     --wake var(--motion-long) var(--easing-standard),
-    --lift var(--motion-long) var(--easing-emphasized_decel);
+    --clock-lift var(--motion-long) var(--easing-emphasized_decel);
 }
 
 [data-reduced] .k-lock[data-live][data-phase="awake"] {
   transition:
     --framed 0s,
     --wake var(--motion-long) var(--easing-emphasized_decel),
-    --lift var(--motion-long) var(--easing-emphasized_decel);
+    --clock-lift var(--motion-long) var(--easing-emphasized_decel);
 }
 
 [data-reduced] .k-lock[data-live] .k-screen-glass {

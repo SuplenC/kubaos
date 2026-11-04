@@ -1,19 +1,19 @@
 /* SidebarPage (`lib/sidebar-page.ts`): the sidebar band beside the page, in the room it is given,
    a window's. */
 
-@property --rise {
+@property --section-rise {
   syntax: "<number>";
   inherits: false;
   initial-value: 1;
 }
 
-@property --at {
+@property --bar-at {
   syntax: "<number>";
   inherits: false;
   initial-value: 1;
 }
 
-@property --shown {
+@property --find-shown {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
@@ -118,7 +118,7 @@
 /* The current sub-section's bar: a short stretch of neon, `type.small`'s line tall, centred in the
    symbols' column, the tabs' rail thick (whole device pixels, a pixel more by day); at night the
    core with the content glow round it, by day the tone's glass with none. It glides from row to row
-   over `medium` on `standard` (`--at`, from `--bar-from` to `--bar-to`). */
+   over `medium` on `standard` (`--bar-at`, from `--bar-from` to `--bar-to`). */
 .k-sp-subs {
   position: relative;
   display: flex;
@@ -132,13 +132,13 @@
   position: absolute;
   z-index: 2;
   left: round(nearest, calc(var(--space-s12) + (var(--type-body-icon) - var(--rail)) / 2), 1px);
-  top: round(nearest, calc(var(--bar-from, 0px) + (var(--bar-to, 0px) - var(--bar-from, 0px)) * var(--at) + (var(--size-control_sm) - var(--type-small-line)) / 2), 1px);
+  top: round(nearest, calc(var(--bar-from, 0px) + (var(--bar-to, 0px) - var(--bar-from, 0px)) * var(--bar-at) + (var(--size-control_sm) - var(--type-small-line)) / 2), 1px);
   width: var(--rail);
   height: var(--type-small-line);
   background: color-mix(in srgb, var(--color-primary_glass), var(--color-primary_core) calc(var(--signs) * 100%));
   filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / calc(var(--focus-content_glow) * var(--signs))));
   pointer-events: none;
-  transition: --at var(--motion-medium) var(--easing-standard);
+  transition: --bar-at var(--motion-medium) var(--easing-standard);
 }
 
 .k-sp-bar[data-still],
@@ -168,14 +168,14 @@
 }
 
 /* A change of section: the page fades in and rises `space.s8` over `short` on `emphasized_decel`
-   (`--rise`, 0 to 1). With reduced motion it is a plain swap. */
+   (`--section-rise`, 0 to 1). With reduced motion it is a plain swap. */
 .k-sp-rise {
   display: flex;
   flex: 1 0 auto;
   flex-direction: column;
-  opacity: var(--rise);
-  translate: 0 calc((1 - var(--rise)) * var(--space-s8));
-  transition: --rise var(--motion-short) var(--easing-emphasized_decel);
+  opacity: var(--section-rise);
+  translate: 0 calc((1 - var(--section-rise)) * var(--space-s8));
+  transition: --section-rise var(--motion-short) var(--easing-emphasized_decel);
 }
 
 .k-sp-rise > .k-page {
@@ -240,21 +240,21 @@
 
 /* The find box: a popover `size.find` wide floating `space.s16` below the page's top and the
    container's padding in from its end, over the content, taking no layout. It arrives and goes with
-   a fade and a `space.s8` drop over `short` on `standard` (`--shown`); with reduced motion only the
-   fade. */
+   a fade and a `space.s8` drop over `short` on `standard` (`--find-shown`); with reduced motion only
+   the fade. */
 .k-sp-find {
   position: absolute;
   z-index: 3;
   top: var(--space-s16);
   right: var(--padding, var(--space-s16));
   --popover-width: var(--size-find);
-  opacity: var(--shown);
-  translate: 0 calc((var(--shown) - 1) * var(--space-s8));
-  transition: --shown var(--motion-short) var(--easing-standard);
+  opacity: var(--find-shown);
+  translate: 0 calc((var(--find-shown) - 1) * var(--space-s8));
+  transition: --find-shown var(--motion-short) var(--easing-standard);
 }
 
 .k-sp-find[data-shown] {
-  --shown: 1;
+  --find-shown: 1;
 }
 
 [data-reduced] .k-sp-find {

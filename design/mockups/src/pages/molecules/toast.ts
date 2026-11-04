@@ -61,7 +61,7 @@ const ARRIVES: Move = {
   what: "It fades in over `short` on `emphasized_decel` as it rises `space.s32` into its place, a whole device pixel at a time, so its edges stay sharp; its shadow fades in with it. A toast isn't a light: it never flickers. With reduced motion it fades in where it stays, with no rise.",
   tracks: [
     { part: "its fade", on: TOAST, target: ".k-toast", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
-    { part: "its rise", on: TOAST, target: ".k-toast", property: "--rise", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
+    { part: "its rise", on: TOAST, target: ".k-toast", property: "--toast-rise", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
   ],
   reduced: [{ part: "its fade", on: TOAST, target: ".k-toast", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
   back: "cuts",
@@ -83,7 +83,7 @@ const REPLACED: Move = {
   tracks: [
     { part: "the one showing", on: "two toasts", target: ".k-toast:first-child", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard_accel" },
     { part: "the new one's fade", on: "two toasts", target: ".k-toast:last-child", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
-    { part: "the new one's rise", on: "two toasts", target: ".k-toast:last-child", property: "--rise", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
+    { part: "the new one's rise", on: "two toasts", target: ".k-toast:last-child", property: "--toast-rise", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
   ],
   reduced: [
     { part: "the one showing", on: "two toasts", target: ".k-toast:first-child", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard_accel" },

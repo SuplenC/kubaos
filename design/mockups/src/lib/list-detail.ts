@@ -304,7 +304,7 @@ function setupDetail(spec: SetupCard): HTMLElement {
  * `long` on `emphasized_decel`, its offset on whole device pixels; with reduced motion it fades.
  */
 export function rise(room: HTMLElement): void {
-  const frames: Keyframe[] = settings().reduced ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, "--rise": 1 }, { opacity: 1, "--rise": 0 }];
+  const frames: Keyframe[] = settings().reduced ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, "--setup-rise": 1 }, { opacity: 1, "--setup-rise": 0 }];
   room.animate(frames, { duration: timed("long"), easing: curve("emphasized_decel") });
 }
 
@@ -374,7 +374,7 @@ export function setupWindow(options: SetupOptions): HTMLElement {
     if (animate) rise(room);
     if (options.rising !== undefined) {
       room.style.opacity = String(options.rising);
-      room.style.setProperty("--rise", String(1 - options.rising));
+      room.style.setProperty("--setup-rise", String(1 - options.rising));
     }
   };
   const pick = (index: number) => {

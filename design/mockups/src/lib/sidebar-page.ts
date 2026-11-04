@@ -343,17 +343,17 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
       bar.dataset.still = "";
       bar.style.setProperty("--bar-from", to);
       bar.style.setProperty("--bar-to", to);
-      bar.style.setProperty("--at", "1");
+      bar.style.setProperty("--bar-at", "1");
       return;
     }
     delete bar.dataset.still;
     bar.style.transition = "none";
     bar.style.setProperty("--bar-from", drawn);
     bar.style.setProperty("--bar-to", to);
-    bar.style.setProperty("--at", "0");
+    bar.style.setProperty("--bar-at", "0");
     void bar.offsetTop;
     bar.style.transition = "";
-    bar.style.setProperty("--at", "1");
+    bar.style.setProperty("--bar-at", "1");
   }
 
   /** A sub-section's box in the page, by its index. */
@@ -597,10 +597,10 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
     pressed = null;
     if (!rises || ms("short") === 0) return;
     rise.style.transition = "none";
-    rise.style.setProperty("--rise", "0");
+    rise.style.setProperty("--section-rise", "0");
     void rise.offsetTop;
     rise.style.transition = "";
-    rise.style.setProperty("--rise", "1");
+    rise.style.setProperty("--section-rise", "1");
   }
 
   /** Goes to section `index` (-1 Home), its first sub-section current. */

@@ -290,7 +290,7 @@ function curve(token: string): string {
 export function arrive(room: HTMLElement, forward: boolean): void {
   room.dataset.from = forward ? "end" : "start";
   const reduced = settings().reduced;
-  const frames: Keyframe[] = reduced ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, "--slide": 1 }, { opacity: 1, "--slide": 0 }];
+  const frames: Keyframe[] = reduced ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, "--step-slide": 1 }, { opacity: 1, "--step-slide": 0 }];
   room.animate(frames, { duration: timed("long"), easing: curve("emphasized_decel") });
 }
 
@@ -381,7 +381,7 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
     if (room) {
       room.dataset.from = options.arriving.forward ? "end" : "start";
       room.style.opacity = String(options.arriving.shown);
-      room.style.setProperty("--slide", String(1 - options.arriving.shown));
+      room.style.setProperty("--step-slide", String(1 - options.arriving.shown));
     }
   }
   const framed = options.host === "kobo" && options.backdrop ? koboPanel(box, options.backdrop) : box;
