@@ -202,7 +202,7 @@ export function select(options: SelectOptions): HTMLElement {
     surface.removeAttribute("aria-activedescendant");
     document.removeEventListener("pointerdown", outside, true);
     // With nothing to play (reduced motion) the fold is done at once.
-    if (getComputedStyle(room).getPropertyValue("--open").trim() === "0") folded();
+    if (getComputedStyle(room).getPropertyValue("--select-open").trim() === "0") folded();
   }
 
   function folded(): void {
@@ -235,7 +235,7 @@ export function select(options: SelectOptions): HTMLElement {
   }
 
   room.addEventListener("transitionend", (event) => {
-    if (event.target === room && event.propertyName === "--open" && !open) folded();
+    if (event.target === room && event.propertyName === "--select-open" && !open) folded();
   });
   head.addEventListener("click", () => (open ? close() : show()));
   items.forEach((item, index) => {

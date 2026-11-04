@@ -43,13 +43,13 @@ type MatrixState = "rest" | "lit" | "pressed" | "selected";
 /** The page's change of section: the page fading in and rising `space.s8`. */
 function rising(reduced: boolean): [Track<Easing>, ...Track<Easing>[]] {
   return reduced
-    ? [{ part: "the page", on: "the section's page", target: ".k-sp-rise", property: "--rise", from: 0, to: 1, duration: "instant", curve: "linear" }]
-    : [{ part: "the page", on: "the section's page", target: ".k-sp-rise", property: "--rise", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }];
+    ? [{ part: "the page", on: "the section's page", target: ".k-sp-rise", property: "--section-rise", from: 0, to: 1, duration: "instant", curve: "linear" }]
+    : [{ part: "the page", on: "the section's page", target: ".k-sp-rise", property: "--section-rise", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }];
 }
 
-/** The find box arriving or going: `--shown` from `from` to `to`. */
+/** The find box arriving or going: `--find-shown` from `from` to `to`. */
 function showing(from: 0 | 1, to: 0 | 1): [Track<Easing>, ...Track<Easing>[]] {
-  return [{ part: "the find box", on: "the find box", target: ".k-sp-find", property: "--shown", from, to, duration: "short", curve: "standard" }];
+  return [{ part: "the find box", on: "the find box", target: ".k-sp-find", property: "--find-shown", from, to, duration: "short", curve: "standard" }];
 }
 
 /** A sample whose bar stands at the first sub-section, to glide to the third. */
@@ -71,7 +71,7 @@ function barSample(): HTMLElement {
 const MOVES: Move[] = [
   {
     name: "Changing section",
-    what: "A section picked in the sidebar, by the pointer or the keys, or with Ctrl+Page Down: the new page fades in and rises `space.s8` into place over `short` on `emphasized_decel` (`--rise`, 0 to 1: its opacity, and `space.s8` less that much of it down). The sidebar opens the section's sub-sections at once and the bar is in place on the first; the page starts at its top. With reduced motion it is a plain swap.",
+    what: "A section picked in the sidebar, by the pointer or the keys, or with Ctrl+Page Down: the new page fades in and rises `space.s8` into place over `short` on `emphasized_decel` (`--section-rise`, 0 to 1: its opacity, and `space.s8` less that much of it down). The sidebar opens the section's sub-sections at once and the bar is in place on the first; the page starts at its top. With reduced motion it is a plain swap.",
     tracks: rising(false),
     reduced: rising(true),
     back: "cuts",
@@ -79,15 +79,15 @@ const MOVES: Move[] = [
   },
   {
     name: "The bar glides",
-    what: "The current sub-section changes, as the page scrolls past a heading or a sub-section is pressed: the bar glides from its row to the new one over `medium` on `standard` (`--at`, 0 to 1, from `--bar-from` to `--bar-to`, landing on whole device pixels). A press also glides the page's scroll to the sub-section, its heading at the lead line `space.s32` below the page's top, on the same duration and curve. With reduced motion both are there at once.",
-    tracks: [{ part: "the bar", on: "the current sub-section", target: ".k-sp-bar", property: "--at", from: 0, to: 1, duration: "medium", curve: "standard" }],
-    reduced: [{ part: "the bar", on: "the current sub-section", target: ".k-sp-bar", property: "--at", from: 0, to: 1, duration: "instant", curve: "linear" }],
+    what: "The current sub-section changes, as the page scrolls past a heading or a sub-section is pressed: the bar glides from its row to the new one over `medium` on `standard` (`--bar-at`, 0 to 1, from `--bar-from` to `--bar-to`, landing on whole device pixels). A press also glides the page's scroll to the sub-section, its heading at the lead line `space.s32` below the page's top, on the same duration and curve. With reduced motion both are there at once.",
+    tracks: [{ part: "the bar", on: "the current sub-section", target: ".k-sp-bar", property: "--bar-at", from: 0, to: 1, duration: "medium", curve: "standard" }],
+    reduced: [{ part: "the bar", on: "the current sub-section", target: ".k-sp-bar", property: "--bar-at", from: 0, to: 1, duration: "instant", curve: "linear" }],
     back: "cuts",
     sample: barSample,
   },
   {
     name: "The find box arrives",
-    what: "`/` or Ctrl+F on a section's page: the box fades in and drops `space.s8` into place over `short` on `standard` (`--shown`, 0 to 1: its opacity, and `space.s8` less that much of it up). It takes no layout, so nothing under it moves. With reduced motion only the fade plays.",
+    what: "`/` or Ctrl+F on a section's page: the box fades in and drops `space.s8` into place over `short` on `standard` (`--find-shown`, 0 to 1: its opacity, and `space.s8` less that much of it up). It takes no layout, so nothing under it moves. With reduced motion only the fade plays.",
     tracks: showing(0, 1),
     reduced: "same",
     back: "cuts",
@@ -95,7 +95,7 @@ const MOVES: Move[] = [
   },
   {
     name: "The find box goes",
-    what: "Esc in the box: it fades out and rises `space.s8` over `short` on `standard` (`--shown`, 1 to 0), and the page is put back where it was, at once. With reduced motion only the fade plays.",
+    what: "Esc in the box: it fades out and rises `space.s8` over `short` on `standard` (`--find-shown`, 1 to 0), and the page is put back where it was, at once. With reduced motion only the fade plays.",
     tracks: showing(1, 0),
     reduced: "same",
     back: "cuts",

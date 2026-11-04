@@ -64,8 +64,8 @@ const SURFACE = "the surface: its height, fill, shadow, rim, hairline and the ch
 const OPENS: Move = {
   name: "Opening",
   what: "A press, Enter, Space, ↓ or ↑: the box grows from its shut height to the value row and its list over `medium` on `emphasized_decel`. The step's shadow and rim come up with it, its fill lifts to the open role, its hairline fades and the chevron turns up over the same. Nothing flickers: a surface isn't a light. With reduced motion it is open at once, the chevron up.",
-  tracks: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--open", from: 0, to: 1, duration: "medium", curve: "emphasized_decel" }],
-  reduced: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--open", from: 0, to: 1, duration: "instant", curve: "linear" }],
+  tracks: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--select-open", from: 0, to: 1, duration: "medium", curve: "emphasized_decel" }],
+  reduced: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--select-open", from: 0, to: 1, duration: "instant", curve: "linear" }],
   back: "cuts",
   sample: opened(),
 };
@@ -73,8 +73,8 @@ const OPENS: Move = {
 const CLOSES: Move = {
   name: "Closing",
   what: "Esc, Tab, a press outside or on the value row: it folds back to the shut box over `short` on `emphasized_accel`, the shadow, rim and fill going down with it and the chevron turning back. Once it is shut, the tube lights again over `short` if the keyboard is on it. With reduced motion it is shut at once.",
-  tracks: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--open", from: 1, to: 0, duration: "short", curve: "emphasized_accel" }],
-  reduced: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--open", from: 1, to: 0, duration: "instant", curve: "linear" }],
+  tracks: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--select-open", from: 1, to: 0, duration: "short", curve: "emphasized_accel" }],
+  reduced: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--select-open", from: 1, to: 0, duration: "instant", curve: "linear" }],
   back: "cuts",
   sample: opened(),
 };
@@ -84,11 +84,11 @@ const PICKS: Move = {
   what: "Enter, Space or a press on an option, here Germany: the value row shows it at once, the highlighted row presses to `secondary_container_pressed` over `micro`, and only then does the surface fold, over `short` on `emphasized_accel`, so the pick is seen landing before the list goes. With reduced motion the press shows and the surface is shut at once.",
   tracks: [
     { part: "the picked row's press", on: "the holidays", target: ".k-menu-item[data-current]", property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" },
-    { part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--open", from: 1, to: 0, duration: "short", cue: "micro", curve: "emphasized_accel" },
+    { part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--select-open", from: 1, to: 0, duration: "short", cue: "micro", curve: "emphasized_accel" },
   ],
   reduced: [
     { part: "the picked row's press", on: "the holidays", target: ".k-menu-item[data-current]", property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" },
-    { part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--open", from: 1, to: 0, duration: "instant", cue: "micro", curve: "linear" },
+    { part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--select-open", from: 1, to: 0, duration: "instant", cue: "micro", curve: "linear" },
   ],
   back: "cuts",
   sample: opened({ picked: 1 }),

@@ -105,9 +105,9 @@ const RAIL_HINT = ".k-collapsible-rail > .k-hint";
 const OPENS: Move = {
   name: "Opening",
   what: "Enter, Space or a press on the header: the room under it eases from nothing to what it holds over `medium` on `standard_decel`, as a list reordering settles, cutting what it holds and the rail as it goes, and the chevron turns a quarter, from right to down, over the same. Nothing moves above it; what is below moves down. With reduced motion the room is open at once, the chevron jumps, and what it holds fades in over `short` on `standard`.",
-  tracks: [{ part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--open", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
+  tracks: [{ part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--collapsible-open", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
   reduced: [
-    { part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--open", from: 0, to: 1, duration: "instant", curve: "linear" },
+    { part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--collapsible-open", from: 0, to: 1, duration: "instant", curve: "linear" },
     { part: "what it holds", on: "a process", target: ".k-collapsible-content", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   back: "cuts",
@@ -117,8 +117,8 @@ const OPENS: Move = {
 const CLOSES: Move = {
   name: "Closing",
   what: "Pressed again: the room eases shut over `short` on `standard_accel`, what it holds and the rail cut away from the bottom, the chevron turning back to point right. With reduced motion it is shut at once.",
-  tracks: [{ part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--open", from: 1, to: 0, duration: "short", curve: "standard_accel" }],
-  reduced: [{ part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--open", from: 1, to: 0, duration: "instant", curve: "linear" }],
+  tracks: [{ part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--collapsible-open", from: 1, to: 0, duration: "short", curve: "standard_accel" }],
+  reduced: [{ part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--collapsible-open", from: 1, to: 0, duration: "instant", curve: "linear" }],
   back: "cuts",
   sample: moving(true),
 };
@@ -140,11 +140,11 @@ const RAIL_CLOSES: Move = {
   what: "A press on the lit rail: the line goes toward `primary_flash` and its glow swells over `micro` at night, the tone tints the strip by day; letting go closes the part, the room easing shut over `short` on `standard_accel` with the rail cut away from the bottom and the chevron turning back to point right. Where the header has scrolled out of its scroll view, the view scrolls it back in at its nearest edge, smoothly, at once with reduced motion. With reduced motion the room is shut at once.",
   tracks: [
     { part: "the rail, pressed", on: "an open process", target: RAIL, property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" },
-    { part: ROOM_PART, on: "an open process", target: ".k-collapsible", property: "--open", from: 1, to: 0, duration: "short", cue: "micro", curve: "standard_accel" },
+    { part: ROOM_PART, on: "an open process", target: ".k-collapsible", property: "--collapsible-open", from: 1, to: 0, duration: "short", cue: "micro", curve: "standard_accel" },
   ],
   reduced: [
     { part: "the rail, pressed", on: "an open process", target: RAIL, property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" },
-    { part: ROOM_PART, on: "an open process", target: ".k-collapsible", property: "--open", from: 1, to: 0, duration: "instant", cue: "micro", curve: "linear" },
+    { part: ROOM_PART, on: "an open process", target: ".k-collapsible", property: "--collapsible-open", from: 1, to: 0, duration: "instant", cue: "micro", curve: "linear" },
   ],
   back: "cuts",
   sample: () => {

@@ -150,7 +150,7 @@ export function collapsible(options: CollapsibleOptions): HTMLElement {
   }
 
   part.addEventListener("transitionend", (event) => {
-    if (event.target === part && event.propertyName === "--open") settle();
+    if (event.target === part && event.propertyName === "--collapsible-open") settle();
   });
   header.addEventListener("click", toggle);
   // Enter and Space press it once per press, never on key repeat.

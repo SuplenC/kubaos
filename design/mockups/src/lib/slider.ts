@@ -263,7 +263,7 @@ export function slider(options: SliderOptions): HTMLElement {
     }
     const widest = numeric() ? Math.max(advance(kind, said), advance(kind, options.widest ?? "100%")) : advance(kind, said);
     const labelLeft = width - px("space-s12") - widest * scale;
-    root.style.setProperty("--shown", String(shown));
+    root.style.setProperty("--slider-shown", String(shown));
     root.setAttribute("aria-valuenow", stepping ? String(index) : String(Math.round(value * 100)));
     root.setAttribute("aria-valuetext", said);
     root.toggleAttribute("data-numeric", numeric());
@@ -312,7 +312,7 @@ export function slider(options: SliderOptions): HTMLElement {
       return;
     }
     root.dataset.settling = "";
-    const settling = root.animate([{ "--shown": String(from) }, { "--shown": String(to) }], { duration, easing: curve });
+    const settling = root.animate([{ "--slider-shown": String(from) }, { "--slider-shown": String(to) }], { duration, easing: curve });
     shown = to;
     settling.finished.then(
       () => {

@@ -77,7 +77,7 @@ function objectIn(state: Shown, selected = false): HTMLElement {
 }
 
 /**
- * A canvas showing `shown`, its objects able to glide (`--fit`) from where `from` fits them to
+ * A canvas showing `shown`, its objects able to glide (`--canvas-fit`) from where `from` fits them to
  * where `to` does: each fitted in a hidden twin of the same size, read back once laid out. An
  * object missing from one keeps the other's box.
  */
@@ -116,8 +116,8 @@ function snapped(): Screen[] {
 /** The glide of every object to its new box as the arrangement fits again. */
 function gliding(target: string, reduced: boolean): Track<Easing> {
   return reduced
-    ? { part: "the objects", on: "every object", target, property: "--fit", from: 0, to: 1, duration: "instant", curve: "linear" }
-    : { part: "the objects", on: "every object", target, property: "--fit", from: 0, to: 1, duration: "medium", curve: "standard_decel" };
+    ? { part: "the objects", on: "every object", target, property: "--canvas-fit", from: 0, to: 1, duration: "instant", curve: "linear" }
+    : { part: "the objects", on: "every object", target, property: "--canvas-fit", from: 0, to: 1, duration: "medium", curve: "standard_decel" };
 }
 
 /** A screen fading in or out over `medium`. */
@@ -139,7 +139,7 @@ const MOVES: Move[] = [
   },
   {
     name: "Fitted again",
-    what: "Shift+↓ moves the side screen to its next snap, and a dragged object is let go: the arrangement fits the canvas again and every object glides to its new box over `medium` on `standard_decel` (`--fit`, 0 to 1, each of its edges from its old place to its new, whole device pixels at the end). While an object is dragged nothing eases: it follows the pointer every frame, its guides on and off at once. A resize fits it again every frame, with no glide. With reduced motion the boxes are there at once.",
+    what: "Shift+↓ moves the side screen to its next snap, and a dragged object is let go: the arrangement fits the canvas again and every object glides to its new box over `medium` on `standard_decel` (`--canvas-fit`, 0 to 1, each of its edges from its old place to its new, whole device pixels at the end). While an object is dragged nothing eases: it follows the pointer every frame, its guides on and off at once. A resize fits it again every frame, with no glide. With reduced motion the boxes are there at once.",
     tracks: [gliding(".k-cv-screen", false)],
     reduced: [gliding(".k-cv-screen", true)],
     back: "cuts",
@@ -147,7 +147,7 @@ const MOVES: Move[] = [
   },
   {
     name: "A screen plugged in",
-    what: "The hardware changes while the page shows: a screen plugged in fades in over `medium` on `standard` at its box in the new fit, as the others glide to theirs over `medium` on `standard_decel` (`--fit`). With reduced motion it fades in over `short` and the boxes are there at once.",
+    what: "The hardware changes while the page shows: a screen plugged in fades in over `medium` on `standard` at its box in the new fit, as the others glide to theirs over `medium` on `standard_decel` (`--canvas-fit`). With reduced motion it fades in over `short` and the boxes are there at once.",
     tracks: [fading("the screen plugged in", '.k-cv-screen[data-n="4"]', 0, 1, false), gliding('.k-cv-screen:not([data-n="4"])', false)],
     reduced: [fading("the screen plugged in", '.k-cv-screen[data-n="4"]', 0, 1, true), gliding('.k-cv-screen:not([data-n="4"])', true)],
     back: "cuts",
@@ -155,7 +155,7 @@ const MOVES: Move[] = [
   },
   {
     name: "A screen unplugged",
-    what: "A screen unplugged, or the lid closed on the laptop's: it fades out over `medium` on `standard` where it was, as the others glide to their boxes in the new fit (`--fit`). If it was selected, the selection goes to the first screen left. With reduced motion it fades out over `short` and the boxes are there at once.",
+    what: "A screen unplugged, or the lid closed on the laptop's: it fades out over `medium` on `standard` where it was, as the others glide to their boxes in the new fit (`--canvas-fit`). If it was selected, the selection goes to the first screen left. With reduced motion it fades out over `short` and the boxes are there at once.",
     tracks: [fading("the screen unplugged", '.k-cv-screen[data-n="3"]', 1, 0, false), gliding('.k-cv-screen:not([data-n="3"])', false)],
     reduced: [fading("the screen unplugged", '.k-cv-screen[data-n="3"]', 1, 0, true), gliding('.k-cv-screen:not([data-n="3"])', true)],
     back: "cuts",

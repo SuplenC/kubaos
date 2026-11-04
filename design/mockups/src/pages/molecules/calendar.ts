@@ -69,7 +69,7 @@ function sliding(name: string, from: 1 | -1, shown: { year: number; month: numbe
     name,
     what: `An arrow, a sideways turn of the wheel, Page ${from === 1 ? "Down" : "Up"} or the keyboard's day crossing into it: the new month's weeks slide in from the ${side}, \`space.s64\` to their place, as they fade in, over \`short\` on \`emphasized_decel\`, cut at the month's edge. The names, the header and the arrows stay; the title changes at once. With reduced motion the weeks fade in where they are.`,
     tracks: [
-      { part: "the weeks' slide", on: "the month", target: ".k-cal-weeks", property: "--slide", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
+      { part: "the weeks' slide", on: "the month", target: ".k-cal-weeks", property: "--cal-slide", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
       { part: "the weeks' fade", on: "the month", target: ".k-cal-weeks", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
     ],
     reduced: [{ part: "the weeks' fade", on: "the month", target: ".k-cal-weeks", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],

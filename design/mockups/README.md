@@ -9,7 +9,7 @@ In `nix develop`, which provides Node, the tokens' generator and Chromium:
 | Command | What |
 |---|---|
 | `just mockups` | Serves the site with hot reload at the address Vite prints. A change to `design/tokens.toml` regenerates `src/tokens.css` and the page follows it. |
-| `just mockups-build` | Type-checks and builds it static into `dist/`, then draws each page in headless Chromium to write its moves' recipes into `dist/motion/PAGE.json`. |
+| `just mockups-build` | Type-checks, holds each registered custom property to one registration (`scripts/property-check.ts`) and builds it static into `dist/`, then draws each page in headless Chromium to write its moves' recipes into `dist/motion/PAGE.json`. |
 | `just mockups-check` | Draws every page at every scale, light and dark, and holds its boxes to the geometry rules and each mocked component to its twin on the specimen's pages (`docs/DESIGN.md`, "The mockups"), then holds every motion player to its recipe (`scripts/player-test.ts`). Part of `just design-check`. |
 | `just shots mockups` | Renders the pages' shots, before and after (`docs/agents/design-pr-loop.md`). |
 

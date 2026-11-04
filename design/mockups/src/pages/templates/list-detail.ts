@@ -106,7 +106,7 @@ const RISES: Move = {
   name: "Kōbō's card page rises in",
   what: "A card picked (↑ ↓, or a click): its page rises `space.s16` into place and fades in over `long` on `emphasized_decel`, its offset on whole device pixels; the list doesn't move. With reduced motion it only fades.",
   tracks: [
-    { part: "rise", on: "the card's page", target: ".k-setup-room", property: "--rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: "rise", on: "the card's page", target: ".k-setup-room", property: "--setup-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
     { part: "fade", on: "the card's page", target: ".k-setup-room", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
   ],
   reduced: [{ part: "fade", on: "the card's page", target: ".k-setup-room", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],

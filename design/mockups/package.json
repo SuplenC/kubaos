@@ -5,8 +5,9 @@
   "description": "KubaOS's mockups: every UI as it is meant to be, the source of truth the builds match",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && node scripts/render.ts dist/motion --motion",
+    "build": "tsc --noEmit && node scripts/property-check.ts && vite build && node scripts/render.ts dist/motion --motion",
     "typecheck": "tsc --noEmit",
+    "property-check": "node scripts/property-check.ts",
     "render": "node scripts/render.ts"
   },
   "devDependencies": {

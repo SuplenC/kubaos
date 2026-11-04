@@ -2,7 +2,7 @@
    Kōbō's glass panel over the wallpaper and its scrim. */
 
 /* How far a page still has to slide, 1 where it starts `space.s32` off and 0 in place. */
-@property --slide {
+@property --step-slide {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
@@ -125,7 +125,7 @@
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
-  translate: calc(round(nearest, var(--slide) * var(--space-s32), 1px) * var(--toward, 1)) 0;
+  translate: calc(round(nearest, var(--step-slide) * var(--space-s32), 1px) * var(--toward, 1)) 0;
 }
 
 /* A page going on comes in from the right; one going back from the left. */

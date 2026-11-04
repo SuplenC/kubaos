@@ -151,7 +151,7 @@ const ROOM = ".k-step-room";
 /** A page arriving: it slides `space.s32` in from where it comes from and fades in, over `long`. */
 function arriving(on: string): readonly [Track<"emphasized_decel">, Track<"emphasized_decel">] {
   return [
-    { part: "slide", on, target: ROOM, property: "--slide", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: "slide", on, target: ROOM, property: "--step-slide", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
     { part: "fade", on, target: ROOM, property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
   ];
 }

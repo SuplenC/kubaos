@@ -15,7 +15,7 @@
 }
 
 /* How far a card's page still has to rise, 1 where it starts `space.s16` low and 0 in place. */
-@property --rise {
+@property --setup-rise {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
@@ -130,7 +130,7 @@
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
-  translate: 0 round(nearest, var(--rise) * var(--space-s16), 1px);
+  translate: 0 round(nearest, var(--setup-rise) * var(--space-s16), 1px);
 }
 
 /* The detail's words keep `space.s16` clear of the scroll's thumb at their end. */

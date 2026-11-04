@@ -194,6 +194,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 - **Only erasable syntax** (`erasableSyntaxOnly`): no enums or namespaces, so Node runs the scripts as they are.
 - **A file opens with a comment on what it owns**, and an exported function, type or constant whose name doesn't say everything gets a `/** */` doc comment, shown on hover as rustdoc is.
 - **The DOM is built in TypeScript, the look is CSS.** A mock sets custom properties naming tokens (`var(--space-s8)`) and CSS draws it; a length worked out in script is one the CSS can't express (a text's advance, a glow's mask) and says so.
+- **A registered custom property (`@property`) is named for its component and means one thing.** A registration is global: the page keeps the last for the name, and every use anywhere is held to its syntax and inheritance, so a colour in a `<number>` or a second registration breaks another component without an error. `scripts/property-check.ts`, run by the build, fails a name registered two ways or a number property given a colour.
 - **No literal design values**, as "Design" below says: every length, colour, duration and curve is a token's custom property, and a length rounds to device pixels in CSS (`round()`), never by a fixed offset.
 - **No UI framework, no dependency beyond the locked dev tools.** A new npm package is a decision for the PR, with its reason.
 
