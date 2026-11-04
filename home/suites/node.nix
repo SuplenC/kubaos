@@ -1,7 +1,7 @@
 # The Node Suite: Node at the chosen version, Bun (the `bun` extra), the
-# TypeScript language server (vtsls), eslint's language server, the
-# JavaScript debugger, and LazyVim's TypeScript and eslint extras (node.lua).
-# prettier is everyone's (home/cli.nix). Nothing
+# TypeScript language server (vtsls), the JavaScript debugger, and LazyVim's
+# TypeScript and eslint extras (node.lua). prettier and eslint's language
+# server (vscode-langservers-extracted) are everyone's (home/cli.nix). Nothing
 # until kubaos.d/suites/node.toml exists; the metadata is the `node` entry in
 # crates/kubaos-core/src/suites/catalog.rs.
 #
@@ -105,7 +105,6 @@ in
       home.packages = [
         node
         pkgs.vtsls
-        pkgs.vscode-langservers-extracted
         jsDebugAdapter
         newProject
       ];

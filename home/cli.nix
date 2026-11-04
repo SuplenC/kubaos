@@ -17,9 +17,19 @@ in
   home.packages = with pkgs; [
     neovim
     tree-sitter # nvim-treesitter (main) builds parsers with the tree-sitter CLI
-    # LazyVim's prettier extra formats markdown, JSON and YAML with it. From
-    # Nix, as Mason's copy needs npm, which only the Node Suite brings.
+    # The npm-based tools LazyVim's shared extras (`config/nvim/lua/config/lazy.lua`)
+    # would ask Mason for. From Nix, as Mason installs them with npm, which only
+    # the Node Suite brings.
     prettier
+    markdownlint-cli2
+    markdown-toc
+    yaml-language-server
+    # jsonls, and eslint's server for the Node Suite's eslint extra.
+    vscode-langservers-extracted
+    dockerfile-language-server
+    docker-compose-language-service
+    # bashls, for the dotfiles extra's shell scripts.
+    bash-language-server
     lazygit
     yazi
     eza
