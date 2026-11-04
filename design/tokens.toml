@@ -368,7 +368,7 @@ line = 88
 icon = 48
 weight = "light"
 family = "sans"
-use = "The lock screen's clock once it is awake, over the password's sheet: a step above the hero, light like every big figure. The clock popup's time stays the hero's number style."
+use = "The clock of the shell's lock surface as it is built (`modules/lock/LockSurface.qml`), over its password field: a step above the hero, light like every big figure. The lock's mockup has no awake size of its own: its awake clock is the rest clock `scale.clock_awake` along its flight to the bar. The clock popup's time stays the hero's number style."
 
 # The lock at rest is the wallpaper and its clock alone, the clock as large as
 # a poster's: Geist Light's figures are 0.726 of the size tall, so 384 draws
@@ -384,8 +384,8 @@ use = "The lock screen's clock at rest, with only the wallpaper round it: the ci
 
 # The kicker above the lock's clock, a step up from a page's accent so it holds its own over a
 # picture under digits 280 tall: one line in two families, where and which day in M PLUS 1, then
-# the date in Geist, each 20 on a 24 line, medium. Two styles, since a style has one family and
-# Geist draws no kanji.
+# the date in Geist, each 20 on a 24 line, medium, at rest and awake alike. Two styles, since a
+# style has one family and Geist draws no kanji.
 [type.clock_place]
 size = 20
 line = 24
@@ -401,25 +401,6 @@ icon = 24
 weight = "medium"
 family = "sans"
 use = "The date, the second half of the kicker above the lock screen's clock, after where and which day."
-
-# The same kicker once the lock is awake, over the 80 clock: at 20 it would be wider than the
-# digits and outweigh them. A step down to 16 on the same 24 line and weight, so as the clock lifts
-# only its size moves, on the lift's own motion, and the line keeps its height.
-[type.clock_place_awake]
-size = 16
-line = 24
-icon = 24
-weight = "medium"
-family = "jp"
-use = "Where and which day in Japanese, the first half of the kicker above the awake lock screen's clock."
-
-[type.clock_date_awake]
-size = 16
-line = 24
-icon = 24
-weight = "medium"
-family = "sans"
-use = "The date, the second half of the kicker above the awake lock screen's clock, after where and which day."
 
 [type.hero]
 size = 64
@@ -832,7 +813,8 @@ window_border = 0.80
 window_shadow = 0.33
 
 # Scale factors a surface is drawn at, round its middle, while it comes or
-# goes: a share of its size, more than 0.
+# goes: a share of its size, more than 0. And how far along its flight a
+# moving surface stands: a share of the path.
 [scale]
 # A surface stepping back behind what comes over it: the desktop's windows as
 # the lock comes up, shrinking to it as they fade, and growing from it as the
@@ -847,6 +829,10 @@ push = 1.025
 # is what the city uncovers of the plate behind it, a band along the city's outline on the side
 # facing the origin, at most about 20 logical pixels at the screen's far corners.
 near = 1.05
+# How far along its flight to the bar's clock the lock's clock stands once the lock is awake, a
+# share of the path: its size, its place and its colour all that far from the rest clock's toward
+# the bar's time, so it stays big, keeps most of the picture's tint, and unlocking flies the rest.
+clock_awake = 0.2
 
 # Shadows: offset down and blur in logical pixels, and the shadow's opacity
 # of the `shadow` role.
