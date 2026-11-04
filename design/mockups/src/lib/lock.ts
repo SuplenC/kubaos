@@ -8,10 +8,9 @@
 // they read as part of it, the kicker lifted off it by a halo of `surface` round each letter.
 //
 // Awake, the frame slides in round the picture, `space.s8` all round, the picture blurs
-// `size.lock_blur` and dims as a panel's desktop does, the clock lifts out from behind the cut-out
-// to `type.clock` near the top, its kicker stepping down to its awake styles, and a Sheet rises
-// from the middle of the bottom edge holding the password's Field alone, the reader's mark at its
-// end.
+// `size.lock_blur` and dims as a panel's desktop does, the clock goes `scale.clock_awake` of the
+// way along its flight to the bar's clock, still behind the cut-out, and a Sheet rises from the
+// middle of the bottom edge holding the password's Field alone, the reader's mark at its end.
 //
 // The lock and the desktop are one surface: locking and unlocking play on a still of the desktop
 // the lock captured as it locked, drawn inside the lock (its windows, and the bar's pills on the
@@ -22,9 +21,10 @@
 //
 // Numbers move it, each a property a move animates, so a frame held on its plot is exactly what
 // plays: `--framed` (the frame sliding in), `--barred` (the bar sliding in over its top edge),
-// `--wake` (the blur), `--lift` (the clock from rest to awake), `--dock` (the clock into the bar),
-// `--push` (the picture and its city pushing in), `--above` (the clock above the frame or behind
-// the city), the sheet's own `--reveal` and the dim's `--panel-dim`.
+// `--wake` (the blur), `--lift` (waking: the clock's first step along its flight to the bar),
+// `--dock` (the rest of its flight, into the bar), `--push` (the picture and its city pushing in),
+// `--above` (the clock above the frame or behind the city), the sheet's own `--reveal` and the
+// dim's `--panel-dim`.
 //
 // It always draws in the night scheme matugen derives from its wallpaper, whatever the mode.
 
@@ -177,9 +177,8 @@ function sheetContent(moment: Moment, error: string, live: boolean, reader: bool
 }
 
 /**
- * The kicker: the place and day in `clock_place`, then ` · ` and the date in `clock_date`, each
- * stepping down to its awake style as the clock lifts. Its sizes and colours are the CSS's, as the
- * digits' are: the picture's tint at rest, its roles awake.
+ * The kicker: the place and day in `clock_place`, then ` · ` and the date in `clock_date`. Its
+ * colours are the CSS's, as the digits' are: the picture's tint at rest, its roles in the bar.
  */
 function kickerLine(kicker: Kicker): HTMLElement {
   const place = text(kicker.place, "clock_place");
@@ -233,7 +232,7 @@ export function lock(options: LockOptions): Lock {
 
   const digits = text(time, "clock_rest");
   digits.classList.add("k-lock-digits");
-  // The digits' colour is the CSS's: the picture's tint at rest, `on_surface` awake and in the bar.
+  // The digits' colour is the CSS's: the picture's tint at rest, `on_surface` in the bar.
   digits.style.removeProperty("color");
   const words = options.kicker ?? KICKER;
   const kicker = kickerLine(words);
