@@ -4,15 +4,19 @@
 
 import { doesntApply, type Move, nonEmpty, page, type Track } from "../../site/page.ts";
 import type { Duration, Easing } from "../../site/page.ts";
+import type { Moment } from "../../lib/lock.ts";
 import { windowSize } from "../../site/settings.ts";
 import { DATES, FINGER_ERROR, kickerFor, LOCK_ERROR, liveLock, PURPLE_HOUR, SHIBUYA, still, TIMES, TOWER, twelveHour, twoScreens } from "./locks.ts";
 
-/** A lock drawn still, wrapped so a move can reach its root: the frame's number is set there. */
-function held(phase: "rest" | "awake" | "desktop", wallpaper = PURPLE_HOUR): () => HTMLElement {
+/**
+ * A lock drawn still, wrapped so a move can reach its root: the frame's number is set there. Its
+ * sheet shows `moment`, seen or not.
+ */
+function held(phase: "rest" | "awake" | "desktop", wallpaper = PURPLE_HOUR, moment: Moment = "rest"): () => HTMLElement {
   return () => {
     const box = document.createElement("span");
     box.className = "k-lock-held";
-    box.append(still({ phase, wallpaper }));
+    box.append(still({ phase, wallpaper, moment }));
     return box;
   };
 }
@@ -38,15 +42,27 @@ type Eased = Track<Easing>;
 
 const WAKES: Move = {
   name: "Waking",
-  what: "A key, a press or a touch of the reader, on the screen with the pointer: the frame slides in from past the screen's edges to `space.s8` all round over `long` on `emphasized_decel`, the locking's slide reversed: each edge comes in from its own side, by its thickness and the fillet its inner corners curve through, `radius.surface` all the way, and its shadow strengthens as it comes. The picture blurs to `size.lock_blur` on the same curve, and dims to `opacity.panel_scrim` over `medium` on `standard`, as a panel's desktop does. The city blurs and dims with the picture and stays in front, and the clock rises out from behind it over `long` on `emphasized_decel`, from its rest place to `space.s48` under the frame's top edge, above the dim and clear of the city, its digits going from `type.clock_rest` to `type.clock` and its kicker from `clock_place` and `clock_date` at 20 to their awake styles at 16 on the same 24 line, on the lift's own curve and whole device pixels, so the kicker is never wider than the digits. The sheet rises from the bottom edge as a Sheet opens, over `long` on `emphasized_decel`, riding on the edge as it slides in. The picture and its city keep their push under the blur. With reduce motion the lock fades to awake over `short`: the frame, the sheet and the clock in their awake places fade in, and the blur and the dim fade in over the picture and its city.",
-  tracks: [
+  what: "A key or a press on the screen with the pointer, or a finger the reader doesn't know, which wakes it with its miss shown (A finger not recognised): the frame slides in from past the screen's edges to `space.s8` all round over `long` on `emphasized_decel`, the locking's slide reversed: each edge comes in from its own side, by its thickness and the fillet its inner corners curve through, `radius.surface` all the way, and its shadow strengthens as it comes. The picture blurs to `size.lock_blur` on the same curve, and dims to `opacity.panel_scrim` over `medium` on `standard`, as a panel's desktop does. The city blurs and dims with the picture and stays in front, and the clock rises out from behind it over `long` on `emphasized_decel`, from its rest place to `space.s48` under the frame's top edge, above the dim and clear of the city, its digits going from `type.clock_rest` to `type.clock` and its kicker from `clock_place` and `clock_date` at 20 to their awake styles at 16 on the same 24 line, on the lift's own curve and whole device pixels, so the kicker is never wider than the digits. The sheet rises from the bottom edge as a Sheet opens, over `long` on `emphasized_decel`, riding on the edge as it slides in. The picture and its city keep their push under the blur. With reduce motion the lock fades to awake over `short`: the frame, the sheet and the clock in their awake places fade in, and the blur and the dim fade in over the picture and its city.",
+  tracks: waking(),
+  reduced: wakingReduced(),
+  back: "cuts",
+  sample: held("rest"),
+};
+
+/** Waking from rest: the frame slides in, the picture blurs and dims, the clock lifts and the sheet rises. */
+function waking(): [Eased, ...Eased[]] {
+  return [
     { part: FRAME, on: ON, target: ".k-lock", property: "--framed", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" },
     { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--lift", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-  ],
-  reduced: [
+  ];
+}
+
+/** Waking with reduce motion: the awake lock fades in over `short`. */
+function wakingReduced(): [Eased, ...Eased[]] {
+  return [
     { part: FRAME, on: ON, target: ".k-lock", property: "--framed", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: "the glass", on: ON, target: ".k-screen-glass", property: "opacity", from: 0, to: { opacity: "frame" }, duration: "short", curve: "standard" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -55,10 +71,8 @@ const WAKES: Move = {
     { part: "the clock's fade", on: ON, target: ".k-lock-clock", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: "the sheet's fade", on: ON, target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-  ],
-  back: "cuts",
-  sample: held("rest"),
-};
+  ];
+}
 
 const RESTS: Move = {
   name: "Going back to rest",
@@ -167,6 +181,19 @@ const UNLOCKS: Move = {
   tracks: [
     { part: "the field's lock", on: ON, target: ".k-lock-shut", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the field's open lock", on: ON, target: ".k-lock-open", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    ...fromAwake(),
+  ],
+  reduced: fromAwakeReduced(),
+  back: "cuts",
+  sample: held("awake"),
+};
+
+/**
+ * Unlocking from awake once the field has opened, over its first `short`: the sheet sinks, the clock
+ * flies into the bar as the bar slides in, and the picture eases back to the desktop's.
+ */
+function fromAwake(): Eased[] {
+  return [
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", cue: "short", curve: "emphasized_accel" },
     { part: KICKER_PART, on: ON, target: ".k-lock-kicker", property: "opacity", from: 1, to: 0, duration: "short", cue: "short", curve: "standard" },
     ...intoTheBar(ON, "short"),
@@ -175,8 +202,12 @@ const UNLOCKS: Move = {
     { part: WINDOWS, on: ON, target: ".k-lock-windows", property: "opacity", from: 0, to: 1, duration: "long", cue: "medium", curve: "emphasized_decel" },
     { part: "the windows' size", on: ON, target: ".k-lock-windows", property: "scale", from: { scale: "behind" }, to: 1, duration: "long", cue: "medium", curve: "emphasized_decel" },
     { part: PUSH, on: ON, target: ".k-lock", property: "--push", from: 1, to: 0, duration: "long", cue: "medium", curve: "emphasized_decel" },
-  ],
-  reduced: [
+  ];
+}
+
+/** Unlocking from awake with reduce motion: the awake lock fades to the desktop over `short`. */
+function fromAwakeReduced(): [Eased, ...Eased[]] {
+  return [
     { part: "the sheet's fade", on: ON, target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the clock's fade", on: ON, target: ".k-lock-clock", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 1, to: 0, duration: "short", curve: "standard" },
@@ -185,10 +216,8 @@ const UNLOCKS: Move = {
     { part: BAR, on: ON, target: ".k-bar", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "the windows' size", on: ON, target: ".k-lock-windows", property: "scale", from: { scale: "behind" }, to: 1, duration: "instant", curve: "standard" },
     { part: WINDOWS, on: ON, target: ".k-lock-windows", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-  ],
-  back: "cuts",
-  sample: held("awake"),
-};
+  ];
+}
 
 const TOUCHES: Move = {
   name: "Unlocking with the fingerprint",
@@ -228,6 +257,40 @@ const SHAKE: Move = {
   sample: () => still({ phase: "awake", moment: "error" }),
 };
 
+const READER = "the reader's mark";
+const READER_SHAKE = "the reader's mark's shake";
+
+const MISSES: Move = {
+  name: "A finger not recognised",
+  what: "A finger the reader doesn't know, from rest. A touch wakes the lock, so it wakes exactly as Waking does: the frame slides in, the picture blurs and dims, the clock lifts and the sheet rises, all on Waking's own durations and curves. The sheet arrives already showing the miss: its placeholder says what went wrong (Finger not recognised), and from `short` on the reader's `fingerprint` eases from `primary` to `error` over `short` on `standard`, as the sheet settles. With it, from `short` on, the mark alone shakes its head, half the wrong password's jolt: `space.s4` and a half one way, `space.s4` back past its place, half a `space.s4` the first way, each over `micro` on `standard`, then home over `short` on `standard_decel`, a whole device pixel at a time. The field stays as it was: no shake, no Invalid tube, since the password wasn't wrong. With reduce motion the lock fades to awake over `short` as Waking does, the mark already in `error`, and nothing shakes.",
+  tracks: [
+    ...waking(),
+    { part: READER, on: ON, target: ".k-lock-reader .k-icon", property: "color", from: { color: "primary" }, to: { color: "error" }, duration: "short", cue: "short", curve: "standard" },
+    { part: READER_SHAKE, on: ON, target: ".k-lock-reader", property: "--jolt", from: 0, to: 1.5, duration: "micro", cue: "short", curve: "standard" },
+    { part: READER_SHAKE, on: ON, target: ".k-lock-reader", property: "--jolt", from: 1.5, to: -1, duration: "micro", cue: ["short", "micro"], curve: "standard" },
+    { part: READER_SHAKE, on: ON, target: ".k-lock-reader", property: "--jolt", from: -1, to: 0.5, duration: "micro", cue: ["short", "micro", "micro"], curve: "standard" },
+    { part: READER_SHAKE, on: ON, target: ".k-lock-reader", property: "--jolt", from: 0.5, to: 0, duration: "short", cue: ["short", "micro", "micro", "micro"], curve: "standard_decel" },
+  ],
+  reduced: wakingReduced(),
+  back: "cuts",
+  sample: held("rest", PURPLE_HOUR, "unknown"),
+};
+
+const KNOWN_AWAKE: Move = {
+  name: "Unlocking with the fingerprint, awake",
+  what: "A known finger, from awake after a finger the reader didn't know: the reader's mark is in `error` and the placeholder says Finger not recognised. Over `short` on `standard` the mark eases back to `primary` and turns into `lock_open`, as the field's `lock` turns after the right password: the `fingerprint` fades as the `lock_open` in `primary` laid over it fades in. The placeholder clears over the same `short`. The rest is Unlocking with the password, track for track: from `short` on the sheet sinks into the bottom edge, the clock rises above the frame and flies into the bar's clock as the bar slides in over the frame's thin top edge, and from `medium` on the picture's blur and dim clear, the windows settle in and the picture and its city ease back from the push to the desktop's 1:1. With reduce motion the awake lock fades to the desktop over `short`.",
+  tracks: [
+    { part: READER, on: ON, target: ".k-lock-reader .k-icon", property: "color", from: { color: "error" }, to: { color: "primary" }, duration: "short", curve: "standard" },
+    { part: "the reader's fingerprint", on: ON, target: ".k-lock-reader", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the reader's open lock", on: ON, target: ".k-lock-reader-open", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the placeholder", on: ON, target: ".k-field-placeholder", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    ...fromAwake(),
+  ],
+  reduced: fromAwakeReduced(),
+  back: "cuts",
+  sample: held("awake", PURPLE_HOUR, "unknown"),
+};
+
 type Shown = "rest" | "loading" | "error";
 
 /** A state of the sheet after a finger: its miss is an unknown finger, not a wrong password. */
@@ -250,7 +313,7 @@ export default page({
     "Nothing stands behind the kicker: no capsule, no band. Round each letter lies a halo of `surface`, two text shadows, a tight one blurred by `size.halo_edge` (1) at `opacity.halo_edge` (0.50) that holds the strokes' edges and a soft one blurred by `size.halo` (6) at `opacity.halo` (0.35) round the word. It follows the glyphs, so no shape shows, and it is the same on every wallpaper: the clock matching its picture matters more than the kicker's contrast. On Shinjuku's pink sky the line holds about 2.5:1 round its letters, on Tokyo Tower's blue hour 4.4 to 5.4:1, and on Shibuya the place 12:1 over a dark awning while the date crosses lit signs. The digits have no halo, with a cut-out or without.",
     "Awake, on the screen with the pointer only, the shell's frame slides in round the picture, `surface` at `opacity.frame`, `space.s8` all round: the top edge is as thin as the others, and the bar slides down over it only as the lock gives way to the desktop. The picture blurs to `size.lock_blur` (8) and dims to `scrim` at `opacity.panel_scrim`. The city blurs and dims with the picture and stays where it is, and the clock rises out from behind it and settles at `type.clock` (80), above the dim, centred, its kicker's top `space.s48` under the frame's top edge, its digits going from the picture's tint to `on_surface` as it lifts. The kicker steps down to 16 with it (`clock_place_awake` and `clock_date_awake`, on the same 24 line, medium), so it is no wider than the 80 digits, and goes to its own roles, where and which day in `primary` and the date in `on_surface_variant`, over the frame and the blurred, dimmed picture as the digits are; its halo stays, lost in the dim.",
     "The lock and the desktop are one surface. Super+L locks the session in its first frame and captures a still of the desktop then; the lock draws that still inside its own surface (the windows, and the bar's pills on the frame) and plays its locking on it: the windows go, and the bar's clock grows out of the bar into the rest clock. Unlocking plays the same way back, the clock flying into the bar's clock, and the session unlocks as it ends. A lid close or an idle suspend skips the motion and goes straight to rest.",
-    "A Sheet rises from the middle of the bottom edge, curving into the frame through concave fillets of `radius.surface`, as the wallpaper picker does, `size.panel` (384) wide with a PanelPage's padding: `space.s16` at its top and foot, the container's 16 at its sides. It holds the md `Field` for the password and nothing else, so the sheet is the field and its padding: the field's lock symbol leads it in the field's icon colour, the `fingerprint` symbol ends it in `primary`, the same size and as far in from its end as the lock is from its start, and it is lit with the keyboard in it. On a machine without a fingerprint reader the field has no trailing mark. Enter and Esc need no hints: the field is the only thing on the sheet. No avatar, no initial, no emoji: only KubaOS Symbols.",
+    "A Sheet rises from the middle of the bottom edge, curving into the frame through concave fillets of `radius.surface`, as the wallpaper picker does, `size.panel` (384) wide with a PanelPage's padding: `space.s16` at its top and foot, the container's 16 at its sides. It holds the md `Field` for the password and nothing else, so the sheet is the field and its padding: the field's lock symbol leads it in the field's icon colour, the `fingerprint` symbol ends it in `primary`, the same size and as far in from its end as the lock is from its start, and it is lit with the keyboard in it. On a machine without a fingerprint reader the field has no trailing mark. A finger the reader doesn't know wakes the lock from rest, the sheet arriving with the miss shown: the mark in `error` and the placeholder Finger not recognised. A known finger unlocks: from rest the clock goes straight into the bar; awake, the mark turns into `lock_open` in `primary` and the lock unlocks as with the password. Enter and Esc need no hints: the field is the only thing on the sheet. No avatar, no initial, no emoji: only KubaOS Symbols.",
     "The lock ignores light and dark. It always draws in the night scheme matugen derives from its wallpaper (the same `scheme-fidelity` dot-theme uses, in dark), and its derived roles from those: Shinjuku's purple hour gives a lavender primary, Tokyo Tower's blue hour a pale blue one, Shibuya's rain a teal one. So the lock is the same in either mode, and its sheet and its awake kicker keep their contrast over the night picture.",
   ],
   variants: [
@@ -281,7 +344,7 @@ export default page({
     described: {
       rest: "Awake and waiting: the field empty and lit, its placeholder Password, the reader's `fingerprint` at its end in `primary`. The same by night and by day: the lock draws in the wallpaper's night scheme in either mode.",
       loading: "A password or a finger being checked: the field's symbol is the hourglass and its placeholder Checking…; the reader's mark stays `primary`. Nothing moves to make room.",
-      error: "A wrong password: the field shakes, empties and turns Invalid, its tube the error's, and its placeholder says what went wrong; the reader's mark stays `primary`. An unknown finger: the field is the password's, its placeholder says what went wrong, and the reader's mark turns `error`, so the miss is told where the finger went; nothing shakes, since the field wasn't wrong. The next key, or the next touch, clears either.",
+      error: "A wrong password: the field shakes, empties and turns Invalid, its tube the error's, and its placeholder says what went wrong; the reader's mark stays `primary`. An unknown finger: the field is the password's, its placeholder says what went wrong, and the reader's mark turns `error` and shakes alone, so the miss is told where the finger went; the field doesn't shake, since it wasn't wrong. At rest, an unknown finger wakes the lock, which arrives with the miss already shown. The next key, or the next touch, clears either; a known finger then turns the mark into `lock_open` and unlocks as the password does.",
     },
   },
   focus: doesntApply("the template draws no line of its own; the field lights as its page says, by the night scheme's primary, or the error's after a miss."),
@@ -300,8 +363,8 @@ export default page({
   },
   motion: {
     arrives: [LOCKS, LOCKS_BARE],
-    leaves: [UNLOCKS, TOUCHES],
-    between: [WAKES, RESTS, SHAKE],
+    leaves: [UNLOCKS, TOUCHES, KNOWN_AWAKE],
+    between: [WAKES, RESTS, SHAKE, MISSES],
   },
   keyboard: {
     keys: [

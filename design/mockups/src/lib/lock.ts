@@ -132,8 +132,9 @@ export const BAR_CLOCK: BarClock = { kanji: "月", date: "Mon 2 Nov" };
 /**
  * The password's field, as `moment` shows it: lit with the keyboard in it unless it is live. Its
  * `lock` has `lock_open` in `primary` laid over it, unseen, for the right password to turn to; with
- * a reader, `fingerprint` ends it in `primary`, or in `error` once a finger is unknown. After a miss
- * its placeholder is `error`, what went wrong, until something is typed.
+ * a reader, `fingerprint` ends it in `primary`, or in `error` once a finger is unknown, with its own
+ * `lock_open` laid over it for a known finger to turn to. After a miss its placeholder is `error`,
+ * what went wrong, until something is typed.
  */
 export function lockField(moment: Moment, live = false, error = "", reader = true): HTMLElement {
   const busy = moment === "loading";
@@ -153,6 +154,14 @@ export function lockField(moment: Moment, live = false, error = "", reader = tru
     open.className = "k-field-mark k-lock-open";
     open.append(icon("lock_open", "var(--type-body_large-icon)", "var(--color-primary)"));
     shut.after(open);
+  }
+  const print = made.querySelector<HTMLElement>(".k-field-trailing");
+  if (print && !busy) {
+    print.classList.add("k-lock-reader");
+    const open = document.createElement("span");
+    open.className = "k-field-mark k-field-trailing k-lock-reader-open";
+    open.append(icon("lock_open", "var(--type-body_large-icon)", "var(--color-primary)"));
+    print.after(open);
   }
   return made;
 }
