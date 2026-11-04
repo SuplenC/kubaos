@@ -845,11 +845,15 @@ window_shadow = 0.33
 # the lock comes up, shrinking to it as they fade, and growing from it as the
 # lock gives way.
 behind = 0.96
-# The wallpaper coming toward you as the lock comes up, and going back to 1:1 as it gives way: the
-# picture and its cut-out together, one transform, so the cut-out never uncovers the picture's own
-# city behind it. 2.5 %, so a 960 tall screen grows 12 at its top and its bottom, whole device
-# pixels at every scale; a gentle dolly, held still at rest and awake.
+# The wallpaper coming toward you as the lock comes up, and going back to 1:1 as it gives way, round
+# the middle of the screen's bottom edge: the picture behind the city, its sky and its plate. A
+# gentle dolly, held still at rest and awake.
 push = 1.025
+# The wallpaper's cut-out, its city, coming toward you faster than the picture behind it, on the
+# same origin and the same curve, so the city stands off the sky: the depth. Its lead over `push`
+# is what the city uncovers of the plate behind it, a band along the city's outline on the side
+# facing the origin, at most about 20 logical pixels at the screen's far corners.
+near = 1.05
 
 # Shadows: offset down and blur in logical pixels, and the shadow's opacity
 # of the `shadow` role.

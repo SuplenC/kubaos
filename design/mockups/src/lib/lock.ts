@@ -14,13 +14,16 @@
 //
 // The lock and the desktop are one surface: locking and unlocking play on a still of the desktop
 // the lock captured as it locked, drawn inside the lock (its windows, and the bar's pills on the
-// frame), and the clock flies between the bar's clock and its own place. The picture and its cut-out
-// push in from the desktop's 1:1 to `scale.push` as the lock comes up, and ease back as it goes.
+// frame), and the clock flies between the bar's clock and its own place. As the lock comes up the
+// picture pushes in from the desktop's 1:1 to `scale.push` and its cut-out further, to
+// `scale.near`, so the city comes off the sky; the plate, the picture with the city painted out,
+// fills in what the city uncovers. As the lock goes they ease back to 1:1.
 //
 // Numbers move it, each a property a move animates, so a frame held on its plot is exactly what
 // plays: `--framed` (the frame closing in), `--barred` (its top edge from `space.s8` to the bar's),
 // `--wake` (the blur), `--lift` (the clock from rest to awake), `--dock` (the clock into the bar),
-// `--push` (the picture pushing in), the sheet's own `--reveal` and the dim's `--panel-dim`.
+// `--push` (the picture and its city pushing in), `--above` (the clock above the frame or behind
+// the city), the sheet's own `--reveal` and the dim's `--panel-dim`.
 //
 // It always draws in the night scheme matugen derives from its wallpaper, whatever the mode.
 
@@ -33,17 +36,32 @@ import { container, gap, row, stack } from "./layout.ts";
 import { pill } from "./pill.ts";
 import { probe, variant } from "./probe.ts";
 import { hang, type Screen, screen, type Sheet, sheet } from "./sheet.ts";
-import { advance, text } from "./text.ts";
+import { advance, text, type TypeStyle } from "./text.ts";
 import { length, number } from "./tokens.ts";
 
 export type { NightScheme };
+
+/**
+ * A wallpaper's depth, each picture the wallpaper's size: its city cut out, and the plate behind
+ * it, the city painted out a little past its outline and nothing else, so the plate over the
+ * picture is the picture wherever the cut-out doesn't cover it fully.
+ */
+export interface Depth {
+  /** The city cut out, as an alpha picture: only its alpha is drawn, as a mask on the picture. */
+  readonly cutout: string;
+  /** What is behind the city: the picture's sky and street, painted in where the city stood. */
+  readonly plate: string;
+}
 
 /** A wallpaper as the lock draws it. */
 export interface Wallpaper {
   readonly name: string;
   readonly picture: string;
-  /** Its foreground cut out, the same size as the picture: what stands in front of the clock. */
-  readonly cutout?: string;
+  /**
+   * Its city cut out and the plate behind it: what stands in front of the clock, and what the city
+   * uncovers as it pushes in.
+   */
+  readonly depth?: Depth;
   /** The roles matugen derives from it in its night scheme. */
   readonly night: NightScheme;
   /**
@@ -68,7 +86,7 @@ export interface Kicker {
   readonly date: string;
 }
 
-/** The bar's clock pill's words: the weekday's kanji, the short date, and the time. */
+/** The bar's clock pill's words: the weekday's kanji and the short date. */
 export interface BarClock {
   readonly kanji: string;
   readonly date: string;
@@ -81,6 +99,8 @@ export interface LockOptions {
   readonly phase: Phase;
   readonly moment?: Moment;
   readonly time?: string;
+  /** Whether the time is a 12-hour clock's (1:00 to 12:59) or a 24-hour one's (00:00 to 23:59). */
+  readonly twelveHour?: boolean;
   readonly kicker?: Kicker;
   /** What the line under the field says after a miss. */
   readonly error?: string;
@@ -165,11 +185,13 @@ function kickerLine(kicker: Kicker): HTMLElement {
 /**
  * The bar's clock, as `modules/bar/Clock.qml` draws it: a pill centred on the bar holding the
  * weekday's kanji in `accent`, `tertiary`, the short date in `body`, `on_surface_variant`, and
- * the time in `body`, `on_surface`.
+ * the time in `body`, `on_surface`, centred in a slot as wide as the widest time its format shows,
+ * so the pill keeps its width as the minutes turn.
  */
-function barClock(time: string, words: BarClock): { pill: HTMLElement; time: HTMLElement } {
+function barClock(time: string, twelve: boolean, words: BarClock): { pill: HTMLElement; time: HTMLElement } {
   const shown = text(time, "body", "on_surface");
   shown.classList.add("k-lock-bar-time");
+  shown.style.setProperty("--slot", String(widestTime("body", twelve)));
   const made = pill({ content: [text(words.kanji, "accent", "tertiary"), text(words.date, "body", "on_surface_variant"), shown], lone: false });
   made.classList.add("k-lock-bar-clock");
   return { pill: made, time: shown };
@@ -179,7 +201,8 @@ export function lock(options: LockOptions): Lock {
   const moment = options.moment ?? "rest";
   const wallpaper = options.wallpaper;
   const time = options.time ?? TIME;
-  const bar = barClock(time, BAR_CLOCK);
+  const twelve = options.twelveHour ?? false;
+  const bar = barClock(time, twelve, BAR_CLOCK);
   const shown = screen({ width: options.width, height: options.height, wallpaper: wallpaper.picture, bar: [bar.pill, ...(options.bar ?? [])] });
   const element = shown.element;
   element.classList.add("k-lock");
@@ -197,7 +220,6 @@ export function lock(options: LockOptions): Lock {
   windows.className = "k-lock-windows";
   windows.append(...(options.windows ?? []));
   const dim = element.querySelector(".k-screen-dim")!;
-  dim.after(windows);
 
   const digits = text(time, "clock_rest");
   digits.classList.add("k-lock-digits");
@@ -216,16 +238,19 @@ export function lock(options: LockOptions): Lock {
   clock.style.setProperty("--place-natural", String(placeNatural));
   clock.style.setProperty("--date-natural", String(dateNatural));
   clock.append(kicker, digits);
-  windows.after(clock);
+  dim.after(clock);
 
-  let cutout: HTMLImageElement | null = null;
-  if (wallpaper.cutout) {
-    cutout = document.createElement("img");
-    cutout.className = "k-lock-cutout";
-    cutout.src = wallpaper.cutout;
-    cutout.alt = "";
-    clock.after(cutout);
+  if (wallpaper.depth) {
+    const plate = document.createElement("img");
+    plate.className = "k-lock-plate";
+    plate.src = wallpaper.depth.plate;
+    plate.alt = "";
+    picture.after(plate);
+    clock.after(cutout(wallpaper.picture, wallpaper.depth.cutout));
+    clock.style.setProperty("--city", `url("${wallpaper.depth.cutout}")`);
   }
+  // The desktop's windows stand in front of the city: they are the still's top layer.
+  (element.querySelector(".k-lock-cutout") ?? clock).after(windows);
 
   const content = sheetContent(moment, options.error ?? "", options.live ?? false);
   const rising = sheet({ content, edge: "bottom", ...(options.live ? {} : { reveal: options.phase === "awake" ? 1 : 0 }) });
@@ -238,8 +263,9 @@ export function lock(options: LockOptions): Lock {
   hang(shown, rising);
 
   // The rest clock's place is the picture's, which only the picture's size and the screen's know:
-  // the screen crops the picture as `object-fit: cover` does, the push scales that round the
-  // screen's middle, and the clock follows the city on the desktop's picture and the pushed one.
+  // the screen crops the picture as `object-fit: cover` does, the push scales that round the middle
+  // of the screen's bottom edge, and the clock follows the sky on the desktop's picture and the
+  // pushed one: it stands in front of the sky and behind the city.
   // The clock's tint is the picture's colour under the digits at rest, read off the picture
   // itself. The bar's clock is where the pill's layout puts its time, which only layout knows.
   const place = () => {
@@ -273,6 +299,11 @@ export function lock(options: LockOptions): Lock {
     clock.style.setProperty("--rest-top-flat", `${restFlat.top}px`);
     clock.style.setProperty("--rest-cx-pushed", `${rest.cx}px`);
     clock.style.setProperty("--rest-top-pushed", `${rest.top}px`);
+    clock.style.setProperty("--city-flat-left", `${flat.left}px`);
+    clock.style.setProperty("--city-flat-top", `${flat.top}px`);
+    clock.style.setProperty("--city-flat-width", `${seen.width * flat.scale}px`);
+    clock.style.setProperty("--city-flat-height", `${seen.height * flat.scale}px`);
+    bar.time.style.setProperty("--slot", String(widestTime("body", twelve)));
     placeBarTime(element, bar, clock);
 
     const restDigitsBox = { x: rest.cx - restDigits / 2, y: rest.top, width: restDigits, height: cap * token("type-clock_rest-size") };
@@ -287,7 +318,7 @@ export function lock(options: LockOptions): Lock {
   picture.addEventListener("load", place);
   void document.fonts.ready.then(place);
 
-  probe(element, { role: "component", name: "Lock", variant: variant(options.phase, wallpaper.cutout && "cutout"), fixed: { width: false, height: false, holds: true } });
+  probe(element, { role: "component", name: "Lock", variant: variant(options.phase, wallpaper.depth && "cutout"), fixed: { width: false, height: false, holds: true } });
   return { element, screen: shown, sheet: rising, content };
 }
 
@@ -320,9 +351,49 @@ interface Cover {
   readonly top: number;
 }
 
-/** `cover` pushed in by `push` round the middle of a screen `width` by `height`, as the CSS scales it. */
+/**
+ * `cover` pushed in by `push` round the middle of the bottom edge of a screen `width` by `height`,
+ * as the CSS scales it.
+ */
 function pushedCover(cover: Cover, width: number, height: number, push: number): Cover {
-  return { scale: cover.scale * push, left: width / 2 + (cover.left - width / 2) * push, top: height / 2 + (cover.top - height / 2) * push };
+  return { scale: cover.scale * push, left: width / 2 + (cover.left - width / 2) * push, top: height + (cover.top - height) * push };
+}
+
+/**
+ * The city: the picture itself drawn through the cut-out's alpha, so where the city is opaque it is
+ * the picture's own pixels and the lock's first frame is the desktop's picture exactly. The mask
+ * is on the picture and the blur on the box round it, so the city's edge blurs with it.
+ */
+function cutout(picture: string, alpha: string): HTMLElement {
+  const box = document.createElement("span");
+  box.className = "k-lock-cutout";
+  const city = document.createElement("img");
+  city.className = "k-lock-city";
+  city.src = picture;
+  city.alt = "";
+  city.style.setProperty("mask-image", `url("${alpha}")`);
+  box.append(city);
+  return box;
+}
+
+const widest = new Map<string, number>();
+
+/**
+ * The widest time a clock can show in `style`, in logical pixels: every time of its day measured on
+ * the font, 00:00 to 23:59, or 1:00 to 12:59 for a 12-hour clock. The figures are proportional, so
+ * no one digit is the widest in every place.
+ */
+function widestTime(style: TypeStyle, twelve: boolean): number {
+  const key = `${style}|${twelve ? "12" : "24"}`;
+  const known = widest.get(key);
+  if (known !== undefined) return known;
+  const hours = twelve ? Array.from({ length: 12 }, (_, h) => String(h + 1)) : Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
+  let most = 0;
+  for (const hour of hours) {
+    for (let minute = 0; minute < 60; minute += 1) most = Math.max(most, advance(style, `${hour}:${String(minute).padStart(2, "0")}`));
+  }
+  if (document.fonts.status === "loaded") widest.set(key, most);
+  return most;
 }
 
 /** The CSS pixels a logical pixel is in `element`'s box: its scale. */

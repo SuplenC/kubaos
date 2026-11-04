@@ -1,6 +1,9 @@
 # The lock's wallpapers
 
-Copies of three of KubaOS's shipped wallpapers (`/usr/share/kubaos/wallpapers/<set>/`), downscaled to 1920 px wide at JPEG quality 82 for the Lock page, and each `-cutout.webp` its foreground cut out of that copy: the city that stands in front of the rest clock.
+Copies of three of KubaOS's shipped wallpapers (`/usr/share/kubaos/wallpapers/<set>/`), downscaled to 1920 px wide at JPEG quality 82 for the Lock page. Two have their depth beside them, both derived from the same photo and the same size as its copy:
+
+- each `-cutout.webp` is its foreground cut out of that copy: the city that stands in front of the rest clock. The lock draws only its alpha, as a mask on the copy.
+- each `-plate.webp` is what stands behind that city: the copy with the cut-out's alpha, grown by 12 px, painted out by [LaMa](https://github.com/advimman/lama) (big-lama, Apache-2.0), kept only where it was painted and transparent everywhere else, WebP at quality 92. It is what the city uncovers as it pushes in faster than the picture.
 
 | File | Set | Photographer | Source | License |
 |---|---|---|---|---|
