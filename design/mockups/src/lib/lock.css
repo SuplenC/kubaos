@@ -358,10 +358,17 @@
   mask-repeat: no-repeat;
 }
 
-/* The field's `lock`, and the `lock_open` in `primary` laid over it that the right password
-   turns it to. */
-.k-lock-open {
+/* The field's `lock` and the reader's `fingerprint`, and the `lock_open` in `primary` laid over
+   each, that the right password and a known finger turn them to. */
+.k-lock-open,
+.k-lock-reader-open {
   opacity: 0;
+}
+
+/* An unknown finger shakes the reader's mark alone, half the wrong password's jolt: the field
+   wasn't wrong, so it stays still. */
+.k-lock-reader {
+  translate: round(nearest, calc(var(--jolt) * var(--space-s4)), 1px) 0;
 }
 
 /* The sheet's content: `size.panel` wide, `space.s16` inside at its top and its foot, the
