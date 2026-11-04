@@ -46,7 +46,7 @@
    it and fading to nothing over the `space.s64` either side. */
 .k-backdrop-scrim[data-scrim="band"] {
   inset: auto 0;
-  top: calc(var(--thing-y, 0px) - var(--backdrop-lift) - var(--space-s64));
+  top: calc(var(--thing-y, 0px) - var(--space-s64));
   height: calc(var(--thing-height, 0px) + 2 * var(--space-s64));
   background: linear-gradient(
     rgb(from var(--color-surface) r g b / 0),
@@ -59,7 +59,7 @@
 .k-backdrop-thing {
   position: absolute;
   left: var(--thing-x, 0px);
-  top: calc(var(--thing-y, 0px) - var(--backdrop-lift));
+  top: var(--thing-y, 0px);
   display: flex;
   translate: 0 round(nearest, calc(var(--backdrop-rise) * var(--space-s24)), 1px);
 }
