@@ -7,8 +7,8 @@
 //! - Which Items there are under the current config, `hide` and the states applied, and what the
 //!   update check changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
-//!   user folder, a desk position, a drive, an idle setting, a shell setting, the power stop's
-//!   status, the CPU scheduler's or the Proxy's.
+//!   user folder, a desk position, a drive, an idle setting or Keep awake, a shell setting, the
+//!   power stop's status, the CPU scheduler's or the Proxy's.
 //!
 //! # Not here
 //!
@@ -224,6 +224,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
                 idle::run(&item.id, arguments, &idle_settings(), &self.runner)
             }
             idle::CHOICE_KIND => idle::choose(&item.id, action, &self.runner),
+            idle::KEEP_AWAKE_KIND if action == idle::KEEP && !self.registry.hides(&item.id) => {
+                idle::keep_awake(arguments, &self.runner)
+            }
             shell::KIND if !self.registry.hides(&item.id) => {
                 let file = shell::path().ok_or("There's no home folder to keep the setting in")?;
                 shell::run(&item.id, action, &file)

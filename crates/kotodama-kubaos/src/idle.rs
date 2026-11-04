@@ -6,14 +6,19 @@
 //! A choice is checked here, so a refusal reads in the menu, then launched as `kubaos-idle set`,
 //! which writes the file, restarts hypridle and says what it came to in a toast.
 //!
+//! "Keep awake for…" takes what is typed after `keep-awake` the same way: a while (`30m`) or a
+//! battery level (`25%`), checked here, then launched as `kubaos-idle awake for` or `until`.
+//!
 //! # Owns
 //!
 //! - The four Items, their choice lists, and what picking one runs.
+//! - "Keep awake for…", and what typing after it runs.
 //!
 //! # Not here
 //!
-//! - The settings, their limits and their words: `kubaos_idle`. Keep awake and the scheduled
-//!   actions: actions of the registry (`config/kotodama/kubaos.toml`).
+//! - The settings, their limits and their words, and what a typed Keep awake reads as:
+//!   `kubaos_idle`. The other Keep awake Items and the scheduled actions: actions of the registry
+//!   (`config/kotodama/kubaos.toml`).
 
 use std::collections::BTreeMap;
 use std::time::Duration;
@@ -26,6 +31,7 @@ use kotodama_protocol::ItemKind;
 use kotodama_protocol::NamespacedKind;
 use kotodama_protocol::View;
 use kotodama_protocol::ViewContent;
+use kubaos_idle::awake::Length;
 use kubaos_idle::settings::LidAction;
 use kubaos_idle::settings::Power;
 use kubaos_idle::settings::Settings;
@@ -49,7 +55,14 @@ pub const BOTH: &str = "both";
 pub const BATTERY: &str = "battery";
 pub const AC: &str = "ac";
 
-/// The Argument typed after a setting's word.
+/// The Item kind of "Keep awake for…".
+pub const KEEP_AWAKE_KIND: &str = "kubaos.keep-awake";
+/// Its id, which `hide` names it by.
+pub const KEEP_AWAKE_ID: &str = "keep-awake-for";
+/// Its one Action: keep awake as typed.
+pub const KEEP: &str = "keep";
+
+/// The Argument typed after a setting's word, or Keep awake's.
 const VALUE: &str = "value";
 
 const ICON: &str = "preferences-desktop-screensaver";
@@ -202,14 +215,72 @@ fn now_for(battery: bool, ac: bool) -> Option<&'static str> {
     }
 }
 
-/// The four Items.
+/// The four settings' Items and "Keep awake for…".
 pub fn items() -> Vec<Item> {
-    Setting::ALL.into_iter().map(Setting::item).collect()
+    Setting::ALL
+        .into_iter()
+        .map(Setting::item)
+        .chain([keep_awake_item()])
+        .collect()
 }
 
 /// Every id of an Item this module sends, which no action of the registry may take.
-pub fn ids() -> [&'static str; 4] {
-    Setting::ALL.map(Setting::id)
+pub fn ids() -> impl Iterator<Item = &'static str> {
+    Setting::ALL.map(Setting::id).into_iter().chain([KEEP_AWAKE_ID])
+}
+
+fn keep_awake_item() -> Item {
+    let keep = Action::new(KEEP, "Keep awake").arguments(vec![Argument {
+        name: VALUE.to_owned(),
+        placeholder: Some("30m, 3h, or a battery level: 25%".to_owned()),
+        optional: false,
+    }]);
+    Item {
+        id: KEEP_AWAKE_ID.to_owned(),
+        kind: kind(KEEP_AWAKE_KIND),
+        identity: None,
+        title: "Keep awake for…".to_owned(),
+        subtitle: Some(
+            "No auto-lock, screens off or suspend, lid included, as long as you say (30m, 3h) or until \
+             the battery is at a level (25%)"
+                .to_owned(),
+        ),
+        icon: Some(ICON.to_owned()),
+        keyword: Some("keep-awake".to_owned()),
+        keywords: ["caffeine", "keep awake", "no sleep", "battery level"]
+            .map(str::to_owned)
+            .to_vec(),
+        hidden: false,
+        app_only: false,
+        weak_keywords: Vec::new(),
+        actions: vec![keep],
+    }
+}
+
+/// Keeps awake as typed after `keep-awake`: a while, or until the battery is at a level.
+///
+/// # Errors
+///
+/// When nothing or neither was typed, the level is outside 1 % to 99 %, or `kubaos-idle` can't
+/// start; the message is what the menu shows.
+pub fn keep_awake(arguments: &BTreeMap<String, String>, runner: &impl Runner) -> Result<Ran, String> {
+    let typed = arguments.get(VALUE).map_or("", |typed| typed.trim());
+    if typed.is_empty() {
+        return Err("Type how long to keep awake, 30m or 3h, or a battery level, 25%".to_owned());
+    }
+    let argv: Vec<String> = match Length::parse(typed).map_err(|err| Chain(&err).to_string())? {
+        Length::For(_) => ["kubaos-idle", "awake", "for", typed].map(str::to_owned).to_vec(),
+        Length::UntilBattery(level) => vec![
+            "kubaos-idle".to_owned(),
+            "awake".to_owned(),
+            "until".to_owned(),
+            format!("{}%", level.percent()),
+        ],
+    };
+    runner
+        .launch(&argv, Duration::ZERO)
+        .map_err(|err| Chain(&err).to_string())?;
+    Ok(Ran::Close)
 }
 
 /// Runs a setting's Action: what was typed after its word, or else its list of choices, marked
