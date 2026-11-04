@@ -166,8 +166,16 @@ export function forgetPalettes(): void {
  */
 export function palette(slug: string, mode: Mode): Palette {
   const theme = THEMES.find((each) => each.slug === slug) ?? THEMES[0]!;
-  const roles = { ...fallback(mode), ...(theme[mode] ?? {}) };
-  return { ...roles, ...derived(roles, mode) };
+  return paletteOf(theme[mode] ?? {}, mode);
+}
+
+/**
+ * The palette matugen's `roles` paint in `mode`: the tokens' fallback, those roles over it, and the
+ * derived roles CSS can't compute worked out from them. A wallpaper's own scheme, as the lock uses.
+ */
+export function paletteOf(roles: Palette, mode: Mode): Palette {
+  const all = { ...fallback(mode), ...roles };
+  return { ...all, ...derived(all, mode) };
 }
 
 /** A theme's name. */
