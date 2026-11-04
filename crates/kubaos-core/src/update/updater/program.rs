@@ -137,19 +137,16 @@ impl<M: Machine> Updater<'_, M> {
                 program.title()
             ));
         }
-        let result = match moved.to {
-            Some(to) => {
-                self.j.detail(format!("{installed} → {to}"));
-                ProgramResult::Updated {
-                    from: installed.to_string(),
-                    to: to.to_string(),
-                }
+        let result = if let Some(to) = moved.to {
+            self.j.detail(format!("{installed} → {to}"));
+            ProgramResult::Updated {
+                from: installed.to_string(),
+                to: to.to_string(),
             }
-            None => {
-                self.j.detail(format!("{installed}, the newest of its series"));
-                ProgramResult::Current {
-                    version: installed.to_string(),
-                }
+        } else {
+            self.j.detail(format!("{installed}, the newest of its series"));
+            ProgramResult::Current {
+                version: installed.to_string(),
             }
         };
         ProgramChange {

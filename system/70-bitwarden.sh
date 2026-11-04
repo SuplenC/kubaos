@@ -27,8 +27,12 @@
 #            The official standalone binary exists for amd64 and arm64,
 #            starts as fast, and 2026.10 can unlock through the desktop app.
 #
-# Updating: kubaos update lists newer releases (this script's
-# --check-updates); bump the versions and sha256s below, re-run this script.
+# Updating: kubaos update moves the desktop app to the newest release of its
+# series (the year) itself, checked against GitHub's sha256 digest, so the
+# pin below is the oldest an install starts from; this script leaves a newer
+# one of the same series alone. A new series, and the bw CLI, wait for a bump
+# here: kubaos update lists them (this script's --check-updates); bump the
+# versions and sha256s below, re-run this script.
 set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -170,6 +174,8 @@ if ((DO_DESKTOP && !REMOVE_U2F)); then
     warn "$(arch): Bitwarden publishes no .deb for it; skipping the desktop app (no SSH agent here)"
   elif [[ "$have" == "$BW_DESKTOP_VERSION" ]]; then
     ok "bitwarden $have installed"
+  elif [[ "${have%%.*}" == "${BW_DESKTOP_VERSION%%.*}" ]] && dpkg --compare-versions "$have" gt "$BW_DESKTOP_VERSION"; then
+    ok "bitwarden $have installed (newer than the pin, of its series: kubaos update moved it)"
   else
     [[ -n "$have" ]] && info "installed: $have"
     tmp="$(mktemp -d)"

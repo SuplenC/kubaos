@@ -23,6 +23,8 @@
 //! | `wallpapers.depth` | on: the wallpaper-depth Suite cuts out the user's own pictures | `U/desktop/wallpapers/depth.toml` |
 //! | `wallpapers.depth-skipped` | on: the current wallpaper is in depth's skip list | the same, and `~/.local/state/theme/wallpaper` |
 //! | `update.firmware` | on: `kubaos update` updates firmware | `U/desktop/update/no-firmware` doesn't exist |
+//! | `update.bitwarden` | on: `kubaos update` moves Bitwarden desktop on within its series | `U/desktop/update/no-bitwarden` doesn't exist |
+//! | `update.nix` | on: `kubaos update` moves Nix on within its minor | `U/desktop/update/no-nix` doesn't exist |
 //!
 //! `U` is the user layer, `~/.config/kubaos`; `S` is `XDG_STATE_HOME`, `~/.local/state`. A state
 //! whose file can't be read has no reading, and an action that names it shows whatever it declares.
@@ -59,7 +61,9 @@ use kubaos_core::state::user_flake;
 use kubaos_core::suites::catalog;
 use kubaos_core::unfree::Setting as UnfreeSetting;
 use kubaos_core::unfree::Unfree;
+use kubaos_core::update::event::Program;
 use kubaos_core::update::firmware::Setting as FirmwareSetting;
+use kubaos_core::update::programs::Switches;
 use kubaos_core::update::record::SystemPaths;
 use kubaos_core::wallpaper_depth;
 use kubaos_user_layer::App;
@@ -102,6 +106,10 @@ pub const DEPTH: &str = "wallpapers.depth";
 pub const DEPTH_SKIPPED: &str = "wallpapers.depth-skipped";
 /// Whether `kubaos update` updates firmware through fwupd.
 pub const FIRMWARE: &str = "update.firmware";
+/// Whether `kubaos update` moves Bitwarden desktop to the newest release of its series.
+pub const UPDATE_BITWARDEN: &str = "update.bitwarden";
+/// Whether `kubaos update` moves Nix to the newest patch release of its minor.
+pub const UPDATE_NIX: &str = "update.nix";
 
 /// What starts the state of an optional package group, `packages.chrome`.
 const PACKAGES: &str = "packages.";
@@ -275,6 +283,8 @@ impl States {
         self.set(GREETING, Reading::Bool(!files.no_greeting.exists()));
         self.set(PHONE_LINK, Reading::Bool(files.phone.is_on()));
         self.set(FIRMWARE, Reading::Bool(files.firmware.is_on()));
+        self.set(UPDATE_BITWARDEN, Reading::Bool(files.updates.is_on(Program::Bitwarden)));
+        self.set(UPDATE_NIX, Reading::Bool(files.updates.is_on(Program::Nix)));
         if let Ok(keyboard) = keyboard_settings::Settings::load(&files.keyboard) {
             self.set(MAC_ACCENTS, Reading::Bool(keyboard.mac_accents));
         }
@@ -300,7 +310,8 @@ pub fn values(name: &str) -> Option<Values> {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK
-        | DND | PANEL_POWER_SAVING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE => Some(Values::Bool),
+        | DND | PANEL_POWER_SAVING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE
+        | UPDATE_BITWARDEN | UPDATE_NIX => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,
@@ -360,6 +371,8 @@ impl Places {
                 user_layer.no_greeting,
                 user_layer.phone.path().to_path_buf(),
                 user_layer.firmware.path().to_path_buf(),
+                user_layer.updates.path(Program::Bitwarden),
+                user_layer.updates.path(Program::Nix),
                 user_layer.keyboard,
                 user_layer.power,
                 user_layer.state_dir.join(NIXPKGS_FILE),
@@ -390,6 +403,8 @@ struct Files {
     no_greeting: PathBuf,
     phone: kubaos_phone::setting::Setting,
     firmware: FirmwareSetting,
+    /// The switches of the update's program phases, `U/desktop/update`.
+    updates: Switches,
     keyboard: PathBuf,
     power: PathBuf,
     /// The user flake's state directory, `U/home/kubaos.d`.
@@ -406,6 +421,7 @@ impl Files {
             no_greeting: kubaos_user_layer::dir(config, App::Zsh).join(NO_GREETING),
             phone: kubaos_phone::setting::Setting::new(config),
             firmware: FirmwareSetting::in_layer(&kubaos_user_layer::root(config)),
+            updates: Switches::new(config),
             keyboard: keyboard_settings::path(config),
             power: kubaos_user_layer::dir(config, App::Power).join(kubaos_power::settings::FILE),
             state_dir: user_flake(config).join(STATE_DIR),

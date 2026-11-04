@@ -2,6 +2,7 @@
 //!
 //!   kubaos update [-y] [--packages-only] [--foreground] [--json]
 //!   kubaos update --check [--json]
+//!   kubaos update --turn-on | --turn-off bitwarden | nix
 //!   kubaos upgrade [--foreground] [--json]
 //!   kubaos rollback [-y] [--foreground] [--json]
 //!   kubaos channel [stable | edge]
@@ -11,12 +12,13 @@
 //! update, upgrade or rollback switches the home back to the release first when it is a live
 //! preview (`kubaos switch --from`). `--foreground`
 //! runs the home-manager switch in this process, for a session without a systemd user manager.
-//! `--check` is the daily notifier's: it only looks at origin. An update offers to stage the
-//! firmware that installs at the next reboot only when it asks, so never with `-y` or `--json`. On
-//! a terminal they show a live view of each phase; elsewhere plain lines; with `--json` one event
-//! per line (`kubaos_core::update::event`), reading a prompt's answer from stdin. Programs' output
-//! goes to the run's log, `~/.local/state/kubaos/update/`. Exit codes: 0 ok, 1 the update failed or
-//! was declined, 2 usage.
+//! `--check` is the daily notifier's: it only looks at origin. `--turn-on` and `--turn-off` set
+//! whether an update moves Bitwarden desktop or Nix on within its series, and update nothing. An
+//! update offers to stage the firmware that installs at the next reboot only when it asks, so never
+//! with `-y` or `--json`. On a terminal they show a live view of each phase; elsewhere plain lines;
+//! with `--json` one event per line (`kubaos_core::update::event`), reading a prompt's answer from
+//! stdin. Programs' output goes to the run's log, `~/.local/state/kubaos/update/`. Exit codes: 0
+//! ok, 1 the update failed or was declined, 2 usage.
 //!
 //! # Owns
 //!
@@ -38,7 +40,9 @@ use kubaos_core::update::Confirm;
 use kubaos_core::update::UpdateError;
 use kubaos_core::update::UpdateOptions;
 use kubaos_core::update::Updater;
+use kubaos_core::update::event::Program;
 use kubaos_core::update::firmware::Setting;
+use kubaos_core::update::programs::Switches;
 use kubaos_core::update::record::Channel;
 use kubaos_core::update::record::SystemPaths;
 
@@ -76,6 +80,31 @@ pub struct UpdateArgs {
     /// Write one JSON event per line on stdout, for a graphical front end.
     #[arg(long)]
     json: bool,
+    /// Have every update move this program to the newest release of its series again; updates
+    /// nothing now.
+    #[arg(long, value_enum, value_name = "PROGRAM", conflicts_with_all = ["check", "packages_only", "turn_off"])]
+    turn_on: Option<ProgramArg>,
+    /// Have updates leave this program at its version; updates nothing now.
+    #[arg(long, value_enum, value_name = "PROGRAM", conflicts_with_all = ["check", "packages_only"])]
+    turn_off: Option<ProgramArg>,
+}
+
+/// A program an update moves on within its series.
+#[derive(Clone, Copy, ValueEnum)]
+enum ProgramArg {
+    /// Bitwarden desktop, to the newest release of its year.
+    Bitwarden,
+    /// The Nix daemon, to the newest patch release of its minor.
+    Nix,
+}
+
+impl ProgramArg {
+    fn program(self) -> Program {
+        match self {
+            Self::Bitwarden => Program::Bitwarden,
+            Self::Nix => Program::Nix,
+        }
+    }
 }
 
 #[derive(Args)]
@@ -150,6 +179,12 @@ fn done<T>(result: &Result<T, UpdateError>) -> ExitCode {
 }
 
 pub fn update(args: &UpdateArgs) -> ExitCode {
+    if let Some(program) = args.turn_on {
+        return turn(program.program(), true);
+    }
+    if let Some(program) = args.turn_off {
+        return turn(program.program(), false);
+    }
     let (paths, mut system) = match machine(place(args.foreground)) {
         Ok(m) => m,
         Err(code) => return code,
@@ -235,4 +270,31 @@ pub fn firmware(args: &FirmwareArgs) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Turns `program`'s updates on or off in the user layer.
+fn turn(program: Program, on: bool) -> ExitCode {
+    let paths = match Paths::from_env() {
+        Ok(paths) => paths,
+        Err(e) => return usage_error(e),
+    };
+    let switches = Switches::new(paths.config_home());
+    let turned = if on {
+        switches.turn_on(program)
+    } else {
+        switches.turn_off(program)
+    };
+    if let Err(e) = turned {
+        return job::report(e);
+    }
+    let text = match (program, on) {
+        (Program::Bitwarden, true) => {
+            "Bitwarden updates on: kubaos update moves Bitwarden desktop to the newest release of its series"
+        }
+        (Program::Bitwarden, false) => "Bitwarden updates off: kubaos update leaves Bitwarden desktop at its version",
+        (Program::Nix, true) => "Nix updates on: kubaos update moves Nix to the newest patch release of its minor",
+        (Program::Nix, false) => "Nix updates off: kubaos update leaves Nix at its version",
+    };
+    out!("{text}");
+    ExitCode::SUCCESS
 }

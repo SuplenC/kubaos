@@ -183,7 +183,6 @@ fn edge_update() -> Vec<UpdateEvent> {
             ],
             hyprland_pin: false,
             migrations: vec!["1792765570-backlight-rule.sh".into()],
-            programs: Vec::new(),
         }),
         UpdateEvent::Prompt {
             prompt: Prompt::Confirm {
@@ -244,6 +243,7 @@ fn edge_update() -> Vec<UpdateEvent> {
             ],
             inputs: vec!["nixpkgs".into()],
             migrations: vec!["1792765570-backlight-rule.sh".into()],
+            programs: Vec::new(),
             reloaded: vec!["reloaded Hyprland".into(), "restarting Quickshell".into()],
             firmware: Firmware::default(),
             restart: Restart::None,

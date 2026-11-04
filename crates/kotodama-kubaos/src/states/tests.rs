@@ -175,6 +175,20 @@ fn the_phone_link_is_on_while_its_file_exists() {
 }
 
 #[test]
+fn each_program_of_the_update_is_on_until_its_off_file_exists() {
+    let machine = Machine::new();
+
+    let before = machine.read();
+    machine.write("config/kubaos/desktop/update/no-nix", "");
+    let after = machine.read();
+
+    assert_eq!(before.get(UPDATE_BITWARDEN), Some(&on(true)));
+    assert_eq!(before.get(UPDATE_NIX), Some(&on(true)));
+    assert_eq!(after.get(UPDATE_BITWARDEN), Some(&on(true)));
+    assert_eq!(after.get(UPDATE_NIX), Some(&on(false)));
+}
+
+#[test]
 fn the_mac_accents_are_the_keyboard_settings_and_unknown_when_they_do_not_read() {
     let machine = Machine::new();
 
@@ -442,6 +456,8 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         DEPTH,
         DEPTH_SKIPPED,
         FIRMWARE,
+        UPDATE_BITWARDEN,
+        UPDATE_NIX,
         "kubaos.suites.test",
     ] {
         assert_eq!(states.get(name), None, "{name}");
@@ -465,6 +481,8 @@ fn every_file_a_state_is_read_from_is_watched() {
         "config/kubaos/desktop/keyboard/keyboard.toml",
         "config/kubaos/desktop/phone/phone-link",
         "config/kubaos/desktop/update/no-firmware",
+        "config/kubaos/desktop/update/no-bitwarden",
+        "config/kubaos/desktop/update/no-nix",
         "config/kubaos/desktop/power/power.toml",
         "config/kubaos/home/kubaos.d/nixpkgs.toml",
         "config/kubaos/home/kubaos.d/suites/test.toml",

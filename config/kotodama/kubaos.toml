@@ -73,9 +73,10 @@ kind = "scripts"
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
 # `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
 # `nix.unfree`, `kubaos.preview`, `kubaos.suites.<name>` (the Suite is
-# installed), `bluetooth.unnamed`, `update.firmware`, `wallpapers.depth` (the
-# wallpaper-depth Suite cuts out your own pictures) and `wallpapers.depth-skipped`
-# (the current wallpaper is in its skip list), true or false;
+# installed), `bluetooth.unnamed`, `update.firmware`, `update.bitwarden`,
+# `update.nix`, `wallpapers.depth` (the wallpaper-depth Suite cuts out your own
+# pictures) and `wallpapers.depth-skipped` (the current wallpaper is in its skip
+# list), true or false;
 # `power.scheduler` ("kernel", "lavd") and `power.low-battery` ("power-saver",
 # "super-saver", "off"). While a state can't be read, the action shows.
 #
@@ -1099,6 +1100,43 @@ keyword = "channel"
 run = ["kubaos", "channel", "{channel}"]
 arguments = [{ name = "channel", placeholder = "stable or edge" }]
 terminal = true
+
+# What kubaos update keeps current beyond apt and the user flake
+# (`kubaos update --turn-on|--turn-off`, the flag files in
+# U/desktop/update/). Both on by default; a new series or minor always waits
+# for a KubaOS release.
+
+[extensions.kubaos.actions.update-bitwarden-on]
+title = "Bitwarden updates on"
+subtitle = "Every update moves Bitwarden desktop to the newest release of its series, checked against GitHub's digest"
+icon = "system-software-update"
+keywords = ["kubaos update", "password manager", "vault", "series", "automatic"]
+run = ["kubaos", "update", "--turn-on", "bitwarden"]
+shown_when = { state = "update.bitwarden", is = false }
+
+[extensions.kubaos.actions.update-bitwarden-off]
+title = "Bitwarden updates off"
+subtitle = "Updates leave Bitwarden desktop at its version until a KubaOS release moves it"
+icon = "system-software-update"
+keywords = ["kubaos update", "password manager", "vault", "pin", "hold"]
+run = ["kubaos", "update", "--turn-off", "bitwarden"]
+shown_when = { state = "update.bitwarden", is = true }
+
+[extensions.kubaos.actions.update-nix-on]
+title = "Nix updates on"
+subtitle = "Every update moves the Nix daemon to the newest patch release of its minor and restarts it"
+icon = "system-software-update"
+keywords = ["kubaos update", "nix-daemon", "patch release", "automatic"]
+run = ["kubaos", "update", "--turn-on", "nix"]
+shown_when = { state = "update.nix", is = false }
+
+[extensions.kubaos.actions.update-nix-off]
+title = "Nix updates off"
+subtitle = "Updates leave the Nix daemon at its version until a KubaOS release moves it"
+icon = "system-software-update"
+keywords = ["kubaos update", "nix-daemon", "pin", "hold"]
+run = ["kubaos", "update", "--turn-off", "nix"]
+shown_when = { state = "update.nix", is = true }
 
 # Project pins (`kubaos pin`, crates/kubaos-core/src/pins.rs): a Suite
 # version for a folder and everything below it, as `use suite NAME VERSION`
