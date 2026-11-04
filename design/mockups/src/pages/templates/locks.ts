@@ -1,6 +1,6 @@
 // The lock screens the Lock page shows: three of the shipped wallpapers (`assets/lock/CREDITS.md`),
-// two with their foreground cut out and one without, each in the night scheme matugen derives from
-// it, and the lock live on them.
+// two with their depth (the city cut out and the plate behind it) and one without, each in the
+// night scheme matugen derives from it, and the lock live on them.
 //
 // Each night scheme is matugen's output for the shipped picture, as `scripts/dot-theme` makes it:
 // `matugen image FILE -m dark -t scheme-fidelity --source-color-index 0 --json hex --dry-run`, its
@@ -8,9 +8,11 @@
 // fixed roles keep the tokens' values.
 
 import purpleCutout from "../../assets/lock/shinjuku-purple-hour-cutout.webp?url";
+import purplePlate from "../../assets/lock/shinjuku-purple-hour-plate.webp?url";
 import purple from "../../assets/lock/shinjuku-purple-hour.jpg?url";
 import shibuya from "../../assets/lock/shibuya-rainy-corner.jpg?url";
 import towerCutout from "../../assets/lock/tokyo-tower-blue-hour-cutout.webp?url";
+import towerPlate from "../../assets/lock/tokyo-tower-blue-hour-plate.webp?url";
 import tower from "../../assets/lock/tokyo-tower-blue-hour.jpg?url";
 import type { Words } from "../../lib/content.ts";
 import { setValue } from "../../lib/field.ts";
@@ -32,7 +34,7 @@ export const SCREEN: { readonly width: string; readonly height: string } = { wid
 export const PURPLE_HOUR: Wallpaper = {
   name: "Shinjuku, purple hour",
   picture: purple,
-  cutout: purpleCutout,
+  depth: { cutout: purpleCutout, plate: purplePlate },
   // The digits stand in the sky, their feet behind the towers along the skyline.
   clock: { x: 0.5, y: 0.512 },
   night: { primary: "#d7baff", on_primary: "#420d7f", primary_container: "#7b4fb9", on_primary_container: "#ffffff", secondary: "#d3bdee", on_secondary: "#392950", secondary_container: "#503f68", on_secondary_container: "#ebd9ff", tertiary: "#ebc160", on_tertiary: "#3f2e00", tertiary_container: "#816100", on_tertiary_container: "#ffffff", cold: "#ebc160", on_cold: "#3f2e00", cold_container: "#816100", on_cold_container: "#ffffff", surface: "#151219", on_surface: "#e8e0ea", surface_variant: "#4b4451", on_surface_variant: "#cdc3d3", surface_dim: "#151219", surface_bright: "#3c383f", surface_container_lowest: "#100d13", surface_container_low: "#1d1a21", surface_container: "#221e25", surface_container_high: "#2c2930", surface_container_highest: "#37333b", outline: "#968e9d", outline_variant: "#4b4451", shadow: "#000000", scrim: "#000000", inverse_surface: "#e8e0ea", inverse_on_surface: "#332f36", inverse_primary: "#7347b0" },
@@ -41,7 +43,7 @@ export const PURPLE_HOUR: Wallpaper = {
 export const TOWER: Wallpaper = {
   name: "Tokyo Tower, blue hour",
   picture: tower,
-  cutout: towerCutout,
+  depth: { cutout: towerCutout, plate: towerPlate },
   // The tower's spire crosses the last digit; the kicker stays clear of it.
   clock: { x: 0.445, y: 0.47 },
   night: { primary: "#9cccf5", on_primary: "#003450", primary_container: "#1b5174", on_primary_container: "#dbedff", secondary: "#b7c9da", on_secondary: "#213240", secondary_container: "#3a4b5a", on_secondary_container: "#d4e6f8", tertiary: "#f0be74", on_tertiary: "#442b00", tertiary_container: "#694604", on_tertiary_container: "#ffe7ca", cold: "#f0be74", on_cold: "#442b00", cold_container: "#694604", on_cold_container: "#ffe7ca", surface: "#111416", on_surface: "#e2e2e5", surface_variant: "#41474e", on_surface_variant: "#c1c7cf", surface_dim: "#111416", surface_bright: "#37393c", surface_container_lowest: "#0c0e11", surface_container_low: "#191c1e", surface_container: "#1e2022", surface_container_high: "#282a2d", surface_container_highest: "#333538", outline: "#8b9198", outline_variant: "#41474e", shadow: "#000000", scrim: "#000000", inverse_surface: "#e2e2e5", inverse_on_surface: "#2e3133", inverse_primary: "#316387" },
@@ -81,6 +83,7 @@ export interface Drawn {
   readonly moment?: Moment;
   readonly wallpaper?: Wallpaper;
   readonly time?: string;
+  readonly twelveHour?: boolean;
   readonly kicker?: Kicker;
   readonly error?: string;
   readonly size?: { readonly width: string; readonly height: string };
@@ -117,6 +120,7 @@ function lockOf(drawn: Drawn, live = false): Lock {
     phase: drawn.phase ?? "rest",
     moment: drawn.moment ?? "rest",
     time: drawn.time ?? TIME,
+    twelveHour: drawn.twelveHour ?? false,
     kicker: drawn.kicker ?? KICKER,
     error: drawn.error ?? LOCK_ERROR.short,
     live,
@@ -127,7 +131,7 @@ function lockOf(drawn: Drawn, live = false): Lock {
 
 /** The 12-hour clock: the digits without a meridiem, which takes its own slot in the kicker. */
 export function twelveHour(phase: Phase): HTMLElement {
-  return still({ phase, time: "9:47", kicker: { place: KICKER.place, date: `${KICKER.date} · PM` } });
+  return still({ phase, time: "9:47", twelveHour: true, kicker: { place: KICKER.place, date: `${KICKER.date} · PM` } });
 }
 
 /** Two screens, one over the other: the one with the pointer awake, the other still at rest. */

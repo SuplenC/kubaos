@@ -1,7 +1,8 @@
-/* The lock (`lib/lock.ts`): a screen with its frame, the wallpaper, its clock and its cut-out at
-   rest; the frame closed in, the picture blurred and dimmed, the clock lifted to the top and the
-   password's sheet up when awake; and the desktop's still, its windows and its bar, which locking
-   leaves and unlocking comes back to. Numbers move it, each 0 at rest but the push. */
+/* The lock (`lib/lock.ts`): a screen with its frame, the wallpaper and its plate, its clock and its
+   city at rest; the frame closed in, the picture and its city blurred and dimmed, the clock lifted
+   to the top and the password's sheet up when awake; and the desktop's still, its windows and its
+   bar, which locking leaves and unlocking comes back to. Numbers move it, each 0 at rest but the
+   push. */
 
 /* The frame, from out past the screen's edges (0) to where the shell draws it (1). */
 @property --framed {
@@ -31,7 +32,8 @@
   initial-value: 0;
 }
 
-/* The picture and its cut-out, from the desktop's 1:1 (0) to pushed in to `scale.push` (1). */
+/* The picture and its city, from the desktop's 1:1 (0) to pushed in, the picture to `scale.push`
+   and its city to `scale.near` (1). */
 @property --push {
   syntax: "<number>";
   inherits: true;
@@ -62,6 +64,7 @@
 .k-screen.k-lock {
   --push: 1;
   --pushed: calc(1 + (var(--scale-push) - 1) * var(--push));
+  --neared: calc(1 + (var(--scale-near) - 1) * var(--push));
   --frame-side: round(nearest, calc(var(--space-s8) * var(--framed)), 1px);
   --frame-top: round(nearest, calc((var(--space-s8) + (var(--size-bar) - var(--space-s8)) * var(--barred)) * var(--framed)), 1px);
 }
@@ -84,14 +87,26 @@
   --push: 0;
 }
 
-/* The picture and its cut-out push in together, one transform round the middle of the screen, a
-   whole device pixel: the cut-out grows exactly over the city it was cut from, so it never uncovers
-   the picture's own city behind it, and a picture with no cut-out pushes in alone. At 0 it is the
-   desktop's picture exactly; at rest and awake it holds still. */
+/* The depth: the picture and its plate push in to `scale.push` and the city in front of them
+   further, to `scale.near`, all round the middle of the screen's bottom edge, where the city
+   stands, so its roofs only ever grow over the sky and what it uncovers is a band along the sides
+   of its towers that face the middle. The plate comes in with the push, so at 1:1 the lock is the
+   desktop's picture exactly and by the time the city has moved off the picture's own outline the
+   plate covers it. At rest and awake it holds still. */
 .k-lock .k-screen-wallpaper,
-.k-lock-cutout {
-  transform-origin: 50% 50%;
+.k-lock-plate {
+  transform-origin: 50% 100%;
   scale: var(--pushed);
+}
+
+.k-lock-plate {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: var(--push);
 }
 
 /* The frame's inner corners grow with it, so a frame not yet in shows no corner. */
@@ -159,6 +174,17 @@
   left: round(down, calc((100% - var(--pill-width, 0px)) / 2), 1px);
 }
 
+/* The bar's time: a slot as wide as the widest time its format shows (`--slot`, measured from the
+   font), the time centred in it on whole device pixels, the odd one after, as the lock's clock is
+   centred, so the pill never changes its width and the clock lands on the time exactly. */
+.k-lock .k-lock-bar-time {
+  --time-width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+  --slot-width: round(up, calc(var(--slot) * var(--px) - 0.001px), 1px);
+  box-sizing: border-box;
+  width: var(--slot-width);
+  padding-inline-start: round(down, calc((var(--slot-width) - var(--time-width)) / 2), 1px);
+}
+
 /* A mark of no size on the bar's time's baseline, read once and removed. */
 .k-lock-baseline {
   display: inline-block;
@@ -173,7 +199,8 @@
    and the bar's time in `type.body` where the pill puts it, as `--lift` and `--dock` say.
    The box is on whole device pixels, and the kicker centred on the same middle, each with the
    odd pixel after it, so as the kicker's size moves its edges only ever move one way.
-   It stands behind the cut-out, and above the frame while it flies to or from the bar. */
+   It stands in front of the picture and behind the city, and above everything while it flies to
+   or from the bar. */
 .k-lock-clock {
   position: absolute;
   z-index: var(--above);
@@ -206,8 +233,12 @@
   --placed-cx: calc(var(--rest-cx) + (var(--middle) - var(--rest-cx)) * var(--lift));
   --placed-top: calc(var(--rest-top) + (var(--awake-top) - var(--rest-top)) * var(--lift));
   --cx: calc(var(--placed-cx) * (1 - var(--dock)) + var(--bar-cx, var(--middle)) * var(--dock));
-  left: round(down, calc(var(--cx) - var(--digits-width) / 2), 1px);
-  top: round(nearest, calc(var(--placed-top) * (1 - var(--dock)) + var(--bar-top) * var(--dock)), 1px);
+  /* `--above` for the digits, which don't inherit it. */
+  --city-cut: var(--above);
+  --clock-left: round(down, calc(var(--cx) - var(--digits-width) / 2), 1px);
+  --clock-top: round(nearest, calc(var(--placed-top) * (1 - var(--dock)) + var(--bar-top) * var(--dock)), 1px);
+  left: var(--clock-left);
+  top: var(--clock-top);
   width: var(--digits-width);
   height: var(--digits-height);
 }
@@ -267,24 +298,51 @@
   letter-spacing: calc(var(--spread) / var(--letters, 1) * var(--px));
   text-box: trim-both cap alphabetic;
   color: color-mix(in oklab, var(--color-on_surface) calc(var(--settled) * 100%), var(--digits-tint, var(--color-on_surface)));
+  /* While the clock flies above the frame it is still behind the city: the city's alpha, laid where
+     the city stands on the screen as it pushes in, is taken out of the digits, so they are cut
+     wherever the city stands in front of them, as they are when the clock stands behind it. Behind
+     the city it is nothing: the layer is no size. `--city` is unset without a cut-out. */
+  mask-image: linear-gradient(var(--color-surface), var(--color-surface)), var(--city);
+  mask-composite: subtract, add;
+  mask-repeat: repeat, no-repeat;
+  mask-clip: no-clip;
+  mask-size:
+    100% 100%,
+    calc(var(--city-flat-width) * var(--neared) * var(--city-cut)) calc(var(--city-flat-height) * var(--neared) * var(--city-cut));
+  mask-position:
+    0 0,
+    calc(var(--middle) + (var(--city-flat-left) - var(--middle)) * var(--neared) - var(--clock-left)) calc(var(--screen-height) + (var(--city-flat-top) - var(--screen-height)) * var(--neared) - var(--clock-top));
 }
 
-/* The foreground cut out of the picture, lying exactly over it and in front of the clock; it
-   blurs with the picture and is gone while the clock is out of it. Its blur is drawn before its
-   push, so it is divided by it, to blur as far as the picture under the frame's blur does. */
+/* The city: the picture through the cut-out's alpha, in front of the clock, pushed in to
+   `scale.near`. It blurs and dims with the picture under it: its blur is drawn before its push, so
+   it is divided by it, to blur as far as the picture under the frame's blur does, and the dim is
+   `scrim`, which is black in every scheme, so the dim over it is its brightness lowered by as
+   much. */
 .k-lock-cutout {
   position: absolute;
   inset: 0;
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: blur(calc(var(--size-lock_blur) * var(--wake) / var(--pushed)));
+  transform-origin: 50% 100%;
+  scale: var(--neared);
+  filter: blur(calc(var(--size-lock_blur) * var(--wake) / var(--neared))) brightness(calc(1 - var(--opacity-panel_scrim) * var(--panel-dim)));
   pointer-events: none;
 }
 
-.k-lock:is([data-phase="awake"], [data-phase="desktop"]) .k-lock-cutout {
-  opacity: 0;
+.k-lock[data-open] .k-lock-cutout {
+  --panel-dim: 1;
+}
+
+/* The cut-out's alpha laid on the picture as `object-fit: cover` lays the picture, so the city
+   lies exactly over itself. */
+.k-lock-city {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mask-size: cover;
+  mask-position: 50% 50%;
+  mask-repeat: no-repeat;
 }
 
 /* The field's `lock`, and the `lock_open` in `primary` laid over it that the right password
@@ -331,8 +389,8 @@
 
 /* A live lock eases between rest and awake: waking on the sheet's opening, the clock settling over
    `long` on `emphasized_decel`; going back to rest, the frame and the sheet leaving over `medium`
-   on `emphasized_accel`, the blur clearing over `long` and the cut-out coming back once the clock
-   is home. */
+   on `emphasized_accel` and the blur clearing over `long`. The city dims as the dim under it
+   does. */
 .k-lock[data-live] {
   transition:
     --framed var(--motion-medium) var(--easing-emphasized_accel),
@@ -348,9 +406,5 @@
 }
 
 .k-lock[data-live] .k-lock-cutout {
-  transition: opacity var(--motion-short) var(--easing-standard) var(--motion-medium);
-}
-
-.k-lock[data-live][data-phase="awake"] .k-lock-cutout {
-  transition: opacity var(--motion-short) var(--easing-standard);
+  transition: --panel-dim var(--motion-medium) var(--easing-standard);
 }
