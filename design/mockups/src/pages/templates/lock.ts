@@ -21,7 +21,6 @@ const FRAME = "the frame";
 const BLUR = "the picture's blur";
 const DIM = "the dim";
 const CLOCK = "the clock";
-const CUTOUT = "the cut-out";
 const SHEET = "the sheet";
 const KICKER_PART = "the kicker";
 const WINDOWS = "the windows";
@@ -29,21 +28,21 @@ const BAR = "the bar's pills";
 const BAR_TIME = "the bar's time";
 const TOP = "the frame's top edge";
 const GLASS = "the frame's glass";
-const PUSH = "the picture's push";
+const PUSH = "the push";
 const ON = "the lock on Shinjuku";
 const ON_SHIBUYA = "the lock on Shibuya";
 const BLURRED = ".k-lock-blur, .k-lock-cutout";
+const DIMMED = ".k-screen-dim, .k-lock-cutout";
 
 type Eased = Track<Easing>;
 
 const WAKES: Move = {
   name: "Waking",
-  what: "A key, a press or a touch of the reader, on the screen with the pointer: the frame closes in from past the screen's edges to `space.s8` all round over `long` on `emphasized_decel`, its inner corners growing with it; the picture blurs to `size.lock_blur` on the same curve, and dims to `opacity.panel_scrim` over `medium` on `standard`, as a panel's desktop does. The cut-out fades over `short` on `standard`, so the clock comes out from behind the city, and the clock lifts over `long` on `emphasized_decel` from its rest place to `space.s48` under the frame's top edge, its digits going from `type.clock_rest` to `type.clock` and its kicker from `clock_place` and `clock_date` at 20 to their awake styles at 16 on the same 24 line, on the lift's own curve and whole device pixels, so the kicker is never wider than the digits. The sheet rises from the bottom edge as a Sheet opens, over `long` on `emphasized_decel`. The picture keeps its push under the blur. With reduce motion the lock fades to awake over `short`: the frame, the sheet and the clock in their awake places fade in, the blur and the dim fade in, and the cut-out is gone at once.",
+  what: "A key, a press or a touch of the reader, on the screen with the pointer: the frame closes in from past the screen's edges to `space.s8` all round over `long` on `emphasized_decel`, its inner corners growing with it; the picture blurs to `size.lock_blur` on the same curve, and dims to `opacity.panel_scrim` over `medium` on `standard`, as a panel's desktop does. The city blurs and dims with the picture and stays in front, and the clock rises out from behind it over `long` on `emphasized_decel`, from its rest place to `space.s48` under the frame's top edge, above the dim and clear of the city, its digits going from `type.clock_rest` to `type.clock` and its kicker from `clock_place` and `clock_date` at 20 to their awake styles at 16 on the same 24 line, on the lift's own curve and whole device pixels, so the kicker is never wider than the digits. The sheet rises from the bottom edge as a Sheet opens, over `long` on `emphasized_decel`. The picture and its city keep their push under the blur. With reduce motion the lock fades to awake over `short`: the frame, the sheet and the clock in their awake places fade in, and the blur and the dim fade in over the picture and its city.",
   tracks: [
     { part: FRAME, on: ON, target: ".k-lock", property: "--framed", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: DIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" },
-    { part: CUTOUT, on: ON, target: ".k-lock-cutout", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" },
     { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--lift", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
   ],
@@ -51,8 +50,7 @@ const WAKES: Move = {
     { part: FRAME, on: ON, target: ".k-lock", property: "--framed", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: "the glass", on: ON, target: ".k-screen-glass", property: "opacity", from: 0, to: { opacity: "frame" }, duration: "short", curve: "standard" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: DIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: CUTOUT, on: ON, target: ".k-lock-cutout", property: "opacity", from: 1, to: 0, duration: "instant", curve: "standard" },
+    { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--lift", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: "the clock's fade", on: ON, target: ".k-lock-clock", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "instant", curve: "standard" },
@@ -64,14 +62,13 @@ const WAKES: Move = {
 
 const RESTS: Move = {
   name: "Going back to rest",
-  what: "Esc, or `duration.lock_idle` (20 s) with no key, press or touch: the sheet goes back into the bottom edge as a Sheet closes and the frame opens out past the screen's edges, both over `medium` on `emphasized_accel`; the dim lifts over `medium` on `standard` and the blur clears over `long` on `standard`. The clock settles back to its rest place and size over `long` on `emphasized_decel`, its kicker back to 20 with it, and the cut-out fades back in over `short`, from `medium` on, so the city is in front again as the clock lands. The field empties. With reduce motion the awake lock fades out over `short` and the rest clock and the cut-out fade in over the next `short`.",
+  what: "Esc, or `duration.lock_idle` (20 s) with no key, press or touch: the sheet goes back into the bottom edge as a Sheet closes and the frame opens out past the screen's edges, both over `medium` on `emphasized_accel`; the dim lifts over `medium` on `standard` and the blur clears over `long` on `standard`. The clock settles back behind the city to its rest place and size over `long` on `emphasized_decel`, its kicker back to 20 with it, the city sharpening and brightening with the picture. The field empties. With reduce motion the awake lock fades out over `short` and the rest clock fades in behind the city over the next `short`.",
   tracks: [
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: FRAME, on: ON, target: ".k-lock", property: "--framed", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: DIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
+    { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 1, to: 0, duration: "long", curve: "standard" },
     { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--lift", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
-    { part: CUTOUT, on: ON, target: ".k-lock-cutout", property: "opacity", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
   ],
   reduced: reducedRest(),
   back: "cuts",
@@ -83,24 +80,23 @@ function reducedRest(): [Eased, ...Eased[]] {
     { part: "the sheet's fade", on: ON, target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the glass", on: ON, target: ".k-screen-glass", property: "opacity", from: { opacity: "frame" }, to: 0, duration: "short", curve: "standard" },
     { part: FRAME, on: ON, target: ".k-lock", property: "--framed", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
-    { part: DIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the clock's fade", on: ON, target: ".k-lock-clock", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--lift", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
     { part: "the clock's fade", on: ON, target: ".k-lock-clock", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
-    { part: CUTOUT, on: ON, target: ".k-lock-cutout", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ];
 }
 
 /**
  * Super+L: the desktop's still leaves and the bar's time hands over to the lock's clock where it
- * stands, which then grows out of the bar to the rest clock, and the city steps in front of it.
+ * stands, which then grows out of the bar to the rest clock behind the city, as the picture and its
+ * city push in.
  */
-function locking(on: string, cutout: boolean): [Eased, ...Eased[]] {
+function locking(on: string): [Eased, ...Eased[]] {
   const landed: Eased[] = [
     { part: KICKER_PART, on, target: ".k-lock-kicker", property: "opacity", from: 0, to: 1, duration: "short", cue: ["micro", "medium"], curve: "standard" },
     { part: "the clock's depth", on, target: ".k-lock-clock", property: "--above", from: 1, to: 0, duration: "instant", cue: ["micro", "long"], curve: "standard" },
-    ...(cutout ? [{ part: CUTOUT, on, target: ".k-lock-cutout", property: "opacity", from: 0, to: 1, duration: "short", cue: ["micro", "long"], curve: "standard" } satisfies Eased] : []),
   ];
   return [
     { part: WINDOWS, on, target: ".k-lock-windows", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
@@ -116,8 +112,8 @@ function locking(on: string, cutout: boolean): [Eased, ...Eased[]] {
   ];
 }
 
-/** Super+L with reduce motion: the desktop's still fades out as the rest clock fades in, over `short`. */
-function lockingReduced(on: string, cutout: boolean): [Eased, ...Eased[]] {
+/** Super+L with reduce motion: the desktop's still fades out as the rest clock fades in behind the city, over `short`. */
+function lockingReduced(on: string): [Eased, ...Eased[]] {
   return [
     { part: WINDOWS, on, target: ".k-lock-windows", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: BAR, on, target: ".k-bar", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
@@ -126,25 +122,24 @@ function lockingReduced(on: string, cutout: boolean): [Eased, ...Eased[]] {
     { part: "the clock's depth", on, target: ".k-lock-clock", property: "--above", from: 1, to: 0, duration: "instant", curve: "standard" },
     { part: "the clock's fade", on, target: ".k-lock-clock", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: KICKER_PART, on, target: ".k-lock-kicker", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-    ...(cutout ? [{ part: CUTOUT, on, target: ".k-lock-cutout", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" } satisfies Eased] : []),
     { part: TOP, on, target: ".k-lock", property: "--barred", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
   ];
 }
 
 const LOCKS: Move = {
   name: "Locking",
-  what: "Super+L. The session locks in the first frame; what follows plays on a still of the desktop the lock captured then, drawn inside the lock's own surface, so the lock and the desktop are one surface. The windows fade and shrink to `scale.behind` round the middle of the screen over `medium` on `emphasized_accel`, and the bar's pills fade out with them, riding up out of the screen in the middle of the frame's top edge as it thins. The bar's clock grows out of the bar: its time, Geist Regular, hands over to the lock's clock, Geist Light, where it stands over `micro`, the strokes thinning in place; from `micro` on the clock grows from the bar's time in `type.body` to `type.clock_rest` at its rest place over `long` on `emphasized_decel`, on whole device pixels, its digits taking the picture's tint, and the kicker fades in above it over `short` from `micro` and `medium` on. Meanwhile, from `micro` on, the frame's top edge thins from the bar's 40 to `space.s8` on the same curve, and from `short` on the whole frame fades out to the bare picture over `long` on `emphasized_decel`. From `micro` on too the picture pushes in from the desktop's own 1:1 to `scale.push` (1.025) round the middle of the screen, with the clock's flight, over `long` on `emphasized_decel`: a gentle dolly, its cut-out on the same transform, so the clock lands as it does. The clock flies above the frame; once it has landed it drops behind the picture, and the cut-out fades in over its digits over `short`: the city steps in front. A lid close or an idle suspend skips all of it and goes straight to rest. With reduce motion nothing pushes: the desktop fades out as the rest clock, its kicker and the cut-out fade in, over `short`.",
-  tracks: locking(ON, true),
-  reduced: lockingReduced(ON, true),
+  what: "Super+L. The session locks in the first frame; what follows plays on a still of the desktop the lock captured then, drawn inside the lock's own surface, so the lock and the desktop are one surface. The city is on screen from that first frame: it is the picture itself drawn through the cut-out's alpha, so the first frame is the desktop's picture exactly. The windows fade and shrink to `scale.behind` round the middle of the screen over `medium` on `emphasized_accel`, and the bar's pills fade out with them, riding up out of the screen in the middle of the frame's top edge as it thins. The bar's clock grows out of the bar: its time, Geist Regular, hands over to the lock's clock, Geist Light, where it stands over `micro`, the strokes thinning in place; from `micro` on the clock grows from the bar's time in `type.body` to `type.clock_rest` at its rest place over `long` on `emphasized_decel`, on whole device pixels, its digits taking the picture's tint, and the kicker fades in above it over `short` from `micro` and `medium` on. Meanwhile, from `micro` on, the frame's top edge thins from the bar's 40 to `space.s8` on the same curve, and from `short` on the whole frame fades out to the bare picture over `long` on `emphasized_decel`. From `micro` on too, with the clock's flight, over `long` on `emphasized_decel`, the picture pushes in from the desktop's 1:1 to `scale.push` (1.025) and its city in front of it further, to `scale.near` (1.05), both round the middle of the screen's bottom edge, so the city comes off the sky; the plate behind the city comes in with the push and fills what the city uncovers, a band along its towers' sides. The clock flies above the frame and the windows, yet behind the city: the city's alpha is taken out of its digits wherever the city stands in front of them, so it never crosses the city. Once it has landed it drops behind the frame, between the picture and its city, which changes nothing on screen. A lid close or an idle suspend skips all of it and goes straight to rest. With reduce motion nothing pushes: the desktop fades out as the rest clock and its kicker fade in behind the city, over `short`.",
+  tracks: locking(ON),
+  reduced: lockingReduced(ON),
   back: "cuts",
   sample: held("desktop"),
 };
 
 const LOCKS_BARE: Move = {
   name: "Locking, without a cut-out",
-  what: "The same on a picture with no cut-out, Shibuya's or one of your own: the picture pushes in alone, and once the clock has landed it drops behind nothing, and no cut-out fades in: the tinted clock stands on the bare picture, only its kicker's letters haloed.",
-  tracks: locking(ON_SHIBUYA, false),
-  reduced: lockingReduced(ON_SHIBUYA, false),
+  what: "The same on a picture with no depth, Shibuya's or one of your own: the picture pushes in alone, nothing cuts the clock as it flies, and once it has landed it drops behind nothing: the tinted clock stands on the bare picture, only its kicker's letters haloed.",
+  tracks: locking(ON_SHIBUYA),
+  reduced: lockingReduced(ON_SHIBUYA),
   back: "cuts",
   sample: held("desktop", SHIBUYA),
 };
@@ -169,7 +164,7 @@ function intoTheBar(on: string, cue: Eased["cue"]): Eased[] {
 
 const UNLOCKS: Move = {
   name: "Unlocking with the password",
-  what: "The right password, from awake: about 0.8 s in all. The field's `lock` turns to `lock_open` in `primary` over `short`. The sheet sinks into the bottom edge as a Sheet closes, over `medium` on `emphasized_accel`. From `short` on the clock flies from `type.clock` into the bar's clock over `long` on `emphasized_decel`, above the frame, its kicker fading over `short`, and lands on the bar's time on whole device pixels: its left edge, its width, its baseline and `type.body`'s size: the Light's letters spread as it lands by what the bar's Regular is wider, an even share after each, so each figure stands within a fifth of a logical pixel of the bar's. Once it has landed it hands over to the bar's own time over `micro`: the bar's Geist Regular fades in on top of the clock's Geist Light, which then goes, so the strokes thicken in place and nothing else moves. Meanwhile the frame's top edge grows from `space.s8` into the bar and the bar's pills fade in with it, on the same curve. From `medium` on the picture's blur and dim clear to the desktop's wallpaper and the windows settle in from `scale.behind`, over `long`, the picture easing back from `scale.push` to the desktop's 1:1 with them on `emphasized_decel`. The kicker leaves at its awake 16. The motion plays on the still the lock captured as it locked; the session unlocks as it ends, and the real windows take the still's place. With reduce motion the awake lock fades to the desktop over `short`.",
+  what: "The right password, from awake: about 0.8 s in all. The field's `lock` turns to `lock_open` in `primary` over `short`. The sheet sinks into the bottom edge as a Sheet closes, over `medium` on `emphasized_accel`. From `short` on the clock rises above the frame, clear of the city, and flies from `type.clock` into the bar's clock over `long` on `emphasized_decel`, its kicker fading over `short`, and lands on the bar's time on whole device pixels: its left edge, its width, its baseline and `type.body`'s size: the Light's letters spread as it lands by what the bar's Regular is wider, an even share after each, so each figure stands within a fifth of a logical pixel of the bar's. Once it has landed it hands over to the bar's own time over `micro`: the bar's Geist Regular fades in on top of the clock's Geist Light, which then goes, so the strokes thicken in place and nothing else moves. Meanwhile the frame's top edge grows from `space.s8` into the bar and the bar's pills fade in with it, on the same curve. From `medium` on the picture's blur and dim clear from the picture and its city and the windows settle in from `scale.behind`, over `long`, the picture easing back from `scale.push` and its city from `scale.near` to the desktop's 1:1 with them on `emphasized_decel`, the plate going with the push, so the last frame is the desktop's picture. The kicker leaves at its awake 16. The motion plays on the still the lock captured as it locked; the session unlocks as it ends, and the real windows take the still's place. With reduce motion the awake lock fades to the desktop over `short`.",
   tracks: [
     { part: "the field's lock", on: ON, target: ".k-lock-shut", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the field's open lock", on: ON, target: ".k-lock-open", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -177,7 +172,7 @@ const UNLOCKS: Move = {
     { part: KICKER_PART, on: ON, target: ".k-lock-kicker", property: "opacity", from: 1, to: 0, duration: "short", cue: "short", curve: "standard" },
     ...intoTheBar(ON, "short"),
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 1, to: 0, duration: "long", cue: "medium", curve: "standard" },
-    { part: DIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "long", cue: "medium", curve: "standard" },
+    { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 1, to: 0, duration: "long", cue: "medium", curve: "standard" },
     { part: WINDOWS, on: ON, target: ".k-lock-windows", property: "opacity", from: 0, to: 1, duration: "long", cue: "medium", curve: "emphasized_decel" },
     { part: "the windows' size", on: ON, target: ".k-lock-windows", property: "scale", from: { scale: "behind" }, to: 1, duration: "long", cue: "medium", curve: "emphasized_decel" },
     { part: PUSH, on: ON, target: ".k-lock", property: "--push", from: 1, to: 0, duration: "long", cue: "medium", curve: "emphasized_decel" },
@@ -186,7 +181,7 @@ const UNLOCKS: Move = {
     { part: "the sheet's fade", on: ON, target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the clock's fade", on: ON, target: ".k-lock-clock", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: DIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: TOP, on: ON, target: ".k-lock", property: "--barred", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: BAR, on: ON, target: ".k-bar", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "the windows' size", on: ON, target: ".k-lock-windows", property: "scale", from: { scale: "behind" }, to: 1, duration: "instant", curve: "standard" },
@@ -198,18 +193,16 @@ const UNLOCKS: Move = {
 
 const TOUCHES: Move = {
   name: "Unlocking with the fingerprint",
-  what: "A known finger, from rest: the cut-out and the kicker fade over `micro`, so the clock comes out from behind the city and rises above the frame before it reaches the frame's top edge, and the rest clock flies straight from `type.clock_rest` into the bar's clock over `long` on `emphasized_decel`, its digits going from the picture's tint to `on_surface`, landing and handing over to the bar's time as the password's unlock does. The frame closes in from past the screen's edges with its top edge growing into the bar, the bar's pills fading in, on the same curve, and from `short` on the windows settle in from `scale.behind` over `long`, the picture easing back to the desktop's 1:1 with them on `emphasized_decel`. The kicker leaves at its rest 20. With reduce motion the rest lock fades to the desktop over `short`.",
+  what: "A known finger, from rest: the kicker fades over `micro`, and the clock rises above the frame at once, behind the city still: the city's alpha is taken out of its digits wherever it stands in front of them, so the clock comes up out from behind the city, never through it. The rest clock flies straight from `type.clock_rest` into the bar's clock over `long` on `emphasized_decel`, its digits going from the picture's tint to `on_surface`, landing and handing over to the bar's time as the password's unlock does. The frame closes in from past the screen's edges with its top edge growing into the bar, the bar's pills fading in, on the same curve, and from `short` on the windows settle in from `scale.behind` over `long`, the picture, its plate and its city easing back to the desktop's 1:1 with them on `emphasized_decel`. The kicker leaves at its rest 20. With reduce motion the rest lock fades to the desktop over `short`.",
   tracks: [
-    { part: CUTOUT, on: ON, target: ".k-lock-cutout", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
     { part: KICKER_PART, on: ON, target: ".k-lock-kicker", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
     { part: FRAME, on: ON, target: ".k-lock", property: "--framed", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    ...intoTheBar(ON, undefined).map((track) => (track.property === "--above" ? { ...track, cue: "micro" as const } : track)),
+    ...intoTheBar(ON, undefined),
     { part: WINDOWS, on: ON, target: ".k-lock-windows", property: "opacity", from: 0, to: 1, duration: "long", cue: "short", curve: "emphasized_decel" },
     { part: "the windows' size", on: ON, target: ".k-lock-windows", property: "scale", from: { scale: "behind" }, to: 1, duration: "long", cue: "short", curve: "emphasized_decel" },
     { part: PUSH, on: ON, target: ".k-lock", property: "--push", from: 1, to: 0, duration: "long", cue: "short", curve: "emphasized_decel" },
   ],
   reduced: [
-    { part: CUTOUT, on: ON, target: ".k-lock-cutout", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the clock's fade", on: ON, target: ".k-lock-clock", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: FRAME, on: ON, target: ".k-lock", property: "--framed", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: TOP, on: ON, target: ".k-lock", property: "--barred", from: 0, to: 1, duration: "instant", curve: "standard" },
@@ -251,9 +244,9 @@ export default page({
   description: [
     "QML `Lock`, a template of the shell's alone: only the shell locks. Click into it and type, or press it: it wakes, and what you type lands in the field. Enter with a password shakes its head and says so; Esc, or 20 s with nothing done, puts it back to rest.",
     "At rest the lock is the wallpaper and its clock, and nothing else: no frame, no bar, no field. The digits are `type.clock_rest`, Geist Light at 384, about 280 tall, under a kicker line `space.s16` above their tops: where and which day in `clock_place` (東京・月曜日, M PLUS 1), then ` · ` and the date in `clock_date` (Geist), both 20 on a 24 line, medium. The kicker and the digits are each centred on the clock's middle, on whole device pixels with the odd one after. The digits are a light tint of the picture behind them, so they read as part of it: the hue the picture shows most strongly under them (each pixel's OKLCH hue counted by its chroma squared, so the glow of a sky or a street's signs decide it, not its haze), at that chroma times 1.2, at lightness 0.84. They are large enough to read without a contrast of their own, so nothing shades them. The kicker takes the same colour, its date at `opacity.clock_date` (0.85) of it, so where and which day lead the line. Every screen of a setup shows rest, each with its own clock.",
-    "Each wallpaper says where its clock stands: the middle of the digits' baseline as shares of the picture, so the clock keeps its place against the city however a screen crops the picture, kept `space.s32` inside the screen's edges. At rest the picture stands pushed in to `scale.push` (1.025) round the middle of the screen, its cut-out on the same transform so the city lies exactly over itself, and holds still; the clock's place moves with it. A wallpaper with a foreground cut-out (an alpha picture of the city, the same size as the wallpaper) has it drawn over the digits, so the towers stand in front of the clock: on Shinjuku the skyline covers the digits' feet, on Tokyo Tower the spire crosses the last digit. The place keeps the kicker clear of the cut-out. A picture of your own has no cut-out, and the clock stands in front of it.",
+    "Each wallpaper says where its clock stands: the middle of the digits' baseline as shares of the picture, so the clock keeps its place against the city however a screen crops the picture, kept `space.s32` inside the screen's edges. A wallpaper with depth has its city cut out (an alpha picture, the same size as the wallpaper) and a plate, the picture with the city painted out a little past its outline. The lock draws the picture and its plate, then the clock, then the city: the picture itself through the cut-out's alpha, so the towers stand in front of the clock: on Shinjuku the skyline covers the digits' feet, on Tokyo Tower the spire crosses the last digit. The place keeps the kicker clear of the city. At rest the picture and its plate stand pushed in to `scale.push` (1.025) and the city further, to `scale.near` (1.05), round the middle of the screen's bottom edge, so the city stands off the sky, and it holds still; the clock's place moves with the picture. A picture of your own has no depth: it pushes in alone, and the clock stands in front of it.",
     "Nothing stands behind the kicker: no capsule, no band. Round each letter lies a halo of `surface`, two text shadows, a tight one blurred by `size.halo_edge` (1) at `opacity.halo_edge` (0.50) that holds the strokes' edges and a soft one blurred by `size.halo` (6) at `opacity.halo` (0.35) round the word. It follows the glyphs, so no shape shows, and it is the same on every wallpaper: the clock matching its picture matters more than the kicker's contrast. On Shinjuku's pink sky the line holds about 2.5:1 round its letters, on Tokyo Tower's blue hour 4.4 to 5.4:1, and on Shibuya the place 12:1 over a dark awning while the date crosses lit signs. The digits have no halo, with a cut-out or without.",
-    "Awake, on the screen with the pointer only, the shell's frame closes in round the picture, `surface` at `opacity.frame`, `space.s8` all round: the top edge is as thin as the others, and grows to the bar's height only as the lock gives way to the desktop. The picture blurs to `size.lock_blur` (8) and dims to `scrim` at `opacity.panel_scrim`. The clock lifts out from behind the cut-out, which fades, and settles at `type.clock` (80), centred, its kicker's top `space.s48` under the frame's top edge, its digits going from the picture's tint to `on_surface` as it lifts. The kicker steps down to 16 with it (`clock_place_awake` and `clock_date_awake`, on the same 24 line, medium), so it is no wider than the 80 digits, and goes to its own roles, where and which day in `primary` and the date in `on_surface_variant`, over the frame and the blurred, dimmed picture as the digits are; its halo stays, lost in the dim.",
+    "Awake, on the screen with the pointer only, the shell's frame closes in round the picture, `surface` at `opacity.frame`, `space.s8` all round: the top edge is as thin as the others, and grows to the bar's height only as the lock gives way to the desktop. The picture blurs to `size.lock_blur` (8) and dims to `scrim` at `opacity.panel_scrim`. The city blurs and dims with the picture and stays where it is, and the clock rises out from behind it and settles at `type.clock` (80), above the dim, centred, its kicker's top `space.s48` under the frame's top edge, its digits going from the picture's tint to `on_surface` as it lifts. The kicker steps down to 16 with it (`clock_place_awake` and `clock_date_awake`, on the same 24 line, medium), so it is no wider than the 80 digits, and goes to its own roles, where and which day in `primary` and the date in `on_surface_variant`, over the frame and the blurred, dimmed picture as the digits are; its halo stays, lost in the dim.",
     "The lock and the desktop are one surface. Super+L locks the session in its first frame and captures a still of the desktop then; the lock draws that still inside its own surface (the windows, and the bar's pills on the frame) and plays its locking on it: the windows go, and the bar's clock grows out of the bar into the rest clock. Unlocking plays the same way back, the clock flying into the bar's clock, and the session unlocks as it ends. A lid close or an idle suspend skips the motion and goes straight to rest.",
     "A Sheet rises from the middle of the bottom edge, curving into the frame through concave fillets of `radius.surface`, as the wallpaper picker does, `size.panel` (384) wide with a PanelPage's padding: `space.s16` at its top and foot, the container's 16 at its sides. It holds the md `Field` for the password, its lock symbol leading in the field's icon colour and lit with the keyboard in it; `space.s4` under it, as a field's note is, the line led by the `fingerprint` symbol in `primary`, Or touch the fingerprint reader; and `space.s16` under that the key hints, ↵ Unlock and Esc Rest. No avatar, no initial, no emoji: only KubaOS Symbols.",
     "The lock ignores light and dark. It always draws in the night scheme matugen derives from its wallpaper (the same `scheme-fidelity` dot-theme uses, in dark), and its derived roles from those: Shinjuku's purple hour gives a lavender primary, Tokyo Tower's blue hour a pale blue one, Shibuya's rain a teal one. So the lock is the same in either mode, and its sheet and its awake kicker keep their contrast over the night picture.",
