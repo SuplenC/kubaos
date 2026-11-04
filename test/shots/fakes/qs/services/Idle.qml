@@ -6,6 +6,7 @@ QtObject {
     readonly property string runtime: "/nonexistent/run"
     readonly property int now: 1793137652
     readonly property int keepAwakeUntil: 0
+    readonly property int keepAwakeBattery: 0
     readonly property bool keepAwake: true
     readonly property string scheduled: "lock"
     readonly property int scheduledAt: 0

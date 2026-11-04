@@ -6,8 +6,9 @@
 #   dot-hypr-lid sync    re-evaluate (login, monitor hotplug)
 #
 # Rule: the panel is off only while the lid is closed AND another monitor is
-# active. If the laptop panel is the only monitor it stays on: on battery
-# logind suspends on lid close anyway, on AC the lid is ignored.
+# active. If the laptop panel is the only monitor it stays on: the lid's own
+# action (the idle settings, crates/kubaos-idle) suspends or locks the laptop,
+# or leaves it running, as under Keep awake.
 #
 # State lives in a flag file that config/hypr/monitors.lua reads, so a config
 # reload keeps the panel in the state chosen here. Changing it triggers
