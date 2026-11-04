@@ -3313,9 +3313,11 @@ c_user_layer() {
 
 # The wallpaper-depth Suite's hook on its own, in a scratch home with
 # systemd-run, the tool and matugen stubbed: what kubaos-depth-queue starts,
-# when it skips, the wait for AC power, and when dot-theme calls it.
+# when it skips, the wait for AC power, when dot-theme calls it, and the
+# settings through the built kubaos (`kubaos depth`).
 c_wallpaper_depth() {
-  as_user bash "$REPO/test/wallpaper-depth-test" "$REPO" || { echo "FAIL test/wallpaper-depth-test"; return 1; }
+  [[ -x /out/kubaos ]] || { echo "FAIL no /out/kubaos (test/run e2e builds it)"; return 1; }
+  as_user bash "$REPO/test/wallpaper-depth-test" "$REPO" /out/kubaos || { echo "FAIL test/wallpaper-depth-test"; return 1; }
 }
 
 # scripts/dot-config on its own, in a scratch home: seeding, the README

@@ -5,10 +5,15 @@
 # reads. `scripts/dot-theme` calls it when a still of the user's own is set,
 # and again at login; home/suites/wallpaper-depth.nix installs it.
 #
-#   kubaos-depth-queue PICTURE       queue PICTURE (an absolute path), unless
-#                                    its folder is up to date
-#   kubaos-depth-queue job PICTURE   the unit's command: wait for AC power, run
-#                                    the tool, record what the folder was made from
+#   kubaos-depth-queue PICTURE         queue PICTURE (an absolute path), unless
+#                                      its folder is up to date or the settings
+#                                      give it no cut-out
+#   kubaos-depth-queue redo PICTURE    stop its unit, empty its folder and queue
+#                                      it again
+#   kubaos-depth-queue forget PICTURE  stop its unit and delete its folder
+#   kubaos-depth-queue stop            stop every picture's unit
+#   kubaos-depth-queue job PICTURE     the unit's command: wait for AC power, run
+#                                      the tool, record what the folder was made from
 #
 # PICTURE's folder is ~/.cache/kubaos/wallpapers/<md5 of its path>/, and its
 # unit kubaos-depth-<md5 of its path>.service, so a picture whose unit is
@@ -17,6 +22,11 @@
 # a failed run writes it too, so a picture the tool fails on isn't tried
 # again at every login. A folder made from an older picture at the same path
 # is emptied at once, so the lock never draws a stale cut-out over a new one.
+# Before it queues a picture it asks `kubaos depth wants PICTURE`, which says
+# no while depth is off, for a picture in the skip list
+# (~/.config/kubaos/desktop/wallpapers/depth.toml), for a video and for one of
+# KubaOS's sets; `kubaos depth` runs the other commands when those settings
+# change.
 # The contract is docs/CONTRACTS.md, "Wallpaper depth".
 #
 # The Nix module sets KUBAOS_DEPTH_TOOL (the kubaos-depth binary),
@@ -35,7 +45,7 @@ RESULTS="$HOME/.cache/kubaos/wallpapers"
 AC_POLL="${KUBAOS_DEPTH_AC_POLL:-60}"
 
 usage() {
-  echo "usage: kubaos-depth-queue PICTURE | kubaos-depth-queue job PICTURE" >&2
+  echo "usage: kubaos-depth-queue PICTURE | redo PICTURE | forget PICTURE | stop | job PICTURE" >&2
   exit 2
 }
 
@@ -60,8 +70,25 @@ on_ac() {
   systemd-ac-power
 }
 
+# Whether the settings give the picture a cut-out: `kubaos depth wants` exits
+# 1 when they don't. Without kubaos, or when it fails otherwise, they are the
+# defaults, which do.
+wanted() {
+  command -v kubaos >/dev/null || return 0
+  local rc=0
+  kubaos depth wants "$1" >/dev/null || rc=$?
+  ((rc != 1))
+}
+
+unit_of() { printf 'kubaos-depth-%s.service\n' "$(key_of "$1")"; }
+
+# Stops the picture's unit, waiting or running, and waits for it to end, so
+# nothing writes into its folder after.
+stop_unit() { systemctl --user stop --quiet "$(unit_of "$1")" 2>/dev/null || true; }
+
 queue() {
   local picture=$1 key dir unit
+  wanted "$picture" || return 0
   key=$(key_of "$picture")
   dir="$RESULTS/$key"
   unit="kubaos-depth-$key.service"
@@ -96,7 +123,27 @@ job() {
   exit "$rc"
 }
 
+redo() {
+  [[ -f $1 ]] || { echo "kubaos-depth-queue: no such file: $1" >&2; exit 1; }
+  stop_unit "$1"
+  rm -f -- "$RESULTS/$(key_of "$1")"/{cutout.png,depth.toml,source}
+  queue "$1"
+}
+
+forget() {
+  stop_unit "$1"
+  rm -rf -- "${RESULTS:?}/$(key_of "$1")"
+}
+
 case ${1:-} in
+  redo | forget)
+    (($# == 2)) && [[ $2 == /* ]] || usage
+    "$1" "$2"
+    ;;
+  stop)
+    (($# == 1)) || usage
+    systemctl --user stop --quiet 'kubaos-depth-*.service'
+    ;;
   job)
     (($# == 2)) && [[ $2 == /* ]] || usage
     job "$2"
