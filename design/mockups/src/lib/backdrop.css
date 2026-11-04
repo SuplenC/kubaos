@@ -70,9 +70,15 @@
   display: none;
 }
 
-/* The words of a thing in the middle are centred under one another. */
-.k-backdrop-thing .k-text[data-wrapped] {
+/* The words of a thing in the middle are centred under one another; a dialog keeps its own. */
+.k-backdrop-thing > :not(.k-dialog) .k-text[data-wrapped] {
   text-align: center;
+}
+
+/* A dialog's room is the screen, less `space.s48` above and below, not the thing it sits in,
+   which is only as tall as the dialog. */
+.k-backdrop-thing > .k-dialog {
+  max-height: calc(var(--backdrop-height) - 2 * var(--space-s48));
 }
 
 /* A glass panel fills the screen less its margin, no wider than a rail and two columns with
