@@ -65,14 +65,17 @@ kind = "scripts"
 #
 # `shown_when = { state = "<state>", is = <value> }` lists an action only
 # while the state reads as the value, and `is_not` only while it doesn't, so
-# of an on/off pair only the half that applies shows. The Extension reads the
+# of an on/off pair only the half that applies shows; a list of them,
+# `shown_when = [{ ... }, { ... }]`, lists it only while each holds. The Extension reads the
 # states from their files and reads them again when one changes
 # (crates/kotodama-kubaos/src/states.rs, docs/CONTRACTS.md): `packages.<group>`,
 # `files.tidy-daily`, `files.automount`, `terminal.greeting`,
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
 # `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
 # `nix.unfree`, `kubaos.preview`, `kubaos.suites.<name>` (the Suite is
-# installed) and `bluetooth.unnamed`, true or false;
+# installed), `bluetooth.unnamed`, `wallpapers.depth` (the wallpaper-depth
+# Suite cuts out your own pictures) and `wallpapers.depth-skipped` (the current
+# wallpaper is in its skip list), true or false;
 # `power.scheduler` ("kernel", "lavd") and `power.low-battery` ("power-saver",
 # "super-saver", "off"). While a state can't be read, the action shows.
 #
@@ -313,6 +316,76 @@ subtitle = "Video wallpapers stay still. Boring, but cheap"
 icon = "video-x-generic"
 keywords = ["video wallpaper", "motion", "still"]
 run = ["qs", "ipc", "call", "wallpaper", "animate", "never"]
+
+# Wallpaper depth, the lock's clock behind the city (kubaos depth), listed
+# only while the wallpaper-depth Suite is installed. Each applies at once and
+# is kept in ~/.config/kubaos/desktop/wallpapers/depth.toml.
+
+[extensions.kubaos.actions.wallpaper-depth-on]
+title = "Turn wallpaper depth on"
+subtitle = "Cut-outs of your own wallpapers put the lock's clock behind the city"
+icon = "preferences-desktop-wallpaper"
+keywords = ["cut-out", "lock screen", "clock", "parallax"]
+run = ["kubaos", "depth", "on"]
+shown_when = [
+  { state = "kubaos.suites.wallpaper-depth", is = true },
+  { state = "wallpapers.depth", is = false },
+]
+
+[extensions.kubaos.actions.wallpaper-depth-off]
+title = "Turn wallpaper depth off"
+subtitle = "The lock's clock in front of your own wallpapers; KubaOS's keep theirs"
+icon = "preferences-desktop-wallpaper"
+keywords = ["cut-out", "lock screen", "clock", "parallax"]
+run = ["kubaos", "depth", "off"]
+shown_when = [
+  { state = "kubaos.suites.wallpaper-depth", is = true },
+  { state = "wallpapers.depth", is = true },
+]
+
+[extensions.kubaos.actions.wallpaper-depth-redo]
+title = "Redo this wallpaper's cut-out"
+subtitle = "Runs wallpaper depth on the current wallpaper again, once plugged in"
+icon = "view-refresh"
+keywords = ["wallpaper depth", "cut-out", "lock screen", "again"]
+run = ["kubaos", "depth", "redo"]
+shown_when = [
+  { state = "kubaos.suites.wallpaper-depth", is = true },
+  { state = "wallpapers.depth", is = true },
+  { state = "wallpapers.depth-skipped", is = false },
+]
+
+[extensions.kubaos.actions.wallpaper-depth-skip]
+title = "No cut-out on this wallpaper"
+subtitle = "The lock's clock stays in front of the current wallpaper"
+icon = "preferences-desktop-wallpaper"
+keywords = ["wallpaper depth", "lock screen", "clock", "skip"]
+run = ["kubaos", "depth", "skip"]
+shown_when = [
+  { state = "kubaos.suites.wallpaper-depth", is = true },
+  { state = "wallpapers.depth-skipped", is = false },
+]
+
+[extensions.kubaos.actions.wallpaper-depth-unskip]
+title = "Cut this wallpaper out again"
+subtitle = "Gives the current wallpaper its cut-out back"
+icon = "preferences-desktop-wallpaper"
+keywords = ["wallpaper depth", "lock screen", "clock"]
+run = ["kubaos", "depth", "unskip"]
+shown_when = [
+  { state = "kubaos.suites.wallpaper-depth", is = true },
+  { state = "wallpapers.depth-skipped", is = true },
+]
+
+[extensions.kubaos.actions.wallpaper-depth-push]
+title = "Set the lock's push"
+subtitle = "How far the wallpaper comes toward you as the lock comes up: 0 to 0.05, 0.025 by default"
+icon = "system-lock-screen"
+keywords = ["wallpaper depth", "lock screen", "zoom", "motion"]
+keyword = "lock-push"
+run = ["kubaos", "depth", "push", "{share}"]
+arguments = [{ name = "share", placeholder = "0.025" }]
+shown_when = { state = "kubaos.suites.wallpaper-depth", is = true }
 
 # The pointer, in the wallpaper's colours (kubaos cursor). Each applies at
 # once and is kept in ~/.config/kubaos/desktop/cursor/cursor.toml.

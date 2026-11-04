@@ -659,6 +659,22 @@ fn the_node_suite_s_first_scaffolder_needs_no_extra() {
 }
 
 #[test]
+fn the_wallpaper_depth_cache_is_the_folder_its_queue_writes_into() {
+    let suite = catalog::find("wallpaper-depth").expect("the wallpaper-depth Suite");
+    let queue = include_str!("../../../../home/suites/wallpaper-depth-queue.sh");
+
+    let [cache] = suite.caches else {
+        panic!("one cache: {:?}", suite.caches);
+    };
+
+    assert!(
+        queue.contains(&format!("RESULTS=\"$HOME/{}\"", cache.path)),
+        "{}",
+        cache.path
+    );
+}
+
+#[test]
 fn a_suite_is_found_by_name() {
     assert_eq!(catalog::find("test").map(|s| s.name), Some("test"));
     assert!(catalog::find("nope").is_none());

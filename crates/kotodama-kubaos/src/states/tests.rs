@@ -52,6 +52,7 @@ impl Machine {
             dnd: Some(root.join("run/kubaos-dnd.json")),
             preview: Some(root.join("state/kubaos/preview.json")),
             shell_state: Some(root.join("state/quickshell/kubaos.json")),
+            wallpaper: Some(root.join("home/.local/state/theme/wallpaper")),
         }
     }
 
@@ -360,6 +361,43 @@ fn a_suite_is_on_while_its_file_is_in_the_state_directory_and_unknown_when_it_do
 }
 
 #[test]
+fn wallpaper_depth_is_on_until_its_settings_turn_it_off_and_unknown_when_they_do_not_read() {
+    let machine = Machine::new();
+    let file = "config/kubaos/desktop/wallpapers/depth.toml";
+
+    let missing = machine.read();
+    machine.write(file, "enabled = false\n");
+    let off = machine.read();
+    machine.write(file, "enabled = maybe\n");
+    let broken = machine.read();
+
+    assert_eq!(missing.get(DEPTH), Some(&on(true)));
+    assert_eq!(off.get(DEPTH), Some(&on(false)));
+    assert_eq!(broken.get(DEPTH), None);
+    assert_eq!(broken.get(DEPTH_SKIPPED), None);
+}
+
+#[test]
+fn the_current_wallpaper_is_skipped_while_depths_skip_list_names_it() {
+    let machine = Machine::new();
+    let settings = "config/kubaos/desktop/wallpapers/depth.toml";
+    let wallpaper = "home/.local/state/theme/wallpaper";
+
+    let no_wallpaper = machine.read();
+    machine.write(wallpaper, "/p/tower.jpg\n");
+    let not_listed = machine.read();
+    machine.write(settings, "skip = [\"/p/tower.jpg\"]\n");
+    let listed = machine.read();
+    machine.write(wallpaper, "/p/harbour.jpg\n");
+    let another = machine.read();
+
+    assert_eq!(no_wallpaper.get(DEPTH_SKIPPED), Some(&on(false)));
+    assert_eq!(not_listed.get(DEPTH_SKIPPED), Some(&on(false)));
+    assert_eq!(listed.get(DEPTH_SKIPPED), Some(&on(true)));
+    assert_eq!(another.get(DEPTH_SKIPPED), Some(&on(false)));
+}
+
+#[test]
 fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
     let machine = Machine::new();
     let places = Places {
@@ -369,6 +407,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         dnd: None,
         preview: None,
         shell_state: None,
+        wallpaper: None,
         ..machine.places()
     };
 
@@ -388,6 +427,8 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         DND,
         PREVIEW,
         BLUETOOTH_UNNAMED,
+        DEPTH,
+        DEPTH_SKIPPED,
         "kubaos.suites.test",
     ] {
         assert_eq!(states.get(name), None, "{name}");
@@ -414,6 +455,8 @@ fn every_file_a_state_is_read_from_is_watched() {
         "config/kubaos/home/kubaos.d/nixpkgs.toml",
         "config/kubaos/home/kubaos.d/suites/test.toml",
         "config/kubaos/desktop/network/proxy.toml",
+        "config/kubaos/desktop/wallpapers/depth.toml",
+        "home/.local/state/theme/wallpaper",
         "run/kubaos-keep-awake.json",
         "run/kubaos-proxy.json",
         "run/kubaos-dnd.json",

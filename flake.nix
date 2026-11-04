@@ -244,6 +244,10 @@
               home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
             ];
             RUSTFMT = pkgs.lib.getExe' rustfmt-nightly "rustfmt";
+            # ONNX Runtime for `kubaos-depth`, which loads it at run time
+            # (crates/kubaos-depth/src/models.rs): its tests with the real
+            # models (docs/TESTING.md) and a `cargo run` find it here.
+            ORT_DYLIB_PATH = "${pkgs.lib.getLib pkgs.onnxruntime}/lib/libonnxruntime.so";
             RUSTC_WRAPPER = pkgs.lib.getExe pkgs.sccache;
             shellHook = ''
               export SCCACHE_DIR=''${SCCACHE_DIR:-''${XDG_CACHE_HOME:-$HOME/.cache}/sccache}

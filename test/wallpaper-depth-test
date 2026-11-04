@@ -1,0 +1,391 @@
+#!/usr/bin/env bash
+# test/wallpaper-depth-test: the wallpaper-depth Suite's hook in a throwaway
+# home: kubaos-depth-queue (home/suites/wallpaper-depth-queue.sh) and the
+# transient unit it starts, and `scripts/dot-theme` calling it. systemd-run,
+# systemctl, systemd-ac-power, matugen and kubaos-depth are stubs, and the
+# scripts run with a PATH of those and a few plain tools, so nothing reaches
+# the live session. Needs nothing installed beyond bash and coreutils.
+#
+#   test/wallpaper-depth-test REPO [KUBAOS]
+#
+# KUBAOS is a built `kubaos` binary. With it, the queue asks it whether the
+# settings give a picture a cut-out, and `kubaos depth` runs against the queue;
+# without it, the queue finds no `kubaos` and takes the defaults, and the
+# tests of the settings are skipped.
+#
+# Prints an ok or FAIL line per test and exits 1 when any fails.
+# shellcheck disable=SC2329 # The tests are called by name from the list at the end.
+set -euo pipefail
+# A test function stops at its first failed check, inside the command substitution too.
+shopt -s inherit_errexit
+
+REPO="${1:?usage: test/wallpaper-depth-test REPO [KUBAOS]}"
+KUBAOS="${2:-}"
+QUEUE="$REPO/home/suites/wallpaper-depth-queue.sh"
+DOT_THEME="$REPO/scripts/dot-theme"
+SCRATCH_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}/kubaos-wallpaper-depth-test"
+failed=0
+
+# A home with a picture of the user's own, a set's picture and a video, the
+# stubs in $H/stubs, and the plain tools the scripts need in $H/tools.
+# shellcheck disable=SC2016 # The stubs' code expands when they run.
+new_home() {
+  mkdir -p "$SCRATCH_ROOT"
+  H="$(mktemp -d "$SCRATCH_ROOT/home.XXXXXX")"
+  LOG="$H/log"
+  mkdir -p "$H/stubs" "$H/tools" "$H/Pictures/wallpapers" "$H/sets/neon" "$LOG"
+  PICTURE="$H/Pictures/wallpapers/tower.jpg"
+  printf 'a picture' >"$PICTURE"
+  printf 'a set picture' >"$H/sets/neon/street.jpg"
+  printf 'a video' >"$H/Pictures/wallpapers/rain.mp4"
+  printf 'a poster' >"$H/Pictures/wallpapers/rain.poster.jpg"
+
+  local tool
+  for tool in bash cat cut md5sum stat realpath mkdir rm mv sed grep sort head paste dirname \
+    basename readlink sha256sum ln tr sleep wc id; do
+    ln -s "$(command -v "$tool")" "$H/tools/$tool"
+  done
+
+  # Each records its arguments, one call a line; systemctl is-active and
+  # systemd-ac-power answer from a file the test writes.
+  stub systemd-run 'printf "%s\n" "$*" >>"$LOG/systemd-run"'
+  stub systemctl 'printf "%s\n" "$*" >>"$LOG/systemctl"
+    case $* in
+      "--user is-active --quiet "*) [[ -f $LOG/active ]] ;;
+      "--user stop "*) rm -f "$LOG/active" ;;
+    esac'
+  stub systemd-ac-power 'printf . >>"$LOG/ac-asked"; [[ $(<"$LOG/power") == ac ]] || {
+    [[ -f $LOG/plug-in-after ]] && (( $(wc -c <"$LOG/ac-asked") > $(<"$LOG/plug-in-after") )); }'
+  stub kubaos-depth 'printf "%s\n" "$*" >>"$LOG/kubaos-depth"
+    out=$4
+    printf "format = 1\ntool = \"0.1.0\"\n" >"$out/depth.toml"
+    exit "${KUBAOS_DEPTH_STUB_EXIT:-0}"'
+  stub matugen 'printf "%s\n" "$*" >>"$LOG/matugen"'
+  # The real `kubaos depth`; dot-theme's `kubaos cursor` stays out of the
+  # throwaway home.
+  [[ -z $KUBAOS ]] || stub kubaos "[[ \$1 == depth ]] || exit 0; exec $(printf %q "$KUBAOS") \"\$@\""
+  echo ac >"$LOG/power"
+}
+
+stub() {
+  printf '#!%s\nLOG=%q\n%s\n' "$(command -v bash)" "$LOG" "$2" >"$H/stubs/$1"
+  chmod +x "$H/stubs/$1"
+}
+
+# The queue command with the stubs, as the Nix module would set it up.
+queue() {
+  env -i HOME="$H" PATH="$H/stubs:$H/tools" KUBAOS_WALLPAPERS="$H/sets" KUBAOS_DEPTH_TOOL="$H/stubs/kubaos-depth" \
+    KUBAOS_DEPTH_VERSION="${VERSION:-0.1.0}" KUBAOS_DEPTH_MODELS="$H/models" KUBAOS_DEPTH_AC_POLL=0 KUBAOS_DEPTH_STUB_EXIT="${KUBAOS_DEPTH_STUB_EXIT:-0}" \
+    bash "$QUEUE" "$@"
+}
+
+# `kubaos depth` with the Suite installed: the queue on its PATH.
+depth() {
+  suite
+  env -i HOME="$H" PATH="$H/suite:$H/stubs:$H/tools" KUBAOS_WALLPAPERS="$H/sets" "$KUBAOS" depth "$@"
+}
+
+# The Suite's queue command in $H/suite, as the Nix module would put it on PATH.
+suite() {
+  mkdir -p "$H/suite"
+  printf '#!%s\nexport KUBAOS_DEPTH_TOOL=%q KUBAOS_DEPTH_VERSION=0.1.0 KUBAOS_DEPTH_MODELS=%q\nexec bash %q "$@"\n' \
+    "$(command -v bash)" "$H/stubs/kubaos-depth" "$H/models" "$QUEUE" >"$H/suite/kubaos-depth-queue"
+  chmod +x "$H/suite/kubaos-depth-queue"
+}
+
+settings() {
+  mkdir -p "$H/.config/kubaos/desktop/wallpapers"
+  printf '%s\n' "$@" >"$H/.config/kubaos/desktop/wallpapers/depth.toml"
+}
+
+# dot-theme with matugen stubbed, the sets in $H/sets and its user layer set
+# up as home/links.nix would, smaller. Without `with-queue`, the Suite isn't
+# installed: kubaos-depth-queue isn't on PATH.
+dot_theme() {
+  local path="$H/stubs:$H/tools"
+  if [[ $1 == with-queue ]]; then
+    shift
+    suite
+    path="$H/suite:$path"
+  fi
+  mkdir -p "$H/.local/share/kubaos" "$H/.config/matugen/templates"
+  printf 'app wallpapers desktop/wallpapers\n' >"$H/.local/share/kubaos/layer"
+  : >"$H/.config/matugen/config.toml"
+  : >"$H/.config/matugen/templates/empty"
+  env -i HOME="$H" PATH="$path" KUBAOS_WALLPAPERS="$H/sets" bash "$DOT_THEME" "$@"
+}
+
+key() { printf '%s' "$1" | md5sum | cut -d' ' -f1; }
+folder() { printf '%s\n' "$H/.cache/kubaos/wallpapers/$(key "$1")"; }
+calls() { if [[ -f $LOG/$1 ]]; then wc -l <"$LOG/$1"; else echo 0; fi; }
+
+test_case() {
+  local name="$1" out rc
+  shift
+  if [[ $1 == needs_kubaos_* && -z $KUBAOS ]]; then
+    echo "skip $name (no kubaos given)"
+    return
+  fi
+  new_home
+  set +e
+  out="$(set -e; "$@" 2>&1)"
+  rc=$?
+  set -e
+  if ((rc == 0)); then
+    echo "ok   $name"
+  else
+    echo "FAIL $name"
+    printf '%s\n' "$out" | sed 's/^/     /'
+    failed=1
+  fi
+  rm -rf -- "$H"
+}
+
+expect() {
+  [[ $2 == "$3" ]] || { printf '%s:\n  got:  %s\n  want: %s\n' "$1" "$2" "$3"; return 1; }
+}
+
+a_new_picture_starts_one_low_priority_unit_named_for_it() {
+  queue "$PICTURE"
+
+  local k
+  k=$(key "$PICTURE")
+  expect "systemd-run" "$(<"$LOG/systemd-run")" \
+    "--user --quiet --collect --unit=kubaos-depth-$k.service --slice=background.slice --description=Wallpaper depth for tower.jpg -p CPUWeight=idle -p IOWeight=1 -p Nice=19 -p IOSchedulingClass=idle -- $(realpath "$QUEUE") job $PICTURE"
+}
+
+the_job_runs_the_tool_into_the_folder_the_lock_finds_and_records_the_picture() {
+  queue job "$PICTURE"
+
+  local dir
+  dir=$(folder "$PICTURE")
+  expect "the folder's name" "$(basename "$dir")" "$(printf '%s' "$PICTURE" | md5sum | cut -c1-32)"
+  expect "kubaos-depth" "$(<"$LOG/kubaos-depth")" "run $PICTURE --out $dir --models $H/models"
+  expect "source" "$(<"$dir/source")" "$(stat -L -c '%s %Y' "$PICTURE") 0.1.0"
+}
+
+an_up_to_date_picture_starts_nothing() {
+  queue job "$PICTURE"
+
+  queue "$PICTURE"
+
+  expect "units started" "$(calls systemd-run)" 0
+}
+
+a_picture_whose_unit_is_running_or_waiting_starts_nothing() {
+  touch "$LOG/active"
+
+  queue "$PICTURE"
+
+  expect "units started" "$(calls systemd-run)" 0
+}
+
+a_new_picture_at_the_same_path_empties_its_folder_and_queues_it() {
+  queue job "$PICTURE"
+  local dir
+  dir=$(folder "$PICTURE")
+  : >"$dir/cutout.png"
+  printf 'another picture, longer' >"$PICTURE"
+
+  queue "$PICTURE"
+
+  [[ ! -e $dir/cutout.png && ! -e $dir/depth.toml && ! -e $dir/source ]] || { ls -la "$dir"; return 1; }
+  expect "units started" "$(calls systemd-run)" 1
+}
+
+a_new_tool_keeps_the_folder_and_queues_the_picture_again() {
+  queue job "$PICTURE"
+  local dir
+  dir=$(folder "$PICTURE")
+  : >"$dir/cutout.png"
+
+  VERSION=0.2.0 queue "$PICTURE"
+
+  [[ -f $dir/cutout.png && -f $dir/depth.toml ]] || { ls -la "$dir"; return 1; }
+  expect "units started" "$(calls systemd-run)" 1
+}
+
+a_failed_run_is_recorded_and_not_tried_again_until_something_changes() {
+  local rc=0
+  KUBAOS_DEPTH_STUB_EXIT=1 queue job "$PICTURE" >/dev/null 2>&1 || rc=$?
+  expect "the job's exit" "$rc" 1
+
+  queue "$PICTURE"
+
+  expect "units started" "$(calls systemd-run)" 0
+}
+
+on_battery_the_job_waits_for_ac_power_before_it_runs() {
+  echo battery >"$LOG/power"
+  echo 3 >"$LOG/plug-in-after"
+
+  local out
+  out=$(queue job "$PICTURE")
+
+  expect "the job's log" "$out" "waiting for AC power"
+  expect "times it asked" "$(wc -c <"$LOG/ac-asked")" 4
+  expect "kubaos-depth runs" "$(calls kubaos-depth)" 1
+}
+
+the_queue_takes_only_an_absolute_path_to_a_file() {
+  local rc=0
+  queue tower.jpg 2>/dev/null || rc=$?
+  expect "a relative path" "$rc" 2
+  rc=0
+  queue "$H/missing.jpg" 2>/dev/null || rc=$?
+  expect "a missing file" "$rc" 1
+  expect "units started" "$(calls systemd-run)" 0
+}
+
+setting_a_still_of_your_own_queues_it() {
+  dot_theme with-queue set "$PICTURE"
+
+  expect "units started" "$(calls systemd-run)" 1
+  grep -q -- "job $PICTURE\$" "$LOG/systemd-run"
+}
+
+setting_a_video_or_a_sets_picture_queues_nothing() {
+  dot_theme with-queue set "$H/Pictures/wallpapers/rain.mp4"
+  dot_theme with-queue set "$H/sets/neon/street.jpg"
+
+  expect "matugen runs" "$(calls matugen)" 2
+  expect "units started" "$(calls systemd-run)" 0
+}
+
+login_queues_the_wallpaper_again_when_the_theme_is_up_to_date() {
+  dot_theme with-queue set "$PICTURE"
+  : >"$LOG/systemd-run"
+
+  dot_theme with-queue apply
+
+  expect "matugen runs" "$(calls matugen)" 1
+  expect "units started" "$(calls systemd-run)" 1
+}
+
+without_the_suite_setting_a_wallpaper_does_nothing_more() {
+  dot_theme set "$PICTURE"
+
+  expect "matugen runs" "$(calls matugen)" 1
+  expect "units started" "$(calls systemd-run)" 0
+  [[ ! -e $H/.cache/kubaos/wallpapers ]]
+}
+
+redo_stops_the_unit_empties_the_folder_and_queues_it_even_when_up_to_date() {
+  queue job "$PICTURE"
+  local dir
+  dir=$(folder "$PICTURE")
+  : >"$dir/cutout.png"
+  touch "$LOG/active"
+
+  queue redo "$PICTURE"
+
+  grep -qx -- "--user stop --quiet kubaos-depth-$(key "$PICTURE").service" "$LOG/systemctl"
+  [[ ! -e $dir/cutout.png && ! -e $dir/depth.toml && ! -e $dir/source ]] || { ls -la "$dir"; return 1; }
+  expect "units started" "$(calls systemd-run)" 1
+}
+
+forget_stops_the_unit_and_deletes_the_folder() {
+  queue job "$PICTURE"
+
+  queue forget "$PICTURE"
+
+  grep -qx -- "--user stop --quiet kubaos-depth-$(key "$PICTURE").service" "$LOG/systemctl"
+  [[ ! -e $(folder "$PICTURE") && -d $H/.cache/kubaos/wallpapers ]]
+}
+
+stop_stops_every_pictures_unit() {
+  queue stop
+
+  expect "systemctl" "$(<"$LOG/systemctl")" "--user stop --quiet kubaos-depth-*.service"
+}
+
+needs_kubaos_with_depth_off_or_the_picture_skipped_the_queue_starts_nothing() {
+  settings "enabled = false"
+  queue "$PICTURE"
+  settings "skip = [\"$PICTURE\"]"
+  queue "$PICTURE"
+  expect "units started" "$(calls systemd-run)" 0
+
+  settings "enabled = true"
+  queue "$PICTURE"
+
+  expect "units started" "$(calls systemd-run)" 1
+}
+
+needs_kubaos_an_unreadable_settings_file_is_the_defaults() {
+  settings "enabled = maybe"
+
+  queue "$PICTURE" 2>/dev/null
+
+  expect "units started" "$(calls systemd-run)" 1
+}
+
+needs_kubaos_skipping_this_wallpaper_forgets_it_and_unskipping_queues_it_again() {
+  dot_theme with-queue set "$PICTURE"
+  queue job "$PICTURE"
+
+  depth skip
+
+  [[ ! -e $(folder "$PICTURE") ]]
+  expect "the skip list" "$(depth show | sed -n 2p)" "$PICTURE"
+  grep -qx -- "--user stop --quiet kubaos-depth-$(key "$PICTURE").service" "$LOG/systemctl"
+  dot_theme with-queue set "$PICTURE"
+  expect "units started" "$(calls systemd-run)" 1
+
+  depth unskip
+
+  expect "the skip list" "$(depth show | sed -n 2p)" ""
+  expect "units started" "$(calls systemd-run)" 2
+}
+
+needs_kubaos_turning_depth_off_stops_every_unit_and_on_queues_this_wallpaper() {
+  dot_theme with-queue set "$PICTURE"
+  touch "$LOG/active"
+
+  depth off
+
+  grep -qx -- "--user stop --quiet kubaos-depth-\*.service" "$LOG/systemctl"
+  expect "the setting" "$(depth show | head -1)" "enabled=false push=0.025"
+  dot_theme with-queue set "$PICTURE"
+  expect "units started" "$(calls systemd-run)" 1
+
+  depth on
+
+  expect "units started" "$(calls systemd-run)" 2
+}
+
+needs_kubaos_redo_queues_this_wallpaper_again_and_refuses_one_without_a_cut_out() {
+  dot_theme with-queue set "$PICTURE"
+  queue job "$PICTURE"
+
+  depth redo
+
+  expect "units started" "$(calls systemd-run)" 2
+  local rc=0 out
+  out=$(depth redo "$H/sets/neon/street.jpg" 2>&1) || rc=$?
+  expect "a shipped wallpaper" "$rc:$out" \
+    "1:kubaos: no cut-out for $H/sets/neon/street.jpg: KubaOS's wallpapers ship their own depth"
+  expect "units started" "$(calls systemd-run)" 2
+}
+
+for t in a_new_picture_starts_one_low_priority_unit_named_for_it \
+  the_job_runs_the_tool_into_the_folder_the_lock_finds_and_records_the_picture \
+  an_up_to_date_picture_starts_nothing a_picture_whose_unit_is_running_or_waiting_starts_nothing \
+  a_new_picture_at_the_same_path_empties_its_folder_and_queues_it \
+  a_new_tool_keeps_the_folder_and_queues_the_picture_again \
+  a_failed_run_is_recorded_and_not_tried_again_until_something_changes \
+  on_battery_the_job_waits_for_ac_power_before_it_runs the_queue_takes_only_an_absolute_path_to_a_file \
+  setting_a_still_of_your_own_queues_it setting_a_video_or_a_sets_picture_queues_nothing \
+  login_queues_the_wallpaper_again_when_the_theme_is_up_to_date \
+  without_the_suite_setting_a_wallpaper_does_nothing_more \
+  redo_stops_the_unit_empties_the_folder_and_queues_it_even_when_up_to_date \
+  forget_stops_the_unit_and_deletes_the_folder stop_stops_every_pictures_unit \
+  needs_kubaos_with_depth_off_or_the_picture_skipped_the_queue_starts_nothing \
+  needs_kubaos_an_unreadable_settings_file_is_the_defaults \
+  needs_kubaos_skipping_this_wallpaper_forgets_it_and_unskipping_queues_it_again \
+  needs_kubaos_turning_depth_off_stops_every_unit_and_on_queues_this_wallpaper \
+  needs_kubaos_redo_queues_this_wallpaper_again_and_refuses_one_without_a_cut_out; do
+  name=${t#needs_kubaos_}
+  test_case "${name//_/ }" "$t"
+done
+exit "$failed"

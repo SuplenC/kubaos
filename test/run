@@ -130,7 +130,7 @@ cmd_warm() {
 }
 
 # build_kubaos: the kubaos CLI for the container's Linux, as $DOTFILES_TEST_OUT/kubaos (the
-# container's /out/kubaos), for the packages, suites and bitwarden checks, with the test Suite built in. The image has no Rust toolchain, so it builds
+# container's /out/kubaos), for the packages, suites, bitwarden and wallpaper_depth checks, with the test Suite built in. The image has no Rust toolchain, so it builds
 # in rust:latest, as install/test/engine-e2e does. Cargo's registry and target dir live in the
 # dotfiles-test-cargo and dotfiles-test-target volumes, with a target subdirectory per checkout:
 # cargo goes by mtime, and worktrees share the volume. Cargo locks the registry itself, so two
@@ -159,7 +159,7 @@ cmd_e2e() {
     shift
   done
   hold_checkout
-  if [[ -z $only || ,$only, =~ ,(packages|preview|suites|pins|suite_rust|suite_go|keyboard|update_edge|update_stable|rollback), ]]; then
+  if [[ -z $only || ,$only, =~ ,(packages|preview|suites|pins|suite_rust|suite_go|keyboard|wallpaper_depth|update_edge|update_stable|rollback), ]]; then
     build_kubaos
   fi
   if ((keep)); then

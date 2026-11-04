@@ -14,6 +14,7 @@
 //! - First-boot setup (`setup`): `setup.rs`.
 //! - The Bitwarden vault (`bitwarden`): `bitwarden.rs`.
 //! - The recoloured pointer (`cursor`): `cursor.rs`.
+//! - The wallpaper-depth settings (`depth`): `depth.rs`.
 //! - The keyboard layouts (`keyboard`): `keyboard.rs`.
 //! - Packages from nixpkgs (`package`, `try`): `package.rs`.
 //! - The power stops (`power`): `power.rs`, which runs `kubaos-power`.
@@ -37,6 +38,7 @@ use crate::out::err;
 mod apt;
 mod bitwarden;
 mod cursor;
+mod depth;
 mod install;
 mod job;
 mod keyboard;
@@ -118,6 +120,11 @@ enum Cmd {
         #[command(subcommand)]
         cmd: cursor::CursorCmd,
     },
+    /// Wallpaper depth, the lock's clock behind the city: on or off, a picture's cut-out, the push.
+    Depth {
+        #[command(subcommand)]
+        cmd: depth::DepthCmd,
+    },
     /// The keyboard layouts, the first the default: show them, or change them.
     Keyboard {
         #[command(subcommand)]
@@ -176,6 +183,7 @@ fn main() -> ExitCode {
         Cmd::Rollback(args) => update::rollback(&args),
         Cmd::Channel(args) => update::channel(&args),
         Cmd::Cursor { cmd } => cursor::main(cmd),
+        Cmd::Depth { cmd } => depth::main(cmd),
         Cmd::Keyboard { cmd } => keyboard::main(cmd),
         Cmd::Power { args } => power::main(&args),
         Cmd::Proxy { args } => proxy::main(&args),

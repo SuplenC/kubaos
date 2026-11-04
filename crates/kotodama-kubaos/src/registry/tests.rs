@@ -474,7 +474,19 @@ fn is_not_shows_an_action_in_every_other_state() {
 #[test]
 fn a_shown_when_of_the_wrong_shape_is_a_problem() {
     for (shown_when, problem) in [
-        ("true", "`shown_when` should be a table of `state` and `is` or `is_not`"),
+        (
+            "true",
+            "`shown_when` should be a table of `state` and `is` or `is_not`, or a list of them",
+        ),
+        ("[]", "`shown_when` is an empty list"),
+        (
+            r#"[{ state = "proxy", is = true }, { is = true }]"#,
+            "`shown_when` needs a `state`",
+        ),
+        (
+            r#"[{ state = "proxy", is = true }, true]"#,
+            "`shown_when` should be a table of `state` and `is` or `is_not`, or a list of them",
+        ),
         ("{ is = true }", "`shown_when` needs a `state`"),
         (
             r#"{ state = "packages.chrome" }"#,
@@ -519,6 +531,164 @@ fn a_shown_when_of_the_wrong_shape_is_a_problem() {
 }
 
 #[test]
+fn a_list_of_states_shows_an_action_only_while_each_holds() {
+    let registry = loaded(
+        r#"
+        [actions.depth-off]
+        title = "Turn wallpaper depth off"
+        run = ["kubaos", "depth", "off"]
+        shown_when = [
+          { state = "kubaos.suites.test", is = true },
+          { state = "wallpapers.depth", is = true },
+        ]
+        "#,
+    );
+    let states = |installed, on| {
+        States::default()
+            .with("kubaos.suites.test", Reading::Bool(installed))
+            .with("wallpapers.depth", Reading::Bool(on))
+    };
+
+    assert_eq!(shown(&registry, &states(true, true)), ["depth-off"]);
+    assert_eq!(shown(&registry, &states(false, true)), Vec::<String>::new());
+    assert_eq!(shown(&registry, &states(true, false)), Vec::<String>::new());
+    assert_eq!(
+        shown(
+            &registry,
+            &States::default().with("kubaos.suites.test", Reading::Bool(true))
+        ),
+        ["depth-off"]
+    );
+}
+
+#[test]
+fn the_wallpaper_depth_items_of_kubaos_toml_show_only_while_the_suite_is_installed() {
+    let (registry, _) = Registry::from_config(&shipped(), &crate::toggles::ids());
+    let items = [
+        "wallpaper-depth-on",
+        "wallpaper-depth-off",
+        "wallpaper-depth-redo",
+        "wallpaper-depth-skip",
+        "wallpaper-depth-unskip",
+        "wallpaper-depth-push",
+    ];
+    let depth_items = |states: &States| -> Vec<String> {
+        shown(&registry, states)
+            .into_iter()
+            .filter(|id| items.contains(&id.as_str()))
+            .collect()
+    };
+    let installed = |on, skipped| {
+        States::default()
+            .with("kubaos.suites.wallpaper-depth", Reading::Bool(true))
+            .with("wallpapers.depth", Reading::Bool(on))
+            .with("wallpapers.depth-skipped", Reading::Bool(skipped))
+    };
+
+    for on in [true, false] {
+        for skipped in [true, false] {
+            let removed = installed(on, skipped).with("kubaos.suites.wallpaper-depth", Reading::Bool(false));
+            assert_eq!(
+                depth_items(&removed),
+                Vec::<String>::new(),
+                "on {on}, skipped {skipped}"
+            );
+        }
+    }
+    assert_eq!(
+        depth_items(&installed(true, false)),
+        [
+            "wallpaper-depth-off",
+            "wallpaper-depth-push",
+            "wallpaper-depth-redo",
+            "wallpaper-depth-skip"
+        ]
+    );
+    assert_eq!(
+        depth_items(&installed(true, true)),
+        ["wallpaper-depth-off", "wallpaper-depth-push", "wallpaper-depth-unskip"]
+    );
+    assert_eq!(
+        depth_items(&installed(false, false)),
+        ["wallpaper-depth-on", "wallpaper-depth-push", "wallpaper-depth-skip"]
+    );
+}
+
+#[test]
+fn the_wallpaper_depth_items_of_kubaos_toml_run_kubaos_depth() {
+    let (registry, _) = Registry::from_config(&shipped(), &crate::toggles::ids());
+    let share = arguments(&[("share", "0.04")]);
+
+    for (id, given, argv) in [
+        ("wallpaper-depth-on", &BTreeMap::new(), &["kubaos", "depth", "on"][..]),
+        ("wallpaper-depth-off", &BTreeMap::new(), &["kubaos", "depth", "off"]),
+        ("wallpaper-depth-redo", &BTreeMap::new(), &["kubaos", "depth", "redo"]),
+        ("wallpaper-depth-skip", &BTreeMap::new(), &["kubaos", "depth", "skip"]),
+        (
+            "wallpaper-depth-unskip",
+            &BTreeMap::new(),
+            &["kubaos", "depth", "unskip"],
+        ),
+        ("wallpaper-depth-push", &share, &["kubaos", "depth", "push", "0.04"]),
+    ] {
+        assert_eq!(registry.command(id, given).expect(id).argv, argv, "{id}");
+    }
+}
+
+/// The states an action's `shown_when` names, each a table of `state` and `is` or `is_not`.
+fn conditions(actions: &Table, id: &str) -> Vec<Table> {
+    let Some(Value::Table(action)) = actions.get(id) else {
+        panic!("no `{id}`");
+    };
+    match action.get("shown_when") {
+        Some(Value::Table(when)) => vec![when.clone()],
+        Some(Value::Array(list)) => list
+            .iter()
+            .map(|when| match when {
+                Value::Table(when) => when.clone(),
+                _ => panic!("`{id}`'s `shown_when` holds a value that is no table"),
+            })
+            .collect(),
+        _ => panic!("`{id}` has no `shown_when`"),
+    }
+}
+
+fn state_of(when: &Table) -> String {
+    let Some(Value::String(state)) = when.get("state") else {
+        panic!("a `shown_when` names no state");
+    };
+    state.clone()
+}
+
+/// A reading of its state that `when` holds in.
+fn holding(when: &Table) -> Reading {
+    let reading = |value: &Value| match value {
+        Value::Bool(on) => Reading::Bool(*on),
+        Value::String(word) => Reading::Word(word.clone()),
+        _ => panic!("a `shown_when` of the wrong shape"),
+    };
+    if let Some(value) = when.get("is") {
+        return reading(value);
+    }
+    let Some(not) = when.get("is_not").map(reading) else {
+        panic!("a `shown_when` without `is` or `is_not`");
+    };
+    readings(&state_of(when))
+        .into_iter()
+        .find(|other| *other != not)
+        .expect("another reading")
+}
+
+/// Every reading of the state `name`.
+fn readings(name: &str) -> Vec<Reading> {
+    match crate::states::values(name) {
+        Some(Values::Bool) => vec![Reading::Bool(true), Reading::Bool(false)],
+        Some(Values::Words(words)) => words.iter().map(|&word| Reading::Word(word.to_owned())).collect(),
+        None => panic!("`{name}` is no state"),
+    }
+}
+
+#[test]
 fn every_on_off_pair_of_kubaos_toml_shows_one_half_at_a_time() {
     let table = shipped();
     let (registry, _) = Registry::from_config(&table, &crate::toggles::ids());
@@ -533,27 +703,22 @@ fn every_on_off_pair_of_kubaos_toml_shows_one_half_at_a_time() {
 
     assert!(pairs.len() >= 12, "{pairs:?}");
     for (on, off) in &pairs {
-        let shown_when = |id: &str| {
-            let Some(Value::Table(action)) = actions.get(id) else {
-                panic!("no `{id}`");
-            };
-            let Some(Value::Table(shown_when)) = action.get("shown_when") else {
-                panic!("`{id}` has no `shown_when`");
-            };
-            let Some(Value::String(state)) = shown_when.get("state") else {
-                panic!("`{id}`'s `shown_when` names no state");
-            };
-            state.clone()
-        };
-        let name = shown_when(on);
-        assert_eq!(name, shown_when(off), "`{on}` and `{off}` follow different states");
-        let readings = match crate::states::values(&name) {
-            Some(Values::Bool) => vec![Reading::Bool(true), Reading::Bool(false)],
-            Some(Values::Words(words)) => words.iter().map(|&word| Reading::Word(word.to_owned())).collect(),
-            None => panic!("`{on}` names `{name}`, which is no state"),
-        };
-        for reading in readings {
-            let states = States::default().with(name.clone(), reading.clone());
+        let (on_when, off_when) = (conditions(actions, on), conditions(actions, off));
+        let shared: Vec<&Table> = on_when.iter().filter(|when| off_when.contains(when)).collect();
+        let mut apart: Vec<String> = on_when
+            .iter()
+            .chain(&off_when)
+            .filter(|when| !shared.contains(when))
+            .map(state_of)
+            .collect();
+        apart.dedup();
+        assert_eq!(apart.len(), 1, "`{on}` and `{off}` follow different states: {apart:?}");
+        let name = apart.remove(0);
+        let holds = shared.iter().fold(States::default(), |states, when| {
+            states.with(state_of(when), holding(when))
+        });
+        for reading in readings(&name) {
+            let states = holds.clone().with(name.clone(), reading.clone());
             let ids = shown(&registry, &states);
             let halves: Vec<&String> = ids.iter().filter(|id| *id == on || *id == off).collect();
             assert_eq!(halves.len(), 1, "`{on}`/`{off}` with {name} {reading:?}: {halves:?}");
