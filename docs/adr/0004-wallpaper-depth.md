@@ -1,6 +1,6 @@
 # 4. Wallpaper depth: cut-outs shipped for KubaOS's wallpapers, and a Suite for the user's own
 
-Status: proposed (2026-11-04)
+Status: accepted (2026-11-04)
 
 ## Context
 
