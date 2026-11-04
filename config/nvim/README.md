@@ -8,7 +8,7 @@ config, so it wins.
 ## What ships
 
 - **LazyVim**, with these extras (`lua/config/lazy.lua`):
-  - languages: Rust, TypeScript, Docker, markdown, git, JSON, TOML and YAML, plus prettier and
+  - languages: Rust, Docker, markdown, git, JSON, TOML and YAML, plus prettier and
     eslint;
   - editing: mini-surround, yanky, dial, inc-rename, mini-move, mini-hipatterns;
   - the snacks explorer and picker, aerial, dap and test.

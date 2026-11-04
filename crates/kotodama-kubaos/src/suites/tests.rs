@@ -29,6 +29,9 @@ fn actions(suites: &Installed, id: &str) -> Vec<String> {
     item(suites, id).actions.into_iter().map(|action| action.id).collect()
 }
 
+/// The Item of every Suite in the catalog, none installed.
+const NOT_INSTALLED: [&str; 4] = ["suite:node", "suite:python", "suite:php", "suite:test"];
+
 fn arguments(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
     pairs
         .iter()
@@ -59,7 +62,7 @@ fn a_suite_that_is_not_installed_is_one_item_that_installs_it() {
 
     let install = item(&suites, "suite:test");
 
-    assert_eq!(ids(&suites), ["suite:test"]);
+    assert_eq!(ids(&suites), NOT_INSTALLED);
     assert_eq!(install.kind.name(), KIND);
     assert_eq!(install.title, "Install the Test Suite");
     assert_eq!(install.subtitle.as_deref(), Some(catalog::TEST.description));
@@ -174,7 +177,7 @@ fn an_installed_suite_has_a_new_project_item_a_scaffolder_after_it() {
 
     let new = item(&suites, "suite-new:test:new");
 
-    assert_eq!(ids(&suites), ["suite:test", "suite-new:test:new"]);
+    assert_eq!(ids(&suites), [&NOT_INSTALLED[..], &["suite-new:test:new"]].concat());
     assert_eq!(new.kind.name(), KIND);
     assert_eq!(new.title, "New Test project…");
     assert_eq!(new.actions.len(), 1);
@@ -211,7 +214,8 @@ fn every_suite_item_is_found_by_its_name_title_suite_and_its_languages_words() {
     let missing = Installed::default();
     let present = installed("1");
 
-    for item in missing.items().into_iter().chain(present.items()) {
+    let test_items = missing.items().into_iter().chain(present.items());
+    for item in test_items.filter(|item| item.id.ends_with(":test") || item.id.contains(":test:")) {
         for word in ["test", "Test", "suite", "kubaos-test-suite"] {
             assert!(
                 item.keywords.iter().any(|keyword| keyword == word),
@@ -219,6 +223,15 @@ fn every_suite_item_is_found_by_its_name_title_suite_and_its_languages_words() {
                 item.id
             );
         }
+    }
+    for word in ["node", "Node", "suite", "typescript", "javascript", "bun", "npm"] {
+        assert!(
+            item(&missing, "suite:node")
+                .keywords
+                .iter()
+                .any(|keyword| keyword == word),
+            "suite:node lacks {word}"
+        );
     }
     assert!(item(&missing, "suite:test").keywords.contains(&"install".to_owned()));
     assert!(item(&present, "suite:test").keywords.contains(&"remove".to_owned()));
@@ -269,5 +282,19 @@ fn reading_takes_each_catalog_suites_file_and_its_options() {
 
 #[test]
 fn ids_name_every_item_a_suite_may_have() {
-    assert_eq!(super::ids(), ["suite:test", "suite-new:test:new"]);
+    assert_eq!(
+        super::ids(),
+        [
+            "suite:node",
+            "suite-new:node:node",
+            "suite-new:node:bun",
+            "suite:python",
+            "suite-new:python:uv",
+            "suite:php",
+            "suite-new:php:composer",
+            "suite-new:php:laravel",
+            "suite:test",
+            "suite-new:test:new",
+        ]
+    );
 }

@@ -39,7 +39,7 @@ fn always() -> Vec<String> {
         .chain(crate::power::ids())
         .chain(crate::proxy::ids())
         .map(str::to_owned)
-        .chain(["suite:test".to_owned()])
+        .chain(["suite:node", "suite:python", "suite:php", "suite:test"].map(str::to_owned))
         .collect()
 }
 
