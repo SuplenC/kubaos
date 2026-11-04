@@ -154,6 +154,8 @@
   display: block;
   --k-awake: calc(1 + (var(--type-clock-size) / var(--type-clock_rest-size) - 1) * var(--lift));
   --k: calc(var(--k-awake) * (1 - var(--dock)) + var(--type-body-size) / var(--type-clock_rest-size) * var(--dock));
+  /* How far the clock's words are from the picture's tint to their own roles: 0 at rest. */
+  --settled: calc(1 - (1 - var(--lift)) * (1 - var(--dock)));
   /* Geist Light's figures are a little narrower than Regular's, so as the clock lands its letters
      spread by what the bar's time is wider, an even share after each: it lands as wide as the bar's
      time, each figure within a fifth of a logical pixel of the bar's. */
@@ -187,11 +189,31 @@
   opacity: 0;
 }
 
+/* The kicker: at rest the digits' tint, the date `opacity.clock_date` of it, so where and which day
+   lead; awake its own roles, where and which day in `primary` and the date in
+   `on_surface_variant`, over the frame and the blurred picture as the awake digits are. The tint
+   gives way as the clock lifts or flies, as the digits' does. Round each letter a halo of
+   `surface`, a tight shadow holding the strokes' edges and a soft one round the word: it follows the
+   glyphs, so no shape shows, and it is the same on every wallpaper. */
+.k-lock-kicker {
+  --tint: var(--digits-tint, var(--color-on_surface));
+  text-shadow:
+    0 0 var(--size-halo_edge) rgb(from var(--color-surface) r g b / var(--opacity-halo_edge)),
+    0 0 var(--size-halo) rgb(from var(--color-surface) r g b / var(--opacity-halo));
+}
+
+.k-lock-place {
+  color: color-mix(in oklab, var(--color-primary) calc(var(--settled) * 100%), var(--tint));
+}
+
+.k-lock-date {
+  color: color-mix(in oklab, var(--color-on_surface_variant) calc(var(--settled) * 100%), rgb(from var(--tint) r g b / var(--opacity-clock_date)));
+}
+
 /* The digits: at rest a light tint of the picture behind them (`--digits-tint`, worked out from the
    picture), so they read as part of it; awake and in the bar `on_surface`, as the rest of the
    lock's and the bar's words are. The tint gives way as the clock lifts or flies. */
 .k-lock .k-lock-digits {
-  --settled: calc(1 - (1 - var(--lift)) * (1 - var(--dock)));
   position: absolute;
   top: 0;
   left: 0;
@@ -202,28 +224,6 @@
   letter-spacing: calc(var(--spread) / var(--letters, 1) * var(--px));
   text-box: trim-both cap alphabetic;
   color: color-mix(in oklab, var(--color-on_surface) calc(var(--settled) * 100%), var(--digits-tint, var(--color-on_surface)));
-}
-
-/* The shade: `surface` behind the kicker, a capsule `space.s16` past it across and `space.s12`
-   down, blurred by `space.s8`, so it has no edge and no shape of its own, at the opacity that keeps
-   the kicker's words at 4.5:1 over this picture where the blur leaves least of it. The digits have
-   none: they are large enough to read as the picture's own colour. It fades as the clock flies to
-   the bar. */
-.k-lock-shade {
-  position: absolute;
-  z-index: -1;
-  display: block;
-  --spread-x: var(--space-s16);
-  --spread-y: var(--space-s12);
-  --shade: calc((var(--shade-rest, 0) + (var(--shade-awake, 0) - var(--shade-rest, 0)) * var(--lift)) * (1 - var(--dock)));
-  left: calc(round(down, calc((var(--digits-width) - var(--kicker-width, 0px)) / 2), 1px) - var(--spread-x));
-  top: calc(-1 * (var(--space-s16) + var(--kicker-height, 0px) + var(--spread-y)));
-  width: calc(var(--kicker-width, 0px) + 2 * var(--spread-x));
-  height: calc(var(--kicker-height, 0px) + 2 * var(--spread-y));
-  border-radius: var(--radius-full);
-  background: rgb(from var(--color-surface) r g b / var(--shade));
-  filter: blur(var(--space-s8));
-  pointer-events: none;
 }
 
 /* The foreground cut out of the picture, lying exactly over it and in front of the clock; it
