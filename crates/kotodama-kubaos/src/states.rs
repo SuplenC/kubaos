@@ -18,6 +18,7 @@
 //! | `power.low-battery` | `power-saver`, `super-saver` or `off` | the same |
 //! | `nix.unfree` | on: the user's nixpkgs takes unfree packages | `U/home/kubaos.d/nixpkgs.toml` |
 //! | `kubaos.preview` | on: the home is a live preview of a KubaOS checkout | `S/kubaos/preview.json` names one |
+//! | `kubaos.suites.<name>` | on: the catalog's Suite `<name>` is installed | `U/home/kubaos.d/suites/<name>.toml` exists |
 //! | `bluetooth.unnamed` | on: Bluetooth lists the devices that send no name | `S/quickshell/kubaos.json` |
 //!
 //! `U` is the user layer, `~/.config/kubaos`; `S` is `XDG_STATE_HOME`, `~/.local/state`. A state
@@ -27,12 +28,14 @@
 //!
 //! - The state names and what each reads as ([`values`]), reading them all ([`States::read`]), and
 //!   the files they come from ([`Places::files`]).
+//! - Holding the installed Suites' options, read with the states, for the Suite Items.
 //!
 //! # Not here
 //!
 //! - Which action shows in which state: `shown_when` in [`crate::registry`].
 //! - Watching the files: `main.rs`.
 //! - The files' formats: the crates that write them.
+//! - Reading a Suite's file, and the Suite Items: [`crate::suites`].
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -48,11 +51,15 @@ use kubaos_core::preview::PreviewFile;
 use kubaos_core::state::DIR_NAME as STATE_DIR;
 use kubaos_core::state::NIXPKGS_FILE;
 use kubaos_core::state::Paths;
+use kubaos_core::state::StateDir;
 use kubaos_core::state::user_flake;
+use kubaos_core::suites::catalog;
 use kubaos_core::unfree::Setting as UnfreeSetting;
 use kubaos_core::unfree::Unfree;
 use kubaos_core::update::record::SystemPaths;
 use kubaos_user_layer::App;
+
+use crate::suites::Installed;
 
 /// Whether the daily Downloads tidy is on.
 pub const TIDY_DAILY: &str = "files.tidy-daily";
@@ -87,6 +94,8 @@ pub const BLUETOOTH_UNNAMED: &str = "bluetooth.unnamed";
 
 /// What starts the state of an optional package group, `packages.chrome`.
 const PACKAGES: &str = "packages.";
+/// What starts the state of a Suite of the catalog, `kubaos.suites.go`.
+const SUITES: &str = "kubaos.suites.";
 
 /// The CPU schedulers' names in the power settings, `kubaos_power::settings::CpuScheduler::ALL`'s.
 const SCHEDULERS: &[&str] = &["kernel", "lavd"];
@@ -138,6 +147,7 @@ pub enum Reading {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct States {
     readings: BTreeMap<String, Reading>,
+    suites: Installed,
 }
 
 impl States {
@@ -172,6 +182,18 @@ impl States {
         self.readings.get(name)
     }
 
+    /// The Suites of the catalog that are installed, with their options.
+    pub fn suites(&self) -> &Installed {
+        &self.suites
+    }
+
+    /// These states with `suites` installed, and each Suite's state read from them.
+    #[must_use]
+    pub fn with_suites(mut self, suites: Installed) -> Self {
+        self.set_suites(suites);
+        self
+    }
+
     /// These states with `name` read as `reading`.
     #[must_use]
     pub fn with(mut self, name: impl Into<String>, reading: Reading) -> Self {
@@ -181,6 +203,21 @@ impl States {
 
     fn set(&mut self, name: impl Into<String>, reading: Reading) {
         self.readings.insert(name.into(), reading);
+    }
+
+    /// Holds `suites` and reads each catalog Suite's state from them; a Suite whose file doesn't
+    /// read has no reading.
+    fn set_suites(&mut self, suites: Installed) {
+        for suite in catalog::all() {
+            let name = format!("{SUITES}{}", suite.name);
+            match suites.is_installed(suite.name) {
+                Some(installed) => self.set(name, Reading::Bool(installed)),
+                None => {
+                    self.readings.remove(&name);
+                }
+            }
+        }
+        self.suites = suites;
     }
 
     /// Each optional group the manifest lists, on or off by the user's choice or its default, and
@@ -220,6 +257,7 @@ impl States {
             let low_battery = power.low_battery_stop.map_or("off", |stop| stop.id());
             self.set(LOW_BATTERY, Reading::Word(low_battery.to_owned()));
         }
+        self.set_suites(Installed::read(&StateDir::new(&files.state_dir)));
         if let Ok(unfree) = UnfreeSetting::read(&files.state_dir) {
             self.set(UNFREE, Reading::Bool(unfree == Unfree::Allowed));
         }
@@ -237,6 +275,7 @@ pub fn values(name: &str) -> Option<Values> {
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK
         | DND | PANEL_POWER_SAVING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
+        _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,
     }
 }
@@ -293,6 +332,8 @@ impl Places {
                 user_layer.state_dir.join(NIXPKGS_FILE),
                 user_layer.network.join(kubaos_proxy::paths::PROFILE),
             ]);
+            let state_dir = StateDir::new(&user_layer.state_dir);
+            files.extend(catalog::all().map(|suite| state_dir.suite_file(suite.name)));
         }
         files.extend(
             self.keep_awake

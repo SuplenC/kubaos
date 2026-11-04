@@ -43,7 +43,7 @@ in
   options.kubaos.suiteToolchains = lib.mkOption {
     type = lib.types.attrsOf (lib.types.attrsOf lib.types.package);
     default = { };
-    example = lib.literalExpression ''{ node = { "18" = pkgs.nodejs_18; "20" = pkgs.nodejs_20; }; }'';
+    example = lib.literalExpression ''{ node = { "22" = pkgs.nodejs_22; "24" = pkgs.nodejs_24; }; }'';
     description = "Each Suite's toolchain per version, by Suite name, for Project pins. Its bin/ goes on PATH.";
   };
 

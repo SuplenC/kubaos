@@ -7,17 +7,17 @@
 //! - Which Items there are under the current config, `hide` and the states applied, and what the
 //!   update check changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
-//!   user folder, a desk position, a drive, an idle setting or Keep awake, a shell setting, the
-//!   power stop's status, the CPU scheduler's or the Proxy's.
+//!   user folder, a desk position, a drive, a Suite, an idle setting or Keep awake, a shell
+//!   setting, the power stop's status, the CPU scheduler's or the Proxy's.
 //!
 //! # Not here
 //!
 //! - Reading the config: [`crate::registry`]. Reading the states: [`crate::states`]. The toggles:
 //!   [`crate::toggles`]. The keyboard layouts: [`crate::keyboard`]. The wallpaper sets:
 //!   [`crate::wallpapers`]. The user folders: [`crate::files`]. The desk positions:
-//!   [`crate::desk`]. The drives: [`crate::drives`]. The idle settings: [`crate::idle`]. The
-//!   shell's settings: [`crate::shell`]. The power stop's status and the CPU scheduler's:
-//!   [`crate::power`]. The Proxy's status: [`crate::proxy`].
+//!   [`crate::desk`]. The drives: [`crate::drives`]. The Suites: [`crate::suites`]. The idle
+//!   settings: [`crate::idle`]. The shell's settings: [`crate::shell`]. The power stop's status and
+//!   the CPU scheduler's: [`crate::power`]. The Proxy's status: [`crate::proxy`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -47,6 +47,7 @@ use crate::registry::Registry;
 use crate::run::Runner;
 use crate::shell;
 use crate::states::States;
+use crate::suites;
 use crate::toggles;
 use crate::toggles::Ran;
 use crate::toggles::Toggle;
@@ -90,14 +91,17 @@ impl<B: Bus, R: Runner> Extension<B, R> {
     /// Takes the Extension's config table, as the Daemon sends it; what is
     /// wrong with it comes back, one problem a line.
     pub fn configure(&mut self, config: &Table) -> Vec<String> {
-        let reserved: Vec<&str> = toggles::ids()
+        let reserved: Vec<String> = toggles::ids()
             .into_iter()
             .chain(keyboard::ids())
             .chain(idle::ids())
             .chain(shell::ids())
             .chain(power::ids())
             .chain(proxy::ids())
+            .map(str::to_owned)
+            .chain(suites::ids())
             .collect();
+        let reserved: Vec<&str> = reserved.iter().map(String::as_str).collect();
         let (registry, problems) = Registry::from_config(config, &reserved);
         self.registry = registry;
         problems
@@ -139,9 +143,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
     }
 
     /// The Items to index: the actions the states show, the toggles, the idle settings, the
-    /// shell's, the power stop's, the CPU scheduler's and the Proxy's status, the keyboard
-    /// Items, the wallpaper sets, the user folders, the desk positions and the drives `hide`
-    /// leaves in, the update actions as the update check has them.
+    /// shell's, the power stop's, the CPU scheduler's and the Proxy's status, the Suites, the
+    /// keyboard Items, the wallpaper sets, the user folders, the desk positions and the drives
+    /// `hide` leaves in, the update actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
@@ -172,6 +176,12 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .items()
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
+        let suites = self
+            .states
+            .suites()
+            .items()
+            .into_iter()
+            .filter(|item| !self.registry.hides(&item.id));
         let idle = idle::items().into_iter().filter(|item| !self.registry.hides(&item.id));
         let shell = shell::items().into_iter().filter(|item| !self.registry.hides(&item.id));
         let power = [power::item(), power::scheduler_item(), proxy::item()]
@@ -184,6 +194,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .chain(idle)
             .chain(shell)
             .chain(power)
+            .chain(suites)
             .chain(keyboards)
             .chain(wallpapers)
             .chain(folders)
@@ -220,6 +231,11 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             files::KIND if !self.registry.hides(&item.id) => self.folders.run(&item.id, action, &self.runner),
             desk::KIND if !self.registry.hides(&item.id) => self.desk.run(&item.id, action, arguments, &self.runner),
             drives::KIND if !self.registry.hides(&item.id) => self.drives.run(&item.id, action, &self.runner),
+            suites::KIND if !self.registry.hides(&item.id) => {
+                self.states
+                    .suites()
+                    .run(&item.id, action, arguments, self.registry.terminal(), &self.runner)
+            }
             idle::KIND if action == idle::CHOOSE && !self.registry.hides(&item.id) => {
                 idle::run(&item.id, arguments, &idle_settings(), &self.runner)
             }

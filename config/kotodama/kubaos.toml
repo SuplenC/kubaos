@@ -71,7 +71,8 @@ kind = "scripts"
 # `files.tidy-daily`, `files.automount`, `terminal.greeting`,
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
 # `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
-# `nix.unfree`, `kubaos.preview` and `bluetooth.unnamed`, true or false;
+# `nix.unfree`, `kubaos.preview`, `kubaos.suites.<name>` (the Suite is
+# installed) and `bluetooth.unnamed`, true or false;
 # `power.scheduler` ("kernel", "lavd") and `power.low-battery` ("power-saver",
 # "super-saver", "off"). While a state can't be read, the action shows.
 #
@@ -1014,14 +1015,14 @@ terminal = true
 
 [extensions.kubaos.actions.pin]
 title = "Pin a Suite version…"
-subtitle = "This folder uses Node 18: a version for a folder and everything in it"
+subtitle = "This folder uses Node 22: a version for a folder and everything in it"
 icon = "view-pin"
 keywords = ["project pin", "suite", "version", "envrc", "direnv", "legacy", "nvm", "toolchain"]
 keyword = "pin"
 run = ["kubaos", "pin", "{suite}", "{version}", "{folder}"]
 arguments = [
   { name = "suite", placeholder = "node" },
-  { name = "version", placeholder = "18" },
+  { name = "version", placeholder = "22" },
   { name = "folder", placeholder = "~/Projects/acme" },
 ]
 terminal = true

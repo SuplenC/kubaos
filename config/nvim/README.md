@@ -8,16 +8,16 @@ config, so it wins.
 ## What ships
 
 - **LazyVim**, with these extras (`lua/config/lazy.lua`):
-  - languages: Rust, TypeScript, Docker, markdown, git, JSON, TOML and YAML, plus prettier and
-    eslint;
+  - languages: Rust, Docker, markdown, git, JSON, TOML and YAML, and prettier, which formats
+    markdown, JSON, YAML and the web languages (prettier itself comes from Nix, not Mason);
   - editing: mini-surround, yanky, dial, inc-rename, mini-move, mini-hipatterns;
   - the snacks explorer and picker, aerial, dap and test.
 - **Plugins** (`lua/plugins/`): diffview and fugitive for git, vim-tmux-navigator (`C-h/j/k/l`
   across Neovim splits and tmux panes), oil, vim-visual-multi, and the theme.
 - **The theme** (`lua/config/theme.lua`, `colors/matugen.lua`): the colours `dot-theme` makes from
   the wallpaper, applied live when it changes. Without them, LazyVim's tokyonight.
-- **The installed Suites' extras**, such as a language's LazyVim extra, from
-  `lua/kubaos/suites.lua`, which `home/suites.nix` writes.
+- **The installed Suites' extras**, such as a language's LazyVim extra (the Node Suite's
+  TypeScript and eslint), from `lua/kubaos/suites.lua`, which `home/suites.nix` writes.
 
 ## Make it yours
 

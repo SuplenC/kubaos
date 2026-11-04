@@ -17,6 +17,9 @@ in
   home.packages = with pkgs; [
     neovim
     tree-sitter # nvim-treesitter (main) builds parsers with the tree-sitter CLI
+    # LazyVim's prettier extra formats markdown, JSON and YAML with it. From
+    # Nix, as Mason's copy needs npm, which only the Node Suite brings.
+    prettier
     lazygit
     yazi
     eza

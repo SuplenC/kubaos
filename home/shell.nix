@@ -18,7 +18,8 @@
 # budget. The tools' init scripts and the completion dump are cached in
 # ~/.cache/kubaos/zsh; deleting that folder is always safe.
 #
-# PATH for proto/bun/cargo/~/.local/bin lives in home.sessionPath (nix agent).
+# PATH entries live in home.sessionPath, not here: ~/.local/bin and cargo's in
+# dev.nix, each installed Suite's in its module under suites/.
 {
   config,
   pkgs,

@@ -18,6 +18,7 @@ use super::SuiteError;
 use super::Suites;
 use super::Toolchain;
 use super::catalog;
+use super::default_config;
 use crate::state::Paths;
 use crate::state::StateDir;
 
@@ -538,8 +539,203 @@ fn every_suite_in_the_catalog_is_well_formed() {
     }
 }
 
+/// A Suite's Nix module, `home/suites/<name>.nix`, as text.
+fn module(suite: &Suite) -> String {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../home/suites")
+        .join(format!("{}.nix", suite.name));
+    fs::read_to_string(&path).expect("read the Suite's module")
+}
+
+/// The strings in a module's `versions = [ … ];` list, or none without one.
+fn module_versions(text: &str) -> Vec<String> {
+    let Some((_, after)) = text.split_once("versions = [") else {
+        return Vec::new();
+    };
+    let (list, _) = after.split_once("];").expect("the versions list ends");
+    list.split('"').skip(1).step_by(2).map(str::to_owned).collect()
+}
+
+#[test]
+fn every_suite_s_module_declares_the_versions_of_its_catalog_entry() {
+    for suite in catalog::all() {
+        assert_eq!(
+            module_versions(&module(suite)),
+            suite.versions,
+            "{}: the module's versions and the catalog's differ",
+            suite.name
+        );
+    }
+}
+
+#[test]
+fn every_scaffolder_runs_a_command_its_module_installs() {
+    for suite in catalog::all() {
+        let text = module(suite);
+        for scaffolder in suite.scaffolders {
+            let command = scaffolder.argv[0];
+            assert!(
+                text.contains(command),
+                "{}: {} runs {command}, which its module never names",
+                suite.name,
+                scaffolder.id
+            );
+        }
+    }
+}
+
+#[test]
+fn no_cache_folder_holds_another_suite_s() {
+    let caches: Vec<(&str, &str)> = catalog::all()
+        .flat_map(|suite| suite.caches.iter().map(|cache| (suite.name, cache.path)))
+        .collect();
+
+    for (i, (suite, path)) in caches.iter().enumerate() {
+        for (other, other_path) in &caches[i + 1..] {
+            let a = Path::new(path);
+            let b = Path::new(other_path);
+            assert!(
+                !a.starts_with(b) && !b.starts_with(a),
+                "{suite}'s {path} and {other}'s {other_path} overlap: purging one deletes the other"
+            );
+        }
+    }
+}
+
+#[test]
+fn every_seed_says_which_suite_it_is_for() {
+    for suite in catalog::all() {
+        for seed in suite.seeds {
+            let first = seed.contents.lines().next().unwrap_or_default().to_lowercase();
+            let wanted = format!("-- your settings for the {} suite.", suite.title.to_lowercase());
+            assert!(
+                first.starts_with(&wanted),
+                "{}: {} starts {first:?}",
+                suite.name,
+                seed.path
+            );
+        }
+    }
+}
+
+#[test]
+fn the_node_python_php_and_proto_suites_are_shipped() {
+    let shipped: Vec<&str> = catalog::SHIPPED.iter().map(|s| s.name).collect();
+
+    for name in ["node", "python", "php", "proto"] {
+        assert!(shipped.contains(&name), "{name} is not in SHIPPED");
+    }
+}
+
+#[test]
+fn a_suite_s_default_version_is_its_first() {
+    let node = catalog::find("node").expect("the Node Suite");
+    let php = catalog::find("php").expect("the PHP Suite");
+    let python = catalog::find("python").expect("the Python Suite");
+
+    assert_eq!(node.versions.first(), Some(&"26"));
+    assert_eq!(php.versions.first(), Some(&"8.5"));
+    assert!(python.versions.is_empty(), "uv picks a project's Python");
+}
+
+#[test]
+fn the_proto_suite_leaves_versions_to_proto() {
+    let proto = catalog::find("proto").expect("the proto + moon Suite");
+
+    assert!(proto.versions.is_empty(), "a project's .prototools pins its tools");
+    assert!(matches!(proto.toolchain, Toolchain::Upstream { manager: "proto" }));
+    assert_eq!(
+        proto.caches.iter().map(|c| c.path).collect::<Vec<_>>(),
+        [".local/share/proto"]
+    );
+}
+
+#[test]
+fn the_node_suite_s_first_scaffolder_needs_no_extra() {
+    let node = catalog::find("node").expect("the Node Suite");
+
+    assert_eq!(node.scaffolders.first().map(|s| s.id), Some("node"));
+    assert!(node.extras.iter().any(|e| e.name == "bun" && e.default));
+}
+
 #[test]
 fn a_suite_is_found_by_name() {
     assert_eq!(catalog::find("test").map(|s| s.name), Some("test"));
     assert!(catalog::find("nope").is_none());
+}
+
+#[test]
+fn kubaos_ships_the_rust_and_go_suites() {
+    let shipped: Vec<&str> = catalog::SHIPPED.iter().map(|s| s.name).collect();
+
+    for name in ["rust", "go"] {
+        assert!(shipped.contains(&name), "{name} is not in SHIPPED");
+    }
+    assert_eq!(
+        catalog::find("rust").map(|s| s.toolchain),
+        Some(Toolchain::Upstream { manager: "rustup" })
+    );
+    assert_eq!(catalog::find("go").map(|s| s.toolchain), Some(Toolchain::Nix));
+}
+
+#[test]
+fn rust_has_no_versions_since_rust_toolchain_toml_pins_a_project() {
+    let rust = catalog::find("rust").unwrap();
+
+    assert!(rust.versions.is_empty());
+    assert!(rust.description.contains("rust-toolchain.toml"), "{}", rust.description);
+    assert_eq!(default_config(rust).version, None);
+}
+
+#[test]
+fn rust_links_with_mold_unless_the_wild_extra_is_on() {
+    let rust = catalog::find("rust").unwrap();
+
+    assert_eq!(
+        rust.extras.iter().map(|e| (e.name, e.default)).collect::<Vec<_>>(),
+        [("wild", false)]
+    );
+    assert!(default_config(rust).extras.is_empty());
+}
+
+#[test]
+fn rust_scaffolds_a_binary_a_library_and_a_workspace() {
+    let rust = catalog::find("rust").unwrap();
+
+    let ids: Vec<&str> = rust.scaffolders.iter().map(|s| s.id).collect();
+
+    assert_eq!(ids, ["bin", "lib", "workspace"]);
+}
+
+#[test]
+fn go_installs_the_version_nixpkgs_builds_its_go_tools_with_by_default() {
+    let go = catalog::find("go").unwrap();
+
+    assert_eq!(default_config(go).version.as_deref(), Some("1.26"));
+}
+
+#[test]
+fn every_seed_is_a_commented_example_that_mentions_its_suite() {
+    for suite in catalog::all() {
+        for seed in suite.seeds {
+            let code: Vec<&str> = seed
+                .contents
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty() && !line.starts_with("--"))
+                .collect();
+            let text = seed.contents.to_ascii_lowercase();
+
+            assert_eq!(code, ["return {", "}"], "{}: {}", suite.name, seed.path);
+            assert!(
+                suite
+                    .mentions
+                    .iter()
+                    .any(|word| super::has_word(&text, &word.to_ascii_lowercase())),
+                "{}: removal wouldn't list {}",
+                suite.name,
+                seed.path
+            );
+        }
+    }
 }

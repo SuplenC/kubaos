@@ -351,7 +351,7 @@ impl Suites {
     ///
     /// [`SuiteError::Read`] when its file cannot be read or parsed.
     pub fn config(&self, suite: &Suite) -> Result<Option<SuiteConfig>, SuiteError> {
-        read_config(&self.state.suite_file(suite.name)).map_err(SuiteError::Read)
+        self.state.suite_config(suite.name).map_err(SuiteError::Read)
     }
 
     /// Installs `suite` with its default options changed by `change`: writes its file and seeds
@@ -626,6 +626,18 @@ fn is_project_name(name: &str) -> bool {
 /// to.
 fn is_plain_relative(path: &str) -> bool {
     !path.is_empty() && Path::new(path).components().all(|c| matches!(c, Component::Normal(_)))
+}
+
+impl StateDir {
+    /// The options of the Suite `name` as its file holds them, or `None` when it is not
+    /// installed.
+    ///
+    /// # Errors
+    ///
+    /// [`ReadError`] when the file exists but cannot be read or parsed.
+    pub fn suite_config(&self, name: &str) -> Result<Option<SuiteConfig>, ReadError> {
+        read_config(&self.suite_file(name))
+    }
 }
 
 fn read_config(path: &Path) -> Result<Option<SuiteConfig>, ReadError> {
