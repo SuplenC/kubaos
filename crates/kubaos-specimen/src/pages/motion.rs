@@ -79,6 +79,15 @@ fn use_of(duration: Duration) -> &'static str {
         Duration::Recolour => "A theme change's colours, all together.",
         Duration::Settle => "A theme change's dark beat before the lights strike.",
         Duration::Strike => "Every light striking on after a theme change.",
+        Duration::SwapLag => "A twin panel's arriving content starting after the leaving one.",
+        Duration::CaretGlow => "The caret's glow coming in on a key.",
+        Duration::SwapFade => "A twin panel's arriving content fading in.",
+        Duration::CaretHold => "The caret's glow holding after the last key.",
+        Duration::CaretFade => "The caret's glow fading once typing stops.",
+        Duration::Hold => "A held button held until it acts.",
+        Duration::Hum => "Half a skeleton's breath.",
+        Duration::Toast => "A toast staying once it has arrived.",
+        Duration::LockIdle => "The awake lock left alone until it goes back to rest.",
     }
 }
 
