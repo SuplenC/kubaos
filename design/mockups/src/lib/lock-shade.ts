@@ -1,6 +1,6 @@
-// The lock's colours and the shade behind its clock (`docs/design/components/lock.md`): the night
+// The lock's colours and the shade behind its words (`docs/design/components/lock.md`): the night
 // scheme matugen derives from the wallpaper, painted on the lock whatever the mode, and the least
-// `surface` that keeps every word of the clock at 4.5:1 over the picture under it.
+// `surface` that keeps the words it backs at 4.5:1 over the picture under them.
 //
 // The shade is worked out from the picture, as the shell works it out from the wallpaper it loads:
 // the brightest of the picture under the words (its 98th percentile by luminance, so one lit pixel
@@ -29,7 +29,13 @@ export interface Cover {
 }
 
 /** The words of the clock, by colour role: the digits, the kicker's place and its date. */
-const WORDS = ["on_surface", "primary", "on_surface_variant"] as const;
+export const CLOCK_WORDS = ["on_surface", "primary", "on_surface_variant"] as const;
+
+/** The kicker's words alone: its place and its date. */
+export const KICKER_WORDS = ["primary", "on_surface_variant"] as const;
+
+/** A colour role the clock's words are drawn in. */
+export type Word = (typeof CLOCK_WORDS)[number];
 
 /** The least ratio the clock's words keep over the picture. */
 const LEAST = 4.5;
@@ -86,11 +92,11 @@ export interface Seen {
 }
 
 /**
- * The shade's opacity behind words in `box` on the screen, in `colours`, over `picture` cropped as
- * `cover` says and seen as `seen` says: the least, in hundredths, that keeps every word at 4.5:1
+ * The shade's opacity behind `words` in `box` on the screen, in `colours`, over `picture` cropped
+ * as `cover` says and seen as `seen` says: the least, in hundredths, that keeps every word at 4.5:1
  * over the picture's brightest under them.
  */
-export function shadeFor(picture: HTMLImageElement, colours: Palette, box: Box, cover: Cover, seen: Seen = { blur: 0, dim: 0 }): number {
+export function shadeFor(picture: HTMLImageElement, colours: Palette, words: readonly Word[], box: Box, cover: Cover, seen: Seen = { blur: 0, dim: 0 }): number {
   const data = pixelsOf(picture, Math.round(seen.blur / cover.scale));
   const surface = colours.surface;
   if (!data || !surface) return 0;
@@ -112,9 +118,27 @@ export function shadeFor(picture: HTMLImageElement, colours: Palette, box: Box, 
   const scrim = colours.scrim ?? "#000000";
   const dimmed = laid(scrim, brightest, seen.dim);
   const bright: [number, number, number] = [1, 3, 5].map((at) => Number.parseInt(dimmed.slice(at, at + 2), 16)) as [number, number, number];
-  const holds = (alpha: number) => WORDS.every((role) => ratio(colours[role] ?? "#ffffff", laid(surface, bright, alpha)) >= LEAST);
+  const holds = (alpha: number) => words.every((role) => ratio(colours[role] ?? "#ffffff", laid(surface, bright, alpha)) >= LEAST);
   for (let hundredths = 0; hundredths <= 100; hundredths++) {
     if (holds(hundredths / 100)) return hundredths / 100;
   }
   return 1;
+}
+
+/** The normal distribution's cumulative share under `z` (Abramowitz and Stegun's 7.1.26). */
+function normal(z: number): number {
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const erf = 1 - (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t) * Math.exp(-x * x);
+  return z >= 0 ? (1 + erf) / 2 : (1 - erf) / 2;
+}
+
+/**
+ * How much of a box blurred by `soft` (a standard deviation) is left at the corners of the words
+ * it backs, when it reaches `spread` past them across and down: the share its opacity is raised by
+ * so the words keep their contrast where it is weakest.
+ */
+export function backingCover(spread: { readonly x: number; readonly y: number }, soft: number): number {
+  if (soft <= 0) return 1;
+  return normal(spread.x / soft) * normal(spread.y / soft);
 }

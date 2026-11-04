@@ -1,9 +1,17 @@
 /* The lock (`lib/lock.ts`): a screen with its frame, the wallpaper, its clock and its cut-out at
    rest; the frame closed in, the picture blurred and dimmed, the clock lifted to the top and the
-   password's sheet up when awake. Three numbers move it, 0 at rest and 1 awake. */
+   password's sheet up when awake; and the desktop's still, its windows and its bar, which locking
+   leaves and unlocking comes back to. Numbers move it, each 0 at rest. */
 
 /* The frame, from out past the screen's edges (0) to where the shell draws it (1). */
 @property --framed {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* The frame's top edge, from `space.s8` like its other edges (0) to the bar's height (1). */
+@property --barred {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;
@@ -23,6 +31,20 @@
   initial-value: 0;
 }
 
+/* The clock, from its rest or its awake place (0) to the bar's clock (1). */
+@property --dock {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* Whether the clock flies above the frame (1) or stands behind the cut-out (0). */
+@property --above {
+  syntax: "<integer>";
+  inherits: false;
+  initial-value: 0;
+}
+
 /* How far the wrong password's shake has the field, in `space.s4`s sideways. */
 @property --jolt {
   syntax: "<number>";
@@ -31,14 +53,20 @@
 }
 
 .k-screen.k-lock {
-  --frame-top: round(nearest, calc(var(--size-bar) * var(--framed)), 1px);
   --frame-side: round(nearest, calc(var(--space-s8) * var(--framed)), 1px);
+  --frame-top: round(nearest, calc((var(--space-s8) + (var(--size-bar) - var(--space-s8)) * var(--barred)) * var(--framed)), 1px);
 }
 
-.k-lock[data-awake] {
+.k-lock[data-phase="awake"] {
   --framed: 1;
   --wake: 1;
   --lift: 1;
+}
+
+.k-lock[data-phase="desktop"] {
+  --framed: 1;
+  --barred: 1;
+  --dock: 1;
 }
 
 /* The frame's inner corners grow with it, so a frame not yet in shows no corner. */
@@ -55,61 +83,152 @@
   backdrop-filter: blur(calc(var(--size-lock_blur) * var(--wake)));
 }
 
-/* The clock: the kicker over the digits, `space.s16` apart, its middle and its top moving from
-   the rest place to the awake one as `--lift` goes 0 to 1, and its digits from `type.clock_rest`
-   to `type.clock`. Its width is the kicker's or the digits', whichever is wider, and each is
-   centred in it on whole device pixels, the odd one after it. */
+/* The desktop's windows, as the still shows them: tiled `space.s8` inside the frame as Hyprland's
+   `gaps_out` puts them, `space.s8` apart, the bar's height at the top. Locking shrinks them to 0.96
+   round the middle of the screen as they fade; at rest and awake they are gone. */
+.k-lock-windows {
+  position: absolute;
+  inset: calc(var(--size-bar) + var(--space-s8)) var(--space-s16) var(--space-s16);
+  display: flex;
+  gap: var(--space-s8);
+  opacity: 0;
+  scale: 0.96;
+}
+
+.k-lock[data-phase="desktop"] .k-lock-windows {
+  opacity: 1;
+  scale: 1;
+}
+
+/* A window of the still: the desktop plane's, as the Elevation page draws one, its corner the
+   frame's surface radius less the gap inside it. */
+.k-lock-window {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--space-s8);
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--space-s16);
+  border-radius: var(--corner);
+  background: var(--color-surface);
+  box-shadow:
+    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
+    0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
+}
+
+/* The bar's contents ride in the middle of the frame's top edge, so as it thins they go up out of
+   the screen, and as it grows into the bar they come down with it. Only the desktop shows them. */
+.k-lock .k-bar {
+  opacity: 0;
+}
+
+.k-lock[data-phase="desktop"] .k-bar {
+  opacity: 1;
+}
+
+/* The bar's clock, centred on the screen as `modules/bar/Bar.qml` centres it, on whole device
+   pixels. */
+.k-lock-bar-clock {
+  position: absolute;
+  left: round(down, calc((100% - var(--pill-width, 0px)) / 2), 1px);
+}
+
+/* A mark of no size on the bar's time's baseline, read once and removed. */
+.k-lock-baseline {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  vertical-align: baseline;
+}
+
+/* The clock: the digits' box, their cap height down to their baseline, with the kicker
+   `space.s16` above it. Its size and place mix three: the rest clock in `type.clock_rest` where
+   the wallpaper puts it, the awake one in `type.clock` centred `space.s48` under the frame's top,
+   and the bar's time in `type.mono_large` where the pill puts it, as `--lift` and `--dock` say.
+   The box is on whole device pixels, and the kicker centred over it, the odd pixel after it.
+   It stands behind the cut-out, and above the frame while it flies to or from the bar. */
 .k-lock-clock {
   position: absolute;
-  z-index: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-s16);
-  --k: calc(1 + (var(--type-clock-size) / var(--type-clock_rest-size) - 1) * var(--lift));
+  z-index: var(--above);
+  display: block;
+  --k-awake: calc(1 + (var(--type-clock-size) / var(--type-clock_rest-size) - 1) * var(--lift));
+  --k: calc(var(--k-awake) * (1 - var(--dock)) + var(--type-mono_large-size) / var(--type-clock_rest-size) * var(--dock));
   --digits-width: round(up, calc(var(--digits-natural) * var(--px) * var(--k) - 0.001px), 1px);
-  --clock-width: max(var(--kicker-width, 0px), var(--digits-width));
-  --cx: calc(var(--rest-cx, 50%) + (50% - var(--rest-cx, 50%)) * var(--lift));
-  --awake-top: calc(var(--size-bar) + var(--space-s48));
-  left: round(down, calc(var(--cx) - var(--clock-width) / 2), 1px);
-  top: round(nearest, calc(var(--rest-top, 0px) + (var(--awake-top) - var(--rest-top, 0px)) * var(--lift)), 1px);
-  width: var(--clock-width);
+  --digits-height: calc(var(--cap-height) * var(--type-clock_rest-size) * var(--k));
+  --awake-top: calc(var(--space-s8) + var(--space-s48) + var(--kicker-height, 0px) + var(--space-s16));
+  --bar-top: calc((var(--frame-top) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-mono_large-size));
+  --placed-cx: calc(var(--rest-cx, 50%) + (50% - var(--rest-cx, 50%)) * var(--lift));
+  --placed-top: calc(var(--rest-top, 0px) + (var(--awake-top) - var(--rest-top, 0px)) * var(--lift));
+  --cx: calc(var(--placed-cx) * (1 - var(--dock)) + var(--bar-cx, 50%) * var(--dock));
+  left: round(down, calc(var(--cx) - var(--digits-width) / 2), 1px);
+  top: round(nearest, calc(var(--placed-top) * (1 - var(--dock)) + var(--bar-top) * var(--dock)), 1px);
+  width: var(--digits-width);
+  height: var(--digits-height);
+}
+
+.k-lock[data-phase="desktop"] .k-lock-clock {
+  --above: 1;
+  opacity: 0;
 }
 
 .k-lock-clock > .k-lock-kicker {
+  position: absolute;
+  top: calc(-1 * (var(--space-s16) + var(--kicker-height, 0px)));
+  left: round(down, calc((var(--digits-width) - var(--kicker-width, 0px)) / 2), 1px);
   width: max-content;
-  margin-left: round(down, calc((var(--clock-width) - var(--kicker-width, 0px)) / 2), 1px);
 }
 
-/* The digits' box is their cap height to their baseline, so the kicker's gap is to the digits'
-   tops and the place a wallpaper gives is their baseline. */
+.k-lock[data-phase="desktop"] .k-lock-kicker {
+  opacity: 0;
+}
+
 .k-lock .k-lock-digits {
-  width: var(--digits-width);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
   height: auto;
-  margin-left: round(down, calc((var(--clock-width) - var(--digits-width)) / 2), 1px);
   font-size: calc(var(--type-clock_rest-size) * var(--k));
-  line-height: var(--type-clock_rest-size);
+  line-height: calc(var(--type-clock_rest-size) * var(--k));
   text-box: trim-both cap alphabetic;
 }
 
-/* The shade behind the clock: `surface` at the least opacity that keeps its words at 4.5:1 over
-   this picture. It is an ellipse through the clock's corners (its box's sides times the square root
-   of two) and `space.s64` past them, blurred by `space.s32`, so it is whole behind every word and
-   fades out round the clock with no edge or corner of its own. */
-.k-lock-clock::before {
-  content: "";
+/* The shade: `surface` behind the words it backs, a box `--spread` past them blurred by `--soft`,
+   so it has no edge and no shape of its own, at the opacity that keeps them at 4.5:1 over this
+   picture where the blur leaves least of it. With a cut-out it backs the kicker alone, the digits
+   standing in the sky: `space.s16` past it across, `space.s12` down, blurred by `space.s8`. With
+   none it backs the whole clock, `space.s32` past it, blurred by `space.s16`. It fades as the
+   clock flies to the bar. */
+.k-lock-shade {
   position: absolute;
-  inset: calc(-1 * (50% * (sqrt(2) - 1) + var(--space-s64)));
   z-index: -1;
   display: block;
-  --shade: calc(var(--shade-rest, 0) + (var(--shade-awake, 0) - var(--shade-rest, 0)) * var(--lift));
-  border-radius: 50%;
+  --spread-x: var(--space-s16);
+  --spread-y: var(--space-s12);
+  --backed: var(--kicker-width, 0px);
+  --shade: calc((var(--shade-rest, 0) + (var(--shade-awake, 0) - var(--shade-rest, 0)) * var(--lift)) * (1 - var(--dock)));
+  left: calc(round(down, calc((var(--digits-width) - var(--backed)) / 2), 1px) - var(--spread-x));
+  top: calc(-1 * (var(--space-s16) + var(--kicker-height, 0px) + var(--spread-y)));
+  width: calc(var(--backed) + 2 * var(--spread-x));
+  height: calc(var(--kicker-height, 0px) + 2 * var(--spread-y));
+  border-radius: var(--radius-full);
   background: rgb(from var(--color-surface) r g b / var(--shade));
-  filter: blur(var(--space-s32));
+  filter: blur(var(--space-s8));
   pointer-events: none;
 }
 
+.k-lock:not([data-cutout]) .k-lock-shade {
+  --spread-x: var(--space-s32);
+  --spread-y: var(--space-s32);
+  --backed: max(var(--kicker-width, 0px), var(--digits-width));
+  height: calc(var(--kicker-height, 0px) + var(--space-s16) + var(--digits-height) + 2 * var(--spread-y));
+  border-radius: 0;
+  filter: blur(var(--space-s16));
+}
+
 /* The foreground cut out of the picture, lying exactly over it and in front of the clock; it
-   blurs with the picture and is gone once the clock is in front. */
+   blurs with the picture and is gone while the clock is out of it. */
 .k-lock-cutout {
   position: absolute;
   inset: 0;
@@ -121,7 +240,13 @@
   pointer-events: none;
 }
 
-.k-lock[data-awake] .k-lock-cutout {
+.k-lock:is([data-phase="awake"], [data-phase="desktop"]) .k-lock-cutout {
+  opacity: 0;
+}
+
+/* The field's `lock`, and the `lock_open` in `primary` laid over it that the right password
+   turns it to. */
+.k-lock-open {
   opacity: 0;
 }
 
@@ -159,7 +284,7 @@
   text-box: trim-both cap alphabetic;
 }
 
-/* A live lock eases between its phases: waking on the sheet's opening, the clock settling over
+/* A live lock eases between rest and awake: waking on the sheet's opening, the clock settling over
    `long` on `emphasized_decel`; going back to rest, the frame and the sheet leaving over `medium`
    on `emphasized_accel`, the blur clearing over `long` and the cut-out coming back once the clock
    is home. */
@@ -170,7 +295,7 @@
     --lift var(--motion-long) var(--easing-emphasized_decel);
 }
 
-.k-lock[data-live][data-awake] {
+.k-lock[data-live][data-phase="awake"] {
   transition:
     --framed var(--motion-long) var(--easing-emphasized_decel),
     --wake var(--motion-long) var(--easing-emphasized_decel),
@@ -181,6 +306,6 @@
   transition: opacity var(--motion-short) var(--easing-standard) var(--motion-medium);
 }
 
-.k-lock[data-live][data-awake] .k-lock-cutout {
+.k-lock[data-live][data-phase="awake"] .k-lock-cutout {
   transition: opacity var(--motion-short) var(--easing-standard);
 }

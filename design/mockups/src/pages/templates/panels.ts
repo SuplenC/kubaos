@@ -187,7 +187,7 @@ function words(said: string): HTMLElement {
 }
 
 /** The twins' buttons along the bar, in their order: the system monitor, the bell, the status. */
-function barButtons(): HTMLElement[] {
+export function barButtons(): HTMLElement[] {
   return [
     pill({ content: [glyph("memory"), words("34%")], lone: false, interactive: true, tooltip: "System" }),
     pill({ content: [glyph("notifications")], lone: true, interactive: true, tooltip: "Notifications" }),
