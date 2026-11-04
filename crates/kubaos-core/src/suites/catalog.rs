@@ -20,7 +20,7 @@ use super::Suite;
 use super::Toolchain;
 
 /// The Suites KubaOS ships, by name.
-pub const SHIPPED: &[Suite] = &[NODE, PYTHON, PHP, PROTO];
+pub const SHIPPED: &[Suite] = &[RUST, GO, NODE, PYTHON, PHP, PROTO];
 
 /// Node and Bun. Its Nix module is `home/suites/node.nix`.
 const NODE: Suite = Suite {
@@ -187,6 +187,129 @@ const PROTO: Suite = Suite {
     }],
     seeds: &[],
     mentions: &["proto", "moon", "moonrepo", ".prototools", "moon.yml"],
+};
+
+/// Go from nixpkgs, with gopls, gofumpt, goimports, golangci-lint and delve. Its Nix module is
+/// `home/suites/go.nix`.
+///
+/// The default version is the one nixpkgs builds its Go tools with, so they come from the binary
+/// cache; a newer one builds gopls, gofumpt, goimports and golangci-lint again with it, since they
+/// read code only up to the Go they were built with.
+const GO: Suite = Suite {
+    name: "go",
+    title: "Go",
+    description: "Go with gopls, gofumpt, goimports, golangci-lint and delve, and Neovim's Go support.",
+    versions: &["1.26", "1.27", "1.25"],
+    extras: &[],
+    toolchain: Toolchain::Nix,
+    caches: &[
+        Cache {
+            path: "go",
+            description: "Go's modules and what `go install` built (GOPATH).",
+        },
+        Cache {
+            path: ".cache/go-build",
+            description: "Go's build cache.",
+        },
+        Cache {
+            path: ".cache/gopls",
+            description: "gopls's index of your modules.",
+        },
+        Cache {
+            path: ".cache/golangci-lint",
+            description: "golangci-lint's cache.",
+        },
+    ],
+    scaffolders: &[Scaffolder {
+        id: "module",
+        label: "New Go project",
+        argv: &["kubaos-go-new", "{path}", "{name}"],
+    }],
+    seeds: &[Seed {
+        app: App::Nvim,
+        path: "plugins/go.lua",
+        contents: include_str!("seeds/go.lua"),
+    }],
+    mentions: &[
+        "golang",
+        "gopls",
+        "gofumpt",
+        "goimports",
+        "golangci-lint",
+        "delve",
+        "lang.go",
+        "gopath",
+        "gotoolchain",
+    ],
+};
+
+/// Rust through rustup, with rust-analyzer, clippy, bacon, cargo-nextest and sccache, linked by
+/// clang with mold. Its Nix module is `home/suites/rust.nix`.
+///
+/// It has no versions: rustup installs the toolchain a project's `rust-toolchain.toml` names on
+/// first use, and stable everywhere else, so that file is the per-project pin.
+const RUST: Suite = Suite {
+    name: "rust",
+    title: "Rust",
+    description: "Rust through rustup, with rust-analyzer, clippy, bacon, cargo-nextest and sccache, and Neovim's Rust \
+                  support. A project's rust-toolchain.toml picks its toolchain.",
+    versions: &[],
+    extras: &[Extra {
+        name: "wild",
+        description: "Links with wild instead of mold: faster relinks, before its 1.0.",
+        default: false,
+    }],
+    toolchain: Toolchain::Upstream { manager: "rustup" },
+    caches: &[
+        Cache {
+            path: ".rustup",
+            description: "The toolchains rustup installed, and its settings.",
+        },
+        Cache {
+            path: ".cargo/registry",
+            description: "The crates cargo downloaded.",
+        },
+        Cache {
+            path: ".cargo/git",
+            description: "The git dependencies cargo checked out.",
+        },
+        Cache {
+            path: ".cache/sccache",
+            description: "sccache's compiled crates.",
+        },
+    ],
+    scaffolders: &[
+        Scaffolder {
+            id: "bin",
+            label: "New Rust project",
+            argv: &["cargo", "new", "--quiet", "{path}"],
+        },
+        Scaffolder {
+            id: "lib",
+            label: "New Rust library",
+            argv: &["cargo", "new", "--quiet", "--lib", "{path}"],
+        },
+        Scaffolder {
+            id: "workspace",
+            label: "New Rust workspace",
+            argv: &["kubaos-rust-workspace", "{path}", "{name}"],
+        },
+    ],
+    seeds: &[Seed {
+        app: App::Nvim,
+        path: "plugins/rust.lua",
+        contents: include_str!("seeds/rust.lua"),
+    }],
+    mentions: &[
+        "rust",
+        "rustup",
+        "rustc",
+        "cargo",
+        "rust-analyzer",
+        "rust_analyzer",
+        "rustaceanvim",
+        "sccache",
+    ],
 };
 
 /// A Suite with one of everything, for the test harness and the unit tests. Its Nix module is

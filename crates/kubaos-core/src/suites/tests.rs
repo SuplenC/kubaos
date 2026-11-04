@@ -18,6 +18,7 @@ use super::SuiteError;
 use super::Suites;
 use super::Toolchain;
 use super::catalog;
+use super::default_config;
 use crate::state::Paths;
 use crate::state::StateDir;
 
@@ -661,4 +662,80 @@ fn the_node_suite_s_first_scaffolder_needs_no_extra() {
 fn a_suite_is_found_by_name() {
     assert_eq!(catalog::find("test").map(|s| s.name), Some("test"));
     assert!(catalog::find("nope").is_none());
+}
+
+#[test]
+fn kubaos_ships_the_rust_and_go_suites() {
+    let shipped: Vec<&str> = catalog::SHIPPED.iter().map(|s| s.name).collect();
+
+    for name in ["rust", "go"] {
+        assert!(shipped.contains(&name), "{name} is not in SHIPPED");
+    }
+    assert_eq!(
+        catalog::find("rust").map(|s| s.toolchain),
+        Some(Toolchain::Upstream { manager: "rustup" })
+    );
+    assert_eq!(catalog::find("go").map(|s| s.toolchain), Some(Toolchain::Nix));
+}
+
+#[test]
+fn rust_has_no_versions_since_rust_toolchain_toml_pins_a_project() {
+    let rust = catalog::find("rust").unwrap();
+
+    assert!(rust.versions.is_empty());
+    assert!(rust.description.contains("rust-toolchain.toml"), "{}", rust.description);
+    assert_eq!(default_config(rust).version, None);
+}
+
+#[test]
+fn rust_links_with_mold_unless_the_wild_extra_is_on() {
+    let rust = catalog::find("rust").unwrap();
+
+    assert_eq!(
+        rust.extras.iter().map(|e| (e.name, e.default)).collect::<Vec<_>>(),
+        [("wild", false)]
+    );
+    assert!(default_config(rust).extras.is_empty());
+}
+
+#[test]
+fn rust_scaffolds_a_binary_a_library_and_a_workspace() {
+    let rust = catalog::find("rust").unwrap();
+
+    let ids: Vec<&str> = rust.scaffolders.iter().map(|s| s.id).collect();
+
+    assert_eq!(ids, ["bin", "lib", "workspace"]);
+}
+
+#[test]
+fn go_installs_the_version_nixpkgs_builds_its_go_tools_with_by_default() {
+    let go = catalog::find("go").unwrap();
+
+    assert_eq!(default_config(go).version.as_deref(), Some("1.26"));
+}
+
+#[test]
+fn every_seed_is_a_commented_example_that_mentions_its_suite() {
+    for suite in catalog::all() {
+        for seed in suite.seeds {
+            let code: Vec<&str> = seed
+                .contents
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty() && !line.starts_with("--"))
+                .collect();
+            let text = seed.contents.to_ascii_lowercase();
+
+            assert_eq!(code, ["return {", "}"], "{}: {}", suite.name, seed.path);
+            assert!(
+                suite
+                    .mentions
+                    .iter()
+                    .any(|word| super::has_word(&text, &word.to_ascii_lowercase())),
+                "{}: removal wouldn't list {}",
+                suite.name,
+                seed.path
+            );
+        }
+    }
 }

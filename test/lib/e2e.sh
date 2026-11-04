@@ -59,7 +59,7 @@ c_login_shell() {
 c_path() {
   local path_lines h="$USER_HOME" i want prev=-1 idx
   path_lines="$(zlogin 'print -l $path' 2>/dev/null)"
-  for want in "$h/.local/bin" "$h/.cargo/bin" "$h/.local/share/proto/shims" "$h/.local/share/proto/bin" "$h/.nix-profile/bin" /usr/bin; do
+  for want in "$h/.local/bin" "$h/.local/share/proto/shims" "$h/.local/share/proto/bin" "$h/.nix-profile/bin" /usr/bin; do
     idx="$(grep -nxF -- "$want" <<<"$path_lines" | head -1 | cut -d: -f1)"
     [[ -n $idx ]] || { echo "FAIL PATH lacks $want"; printf '%s\n' "$path_lines"; return 1; }
     echo "ok   PATH[$idx] $want"
@@ -75,7 +75,7 @@ c_path() {
 # the image installs, resolved in a login shell, with its owner checked.
 # Hyprland is the PPA's, from apt.
 NIX_TOOLS=(qs ghostty nvim tmux tms lazygit yazi fzf zoxide atuin direnv eza bat fd rg delta dust dysk
-  btop jq yq xh tldr just glow gh fastfetch lazydocker bacon cargo-nextest hyperfine sccache wild
+  btop jq yq xh tldr just glow gh fastfetch lazydocker hyperfine
   oh-my-posh matugen home-manager non-nixos-gpu-setup gpu-screen-recorder satty kubaos-files kubaos-bluetooth
   kubaos-automount kubaos-phone ripdrag)
 APT_TOOLS=(foot fuzzel wl-copy grim slurp playerctl socat qalc notify-send brightnessctl clang mold
@@ -2916,6 +2916,134 @@ c_pins() {
     { echo "FAIL kubaos suite remove test"; printf '%s\n' "$out" | tail -20; return 1; }
 }
 
+# gone_from_generation WHAT PATTERN: fails, naming WHAT, when a store path of
+# the home's current generation (its .drv files aside, which Project pins
+# keep) matches the extended regex PATTERN.
+gone_from_generation() {
+  local gen left
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  left="$("$NIX_BIN/nix-store" -qR "$gen" | grep -v '\.drv$' | grep -E -- "$2" || true)"
+  [[ -z $left ]] || { echo "FAIL $1 still in the generation:"; printf '%s\n' "$left"; return 1; }
+}
+
+# The Rust Suite (home/suites/rust.nix): rustup and the cargo tools, cargo's
+# config with mold and then wild, rustup's default set without a download,
+# rust-analyzer as the wrapper that adds the component, and nothing of it left
+# in the generation after removal. No toolchain is downloaded, so no cargo
+# runs.
+c_suite_rust() {
+  local u="$USER_HOME/.config/kubaos/home" out gen t
+  local cargo_config="$USER_HOME/.cargo/config.toml" settings="$USER_HOME/.rustup/settings.toml"
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$USER_HOME/.rustup" "$USER_HOME/.config/kubaos/editor/nvim/plugins/rust.lua"
+
+  out="$(kz 'kubaos suite add rust --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add rust"; printf '%s\n' "$out" | tail -20; return 1; }
+  for t in rustup cargo rustc rust-analyzer bacon cargo-nextest sccache wild kubaos-rust-workspace; do
+    has_bin "$t" || { echo "FAIL $t not on PATH"; return 1; }
+  done
+  [[ $(readlink -f "$USER_HOME/.nix-profile/bin/rust-analyzer") == */rust-analyzer/bin/rust-analyzer ]] ||
+    { echo "FAIL rust-analyzer is rustup's proxy, not the wrapper that adds the component"; return 1; }
+  zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.cargo/bin" ||
+    { echo "FAIL ~/.cargo/bin is not on PATH"; return 1; }
+  [[ $(zrun 'print -r -- "$SCCACHE_CACHE_SIZE"') == 10G ]] || { echo "FAIL SCCACHE_CACHE_SIZE is not 10G"; return 1; }
+  echo "ok   kubaos suite add rust: rustup, its proxies, the rust-analyzer wrapper, bacon, cargo-nextest, sccache, wild, ~/.cargo/bin on PATH"
+  grep -q 'rustc-wrapper = ".*/bin/sccache"' "$cargo_config" && grep -qF 'link-arg=-fuse-ld=mold' "$cargo_config" ||
+    { echo "FAIL ~/.cargo/config.toml:"; cat "$cargo_config"; return 1; }
+  grep -qx 'default_toolchain = "stable"' "$settings" && grep -qx 'profile = "default"' "$settings" &&
+    [[ ! -e $USER_HOME/.rustup/toolchains ]] ||
+    { echo "FAIL rustup's settings, or a toolchain downloaded at the switch:"; cat "$settings"; return 1; }
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  grep -qF 'lazyvim.plugins.extras.lang.rust' "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
+    { echo "FAIL LazyVim's Rust extra is not in the Defaults"; return 1; }
+  [[ -f $USER_HOME/.config/kubaos/editor/nvim/plugins/rust.lua ]] || { echo "FAIL plugins/rust.lua was not seeded"; return 1; }
+  echo "ok   cargo's config (sccache, clang with mold), rustup's default (stable) with nothing downloaded, LazyVim's Rust extra, the seeded rust.lua"
+
+  out="$(kz 'kubaos suite configure rust --extra wild --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite configure rust --extra wild"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -q 'link-arg=--ld-path=/nix/store/.*/bin/wild"' "$cargo_config" && ! grep -qF mold "$cargo_config" ||
+    { echo "FAIL with the wild extra, ~/.cargo/config.toml:"; cat "$cargo_config"; return 1; }
+  echo "ok   the wild extra links with wild"
+
+  out="$(kz 'kubaos suite remove rust --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove rust"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^cache ~/.rustup \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" && [[ -f $settings ]] ||
+    { echo "FAIL remove: ~/.rustup not shown with its size, or not kept"; printf '%s\n' "$out"; return 1; }
+  gone_from_generation "the Rust Suite's packages" '-(rustup|rust-analyzer|bacon|cargo-nextest|sccache|wild-unwrapped|kubaos-rust-workspace)-' || return 1
+  for t in rustup cargo rust-analyzer bacon sccache wild; do
+    ! has_bin "$t" || { echo "FAIL $t is still on PATH"; return 1; }
+  done
+  [[ ! -e $cargo_config ]] && ! zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.cargo/bin" ||
+    { echo "FAIL ~/.cargo/config.toml or ~/.cargo/bin on PATH is left"; return 1; }
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  ! grep -qs SCCACHE "$gen/home-path/etc/profile.d/hm-session-vars.sh" &&
+    ! grep -qF lang.rust "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
+    { echo "FAIL the Suite's environment or Neovim extra is left"; return 1; }
+  echo "ok   kubaos suite remove rust: ~/.rustup kept with its size shown, nothing of the Suite left in the generation"
+  rm -rf "$USER_HOME/.rustup" "$USER_HOME/.config/kubaos/editor/nvim/plugins/rust.lua"
+}
+
+# The Go Suite (home/suites/go.nix): Go and its tools, a project scaffolded
+# and run (no network: the standard library only), Neovim's Go support taking
+# Nix's tools instead of Mason's, a toolchain entry per version for Project
+# pins, and nothing of it left in the generation after removal.
+c_suite_go() {
+  local u="$USER_HOME/.config/kubaos/home" project="$USER_HOME/Projects/go-demo" out gen t v
+  local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/go.lua"
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$project" "$mine"
+
+  out="$(kz 'kubaos suite add go --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add go"; printf '%s\n' "$out" | tail -20; return 1; }
+  for t in go gopls gofumpt goimports golangci-lint dlv kubaos-go-new; do
+    has_bin "$t" || { echo "FAIL $t not on PATH"; return 1; }
+  done
+  [[ $(zrun 'go env GOVERSION') == go1.26.* && $(zrun 'print -r -- "$GOTOOLCHAIN"') == local ]] ||
+    { echo "FAIL want Go 1.26 with GOTOOLCHAIN=local: $(zrun 'go env GOVERSION GOTOOLCHAIN' | tr '\n' ' ')"; return 1; }
+  zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/go/bin" || { echo "FAIL ~/go/bin is not on PATH"; return 1; }
+  for v in 1.26 1.27 1.25; do
+    [[ -f $USER_HOME/.local/share/kubaos/toolchains/go/$v ]] || { echo "FAIL no toolchain entry for Go $v"; return 1; }
+  done
+  [[ -f $mine ]] || { echo "FAIL plugins/go.lua was not seeded"; return 1; }
+  echo "ok   kubaos suite add go: Go 1.26 with GOTOOLCHAIN=local, its tools, ~/go/bin on PATH, an entry per version, the seeded go.lua"
+
+  out="$(kz 'kubaos suite new go go-demo' 2>&1)" ||
+    { echo "FAIL kubaos suite new go go-demo"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ -d $project/.git && $(zrun "cd $project && go run .") == "Hello from go-demo" ]] &&
+    grep -qx 'module go-demo' "$project/go.mod" ||
+    { echo "FAIL the scaffolded project doesn't run"; ls -la "$project"; return 1; }
+  [[ -z $(zrun "cd $project && gofumpt -l . && goimports -l .") ]] || { echo "FAIL the scaffolded main.go isn't formatted"; return 1; }
+  echo "ok   kubaos suite new go go-demo: a module under git whose main package runs and is formatted"
+
+  cache_lock nvim
+  out="$(zrun "nvim --headless +'lua io.write(\"\\nMASON \", table.concat(LazyVim.opts(\"mason.nvim\").ensure_installed, \",\"), \"\\nGOPLS \", tostring(LazyVim.opts(\"nvim-lspconfig\").servers.gopls.mason))' +qa" 2>&1 | tr -d '\r')"
+  grep -qx 'GOPLS false' <<<"$out" && grep -q '^MASON ' <<<"$out" &&
+    ! grep '^MASON ' <<<"$out" | grep -qwE 'delve|gofumpt|goimports|golangci-lint' ||
+    { echo "FAIL Mason would install Go tools Nix has:"; printf '%s\n' "$out" | grep -E '^(MASON|GOPLS)'; return 1; }
+  echo "ok   LazyVim's Go extra uses Nix's gopls, gofumpt, goimports, golangci-lint and delve, not Mason's"
+
+  out="$(kz 'kubaos suite remove go --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove go"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^cache ~/.cache/go-build \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" &&
+    grep -qx '  ~/.config/kubaos/editor/nvim/plugins/go.lua' <<<"$out" && [[ -f $project/main.go ]] ||
+    { echo "FAIL remove: the build cache's size, the user's go.lua, or the project"; printf '%s\n' "$out"; return 1; }
+  gone_from_generation "the Go Suite's packages" '-(go-1\.[0-9.]+|gopls|gofumpt|gotools|golangci-lint|delve|kubaos-go-new)(-|$)' || return 1
+  for t in go gopls dlv kubaos-go-new; do
+    ! has_bin "$t" || { echo "FAIL $t is still on PATH"; return 1; }
+  done
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  ! grep -qs GOTOOLCHAIN "$gen/home-path/etc/profile.d/hm-session-vars.sh" &&
+    ! grep -qF lang.go "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
+    { echo "FAIL the Suite's environment or Neovim extra is left"; return 1; }
+  [[ -f $USER_HOME/.local/share/kubaos/toolchains/go/1.26 ]] || { echo "FAIL the pins' entries went with the Suite"; return 1; }
+  echo "ok   kubaos suite remove go: the build cache kept with its size, go.lua listed, the project untouched, nothing of the Suite in the generation but the pins' entries"
+  rm -rf "$project" "$mine"
+}
+
 # The user layer: test/user-layer-check, which the VM bench also
 # runs on an installed system. Commits to the checkout, so it runs after the
 # other checks but the update ones, which start from a clone of it.
@@ -3834,7 +3962,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins dot_config warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go dot_config warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

@@ -67,9 +67,9 @@ system/30-hardware.sh
 sudo reboot          # enroll the MOK on the blue screen if it asked for a password
 system/30-hardware.sh   # second run: confirms modules + power profiles
 
-# 2. Toolchains, outside Nix on purpose.
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup component add rust-analyzer clippy
+# 2. The languages you write, as Suites (`kubaos suite list`).
+kubaos suite add rust
+kubaos suite add go
 ```
 
 The MOK screen, the fingerprint enrollment and what to verify are in the hard way's sections 1, 7 and 8 below: same scripts, same steps.
@@ -438,11 +438,11 @@ starts from Hyprland's autostart (`qs`, no systemd unit).
 /run/opengl-driver`; Ghostty (`SUPER+Return`) and the bar render;
 `hyprctl monitors` shows every screen on the dock at its preferred mode.
 
-Then, outside Nix on purpose:
+Then the languages you write, as Suites (`kubaos suite list`):
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup component add rust-analyzer clippy
+kubaos suite add rust
+kubaos suite add go
 ```
 
 ### 11. `system/70-bitwarden.sh`, then `kubaos bitwarden setup`

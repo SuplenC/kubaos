@@ -138,9 +138,8 @@ Ranked by benefit over effort. None of these is urgent; the current set already 
 
 Expected gain: about 20 to 25% faster incremental debug rebuilds on large binaries in this test (0.4 s per rebuild on helix); upstream reports 2.3 to 2.5x faster linking than mold on linker-only benchmarks. Effort: small. Risk: pre-1.0 linker bugs; fall back to mold.
 
-- `home/dev.nix`: in `linuxTarget`, replace `"link-arg=-fuse-ld=mold"` with `"link-arg=--ld-path=${lib.getExe pkgs.wild-unwrapped}"`. Use `wild-unwrapped`, not `wild`: the wrapped variant is a nixpkgs bintools wrapper meant for Nix stdenv, and on Ubuntu the pure binary is what clang should call. Keep `linker = "clang"` (clang from apt).
+- `kubaos suite configure rust --extra wild`: the Rust Suite's `~/.cargo/config.toml` (`home/suites/rust.nix`) then passes `link-arg=--ld-path=<wild-unwrapped>/bin/wild` instead of `-fuse-ld=mold`. It uses `wild-unwrapped`, not `wild`: the wrapped variant is a nixpkgs bintools wrapper meant for Nix stdenv, and on Ubuntu the pure binary is what clang should call. `linker = "clang"` (clang from apt) stays.
 - Keep `mold` in `system/20-base.sh` as the fallback. For a one-off build with mold: `CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=mold" cargo build`.
-- Update the comment at the top of `home/dev.nix` ("clang and mold come from apt") and add `wild` to the Nix list in `docs/CONTRACTS.md`, "Packages: who installs what" (lead owns that file).
 - Verify on the laptop: `readelf --string-dump .comment target/debug/<bin> | grep -i wild`, then `cargo build --timings` on a large Rust workspace with both linkers.
 
 ### 2. Replace duf with dysk (Switch, low priority)

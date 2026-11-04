@@ -347,7 +347,7 @@ In the Command menu, "Settings folder" opens it in Files, and "Settings: Desktop
 | A whole language setup (a Suite) | `kubaos suite list`, `kubaos suite add NAME [--version V] [--extra E]`, `configure`, `remove [--purge-caches]`; `kubaos suite new NAME PROJECT` starts a project in `~/Projects` (another folder: `home.sessionVariables.KUBAOS_PROJECTS` in `home/home.nix`). In the Command menu, type the language's name: "Install the Go Suite", or once it's installed "Go Suite" (Configure…, Remove) and "New Go project…" | the switch `add`, `configure` and `remove` queue |
 | A Suite version for one folder (a Project pin) | `kubaos pin node 22 ~/Projects/acme` writes `use suite node 22` into `~/Projects/acme/.envrc`; `kubaos unpin node ~/Projects/acme`; `kubaos pins` shows what applies where you are, `kubaos pins --all` every pin under `~/Projects`. In the Command menu: "Pin a Suite version…", "Unpin a Suite version…", "Project pins" | the next `cd` into the folder |
 
-- `~/.zshrc` and the other files home-manager links are read-only, so an installer that offers to "update your profile" fails there. Say no, or pass its flag for that (often `--no-profile`), and put any lines it wanted in `~/.config/kubaos/terminal/zsh/zshrc`. rustup's and cargo's PATH entries are already set, and each Suite sets its own.
+- `~/.zshrc` and the other files home-manager links are read-only, so an installer that offers to "update your profile" fails there. Say no, or pass its flag for that (often `--no-profile`), and put any lines it wanted in `~/.config/kubaos/terminal/zsh/zshrc`. Each Suite sets its own PATH entries.
 - To see what KubaOS ships for an app, read `~/.local/share/kubaos/defaults/<app>/` (or `config/<app>/` in the repo).
 - Delete a file in `~/.config/kubaos` to get the example back on the next `dot-config apply` or update.
 - Coming from a release before the groups, the update moves each `~/.config/kubaos/<app>` into its group for you and loses nothing. Where you had edited both the old file and a new one in the group, it keeps the group's and puts yours beside it as `<file>.old`, and says so; merge the two by hand. A user layer under git sees the moves as renames, for you to commit.
@@ -426,7 +426,11 @@ Secrets, Bitwarden and the YubiKey have their own page: [`docs/SECRETS.md`](SECR
 
 ## Rust
 
-rustup (outside Nix) owns the toolchains. `home/dev.nix` writes `~/.cargo/config.toml`: sccache as the rustc wrapper, and clang (apt) as the linker driver for x86_64 and aarch64 Linux with mold (`-C link-arg=-fuse-ld=mold`). wild 0.8.0 from nixpkgs is on PATH as the opt-in alternative; `docs/ALTERNATIVES.md` measured 1.15x to 1.26x faster incremental rebuilds than mold.
+The Rust Suite: `kubaos suite add rust` installs rustup, rust-analyzer, bacon, cargo-nextest, sccache and wild, writes `~/.cargo/config.toml`, puts `~/.cargo/bin` on PATH for what `cargo install` builds, and turns on LazyVim's Rust extra (rustaceanvim, crates.nvim, codelldb through Mason for debugging). `kubaos suite new rust NAME` starts a binary in `~/Projects/NAME`; `--with lib` starts a library, and `--with workspace` a workspace under git whose members are `crates/*`, with a first library, `crates/NAME`.
+
+rustup owns the toolchains, in `~/.rustup`. The Suite has no versions: a project's `rust-toolchain.toml` pins its own (`[toolchain]` and `channel = "1.90"`), and rustup installs it the first time cargo runs there; everywhere else it's stable. Adding the Suite downloads nothing: the first `cargo` or `rustc` does, once. Each toolchain comes with clippy and rustfmt (rustup's default profile), and the first start of rust-analyzer in a toolchain adds it. rustup comes from nixpkgs, which points the toolchains it downloads at Nix's C library; what cargo builds still links against the system's. A rustup installed by hand from rustup.rs keeps its own copy in `~/.cargo/bin`, which comes first on PATH: delete `~/.cargo/bin/rustup` and the proxies beside it (`cargo`, `rustc`, `rustdoc`, `rustfmt`, `cargo-fmt`, `cargo-clippy`, `clippy-driver`, `cargo-miri`, `rust-analyzer`, `rust-gdb`, `rust-gdbgui`, `rust-lldb`, `rls`) to use the Suite's; the toolchains in `~/.rustup` stay.
+
+`~/.cargo/config.toml` has sccache as the rustc wrapper and clang (apt) as the linker driver for x86_64 and aarch64 Linux, with mold (`-C link-arg=-fuse-ld=mold`). sccache's cache is `~/.cache/sccache`, up to 10 GB; more in `home.nix` with `home.sessionVariables.SCCACHE_CACHE_SIZE = "30G";`. wild is on PATH as the faster alternative; `docs/ALTERNATIVES.md` measured 1.15x to 1.26x faster incremental rebuilds than mold.
 
 Try wild in one project without switching, for one build:
 
@@ -443,7 +447,7 @@ rustflags = ["-C", "link-arg=--ld-path=wild"]
 
 Cargo appends these flags to the global `-fuse-ld=mold`, and clang's `--ld-path` takes precedence over `-fuse-ld`, so wild links. Check with `readelf -p .comment target/debug/<bin> | grep -i wild`. Different rustflags mean a full rebuild the first time (cargo and sccache key on them).
 
-Switch for good: set `rustLinker = "wild"` at the top of `home/dev.nix` and `home-manager switch` (`"mold"` to go back). With wild as the default, one build with mold is `CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=--ld-path=mold" cargo build` (the last `--ld-path` wins).
+Switch for good: `kubaos suite configure rust --extra wild` (`--no-extra wild` to go back to mold). With wild as the default, one build with mold is `CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=--ld-path=mold" cargo build` (the last `--ld-path` wins).
 
 Benchmark on a project of yours, with a separate target dir per linker so they don't invalidate each other, and without sccache so clean builds aren't served from its cache:
 
@@ -469,6 +473,16 @@ rm -rf target/bench-mold target/bench-wild
 
 `cargo build --timings` on the same two target dirs shows where the time goes.
 
+Your Neovim settings for Rust go in `~/.config/kubaos/editor/nvim/plugins/rust.lua`, which the Suite creates with an example when it's missing. `kubaos suite remove rust` takes the Suite away and keeps `~/.rustup` (the toolchains), cargo's downloads (`~/.cargo/registry`, `~/.cargo/git`) and sccache's cache, showing their sizes; `--purge-caches` deletes them. What `cargo install` put in `~/.cargo/bin` stays.
+
+## Go
+
+The Go Suite: `kubaos suite add go` installs Go from your nixpkgs with gopls, gofumpt, goimports, golangci-lint and delve, puts `~/go/bin` on PATH for what `go install` builds, and turns on LazyVim's Go extra, which uses those tools instead of installing its own through Mason: diagnostics and completion from gopls, formatting with goimports and gofumpt, linting with golangci-lint, debugging with delve (nvim-dap-go). `kubaos suite new go NAME` starts a module called NAME in `~/Projects/NAME`, under git, with a main package.
+
+Go 1.26 is the default, the version nixpkgs builds its Go tools with, so they come from the binary cache; `kubaos suite add go --version 1.27` (or `configure`) picks another of the versions `kubaos suite show go` lists. A version newer than the default builds gopls, gofumpt, goimports and golangci-lint again with it, about a minute at that switch, since they only read code up to the Go they were built with; delve stays as it is. `GOTOOLCHAIN` is `local`, so a `go.mod` asking for a newer Go fails with a message naming it instead of go downloading one past Nix: pin that project with `kubaos pin go 1.27` (Project pins, above), which works with the Suite at another version, or not installed.
+
+Your Neovim settings for Go go in `~/.config/kubaos/editor/nvim/plugins/go.lua`, which the Suite creates with an example when it's missing. `kubaos suite remove go` keeps `~/go` (the module cache and what `go install` built), `~/.cache/go-build`, `~/.cache/gopls` and `~/.cache/golangci-lint`, showing their sizes; `--purge-caches` deletes them.
+
 ## Under the hood
 
 For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the interfaces between the parts in [`docs/CONTRACTS.md`](CONTRACTS.md).
@@ -480,7 +494,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 - **Shell:** KubaOS's own, written in QML on Quickshell v0.3.2 (pinned), in the structure of Caelestia: bar, notifications, OSD, control center, power menu, wallpaper picker, lock screen with password, fingerprint and security key in parallel. The Command menu is [Kotodama](https://github.com/SuplenC/kotodama), drawn by the shell in its colors.
 - **User environment:** standalone home-manager (nixos-26.05) owns everything in `$HOME`. KubaOS's configs are read-only links from the store into `~/.config`, and yours live in `~/.config/kubaos` (above, "Make it yours"). Nix apps get the GPU through home-manager's `targets.genericLinux.gpu`.
 - **Theming:** matugen (`scheme-fidelity`) turns the wallpaper into Material 3 colors and renders 22 files in `~/.local/state/theme/` for every consumer, the pointer included: Bibata, recoloured. Geist, M PLUS 1 for the Japanese bits, KubaOS Symbols (Tabler's outline icons, drawn as SVGs), Colloid icons (orange).
-- **Terminal and dev:** Ghostty (foot as the fallback), tmux + tms, Neovim 0.12 (LazyVim), rustup, sccache, clang + mold (wild optional), Docker Engine + lazydocker, Chrome.
+- **Terminal and dev:** Ghostty (foot as the fallback), tmux + tms, Neovim 0.12 (LazyVim), the Suites (Rust through rustup with sccache and clang + mold or wild, Go, and the others `kubaos suite list` shows), Docker Engine + lazydocker, Chrome.
 - **Secrets:** Bitwarden desktop's SSH agent (private keys never touch the disk), `bw` for SSH Host blocks, git signing, the gh token and per-project env through direnv. A FIDO2 security key with a fingerprint sensor (the YubiKey C Bio is the tested one) does sudo, polkit and the lock screen; the password stays as the fallback.
 - **Hardware:** `tuxedo-drivers` and power-profiles-daemon (no TUXEDO Control Center), fprintd, bolt for the dock.
 - **Install:** Kōbō, an iced app, on a casper live ISO, with the Rust engine (`kubaos-core`, also behind the `kubaos` CLI) running inside it. It unpacks a prebuilt image with `/nix` and the home-manager generation already inside, which is why it needs no network.
