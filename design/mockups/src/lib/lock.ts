@@ -4,9 +4,8 @@
 // At rest it is the wallpaper and its clock: the digits in `type.clock_rest` under a kicker line
 // (where and which day, then the date), placed on the picture where the wallpaper says, and the
 // picture's foreground cut-out, where it has one, drawn over the digits so the city stands in front
-// of the clock. The digits are a light tint of the picture behind them, so they read as part of it.
-// Behind the kicker a shade of `surface` tight to it, as strong as this picture needs for its words
-// to hold 4.5:1 and no stronger.
+// of the clock. The digits and the kicker are a light tint of the picture behind the digits, so
+// they read as part of it, the kicker lifted off it by a halo of `surface` round each letter.
 //
 // Awake, the frame closes in round the picture, `space.s8` all round, the picture blurs
 // `size.lock_blur` and dims as a panel's desktop does, the clock lifts out from behind the cut-out
@@ -25,7 +24,7 @@
 // It always draws in the night scheme matugen derives from its wallpaper, whatever the mode.
 
 import "./lock.css";
-import { backingCover, KICKER_WORDS, type NightScheme, paintNight, shadeFor, tintFor } from "./lock-shade.ts";
+import { type NightScheme, paintNight, tintFor } from "./lock-tint.ts";
 import { field, fieldRoom, note } from "./field.ts";
 import { icon } from "./icon.ts";
 import { keyHints } from "./keycap.ts";
@@ -34,7 +33,7 @@ import { pill } from "./pill.ts";
 import { probe, variant } from "./probe.ts";
 import { hang, type Screen, screen, type Sheet, sheet } from "./sheet.ts";
 import { advance, text } from "./text.ts";
-import { length, number } from "./tokens.ts";
+import { length } from "./tokens.ts";
 
 export type { NightScheme };
 
@@ -62,7 +61,7 @@ export type Phase = "rest" | "awake" | "desktop";
 /** What the sheet shows: waiting for a password, checking one, or after a miss. */
 export type Moment = "rest" | "loading" | "error";
 
-/** The kicker over the digits: where and which day in `primary`, then the date. */
+/** The kicker over the digits: where and which day, then the date. */
 export interface Kicker {
   readonly place: string;
   readonly date: string;
@@ -146,9 +145,17 @@ function sheetContent(moment: Moment, error: string, live: boolean): HTMLElement
   return box;
 }
 
-/** The kicker: the place and day in `primary`, then ` · ` and the date in `on_surface_variant`. */
+/**
+ * The kicker: the place and day in `clock_place`, then ` · ` and the date in `clock_date`. Its
+ * colours are the CSS's, as the digits' are: the picture's tint at rest, its roles awake.
+ */
 function kickerLine(kicker: Kicker): HTMLElement {
-  const line = row(0, "centre", text(kicker.place, "accent", "primary"), text(` · ${kicker.date}`, "body_strong", "on_surface_variant"));
+  const place = text(kicker.place, "clock_place");
+  const date = text(` · ${kicker.date}`, "clock_date");
+  for (const words of [place, date]) words.style.removeProperty("color");
+  place.classList.add("k-lock-place");
+  date.classList.add("k-lock-date");
+  const line = row(0, "centre", place, date);
   line.classList.add("k-lock-kicker");
   return line;
 }
@@ -174,7 +181,7 @@ export function lock(options: LockOptions): Lock {
   const shown = screen({ width: options.width, height: options.height, wallpaper: wallpaper.picture, bar: [bar.pill, ...(options.bar ?? [])] });
   const element = shown.element;
   element.classList.add("k-lock");
-  const colours = paintNight(element, wallpaper.night);
+  paintNight(element, wallpaper.night);
   element.dataset.phase = options.phase;
   element.toggleAttribute("data-open", options.phase === "awake");
   element.toggleAttribute("data-live", options.live ?? false);
@@ -195,15 +202,13 @@ export function lock(options: LockOptions): Lock {
   // The digits' colour is the CSS's: the picture's tint at rest, `on_surface` awake and in the bar.
   digits.style.removeProperty("color");
   const kicker = kickerLine(options.kicker ?? KICKER);
-  const shade = document.createElement("span");
-  shade.className = "k-lock-shade";
   const clock = document.createElement("span");
   clock.className = "k-lock-clock";
   clock.style.setProperty("--digits-natural", String(digitsWidth(time)));
   clock.style.setProperty("--cap-height", String(capHeight()));
   clock.style.setProperty("--bar-natural", String(advance("body", time)));
   clock.style.setProperty("--letters", String([...time].length));
-  clock.append(shade, kicker, digits);
+  clock.append(kicker, digits);
   windows.after(clock);
 
   let cutout: HTMLImageElement | null = null;
@@ -227,9 +232,8 @@ export function lock(options: LockOptions): Lock {
 
   // The rest clock's place is the picture's, which only the picture's size and the screen's know:
   // the screen crops the picture as `object-fit: cover` does, and the clock follows the city. The
-  // digits' tint and the shade's strength are the picture's colours under the digits and the
-  // kicker, read off the picture itself. The bar's clock is where the pill's layout puts its time,
-  // which only layout knows.
+  // clock's tint is the picture's colour under the digits, read off the picture itself. The bar's
+  // clock is where the pill's layout puts its time, which only layout knows.
   const place = () => {
     const width = element.clientWidth;
     const height = element.clientHeight;
@@ -250,8 +254,6 @@ export function lock(options: LockOptions): Lock {
     const cx = Math.min(width - margin - half, Math.max(margin + half, cover.left + wallpaper.clock.x * seen.width * scale));
     const restBase = cover.top + wallpaper.clock.y * seen.height * scale;
     const restTop = Math.round(restBase - cap * token("type-clock_rest-size"));
-    const above = kickerHeight + token("space-s16");
-    const awakeTop = token("space-s8") + token("space-s48") + above;
     clock.style.setProperty("--digits-natural", String(natural));
     clock.style.setProperty("--cap-height", String(cap));
     clock.style.setProperty("--bar-natural", String(advance("body", time)));
@@ -266,14 +268,6 @@ export function lock(options: LockOptions): Lock {
     if (tint) clock.style.setProperty("--digits-tint", tint);
     else clock.style.removeProperty("--digits-tint");
 
-    const kickerBox = (top: number, middle: number) => ({ x: middle - kickerWidth / 2, y: top - above, width: kickerWidth, height: kickerHeight });
-    const dimmed = { blur: token("size-lock_blur"), dim: number("opacity-panel_scrim") };
-    // The shade is a box blurred past the kicker, so its opacity is raised by what the blur leaves
-    // at the kicker's corners: the words hold 4.5:1 where it is weakest.
-    const left = backingCover({ x: token("space-s16"), y: token("space-s12") }, token("space-s8"));
-    const shade = (needed: number) => String(Math.min(1, Math.ceil((needed / left) * 100) / 100));
-    clock.style.setProperty("--shade-rest", shade(shadeFor(picture, colours, KICKER_WORDS, kickerBox(restTop, cx), cover)));
-    clock.style.setProperty("--shade-awake", shade(shadeFor(picture, colours, KICKER_WORDS, kickerBox(awakeTop, width / 2), cover, dimmed)));
   };
   const watch = new ResizeObserver(place);
   watch.observe(element);
