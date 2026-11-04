@@ -94,8 +94,8 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 
 | Style | Size / line | Weight, family | For |
 |---|---|---|---|
-| `clock_rest` | 384 / 384 | light, tabular figures | The lock screen's clock at rest, with only the wallpaper round it: digits about 280 tall, which the city's cut-out may stand in front of. Its line is its size, so the digits sit on the grid wherever the wallpaper places them. |
-| `clock` | 80 / 88 | light, tabular figures | The lock screen's clock once it is awake, over the password's sheet: a step above the hero, light like every big figure. The clock popup's time stays `hero_number`. |
+| `clock_rest` | 384 / 384 | light | The lock screen's clock at rest, with only the wallpaper round it: digits about 280 tall, which the city's cut-out may stand in front of. Its line is its size, so the digits sit on the grid wherever the wallpaper places them. |
+| `clock` | 80 / 88 | light | The lock screen's clock once it is awake, over the password's sheet: a step above the hero, light like every big figure. The clock popup's time stays `hero_number`. |
 | `hero` | 64 / 72 | semibold | Words at the hero size: Kōbō's welcome line and its done screen's headline, nothing else. The first and the last thing an install shows get the same size. |
 | `hero_number` | 64 / 72 | light | Numbers at the hero size: the install percent, the clock popup's time. Light, so a big figure doesn't shout. |
 | `display` | 48 / 56 | semibold | The heading of a full-screen moment other than Kōbō's welcome and done screens. |
@@ -105,7 +105,6 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 | `subheading` | 16 / 24 | semibold | A card's or an error's first line. |
 | `body_large` | 16 / 24 | regular | A lede under a display line; the text in a field. |
 | `body` | 14 / 20 | regular | Running text, explanations, toasts. |
-| `body_number` | 14 / 20 | regular, tabular figures | A time or number that changes in place at the body's size: the bar's time, which the lock's clock flies into. |
 | `body_strong` | 14 / 20 | medium | A list row's title; a value next to its label. |
 | `button_large` | 16 / 24 | semibold | A large button's label (48 control). |
 | `button` | 14 / 24 | semibold | A regular button's label (40 control). |
@@ -119,7 +118,7 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 | `keycap` | 11 / 20 | medium, Geist Mono | The key on a `Keycap`, on the keycap's 20 line so it centres in it. |
 | `mono_large` | 14 / 20 | regular, Geist Mono | A command or key that is the subject of its line. |
 
-**Tabular figures** (`tabular` on a style, OpenType `tnum`) make every figure one width, so a number that changes in place keeps its width: `label_number` and `body_number` have them, and the lock's two clocks, which are one clock with the bar's time as it flies between them, so it lands on the bar's figures where the bar draws them. QML turns the feature on (`font.features`, which Qt applies only to shaped text, so such a style is always shaped). iced's text (0.14) has no font features, so iced draws the figures proportional, and a component showing a changing number holds it in a box as wide as its widest value, ending in one place.
+**Tabular figures** (`tabular` on a style, OpenType `tnum`) make every figure one width, so a number that changes in place keeps its width: `label_number` has them. A clock keeps its proportional figures: the lock's two clocks and the bar's time, which the lock's clock flies into, are drawn with Geist's own figures, and the bar's clock pill eases to its new width as a minute changes it (`docs/design/components/pill.md`). QML turns the feature on (`font.features`, which Qt applies only to shaped text, so such a style is always shaped). iced's text (0.14) has no font features, so iced draws the figures proportional, and a component showing a changing number holds it in a box as wide as its widest value, ending in one place.
 
 A single-line control's label takes the control's content box as its line height (a 40 button has a 24 line inside 8 + 8 padding), so the label centres on the grid with no centring arithmetic.
 
@@ -130,7 +129,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | Icon | Beside |
 |---|---|
 | 16 | `caption`, `small`, `label`, `mono`, `keycap`, `accent`, `button_small` |
-| 20 | `body`, `body_number`, `body_strong`, `body_large`, `mono_large`, `button` |
+| 20 | `body`, `body_strong`, `body_large`, `mono_large`, `button` |
 | 24 | `subheading`, `heading`, `button_large` |
 | 32 | `headline`, `title` |
 | 48 | `display`, `hero`, `hero_number`, `clock` |
