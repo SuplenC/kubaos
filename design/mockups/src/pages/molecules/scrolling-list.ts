@@ -116,7 +116,7 @@ export default page({
       {
         name: "The thumb lights",
         what: "The pointer onto the thumb: it goes from `outline_variant` to `outline` over `micro` on `standard`, a colour change under the pointer; the pointer leaving plays it back.",
-        tracks: [{ part: "the thumb", on: "a scrolled list", target: ".k-list-thumb", property: "background-color", from: { color: "outline_variant" }, to: { color: "outline" }, duration: "micro", curve: "standard" }],
+        tracks: [{ part: "the thumb", on: "a scrolled list", target: ".k-list-thumb", property: "--list-thumb-lit", from: 0, to: 1, duration: "micro", curve: "standard" }],
         reduced: "same",
         back: "plays",
         sample: () => scrolling({ down: 0.5 }),
