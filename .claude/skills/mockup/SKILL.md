@@ -33,7 +33,7 @@ A mockup is the thing itself, complete, in the mockup site: `design/mockups/`, s
 
 `design/mockups/README.md` says how a page is added: its required parts, and where it is listed.
 
-A mockup page is **exhaustive**. It shows and describes every one of these that applies, live, next to its written description:
+A mockup page is **exhaustive**. It shows every one of these that applies, live, with labels and table cells of a few words, never paragraphs: the sample shows what words would restate, and the full reference is the component's page under `docs/design/components/`.
 
 - **Variants and sizes,** and which is for what.
 - **Every state:** rest, lit (hovered or focused from the keyboard, one state), pressed, disabled, selected, loading, empty, error, and open for a part that opens (a select), by night and by day (`docs/DESIGN.md`, "States").
