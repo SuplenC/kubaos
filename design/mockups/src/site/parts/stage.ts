@@ -2,7 +2,7 @@
 // side by side (or the one mode the top bar picks), under one bar of chips that drives both: Live,
 // then each state the page shows, pinned on every row. A mono hint at the bar's end says how to try
 // the live sample, or what the pinned state looks like. A sample wider than its pane is scaled down
-// to fit it, and its pane says by how much.
+// to fit it, and its pane says by how much; with `?all`, the panes stack and nothing is scaled.
 
 import { el, label, relayout, sampleBox } from "../dom.ts";
 import { applies, type DoesntApply, type Focus, LOOK_NAMES, STATE_NAMES, type Stage, type State, type States } from "../page.ts";
@@ -93,7 +93,9 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
     const read = panes.map(({ inner }) => ({ natural: inner.scrollWidth, room: inner.clientWidth }));
     panes.forEach(({ outer, inner, scale }, i) => {
       const { natural, room } = read[i]!;
-      const by = natural > room && room > 0 ? room / natural : 1;
+      // `?all` draws every sample at its own size for the shots and the geometry frames, which
+      // measure each box as drawn: one wider than its pane scrolls in it instead.
+      const by = natural > room && room > 0 && !ALL ? room / natural : 1;
       scale.replaceChildren(...(by < 1 ? [label(`shown at ${Math.floor(by * 100)}%`, "label", "on_surface_variant")] : []));
       if (by === 1) return;
       inner.style.width = `${natural}px`;

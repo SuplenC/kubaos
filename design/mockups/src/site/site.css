@@ -291,6 +291,15 @@ body {
   align-self: stretch;
 }
 
+/* `?all` draws the panes one under another at their samples' own size (`site/parts/stage.ts`). */
+[data-all] .page-panes {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+[data-all] .page-pane-fit {
+  overflow-x: auto;
+}
+
 .page-stage-flow {
   display: flex;
   flex-wrap: wrap;
