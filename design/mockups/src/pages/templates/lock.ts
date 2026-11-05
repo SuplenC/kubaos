@@ -305,7 +305,7 @@ export default page({
   slug: "lock",
   title: "Lock",
   lede: "The lock screen: a clock the city stands in front of, then the frame and the password's sheet.",
-  code: { qml: "Lock", unbuilt: "QML: not built yet" },
+  code: { unbuilt: "QML Lock: not built yet" },
   stage: {
     live: () => liveLock(),
     hint: "click it and type, or Esc",

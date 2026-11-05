@@ -8,7 +8,6 @@ import { el, label, relayout, sampleBox } from "../dom.ts";
 import { applies, type DoesntApply, type Focus, LOOK_NAMES, STATE_NAMES, type Stage, type State, type States } from "../page.ts";
 import { ALL, type Mode, settings } from "../settings.ts";
 import { picker } from "./picker.ts";
-import { notApplying } from "./section.ts";
 import { painted } from "./swatches.ts";
 
 const MODE_NAMES: Record<Mode, string> = { dark: "Night", light: "Day" };
@@ -117,7 +116,6 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
     "page-hero",
     el("div", "page-panes", ...panes.map((pane) => pane.box)),
     bar,
-    ...(applies(spec.daylight) ? [] : [notApplying(spec.daylight.doesntApply, "Day")]),
   );
   box.dataset.panes = String(panes.length);
   show(0);
