@@ -9,7 +9,8 @@ import { type ItemPinned, type MenuEntry, type MenuItemSpec, menu, menuItem } fr
 import { text } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const ACTION: Words = { short: "Open", long: "Open the folder this download was saved in" };
 

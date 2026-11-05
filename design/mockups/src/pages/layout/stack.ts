@@ -11,7 +11,8 @@ import { divider, fill, filling, gap, row, stack, within } from "../../lib/layou
 import type { Align } from "../../lib/probe.ts";
 import { switchControl } from "../../lib/switch.ts";
 import { clamped, text, wrapped } from "../../lib/text.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { settingsWindow } from "./example.ts";
 
 const PANEL = "var(--size-panel)";

@@ -5,7 +5,8 @@ import { type Shown, stateOptions } from "../../lib/control.ts";
 import { row } from "../../lib/layout.ts";
 import { switchControl } from "../../lib/switch.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** A switch, on or off, in `state`. */
 function sample(on: boolean, state: Shown = "rest"): HTMLButtonElement {

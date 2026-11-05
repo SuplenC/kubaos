@@ -8,7 +8,8 @@ import { type Pinned } from "../../lib/control.ts";
 import { stack, within } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const TODAY: Day = { year: 2026, month: 10, day: 27 };
 const PICKED: Day = { year: 2026, month: 10, day: 30 };

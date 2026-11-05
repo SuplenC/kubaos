@@ -1,5 +1,5 @@
-/* The site around the mocks (the toolbar, the navigation) at scale 1, and the page's parts, drawn
-   at the page's scale like the mocks they hold. Every value is a token. */
+/* The site around the mocks (the top bar, the navigation, the rail) at scale 1, and the page's
+   parts, drawn at the page's scale like the mocks they hold. Every value is a token. */
 
 * {
   box-sizing: border-box;
@@ -46,80 +46,88 @@ body {
   outline: max(1px, round(nearest, var(--focus-tube), 1px)) solid var(--color-primary);
 }
 
-/* Over the page, the floating hints among it too. */
+/* The top bar: the brand, the settings' groups and the search, over the page and the floating
+   hints among it. It wraps onto more rows in a narrow window. */
 .site-toolbar {
   position: sticky;
   top: 0;
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-s8) var(--space-s24);
-  padding: var(--space-s12) var(--space-s16);
+  align-items: center;
+  gap: var(--space-s12) var(--space-s32);
+  padding: var(--space-s12) var(--space-s24);
   background: var(--color-surface_container_low);
   border-bottom: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
 }
 
-.site-note {
-  flex-basis: 100%;
-  font-size: var(--type-small-size);
-  line-height: var(--type-small-line);
-  color: var(--color-warning);
-}
-
-.site-choice {
+.site-group {
   display: flex;
   align-items: center;
-  gap: var(--space-s4);
+  gap: var(--space-s8);
 }
 
-.site-choice-name {
-  margin-right: var(--space-s4);
-  font-size: var(--type-label-size);
-  line-height: var(--type-label-line);
-  color: var(--color-on_surface_variant);
+.site-spacer {
+  flex: 1;
 }
 
+.site-search {
+  width: var(--size-menu);
+}
+
+/* The navigation, the page and the rail: the page fills the room between the two. */
 .site-body {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: var(--size-sidebar) minmax(0, 1fr) var(--size-rail);
+  align-items: start;
 }
 
-/* The navigation sticks under the toolbar and scrolls on its own when it is taller than the window
-   below it, so no link hides under the toolbar or past the window's foot. */
-.site-nav {
+/* The navigation and the rail stick under the top bar and scroll on their own when taller than
+   the window below it, so no link hides under the bar or past the window's foot. */
+.site-nav,
+.site-rail {
   position: sticky;
   top: var(--site-toolbar-height, 0px);
   max-height: calc(100vh - var(--site-toolbar-height, 0px));
   overflow-y: auto;
-  flex: none;
-  width: var(--size-sidebar);
-  padding: var(--space-s16);
   display: flex;
   flex-direction: column;
-  gap: var(--space-s16);
 }
 
-.site-nav-title {
-  font-size: var(--type-label-size);
-  font-weight: var(--type-label-weight);
-  line-height: var(--type-label-line);
-  color: var(--color-on_surface_variant);
-  padding: 0 var(--space-s8) var(--space-s4);
+.site-nav {
+  gap: var(--space-s16);
+  padding: var(--space-s24) var(--space-s12);
+  border-right: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.site-nav-level {
+  display: flex;
+  flex-direction: column;
+}
+
+.site-nav-level > .k-text {
+  padding: 0 var(--space-s12) var(--space-s4);
+}
+
+.site-nav-level[hidden],
+.site-nav-link[hidden] {
+  display: none;
 }
 
 .site-nav-link,
-.site-nav-empty {
+.site-rail-link {
   display: block;
-  padding: var(--space-s4) var(--space-s8);
-  border-radius: var(--radius-control);
-  color: var(--color-on_surface);
+  color: var(--color-on_surface_variant);
   text-decoration: none;
 }
 
-.site-nav-empty {
-  color: var(--color-on_surface_variant);
-  font-size: var(--type-small-size);
-  line-height: var(--type-small-line);
+.site-nav-link {
+  padding: var(--space-s4) var(--space-s12);
+  border-radius: var(--radius-row);
+}
+
+.site-nav-link:hover {
+  color: var(--color-on_surface);
 }
 
 .site-nav-link[aria-current="page"] {
@@ -127,29 +135,55 @@ body {
   color: var(--color-on_secondary_container);
 }
 
-/* The page: its parts at the page's scale, in a container centred on it. The page is a layer of
-   its own: a part that lifts itself inside it (a lit list's ring, an open select) stays under the
-   toolbar and the navigation as the page scrolls past them. It never scrolls sideways: a sample
-   wider than its room scrolls in its own box (`site/settle.ts`). */
+.site-rail {
+  gap: var(--space-s4);
+  padding: var(--space-s32) var(--space-s24);
+  border-left: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.site-rail > .k-text {
+  padding-bottom: var(--space-s8);
+}
+
+/* A link's mark is a line down its start, lit in the accent on the section read now. */
+.site-rail-link {
+  padding: var(--space-s4) 0 var(--space-s4) var(--space-s12);
+  border-left: var(--stroke-thin) solid var(--color-outline_variant);
+}
+
+.site-rail-link:hover,
+.site-rail-link[aria-current] {
+  color: var(--color-on_surface);
+}
+
+.site-rail-link[aria-current] {
+  border-left-color: var(--color-primary);
+}
+
+/* The page: its parts at the page's scale, in a container that fills the room between the
+   navigation and the rail. The page is a layer of its own: a part that lifts itself inside it (a
+   lit list's ring, an open select) stays under the top bar as the page scrolls past it. It never
+   scrolls sideways: a sample wider than its room scrolls in its own box (`site/settle.ts`). */
 .page {
   isolation: isolate;
-  flex: 1;
   min-width: 0;
   overflow-x: clip;
-  padding: var(--space-s32) 0 var(--space-s48);
+  padding: var(--space-s32) 0 var(--space-s64);
   background: var(--color-surface);
 }
 
-/* As wide as the viewport's step lets it (`--page-container`) and its padding for the width it
-   takes (`--page-padding`), both picked by `site/settle.ts`. */
+/* Its padding for the width it takes (`--page-padding`), picked by `site/settle.ts`. */
 .page-container {
-  max-width: var(--page-container, none);
-  margin-left: var(--page-left, auto);
-  margin-right: auto;
   padding-inline: var(--page-padding, var(--container-0-padding));
   display: flex;
   flex-direction: column;
-  gap: var(--space-s48);
+  gap: var(--space-s64);
+}
+
+.page-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s32);
 }
 
 .page-header {
@@ -158,24 +192,33 @@ body {
   gap: var(--space-s8);
 }
 
-/* The page's contents, pinned under the toolbar, a hairline under them as under the toolbar: on
-   the page's own surface across the page's whole width, cut at the page's edges, so what scrolls
-   under them is hidden; a lit chip's glow reaches past the band. */
-.page-contents {
-  position: sticky;
-  top: var(--page-pinned-top, 0px);
-  z-index: 1;
-  margin-block: calc(-1 * var(--space-s32));
-  padding-block: var(--space-s12);
+.page-header > .page-prose {
+  max-width: none;
 }
 
-.page-contents::before {
-  content: "";
-  position: absolute;
-  inset: 0 -100vmax;
-  z-index: -1;
-  background: var(--color-surface);
-  border-bottom: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+.page-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s8);
+  padding-top: var(--space-s8);
+}
+
+/* A name in code: a pill with a hairline, in the error's colour for what isn't built yet. */
+.page-code-tag {
+  display: flex;
+  padding: var(--space-s4) var(--space-s12);
+  border-radius: var(--radius-full);
+  background: var(--color-surface_container_low);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.page-code-tag[data-warn] {
+  outline-color: var(--color-error);
+}
+
+.page-code-tag[data-warn] > .k-text {
+  color: var(--color-error) !important;
 }
 
 .page-picker {
@@ -184,7 +227,13 @@ body {
   gap: var(--space-s8);
 }
 
-.page-section,
+/* A section: its heading, then its tables and samples. */
+.page-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s24);
+}
+
 .page-part {
   display: flex;
   flex-direction: column;
@@ -206,27 +255,138 @@ body {
   color: var(--color-on_surface_variant);
 }
 
-/* The description: the thing itself, live, its words beside it while a text column fits there,
-   under it, from the left, when one doesn't. */
-.page-description {
+/* The stage: the panes side by side, then the bar of chips that drives them, all one surface in
+   a hairline. Each pane is painted in its own mode; a sample wider than it is scaled to fit. */
+.page-hero {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-surface);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  overflow: clip;
+}
+
+.page-panes {
+  display: grid;
+  grid-template-columns: repeat(var(--panes, 1), minmax(0, 1fr));
+}
+
+.page-hero[data-panes="2"] {
+  --panes: 2;
+}
+
+.f-painted.page-pane {
+  min-width: 0;
+  gap: var(--space-s24);
+  padding: var(--space-s32);
+  border-radius: 0;
+}
+
+.page-pane-head {
+  display: flex;
+  justify-content: space-between;
+  align-self: stretch;
+}
+
+.page-pane-fit {
+  align-self: stretch;
+}
+
+.page-stage-flow {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--space-s32);
+  gap: var(--space-s24) var(--space-s32);
+  transform-origin: 0 0;
 }
 
-/* The live thing at the top of its column, where it starts on a whole device pixel. */
-.page-live {
+.page-stage-bar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  gap: var(--space-s16);
+  padding: var(--space-s12) var(--space-s16);
+  background: var(--color-surface_container_low);
+  border-top: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
 }
 
-.page-description-words {
-  flex: 1 1 var(--size-column);
-  max-width: var(--size-column);
+.page-stage-hint {
+  margin-left: auto;
+  text-align: right;
+}
+
+.page-hero > .page-na {
+  padding: var(--space-s12) var(--space-s16);
+  border-top: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+/* The page's tables: on the low container at the content radius, a hairline under each row. */
+.page-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--size-column)), 1fr));
+  gap: var(--space-s24) var(--space-s32);
+  align-items: start;
+}
+
+.page-titled {
   display: flex;
   flex-direction: column;
-  gap: var(--space-s16);
+  gap: var(--space-s12);
+  min-width: 0;
+}
+
+.page-spec-box {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container_low);
+}
+
+.page-spec-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.page-spec-table th,
+.page-spec-table td {
+  padding: var(--space-s8) var(--space-s16);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.page-spec-table tbody tr:last-child > td {
+  border-bottom: 0;
+}
+
+.page-spec-table .page-spec-value {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.page-spec-table .page-prose {
+  max-width: none;
+}
+
+.page-tokens tbody tr {
+  cursor: pointer;
+}
+
+.page-tokens tbody tr[data-lit] > td {
+  background: var(--color-secondary_container);
+}
+
+.page-tokens tbody tr[data-pinned] > td {
+  background: var(--color-secondary_container_pressed);
+}
+
+.page-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s4) var(--space-s12);
+}
+
+.page-combination {
+  display: inline-flex;
+  gap: var(--space-s4);
 }
 
 /* A sample clicked into, which takes the wheel until Esc or a click outside lets it go
@@ -275,6 +435,7 @@ body {
    the focus glow's reach. */
 .page-cards {
   display: grid;
+  align-items: start;
   grid-template-columns: repeat(auto-fill, min(100%, max(var(--size-rail), calc(var(--widest) + 2 * var(--space-s24)))));
   gap: var(--space-s16);
 }
@@ -386,28 +547,9 @@ body {
   justify-content: flex-start;
 }
 
-.page-list {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--space-s8) var(--space-s24);
-}
 
-.page-list dd {
-  margin: 0;
-}
 
-.page-keys {
-  display: flex;
-  align-self: start;
-  align-items: flex-start;
-  gap: var(--space-s4);
-}
 
-.page-key {
-  padding: 0 var(--space-s4);
-  border-radius: var(--radius-small);
-  background: var(--color-surface_container_high);
-}
 
 .page-players {
   display: flex;
@@ -723,11 +865,9 @@ body {
   background: var(--color-secondary_container);
 }
 
-.page-na {
-  max-width: var(--size-column);
-  padding: var(--space-s12) var(--space-s16);
-  border-radius: var(--radius-control);
-  background: var(--color-surface_container_low);
+/* What doesn't apply: one muted line in the part's place. */
+.page-na > .page-prose {
+  max-width: none;
 }
 
 /* The measures (`site/parts/measures.ts`): a sample in its box, clean at rest, and the layer over
@@ -946,26 +1086,6 @@ body {
 
 /* The measures by token: what is lit, its count on the line over the table, and its row's token
    filled; a pinned one outlined too. */
-.page-tokens > dt,
-.page-tokens > dd {
-  cursor: default;
-}
-
-.page-tokens > dt > .page-code {
-  padding-inline: var(--space-s4);
-  margin-inline: calc(-1 * var(--space-s4));
-  border-radius: var(--radius-small);
-}
-
-.page-tokens > dt[data-lit] > .page-code {
-  background: rgb(from var(--color-cold) r g b / var(--opacity-press));
-  color: var(--color-on_surface);
-}
-
-.page-tokens > dt[data-pinned] > .page-code {
-  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-cold);
-}
-
 .page-token-status {
   overflow: hidden;
   text-overflow: ellipsis;

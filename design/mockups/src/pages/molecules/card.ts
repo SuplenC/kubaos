@@ -12,7 +12,8 @@ import { media } from "../../lib/media.ts";
 import { role } from "../../lib/radius.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const TITLE: Words = { short: "Disk", long: "Samsung 990 Pro, the disk KubaOS installs on" };
 const BODY: Words = {

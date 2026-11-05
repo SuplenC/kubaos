@@ -7,7 +7,8 @@ import { figure, tick } from "../../lib/figure.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { advance, text, type TypeStyle } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { CHROME } from "../../site/settings.ts";
 
 const SPECIMEN: readonly (readonly [string, TypeStyle])[] = [

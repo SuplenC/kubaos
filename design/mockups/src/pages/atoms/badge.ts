@@ -6,7 +6,8 @@
 import { badge, badgedIcon, MEANINGS } from "../../lib/badge.ts";
 import { row } from "../../lib/layout.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** The bar's symbols as the QML specimen shows them: none, a dot, a count, a count past 99. */
 function bar(): HTMLElement {

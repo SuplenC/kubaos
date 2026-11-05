@@ -3,7 +3,8 @@
 // template inside it: the header band with its pun, the tabs, the body that alone scrolls under its
 // fade, and the footer band.
 
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { windowSize } from "../../site/settings.ts";
 import {

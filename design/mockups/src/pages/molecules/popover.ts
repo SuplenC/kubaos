@@ -8,7 +8,8 @@ import { menu } from "../../lib/menu.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const NOTE: Words = { short: "Saved.", long: "Saved to Downloads, next to the three other copies of the same file you saved this morning." };
 

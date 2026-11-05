@@ -9,7 +9,8 @@ import { iconButton } from "../../lib/icon-button.ts";
 import { filling, flow, header, section, stack, within } from "../../lib/layout.ts";
 import { list } from "../../lib/list.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { SUBTITLE, TITLE, settingsWindow, themeSection } from "./example.ts";
 
 const COLUMN = "var(--size-column)";

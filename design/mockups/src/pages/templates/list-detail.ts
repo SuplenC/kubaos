@@ -10,7 +10,8 @@ import { stack, within } from "../../lib/layout.ts";
 import { commandMenu, menuMeasures, menuOnScreen, type Result, type SetupCard, setupWindow } from "../../lib/list-detail.ts";
 import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { windowSize } from "../../site/settings.ts";
 
 const TITLE: Words = { short: "Files", long: "Files, the file manager that opens where you last were" };

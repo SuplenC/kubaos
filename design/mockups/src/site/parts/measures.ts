@@ -1,5 +1,6 @@
-// A page's measures: its samples, each clean at rest with its parts tree and spec list beside it;
-// the measures by their tokens; then the reflow in a window of the toolbar's size. There are two
+// A page's measures: the anatomy table, each part by its token and the token's value at the scale
+// picked; the samples, each clean at rest with its parts tree and spec list beside it; then the
+// reflow in a window of the top bar's size. There are two
 // ways in, and the section draws one thing at a time across its samples: pointing at a part (in a
 // sample or its tree) inspects it, pointing at a token's row lights every place it is used. One
 // replaces the other. A click pins either; clicking it again or Esc lets it go.
@@ -9,14 +10,14 @@
 // letting the pin go by a click lets the wheel go with it, and Esc lets both go.
 
 import { length, raw } from "../../lib/tokens.ts";
-import { windowSize } from "../settings.ts";
+import { settings, windowSize } from "../settings.ts";
 import type { Measures } from "../page.ts";
-import { el, prose } from "../dom.ts";
+import { el } from "../dom.ts";
 import { applies } from "../page.ts";
 import { releaseWheel } from "../scroll.ts";
 import { inspector, type Inspector, type Lit, litWords, tokenName } from "./inspector.ts";
-import { subheading } from "./section.ts";
 import { besideWords, type Group } from "./shelf.ts";
+import { specTable } from "./table.ts";
 
 /** Each measures section's drawing, again: after a change of scale or of the window. */
 const sections = new Set<() => void>();
@@ -33,14 +34,34 @@ addEventListener("keydown", (event) => {
   if (event.key === "Escape") for (const unpin of unpins) unpin();
 });
 
-const AT_REST = "Point at a token to light every place the samples above use it; click to pin it.";
+const AT_REST = "Point at a row to light where the samples use its token; click to pin it.";
 
 function round(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
 
-/** The measures' parts: the samples with their trees, every measure by its token, then the reflow. */
-export function measures(spec: Measures): (Group | Element)[] {
+/** `token`'s value as the table shows it: logical pixels, and device pixels at another scale. */
+function value(token: string): string {
+  // An aspect ratio is two numbers, not a length: shown as written.
+  if (token.startsWith("aspect-")) return raw(token);
+  const logical = length(token);
+  const scale = settings().scale;
+  return scale === 1 ? round(logical) : `${round(logical)} · ${round(logical * scale)} px`;
+}
+
+/** The measures' parts, each placed by the page. */
+export interface Drawn {
+  /** Part, token and value, a row per measure, lighting where the samples use it. */
+  readonly table: HTMLElement;
+  /** The line over the samples saying what is lit. */
+  readonly status: HTMLElement;
+  /** The samples with their trees. */
+  readonly samples: Group;
+  readonly reflow: Group;
+}
+
+/** The measures' parts: the table, the samples with their trees, and the reflow. */
+export function measures(spec: Measures): Drawn {
   const tokens = spec.measures.map((measure) => measure.token.replace(/^--/, ""));
   let hovered: Lit | null = null;
   let pinned: Lit | null = null;
@@ -48,7 +69,7 @@ export function measures(spec: Measures): (Group | Element)[] {
     a !== null && b !== null && ("part" in a ? "part" in b && a.part === b.part : "token" in b && a.token === b.token);
 
   const inspectors: Inspector[] = [];
-  const rows = new Map<string, { term: HTMLElement; words: HTMLElement }>();
+  const rows = new Map<string, HTMLElement>();
   const status = el("p", "page-token-status", AT_REST);
 
   const draw = () => {
@@ -60,10 +81,8 @@ export function measures(spec: Measures): (Group | Element)[] {
     }
     const token = lit && "token" in lit ? lit.token : null;
     for (const [each, row] of rows) {
-      for (const part of [row.term, row.words]) {
-        part.toggleAttribute("data-lit", each === token);
-        part.toggleAttribute("data-pinned", each === token && lit === pinned);
-      }
+      row.toggleAttribute("data-lit", each === token);
+      row.toggleAttribute("data-pinned", each === token && lit === pinned);
     }
     // The count is a line of its own over the table, so lighting a row never moves the table.
     const unseen = token && places === 0 ? inspectors.filter((each) => each.uses(token)).map((each) => each.name) : [];
@@ -107,21 +126,18 @@ export function measures(spec: Measures): (Group | Element)[] {
     }),
   };
 
-  const table = el("dl", "page-list page-tokens");
-  for (const [i, measure] of spec.measures.entries()) {
+  const drawn = specTable(
+    { heads: ["Part", "Token", "Value"], numeric: [2] },
+    spec.measures.map((measure, i) => ({ cells: [measure.part, `\`${tokenName(tokens[i]!)}\``, value(tokens[i]!)] })),
+  );
+  drawn.element.classList.add("page-tokens");
+  drawn.rows.forEach((row, i) => {
     const token = tokens[i]!;
-    // An aspect ratio is two numbers, not a length: shown as written.
-    const value = token.startsWith("aspect-") ? raw(token) : round(length(token));
-    const term = el("dt", "", el("code", "page-code", `${tokenName(token)} = ${value}`));
-    const words = el("dd", "", prose(measure.what));
-    rows.set(token, { term, words });
-    for (const part of [term, words]) {
-      part.addEventListener("pointerenter", () => point({ token }));
-      part.addEventListener("pointerleave", () => point(null));
-      part.addEventListener("click", () => click({ token }));
-    }
-    table.append(term, words);
-  }
+    rows.set(token, row);
+    row.addEventListener("pointerenter", () => point({ token }));
+    row.addEventListener("pointerleave", () => point(null));
+    row.addEventListener("click", () => click({ token }));
+  });
 
   const redraw = () => {
     if (!inspectors.some((each) => each.holder.isConnected)) {
@@ -136,12 +152,12 @@ export function measures(spec: Measures): (Group | Element)[] {
 
   const size = windowSize();
   const reflow: Group = {
-    title: "Reflow",
+    title: "",
     items: applies(spec.reflow)
-      ? [{ name: `In a window of the toolbar's size, ${size.name}`, words: spec.reflow.described, sample: windowed(spec.reflow.sample()) }]
+      ? [{ name: `In a window, ${size.name}`, words: spec.reflow.note, sample: windowed(spec.reflow.sample()) }]
       : spec.reflow,
   };
-  return [samples, subheading("By token"), status, table, reflow];
+  return { table: drawn.element, status, samples, reflow };
 }
 
 /** `sample` in a window of the toolbar's size. */

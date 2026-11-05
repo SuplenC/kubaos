@@ -90,7 +90,7 @@ export function shelves(...parts: readonly (Group | Element)[]): Element[] {
       continue;
     }
     if (!applies(part.items) || part.items.length === 0) {
-      out.push(...titled(part.title), ...(applies(part.items) ? [] : [notApplying(part.items.doesntApply)]));
+      out.push(...(applies(part.items) ? titled(part.title) : [notApplying(part.items.doesntApply, part.title)]));
       continue;
     }
     if (!big.has(part)) {

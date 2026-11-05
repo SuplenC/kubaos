@@ -9,7 +9,8 @@ import { type FieldOptions, field, fieldRoom, labelled, note, setSecret } from "
 import { stack } from "../../lib/layout.ts";
 import { label } from "../../site/dom.ts";
 import { lights, powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const VALUE: Words = { short: "tuxedo", long: "tuxedo-workstation-in-the-living-room" };
 const PLACEHOLDER: Words = { short: "Name", long: "Your full name, as it appears on your ID" };

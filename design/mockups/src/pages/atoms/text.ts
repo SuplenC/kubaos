@@ -9,7 +9,8 @@ import { row, stack, within } from "../../lib/layout.ts";
 import { clamped, marked, STYLE_WORDS, styles, text, wrapped } from "../../lib/text.ts";
 import { words as said } from "../../lib/tokens.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const TITLE: Words = { short: "Wi-Fi", long: "Samsung 990 Pro NVMe M.2 2 TB, the disk KubaOS is installed on" };
 const BODY: Words = {

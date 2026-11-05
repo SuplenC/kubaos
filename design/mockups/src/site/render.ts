@@ -1,81 +1,125 @@
-// Draws a page: its title and summary, then every part in the mockup skill's order, or a
-// foundation's parts in theirs, each a section the page's contents jump to. A part that doesn't
-// apply shows why, in its place.
+// Draws a page: its header (the crumb, the title, the lede and the names in code), the stage with
+// the thing itself live, then every part as tables and samples, in the mockup skill's order, or a
+// foundation's parts in theirs. Each section is listed in the right rail; a part that doesn't apply
+// is one muted line in its place, not a section. Every page is checked for its words first
+// (`wordy`): a page with a field past its kind's most isn't drawn.
 
-import { type AnyPage, applies, type DoesntApply, type Foundation, isFoundation, type Page } from "./page.ts";
+import { type AnyPage, applies, type DoesntApply, type Foundation, isFoundation, LEVELS, type Page, STATE_NAMES, type State, wordy } from "./page.ts";
 import { el, label, prose } from "./dom.ts";
 import { content } from "./parts/content.ts";
-import { description } from "./parts/description.ts";
 import { checks, shownAll } from "./parts/shown.ts";
 import { keyboard } from "./parts/keyboard.ts";
 import { matrix } from "./parts/matrix.ts";
 import { measures } from "./parts/measures.ts";
 import { motion } from "./parts/motion.ts";
-import { contents, forgetContents } from "./parts/contents.ts";
-import { notApplying, partOr, section, subheading } from "./parts/section.ts";
+import { notApplying, section, subheading } from "./parts/section.ts";
 import { shelves } from "./parts/shelf.ts";
+import { stage } from "./parts/stage.ts";
+import { pair, specTable, titled } from "./parts/table.ts";
 import { tubes } from "./parts/tubes.ts";
 import { variants } from "./parts/variants.ts";
-import { CHROME } from "./settings.ts";
+import type { Section } from "./rail.ts";
 
-const SCALES_WORDS =
-  "The toolbar shows this page in light or dark, at 1, 1.25, 1.5 and 2, where a CSS pixel is a device pixel; every length above follows, and the shots render all eight.";
+/** A page drawn: its container, and its sections for the rail. */
+export interface Drawn {
+  readonly container: HTMLElement;
+  readonly sections: readonly Section[];
+}
 
-/** The page's sections, each its heading's words and its box. */
-type Sections = { readonly title: string; readonly element: HTMLElement }[];
+/** A part of the page: a section the rail lists, or a muted line for a part that doesn't apply. */
+type Part = Section | Element;
 
-/**
- * The page in its container: its header, the pinned row of its sections' chips when the site's
- * chrome shows, then its sections.
- */
-export function render(page: AnyPage): HTMLElement[] {
-  const sections = isFoundation(page) ? renderFoundation(page) : renderComponent(page);
-  const parts = sections.map((each) => each.element);
-  if (!CHROME) forgetContents();
-  const container = el("div", "page-container", header(page), ...(CHROME ? [contents(sections)] : []), ...parts);
-  return [container];
+export function render(page: AnyPage): Drawn {
+  const found = wordy(page);
+  if (found.length > 0) {
+    const list = found.map((each) => `${each.where} (${each.kind}): "${each.words}"`).join("; ");
+    throw new Error(`${page.slug} has words past their most: ${list}`);
+  }
+  const overview: Section = { title: "Overview", element: el("div", "page-overview", header(page), hero(page)) };
+  const parts = [overview, ...(isFoundation(page) ? renderFoundation(page) : renderComponent(page))];
+  const sections = parts.filter((part): part is Section => !(part instanceof Element));
+  const container = el("div", "page-container", ...parts.map((part) => (part instanceof Element ? part : part.element)));
+  return { container, sections };
 }
 
 function header(page: AnyPage): HTMLElement {
+  const level = LEVELS.find((each) => each.slug === page.level)?.title ?? page.level;
+  const tags = isFoundation(page) ? [] : codeTags(page);
   return el(
     "header",
     "page-header",
-    el("h1", "page-title", label(page.title, "title", "on_surface")),
-    prose(page.summary, "body_large", "on_surface_variant"),
+    label(`${level} › ${page.title}`, "small", "on_surface_variant"),
+    el("h1", "page-title", label(page.title, "display", "on_surface")),
+    prose(page.lede, "body_large", "on_surface_variant"),
+    ...(tags.length > 0 ? [el("div", "page-tags", ...tags)] : []),
   );
 }
 
-/** A section under `title`, kept with its title for the page's contents. */
-function part(title: string, ...body: Element[]): Sections[number] {
+/** The names in code its component page gives, and what isn't built yet. */
+function codeTags(page: Page): HTMLElement[] {
+  const tag = (words: string, warn = false) => {
+    const box = el("span", "page-code-tag", label(words, "mono"));
+    box.toggleAttribute("data-warn", warn);
+    return box;
+  };
+  const { rust, qml, unbuilt } = page.code;
+  return [...(rust ? [tag(`Rust ${rust}`)] : []), ...(qml ? [tag(`QML ${qml}`)] : []), ...(unbuilt ? [tag(unbuilt, true)] : [])];
+}
+
+function hero(page: AnyPage): HTMLElement {
+  return isFoundation(page) ? stage(page.stage) : stage(page.stage, { states: page.states, focus: page.focus });
+}
+
+/** A section under `title`. */
+function part(title: string, ...body: Element[]): Section {
   return { title, element: section(title, ...body) };
 }
 
-function renderFoundation(page: Foundation): Sections {
+/** A section under `title` drawn by `draw`, or a muted line in its place. */
+function partOr<T>(title: string, value: T | DoesntApply, draw: (value: T) => Element[]): Part {
+  return applies(value) ? part(title, ...draw(value)) : notApplying(value.doesntApply, title);
+}
+
+function renderFoundation(page: Foundation): Part[] {
   const shown = (parts: Parameters<typeof shownAll>[0]) => shelves(shownAll(parts));
-  const or = <T>(value: T | DoesntApply, draw: (value: T) => Element[]): Element[] => (applies(value) ? draw(value) : [notApplying(value.doesntApply)]);
   return [
-    part("Description", description(page.live, page.description)),
-    part("Every token", ...shown(page.tokens)),
-    part("Rules, worked", ...shown(page.rules)),
-    part("Light and dark", ...or(page.modes, shown)),
-    part("Across the themes", ...or(page.themes, shown)),
-    part("At every scale, in device pixels", ...or(page.scales, shown)),
-    part("Content", ...or(page.content, shown)),
-    part("Motion", partOr(page.motion, motion)),
-    part("What holds it", checks(page.checks)),
-    part("Light and dark, at every scale", prose(SCALES_WORDS)),
+    part("Tokens", ...shown(page.tokens)),
+    part("Rules", ...shown(page.rules)),
+    partOr("Light and dark", page.modes, shown),
+    partOr("Themes", page.themes, shown),
+    partOr("At every scale", page.scales, shown),
+    partOr("Content", page.content, shown),
+    partOr("Motion", page.motion, (spec) => [motion(spec)]),
+    part("Checks", checks(page.checks)),
   ];
 }
 
-function renderComponent(page: Page): Sections {
+/** The states table: each state shown and the few words of its look, then those it hasn't, muted. */
+function statesTable(page: Page): HTMLElement {
+  const { states } = page;
+  const shown = states.shown.map((state) => ({ cells: [STATE_NAMES[state], states.looks[state]] }));
+  const absent = (Object.entries(states.absent) as [State, string][]).map(([state, why]) => ({ cells: [STATE_NAMES[state], `doesn't apply: ${why}`], muted: true }));
+  return specTable({ heads: ["State", "Look"] }, [...shown, ...absent]).element;
+}
+
+function renderComponent(page: Page): Part[] {
+  const measured = measures(page.measures);
+  const lit = applies(page.focus) ? [tubes(page.focus)] : [notApplying(page.focus.doesntApply, "The lit line")];
   return [
-    part("Description", description(page.live, page.description)),
-    part("Variants and sizes", ...shelves(variants("Variants", page.variants), variants("Sizes", page.sizes))),
-    part("States", ...shelves(...matrix(page.states, page.focus)), subheading("The lit line"), partOr(page.focus, tubes)),
-    part("Content", ...shelves(...content(page.content))),
+    part(
+      "Anatomy",
+      pair(titled("Parts", measured.table), titled("States", statesTable(page))),
+      ...lit,
+      subheading("Inspect"),
+      measured.status,
+      ...shelves(measured.samples),
+    ),
+    // A section of variants alone needs no sub-heading of the same words.
+    part("Variants", ...shelves(variants(applies(page.sizes) ? "Variants" : "", page.variants), variants("Sizes", page.sizes))),
     part("Motion", motion(page.motion)),
-    part("Keyboard", partOr(page.keyboard, keyboard)),
-    part("Measures and reflow", ...shelves(...measures(page.measures))),
-    part("Light and dark, at every scale", prose(SCALES_WORDS)),
+    partOr("Keyboard", page.keyboard, (keys) => [keyboard(keys)]),
+    part("Content", ...shelves(...content(page.content))),
+    part("Every state", ...shelves(matrix(page.states, page.focus))),
+    partOr("Reflow", page.measures.reflow, () => shelves(measured.reflow)),
   ];
 }

@@ -1,6 +1,5 @@
-// The Select page: `docs/design/components/select.md`. One of a list too long for radio rows or
-// tabs: a field's look that grows into its list, one raised surface with the value row where it
-// was. Lit as a field is; open, its hairline and tube go and its chevron turns up.
+// The Select page: `docs/design/components/select.md` is its full reference. One of a list too
+// long for radio rows or tabs: a field's look that grows into its list.
 
 import { shown, type Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
@@ -63,7 +62,7 @@ const SURFACE = "the surface: its height, fill, shadow, rim, hairline and the ch
 
 const OPENS: Move = {
   name: "Opening",
-  what: "A press, Enter, Space, ↓ or ↑: the box grows from its shut height to the value row and its list over `medium` on `emphasized_decel`. The step's shadow and rim come up with it, its fill lifts to the open role, its hairline fades and the chevron turns up over the same. Nothing flickers: a surface isn't a light. With reduced motion it is open at once, the chevron up.",
+  what: "The box grows into its list over `medium` on `emphasized_decel`, its shadow and rim with it.",
   tracks: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--select-open", from: 0, to: 1, duration: "medium", curve: "emphasized_decel" }],
   reduced: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--select-open", from: 0, to: 1, duration: "instant", curve: "linear" }],
   back: "cuts",
@@ -72,7 +71,7 @@ const OPENS: Move = {
 
 const CLOSES: Move = {
   name: "Closing",
-  what: "Esc, Tab, a press outside or on the value row: it folds back to the shut box over `short` on `emphasized_accel`, the shadow, rim and fill going down with it and the chevron turning back. Once it is shut, the tube lights again over `short` if the keyboard is on it. With reduced motion it is shut at once.",
+  what: "It folds back to the shut box over `short` on `emphasized_accel`; the tube lights again after.",
   tracks: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--select-open", from: 1, to: 0, duration: "short", curve: "emphasized_accel" }],
   reduced: [{ part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--select-open", from: 1, to: 0, duration: "instant", curve: "linear" }],
   back: "cuts",
@@ -81,7 +80,7 @@ const CLOSES: Move = {
 
 const PICKS: Move = {
   name: "Picking",
-  what: "Enter, Space or a press on an option, here Germany: the value row shows it at once, the highlighted row presses to `secondary_container_pressed` over `micro`, and only then does the surface fold, over `short` on `emphasized_accel`, so the pick is seen landing before the list goes. With reduced motion the press shows and the surface is shut at once.",
+  what: "The row presses over `micro`, then the surface folds, so the pick is seen landing.",
   tracks: [
     { part: "the picked row's press", on: "the holidays", target: ".k-menu-item[data-current]", property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" },
     { part: SURFACE, on: "the holidays", target: ".k-select-room", property: "--select-open", from: 1, to: 0, duration: "short", cue: "micro", curve: "emphasized_accel" },
@@ -94,111 +93,106 @@ const PICKS: Move = {
   sample: opened({ picked: 1 }),
 };
 
-const DESCRIBED =
-  "Shut, a field's look: `size.control_md` (40) tall at the control radius, filling its room, `surface_container_high` with a field's sunken edge, a hairline of `outline` at full inside its edge, `space.s12` inside. The picked option is `body_large` in `on_surface` on one line, ending in an ellipsis where it doesn't fit; an optional `body_large` symbol (20) leads it and a chevron (`expand_more`) ends it, both `on_surface_variant`, `space.s8` from the words. With nothing picked it shows its placeholder in `on_surface_variant`.";
-
 export default page({
   level: "molecules",
   slug: "select",
   title: "Select",
-  summary: "One of a list too long for radio rows or tabs: a field's look that grows into its list.",
-  live: () => within("var(--size-column)", stack("s16", "start", select(holidays()), select(many()), select(often()))),
-  description: [
-    "Rust `select::select`, QML `Select`. Press one, or Tab to it and press Enter, Space, ↓ or ↑: ↑ ↓ move the highlight, a letter jumps to the next option starting with it, Enter, Space or a press picks, and Esc, Tab or a press anywhere else closes it. The fourteen countries scroll past eight.",
-    DESCRIBED,
-    "Open, the select's own box grows into its list: one surface, no gap and no second popover. The value row stays where it was at the top and the options are under it; the box rises to the ladder's step 2, a menu's (its contact and ambient layers of `shadow` and the rim), on `surface_container_high` by day and the highest container at night, one role lighter. Its hairline goes, its tube goes out and the chevron turns up. A rule in a divider's soft outline (`outline_variant` at `opacity.outline_soft`) separates the row from the list, `space.s12` in from the sides. A select too near the bottom of the room that clips it, or of the window, for its list grows upward instead: the value row stays put and the list opens above it, the rule between them.",
-    "The options are menu items (the Menu page): `size.control_sm` tall, `space.s4` inside the surface, their words `body` lined up with the value row's start, `space.s12` in, at the row radius (`radius.row`, 8), the control radius less `space.s4`. The highlighted row is a lit menu item, `secondary_container` with `on_secondary_container`, fading over `short`; the pointer moving onto a row and the keyboard move one highlight. The picked option's words are `primary_lit`, a picked tab's, with the label glow round them at night while the signs are on; highlighted, the pick takes the highlight's colours. There is no check. Past eight options the list scrolls with no bar of its own; the surface is the value row and the list's visible part, never the whole list, and it opens scrolled so the pick has three rows above it where the list allows. The highlight keeps itself in view, `space.s4` clear of the list's edge, and the value row never scrolls.",
-    "Its states follow the neon, as a field's do: lit under the pointer or with the keyboard on it, its fill rises to `surface_container_highest` and the tube burns over its hairline, `primary` at `focus.tube`, with the glow outside at night; pressed, the glow brightens to `focus.pressed_glow` times the lit one. Disabled, it is grey as a disabled field is. Whatever closes or hides what holds the select (its panel closed by any route, its page swapped out) closes it too.",
-  ],
+  lede: "One of a list too long for radio rows or tabs: a field's look that grows into its list.",
+  code: { rust: "select::select", qml: "Select" },
+  stage: {
+    live: () => within("var(--size-column)", stack("s16", "start", select(holidays()), select(many()), select(often()))),
+    hint: "click it, or Tab and ↓",
+    daylight: true,
+  },
   variants: [
-    { name: "With a symbol", for: "Options a symbol helps place: the clock's holidays, by country.", sample: () => boxed(holidays()) },
-    { name: "Without", for: "Plain options: how often something runs.", sample: () => boxed(often()) },
-    { name: "With a placeholder", for: "Nothing picked yet: what to pick, in `on_surface_variant`, never a pick that looks made.", sample: () => boxed(holidays({ picked: -1 })) },
-    { name: "A long list", for: "Fourteen countries, open: eight in view, scrolled so the pick has three rows above it.", sample: () => boxed(many({ open: true })) },
-    { name: "Growing upward", for: "Too near the bottom of its room for its list: the value row stays put and the list opens above it.", sample: () => boxed(holidays({ open: true, up: true })) },
+    { name: "With a symbol", for: "options a symbol helps place", sample: () => boxed(holidays()) },
+    { name: "Without", for: "plain options", sample: () => boxed(often()) },
+    { name: "With a placeholder", for: "nothing picked yet", sample: () => boxed(holidays({ picked: -1 })) },
+    { name: "A long list", for: "eight in view, the pick three rows down", sample: () => boxed(many({ open: true })) },
+    { name: "Growing upward", for: "too near its room's foot", sample: () => boxed(holidays({ open: true, up: true })) },
   ],
-  sizes: doesntApply("a select has one height, a field's (`size.control_md`), and fills the room it is given."),
+  sizes: doesntApply("one height, a field's, filling the room it is given."),
   states: {
     shown: ["rest", "lit", "pressed", "open", "disabled"],
     absent: {
-      selected: "the picked option is what it shows; open, its words are `primary_lit`.",
-      loading: "its options are known when it shows; a list still on its way leaves it disabled.",
-      empty: "nothing picked is the placeholder, a variant above.",
-      error: "a pick can't be wrong; a select that needs one shows the placeholder until it has it.",
+      selected: "the pick is what it shows",
+      loading: "a list on its way leaves it disabled",
+      empty: "the placeholder, a variant",
+      error: "a pick can't be wrong",
     },
     rows: nonEmpty(ROWS.map(({ name, options }) => ({ name, cell: (state: MatrixState) => cell(options, state) }))),
-    described: {
-      rest: "`surface_container_high`, the hairline `outline_variant`, the pick `on_surface`, the symbol and the chevron `on_surface_variant`. By day the same roles in daylight colours.",
-      lit: "Under the pointer or with the keyboard on it, here with the signs on: the fill rises to `surface_container_highest`, the tube burns over the hairline, `primary` at `focus.tube`, with the glow outside. By day the tube with no glow.",
-      pressed: "Lit and pressed: the glow `focus.pressed_glow` times the lit one; letting go opens it.",
-      open: "Grown into its list, the highlight on the pick: raised to step 2 with its shadow and rim, `surface_container_highest` at night and `surface_container_high` by day, no hairline and no tube, the chevron up, the rule under the value row. The pick's words would be `primary_lit` with the highlight elsewhere.",
-      disabled: "Grey, as a disabled field: the fill `on_surface` at `opacity.disabled_container` with no hairline, the pick, the symbol and the chevron at `opacity.disabled_content`. No press, no stop for Tab.",
+    looks: {
+      rest: "`surface_container_high`, an `outline_variant` hairline",
+      lit: "fill to `…_highest`, the `primary` tube, glow at night",
+      pressed: "as lit, glow × `focus.pressed_glow`",
+      open: "raised to step 2, no hairline or tube, chevron up",
+      disabled: "grey, no hairline, no Tab stop",
     },
   },
   focus: {
     tubes: [{ name: "Every select, shut", tone: "accent", filled: false, content: false }],
     looks: {
-      lit: "At night at rest, the signs burn: the tube over the hairline inside its edge, the glow outside, all that reaches past it. Open, there is no tube: the highlight shows where the keyboard is.",
-      signsOff: "Still lit with the neon unpowered: by day always, and at night while a power change has the lights out. The tube is solid glass, `primary_glass`, with no glow; the fill stays risen. An open select's pick loses its label glow and keeps `primary_lit`.",
+      lit: "the tube over the hairline, the glow outside",
+      signsOff: "the tube as `primary_glass`, no glow",
     },
     signsOff: (index: number) => cell((extra) => ROWS[index]!.options({ ...extra, pinned: "signs-off" }), "rest"),
   },
   content: {
     text: [{ name: "The picked option", words: OPTION, sample: (words: string) => boxed({ options: [words], picked: 0, icon: "schedule" }) }],
-    missingPicture: [{ name: "No symbol", for: "A select may have none: its words start `space.s12` in.", sample: () => boxed(often()) }],
+    missingPicture: [{ name: "No symbol", for: "words start `space.s12` in", sample: () => boxed(often()) }],
     counts: [
-      { name: "Nothing picked", for: "The placeholder.", sample: () => boxed(holidays({ picked: -1 })) },
-      { name: "A few options", for: "Four, open with the highlight off the pick: the surface as tall as they are, the pick's words `primary_lit`.", sample: () => boxed(holidays({ open: true, highlight: 1 })) },
-      { name: "Many", for: "Fourteen: eight in view, the rest scrolled under the rule and the surface's edge.", sample: () => boxed(many({ open: true })) },
+      { name: "Nothing picked", for: "the placeholder", sample: () => boxed(holidays({ picked: -1 })) },
+      { name: "A few options", for: "as tall as they are", sample: () => boxed(holidays({ open: true, highlight: 1 })) },
+      { name: "Many", for: "eight in view, the rest scroll", sample: () => boxed(many({ open: true })) },
     ],
   },
   motion: {
-    arrives: doesntApply("a select comes with the surface it is on; its list arrives as it opens, below."),
-    leaves: doesntApply("a select goes with the surface it is on, shut."),
+    arrives: doesntApply("it comes with its surface; its list arrives as it opens."),
+    leaves: doesntApply("it goes with its surface, shut."),
     between: [
       OPENS,
       CLOSES,
       PICKS,
-      { name: "Focus arrives", what: "Under the pointer or with the keyboard on it, it lights up over `short` on `standard`: the fill rises, the tube and the glow fade in.", tracks: lights(".k-select", ON, 0, 1), reduced: "same", back: "cuts", sample: pair() },
-      { name: "Focus leaves", what: "It goes back to rest over `short` on `standard`.", tracks: lights(".k-select", ON, 1, 0), reduced: "same", back: "cuts", sample: pair("lit") },
-      { name: "Pressed", what: "A lit select pressed: the glow brightens over `micro`, and back as it comes up; letting go opens it.", tracks: press(".k-select", ON), reduced: "same", back: "plays", sample: pair("lit") },
+      { name: "Focus arrives", what: "It lights up over `short` on `standard`: the fill rises, the tube and glow fade in.", tracks: lights(".k-select", ON, 0, 1), reduced: "same", back: "cuts", sample: pair() },
+      { name: "Focus leaves", what: "Back to rest over `short` on `standard`.", tracks: lights(".k-select", ON, 1, 0), reduced: "same", back: "cuts", sample: pair("lit") },
+      { name: "Pressed", what: "The glow brightens over `micro`, and back as it comes up.", tracks: press(".k-select", ON), reduced: "same", back: "plays", sample: pair("lit") },
       ...powerMoves(pair("lit")),
     ],
   },
   keyboard: {
     keys: [
-      { keys: ["Enter", "Space", "↓", "↑"], does: "On the shut select, opens it, the highlight on the pick (on the first option with nothing picked)." },
-      { keys: ["↑", "↓"], does: "Open, the highlight to the option before or after, stopping at either end." },
-      { keys: ["Home", "End"], does: "Open, the highlight to the first or the last option." },
-      { keys: ["A letter"], does: "Open, the highlight to the next option starting with it, round from the end: pressed again, the one after." },
-      { keys: ["Enter", "Space"], does: "Open, picks the highlighted option and closes it." },
-      { keys: ["Esc"], does: "Open, closes it without picking." },
-      { keys: ["Tab", "Shift+Tab"], does: "To the select, or on to the next or previous control; open, it closes without picking as the keyboard moves on." },
+      { keys: ["Enter", "Space", "↓", "↑"], does: "shut: opens it, highlight on the pick" },
+      { keys: ["↑", "↓"], does: "open: the highlight up or down" },
+      { keys: ["Home", "End"], does: "open: the first or last option" },
+      { keys: ["A letter"], does: "open: the next option starting with it" },
+      { keys: ["Enter", "Space"], does: "open: picks and closes" },
+      { keys: ["Esc"], does: "open: closes without picking" },
+      { keys: ["Tab", "Shift+Tab"], does: "on to the next control, closing it" },
     ],
-    order: "One stop in the surface's reading order; a disabled one is skipped. The keyboard never leaves the select while it is open: its list is no stop of its own.",
-    lands: "On the select, open or shut: picking, Esc and a press elsewhere leave it there.",
+    order: "One stop in reading order; a disabled one is skipped, and its list is never a stop.",
+    lands: "On the select, open or shut.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "With a symbol", for: "Its height, padding, symbol, chevron and the gaps between them.", sample: () => boxed(holidays()) },
-      { name: "Open", for: "The value row, the rule, the list's padding and its rows.", sample: () => boxed(holidays({ open: true })) },
+      { name: "With a symbol", for: "height, inset, symbol, chevron", sample: () => boxed(holidays()) },
+      { name: "Open", for: "value row, rule, list padding, rows", sample: () => boxed(holidays({ open: true })) },
     ]),
     measures: [
-      { what: "Its height shut, a field's, and the value row's open.", token: "size-control_md" },
-      { what: "Inside its sides, and the rule's inset.", token: "space-s12" },
-      { what: "Between the symbol, the words and the chevron.", token: "space-s8" },
-      { what: "The symbol and the chevron, `body_large`'s.", token: "type-body_large-icon" },
-      { what: "The pick's line.", token: "type-body_large-line" },
-      { what: "Its corners, shut and open.", token: "radius-control" },
-      { what: "An option's corners: the open box's less its padding.", token: "radius-row" },
-      { what: "The hairline inside its edge, the rim open, and the rule: one device pixel.", token: "stroke-hairline_device_px" },
-      { what: "The list's padding inside the surface.", token: "space-s4" },
-      { what: "The options, eight in view before it scrolls.", token: "size-control_sm" },
-      { what: "The open shadow's ambient layer: its drop.", token: "elevation-2-ambient-y" },
-      { what: "The open shadow's ambient layer: its blur.", token: "elevation-2-ambient-blur" },
+      { part: "Height", token: "size-control_md" },
+      { part: "Inset, rule inset", token: "space-s12" },
+      { part: "Symbol → words → chevron", token: "space-s8" },
+      { part: "Symbol, chevron", token: "type-body_large-icon" },
+      { part: "Value line", token: "type-body_large-line" },
+      { part: "Corner", token: "radius-control" },
+      { part: "Option corner", token: "radius-row" },
+      { part: "Hairline, rim, rule", token: "stroke-hairline_device_px" },
+      { part: "List padding", token: "space-s4" },
+      { part: "Option row", token: "size-control_sm" },
+      { part: "Shadow drop", token: "elevation-2-ambient-y" },
+      { part: "Shadow blur", token: "elevation-2-ambient-blur" },
     ],
     reflow: {
-      described: "A select fills the room it is given at every window size, its pick ending in an ellipsis where it doesn't fit; open, its list is as wide as it. Near the bottom of its room or the window it grows upward.",
+      note: "It fills the room it is given; the pick ends in an ellipsis where it doesn't fit.",
       sample: () => within("100%", stack("s8", "start", select({ options: [shown(OPTION)], picked: 0, icon: "schedule" }), text("A select as wide as the window.", "small", "on_surface_variant"))),
     },
   },

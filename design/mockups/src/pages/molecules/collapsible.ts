@@ -11,7 +11,8 @@ import { row, stack, within } from "../../lib/layout.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { el } from "../../site/dom.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const TITLE: Words = { short: "Hyprland · pid 1203", long: "firefox -contentproc · pid 4127 · Isolated Web Content" };
 const SUMMARY: Words = { short: "3 · 310 MB", long: "92 threads · 2.1 GB resident · 4 % CPU" };

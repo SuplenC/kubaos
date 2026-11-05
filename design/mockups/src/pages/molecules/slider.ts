@@ -11,7 +11,8 @@ import { stack, within } from "../../lib/layout.ts";
 import { type SliderOptions, type SliderSize, type SliderToggle, slider } from "../../lib/slider.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const PROFILES: Words = { short: "Saver", long: "Max Performance" };
 const NAMES = ["Super Saver", "Power Saver", "Balanced", "Performance", "Max Performance"];

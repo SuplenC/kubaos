@@ -7,7 +7,8 @@ import { stack, within } from "../../lib/layout.ts";
 import { type ListRowSpec, type ScrollingOptions, scrollingList } from "../../lib/list.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { WELL_ROOM } from "./list.ts";
 
 /** Five two-line rows and their gaps, inside the well's padding: the control center's Wi-Fi tab. */
