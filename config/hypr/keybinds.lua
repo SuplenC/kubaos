@@ -193,7 +193,7 @@ bind("SUPER + CTRL + W", "Control center (Wi-Fi)", qs("controlcenter", "wifi"))
 bind("SUPER + N", "Notifications", qs("notifications", "toggle"))
 bind("SUPER + CTRL + comma", "Do not disturb", qs("notifications", "toggleDnd"))
 bind("SUPER + SHIFT + comma", "Clear notifications", qs("notifications", "clear"))
-bind("SUPER + CTRL + ALT + R", "Restart Quickshell", "qs kill; sleep 0.5; qs")
+bind("SUPER + CTRL + ALT + R", "Restart Quickshell", "dot-session restart-shell")
 
 -- Theme / wallpaper (dot-theme is owned by the theme part of the repo).
 bind("SUPER + CTRL + Space", "Wallpaper picker", qs("wallpaper", "toggle"))
