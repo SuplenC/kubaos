@@ -23,6 +23,20 @@
   initial-value: 0;
 }
 
+/* How far a rail step's symbol is reached, from its step's ink (0) to `primary` (1), and how far it
+   glows as the current one, 0 to 1: a step rail eases both as it moves on. */
+@property --bead-lit {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --bead-glow {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 /* A progress bar (`lib/progress.ts`): a pill `size.progress` tall across its room, the track
    `surface_container_highest` at `opacity.track`. The fill runs from the left edge to the work's
    fraction of the width, rounded up to a device pixel, in `primary`, with `shadow.glow` under it in
