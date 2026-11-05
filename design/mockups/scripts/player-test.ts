@@ -48,7 +48,9 @@ async function held(page: Page, index: number): Promise<Held> {
     const plot = player.querySelector<SVGSVGElement>(".page-plot")!;
     const stage = player.querySelector(".page-player-stage")!;
     const alone = [...player.querySelectorAll(".page-part-stage")];
-    const time = Number(player.querySelector(".page-player-stage")!.getAnimations({ subtree: true })[0]?.currentTime ?? 0);
+    // The player's clock is its own script animations: a CSS animation or transition on the
+    // sample (a spinner's spin) runs on the component's clock, not the player's.
+    const time = Number(stage.getAnimations({ subtree: true }).find((animation) => !(animation instanceof CSSAnimation || animation instanceof CSSTransition))?.currentTime ?? 0);
     const value = (element: Element, property: string) => Number(getComputedStyle(element).getPropertyValue(property));
     const curves = [...plot.querySelectorAll<SVGPathElement>(".page-plot-curve")];
     const undashed = (curve: SVGPathElement, test: (curve: SVGPathElement) => boolean) => {
@@ -155,14 +157,18 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
       check((await page.locator(".page-player").nth(index).locator(".page-player-controls .site-control").first().textContent()) === "Play", `${where}: seeking didn't pause`);
       shown.balls.forEach((ball, i) => {
         const range = tracks[i]!;
-        const playing = ball.played.map((v) => (v - range.from) / (range.to - range.from));
+        // A track that holds still (reduced motion's 0 to 0) has no way to go: it plays on its
+        // ball's progress while it holds its value.
+        const progressOf = (v: number) =>
+          range.to === range.from ? (Math.abs(v - range.from) <= 1e-6 ? ball.progress : Number.NaN) : (v - range.from) / (range.to - range.from);
+        const playing = ball.played.map(progressOf);
         check(Math.abs(ball.cy - ball.want) <= PIXEL, `${where} at ${shown.time} ms: ${ball.part}'s ball at y ${ball.cy}, its progress ${ball.progress} is drawn at ${ball.want}`);
         check(ball.onCurve, `${where} at ${shown.time} ms: ${ball.part}'s ball is off its curve`);
         check(Math.abs(shown.cx[i]! - shown.head) <= 1, `${where} at ${shown.time} ms: ${ball.part}'s ball isn't on the playhead`);
         if (ball.followed) {
           // Its part alone plays it alone: held to its own ball, as the whole is to the last's.
           for (const v of ball.alone) {
-            const p = (v - range.from) / (range.to - range.from);
+            const p = progressOf(v);
             check(Math.abs(p - ball.progress) <= PROGRESS, `${where} at ${shown.time} ms: ${ball.part} alone plays at ${p}, its ball says ${ball.progress}`);
           }
         } else {
@@ -183,13 +189,18 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
     const ticks = page.locator(".page-player").nth(index).locator(".page-plot-mark");
     const mark = ticks.nth(Math.min(1, (await ticks.count()) - 1));
     const at = Number(await mark.getAttribute("data-at"));
+    const total = Number(await page.locator(".page-plot").nth(index).getAttribute("data-total"));
+    // The loop's end is the next loop's start: a mark there holds a microsecond before it, and →
+    // stays on the last frame.
+    const last = Math.ceil(total / FRAME - 1e-6) - 1;
+    const want = Math.min(at, total - 1e-3);
     await mark.locator("rect").dispatchEvent("pointerdown", { pointerId: 1, button: 0, isPrimary: true });
     const marked = await held(page, index);
-    check(Math.abs(marked.time - at) < 1e-6, `${where}: the mark at ${at} ms held ${marked.time} ms`);
+    check(Math.abs(marked.time - want) < 1e-6, `${where}: the mark at ${at} ms held ${marked.time} ms`);
     await page.locator(".page-plot-box").nth(index).focus();
     await page.keyboard.press("ArrowRight");
     const stepped = await held(page, index);
-    const frame = Math.floor(at / FRAME + 1e-6) + 1;
+    const frame = Math.min(Math.floor(want / FRAME + 1e-6) + 1, last);
     check(Math.abs(stepped.time - frame * FRAME) < 1e-6, `${where}: → from ${at} ms held ${stepped.time} ms, not frame ${frame}'s ${frame * FRAME}`);
     await page.keyboard.press("Shift+ArrowLeft");
     const back = await held(page, index);
@@ -248,11 +259,17 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
         const hit = [...element.querySelectorAll<SVGPathElement>(".page-plot-curve-hit")].at(-1)!;
         const plot = hit.ownerSVGElement!;
         const length = hit.getTotalLength();
-        // Along the curve, at its middle: inside the move, away from the axes.
-        const point = hit.getPointAtLength(length / 2);
         const box = plot.getBoundingClientRect();
         const zoom = box.width / plot.clientWidth;
-        return { x: box.left + point.x * zoom, y: box.top + point.y * zoom, want: hit.getAttribute("data-pick") };
+        const at = (share: number) => {
+          const point = hit.getPointAtLength(length * share);
+          return { x: box.left + point.x * zoom, y: box.top + point.y * zoom };
+        };
+        // Along the curve, as near its middle as the pointer can reach it: inside the move, away
+        // from the axes, and clear of the page's pinned bands, which a tall plot scrolls under.
+        const shares = Array.from({ length: 41 }, (_, i) => 0.5 + (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * 0.01);
+        const spot = shares.map(at).find(({ x, y }) => document.elementFromPoint(x, y) === hit) ?? at(0.5);
+        return { ...spot, want: hit.getAttribute("data-pick") };
       });
       await page.mouse.move(spot.x, spot.y);
       const curve = await player.evaluate((element) => element.querySelector(".page-plot-curve[data-picked]")?.getAttribute("data-pick") ?? null);
