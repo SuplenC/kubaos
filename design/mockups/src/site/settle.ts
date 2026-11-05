@@ -1,7 +1,7 @@
-// What is laid out in script once the page's CSS has laid it out: the page's container and its
-// padding for the viewport, the sample grids' bands for it, the samples wider than it let out of
-// it, each mock centred down its row on a whole device pixel, the focus rings' glows for their
-// controls' sizes, then what the measures draw over their samples. CSS centres by half the spare
+// What is laid out in script once the page's CSS has laid it out: the page's container's padding
+// for its width, the sample grids' bands for it, the samples wider than it let out of it, the
+// stage's samples fitted to their panes, each mock centred down its row on a whole device pixel,
+// the focus rings' glows for their controls' sizes, then what the measures draw over their samples. CSS centres by half the spare
 // room, which is half a device pixel whenever that is odd; a mock is placed as the builds place a
 // child, the odd device pixel after it (`kubaos-ui`'s `centre`).
 
@@ -9,6 +9,7 @@ import { redrawRings } from "../lib/focus.ts";
 import { raw } from "../lib/tokens.ts";
 import { reflowBands } from "./parts/bands.ts";
 import { redrawOverlays } from "./parts/measures.ts";
+import { refitStages } from "./parts/stage.ts";
 import { settings } from "./settings.ts";
 
 /** Centres every mock cell's content on `page` down its row, on whole device pixels. */
@@ -30,26 +31,14 @@ function centreMocks(page: HTMLElement): void {
 }
 
 /**
- * The widest the page's container grows from each viewport width up, in logical pixels: Tailwind's
- * `container` steps. They frame the site's pages, not KubaOS's surfaces, so they aren't tokens.
- */
-const CONTAINER_STEPS = [640, 768, 1024, 1280, 1536];
-
-/**
- * Gives `page`'s container its widest for the viewport, the step it reaches, then its padding at
- * the width it takes in logical pixels: the padding of the widest step of `[container]` in the
+ * Gives `page`'s container, which fills the room between the navigation and the rail, its padding
+ * for the width it takes in logical pixels: the padding of the widest step of `[container]` in the
  * tokens it reaches (`Tokens.containerPadding`).
  */
 function fitContainer(page: HTMLElement): void {
   const container = page.querySelector<HTMLElement>(":scope > .page-container");
   if (!container) return;
-  const scale = settings().scale;
-  const viewport = (innerWidth * devicePixelRatio) / scale;
-  const reached = CONTAINER_STEPS.filter((step) => viewport >= step).at(-1);
-  container.style.setProperty("--page-container", reached === undefined ? "none" : `calc(${reached} * var(--px))`);
-  // Centred by half the spare room, the odd device pixel after it, so every sample starts on one.
-  container.style.setProperty("--page-left", `${Math.floor((page.clientWidth - container.offsetWidth) / 2)}px`);
-  const width = container.offsetWidth / scale;
+  const width = container.offsetWidth / settings().scale;
   let step = 0;
   for (let i = 0; raw(`container-${i}-from`) !== ""; i++) {
     if (width >= Number(raw(`container-${i}-from`))) step = i;
@@ -108,6 +97,7 @@ export function settle(page: HTMLElement): void {
   // A grid of bands is split for the container's room before a box is let out for what it holds.
   reflowBands(page);
   breakOut(page);
+  refitStages();
   centreMocks(page);
   redrawRings();
   redrawOverlays();

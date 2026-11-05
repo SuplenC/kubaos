@@ -11,7 +11,8 @@ import { type Arrival, type MediaOptions, media, settle } from "../../lib/media.
 import { role } from "../../lib/radius.ts";
 import { raw } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const CAPTION: Words = { short: "Shinjuku, night", long: "Shinjuku, night: the neon sign over the alley behind the station, after the rain" };
 

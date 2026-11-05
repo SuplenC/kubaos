@@ -1,6 +1,6 @@
-// The Colour foundation: every colour role in both modes and every theme, the fixed palette, the
-// derived roles as their recipes, the opacities and state layers, and every contrast pair with
-// its ratio in the palette picked (`docs/DESIGN.md`, "Colour").
+// The Colour foundation (`docs/DESIGN.md`, "Colour", is its full reference): every colour role in
+// both modes and every theme, the fixed palette, the derived roles as their recipes, the
+// opacities, and every contrast pair with its ratio in the palette picked.
 
 import { button, KINDS, type Kind, type Pinned } from "../../lib/button.ts";
 import { row, stack } from "../../lib/layout.ts";
@@ -481,89 +481,83 @@ export default foundation({
   level: "foundations",
   slug: "colour",
   title: "Colour",
-  summary: "Every colour is a role: matugen's from the wallpaper, a fixed palette of our own for the meanings, and roles derived from their tones by recipe, held to a contrast minimum in every pair.",
-  live: () => painted(settings().theme, settings().mode, scene()),
-  description: [
-    "Code names a role (`primary`, `on_surface`, `surface_container_high`), never a colour. Matugen sets every role it has a source for from the wallpaper (`scheme-fidelity`), so `primary` and `cold` and everything around them are dynamic: the hex values here are a theme's, never the role's. The tokens' palettes are matugen's for the default wallpaper, the Neon sign theme; the toolbar paints the page in three others matugen made from seed colours, so nothing is judged in one accent alone.",
-    "The fixed palette is ours and keeps its colours whatever the wallpaper, so a meaning has one colour on every desktop: error, success, warning, sharing, the microphone and recording. Each meaning has a burning tone, decided in OKLCH and fitted into sRGB at its hue and lightness, neon-bright at night and deeper by day, and the Danger, Success and Warning buttons burn on theirs. Every role carrying the meaning is a recipe over the tone: its text role (`error`, `success` and the rest) the tone with its lightness moved only as far as it takes to hold 4.5:1 on every surface, its core (`_core`) and its unlit form (`_unlit`). The error family's labels and container follow from its tone too, so Material 3's pastel error, the same for every wallpaper, never reaches the screen. The logo keeps its own cores, fixed values only its mark draws.",
-    "Everything that follows from a tone is a derived role (`[color.derived]`), a recipe over the live tone, never a value, so it follows the wallpaper. A lit tube's core is its tone 50% toward white (`_core`); the tone unlit is its OKLCH lightness × 0.6 and chroma × 1.2 (`_unlit`), a deep, rich colour, not a greyed one. Each button kind's fills, labels and lines build on them: Filled's unlit fill is `primary_unlit`, its pressed fill 0.035 lighter, its signs-off glass 0.12 lighter; by day its fill is the tone at lightness 0.80. A recipe that moves lightness or chroma is fitted back into sRGB by lowering its chroma alone, so the hue and lightness hold, and a label's recipe fits its lightness until it holds 4.5:1 on every fill it sits on. `primary`, and so every role built on it, comes from the wallpaper: here each is drawn in every theme the toolbar paints in.",
-    "An opacity lays a role over another: the state layers, disabled content, scrims, glass. A component never picks its own alpha. Every foreground drawn on a background is a listed pair that holds WCAG 2.1 AA: 4.5:1 for text, 3:1 for large text and for marks that carry meaning.",
-  ],
+  lede: "Every colour is a role: matugen's from the wallpaper, a fixed palette for meanings, and recipes over both.",
+  stage: { live: scene, hint: "the top bar's theme repaints it", daylight: true },
   tokens: [
     {
       name: "Roles from the wallpaper",
-      described: "Every role matugen sets, by family, in the theme the toolbar picks, dark beside light: each tile is a role with the role drawn on it, both with their values in this theme; a line or a shade is shown alone.",
+      note: "Each role matugen sets, by family, dark beside light, in the theme picked.",
       sample: sourcedRoles,
     },
     {
       name: "Where each comes from",
-      described: "The matugen colour each role is read from at runtime (`[color.source]`). `cold` is matugen's tertiary, the wallpaper's complement.",
+      note: "The matugen colour each role reads at runtime; `cold` is the tertiary.",
       sample: sources,
     },
     {
       name: "The fixed palette",
-      described: "Each meaning in the theme the toolbar picks, dark and light: its burning tone, its text role, its core and its unlit form, each with its value, then words in the text role. The tones are the same in every theme; the text roles are fitted to that theme's surfaces.",
+      note: "Each meaning's burning tone, text role, core and unlit form, the same in every theme.",
       sample: fixedPalette,
     },
     {
       name: "The logo's cores",
-      described: "Fixed values of our own outside the palette, one per mode whatever the wallpaper, drawn along the logo's tubes.",
+      note: "Fixed values outside the palette, one per mode, along the logo's tubes.",
       sample: fixedRoles,
     },
     {
       name: "Derived roles",
-      described: "Every derived role as its recipe, in each mode, drawn from what it is computed from in every theme: a line inside a control filled with its tone, or, for a label, its text on the first fill it is fitted to; then the role alone. `_core` is the line lit with the signs on, `_unlit` the tone unlit; the `_fill`, `_rest`, `_lit`, `_pressed`, `_line` and `_glass` roles are the button kinds' states. No value is fixed: in every theme, the same recipe on that tone.",
+      note: "Every derived role as its recipe, drawn from what it is computed from, in each mode.",
       sample: () => el("div", "page-part", ...MODES.flatMap((mode) => [label(modeName(mode), "body_strong", "on_surface"), derivedIn(mode)])),
     },
     {
       name: "Opacities",
-      described: "Every opacity at its value, laying the role it is used with over its background, in the theme and mode picked.",
+      note: "Each opacity at its value, laying its role over its background.",
       sample: opacities,
     },
     {
       name: "A button's states, by role",
-      described: "A button has no state layer: each state is its own derived roles, computed from the live tone (`docs/DESIGN.md`, \"States\"). Rest, lit with the signs on (its line, its glow and its lit label), lit with the signs off (its line as glass, no glow, its label at rest), and pressed, overdriven. Disabled alone lays opacities: its content at `opacity.disabled_content` of `on_surface`, its fill at `opacity.disabled_container`. Every kind, in the theme and mode picked, as the Button page shows them.",
+      note: "No state layer: each state is its own derived roles from the live tone.",
       sample: buttonStates,
     },
   ],
   rules: [
     {
       name: "Every pair holds its minimum",
-      described: "Every foreground role the front ends draw on a background role, at the opacity it is drawn at, with what it needs and where it is drawn: its ratio here is worked out live from the theme picked, as `kubaos-design contrast` works out the tokens' own. A ratio under its minimum is red.",
+      note: "Every foreground on its background, its ratio live in the theme picked; red is under.",
       sample: contrastPairs,
     },
     {
       name: "The themes, pair by pair",
-      described: "How many pairs fall under their minimum in each theme the toolbar paints in. The tokens' own palettes are refused when one does; matugen's palettes from other wallpapers aren't checked yet, so a pair failing here is a question for the design, not a passing build.",
+      note: "How many pairs fall under their minimum in each theme.",
       sample: failures,
     },
     {
       name: "Decoration needs no pair",
-      described: "A role drawn only as decoration carries no meaning, as WCAG exempts it: dividers and soft edges, the shadow and the scrim, the cores along a tube's middle, the unlit tones, and a lit button's line and glass. `kubaos-design contrast` fails on a role a front end draws that is in no pair and not here.",
+      note: "Roles drawn only as decoration carry no meaning, so no pair holds them.",
       sample: () => el("div", "f-row", ...decorative().map((role) => swatchWith(role, role))),
     },
   ],
   modes: [
     {
       name: "The same scene, dark and light",
-      described: "Dark is the default: the Filled button rests on its unlit fill with near-white letters, and lit, its core burns inside its edge with the glow outside. By day the signs are off and nothing glows: its fill is the tone lifted to lightness 0.80 with a dark label, and lit adds a dark line inside its edge. Geometry never changes with the mode.",
+      note: "By night the signs burn; by day nothing glows and fills lift to 0.80.",
       sample: () => el("div", "f-row", ...MODES.map((mode) => sceneIn(settings().theme, mode))),
     },
   ],
   themes: [
     {
       name: "The scene in every theme",
-      described: "The same card in each theme the toolbar paints in, in the mode picked. The fixed palette's words keep their tone, fitted to each theme's surfaces; everything else follows the wallpaper.",
+      note: "The same card in each theme; the fixed palette keeps its tones.",
       sample: () => el("div", "f-row", ...themes().map((theme) => sceneIn(theme.slug, settings().mode))),
     },
     {
       name: "Every role in every theme",
-      described: "Each matugen role's value in each theme and mode: what `primary` and `cold` are depends on the wallpaper, so no page is right in one alone.",
+      note: "Each matugen role's value in each theme and mode.",
       sample: sourcedEverywhere,
     },
   ],
-  scales: doesntApply("a colour is the same at every scale; only the lengths it fills change, which the space and elevation pages show in device pixels."),
-  content: doesntApply("a colour holds no words; the type page shows text at its extremes."),
+  scales: doesntApply("a colour is the same at every scale."),
+  content: doesntApply("a colour holds no words; the Type page shows text's extremes."),
   motion: {
     arrives: doesntApply("a colour arrives with what it paints."),
     leaves: doesntApply("a colour leaves with what it paints."),
@@ -575,10 +569,9 @@ export default foundation({
     ],
   },
   checks: [
-    { check: "kubaos-tokens", holds: "Refuses the tokens when a pair falls under its minimum in either of their palettes, or a derived role names both white and black or neither; nothing generates from them until it holds." },
-    { check: "kubaos-design contrast", holds: "Lists every pair with its ratio in both palettes, and fails on a role a front end draws that is in no pair and isn't decorative." },
-    { check: "kubaos-design lint", holds: "Fails on a colour written out in QML or Rust UI code: a colour is a role." },
-    { check: "Matugen's palettes", holds: "Not checked yet: the fallback palettes are matugen's for the default wallpaper, so a pair failing there fails on the desktop too, but a wallpaper's own palette isn't held to the pairs." },
+    { check: "kubaos-tokens", holds: "refuses a pair under its minimum, in either palette" },
+    { check: "kubaos-design contrast", holds: "lists every pair; fails a drawn role in none" },
+    { check: "kubaos-design lint", holds: "fails a colour written out in UI code" },
+    { check: "Matugen's palettes", holds: "not checked yet: a wallpaper's own palette" },
   ],
 });
-

@@ -10,7 +10,8 @@ import { filling, row, stack, within } from "../../lib/layout.ts";
 import { type Level, level, meter, type MeterPart, setMeter, tint } from "../../lib/meter.ts";
 import { clamped, text, wrapped } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** A system monitor card's room: the shell's panel less its padding and the card's. */
 export const CARD_ROOM = "calc(var(--size-panel) - 4 * var(--space-s16))";

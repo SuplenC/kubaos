@@ -8,7 +8,8 @@ import { shown, type Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { stack, within } from "../../lib/layout.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const TITLE: Words = { short: "Erase", long: "Erase the whole disk and install KubaOS on it" };
 const LINE: Words = { short: "Everything on it goes.", long: "Wipes all three partitions, Windows and its recovery partition included." };

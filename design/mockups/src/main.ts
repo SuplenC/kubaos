@@ -1,4 +1,4 @@
-// The mockup site: the toolbar and the navigation around the page picked by the address,
+// The mockup site: the top bar, the navigation and the rail around the page picked by the address,
 // `#/LEVEL/PAGE`. `?chrome=off` shows the page alone, as the shots draw it.
 //
 // `window.kubaos` lets a script that drives the site (`scripts/render.ts`) wait until the page is
@@ -16,14 +16,15 @@ import { forgetPalettes } from "./site/recolour.ts";
 import { PAGES } from "./pages/index.ts";
 import { el, RELAYOUT } from "./site/dom.ts";
 import { type Frame, frame } from "./site/frame.ts";
-import { nav } from "./site/nav.ts";
+import { type Nav, nav } from "./site/nav.ts";
 import { type AnyPage, applies, isFoundation } from "./site/page.ts";
 import { recipes, stopPlayers } from "./site/parts/motion.ts";
+import { forgetRail, rail } from "./site/rail.ts";
 import { render } from "./site/render.ts";
 import { apply, CHROME, onChange, settings } from "./site/settings.ts";
 import { holdWheel, releaseWheel } from "./site/scroll.ts";
 import { settle } from "./site/settle.ts";
-import { toolbar, updateToolbar } from "./site/toolbar.ts";
+import { toolbar } from "./site/toolbar.ts";
 
 declare global {
   interface Window {
@@ -60,15 +61,28 @@ function refit(): void {
   draw();
 }
 
+/** What the search holds, kept across pages, and the navigation it filters. */
+let query = "";
+let shownNav: Nav | null = null;
+
+const bar = toolbar(
+  (typed) => {
+    query = typed;
+    shownNav?.filter(query);
+  },
+  () => {
+    const address = shownNav?.first();
+    if (address) location.hash = address;
+  },
+);
+
 /**
- * The toolbar's height, which wraps onto more lines in a narrow window, kept in
+ * The top bar's height, which wraps onto more lines in a narrow window, kept in
  * `--site-toolbar-height` so the navigation sticks just under it instead of sliding beneath it.
  */
 const toolbarHeight = new ResizeObserver(([entry]) => {
   const height = entry?.borderBoxSize[0]?.blockSize ?? 0;
   document.documentElement.style.setProperty("--site-toolbar-height", `${height}px`);
-  // The page's contents stick under it, inside the page's box, whose zoom shrinks its pixels.
-  pageBox.style.setProperty("--page-pinned-top", `${height * devicePixelRatio}px`);
 });
 
 function draw(): void {
@@ -78,14 +92,17 @@ function draw(): void {
   releaseWheel();
   // The page measures its samples as it draws them, so its box is on the document first.
   if (!pageBox.isConnected) site.append(pageBox);
-  pageBox.replaceChildren(...(page ? render(page) : [el("p", "page-prose", "No pages yet.")]));
+  const drawn = page ? render(page) : null;
+  pageBox.replaceChildren(drawn?.container ?? el("p", "page-prose", "No pages yet."));
   if (CHROME) {
-    const hasWindow = page !== undefined && !isFoundation(page) && applies(page.measures.reflow);
-    const bar = toolbar(hasWindow);
-    site.replaceChildren(bar, el("div", "site-body", nav(page), pageBox));
+    bar.windows(page !== undefined && !isFoundation(page) && applies(page.measures.reflow));
+    shownNav = nav(page);
+    shownNav.filter(query);
+    site.replaceChildren(bar.element, el("div", "site-body", shownNav.element, pageBox, rail(drawn?.sections ?? [])));
     toolbarHeight.disconnect();
-    toolbarHeight.observe(bar);
+    toolbarHeight.observe(bar.element);
   } else {
+    forgetRail();
     site.replaceChildren(pageBox);
   }
   document.title = page ? `${page.title} · KubaOS mockups` : "KubaOS mockups";
@@ -127,9 +144,12 @@ async function start(): Promise<void> {
       draw();
       return;
     }
+    if (changed.has("both") || changed.has("scale")) {
+      // The stage's panes follow Both, and the anatomy's values the scale.
+      draw();
+      return;
+    }
     apply(pageBox);
-    const bar = site.querySelector(".site-toolbar");
-    if (bar) updateToolbar(bar);
     settle(pageBox);
   });
   await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));

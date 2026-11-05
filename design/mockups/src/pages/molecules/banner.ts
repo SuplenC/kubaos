@@ -10,7 +10,8 @@ import { progressBar, setProgress } from "../../lib/progress.ts";
 import { text } from "../../lib/text.ts";
 import { number } from "../../lib/tokens.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { settings } from "../../site/settings.ts";
 
 /** A column of text at its widest: a banner of words alone. */

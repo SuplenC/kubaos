@@ -7,7 +7,8 @@ import { icon, missingIcon } from "../../lib/icon.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { text, type TypeStyle } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const SIZES = ["s16", "s20", "s24", "s32", "s48"] as const;
 

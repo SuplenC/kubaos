@@ -5,7 +5,8 @@ import type { Words } from "../../lib/content.ts";
 import { type Fact, descriptionList } from "../../lib/description.ts";
 import { stack, within } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** A card's content: the column less a card's padding. */
 const ROOM = "calc(var(--size-column) - 2 * var(--space-s16))";

@@ -11,7 +11,8 @@ import { list } from "../../lib/list.ts";
 import { media } from "../../lib/media.ts";
 import { role } from "../../lib/radius.ts";
 import { wrapped } from "../../lib/text.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { settingsWindow } from "./example.ts";
 
 const COLUMN = "var(--size-column)";

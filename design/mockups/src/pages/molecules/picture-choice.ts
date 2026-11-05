@@ -13,7 +13,8 @@ import { stack, within } from "../../lib/layout.ts";
 import { type PictureChoiceOptions, pictureChoice, setPickedPicture, type Tag } from "../../lib/picture-choice.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const NAME: Words = { short: "Shinjuku", long: "Shinjuku, night: the alley behind the station after the rain" };
 

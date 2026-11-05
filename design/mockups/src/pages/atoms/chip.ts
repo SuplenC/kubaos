@@ -8,7 +8,8 @@ import { type Shown, stateOptions } from "../../lib/control.ts";
 import { hintRoom } from "../../lib/hint.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** The words and the symbol each kind shows here, as long as they get. */
 const SAMPLES: Record<ChipKind, { words: Words; icon: string }> = {

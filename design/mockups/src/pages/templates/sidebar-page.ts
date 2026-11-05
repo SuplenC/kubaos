@@ -7,7 +7,8 @@ import { fixed, shown, type Words } from "../../lib/content.ts";
 import { stack } from "../../lib/layout.ts";
 import { type SidebarPageOptions, sidebarPage, sidebarRow } from "../../lib/sidebar-page.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, type Easing, type Move, nonEmpty, page, type Track } from "../../site/page.ts";
+import { doesntApply, type Easing, type Move, nonEmpty, type Track } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { fewer, outline } from "./settings.ts";
 import { resizable, still } from "./window.ts";
 

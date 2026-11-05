@@ -6,7 +6,8 @@ import { shown, type Words } from "../../lib/content.ts";
 import { row, stack, within } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
 import { onSurface, type ToastOptions, toast, toastRoom } from "../../lib/toast.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const SAID: Words = { short: "Copied.", long: "Copied the path of the file you saved to Downloads this morning." };
 

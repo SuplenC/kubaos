@@ -8,7 +8,8 @@ import { LEVEL_COLOURS, LEVELS, type Level, log, type LogLine, logRoom } from ".
 import { text } from "../../lib/text.ts";
 import { CHROME } from "../../site/settings.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { INSTALL_LOG } from "./error-block.ts";
 
 const ROOM = "var(--size-column)";

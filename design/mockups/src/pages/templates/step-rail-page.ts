@@ -17,7 +17,8 @@ import { step, type StepOptions } from "../../lib/step.ts";
 import { footer, koboBrand, type RailPage, stepRailPage, type StepRailOptions, windowBrand } from "../../lib/step-rail.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page, type Track } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty, type Track } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { windowSize } from "../../site/settings.ts";
 
 /** A step in the rail, inside its `space.s12` of padding. */

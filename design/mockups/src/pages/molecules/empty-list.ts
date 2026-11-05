@@ -5,7 +5,8 @@ import { shown, type Words } from "../../lib/content.ts";
 import { stack, within } from "../../lib/layout.ts";
 import { emptyList, type ListRowSpec, list } from "../../lib/list.ts";
 import { text } from "../../lib/text.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { WELL_ROOM } from "./list.ts";
 
 const LINE: Words = { short: "No devices found", long: "No Bluetooth devices nearby. Put yours in pairing mode to see it here." };

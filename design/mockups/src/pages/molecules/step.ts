@@ -7,7 +7,8 @@ import { well } from "../../lib/list.ts";
 import { step, type StepOptions } from "../../lib/step.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** Kōbō's step rail, inside its 12 of padding. */
 const RAIL = "calc(var(--size-rail) - 2 * var(--space-s12))";

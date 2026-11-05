@@ -8,7 +8,8 @@ import { container, containerSteps, divider, header, inset, page, row, stack, wi
 import { text } from "../../lib/text.ts";
 import { length } from "../../lib/tokens.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page as mockPage } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page as mockPage } from "../../site/legacy.ts";
 import { appearanceHeader, settingsWindow } from "./example.ts";
 
 /**

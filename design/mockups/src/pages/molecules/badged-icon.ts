@@ -7,7 +7,8 @@ import { row } from "../../lib/layout.ts";
 import { pill } from "../../lib/pill.ts";
 import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** What each size sits beside. */
 const BESIDE: Record<BadgedSize, string> = {

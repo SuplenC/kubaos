@@ -8,7 +8,8 @@ import { stack, within } from "../../lib/layout.ts";
 import { type Job, progressPanel } from "../../lib/progress-panel.ts";
 import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** The Command menu's room for a View: its panel's width less its padding, a few rows tall. */
 const ROOM = "var(--size-column)";

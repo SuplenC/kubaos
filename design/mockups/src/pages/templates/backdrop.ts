@@ -3,7 +3,8 @@
 // Kōbō's step-rail screens hold.
 
 import { backdrop } from "../../lib/backdrop.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { windowSize } from "../../site/settings.ts";
 import { atSize, DONE, done, HERO, LEDE, type Moment, polkit, SAMPLE, stepRailHost, welcome, welcomeColumn } from "./backdrops.ts";

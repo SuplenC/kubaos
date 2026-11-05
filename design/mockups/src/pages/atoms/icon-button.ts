@@ -8,7 +8,8 @@ import { hintRoom } from "../../lib/hint.ts";
 import { ICON_KINDS, type IconKind, iconButton } from "../../lib/icon-button.ts";
 import { row } from "../../lib/layout.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** The symbol and the label each kind shows here, the label as long as it gets. */
 const SAMPLES: Record<IconKind, { icon: string; words: Words }> = {

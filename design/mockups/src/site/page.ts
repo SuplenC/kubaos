@@ -3,18 +3,36 @@
 // tokens shown as it is used. Every part is required: a part that doesn't apply says so with
 // `doesntApply(why)`, so no page can leave one out unnoticed.
 //
+// A page's words are a one-line lede, labels, table cells and one-line notes, never paragraphs:
+// the samples show what the words would restate, and the full reference is the component's page
+// under `docs/design/components/`. Each kind of words has a most it may hold (`MOST`), and
+// `wordy` finds every one past it, which the site refuses to draw.
+//
 // A page only says what it shows; `site/render.ts` draws every page of a kind the same way.
 
 import type { Words } from "../lib/content.ts";
 import type { Tone } from "../lib/focus.ts";
 import type { ColourPath } from "./recolour.ts";
 
-/** A part that doesn't apply to this page, and why. */
+/** A name: a variant's, a part's, a row's. A few words. */
+export type Label = string;
+/** A table's cell: what a variant is for, what a state looks like, what a key does. */
+export type Cell = string;
+/** A note under a sample or a move, or why a part doesn't apply: one line, two at most. */
+export type Note = string;
+/** The page's lede: what it is, one sentence. */
+export type Lede = string;
+
+/** The most words each kind holds, a `backticked` token counting as one. */
+export const MOST = { label: 6, cell: 12, note: 24, lede: 24 } as const;
+export type WordKind = keyof typeof MOST;
+
+/** A part that doesn't apply to this page, and why, in a note: drawn as one muted line. */
 export interface DoesntApply {
-  readonly doesntApply: string;
+  readonly doesntApply: Note;
 }
 
-export function doesntApply(why: string): DoesntApply {
+export function doesntApply(why: Note): DoesntApply {
   return { doesntApply: why };
 }
 
@@ -50,10 +68,10 @@ export const LEVELS = [
 ] as const;
 export type Level = (typeof LEVELS)[number]["slug"];
 
-/** One variant or size, what it is for, and how it looks. */
+/** One variant or size, what it is for in a few words, and how it looks. */
 export interface Variant {
-  readonly name: string;
-  readonly for: string;
+  readonly name: Label;
+  readonly for: Cell;
   readonly sample: Sample;
 }
 
@@ -86,16 +104,16 @@ export const STATE_NAMES: Record<State, string> = {
 };
 
 /**
- * The state matrix: a row per variant and a column per state it has, once in each mode, night
- * then daylight, each cell live in that mode. Every state the page doesn't show is in `absent` with
+ * The states: a row per variant and a column per state it has, which the stage's chips pin and the
+ * compact matrix draws once in each mode. Every state the page doesn't show is in `absent` with
  * why, which the types hold to the list.
  */
 export interface States<S extends State> {
   readonly shown: readonly S[];
-  readonly absent: Record<Exclude<State, S | Optional>, string>;
-  readonly rows: NonEmpty<{ readonly name: string; readonly cell: (state: S) => Element }>;
-  /** What each state looks like and does, in words, by night and by day. */
-  readonly described: Record<S, string>;
+  readonly absent: Record<Exclude<State, S | Optional>, Cell>;
+  readonly rows: NonEmpty<{ readonly name: Label; readonly cell: (state: S) => Element }>;
+  /** What each state looks like, a few words: the states table's second column. */
+  readonly looks: Record<S, Cell>;
 }
 
 /**
@@ -104,7 +122,7 @@ export interface States<S extends State> {
  */
 export interface Tube {
   /** The variant or state it lights on. */
-  readonly name: string;
+  readonly name: Label;
   readonly tone: Tone;
   /** It has a fill: the line inside the fill's edge is the tone's core by night. */
   readonly filled: boolean;
@@ -132,8 +150,8 @@ export const LOOK_NAMES: Record<Look, string> = {
  */
 export interface Focus {
   readonly tubes: NonEmpty<Tube>;
-  /** What the line, the glow and the content are in each look, in words. */
-  readonly looks: Record<Look, string>;
+  /** What the line, the glow and the content are in each look, a few words. */
+  readonly looks: Record<Look, Cell>;
   /** The matrix's row at `index`, lit with the signs off. */
   readonly signsOff: (index: number) => Element;
 }
@@ -141,7 +159,7 @@ export interface Focus {
 /** The content extremes the mockup skill names. */
 export interface Content {
   /** The shortest and the longest text, and the translation 40% longer (the toolbar's text). */
-  readonly text: readonly { readonly name: string; readonly words: Words; readonly sample: (words: string) => Element }[] | DoesntApply;
+  readonly text: readonly { readonly name: Label; readonly words: Words; readonly sample: (words: string) => Element }[] | DoesntApply;
   readonly missingPicture: readonly Variant[] | DoesntApply;
   /** None, one and many items. */
   readonly counts: readonly Variant[] | DoesntApply;
@@ -223,8 +241,9 @@ export interface Recolour {
 export type Move = MoveWords & (Eased | Struck);
 
 interface MoveWords {
-  readonly name: string;
-  readonly what: string;
+  readonly name: Label;
+  /** What happens, one line: the player and its recipe show the rest. */
+  readonly what: Note;
   /** The sample the move plays on, at rest: the player moves its parts. */
   readonly sample: () => Element;
   /** A still beat at the move's end, after its last part, that belongs to the move. */
@@ -270,14 +289,17 @@ export interface Motion {
 
 /** The keyboard: every key, where focus goes, and where it lands. */
 export interface Keyboard {
-  readonly keys: NonEmpty<{ readonly keys: NonEmpty<string>; readonly does: string }>;
-  readonly order: string;
-  readonly lands: string;
+  readonly keys: NonEmpty<{ readonly keys: NonEmpty<string>; readonly does: Cell }>;
+  /** Where Tab and Shift+Tab take focus. */
+  readonly order: Note;
+  /** Where focus lands when the part appears or goes. */
+  readonly lands: Note;
 }
 
-/** A measure of the sample, by the token it comes from. */
+/** A measure of the sample, by the token it comes from: the anatomy table's row. */
 export interface Measure {
-  readonly what: string;
+  /** The part it measures, a few words: Height, Inset, Option row. */
+  readonly part: Label;
   readonly token: string;
 }
 
@@ -287,7 +309,30 @@ export interface Measures {
   readonly samples: NonEmpty<Variant>;
   readonly measures: NonEmpty<Measure>;
   /** The part in a window of the toolbar's size, from the minimum to a full screen. */
-  readonly reflow: { readonly described: string; readonly sample: Sample } | DoesntApply;
+  readonly reflow: { readonly note: Note; readonly sample: Sample } | DoesntApply;
+}
+
+/**
+ * The page's names in code, for its header's tags: only those the component's page under
+ * `docs/design/components/` gives, and where it says a toolkit has yet to build it, that.
+ */
+export interface Code {
+  readonly rust?: string;
+  readonly qml?: string;
+  /** What isn't built yet, as that page says: QML not built yet. */
+  readonly unbuilt?: Label;
+}
+
+/**
+ * The stage, which leads the page: the thing itself, live and large, by night and by day side by
+ * side, under a bar of the states' chips with a hint on how to try it.
+ */
+export interface Stage {
+  readonly live: Sample;
+  /** How to try the live sample, a few words: click it, or Tab and ↓. */
+  readonly hint: Cell;
+  /** The day pane, or why it doesn't apply: a lock drawn in its wallpaper's night scheme. */
+  readonly daylight: true | DoesntApply;
 }
 
 export interface Page<S extends State = State> {
@@ -296,11 +341,9 @@ export interface Page<S extends State = State> {
   readonly slug: string;
   readonly title: string;
   /** One sentence: what it is. */
-  readonly summary: string;
-  /** The thing itself, live, which the description sits beside. */
-  readonly live: Sample;
-  /** How it looks and behaves, a paragraph each. */
-  readonly description: NonEmpty<string>;
+  readonly lede: Lede;
+  readonly code: Code;
+  readonly stage: Stage;
   readonly variants: readonly Variant[] | DoesntApply;
   readonly sizes: readonly Variant[] | DoesntApply;
   readonly states: States<S>;
@@ -324,17 +367,17 @@ export function page<S extends State>(spec: Page<S>): Page {
   return spec as unknown as Page;
 }
 
-/** A part of a foundation: its name, what it shows in words, and the thing itself, live. */
+/** A part of a foundation: its name, a note on what to read in it, and the thing itself, live. */
 export interface Shown {
-  readonly name: string;
-  readonly described: string;
+  readonly name: Label;
+  readonly note: Note;
   readonly sample: Sample;
 }
 
 /** What holds a family of tokens to its rules, and how. */
 export interface Check {
-  readonly check: string;
-  readonly holds: string;
+  readonly check: Label;
+  readonly holds: Cell;
 }
 
 /**
@@ -348,11 +391,9 @@ export interface Foundation {
   readonly slug: string;
   readonly title: string;
   /** One sentence: what the family is. */
-  readonly summary: string;
-  /** The family in use, live, which the description sits beside. */
-  readonly live: Sample;
-  /** What the family is for and how it is picked, a paragraph each. */
-  readonly description: NonEmpty<string>;
+  readonly lede: Lede;
+  /** The family in use, live, by night and by day. */
+  readonly stage: Stage;
   /** Every token of the family, live, by its token, with its value and what it is for. */
   readonly tokens: NonEmpty<Shown>;
   /** The rules the values keep, each with a worked example, live. */
@@ -381,4 +422,71 @@ export type AnyPage = Page | Foundation;
 
 export function isFoundation(page: AnyPage): page is Foundation {
   return page.level === "foundations";
+}
+
+/** `words`' count, a `backticked` token one word. */
+export function wordCount(words: string): number {
+  return words.replaceAll(/`[^`]*`/g, "x").split(/\s+/).filter(Boolean).length;
+}
+
+/** A field of a page past its kind's most: where it is, its kind and its words. */
+export interface Wordy {
+  readonly where: string;
+  readonly kind: WordKind;
+  readonly words: string;
+}
+
+/** Every field of `page` past its kind's most: none on a page the site draws. */
+export function wordy(page: AnyPage): Wordy[] {
+  const found: Wordy[] = [];
+  const hold = (where: string, kind: WordKind, words: string) => {
+    if (wordCount(words) > MOST[kind] || (kind === "lede" && /[.!?]\s+\S/.test(words))) found.push({ where, kind, words });
+  };
+  const each = <T>(part: T | DoesntApply, where: string, check: (value: T) => void) => {
+    if (applies(part)) check(part);
+    else hold(where, "note", part.doesntApply);
+  };
+  const variants = (list: readonly Variant[] | DoesntApply, where: string) =>
+    each(list, where, (rows) => rows.forEach((row) => (hold(`${where} ${row.name}`, "label", row.name), hold(`${where} ${row.name}`, "cell", row.for))));
+  const motion = (spec: Motion | DoesntApply) =>
+    each(spec, "motion", (moves) =>
+      (["arrives", "leaves", "between"] as const).forEach((when) =>
+        each(moves[when], `motion ${when}`, (list) => list.forEach((move) => (hold(`move ${move.name}`, "label", move.name), hold(`move ${move.name}`, "note", move.what)))),
+      ),
+    );
+  hold("lede", "lede", page.lede);
+  hold("stage hint", "cell", page.stage.hint);
+  each(page.stage.daylight, "stage daylight", () => {});
+  motion(page.motion);
+  if (isFoundation(page)) {
+    const shown = (list: NonEmpty<Shown> | DoesntApply, where: string) =>
+      each(list, where, (rows) => rows.forEach((row) => (hold(`${where} ${row.name}`, "label", row.name), hold(`${where} ${row.name}`, "note", row.note))));
+    shown(page.tokens, "tokens");
+    shown(page.rules, "rules");
+    shown(page.modes, "modes");
+    shown(page.themes, "themes");
+    shown(page.scales, "scales");
+    shown(page.content, "content");
+    page.checks.forEach((check) => (hold(`check ${check.check}`, "label", check.check), hold(`check ${check.check}`, "cell", check.holds)));
+    return found;
+  }
+  if (page.code.unbuilt) hold("code", "label", page.code.unbuilt);
+  variants(page.variants, "variant");
+  variants(page.sizes, "size");
+  for (const [state, words] of Object.entries(page.states.looks)) hold(`state ${state}`, "cell", words as string);
+  for (const [state, words] of Object.entries(page.states.absent)) hold(`absent ${state}`, "cell", words as string);
+  page.states.rows.forEach((row) => hold(`row ${row.name}`, "label", row.name));
+  each(page.focus, "focus", (focus) => LOOKS.forEach((look) => hold(`look ${look}`, "cell", focus.looks[look])));
+  each(page.content.text, "content text", (rows) => rows.forEach((row) => hold(`content ${row.name}`, "label", row.name)));
+  variants(page.content.missingPicture, "missing picture");
+  variants(page.content.counts, "counts");
+  each(page.keyboard, "keyboard", (keyboard) => {
+    keyboard.keys.forEach((row) => hold(`key ${row.keys.join(" ")}`, "cell", row.does));
+    hold("keyboard order", "note", keyboard.order);
+    hold("keyboard lands", "note", keyboard.lands);
+  });
+  variants(page.measures.samples, "measured");
+  page.measures.measures.forEach((measure) => hold(`measure ${measure.token}`, "label", measure.part));
+  each(page.measures.reflow, "reflow", (reflow) => hold("reflow", "note", reflow.note));
+  return found;
 }

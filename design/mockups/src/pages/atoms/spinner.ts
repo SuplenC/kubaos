@@ -7,7 +7,8 @@ import { filling, row, stack, within } from "../../lib/layout.ts";
 import { SPINNER_SIZES, type SpinnerSize, spinner } from "../../lib/spinner.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const DOING: Words = {
   short: "Connecting…",

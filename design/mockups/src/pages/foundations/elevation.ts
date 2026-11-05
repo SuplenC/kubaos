@@ -14,7 +14,8 @@ import { text } from "../../lib/text.ts";
 import { popover, tooltip } from "../../lib/tooltip.ts";
 import { length, names, number } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
-import { doesntApply, foundation } from "../../site/page.ts";
+import { doesntApply } from "../../site/page.ts";
+import { foundation } from "../../site/legacy.ts";
 import { atScale, MODES, modeName, painted, table, themes, token } from "../../site/parts/swatches.ts";
 import { type Mode, SCALES, settings } from "../../site/settings.ts";
 

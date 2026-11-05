@@ -8,7 +8,8 @@ import { stack } from "../../lib/layout.ts";
 import { type Tab, tabs } from "../../lib/tabs.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
+import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, type Track } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const SECTIONS: readonly Tab[] = [{ label: "Wi-Fi" }, { label: "Bluetooth" }, { label: "Output" }, { label: "Keyboard" }];
 const TOOLS: readonly Tab[] = [

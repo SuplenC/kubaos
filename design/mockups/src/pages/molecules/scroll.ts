@@ -7,7 +7,8 @@ import type { Words } from "../../lib/content.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { type ScrollOptions, scroll } from "../../lib/scroll.ts";
 import { text, wrapped } from "../../lib/text.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** The scroll's room in the panel: six rows tall. */
 const TALL = "calc(6 * var(--size-row))";
