@@ -143,7 +143,7 @@ export function lockField(moment: Moment, live = false, error = "", reader = tru
     icon: busy ? "hourglass_top" : "lock",
     placeholder: busy ? "Checking…" : missed ? error : "Password",
     secret: true,
-    ...(reader ? { trailing: { icon: "fingerprint", color: moment === "unknown" ? "error" : "primary" } } : {}),
+    ...(reader ? { trailing: { icon: "fingerprint", color: "primary" } } : {}),
     ...(moment === "error" ? { state: "Invalid" as const } : {}),
     ...(live ? {} : { pinned: "lit" as const }),
   });
@@ -158,6 +158,9 @@ export function lockField(moment: Moment, live = false, error = "", reader = tru
   const print = made.querySelector<HTMLElement>(".k-field-trailing");
   if (print && !busy) {
     print.classList.add("k-lock-reader");
+    // The CSS mixes the mark's colour from `--lock-reader-missed`, so a miss can animate it.
+    print.style.removeProperty("--trailing");
+    print.toggleAttribute("data-missed", moment === "unknown");
     const open = document.createElement("span");
     open.className = "k-field-mark k-field-trailing k-lock-reader-open";
     open.append(icon("lock_open", "var(--type-body_large-icon)", "var(--color-primary)"));

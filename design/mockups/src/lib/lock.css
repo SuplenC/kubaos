@@ -57,6 +57,14 @@
   initial-value: 0;
 }
 
+/* How far the reader's mark has turned from `primary` (0) to `error` (1) for a finger it doesn't
+   know. */
+@property --lock-reader-missed {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 /* How far the wrong password's shake has the field, in `space.s4`s sideways. */
 @property --jolt {
   syntax: "<number>";
@@ -363,7 +371,12 @@
 /* An unknown finger shakes the reader's mark alone, half the wrong password's jolt: the field
    wasn't wrong, so it stays still. */
 .k-lock-reader {
+  --trailing: color-mix(in srgb, var(--color-primary), var(--color-error) calc(var(--lock-reader-missed) * 100%));
   translate: round(nearest, calc(var(--jolt) * var(--space-s4)), 1px) 0;
+}
+
+.k-lock-reader[data-missed] {
+  --lock-reader-missed: 1;
 }
 
 /* The sheet's content: `size.panel` wide, `space.s16` inside at its top and its foot, the
