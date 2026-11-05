@@ -73,7 +73,6 @@ function unseen<C extends Curve>(track: Track<C>): Track<C> {
 }
 
 /** What every sequence holds to, in its words. */
-const ALWAYS = "A lit control is lit with the signs on or off, never gone; a control at rest just recolours.";
 
 const STRIKE_CUE: NonEmpty<Duration> = ["medium", "medium", "recolour", "settle"];
 
@@ -87,7 +86,7 @@ export function themeChange(name: string, between: Between, sample: () => Elemen
   const { from, to } = between;
   return {
     name,
-    what: `A new wallpaper's accent or a custom colour, here ${from} to ${to}: a power change, so the lights flicker. ${ALWAYS} Every light on every screen flickers out together over \`medium\` (\`neon.strike\` played backwards), and at each step every lit control goes to its signs-off look and back: its line to unlit glass, which stays inside its edge, its glow out, its label to its rest colour. Everything holds for \`medium\`, every colour role moves through grey over \`recolour\` on \`gather\`, the glass following the colours, and a beat of \`settle\` passes in the new colours, the signs off. Then every light strikes on together over \`strike\` (\`neon.strike\`), and every lit control strikes back to its lit look with the signs on, in the new theme. 2.3 s in all, on one clock: a control lit mid-way waits and strikes with the rest. In light mode the same clock runs with nothing to flicker, a lit control keeping its daylight lit look: only the colours are seen to change, at the same moment.`,
+    what: `A power change, ${from} to ${to}: the lights flicker out, the colours pass through grey, the lights strike on.`,
     tracks: [lightsOut("neon.strike.reversed"), colours("through grey", from, to, ["medium", "medium"]), lightsOn(STRIKE_CUE, "neon.strike")],
     reduced: [colours("through grey", from, to, undefined, "instant")],
     unflickered: [lightsOut("standard"), colours("through grey", from, to, ["medium", "medium"]), lightsOn(STRIKE_CUE, "standard")],
@@ -105,7 +104,7 @@ export function themeChange(name: string, between: Between, sample: () => Elemen
 export function toLight(between: Between, sample: () => Element): Move {
   return {
     name: "To light",
-    what: `Dark to light, ${between.from} to ${between.to}: a power change. ${ALWAYS} The lit signs flicker out together over \`medium\` (\`neon.strike\` played backwards), every lit control flickering down to its signs-off look: its line turns to unlit glass and stays, its glow goes out, its label goes to its rest colour. Everything pauses for \`medium\`, then the colours change on the dawn path over \`recolour\` on \`gather\` as the night turns to daylight, and the signs-off look becomes the daylight lit look with them, the same look in daylight colours: the glass becomes the dark line or the tone's. A closing beat of \`settle\` passes. About 1.7 s. The signs stay off in daylight.`,
+    what: `Dark to light, ${between.from} to ${between.to}: the signs flicker out, then the colours dawn into daylight.`,
     tracks: [lightsOut("neon.strike.reversed"), colours("dawn", between.from, between.to, ["medium", "medium"]), daylight(0, ["medium", "medium"])],
     tail: "settle",
     reduced: [colours("dawn", between.from, between.to, undefined, "instant"), daylight(0, undefined, "instant")],
@@ -123,7 +122,7 @@ export function toLight(between: Between, sample: () => Element): Move {
 export function toDark(between: Between, sample: () => Element): Move {
   return {
     name: "To dark",
-    what: `Light to dark, ${between.from} to ${between.to}: a power change. ${ALWAYS} After a pause of \`medium\`, the colours change on the dawn path over \`recolour\` on \`gather\` as the daylight goes, and a lit control holds its daylight lit look, which is its signs-off look: its line stays inside its edge as glass, following the palette into the night's unlit colour. A beat of \`settle\` passes, the signs off. Then every sign strikes on over \`strike\` (\`neon.strike\`), and every lit control strikes to its lit look with the signs on: the core or the tube inside its edge, its glow and its lit label. About 2 s.`,
+    what: `Light to dark, ${between.from} to ${between.to}: the colours fall to night, then every sign strikes on.`,
     tracks: [daylight(1, ["medium"]), colours("dawn", between.from, between.to, ["medium"]), lightsOn(["medium", "recolour", "settle"], "neon.strike")],
     reduced: [colours("dawn", between.from, between.to, undefined, "instant"), daylight(1, undefined, "instant"), lightsOn(undefined, "linear", "instant")],
     unflickered: [daylight(1, ["medium"]), colours("dawn", between.from, between.to, ["medium"]), lightsOn(["medium", "recolour", "settle"], "standard")],

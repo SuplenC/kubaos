@@ -11,7 +11,8 @@ import { filling, row, stack, within } from "../../lib/layout.ts";
 import { progressBar, setProgress } from "../../lib/progress.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const ROOM = "var(--size-column)";
 

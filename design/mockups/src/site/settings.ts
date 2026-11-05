@@ -54,6 +54,8 @@ export const WINDOWS: readonly WindowSize[] = [
 
 export interface Settings {
   mode: Mode;
+  /** The stage's night and day panes side by side, the rest of the page in `mode`. */
+  both: boolean;
   /** The theme every page is painted in, by its slug (`site/themes.ts`). */
   theme: string;
   scale: Scale;
@@ -66,6 +68,7 @@ export interface Settings {
 
 const DEFAULTS: Settings = {
   mode: "dark",
+  both: true,
   theme: THEMES[0]!.slug,
   scale: 1,
   reduced: false,
@@ -82,6 +85,7 @@ type Listener = (settings: Settings, changed: ReadonlySet<keyof Settings>) => vo
 function parsed(raw: Record<string, string | null | undefined>): Partial<Settings> {
   const found: Partial<Settings> = {};
   if (raw.mode === "dark" || raw.mode === "light") found.mode = raw.mode;
+  if (raw.both === "on" || raw.both === "off") found.both = raw.both === "on";
   if (THEMES.some((theme) => theme.slug === raw.theme) && raw.theme) found.theme = raw.theme;
   const scale = SCALES.find((s) => String(s) === raw.scale);
   if (scale !== undefined) found.scale = scale;
@@ -110,6 +114,7 @@ function fromUrl(): Partial<Settings> {
 function serialised(settings: Settings): Record<string, string> {
   return {
     mode: settings.mode,
+    both: settings.both ? "on" : "off",
     theme: settings.theme,
     scale: String(settings.scale),
     reduced: settings.reduced ? "on" : "off",

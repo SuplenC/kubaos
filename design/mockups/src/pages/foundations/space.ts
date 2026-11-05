@@ -8,7 +8,8 @@ import { row, stack } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
 import { length, names, raw } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
-import { doesntApply, foundation } from "../../site/page.ts";
+import { doesntApply } from "../../site/page.ts";
+import { foundation } from "../../site/legacy.ts";
 import { atScale, table, token } from "../../site/parts/swatches.ts";
 import { SCALES } from "../../site/settings.ts";
 

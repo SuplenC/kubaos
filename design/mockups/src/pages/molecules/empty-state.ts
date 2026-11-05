@@ -8,7 +8,8 @@ import { stack, within } from "../../lib/layout.ts";
 import { emptyList } from "../../lib/list.ts";
 import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { WELL_ROOM } from "./list.ts";
 
 const ROOM = "var(--size-column)";

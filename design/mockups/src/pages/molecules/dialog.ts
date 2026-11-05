@@ -10,7 +10,8 @@ import { centreIn, type DialogOptions, dialog, scrim } from "../../lib/dialog.ts
 import { field, labelled } from "../../lib/field.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const TITLE: Words = { short: "Restart now?", long: "Restart now to finish installing the updates you downloaded?" };
 const BODY: Words = {

@@ -12,7 +12,8 @@ import type { ListRowSpec } from "../../lib/list.ts";
 import { type Section, sidebarPage } from "../../lib/sidebar-page.ts";
 import { el } from "../../site/dom.ts";
 import { lights, powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Easing, type Move, nonEmpty, page, type Track } from "../../site/page.ts";
+import { doesntApply, type Easing, type Move, nonEmpty, type Track } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { outline } from "./settings.ts";
 import { resizable, still } from "./window.ts";
 

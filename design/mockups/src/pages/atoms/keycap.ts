@@ -7,7 +7,8 @@ import { inline, type KeyHint, keycap, keyHints } from "../../lib/keycap.ts";
 import { stack } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const KEY: Words = { short: "K", long: "Print Screen" };
 const DOES: Words = { short: "back", long: "Open it in a new window beside this one" };

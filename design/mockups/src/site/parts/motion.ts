@@ -175,7 +175,7 @@ function keyframeTables(tracks: readonly Track[], set: TrackSet, lits: Lit[]): H
     rows.push(el("tr", "", cell(`${duration} ms`), cell(`${shown(between(first, 1))}, held`)));
     const parts = group.map((track) => `the ${track.part} (${track.on})`).join(", ");
     const whose = first.curve === "neon.strike.reversed" ? "`neon.strike`'s keyframes played backwards" : "`neon.strike`'s keyframes";
-    return el("div", "page-recipe-part", prose(`${whose} for ${parts}: each value holds until the next. Time is from the part's start, at speed 1.`, "small"), table(["Time", first.property], rows));
+    return el("div", "page-recipe-part", prose(`${whose} for ${parts}, from the part's start at speed 1.`, "small"), table(["Time", first.property], rows));
   });
 }
 
@@ -191,15 +191,13 @@ function recipeOf(move: Move, lits: Lit[], picks: Row[]): HTMLElement {
     "page-recipe",
     ...of("tracks", "The recipe"),
     ...(move.reduced === "same"
-      ? [label("Reduced motion", "body_strong", "on_surface"), prose("The same: every duration is within the `short` that reduced motion caps durations at.", "small")]
+      ? [label("Reduced motion", "body_strong", "on_surface"), prose("The same: every duration is within `short`.", "small")]
       : of("reduced", "Reduced motion")),
     ...of("daylight", "In light mode, where the neon is off"),
     ...of("unflickered", "With the flicker off"),
     ...(move.tail
-      ? [label("The closing beat", "body_strong", "on_surface"), prose(`After the last part, a still \`duration.${move.tail}\`, ${milliseconds(move.tail)} ms, that belongs to the move; reduced motion's move has none.`, "small")]
+      ? [label("The closing beat", "body_strong", "on_surface"), prose(`A still \`duration.${move.tail}\`, ${milliseconds(move.tail)} ms, after the last part.`, "small")]
       : []),
-    label("Speed", "body_strong", "on_surface"),
-    prose("The speed setting (0.5× to 2×) divides every duration, cue and beat; the player's holds aren't motion, so they stay.", "small"),
   );
 }
 
@@ -214,7 +212,7 @@ function loopTable(playing: Loop, lits: Lit[]): HTMLElement {
     "div",
     "page-recipe-part",
     label("The player's loop", "body_strong", "on_surface"),
-    prose(`Not part of the move: each end held for \`duration.${HOLD}\`, ${milliseconds(HOLD)} ms, so each state can be seen, then it starts again.`, "small"),
+    prose(`Each end held for \`duration.${HOLD}\`, ${milliseconds(HOLD)} ms; not part of the move.`, "small"),
     table(["Phase", "From", "To"], rows),
   );
 }
@@ -701,11 +699,6 @@ function player(move: Move): Player {
     readout,
     key,
     parts,
-    prose(
-      "The loop across, in milliseconds, holds included; each part's value up, along its curve (a fade-out falls from 1 to 0; a part whose values aren't numbers, a colour or a palette's path, rises from its `from`, 0, to its `to`, 1, as the legend says), a ball on it at the playhead. Drag or click the plot to hold a moment; ← and → step a frame, with Shift ten. The ticks under it are each part's start and end, and each keyframe: click one to go to it. Under the legend, a move of more than one part plays each alone on the same clock, in the legend's order, the sample with the other parts hidden; pointing at a part's row, curve or stage picks it everywhere, outlined on the whole.",
-      "small",
-      "on_surface_variant",
-    ),
     recipePart,
     loopPart,
   );

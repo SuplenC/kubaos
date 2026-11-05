@@ -8,7 +8,8 @@ import { stack, within } from "../../lib/layout.ts";
 import { type ListOptions, type ListRowSpec, list, type RowPinned } from "../../lib/list.ts";
 import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** A panel's body, where a list's well lives: the control center's width less its padding. */
 export const WELL_ROOM = "calc(var(--size-panel) - 2 * var(--container-0-padding))";

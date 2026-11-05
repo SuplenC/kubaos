@@ -7,7 +7,8 @@ import { type Held, hint, hintRoom, withHint } from "../../lib/hint.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { row } from "../../lib/layout.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const NAME: Words = { short: "Close", long: "Close the panel and go back to the desktop" };
 

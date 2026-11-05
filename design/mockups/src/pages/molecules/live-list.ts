@@ -8,7 +8,8 @@ import { row, stack, within } from "../../lib/layout.ts";
 import { type LiveRowSpec, liveList } from "../../lib/live-list.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { lights, powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { WELL_ROOM } from "./list.ts";
 
 /** Five two-line rows and their gaps, inside the well's padding. */

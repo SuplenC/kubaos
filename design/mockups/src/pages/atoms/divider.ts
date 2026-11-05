@@ -6,7 +6,8 @@ import { keyHints } from "../../lib/keycap.ts";
 import { divider, row, stack, within } from "../../lib/layout.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 /** Two blocks with a divider between them, in a room `width` wide, `gap` clear of each. */
 function between(width = "var(--size-menu)", gap: string | 0 = "s12"): HTMLElement {

@@ -9,7 +9,8 @@ import { keyHints } from "../../lib/keycap.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { type TipOptions, tooltip, withTooltip } from "../../lib/tooltip.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const TITLE: Words = { short: "Mac accents", long: "Mac accents on Left Alt, for every layout" };
 const BODY: Words = {

@@ -9,7 +9,8 @@ import { row, stack, within } from "../../lib/layout.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
 import { el } from "../../site/dom.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { MODES, painted } from "../../site/parts/swatches.ts";
 import { settings } from "../../site/settings.ts";
 

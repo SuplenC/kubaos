@@ -8,7 +8,8 @@ import { filling, row, stack, within } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
 import { type TileOptions, tile } from "../../lib/tile.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 
 const STATUS: Words = { short: "Off", long: "Home network 5 GHz, through the living room" };
 const TITLE: Words = { short: "Wi-Fi", long: "Wallpaper motion" };

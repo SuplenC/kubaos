@@ -6,7 +6,8 @@ import { stack, within } from "../../lib/layout.ts";
 import { type Column, type TablePinned, type TableRowSpec, table } from "../../lib/table.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { WELL_ROOM } from "./list.ts";
 
 /** The system monitor's columns: the name twice as wide as each number. */

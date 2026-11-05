@@ -9,7 +9,8 @@ import { type Level, minute, type Sample, SECOND, sparkline, tint } from "../../
 import { clamped, text } from "../../lib/text.ts";
 import { CHROME } from "../../site/settings.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, nonEmpty } from "../../site/page.ts";
+import { page } from "../../site/legacy.ts";
 import { CARD_ROOM } from "./meter.ts";
 
 /** When every still sample's minute ends, so a sample draws the same each time. */
