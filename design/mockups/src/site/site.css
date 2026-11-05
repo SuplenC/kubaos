@@ -300,6 +300,11 @@ body {
   overflow-x: auto;
 }
 
+/* A sample drawn in one pane (a template with no daylight) stands in the stage's middle. */
+.page-hero[data-panes="1"] .page-stage-flow {
+  justify-content: center;
+}
+
 .page-stage-flow {
   display: flex;
   flex-wrap: wrap;
@@ -364,6 +369,11 @@ body {
 
 .page-spec-table tbody tr:last-child > td {
   border-bottom: 0;
+}
+
+/* A state the part doesn't have reads as a footnote to the ones it has. */
+.page-spec-table tr[data-muted] > td {
+  opacity: var(--opacity-disabled_content);
 }
 
 .page-spec-table .page-spec-value {
@@ -1195,6 +1205,24 @@ body {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-s4);
+}
+
+/* Each mode's roles take half the width, their families flowing in columns across it. */
+.f-roles {
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.f-roles > .f-painted {
+  align-items: stretch;
+}
+
+.f-families {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-menu), 1fr));
+  gap: var(--space-s16) var(--space-s24);
+  align-items: start;
 }
 
 /* A control filled with a tone, the line inside its fill's edge in a colour derived from it: how

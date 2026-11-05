@@ -248,12 +248,12 @@ function rolesIn(theme: string, mode: Mode): HTMLElement {
   const colours = palette(theme, mode);
   return el(
     "div",
-    "f-swatch-cell",
+    "f-swatch-cell f-roles",
     label(paletteName(theme, mode), "label"),
     painted(
       theme,
       mode,
-      ...families().map((family) => stack("s8", "start", text(family.name, "label", "on_surface_variant"), ...family.tiles.map(([bg, fg]) => tile(bg, fg, colours)))),
+      el("div", "f-families", ...families().map((family) => stack("s8", "start", text(family.name, "label", "on_surface_variant"), ...family.tiles.map(([bg, fg]) => tile(bg, fg, colours))))),
     ),
   );
 }
