@@ -31,6 +31,20 @@
   initial-value: 0;
 }
 
+/* How lit a list's thumb and a scroll's thumb are, from the outline variant (0) to the outline
+   (1): under the pointer and while dragged. */
+@property --list-thumb-lit {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --scroll-thumb-lit {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 /* How much a header fade shows, 0 at rest to 1 scrolled. */
 @property --faded {
   syntax: "<number>";
@@ -111,9 +125,9 @@
   width: var(--size-scrollbar);
   height: var(--tall);
   border-radius: var(--radius-full);
-  background: var(--color-outline_variant);
+  background: color-mix(in srgb, var(--color-outline_variant), var(--color-outline) calc(var(--list-thumb-lit) * 100%));
   cursor: default;
-  transition: background-color var(--motion-micro) var(--easing-standard);
+  transition: --list-thumb-lit var(--motion-micro) var(--easing-standard);
 }
 
 .k-list-thumb[data-shown] {
@@ -121,7 +135,7 @@
 }
 
 .k-list-thumb:is(:hover, [data-dragged], [data-pinned]) {
-  background: var(--color-outline);
+  --list-thumb-lit: 1;
 }
 
 /* A row (`lib/list.ts`): `size.row` tall with one line, `size.row_two_line` with two, `space.s16`
@@ -477,8 +491,8 @@
   width: var(--size-scrollbar);
   height: var(--tall);
   border-radius: var(--radius-full);
-  background: var(--color-outline_variant);
-  transition: background-color var(--motion-micro) var(--easing-standard);
+  background: color-mix(in srgb, var(--color-outline_variant), var(--color-outline) calc(var(--scroll-thumb-lit) * 100%));
+  transition: --scroll-thumb-lit var(--motion-micro) var(--easing-standard);
 }
 
 .k-scroll-thumb[data-shown] {
@@ -486,7 +500,7 @@
 }
 
 .k-scroll-thumb:is(:hover, [data-dragged], [data-pinned]) {
-  background: var(--color-outline);
+  --scroll-thumb-lit: 1;
 }
 
 /* A header fade: over the gap above the scroll, the gap in `surface`, then `space.s16` fading to

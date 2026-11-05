@@ -122,7 +122,7 @@ export default page({
       {
         name: "The thumb lights",
         what: "The pointer onto the thumb: `outline_variant` to `outline` over `micro` on `standard`, and back as it leaves.",
-        tracks: [{ part: "the thumb", on: "the notifications", target: ".k-scroll-thumb", property: "background-color", from: { color: "outline_variant" }, to: { color: "outline" }, duration: "micro", curve: "standard" }],
+        tracks: [{ part: "the thumb", on: "the notifications", target: ".k-scroll-thumb", property: "--scroll-thumb-lit", from: 0, to: 1, duration: "micro", curve: "standard" }],
         reduced: "same",
         back: "plays",
         sample: () => panel({ down: 0.3, fadePinned: true }),
