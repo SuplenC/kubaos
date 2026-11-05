@@ -589,7 +589,7 @@ title = "Restart Quickshell"
 subtitle = "The bar, panels and lock screen. Off and on again, the classic"
 icon = "view-refresh"
 keywords = ["shell", "bar", "reload"]
-run = ["sh", "-c", "qs kill; sleep 0.5; exec qs"]
+run = ["dot-session", "restart-shell"]
 
 # "Focus stutter: on/off" is the Extension's own Item (crates/kotodama-kubaos,
 # shell.rs): Enter turns the focus tube's neon strike off or back on, on

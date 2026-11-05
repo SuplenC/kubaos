@@ -91,7 +91,7 @@ A switch writes no file: it points the links in `~/.config` at new store files. 
 | Part | Record | On a change |
 |---|---|---|
 | Hyprland | `config/hypr/` without `hypridle.conf`, `hyprlock.conf`, `README.md` | `hyprctl -i <instance> reload` |
-| Quickshell | `config/quickshell/`, `kubaosPkgs.quickshell` (which carries Kotodama's QML module) | Hyprland execs `dot-session restart-shell`: it waits while `qs ipc call session locked` says `true`, then `qs kill` and `exec qs`. When no Quickshell of the default config runs, nothing starts. Two restarts waiting at once start one shell |
+| Quickshell | `config/quickshell/`, `kubaosPkgs.quickshell` (which carries Kotodama's QML module) | Hyprland execs `dot-session restart-shell`: it waits while `qs ipc call session locked` says `true`, then kills every Quickshell process (`pkill -x .quickshell-wra`, the supervisor included, since it relaunches a shell it sees die and `qs kill` reaches one instance), waits for them to go and `exec qs`. The Command menu's "Restart Quickshell" and `SUPER+CTRL+ALT+R` run the same. When no Quickshell runs, nothing starts. Two restarts waiting at once start one shell |
 | hypridle | `config/hypr/hypridle.conf` | Hyprland execs `dot-session restart-idle`: when hypridle runs, it is stopped and started again. One stopped by hand stays stopped. Activation writes the idle settings' listeners (`kubaos-idle write`, `home/idle.nix`) before this runs |
 | Ghostty | `config/ghostty/` | `SIGUSR2` to the user's Ghostty processes |
 | tmux | `config/tmux/` | `tmux source-file` when a server runs |
