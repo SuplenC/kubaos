@@ -130,8 +130,9 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
     });
     if (pressable) {
       element.addEventListener("click", () => go(index));
+      // Enter stays the page's `Filled` action wherever the keyboard is: Space presses a step.
       element.addEventListener("keydown", (event) => {
-        if ((event.key === "Enter" || event.key === " ") && !event.repeat) {
+        if (event.key === " " && !event.repeat) {
           event.preventDefault();
           go(index);
         }
@@ -246,7 +247,7 @@ export interface FooterPins {
  * Filled button on the right. A blocker is the `error` symbol and its reason in `small`, flashing
  * in `error` as Enter is refused.
  */
-export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: () => void = () => {}, pinned: FooterPins = {}): { band: HTMLElement; nudge: HTMLElement | null } {
+export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: () => void = () => {}, pinned: FooterPins = {}): { band: HTMLElement; nudge: HTMLElement | null; next: HTMLElement } {
   const back = button({ label: "Back", kind: "Text", icon: "arrow_back", ...(pinned.back ? { pinned: pinned.back } : {}) });
   back.addEventListener("click", onBack);
   const parts: Element[] = [back, fill()];
@@ -265,7 +266,7 @@ export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: ()
   parts.push(next);
   const band = hangs(row("s16", "centre", ...parts));
   band.classList.add("k-step-footer");
-  return { band, nudge };
+  return { band, nudge, next };
 }
 
 /** A duration token in milliseconds at the speed picked, capped at `short` with reduced motion. */
@@ -299,19 +300,29 @@ function flash(nudge: HTMLElement): void {
   nudge.animate([{ "--nudge": 1 }, { "--nudge": 0 }], { duration: timed("slow"), easing: curve("standard_accel") });
 }
 
-/** The page's room: the clear page, its body above the footer band; what slides and fades. */
-function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void): { room: HTMLElement; nudge: HTMLElement | null } {
-  const parts: Element[] = [fillingHeight(filling(spec.body()))];
+/** What in a page's body takes the keyboard. */
+const TAKES_KEYS = "[tabindex='0'], button:not(:disabled)";
+
+/**
+ * The page's room: the clear page, its body above the footer band; what slides and fades. `first`
+ * is its first thing to do, where the keyboard lands: the body's first control, or Continue while
+ * nothing blocks it.
+ */
+function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void): { room: HTMLElement; nudge: HTMLElement | null; first: HTMLElement | null } {
+  const body = spec.body();
+  const parts: Element[] = [fillingHeight(filling(body))];
   let nudge: HTMLElement | null = null;
+  let first = body.querySelector<HTMLElement>(TAKES_KEYS);
   if (!spec.footless) {
     const made = footer(spec, onBack, onNext);
     nudge = made.nudge;
+    first ??= spec.blocker ? null : made.next;
     parts.push(gap("s16"), filling(made.band));
   }
   const room = document.createElement("span");
   room.className = "k-step-room";
   room.append(page(fillingHeight(stack(0, "start", ...parts)), { clear: true }));
-  return { room, nudge };
+  return { room, nudge, first };
 }
 
 /**
@@ -340,12 +351,16 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
     side.className = "k-step-side";
     side.append(made.room);
     const scrolled = box.querySelector(".k-rail .k-scroll-view")?.scrollTop ?? 0;
+    // Drawing replaces what has the keyboard, which would drop it out of the template.
+    const keyboardIn = box.contains(document.activeElement);
     box.replaceChildren(rail(options, current, reached, go), side);
     const steps = box.querySelector<HTMLElement>(".k-rail-steps");
     if (steps) keepInView(steps, current, scrolled);
     if (from === null) return;
     arrive(made.room, current > from);
     if (steps) travel(steps, from, current, options.failed ?? false);
+    // The template holds the keys on a page with nothing to do yet: Enter and Esc still work.
+    if (keyboardIn) (made.first ?? box).focus({ preventScroll: true });
   };
 
   function go(to: number): void {
@@ -367,7 +382,6 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
 
   box.addEventListener("keydown", (event) => {
     if (event.defaultPrevented || event.repeat) return;
-    if ((event.target as Element).closest(".k-step")) return;
     if (event.key === "Enter") next();
     else if (event.key === "Escape") go(current - 1);
     else return;

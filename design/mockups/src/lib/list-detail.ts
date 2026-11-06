@@ -227,7 +227,7 @@ export function commandMenu(options: MenuOptions, measures: MenuMeasures): HTMLE
     }).observe(list, { attributes: true, attributeFilter: ["data-current"], subtree: true });
   }
   panel.addEventListener("keydown", (event) => {
-    if (event.target !== panel) return;
+    if ((event.target !== panel && event.target !== search) || event.key === "Tab") return;
     event.preventDefault();
     list.dispatchEvent(new KeyboardEvent("keydown", { key: event.key, ctrlKey: event.ctrlKey, repeat: event.repeat }));
   });
