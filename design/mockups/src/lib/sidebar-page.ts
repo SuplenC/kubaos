@@ -781,7 +781,9 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
       box.classList.add("k-sp-find");
       find.box = box;
       pane.append(box);
-      requestAnimationFrame(() => box.setAttribute("data-shown", ""));
+      // Opened by a key it fades in; a sample drawn with it open shows it at rest from the start.
+      if (focus) requestAnimationFrame(() => box.setAttribute("data-shown", ""));
+      else box.setAttribute("data-shown", "");
     }
     placeFind();
     if (focus) find.field?.focus({ preventScroll: true });

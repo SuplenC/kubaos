@@ -2846,6 +2846,14 @@
   }
 }
 
+/* A dialog the room is drawn with is already there: it only moves on leaving. */
+.k-dialog-room[data-live] > [data-at-rest] {
+  @starting-style {
+    opacity: 1;
+    --dialog-rise: 0;
+  }
+}
+
 .k-dialog-room[data-live] > [data-leaving] {
   opacity: 0;
   pointer-events: none;
