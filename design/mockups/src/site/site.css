@@ -76,7 +76,10 @@ body {
 }
 
 .site-search {
-  width: var(--size-menu);
+  --field-height: var(--size-control_sm);
+  flex: 0 1 var(--size-menu);
+  width: auto;
+  min-width: 0;
 }
 
 /* The navigation, the page and the rail: the page fills the room between the two. */
@@ -488,6 +491,11 @@ body {
 .page-card-sample {
   display: flex;
   align-items: flex-start;
+}
+
+.page-cards[data-filled] {
+  align-items: stretch;
+  grid-template-columns: repeat(auto-fill, var(--card));
 }
 
 .page-card-words {
@@ -970,9 +978,10 @@ body {
   white-space: nowrap;
 }
 
+/* The parts tree and the spec list, side by side while each has a rail's width. */
 .page-inspect {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--size-rail)), 1fr));
   gap: var(--space-s16);
   min-width: 0;
 }
@@ -1153,7 +1162,6 @@ body {
 
 .page-window {
   box-sizing: border-box;
-  margin-top: var(--space-s16);
   padding: var(--space-s24);
   border: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
   border-radius: var(--radius-surface);

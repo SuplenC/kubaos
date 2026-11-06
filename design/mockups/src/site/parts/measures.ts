@@ -16,7 +16,7 @@ import { el } from "../dom.ts";
 import { applies } from "../page.ts";
 import { releaseWheel } from "../scroll.ts";
 import { inspector, type Inspector, type Lit, litWords, tokenName } from "./inspector.ts";
-import { besideWords, type Group } from "./shelf.ts";
+import { type Group, inspected } from "./shelf.ts";
 import { specTable } from "./table.ts";
 
 /** Each measures section's drawing, again: after a change of scale or of the window. */
@@ -34,7 +34,7 @@ addEventListener("keydown", (event) => {
   if (event.key === "Escape") for (const unpin of unpins) unpin();
 });
 
-const AT_REST = "Point at a row to light where the samples use its token; click to pin it.";
+const AT_REST = "Point at a row to light its token, or a part to read its measures; click pins, Esc lets go.";
 
 function round(value: number): string {
   return String(Math.round(value * 100) / 100);
@@ -44,6 +44,8 @@ function round(value: number): string {
 function value(token: string): string {
   // An aspect ratio is two numbers, not a length: shown as written.
   if (token.startsWith("aspect-")) return raw(token);
+  // Its number only stands for half the shorter side, which no table should read as a measure.
+  if (token === "radius-full") return "full";
   const logical = length(token);
   const scale = settings().scale;
   return scale === 1 ? round(logical) : `${round(logical)} · ${round(logical * scale)} px`;
@@ -118,7 +120,7 @@ export function measures(spec: Measures): Drawn {
   };
   const samples: Group = {
     title: "",
-    small: besideWords,
+    small: inspected,
     items: spec.samples.map((sample) => {
       const each = inspector(sample.name, sample.sample(), hands);
       inspectors.push(each);
@@ -165,6 +167,8 @@ function windowed(sample: Element): HTMLElement {
   const size = windowSize();
   const frame = el("div", "page-window", sample);
   frame.style.width = size.width;
-  frame.style.height = size.height;
+  // A part keeps its own height in the window, as it does in an app; a whole surface fills it.
+  const whole = sample.matches("[data-whole]") || sample.querySelector("[data-whole]") !== null;
+  frame.style[whole ? "height" : "maxHeight"] = size.height;
   return frame;
 }

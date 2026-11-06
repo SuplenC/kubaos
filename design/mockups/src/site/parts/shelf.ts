@@ -1,10 +1,10 @@
-// A page's samples, laid out by their size. A group whose samples are all as small as a component
-// sits in a wrapping grid of cards, each the live sample over its name and words, so they compare
-// side by side; a group with a sample as big as a window goes on its section's one stage, where a
-// switcher picks the sample shown, at its real size, its name and words beside it or under it.
+// A page's samples, laid out by their size. Samples as small as a component sit in a wrapping grid
+// of cards, each the live sample over its name and words, so they compare side by side; a sample as
+// big as a window goes on its section's one stage, where a switcher picks the sample shown, at its
+// real size, its name and words beside it or under it.
 // `?all` draws every stage's samples one under another instead, for the shots and the checks.
 //
-// Which of the two a group takes is decided here alone (`windowSized`), from the samples as drawn.
+// Which of the two a sample takes is decided here alone (`windowSized`), from the samples as drawn.
 
 import { applies, type DoesntApply } from "../page.ts";
 import { el, label, prose, relayout, sampleBox } from "../dom.ts";
@@ -36,6 +36,8 @@ export interface Item {
 /** Samples shown together under a sub-heading. */
 export interface Group {
   readonly title: string;
+  /** Its name on a stage's switcher, where its title is left to the section's heading. */
+  readonly chip?: string;
   readonly items: readonly Item[] | DoesntApply;
   /** How the group is drawn when its samples are small, from its items: cards when it has none. */
   readonly small?: (items: readonly Item[]) => Element;
@@ -71,18 +73,35 @@ function measure(groups: readonly (readonly Item[])[]): { widths: number[][]; co
   return { widths, column: columnWidth };
 }
 
+/** A group's items by where each goes, and the widest of the cards'. */
+interface Placed {
+  readonly big: readonly Item[];
+  readonly small: readonly Item[];
+  readonly widest: number;
+}
+
 /**
- * The parts of a section: each group under its sub-heading as cards, or, for those with a sample
- * as big as a window, on one stage at the first such group's place; `between` parts stay where
- * they are listed.
+ * `group`'s items by where each goes: cards hold the small and a stage the big. A group with a
+ * layout of its own (`small`, a state matrix's grid) reads across its items, so it stays whole, on
+ * the stage if any of them is big.
+ */
+function placed(group: Group & { items: readonly Item[] }, widths: readonly number[], column: number): Placed {
+  const isBig = group.items.map((item, i) => windowSized(item, widths[i]!, column));
+  if (group.small) return isBig.includes(true) ? { big: group.items, small: [], widest: 0 } : { big: [], small: group.items, widest: 0 };
+  const widest = Math.max(0, ...widths.filter((_, i) => !isBig[i]));
+  return { big: group.items.filter((_, i) => isBig[i]), small: group.items.filter((_, i) => !isBig[i]), widest };
+}
+
+/**
+ * The parts of a section: each group under its sub-heading as cards, and its samples as big as a
+ * window on one stage at the first such group's place; `between` parts stay where they are listed.
  */
 export function shelves(...parts: readonly (Group | Element)[]): Element[] {
   const groups = parts.filter((part): part is Group => !(part instanceof Element));
   const drawn = groups.filter((group): group is Group & { items: readonly Item[] } => applies(group.items) && group.items.length > 0);
   const { widths, column } = measure(drawn.map((group) => group.items));
-  const big = new Set<Group>(drawn.filter((group, i) => group.items.some((item, j) => windowSized(item, widths[i]![j]!, column))));
-  const widest = new Map<Group, number>(drawn.map((group, i) => [group, Math.max(0, ...widths[i]!)]));
-  const staged = drawn.filter((group) => big.has(group));
+  const parted = new Map<Group, Placed>(drawn.map((group, i) => [group, placed(group, widths[i]!, column)]));
+  const staged = drawn.filter((group) => parted.get(group)!.big.length > 0);
   const out: Element[] = [];
   for (const part of parts) {
     if (part instanceof Element) {
@@ -93,14 +112,12 @@ export function shelves(...parts: readonly (Group | Element)[]): Element[] {
       out.push(...(applies(part.items) ? titled(part.title) : [notApplying(part.items.doesntApply, part.title)]));
       continue;
     }
-    if (!big.has(part)) {
-      out.push(...titled(part.title), part.small ? part.small(part.items) : cards(part.items, widest.get(part) ?? 0));
-      continue;
-    }
-    if (part !== staged[0]) continue;
+    const { big, small, widest } = parted.get(part)!;
+    if (small.length > 0) out.push(...titled(part.title), part.small ? part.small(small) : cards(small, widest));
+    if (big.length === 0 || part !== staged[0]) continue;
     // One group keeps its heading over the stage; several are its switcher's first row.
-    if (staged.length === 1) out.push(...titled(part.title), stage(part.items));
-    else out.push(stage(staged.flatMap((group) => group.items.map((item) => ({ ...item, at: [group.title, ...(item.at ?? [item.name])] })))));
+    if (staged.length === 1) out.push(...(small.length > 0 ? [] : titled(part.title)), stage(big));
+    else out.push(stage(staged.flatMap((group) => parted.get(group)!.big.map((item) => ({ ...item, at: [group.chip ?? group.title, ...(item.at ?? [item.name])] })))));
   }
   return out;
 }
@@ -128,11 +145,13 @@ export function cards(items: readonly Item[], widest: number): HTMLElement {
 }
 
 /**
- * Small samples one under another, each beside its words as on a stage, or under them where it
- * leaves no room: the measures', whose words hold each one's parts tree.
+ * Small samples with their parts trees: cards across the page's whole width, as many a row as hold
+ * a column of text (`site/settle.ts`), so a tree has room beside its spec list.
  */
-export function besideWords(items: readonly Item[]): HTMLElement {
-  return el("div", "page-stage", ...items.map(shown));
+export function inspected(items: readonly Item[]): HTMLElement {
+  const grid = cards(items, 0);
+  grid.dataset.filled = String(items.length);
+  return grid;
 }
 
 /**

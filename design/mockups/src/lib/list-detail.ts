@@ -329,6 +329,7 @@ export function setupWindow(options: SetupOptions): HTMLElement {
   let selected = options.selected ?? 0;
   const window = document.createElement("span");
   window.className = "k-setup";
+  window.dataset.whole = "";
   const steps = options.cards.map((each, index) => step({ ...each.step, selected: index === selected, pressable: true }));
   for (const each of steps) each.tabIndex = -1;
   const rows = stack("s4", "start", ...steps);

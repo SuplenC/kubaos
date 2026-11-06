@@ -114,8 +114,7 @@ function renderComponent(page: Page): Part[] {
       measured.status,
       ...shelves(measured.samples),
     ),
-    // A section of variants alone needs no sub-heading of the same words.
-    part("Variants", ...shelves(variants(applies(page.sizes) ? "Variants" : "", page.variants), variants("Sizes", page.sizes))),
+    part("Variants", ...shelves(variants("", page.variants, "Variants"), variants("Sizes", page.sizes))),
     part("Motion", motion(page.motion)),
     partOr("Keyboard", page.keyboard, (keys) => [keyboard(keys)]),
     part("Content", ...shelves(...content(page.content))),

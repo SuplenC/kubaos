@@ -66,8 +66,6 @@ export function litWords(token: string, count: number, unseen: readonly string[]
   return `${name} · no place: a rule, not a box`;
 }
 
-const HINT = "Point at a part to read its measures; click to pin it, Esc to let go.";
-
 function round(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
@@ -313,7 +311,7 @@ export function inspector(name: string, sample: Element, hands: Hands): Inspecto
     }
     const places = lit && "token" in lit && holder.offsetParent !== null ? drawToken(lit.token) : 0;
     const token = lit && "token" in lit ? lit.token : null;
-    spec.replaceChildren(el("dd", "page-spec-hint", token ? litWords(token, places, places === 0 && self.uses(token) ? [name] : []) : HINT));
+    spec.replaceChildren(...(token ? [el("dd", "page-spec-hint", litWords(token, places, places === 0 && self.uses(token) ? [name] : []))] : []));
     return places;
   }
 
@@ -566,7 +564,6 @@ export function inspector(name: string, sample: Element, hands: Hands): Inspecto
   }
 
   buildTree();
-  spec.append(el("dd", "page-spec-hint", HINT));
   return self;
 }
 
