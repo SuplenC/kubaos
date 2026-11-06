@@ -9,7 +9,10 @@ export function variantItems(rows: readonly Variant[]): Item[] {
   return rows.map((row) => ({ name: row.name, words: row.for, sample: row.sample() }));
 }
 
-/** A group of variants under `title`, or why it doesn't apply. */
-export function variants(title: string, rows: readonly Variant[] | DoesntApply): Group {
-  return { title, items: applies(rows) ? variantItems(rows) : rows };
+/**
+ * A group of variants under `title`, or why it doesn't apply; `chip` names it on a stage's switcher
+ * where the section's own heading already says its title.
+ */
+export function variants(title: string, rows: readonly Variant[] | DoesntApply, chip = title): Group {
+  return { title, chip, items: applies(rows) ? variantItems(rows) : rows };
 }

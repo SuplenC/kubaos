@@ -1,12 +1,12 @@
 // What is laid out in script once the page's CSS has laid it out: the page's container's padding
-// for its width, the sample grids' bands for it, the samples wider than it let out of it, the
+// for its width, the inspected cards' widths and the sample grids' bands for it, the samples wider than it let out of it, the
 // stage's samples fitted to their panes, each mock centred down its row on a whole device pixel,
 // the focus rings' glows for their controls' sizes, then what the measures draw over their samples. CSS centres by half the spare
 // room, which is half a device pixel whenever that is odd; a mock is placed as the builds place a
 // child, the odd device pixel after it (`kubaos-ui`'s `centre`).
 
 import { redrawRings } from "../lib/focus.ts";
-import { raw } from "../lib/tokens.ts";
+import { length, raw } from "../lib/tokens.ts";
 import { reflowBands } from "./parts/bands.ts";
 import { redrawOverlays } from "./parts/measures.ts";
 import { refitStages } from "./parts/stage.ts";
@@ -44,6 +44,21 @@ function fitContainer(page: HTMLElement): void {
     if (width >= Number(raw(`container-${i}-from`))) step = i;
   }
   container.style.setProperty("--page-padding", `var(--container-${step}-padding)`);
+}
+
+/**
+ * Shares each grid of inspected cards' whole width among as many cards a row as hold a column of
+ * text, at most one each, on a whole device pixel: a sample starts on one.
+ */
+function fillCards(page: HTMLElement): void {
+  const grids = [...page.querySelectorAll<HTMLElement>(".page-cards[data-filled]")];
+  const column = length("size-column") * settings().scale;
+  const read = grids.map((grid) => ({ room: grid.clientWidth, gap: Number.parseFloat(getComputedStyle(grid).columnGap) }));
+  grids.forEach((grid, i) => {
+    const { room, gap } = read[i]!;
+    const count = Math.max(1, Math.min(Number(grid.dataset.filled), Math.floor((room + gap) / (column + gap))));
+    grid.style.setProperty("--card", `${Math.floor((room - gap * (count - 1)) / count)}px`);
+  });
 }
 
 /** Puts every sample's box back in the container, to be measured there again. */
@@ -93,6 +108,7 @@ function breakOut(page: HTMLElement): void {
 /** Lays out what script lays out on `page`, after its CSS has. */
 export function settle(page: HTMLElement): void {
   fitContainer(page);
+  fillCards(page);
   keepIn(page);
   // A grid of bands is split for the container's room before a box is let out for what it holds.
   reflowBands(page);
