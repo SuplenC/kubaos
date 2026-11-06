@@ -8,8 +8,7 @@ import { type Shown, stateOptions } from "../../lib/control.ts";
 import { hintRoom } from "../../lib/hint.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
 /** The words and the symbol each kind shows here, as long as they get. */
 const SAMPLES: Record<ChipKind, { words: Words; icon: string }> = {
@@ -44,11 +43,11 @@ function kinds(state: Shown = "rest"): () => HTMLElement {
 const ON = "every kind";
 
 const FOR: Record<ChipKind, string> = {
-  Neutral: "A fact: a picked keyboard layout, a file's type. `surface_container_high` with an `on_surface` label.",
-  Selected: "One of several picks that is on: a setting a toolbar turns on (`Neutral` while off). The accent's quieter sibling, as a Tonal button: `secondary_container`, but its label is full (`on_secondary_container`) at rest as well as lit, by night too, so a pick that is on reads as on.",
-  Accent: "A tag that matters: Recommended, Default. The accent at `opacity.tint` under a `primary` label.",
-  Cold: "Rarely: a demo, a preview. The cold accent at `opacity.tint` under a `cold` label; it lights in the cold accent.",
-  Filled: "An action among states: Reboot beside Done and To do. Filled with the accent, so at night it rests on the unlit fill (`primary_fill`) with a near-white label (`on_primary_fill`), as a Filled button.",
+  Neutral: "a fact: a layout, a file's type",
+  Selected: "a pick that is on; `Neutral` while off",
+  Accent: "a tag that matters: Recommended, Default",
+  Cold: "rarely: a demo, a preview",
+  Filled: "an action among states: Reboot beside Done",
 };
 
 /** The state matrix's rows: every kind pressable, then the close button on a Neutral and a Filled chip. */
@@ -62,70 +61,67 @@ export default page({
   level: "atoms",
   slug: "chip",
   title: "Chip",
-  summary: "A short fact or pick in a pill: five kinds, an optional icon and close button. A plain chip has no states; a pressable one follows the neon.",
-  live: () => row("s8", "start", sample("Neutral", { icon: "keyboard", removable: true }), sample("Selected", { press: "toggle", on: true }), sample("Accent"), sample("Filled", { press: "press" })),
-  description: [
-    "A chip is a short fact or pick: a keyboard layout, a tag, a state. It is `size.chip` tall at the control radius, which on a chip is a pill, its label `label` type. An optional icon, `label`'s icon, sits `space.s4` before the label; an optional close button ends it, a circle as tall as the chip with its `close` symbol `space.s4` in, whose curve is the chip's own. Its left side pads `space.s12`, or `space.s8` with an icon; its right `space.s12`, or nothing when the close button ends it. Its content is centred down it.",
-    "A plain chip is a fact and has no states: it is what its kind's colours are at rest. A pressable one takes a press of its own (a pick made the default, a setting turned on), and in the shell the keyboard too; one that toggles a setting is `Selected` while on and `Neutral` while off, fading between the two over `short`. In QML a pressable chip may be no stop for Tab (`tabStop: false`) where the field or the row beside the chips is the stop and a click picks one: the clock's timer presets. A pressable chip's `tooltip` names it in a `Hint` under it while it is lit.",
-    "A pressable chip's states follow the neon (`docs/DESIGN.md`, \"States\"): rest, lit (hovered or focused, one state, with its two looks), pressed and disabled. Lit, the line inside its edge burns with the glow outside it, in its kind's tone: the tube, `focus.tube` wide, on Neutral, Selected and Accent in the accent and on Cold in the cold accent; the core inside the fill's edge, `stroke.thin` wide, on Filled. Filled's label brightens, as a Filled button's does; the others' labels don't change, Selected's among them: it is full already at rest, so a pick that is on reads as on. Nothing but the glow reaches past the pill. Lighting up, going back to rest and pressing are fades; the flicker is for power changes only.",
-    "Its close button is a control of its own: it lights as a Text icon button does, the tube inside its circle in the chip's tone (the core on a Filled chip) with the glow outside it, and with the pointer over it the close button lights alone, so it is plain which press is under the pointer. Disabled, neither the chip's press nor its close button takes the pointer or the keyboard: the chip goes grey, `on_surface` at `opacity.disabled_container` under its content at `opacity.disabled_content`, with no tone, no line and no glow.",
-  ],
+  lede: "A short fact or pick in a pill: five kinds, an optional icon and close button.",
+  code: { rust: "chip::chip", qml: "Chip" },
+  stage: {
+    live: () => row("s8", "start", sample("Neutral", { press: "press", icon: "keyboard", removable: true }), sample("Selected", { press: "toggle", on: true }), sample("Accent", { press: "press" }), sample("Cold", { press: "press" }), sample("Filled", { press: "press" })),
+    hint: "hover it, or Tab; the second toggles",
+    daylight: true,
+  },
   variants: nonEmpty([
     ...CHIP_KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind) })),
-    { name: "With an icon", for: "A symbol before the label, `space.s4` from it; the left side pads `space.s8` instead of `space.s12`, as the icon is rounder than a letter.", sample: () => sample("Neutral", { icon: SAMPLES.Neutral.icon }) },
-    { name: "Removable", for: "A close button ends it, and its right side has no padding: the circle's curve is the chip's own. Any kind can be removable; the close sends `removed`.", sample: () => sample("Neutral", { removable: true }) },
+    { name: "With an icon", for: "the left side pads `space.s8`, not `space.s12`", sample: () => sample("Neutral", { icon: SAMPLES.Neutral.icon }) },
+    { name: "Removable", for: "any kind; the close's curve is the chip's own", sample: () => sample("Neutral", { removable: true }) },
     {
       name: "Pressable, with a tooltip",
-      for: "A press of its own, and its name in a hint under it while it is lit.",
+      for: "its name in a hint while it is lit",
       sample: () => hintRoom(sample("Selected", { press: "press", tooltip: "Five minutes" }, shown(fixed("5 min"))), "Five minutes", "var(--size-chip)"),
     },
   ]),
-  sizes: doesntApply("a chip has one size, `size.chip` tall with `label` type, in every row."),
+  sizes: doesntApply("one size: `size.chip` tall, `label` type."),
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],
     absent: {
-      selected: "being picked is a kind of its own, `Selected`, and a row here; a chip that toggles fades between `Neutral` and `Selected` (Motion).",
-      loading: "a chip states a fact that is there; what is still on its way shows as a `Skeleton` in its place.",
-      empty: "a chip always has its label; a list of chips with none is the list's empty state.",
-      error: "a chip has no value to be wrong; a fact that is an error is a `Badge` in the error tone, or a `Note`.",
+      selected: "`Selected` is a kind, a row here",
+      loading: "what is on its way is a `Skeleton`",
+      empty: "it always has its label",
+      error: "an error is a `Badge` or a `Note`",
     },
     rows: nonEmpty(ROWS.map(({ name, cell }) => ({ name, cell: (state: "rest" | "lit" | "pressed" | "disabled") => cell(state) }))),
-    described: {
-      rest: "Its kind's colours. Neutral `surface_container_high` under `on_surface`; Selected `secondary_container` under its full label (`on_secondary_container`), never dimmed as a Tonal button's is at night, so a pick that is on reads as on; Accent the accent at `opacity.tint` under `primary`; Cold the cold accent at `opacity.tint` under `cold`; Filled at night the unlit fill, `primary_fill`, under `on_primary_fill`. By day: the same roles in daylight colours, Filled the accent lifted to lightness 0.80 with a dark label. A plain chip is always this.",
-      lit: "Hovered or focused, here with the signs on: the line inside the pill's edge burns with the glow outside it, the tube in the accent on Neutral, Selected and Accent and in the cold accent on Cold, the core (`primary_fill_line`, `stroke.thin` wide) on Filled. Filled's label brightens (`on_primary_fill_lit`); Selected's stays full, as it rests. On the close rows the close button is lit: the tube inside its circle, which shares the pill's curve, or the core on Filled. By day lit is its signs-off look in daylight colours: no glow, the line as glass.",
-      pressed: "Overdriven, under the pointer or Space and Enter, so lit as well; the glow `focus.pressed_glow` times the lit one. Neutral, Accent and Cold: the tube runs white-hot, to the core; by day their tone tints the pill at `opacity.press_tint`. Selected: the container lifts 0.035 (`secondary_container_pressed`), 0.04 darker by day. Filled: the fill lifts 0.035 (`primary_fill_pressed`), 0.04 darker by day. The close button's tube runs white-hot, its tone a tint under it by day.",
-      disabled: "Grey, with no tone, no line and no glow: the pill `on_surface` at `opacity.disabled_container`, its label, icon and close at `opacity.disabled_content`. Neither its press nor its close takes the pointer or the keyboard.",
+    looks: {
+      rest: "its kind's colours; a plain chip is always this",
+      lit: "the tube, or Filled's core, with the glow outside",
+      pressed: "glow × `focus.pressed_glow`; tube white-hot, or the fill lifts",
+      disabled: "grey: no tone, line or glow, and no press",
     },
   },
   focus: {
     tubes: nonEmpty(CHIP_KINDS.map((kind) => ({ name: kind, tone: CHIP_TONES[kind], filled: chipFilled(kind), content: false }))),
     looks: {
-      lit: "At night at rest, the signs burn: the tube inside the pill's edge, or the core inside a Filled chip's fill, with the glow outside it, all that reaches past the pill; Filled's label lights. A lit close button draws its own line inside its circle, the pill's curve at its end.",
-      signsOff: "The same chip still hovered or focused with the neon unpowered: by day always, and at night while a theme change or dark ⇄ light has the lights out. The tube is solid unlit glass, its tone's `_glass` (`primary_glass`, `cold_glass` on Cold), as a Tonal or Text button's; a Filled chip's line is `primary_fill_glass`, the unlit fill lifted 0.12. No glow, and the label at its rest colour.",
+      lit: "inside the pill's edge; Filled's label lights; a lit close lights alone",
+      signsOff: "the tone's `_glass`, or `primary_fill_glass`; no glow, label at rest",
     },
     signsOff: (index: number) => ROWS[index]!.cell("signs-off"),
   },
   content: {
     text: CHIP_KINDS.map((kind) => ({ name: kind, words: SAMPLES[kind].words, sample: (words: string) => sample(kind, { icon: SAMPLES[kind].icon }, words) })),
-    missingPicture: [
-      { name: "No icon", for: "The icon is optional: without one the label starts `space.s12` in, where the curve ends, and the chip keeps its height. A named symbol is never missing.", sample: () => sample("Accent") },
-    ],
+    missingPicture: [{ name: "No icon", for: "the label starts `space.s12` in; the same height", sample: () => sample("Accent") }],
     counts: [
-      { name: "One", for: "A chip on its own: a tag beside a title.", sample: () => sample("Accent") },
+      { name: "One", for: "a tag beside a title", sample: () => sample("Accent") },
       {
         name: "Many",
-        for: "Chips side by side in a row of the layout; each is its own stop for Tab when pressable, and a removed one closes the gap.",
+        for: "a row of the layout; a removed one closes the gap",
         sample: () => row("s8", "start", ...["US", "Polish", "German (no dead keys)"].map((words) => sample("Neutral", { removable: true }, shown(fixed(words))))),
       },
     ],
   },
   motion: {
-    arrives: doesntApply("a chip comes with the surface or the row it is on."),
-    leaves: doesntApply("a chip goes with the surface or the row it is on; a removed one leaves with its row's layout."),
+    arrives: doesntApply("it comes with its surface or row."),
+    leaves: doesntApply("it goes with its surface or row; a removed one with its row's layout."),
     between: [
       {
         name: "Turns on",
-        what: "A chip that toggles a setting, pressed from off to on: `--checked` from 0 to 1 over `short` on `standard`, its fill and label fading from Neutral's to Selected's. Nothing moves or grows. Turning off plays it backwards.",
+        what: "A toggling chip fades from Neutral's colours to Selected's over `short` on `standard`; nothing moves.",
         tracks: [{ part: "on", on: "a toggling chip", target: ".k-chip", property: "--checked", from: 0, to: 1, duration: "short", curve: "standard" }],
         reduced: "same",
         back: "plays",
@@ -133,7 +129,7 @@ export default page({
       },
       {
         name: "Focus arrives",
-        what: "Hovered or focused, a pressable chip lights up: a fade over `short` on `standard`, never the flicker. Its line and glow fade in and Filled's label lights as `--lit` goes from 0 to 1.",
+        what: "A fade over `short` on `standard`, never the flicker: line, glow and Filled's label together.",
         tracks: lights(".k-chip", ON, 0, 1),
         reduced: "same",
         back: "cuts",
@@ -141,7 +137,7 @@ export default page({
       },
       {
         name: "Focus leaves",
-        what: "The pointer leaves or focus moves on: it fades back to rest over `short` on `standard`.",
+        what: "Back to rest over `short` on `standard`.",
         tracks: lights(".k-chip", ON, 1, 0),
         reduced: "same",
         back: "cuts",
@@ -149,7 +145,7 @@ export default page({
       },
       {
         name: "Press",
-        what: "A lit chip goes down over `micro`, and back as it comes up: Neutral's, Accent's and Cold's tube runs white-hot, Selected's container and Filled's fill lift 0.035, and every glow grows to `focus.pressed_glow` times the lit one.",
+        what: "Down over `micro` and back as it comes up: the tube runs white-hot or the fill lifts, the glow grows.",
         tracks: press(".k-chip", ON),
         reduced: "same",
         back: "plays",
@@ -160,31 +156,31 @@ export default page({
   },
   keyboard: {
     keys: [
-      { keys: ["Tab", "Shift+Tab"], does: "Focus to a pressable chip, then to its close button, or on to the next or previous control, in reading order. A plain chip, and a chip with `tabStop` off, is no stop." },
-      { keys: ["Enter", "Space"], does: "Presses the focused chip (or turns it on or off), or its focused close button, which removes it." },
-      { keys: ["Esc"], does: "Nothing of the chip's: it goes back one step, as the surface says." },
+      { keys: ["Tab", "Shift+Tab"], does: "to a pressable chip, then its close, or on" },
+      { keys: ["Enter", "Space"], does: "presses or toggles it; on its close, removes it" },
+      { keys: ["Esc"], does: "nothing of the chip's" },
     ],
-    order: "A pressable chip is one stop and its close button another, after it; a disabled chip is neither. Where focus goes after a chip is removed is its surface's to say. Focus moving never moves anything: the line and the glow take no room.",
-    lands: "A chip takes focus when the surface gives it; a row of chips is never where a surface starts.",
+    order: "A pressable chip and its close are two stops; a plain, disabled or `tabStop: false` chip is none.",
+    lands: "Where its surface puts it; a row of chips is never where a surface starts.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "Plain", for: "Its label between the paddings.", sample: () => sample("Neutral") },
-      { name: "With an icon, removable", for: "The icon's padding, the gaps and the close button.", sample: () => sample("Neutral", { icon: SAMPLES.Neutral.icon, removable: true }) },
+      { name: "Plain", for: "label and paddings", sample: () => sample("Neutral") },
+      { name: "With an icon, removable", for: "icon padding, gaps, close", sample: () => sample("Neutral", { icon: SAMPLES.Neutral.icon, removable: true }) },
     ]),
     measures: [
-      { what: "Its height, and the close button's side.", token: "size-chip" },
-      { what: "The pill: the control radius, half its height.", token: "radius-control" },
-      { what: "Its label's line, centred down it.", token: "type-label-line" },
-      { what: "The icon and the close symbol.", token: "type-label-icon" },
-      { what: "The padding at its sides without an icon.", token: "space-s12" },
-      { what: "The padding before an icon.", token: "space-s8" },
-      { what: "The gaps between icon, label and close, and the close symbol's inset.", token: "space-s4" },
-      { what: "The lit tube, rounded half up to device pixels.", token: "focus-tube" },
-      { what: "The lit line inside a Filled chip's fill, rounded half up.", token: "stroke-thin" },
-      { what: "The near glow's reach.", token: "focus-near" },
-      { what: "The far glow's reach.", token: "focus-far" },
+      { part: "Height, close's side", token: "size-chip" },
+      { part: "Corner", token: "radius-control" },
+      { part: "Label line", token: "type-label-line" },
+      { part: "Icon, close symbol", token: "type-label-icon" },
+      { part: "Sides, no icon", token: "space-s12" },
+      { part: "Before an icon", token: "space-s8" },
+      { part: "Gaps, close's inset", token: "space-s4" },
+      { part: "Tube", token: "focus-tube" },
+      { part: "Line, Filled", token: "stroke-thin" },
+      { part: "Near glow", token: "focus-near" },
+      { part: "Far glow", token: "focus-far" },
     ],
-    reflow: doesntApply("a chip is as wide as its content and paddings at every window size: it never stretches or wraps, and the layout it is in gives it room."),
+    reflow: doesntApply("as wide as its content: it never stretches or wraps."),
   },
 });
