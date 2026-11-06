@@ -14,9 +14,6 @@ import { wrapped } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 const TITLE: Words = { short: "Disk", long: "Samsung 990 Pro, the disk KubaOS installs on" };
 const BODY: Words = {
   short: "Everything on it goes.",
@@ -57,7 +54,7 @@ function pictured(): HTMLElement {
 
 /** The live sample: a card with actions and a pressable one, beside a card holding a picture. */
 function live(): HTMLElement {
-  return within(ACROSS, filling(flow("s16", within(COLUMN, stack("s16", "start", card(withActions()), log())), within(HALF, pictured()))));
+  return within("100%", filling(flow("s16", within(COLUMN, stack("s16", "start", card(withActions()), log())), within(HALF, pictured()))));
 }
 
 /** Two cards side by side in a grid, ending together. */

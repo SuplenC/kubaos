@@ -11,9 +11,6 @@ import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { INSTALL_LOG } from "./error-block.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 const ROOM = "var(--size-column)";
 /** A short log's height, for samples that show a few lines: four of `mono`'s and its padding. */
 const SHORT = "calc(4 * var(--type-mono-line) + 2 * var(--space-s12))";
@@ -81,7 +78,7 @@ function live(): HTMLElement {
       state.textContent = shown.following() ? "Following the newest line." : "Holding still. End follows again.";
     }, pace);
   }
-  return within(ACROSS, stack("s8", "start", shown.box, state));
+  return within("100%", stack("s8", "start", shown.box, state));
 }
 
 const OPENS: Move = {

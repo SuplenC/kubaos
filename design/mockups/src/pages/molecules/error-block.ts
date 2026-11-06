@@ -9,9 +9,6 @@ import { log, type LogLine, logRoom } from "../../lib/log.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 const ROOM = "var(--size-column)";
 
 const MESSAGE: Words = { short: "Fuck. The disk is busy.", long: "Fuck. Couldn't partition /dev/nvme0n1: something still has it mounted, so the table can't be rewritten." };
@@ -74,7 +71,7 @@ export default page<"error">({
   lede: "What broke and what to do next, where it broke: the message, the hint, and the log behind it.",
   code: { rust: "error::error_block", qml: "ErrorBlock" },
   stage: {
-    live: () => onScreen(false, true, ACROSS),
+    live: () => onScreen(false, true, "100%"),
     hint: "press Show log",
     daylight: true,
   },
