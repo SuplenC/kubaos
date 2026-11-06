@@ -1001,7 +1001,7 @@
   flex: none;
   box-sizing: border-box;
   width: 100%;
-  height: var(--size-control_md);
+  height: var(--field-height, var(--size-control_md));
   border-radius: var(--radius-control);
   outline: none;
   cursor: text;
@@ -1079,7 +1079,7 @@
 .k-field-mark {
   position: absolute;
   left: var(--space-s12);
-  top: round(nearest, calc((var(--size-control_md) - var(--type-body_large-icon)) / 2), 1px);
+  top: round(nearest, calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-icon)) / 2), 1px);
 }
 
 /* The trailing icon, `space.s12` in from the far side, in its own role (`--trailing`) unless the
@@ -1093,7 +1093,7 @@
   position: absolute;
   left: var(--start);
   right: var(--end);
-  top: calc((var(--size-control_md) - var(--type-body_large-line)) / 2);
+  top: calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-line)) / 2);
   height: var(--type-body_large-line);
   overflow: hidden;
 }
@@ -1148,7 +1148,7 @@
 .k-field-caret {
   display: none;
   position: absolute;
-  top: round(nearest, calc((var(--size-control_md) - var(--caret-height)) / 2), 1px);
+  top: round(nearest, calc((var(--field-height, var(--size-control_md)) - var(--caret-height)) / 2), 1px);
   height: var(--caret-height);
   width: var(--thin);
   left: round(
