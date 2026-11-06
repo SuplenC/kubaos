@@ -20,9 +20,9 @@ export interface AppIcon {
 }
 
 export const APP_ICONS: readonly AppIcon[] = [
-  { name: "A full plate", picture: kubaos, for: "KubaOS's own icon, a plate out to the edges of its file: it fills the tile, cut by the tile's corners." },
-  { name: "A plate in a margin", picture: plate, for: "A rounded square in the middle half of its file: measured, it fills the tile all the same." },
-  { name: "A disc", picture: disc, for: "A round badge: it covers too little of its box to be a plate, so it sits `space.s4` inside the tile." },
-  { name: "A glyph", picture: star, for: "A star with no plate: its box is square but mostly empty, a shape inside the tile." },
-  { name: "A wide logo", picture: wide, for: "A logo three times as wide as tall: a shape, fitted to the tile's width, with tile above and below." },
+  { name: "A full plate", picture: kubaos, for: "fills the tile, cut by its corners" },
+  { name: "A plate in a margin", picture: plate, for: "measured, it fills the tile all the same" },
+  { name: "A disc", picture: disc, for: "too little of its box: a shape, `space.s4` in" },
+  { name: "A glyph", picture: star, for: "square but mostly empty: a shape" },
+  { name: "A wide logo", picture: wide, for: "a shape, fitted to the tile's width" },
 ];

@@ -24,15 +24,6 @@ const BESIDE: Record<TileSize, string> = {
   Lg: "over a `headline` name",
 };
 
-/** What each measured kind of app icon comes to in the tile. */
-const FITS: Record<string, string> = {
-  "A full plate": "fills the tile, cut by its corners",
-  "A plate in a margin": "measured, it fills the tile all the same",
-  "A disc": "too little of its box: a shape, `space.s4` in",
-  "A glyph": "square but mostly empty: a shape",
-  "A wide logo": "a shape, fitted to the tile's width",
-};
-
 /** A tile beside its words, laid out as the row it sits in lays it out. */
 function besideWords(size: TileSize, options: Partial<TileOptions> = {}, name = "Kitchen"): HTMLElement {
   const tile = iconTile({ glyph: "wifi", size, ...options });
@@ -96,7 +87,7 @@ export default page({
     { name: "A symbol", for: "something KubaOS draws", sample: () => iconTile({ glyph: "keyboard", size: "Md" }) },
     { name: "Accent", for: "the one of a list that comes first", sample: () => iconTile({ glyph: "star_filled", size: "Md", accent: true }) },
     { name: "Danger", for: "a critical notification", sample: () => iconTile({ glyph: "warning", size: "Md", danger: true }) },
-    ...APP_ICONS.map((app) => ({ name: app.name, for: FITS[app.name]!, sample: () => measured(app.picture) })),
+    ...APP_ICONS.map((app) => ({ name: app.name, for: app.for, sample: () => measured(app.picture) })),
     { name: "A photo", for: "covers the tile", sample: () => iconTile({ glyph: "notifications", size: "Md", photo }) },
   ],
   sizes: nonEmpty(TILE_SIZES.map((size) => ({ name: size.toLowerCase(), for: BESIDE[size], sample: () => besideWords(size) }))),
