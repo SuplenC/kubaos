@@ -72,8 +72,7 @@ kind = "scripts"
 # `files.tidy-daily`, `files.automount`, `terminal.greeting`,
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
 # `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
-# `power.critical-warning`,
-# `power.battery-notes`,
+# `power.critical-warning`, `power.battery-notes`,
 # `nix.unfree`, `kubaos.preview`, `kubaos.suites.<name>` (the Suite is
 # installed), `bluetooth.unnamed`, `update.firmware`, `update.bitwarden`,
 # `update.nix`, `wallpapers.depth` (the wallpaper-depth Suite cuts out your own
