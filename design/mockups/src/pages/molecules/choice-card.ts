@@ -6,10 +6,12 @@
 import { type ChoiceCardOptions, choiceCard, choiceGroup, type Picks } from "../../lib/card.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
-import { stack, within } from "../../lib/layout.ts";
+import { filling, stack, within } from "../../lib/layout.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+
+/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
+const ACROSS = "calc(100% - var(--space-s24))";
 
 const TITLE: Words = { short: "Erase", long: "Erase the whole disk and install KubaOS on it" };
 const LINE: Words = { short: "Everything on it goes.", long: "Wipes all three partitions, Windows and its recovery partition included." };
@@ -32,14 +34,14 @@ function boxed(options: ChoiceCardOptions, state: Shown = "rest"): HTMLElement {
 }
 
 /** Kōbō's disk modes: two radio cards, the first picked. */
-function modes(): HTMLElement {
-  return within(COLUMN, choiceGroup("one", 2, [choiceCard({ ...ERASE, picked: true }), choiceCard(ALONGSIDE)]));
+function modes(room = COLUMN): HTMLElement {
+  return within(room, choiceGroup("one", 2, [choiceCard({ ...ERASE, picked: true }), choiceCard(ALONGSIDE)]));
 }
 
 /** Kōbō's software: four checkbox cards, two picked. */
-function suites(): HTMLElement {
+function suites(room = COLUMN): HTMLElement {
   return within(
-    COLUMN,
+    room,
     choiceGroup("many", 2, [
       choiceCard({ ...SHELL, picks: "many", picked: true }),
       choiceCard({ ...DESKTOP, picks: "many" }),
@@ -50,7 +52,7 @@ function suites(): HTMLElement {
 }
 
 function live(): HTMLElement {
-  return stack("s32", "start", modes(), suites());
+  return within(ACROSS, stack("s32", "start", filling(modes("100%")), filling(suites("100%"))));
 }
 
 const ROWS: readonly { name: string; options: ChoiceCardOptions }[] = [
@@ -79,35 +81,34 @@ export default page({
   level: "molecules",
   slug: "choice-card",
   title: "ChoiceCard",
-  summary: "A card picked from a set, saying what each choice means: one of the set, as radios, or any of it, as checkboxes.",
-  live,
-  description: [
-    "Rust `card::choice_card`, QML `ChoiceCard`. A choice that needs a sentence to say what it means (Kōbō's disk modes, the software to install) is a card of its own, side by side with the others in a grid, `space.s16` apart. A choice a word says is a `Radio`, a `Checkbox` or `Tabs`.",
-    "It is a `Card`: flat on the page, one container role above it (`surface_container` on a window's `surface`) with the soft hairline for its edge, at the content radius (16), `space.s16` inside. Its header is the card's: a symbol at `subheading`'s 24, its title in `subheading` `space.s8` after it, and its line in `small`, `on_surface_variant`, `space.s4` below. Its mark ends the title's first line, centred on it: a radio's disc for one of a set, a checkbox's box for any of it, both `size.check` across and drawn as their atoms draw them.",
-    "Picked, it says so as every pick does: in the accent's words. Its title and symbol are `primary_lit` (the core at night, the tone by day), with the label glow round them at night while the signs are on (`focus.label_glow` over `focus.label_near`), and its mark is filled with the accent, the disc's dot or the box's tick on it. Its surface doesn't change: a big surface takes few effects. Picking fades its words and its mark over `short`.",
-    "Its states follow the neon, as a card's do. Lit, its tube burns inside its edge at its own corner with the glow outside at night, cold (`cold` at `focus.tube`), since the accent already means picked here; its mark lights with it. Pressed, the tube runs white-hot, the glow brightens, by day the cold tone tints it (`opacity.press_tint`), and its title goes to the picked words over `micro` before letting go picks it. Disabled (a choice that can't be had: no room left to install alongside), it keeps its resting surface and dims what it holds: its words, symbol and mark at `opacity.disabled_content` of `on_surface`, the mark's box at `opacity.disabled_container`, picked or not; no line, no glow, no press, and the keyboard passes it by.",
-  ],
+  lede: "A card picked from a set, saying what each choice means: one of the set, as radios, or any of it, as checkboxes.",
+  code: { rust: "card::choice_card", qml: "ChoiceCard" },
+  stage: {
+    live,
+    hint: "click a card, or Tab, the arrows and Space",
+    daylight: true,
+  },
   variants: [
-    { name: "One of a set", for: "Exactly one picked, as radios: a disc. Picking one unpicks the one that was.", sample: modes },
-    { name: "Any of a set", for: "Each picked or not, as checkboxes: a box with a tick.", sample: suites },
-    { name: "A title alone", for: "A choice its title says: no line under it.", sample: () => boxed({ glyph: "dark_mode", title: "Dark", picked: true }) },
-    { name: "Without a symbol", for: "A choice with nothing to draw: the title starts at the padding.", sample: () => boxed({ title: "Erase the disk", subtitle: "Everything on it goes." }) },
+    { name: "One of a set", for: "as radios: picking one unpicks the last", sample: modes },
+    { name: "Any of a set", for: "as checkboxes: each picked or not", sample: suites },
+    { name: "A title alone", for: "no line under it", sample: () => boxed({ glyph: "dark_mode", title: "Dark", picked: true }) },
+    { name: "Without a symbol", for: "the title starts at the padding", sample: () => boxed({ title: "Erase the disk", subtitle: "Everything on it goes." }) },
   ],
-  sizes: doesntApply("a choice card has one padding and one corner, and is as wide as its cell of the set's grid."),
+  sizes: doesntApply("one padding and one corner; as wide as its cell of the grid."),
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],
     absent: {
-      selected: "picked and not are its value, and each is a row here, so every state shows in both.",
-      loading: "a choice is known as the set shows; one that waits on a scan is disabled until it can be had.",
-      empty: "a card always has a title; a set has at least two cards.",
-      error: "a choice that can't be had is disabled, and its line says why.",
+      selected: "picked or not is its value: a row each",
+      loading: "one waiting on a scan is disabled",
+      empty: "always a title; a set has at least two",
+      error: "disabled, its line saying why",
     },
     rows: nonEmpty(ROWS.map(({ name, options }) => ({ name, cell: (state: MatrixState) => boxed(options, state) }))),
-    described: {
-      rest: "Flat on the page: `surface_container` on the window's `surface`, its edge the soft hairline. Not picked, its title and symbol are `on_surface` and its mark empty; picked, they are `primary_lit` with the label glow at night, and the mark filled with the accent. By day the same roles in daylight colours, with no glow.",
-      lit: "Under the pointer or with the keyboard on it, here with the signs on: the cold tube, `cold` at `focus.tube`, inside its edge with the glow outside; the mark lights with it. By day the tube with no glow.",
-      pressed: "Lit and pressed: the tube runs white-hot (`cold_core`), the glow `focus.pressed_glow` times the lit one, by day a tint of the cold tone at `opacity.press_tint` over its fill; the title goes to `primary_lit` and the mark's fill lifts. Letting go picks it.",
-      disabled: "Its resting surface; its words, symbol and mark grey at `opacity.disabled_content` of `on_surface`, the mark's box at `opacity.disabled_container`, picked or not. No line, no glow, no press, skipped by the keyboard.",
+    looks: {
+      rest: "flat, soft hairline; picked, `primary_lit` words and a filled mark",
+      lit: "the cold tube inside its edge, glow at night",
+      pressed: "`cold_core`, glow × `focus.pressed_glow`; the title goes `primary_lit`",
+      disabled: "content at `opacity.disabled_content`, no line, skipped by keys",
     },
   },
   focus: {
@@ -116,8 +117,8 @@ export default page({
       { name: "Picked", tone: "cold", filled: false, content: false },
     ],
     looks: {
-      lit: "At night at rest the sign burns: the cold tube inside the card's edge at `radius.content`, the glow outside it. A picked card's words keep their label glow; nothing else in it lights.",
-      signsOff: "Still lit with the neon unpowered, by day always and at night while a power change has the lights out: the tube is `cold_glass`, with no glow, and a picked card's words have no glow.",
+      lit: "cold tube at `radius.content`, glow outside: the accent already means picked",
+      signsOff: "the tube as `cold_glass`, no glow on the tube or words",
     },
     signsOff: (index: number) => boxed(ROWS[index]!.options, "signs-off"),
   },
@@ -126,20 +127,20 @@ export default page({
       { name: "The title", words: TITLE, sample: (words: string) => boxed({ ...ERASE, title: words, picked: true }) },
       { name: "The line", words: LINE, sample: (words: string) => boxed({ ...ERASE, subtitle: words }) },
     ],
-    missingPicture: doesntApply("a choice card draws no picture: its symbol is one of KubaOS Symbols, always there. A choice made by its picture is a `PictureChoice`."),
+    missingPicture: doesntApply("its symbol is always there; a choice made by its picture is a `PictureChoice`."),
     counts: [
-      { name: "Two", for: "The least a set holds: Kōbō's disk modes.", sample: () => set("one", 2) },
-      { name: "Three", for: "An odd one out leaves its cell of the last row empty: the cards keep their width.", sample: () => set("one", 3) },
-      { name: "Many", for: "Rows of two, each row's cards one height.", sample: () => set("many", 6) },
+      { name: "Two", for: "the least a set holds", sample: () => set("one", 2) },
+      { name: "Three", for: "the last row's spare cell stays empty", sample: () => set("one", 3) },
+      { name: "Many", for: "rows of two, each one height", sample: () => set("many", 6) },
     ],
   },
   motion: {
-    arrives: doesntApply("a set comes with the page it is on."),
-    leaves: doesntApply("it goes with the page it is on."),
+    arrives: doesntApply("a set comes with its page."),
+    leaves: doesntApply("it goes with its page."),
     between: [
       {
         name: "Picked",
-        what: "A press, Space or Enter, or an arrow in a set of one: its title and symbol fade to `primary_lit` and its mark fills over `short` on `standard`, as the one that was picked fades back. Never the flicker.",
+        what: "Its words fade to `primary_lit` and its mark fills over `short` on `standard`, as the last pick fades back.",
         tracks: [
           { part: "words", on: "the card picked", target: ".k-choice-card:last-child", property: "--picked", from: 0, to: 1, duration: "short", curve: "standard" },
           { part: "mark", on: "the card picked", target: ".k-choice-card:last-child", property: "--checked", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -150,41 +151,41 @@ export default page({
         back: "plays",
         sample: pair(),
       },
-      { name: "Focus arrives", what: "Under the pointer or with the keyboard on it, it lights up over `short` on `standard`: the cold tube and its glow fade in.", tracks: lights(".k-choice-card", ON, 0, 1), reduced: "same", back: "cuts", sample: pair() },
-      { name: "Focus leaves", what: "It goes back to rest over `short` on `standard`.", tracks: lights(".k-choice-card", ON, 1, 0), reduced: "same", back: "cuts", sample: pair("lit") },
-      { name: "Pressed", what: "A lit card pressed: over `micro` its tube runs white-hot, the glow brightens, by day the cold tone tints it, and its title goes to the picked words.", tracks: press(".k-choice-card", ON), reduced: "same", back: "plays", sample: pair("lit") },
+      { name: "Focus arrives", what: "The cold tube and glow fade in over `short` on `standard`.", tracks: lights(".k-choice-card", ON, 0, 1), reduced: "same", back: "cuts", sample: pair() },
+      { name: "Focus leaves", what: "Back to rest over `short` on `standard`.", tracks: lights(".k-choice-card", ON, 1, 0), reduced: "same", back: "cuts", sample: pair("lit") },
+      { name: "Pressed", what: "Over `micro` the tube runs white-hot, the glow brightens, and its title goes to the picked words.", tracks: press(".k-choice-card", ON), reduced: "same", back: "plays", sample: pair("lit") },
       ...powerMoves(pair("lit")),
     ],
   },
   keyboard: {
     keys: [
-      { keys: ["Tab", "Shift+Tab"], does: "Into the set or on out of it: the set is one stop, on its picked card (one of a set) or the card the keyboard was last on (any of it), else its first." },
-      { keys: ["←", "→", "h", "l"], does: "To the card before or after, in reading order. In a set of one, it picks that card as it goes, as radios do." },
-      { keys: ["↑", "↓", "k", "j"], does: "To the card above or below, a row of the grid at a time." },
-      { keys: ["Home", "End"], does: "To the first or the last card." },
-      { keys: ["Space", "Enter"], does: "Picks the card the keyboard is on (one of a set), or turns it (any of it), once per press, never on key repeat." },
+      { keys: ["Tab", "Shift+Tab"], does: "the set is one stop, on its picked card" },
+      { keys: ["←", "→", "h", "l"], does: "the card before or after; radios pick as they go" },
+      { keys: ["↑", "↓", "k", "j"], does: "a row of the grid" },
+      { keys: ["Home", "End"], does: "the first or last card" },
+      { keys: ["Space", "Enter"], does: "picks or turns it, once per press" },
     ],
-    order: "One stop in the surface's reading order. The arrows pass a disabled card by and stop at the set's ends.",
-    lands: "A page that asks the choice starts on the set, on its picked card. A pick keeps the keyboard on the card.",
+    order: "One stop in reading order; the arrows pass a disabled card and stop at the ends.",
+    lands: "On the picked card; a pick keeps the keyboard there.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "A set of two", for: "Each card's padding, its symbol, title, line and mark, and the gap between two.", sample: modes },
+      { name: "A set of two", for: "padding, symbol, title, line, mark, the gap", sample: modes },
     ]),
     measures: [
-      { what: "Inside its edge, and between two cards across and down.", token: "space-s16" },
-      { what: "Its corners.", token: "radius-content" },
-      { what: "Its edge, the soft hairline.", token: "stroke-hairline_device_px" },
-      { what: "The symbol, `subheading`'s.", token: "type-subheading-icon" },
-      { what: "Between the symbol, the title and the mark.", token: "space-s8" },
-      { what: "The title's line.", token: "type-subheading-line" },
-      { what: "Between the title and its line.", token: "space-s4" },
-      { what: "The line under the title.", token: "type-small-line" },
-      { what: "The mark's disc or box.", token: "size-check" },
-      { what: "The mark's corner on a box.", token: "radius-small" },
+      { part: "Inset, gap between cards", token: "space-s16" },
+      { part: "Corner", token: "radius-content" },
+      { part: "Edge", token: "stroke-hairline_device_px" },
+      { part: "Symbol", token: "type-subheading-icon" },
+      { part: "Symbol → title → mark", token: "space-s8" },
+      { part: "Title line", token: "type-subheading-line" },
+      { part: "Title → line", token: "space-s4" },
+      { part: "Line under the title", token: "type-small-line" },
+      { part: "Mark", token: "size-check" },
+      { part: "Box mark's corner", token: "radius-small" },
     ],
     reflow: {
-      described: "A set is a grid of two across its room, its columns split in device pixels, each row's cards one height. A card's title and line break between words where they don't fit; the mark stays on the title's first line.",
+      note: "A grid of two across its room, each row one height; the mark stays on the title's first line.",
       sample: () => within("100%", choiceGroup("one", 2, [choiceCard({ ...ERASE, title: shown(TITLE), picked: true }), choiceCard(ALONGSIDE)])),
     },
   },

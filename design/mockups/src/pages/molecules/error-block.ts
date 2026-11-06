@@ -6,10 +6,11 @@ import { shown, type Words } from "../../lib/content.ts";
 import { errorBlock } from "../../lib/error-block.ts";
 import { filling, row, stack, within } from "../../lib/layout.ts";
 import { log, type LogLine, logRoom } from "../../lib/log.ts";
-import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+
+/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
+const ACROSS = "calc(100% - var(--space-s24))";
 
 const ROOM = "var(--size-column)";
 
@@ -39,7 +40,7 @@ function inRoom(element: HTMLElement): HTMLElement {
  * The block as Kōbō's failed screen shows it: the error, the log under it when it is open, and the
  * screen's actions at its foot: Show log beside the error's own actions, Save log and Try again.
  */
-function onScreen(open: boolean, live = false): HTMLElement {
+function onScreen(open: boolean, live = false, width = ROOM): HTMLElement {
   const room = logRoom(log(INSTALL_LOG).box, open, "s16");
   const toggle = button({ label: open ? "Hide log" : "Show log", kind: "Text", icon: "terminal" });
   const retry = button({ label: "Try again", icon: "restart_alt" });
@@ -51,12 +52,12 @@ function onScreen(open: boolean, live = false): HTMLElement {
       toggle.querySelector(".k-text")!.textContent = opening ? "Hide log" : "Show log";
     });
   }
-  return inRoom(stack("s16", "start", filling(stack(0, "start", errorBlock(BUSY), room)), filling(foot)));
+  return within(width, stack("s16", "start", filling(stack(0, "start", errorBlock(BUSY), room)), filling(foot)));
 }
 
 const OPENS: Move = {
   name: "The log opens",
-  what: "Show log: the room under the error opens from nothing to `size.log` over `medium` on `emphasized_decel`, a log opening, cutting the log as it goes; what is under it moves down with it. Hide log closes it the same way back. With reduced motion the room is open at once and the log fades in over `short`.",
+  what: "The room under the error opens to `size.log` over `medium` on `emphasized_decel`; what is under it moves down.",
   tracks: [{ part: "the log's room", on: "the failed screen", target: ".k-log-room", property: "--log-open", from: 0, to: 1, duration: "medium", curve: "emphasized_decel" }],
   reduced: [
     { part: "the log's room", on: "the failed screen", target: ".k-log-room", property: "--log-open", from: 0, to: 1, duration: "instant", curve: "linear" },
@@ -66,82 +67,78 @@ const OPENS: Move = {
   sample: () => onScreen(false),
 };
 
-const DESCRIBED =
-  "A status message lying flat in the page: `error_container` at `opacity.error_fill`, the sunken soft hairline inside its edge, `radius.content` and `space.s16` inside. Down its start side runs a rail of neon in `error`, from the top padding to the bottom one with round ends: the tabs' and the collapsible's rail made thicker, `banner.rail` at night and `banner.rail_day` by day, filling a lane `space.s4` wide `space.s12` in, so the words start `space.s12` past the lane, 28 in; `error_core` with a lit control's glow round it, near and far, at night while the signs are on, glass while they are off, `error` by day. In it the `error` symbol at `subheading`'s 24, `space.s16` from the message in `subheading` over the hint in `body`, `on_surface_variant`, `space.s4` under it; the symbol is centred down the words, and the words wrap.";
-
 export default page<"error">({
   level: "molecules",
   slug: "error-block",
   title: "ErrorBlock",
-  summary: "What broke and what to do next, where it broke: the message, the hint, and the log behind it.",
-  live: () => onScreen(false, true),
-  description: [
-    "Rust `error::error_block(look, message, hint)`, QML `ErrorBlock` (`message`, `hint`). Kōbō's failed install and a setup step that failed. Press Show log: the log behind the error opens under it.",
-    DESCRIBED,
-    "A message past 90 characters (`LONG_MESSAGE`) drops to `body_strong`, since a whole command line in 16 px semibold is a wall. The message says what broke, in the voice of the place (`docs/BRAND.md`); the hint says the next thing to try. An error with no next action isn't finished.",
-    "It holds no buttons. What to do about it is the screen's: the Log behind it, opened by a Text button with the `terminal` symbol, Save log (Tonal) and Try again, the screen's one Filled action, at the screen's foot. It is shown inline, where the user is looking (`docs/DESIGN.md`, \"Notify or show inline\"), and is never also a toast or a notification.",
-  ],
+  lede: "What broke and what to do next, where it broke: the message, the hint, and the log behind it.",
+  code: { rust: "error::error_block", qml: "ErrorBlock" },
+  stage: {
+    live: () => onScreen(false, true, ACROSS),
+    hint: "press Show log",
+    daylight: true,
+  },
   variants: [
-    { name: "A short message", for: "What broke in a sentence, in `subheading`.", sample: () => inRoom(errorBlock(BUSY)) },
-    { name: "A long message", for: "Past 90 characters, a command line and its output: `body_strong`.", sample: () => inRoom(errorBlock(COMMAND)) },
-    { name: "With its log", for: "On a screen: the log open under it, the screen's actions at its foot.", sample: () => onScreen(true) },
+    { name: "A short message", for: "a sentence, in `subheading`", sample: () => inRoom(errorBlock(BUSY)) },
+    { name: "A long message", for: "past 90 characters: `body_strong`", sample: () => inRoom(errorBlock(COMMAND)) },
+    { name: "With its log", for: "the log open, the screen's actions at its foot", sample: () => onScreen(true) },
   ],
-  sizes: doesntApply("one size: its padding and its words' styles; its width is its room's."),
+  sizes: doesntApply("one size; its width is its room's."),
   states: {
     shown: ["error"],
     absent: {
-      rest: "it shows only when something broke.",
-      lit: "it takes no pointer and no focus; the actions round it are buttons.",
-      pressed: "it takes no press.",
-      disabled: "an error is shown or not.",
-      selected: "it holds no choice.",
-      loading: "trying again takes it away: the work shows its progress again.",
-      empty: "an error always says what broke.",
+      rest: "shows only when something broke",
+      lit: "takes no pointer or focus",
+      pressed: "takes no press",
+      disabled: "shown or not",
+      selected: "holds no choice",
+      loading: "trying again takes it away",
+      empty: "always says what broke",
     },
     rows: [
       { name: "Short", cell: () => inRoom(errorBlock(BUSY)) },
       { name: "Long", cell: () => inRoom(errorBlock(COMMAND)) },
     ],
-    described: {
-      error: `${DESCRIBED} By day the same roles in daylight colours, the rail \`error\` with no glow.`,
+    looks: {
+      error: "`error_container` at `opacity.error_fill`, a rail in `error`, no glow by day",
     },
   },
-  focus: doesntApply("it takes no focus. Its rail is a fixed signal, always lit: it burns at night while the signs are on, flickers with them in a power change, and is the plain tone by day."),
+  focus: doesntApply("it takes no focus; its rail is a fixed signal, burning at night and plain by day."),
   content: {
     text: [
       { name: "The message", words: MESSAGE, sample: (words: string) => inRoom(errorBlock({ ...BUSY, message: words })) },
       { name: "The hint", words: HINT, sample: (words: string) => inRoom(errorBlock({ ...BUSY, hint: words })) },
     ],
     missingPicture: doesntApply("its symbol is always `error`."),
-    counts: doesntApply("one error says one thing; a second failure replaces it."),
+    counts: doesntApply("one error says one thing; a second replaces it."),
   },
   motion: {
-    arrives: doesntApply("it shows at once in place of the work that broke, with its screen."),
+    arrives: doesntApply("it shows at once in place of the work that broke."),
     leaves: doesntApply("trying again replaces it at once with the work's progress."),
     between: [OPENS, ...powerMoves(() => inRoom(errorBlock(BUSY)))],
   },
-  keyboard: doesntApply("it takes no key; the screen's actions round it do, in reading order: Show log, Save log, Try again."),
+  keyboard: doesntApply("it takes no key; the screen's actions round it do: Show log, Save log, Try again."),
   measures: {
     samples: nonEmpty([
-      { name: "Short", for: "Its padding, the symbol and its gap, the words and theirs.", sample: () => inRoom(errorBlock(BUSY)) },
-      { name: "With its log", for: "The gaps to the log and to the screen's actions.", sample: () => onScreen(true) },
+      { name: "Short", for: "padding, symbol, words, their gaps", sample: () => inRoom(errorBlock(BUSY)) },
+      { name: "With its log", for: "the gaps to the log and the actions", sample: () => onScreen(true) },
     ]),
     measures: [
-      { what: "Inside it at the top, the end and the foot, the rail's ends in from its top and foot, between the symbol and the words, and between it, the log and the actions.", token: "space-s16" },
-      { what: "The rail's lane in from its start edge, and the words past the lane.", token: "space-s12" },
-      { what: "The rail's lane, the rail centred in it.", token: "space-s4" },
-      { what: "The rail, at night, before it is rounded to whole device pixels.", token: "banner-rail" },
-      { what: "The rail by day.", token: "banner-rail_day" },
-      { what: "Between the message and the hint.", token: "space-s4" },
-      { what: "The symbol, `subheading`'s.", token: "type-subheading-icon" },
-      { what: "The message's line, `subheading`'s.", token: "type-subheading-line" },
-      { what: "The hint's, `body`'s.", token: "type-body-line" },
-      { what: "Its corners.", token: "radius-content" },
-      { what: "The log open under it.", token: "size-log" },
+      { part: "Inset, gaps to log and actions", token: "space-s16" },
+      { part: "Rail lane in, words past it", token: "space-s12" },
+      { part: "Rail lane", token: "space-s4" },
+      { part: "Rail at night", token: "banner-rail" },
+      { part: "Rail by day", token: "banner-rail_day" },
+      { part: "Message → hint", token: "space-s4" },
+      { part: "Symbol", token: "type-subheading-icon" },
+      { part: "Message line", token: "type-subheading-line" },
+      { part: "Hint line", token: "type-body-line" },
+      { part: "Corner", token: "radius-content" },
+      { part: "Log, open", token: "size-log" },
     ],
     reflow: {
-      described: "It fills its room at every window size; its words wrap, and the symbol stays centred down them.",
-      sample: () => within("100%", stack("s8", "start", errorBlock({ message: shown(MESSAGE), hint: shown(HINT) }), text("An error as wide as the window.", "small", "on_surface_variant"))),
+      note: "It fills its room; its words wrap, the symbol centred down them.",
+      sample: () => within("100%", errorBlock({ message: shown(MESSAGE), hint: shown(HINT) })),
     },
   },
 });
