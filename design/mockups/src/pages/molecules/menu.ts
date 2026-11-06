@@ -4,13 +4,11 @@
 // moving onto an item puts the keyboard on it.
 
 import { shown, type Words } from "../../lib/content.ts";
-import { stack, within } from "../../lib/layout.ts";
+import { row, within } from "../../lib/layout.ts";
 import { type ItemPinned, type MenuEntry, type MenuItemSpec, menu, menuItem } from "../../lib/menu.ts";
-import { text } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
 const ACTION: Words = { short: "Open", long: "Open the folder this download was saved in" };
 
@@ -70,53 +68,44 @@ function cell(spec: MenuItemSpec, state: MatrixState): HTMLElement {
   return alone(spec, state !== "rest", state === "rest" ? undefined : state === "lit" ? "lit" : "pressed");
 }
 
-const DESCRIBED =
-  "The popover is `space.s4` inside round a menu. An item is `size.control_sm` (32) tall, `space.s8` inside, so its words start `space.s12` from the popover's edge, at the row radius (`radius.row`, 8), concentric inside the popover's (`radius.control` − `space.s4`): an optional symbol, 16 (`icon.s16`), its words in `body` on one line, ending in an ellipsis where they don't fit, the keys that do the same as keycaps `space.s4` apart at the item's end, and a 16 check whose room is kept when unchecked so every item's end lines up; `space.s8` between each. Its content is `on_surface`, or `error` on an item that destroys something (Quit, Delete). A hairline `space.s4` clear of each side separates groups, inset `space.s8` so it lines up with the words. A select's open list is built the same: one build for every raised list.";
-
 export default page({
   level: "molecules",
   slug: "menu",
   title: "Menu and MenuItem",
-  summary: "A few actions or choices one under the other on a popover: the item the keyboard is on is lit, and Enter takes it.",
-  live: () => stack("s24", "start", onPopover(ACTIONS), onPopover(choices(3), 3)),
-  description: [
-    "Rust `menu::menu`, `menu::menu_item` and `menu::menu_separator`, QML `Menu` and `MenuItem`. Tab into a menu here and use ↑ and ↓, or move the pointer over it.",
-    "A menu holds a few actions (a tray icon's app menu) or choices, one under the other on a `Popover` as wide as `size.menu`. A select's options are menu items too, on the select's own surface as it grows into its list (the Select page). It is for what doesn't fit the surface: a surface's own actions are its buttons.",
-    DESCRIBED,
-    "The item the keyboard is on is lit: it fades onto `secondary_container` over `short`, its content to `on_secondary_container`, and its keycaps' keys and edges to `primary` with it; a danger item fades onto `error` itself instead, its content to `on_error`, its keycaps staying as they are. Pressed, the container lifts to `secondary_container_pressed` (`error_pressed`) over `micro`. The pointer moving onto an item puts the keyboard on it, so one item is lit at a time, by the pointer and the keys alike. An item that can't be taken now is dimmed, `on_surface` at `opacity.disabled_content`, its keycaps too, and the keys pass over it. Items aren't neon: no tube, no glow, the popover's own edge their room.",
-    "A menu taller than its room (the room under a tray icon) scrolls, with no bar, the item the keyboard is on kept in view. In the tray's menus a submenu opens in place, with a Back item at its top; Esc steps back one level before it closes.",
-  ],
+  lede: "A few actions or choices one under the other on a popover: the item the keyboard is on is lit.",
+  code: { rust: "menu::menu, menu::menu_item, menu::menu_separator", qml: "Menu, MenuItem" },
+  stage: { live: () => row("s32", "start", onPopover(ACTIONS), onPopover(choices(3), 3)), hint: "Tab in and ↑ ↓, or point at it", daylight: true },
   variants: [
-    { name: "Actions", for: "What can be done to one thing: a tray app's menu, with symbols, keys and groups.", sample: () => onPopover(ACTIONS) },
-    { name: "Choices", for: "One of a few, checked, in a tray app's menu. Every item keeps the check's room.", sample: () => onPopover(choices(3), 3) },
-    { name: "MenuItem, with keys", for: "An action with a shortcut: its keys as keycaps at its end.", sample: () => alone({ label: "Copy path", icon: "content_paste", keys: "Ctrl+C" }) },
-    { name: "MenuItem, danger", for: "An action that destroys something: in `error`.", sample: () => alone({ label: "Quit", icon: "logout", danger: true }) },
+    { name: "Actions", for: "what can be done to one thing: symbols, keys, groups", sample: () => onPopover(ACTIONS) },
+    { name: "Choices", for: "one of a few, checked; each item keeps the check's room", sample: () => onPopover(choices(3), 3) },
+    { name: "MenuItem, with keys", for: "a shortcut's keys as keycaps at its end", sample: () => alone({ label: "Copy path", icon: "content_paste", keys: "Ctrl+C" }) },
+    { name: "MenuItem, danger", for: "destroys something: in `error`", sample: () => alone({ label: "Quit", icon: "logout", danger: true }) },
   ],
-  sizes: doesntApply("an item is always a small control tall; a menu is as tall as its items, up to its room, and as wide as its popover."),
+  sizes: doesntApply("an item is a small control tall; a menu as tall as its items, as wide as its popover."),
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],
     absent: {
-      selected: "a checked choice is its check, in the rows here; the item the keyboard is on is lit.",
-      loading: "a menu shows what it holds at once; a list still on its way isn't a menu yet.",
-      empty: "a menu with nothing in it isn't shown: its owner leaves its control disabled.",
-      error: "an item can't be wrong; one that can't be taken now is disabled.",
+      selected: "a checked choice is its check",
+      loading: "a menu shows what it holds at once",
+      empty: "never shown empty: its owner disables its control",
+      error: "an item can't be wrong",
     },
     rows: nonEmpty(ITEMS.map(({ name, spec }) => ({ name, cell: (state: MatrixState) => cell(spec, state) }))),
-    described: {
-      rest: "No fill; its content `on_surface`, a danger item's `error`. By day the same roles in daylight colours.",
-      lit: "The keyboard on it, which the pointer moves: `secondary_container` behind it, its content `on_secondary_container`, its keycaps' keys and edges `primary`; a danger item's `error`, its content `on_error`, its keycaps unchanged. No line and no glow, by night or by day.",
-      pressed: "Lit and pressed: the container lifts to `secondary_container_pressed` (a danger item's to `error_pressed`), 0.035 lighter at night and 0.04 darker by day. Letting go takes it.",
-      disabled: "Dimmed: `on_surface` at `opacity.disabled_content`, a danger item's too, its keycaps at `opacity.disabled_content` with it, never lit, and passed over by the keys.",
+    looks: {
+      rest: "no fill, `on_surface`; a danger item's `error`",
+      lit: "`secondary_container`, keycaps `primary`; danger fills `error`; no line or glow",
+      pressed: "lifts to `secondary_container_pressed`, or `error_pressed`",
+      disabled: "`on_surface` at `opacity.disabled_content`, passed over by the keys",
     },
   },
-  focus: doesntApply("a menu's items light on the secondary container, with no tube and no glow: the keyboard is in the menu, and its popover's edge is right there. The menu takes the keyboard as one stop; the item it is on is its lit state."),
+  focus: doesntApply("items light on the secondary container, with no tube or glow; the menu is one stop."),
   content: {
     text: [{ name: "An item's words", words: ACTION, sample: (words: string) => onPopover([{ label: words, icon: "folder_open", keys: "Enter" }, { label: "Copy path", icon: "content_paste", keys: "Ctrl+C" }]) }],
-    missingPicture: [{ name: "No symbol", for: "An item may have none: its words start `space.s8` in, `space.s12` from the popover's edge. A menu's items all have one or none.", sample: () => onPopover(choices(3), 3) }],
+    missingPicture: [{ name: "No symbol", for: "words start `space.s8` in; a menu's items all have one or none", sample: () => onPopover(choices(3), 3) }],
     counts: [
-      { name: "One", for: "A single action: still a menu, as a tray app with only Quit has.", sample: () => onPopover([{ label: "Quit", icon: "logout", danger: true }]) },
-      { name: "A few, in groups", for: "Groups apart by hairlines.", sample: () => onPopover(ACTIONS) },
-      { name: "Past eight", for: "A list of twelve held to eight: eight show and the rest scroll, the keyboard's item in view.", sample: long },
+      { name: "One", for: "still a menu: a tray app with only Quit", sample: () => onPopover([{ label: "Quit", icon: "logout", danger: true }]) },
+      { name: "A few, in groups", for: "groups apart by hairlines", sample: () => onPopover(ACTIONS) },
+      { name: "Past eight", for: "twelve held to eight: the rest scroll", sample: long },
     ],
   },
   motion: {
@@ -125,7 +114,7 @@ export default page({
     between: [
       {
         name: "The keyboard moves to an item",
-        what: "↓ or the pointer moves the keyboard to the next item: it lights up over `short` on `standard`, onto `secondary_container`, as the one it left goes back to rest over `short`. Never the flicker.",
+        what: "↓ or the pointer: it lights onto `secondary_container` over `short` on `standard` as the last goes back.",
         tracks: [
           { part: "the item left", on: "two items", target: ".k-menu-item:first-child", property: "--lit", from: 1, to: 0, duration: "short", curve: "standard" },
           { part: "the item reached", on: "two items", target: ".k-menu-item:last-child", property: "--lit", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -136,7 +125,7 @@ export default page({
       },
       {
         name: "Pressed",
-        what: "A lit item pressed: its container lifts over `micro`, and back as it comes up; letting go takes it.",
+        what: "Its container lifts over `micro`, and back as it comes up; letting go takes it.",
         tracks: [{ part: "pressed", on: "the lit item", target: ".k-menu-item", property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" }],
         reduced: "same",
         back: "plays",
@@ -147,35 +136,35 @@ export default page({
   },
   keyboard: {
     keys: [
-      { keys: ["↓", "j", "Ctrl+J", "Ctrl+N"], does: "The next item that can be taken, round from the last to the first." },
-      { keys: ["↑", "k", "Ctrl+K", "Ctrl+P"], does: "The item before that can be taken, round from the first to the last." },
-      { keys: ["Home", "End"], does: "The first or the last item that can be taken." },
-      { keys: ["Enter"], does: "Takes the item, once per press, never on key repeat; the menu closes." },
-      { keys: ["Esc"], does: "Leaves the menu, or steps back out of a submenu first; the keyboard goes back to what opened it." },
+      { keys: ["↓", "j", "Ctrl+J", "Ctrl+N"], does: "next item that can be taken, wrapping round" },
+      { keys: ["↑", "k", "Ctrl+K", "Ctrl+P"], does: "previous item that can be taken, wrapping round" },
+      { keys: ["Home", "End"], does: "first or last item that can be taken" },
+      { keys: ["Enter"], does: "takes it, never on key repeat; the menu closes" },
+      { keys: ["Esc"], does: "leaves, or steps out of a submenu first" },
     ],
-    order: "A menu is one stop: the keys move inside it. Disabled items and the hairlines are passed over.",
-    lands: "As it opens, on its checked choice, or on its first item that can be taken.",
+    order: "One stop: the keys move inside it, past disabled items and hairlines.",
+    lands: "On its checked choice, or its first item that can be taken.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "A tray menu", for: "Each item's height, padding, gaps, keys, and the hairlines between groups.", sample: () => onPopover(ACTIONS) },
-      { name: "A choice", for: "The check's room, kept when unchecked.", sample: () => alone({ label: "Italy", checked: false }, true) },
+      { name: "A tray menu", for: "item height, padding, gaps, keys, hairlines", sample: () => onPopover(ACTIONS) },
+      { name: "A choice", for: "the check's room, kept when unchecked", sample: () => alone({ label: "Italy", checked: false }, true) },
     ]),
     measures: [
-      { what: "An item's height.", token: "size-control_sm" },
-      { what: "Inside an item's sides, between its parts, and a hairline's inset.", token: "space-s8" },
-      { what: "The popover's padding round a menu, between keycaps, and above and below a hairline.", token: "space-s4" },
-      { what: "An item's symbol and its check.", token: "icon-s16" },
-      { what: "An item's words, `body`'s line.", token: "type-body-line" },
-      { what: "A keycap.", token: "size-keycap" },
-      { what: "The hairline between groups: one device pixel.", token: "stroke-hairline_device_px" },
-      { what: "The popover's corners.", token: "radius-control" },
-      { what: "An item's corners: the popover's less its padding.", token: "radius-row" },
-      { what: "A menu's width, a popover's.", token: "size-menu" },
+      { part: "Item height", token: "size-control_sm" },
+      { part: "Item sides, gaps, hairline inset", token: "space-s8" },
+      { part: "Popover padding, keycap gap", token: "space-s4" },
+      { part: "Symbol, check", token: "icon-s16" },
+      { part: "Item words' line", token: "type-body-line" },
+      { part: "Keycap", token: "size-keycap" },
+      { part: "Hairline", token: "stroke-hairline_device_px" },
+      { part: "Popover corners", token: "radius-control" },
+      { part: "Item corners", token: "radius-row" },
+      { part: "Menu width", token: "size-menu" },
     ],
     reflow: {
-      described: "A menu is as wide as its popover (\`size.menu\`, or its room's width) at every window size, and as tall as its items up to its room, then it scrolls. An item's words end in an ellipsis where they don't fit: here on a popover held to a third of the window.",
-      sample: () => within("33%", stack("s8", "start", filled(menu([{ label: shown(ACTION), icon: "folder_open", keys: "Enter" }], { current: -1 })), text("A popover a third of the window wide.", "small", "on_surface_variant"))),
+      note: "As wide as its popover, as tall as its items up to its room, then it scrolls; words end in an ellipsis.",
+      sample: () => within("33%", filled(menu([{ label: shown(ACTION), icon: "folder_open", keys: "Enter" }], { current: -1 }))),
     },
   },
 });

@@ -4,10 +4,8 @@
 import { button } from "../../lib/button.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { row, stack, within } from "../../lib/layout.ts";
-import { text } from "../../lib/text.ts";
 import { onSurface, type ToastOptions, toast, toastRoom } from "../../lib/toast.ts";
-import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
 const SAID: Words = { short: "Copied.", long: "Copied the path of the file you saved to Downloads this morning." };
 
@@ -49,7 +47,7 @@ function live(): HTMLElement {
     forgotten = false;
     say({ words: "Home 5G is back." });
   });
-  const inside = stack("s8", "start", actions, text("Press one; Ctrl+Z brings Home 5G back.", "small", "on_surface_variant"));
+  const inside = stack("s8", "start", actions);
   inside.classList.add("k-toast-inside");
   surface.append(inside, room);
   return surface;
@@ -59,7 +57,7 @@ const TOAST = "a toast";
 
 const ARRIVES: Move = {
   name: "Arriving",
-  what: "It fades in over `short` on `emphasized_decel` as it rises `space.s32` into its place, a whole device pixel at a time, so its edges stay sharp; its shadow fades in with it. A toast isn't a light: it never flickers. With reduced motion it fades in where it stays, with no rise.",
+  what: "It fades in over `short` on `emphasized_decel`, rising `space.s32` into place; no rise with reduced motion.",
   tracks: [
     { part: "its fade", on: TOAST, target: ".k-toast", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
     { part: "its rise", on: TOAST, target: ".k-toast", property: "--toast-rise", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
@@ -71,7 +69,7 @@ const ARRIVES: Move = {
 
 const LEAVES: Move = {
   name: "Leaving",
-  what: "After `duration.toast` (3.6 s, long enough to read its line twice; held while the pointer is on it, and counted again once it leaves), it fades out where it is over `medium` on `standard_accel`, its shadow with it, something small leaving for good. With reduced motion the fade is capped at `short`; the stay isn't, since the words must still be read.",
+  what: "After `duration.toast`, held under the pointer, it fades out where it is over `medium` on `standard_accel`.",
   tracks: [{ part: "its fade", on: TOAST, target: ".k-toast", property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_accel" }],
   reduced: [{ part: "its fade", on: TOAST, target: ".k-toast", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" }],
   back: "cuts",
@@ -80,7 +78,7 @@ const LEAVES: Move = {
 
 const REPLACED: Move = {
   name: "Another takes its place",
-  what: "One shows at a time. A new one while one shows: the one showing fades out over `micro` on `standard_accel` where it is, as the new one arrives, fading and rising over `short`. With reduced motion the new one fades in with no rise.",
+  what: "One at a time: the one showing fades over `micro` as the new one arrives over `short`.",
   tracks: [
     { part: "the one showing", on: "two toasts", target: ".k-toast:first-child", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard_accel" },
     { part: "the new one's fade", on: "two toasts", target: ".k-toast:last-child", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
@@ -94,55 +92,47 @@ const REPLACED: Move = {
   sample: () => over(COPIED, FORGOT),
 };
 
-const DESCRIBED =
-  "One `body` line saying what just happened, in `surface` on `on_surface`, the inverse colours, so it reads over anything; an optional symbol (`body`'s 20) `space.s12` before the words; `space.s12` inside; the control radius (`radius.control`, 12), a small floating thing's, as a popover's. It floats over its window or panel, so it is raised to the ladder's step 2 with the popover and the menu (`[elevation]`, `docs/DESIGN.md`, \"Elevation\"): step 2's contact and ambient shadow, and the rim in `surface`, the colour of its words, since a rim of `on_surface` would be its own fill. It is as wide as what it says, rounded up to a device pixel, up to its room less `space.s24` at either side; past that its words wrap and its corners stay the same.";
-
 export default page({
   level: "molecules",
   slug: "toast",
   title: "Toast",
-  summary: "One line saying what just happened, at the bottom of the surface it happened in: it rises in, stays, and goes by itself.",
-  live,
-  description: [
-    "Rust `toast::toast` and `toast::toast_at`, QML `Toast`. Press an action: its toast rises in at the bottom, stays, and fades; press the other while it shows and the new one takes its place. After Forget, Ctrl+Z with the keyboard in the window brings Home 5G back.",
-    DESCRIBED,
-    "It confirms something just done that left no other trace on screen (`docs/DESIGN.md`, \"Notify or show inline\"): Copied, Forgot. It shows at the bottom of the surface it happened in (Kōbō's window, the Command menu's list), centred across it on a whole device pixel, `space.s24` above the edge, over what is there, moving nothing. It never asks for anything and never takes the keyboard. Where what it says can be undone, the surface's own key for it shows as key hints `space.s16` after the words, in `surface`: the keys as keycaps, Undo in `caption`; the toast itself takes no key.",
-    "It arrives over `short`, fading in as it rises `space.s32` into place (`emphasized_decel`), stays `duration.toast` (3.6 s), and leaves over `medium`, fading where it is (`standard_accel`). While the pointer is on it, it stays, and counts its stay again once the pointer leaves. One shows at a time: a new one takes the place of the one showing, which fades out over `micro`.",
-  ],
+  lede: "One line saying what just happened, at the bottom of the surface it happened in: it rises in and goes by itself.",
+  code: { rust: "toast::toast, toast::toast_at", qml: "Toast", unbuilt: "rise, held stay: not built yet" },
+  stage: { live, hint: "press an action; Ctrl+Z after Forget", daylight: true },
   variants: [
-    { name: "Words", for: "What just happened, alone.", sample: () => over(PLAIN) },
-    { name: "With a symbol", for: "Where a symbol says it faster: a tick on Copied.", sample: () => over(COPIED) },
-    { name: "With the keys that undo it", for: "What it says can be undone: the surface's key for it, as key hints after the words.", sample: () => over(FORGOT) },
+    { name: "Words", for: "what just happened, alone", sample: () => over(PLAIN) },
+    { name: "With a symbol", for: "a symbol says it faster: Copied", sample: () => over(COPIED) },
+    { name: "With the keys that undo it", for: "it can be undone: the surface's key as hints", sample: () => over(FORGOT) },
   ],
-  sizes: doesntApply("a toast has one size: its words' line and its padding; it is as wide as what it says, up to its room."),
+  sizes: doesntApply("one size: its line and padding, as wide as what it says."),
   states: {
     shown: ["rest"],
     absent: {
-      lit: "it takes no focus, and the pointer on it only holds it, with no change of look.",
-      pressed: "a press on it does nothing: it goes by itself.",
-      disabled: "a toast is there or not.",
-      selected: "it holds no choice.",
-      loading: "it says what is done; work still going on is a progress bar or a spinner where it happens.",
-      empty: "a toast with nothing to say isn't shown.",
-      error: "a toast confirms: what went wrong shows inline where it happened, or in a notification when you are elsewhere.",
+      lit: "the pointer only holds it",
+      pressed: "a press does nothing",
+      disabled: "there or not",
+      selected: "it holds no choice",
+      loading: "work going on is a bar or spinner",
+      empty: "with nothing to say it isn't shown",
+      error: "it confirms: errors show inline or in a notification",
     },
     rows: [
       { name: "Words", cell: () => over(PLAIN) },
       { name: "With a symbol", cell: () => over(COPIED) },
       { name: "With keys", cell: () => over(FORGOT) },
     ],
-    described: {
-      rest: "Showing, raised to step 2: `on_surface` behind its words, symbol and key hints' words in `surface`, the keycaps their own colours, the rim in `surface` and step 2's shadow under it. By day the same roles in daylight colours: a dark box on a light surface, where at night it is a light one on a dark surface.",
+    looks: {
+      rest: "inverse: `surface` on `on_surface`, step 2's shadow and rim",
     },
   },
-  focus: doesntApply("a toast never takes the keyboard and isn't neon: it has no line and no glow."),
+  focus: doesntApply("a toast never takes the keyboard and isn't neon: no line, no glow."),
   content: {
     text: [{ name: "What it says", words: SAID, sample: (words: string) => over({ words }) }],
-    missingPicture: doesntApply("its symbol is optional and one of KubaOS Symbols; a toast without one is its words alone."),
+    missingPicture: doesntApply("its symbol is optional; without one it is its words alone."),
     counts: [
-      { name: "None", for: "Nothing just happened: no toast, nothing kept for it.", sample: () => onSurface(WIDE, SHORT) },
-      { name: "One", for: "What just happened.", sample: () => over(COPIED) },
-      { name: "Another while one shows", for: "The new one takes the place of the one showing, which fades out over `micro`: only the last thing done is said.", sample: () => over(FORGOT) },
+      { name: "None", for: "no toast, nothing kept for it", sample: () => onSurface(WIDE, SHORT) },
+      { name: "One", for: "what just happened", sample: () => over(COPIED) },
+      { name: "Another while one shows", for: "only the last thing done is said", sample: () => over(FORGOT) },
     ],
   },
   motion: {
@@ -151,32 +141,32 @@ export default page({
     between: [REPLACED],
   },
   keyboard: {
-    keys: [{ keys: ["Ctrl+Z"], does: "Its surface's own key, shown on a toast whose words can be undone: it undoes them, and its own toast says so, taking this one's place." }],
-    order: "No stop: a toast never takes the keyboard, which stays where it was.",
-    lands: "Nowhere: the keyboard stays on what was done, so the next key goes on from there.",
+    keys: [{ keys: ["Ctrl+Z"], does: "its surface's key: undoes it, and says so in a toast" }],
+    order: "No stop: a toast never takes the keyboard.",
+    lands: "Nowhere: the keyboard stays on what was done.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "With a symbol", for: "Its padding, the symbol and its gap, and its place in the surface.", sample: () => over(COPIED) },
-      { name: "With keys", for: "The key hints after the words.", sample: () => over(FORGOT) },
+      { name: "With a symbol", for: "padding, symbol and gap, its place", sample: () => over(COPIED) },
+      { name: "With keys", for: "the key hints after the words", sample: () => over(FORGOT) },
     ]),
     measures: [
-      { what: "Between the words and the key hints.", token: "space-s16" },
-      { what: "Inside it all round, and between the symbol and the words.", token: "space-s12" },
-      { what: "Its words, `body`'s line.", token: "type-body-line" },
-      { what: "The symbol, `body`'s.", token: "type-body-icon" },
-      { what: "A keycap.", token: "size-keycap" },
-      { what: "Its corners.", token: "radius-control" },
-      { what: "Its rim, inside its edge.", token: "stroke-hairline_device_px" },
-      { what: "Its shadow's contact layer: its blur.", token: "elevation-2-contact-blur" },
-      { what: "Its shadow's ambient layer: its drop.", token: "elevation-2-ambient-y" },
-      { what: "Its shadow's ambient layer: its blur.", token: "elevation-2-ambient-blur" },
-      { what: "Above the surface's bottom edge, and the least room at either side.", token: "space-s24" },
-      { what: "How far under its place it starts as it arrives.", token: "space-s32" },
+      { part: "Words → key hints", token: "space-s16" },
+      { part: "Padding, symbol → words", token: "space-s12" },
+      { part: "Words' line", token: "type-body-line" },
+      { part: "Symbol", token: "type-body-icon" },
+      { part: "Keycap", token: "size-keycap" },
+      { part: "Corners", token: "radius-control" },
+      { part: "Rim", token: "stroke-hairline_device_px" },
+      { part: "Shadow contact blur", token: "elevation-2-contact-blur" },
+      { part: "Shadow ambient drop", token: "elevation-2-ambient-y" },
+      { part: "Shadow ambient blur", token: "elevation-2-ambient-blur" },
+      { part: "Above the edge, side room", token: "space-s24" },
+      { part: "Rise as it arrives", token: "space-s32" },
     ],
     reflow: {
-      described: "A toast is as wide as what it says, up to its surface less `space.s24` at either side, and centred across it at every window size; past that its words wrap onto more lines, its corners the same.",
-      sample: () => within("100%", stack("s8", "start", onSurface("100%", SHORT, toast({ words: shown(SAID), icon: "check" })), text("A toast in a window as wide as this one.", "small", "on_surface_variant"))),
+      note: "As wide as what it says, up to its surface less `space.s24` a side, centred; past that its words wrap.",
+      sample: () => within("100%", onSurface("100%", SHORT, toast({ words: shown(SAID), icon: "check" }))),
     },
   },
 });
