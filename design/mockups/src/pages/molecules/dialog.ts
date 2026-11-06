@@ -118,7 +118,8 @@ function live(): HTMLElement {
   const behind = row("s8", "centre", ...buttons);
   behind.classList.add("k-dialog-behind");
   room.append(behind);
-  ask(buttons[0]!, QUESTION);
+  const first = ask(buttons[0]!, QUESTION);
+  for (const each of [first.element, first.element.previousElementSibling as HTMLElement]) each.dataset.atRest = "";
 
   function open(opener: HTMLElement, options: DialogOptions): void {
     const asked = ask(opener, options);

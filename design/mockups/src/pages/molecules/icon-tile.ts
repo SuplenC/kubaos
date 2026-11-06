@@ -8,7 +8,7 @@ import { iconTile, measure, TILE_MEASURES, TILE_SIZES, type TileOptions, type Ti
 import { filling, flow, row, stack, within } from "../../lib/layout.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
-import { el } from "../../site/dom.ts";
+import { el, label } from "../../site/dom.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { MODES, painted } from "../../site/parts/swatches.ts";
 import { settings } from "../../site/settings.ts";
@@ -50,10 +50,11 @@ function senders(): HTMLElement {
 
 /** What the measurement of `picture` found, as the measures table prints a value. */
 function found(picture: string): HTMLElement {
-  const line = el("code", "page-code");
+  const line = el("span", "");
   void measure(picture).then((drawing) => {
     const coverage = drawing ? String(Math.round(drawing.coverage * 100) / 100) : "";
-    line.textContent = drawing ? `${drawing.plate ? "plate" : "shape"}, coverage = ${coverage}` : "can't be read";
+    // A label's box is whole device pixels, where the sample in its card has to start and end.
+    line.replaceChildren(label(drawing ? `${drawing.plate ? "plate" : "shape"}, coverage = ${coverage}` : "can't be read", "mono", "on_surface"));
   });
   return line;
 }
