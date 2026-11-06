@@ -94,7 +94,10 @@ function capped(options: DialogOptions, down = 0): HTMLElement {
   return room;
 }
 
-/** A window with four things to ask about; each opens its dialog over the scrim. */
+/**
+ * A window with four things to ask about, each opening its dialog over the scrim. It opens on the
+ * first's, so the stage shows a dialog at once; the keyboard goes in only when the reader opens one.
+ */
 function live(): HTMLElement {
   const room = document.createElement("span");
   room.className = "k-dialog-room";
@@ -115,14 +118,26 @@ function live(): HTMLElement {
   const behind = row("s8", "centre", ...buttons);
   behind.classList.add("k-dialog-behind");
   room.append(behind);
+  ask(buttons[0]!, QUESTION);
 
   function open(opener: HTMLElement, options: DialogOptions): void {
+    const asked = ask(opener, options);
+    centreIn(room, asked.element);
+    asked.land();
+  }
+
+  /** `options`' dialog over the scrim, what it covers out of the keyboard's reach until it is answered. */
+  function ask(opener: HTMLElement, options: DialogOptions): ReturnType<typeof dialog> {
     const dim = scrim();
     const asked = dialog(options);
     room.append(dim, asked.element);
-    centreIn(room, asked.element);
-    asked.land();
+    behind.inert = true;
+    // The room has no size until it is on the page, and its size follows the stage's.
+    const centring = new ResizeObserver(() => centreIn(room, asked.element));
+    centring.observe(room);
     asked.onAnswer = () => {
+      centring.disconnect();
+      behind.inert = false;
       for (const each of [dim, asked.element]) {
         each.dataset.leaving = "";
         each.addEventListener("transitionend", (event) => {
@@ -131,6 +146,7 @@ function live(): HTMLElement {
       }
       opener.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
     };
+    return asked;
   }
 
   return room;
@@ -178,7 +194,7 @@ export default page({
   code: { rust: "dialog::dialog, dialog::prompt, dialog::scrim", qml: "Dialog, Scrim" },
   stage: {
     live,
-    hint: "press a button; Tab goes round, Esc closes",
+    hint: "answer it, then press a button; Tab goes round, Esc closes",
     daylight: true,
   },
   variants: [
