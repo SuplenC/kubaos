@@ -28,6 +28,7 @@ use kotodama_protocol::ItemRef;
 use kotodama_protocol::Table;
 use kubaos_power::live::Now;
 use kubaos_power::machine::Machine;
+use kubaos_power::report::Drain;
 use kubaos_power::settings::Settings as PowerSettings;
 
 use crate::bus::Bus;
@@ -184,9 +185,14 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .filter(|item| !self.registry.hides(&item.id));
         let idle = idle::items().into_iter().filter(|item| !self.registry.hides(&item.id));
         let shell = shell::items().into_iter().filter(|item| !self.registry.hides(&item.id));
-        let power = [power::item(), power::scheduler_item(), proxy::item()]
-            .into_iter()
-            .filter(|item| !self.registry.hides(&item.id));
+        let power = [
+            power::item(),
+            power::scheduler_item(),
+            power::drain_item(),
+            proxy::item(),
+        ]
+        .into_iter()
+        .filter(|item| !self.registry.hides(&item.id));
         self.registry
             .items(&self.states)
             .filter_map(|item| self.pending.apply(item))
@@ -255,6 +261,15 @@ impl<B: Bus, R: Runner> Extension<B, R> {
                 Ok(Ran::Push(power::scheduler_view(&kubaos_power::live::scheduler(
                     &settings,
                     &Machine::real(),
+                ))))
+            }
+            power::DRAIN_KIND if action == power::SHOW && !self.registry.hides(&item.id) => {
+                Ok(Ran::Push(power::drain_view(&Drain::now(
+                    &Machine::real(),
+                    kubaos_power::live::stop().title(),
+                    kubaos_power::history::path().as_deref(),
+                    kubaos_power::history::now(),
+                    &mut std::thread::sleep,
                 ))))
             }
             proxy::KIND if action == proxy::SHOW && !self.registry.hides(&item.id) => {

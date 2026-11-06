@@ -6,6 +6,7 @@
 //! low_battery = 20              # the drop's level, in percent
 //! low_battery_stop = "power-saver"   # "super-saver", or "off" for no drop
 //! scheduler = "kernel"          # "lavd": scx_lavd through sched_ext, its mode the stop's
+//! battery_notes = true          # the toasts when a sleep or a night went wrong
 //!
 //! [usb]
 //! skip = ["046d:c547", "1050:*"]
@@ -130,6 +131,10 @@ impl CpuScheduler {
     }
 }
 
+/// The toasts about a sleep or a night gone wrong are on: they stay silent while all is well, and
+/// a drained battery is what they exist to explain.
+pub const DEFAULT_BATTERY_NOTES: bool = true;
+
 /// The kernel's own scheduler, until LAVD's numbers against it on the reference laptop (frame
 /// times under a full build, input latency, build time, battery draw) say otherwise.
 pub const DEFAULT_CPU_SCHEDULER: CpuScheduler = CpuScheduler::Kernel;
@@ -188,6 +193,8 @@ pub struct Settings {
     pub usb_skip: Vec<UsbId>,
     /// The CPU scheduler every stop runs, LAVD in the stop's mode or the kernel's own.
     pub scheduler: CpuScheduler,
+    /// The toasts when a sleep or a night went wrong; the history is written either way.
+    pub battery_notes: bool,
     stops: [StopSettings; 5],
 }
 
@@ -200,6 +207,7 @@ impl Default for Settings {
             low_battery_stop: Some(DEFAULT_LOW_BATTERY_STOP),
             usb_skip: Vec::new(),
             scheduler: DEFAULT_CPU_SCHEDULER,
+            battery_notes: DEFAULT_BATTERY_NOTES,
             stops: Stop::ALL.map(default_stop),
         }
     }
@@ -291,6 +299,7 @@ struct SettingsToml {
     low_battery: Option<i64>,
     low_battery_stop: Option<String>,
     scheduler: Option<String>,
+    battery_notes: Option<bool>,
     #[serde(default)]
     usb: UsbToml,
     #[serde(rename = "super-saver")]
@@ -364,6 +373,9 @@ impl Settings {
         let mut settings = Settings::default();
         if let Some(on) = read.panel_power_saving {
             settings.panel_power_saving = on;
+        }
+        if let Some(on) = read.battery_notes {
+            settings.battery_notes = on;
         }
         if let Some(limit) = read.charge_limit {
             settings.charge_limit = u8::try_from(limit)
@@ -467,6 +479,22 @@ pub fn path() -> Option<PathBuf> {
 /// As reading and writing the file.
 pub fn set_panel_power_saving(path: &Path, on: bool) -> Result<Settings, SettingsError> {
     edit(path, |doc| doc["panel_power_saving"] = value(on))
+}
+
+/// Turns the toasts about a sleep or a night gone wrong on or off. On is the default, written by
+/// removing the key, so a release from before them still reads the file.
+///
+/// # Errors
+///
+/// As reading and writing the file.
+pub fn set_battery_notes(path: &Path, on: bool) -> Result<Settings, SettingsError> {
+    edit(path, |doc| {
+        if on {
+            doc.remove("battery_notes");
+        } else {
+            doc["battery_notes"] = value(false);
+        }
+    })
 }
 
 /// Sets how far the battery charges.

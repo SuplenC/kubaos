@@ -120,6 +120,14 @@ pub fn read(settings: &Settings, problem: Option<&str>, machine: &Machine) -> No
     }
 }
 
+/// The stop now, without the rows: what the service published, which asks nobody, else
+/// power-profiles-daemon.
+pub fn stop() -> Stop {
+    let published = runtime::file().and_then(|file| Published::load(&file));
+    let profile = if published.is_some() { None } else { profile() };
+    stop_now(published.as_ref(), profile)
+}
+
 /// The stop the service published, else the one power-profiles-daemon's profile is named after.
 fn stop_now(published: Option<&Published>, profile: Option<Profile>) -> Stop {
     published

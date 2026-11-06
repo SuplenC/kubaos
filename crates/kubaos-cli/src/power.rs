@@ -2,6 +2,7 @@
 //! service (`home/power.nix`). The words after `power` go to it as they are typed:
 //!
 //!   kubaos power set STOP | undo | status | measure [--seconds N] | apply
+//!   kubaos power report [--days N] [--json] | battery-notes on|off
 //!   kubaos power panel-power-saving on|off | charge-limit 80|90|100
 //!   kubaos power low-battery power-saver|super-saver|off|PERCENT | panel STOP 60hz|vrr|native
 //!   kubaos power scheduler [on|off|status]

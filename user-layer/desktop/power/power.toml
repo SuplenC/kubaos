@@ -26,6 +26,11 @@
 # runs and why:
 # scheduler = "kernel"
 #
+# A toast when a sleep over 30 min stayed out of deep sleep, or the laptop stayed awake over an
+# hour with the lid closed, on battery, with a button to `kubaos power report`. Silent when all is
+# well. The history behind it is written either way:
+# battery_notes = true
+#
 # Input devices (keyboards, mice, security keys) and headsets are never autosuspended. Keep other
 # USB devices awake too, by vendor:product as `lsusb` shows them, or vendor:* for any of a
 # vendor's:

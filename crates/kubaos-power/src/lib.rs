@@ -15,7 +15,9 @@
 //!   the user's settings ([`settings`]), what the service remembers ([`memory`]) and tells the
 //!   shell ([`runtime`]), which stop to be on ([`control`]), what to write on this machine
 //!   ([`machine`], [`writes`], [`panel`]), the CPU scheduler ([`scheduler`]), `status` ([`status`],
-//!   read live by [`live`]) and `measure` ([`measure`]).
+//!   read live by [`live`]), `measure` ([`measure`]), and the battery's history: its file
+//!   ([`history`]), what is read for it ([`reading`]), when it is written and when a toast comes
+//!   ([`recorder`]), and the report and the menu's short answer on it ([`report`]).
 //!
 //! # Not here
 //!
@@ -28,12 +30,16 @@
 //!   `crates/kotodama-kubaos/src/power.rs` and `config/kotodama/kubaos.toml`.
 
 pub mod control;
+pub mod history;
 pub mod live;
 pub mod machine;
 pub mod measure;
 pub mod memory;
 pub mod panel;
 pub mod plan;
+pub mod reading;
+pub mod recorder;
+pub mod report;
 pub mod runtime;
 pub mod scheduler;
 pub mod settings;
