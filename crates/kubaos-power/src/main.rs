@@ -114,6 +114,7 @@ const UPOWER_SERVICE: &str = "org.freedesktop.UPower";
 const UPOWER_PATH: &str = "/org/freedesktop/UPower";
 const DISPLAY_DEVICE: &str = "/org/freedesktop/UPower/devices/DisplayDevice";
 const SYSTEMD: &str = "org.freedesktop.systemd1";
+const LOGIND: &str = "org.freedesktop.login1";
 
 #[expect(
     clippy::print_stdout,
@@ -496,6 +497,8 @@ enum Event {
     Percent(f64),
     /// The scheduler's unit changed state.
     Scheduler(UnitState),
+    /// logind's `PrepareForSleep`: `true` as the machine goes to sleep, `false` once it woke.
+    Sleep(bool),
     /// A line on the socket, and where its answer goes.
     Ask(String, Sender<String>),
     Undo,
@@ -513,6 +516,7 @@ fn serve() -> Result<(), String> {
     follow_bus(&bus, &events)?;
     follow_devices(events.clone());
     follow_scheduler(&bus, events.clone());
+    follow_sleep(&bus, events.clone());
     listen(&runtime, events.clone())?;
     let mut service = Service::new(bus, runtime, events);
     service.run(&received)
@@ -647,6 +651,36 @@ fn follow_scheduler(bus: &zbus::blocking::Connection, events: Sender<Event>) {
     });
 }
 
+/// Follows logind's `PrepareForSleep` on the system bus. systemd-sleep's hook
+/// (`system/files/power/kubaos-power-sleep`) puts sleep-safe values in place before a suspend, and
+/// the service puts the stop's back once the machine woke. Without logind the stop's values come
+/// back at the next device event or stop.
+fn follow_sleep(bus: &zbus::blocking::Connection, events: Sender<Event>) {
+    let bus = bus.clone();
+    thread::spawn(move || {
+        let follow = || -> zbus::Result<()> {
+            let manager = zbus::blocking::Proxy::new(
+                &bus,
+                LOGIND,
+                "/org/freedesktop/login1",
+                "org.freedesktop.login1.Manager",
+            )?;
+            for signal in manager.receive_signal("PrepareForSleep")? {
+                if let Ok(start) = signal.body().deserialize::<bool>() {
+                    let _ = events.send(Event::Sleep(start));
+                }
+            }
+            Ok(())
+        };
+        if let Err(err) = follow() {
+            log::warn!(
+                "couldn't follow logind's sleep ({}); after a resume the stop comes back at the next device event",
+                chain(&err)
+            );
+        }
+    });
+}
+
 /// The scheduler's unit as systemd has it now, read through `properties`, its
 /// `org.freedesktop.DBus.Properties`; a property that doesn't read stays empty.
 fn unit_state(properties: &zbus::blocking::Proxy<'_>) -> UnitState {
@@ -723,6 +757,8 @@ struct Service {
     scheduler_unit: Option<UnitState>,
     /// LAVD was just turned on: the next stop's writes let a LAVD that kept crashing start again.
     retry_scheduler: bool,
+    /// A stop's writes came while the machine went to sleep and were held for its wake.
+    held_stop: bool,
 }
 
 impl Service {
@@ -750,16 +786,19 @@ impl Service {
             refused: writes::Refused::default(),
             scheduler_unit: None,
             retry_scheduler: false,
+            held_stop: false,
         }
     }
 
     fn run(&mut self, received: &mpsc::Receiver<Event>) -> Result<(), String> {
         loop {
             let now = Instant::now();
-            let wait = [self.settle.wait(now), self.recheck.wait(now)]
-                .into_iter()
-                .flatten()
-                .min()
+            // A power source on its way to counting brings its stop's writes, which cover the
+            // recheck: waiting for it keeps a resume on another source from writing the old stop.
+            let wait = self
+                .settle
+                .wait(now)
+                .or_else(|| self.recheck.wait(now))
                 .unwrap_or(Duration::from_hours(1));
             match received.recv_timeout(wait) {
                 Ok(Event::Lost(what)) => return Err(format!("lost {what} on the system bus")),
@@ -770,8 +809,10 @@ impl Service {
             if let Some(source) = self.settle.due(Instant::now()) {
                 self.input(Input::Source(source));
             }
-            if self.recheck.due(Instant::now()) {
-                self.write_plan(false);
+            let now = Instant::now();
+            if self.settle.wait(now).is_none() && self.recheck.due(now) {
+                let at_stop = std::mem::take(&mut self.held_stop);
+                self.write_plan(at_stop);
             }
         }
     }
@@ -809,6 +850,8 @@ impl Service {
             }
             Event::Percent(percent) => self.input(Input::Percent(percent)),
             Event::Scheduler(now) => self.scheduler_changed(now),
+            Event::Sleep(true) => self.recheck.sleep(),
+            Event::Sleep(false) => self.recheck.wake(Instant::now()),
             Event::Undo => self.input(Input::Undo),
             Event::Ask(line, reply) => {
                 let answer = self.ask(&line);
@@ -917,10 +960,17 @@ impl Service {
     /// The stop's writes that the machine lacks now: all of them at a stop (`at_stop`), the
     /// scheduler last, as restarting it takes longest; on a recheck, the ones a new device or
     /// power-profiles-daemon undid, never the scheduler.
+    ///
+    /// Between logind's sleep and wake it writes nothing, so nothing lands over the sleep hook's
+    /// values; a stop's writes wait for the check after the wake.
     fn write_plan(&mut self, at_stop: bool) {
         let Some(stop) = self.control.as_ref().map(Control::stop) else {
             return;
         };
+        if self.recheck.asleep() {
+            self.held_stop |= at_stop;
+            return;
+        }
         let plan = Plan::for_stop(stop, &self.settings);
         let mut writes = writes::for_plan(&plan, &self.settings, &self.machine, &live::wifi_power_save);
         if at_stop {

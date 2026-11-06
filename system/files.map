@@ -68,6 +68,7 @@ polkit/org.kubaos.power.policy                          install_power_helper
 polkit/50-kubaos-proxy.rules                            install_proxy_helper
 polkit/org.kubaos.proxy.policy                          install_proxy_helper
 
+power/kubaos-power-sleep                                install_power_helper
 power/kubaos-power-write                                install_power_helper
 proxy/kubaos-proxy-write                                install_proxy_helper
 sysctl.d/60-kubaos-arp.conf                             install_arp_per_interface
