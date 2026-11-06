@@ -8,8 +8,7 @@ import { menu } from "../../lib/menu.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
 const NOTE: Words = { short: "Saved.", long: "Saved to Downloads, next to the three other copies of the same file you saved this morning." };
 
@@ -47,7 +46,7 @@ function over(): HTMLElement {
 
 const OPENS: Move = {
   name: "Opens",
-  what: "Summoned to act and go, it arrives one step quicker than a panel: it fades in over `short` on `emphasized_decel`, where it will stay, with its shadow; it doesn't move or grow, and never flickers: a popover isn't a light. With reduced motion it is there at once.",
+  what: "It fades in where it stays over `short` on `emphasized_decel`, with its shadow, never flickering or moving.",
   tracks: [{ part: "popover", on: "a tray menu", target: ".k-popover", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
   reduced: [{ part: "popover", on: "a tray menu", target: ".k-popover", property: "opacity", from: 0, to: 1, duration: "instant", curve: "linear" }],
   back: "cuts",
@@ -56,59 +55,51 @@ const OPENS: Move = {
 
 const CLOSES: Move = {
   name: "Closes",
-  what: "An item taken, Esc or a press elsewhere: it fades out over `micro` on `emphasized_accel`, where it is, so what was taken runs at once. With reduced motion it is gone at once.",
+  what: "An item taken, Esc or a press elsewhere: it fades out over `micro` on `emphasized_accel`.",
   tracks: [{ part: "popover", on: "a tray menu", target: ".k-popover", property: "opacity", from: 1, to: 0, duration: "micro", curve: "emphasized_accel" }],
   reduced: [{ part: "popover", on: "a tray menu", target: ".k-popover", property: "opacity", from: 1, to: 0, duration: "instant", curve: "linear" }],
   back: "cuts",
   sample: card,
 };
 
-const DESCRIBED =
-  "`surface_container`, `surface_container_high` at night (a raised part takes the container role one above its day one), at the control radius (`radius.control`, 12), whatever it holds. Holding a menu it is `space.s4` inside, so the items take 12 − 4 = 8 and their curves run parallel to its own, and their words start `space.s12` from its edge; holding words of its own it is `space.s12` inside. A popover's menu and a select's open list measure the same: one build for every raised list. It is raised to the ladder's step 2 over the plane it is in: the contact layer, 4 blur, and the ambient layer, 8 down and 32 blur, both of `shadow`, stronger at night; and the rim, a hairline of `on_surface` inside its edge at `elevation.rim` (`light_rim` by day). It is `size.menu` (240) wide.";
-
 export default page({
   level: "molecules",
   slug: "popover",
   title: "Popover",
-  summary: "The floating surface a menu sits on: raised to step 2 over the window or the panel it is in.",
-  live: () => row("s32", "start", card(), words()),
-  description: [
-    "Rust `menu::popover`, QML `Popover`. It floats over the window or the panel at its anchor: under a tray icon; at the pointer for a menu it opens. `kubaos-ui` draws one where the app lays it out; in QML it floats over the window's content, so no panel that clips cuts it.",
-    DESCRIBED,
-    "It floats over everything in its plane, no part of the layout, so it moves nothing as it comes and goes; a press on it stays on it. It is held inside the window or the panel: one that would hang past an edge moves back until its edge is on it. A menu or a tooltip that reaches past its window's edge keeps its step's shadow.",
-    "It opens over `short` and closes over `micro`, a fade with no move, as a surface a key or a press summons to act and go: never the flicker, since it isn't a light.",
-  ],
+  lede: "The floating surface a menu sits on, raised to step 2 over the window or panel it is in.",
+  code: { rust: "menu::popover", qml: "Popover" },
+  stage: { live: () => row("s32", "start", card(), words()), hint: "point at its menu's items", daylight: true },
   variants: [
-    { name: "A menu's", for: "`size.menu` wide: a tray app's menu, a menu at the pointer.", sample: card },
-    { name: "Words", for: "Something to say that a tooltip is too small for and a dialog too much: a short note at its anchor.", sample: () => words() },
+    { name: "A menu's", for: "`size.menu` wide: a tray menu, a menu at the pointer", sample: card },
+    { name: "Words", for: "a short note at its anchor", sample: () => words() },
   ],
-  sizes: doesntApply("a popover is `size.menu` wide and as tall as what it holds."),
+  sizes: doesntApply("`size.menu` wide, as tall as what it holds."),
   states: {
     shown: ["rest"],
     absent: {
-      lit: "it takes no pointer of its own and no focus: what it holds lights.",
-      pressed: "a press on it stays on it and does nothing of its own.",
-      disabled: "a popover is open or not there.",
-      selected: "it holds no choice: its menu's items do.",
-      loading: "what it holds is known as it opens.",
-      empty: "a popover with nothing to hold isn't opened.",
-      error: "it has no value to be wrong.",
+      lit: "what it holds lights",
+      pressed: "a press on it does nothing",
+      disabled: "open or not there",
+      selected: "its menu's items hold the choice",
+      loading: "what it holds is known as it opens",
+      empty: "with nothing to hold it doesn't open",
+      error: "it has no value to be wrong",
     },
     rows: [
       { name: "A menu's", cell: card },
       { name: "Words", cell: () => words() },
     ],
-    described: {
-      rest: `Open. ${DESCRIBED} By day the same roles in daylight colours, with the day's lighter shadow and fainter rim.`,
+    looks: {
+      rest: "`surface_container`, `…_high` at night; step 2 shadow and rim",
     },
   },
-  focus: doesntApply("a popover isn't a control and isn't neon: it has no line and no glow. The keyboard goes into what it holds."),
+  focus: doesntApply("a popover isn't neon: no line, no glow; the keyboard goes into what it holds."),
   content: {
     text: [{ name: "Words it holds", words: NOTE, sample: (note: string) => words(note) }],
     missingPicture: doesntApply("a popover draws no picture of its own."),
     counts: [
-      { name: "One item", for: "A menu of one: still as wide as a menu.", sample: () => popover(2, menu([{ label: "Quit", icon: "logout", danger: true }], { current: -1 })) },
-      { name: "Many", for: "A tray menu.", sample: card },
+      { name: "One item", for: "a menu of one: still a menu's width", sample: () => popover(2, menu([{ label: "Quit", icon: "logout", danger: true }], { current: -1 })) },
+      { name: "Many", for: "a tray menu", sample: card },
     ],
   },
   motion: {
@@ -118,27 +109,27 @@ export default page({
   },
   keyboard: {
     keys: [
-      { keys: ["Esc"], does: "Closes it; the keyboard goes back to what opened it." },
-      { keys: ["Tab", "Shift+Tab"], does: "Inside what it holds: a popover is no stop of its own." },
+      { keys: ["Esc"], does: "closes it; the keyboard goes back to its opener" },
+      { keys: ["Tab", "Shift+Tab"], does: "inside what it holds" },
     ],
-    order: "No stop of its own: the keyboard goes into what it holds as it opens.",
+    order: "No stop of its own: the keyboard goes into what it holds.",
     lands: "On what it holds: a menu's picked or first item.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "A menu's", for: "Its width, padding round a menu, corners and shadow.", sample: card },
-      { name: "Words", for: "Its padding round words of its own.", sample: () => words() },
+      { name: "A menu's", for: "width, padding round a menu, corners, shadow", sample: card },
+      { name: "Words", for: "padding round words", sample: () => words() },
     ]),
     measures: [
-      { what: "Its width, a menu's.", token: "size-menu" },
-      { what: "Its padding round a menu.", token: "space-s4" },
-      { what: "Its padding round words of its own.", token: "space-s12" },
-      { what: "Its corners.", token: "radius-control" },
-      { what: "The rim inside its edge: one device pixel.", token: "stroke-hairline_device_px" },
-      { what: "Its shadow's contact layer: its blur.", token: "elevation-2-contact-blur" },
-      { what: "Its shadow's ambient layer: its drop.", token: "elevation-2-ambient-y" },
-      { what: "Its shadow's ambient layer: its blur.", token: "elevation-2-ambient-blur" },
+      { part: "Width", token: "size-menu" },
+      { part: "Padding round a menu", token: "space-s4" },
+      { part: "Padding round words", token: "space-s12" },
+      { part: "Corners", token: "radius-control" },
+      { part: "Rim", token: "stroke-hairline_device_px" },
+      { part: "Shadow contact blur", token: "elevation-2-contact-blur" },
+      { part: "Shadow ambient drop", token: "elevation-2-ambient-y" },
+      { part: "Shadow ambient blur", token: "elevation-2-ambient-blur" },
     ],
-    reflow: doesntApply("a popover is its width at every window size; near the window's edge it moves back to stay inside."),
+    reflow: doesntApply("its width at every window size; near an edge it moves back inside."),
   },
 });
