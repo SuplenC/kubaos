@@ -10,6 +10,7 @@
 //! kubaos-power panel-power-saving on|off  AMD's panel power saving in the saver stops
 //! kubaos-power charge-limit 80|90|100     how far the battery charges
 //! kubaos-power low-battery power-saver|super-saver|off|PERCENT
+//! kubaos-power critical-warning PERCENT|off
 //! kubaos-power panel STOP 60hz|vrr|native what the laptop panel does in a stop
 //! kubaos-power apply                      put a hand edit of power.toml to work
 //! kubaos-power scheduler [on|off]         which CPU scheduler runs and why; LAVD on or off
@@ -80,6 +81,7 @@ use kubaos_power::status;
 use kubaos_power::stop::Profile;
 use kubaos_power::stop::Source;
 use kubaos_power::stop::Stop;
+use kubaos_power::warning;
 use kubaos_power::writes;
 
 const USAGE: &str = "\
@@ -89,6 +91,7 @@ usage: kubaos power set super-saver|power-saver|balanced|performance|max-perform
        kubaos power panel-power-saving on|off
        kubaos power charge-limit 80|90|100
        kubaos power low-battery power-saver|super-saver|off|PERCENT
+       kubaos power critical-warning PERCENT|off
        kubaos power panel STOP 60hz|vrr|native
        kubaos power scheduler [on|off]
 
@@ -99,6 +102,7 @@ measure   the battery's average draw and what woke the machine most, as a report
 panel-power-saving  AMD's panel power saving in the saver stops; off for colour-accurate work
 charge-limit        how far the battery charges, in percent
 low-battery         where the stop drops at the low-battery level, or that level in percent
+critical-warning    the battery level of the toast and sound before the power-off at 2 %, or off
 panel     the laptop panel in a stop: 60 Hz, the native rate with VRR, or native
 apply     put a hand edit of the settings file to work
 scheduler which CPU scheduler runs and why; on runs LAVD (sched_ext) in each stop's mode, off
@@ -158,6 +162,7 @@ fn main() -> ExitCode {
         )),
         ["charge-limit", percent] => report_said(charge_limit(percent)),
         ["low-battery", what] => report_said(low_battery(what)),
+        ["critical-warning", what] => report_said(critical_warning(what)),
         ["panel", stop, mode] => report_said(set_panel(stop, mode)),
         ["apply"] => report_said(apply_file()),
         ["scheduler"] | ["scheduler", "status"] => {
@@ -369,6 +374,23 @@ fn low_battery(what: &str) -> Result<String, String> {
                 settings.low_battery
             ),
             None => "The low-battery drop is off: the stop stays where you put it.".to_owned(),
+        },
+    )
+}
+
+fn critical_warning(what: &str) -> Result<String, String> {
+    let warning = settings::parse_critical_warning(what).map_err(|err| chain(&err))?;
+    change(
+        |path| settings::set_critical_warning(path, warning),
+        |_| match warning {
+            Some(percent) => format!(
+                "At {percent} % on battery, a toast and a sound warn that the laptop powers off at {} %.",
+                settings::UPOWER_ACTION_PERCENT
+            ),
+            None => format!(
+                "The critical-battery warning is off: the laptop still powers off at {} %, unannounced.",
+                settings::UPOWER_ACTION_PERCENT
+            ),
         },
     )
 }
@@ -793,6 +815,7 @@ impl Service {
                 let memory = memory::path().map(|path| Memory::load(&path)).unwrap_or_default();
                 let source = Source::from_on_battery(on_battery);
                 let (mut control, effects) = Control::start(memory, source, profile, drop_of(&self.settings));
+                control.set_warning(self.settings.critical_warning);
                 let mut more = Vec::new();
                 if let Some(percent) = percent {
                     more = control.handle(Input::Percent(percent));
@@ -860,6 +883,7 @@ impl Service {
                 self.retry_scheduler = *line == "retry-scheduler";
                 if let Some(control) = &mut self.control {
                     control.set_drop(drop_of(&self.settings));
+                    control.set_warning(self.settings.critical_warning);
                     let stop = control.stop();
                     self.act(vec![Effect::Apply(stop)]);
                 }
@@ -1021,6 +1045,7 @@ impl Service {
                 let body = format!("{stop}, as you left it {}.", source.words());
                 thread::spawn(move || notify(title, &body, "low", None));
             }
+            Toast::Critical { percent } => warning::ring(percent),
             Toast::Dropped { to, from, percent } => {
                 let events = self.events.clone();
                 thread::spawn(move || {

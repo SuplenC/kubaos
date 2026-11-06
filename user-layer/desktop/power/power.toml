@@ -1,6 +1,6 @@
 # Your power settings: ~/.config/kubaos/desktop/power/power.toml. The power slider's five
-# stops (Super Saver, Power Saver, Balanced, Performance, Max Performance), the charge limit and
-# the low-battery drop. The Command menu's power Items write the lines below, comments kept, and
+# stops (Super Saver, Power Saver, Balanced, Performance, Max Performance), the charge limit, the
+# low-battery drop and the critical-battery warning. The Command menu's power Items write the lines below, comments kept, and
 # apply at once. After a hand edit, run `kubaos power apply`. `kubaos power status` shows what the
 # stop you're on does, row by row.
 #
@@ -18,6 +18,10 @@
 # drops further, "off" leaves the stop where you put it:
 # low_battery = 20
 # low_battery_stop = "power-saver"
+#
+# At this battery level, on battery, a critical toast and a sound warn that the laptop powers off
+# at 2 %, once each time it runs down, locked or not. From 3 to 20, or "off":
+# critical_warning = 5
 #
 # The CPU scheduler: "kernel" (Linux's own, EEVDF) or "lavd" (scx_lavd through sched_ext, which
 # puts input, the compositor and audio first, in a mode that follows the stop: powersave on the

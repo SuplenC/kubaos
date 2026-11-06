@@ -15,7 +15,8 @@
 //!   the user's settings ([`settings`]), what the service remembers ([`memory`]) and tells the
 //!   shell ([`runtime`]), which stop to be on ([`control`]), what to write on this machine
 //!   ([`machine`], [`writes`], [`panel`]), the CPU scheduler ([`scheduler`]), the file indexer's
-//!   pause ([`indexer`]), `status` ([`status`], read live by [`live`]) and `measure` ([`measure`]).
+//!   pause ([`indexer`]), the critical-battery warning ([`warning`]), `status` ([`status`], read
+//!   live by [`live`]) and `measure` ([`measure`]).
 //!
 //! # Not here
 //!
@@ -39,6 +40,7 @@ pub mod scheduler;
 pub mod settings;
 pub mod status;
 pub mod stop;
+pub mod warning;
 pub mod writes;
 
 #[cfg(test)]
