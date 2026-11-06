@@ -148,7 +148,7 @@ export default page({
   code: { unbuilt: "Rust template::sidebar_page: not built yet" },
   stage: {
     live,
-    hint: "type a setting, then Enter; click a section; Ctrl+F finds",
+    hint: "type a setting, then Enter; click a section; / finds",
     daylight: true,
   },
   variants: [

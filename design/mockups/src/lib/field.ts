@@ -349,11 +349,12 @@ export function field(options: FieldOptions = {}): HTMLElement {
     element.addEventListener("keydown", edit);
     element.addEventListener("mousedown", (event) => {
       // The pointer in logical pixels from the text's start: the page is zoomed, so its client
-      // pixels are the room's drawn width over its laid-out one, and a logical pixel is a scale.
+      // pixels are the room's drawn width over its laid-out one, and a logical pixel is the scale the
+      // field is drawn at, which the site's top bar holds at 1 whatever the page's is.
       const box = room.getBoundingClientRect();
       const start = room.querySelector(".k-field-line")?.getBoundingClientRect().left ?? box.left;
       const ratio = box.width / room.offsetWidth || 1;
-      const at = (x: number) => nearest(shownText(), (x - start) / ratio / settings().scale);
+      const at = (x: number) => nearest(shownText(), (x - start) / ratio / scaleOf(element));
       const pos = at(event.clientX);
       element.focus({ preventScroll: true });
       event.preventDefault();
