@@ -23,7 +23,7 @@ listener {
 listener {
     timeout = 600
     on-timeout = hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })'
-    on-resume = hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })'
+    on-resume = hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })'; dot-hypr-lid sync
 }
 
 listener {

@@ -2,8 +2,8 @@
 # Long-running helper started from config/hypr/autostart.lua.
 #
 # Listens on Hyprland's event socket and runs `dot-hypr-lid sync` at login and
-# on every monitor added or removed, so the laptop panel comes back on when
-# the last external disappears with the lid closed. Putting each screen's
+# on every monitor added or removed, so the laptop panel stays right when a
+# monitor comes or goes with the lid closed. Putting each screen's
 # workspaces back on it is config/hypr/workspaces.lua's job, on the same
 # events.
 #
