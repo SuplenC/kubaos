@@ -41,19 +41,27 @@ function line(style: TypeStyle, words = WORDS[style]): HTMLElement {
   return el("div", "f-line", row("s8", "start", iconBeside(style), text(words, style, "on_surface")));
 }
 
-/** Every style: its measures by token, its family and weight, its icon, real words, and its use. */
+/**
+ * Every style: its measures by token, its family and weight, its icon, real words, and its use. The
+ * rest clock's digits are wider than the words' column can be beside the others, so they take a row
+ * of their own across the table, under the clock's.
+ */
 function everyStyle(): HTMLElement {
-  return across(table(
+  const drawn = across(table(
     ["Style", "Size / line", "Weight, family", "Icon", "Its words, its line box", "For"],
     styles().map((style) => [
       token(style),
       label(`${px(`type-${style}-size`)} / ${px(`type-${style}-line`)}`, "mono", "on_surface"),
       label(`${WEIGHTS[raw(`type-${style}-weight`)] ?? raw(`type-${style}-weight`)}, ${familyOf(style)}${raw(`type-${style}-features`) === "normal" ? "" : ", tabular"}`, "body", "on_surface"),
       label(px(`type-${style}-icon`), "mono", "on_surface"),
-      line(style),
+      style === "clock_rest" ? "" : line(style),
       prose(words(`type-${style}-use`)),
     ]),
   ));
+  const digits = el("td", "", line("clock_rest"));
+  digits.colSpan = 6;
+  drawn.querySelector("tbody > tr")?.after(el("tr", "", digits));
+  return drawn;
 }
 
 /** Each family, with every weight a style draws it in, each in the words of a style that does. */

@@ -6,7 +6,8 @@ import { button } from "../../lib/button.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { icon } from "../../lib/icon.ts";
 import { row, stack, within } from "../../lib/layout.ts";
-import { clamped, marked, STYLE_WORDS, styles, text, type TypeStyle, wrapped } from "../../lib/text.ts";
+import { clamped, marked, STYLE_WORDS, styles, text, wrapped } from "../../lib/text.ts";
+import { words } from "../../lib/tokens.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
@@ -52,38 +53,6 @@ function dimmed(words: HTMLElement, disabled: boolean): HTMLElement {
   return words;
 }
 
-/** Every style but the rest clock, whose digits are far wider than a card: Foundations, Type has it. */
-type Sized = Exclude<TypeStyle, "clock_rest">;
-const SIZED = styles().filter((style): style is Sized => style !== "clock_rest");
-
-/** What each style is for, in a few words: Foundations, Type has it in full. */
-const USE: Record<Sized, string> = {
-  clock: "the clock of the lock surface as built",
-  clock_place: "the lock kicker: where and which day",
-  clock_date: "the lock kicker: the date",
-  hero: "Kōbō's welcome and done lines",
-  hero_number: "big figures: install percent, the clock popup's time",
-  display: "a full-screen moment's heading",
-  title: "a screen's or page's title",
-  headline: "a big number",
-  heading: "a section's title, a dialog's title",
-  subheading: "a card's or an error's first line",
-  body_large: "a lede, the text in a field",
-  body: "running text, explanations, toasts",
-  body_strong: "a list row's title, a value by its label",
-  button_large: "a large button's label",
-  button: "a regular button's label",
-  button_small: "a small button's label",
-  label: "a field's label, a chip, a quiet button",
-  label_number: "a number changing in place",
-  small: "a note under a field, a row's subtitle",
-  caption: "version lines, what a key hint's key does",
-  accent: "the Japanese accent above a title",
-  mono: "logs, device paths, timings",
-  keycap: "the key on a keycap",
-  mono_large: "commands and keys as a line's subject",
-};
-
 export default page({
   level: "atoms",
   slug: "text",
@@ -110,9 +79,9 @@ export default page({
     { name: "Tabular figures", for: "`label_number`: each figure one width", sample: figures },
   ],
   sizes: nonEmpty(
-    SIZED.map((style) => ({
+    styles().map((style) => ({
       name: style,
-      for: USE[style],
+      for: words(`type-${style}-use`),
       sample: () => text(STYLE_WORDS[style], style),
     })),
   ),

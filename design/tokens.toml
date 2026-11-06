@@ -368,7 +368,7 @@ line = 88
 icon = 48
 weight = "light"
 family = "sans"
-use = "The clock of the shell's lock surface as it is built (`modules/lock/LockSurface.qml`), over its password field: a step above the hero, light like every big figure. The lock's mockup has no awake size of its own: its awake clock is the rest clock `scale.clock_awake` along its flight to the bar. The clock popup's time stays the hero's number style."
+use = "The shell's built lock clock, over its password field."
 
 # The lock at rest is the wallpaper and its clock alone, the clock as large as
 # a poster's: Geist Light's figures are 0.726 of the size tall, so 384 draws
@@ -380,7 +380,7 @@ line = 384
 icon = 48
 weight = "light"
 family = "sans"
-use = "The lock screen's clock at rest, with only the wallpaper round it: the city's cut-out may stand in front of its digits."
+use = "The lock screen's clock at rest, the wallpaper round it."
 
 # The kicker above the lock's clock, a step up from a page's accent so it holds its own over a
 # picture under digits 280 tall: one line in two families, where and which day in M PLUS 1, then
@@ -392,7 +392,7 @@ line = 24
 icon = 24
 weight = "medium"
 family = "jp"
-use = "Where and which day in Japanese, the first half of the kicker above the lock screen's clock."
+use = "The lock kicker's first half: where and which day."
 
 [type.clock_date]
 size = 20
@@ -400,7 +400,7 @@ line = 24
 icon = 24
 weight = "medium"
 family = "sans"
-use = "The date, the second half of the kicker above the lock screen's clock, after where and which day."
+use = "The lock kicker's second half: the date."
 
 [type.hero]
 size = 64
@@ -408,7 +408,7 @@ line = 72
 icon = 48
 weight = "semibold"
 family = "sans"
-use = "Words at the hero size: Kōbō's welcome line and its done screen's headline, and nothing else."
+use = "Kōbō's welcome line and done headline, nothing else."
 
 [type.hero_number]
 size = 64
@@ -416,7 +416,7 @@ line = 72
 icon = 48
 weight = "light"
 family = "sans"
-use = "Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent, the clock popup's time."
+use = "Big figures: Kōbō's install percent, the clock popup's time."
 
 [type.display]
 size = 48
@@ -424,7 +424,7 @@ line = 56
 icon = 48
 weight = "semibold"
 family = "sans"
-use = "The heading of a full-screen moment other than Kōbō's welcome and done screens."
+use = "A full-screen moment's heading, but Kōbō's welcome and done."
 
 [type.title]
 size = 32
@@ -488,7 +488,7 @@ line = 24
 icon = 20
 weight = "semibold"
 family = "sans"
-use = "A regular button's label, on a 24 px line so it centres in a 40 px control."
+use = "A regular button's label."
 
 [type.button_large]
 size = 16
@@ -547,7 +547,7 @@ line = 20
 icon = 16
 weight = "medium"
 family = "mono"
-use = "The key on a keycap, on the keycap's 20 px line so it centres in it."
+use = "The key on a keycap."
 
 [type.accent]
 size = 13
@@ -578,7 +578,7 @@ use = "Commands and keys shown as the subject of a line."
 # anything from `short` up into a `short` fade.
 [duration.instant]
 ms = 0
-use = "Changes that must not lag: the caret, text appearing as it is typed, reduce motion's moves."
+use = "What must not lag: the caret, typed text, reduced moves."
 
 [duration.micro]
 ms = 100
@@ -586,11 +586,11 @@ use = "A control pressed, a state layer, a colour change under the pointer."
 
 [duration.short]
 ms = 200
-use = "A control lighting up or going back to rest, a toggle's knob, a checkbox's mark, a toast fading in."
+use = "A control lighting or resting, a knob, a mark, a toast arriving."
 
 [duration.medium]
 ms = 300
-use = "A panel or popup leaving, a log opening, a list reordering, a toast fading out."
+use = "A panel leaving, a log opening, a list reordering, a toast going."
 
 [duration.long]
 ms = 500
@@ -616,15 +616,15 @@ use = "A whole scene changing once: the lock screen lifting, Kōbō's welcome se
 # are `medium`.
 [duration.recolour]
 ms = 700
-use = "Every colour role changing together in a theme change or the dark ⇄ light switch."
+use = "Every colour role changing: a theme change, dark ⇄ light."
 
 [duration.settle]
 ms = 400
-use = "The dark beat in the new colours after a theme change's colours change, before the lights strike."
+use = "The dark beat in the new colours, before the strike."
 
 [duration.strike]
 ms = 600
-use = "Every light striking on together at the end of a theme change or a switch to dark."
+use = "Every light striking on: a theme change, a switch to dark."
 
 # A twin panel taking the surface over (`docs/design/components/sheet.md`): the content leaving
 # goes over `micro`, the arriving one starts moving in half a `micro` later over `short`, and
@@ -632,22 +632,22 @@ use = "Every light striking on together at the end of a theme change or a switch
 # each other.
 [duration.swap_lag]
 ms = 50
-use = "How long after a twin panel's content starts leaving the arriving one starts moving in: half a micro."
+use = "A twin panel's arriving content waiting: half a `micro`."
 
 [duration.swap_fade]
 ms = 150
-use = "The arriving twin panel's content fading in, from when the leaving one is gone until it lands: short less swap_lag."
+use = "A twin panel's arriving content fading in: `short` less `swap_lag`."
 
 # The caret's glow while you type: it comes in at once on a key, holds while
 # keys follow, and fades out once they stop, so it shows that typing is going
 # on without pulsing under every key.
 [duration.caret_glow]
 ms = 80
-use = "The caret's glow coming in on a key: quick enough to keep up with typing."
+use = "The caret's glow coming in on a key."
 
 [duration.caret_hold]
 ms = 500
-use = "How long the caret's glow holds after the last key before it fades: a pause between words keeps it."
+use = "The caret's glow holding after the last key."
 
 [duration.caret_fade]
 ms = 800
@@ -655,25 +655,25 @@ use = "The caret's glow fading after typing stops, down to nothing."
 
 [duration.hum]
 ms = 1200
-use = "Half a skeleton's breath: its glass warming from rest to its peak, or cooling back."
+use = "Half a skeleton's breath: its glass warming or cooling."
 
 # How long a toast stays once it has arrived, before it leaves. Not a move: reduce motion doesn't
 # cap it, since the words must still be read.
 [duration.toast]
 ms = 3600
-use = "A toast staying once it has arrived: long enough to read its line twice."
+use = "A toast staying: long enough to read twice."
 
 # How long a held button is held before it acts, its timed bar filling meanwhile: long enough that
 # a press can't erase a disk by accident. Not a move: reduce motion doesn't cap it.
 [duration.hold]
 ms = 1100
-use = "A held button held until it acts: Kōbō's Install, the hold that erases a disk."
+use = "A held button until it acts: Install, erasing a disk."
 
 # How long the awake lock waits for a key, a press or a touch of the reader
 # before it goes back to rest. Not a move: reduce motion doesn't cap it.
 [duration.lock_idle]
 ms = 20000
-use = "The awake lock left alone until it goes back to rest: time to find a key or a finger, short enough that an empty field doesn't sit lit."
+use = "The awake lock left alone, until it goes back to rest."
 
 # Easing curves, as CSS cubic béziers (x1, y1, x2, y2).
 [easing.standard]
@@ -682,12 +682,12 @@ use = "Small state changes that stay on screen: toggles, colour, focus."
 
 [easing.standard_decel]
 curve = [0.0, 0.0, 0.0, 1.0]
-use = "Something already moving settling in: a list reordering, a slider settling on its step."
+use = "Already moving, settling: a list reordering, a slider's step."
 
 # Past its end and back: a small mark popping in.
 [easing.pop]
 curve = [0.2, 0.9, 0.3, 1.3]
-use = "A small mark popping in, a little past its size and back: a slider's anchor dot."
+use = "A small mark overshooting and back: a slider's anchor dot."
 
 # Past its end and back, softly: something gliding into place, over `long`.
 [easing.spring]
@@ -713,7 +713,7 @@ use = "Progress that tracks a real quantity, and spinners."
 # In, gently: slow to start, gathering speed to the end.
 [easing.gather]
 curve = [0.11, 0.0, 0.5, 0.0]
-use = "A colour change gathering speed: the theme change and the dark ⇄ light switch."
+use = "A colour change speeding up: a theme change, dark ⇄ light."
 
 # Opacities laid over a colour role.
 [opacity]
@@ -1288,7 +1288,7 @@ pairs = [
   { fg = "on_surface_variant", bg = "surface", need = "text", use = "Secondary text, a key hint's label" },
   { fg = "on_surface_variant", bg = "surface_container_low", need = "text", use = "A row's subtitle in a well" },
   { fg = "on_surface_variant", bg = "surface_container", need = "text", use = "Secondary text on a container" },
-  { fg = "on_surface_variant", bg = "surface_container_high", need = "text", use = "Secondary text on a dialog or a card on a panel" },
+  { fg = "on_surface_variant", bg = "surface_container_high", need = "text", use = "Secondary text on a dialog or panel card" },
   { fg = "on_surface_variant", bg = "surface_container_highest", need = "text", use = "A keycap's key" },
   { fg = "primary", bg = "surface_container_highest", need = "text", use = "A keycap's key on a lit menu item" },
   { fg = "primary", bg = "secondary_container", need = "graphic", use = "A keycap's edge on a lit menu item" },
@@ -1296,14 +1296,14 @@ pairs = [
   { fg = "on_surface_variant", bg = "surface_container_high", need = "text", opacity = "placeholder_text", use = "A field's placeholder in its resting fill" },
   { fg = "on_surface_variant", bg = "surface_container_highest", need = "text", opacity = "placeholder_text", use = "A field's placeholder while it is focused or hovered" },
   { fg = "primary", bg = "surface", need = "text", use = "Accent text: an accent line, a detail, a Text button" },
-  { fg = "primary", bg = "surface_container", need = "text", use = "A notification group's \"+N more\" under its fan, over the cards turned toward the surface" },
+  { fg = "primary", bg = "surface_container", need = "text", use = "A notification group's \"+N more\" over its fan's turned cards" },
   { fg = "primary", bg = "surface_container_low", need = "text", use = "Accent text in a well" },
   { fg = "on_primary", bg = "primary", need = "text", use = "A Filled button's label, today in the calendar" },
   { fg = "on_primary", bg = "primary", need = "text", opacity = "subdued_text", use = "Secondary text on a checked tile" },
   { fg = "on_primary_container", bg = "primary_container", need = "text", use = "Text on the primary container" },
   { fg = "on_secondary_container", bg = "secondary_container", need = "text", use = "A Tonal button, a selected row's title" },
   { fg = "on_secondary_container", bg = "secondary_container", need = "text", opacity = "subdued_text", use = "A selected row's subtitle" },
-  { fg = "on_error", bg = "error", need = "text", use = "A Danger button's label in iced and QML, which don't build the burning kinds yet" },
+  { fg = "on_error", bg = "error", need = "text", use = "A Danger button's label in iced and QML" },
   { fg = "on_primary_fill", bg = "primary_fill", need = "text", use = "A Filled button's label at rest" },
   { fg = "on_primary_fill_lit", bg = "primary_fill", need = "text", use = "A Filled button's label, lit" },
   { fg = "on_primary_fill_lit", bg = "primary_fill_pressed", need = "text", use = "A Filled button's label, pressed" },
@@ -1311,12 +1311,12 @@ pairs = [
   { fg = "on_secondary_container", bg = "secondary_container_pressed", need = "text", use = "A Tonal button's label, pressed" },
   { fg = "primary_rest", bg = "surface", need = "text", use = "A Text button's label at rest, on a page" },
   { fg = "primary_rest", bg = "surface_container_low", need = "text", use = "A Text button's label at rest, in a well" },
-  { fg = "primary_rest", bg = "surface_container", need = "text", use = "A Text button's label at rest, on a panel or a card in a window" },
-  { fg = "primary_rest", bg = "surface_container_high", need = "text", use = "A Text button's label at rest, in a dialog or a card on a panel" },
+  { fg = "primary_rest", bg = "surface_container", need = "text", use = "A Text button's label at rest, on a panel or window card" },
+  { fg = "primary_rest", bg = "surface_container_high", need = "text", use = "A Text button's label at rest, in a dialog or panel card" },
   { fg = "primary_lit", bg = "surface", need = "text", use = "A Text button's label lit or pressed, on a page" },
   { fg = "primary_lit", bg = "surface_container_low", need = "text", use = "A Text button's label lit or pressed, in a well" },
-  { fg = "primary_lit", bg = "surface_container", need = "text", use = "A Text button's label lit or pressed, on a panel or a card in a window" },
-  { fg = "primary_lit", bg = "surface_container_high", need = "text", use = "A Text button's label lit or pressed, in a dialog or a card on a panel" },
+  { fg = "primary_lit", bg = "surface_container", need = "text", use = "A Text button's label lit, pressed, on a panel or window card" },
+  { fg = "primary_lit", bg = "surface_container_high", need = "text", use = "A Text button's label lit, pressed, in a dialog or panel card" },
   { fg = "primary_lit", bg = "surface_container_highest", need = "text", use = "A picked tab's words on the tabs' well" },
   { fg = "on_burn_error", bg = "burn_error", need = "text", use = "A Danger button's label at rest" },
   { fg = "on_burn_error", bg = "burn_error_lit", need = "text", use = "A Danger button's label, lit" },
@@ -1345,11 +1345,11 @@ pairs = [
   { fg = "surface", bg = "on_surface", need = "text", use = "A toast, a hint's bubble: the inverse colours" },
   { fg = "on_surface", bg = "surface", need = "graphic", use = "An icon, the wordmark of the logo" },
   { fg = "on_surface_variant", bg = "surface", need = "graphic", use = "A muted icon" },
-  { fg = "primary", bg = "surface", need = "graphic", use = "The focus tube on a page, a switch that is on, the mark of the logo" },
+  { fg = "primary", bg = "surface", need = "graphic", use = "The focus tube on a page, an on switch, the logo's mark" },
   { fg = "primary", bg = "surface_container_low", need = "graphic", use = "The focus tube in a well" },
-  { fg = "primary", bg = "surface_container", need = "graphic", use = "The focus tube on a panel or a card in a window, an unread dot past its tile" },
-  { fg = "primary", bg = "surface_container_high", need = "graphic", use = "The focus tube in a dialog or a card on a panel, a field's tube on its fill" },
-  { fg = "primary", bg = "surface_container_highest", need = "graphic", use = "A slider's or progress bar's fill, a focused field's tube, an accent symbol or unread dot on a tile" },
+  { fg = "primary", bg = "surface_container", need = "graphic", use = "The focus tube on a panel or window card, an unread dot" },
+  { fg = "primary", bg = "surface_container_high", need = "graphic", use = "The focus tube in a dialog, panel card or field's fill" },
+  { fg = "primary", bg = "surface_container_highest", need = "graphic", use = "A slider or progress fill, a field's tube, a tile's accent mark" },
   { fg = "on_primary", bg = "primary", need = "graphic", opacity = "subdued", use = "A slider's step the fill has passed" },
   { fg = "on_secondary", bg = "secondary", need = "text", use = "A slider's label and icon on its softer fill (Auto)" },
   { fg = "on_secondary", bg = "secondary", need = "graphic", opacity = "subdued", use = "A slider's passed step on its softer fill (Auto)" },
@@ -1357,71 +1357,71 @@ pairs = [
   { fg = "secondary", bg = "surface_container_highest", need = "graphic", use = "A slider's softer fill (Auto) on its track" },
   { fg = "cold", bg = "surface", need = "graphic", use = "The cold focus tube on a page, the logo's dakuten" },
   { fg = "cold", bg = "surface_container_low", need = "graphic", use = "The cold focus tube in a well" },
-  { fg = "cold", bg = "surface_container", need = "graphic", use = "The cold focus tube on a panel or a card in a window" },
+  { fg = "cold", bg = "surface_container", need = "graphic", use = "The cold focus tube on a panel or window card" },
   { fg = "cold", bg = "secondary_container", need = "graphic", use = "The cold focus tube on a picked card's fill" },
   { fg = "error", bg = "surface_container_low", need = "graphic", use = "An invalid field's focus tube in a well" },
-  { fg = "error", bg = "surface_container", need = "graphic", use = "An invalid field's focus tube on a panel or a card in a window" },
-  { fg = "error", bg = "surface_container_high", need = "graphic", use = "An invalid field's focus tube in a dialog, and on its own fill" },
-  { fg = "outline", bg = "surface", need = "graphic", use = "A field's or a shut select's edge, a checkbox's or a switch's outline" },
+  { fg = "error", bg = "surface_container", need = "graphic", use = "An invalid field's focus tube on a panel or window card" },
+  { fg = "error", bg = "surface_container_high", need = "graphic", use = "An invalid field's focus tube in a dialog, and on its fill" },
+  { fg = "outline", bg = "surface", need = "graphic", use = "A field's or shut select's edge, a checkbox or switch outline" },
   { fg = "outline", bg = "surface_container_low", need = "graphic", use = "A field's or a shut select's edge in a well" },
-  { fg = "outline", bg = "surface_container", need = "graphic", use = "A field's or a shut select's edge on a panel or a card in a window" },
-  { fg = "outline", bg = "surface_container_high", need = "graphic", use = "A field's or a shut select's edge on its resting fill, in a dialog or a card on a panel" },
-  { fg = "outline", bg = "surface_container_highest", need = "graphic", use = "An outline on the highest container, a lit field's edge on its fill" },
+  { fg = "outline", bg = "surface_container", need = "graphic", use = "A field's or shut select's edge on a panel or window card" },
+  { fg = "outline", bg = "surface_container_high", need = "graphic", use = "A field's or shut select's edge on its fill, dialog or card" },
+  { fg = "outline", bg = "surface_container_highest", need = "graphic", use = "An outline on the highest container, a lit field's edge" },
   { fg = "on_surface", bg = "surface_container", need = "text", use = "A pill of the bar" },
-  { fg = "on_surface", bg = "surface_container_high", need = "text", use = "An Action's title in the Action panel, a chip, a done step's chip on a selected row" },
+  { fg = "on_surface", bg = "surface_container_high", need = "text", use = "An Action's title, a chip, a selected row's done chip" },
   { fg = "tertiary", bg = "surface", need = "text", use = "The clock's Copied line" },
   { fg = "on_surface", bg = "surface_container_lowest", need = "text", use = "The lock screen before its wallpaper loads" },
   { fg = "primary_container", bg = "surface_container_lowest", need = "large_text", use = "The 完了 hanko on Kōbō's done screen" },
   { fg = "on_surface_variant", bg = "surface_container_lowest", need = "text", use = "The boot screens' notes, key hints and messages" },
   { fg = "error", bg = "surface_container_lowest", need = "text", use = "A wrong disk passphrase" },
   { fg = "primary", bg = "surface_container_lowest", need = "graphic", use = "The disk passphrase field's focus ring and caret" },
-  { fg = "sharing", bg = "surface", need = "text", use = "Words about something shared off the machine, on a page" },
-  { fg = "sharing", bg = "surface_container_lowest", need = "text", use = "Words about something shared off the machine, on the lock screen" },
-  { fg = "sharing", bg = "surface_container_low", need = "text", use = "Words about something shared off the machine, on a well" },
-  { fg = "sharing", bg = "surface_container", need = "text", use = "Words about something shared off the machine, on a panel, a card in a window or a pill of the bar" },
-  { fg = "sharing", bg = "surface_container_high", need = "text", use = "Words about something shared off the machine, on a dialog or a card on a panel" },
-  { fg = "sharing", bg = "surface_container_highest", need = "text", use = "Words about something shared off the machine, on the highest container" },
+  { fg = "sharing", bg = "surface", need = "text", use = "Shared-off-the-machine words, on a page" },
+  { fg = "sharing", bg = "surface_container_lowest", need = "text", use = "Shared-off-the-machine words, on the lock screen" },
+  { fg = "sharing", bg = "surface_container_low", need = "text", use = "Shared-off-the-machine words, on a well" },
+  { fg = "sharing", bg = "surface_container", need = "text", use = "Shared-off-the-machine words, on a panel, window card or bar pill" },
+  { fg = "sharing", bg = "surface_container_high", need = "text", use = "Shared-off-the-machine words, on a dialog or panel card" },
+  { fg = "sharing", bg = "surface_container_highest", need = "text", use = "Shared-off-the-machine words, on the highest container" },
   { fg = "sharing", bg = "surface", need = "graphic", use = "The sharing tube and dot, on a page" },
   { fg = "sharing", bg = "surface_container_lowest", need = "graphic", use = "The sharing tube and dot, on the lock screen" },
   { fg = "sharing", bg = "surface_container_low", need = "graphic", use = "The sharing tube and dot, on a well" },
-  { fg = "sharing", bg = "surface_container", need = "graphic", use = "The sharing tube and dot, on a panel, a card in a window or a pill of the bar" },
-  { fg = "sharing", bg = "surface_container_high", need = "graphic", use = "The sharing tube and dot, on a dialog or a card on a panel" },
+  { fg = "sharing", bg = "surface_container", need = "graphic", use = "Sharing's tube and dot, on a panel, window card or bar pill" },
+  { fg = "sharing", bg = "surface_container_high", need = "graphic", use = "The sharing tube and dot, on a dialog or panel card" },
   { fg = "sharing", bg = "surface_container_highest", need = "graphic", use = "The sharing tube and dot, on the highest container" },
   { fg = "microphone", bg = "surface", need = "text", use = "A listening microphone's words, on a page" },
   { fg = "microphone", bg = "surface_container_lowest", need = "text", use = "A listening microphone's words, on the lock screen" },
   { fg = "microphone", bg = "surface_container_low", need = "text", use = "A listening microphone's words, on a well" },
-  { fg = "microphone", bg = "surface_container", need = "text", use = "A listening microphone's words, on a panel, a card in a window or a pill of the bar" },
-  { fg = "microphone", bg = "surface_container_high", need = "text", use = "A listening microphone's words, on a dialog or a card on a panel" },
+  { fg = "microphone", bg = "surface_container", need = "text", use = "A listening microphone's words, on a panel, window card or bar pill" },
+  { fg = "microphone", bg = "surface_container_high", need = "text", use = "A listening microphone's words, on a dialog or panel card" },
   { fg = "microphone", bg = "surface_container_highest", need = "text", use = "A listening microphone's words, on the highest container" },
   { fg = "microphone", bg = "surface", need = "graphic", use = "A listening microphone's dot, on a page" },
   { fg = "microphone", bg = "surface_container_lowest", need = "graphic", use = "A listening microphone's dot, on the lock screen" },
   { fg = "microphone", bg = "surface_container_low", need = "graphic", use = "A listening microphone's dot, on a well" },
-  { fg = "microphone", bg = "surface_container", need = "graphic", use = "A listening microphone's dot, on a panel, a card in a window or a pill of the bar" },
-  { fg = "microphone", bg = "surface_container_high", need = "graphic", use = "A listening microphone's dot, on a dialog or a card on a panel" },
+  { fg = "microphone", bg = "surface_container", need = "graphic", use = "A listening microphone's dot, on a panel, window card or bar pill" },
+  { fg = "microphone", bg = "surface_container_high", need = "graphic", use = "A listening microphone's dot, on a dialog or panel card" },
   { fg = "microphone", bg = "surface_container_highest", need = "graphic", use = "A listening microphone's dot, on the highest container" },
   { fg = "recording", bg = "surface", need = "text", use = "Recording's words, on a page" },
   { fg = "recording", bg = "surface_container_lowest", need = "text", use = "Recording's words, on the lock screen" },
   { fg = "recording", bg = "surface_container_low", need = "text", use = "Recording's words, on a well" },
-  { fg = "recording", bg = "surface_container", need = "text", use = "Recording's words, on a panel, a card in a window or a pill of the bar" },
-  { fg = "recording", bg = "surface_container_high", need = "text", use = "Recording's words, on a dialog or a card on a panel" },
+  { fg = "recording", bg = "surface_container", need = "text", use = "Recording's words, on a panel, window card or bar pill" },
+  { fg = "recording", bg = "surface_container_high", need = "text", use = "Recording's words, on a dialog or panel card" },
   { fg = "recording", bg = "surface_container_highest", need = "text", use = "Recording's words, on the highest container" },
   { fg = "recording", bg = "surface", need = "graphic", use = "Recording's dot, on a page" },
   { fg = "recording", bg = "surface_container_lowest", need = "graphic", use = "Recording's dot, on the lock screen" },
   { fg = "recording", bg = "surface_container_low", need = "graphic", use = "Recording's dot, on a well" },
-  { fg = "recording", bg = "surface_container", need = "graphic", use = "Recording's dot, on a panel, a card in a window or a pill of the bar" },
-  { fg = "recording", bg = "surface_container_high", need = "graphic", use = "Recording's dot, on a dialog or a card on a panel" },
+  { fg = "recording", bg = "surface_container", need = "graphic", use = "Recording's dot, on a panel, window card or bar pill" },
+  { fg = "recording", bg = "surface_container_high", need = "graphic", use = "Recording's dot, on a dialog or panel card" },
   { fg = "recording", bg = "surface_container_highest", need = "graphic", use = "Recording's dot, on the highest container" },
   { fg = "success", bg = "surface", need = "text", use = "Done or installed, on a page" },
   { fg = "success", bg = "surface_container_lowest", need = "text", use = "Done or installed, on the lock screen" },
   { fg = "success", bg = "surface_container_low", need = "text", use = "Done or installed, on a well" },
-  { fg = "success", bg = "surface_container", need = "text", use = "Done or installed, on a panel, a card in a window or a pill of the bar" },
-  { fg = "success", bg = "surface_container_high", need = "text", use = "Done or installed, on a dialog or a card on a panel" },
+  { fg = "success", bg = "surface_container", need = "text", use = "Done or installed, on a panel, window card or bar pill" },
+  { fg = "success", bg = "surface_container_high", need = "text", use = "Done or installed, on a dialog or panel card" },
   { fg = "success", bg = "surface_container_highest", need = "text", use = "Done or installed, on the highest container" },
   { fg = "success", bg = "surface", need = "graphic", use = "A done or installed mark, on a page" },
   { fg = "success", bg = "surface_container_lowest", need = "graphic", use = "A done or installed mark, on the lock screen" },
   { fg = "success", bg = "surface_container_low", need = "graphic", use = "A done or installed mark, on a well" },
-  { fg = "success", bg = "surface_container", need = "graphic", use = "A done or installed mark, on a panel, a card in a window or a pill of the bar" },
-  { fg = "success", bg = "surface_container_high", need = "graphic", use = "A done or installed mark, on a dialog or a card on a panel" },
+  { fg = "success", bg = "surface_container", need = "graphic", use = "A done mark, on a panel, window card or bar pill" },
+  { fg = "success", bg = "surface_container_high", need = "graphic", use = "A done or installed mark, on a dialog or panel card" },
   { fg = "success", bg = "surface_container_highest", need = "graphic", use = "A done or installed mark, on the highest container" },
 ]
 # Roles a front end draws only as decoration, with no text or meaning drawn on
