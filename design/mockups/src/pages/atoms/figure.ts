@@ -7,8 +7,7 @@ import { figure, tick } from "../../lib/figure.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { advance, text, type TypeStyle } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { CHROME } from "../../site/settings.ts";
 
 const SPECIMEN: readonly (readonly [string, TypeStyle])[] = [
@@ -65,71 +64,66 @@ function beside(held: boolean): HTMLElement {
   return row("s8", "centre", ticking(3, "headline", held), text(held ? "held by a Figure" : "a plain Text", "body", "on_surface_variant"));
 }
 
-const DESCRIBED =
-  "A `Text` (`text`, `style`, `color`) in a box as wide as the same text with every digit a 0, Geist's widest figure; the text starts at the box's left edge, and its line is the style's. Only the digits are held: a colon, a point, a sign or a unit takes its own width, so the box grows only when the text's shape does (59:59 to 1:00:00).";
-
 export default page({
   level: "atoms",
   slug: "figure",
   title: "Figure",
-  summary: "A number that ticks (a time, a timer, a stopwatch) in a box that holds still as its digits change.",
-  live: () => stack("s16", "start", beside(true), beside(false)),
-  description: [
-    "QML `Figure`: the clock popup's times, its timer and its stopwatch, on the QML specimen's \"Shell only\" page. `kubaos-ui` gets one with the first app that shows a ticking number.",
-    "Geist's figures are proportional, so a ticking number in a plain `Text` changes width with its digits and jitters whatever sits beside it, as the second line above does. A `Figure` holds its box at its widest.",
-    DESCRIBED,
-    "Its words go through the locale's formatting (`Qt.formatDateTime` and `Number.toLocaleString` in QML, `Intl` here, chrono's in Rust), never padded or put together by hand: the locale picks the digits, the separators and where each part goes, and the box holds whatever shape it gives.",
-    "A number that changes in place but doesn't tick (a slider's value) takes `label_number`, whose figures are tabular, instead.",
-  ],
+  lede: "A number that ticks, in a box as wide as its widest, so what sits beside it holds still.",
+  code: { qml: "Figure", unbuilt: "Rust: not built yet" },
+  stage: {
+    live: () => row("s64", "centre", figure("21:47", "hero_number"), stack("s16", "start", beside(true), beside(false))),
+    hint: "watch the words beside each stopwatch",
+    daylight: true,
+  },
   variants: nonEmpty(
     SPECIMEN.map(([words, style]) => ({
       name: style,
-      for: style === "hero_number" ? "The clock popup's time." : style === "headline" ? "A timer counting down." : "A stopwatch, to the tenth.",
+      for: style === "hero_number" ? "the clock popup's time" : style === "headline" ? "a timer counting down" : "a stopwatch, to the tenth",
       sample: () => figure(words, style),
     })),
   ),
-  sizes: doesntApply("a figure takes its style's size: the variants are the styles the clock popup uses."),
+  sizes: doesntApply("its style's size: the variants are the clock popup's styles."),
   states: {
     shown: ["rest"],
     absent: {
-      lit: "a figure takes no pointer and no focus.",
-      pressed: "it takes no press: the timer's buttons beside it do.",
-      disabled: "a stopped timer still shows its time, unchanged.",
-      selected: "it holds no choice.",
-      loading: "a time is known at once.",
-      empty: "a figure always shows a number: a timer that isn't set shows 0:00.",
-      error: "it has no value to be wrong.",
+      lit: "no pointer and no focus",
+      pressed: "the timer's buttons take the press",
+      disabled: "a stopped timer still shows its time",
+      selected: "it holds no choice",
+      loading: "a time is known at once",
+      empty: "a timer that isn't set shows 0:00",
+      error: "it has no value to be wrong",
     },
     rows: nonEmpty(SPECIMEN.map(([words, style]) => ({ name: style, cell: () => figure(words, style) }))),
-    described: {
-      rest: `Always. ${DESCRIBED} By day the same role in daylight colours.`,
+    looks: {
+      rest: "a `Text` in a box as wide as every digit a 0",
     },
   },
-  focus: doesntApply("a figure isn't a control and isn't neon: it has no line and no glow."),
+  focus: doesntApply("not a control and not neon: no line and no glow."),
   content: {
     text: [{ name: "A stopwatch", words: TIME, sample: (words: string) => row("s8", "centre", figure(words, "headline"), text("elapsed", "body", "on_surface_variant")) }],
     missingPicture: doesntApply("a figure is words."),
     counts: [
-      { name: "Minutes", for: "59:59: the box as wide as 00:00.", sample: () => figure("59:59", "headline") },
-      { name: "An hour", for: "1:00:00: the text's shape changes, so the box grows to 0:00:00, once.", sample: () => figure("1:00:00", "headline") },
+      { name: "Minutes", for: "59:59, as wide as 00:00", sample: () => figure("59:59", "headline") },
+      { name: "An hour", for: "1:00:00: the shape changes, so it grows, once", sample: () => figure("1:00:00", "headline") },
     ],
   },
   motion: {
-    arrives: doesntApply("a figure comes with the surface it is on."),
-    leaves: doesntApply("a figure goes with the surface it is on."),
+    arrives: doesntApply("it comes with its surface."),
+    leaves: doesntApply("it goes with its surface."),
     between: powerMoves(() => figure("21:47", "hero_number")),
   },
-  keyboard: doesntApply("a figure takes no focus and no key."),
+  keyboard: doesntApply("no focus and no key."),
   measures: {
     samples: nonEmpty([
-      { name: "A stopwatch", for: "Its box as wide as 0:00:00.0, the text at its left.", sample: () => figure("1:02:11.4", "body_strong") },
-      { name: "The clock's time", for: "Its box as wide as 00:00.", sample: () => figure("21:47", "hero_number") },
+      { name: "A stopwatch", for: "as wide as 0:00:00.0", sample: () => figure("1:02:11.4", "body_strong") },
+      { name: "The clock's time", for: "as wide as 00:00", sample: () => figure("21:47", "hero_number") },
     ]),
     measures: [
-      { what: "The clock's time, its line.", token: "type-hero_number-line" },
-      { what: "A timer's line.", token: "type-headline-line" },
-      { what: "A stopwatch's line.", token: "type-body_strong-line" },
+      { part: "The clock's line", token: "type-hero_number-line" },
+      { part: "A timer's line", token: "type-headline-line" },
+      { part: "A stopwatch's line", token: "type-body_strong-line" },
     ],
-    reflow: doesntApply("a figure is as wide as its widest at every window size."),
+    reflow: doesntApply("as wide as its widest at every window size."),
   },
 });
