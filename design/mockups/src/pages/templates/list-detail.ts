@@ -1,7 +1,6 @@
 // The ListDetail page: `docs/design/components/list-detail.md`. A list beside the detail of its
 // selected row, as its two builds draw it today: the Command menu's Results beside its pane, and
-// Kōbō's first-boot cards beside the picked card's page. Its new design is sketched later; every
-// difference between the two builds is a question on the page's issue.
+// Kōbō's first-boot cards beside the picked card's page. Its new design is sketched later.
 
 import "./list-detail-page.css";
 import { banner } from "../../lib/banner.ts";
@@ -10,8 +9,7 @@ import { stack, within } from "../../lib/layout.ts";
 import { commandMenu, menuMeasures, menuOnScreen, type Result, type SetupCard, setupWindow } from "../../lib/list-detail.ts";
 import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { windowSize } from "../../site/settings.ts";
 
 const TITLE: Words = { short: "Files", long: "Files, the file manager that opens where you last were" };
@@ -60,7 +58,7 @@ function setup(extra: { selected?: number; rising?: number; online?: boolean } =
 
 const OPENS: Move = {
   name: "The Command menu opens",
-  what: "Super+Space: the panel fades in and drops `space.s8` into place over `short` on `emphasized_decel`, one step quicker than a panel's `long`, since a key summons it many times an hour. Its Results are there in its first frame. With the setting \"fades\" or reduced motion it only fades.",
+  what: "Super+Space: the panel fades in and drops into place, its Results there from the first frame.",
   tracks: [
     { part: "fade", on: "the panel", target: ".k-menu", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
     { part: "drop", on: "the panel", target: ".k-menu", property: "--menu-drop", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
@@ -72,7 +70,7 @@ const OPENS: Move = {
 
 const CLOSES: Move = {
   name: "The Command menu closes",
-  what: "Esc, or an Item run: the panel fades out and lifts `space.s8` over `micro` on `emphasized_accel`; what it runs waits for it to be gone.",
+  what: "Esc, or an Item run: the panel fades and lifts; what it runs waits until it is gone.",
   tracks: [
     { part: "fade", on: "the panel", target: ".k-menu", property: "opacity", from: 1, to: 0, duration: "micro", curve: "emphasized_accel" },
     { part: "drop", on: "the panel", target: ".k-menu", property: "--menu-drop", from: 0, to: 1, duration: "micro", curve: "emphasized_accel" },
@@ -84,7 +82,7 @@ const CLOSES: Move = {
 
 const FOLLOWS: Move = {
   name: "The pane follows the selection",
-  what: "↓ moves the list's selection (it slides between rows over `short`, the List page); the pane crossfades from the row left to the row reached over `short` on `standard`, once typing has paused. Results a keystroke brought swap the pane at once, and the same row changing in place just updates.",
+  what: "↓ slides the selection; the pane crossfades once typing has paused.",
   tracks: [{ part: "the row reached", on: "the pane's content", target: ".k-menu-pane-content", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
   reduced: "same",
   back: "cuts",
@@ -93,7 +91,7 @@ const FOLLOWS: Move = {
 
 const PUSHED: Move = {
   name: "A View pushed",
-  what: "An Item that opens a View (a list, a form, a detail): the body slides `space.s24` in from the right and settles from 0.4 to whole over `medium` on `emphasized_decel`, so a pushed list's rows read in its first frame. Back slides it in from the left. With \"fades\" or reduced motion it only settles.",
+  what: "An Item opens a View: the body slides in from the right; Back, from the left.",
   tracks: [
     { part: "slide", on: "the body", target: ".k-menu-body", property: "--view-push", from: 1, to: 0, duration: "medium", curve: "emphasized_decel" },
     { part: "settle", on: "the body", target: ".k-menu-body", property: "opacity", from: 0.4, to: 1, duration: "medium", curve: "emphasized_decel" },
@@ -105,7 +103,7 @@ const PUSHED: Move = {
 
 const RISES: Move = {
   name: "Kōbō's card page rises in",
-  what: "A card picked (↑ ↓, or a click): its page rises `space.s16` into place and fades in over `long` on `emphasized_decel`, its offset on whole device pixels; the list doesn't move. With reduced motion it only fades.",
+  what: "A card picked: its page rises and fades in; the list stays.",
   tracks: [
     { part: "rise", on: "the card's page", target: ".k-setup-room", property: "--setup-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
     { part: "fade", on: "the card's page", target: ".k-setup-room", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
@@ -119,34 +117,34 @@ export default page<"rest" | "selected" | "empty" | "error" | "loading">({
   level: "templates",
   slug: "list-detail",
   title: "ListDetail",
-  summary: "A list beside the detail of its selected row, as the Command menu and Kōbō's first-boot setup draw it today.",
-  live: () => menu(1536, 864),
-  description: [
-    "Two builds, one template to be: the Command menu's Results beside its pane (`config/quickshell/modules/menu/Menu.qml`, `DetailPane.qml`), and Kōbō's first-boot cards beside the picked card's page (`crates/kubaos-kobo/src/setup/view.rs`). Its new design is sketched once the mockups are done; this page mocks what both draw now, side by side, so every difference shows. ↑ and ↓ on the menu move its selection and the pane follows; on Kōbō's list they pick a card.",
-    "**The Command menu** is a panel of the shell, sized by its screen: half the screen's width, from one `size.column` to two, on the 4 grid; rows for about two thirds of its height, 8 to 14, each `size.row_two_line` with `space.s4` between; two fifths down the room it leaves. It is the frame's glass (`surface` at `opacity.frame`) in the soft hairline at `radius.surface`, `space.s12` inside and between its parts: the search field (a md `Field`), the body, a hairline across the whole panel, and the footer, a sm control tall, holding the keys. The body is the Results (`ScrollingList`, tall tiled rows, the selection the list's and sliding) and, where the panel is as wide as `size.dialog` beside `size.rail`, the pane: a `Card` two fifths of the room and a rail wide at the least, holding the selected row's 48 symbol, its title in `heading`, its subtitle, its kind in `label`, `space.s24` then its Actions with their keycaps, and its keys at its foot. Without the pane the footer shows the row's keys instead.",
-    "**Kōbō's setup** is an app's window, one solid `surface`. The side is a third of the window and never wider than `size.column`, on the well's fill: a clear `Page` holding the header (初期設定, First boot, its line), `space.s20`, the cards as two-line `Step`s in a `ScrollingList` that takes the height left, `space.s12` twice (a \"Checking again…\" line between them while it re-detects), the Online chip, `space.s16`, Done for now (`Tonal`), `space.s16` and the keys flowing onto lines. Beside it the picked card's page, a clear `Page`: its 48 symbol beside its title in `title` with its state's chip and its summary, then `space.s24` apart its words in a `Scroll` and its actions: Skip or Next (`Text`) on the left, a `Tonal` and the `Filled` action on the right.",
-  ],
+  lede: "A list beside the detail of its selected row, as the Command menu and Kōbō's setup draw it today.",
+  code: { unbuilt: "not built yet" },
+  stage: {
+    live: () => menu(1536, 864),
+    hint: "click a row, then ↑ ↓; the pane follows",
+    daylight: true,
+  },
   variants: [
-    { name: "The Command menu", for: "A shell panel summoned by a key: the list is what you search, the pane what the row does. Drawn for a 1536 × 864 screen (1080p at 1.25), where the pane fits.", sample: () => menu(1536, 864) },
-    { name: "Kōbō's setup", for: "An app's window: the list is what's left to do, the page how to do it. At an app's default size.", sample: () => framed(setup(), "var(--size-app_width)", "var(--size-app_height)") },
+    { name: "The Command menu", for: "a key summons it; drawn for a 1536 × 864 screen", sample: () => menu(1536, 864) },
+    { name: "Kōbō's setup", for: "an app's window: what's left to do, and how", sample: () => framed(setup(), "var(--size-app_width)", "var(--size-app_height)") },
   ],
   sizes: [
-    { name: "The Command menu without its pane", for: "A 1280 × 800 screen: a 640 panel is narrower than `size.dialog` beside `size.rail`, so the list takes the body and the footer shows the row's keys.", sample: () => menu(1280, 800) },
-    { name: "The Command menu on a screen of the toolbar's window size", for: "Its width, rows and place follow the screen: pick a window size in the toolbar. On a screen too short for eight rows the mock lets it take fewer (a question).", sample: () => framed(menuOnScreen({ results: results(), query: "fi" }), windowSize().width, windowSize().height) },
+    { name: "The menu without its pane", for: "a 1280 × 800 screen: the footer shows the row's keys", sample: () => menu(1280, 800) },
+    { name: "The menu at the toolbar's size", for: "width, rows and place follow the screen", sample: () => framed(menuOnScreen({ results: results(), query: "fi" }), windowSize().width, windowSize().height) },
   ],
   states: {
     shown: ["rest", "selected", "empty", "error", "loading"],
     absent: {
-      lit: "the template takes no pointer of its own: its list, rows, cards and buttons light, each on its page (List, Step, Card, Button).",
-      pressed: "the same: what it holds is pressed, never the template.",
-      disabled: "a row that can't run is dimmed by its list (an unavailable Result); the template never is.",
+      lit: "its list, rows and cards light on their pages",
+      pressed: "what it holds is pressed, never it",
+      disabled: "an unavailable Result is dimmed by its list",
     },
     rows: [
       {
         name: "The Command menu",
         cell: (state) => {
           if (state === "empty") return commandMenu({ results: [], query: "fiq", rows: 2 }, menuMeasures(1536, 864));
-          if (state === "error") return text("A failed Action's reason in `error` across the footer.", "small", "error");
+          if (state === "error") return text("Why the Action failed, across the footer.", "small", "error");
           if (state === "loading") return text("Not drawn: Results come with the first frame.", "small", "on_surface_variant");
           return menu(1536, 864, { rows: 2, current: state === "selected" ? 1 : 0 });
         },
@@ -154,29 +152,29 @@ export default page<"rest" | "selected" | "empty" | "error" | "loading">({
       {
         name: "Kōbō's setup",
         cell: (state) => {
-          if (state === "loading") return text("Checking what this machine has…, a spinner in the list's place.", "small", "on_surface_variant");
+          if (state === "loading") return text("A spinner in the list's place.", "small", "on_surface_variant");
           if (state === "empty") return text("Doesn't occur: every machine has its cards.", "small", "on_surface_variant");
           if (state === "error") return framed(setup({ online: false }), "var(--size-app_min_width)", "var(--size-app_min_height)");
           return framed(setup({ selected: state === "selected" ? 2 : 0 }), "var(--size-app_min_width)", "var(--size-app_min_height)");
         },
       },
     ],
-    described: {
-      rest: "The first row selected, its detail beside it. By day the same roles in daylight colours.",
-      selected: "Another row picked: the menu's selection slides to it and the pane follows; Kōbō's card turns `secondary_container` and its page rises in.",
-      empty: "The menu with no Results: an `EmptyState` (`search_off`, No results) in the list's room, and the pane's own (Nothing selected).",
-      error: "The menu: why an Action failed, in `error` across the footer. Kōbō: offline, the chip saying what needs the internet.",
-      loading: "The menu never waits: Results come with the frame that typed them. Kōbō's first detection: a spinner and its line in the list's place.",
+    looks: {
+      rest: "the first row selected, its detail beside it",
+      selected: "the selection slides, the pane follows; Kōbō's card turns `secondary_container`",
+      empty: "an `EmptyState` in the list; the pane's Nothing selected",
+      error: "the menu's reason in `error`; Kōbō's offline chip",
+      loading: "the menu never waits; Kōbō shows a spinner",
     },
   },
-  focus: doesntApply("the template lights no line of its own: the menu's field keeps the keyboard (its tube, the Field page), and Kōbō's list lights its well (ScrollingList)."),
+  focus: doesntApply("no line of its own: the menu's field and Kōbō's list light theirs."),
   content: {
     text: [{ name: "A row's title", words: TITLE, sample: (words: string) => menu(1536, 864, { rows: 2, current: 1, title: words }) }],
-    missingPicture: doesntApply("a Result without an icon of its own shows its Extension's symbol on its tile (IconTile); a card's symbol is one of KubaOS Symbols."),
+    missingPicture: doesntApply("a Result with no icon shows its Extension's symbol on its tile."),
     counts: [
-      { name: "None", for: "The menu's empty state in the list, Nothing selected in the pane.", sample: () => commandMenu({ results: [], query: "fiq", rows: 4 }, menuMeasures(1536, 864)) },
-      { name: "One", for: "One Result, selected, the pane on it.", sample: () => commandMenu({ results: results().slice(0, 1), query: "firef", rows: 4 }, menuMeasures(1536, 864)) },
-      { name: "Many", for: "More than the body holds: the list scrolls in its well, keeping the selection in view.", sample: () => menu(1536, 864, { rows: 4 }) },
+      { name: "None", for: "the empty state in the list, Nothing selected", sample: () => commandMenu({ results: [], query: "fiq", rows: 4 }, menuMeasures(1536, 864)) },
+      { name: "One", for: "one Result, the pane on it", sample: () => commandMenu({ results: results().slice(0, 1), query: "firef", rows: 4 }, menuMeasures(1536, 864)) },
+      { name: "Many", for: "the list scrolls, the selection stays in view", sample: () => menu(1536, 864, { rows: 4 }) },
     ],
   },
   motion: {
@@ -186,38 +184,36 @@ export default page<"rest" | "selected" | "empty" | "error" | "loading">({
   },
   keyboard: {
     keys: [
-      { keys: ["↑", "↓", "Ctrl+N", "Ctrl+P"], does: "The menu: the selection up or down, the field keeping the keyboard. Kōbō: the card above or below (also k and j), its page rising in." },
-      { keys: ["Page Up", "Page Down"], does: "The menu: a page of Results at a time." },
-      { keys: ["Enter"], does: "The menu: runs the selected Result's first Action. Kōbō: opens or presses what has the keyboard." },
-      { keys: ["Ctrl+K"], does: "The menu: the selected Result's Action panel, over the bottom right of the list." },
-      { keys: ["Tab", "Shift+Tab"], does: "The menu: Tab enters an app's scope on its row. Kōbō: from the list through the page's controls and its actions." },
-      { keys: ["Esc"], does: "The menu: clears what is typed, then goes back a View, then closes. Kōbō: back to the cards." },
+      { keys: ["↑", "↓", "Ctrl+N", "Ctrl+P"], does: "menu: moves the selection; Kōbō: the card, also k j" },
+      { keys: ["Page Up", "Page Down"], does: "menu: a page of Results" },
+      { keys: ["Enter"], does: "menu: the first Action; Kōbō: presses what has the keyboard" },
+      { keys: ["Ctrl+K"], does: "menu: the Result's Action panel" },
+      { keys: ["Tab", "Shift+Tab"], does: "menu: an app's scope; Kōbō: through the page's controls" },
+      { keys: ["Esc"], does: "menu: clears, back a View, closes; Kōbō: back to the cards" },
     ],
-    order: "The menu is one stop, its field, which hands the list its keys. Kōbō: the list, the page's controls, its actions, then Done for now.",
-    lands: "The menu opens with the keyboard in its field and the first Result selected. Kōbō starts on its list, the first card that is still to do selected.",
+    order: "The menu is one stop, its field; Kōbō goes list, page, actions, Done for now.",
+    lands: "The menu, in its field on the first Result; Kōbō, on the first card still to do.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "The Command menu", for: "Its `space.s12` padding and gaps, the field, the body beside the pane, the rule and the footer.", sample: () => menu(1536, 864, { rows: 3 }) },
-      { name: "Kōbō's setup", for: "The side's page and the card's page.", sample: () => framed(setup(), "var(--size-app_min_width)", "var(--size-app_min_height)") },
+      { name: "The Command menu", for: "padding and gaps, field, body, pane, footer", sample: () => menu(1536, 864, { rows: 3 }) },
+      { name: "Kōbō's setup", for: "the side and the card's page", sample: () => framed(setup(), "var(--size-app_min_width)", "var(--size-app_min_height)") },
     ]),
     measures: [
-      { what: "The menu's padding and the gaps between its parts; the room between the list and the pane; Kōbō's gaps round the online chip.", token: "space-s12" },
-      { what: "One column: the menu's least width, and the most of Kōbō's side; two of them, the menu's widest.", token: "size-column" },
-      { what: "With `size.rail`, the narrowest panel that shows the pane.", token: "size-dialog" },
-      { what: "The pane's least width.", token: "size-rail" },
-      { what: "A Result's row; with `space.s4`, the pitch the menu counts its rows by.", token: "size-row_two_line" },
-      { what: "The field.", token: "size-control_md" },
-      { what: "The menu's footer.", token: "size-control_sm" },
-      { what: "The menu's corners.", token: "radius-surface" },
-      { what: "Kōbō: between the header and the list.", token: "space-s20" },
-      { what: "Kōbō: between the card's head, its words and its actions.", token: "space-s24" },
+      { part: "Menu's padding, gaps; Kōbō's chip", token: "space-s12" },
+      { part: "Menu's least; Kōbō's side's most", token: "size-column" },
+      { part: "With a rail, shows the pane", token: "size-dialog" },
+      { part: "Pane's least width", token: "size-rail" },
+      { part: "A Result's row", token: "size-row_two_line" },
+      { part: "Field", token: "size-control_md" },
+      { part: "Menu's footer", token: "size-control_sm" },
+      { part: "Menu's corners", token: "radius-surface" },
+      { part: "Kōbō: header → list", token: "space-s20" },
+      { part: "Kōbō: head, words, actions", token: "space-s24" },
     ],
     reflow: {
-      described:
-        "Kōbō's setup in a window of the toolbar's size: the side is a third of it (240 at the 720 minimum, 373 at 1120) up to `size.column` (560 from a 1680 window), the page takes the rest; the cards scroll in the height their list is left. The menu on a screen of the same size is under Sizes.",
+      note: "Kōbō's side is a third of the window up to `size.column`; the page takes the rest.",
       sample: () => setup(),
     },
   },
 });
-
