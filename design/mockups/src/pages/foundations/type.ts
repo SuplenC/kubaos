@@ -2,16 +2,16 @@
 // the scale in device pixels, and how a long word and a translation wrap (`docs/DESIGN.md`, "Type").
 
 import { button, METRICS, SIZES } from "../../lib/button.ts";
-import { translated } from "../../lib/content.ts";
+import { shown, translated, type Words } from "../../lib/content.ts";
 import { icon } from "../../lib/icon.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { STYLE_WORDS as WORDS, styles, type TypeStyle, text, typeset } from "../../lib/text.ts";
 import { length, names, raw, words } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
-import { doesntApply } from "../../site/page.ts";
-import { foundation } from "../../site/legacy.ts";
+import { doesntApply, foundation } from "../../site/page.ts";
 import { atScale, MODES, modeName, painted, table, token } from "../../site/parts/swatches.ts";
 import { SCALES, settings } from "../../site/settings.ts";
+import { across } from "./across.ts";
 
 /** A weight's name, as the tokens write it. */
 const WEIGHTS: Record<string, string> = { "300": "light", "400": "regular", "500": "medium", "600": "semibold" };
@@ -43,7 +43,7 @@ function line(style: TypeStyle, words = WORDS[style]): HTMLElement {
 
 /** Every style: its measures by token, its family and weight, its icon, real words, and its use. */
 function everyStyle(): HTMLElement {
-  return table(
+  return across(table(
     ["Style", "Size / line", "Weight, family", "Icon", "Its words, its line box", "For"],
     styles().map((style) => [
       token(style),
@@ -53,12 +53,12 @@ function everyStyle(): HTMLElement {
       line(style),
       prose(words(`type-${style}-use`)),
     ]),
-  );
+  ));
 }
 
 /** Each family, with every weight a style draws it in, each in the words of a style that does. */
 function families(): HTMLElement {
-  return table(
+  return across(table(
     ["Family", "Weight", "Drawn", "By"],
     names("font-").flatMap((name) => {
       const family = name.slice("font-".length);
@@ -74,7 +74,7 @@ function families(): HTMLElement {
         ];
       });
     }),
-  );
+  ));
 }
 
 /** Text that wraps in the room it has, in `style`, as the page's own words do but in the role picked. */
@@ -93,7 +93,7 @@ function onTheGrid(): HTMLElement {
 
 /** Each button size: its height, the label's line inside it, and what is above and below. */
 function controlLabels(): HTMLElement {
-  return table(
+  return across(table(
     ["Size", "Button", "Height = above + line + below"],
     SIZES.map((size) => {
       const metrics = METRICS[size];
@@ -105,7 +105,7 @@ function controlLabels(): HTMLElement {
         token(`size.${metrics.height} ${height} = ${(height - line) / 2} + type.${metrics.label}.line ${line} + ${(height - line) / 2}`),
       ];
     }),
-  );
+  ));
 }
 
 /** The same numbers in a style without tabular figures and in one with them. */
@@ -127,7 +127,7 @@ function figures(): HTMLElement {
 
 /** Each style's size and line in device pixels at every scale. */
 function deviceLengths(): HTMLElement {
-  return table(
+  return across(table(
     ["Style", ...SCALES.map((scale) => `${scale}×`)],
     styles().map((style) => [
       token(style),
@@ -137,7 +137,7 @@ function deviceLengths(): HTMLElement {
         return label(`${size} / ${line}`, "mono", Number.isInteger(line) ? "on_surface" : "error");
       }),
     ]),
-  );
+  ));
 }
 
 /** A title and a paragraph in a panel's width, English beside its translation. */
@@ -187,92 +187,53 @@ function textRoles(mode: "dark" | "light"): HTMLElement {
   );
 }
 
+const WELCOME: Words = { short: "Welcome to KubaOS", long: "Welcome to KubaOS, the whole disk encrypted and yours alone" };
+const ERASED: Words = { short: "Everything on this disk will be erased.", long: "Everything on this disk will be erased: KubaOS takes the whole of it and encrypts it with your passphrase and your YubiKey." };
+
+/** The styles at work: a page's opening beside a column of the styles under it, each on its line box. */
+function specimen(): HTMLElement {
+  const under: TypeStyle[] = ["heading", "subheading", "body_strong", "body", "small", "label", "mono"];
+  return el(
+    "div",
+    "f-row",
+    el("div", "f-measure", text(WORDS.accent, "accent", "primary"), wrapping(shown(WELCOME), "title"), wrapping(shown(ERASED), "body_large", "on_surface_variant")),
+    el("div", "f-measure", ...under.map((style) => line(style))),
+  );
+}
+
 export default foundation({
   level: "foundations",
   slug: "type",
   title: "Type",
-  summary: "A closed set of type styles, picked by what the text is: three families, eleven sizes, every line on the 4 grid, and an icon size for each.",
-  live: () =>
-    el(
-      "div",
-      "f-measure",
-      text(WORDS.accent, "accent", "primary"),
-      text("Welcome to KubaOS", "title", "on_surface"),
-      wrapping("Everything on this disk will be erased. KubaOS takes the whole disk and encrypts it.", "body_large", "on_surface_variant"),
-      row("s8", "start", text(WORDS.label, "label", "on_surface_variant"), text(WORDS.mono, "mono", "on_surface_variant")),
-    ),
-  description: [
-    "A piece of text takes a style by what it is (a page's title, a row's title, a field's note), never by how big it should look. A style is a size, a line height, a weight, a family and the icon that sits beside it; nothing else draws text.",
-    "Geist is the interface, Geist Mono anything typed or read by a machine, and M PLUS 1 the Japanese accent above a title. The sizes are a closed list, and every line height is a multiple of 4, so a text box lands on whole device pixels at every scale.",
-    "A number that changes in place takes tabular figures, every figure one width, so it never shifts as it ticks: `label_number`. iced has no font features, so its components hold such a number in a box as wide as its widest value instead.",
-    "Text grows: a translation runs up to 40% longer, so text fits by wrapping or by the layout giving it room, never by a width chosen for the English.",
-  ],
+  lede: "A closed set of type styles, picked by what the text is: three families, every line on the 4 grid.",
+  stage: { live: specimen, hint: "pick Text long: it wraps and grows down", daylight: true },
   tokens: [
-    {
-      name: "Every style",
-      described: "Largest first, each in real words with its icon before them, on its line box: its size and line in logical pixels, its weight and family, the icon it takes, and what it is for, as the tokens say it.",
-      sample: everyStyle,
-    },
-    {
-      name: "Families and weights",
-      described: "Each family in every weight a style draws it in, in that style's words, with the styles that do.",
-      sample: families,
-    },
+    { name: "Every style", note: "Largest first, in real words on their line box; size and line in logical pixels.", sample: everyStyle },
+    { name: "Families and weights", note: "Each family in every weight a style draws it in.", sample: families },
   ],
   rules: [
-    {
-      name: "Every line is on the grid",
-      described: "Each line box is a multiple of `grid` tall, so stacked lines land on the 4 grid drawn behind them, and a text's top is a whole device pixel at every scale. The icon is centred down the line on a whole device pixel and never makes it taller.",
-      sample: onTheGrid,
-    },
-    {
-      name: "A control's label is its content box",
-      described: "A single-line control's label takes the control's content box as its line, so it centres with no arithmetic: the rest of the height is split above and below.",
-      sample: controlLabels,
-    },
-    {
-      name: "Tabular figures keep a number's width",
-      described: "In `label` the figures are as wide as their shapes, so 11% is narrower than 48%; in `label_number` every figure is one width, and a column of numbers ends in one place. iced draws them proportional and holds the number in a box as wide as its widest value.",
-      sample: figures,
-    },
+    { name: "Lines land on the grid", note: "Each line box is a multiple of `grid`; its icon never makes it taller.", sample: onTheGrid },
+    { name: "A label is its content box", note: "The label's line fills the control's content box; the rest splits above and below.", sample: controlLabels },
+    { name: "Tabular figures", note: "`label_number` gives every figure one width; iced, with no font features, boxes the widest value instead.", sample: figures },
   ],
-  modes: [
-    {
-      name: "The text roles in each mode",
-      described: "Text is drawn in `on_surface`, `on_surface_variant` for what is secondary, `primary` for an action, `error` for a failure, each holding 4.5:1 on its surface (the colour page lists the pairs). The style is the same in both modes.",
-      sample: () => el("div", "f-row", ...MODES.map(textRoles)),
-    },
-  ],
-  themes: doesntApply("a type style takes no colour of its own: its roles follow the theme, which the colour page shows in every theme."),
+  modes: [{ name: "The text roles", note: "Each role holds 4.5:1 on its surface; the style doesn't change.", sample: () => el("div", "f-row", ...MODES.map(textRoles)) }],
+  themes: doesntApply("a style's roles follow the theme; the Colour page shows them."),
   scales: [
+    { name: "In device pixels", note: "Every line is whole; a size may be fractional; a line in red isn't whole.", sample: deviceLengths },
     {
-      name: "Sizes and lines in device pixels",
-      described: "Every line is a whole number of device pixels at every scale, since it is a multiple of 4; a size may be fractional (13 at 1.25 is 16.25), which the font's own rendering takes. A line that isn't whole would be red.",
-      sample: deviceLengths,
-    },
-    {
-      name: "The same words at every scale",
-      described: "Each box below is drawn at its own scale, whatever the toolbar's: every length in it is that scale's, in device pixels.",
-      sample: () =>
-        el("div", "f-row", ...SCALES.map((scale) => atScale(scale, stack("s4", "start", line("subheading"), line("body"), line("caption"))))),
+      name: "The same words",
+      note: "Each box at its own scale, whatever the top bar picks.",
+      sample: () => el("div", "f-row", ...SCALES.map((scale) => atScale(scale, stack("s4", "start", line("subheading"), line("body"), line("caption"))))),
     },
   ],
   content: [
-    {
-      name: "A translation 40% longer",
-      described: "A title and its paragraph in a column as wide as a panel, in English and in a translation that runs 40% longer: the text wraps onto more lines and the column grows down, never sideways.",
-      sample: translations,
-    },
-    {
-      name: "A long word",
-      described: "A word longer than its column breaks where it meets the edge, rather than running out of its box: in a title, and in running text.",
-      sample: longWord,
-    },
+    { name: "A translation 40% longer", note: "It wraps and grows down, never sideways.", sample: translations },
+    { name: "A long word", note: "It breaks at the edge rather than running out of its box.", sample: longWord },
   ],
-  motion: doesntApply("text doesn't move on its own: typed text and the caret appear at once (`instant`), and text moves only with what it is in."),
+  motion: doesntApply("text moves only with what it is in; typed text and the caret are `instant`."),
   checks: [
-    { check: "kubaos-tokens", holds: "Refuses a size that isn't in `rules.font_sizes`, a line height off the grid, and an icon taller than its style's line." },
-    { check: "kubaos-design lint", holds: "Fails on a font size, weight or family written out in QML or Rust UI code: text takes a style." },
-    { check: "The geometry check", holds: "Holds every text box to whole device pixels and to its style's line height, at every scale, in the specimens and the mockups." },
+    { check: "kubaos-tokens", holds: "refuses off-list sizes, off-grid lines, icons taller than their line" },
+    { check: "kubaos-design lint", holds: "fails a font size, weight or family in UI code" },
+    { check: "The geometry check", holds: "holds every text box to whole device pixels and its line" },
   ],
 });

@@ -11,22 +11,22 @@ import { type Corner, concentric, role } from "../../lib/radius.ts";
 import { text } from "../../lib/text.ts";
 import { length } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
-import { doesntApply } from "../../site/page.ts";
-import { foundation } from "../../site/legacy.ts";
+import { doesntApply, foundation } from "../../site/page.ts";
 import { atScale, table, token } from "../../site/parts/swatches.ts";
 import { SCALES } from "../../site/settings.ts";
+import { across } from "./across.ts";
 
 const ROLES = ["small", "row", "control", "content", "surface", "full"] as const;
 type Role = (typeof ROLES)[number];
 
 /** What each role is for. */
 const FOR: Record<Role, string> = {
-  small: "Marks inside controls: the checkbox, a keycap, a skeleton's line, a field's selection.",
-  row: "A row inside a small or a content box, the box's corner less its padding: a menu's or a select's items, a list well's rows, a table's rows; and a hint.",
-  control: "Everything you click or type in: buttons, fields, chips, a calendar's months and title; and the small floating things, raised over what opened them: a popover, a menu, a select's open list, a toast.",
-  content: "A content box inside a window or a panel: a card, a list well, a dialog. A step under a surface, so a box inside reads as a part of what holds it.",
-  surface: "The shell's big surfaces alone: a panel, a window, the screen frame.",
-  full: "Pills and circles: switches, icon buttons, radios, progress bars, sliders, avatars, badges. Half the shorter side.",
+  small: "Marks inside controls: a checkbox, a keycap, a skeleton's line",
+  row: "A box's rows: a menu's items, a list well's rows; a hint",
+  control: "What you click or type in; a popover, a menu, a toast",
+  content: "A box in a window or panel: a card, a well, a dialog",
+  surface: "The shell's big surfaces: a panel, a window, the screen frame",
+  full: "Pills and circles: half the shorter side",
 };
 
 /** A shape with `corner`, of the class that sizes it. */
@@ -55,7 +55,7 @@ function inUse(name: Role): HTMLElement {
 }
 
 function roles(): HTMLElement {
-  return table(
+  return across(table(
     ["Role", "Radius", "Its corner", "In use", "For"],
     ROLES.map((name) => {
       const corner = role(name);
@@ -67,7 +67,7 @@ function roles(): HTMLElement {
         prose(FOR[name]),
       ];
     }),
-  );
+  ));
 }
 
 /**
@@ -94,11 +94,11 @@ function worked(): HTMLElement {
   return el(
     "div",
     "f-row",
-    nesting(role("content"), "s8", "A list well's rows: 16 less 8 is 8, the row radius."),
-    nesting(role("control"), "s4", "A menu's or a select's items: 12 less 4 is 8, the row radius too."),
-    nesting(role("surface"), "s8", "A window 8 inside the screen frame: its outer edge is 16, Hyprland's rounding 14 plus its 2 border."),
-    nesting(role("full"), "s4", "A pill in a pill is a pill."),
-    nesting(role("content"), "s16", "A picture filling a card less its 16: nothing is left to round, so `nested` refuses it, and the picture takes the row radius, 8."),
+    nesting(role("content"), "s8", "A list well's rows"),
+    nesting(role("control"), "s4", "A menu's items"),
+    nesting(role("surface"), "s8", "A window in the screen frame"),
+    nesting(role("full"), "s4", "A pill in a pill"),
+    nesting(role("content"), "s16", "A picture in a card: it takes `radius.row`"),
   );
 }
 
@@ -113,16 +113,16 @@ function wellRow(name: string, lit: boolean): HTMLElement {
 /** The padding each box takes, by what it holds. */
 function paddings(): HTMLElement {
   const steps: readonly [string, string, string][] = [
-    ["space.s4", "4", "Around rows in a floating box: a menu, a select's open list."],
-    ["space.s8", "8", "Around rows in a content box: a list well."],
-    ["space.s12", "12", "Around words in a small floating thing: a popover holding words, a toast. A hint, the smallest, is 8 by 4."],
-    ["space.s16", "16", "Around content in a content box: a card; or in a shell panel."],
-    ["space.s24", "24", "Around a dialog's content, the dialog alone."],
+    ["space.s4", "4", "Rows in a floating box: a menu, a select's list"],
+    ["space.s8", "8", "Rows in a content box: a list well"],
+    ["space.s12", "12", "Words in a small floating thing: a popover, a toast"],
+    ["space.s16", "16", "Content in a card or a shell panel"],
+    ["space.s24", "24", "A dialog's content"],
   ];
-  return table(
+  return across(table(
     ["Padding", "px", "For"],
     steps.map(([name, px, what]) => [token(name), label(px, "mono", "on_surface"), prose(what)]),
-  );
+  ));
 }
 
 /** A button inside a card keeps the control radius: it isn't filling the card. */
@@ -137,7 +137,7 @@ function focusCorners(): HTMLElement {
 
 /** Each radius in device pixels at every scale. */
 function deviceRadii(): HTMLElement {
-  return table(
+  return across(table(
     ["Role", ...SCALES.map((scale) => `${scale}×`)],
     ROLES.filter((name) => name !== "full").map((name) => [
       token(`radius.${name}`),
@@ -146,69 +146,44 @@ function deviceRadii(): HTMLElement {
         return label(String(value), "mono", Number.isInteger(value) ? "on_surface" : "error");
       }),
     ]),
-  );
+  ));
+}
+
+/** A well's rows beside every other role, each as it is used, under its token. */
+function ladder(): HTMLElement {
+  const used = (name: Role) => el("div", "f-swatch-cell", label(`radius.${name}`, "mono", "on_surface_variant"), inUse(name));
+  const well = el("div", "f-well", ...["Wi-Fi", "Bluetooth", "Sound"].map((name, i) => wellRow(name, i === 0)));
+  return el("div", "f-row", el("div", "f-swatch-cell", label("radius.content, radius.row", "mono", "on_surface_variant"), well), ...(["small", "full", "control", "content", "surface"] as const).map(used));
 }
 
 export default foundation({
   level: "foundations",
   slug: "radii",
   title: "Radii",
-  summary: "Five corner radii by what a shape is, and full for pills: one ladder of boxes, and rows that follow the box they sit in.",
-  live: () => el("div", "f-well", ...["Wi-Fi", "Bluetooth", "Sound"].map((name, i) => wellRow(name, i === 0))),
-  description: [
-    "Every radius says what the shape is, on one ladder of boxes: small for marks inside controls; row for the rows of a box; control for everything you click or type in and the small floating things (a popover, a menu, a toast); content for a box inside a window (a card, a list well, a dialog); surface for the shell's big surfaces alone (a panel, a window, the screen frame); and full for pills and circles. A component takes the one its role names, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.",
-    "A row follows the box it sits in: its corner is the box's corner less the box's padding, so both corners share a centre. A menu is 12 with 4 inside and a list well 16 with 8 inside, so both rows are 8, the row radius. A control placed in content (a button in a card) isn't filling it, so it keeps its own role.",
-    "A box's padding goes with what it holds: 4 around rows in a floating box, 8 around rows in a content box, 12 around words in a small floating thing, 16 around content in a content box, and 24 in a dialog.",
-    "The live list is a well, a content box at 16, with its rows 8 in: they take 16 less 8, the row radius.",
-  ],
-  tokens: [
-    {
-      name: "The roles",
-      described: "Each role's radius, its corner on a plain shape, and the role in use: a checkbox's box, a button, a dialog, a card, a switch's track.",
-      sample: roles,
-    },
-  ],
+  lede: "Five corner radii by what a shape is, and full for pills; a row follows the box it sits in.",
+  stage: { live: ladder, hint: "pick a Scale: the corners stay concentric", daylight: true },
+  tokens: [{ name: "The roles", note: "Each role's radius, its corner on a plain shape, and the role in use.", sample: roles }],
   rules: [
-    {
-      name: "Padding goes with the box",
-      described: "Each box's padding, by what it holds. A row's corner is the box's less this padding.",
-      sample: paddings,
-    },
-    {
-      name: "A row follows its box",
-      described: "Each shape fills the box round it less the box's padding; its corner is the box's less the padding, and the dot is the centre both corners share. A well's rows and a menu's items both come to 8, the row radius. An inset that reaches the radius leaves nothing to round, and the nesting is refused.",
-      sample: worked,
-    },
-    {
-      name: "A control in content keeps its role",
-      described: "A card's buttons sit inside it without filling it, so they keep the control radius; nesting is only for a shape that fills another less an inset.",
-      sample: placedInside,
-    },
-    {
-      name: "The focus tube takes its control's corner",
-      described: "The tube is drawn at the control's own corner, 12 on a button, and each ring of its glow is concentric with it, its radius the control's plus its distance out. A pill's glow is a pill.",
-      sample: focusCorners,
-    },
+    { name: "Padding goes with the box", note: "Each box's padding, by what it holds; a row's corner is the box's less this.", sample: paddings },
+    { name: "A row follows its box", note: "The row's corner is the box's less its padding; the dot is the centre they share.", sample: worked },
+    { name: "A control keeps its role", note: "A card's button doesn't fill it, so it keeps `radius.control`.", sample: placedInside },
+    { name: "The tube takes its corner", note: "The tube is drawn at the control's corner; each ring of its glow is concentric with it.", sample: focusCorners },
   ],
   modes: doesntApply("a corner is the same in light and dark."),
   themes: doesntApply("a corner is the same in every theme."),
   scales: [
+    { name: "Every radius in device pixels", note: "Multiples of 4, whole at all four; full is half the shorter side.", sample: deviceRadii },
     {
-      name: "Every radius in device pixels",
-      described: "Each role's radius at each scale: a multiple of 4, so whole at all four. Full is half the shorter side, whatever that is.",
-      sample: deviceRadii,
-    },
-    {
-      name: "The same nesting at every scale",
-      described: "A well's rows 8 in, drawn at each scale: the corners stay concentric, on whole device pixels.",
+      name: "The same nesting",
+      note: "A well's rows 8 in: concentric, on whole device pixels.",
       sample: () => el("div", "f-scroll", el("div", "f-row", ...SCALES.map((scale) => atScale(scale, nesting(role("content"), "s8", ""))))),
     },
   ],
-  content: doesntApply("a corner doesn't change with the words inside: a pill stays a pill however long its label."),
-  motion: doesntApply("a corner doesn't animate: a shape keeps its role in every state."),
+  content: doesntApply("a pill stays a pill however long its label."),
+  motion: doesntApply("a shape keeps its corner in every state."),
   checks: [
-    { check: "kubaos-tokens", holds: "Refuses a radius that isn't a multiple of `grid`." },
-    { check: "`nested`", holds: "Refuses an inset that reaches the outer radius; in a `const`, in Rust, the build stops. The mockups' `nested` (`lib/radius.ts`) fails the page instead." },
-    { check: "kubaos-design lint", holds: "Fails on a radius written as a number, a shell radius that isn't a role, and a radius derived by hand (`outer - inset`)." },
+    { check: "kubaos-tokens", holds: "refuses a radius off `grid`" },
+    { check: "`nested`", holds: "refuses an inset reaching the radius: Rust's build stops, the page fails" },
+    { check: "kubaos-design lint", holds: "fails a radius as a number or derived by hand" },
   ],
 });

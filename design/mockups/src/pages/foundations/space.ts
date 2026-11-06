@@ -8,60 +8,67 @@ import { row, stack } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
 import { length, names, raw } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
-import { doesntApply } from "../../site/page.ts";
-import { foundation } from "../../site/legacy.ts";
+import { doesntApply, foundation } from "../../site/page.ts";
 import { atScale, table, token } from "../../site/parts/swatches.ts";
 import { SCALES } from "../../site/settings.ts";
+import { across } from "./across.ts";
 
 /** Which way a size runs, so it is drawn as it is measured. */
 type Axis = "width" | "height" | "side";
 
 /** What each size is for and which way it runs, from the tokens' own words. */
 const SIZE_FOR: Record<string, { axis: Axis; for: string }> = {
-  control_sm: { axis: "height", for: "A small button or field: chrome around a screen, beside a field's label." },
-  control_md: { axis: "height", for: "A regular button, and a field, so the two line up side by side." },
-  control_lg: { axis: "height", for: "The one main action of a big page: Kōbō's Install." },
-  row: { axis: "height", for: "A list row with one line." },
-  row_two_line: { axis: "height", for: "A list row with a title over a subtitle." },
-  row_compact: { axis: "height", for: "A table's row: a line of body text with 4 above and below, dense and still easy to hit." },
-  menu: { axis: "width", for: "A menu: an item's symbol, its words and a shortcut's keycaps side by side." },
-  chip: { axis: "height", for: "A chip." },
-  badge: { axis: "side", for: "A count's pill over an icon's corner, a line of label text tall." },
-  badge_dot: { axis: "side", for: "A badge's dot, the size of a picked radio button's." },
-  switch_width: { axis: "width", for: "A switch's track." },
-  switch_height: { axis: "height", for: "A switch's track." },
-  switch_knob_off: { axis: "side", for: "A switch's knob off, leaving 6 of track round it." },
-  switch_knob_on: { axis: "side", for: "A switch's knob on: it grows, leaving 4." },
-  check: { axis: "side", for: "A checkbox's box and a radio button's disc." },
-  radio_dot: { axis: "side", for: "The dot of a picked radio button." },
-  progress: { axis: "height", for: "A progress bar." },
-  dialog: { axis: "width", for: "A dialog." },
-  password: { axis: "width", for: "A password field alone on a screen, under the lock screen's clock: wider than the clock without outweighing it." },
-  column: { axis: "width", for: "The widest a column of text and fields grows." },
-  rail: { axis: "width", for: "Kōbō's step rail on a wide screen." },
-  sidebar: { axis: "width", for: "An app's sidebar, its list of pages beside the page: wider than the rail, for settings' names." },
-  app_width: { axis: "width", for: "An app's window opens centred and floating at this width." },
-  app_height: { axis: "height", for: "And at this height." },
-  app_min_width: { axis: "width", for: "Tiled, an app's window never goes narrower." },
-  app_min_height: { axis: "height", for: "Nor lower." },
-  log: { axis: "height", for: "A log opened under an error or a progress bar." },
-  panel: { axis: "width", for: "A panel of the shell, and a notification beside one: the control center's side sheet." },
-  bar: { axis: "height", for: "The shell's bar along the top of every screen: a small control with 4 above and below." },
-  bar_label: { axis: "width", for: "The widest a name the bar shows grows, past which it ends in an ellipsis." },
-  thumbnail_width: { axis: "width", for: "A wallpaper's thumbnail in the shell's picker, 16:10 as the screens are." },
-  thumbnail_height: { axis: "height", for: "Its height." },
-  slider: { axis: "height", for: "A slider, a pill whose fill marks the value." },
-  slider_compact: { axis: "height", for: "A slider in a dense panel, as tall as a compact row." },
-  slider_stop: { axis: "side", for: "The dot of each step; off the grid, drawn centred on a point that moves with the value." },
-  slider_anchor: { axis: "side", for: "The solid dot of the mark the value rests on; off the grid, as the stop is." },
-  slider_anchor_compact: { axis: "side", for: "The anchor dot on a compact slider." },
-  slider_hold: { axis: "width", for: "How near a drag holds on a sticky point before it pulls free." },
-  scrollbar: { axis: "width", for: "A scrollbar's thumb, a thin pill: it only says where you are." },
-  keycap: { axis: "height", for: "A keycap: as tall as a line of body text, and never narrower than tall." },
-  neon_mark: { axis: "side", for: "The クバ mark drawn as lit neon tubes on Kōbō's done screen, with room for the glow." },
-  hanko: { axis: "side", for: "The 完了 hanko stamped beside it." },
-  sparkline: { axis: "height", for: "A sparkline in a panel, as tall as a large control so a graph and the buttons beside it line up." },
-  motion_plot: { axis: "height", for: "The mockups' motion player's plot, from 0 to 1." },
+  control_sm: { axis: "height", for: "A small button or field" },
+  control_md: { axis: "height", for: "A regular button, and a field to line up with it" },
+  control_lg: { axis: "height", for: "A big page's one main action" },
+  row: { axis: "height", for: "A list row of one line" },
+  row_two_line: { axis: "height", for: "A list row, title over subtitle" },
+  row_compact: { axis: "height", for: "A table's row" },
+  menu: { axis: "width", for: "A menu" },
+  chip: { axis: "height", for: "A chip" },
+  badge: { axis: "side", for: "A count's pill on an icon's corner" },
+  badge_dot: { axis: "side", for: "A badge's dot" },
+  switch_width: { axis: "width", for: "A switch's track" },
+  switch_height: { axis: "height", for: "A switch's track" },
+  switch_knob_off: { axis: "side", for: "A switch's knob off, 6 of track round it" },
+  switch_knob_on: { axis: "side", for: "A switch's knob on, 4 round it" },
+  check: { axis: "side", for: "A checkbox's box, a radio's disc" },
+  radio_dot: { axis: "side", for: "A picked radio's dot" },
+  progress: { axis: "height", for: "A progress bar" },
+  dialog: { axis: "width", for: "A dialog" },
+  password: { axis: "width", for: "The lock screen's password field" },
+  column: { axis: "width", for: "The widest column of text and fields" },
+  rail: { axis: "width", for: "Kōbō's step rail" },
+  sidebar: { axis: "width", for: "An app's sidebar" },
+  app_width: { axis: "width", for: "An app's window as it opens" },
+  app_height: { axis: "height", for: "An app's window as it opens" },
+  app_min_width: { axis: "width", for: "The narrowest a tiled app goes" },
+  app_min_height: { axis: "height", for: "The lowest a tiled app goes" },
+  log: { axis: "height", for: "A log under an error or a progress bar" },
+  panel: { axis: "width", for: "A shell panel, a notification beside one" },
+  bar: { axis: "height", for: "The shell's bar" },
+  bar_label: { axis: "width", for: "The widest name in the bar" },
+  thumbnail_width: { axis: "width", for: "A wallpaper's thumbnail, 16:10" },
+  thumbnail_height: { axis: "height", for: "A wallpaper's thumbnail, 16:10" },
+  slider: { axis: "height", for: "A slider" },
+  slider_compact: { axis: "height", for: "A slider in a dense panel" },
+  slider_stop: { axis: "side", for: "A step's dot, off the grid" },
+  slider_anchor: { axis: "side", for: "The anchor's dot, off the grid" },
+  slider_anchor_compact: { axis: "side", for: "The anchor's dot on a compact slider" },
+  slider_hold: { axis: "width", for: "How near a drag holds on a sticky point" },
+  scrollbar: { axis: "width", for: "A scrollbar's thumb" },
+  keycap: { axis: "height", for: "A keycap, never narrower than tall" },
+  neon_mark: { axis: "side", for: "The クバ mark on Kōbō's done screen" },
+  hanko: { axis: "side", for: "The 完了 hanko beside it" },
+  sparkline: { axis: "height", for: "A sparkline in a panel" },
+  motion_plot: { axis: "height", for: "The motion player's plot" },
+  canvas_settings: { axis: "width", for: "CanvasPage's settings beside its canvas" },
+  canvas_wide: { axis: "width", for: "Where CanvasPage's settings move beside its canvas" },
+  collapsible_rail: { axis: "width", for: "The strip round a collapsible's rail that takes the pointer" },
+  find: { axis: "width", for: "SidebarPage's find box" },
+  halo: { axis: "side", for: "The soft blur round words on a picture" },
+  halo_edge: { axis: "side", for: "The tight blur round words on a picture" },
+  lock_blur: { axis: "side", for: "How far the lock's wallpaper blurs, awake" },
 };
 
 /** A length in logical pixels, as the page writes it. */
@@ -84,31 +91,29 @@ function bar(token: string, axis: Axis): HTMLElement {
 
 /** Every spacing step: its bar, its value, and its device pixels at every scale. */
 function spacing(): HTMLElement {
-  return table(
+  return across(table(
     ["Step", "Its length", ...SCALES.map((scale) => `${scale}×`)],
     names("space-").map((name) => [
       token(name.replace("-", "."), logical(name)),
       bar(name, "width"),
       ...SCALES.map((scale) => label(device(name, scale).words, "mono", device(name, scale).whole ? "on_surface" : "error")),
     ]),
-  );
+  ));
 }
 
 /** Every fixed size: its value, drawn the way it runs, and what it is for. */
 function sizes(): HTMLElement {
-  return el(
-    "div",
-    "f-scroll",
+  return across(
     table(
-      ["Size", "Runs", "Drawn", "For"],
+      ["Size", "Runs", "For", "Drawn"],
       names("size-").map((name) => {
         const short = name.slice("size-".length);
         const use = SIZE_FOR[short];
         return [
           token(`size.${short}`, logical(name)),
           label(use?.axis ?? "?", "body", "on_surface"),
-          bar(name, use?.axis ?? "width"),
           prose(use?.for ?? "No words for this size: add them to `SIZE_FOR`.", "body", use ? "on_surface" : "error"),
+          bar(name, use?.axis ?? "width"),
         ];
       }),
     ),
@@ -156,22 +161,28 @@ function container(): HTMLElement {
   return el(
     "div",
     "page-part",
-    table(
-      ["From", "Padding at its sides"],
-      steps().map((each) => [label(`${each.from}`, "mono", "on_surface"), token(stepName(each.padding), String(length(each.padding)))]),
+    across(
+      table(
+        ["From", "Padding at its sides"],
+        steps().map((each) => [label(`${each.from}`, "mono", "on_surface"), token(stepName(each.padding), String(length(each.padding)))]),
+      ),
     ),
     el("div", "f-scroll", el("div", "f-stack", containerAt("size-panel", "A panel"), containerAt("size-app_min_width", "An app at its minimum"), containerAt("size-app_width", "An app at its default"))),
   );
 }
 
 /** A toolbar band: a small control, a step above and below, and nothing more. */
-function band(): HTMLElement {
+function bandBox(): HTMLElement {
   const inner = row("s8", "start", button({ label: "Back", kind: "Text", size: "Sm" }), button({ label: "Continue", kind: "Filled", size: "Sm" }));
-  const box = padded("container-0-padding", "space-s16", inner);
+  return padded("container-0-padding", "space-s16", inner);
+}
+
+/** The band over its sum. */
+function band(): HTMLElement {
   return el(
     "div",
     "f-swatch-cell",
-    box,
+    bandBox(),
     token(`band = space.s16 ${length("space-s16")} + size.control_sm ${length("size-control_sm")} + space.s16 ${length("space-s16")} = ${length("space-s16") * 2 + length("size-control_sm")}`),
   );
 }
@@ -225,80 +236,50 @@ function live(): HTMLElement {
 
 /** Every fixed size's device pixels at every scale; a size off the grid is red where it isn't whole. */
 function deviceSizes(): HTMLElement {
-  return table(
+  return across(table(
     ["Size", ...SCALES.map((scale) => `${scale}×`)],
     names("size-").map((name) => [
       token(`size.${name.slice("size-".length)}`),
       ...SCALES.map((scale) => label(device(name, scale).words, "mono", device(name, scale).whole ? "on_surface" : "error")),
     ]),
-  );
+  ));
 }
 
 export default foundation({
   level: "foundations",
   slug: "space",
   title: "Space, sizes and the container",
-  summary: "Every length on the 4 grid: the spacing steps, the fixed sizes of components, and the container that pads every page and panel at its sides.",
-  live,
-  description: [
-    "Every spacing, size, radius, icon size, line height and shadow offset is a multiple of `grid`, 4 logical pixels, because the scales are 1, 1.25, 1.5 and 2: a multiple of 4 is a whole number of device pixels at every one of them. Hairlines are the exception, one device pixel at every scale, and two dots drawn centred on a moving point are allowed off the grid.",
-    "Gaps, paddings and insets take a spacing step; a component's fixed measure takes its size, by name. A box sized by its words is rounded up to the next device pixel, and centring puts an odd spare pixel after the child, never before it.",
-    "Every page's and panel's body is padded at its sides by the container, by its own width: 16 under 640, 24 from 640, 32 from 1024, Tailwind's container on its breakpoints. Above and below, content keeps the steps it is laid out with.",
-    "Dense, never cramped: room that holds nothing is a bug. A band is its content and a step, a row its type's natural height, content runs to the container's padding, and padding is applied once.",
-  ],
+  lede: "Every length on the 4 grid: spacing steps, components' fixed sizes, and the container that pads every page and panel.",
+  stage: {
+    live: () => el("div", "f-row", live(), bandBox()),
+    hint: "pick a Scale: every length stays on whole pixels",
+    daylight: true,
+  },
   tokens: [
-    {
-      name: "The spacing steps",
-      described: "Every step as a bar of its length at the page's scale, and its device pixels at each scale: all whole.",
-      sample: spacing,
-    },
-    {
-      name: "Every fixed size",
-      described: "Every component's fixed measure, by name, drawn the way it runs (a bar along a width or a height, a square for a side), with what it is for. A size wider than the page at this scale scrolls.",
-      sample: sizes,
-    },
-    {
-      name: "The container",
-      described: "From which width of its own each padding applies, and a container at a width in each step, its padding shaded: a panel, an app at its minimum, an app at its default. A container wider than the page at this scale scrolls.",
-      sample: container,
-    },
+    { name: "The spacing steps", note: "Each step as a bar, and its device pixels at every scale.", sample: spacing },
+    { name: "Every fixed size", note: "Each component's fixed measure, drawn the way it runs.", sample: sizes },
+    { name: "The container", note: "Padding follows the box's own width, not the screen's; it is shaded here.", sample: container },
   ],
   rules: [
-    {
-      name: "A band is its content and a step",
-      described: "A footer, toolbar or header band is as tall as what is in it and one step above and below, and no taller: the specimen's bar is a small control with 16 above and below.",
-      sample: band,
-    },
-    {
-      name: "Rows are their type's natural height",
-      described: "A row is `row` with one line or `row_two_line` with two, a line of text its style's line. A row taller than that holds air.",
-      sample: rows,
-    },
-    {
-      name: "Padding is applied once",
-      described: "A container inside a container doesn't pad again: a card inside a page keeps its own padding inside it, and the page's padding is the only one round it. Content runs to the container's padding at either side; nothing pads it further in.",
-      sample: nestedContainer,
-    },
+    { name: "A band: content and a step", note: "As tall as what is in it and one step above and below, and no taller.", sample: band },
+    { name: "Rows are their type's height", note: "`row` with one line, `row_two_line` with two; a taller row holds air.", sample: rows },
+    { name: "Padding is applied once", note: "A card keeps its padding inside; the page's is the only one round it.", sample: nestedContainer },
   ],
-  modes: doesntApply("geometry never changes with the mode: the light and dark pages are the same boxes, and the geometry check holds them to it."),
+  modes: doesntApply("geometry never changes with the mode."),
   themes: doesntApply("a length is the same in every theme."),
   scales: [
+    { name: "Every size in device pixels", note: "A multiple of 4 is whole at all four; only the off-grid dots may not be.", sample: deviceSizes },
     {
-      name: "Every size in device pixels",
-      described: "Each fixed size at each scale. A multiple of 4 is whole at all four; the off-grid dots aren't, which they may be, being drawn centred on a point that moves.",
-      sample: deviceSizes,
-    },
-    {
-      name: "The same panel at every scale",
-      described: "Each box below is drawn at its own scale, whatever the toolbar's: its padding, its gaps and its controls are that scale's device pixels.",
+      name: "The same panel",
+      note: "Each box at its own scale, whatever the top bar picks.",
       sample: () => el("div", "f-scroll", el("div", "f-row", ...SCALES.map((scale) => atScale(scale, live())))),
     },
   ],
-  content: doesntApply("space holds no words: how a box grows with its words is each component's page, and how text wraps the type page."),
-  motion: doesntApply("a length doesn't animate on its own; what moves, moves by its component's motion."),
+  content: doesntApply("space holds no words; the Type page shows how text wraps."),
+  motion: doesntApply("a length doesn't animate on its own."),
   checks: [
-    { check: "kubaos-tokens", holds: "Refuses a spacing step, size, radius, icon size, line height or shadow that isn't a multiple of `grid`, but for the sizes listed in `rules.off_grid`, and a container breakpoint or padding off the grid." },
-    { check: "kubaos-design lint", holds: "Fails on a length written out in QML or Rust UI code: a length is a `Space`, `Size` or `Radius` token." },
-    { check: "The geometry check", holds: "Holds every box to whole device pixels at every scale, and every `Page` and `Container` to the container's padding at its width (`container-padding`). An empty band is judged by eye in the shots." },
+    { check: "kubaos-tokens", holds: "refuses any length off `grid`, but those in `rules.off_grid`" },
+    { check: "kubaos-design lint", holds: "fails a length written out in UI code" },
+    { check: "The geometry check", holds: "holds boxes to whole device pixels, pages to the container's padding" },
   ],
 });

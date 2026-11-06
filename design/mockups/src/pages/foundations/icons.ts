@@ -7,10 +7,10 @@ import { type TypeStyle, text } from "../../lib/text.ts";
 import { iconTile, TILE_MEASURES, TILE_SIZES } from "../../lib/icon-tile.ts";
 import { length, names, number } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
-import { doesntApply } from "../../site/page.ts";
-import { foundation } from "../../site/legacy.ts";
+import { doesntApply, foundation } from "../../site/page.ts";
 import { atScale, MODES, modeName, painted, table, themes, token } from "../../site/parts/swatches.ts";
 import { SCALES, settings } from "../../site/settings.ts";
+import { across } from "./across.ts";
 import appIcon from "../../../../../branding/png/kubaos-icon-128.png?url";
 // An app's icon with no plate, a star: a shape on its tile (`site/app-icons.ts`).
 import glyph from "../../assets/icon-tile/star.svg?url";
@@ -18,11 +18,11 @@ import photo from "../../../../../branding/photo/neon-sign-front.png?url";
 
 /** The symbols drawn by us where Tabler has none, how each is drawn, and its Tabler relatives in the set. */
 const OURS: Record<string, { readonly drawn: string; readonly relatives: readonly string[] }> = {
-  hard_drive: { drawn: "A drive's case in server-2's proportions, its board below a line, server-2's light and slot.", relatives: ["storage", "memory"] },
-  wifi_lock: { drawn: "Tabler's Wi-Fi fan at full size, stopped 2 units clear of its lock badge.", relatives: ["wifi", "lock"] },
-  wifi_find: { drawn: "Tabler's Wi-Fi fan at full size, stopped 2 units clear of its search badge.", relatives: ["wifi", "search"] },
-  bluetooth_searching: { drawn: "Tabler's bluetooth-x, a magnifier where its x is.", relatives: ["bluetooth", "search"] },
-  star_filled: { drawn: "Tabler's star, filled, its outline kept so it is the outline star's size.", relatives: ["star"] },
+  hard_drive: { drawn: "A drive's case in server-2's proportions", relatives: ["storage", "memory"] },
+  wifi_lock: { drawn: "Tabler's Wi-Fi fan, stopped 2 units clear of its lock", relatives: ["wifi", "lock"] },
+  wifi_find: { drawn: "Tabler's Wi-Fi fan, stopped 2 units clear of its search", relatives: ["wifi", "search"] },
+  bluetooth_searching: { drawn: "Tabler's bluetooth-x, a magnifier for its x", relatives: ["bluetooth", "search"] },
+  star_filled: { drawn: "Tabler's star filled, its outline kept", relatives: ["star"] },
 };
 
 /** The sizes a symbol is drawn at beside text, in the set's cells. */
@@ -74,27 +74,27 @@ function symbolSet(): HTMLElement {
 
 /** Every icon size, its box drawn round a symbol, and the styles it sits beside. */
 function sizeTable(): HTMLElement {
-  return table(
+  return across(table(
     ["Size", "Drawn in its box", "Beside"],
     sizes().map((size) => {
       const px = length(size);
-      const styles = size === "icon-two_line" ? "a title over a subtitle, `body_strong` over `small`" : beside(px).map((style) => `\`${style}\``).join(", ");
+      const styles = size === "icon-two_line" ? "a title over a subtitle: `body_strong` over `small`" : beside(px).map((style) => `\`${style}\``).join(", ");
       return [token(size.replace("-", "."), String(px)), boxed("settings", size), prose(styles || "above text: an empty state's, a page's one big symbol", "body", "on_surface")];
     }),
-  );
+  ));
 }
 
 /** The five drawn by us, each beside its Tabler relatives, at 16, 20, 24 and 48, all one colour. */
 function ours(): HTMLElement {
   const at = (name: string) => row("s16", "end", ...["icon-s16", "icon-s20", "icon-s24", "icon-s48"].map((size) => icon(name, `var(--${size})`, "var(--color-on_surface)")));
-  return table(
+  return across(table(
     ["Ours", "Its relatives", "How it is drawn"],
     Object.entries(OURS).map(([name, { drawn, relatives }]) => [
       stack("s8", "start", at(name), label(name, "mono", "on_surface_variant")),
       stack("s8", "start", ...relatives.map((relative) => stack("s4", "start", at(relative), label(relative, "mono", "on_surface_variant")))),
       prose(drawn, "body", "on_surface"),
     ]),
-  );
+  ));
 }
 
 /** `style`'s symbol in a box as wide as itself and its line tall, centred down it. */
@@ -113,10 +113,10 @@ function line(style: TypeStyle, words = "Wi-Fi"): HTMLElement {
 
 /** Every style, its icon and the line it sits on. */
 function byType(): HTMLElement {
-  return table(
+  return across(table(
     ["Style", "Icon", "On its line"],
     styles().map((style) => [token(style), label(String(length(`type-${style}-icon`)), "mono", "on_surface"), line(style)]),
-  );
+  ));
 }
 
 /** A title over a subtitle, the icon spanning both, and a tile beside the same two lines. */
@@ -177,10 +177,10 @@ function symbolStroke(size: number, scale: number): number {
 }
 
 function strokeTable(): HTMLElement {
-  return table(
+  return across(table(
     ["Size", ...SCALES.map((scale) => `${scale}×`)],
     names("icon-s").map((size) => [token(size.replace("-", "."), String(length(size))), ...SCALES.map((scale) => label(String(symbolStroke(length(size), scale)), "mono", "on_surface"))]),
-  );
+  ));
 }
 
 /** A few symbols at every size, in the theme and `mode`. */
@@ -193,108 +193,72 @@ function sampler(mode: "dark" | "light", theme = settings().theme): HTMLElement 
   );
 }
 
+/** The set at work: a symbol on each kind of line, beside two lines and on every tile, on the surface it is drawn on. */
+function atWork(): HTMLElement {
+  const twoLine = row("s12", "start", iconTile({ glyph: "wifi", size: "Md" }), stack(0, "start", text("Kitchen", "body_strong", "on_surface"), text("Connected · WPA2", "small", "on_surface_variant")));
+  return el(
+    "div",
+    "f-row",
+    stack("s8", "start", line("heading"), line("body"), line("small")),
+    twoLine,
+    row("s16", "start", ...TILE_SIZES.map((size) => iconTile({ glyph: "terminal", size })), iconTile({ glyph: "star_filled", size: "Md", accent: true }), iconTile({ glyph: "warning", size: "Md", danger: true })),
+    row("s16", "end", ...names("icon-s").map((size) => icon("wifi_lock", `var(--${size})`, "var(--color-on_surface)"))),
+  );
+}
+
 export default foundation({
   level: "foundations",
   slug: "icons",
   title: "Icons",
-  summary: "One set, KubaOS Symbols: Tabler's outline icons and five of our own, drawn from SVGs at the size of the text beside them, their strokes whole device pixels at every scale.",
-  live: () =>
-    painted(
-      settings().theme,
-      settings().mode,
-      line("body"),
-      row("s12", "start", iconTile({ glyph: "wifi", size: "Md" }), stack(0, "start", text("Kitchen", "body_strong", "on_surface"), text("Connected · WPA2", "small", "on_surface_variant"))),
-      row("s16", "start", ...TILE_SIZES.map((size) => iconTile({ glyph: "terminal", size }))),
-    ),
-  description: [
-    "One set: KubaOS Symbols, Tabler's outline icons, picked by Kuba from a sheet of the same 40 glyphs in four sets, each named for the Material Symbol it replaced. Five are ours, where Tabler has none, drawn on Tabler's 24 grid with its 2 unit stroke and round caps and joins, as Tabler builds its own badged icons.",
-    "A symbol is drawn from its SVG, not a font, with its stroke set for its size and scale: 2 of its 24 units scaled to the size, rounded half up to whole device pixels and never under one, so no line falls between device pixels.",
-    "A symbol takes its size from the text beside it, never a size of its own: each type style names its icon, one or two icon sizes above its font size, never taller than its line. Beside a title over a subtitle it spans both, 24. Above text it takes the size its place names: an empty state's 32, a page's one big symbol 48.",
-    "A symbol's box is centred in its slot on a whole device pixel, the odd one after it; the drawing's own optical centre is Tabler's grid, which ours follow. Its colour is a role, and its alpha dims it as its label dims. Apps show as uniform tiles: the app's icon on a tile of one size and radius, so a list of apps reads as one set, whatever each vendor drew.",
-  ],
+  lede: "One set: Tabler's outline icons and five of our own, drawn at the size of the text beside them, strokes on whole device pixels.",
+  stage: { live: atWork, hint: "pick a Scale: strokes thicken in whole pixels", daylight: true },
   tokens: [
-    {
-      name: "The whole symbol set",
-      described: "Every symbol at 16, 20 and 24, under its name; the five drawn by us are outlined in the accent. A named symbol is never missing: the set is closed, and a new one is drawn and shown here before it ships.",
-      sample: symbolSet,
-    },
-    {
-      name: "The sizes",
-      described: "Every `[icon]` size, a symbol in its box with the box drawn round it (its ink 2 units clear inside, Tabler's margin), and the styles it sits beside.",
-      sample: sizeTable,
-    },
-    {
-      name: "Drawn by us",
-      described: "Each of our five beside the Tabler symbols it borrows from, all one colour, at 16, 20, 24 and 48: its ink as dense as theirs.",
-      sample: ours,
-    },
+    { name: "The whole symbol set", note: "Every symbol at 16, 20 and 24; ours outlined in the accent; the set is closed.", sample: symbolSet },
+    { name: "The sizes", note: "Each size in its box, its ink 2 units clear, and the styles it sits beside.", sample: sizeTable },
+    { name: "Drawn by us", note: "Our five beside the Tabler symbols they borrow from, their ink as dense.", sample: ours },
   ],
   rules: [
-    {
-      name: "Icons by type",
-      described: "Every type style with its icon before its words on its line box, tinted so its height shows: the icon is centred down the line on a whole device pixel and never makes it taller, so a row with an icon is as tall as one without. `kubaos-tokens` refuses an icon taller than its style's line.",
-      sample: byType,
-    },
-    {
-      name: "Beside two lines",
-      described: "A title over a subtitle (`body_strong` over `small`, a 40 block) takes the icon that spans both, `icon.two_line`, 24, centred down the block; a tile beside the same two lines is md, 40, the block's height.",
-      sample: twoLines,
-    },
-    {
-      name: "Optically centred",
-      described: "A symbol centred in a slot of each tile's size, the slot's middle marked across and down: its box sits on a whole device pixel, the odd one after it. Then symbols on their 24 unit grid, a line every unit, the 2 unit margin shaded: Tabler's grid is the drawing's optical centre, and ours keep to it.",
-      sample: centring,
-    },
-    {
-      name: "Colour is a role",
-      described: "A symbol takes the colour role of what it says: the content's, the quiet content's, the accent, the cold accent, the error; disabled, it dims to `opacity.disabled_content` as its label does.",
-      sample: roles,
-    },
-    {
-      name: "Apps as uniform tiles",
-      described: "An `IconTile` at sm 32 beside one line (a 20 symbol), md 40 beside a title over a subtitle (24) and lg 48 over a `headline` name (32), at the control radius, on `surface_container_highest`; its symbol `on_surface_variant`, or `primary` on the one tile of a list that comes first, and on `error` for a critical notification. An app's icon is measured once when it loads: the box of what it draws, without its theme's margin, fills the tile when it is a plate (square, and covering at least `icon_tile.plate` of the box), cut by the tile's corners, and otherwise sits as a shape `space.s4` inside it, kept whole either way. A photo covers the tile.",
-      sample: tiles,
-    },
+    { name: "Icons by type", note: "Centred down the line and never taller, so a row with an icon is as tall as one without.", sample: byType },
+    { name: "Beside two lines", note: "`icon.two_line`, 24, spans the 40 block; a tile beside it is md, 40.", sample: twoLines },
+    { name: "Optically centred", note: "Its box on a whole device pixel, the odd one after; Tabler's 24 grid is the optical centre.", sample: centring },
+    { name: "Colour is a role", note: "The role of what it says; disabled, it dims to `opacity.disabled_content`.", sample: roles },
+    { name: "Apps as uniform tiles", note: "sm 32, md 40, lg 48 at the control radius; a plate fills it, a shape sits `space.s4` inside.", sample: tiles },
   ],
   modes: [
     {
       name: "Dark and light",
-      described: "The symbols at every size and the tiles in each mode: a symbol is its role's colour in either, so it reads on both surfaces.",
+      note: "A symbol is its role's colour, so it reads on both surfaces.",
       sample: () => el("div", "f-row", ...MODES.map((mode) => el("div", "f-swatch-cell", label(modeName(mode), "label"), sampler(mode)))),
     },
   ],
   themes: [
     {
       name: "In every theme",
-      described: "The same symbols and tiles in each theme the toolbar paints in, in the mode picked: only the accent's symbol and the tiles' tint follow the wallpaper.",
+      note: "Only the accent's symbol and the tiles' tint follow the wallpaper.",
       sample: () => el("div", "f-row", ...themes().map((theme) => el("div", "f-swatch-cell", label(theme.name, "label"), sampler(settings().mode, theme.slug)))),
     },
   ],
   scales: [
+    { name: "The stroke in device pixels", note: "2 of 24 units, rounded half up, never under one; 16 at 1× stays 1.", sample: strokeTable },
     {
-      name: "The stroke in device pixels",
-      described: "Each size's stroke at each scale: 2 of 24 units, rounded half up, never under one. 16 at 1× stays 1: 1.33 rounds to 1, and 2 would make the small symbols heavier than the text beside them.",
-      sample: strokeTable,
-    },
-    {
-      name: "The symbols at every scale",
-      described: "Each box is drawn at its own scale, whatever the toolbar's: the strokes thicken in whole device pixels.",
+      name: "The symbols",
+      note: "Each box at its own scale, whatever the top bar picks.",
       sample: () => el("div", "f-scroll", el("div", "f-row", ...SCALES.map((scale) => atScale(scale, row("s16", "end", ...names("icon-s").map((size) => icon("wifi_lock", `var(--${size})`, "var(--color-on_surface)"))))))),
     },
   ],
   content: [
     {
       name: "No picture",
-      described: "A tile shows its symbol until the app's picture has loaded, and keeps it when there is none, so every row reads the same size; a symbol of the set is never missing.",
+      note: "A tile keeps its symbol until the picture loads, or when there is none.",
       sample: () => el("div", "f-row", iconTile({ glyph: "terminal", size: "Md" }), iconTile({ glyph: "terminal", size: "Md", picture: appIcon })),
     },
   ],
-  motion: doesntApply("a symbol moves only with what it is on; one symbol changing for another (a Wi-Fi strength's bars) swaps at once, with its state."),
+  motion: doesntApply("a symbol moves with what it is on; a swap is at once, with its state."),
   checks: [
-    { check: "kubaos-tokens", holds: "Refuses an icon taller than its style's line." },
-    { check: "make-symbols.sh", holds: "Fetches each Tabler symbol hash-pinned, from `@tabler/icons` 3.49.0, by the name `[symbols]` gives it." },
-    { check: "The geometry check", holds: "Holds each symbol's box to whole device pixels at every scale, centred in its slot, and an `IconTile` to its twin on the specimen's page." },
-    { check: "kubaos-design lint", holds: "Fails on a size written out as a number in QML or Rust UI code: an icon takes its size from its text's style." },
-    { check: "Not enforced yet", holds: "Uniform app tiles for every list of apps land with the apps catalog." },
+    { check: "kubaos-tokens", holds: "refuses an icon taller than its style's line" },
+    { check: "make-symbols.sh", holds: "fetches each Tabler symbol hash-pinned, from `@tabler/icons` 3.49.0" },
+    { check: "The geometry check", holds: "holds each symbol's box to device pixels, an `IconTile` to its twin" },
+    { check: "kubaos-design lint", holds: "fails an icon size written as a number in UI code" },
+    { check: "Not enforced yet", holds: "uniform tiles for every list of apps land with the catalog" },
   ],
 });
