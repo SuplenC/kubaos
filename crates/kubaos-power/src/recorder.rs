@@ -42,8 +42,8 @@ use crate::reading::Reading;
 /// How often a sample comes on battery: fine enough to see a stretch's edges, and one wakeup a
 /// minute next to the machine's hundreds a second.
 pub const SAMPLE_EVERY: Duration = Duration::from_mins(1);
-/// How long after a wake the battery is read. It is past [`crate::control::SETTLE`], and ACPI says
-/// a charger plugged in during the sleep only after the resume, so `status` is true by then.
+/// How long after a wake the battery is read. It is past [`crate::control::SETTLE`], and a charger
+/// plugged in during the sleep can take a moment after the resume to show in `status`.
 pub const WAKE_READING: Duration = Duration::from_secs(5);
 /// How often the history is asked whether it needs pruning, which reads its first line.
 pub const PRUNE_EVERY: Duration = Duration::from_hours(24);
