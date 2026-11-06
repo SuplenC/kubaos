@@ -157,3 +157,75 @@ fn the_tuxedo_profiles_stand_for_80_90_and_100() {
         Some(ChargeLimit::Full)
     );
 }
+
+#[test]
+fn the_critical_warning_defaults_to_five_percent() {
+    assert_eq!(Settings::default().critical_warning, Some(5));
+}
+
+#[test]
+fn the_critical_warning_reads_a_percent_or_off() {
+    let level = Settings::parse("critical_warning = 8\n").expect("parses");
+    let off = Settings::parse("critical_warning = \"off\"\n").expect("parses");
+
+    assert_eq!(level.critical_warning, Some(8));
+    assert_eq!(off.critical_warning, None);
+}
+
+#[test]
+fn the_critical_warning_refuses_anything_else_in_the_file() {
+    for text in [
+        "critical_warning = 2\n",
+        "critical_warning = 21\n",
+        "critical_warning = -5\n",
+        "critical_warning = \"soon\"\n",
+        "critical_warning = true\n",
+    ] {
+        assert!(
+            matches!(Settings::parse(text), Err(SettingsError::NotACriticalWarning(_))),
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn the_critical_warning_parses_what_the_command_is_given() {
+    assert_eq!(parse_critical_warning("off").expect("off"), None);
+    assert_eq!(parse_critical_warning("7").expect("7"), Some(7));
+    assert_eq!(parse_critical_warning("7%").expect("7%"), Some(7));
+
+    for text in ["2", "21", "on", ""] {
+        assert!(parse_critical_warning(text).is_err(), "{text:?}");
+    }
+}
+
+#[test]
+fn setting_the_critical_warning_keeps_the_comments_and_the_default_removes_the_key() {
+    let (_dir, path) = file("# mine\nlow_battery = 15\n");
+
+    let off = set_critical_warning(&path, None).expect("off");
+    assert_eq!(off.critical_warning, None);
+    assert!(
+        fs::read_to_string(&path)
+            .expect("read")
+            .contains("critical_warning = \"off\"")
+    );
+
+    let level = set_critical_warning(&path, Some(8)).expect("8");
+    assert_eq!(level.critical_warning, Some(8));
+
+    let default = set_critical_warning(&path, Some(DEFAULT_CRITICAL_WARNING)).expect("the default");
+    let text = fs::read_to_string(&path).expect("read");
+    assert_eq!(default.critical_warning, Some(DEFAULT_CRITICAL_WARNING));
+    assert!(!text.contains("critical_warning"), "{text}");
+    assert!(text.contains("# mine"), "{text}");
+}
+
+#[test]
+fn setting_the_critical_warning_out_of_range_changes_nothing() {
+    let (_dir, path) = file("low_battery = 15\n");
+
+    assert!(set_critical_warning(&path, Some(2)).is_err());
+
+    assert_eq!(fs::read_to_string(&path).expect("read"), "low_battery = 15\n");
+}

@@ -5,6 +5,7 @@
 //! charge_limit = 100            # 80, 90 or 100
 //! low_battery = 20              # the drop's level, in percent
 //! low_battery_stop = "power-saver"   # "super-saver", or "off" for no drop
+//! critical_warning = 5          # the warning's level, in percent, or "off"
 //! scheduler = "kernel"          # "lavd": scx_lavd through sched_ext, its mode the stop's
 //!
 //! [usb]
@@ -53,6 +54,16 @@ pub const MIN_LOW_BATTERY: u8 = 5;
 pub const MAX_LOW_BATTERY: u8 = 50;
 /// Where the low-battery drop goes: Power Saver, which keeps the panel and the machine usable.
 pub const DEFAULT_LOW_BATTERY_STOP: Stop = Stop::PowerSaver;
+/// The level UPower takes its critical action at: `PercentageAction` in Ubuntu's
+/// `/etc/UPower/UPower.conf`, which KubaOS leaves as it ships.
+pub const UPOWER_ACTION_PERCENT: u8 = 2;
+/// The level the critical-battery warning comes at: UPower's own `PercentageCritical`, three points
+/// before it acts.
+pub const DEFAULT_CRITICAL_WARNING: u8 = 5;
+/// The lowest level the warning may be set to: at UPower's own, it comes with the power-off.
+pub const MIN_CRITICAL_WARNING: u8 = UPOWER_ACTION_PERCENT + 1;
+/// The highest: the low-battery drop's level, above which a warning says nothing the drop doesn't.
+pub const MAX_CRITICAL_WARNING: u8 = 20;
 /// The battery charges full by default: a limit is the user's choice, for a laptop on a desk.
 pub const DEFAULT_CHARGE_LIMIT: ChargeLimit = ChargeLimit::Full;
 /// Super Saver's clock cap. With boost off the Ryzen AI 9 HX 370 already tops out at its 2.0 GHz
@@ -184,6 +195,8 @@ pub struct Settings {
     pub low_battery: u8,
     /// Where the low-battery drop goes; `None` turns it off.
     pub low_battery_stop: Option<Stop>,
+    /// The battery level of the critical-battery warning, in percent; `None` turns it off.
+    pub critical_warning: Option<u8>,
     /// USB devices never autosuspended, beyond the input devices, which never are.
     pub usb_skip: Vec<UsbId>,
     /// The CPU scheduler every stop runs, LAVD in the stop's mode or the kernel's own.
@@ -198,6 +211,7 @@ impl Default for Settings {
             charge_limit: DEFAULT_CHARGE_LIMIT,
             low_battery: DEFAULT_LOW_BATTERY,
             low_battery_stop: Some(DEFAULT_LOW_BATTERY_STOP),
+            critical_warning: Some(DEFAULT_CRITICAL_WARNING),
             usb_skip: Vec::new(),
             scheduler: DEFAULT_CPU_SCHEDULER,
             stops: Stop::ALL.map(default_stop),
@@ -290,6 +304,7 @@ struct SettingsToml {
     charge_limit: Option<i64>,
     low_battery: Option<i64>,
     low_battery_stop: Option<String>,
+    critical_warning: Option<toml::Value>,
     scheduler: Option<String>,
     #[serde(default)]
     usb: UsbToml,
@@ -321,6 +336,10 @@ pub enum SettingsError {
     NotALowBattery(i64),
     #[error("`{0}` isn't where the low-battery drop can go: power-saver, super-saver or off")]
     NotALowBatteryStop(String),
+    #[error(
+        "the critical-battery warning comes between {MIN_CRITICAL_WARNING} and {MAX_CRITICAL_WARNING} %, or is off, not `{0}`"
+    )]
+    NotACriticalWarning(String),
     #[error("`{0}` isn't a USB device: write it as vendor:product, 046d:c547, or 1050:* for any of a vendor's")]
     NotAUsbId(String),
     #[error("`{0}` isn't a CPU scheduler: kernel or lavd")]
@@ -379,6 +398,9 @@ impl Settings {
         }
         if let Some(stop) = read.low_battery_stop {
             settings.low_battery_stop = parse_low_battery_stop(&stop)?;
+        }
+        if let Some(warning) = read.critical_warning {
+            settings.critical_warning = critical_warning_of(&warning)?;
         }
         if let Some(scheduler) = read.scheduler {
             settings.scheduler = CpuScheduler::from_name(&scheduler).ok_or(SettingsError::NotAScheduler(scheduler))?;
@@ -450,6 +472,34 @@ pub fn parse_low_battery_stop(text: &str) -> Result<Option<Stop>, SettingsError>
         .ok_or_else(|| SettingsError::NotALowBatteryStop(text.to_owned()))
 }
 
+/// The file's `critical_warning`: a percent, or `"off"`.
+fn critical_warning_of(value: &toml::Value) -> Result<Option<u8>, SettingsError> {
+    match value {
+        toml::Value::String(text) if text == "off" => Ok(None),
+        toml::Value::Integer(percent) => u8::try_from(*percent)
+            .ok()
+            .filter(|percent| (MIN_CRITICAL_WARNING..=MAX_CRITICAL_WARNING).contains(percent))
+            .map(Some)
+            .ok_or_else(|| SettingsError::NotACriticalWarning(percent.to_string())),
+        other => Err(SettingsError::NotACriticalWarning(other.to_string())),
+    }
+}
+
+/// What `kubaos power critical-warning` was given: a percent, with its `%` or not, or `off`.
+///
+/// # Errors
+///
+/// [`SettingsError::NotACriticalWarning`] for anything else, or a level out of its range.
+pub fn parse_critical_warning(text: &str) -> Result<Option<u8>, SettingsError> {
+    let text = text.trim();
+    if text == "off" {
+        return Ok(None);
+    }
+    let refused = || SettingsError::NotACriticalWarning(text.to_owned());
+    let percent: i64 = text.trim_end_matches('%').trim().parse().map_err(|_| refused())?;
+    critical_warning_of(&toml::Value::Integer(percent))
+}
+
 /// The power folder in the user layer: `~/.config/kubaos/desktop/power`.
 pub fn dir() -> Option<PathBuf> {
     kubaos_user_layer::config_home().map(|config| kubaos_user_layer::dir(&config, App::Power))
@@ -498,6 +548,23 @@ pub fn set_low_battery(path: &Path, percent: u8) -> Result<Settings, SettingsErr
         return Err(SettingsError::NotALowBattery(i64::from(percent)));
     }
     edit(path, |doc| doc["low_battery"] = value(i64::from(percent)))
+}
+
+/// Sets the critical-battery warning's level, `None` for no warning. The default removes the key: a
+/// release from before the key refuses a file that has it, so a rollback would lose every power
+/// setting.
+///
+/// # Errors
+///
+/// [`SettingsError::NotACriticalWarning`] out of its range, else as reading and writing the file.
+pub fn set_critical_warning(path: &Path, warning: Option<u8>) -> Result<Settings, SettingsError> {
+    edit(path, |doc| match warning {
+        Some(DEFAULT_CRITICAL_WARNING) => {
+            doc.remove("critical_warning");
+        }
+        Some(percent) => doc["critical_warning"] = value(i64::from(percent)),
+        None => doc["critical_warning"] = value("off"),
+    })
 }
 
 /// Sets which CPU scheduler runs. The kernel's, the default, removes the key: a release from

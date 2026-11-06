@@ -16,6 +16,7 @@
 //! | `power.panel-power-saving` | on: panel power saving | `U/desktop/power/power.toml` |
 //! | `power.scheduler` | `kernel` or `lavd` | the same |
 //! | `power.low-battery` | `power-saver`, `super-saver` or `off` | the same |
+//! | `power.critical-warning` | on: the critical-battery warning | the same |
 //! | `nix.unfree` | on: the user's nixpkgs takes unfree packages | `U/home/kubaos.d/nixpkgs.toml` |
 //! | `kubaos.preview` | on: the home is a live preview of a KubaOS checkout | `S/kubaos/preview.json` names one |
 //! | `kubaos.suites.<name>` | on: the catalog's Suite `<name>` is installed | `U/home/kubaos.d/suites/<name>.toml` exists |
@@ -93,6 +94,8 @@ pub const PANEL_POWER_SAVING: &str = "power.panel-power-saving";
 pub const SCHEDULER: &str = "power.scheduler";
 /// Where the low-battery drop goes, or `off`.
 pub const LOW_BATTERY: &str = "power.low-battery";
+/// Whether the critical-battery warning is on.
+pub const CRITICAL_WARNING: &str = "power.critical-warning";
 /// Whether the user's nixpkgs takes unfree packages.
 pub const UNFREE: &str = "nix.unfree";
 /// Whether the home is a live preview of a KubaOS checkout rather than the release.
@@ -292,6 +295,7 @@ impl States {
             self.set(SCHEDULER, Reading::Word(power.scheduler.name().to_owned()));
             let low_battery = power.low_battery_stop.map_or("off", |stop| stop.id());
             self.set(LOW_BATTERY, Reading::Word(low_battery.to_owned()));
+            self.set(CRITICAL_WARNING, Reading::Bool(power.critical_warning.is_some()));
         }
         self.set_suites(Installed::read(&StateDir::new(&files.state_dir)));
         if let Ok(unfree) = UnfreeSetting::read(&files.state_dir) {
@@ -309,8 +313,8 @@ pub fn values(name: &str) -> Option<Values> {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK
-        | DND | PANEL_POWER_SAVING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE
-        | UPDATE_BITWARDEN | UPDATE_NIX => Some(Values::Bool),
+        | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED | DEPTH
+        | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,

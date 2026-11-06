@@ -1,6 +1,7 @@
 //! Which stop the machine is on, and why: the user's choice on each power source, a profile set
-//! from outside, a plug or an unplug, and the low-battery drop with its Undo. Pure: it takes what
-//! happened and says what to do, so every path is tested without a bus or a battery.
+//! from outside, a plug or an unplug, and the low-battery drop with its Undo; and when the
+//! critical-battery warning fires. Pure: it takes what happened and says what to do, so every path
+//! is tested without a bus or a battery.
 //!
 //! ```text
 //! unplug ─▶ battery's stop ─(20 %)─▶ Power Saver ─(Undo)─▶ battery's stop again
@@ -53,6 +54,8 @@ pub enum Toast {
     Followed { source: Source, stop: Stop },
     /// The low-battery drop, with Undo.
     Dropped { to: Stop, from: Stop, percent: u8 },
+    /// The critical-battery warning, at the battery's `percent`.
+    Critical { percent: u8 },
 }
 
 /// What to do.
@@ -84,6 +87,11 @@ pub struct Control {
     stop: Stop,
     percent: Option<f64>,
     drop: Drop,
+    /// The critical-battery warning's level; `None` turns it off.
+    warning: Option<u8>,
+    /// The warning fired in this discharge. Memory of the service's life only: a boot on an empty
+    /// battery is a new chance to warn, whatever the last boot's discharge came to.
+    warned: bool,
     /// The profiles asked of power-profiles-daemon whose change hasn't come back yet, oldest
     /// first. Their changes are ours, not an outside one.
     asked: Vec<Profile>,
@@ -123,6 +131,8 @@ impl Control {
             stop,
             percent: None,
             drop,
+            warning: None,
+            warned: false,
             asked: Vec::new(),
         };
         let mut effects = Vec::new();
@@ -157,6 +167,12 @@ impl Control {
         self.drop = drop;
     }
 
+    /// Takes the user's critical-battery warning level, `None` for no warning. A level the battery
+    /// is already under warns at its next change.
+    pub fn set_warning(&mut self, warning: Option<u8>) {
+        self.warning = warning;
+    }
+
     /// What `input` changes, and what to do about it.
     pub fn handle(&mut self, input: Input) -> Vec<Effect> {
         let mut effects = Vec::new();
@@ -179,6 +195,7 @@ impl Control {
                 if source == Source::Ac {
                     self.memory.dropped_from = None;
                     self.memory.undone = false;
+                    self.warned = false;
                 }
                 let stop = self.memory.stop_for(source);
                 let moved = stop != self.stop;
@@ -187,6 +204,7 @@ impl Control {
                     effects.push(Effect::Toast(Toast::Followed { source, stop }));
                 }
                 self.check_drop(&mut effects);
+                self.check_warning(&mut effects);
                 effects.push(Effect::Remember(self.memory));
             }
             Input::Percent(percent) => {
@@ -194,6 +212,7 @@ impl Control {
                 if self.check_drop(&mut effects) {
                     effects.push(Effect::Remember(self.memory));
                 }
+                self.check_warning(&mut effects);
             }
             Input::Undo => {
                 if self.memory.dropped_from.take().is_some() {
@@ -284,6 +303,30 @@ impl Control {
         }));
         true
     }
+
+    /// Warns once a discharge when the battery is at or under the warning's level.
+    fn check_warning(&mut self, effects: &mut Vec<Effect>) {
+        let (Some(level), Some(percent)) = (self.warning, self.percent) else {
+            return;
+        };
+        if self.source != Source::Battery || self.warned || percent > f64::from(level) {
+            return;
+        }
+        self.warned = true;
+        effects.push(Effect::Toast(Toast::Critical {
+            percent: whole_percent(percent),
+        }));
+    }
+}
+
+/// `percent` as a whole number for a sentence.
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Clamped to 0..=100 and rounded, it fits a u8 exactly."
+)]
+fn whole_percent(percent: f64) -> u8 {
+    percent.clamp(0.0, 100.0).round() as u8
 }
 
 /// How long the machine's devices settle before the stop's writes are checked again: a dock's

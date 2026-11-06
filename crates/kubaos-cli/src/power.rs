@@ -3,7 +3,8 @@
 //!
 //!   kubaos power set STOP | undo | status | measure [--seconds N] | apply
 //!   kubaos power panel-power-saving on|off | charge-limit 80|90|100
-//!   kubaos power low-battery power-saver|super-saver|off|PERCENT | panel STOP 60hz|vrr|native
+//!   kubaos power low-battery power-saver|super-saver|off|PERCENT | critical-warning PERCENT|off
+//!   kubaos power panel STOP 60hz|vrr|native
 //!   kubaos power scheduler [on|off|status]
 //!
 //! # Not here
