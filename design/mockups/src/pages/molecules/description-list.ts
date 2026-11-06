@@ -4,9 +4,7 @@
 import type { Words } from "../../lib/content.ts";
 import { type Fact, descriptionList } from "../../lib/description.ts";
 import { stack, within } from "../../lib/layout.ts";
-import { text } from "../../lib/text.ts";
-import { doesntApply, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
 /** A card's content: the column less a card's padding. */
 const ROOM = "calc(var(--size-column) - 2 * var(--space-s16))";
@@ -34,31 +32,31 @@ export default page({
   level: "molecules",
   slug: "description-list",
   title: "DescriptionList",
-  summary: "Facts beside their labels, as a summary reads them: a label a quarter of the width, its value the rest.",
-  live: () => facts(INSTALL),
-  description: [
-    "Rust `description::description_list`, QML `DescriptionList`. Kōbō's Last chance cards: what is about to happen, said once more before it does.",
-    "One fact under the other, `space.s8` apart: each label in `small`, `on_surface_variant`, a quarter of the width, its value in `body`, `on_surface`, the other three quarters, `space.s8` from it, the quarter split in whole device pixels. Both wrap in their room; each label sits at the top of its value. An optional `mono` line `space.s4` under the value, `on_surface_variant`, holds a path, an email or a version, on one line ending in an ellipsis, since those break badly wrapped mid-token.",
-    "It is words, not a control: it takes no pointer and no keyboard.",
-  ],
+  lede: "Facts beside their labels, as a summary reads them: a label a quarter of the width, its value the rest.",
+  code: { rust: "description::description_list", qml: "DescriptionList" },
+  stage: {
+    live: () => facts(INSTALL, "100%"),
+    hint: "words, not a control: Tab passes it",
+    daylight: true,
+  },
   variants: [
-    { name: "Facts", for: "A label and a value each.", sample: () => facts(INSTALL.slice(1, 2)) },
-    { name: "With a machine's line", for: "A path, an email or a version under the value, in `mono`.", sample: () => facts([INSTALL[0]!, INSTALL[3]!]) },
+    { name: "Facts", for: "a label and a value each", sample: () => facts(INSTALL.slice(1, 2)) },
+    { name: "With a machine's line", for: "a path, an email or a version, in `mono`", sample: () => facts([INSTALL[0]!, INSTALL[3]!]) },
   ],
-  sizes: doesntApply("it is as wide as its place, its label a quarter of it, and as tall as its facts."),
+  sizes: doesntApply("as wide as its place, as tall as its facts."),
   states: {
     shown: ["rest"],
     absent: {
-      lit: "it is words, not a control.",
-      pressed: "it takes no press.",
-      disabled: "it says what will happen; nothing in it can be turned off.",
-      selected: "nothing in it is picked.",
-      loading: "its facts are known before it shows.",
-      empty: "a summary with nothing to say isn't shown.",
-      error: "a fact can't be wrong here; what failed is an ErrorBlock.",
+      lit: "words, not a control",
+      pressed: "takes no press",
+      disabled: "nothing in it turns off",
+      selected: "nothing in it is picked",
+      loading: "its facts are known before it shows",
+      empty: "with nothing to say, it isn't shown",
+      error: "what failed is an `ErrorBlock`",
     },
     rows: [{ name: "Last chance", cell: () => facts(INSTALL) }],
-    described: { rest: "Labels `on_surface_variant`, values `on_surface`, machine lines `on_surface_variant`. By day the same roles in daylight colours." },
+    looks: { rest: "labels and machine lines `on_surface_variant`, values `on_surface`" },
   },
   focus: doesntApply("it takes no keyboard."),
   content: {
@@ -69,8 +67,8 @@ export default page({
     ],
     missingPicture: doesntApply("it draws no pictures."),
     counts: [
-      { name: "One", for: "A single fact.", sample: () => facts(INSTALL.slice(1, 2)) },
-      { name: "Several", for: "`space.s8` apart.", sample: () => facts(INSTALL) },
+      { name: "One", for: "a single fact", sample: () => facts(INSTALL.slice(1, 2)) },
+      { name: "Several", for: "`space.s8` apart", sample: () => facts(INSTALL) },
     ],
   },
   motion: {
@@ -80,17 +78,17 @@ export default page({
   },
   keyboard: doesntApply("it takes no keyboard; Tab passes it."),
   measures: {
-    samples: nonEmpty([{ name: "Last chance", for: "The label's quarter, the gap to the value, the gap between facts, the machine's line under its value.", sample: () => facts(INSTALL) }]),
+    samples: nonEmpty([{ name: "Last chance", for: "the label's quarter, the gaps, the machine's line", sample: () => facts(INSTALL) }]),
     measures: [
-      { what: "Between facts, and between a label and its value.", token: "space-s8" },
-      { what: "Between a value and its machine's line.", token: "space-s4" },
-      { what: "A label's line, `small`'s.", token: "type-small-line" },
-      { what: "A value's line, `body`'s.", token: "type-body-line" },
-      { what: "A machine's line, `mono`'s.", token: "type-mono-line" },
+      { part: "Between facts, label → value", token: "space-s8" },
+      { part: "Value → machine's line", token: "space-s4" },
+      { part: "Label line", token: "type-small-line" },
+      { part: "Value line", token: "type-body-line" },
+      { part: "Machine's line", token: "type-mono-line" },
     ],
     reflow: {
-      described: "It fills its place at every window size, the label a quarter of it: wider, values run on one line; narrow, labels and values wrap, and a machine's line ends in an ellipsis. Here as wide as the window, then in half a panel.",
-      sample: () => stack("s16", "start", facts(INSTALL, "100%"), facts(INSTALL, "calc(var(--size-panel) / 2)"), text("As wide as the window, then half a panel.", "small", "on_surface_variant")),
+      note: "The label stays a quarter: narrow, words wrap and a machine's line ends in an ellipsis.",
+      sample: () => stack("s16", "start", facts(INSTALL, "100%"), facts(INSTALL, "calc(var(--size-panel) / 2)")),
     },
   },
 });
