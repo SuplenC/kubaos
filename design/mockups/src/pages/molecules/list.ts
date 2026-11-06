@@ -9,9 +9,6 @@ import { type ListOptions, type ListRowSpec, list, type RowPinned } from "../../
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 /** A panel's body, where a list's well lives: the control center's width less its padding. */
 export const WELL_ROOM = "calc(var(--size-panel) - 2 * var(--container-0-padding))";
 
@@ -139,7 +136,7 @@ export default page({
   lede: "Rows in a well, moved through with the keys: the row the keyboard is on is lit, and Enter takes it.",
   code: { rust: "list::list, list::list_row", qml: "List, ListRow, ListRows" },
   stage: {
-    live: () => within(ACROSS, filling(flow("s32", picking(LAYOUTS), well(NETWORKS)))),
+    live: () => within("100%", filling(flow("s32", picking(LAYOUTS), well(NETWORKS)))),
     hint: "Tab in, ↑ ↓ and Enter, or click a row",
     daylight: true,
   },

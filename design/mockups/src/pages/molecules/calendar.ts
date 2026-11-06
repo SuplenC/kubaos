@@ -9,9 +9,6 @@ import { filling, flow, stack, within } from "../../lib/layout.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 const TODAY: Day = { year: 2026, month: 10, day: 27 };
 const PICKED: Day = { year: 2026, month: 10, day: 30 };
 
@@ -87,7 +84,7 @@ export default page({
   lede: "A month as six weeks led by their week numbers: today filled, the picked day ringed, holidays dotted.",
   code: { rust: "calendar::calendar", qml: "Calendar" },
   stage: {
-    live: () => within(ACROSS, filling(flow("s48", month(), month({ year: true })))),
+    live: () => within("100%", filling(flow("s48", month(), month({ year: true })))),
     hint: "press a day or the title, or Tab and the arrows",
     daylight: true,
   },

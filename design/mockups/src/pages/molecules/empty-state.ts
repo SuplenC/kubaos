@@ -10,9 +10,6 @@ import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { WELL_ROOM } from "./list.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 const ROOM = "var(--size-column)";
 
 const TITLE: Words = { short: "Nothing here yet", long: "Nothing here yet: this folder holds no pictures or videos to pick from" };
@@ -38,7 +35,7 @@ export default page<"empty">({
   lede: "A place with nothing in it that isn't a list: a symbol, what is missing, what to do, and an action.",
   code: { rust: "empty::empty_state", qml: "EmptyState" },
   stage: {
-    live: () => within(ACROSS, filling(flow("s32", within(WELL_ROOM, emptyState(withAction(BLUETOOTH, "Turn on"))), within(WELL_ROOM, emptyState(RESULTS))))),
+    live: () => within("100%", filling(flow("s32", within(WELL_ROOM, emptyState(withAction(BLUETOOTH, "Turn on"))), within(WELL_ROOM, emptyState(RESULTS))))),
     hint: "Tab to its action, or press it",
     daylight: true,
   },

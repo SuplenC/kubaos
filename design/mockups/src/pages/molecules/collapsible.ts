@@ -13,9 +13,6 @@ import { el } from "../../site/dom.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 const TITLE: Words = { short: "Hyprland · pid 1203", long: "firefox -contentproc · pid 4127 · Isolated Web Content" };
 const SUMMARY: Words = { short: "3 · 310 MB", long: "92 threads · 2.1 GB resident · 4 % CPU" };
 
@@ -164,7 +161,7 @@ export default page({
   lede: "A titled part that opens to show more: a turning chevron, a room easing open, and a rail that closes it.",
   code: { rust: "collapsible::collapsible", qml: "Collapsible" },
   stage: {
-    live: () => within(ACROSS, filling(flow("s32", scrolled(), part({ open: true, summary: SUMMARY.short })))),
+    live: () => within("100%", filling(flow("s32", scrolled(), part({ open: true, summary: SUMMARY.short })))),
     hint: "press a header; scroll and press the rail; or Tab and Enter",
     daylight: true,
   },

@@ -60,7 +60,7 @@ function fonts(): HTMLElement {
 function opening(): HTMLElement {
   // A lit button's glow reaches past its box: this leaves it room in the pane, which a sample
   // overflowing would scale down.
-  return within("calc(100% - var(--focus-far))", stack("s32", "start", ...[header({ accent: "外観", title: shown(TITLE), subtitle: shown(SUBTITLE), actions: actions() }), themeSection(), fonts()].map(filling)));
+  return within("100%", stack("s32", "start", ...[header({ accent: "外観", title: shown(TITLE), subtitle: shown(SUBTITLE), actions: actions() }), themeSection(), fonts()].map(filling)));
 }
 
 /** A page's header over two sections, the stack's `space.s32` between them. */

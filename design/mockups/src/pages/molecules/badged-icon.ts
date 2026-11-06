@@ -8,9 +8,6 @@ import { pill } from "../../lib/pill.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 /** What each size sits beside. */
 const BESIDE: Record<BadgedSize, string> = {
   s16: "the bar's, in a pill",
@@ -50,7 +47,7 @@ export default page({
   lede: "A symbol with a badge on its top right corner: how many wait, or a dot that something does.",
   code: { qml: "BadgedIcon", unbuilt: "Rust: not built yet" },
   stage: {
-    live: () => within(ACROSS, filling(flow("s32", bar(), counts("s16"), counts("s20"), counts("s24")))),
+    live: () => within("100%", filling(flow("s32", bar(), counts("s16"), counts("s20"), counts("s24")))),
     hint: "a mark: nothing to press",
     daylight: true,
   },

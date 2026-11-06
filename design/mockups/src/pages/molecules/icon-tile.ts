@@ -13,9 +13,6 @@ import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { MODES, painted } from "../../site/parts/swatches.ts";
 import { settings } from "../../site/settings.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 const NAME: Words = { short: "Kitchen", long: "Kitchen and living room, the 5 GHz network upstairs" };
 /** A path no picture is at: what a picture that can't be read leaves. */
 const NOWHERE = "data:image/png;base64,AAAA";
@@ -91,7 +88,7 @@ export default page({
   lede: "A symbol or a picture on a tinted square of one size, so a list of apps, senders or devices reads as one set.",
   code: { rust: "icon_tile::icon_tile", qml: "IconTile" },
   stage: {
-    live: () => within(ACROSS, filling(flow("s48", senders(), stack("s16", "start", ...TILE_SIZES.map((size) => besideWords(size)))))),
+    live: () => within("100%", filling(flow("s48", senders(), stack("s16", "start", ...TILE_SIZES.map((size) => besideWords(size)))))),
     hint: "a mark: its row lights, not the tile",
     daylight: true,
   },

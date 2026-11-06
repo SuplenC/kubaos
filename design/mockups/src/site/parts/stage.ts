@@ -30,6 +30,27 @@ interface Pane {
   readonly scale: HTMLElement;
 }
 
+/**
+ * How wide `inner`'s samples are, in its own pixels. A lit control's glow reaches past the control's
+ * edge into the pane's padding, and a browser counts it as overflow, but it asks for no room: only
+ * the boxes the samples lay out count. A box that clips keeps what is inside it to itself.
+ */
+function samplesWidth(inner: HTMLElement): number {
+  if (inner.scrollWidth <= inner.clientWidth) return inner.scrollWidth;
+  const box = inner.getBoundingClientRect();
+  let right = box.left;
+  const reach = (parent: Element): void => {
+    for (const child of parent.children) {
+      if (child.matches(".k-ring, .k-field-caret-glow")) continue;
+      right = Math.max(right, child.getBoundingClientRect().right);
+      if (getComputedStyle(child).overflowX === "visible") reach(child);
+    }
+  };
+  reach(inner);
+  // The page's zoom shrinks its CSS pixels in the viewport's.
+  return Math.ceil(((right - box.left) * inner.offsetWidth) / box.width);
+}
+
 /** Every stage's fitting, again: after the page is laid out anew. */
 const fitting = new Set<() => void>();
 
@@ -89,7 +110,7 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
     }
     // Every box is read, then every one sized: one layout, not one a box. The samples wrap in the
     // pane's room, so one wider than it is what overflows it.
-    const read = panes.map(({ inner }) => ({ natural: inner.scrollWidth, room: inner.clientWidth }));
+    const read = panes.map(({ inner }) => ({ natural: samplesWidth(inner), room: inner.clientWidth }));
     panes.forEach(({ outer, inner, scale }, i) => {
       const { natural, room } = read[i]!;
       // `?all` draws every sample at its own size for the shots and the geometry frames, which

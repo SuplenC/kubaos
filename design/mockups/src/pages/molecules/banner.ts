@@ -12,9 +12,6 @@ import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { settings } from "../../site/settings.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 /** A column of text at its widest: a banner of words alone. */
 const ROOM = "var(--size-column)";
 /** An app's window at its least: a banner holding its button bar, as Kōbō's does. */
@@ -116,7 +113,7 @@ export default page<"rest">({
   lede: "A message that matters on the page itself, with what to do about it inside: a rail of its tone down a flat box.",
   code: { rust: "banner::banner", qml: "Banner" },
   stage: {
-    live: () => confirm(ERASE, true, 0, ACROSS),
+    live: () => confirm(ERASE, true, 0, "100%"),
     hint: "hold the button, or Tab to it and hold Enter",
     daylight: true,
   },
