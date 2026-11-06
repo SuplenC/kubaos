@@ -5,14 +5,14 @@
 
 import { button } from "../../lib/button.ts";
 import { chip } from "../../lib/chip.ts";
-import type { Words } from "../../lib/content.ts";
+import { shown, type Words } from "../../lib/content.ts";
 import { icon } from "../../lib/icon.ts";
 import { divider, fill, filling, gap, row, stack, within } from "../../lib/layout.ts";
 import type { Align } from "../../lib/probe.ts";
 import { switchControl } from "../../lib/switch.ts";
 import { clamped, text, wrapped } from "../../lib/text.ts";
-import { doesntApply, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { el } from "../../site/dom.ts";
+import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { settingsWindow } from "./example.ts";
 
 const PANEL = "var(--size-panel)";
@@ -60,87 +60,82 @@ export default page({
   level: "layout",
   slug: "stack",
   title: "Stack, Row, Fill and Gap",
-  summary: "Children one under another or side by side, a spacing step apart; room that pushes what follows to the far end; and one larger step in a stack.",
-  live: () => stack("s32", "start", settingLine(), pushed(), divided()),
-  description: [
-    "Rust `layout::stack`, `layout::row`, `layout::fill` and `layout::gap`; QML `Stack`, `Row`, `Fill` and `Gap`. Every box in a surface is placed by one of these or by a grid: nothing is placed by a margin, a number or an absolute position. Each child is rounded up to whole device pixels, so every child starts on one.",
-    "Stack puts its children one under another, one spacing step apart (`space.*`, or none). It lines them up at its start, or centres each across its whole width on a whole device pixel, an odd spare pixel after the child, never before it. A child that fills (`filling`) takes the whole width; a child that fills the height (`fillingHeight`) takes what the stack has left of it.",
-    "Row puts its children side by side, one spacing step apart, along its top, its middle or its bottom. A child that fills takes the room the others leave, and the row is as tall as its tallest child.",
-    "Fill is room that grows across a row and pushes what follows to its far end: a count at the start, its buttons at the end. It never grows down, so the row stays as tall as its content.",
-    "Gap is one spacing step of empty room both ways, where one step of a stack wants to be larger than its gap: a title with `space.s16` under it in a stack of `space.s4`. Where every step is the same, the stack's gap is the answer; where a whole box wants room round it, that box's padding is (a band's `space.s16`, a card's), never a gap before and after it.",
-    "Divider is the hairline across, in the soft outline, between two parts that would otherwise run together where space alone can't part them: a window's bar from its body. It takes no room but its pixel; the stack's gap keeps it clear either side. Where a gap is enough there is no divider (its own page is the atom's).",
-    "When to use which: one line of things that never wraps is a Row; things that wrap onto new lines (chips, tags) are a Flow; columns whose edges line up from row to row are a Grid or a Split. A label beside its value where every label lines up down the page is a Split, never a Row with a fixed label width.",
-  ],
+  lede: "Children one under another or side by side, a spacing step apart; room that pushes to the far end; one larger step.",
+  code: { rust: "layout::stack, layout::row, layout::fill, layout::gap", qml: "Stack, Row, Fill, Gap" },
+  stage: {
+    live: () => el("div", "f-row", stack("s32", "start", pushed(), stepped()), stack("s32", "start", divided(), settingLine(shown(LINE)))),
+    hint: "pick Text long: the words wrap, the switch stays",
+    daylight: true,
+  },
   variants: [
-    { name: "Stack, at its start", for: "The usual: each child at the stack's start.", sample: () => stacked() },
-    { name: "Stack, centred", for: "Each child centred across: an empty state, a hero.", sample: () => stacked("centre") },
-    { name: "Row, along its top", for: "Parts of different heights from the top: a symbol beside words that wrap.", sample: () => within(PANEL, aligned("start")) },
-    { name: "Row, centred", for: "The usual for a line of controls: each on the row's middle.", sample: () => within(PANEL, aligned("centre")) },
-    { name: "Row, along its bottom", for: "Parts sharing a baseline's foot: a figure beside its unit.", sample: () => within(PANEL, aligned("end")) },
-    { name: "Fill", for: "Pushes what follows to the row's far end.", sample: pushed },
-    { name: "Gap", for: "One larger step in a stack with none of its own.", sample: stepped },
-    { name: "Divider, in a stack", for: "A window's bar parted from its body, the stack's `space.s12` either side.", sample: () => divided() },
+    { name: "Stack, at its start", for: "the usual: each child at its start", sample: () => stacked() },
+    { name: "Stack, centred", for: "an empty state, a hero", sample: () => stacked("centre") },
+    { name: "Row, along its top", for: "a symbol beside words that wrap", sample: () => within(PANEL, aligned("start")) },
+    { name: "Row, centred", for: "the usual for a line of controls", sample: () => within(PANEL, aligned("centre")) },
+    { name: "Row, along its bottom", for: "a figure beside its unit", sample: () => within(PANEL, aligned("end")) },
+    { name: "Fill", for: "pushes what follows to the far end", sample: pushed },
+    { name: "Gap", for: "one step larger than the stack's own", sample: stepped },
+    { name: "Divider, in a stack", for: "a window's bar from its body, `space.s12` either side", sample: () => divided() },
   ],
-  sizes: doesntApply("none has a size: a stack and a row are their children and their gaps, a fill is what the row leaves, a gap is the step it is given."),
+  sizes: doesntApply("none has a size: its children and gaps, what is left, or the step given."),
   states: {
     shown: ["rest", "empty"],
     absent: {
-      lit: "they take no pointer and no focus.",
-      pressed: "they take no press.",
-      disabled: "they hold controls, disabled each on their own.",
-      selected: "they hold no choice.",
-      loading: "what loads in them holds its own `Skeleton`, in its own box, so the layout doesn't move when it arrives.",
-      error: "they have no value to be wrong.",
+      lit: "they take no pointer and no focus",
+      pressed: "they take no press",
+      disabled: "what they hold is disabled on its own",
+      selected: "they hold no choice",
+      loading: "a `Skeleton` in its own box, so nothing moves",
+      error: "they have no value to be wrong",
     },
     rows: [
       { name: "Row", cell: (state: "rest" | "empty") => (state === "empty" ? chips(0) : chips(3)) },
       { name: "Stack", cell: (state: "rest" | "empty") => (state === "empty" ? within(PANEL, stack("s8", "start")) : stacked()) },
     ],
-    described: {
-      rest: "They draw nothing: what shows is what they hold, where they put it.",
-      empty: "With nothing in it a stack or a row takes no room and adds no gap; a surface with nothing to show holds an `EmptyState` instead.",
+    looks: {
+      rest: "they draw nothing but what they hold",
+      empty: "no room and no gap",
     },
   },
-  focus: doesntApply("none is a control; they draw no line and no glow."),
+  focus: doesntApply("none is a control: no line and no glow."),
   content: {
     text: [
       { name: "Words that fill a row", words: LINE, sample: (words: string) => settingLine(words) },
-      { name: "Words that fill a row, along its top", words: LINE, sample: (words: string) => settingLine(words, "start") },
+      { name: "Filling words, along its top", words: LINE, sample: (words: string) => settingLine(words, "start") },
     ],
-    missingPicture: doesntApply("they draw no picture; a missing symbol is its own `Icon`'s, and keeps its box, so the row doesn't move."),
+    missingPicture: doesntApply("they draw no picture; a missing symbol keeps its box."),
     counts: [
-      { name: "None", for: "No room and no gap.", sample: () => chips(0) },
-      { name: "One", for: "One child, no gap.", sample: () => chips(1) },
-      { name: "Many", for: "Each a step apart; past the room a row has, it is a Flow.", sample: () => chips(4) },
+      { name: "None", for: "no room and no gap", sample: () => chips(0) },
+      { name: "One", for: "no gap", sample: () => chips(1) },
+      { name: "Many", for: "past the row's room, it is a Flow", sample: () => chips(4) },
     ],
   },
   motion: {
-    arrives: doesntApply("they draw nothing to arrive; what they hold arrives by its own moves, and a list's rows open their room by `LiveList`'s."),
+    arrives: doesntApply("they draw nothing to arrive; what they hold has its own moves."),
     leaves: doesntApply("they draw nothing to leave."),
-    between: doesntApply("layout never animates: a control's state takes no room, and a window's size never eases (`docs/DESIGN.md`, \"Motion\"). A divider's colours change with the theme on its own page."),
+    between: doesntApply("layout never animates: a control's state takes no room."),
   },
   keyboard: {
-    keys: [{ keys: ["Tab", "Shift+Tab"], does: "Through what they hold in reading order: a stack top to bottom, a row from its start to its end." }],
-    order: "The order on screen is the order of the keys: a layout never puts a child where Tab wouldn't reach it next. A fill, a gap and a divider are no stop.",
+    keys: [{ keys: ["Tab", "Shift+Tab"], does: "what they hold, in reading order" }],
+    order: "The order on screen is the order of the keys; a fill, a gap and a divider are no stop.",
     lands: "Nowhere of their own: the surface lands on its first thing to do.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "A stack", for: "Its `space.s8` between each child.", sample: () => stacked() },
-      { name: "A row with a fill", for: "Its `space.s8` between each child; the fill is what the others leave.", sample: pushed },
-      { name: "A gap in a stack", for: "One `space.s16` in a stack of none.", sample: stepped },
-      { name: "A divider in a stack", for: "The hairline, the stack's `space.s12` either side.", sample: () => divided() },
+      { name: "A stack", for: "`space.s8` between each child", sample: () => stacked() },
+      { name: "A row with a fill", for: "`space.s8` between; the fill is what is left", sample: pushed },
+      { name: "A gap in a stack", for: "one `space.s16` in a stack of none", sample: stepped },
+      { name: "A divider in a stack", for: "the hairline, `space.s12` either side", sample: () => divided() },
     ]),
     measures: [
-      { what: "The gaps the samples' stacks and rows take, from the spacing steps.", token: "space-s8" },
-      { what: "Between a setting's symbol and its name.", token: "space-s12" },
-      { what: "The gap's one larger step.", token: "space-s16" },
-      { what: "The divider: one device pixel at every scale.", token: "stroke-hairline_device_px" },
-      { what: "The room the samples are given, a panel's width.", token: "size-panel" },
+      { part: "The samples' gaps", token: "space-s8" },
+      { part: "A setting's symbol to its name", token: "space-s12" },
+      { part: "The gap's larger step", token: "space-s16" },
+      { part: "The divider, one device pixel", token: "stroke-hairline_device_px" },
+      { part: "The samples' room", token: "size-panel" },
     ],
     reflow: {
-      described:
-        "Settings' page at the toolbar's window size is a stack of its header and sections, `space.s32` apart; each section a stack; the wallpaper's line a row whose fill pushes its button to the page's far edge at every width. A row never wraps: what doesn't fit is a Flow's or ends in an ellipsis.",
+      note: "Settings' page is a stack of sections; a row's fill pushes its button to the far edge; a row never wraps.",
       sample: settingsWindow,
     },
   },
