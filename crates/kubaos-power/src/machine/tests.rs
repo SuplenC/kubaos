@@ -96,6 +96,73 @@ fn the_battery_draw_comes_from_current_and_voltage_and_a_mouse_battery_is_not_th
 }
 
 #[test]
+fn the_energy_is_energy_now_else_the_charge_at_the_design_voltage() {
+    let root = FakeRoot::laptop();
+    assert_eq!(root.machine().battery().expect("a battery").wh, None);
+
+    root.write("sys/class/power_supply/BAT0/charge_now", "1144000");
+    root.write("sys/class/power_supply/BAT0/voltage_now", "16000000");
+    let by_voltage = root.machine().battery().expect("a battery").wh.expect("an energy");
+    root.write("sys/class/power_supply/BAT0/voltage_min_design", "15400000");
+    let by_design = root.machine().battery().expect("a battery").wh.expect("an energy");
+    root.write("sys/class/power_supply/BAT0/energy_now", "51200000");
+    let reported = root.machine().battery().expect("a battery").wh.expect("an energy");
+
+    assert!((by_voltage - 18.304).abs() < 1e-9);
+    assert!((by_design - 17.6176).abs() < 1e-9);
+    assert!((reported - 51.2).abs() < 1e-9);
+}
+
+#[test]
+fn the_panel_and_a_second_screen_are_told_apart() {
+    let root = FakeRoot::laptop();
+    root.write("sys/class/drm/card1-eDP-1/dpms", "On");
+
+    assert_eq!(
+        root.machine().displays(),
+        Displays {
+            panel_on: Some(true),
+            external: true
+        }
+    );
+
+    root.write("sys/class/drm/card1-eDP-1/dpms", "Off");
+    root.write("sys/class/drm/card1-HDMI-A-1/status", "disconnected");
+    assert_eq!(
+        root.machine().displays(),
+        Displays {
+            panel_on: Some(false),
+            external: false
+        }
+    );
+}
+
+#[test]
+fn the_backlight_is_a_percent_of_its_range_and_may_be_missing() {
+    let root = FakeRoot::laptop();
+    assert_eq!(root.machine().brightness(), None);
+
+    root.write("sys/class/backlight/amdgpu_bl1/brightness", "102");
+    root.write("sys/class/backlight/amdgpu_bl1/max_brightness", "255");
+    assert_eq!(root.machine().brightness(), Some(40));
+
+    root.write("sys/class/backlight/amdgpu_bl1/max_brightness", "0");
+    assert_eq!(root.machine().brightness(), None);
+}
+
+#[test]
+fn the_cpu_is_as_busy_as_the_ticks_that_were_not_idle() {
+    let before = CpuTimes::parse("cpu  100 0 100 800 0 0 0 0 0 0\ncpu0 1 1 1 1\n").expect("reads");
+    let after = CpuTimes::parse("cpu  150 0 100 830 20 0 0 0 7 7\n").expect("reads");
+
+    assert_eq!(before.total, 1000);
+    assert_eq!(before.idle, 800);
+    assert_eq!(after.busy_since(before), Some(50.0));
+    assert_eq!(before.busy_since(before), None);
+    assert_eq!(CpuTimes::parse("intr 1 2 3"), None);
+}
+
+#[test]
 fn a_charging_battery_has_no_draw() {
     let root = FakeRoot::laptop();
     root.write("sys/class/power_supply/BAT0/status", "Charging");
