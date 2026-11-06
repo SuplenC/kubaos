@@ -226,6 +226,7 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
   const sections = outline.sections;
   const root = document.createElement("span");
   root.className = "k-sp";
+  root.dataset.whole = "";
 
   let current = options.section ?? -1;
   let sub = options.sub ?? 0;
