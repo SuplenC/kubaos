@@ -1,16 +1,18 @@
 //! "Power: what this stop does" in the menu: the stop now, with every layer it sets as a row,
 //! what it wants and what the machine says, read live when the Item runs. "CPU scheduler: status"
-//! beside it: which scheduler runs, why, and what is behind it.
+//! beside it: which scheduler runs, why, and what is behind it. "What's draining the battery": the
+//! draw now and the top wakers, a short answer.
 //!
 //! # Owns
 //!
-//! - The two Items and their Views.
+//! - The three Items and their Views.
 //!
 //! # Not here
 //!
 //! - The rows: `kubaos_power::status`, read by `kubaos_power::live`; the scheduler's report:
-//!   `kubaos_power::scheduler`. The stops' own Items, the charge limit, the low-battery drop, the
-//!   critical-battery warning, LAVD on and off and the measurement: actions of the registry
+//!   `kubaos_power::scheduler`; the drain's answer: `kubaos_power::report`. The stops' own Items,
+//!   the charge limit, the low-battery drop, the critical-battery warning, LAVD on and off, the
+//!   measurement, the battery report and its toasts: actions of the registry
 //!   (`config/kotodama/kubaos.toml`), which run `kubaos-power`.
 
 use kotodama_protocol::Action;
@@ -20,6 +22,7 @@ use kotodama_protocol::NamespacedKind;
 use kotodama_protocol::View;
 use kotodama_protocol::ViewContent;
 use kubaos_power::live::Now;
+use kubaos_power::report::Drain;
 use kubaos_power::scheduler::Report;
 use kubaos_power::status::Row;
 
@@ -35,6 +38,11 @@ pub const SHOW: &str = "show";
 pub const SCHEDULER_KIND: &str = "kubaos.cpu-scheduler";
 /// Its id, which `hide` names it by.
 pub const SCHEDULER_ID: &str = "cpu-scheduler-status";
+
+/// The Item kind of "What's draining the battery".
+pub const DRAIN_KIND: &str = "kubaos.battery-drain";
+/// Its id, which `hide` names it by.
+pub const DRAIN_ID: &str = "battery-drain";
 
 const ICON: &str = "battery";
 const SCHEDULER_ICON: &str = "cpu";
@@ -98,9 +106,67 @@ pub fn scheduler_item() -> Item {
     }
 }
 
+/// "What's draining the battery".
+pub fn drain_item() -> Item {
+    Item {
+        id: DRAIN_ID.to_owned(),
+        kind: kind(DRAIN_KIND),
+        identity: None,
+        title: "What's draining the battery".to_owned(),
+        subtitle: Some("The draw now, the power stop and what wakes the machine most".to_owned()),
+        icon: Some(ICON.to_owned()),
+        keyword: None,
+        keywords: [
+            "battery drain",
+            "power draw",
+            "watts",
+            "wakeups",
+            "powertop",
+            "battery life",
+        ]
+        .map(str::to_owned)
+        .to_vec(),
+        hidden: false,
+        app_only: false,
+        weak_keywords: Vec::new(),
+        actions: vec![Action::new(SHOW, "Show")],
+    }
+}
+
 /// Every id of an Item this module sends, which no action of the registry may take.
-pub fn ids() -> [&'static str; 2] {
-    [ID, SCHEDULER_ID]
+pub fn ids() -> [&'static str; 3] {
+    [ID, SCHEDULER_ID, DRAIN_ID]
+}
+
+/// The View of `drain`: its answer, a row a line.
+pub fn drain_view(drain: &Drain) -> View {
+    let items = drain
+        .rows()
+        .into_iter()
+        .enumerate()
+        .map(|(row, (title, subtitle))| Item {
+            id: format!("{DRAIN_ID}:{row}"),
+            kind: kind(ROW_KIND),
+            identity: None,
+            title,
+            subtitle: Some(subtitle),
+            icon: Some(ICON.to_owned()),
+            keyword: None,
+            keywords: Vec::new(),
+            hidden: false,
+            app_only: false,
+            weak_keywords: Vec::new(),
+            actions: Vec::new(),
+        })
+        .collect();
+    View {
+        id: DRAIN_ID.to_owned(),
+        title: "What's draining the battery".to_owned(),
+        content: ViewContent::List {
+            items,
+            filters_itself: false,
+        },
+    }
 }
 
 /// The View of the scheduler's `report`: which runs, with why under it, then the details, a line

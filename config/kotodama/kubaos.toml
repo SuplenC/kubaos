@@ -73,6 +73,7 @@ kind = "scripts"
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
 # `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
 # `power.critical-warning`,
+# `power.battery-notes`,
 # `nix.unfree`, `kubaos.preview`, `kubaos.suites.<name>` (the Suite is
 # installed), `bluetooth.unnamed`, `update.firmware`, `update.bitwarden`,
 # `update.nix`, `wallpapers.depth` (the wallpaper-depth Suite cuts out your own
@@ -1511,7 +1512,8 @@ arguments = [{ name = "setting", placeholder = "cpu-temp, ram, disk or battery-d
 # of them still works. "Power: what this stop does" is the Extension's own
 # Item (`power-status`): every layer of the stop, as the machine has it now;
 # so is "CPU scheduler: status" (`cpu-scheduler-status`): which scheduler
-# runs, Linux's own or LAVD, and why.
+# runs, Linux's own or LAVD, and why; and "What's draining the battery"
+# (`battery-drain`): the draw now, the stop and what wakes the machine most.
 # The settings Items write ~/.config/kubaos/desktop/power/power.toml through
 # `kubaos-power`, which puts them to work at once and says so in a toast.
 
@@ -1669,6 +1671,30 @@ keyword = "measure-power"
 terminal = true
 run = ["kubaos", "power", "measure", "--seconds", "{seconds}"]
 arguments = [{ name = "seconds", placeholder = "300" }]
+
+[extensions.kubaos.actions.battery-report]
+title = "Battery report"
+subtitle = "The last week on battery: what went wrong first, long stretches, the average draw and what woke the machine"
+icon = "battery"
+keywords = ["battery history", "battery drain", "battery life", "deep sleep", "suspend", "overnight", "watts", "wakeups"]
+terminal = true
+run = ["kubaos", "power", "report"]
+
+[extensions.kubaos.actions.battery-notes-off]
+title = "Battery toasts off"
+subtitle = "No toast when a sleep missed deep sleep or the laptop stayed awake with the lid closed. The battery report still has them"
+icon = "battery"
+keywords = ["battery notes", "battery notification", "deep sleep", "suspend", "lid closed"]
+run = ["kubaos-power", "battery-notes", "off"]
+shown_when = { state = "power.battery-notes", is = true }
+
+[extensions.kubaos.actions.battery-notes-on]
+title = "Battery toasts on"
+subtitle = "A toast when a sleep missed deep sleep or the laptop stayed awake with the lid closed, with a button to the battery report"
+icon = "battery"
+keywords = ["battery notes", "battery notification", "deep sleep", "suspend", "lid closed"]
+run = ["kubaos-power", "battery-notes", "on"]
+shown_when = { state = "power.battery-notes", is = false }
 
 [extensions.kubaos.actions.cpu-scheduler-lavd-on]
 title = "CPU scheduler: LAVD on"
