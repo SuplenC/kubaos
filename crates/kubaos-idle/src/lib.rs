@@ -6,8 +6,8 @@
 //!                          └─▶ a lid holder (systemd-inhibit handle-lid-switch), when the lid
 //!                              setting isn't logind's own
 //! kubaos-idle awake 1h ─▶ systemd-inhibit --what=idle, which hypridle honours, for an hour
-//!                     └─▶ the lid holder, which does nothing on lid close meanwhile
 //! kubaos-idle awake 20% ─▶ the same, until the battery is at 20 % on battery
+//! kubaos-idle awake lid 2h ─▶ the same, and the lid holder, which does nothing on lid close
 //! kubaos-idle lock at 17:00 ─▶ systemd --user transient timers: two heads-ups, then the lock
 //! ```
 //!

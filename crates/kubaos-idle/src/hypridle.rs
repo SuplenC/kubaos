@@ -7,6 +7,9 @@
 //! effect within a minute: unplugged past the battery's wait, the battery's listener fires at its
 //! next retry; plugged in, it keeps waiting and the plugged-in listener fires at its own time.
 //!
+//! Waking from screens off lights every screen, then `scripts/dot-hypr-lid sync` turns the laptop's
+//! panel off again if the lid is closed. In that order, so a failing script leaves it on.
+//!
 //! # Owns
 //!
 //! - The listeners' text and where the file goes.
@@ -78,7 +81,7 @@ fn listener(out: &mut String, timer: Timer, wait: Wait, condition: Option<&str>)
         Timer::Lock => ("loginctl lock-session", None),
         Timer::ScreensOff => (
             r#"hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })'"#,
-            Some(r#"hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })'"#),
+            Some(r#"hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })'; dot-hypr-lid sync"#),
         ),
         Timer::Suspend => ("systemctl suspend", None),
     };

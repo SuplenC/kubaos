@@ -8,6 +8,7 @@ QtObject {
     readonly property int keepAwakeUntil: 0
     readonly property int keepAwakeBattery: 0
     readonly property bool keepAwake: true
+    readonly property bool keepAwakeLid: false
     readonly property string scheduled: "lock"
     readonly property int scheduledAt: 0
     readonly property bool scheduledPending: false

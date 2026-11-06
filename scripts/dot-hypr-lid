@@ -3,30 +3,45 @@
 #
 #   dot-hypr-lid close   lid closed (Hyprland "switch:on:Lid Switch" bind)
 #   dot-hypr-lid open    lid opened ("switch:off:Lid Switch")
-#   dot-hypr-lid sync    re-evaluate (login, monitor hotplug)
+#   dot-hypr-lid sync    re-evaluate (login, monitor hotplug, after hypridle
+#                        lights the screens)
 #
-# Rule: the panel is off only while the lid is closed AND another monitor is
-# active. If the laptop panel is the only monitor it stays on: the lid's own
-# action (the idle settings, crates/kubaos-idle) suspends or locks the laptop,
-# or leaves it running, as under Keep awake.
+# Rule: an open lid has the panel on, and a closed one has it off, whichever
+# way it is off:
 #
-# State lives in a flag file that config/hypr/monitors.lua reads, so a config
-# reload keeps the panel in the state chosen here. Changing it triggers
-# `hyprctl reload`, which re-runs monitors.lua.
+# - Another monitor active: the panel is disabled, through a flag file that
+#   config/hypr/monitors.lua reads, so a config reload keeps it off. Changing
+#   the flag triggers `hyprctl reload`, which re-runs monitors.lua.
+# - The panel alone: it is powered off with DPMS, so the session keeps its
+#   output and windows. The lid's own action (the idle settings,
+#   crates/kubaos-idle) still suspends or locks the laptop, or leaves it
+#   running. A second flag file records it, so `sync` lights only a panel it
+#   turned off itself, never one hypridle's screens-off timer did.
+#
+# hypridle's commands light every screen and then run `sync`, which turns the
+# panel off again under a closed lid. Lighting first means a failure here
+# leaves the panel on.
+#
+# HAZARD: a key press or a mouse move lights the panel under a closed lid too
+# (misc:key_press_enables_dpms, misc:mouse_move_enables_dpms in
+# config/hypr/looks.lua). Leave them on: they are the way back to a lit panel
+# if Hyprland ever misses the lid opening.
 set -euo pipefail
 
 laptop=${DOT_HYPR_LAPTOP:-eDP-1}
+lid_nodes=${DOT_HYPR_LID_NODES:-/proc/acpi/button/lid}
 state_dir="${XDG_RUNTIME_DIR:-/tmp}/dot-hypr"
 flag="$state_dir/laptop-panel-off"
+dark="$state_dir/laptop-panel-dark"
 recorded="$state_dir/lid"
 
-mkdir -p "$state_dir"
-exec 9>"$state_dir/lid.lock"
-flock -w 5 9
+panel_power() {
+  hyprctl dispatch "hl.dsp.dpms({ action = \"$1\", monitor = \"$laptop\" })" >/dev/null || true
+}
 
 lid_closed() {
   local f
-  for f in /proc/acpi/button/lid/*/state; do
+  for f in "$lid_nodes"/*/state; do
     [[ -r $f ]] || continue
     grep -q closed "$f"
     return
@@ -41,30 +56,70 @@ other_monitor_active() {
   hyprctl monitors | awk -v laptop="$laptop" '$1 == "Monitor" && $2 != laptop { found = 1 } END { exit !found }'
 }
 
+# Takes whether the lid is closed, 1 or 0.
 sync() {
-  local want_off=0 have_off=0
-  if lid_closed && other_monitor_active; then
-    want_off=1
+  local want_off=0 want_dark=0 have_off=0
+  if (($1)); then
+    if other_monitor_active; then
+      want_off=1
+    else
+      want_dark=1
+    fi
   fi
-  [[ -f $flag ]] && have_off=1
-  ((want_off == have_off)) && return 0
 
-  if ((want_off)); then
-    : >"$flag"
-  else
-    rm -f "$flag"
+  if ((want_dark)); then
+    : >"$dark"
+  elif [[ -f $dark ]]; then
+    rm -f "$dark"
+    panel_power enable
   fi
-  hyprctl reload >/dev/null
+
+  [[ -f $flag ]] && have_off=1
+  if ((want_off != have_off)); then
+    if ((want_off)); then
+      # HAZARD: light the panel before disabling it. Hyprland keeps a monitor's
+      # DPMS state while it is disabled and its dpms dispatcher skips disabled
+      # monitors, so a panel disabled while dark comes back dark on an open lid.
+      panel_power enable
+      : >"$flag"
+    else
+      rm -f "$flag"
+    fi
+    hyprctl reload >/dev/null
+  fi
+
+  # The reload above enables a panel only after this runs, which makes this a
+  # no-op; enabling it sends `monitoradded`, and `dot-hypr-workspaces` syncs
+  # again. So this goes through whenever it is wanted, not only on a change.
+  if ((want_dark)); then
+    panel_power disable
+  fi
 }
 
 case "${1:-}" in
-  close) echo closed >"$recorded" ;;
-  open) echo open >"$recorded" ;;
-  sync) ;;
+  close | sync) ;;
+  # HAZARD: light the panel before anything that can fail or wait, the lock
+  # included. A black screen on an open laptop is the worst way this can go.
+  open) panel_power enable ;;
   *)
     echo "usage: $(basename "$0") open|close|sync" >&2
     exit 2
     ;;
 esac
 
-sync
+mkdir -p "$state_dir"
+exec 9>"$state_dir/lid.lock"
+flock -w 5 9
+
+case "$1" in
+  close) echo closed >"$recorded" ;;
+  open) echo open >"$recorded" ;;
+esac
+
+# An opening is taken at its word. A closing is asked of the lid: its bind can
+# run late, after a suspend the lid's opening woke the laptop from.
+if [[ $1 != open ]] && lid_closed; then
+  sync 1
+else
+  sync 0
+fi

@@ -1,26 +1,30 @@
-//! Keep awake: no lock, screens off or suspend after a time idle, and no lock or suspend when the
-//! lid closes, for a while, until turned off, or until the battery falls to a level. It is an
-//! `idle` inhibitor of logind's, held by `systemd-inhibit` around `kubaos-idle awake hold`, which
-//! hypridle honours (`ignore_systemd_inhibit` stays off); the lid's holder ([`crate::lid`]) keeps
-//! the lid from logind meanwhile. hypridle keeps running, so the lock before a suspend and a lock
-//! asked for still work, and a scheduled lock, suspend, shut down or reboot still fires.
+//! Keep awake: no lock, screens off or suspend after a time idle, for a while, until turned off, or
+//! until the battery falls to a level. It is an `idle` inhibitor of logind's, held by
+//! `systemd-inhibit` around `kubaos-idle awake hold`, which hypridle honours
+//! (`ignore_systemd_inhibit` stays off). hypridle keeps running, so the lock before a suspend and a
+//! lock asked for still work, and a scheduled lock, suspend, shut down or reboot still fires.
+//!
+//! It leaves the lid to the lid settings, so closing the lid on battery suspends, and it is still
+//! on after the resume if its time isn't up. Keep awake with the lid closed is asked for apart,
+//! because an intent set hours before the lid closes fails silently and drains the battery: only
+//! that form has the lid's holder ([`crate::lid`]) keep the lid from logind.
 //!
 //! Its state is a file in the runtime dir the bar watches, replaced whole on every change:
 //!
 //! ```json
-//! {"active": true, "until": 1793000000, "battery": 0}
+//! {"active": true, "until": 1793000000, "battery": 0, "lid": false}
 //! ```
 //!
 //! `until` is when it ends, in seconds since the epoch, 0 until turned off. `battery` is the level
 //! it ends at, in percent, once on battery; 0 for none. Plugged in it never ends for the battery,
-//! and a Keep awake for a while or until turned off never ends for it at all. The holder runs as
-//! the systemd user unit [`UNIT`], so it outlives the menu and the shell, and stopping the unit
-//! ends it.
+//! and a Keep awake for a while or until turned off never ends for it at all. `lid` is whether it
+//! holds the lid too; missing, it doesn't. The holder runs as the systemd user unit [`UNIT`], so it
+//! outlives the menu and the shell, and stopping the unit ends it.
 //!
 //! # Owns
 //!
-//! - The state and its file, what a Keep awake is asked for ([`Length`]), and when the battery ends
-//!   it.
+//! - The state and its file, what a Keep awake is asked for ([`Asked`], [`Length`]), and when the
+//!   battery ends it.
 //!
 //! # Not here
 //!
@@ -60,6 +64,9 @@ pub struct State {
     /// The battery level it ends at, in percent, once on battery; 0 for none.
     #[serde(default)]
     pub battery: u8,
+    /// Whether it holds the lid too, so closing the lid does nothing.
+    #[serde(default)]
+    pub lid: bool,
 }
 
 impl State {
@@ -70,6 +77,7 @@ impl State {
             active: true,
             until,
             battery: 0,
+            lid: false,
         }
     }
 
@@ -80,12 +88,24 @@ impl State {
             active: true,
             until: 0,
             battery: level.percent(),
+            lid: false,
         }
+    }
+
+    /// The same Keep awake, holding the lid too.
+    #[must_use]
+    pub fn holding_lid(self) -> Self {
+        State { lid: true, ..self }
     }
 
     /// Whether it holds at `now`, in seconds since the epoch: on, and not past its end.
     pub fn holds(&self, now: i64) -> bool {
         self.active && (self.until == 0 || self.until > now)
+    }
+
+    /// Whether it holds the lid at `now`: it holds, and was asked to hold the lid too.
+    pub fn holds_lid(&self, now: i64) -> bool {
+        self.lid && self.holds(now)
     }
 
     /// The battery level it ends at, if it ends at one.
@@ -182,6 +202,36 @@ impl Length {
             .and_then(Level::new)
             .map(Length::UntilBattery)
             .ok_or(LengthError::LevelOutOfRange(percent))
+    }
+}
+
+/// What `kubaos-idle awake` is asked for, from the words after it: `lid` first to hold the lid
+/// too, then `on` for until turned off, or a [`Length`], with `for` or `until` before it if wanted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Asked {
+    /// How long; `None` for until turned off.
+    pub length: Option<Length>,
+    /// Whether it holds the lid too.
+    pub lid: bool,
+}
+
+impl Asked {
+    /// Reads the words after `kubaos-idle awake`.
+    ///
+    /// # Errors
+    ///
+    /// When they are no length, or the level is outside 1 % to 99 %.
+    pub fn parse(words: &[&str]) -> Result<Asked, LengthError> {
+        let (lid, rest) = match words {
+            ["lid", rest @ ..] => (true, rest),
+            _ => (false, words),
+        };
+        let length = match rest {
+            ["on"] => None,
+            [] | ["for" | "until"] => return Err(LengthError::Unreadable(words.join(" "))),
+            ["for" | "until", typed @ ..] | typed => Some(Length::parse(&typed.join(" "))?),
+        };
+        Ok(Asked { length, lid })
     }
 }
 

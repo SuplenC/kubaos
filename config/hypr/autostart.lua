@@ -73,7 +73,7 @@ hl.on("hyprland.start", function()
   start("command -v kubaos-idle >/dev/null && exec kubaos-idle session || exec hypridle")
 
   -- Runs `dot-hypr-lid sync` at login and on every monitor hotplug, so the
-  -- laptop panel comes back when the last external goes with the lid closed.
+  -- laptop panel stays right when a monitor comes or goes with the lid closed.
   start("dot-hypr-workspaces")
 
   if POLKIT_AGENT == "auto" then

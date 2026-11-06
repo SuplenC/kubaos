@@ -1,0 +1,272 @@
+#!/usr/bin/env bash
+# test/hypr-lid-test: `scripts/dot-hypr-lid` with `hyprctl` stubbed and a lid
+# node of the test's own, so nothing reaches the live session. Needs nothing
+# installed beyond bash, coreutils, flock, awk and grep.
+#
+#   test/hypr-lid-test REPO
+#
+# Prints an ok or FAIL line per test and exits 1 when any fails.
+# shellcheck disable=SC2329 # The tests are called by name from the list at the end.
+set -euo pipefail
+# A test function stops at its first failed check, inside the command substitution too.
+shopt -s inherit_errexit
+
+REPO="${1:?usage: test/hypr-lid-test REPO}"
+LID="$REPO/scripts/dot-hypr-lid"
+SCRATCH="$(mktemp -d)"
+trap 'rm -rf "$SCRATCH"' EXIT
+failed=0
+
+ENABLE='dispatch hl.dsp.dpms({ action = "enable", monitor = "eDP-1" })'
+DISABLE='dispatch hl.dsp.dpms({ action = "disable", monitor = "eDP-1" })'
+
+# A runtime dir, a `hyprctl` that logs its arguments and lists the monitors in
+# $T/monitors, and a lid node saying $1.
+setup() {
+  T="$(mktemp -d "$SCRATCH/XXXXXX")"
+  mkdir -p "$T/stubs" "$T/run" "$T/lid/LID0"
+  cat >"$T/stubs/hyprctl" <<STUB
+#!/usr/bin/env bash
+if [[ \$1 == monitors ]]; then
+  while read -r name; do
+    echo "Monitor \$name (ID 0):"
+  done <"$T/monitors"
+  exit 0
+fi
+printf '%s\n' "\$*" >>"$T/log"
+STUB
+  chmod +x "$T/stubs/hyprctl"
+  monitors eDP-1
+  : >"$T/log"
+  lid_is "$1"
+}
+
+lid_is() { echo "state:      $1" >"$T/lid/LID0/state"; }
+
+monitors() { printf '%s\n' "$@" >"$T/monitors"; }
+
+run_lid() {
+  PATH="$T/stubs:$PATH" XDG_RUNTIME_DIR="$T/run" DOT_HYPR_LID_NODES="$T/lid" bash "$LID" "$@"
+}
+
+# What `hyprctl` was asked since the last time, a call a line.
+asked() {
+  cat "$T/log"
+  : >"$T/log"
+}
+
+expect() {
+  local what=$1 got=$2 want=$3
+  [[ $got == "$want" ]] || {
+    printf 'expected %s:\n%s\ngot:\n%s\n' "$what" "$want" "$got"
+    return 1
+  }
+}
+
+# Plain tests, since errexit doesn't stop a test on a failed `! dark`.
+dark() { [[ -f $T/run/dot-hypr/laptop-panel-dark ]]; }
+not_dark() { [[ ! -f $T/run/dot-hypr/laptop-panel-dark ]]; }
+off() { [[ -f $T/run/dot-hypr/laptop-panel-off ]]; }
+not_off() { [[ ! -f $T/run/dot-hypr/laptop-panel-off ]]; }
+
+t_a_lid_closed_on_the_only_monitor_powers_the_panel_off() {
+  setup closed
+
+  run_lid close
+
+  expect "the panel powered off, no reload" "$(asked)" "$DISABLE"
+  dark
+  not_off
+}
+
+t_opening_the_lid_lights_the_panel() {
+  setup closed
+  run_lid close
+  asked >/dev/null
+
+  lid_is open
+  run_lid open
+
+  expect "the panel lit" "$(sort -u "$T/log")" "$ENABLE"
+  not_dark
+}
+
+t_opening_the_lid_lights_the_panel_even_when_the_lid_node_still_says_closed() {
+  setup closed
+  run_lid close
+  asked >/dev/null
+
+  run_lid open
+
+  expect "the panel lit" "$(sort -u "$T/log")" "$ENABLE"
+  not_dark
+}
+
+t_opening_the_lid_lights_the_panel_it_didnt_turn_off_itself() {
+  setup open
+
+  run_lid open
+
+  expect "the panel lit" "$(asked)" "$ENABLE"
+}
+
+t_opening_the_lid_lights_the_panel_when_the_lock_cant_be_had() {
+  setup closed
+  mkdir -p "$T/run/dot-hypr"
+  flock "$T/run/dot-hypr/lid.lock" sleep 6 >/dev/null 2>&1 &
+  sleep 0.2
+
+  run_lid open 2>/dev/null || true
+
+  expect "the panel lit" "$(asked)" "$ENABLE"
+}
+
+t_a_sync_after_hypridle_lit_the_screens_turns_the_panel_off_again_under_a_closed_lid() {
+  setup closed
+  run_lid close
+  asked >/dev/null
+
+  run_lid sync
+
+  expect "the panel powered off again" "$(asked)" "$DISABLE"
+  dark
+}
+
+t_a_sync_with_the_lid_open_leaves_a_panel_hypridles_timer_turned_off() {
+  setup open
+
+  run_lid sync
+
+  expect "nothing asked" "$(asked)" ""
+}
+
+t_a_sync_with_the_lid_open_lights_a_panel_it_turned_off() {
+  setup closed
+  run_lid close
+  asked >/dev/null
+  lid_is open
+
+  run_lid sync
+
+  expect "the panel lit" "$(asked)" "$ENABLE"
+  not_dark
+}
+
+t_a_login_with_the_lid_closed_powers_the_panel_off() {
+  setup closed
+
+  run_lid sync
+
+  expect "the panel powered off" "$(asked)" "$DISABLE"
+  dark
+}
+
+t_a_login_with_the_lid_open_and_a_flag_left_behind_lights_the_panel() {
+  setup open
+  mkdir -p "$T/run/dot-hypr"
+  : >"$T/run/dot-hypr/laptop-panel-dark"
+
+  run_lid sync
+
+  expect "the panel lit" "$(asked)" "$ENABLE"
+  not_dark
+}
+
+t_a_lid_closed_with_another_monitor_disables_the_panel_lit_first() {
+  setup closed
+  monitors eDP-1 DP-2
+
+  run_lid close
+
+  expect "lit, then reloaded" "$(asked)" "$ENABLE"$'\n'"reload"
+  off
+  not_dark
+}
+
+t_a_monitor_plugged_in_under_a_closed_lid_lights_the_panel_before_disabling_it() {
+  setup closed
+  run_lid close
+  asked >/dev/null
+  monitors eDP-1 DP-2
+
+  run_lid sync
+
+  expect "lit, then reloaded" "$(asked)" "$ENABLE"$'\n'"$ENABLE"$'\n'"reload"
+  off
+  not_dark
+}
+
+t_the_last_monitor_going_under_a_closed_lid_enables_the_panel_then_powers_it_off() {
+  setup closed
+  monitors eDP-1 DP-2
+  run_lid close
+  asked >/dev/null
+  # The panel is disabled, so with the external gone Hyprland lists nothing.
+  : >"$T/monitors"
+
+  run_lid sync
+
+  expect "reloaded, then powered off" "$(asked)" "reload"$'\n'"$DISABLE"
+  not_off
+  dark
+}
+
+t_opening_the_lid_with_another_monitor_enables_the_panel_again() {
+  setup closed
+  monitors eDP-1 DP-2
+  run_lid close
+  asked >/dev/null
+  lid_is open
+
+  run_lid open
+
+  expect "lit, then reloaded" "$(asked)" "$ENABLE"$'\n'"reload"
+  not_off
+}
+
+t_a_late_close_bind_after_the_lid_opened_keeps_the_panel_on() {
+  setup open
+
+  run_lid close
+
+  expect "nothing asked" "$(asked)" ""
+  not_dark
+}
+
+t_a_machine_without_a_lid_node_goes_by_the_last_switch_event() {
+  setup open
+  rm -rf "$T/lid/LID0"
+
+  run_lid close
+  expect "the panel powered off" "$(asked)" "$DISABLE"
+
+  run_lid open
+  expect "the panel lit" "$(sort -u "$T/log")" "$ENABLE"
+}
+
+t_anything_else_is_a_usage_error() {
+  setup open
+
+  local code=0
+  run_lid nonsense 2>/dev/null || code=$?
+
+  expect "the exit code" "$code" 2
+  expect "nothing asked" "$(asked)" ""
+}
+
+mapfile -t tests < <(declare -F | awk '$3 ~ /^t_/ { print $3 }')
+for t in "${tests[@]}"; do
+  # Not in an `if` or before `||`, where errexit wouldn't stop the test at its first failed check.
+  set +e
+  out="$(set -e; "$t" 2>&1)"
+  code=$?
+  set -e
+  if ((code == 0)); then
+    echo "ok   $t"
+  else
+    echo "FAIL $t"
+    printf '%s\n' "$out"
+    failed=1
+  fi
+done
+exit "$failed"
