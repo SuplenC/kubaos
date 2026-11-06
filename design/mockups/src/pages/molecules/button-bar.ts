@@ -8,9 +8,6 @@ import { filling, flow, stack, within } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 /** The room a dialog gives its bar: its width less its padding on both sides. */
 const DIALOG = "calc(var(--size-dialog) - 2 * var(--space-s24))";
 /** The room a panel's body gives it: the panel's width less the container's padding on both sides. */
@@ -54,7 +51,7 @@ export default page({
   lede: "The row of buttons that ends a surface: Cancel at the start, the actions at the end, the one Enter presses last.",
   code: { rust: "button_bar::button_bar", qml: "ButtonBar", unbuilt: "Not built yet" },
   stage: {
-    live: () => within(ACROSS, filling(flow("s32", live(), inRoom(DANGER, PANEL)))),
+    live: () => within("100%", filling(flow("s32", live(), inRoom(DANGER, PANEL)))),
     hint: "click a button, or Tab and Enter",
     daylight: true,
   },

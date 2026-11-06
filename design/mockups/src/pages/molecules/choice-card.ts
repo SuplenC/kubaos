@@ -10,9 +10,6 @@ import { filling, stack, within } from "../../lib/layout.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 const TITLE: Words = { short: "Erase", long: "Erase the whole disk and install KubaOS on it" };
 const LINE: Words = { short: "Everything on it goes.", long: "Wipes all three partitions, Windows and its recovery partition included." };
 
@@ -52,7 +49,7 @@ function suites(room = COLUMN): HTMLElement {
 }
 
 function live(): HTMLElement {
-  return within(ACROSS, stack("s32", "start", filling(modes("100%")), filling(suites("100%"))));
+  return within("100%", stack("s32", "start", filling(modes("100%")), filling(suites("100%"))));
 }
 
 const ROWS: readonly { name: string; options: ChoiceCardOptions }[] = [

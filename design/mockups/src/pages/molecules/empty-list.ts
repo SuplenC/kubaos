@@ -7,9 +7,6 @@ import { emptyList, type ListRowSpec, list } from "../../lib/list.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { WELL_ROOM } from "./list.ts";
 
-/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
-const ACROSS = "calc(100% - var(--space-s24))";
-
 const LINE: Words = { short: "No devices found", long: "No Bluetooth devices nearby. Put yours in pairing mode to see it here." };
 const NETWORKS: Words = { short: "No networks found", long: "No Wi-Fi networks in range. Move closer to one, or plug in a cable." };
 
@@ -42,7 +39,7 @@ export default page<MatrixState>({
   lede: "A list's well with nothing in it: one centred line saying so, or rows still being found in their place.",
   code: { rust: "list::empty_list", qml: "EmptyList" },
   stage: {
-    live: () => within(ACROSS, filling(flow("s32", empty(shown(LINE)), loading()))),
+    live: () => within("100%", filling(flow("s32", empty(shown(LINE)), loading()))),
     hint: "nothing to press: Tab passes it",
     daylight: true,
   },
