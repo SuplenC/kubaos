@@ -18,7 +18,7 @@
 //!   pause ([`indexer`]), the critical-battery warning ([`warning`]), `status` ([`status`], read
 //!   live by [`live`]), `measure` ([`measure`]), and the battery's history: its file
 //!   ([`history`]), what is read for it ([`reading`]), when it is written and when a toast comes
-//!   ([`recorder`]).
+//!   ([`recorder`]), and the report and the menu's short answer on it ([`report`]).
 //!
 //! # Not here
 //!
@@ -41,6 +41,7 @@ pub mod panel;
 pub mod plan;
 pub mod reading;
 pub mod recorder;
+pub mod report;
 pub mod runtime;
 pub mod scheduler;
 pub mod settings;
