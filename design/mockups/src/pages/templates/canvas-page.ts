@@ -12,8 +12,7 @@ import type { ListRowSpec } from "../../lib/list.ts";
 import { type Section, sidebarPage } from "../../lib/sidebar-page.ts";
 import { el } from "../../site/dom.ts";
 import { lights, powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Easing, type Move, nonEmpty, type Track } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, type Easing, type Move, nonEmpty, type Track, page } from "../../site/page.ts";
 import { outline } from "./settings.ts";
 import { resizable, still } from "./window.ts";
 
@@ -60,7 +59,7 @@ function displays(options: { readonly selected?: number; readonly keyboard?: boo
 }
 
 /** The canvas alone in a room `width` × `height`, standing as `options` say. */
-function alone(options: Partial<Parameters<typeof canvas>[0]> = {}, width = "var(--size-panel)", height = "calc(var(--size-panel) * 5 / 8)"): HTMLElement {
+function alone(options: Partial<Parameters<typeof canvas>[0]> = {}, width = "calc(var(--size-panel) * 3 / 2)", height = "calc(var(--size-panel) * 15 / 16)"): HTMLElement {
   const drawn = canvas({ screens: screens(), desk: "Desk at home", ...options });
   drawn.element.style.width = width;
   drawn.element.style.height = height;
@@ -129,7 +128,7 @@ function fading(on: string, target: string, from: 0 | 1, to: 0 | 1, reduced: boo
 const MOVES: Move[] = [
   {
     name: "Picking another object",
-    what: "← or → (h, l), or a press: the tube leaves the object it was on and lights on the new one, each over `short` on `standard` (`--lit`), as focus moving between controls does. The settings under the canvas follow at once.",
+    what: "← → or a press: the tube leaves one object and lights on the next; the settings follow.",
     tracks: [
       { part: "the object left", on: "the first screen", target: '.k-cv-screen[data-n="1"]', property: "--lit", from: 1, to: 0, duration: "short", curve: "standard" },
       { part: "the object picked", on: "the third screen", target: '.k-cv-screen[data-n="3"]', property: "--lit", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -140,7 +139,7 @@ const MOVES: Move[] = [
   },
   {
     name: "Fitted again",
-    what: "Shift+↓ moves the side screen to its next snap, and a dragged object is let go: the arrangement fits the canvas again and every object glides to its new box over `medium` on `standard_decel` (`--canvas-fit`, 0 to 1, each of its edges from its old place to its new, whole device pixels at the end). While an object is dragged nothing eases: it follows the pointer every frame, its guides on and off at once. A resize fits it again every frame, with no glide. With reduced motion the boxes are there at once.",
+    what: "A snap key, or a drag let go: every object glides to its new box; a resize never glides.",
     tracks: [gliding(".k-cv-screen", false)],
     reduced: [gliding(".k-cv-screen", true)],
     back: "cuts",
@@ -148,7 +147,7 @@ const MOVES: Move[] = [
   },
   {
     name: "A screen plugged in",
-    what: "The hardware changes while the page shows: a screen plugged in fades in over `medium` on `standard` at its box in the new fit, as the others glide to theirs over `medium` on `standard_decel` (`--canvas-fit`). With reduced motion it fades in over `short` and the boxes are there at once.",
+    what: "It fades in at its new box as the others glide to theirs.",
     tracks: [fading("the screen plugged in", '.k-cv-screen[data-n="4"]', 0, 1, false), gliding('.k-cv-screen:not([data-n="4"])', false)],
     reduced: [fading("the screen plugged in", '.k-cv-screen[data-n="4"]', 0, 1, true), gliding('.k-cv-screen:not([data-n="4"])', true)],
     back: "cuts",
@@ -156,7 +155,7 @@ const MOVES: Move[] = [
   },
   {
     name: "A screen unplugged",
-    what: "A screen unplugged, or the lid closed on the laptop's: it fades out over `medium` on `standard` where it was, as the others glide to their boxes in the new fit (`--canvas-fit`). If it was selected, the selection goes to the first screen left. With reduced motion it fades out over `short` and the boxes are there at once.",
+    what: "It fades out where it was as the others glide; a selection on it goes to the first left.",
     tracks: [fading("the screen unplugged", '.k-cv-screen[data-n="3"]', 1, 0, false), gliding('.k-cv-screen:not([data-n="3"])', false)],
     reduced: [fading("the screen unplugged", '.k-cv-screen[data-n="3"]', 1, 0, true), gliding('.k-cv-screen:not([data-n="3"])', true)],
     back: "cuts",
@@ -164,7 +163,7 @@ const MOVES: Move[] = [
   },
   {
     name: "The canvas takes the keyboard",
-    what: "Tab onto the canvas: its tube and the glow outside it fade in over `short` on `standard` (`--lit`), as a list's well does; the selected object keeps its own.",
+    what: "Tab onto the canvas: its tube and glow fade in; the selected object keeps its own.",
     tracks: lights(".k-cv > .k-ring", "the canvas", 0, 1),
     reduced: "same",
     back: "plays",
@@ -172,7 +171,7 @@ const MOVES: Move[] = [
   },
   {
     name: "An object under the pointer",
-    what: "The pointer comes onto an object that isn't selected: it lights over `short` on `standard` (`--lit`), its tube inside its edge; a press selects it and starts a drag.",
+    what: "It lights with its tube inside its edge; a press selects it and starts a drag.",
     tracks: lights('.k-cv-screen[data-n="3"]', "the third screen", 0, 1),
     reduced: "same",
     back: "plays",
@@ -213,29 +212,26 @@ export default page({
   level: "templates",
   slug: "canvas-page",
   title: "CanvasPage",
-  summary: "A canvas of objects drawn to scale inside a SidebarPage page, with the selected one's settings under it or beside it: Settings › Displays' screens.",
-  live,
-  description: [
-    "Rust `template::canvas_page`; iced only, inside a SidebarPage page. Drag a screen: its edges and centre snap to its neighbours', a `primary` guide showing while a snap holds, and its numbers under the canvas follow it live. Drag the window's corner: the canvas grows with it and the screens fit again every frame. Plug a tablet in and out under the window.",
-    "The canvas is a well in `surface_container_lowest` at the content radius, its sunken hairline round it and a faint dot, the soft outline one device pixel square, on every `space.s16` of its grid from its corner. Its toolbar is its top band, `space.s12` in: the current desk as a chip, then the canvas's actions at the far end, Text sm buttons (Identify, Mirror). Its key hints are its bottom band, `space.s12` in.",
-    "The objects are screens drawn to scale in logical pixels, fitted together into the room between the bands less `space.s24` all round, centred, every edge rounded to a whole device pixel so two screens that touch share their pixel. Each is `surface_container_high` at the control radius with its sunken hairline, its number in `headline` and its size in `mono` under it; one too small for its size shows its number alone. The selected one burns the neon tube inside its edge; one under the pointer lights as a control does.",
-    "Dragging tracks the pointer every frame: the object's left, centre and right, and its top, middle and bottom, snap to any neighbour's within `space.s8` on the canvas, the nearest winning on each axis, with a `primary` hairline across the stage where the snap holds. Nothing eases while it moves. Letting go is when the change applies, and the arrangement fits the canvas again, every object gliding to its new box.",
-    "On a page under `size.canvas_wide` the canvas spans the page at `aspect.canvas` of its width tall (42%), capped so the heading of the settings under it stays in view at the window's foot; the settings follow it down the page. From `size.canvas_wide` the settings go into a column `size.canvas_settings` wide beside the canvas, scrolling on their own, and the canvas takes all the height left above the page's foot. Either way the selected object's settings are ordinary sub-sections of the page: a heading of its name, a line of its numbers, then wells of rows, following the selection; the sidebar's sub-section takes its name.",
-    "The hardware is live: a screen plugged in fades in at its place as the others glide to the new fit; one unplugged, or the laptop's with its lid closed, fades out. The template draws what the app tells it; applying a change and its revert countdown are the app's.",
-  ],
+  lede: "A canvas of objects drawn to scale, with the selected one's settings: Settings › Displays' screens.",
+  code: { unbuilt: "Rust template::canvas_page: not built yet" },
+  stage: {
+    live,
+    hint: "drag a screen or the window's corner; plug in below",
+    daylight: true,
+  },
   variants: [
-    { name: "Under 1000 wide", for: "The settings under the canvas, which is 42% of the page's width tall: a window up to 1263 wide.", sample: () => still(displays(), "var(--size-app_width)", "var(--size-app_height)") },
-    { name: "From 1000 wide", for: "The settings in a column beside the canvas, which takes all the height: a laptop's full screen and up.", sample: wide },
-    { name: "Dragging, a snap held", for: "The side screen held where its top meets the big screen's middle: the guide across the stage.", sample: () => alone({ selected: 2, held: { index: 2, x: 2580, y: 760 } }, "calc(var(--size-panel) * 3 / 2)", "var(--size-panel)") },
+    { name: "Under 1000 wide", for: "the settings under the canvas, `aspect.canvas` tall", sample: () => still(displays(), "var(--size-app_width)", "var(--size-app_height)") },
+    { name: "From 1000 wide", for: "the settings in a column; the canvas takes the height", sample: wide },
+    { name: "Dragging, a snap held", for: "the `primary` guide across the stage", sample: () => alone({ selected: 2, held: { index: 2, x: 2580, y: 760 } }, "calc(var(--size-panel) * 3 / 2)", "var(--size-panel)") },
   ],
-  sizes: doesntApply("it has no sizes of its own: the canvas takes its page's width, its height the share or the room the page's width gives it (Measures, Reflow)."),
+  sizes: doesntApply("none of its own: its page's width sets the canvas's height."),
   states: {
     shown: ["rest", "lit", "pressed", "selected"],
     absent: {
-      disabled: "an object that can't be moved (a mirrored screen) is still selected and set; it just doesn't drag, which its settings say.",
-      loading: "the hardware is known as the page opens; nothing on the canvas waits.",
-      empty: "there is always a screen: the one the window is on.",
-      error: "an arrangement that can't apply is the app's, said in its settings with an `ErrorBlock`; the canvas shows what is.",
+      disabled: "a mirrored screen is still selected; it just doesn't drag",
+      loading: "the hardware is known as the page opens",
+      empty: "there is always the screen the window is on",
+      error: "the app says it, an `ErrorBlock` in the settings",
     },
     rows: [
       {
@@ -243,66 +239,64 @@ export default page({
         cell: (state: MatrixState) => objectIn(state === "selected" ? "rest" : state, state === "selected"),
       },
     ],
-    described: {
-      rest: "`surface_container_high` with its sunken hairline, its number and size in `on_surface` and `on_surface_variant`. By day the same in daylight colours.",
-      lit: "Under the pointer: the tube inside its edge with the glow outside at night; by day the tube as glass.",
-      pressed: "Pressed to drag: the tube runs as a pressed control's, the glow `focus.pressed_glow` times the lit one, while it follows the pointer.",
-      selected: "The selected object keeps its tube lit, by night with its glow, and the settings under the canvas are its own.",
+    looks: {
+      rest: "`surface_container_high`, a sunken hairline, its number and size",
+      lit: "the tube inside its edge, glow at night",
+      pressed: "the tube runs hot, glow × `focus.pressed_glow`, following the pointer",
+      selected: "the tube stays lit; the settings are its own",
     },
   },
   focus: {
     tubes: [
       { name: "The selected object", tone: "accent", filled: false, content: false },
-      { name: "The canvas, with the keyboard on it", tone: "accent", filled: false, content: false },
+      { name: "The canvas, with the keyboard", tone: "accent", filled: false, content: false },
     ],
     looks: {
-      lit: "At night: the selected object's tube inside its edge with the glow outside, cut by the canvas's edge; with the keyboard on the canvas its own tube round the well too.",
-      signsOff: "By day, and at night while a power change has the lights out: both tubes are glass, `primary_glass`, with no glow.",
+      lit: "the object's tube inside its edge, its glow cut by the canvas",
+      signsOff: "both tubes as `primary_glass`, no glow",
     },
     signsOff: () => objectIn("signs-off"),
   },
   content: {
-    text: [{ name: "A screen's name, its heading under the canvas", words: NAME, sample: () => still(displays(), "var(--size-app_width)", "var(--size-app_height)") }],
-    missingPicture: doesntApply("an object is drawn, never a picture: its number and size."),
+    text: [{ name: "A screen's name, under the canvas", words: NAME, sample: () => still(displays(), "var(--size-app_width)", "var(--size-app_height)") }],
+    missingPicture: doesntApply("an object is drawn, never a picture."),
     counts: [
-      { name: "One screen", for: "The laptop alone: it fills the canvas less its margin, centred.", sample: () => alone({ screens: [screens()[1]!] }) },
-      { name: "Three screens", for: "The desk: the big screen, the laptop under it and a side screen.", sample: () => alone() },
-      { name: "A screen too small for its size", for: "A tablet beside two big screens at a panel's width: it shows its number alone.", sample: () => alone({ screens: [...screens(), { ...TABLET, x: 4480, y: 0 }] }, "var(--size-panel)", "calc(var(--size-panel) / 2)") },
+      { name: "One screen", for: "it fills the canvas less its margin", sample: () => alone({ screens: [screens()[1]!] }) },
+      { name: "Three screens", for: "the desk: big screen, laptop under it, side screen", sample: () => alone() },
+      { name: "A screen too small", for: "it shows its number alone", sample: () => alone({ screens: [...screens(), { ...TABLET, x: 4480, y: 0 }] }, "var(--size-panel)", "calc(var(--size-panel) / 2)") },
     ],
   },
-  motion: { arrives: doesntApply("it comes with its page, which SidebarPage's change of section moves."), leaves: doesntApply("it goes with its page."), between: MOVES },
+  motion: { arrives: doesntApply("it comes with its page, in SidebarPage's change of section."), leaves: doesntApply("it goes with its page."), between: MOVES },
   keyboard: {
     keys: [
-      { keys: ["Tab", "Shift+Tab"], does: "Into the canvas, as a stop of the page, then its toolbar's buttons, then the settings' wells." },
-      { keys: ["←", "→", "h", "l"], does: "Picks the object before or after, left to right, round from either end; the settings follow." },
-      { keys: ["Shift+←", "Shift+→", "Shift+↑", "Shift+↓", "H", "J", "K", "L"], does: "Moves the selected object to its next snap that way: the nearest place where one of its edges or its centre meets a neighbour's. The arrangement fits again." },
-      { keys: ["Enter"], does: "Into the settings under it, at the first row of the selected object's." },
+      { keys: ["Tab", "Shift+Tab"], does: "into the canvas, its toolbar, then the settings' wells" },
+      { keys: ["←", "→", "h", "l"], does: "the object before or after, round; the settings follow" },
+      { keys: ["Shift+←", "Shift+→", "Shift+↑", "Shift+↓", "H", "J", "K", "L"], does: "moves the object to its next snap that way" },
+      { keys: ["Enter"], does: "into the settings, at the object's first row" },
     ],
-    order: "The canvas is the page's first stop after its header, then its toolbar, then the settings.",
-    lands: "Tab into the canvas lands on the selected object, the first screen as the page opens.",
+    order: "The page's first stop after its header, then its toolbar, then the settings.",
+    lands: "On the selected object: the first screen as the page opens.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "The canvas", for: "Its bands `space.s12` in, the objects fitted `space.s24` in from the stage's edges.", sample: () => alone() },
-      { name: "Displays at the default", for: "A page of 856: the canvas 42% of 808 tall, the settings below.", sample: () => still(displays(), "var(--size-app_width)", "var(--size-app_height)") },
+      { name: "The canvas", for: "its bands and the objects' margin", sample: () => alone() },
+      { name: "Displays at the default", for: "the canvas over its settings", sample: () => still(displays(), "var(--size-app_width)", "var(--size-app_height)") },
     ]),
     measures: [
-      { what: "The canvas's corners.", token: "radius-content" },
-      { what: "The dot grid's step.", token: "space-s16" },
-      { what: "The bands' padding.", token: "space-s12" },
-      { what: "The objects' margin from the stage's edges.", token: "space-s24" },
-      { what: "How near an edge snaps, on the canvas.", token: "space-s8" },
-      { what: "An object's corners.", token: "radius-control" },
-      { what: "The page width the settings go beside the canvas from.", token: "size-canvas_wide" },
-      { what: "The settings' column beside the canvas.", token: "size-canvas_settings" },
-      { what: "The canvas's height under that width, to its width.", token: "aspect-canvas" },
-      { what: "Between the canvas and the settings, as between the page's parts.", token: "space-s32" },
+      { part: "Canvas's corners", token: "radius-content" },
+      { part: "Dot grid's step", token: "space-s16" },
+      { part: "Bands' padding", token: "space-s12" },
+      { part: "Objects' margin from the stage", token: "space-s24" },
+      { part: "Snap's reach", token: "space-s8" },
+      { part: "Object's corners", token: "radius-control" },
+      { part: "Settings go beside from", token: "size-canvas_wide" },
+      { part: "Settings' column", token: "size-canvas_settings" },
+      { part: "Canvas's height to width", token: "aspect-canvas" },
+      { part: "Canvas → settings", token: "space-s32" },
     ],
     reflow: {
-      described:
-        "Displays in a window of the toolbar's size. At the 720 minimum the page is 456 and the canvas 424 wide, 178 tall; at the 1120 default 808 wide and 339 tall, capped where a short window would push the settings' heading out of view; from a page of 1000 (a 1264 window) the settings are a 400 column beside the canvas, which takes all the height. The objects fit again on every frame of a resize.",
+      note: "The objects fit again every frame; from a page of `size.canvas_wide` the settings go beside the canvas.",
       sample: () => displays(),
     },
   },
 });
-
