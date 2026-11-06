@@ -11,8 +11,7 @@ import { filling, row, stack, within } from "../../lib/layout.ts";
 import { type SpinnerSize, spinner } from "../../lib/spinner.ts";
 import { clamped, text, type TypeStyle, wrapped } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
 const ROOM = "var(--size-column)";
 
@@ -81,53 +80,48 @@ function aboveWords(): HTMLElement {
 }
 
 const PAIRS: readonly { readonly size: SpinnerSize; readonly style: TypeStyle; readonly gap: string; readonly words: string; readonly for: string }[] = [
-  { size: "s16", style: "small", gap: "s8", words: "Checking again…", for: "Beside `small` or `label` text, `space.s8` apart: a running job in the Command menu, first boot checking again." },
-  { size: "s20", style: "body", gap: "s12", words: "Poking at the hardware…", for: "Beside `body` text, `space.s12` apart: Kōbō looking at the machine, a step running, a button's place." },
-  { size: "s24", style: "subheading", gap: "s12", words: "Looking for disks", for: "Beside a `subheading`, `space.s12` apart." },
-  { size: "s48", style: "heading", gap: "s20", words: "Setting up the reader", for: "A page's one spinner beside its `heading`, `space.s20` apart, or above its words, `space.s16`." },
+  { size: "s16", style: "small", gap: "s8", words: "Checking again…", for: "`small` or `label` words, `space.s8` apart" },
+  { size: "s20", style: "body", gap: "s12", words: "Poking at the hardware…", for: "`body` words, `space.s12` apart" },
+  { size: "s24", style: "subheading", gap: "s12", words: "Looking for disks", for: "a `subheading`, `space.s12` apart" },
+  { size: "s48", style: "heading", gap: "s20", words: "Setting up the reader", for: "a page's one, `space.s20` beside or `space.s16` above" },
 ];
 
 export default page<"loading" | "rest" | "error">({
   level: "molecules",
   slug: "spinner-in-context",
   title: "Spinner in context",
-  summary: "The spinner where work that can't tell how far it is shows: in a button's place, leading a row, under a field, and for a page loading.",
-  live: () => stack("s32", "start", inPlace(true), installSteps(), pageLoading()),
-  description: [
-    "The Spinner atom (`docs/design/components/spinner.md`) placed in the parts round it. It is for work that can't say how far it has got; work that can shows a ProgressBar. Its size is the icon size of the text beside it, so it sits on that text's line like any symbol, and its gap is the symbol's: `space.s8` beside `small`, `space.s12` beside `body`.",
-    "In a button's place: a button that starts work it can't measure gives its place to a 20 spinner and a `body` line saying what is going on, `on_surface_variant`, `space.s12` apart. On Kōbō's done screen Reboot gives its place and Stay in the live system keeps its own; in the power menu every action waits on the work, so the spinner and its words take all their places. Work that destroys something spins in `error`. A spinner never sits inside a button: a button is something to press, and work going on isn't.",
-    "Leading a row: a row of work (Kōbō's install steps, the Command menu's running jobs) leads with its mark, the spinner while it runs; once it ends, the mark says how it went, `check_circle` in `primary` or `error` in `error`, in the spinner's place, so nothing moves. Under a field: the form's `small` status line says what is going on in words (Connecting…), its room kept while it is empty.",
-    "For a page loading: the page's one spinner, 48, beside its `heading` in a card (first boot's step running) or above its words (a progress panel whose job can't tell). Only work that can't tell spins: a running animation makes every frame wait on the screen's refresh, so the moment it can tell, a bar takes its place.",
-  ],
+  lede: "The spinner where work can't tell how far it is: in a button's place, leading a row, under a field, for a page.",
+  code: { rust: "progress::spinner", qml: "Spinner", unbuilt: "steady arc: not built yet" },
+  stage: { live: () => stack("s32", "start", inPlace(true), installSteps(), pageLoading()), hint: "nothing to press: it turns while work runs", daylight: true },
   variants: [
-    { name: "In a button's place", for: "A pressed button whose work can't be measured: the spinner and its words where the buttons were.", sample: () => stack("s16", "start", inPlace(false), inPlace(true)) },
-    { name: "In the actions' place", for: "A dialog whose actions all wait on the work: the power menu going down.", sample: () => dialogActions(false) },
-    { name: "In the actions' place, danger", for: "Work that loses something, in `error`: powering off mid-install.", sample: () => dialogActions(true) },
-    { name: "Leading a row", for: "A step running among done and waiting ones: Kōbō's install.", sample: () => installSteps() },
-    { name: "Leading a job's row", for: "The Command menu's running job, 16 beside `small`.", sample: jobRow },
-    { name: "Under a field", for: "The connect form's status line: what is going on, in words under the field.", sample: () => underField("Connecting…") },
-    { name: "A page loading, beside its heading", for: "First boot's step running: 48 beside its `heading`, in its card.", sample: () => pageLoading() },
-    { name: "A page loading, above its words", for: "A progress panel's job that can't tell: 48 above its title.", sample: aboveWords },
+    { name: "In a button's place", for: "a pressed button's place, with its words", sample: () => stack("s16", "start", inPlace(false), inPlace(true)) },
+    { name: "In the actions' place", for: "all of a dialog's actions wait: the power menu", sample: () => dialogActions(false) },
+    { name: "In the actions' place, danger", for: "work that loses something, in `error`", sample: () => dialogActions(true) },
+    { name: "Leading a row", for: "a step among done and waiting ones", sample: () => installSteps() },
+    { name: "Leading a job's row", for: "the Command menu's job, 16 beside `small`", sample: jobRow },
+    { name: "Under a field", for: "the connect form's status line", sample: () => underField("Connecting…") },
+    { name: "A page loading, beside its heading", for: "first boot's step: 48, in its card", sample: () => pageLoading() },
+    { name: "A page loading, above its words", for: "a progress panel's job that can't tell", sample: aboveWords },
   ],
   sizes: nonEmpty(PAIRS.map((pair) => ({ name: pair.size.slice(1), for: pair.for, sample: () => within(ROOM, beside(pair.size, pair.words, pair.style, pair.gap)) }))),
   states: {
     shown: ["loading", "rest", "error"],
     absent: {
-      lit: "a spinner takes no pointer and no focus; what is round it keeps its own states.",
-      pressed: "it takes no press: the button that started the work has given its place to it.",
-      disabled: "work that can't run shows no spinner.",
-      selected: "it holds no choice.",
-      empty: "a spinner always turns while it shows.",
+      lit: "it takes no pointer or focus",
+      pressed: "the button gave its place to it",
+      disabled: "work that can't run shows no spinner",
+      selected: "it holds no choice",
+      empty: "it always turns while it shows",
     },
     rows: [
       { name: "A row", cell: (state) => installSteps(state === "loading" ? "running" : state === "rest" ? "done" : "failed") },
       { name: "A job", cell: (state) => jobRow(state === "loading" ? "running" : state === "rest" ? "done" : "failed") },
       { name: "A page", cell: (state) => pageLoading(state === "loading" ? "running" : state === "rest" ? "done" : "failed") },
     ],
-    described: {
-      loading: "Running: the spinner turning at the size of the text beside it, its words saying what is going on.",
-      rest: "Done: `check_circle` in `primary` in the spinner's place, at its size, so nothing moves.",
-      error: "Failed: `error` in `error` in the spinner's place; a row's title turns `error` and `body_strong`.",
+    looks: {
+      loading: "the spinner at its text's size, words beside it",
+      rest: "`check_circle` in `primary` in its place",
+      error: "`error` in `error` in its place; a row's title too",
     },
   },
   focus: doesntApply("a spinner takes no focus; the parts round it keep their own."),
@@ -135,34 +129,34 @@ export default page<"loading" | "rest" | "error">({
     text: [{ name: "What is going on", words: DOING, sample: (words: string) => within(ROOM, beside("s20", words, "body", "s12")) }],
     missingPicture: doesntApply("a spinner is drawn."),
     counts: [
-      { name: "One", for: "A page's one spinner, or one line of work.", sample: () => inPlace(true) },
-      { name: "Many", for: "Each line of work that can't tell spins on its own, on one clock: the Command menu's running jobs.", sample: () => stack("s8", "start", jobRow(), row("s8", "centre", spinner("s16"), text("Updating KubaOS · Resolving the flake", "small", "on_surface_variant"))) },
+      { name: "One", for: "a page's one, or one line of work", sample: () => inPlace(true) },
+      { name: "Many", for: "each line spins on one clock: running jobs", sample: () => stack("s8", "start", jobRow(), row("s8", "centre", spinner("s16"), text("Updating KubaOS · Resolving the flake", "small", "on_surface_variant"))) },
     ],
   },
   motion: {
-    arrives: doesntApply("the spinner takes the place of what started the work at once, already turning; its turn is the Spinner page's."),
-    leaves: doesntApply("the mark of how the work went takes its place at once, at its size, so nothing moves."),
+    arrives: doesntApply("it takes its place at once, already turning."),
+    leaves: doesntApply("the mark of how it went takes its place at once."),
     between: powerMoves(() => within(ROOM, beside("s20", "Poking at the hardware…", "body", "s12"))),
   },
-  keyboard: doesntApply("a spinner takes no key; where it takes a button's place, the keyboard stays on the button's place and goes on to the next stop."),
+  keyboard: doesntApply("a spinner takes no key; the keyboard goes on to the next stop."),
   measures: {
     samples: nonEmpty([
-      { name: "Beside small", for: "16, `space.s8` from its words.", sample: () => beside("s16", "Checking again…", "small", "s8") },
-      { name: "Beside body", for: "20, `space.s12` from its words.", sample: () => beside("s20", "Poking at the hardware…", "body", "s12") },
-      { name: "A page loading", for: "48 beside its heading, in its card.", sample: () => pageLoading() },
+      { name: "Beside small", for: "16, `space.s8` from its words", sample: () => beside("s16", "Checking again…", "small", "s8") },
+      { name: "Beside body", for: "20, `space.s12` from its words", sample: () => beside("s20", "Poking at the hardware…", "body", "s12") },
+      { name: "A page loading", for: "48 beside its heading, in its card", sample: () => pageLoading() },
     ]),
     measures: [
-      { what: "Beside `small` and `label`.", token: "icon-s16" },
-      { what: "Beside `body`.", token: "icon-s20" },
-      { what: "Beside a `subheading`.", token: "icon-s24" },
-      { what: "A page's one.", token: "icon-s48" },
-      { what: "From `small` words.", token: "space-s8" },
-      { what: "From `body` words.", token: "space-s12" },
-      { what: "A page's one from its heading.", token: "space-s20" },
+      { part: "Beside `small`, `label`", token: "icon-s16" },
+      { part: "Beside `body`", token: "icon-s20" },
+      { part: "Beside a `subheading`", token: "icon-s24" },
+      { part: "A page's one", token: "icon-s48" },
+      { part: "From `small` words", token: "space-s8" },
+      { part: "From `body` words", token: "space-s12" },
+      { part: "A page's one from its heading", token: "space-s20" },
     ],
     reflow: {
-      described: "The spinner keeps its size at every window size; its words wrap beside it, the spinner centred down them.",
-      sample: () => within("100%", stack("s8", "start", beside("s20", shown(DOING), "body", "s12"), text("A spinner and its words as wide as the window.", "small", "on_surface_variant"))),
+      note: "It keeps its size; its words wrap beside it, the spinner centred down them.",
+      sample: () => within("100%", beside("s20", shown(DOING), "body", "s12")),
     },
   },
 });

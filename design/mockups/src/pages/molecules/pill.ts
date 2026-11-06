@@ -10,8 +10,7 @@ import { row, stack } from "../../lib/layout.ts";
 import { makePill, type PillOptions, type PillTone, pill } from "../../lib/pill.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
 const LAYOUT: Words = { short: "PL", long: "Polish (programmer's)" };
 
@@ -55,7 +54,7 @@ function growing(): HTMLElement {
 }
 
 function live(): HTMLElement {
-  return stack("s24", "start", bar(), row("s12", "centre", growing(), text("Press it: it eases to its new width.", "small", "on_surface_variant")));
+  return stack("s24", "start", bar(), growing());
 }
 
 type MatrixState = "rest" | "lit" | "pressed";
@@ -72,43 +71,37 @@ function cell(index: number, state: Shown): HTMLElement {
 }
 
 const TONES: readonly { name: string; tone: PillTone; for: string; content: () => Element[] }[] = [
-  { name: "The bar's", tone: "neutral", for: "Every group: `surface_container`, its content `on_surface`.", content: STATUS },
-  { name: "Recording", tone: "recording", for: "The screen being recorded: `error_container`, `on_error_container`.", content: () => [glyph("screen_record"), words("0:42")] },
-  { name: "Preview", tone: "preview", for: "A preview build: the `cold` tint at `opacity.tint`, its words `cold`.", content: () => [words("Preview")] },
+  { name: "The bar's", tone: "neutral", for: "every group: `surface_container`, `on_surface`", content: STATUS },
+  { name: "Recording", tone: "recording", for: "recording: `error_container`, `on_error_container`", content: () => [glyph("screen_record"), words("0:42")] },
+  { name: "Preview", tone: "preview", for: "a preview build: `cold` tint, `cold` words", content: () => [words("Preview")] },
 ];
 
 export default page({
   level: "molecules",
   slug: "pill",
   title: "Pill",
-  summary: "A group in the bar: symbols and short words side by side in a pill a small control tall, the shell's alone.",
-  live,
-  description: [
-    "QML `Pill`; the shell's alone: the bar is the shell's and no app has one, so it is on the QML specimen's \"Shell only\" page. The status pill (Wi-Fi, volume, battery), the keyboard layout, the notifications' bell, the recording and preview pills are each one.",
-    "A pill `size.control_sm` (32) tall at the full radius, on `surface_container`; its content a row `space.s8` apart, centred on device pixels, with `space.s12` at each end between the curve and the content, or `space.s8` round a lone symbol (the bell, the proxy, the updates). Its symbols are the bar's 16 and its words `button_small`. A pill of its own tone takes its fill and its ink together: the recording pill's `error_container` with `on_error_container`, the preview pill's `cold` tint with `cold`.",
-    "It isn't a `Chip` or a `Badge`. A chip is a fact or a pick inside a surface, `size.chip` (24) tall, a `label`'s words at the control radius; a badge is a count or a dot hung on a symbol's corner. A pill is the bar's own group, as tall as the bar's controls, holding the bar's symbols and words, with the bar's actions behind it.",
-    "An interactive pill takes the pointer: a click, a right click and the wheel (a step per notch). Its states follow the neon, lit by the pointer alone: lit, its tube burns inside its edge in its tone (the accent, or the recording pill's error) with the glow outside at night; pressed, the tube runs white-hot, the glow brightens, and by day its ink tints it (`opacity.press_tint`). It is never a stop for Tab and the keyboard never lights it, so a panel's keyboard focus never wanders into the bar: the bar's actions are Items in the Command menu. While lit, its name shows in a `Hint` under it, moved sideways as far as keeps it whole in the window, `space.s8` from its edge, and kept there as its words change.",
-    "When its content changes width, it eases to the new width over `medium` on `standard_decel`, as a list reorders, and cuts its content at its own edge meanwhile, so nothing draws over its neighbours. Content that animates its own width every frame isn't put in a pill: the workspaces draw a pill of their own.",
-  ],
+  lede: "A group in the bar: symbols and short words side by side in a pill, the shell's alone.",
+  code: { qml: "Pill", unbuilt: "QML only; neon not built yet" },
+  stage: { live, hint: "point at one; press PL to see it ease", daylight: true },
   variants: nonEmpty(TONES.map(({ name, tone, for: what, content }) => ({ name, for: what, sample: () => pill({ content: content(), lone: false, tone }) }))),
   sizes: [
-    { name: "Symbols and words", for: "`space.s12` at each end.", sample: () => pill({ content: STATUS(), lone: false }) },
-    { name: "A lone symbol", for: "`space.s8` round it: a circle as tall as the bar's controls.", sample: () => pill({ content: [glyph("notifications")], lone: true }) },
+    { name: "Symbols and words", for: "`space.s12` at each end", sample: () => pill({ content: STATUS(), lone: false }) },
+    { name: "A lone symbol", for: "`space.s8` round it: a circle", sample: () => pill({ content: [glyph("notifications")], lone: true }) },
   ],
   states: {
     shown: ["rest", "lit", "pressed"],
     absent: {
-      disabled: "the bar shows only what can be used: a group with nothing to do takes no pointer, and rests.",
-      selected: "a pill holds no choice; the bar's picks are in the panels it opens.",
-      loading: "what a pill shows is known as the bar draws it; a count it waits for shows when it arrives.",
-      empty: "a group with nothing to show is no pill: the bar leaves it out.",
-      error: "a pill says something is wrong with its content (a badge, a symbol) or its tone (recording).",
+      disabled: "a group with nothing to do just rests",
+      selected: "the bar's picks are in its panels",
+      loading: "a count it waits for shows on arrival",
+      empty: "a group with nothing to show is left out",
+      error: "its content or tone says so",
     },
     rows: nonEmpty(ROWS.map(({ name }, index) => ({ name, cell: (state: MatrixState) => cell(index, state) }))),
-    described: {
-      rest: "Its fill and its content in its ink; a pill that takes no pointer always rests.",
-      lit: "The pointer on it, here with the signs on: its tube inside its edge in its tone, the glow outside; its name in a hint under it. By day the tube with no glow.",
-      pressed: "Lit and pressed: the tube runs white-hot, the glow `focus.pressed_glow` times the lit one; by day its ink tints it at `opacity.press_tint`.",
+    looks: {
+      rest: "its fill, its content in its ink",
+      lit: "pointer only: tube in its tone, glow at night, name hint",
+      pressed: "tube white-hot, glow × `focus.pressed_glow`; by day an ink tint",
     },
   },
   focus: {
@@ -117,27 +110,27 @@ export default page({
       { name: "Recording", tone: "error", filled: false, content: false },
     ],
     looks: {
-      lit: "At night, under the pointer, the sign burns: the tube inside the pill's edge, a pill itself, the glow outside it.",
-      signsOff: "By day always, and at night while a power change has the lights out: the tube is its tone's glass, with no glow.",
+      lit: "the tube inside the pill's edge, the glow outside",
+      signsOff: "the tube as its tone's glass, no glow",
     },
     signsOff: (index: number) => cell(index, "signs-off"),
   },
   content: {
     text: [{ name: "Its words", words: LAYOUT, sample: (said: string) => pill({ content: [words(said)], lone: false }) }],
-    missingPicture: doesntApply("its symbols are KubaOS Symbols, always there; an app's tray icon is the tray's, on its own page."),
+    missingPicture: doesntApply("its symbols are KubaOS Symbols, always there."),
     counts: [
-      { name: "One", for: "A lone symbol.", sample: () => pill({ content: [glyph("notifications")], lone: true }) },
-      { name: "Many", for: "Symbols and words `space.s8` apart.", sample: () => pill({ content: STATUS(), lone: false }) },
-      { name: "A badged symbol", for: "A `BadgedIcon`'s room on both sides is part of its content.", sample: () => pill({ content: [badgedIcon({ name: "system_update_alt", badged: true, count: 3 })], lone: true }) },
+      { name: "One", for: "a lone symbol", sample: () => pill({ content: [glyph("notifications")], lone: true }) },
+      { name: "Many", for: "symbols and words `space.s8` apart", sample: () => pill({ content: STATUS(), lone: false }) },
+      { name: "A badged symbol", for: "a `BadgedIcon`'s room is part of its content", sample: () => pill({ content: [badgedIcon({ name: "system_update_alt", badged: true, count: 3 })], lone: true }) },
     ],
   },
   motion: {
-    arrives: doesntApply("a pill comes with the bar, or as the bar's content says (recording starting), at once."),
+    arrives: doesntApply("it comes with the bar, or as its content says, at once."),
     leaves: doesntApply("it goes at once, as its content ends."),
     between: [
       {
         name: "Its content changes width",
-        what: "New content (a longer layout's name): the pill eases from its old width to its new over `medium` on `standard_decel`, its content cut at its edge meanwhile.",
+        what: "It eases to its new width over `medium` on `standard_decel`, its content cut at its edge.",
         tracks: [{ part: "width", on: "the keyboard layout's pill", target: ".k-pill", property: "--grown", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
         reduced: [{ part: "width", on: "the keyboard layout's pill", target: ".k-pill", property: "--grown", from: 0, to: 1, duration: "instant", curve: "standard_decel" }],
         back: "plays",
@@ -148,25 +141,25 @@ export default page({
           return made.element;
         },
       },
-      { name: "Lit", what: "The pointer comes onto it: it lights up over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => bar() },
-      { name: "Back to rest", what: "The pointer leaves: back to rest over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => bar("lit") },
-      { name: "Pressed", what: "A lit pill pressed: over `micro` the tube runs white-hot and the glow brightens; by day its ink tints it.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => bar("lit") },
+      { name: "Lit", what: "The pointer onto it: it lights up over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => bar() },
+      { name: "Back to rest", what: "The pointer off: back to rest over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => bar("lit") },
+      { name: "Pressed", what: "Over `micro` the tube runs white-hot and the glow brightens; by day its ink tints it.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => bar("lit") },
       ...powerMoves(() => bar("lit")),
     ],
   },
-  keyboard: doesntApply("a pill is never a stop for Tab: the bar's actions are Items in the Command menu, so none needs the bar's keyboard focus."),
+  keyboard: doesntApply("never a stop for Tab: the bar's actions are Items in the Command menu."),
   measures: {
     samples: nonEmpty([
-      { name: "Symbols and words", for: "Its height, the ends, and the gaps between its content.", sample: () => pill({ content: STATUS(), lone: false }) },
-      { name: "A lone symbol", for: "The ends round a lone symbol.", sample: () => pill({ content: [glyph("notifications")], lone: true }) },
+      { name: "Symbols and words", for: "height, ends, gaps", sample: () => pill({ content: STATUS(), lone: false }) },
+      { name: "A lone symbol", for: "the ends round a lone symbol", sample: () => pill({ content: [glyph("notifications")], lone: true }) },
     ]),
     measures: [
-      { what: "Its height.", token: "size-control_sm" },
-      { what: "At each end, round symbols and words.", token: "space-s12" },
-      { what: "At each end round a lone symbol, and between its content.", token: "space-s8" },
-      { what: "Its symbols.", token: "icon-s16" },
-      { what: "Its words' line.", token: "type-button_small-line" },
+      { part: "Height", token: "size-control_sm" },
+      { part: "Ends, symbols and words", token: "space-s12" },
+      { part: "Ends round a lone symbol, gaps", token: "space-s8" },
+      { part: "Symbols", token: "icon-s16" },
+      { part: "Words' line", token: "type-button_small-line" },
     ],
-    reflow: doesntApply("a pill is as wide as its content at every window size; the bar gives each group its room."),
+    reflow: doesntApply("as wide as its content at every window size."),
   },
 });

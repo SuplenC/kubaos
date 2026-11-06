@@ -2,13 +2,11 @@
 // mark at its end, and first boot's checklist, each a chip saying where it stands.
 
 import { shown, type Words } from "../../lib/content.ts";
-import { stack, within } from "../../lib/layout.ts";
+import { row, stack, within } from "../../lib/layout.ts";
 import { well } from "../../lib/list.ts";
 import { step, type StepOptions } from "../../lib/step.ts";
-import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
 /** Kōbō's step rail, inside its 12 of padding. */
 const RAIL = "calc(var(--size-rail) - 2 * var(--space-s12))";
@@ -78,7 +76,7 @@ const TARGET = ".k-step";
 
 const LIGHTS: Move = {
   name: "Lighting up",
-  what: "The pointer onto a step that takes a press, or the keyboard on it: the accent's tube fades in inside its edge over `short` on `standard`, with the glow outside it at night. The pointer leaving plays it back. A fade, never the flicker.",
+  what: "Pointer or keyboard: the accent's tube fades in over `short` on `standard`, the glow outside at night.",
   tracks: lights(TARGET, STEP, 0, 1),
   reduced: "same",
   back: "plays",
@@ -87,43 +85,41 @@ const LIGHTS: Move = {
 
 const PRESSED: Move = {
   name: "Pressed",
-  what: "Pressed while lit: over `micro` on `standard` the tube runs white-hot, to the core, at night; by day the tone tints its fill (`opacity.press_tint`). Letting go goes to the step it names.",
+  what: "Over `micro` the tube runs white-hot at night; by day the tone tints its fill.",
   tracks: press(TARGET, STEP),
   reduced: "same",
   back: "plays",
   sample: () => one({ title: "Network", icon: "wifi", state: { is: "done" }, pressable: true, box: "rail", mark: true, pinned: "lit" }, RAIL),
 };
 
-const DESCRIBED =
-  "An optional symbol (`icon.two_line`'s 24 beside a subtitle, `body_strong`'s 20 beside a title alone), a `body_strong` title on one line, a `small` subtitle in `on_surface_variant` that wraps to as many lines as it needs, never cut, then where it stands, `space.s12` apart. `size.row` (44) tall with one line; with a subtitle `space.s8` above and below, so `size.row_two_line` (56) with its first line and a line taller for each line more; `space.s12` in at the sides. Its corner is its box's less the box's padding: `radius.row` in a list's well, `radius.surface` less `space.s12` in Kōbō's rail.";
-
 export default page<"rest" | "lit" | "pressed" | "selected" | "error">({
   level: "molecules",
   slug: "step",
   title: "Step",
-  summary: "One step of a flow: to do, current, done, waiting on an action, or failed, each its own look.",
-  live: () => stack("s32", "start", rail(SCREENS), checklist(CARDS)),
-  description: [
-    "Rust `step::step(title)` with `subtitle`, `icon`, `state`, `words`, `mark`, `selected` and `on_press_maybe`, drawn by `view`; QML `Step`. Kōbō's step rail, each step a mark at its end, and first boot's checklist, each a chip. Point at the steps, or Tab onto them and use ↑ and ↓.",
-    DESCRIBED,
-    "Where it stands is a chip: to do a Neutral chip, done an Accent chip with a check, an action (Reboot) a Filled chip with its symbol, the loudest of the three since it is what to do next; the current step is the selected row, on `secondary_container`, its words `on_secondary_container` and its subtitle that at `opacity.subdued_text`, with no chip. On the selected row done is a Neutral chip with its check, since the accent's tint over `secondary_container` leaves its label under 4.5:1. A chip can say other words in its state's look: Waiting, Running, Not here. In a narrow rail a mark takes the chip's place: a check when done, the action's symbol in `primary`, its room kept otherwise so the ends line up. In a rail the symbol is a bead on the rail's progress wire (StepRailPage): `primary` once its step is reached, the current one glowing at night with a lit control's glow and humming while it runs, a step not reached in its ink; and the current step is a quiet fill, `on_surface` at `opacity.hover`, its words as they rest.",
-    "A step that failed shows `error` in its symbol's place, in `error`: Kōbō's Install step on its failed screen. A step that takes a press is a control: lit, the accent's tube inside its edge, the glow outside at night; pressed, the tube white-hot at night and the tone's tint by day. One that takes none (a step not reached yet) is passed over.",
-  ],
+  lede: "One step of a flow: to do, current, done, waiting on an action, or failed, each its own look.",
+  code: { rust: "step::step(title)", qml: "Step", unbuilt: "neon, rail bead: not built yet" },
+  stage: { live: () => {
+      const both = row("s32", "start", rail(SCREENS), checklist(CARDS));
+      // Side by side where the pane holds both, one over the other where it doesn't, never scaled.
+      both.style.flexWrap = "wrap";
+      both.style.maxWidth = "100%";
+      return both;
+    }, hint: "point at a step, or Tab and ↑ ↓", daylight: true },
   variants: [
-    { name: "In a rail", for: "Kōbō's step rail: a symbol, the title, and a mark at the end.", sample: () => rail(SCREENS, false) },
-    { name: "In a checklist", for: "First boot's cards: a two-line step with a chip saying where it stands.", sample: () => checklist(CARDS) },
-    { name: "Failed", for: "The step that failed, its symbol `error` in `error`: Kōbō's Install on its failed screen.", sample: () => rail([...SCREENS.slice(0, 4).map((each) => ({ ...each, state: { is: "done" } as const })), { title: "Install", icon: "download", failed: true, state: { is: "current" } }], false) },
+    { name: "In a rail", for: "Kōbō's rail: a symbol, the title, a mark at its end", sample: () => rail(SCREENS, false) },
+    { name: "In a checklist", for: "first boot's cards: two lines and a chip", sample: () => checklist(CARDS) },
+    { name: "Failed", for: "its symbol `error` in `error`: Kōbō's Install", sample: () => rail([...SCREENS.slice(0, 4).map((each) => ({ ...each, state: { is: "done" } as const })), { title: "Install", icon: "download", failed: true, state: { is: "current" } }], false) },
   ],
   sizes: [
-    { name: "One line", for: "A title alone: `size.row`, 44.", sample: () => one({ title: "Language", icon: "language", state: { is: "done" } }) },
-    { name: "Two lines", for: "With a subtitle: `size.row_two_line`, 56, and a line taller for each line more.", sample: () => one({ title: "Fingerprint", subtitle: "Unlock with a finger on the laptop's reader.", icon: "fingerprint", state: { is: "todo" } }) },
+    { name: "One line", for: "a title alone: `size.row`", sample: () => one({ title: "Language", icon: "language", state: { is: "done" } }) },
+    { name: "Two lines", for: "a subtitle: `size.row_two_line`, taller per extra line", sample: () => one({ title: "Fingerprint", subtitle: "Unlock with a finger on the laptop's reader.", icon: "fingerprint", state: { is: "todo" } }) },
   ],
   states: {
     shown: ["rest", "lit", "pressed", "selected", "error"],
     absent: {
-      disabled: "a step not reached takes no press and looks as one to do: it is passed over rather than greyed out.",
-      loading: "a step running says so on its chip, in its state's look (Running, with `progress_activity`).",
-      empty: "a step always has its title.",
+      disabled: "not reached: passed over, not greyed out",
+      loading: "its chip says Running",
+      empty: "a step always has its title",
     },
     rows: [
       { name: "To do", cell: (state) => one({ title: "YubiKey", subtitle: "Touch the key to unlock the disk.", icon: "key", state: state === "selected" ? { is: "current" } : { is: "todo" }, failed: state === "error", pressable: true, ...(state === "lit" || state === "pressed" ? { pinned: state } : {}) }) },
@@ -131,19 +127,19 @@ export default page<"rest" | "lit" | "pressed" | "selected" | "error">({
       { name: "Action", cell: (state) => one({ title: "Secure Boot", subtitle: "Enroll the key, then turn it on.", icon: "lock", state: REBOOT, selected: state === "selected", failed: state === "error", pressable: true, ...(state === "lit" || state === "pressed" ? { pinned: state } : {}) }) },
       { name: "Rail", cell: (state) => one({ title: "Network", icon: "wifi", state: { is: "done" }, selected: state === "selected", failed: state === "error", box: "rail", mark: true, pressable: true, ...(state === "lit" || state === "pressed" ? { pinned: state } : {}) }, RAIL) },
     ],
-    described: {
-      rest: "No fill: its words `on_surface` and `on_surface_variant`, its chip or mark saying where it stands. By day the same roles in daylight colours.",
-      lit: "The pointer or the keyboard on a step that takes a press: the accent's tube inside its edge at its corner, the glow outside it at night. By day the line alone.",
-      pressed: "Overdriven: at night the tube runs white-hot, to the core, the glow a touch stronger; by day the tone tints its fill at `opacity.press_tint`.",
-      selected: "The current step, or the one picked: `secondary_container`, its words `on_secondary_container`, its subtitle that at `opacity.subdued_text`; the current step has no chip, a picked done one a Neutral chip. In a rail, a quiet fill, `on_surface` at `opacity.hover`, its words as they rest.",
-      error: "Failed: its symbol is `error`, in `error`; the rest as it was.",
+    looks: {
+      rest: "no fill; its chip or mark says where it stands",
+      lit: "the accent's tube inside its edge, glow at night",
+      pressed: "tube white-hot at night; by day `opacity.press_tint`",
+      selected: "`secondary_container`; in a rail, a quiet `opacity.hover` fill",
+      error: "its symbol is `error`, in `error`",
     },
   },
   focus: {
     tubes: [{ name: "A step that takes a press", tone: "accent", filled: false, content: false }],
     looks: {
-      lit: "At night: the accent's tube inside its edge at its corner, the glow outside it.",
-      signsOff: "By day, and at night while the signs are off: the tube as glass, `primary_glass`, no glow.",
+      lit: "the accent's tube inside its edge, the glow outside",
+      signsOff: "the tube as `primary_glass`, no glow",
     },
     signsOff: (index: number) => {
       const shapes: StepOptions[] = [
@@ -157,11 +153,11 @@ export default page<"rest" | "lit" | "pressed" | "selected" | "error">({
   },
   content: {
     text: [{ name: "Its subtitle", words: SUMMARY, sample: (words: string) => one({ title: "Fingerprint", subtitle: words, icon: "fingerprint", state: { is: "todo" } }) }],
-    missingPicture: doesntApply("its symbol is optional and one of KubaOS Symbols; a step without one starts with its title."),
+    missingPicture: doesntApply("its symbol is optional; without one it starts with its title."),
     counts: [
-      { name: "No symbol", for: "Its title first.", sample: () => one({ title: "Account", state: { is: "todo" } }) },
-      { name: "Other words", for: "Its state's chip saying something else: Waiting, Running, Not here.", sample: () => checklist([{ title: "Snapshots", subtitle: "Roll back a bad update.", icon: "schedule", words: { label: "Running", glyph: "progress_activity" } }, { title: "Fingerprint", subtitle: "No reader on this machine.", icon: "fingerprint", words: { label: "Not here" } }]) },
-      { name: "Many", for: "A flow's whole rail, done, current and to come.", sample: () => rail(SCREENS, false) },
+      { name: "No symbol", for: "its title first", sample: () => one({ title: "Account", state: { is: "todo" } }) },
+      { name: "Other words", for: "its chip saying Waiting, Running, Not here", sample: () => checklist([{ title: "Snapshots", subtitle: "Roll back a bad update.", icon: "schedule", words: { label: "Running", glyph: "progress_activity" } }, { title: "Fingerprint", subtitle: "No reader on this machine.", icon: "fingerprint", words: { label: "Not here" } }]) },
+      { name: "Many", for: "a whole rail: done, current, to come", sample: () => rail(SCREENS, false) },
     ],
   },
   motion: {
@@ -171,31 +167,31 @@ export default page<"rest" | "lit" | "pressed" | "selected" | "error">({
   },
   keyboard: {
     keys: [
-      { keys: ["↑", "↓", "k", "j"], does: "The keyboard to the step above or below that takes a press." },
-      { keys: ["Enter", "Space"], does: "Goes to the step it names, once per press." },
-      { keys: ["Tab", "Shift+Tab"], does: "Onto the steps and past them." },
+      { keys: ["↑", "↓", "k", "j"], does: "to the step above or below that takes a press" },
+      { keys: ["Enter", "Space"], does: "goes to the step it names" },
+      { keys: ["Tab", "Shift+Tab"], does: "onto the steps and past them" },
     ],
-    order: "Each step that takes a press, top to bottom; one that takes none is passed over.",
-    lands: "Where its flow puts the keyboard; going to a step leaves it on that step's page.",
+    order: "Each step that takes a press, top to bottom.",
+    lands: "Where its flow puts it; going to a step leaves it on that page.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "Two lines, in a checklist", for: "Its padding, the symbol, the words and the chip; the well round it.", sample: () => checklist(CARDS.slice(0, 2)) },
-      { name: "In a rail", for: "One line, its mark's room.", sample: () => rail(SCREENS.slice(2, 4), false) },
+      { name: "Two lines, in a checklist", for: "padding, symbol, words, chip, the well", sample: () => checklist(CARDS.slice(0, 2)) },
+      { name: "In a rail", for: "one line, its mark's room", sample: () => rail(SCREENS.slice(2, 4), false) },
     ]),
     measures: [
-      { what: "One line.", token: "size-row" },
-      { what: "Two lines, with its first subtitle line.", token: "size-row_two_line" },
-      { what: "In at the sides, and between its parts.", token: "space-s12" },
-      { what: "Above and below, with a subtitle.", token: "space-s8" },
-      { what: "Between the title and the subtitle, and between steps in a well.", token: "space-s4" },
-      { what: "The symbol beside two lines.", token: "icon-two_line" },
-      { what: "The symbol and the mark beside one line, `body_strong`'s.", token: "type-body_strong-icon" },
-      { what: "Its corners in a list's well.", token: "radius-row" },
+      { part: "One line", token: "size-row" },
+      { part: "Two lines", token: "size-row_two_line" },
+      { part: "Sides, gaps", token: "space-s12" },
+      { part: "Above and below, with subtitle", token: "space-s8" },
+      { part: "Title → subtitle, between steps", token: "space-s4" },
+      { part: "Symbol beside two lines", token: "icon-two_line" },
+      { part: "Symbol, mark beside one line", token: "type-body_strong-icon" },
+      { part: "Corners in a well", token: "radius-row" },
     ],
     reflow: {
-      described: "A step fills its rail or its well at every window size; its title ends in an ellipsis, its subtitle wraps onto more lines and the step grows a line for each.",
-      sample: () => within("100%", stack("s8", "start", checklist([{ title: "Fingerprint", subtitle: shown(SUMMARY), icon: "fingerprint", state: { is: "done" } }, ...CARDS.slice(1)], "100%"), text("A checklist as wide as the window.", "small", "on_surface_variant"))),
+      note: "Fills its rail or well; its title ends in an ellipsis, its subtitle wraps and the step grows.",
+      sample: () => within("100%", checklist([{ title: "Fingerprint", subtitle: shown(SUMMARY), icon: "fingerprint", state: { is: "done" } }, ...CARDS.slice(1)], "100%")),
     },
   },
 });
