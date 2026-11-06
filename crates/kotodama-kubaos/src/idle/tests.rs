@@ -45,7 +45,8 @@ fn there_are_four_settings_each_with_its_word_and_an_optional_value() {
             "Screens off after…",
             "Suspend after…",
             "When the lid closes…",
-            "Keep awake for…"
+            "Keep awake for…",
+            "Keep awake with the lid closed for…"
         ]
     );
     assert_eq!(items[0].keyword.as_deref(), Some("lock-after"));
@@ -61,7 +62,8 @@ fn there_are_four_settings_each_with_its_word_and_an_optional_value() {
             "idle-screens-off",
             "idle-suspend",
             "idle-lid",
-            "keep-awake-for"
+            "keep-awake-for",
+            "keep-awake-lid-for"
         ]
     );
 }
@@ -81,9 +83,9 @@ fn keep_awake_takes_a_typed_value_after_its_word() {
 fn a_typed_keep_awake_runs_for_a_while_or_until_the_battery_level() {
     let runner = FakeRunner::default();
 
-    assert_eq!(keep_awake(&typed("1h30m"), &runner), Ok(Ran::Close));
-    keep_awake(&typed("25%"), &runner).expect("a level");
-    keep_awake(&typed(" 40 % "), &runner).expect("a spaced level");
+    assert_eq!(keep_awake(KEEP_AWAKE_ID, &typed("1h30m"), &runner), Ok(Ran::Close));
+    keep_awake(KEEP_AWAKE_ID, &typed("25%"), &runner).expect("a level");
+    keep_awake(KEEP_AWAKE_ID, &typed(" 40 % "), &runner).expect("a spaced level");
 
     assert_eq!(
         launched(&runner),
@@ -96,13 +98,48 @@ fn a_typed_keep_awake_runs_for_a_while_or_until_the_battery_level() {
 }
 
 #[test]
+fn keep_awake_with_the_lid_closed_takes_a_typed_value_after_its_own_word() {
+    let item = &items()[5];
+
+    assert_eq!(item.id, KEEP_AWAKE_LID_ID);
+    assert_eq!(item.keyword.as_deref(), Some("keep-awake-lid"));
+    assert_eq!(item.actions[0].id, KEEP);
+    assert!(!item.actions[0].arguments[0].optional);
+}
+
+#[test]
+fn a_typed_keep_awake_with_the_lid_closed_asks_to_hold_the_lid() {
+    let runner = FakeRunner::default();
+
+    assert_eq!(keep_awake(KEEP_AWAKE_LID_ID, &typed("2h"), &runner), Ok(Ran::Close));
+    keep_awake(KEEP_AWAKE_LID_ID, &typed(" 25 % "), &runner).expect("a level");
+
+    assert_eq!(
+        launched(&runner),
+        ["kubaos-idle awake lid for 2h", "kubaos-idle awake lid until 25%"]
+    );
+}
+
+#[test]
+fn a_typed_keep_awake_with_the_lid_closed_is_checked_the_same_way() {
+    let runner = FakeRunner::default();
+
+    let full = keep_awake(KEEP_AWAKE_LID_ID, &typed("100%"), &runner).expect_err("full");
+    let nothing = keep_awake(KEEP_AWAKE_LID_ID, &BTreeMap::new(), &runner).expect_err("nothing typed");
+
+    assert_eq!(full, "Keep awake lasts until the battery is at 1 % to 99 %, not 100 %");
+    assert!(nothing.contains("25%"), "{nothing}");
+    assert_eq!(launched(&runner), Vec::<String>::new());
+}
+
+#[test]
 fn a_battery_level_outside_one_to_ninety_nine_or_nonsense_reads_in_the_menu() {
     let runner = FakeRunner::default();
 
-    let empty = keep_awake(&typed("0%"), &runner).expect_err("empty");
-    let full = keep_awake(&typed("100%"), &runner).expect_err("full");
-    let nonsense = keep_awake(&typed("lots"), &runner).expect_err("nonsense");
-    let nothing = keep_awake(&BTreeMap::new(), &runner).expect_err("nothing typed");
+    let empty = keep_awake(KEEP_AWAKE_ID, &typed("0%"), &runner).expect_err("empty");
+    let full = keep_awake(KEEP_AWAKE_ID, &typed("100%"), &runner).expect_err("full");
+    let nonsense = keep_awake(KEEP_AWAKE_ID, &typed("lots"), &runner).expect_err("nonsense");
+    let nothing = keep_awake(KEEP_AWAKE_ID, &BTreeMap::new(), &runner).expect_err("nothing typed");
 
     assert_eq!(empty, "Keep awake lasts until the battery is at 1 % to 99 %, not 0 %");
     assert_eq!(full, "Keep awake lasts until the battery is at 1 % to 99 %, not 100 %");

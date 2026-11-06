@@ -7,12 +7,14 @@
 //! which writes the file, restarts hypridle and says what it came to in a toast.
 //!
 //! "Keep awake for…" takes what is typed after `keep-awake` the same way: a while (`30m`) or a
-//! battery level (`25%`), checked here, then launched as `kubaos-idle awake for` or `until`.
+//! battery level (`25%`), checked here, then launched as `kubaos-idle awake for` or `until`. "Keep
+//! awake with the lid closed for…" does the same after `keep-awake-lid`, as `kubaos-idle awake lid
+//! for` or `until`.
 //!
 //! # Owns
 //!
 //! - The four Items, their choice lists, and what picking one runs.
-//! - "Keep awake for…", and what typing after it runs.
+//! - "Keep awake for…" and "Keep awake with the lid closed for…", and what typing after them runs.
 //!
 //! # Not here
 //!
@@ -55,11 +57,13 @@ pub const BOTH: &str = "both";
 pub const BATTERY: &str = "battery";
 pub const AC: &str = "ac";
 
-/// The Item kind of "Keep awake for…".
+/// The Item kind of "Keep awake for…" and "Keep awake with the lid closed for…".
 pub const KEEP_AWAKE_KIND: &str = "kubaos.keep-awake";
-/// Its id, which `hide` names it by.
+/// "Keep awake for…"'s id, which `hide` names it by.
 pub const KEEP_AWAKE_ID: &str = "keep-awake-for";
-/// Its one Action: keep awake as typed.
+/// "Keep awake with the lid closed for…"'s id.
+pub const KEEP_AWAKE_LID_ID: &str = "keep-awake-lid-for";
+/// Their one Action: keep awake as typed.
 pub const KEEP: &str = "keep";
 
 /// The Argument typed after a setting's word, or Keep awake's.
@@ -215,41 +219,76 @@ fn now_for(battery: bool, ac: bool) -> Option<&'static str> {
     }
 }
 
-/// The four settings' Items and "Keep awake for…".
+/// The four settings' Items and the two typed Keep awakes.
 pub fn items() -> Vec<Item> {
     Setting::ALL
         .into_iter()
         .map(Setting::item)
-        .chain([keep_awake_item()])
+        .chain([keep_awake_item(), keep_awake_lid_item()])
         .collect()
 }
 
 /// Every id of an Item this module sends, which no action of the registry may take.
 pub fn ids() -> impl Iterator<Item = &'static str> {
-    Setting::ALL.map(Setting::id).into_iter().chain([KEEP_AWAKE_ID])
+    Setting::ALL
+        .map(Setting::id)
+        .into_iter()
+        .chain([KEEP_AWAKE_ID, KEEP_AWAKE_LID_ID])
 }
 
 fn keep_awake_item() -> Item {
+    typed_keep_awake(
+        KEEP_AWAKE_ID,
+        "Keep awake for…",
+        "No auto-lock, screens off or suspend, as long as you say (30m, 3h) or until the battery is at a \
+         level (25%); the lid does as set",
+        "keep-awake",
+        "30m, 3h, or a battery level: 25%",
+        &["caffeine", "keep awake", "no sleep", "battery level"],
+    )
+}
+
+fn keep_awake_lid_item() -> Item {
+    typed_keep_awake(
+        KEEP_AWAKE_LID_ID,
+        "Keep awake with the lid closed for…",
+        "As Keep awake, and closing the lid does nothing, as long as you say (2h) or until the battery is at \
+         a level (25%)",
+        "keep-awake-lid",
+        "2h, or a battery level: 25%",
+        &[
+            "caffeine",
+            "keep awake",
+            "no sleep",
+            "lid closed",
+            "clamshell",
+            "battery level",
+        ],
+    )
+}
+
+fn typed_keep_awake(
+    id: &str,
+    title: &str,
+    subtitle: &str,
+    keyword: &str,
+    placeholder: &str,
+    keywords: &[&str],
+) -> Item {
     let keep = Action::new(KEEP, "Keep awake").arguments(vec![Argument {
         name: VALUE.to_owned(),
-        placeholder: Some("30m, 3h, or a battery level: 25%".to_owned()),
+        placeholder: Some(placeholder.to_owned()),
         optional: false,
     }]);
     Item {
-        id: KEEP_AWAKE_ID.to_owned(),
+        id: id.to_owned(),
         kind: kind(KEEP_AWAKE_KIND),
         identity: None,
-        title: "Keep awake for…".to_owned(),
-        subtitle: Some(
-            "No auto-lock, screens off or suspend, lid included, as long as you say (30m, 3h) or until \
-             the battery is at a level (25%)"
-                .to_owned(),
-        ),
+        title: title.to_owned(),
+        subtitle: Some(subtitle.to_owned()),
         icon: Some(ICON.to_owned()),
-        keyword: Some("keep-awake".to_owned()),
-        keywords: ["caffeine", "keep awake", "no sleep", "battery level"]
-            .map(str::to_owned)
-            .to_vec(),
+        keyword: Some(keyword.to_owned()),
+        keywords: keywords.iter().map(|&word| word.to_owned()).collect(),
         hidden: false,
         app_only: false,
         weak_keywords: Vec::new(),
@@ -257,26 +296,26 @@ fn keep_awake_item() -> Item {
     }
 }
 
-/// Keeps awake as typed after `keep-awake`: a while, or until the battery is at a level.
+/// Keeps awake as typed after the word of the Item `id`: a while, or until the battery is at a
+/// level; "Keep awake with the lid closed for…" holds the lid too.
 ///
 /// # Errors
 ///
 /// When nothing or neither was typed, the level is outside 1 % to 99 %, or `kubaos-idle` can't
 /// start; the message is what the menu shows.
-pub fn keep_awake(arguments: &BTreeMap<String, String>, runner: &impl Runner) -> Result<Ran, String> {
+pub fn keep_awake(id: &str, arguments: &BTreeMap<String, String>, runner: &impl Runner) -> Result<Ran, String> {
     let typed = arguments.get(VALUE).map_or("", |typed| typed.trim());
     if typed.is_empty() {
         return Err("Type how long to keep awake, 30m or 3h, or a battery level, 25%".to_owned());
     }
-    let argv: Vec<String> = match Length::parse(typed).map_err(|err| Chain(&err).to_string())? {
-        Length::For(_) => ["kubaos-idle", "awake", "for", typed].map(str::to_owned).to_vec(),
-        Length::UntilBattery(level) => vec![
-            "kubaos-idle".to_owned(),
-            "awake".to_owned(),
-            "until".to_owned(),
-            format!("{}%", level.percent()),
-        ],
-    };
+    let mut argv = vec!["kubaos-idle".to_owned(), "awake".to_owned()];
+    if id == KEEP_AWAKE_LID_ID {
+        argv.push("lid".to_owned());
+    }
+    match Length::parse(typed).map_err(|err| Chain(&err).to_string())? {
+        Length::For(_) => argv.extend(["for".to_owned(), typed.to_owned()]),
+        Length::UntilBattery(level) => argv.extend(["until".to_owned(), format!("{}%", level.percent())]),
+    }
     runner
         .launch(&argv, Duration::ZERO)
         .map_err(|err| Chain(&err).to_string())?;
