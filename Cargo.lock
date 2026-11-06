@@ -2316,6 +2316,7 @@ dependencies = [
 name = "kubaos-power"
 version = "0.1.0"
 dependencies = [
+ "jiff",
  "kubaos-user-layer",
  "log",
  "serde",

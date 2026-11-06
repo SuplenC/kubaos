@@ -7,6 +7,7 @@
 //! kubaos-power undo                       the low-battery drop's Undo
 //! kubaos-power status                     what the stop does, every row read live
 //! kubaos-power measure [--seconds N]      the battery's draw and the top wakeups, as a report
+//! kubaos-power report [--days N] [--json] what the battery's history comes to
 //! kubaos-power battery-notes on|off       the toasts when a sleep or a night went wrong
 //! kubaos-power panel-power-saving on|off  AMD's panel power saving in the saver stops
 //! kubaos-power charge-limit 80|90|100     how far the battery charges
@@ -74,6 +75,7 @@ use kubaos_power::reading::Edge;
 use kubaos_power::recorder;
 use kubaos_power::recorder::Facts;
 use kubaos_power::recorder::Note;
+use kubaos_power::report::Report;
 use kubaos_power::runtime;
 use kubaos_power::runtime::Published;
 use kubaos_power::scheduler;
@@ -93,6 +95,7 @@ const USAGE: &str = "\
 usage: kubaos power set super-saver|power-saver|balanced|performance|max-performance
        kubaos power undo | status | apply
        kubaos power measure [--seconds N]
+       kubaos power report [--days N] [--json]
        kubaos power battery-notes on|off
        kubaos power panel-power-saving on|off
        kubaos power charge-limit 80|90|100
@@ -104,6 +107,8 @@ set       move the power slider to a stop; each power source remembers its own
 undo      undo the low-battery drop
 status    what the stop does, every layer read live, and what this machine lacks
 measure   the battery's average draw and what woke the machine most, as a report (default 120 s)
+report    the battery's history: long stretches, what went wrong first, the average draw and the
+          top wakers (default the last 7 days)
 battery-notes       the toasts when a sleep or a night went wrong
 panel-power-saving  AMD's panel power saving in the saver stops; off for colour-accurate work
 charge-limit        how far the battery charges, in percent
@@ -155,6 +160,10 @@ fn main() -> ExitCode {
                 ExitCode::SUCCESS
             }
             _ => usage(),
+        },
+        ["report", rest @ ..] => match report_options(rest) {
+            Some((days, json)) => report_history(days, json),
+            None => usage(),
         },
         ["battery-notes", on @ ("on" | "off")] => report_said(change(
             |path| settings::set_battery_notes(path, *on == "on"),
@@ -483,6 +492,42 @@ fn measure(seconds: u64) {
             Err(err) => eprintln!("kubaos-power: couldn't save the report to {}: {err}", path.display()),
         }
     }
+}
+
+/// `--days N` and `--json` in any order: the days and whether JSON; `None` for anything else.
+fn report_options(args: &[&str]) -> Option<(i64, bool)> {
+    let mut days = kubaos_power::report::DEFAULT_DAYS;
+    let mut json = false;
+    let mut args = args.iter();
+    while let Some(arg) = args.next() {
+        match *arg {
+            "--json" => json = true,
+            "--days" => days = args.next()?.parse().ok().filter(|days| *days > 0)?,
+            _ => return None,
+        }
+    }
+    Some((days, json))
+}
+
+#[expect(
+    clippy::print_stdout,
+    reason = "The report is the command's output, for the person who asked or the program reading it."
+)]
+fn report_history(days: i64, json: bool) -> ExitCode {
+    let now = history::now();
+    let entries = history::path().map_or_else(Vec::new, |path| {
+        history::read(&path, kubaos_power::report::since(days, now))
+    });
+    let report = Report::of(&entries, days, now);
+    if json {
+        match serde_json::to_string_pretty(&report) {
+            Ok(text) => println!("{text}"),
+            Err(err) => return self::report(Err(chain(&err))),
+        }
+    } else {
+        print!("{}", report.text(&jiff::tz::TimeZone::system()));
+    }
+    ExitCode::SUCCESS
 }
 
 // ----- The bus ----------------------------------------------------------------------------------
