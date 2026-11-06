@@ -51,6 +51,9 @@ const LOOK: readonly Choice[] = [
   { words: "Both", on: (now) => now.both, patch: { both: true } },
 ];
 
+/** The words' lengths, short enough to keep the bar on one row at 1920: a translation is 40% longer. */
+const TEXT_WORDS: Record<Settings["text"], string> = { short: "Short", long: "Long", translated: "+40%" };
+
 const MOTION: readonly Choice[] = [
   { words: "Flicker", on: (now) => !now.reduced && now.flicker, patch: { reduced: false, flicker: true } },
   { words: "Steady", on: (now) => !now.reduced && !now.flicker, patch: { reduced: false, flicker: false } },
@@ -79,7 +82,8 @@ function search(onQuery: (query: string) => void, onEnter: () => void): HTMLElem
   });
   addEventListener("keydown", (event) => {
     const typing = event.target instanceof HTMLElement && (event.target.isContentEditable || event.target.matches("input, textarea, [role=textbox]"));
-    if (event.key !== "/" || typing) return;
+    // A sample that handles the key has prevented its default: the key is the sample's.
+    if (event.key !== "/" || typing || event.defaultPrevented) return;
     event.preventDefault();
     box.focus();
   });
@@ -100,7 +104,7 @@ export function toolbar(onQuery: (query: string) => void, onEnter: () => void): 
       "Window",
       segmented(
         "Window",
-        each("window", WINDOWS.map((w) => w.name), (name) => name),
+        each("window", WINDOWS.map((w) => w.name), (name) => (name === "Minimum" ? "Min" : name)),
         !shown,
       ),
     );
@@ -108,13 +112,12 @@ export function toolbar(onQuery: (query: string) => void, onEnter: () => void): 
   const element = el(
     "div",
     "site-toolbar",
-    label("KubaOS mockups", "subheading", "on_surface"),
+    label("Mockups", "subheading", "on_surface"),
     group("Look", segmented("Mode", LOOK), segmented("Theme", each("theme", THEMES.map((theme) => theme.slug), (slug) => THEMES.find((theme) => theme.slug === slug)!.name))),
     group("Scale", segmented("Scale", each("scale", SCALES, (s) => `${s}×`))),
-    group("Text", segmented("Text", each("text", ["short", "long", "translated"], (length) => length[0]!.toUpperCase() + length.slice(1)))),
+    group("Text", segmented("Text", each("text", ["short", "long", "translated"], (length) => TEXT_WORDS[length]))),
     group("Motion", segmented("Speed", each("speed", SPEEDS, (s) => (s === 0.5 ? "½×" : `${s}×`))), segmented("Motion", MOTION)),
     windows,
-    el("div", "site-spacer"),
     ...(note ? [note] : []),
     search(onQuery, onEnter),
   );
