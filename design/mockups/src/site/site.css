@@ -262,12 +262,23 @@ body {
   flex-direction: column;
   border-radius: var(--radius-surface);
   outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
-  overflow: clip;
 }
 
+/* Nothing clips the stage: a sample that opens (a select's list, a menu) spills past its pane, over
+   the bar and the page under it. So the corners are rounded part by part. */
 .page-panes {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(var(--panes, 1), minmax(0, 1fr));
+}
+
+.page-panes > .page-pane:first-child {
+  border-top-left-radius: var(--radius-surface);
+}
+
+.page-panes > .page-pane:last-child {
+  border-top-right-radius: var(--radius-surface);
 }
 
 .page-hero[data-panes="2"] {
@@ -320,6 +331,7 @@ body {
   padding: var(--space-s12) var(--space-s16);
   background: var(--color-surface_container_low);
   border-top: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  border-radius: 0 0 var(--radius-surface) var(--radius-surface);
 }
 
 .page-stage-hint {
