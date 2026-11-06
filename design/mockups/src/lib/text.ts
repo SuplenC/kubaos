@@ -2,9 +2,10 @@
 // rounded up to a device pixel (`.k-text` in `lib.css`), and its style's line tall.
 //
 // The advances are measured as iced lays text out: plain ASCII unkerned, with no ligatures, and
-// anything else shaped with kerning. They are measured at 64 times the size, where the canvas's
-// rounding is under a thousandth of a pixel, in logical pixels, which the box scales. A style with
-// tabular figures is measured laid out in the page, as the canvas has no font features.
+// anything else shaped with kerning. They are measured at 64 times the size, or as many times as a
+// font may be large, where the canvas's rounding is under a thousandth of a pixel, in logical
+// pixels, which the box scales. A style with tabular figures is measured laid out in the page, as
+// the canvas has no font features.
 
 import { probe } from "./probe.ts";
 import { length, names } from "./tokens.ts";
@@ -16,17 +17,25 @@ export type TypeStyle =
   | "label_number" | "small" | "caption" | "accent" | "mono" | "keycap" | "mono_large";
 
 const PRECISION = 64;
+/** HAZARD: Chromium clamps a font's size to 10000 px, on a canvas and in a page. A measure past it reads short. */
+const LARGEST_FONT = 10000;
 
 let canvas: CanvasRenderingContext2D | null = null;
 const widths = new Map<string, number>();
 
-const fonts = new Map<TypeStyle, string>();
+/** A style's font as a measure takes it, and how many times its size that is. */
+interface Meter {
+  readonly font: string;
+  readonly times: number;
+}
+
+const fonts = new Map<TypeStyle, Meter>();
 
 /**
- * A style's font as the canvas takes it, at `PRECISION` times its size: its tokens read on the
- * root, which is at scale 1, so the size is in logical pixels.
+ * A style's font as the canvas takes it, at as near `PRECISION` times its size as a font may be
+ * large: its tokens read on the root, which is at scale 1, so the size is in logical pixels.
  */
-function font(style: TypeStyle): string {
+function font(style: TypeStyle): Meter {
   const known = fonts.get(style);
   if (known !== undefined) return known;
   const meter = document.createElement("div");
@@ -36,7 +45,8 @@ function font(style: TypeStyle): string {
   meter.remove();
   const read = (name: string) =>
     getComputedStyle(document.documentElement).getPropertyValue(`--type-${style}-${name}`).trim();
-  const made = `${read("weight")} ${size * PRECISION}px ${read("family")}`;
+  const times = Math.min(PRECISION, Math.floor(LARGEST_FONT / size));
+  const made = { font: `${read("weight")} ${size * times}px ${read("family")}`, times };
   fonts.set(style, made);
   return made;
 }
@@ -58,7 +68,7 @@ export function advance(style: TypeStyle, words: string): number {
   const known = widths.get(key);
   if (known !== undefined) return known;
   const shape = shaped(words);
-  const width = (tabular(style) ? laidOut(style, words, shape) : measured(style, words, shape)) / PRECISION;
+  const width = (tabular(style) ? laidOut(style, words, shape) : measured(style, words, shape)) / font(style).times;
   widths.set(key, width);
   return width;
 }
@@ -68,21 +78,21 @@ function tabular(style: TypeStyle): boolean {
   return getComputedStyle(document.documentElement).getPropertyValue(`--type-${style}-features`).trim() !== "normal";
 }
 
-/** `words`' advance at `PRECISION` times `style`'s size, measured on the canvas. */
+/** `words`' advance at `font(style).times` its size, measured on the canvas. */
 function measured(style: TypeStyle, words: string, shape: boolean): number {
   canvas ??= document.createElement("canvas").getContext("2d");
   if (!canvas) throw new Error("no 2D canvas to measure text with");
-  canvas.font = font(style);
+  canvas.font = font(style).font;
   canvas.fontKerning = shape ? "normal" : "none";
   canvas.textRendering = shape ? "optimizeLegibility" : "optimizeSpeed";
   return canvas.measureText(words).width;
 }
 
-/** `words`' advance at `PRECISION` times `style`'s size, laid out with the style's features. */
+/** `words`' advance at `font(style).times` its size, laid out with the style's features. */
 function laidOut(style: TypeStyle, words: string, shape: boolean): number {
   const meter = document.createElement("span");
   meter.style.cssText = "position:absolute;visibility:hidden;white-space:pre";
-  meter.style.font = font(style);
+  meter.style.font = font(style).font;
   meter.style.fontFeatureSettings = `var(--type-${style}-features)`;
   meter.style.fontKerning = shape ? "normal" : "none";
   meter.style.fontVariantLigatures = shape ? "normal" : "none";
