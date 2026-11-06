@@ -6,10 +6,9 @@ import { button } from "../../lib/button.ts";
 import type { Words } from "../../lib/content.ts";
 import { row, stack, within } from "../../lib/layout.ts";
 import { type LiveRowSpec, liveList } from "../../lib/live-list.ts";
-import { text, wrapped } from "../../lib/text.ts";
+import { text } from "../../lib/text.ts";
 import { lights, powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { WELL_ROOM } from "./list.ts";
 
 /** Five two-line rows and their gaps, inside the well's padding. */
@@ -52,7 +51,7 @@ function scanning(): HTMLElement {
   const say = (words: string) => {
     status.textContent = words;
   };
-  live.onWaiting = (waiting) => say(waiting ? "An update waits: the row under the pointer or the keyboard would move. It plays as they let go." : "");
+  live.onWaiting = (waiting) => say(waiting ? "An update waits until you let go." : "");
   const set = (next: LiveRowSpec[]) => {
     rows = next;
     live.update(rows);
@@ -89,7 +88,7 @@ function scanning(): HTMLElement {
     each.addEventListener("click", does);
     return each;
   });
-  return stack("s12", "start", within(WELL_ROOM, live.element), row("s8", "centre", ...buttons), within(WELL_ROOM, status));
+  return row("s24", "start", within(WELL_ROOM, live.element), stack("s8", "start", ...buttons, status));
 }
 
 /** Rows of a live list drawn still, for a player to move. */
@@ -103,7 +102,7 @@ const ROOM = ".k-live-row:nth-child(2)";
 
 const ARRIVES: Move = {
   name: "A row arrives",
-  what: "A scan finds a network: its room opens from nothing over `medium` on `standard_decel`, the rows below moving down with it, and its row fades in over `slow` on the same curve, cut by its room while it opens. With reduced motion its room is there at once and it fades in over `short`.",
+  what: "Its room opens over `medium` on `standard_decel`, the rows below moving down, as it fades in over `slow`.",
   tracks: [
     { part: "its room", on: "the second row", target: ROOM, property: "--grow", from: 0, to: 1, duration: "medium", curve: "standard_decel" },
     { part: "its row", on: "the second row", target: ROOM, property: "opacity", from: 0, to: 1, duration: "slow", curve: "standard_decel" },
@@ -118,7 +117,7 @@ const ARRIVES: Move = {
 
 const LEAVES: Move = {
   name: "A row leaves",
-  what: "A network goes: its row fades and its room closes over `medium` on `standard_accel`, giving back its gap with it, the rows below moving up. It takes no press while it goes, so a click can't land on the row sliding under the pointer. With reduced motion it fades over `short`, then its room goes at once.",
+  what: "It fades and its room closes over `medium` on `standard_accel`; it takes no press while it goes.",
   tracks: [
     { part: "its room", on: "the second row", target: ROOM, property: "--grow", from: 1, to: 0, duration: "medium", curve: "standard_accel" },
     { part: "its row", on: "the second row", target: ROOM, property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_accel" },
@@ -142,7 +141,7 @@ function swapped(): HTMLElement {
 
 const MOVES: Move = {
   name: "Rows change places",
-  what: "A scan re-sorts by signal: each row that changes place glides from where it was to where it goes over `medium` on `standard_decel`, as a list the user reorders does; the rest stay as they are. With reduced motion they are in their new places at once.",
+  what: "Each row that moved glides there over `medium` on `standard_decel`; the rest stay.",
   tracks: [
     { part: "the row going down", on: "two rows", target: ".k-live-row:nth-child(3)", property: "--glide", from: 1, to: 0, duration: "medium", curve: "standard_decel" },
     { part: "the row going up", on: "two rows", target: ".k-live-row:nth-child(2)", property: "--glide", from: 1, to: 0, duration: "medium", curve: "standard_decel" },
@@ -170,7 +169,7 @@ function heldSample(): HTMLElement {
 
 const HOLDS: Move = {
   name: "The held row stays",
-  what: "A network arrives above the row under the pointer, in a list scrolled down: as its room opens over `medium` on `standard_decel`, the list scrolls by the same amount on the same curve, so the row under the pointer, lit here, stays exactly where it was and the new row opens out of sight above it. Where the list can't scroll that far, or the held row itself would change place, the update waits until the pointer leaves and the keyboard does.",
+  what: "A row arrives above the held one: the list scrolls by as much, or the update waits for you to let go.",
   tracks: [
     { part: "the arriving room", on: "a scrolled list", target: ROOM, property: "--grow", from: 0, to: 1, duration: "medium", curve: "standard_decel" },
     { part: "the arriving row", on: "a scrolled list", target: ROOM, property: "opacity", from: 0, to: 1, duration: "slow", curve: "standard_decel" },
@@ -202,51 +201,49 @@ export default page({
   level: "molecules",
   slug: "live-list",
   title: "LiveList and LiveRow",
-  summary: "A list a scan updates while it shows, which never jumps: rows arrive, leave and glide, and the row being looked at stays still.",
-  live: scanning,
-  description: [
-    "QML `LiveList`, its delegates `LiveRow`s; iced has none yet. Play a scan with the buttons. Rest the pointer on a row, or Tab in and pick one with the keys, and play them again: that row doesn't move. The control center's Wi-Fi and Bluetooth tabs.",
-    "A ScrollingList whose rows (each with a `key`, a network's name, a device's address) are kept in step by key, with the fewest removes, inserts and moves, so only what changed changes: a row whose facts change (its signal) is redrawn in place, and the rest stay the same rows.",
-    "A row that arrives opens its room from nothing over `medium` on `standard_decel` and fades in over `slow`; one that leaves fades and gives its room back, its `space.s4` gap with it, over `medium` on `standard_accel`, taking no press while it goes; one that changes place glides there over `medium` on `standard_decel`. Each row's room is the row and the gap after it, so the list's padding under its last row is the well's `space.s8` less that `space.s4`. Only while the list shows: an update nobody sees is in place when it next shows.",
-    "**It never jumps.** The row under the pointer, or the one the keyboard is on while the list has it, is held still. An update that would move it, a row arriving or leaving above it, plays with the list scrolling by the same amount as their rooms open and close, so the held row stays where it is on screen. Where the list can't scroll that far (it fits its well, or is at its top) or the held row would itself change place in a re-sort, the update waits, and plays once the pointer leaves and the keyboard does. Nothing else scrolls it: it moves only when the person scrolls it or moves with the keys.",
-    "With reduced motion a row arrives in its room and fades in over `short`, leaves by fading over `short` and giving its room back at once, and changes place at once. The held row's rule is the same.",
-  ],
+  lede: "A list a scan updates while it shows, which never jumps: rows arrive, leave and glide, and the row looked at stays still.",
+  code: { qml: "LiveList, LiveRow", unbuilt: "Rust: not built yet" },
+  stage: {
+    live: scanning,
+    hint: "press a button; rest on a row and it stays",
+    daylight: true,
+  },
   variants: [
-    { name: "A scan's networks", for: "The Wi-Fi tab: the network you're on first, then by signal.", sample: () => still(FOUND, FIVE) },
-    { name: "The keyboard in it", for: "The list with the keyboard on a row: that row is held still while the scan goes on.", sample: () => cell(FOUND, "lit") },
+    { name: "A scan's networks", for: "the network you're on first, then by signal", sample: () => still(FOUND, FIVE) },
+    { name: "The keyboard in it", for: "that row held still as the scan goes on", sample: () => cell(FOUND, "lit") },
   ],
-  sizes: doesntApply("a live list is a ScrollingList, as tall as its place makes it; its rows are a List's."),
+  sizes: doesntApply("a `ScrollingList`, as tall as its place; its rows are a `List`'s."),
   states: {
     shown: ["rest", "lit"],
     absent: {
-      pressed: "the well takes no press; its rows press as the List page shows, and a leaving row takes none.",
-      disabled: "a live list is never disabled as a whole; a row that can't be taken is.",
-      selected: "a picked row is its tick, as the List page shows: the network you're on.",
-      loading: "a scan with nothing found yet shows loading rows in the well (the EmptyList page); a row found takes one's place.",
-      empty: "a scan that found nothing is an EmptyList.",
-      error: "a scan that failed is an ErrorBlock in the list's place.",
+      pressed: "its rows press; a leaving row takes none",
+      disabled: "never as a whole; a row can be",
+      selected: "a picked row is its tick",
+      loading: "loading rows in the well: `EmptyList`",
+      empty: "a scan that found nothing: `EmptyList`",
+      error: "a failed scan: `ErrorBlock`",
     },
     rows: nonEmpty(MATRIX.map(({ name, rows }) => ({ name, cell: (state: MatrixState) => cell(rows, state) }))),
-    described: {
-      rest: "Its rows settled; the well unlit. By day the same roles in daylight colours.",
-      lit: "The list has the keyboard: the well's tube lit, the row the keyboard is on lit and held still while updates play round it.",
+    looks: {
+      rest: "rows settled, the well unlit",
+      lit: "the well's tube lit, the keyboard's row lit and held",
     },
   },
   focus: {
     tubes: [{ name: "The well", tone: "accent", filled: false, content: false }],
     looks: {
-      lit: "At night at rest, the signs burn: the tube inside the well's edge, the glow outside it, while the list has the keyboard.",
-      signsOff: "By day always, and at night while a power change has the lights out: the tube is solid glass, `primary_glass`, with no glow.",
+      lit: "the tube inside the well's edge, the glow outside",
+      signsOff: "the tube as `primary_glass`, no glow",
     },
     signsOff: (index: number) => cell(MATRIX[index]!.rows, "signs-off"),
   },
   content: {
     text: [{ name: "A network's name", words: NAME, sample: (words: string) => still([FOUND[0]!, { ...FOUND[1]!, title: words }, FOUND[2]!]) }],
-    missingPicture: doesntApply("its rows' symbols are the List page's."),
+    missingPicture: doesntApply("its rows' symbols are the `List` page's."),
     counts: [
-      { name: "One", for: "Only the network you're on.", sample: () => still(FOUND.slice(0, 1)) },
-      { name: "A few", for: "Fewer than the well shows: nothing scrolls, so a row arriving above the held one waits.", sample: () => still(FOUND.slice(0, 3)) },
-      { name: "Many", for: "More than it shows: it scrolls, and a row arriving above the held one plays as the list follows.", sample: () => still(FOUND, FIVE) },
+      { name: "One", for: "only the network you're on", sample: () => still(FOUND.slice(0, 1)) },
+      { name: "A few", for: "nothing scrolls: an update above the held row waits", sample: () => still(FOUND.slice(0, 3)) },
+      { name: "Many", for: "it scrolls: an update plays as the list follows", sample: () => still(FOUND, FIVE) },
     ],
   },
   motion: {
@@ -255,30 +252,30 @@ export default page({
     between: [
       MOVES,
       HOLDS,
-      { name: "The list takes the keyboard", what: "Tab onto it: the well's tube and glow fade in over `short` on `standard`.", tracks: lights(".k-list > .k-ring", "the networks", 0, 1), reduced: "same", back: "plays", sample: () => still() },
+      { name: "The list takes the keyboard", what: "The well's tube and glow fade in over `short` on `standard`.", tracks: lights(".k-list > .k-ring", "the networks", 0, 1), reduced: "same", back: "plays", sample: () => still() },
       ...powerMoves(() => cell(FOUND.slice(0, 3), "lit")),
     ],
   },
   keyboard: {
     keys: [
-      { keys: ["↓", "↑", "j", "k"], does: "The next or the row before, round from either end; the row it is on stays on that network as rows come and go round it." },
-      { keys: ["Page Down", "Page Up", "Home", "End"], does: "As a List: by a page, or to the ends." },
-      { keys: ["Enter"], does: "Takes the row, once per press; a row leaving takes none." },
+      { keys: ["↓", "↑", "j", "k"], does: "next or before; it stays on that network" },
+      { keys: ["Page Down", "Page Up", "Home", "End"], does: "as a `List`" },
+      { keys: ["Enter"], does: "takes the row; a leaving row takes none" },
     ],
-    order: "One stop for Tab, as a List. A row that leaves while the keyboard is on it gives the keyboard to the nearest row after it.",
-    lands: "Tabbing in, on the network you're on, else the row it was last on, else its first.",
+    order: "One stop for Tab; a row leaving under the keyboard hands it to the nearest after it.",
+    lands: "On the network you're on, else the row it was last on, else its first.",
   },
   measures: {
-    samples: nonEmpty([{ name: "A scan's networks", for: "The rows' rooms, each the row and the gap after it, and the padding under the last.", sample: () => still(FOUND, FIVE) }]),
+    samples: nonEmpty([{ name: "A scan's networks", for: "each row's room, the padding under the last", sample: () => still(FOUND, FIVE) }]),
     measures: [
-      { what: "A row's room: the row and the gap after it.", token: "size-row_two_line" },
-      { what: "The gap each row's room carries.", token: "space-s4" },
-      { what: "The padding above the first row; under the last, it less the last room's gap.", token: "space-s8" },
-      { what: "The well's corners.", token: "radius-content" },
+      { part: "Row in its room", token: "size-row_two_line" },
+      { part: "Gap in each room", token: "space-s4" },
+      { part: "Well padding", token: "space-s8" },
+      { part: "Well corner", token: "radius-content" },
     ],
     reflow: {
-      described: "As a ScrollingList: it fills its place, showing more rows in a taller one.",
-      sample: () => within("100%", stack("s8", "start", liveList(FOUND, { height: THREE }).element, wrapped("A live list as wide as the window.", "small", "on_surface_variant"))),
+      note: "It fills its place, showing more rows in a taller one.",
+      sample: () => within("100%", liveList(FOUND, { height: THREE }).element),
     },
   },
 });

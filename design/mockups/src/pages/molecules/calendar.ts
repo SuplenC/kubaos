@@ -5,11 +5,12 @@
 import { type CalendarOptions, calendar, type Day, type DayLook, dayCell, monthCell, titlePill } from "../../lib/calendar.ts";
 import type { Words } from "../../lib/content.ts";
 import { type Pinned } from "../../lib/control.ts";
-import { stack, within } from "../../lib/layout.ts";
-import { text } from "../../lib/text.ts";
+import { filling, flow, stack, within } from "../../lib/layout.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+
+/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
+const ACROSS = "calc(100% - var(--space-s24))";
 
 const TODAY: Day = { year: 2026, month: 10, day: 27 };
 const PICKED: Day = { year: 2026, month: 10, day: 30 };
@@ -68,7 +69,7 @@ function sliding(name: string, from: 1 | -1, shown: { year: number; month: numbe
   const side = from === 1 ? "right" : "left";
   return {
     name,
-    what: `An arrow, a sideways turn of the wheel, Page ${from === 1 ? "Down" : "Up"} or the keyboard's day crossing into it: the new month's weeks slide in from the ${side}, \`space.s64\` to their place, as they fade in, over \`short\` on \`emphasized_decel\`, cut at the month's edge. The names, the header and the arrows stay; the title changes at once. With reduced motion the weeks fade in where they are.`,
+    what: `The weeks slide \`space.s64\` in from the ${side} as they fade, over \`short\` on \`emphasized_decel\`; the header stays.`,
     tracks: [
       { part: "the weeks' slide", on: "the month", target: ".k-cal-weeks", property: "--cal-slide", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
       { part: "the weeks' fade", on: "the month", target: ".k-cal-weeks", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
@@ -79,54 +80,48 @@ function sliding(name: string, from: 1 | -1, shown: { year: number; month: numbe
   };
 }
 
-const DESCRIBED =
-  "Under the header, the weekdays' names, `space.s24` tall, in `label`: two letters each, the weekend's in `tertiary`, the rest `on_surface_variant`, after `Wk` over the week numbers. Then six weeks, so every month is as tall as every other, each led by its ISO week number (the week's Thursday's) in `caption`, `on_surface_variant`, in a column a small control wide (`size.control_sm`). A day is a regular control (`size.control_md`, 40) holding a small control's disc (`size.control_sm`, 32), a pill, `space.s4` in, its number in `body` centred on whole device pixels: `on_surface`, a weekend's `on_surface_variant`, a holiday's `tertiary`. The days of the months around are the same at `opacity.disabled_content`.";
-
 export default page({
   level: "molecules",
   slug: "calendar",
   title: "Calendar",
-  summary: "A month as six weeks led by their week numbers: today filled, the picked day ringed, holidays dotted, the months around dimmed.",
-  live: () => stack("s8", "start", month(), text("Tab into the month: the arrows move a day or a week.", "small", "on_surface_variant")),
-  description: [
-    "Rust `calendar::calendar`, QML `Calendar`. Press a day, an arrow or the title; or Tab to the month and use the arrow keys, Page Up and Page Down, Home and End, Enter. A sideways turn of the wheel (Shift and the wheel, or a touchpad's sideways swipe) moves a month, a notch at a time; a turn up or down scrolls the page past it. The clock popup's.",
-    "The header, a small control tall: the arrows at either end, Text icon buttons (sm, `chevron_left` and `chevron_right`, hinted Last month and Next month), and between them the title, the month and year in `subheading`, `on_surface`, at the control radius as the year's months are, `space.s12` inside, centred on whole device pixels. The title opens the year; the month is `space.s8` under the header.",
-    DESCRIBED,
-    "Today's disc is filled with `primary` and its number is `body_strong` in `on_primary`. The picked day's disc is ringed with `primary` in the thin stroke (`stroke.thin`, whole device pixels), its number as it was; picking today shows today. A holiday has a `tertiary` dot, `space.s4` across, `space.s4` above the disc's foot (`on_primary` on today), and its name in a hint under the day while it is lit. The first weekday is the clock's setting, Monday by default as ISO 8601 has it, and the names are the locale's.",
-    "Its days follow the neon, as a Text button does: lit (under the pointer, or the keyboard's day while the month has the keyboard), the tube burns inside the disc's edge, `primary` at `focus.tube`, with the glow outside at night; today's fill takes the core inside its edge. Pressed, the tube runs white-hot and the glow brightens, and by day the tone tints the disc; letting go picks the day, and a day of another month shows that month. The pointer moving onto a day puts the keyboard there, so one day is lit at a time. The title and the year's months light the same.",
-    "The year: the title turns Tonal (`secondary_container`, `on_secondary_container`) and reads the year; the twelve months, three to a row `space.s8` apart, regular controls at the control radius in `surface_container_high` with their short names in `body_strong`, the one shown filled with `primary`, sit in the month's room, the arrows moving a year. The month and the year cross-fade over `short` on `emphasized_decel`. A month picked shows it.",
-  ],
+  lede: "A month as six weeks led by their week numbers: today filled, the picked day ringed, holidays dotted.",
+  code: { rust: "calendar::calendar", qml: "Calendar" },
+  stage: {
+    live: () => within(ACROSS, filling(flow("s48", month(), month({ year: true })))),
+    hint: "press a day or the title, or Tab and the arrows",
+    daylight: true,
+  },
   variants: [
-    { name: "Monday first", for: "ISO 8601's week, most of Europe's, and the clock's default.", sample: () => month() },
-    { name: "Sunday first", for: "The clock set to start on Sunday: the names and the weeks follow, the week numbers still ISO's.", sample: () => month({ firstWeekday: 0, locale: "en-US" }) },
-    { name: "The year", for: "The title pressed: the twelve months, the one shown filled.", sample: () => month({ year: true }) },
-    { name: "A holiday, lit", for: "The keyboard on Independence Day: its name in a hint under it.", sample: () => calendar({ shown: { year: 2026, month: 11 }, today: TODAY, holidays: HOLIDAYS, current: day(11, 11) }) },
+    { name: "Monday first", for: "ISO 8601's week, the clock's default", sample: () => month() },
+    { name: "Sunday first", for: "the names and weeks follow; week numbers stay ISO's", sample: () => month({ firstWeekday: 0, locale: "en-US" }) },
+    { name: "The year", for: "the title pressed: twelve months, the shown one filled", sample: () => month({ year: true }) },
+    { name: "A holiday, lit", for: "its name in a hint under it", sample: () => calendar({ shown: { year: 2026, month: 11 }, today: TODAY, holidays: HOLIDAYS, current: day(11, 11) }) },
   ],
-  sizes: doesntApply("a calendar has one size: a small control's column and seven regular controls wide, the header and six weeks tall."),
+  sizes: doesntApply("one size: a small control's column and seven regular ones wide."),
   states: {
     shown: ["rest", "lit", "pressed"],
     absent: {
-      disabled: "every day can be picked, and the arrows always move: a calendar has no disabled state.",
-      selected: "the picked day is a row of its own here, ringed.",
-      loading: "the owner works the month out before it shows: the weeks, today and the holidays come at once.",
-      empty: "a month always has its six weeks.",
-      error: "a day can't be wrong.",
+      disabled: "every day can be picked",
+      selected: "the picked day is a row here",
+      loading: "the month is worked out before it shows",
+      empty: "always six weeks",
+      error: "a day can't be wrong",
     },
     rows: nonEmpty(ROWS.map(({ name, cell }) => ({ name, cell: (state: MatrixState) => cell(lookOf(state)) }))),
-    described: {
-      rest: "No fill but today's `primary`; a day's number `on_surface`, a weekend's `on_surface_variant`, a holiday's `tertiary` with its dot, the picked day's disc ringed in `primary`, the months around at `opacity.disabled_content`. A month of the year `surface_container_high`, the one shown `primary`; the title bare, or Tonal with the year open. By day the same roles in daylight colours.",
-      lit: "Under the pointer, or the keyboard's day, here with the signs on: the tube inside the disc's edge (today's core inside its fill), a month's or the title's inside theirs, with the glow outside; a holiday shows its name in a hint (A holiday, lit, in the variants). By day the tube, or a dark line, with no glow.",
-      pressed: "Lit and pressed: the tube runs white-hot and the glow brightens to `focus.pressed_glow` times the lit one; by day the tone tints the disc. Letting go picks it.",
+    looks: {
+      rest: "only today filled, `primary`; holidays `tertiary`; other months dimmed",
+      lit: "the tube inside the disc, glow at night",
+      pressed: "white-hot, glow × `focus.pressed_glow`; by day a tint",
     },
   },
   focus: {
     tubes: [
-      { name: "A day, a month of the year, the title", tone: "accent", filled: false, content: false },
+      { name: "A day, a month, the title", tone: "accent", filled: false, content: false },
       { name: "Today, the month shown", tone: "accent", filled: true, content: false },
     ],
     looks: {
-      lit: "At night at rest, the signs burn: the tube inside the disc's edge, the core inside today's fill, the glow outside. On the picked day the tube lies over its ring.",
-      signsOff: "Still lit with the neon unpowered: by day always, and at night while a power change has the lights out. The tube is `primary_glass`, today's line the fill's glass, with no glow; the picked day's ring stays `primary`.",
+      lit: "the tube inside the disc, the core in today's, glow outside",
+      signsOff: "the tube as `primary_glass`, no glow; the picked ring stays",
     },
     signsOff: (index: number) => ROWS[index]!.cell("signs-off"),
   },
@@ -139,22 +134,22 @@ export default page({
         sample: (words: string) => stack(0, "start", dayCell({ day: day(6, 1), holiday: words } satisfies DayLook, "lit")),
       },
     ],
-    missingPicture: doesntApply("a calendar draws no picture: its arrows are always there."),
+    missingPicture: doesntApply("it draws no picture."),
     counts: [
-      { name: "Four weeks of its own", for: "February 2027 starts on a Monday: four weeks, then two of March's, so the month keeps its height.", sample: () => calendar({ shown: { year: 2027, month: 2 }, today: TODAY, holidays: HOLIDAYS }) },
-      { name: "Across six weeks", for: "August 2026 starts on a Saturday and ends on a Monday: it takes all six.", sample: () => calendar({ shown: { year: 2026, month: 8 }, today: TODAY, holidays: HOLIDAYS }) },
-      { name: "No holidays", for: "The holidays set to none: no dots and no hints.", sample: () => calendar({ shown: { year: 2026, month: 10 }, today: TODAY, picked: PICKED }) },
+      { name: "Four weeks of its own", for: "February 2027: two of March's keep the height", sample: () => calendar({ shown: { year: 2027, month: 2 }, today: TODAY, holidays: HOLIDAYS }) },
+      { name: "Across six weeks", for: "August 2026 takes all six", sample: () => calendar({ shown: { year: 2026, month: 8 }, today: TODAY, holidays: HOLIDAYS }) },
+      { name: "No holidays", for: "no dots, no hints", sample: () => calendar({ shown: { year: 2026, month: 10 }, today: TODAY, picked: PICKED }) },
     ],
   },
   motion: {
-    arrives: doesntApply("a calendar comes with the clock popup it is on."),
+    arrives: doesntApply("it comes with the clock popup."),
     leaves: doesntApply("it goes with the clock popup."),
     between: [
       sliding("The next month", 1, { year: 2026, month: 11 }),
       sliding("The last month", -1, { year: 2026, month: 9 }),
       {
         name: "Opening the year",
-        what: "The title pressed: the weeks fade out as the twelve months fade in, over `short` on `emphasized_decel`, and the title turns Tonal and reads the year at once. Closing (a month picked, the title again, Esc) plays it back. Reduced motion keeps the fade, which is within its cap.",
+        what: "The weeks fade out as the months fade in, over `short` on `emphasized_decel`; the title turns Tonal at once.",
         tracks: [{ part: "the month and the year", on: "the calendar", target: ".k-calendar", property: "--year", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
         reduced: "same",
         back: "plays",
@@ -162,7 +157,7 @@ export default page({
       },
       {
         name: "The keyboard moves a day",
-        what: "→, or the pointer onto the next day: it lights up over `short` on `standard` as the day it left goes back to rest. Never the flicker.",
+        what: "The day reached lights over `short` on `standard` as the one left goes back to rest.",
         tracks: [
           { part: "the day left", on: "two days", target: at(day(15)), property: "--lit", from: 1, to: 0, duration: "short", curve: "standard" },
           { part: "the day reached", on: "two days", target: at(day(16)), property: "--lit", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -171,10 +166,10 @@ export default page({
         back: "plays",
         sample: () => month(),
       },
-      { name: "Pressed", what: "A lit day pressed: its tube runs white-hot and the glow brightens over `micro`, and back as it comes up; letting go picks it.", tracks: press(at(day(15)), "the keyboard's day"), reduced: "same", back: "plays", sample: keyed() },
+      { name: "Pressed", what: "The tube runs white-hot and the glow brightens over `micro`, and back as it comes up.", tracks: press(at(day(15)), "the keyboard's day"), reduced: "same", back: "plays", sample: keyed() },
       {
         name: "Picking",
-        what: "Enter, Space or a press on a day: its ring fades in over `short` on `standard` as the last pick's fades out.",
+        what: "The new ring fades in over `short` on `standard` as the last one fades out.",
         tracks: [
           { part: "the last pick", on: "two days", target: at(PICKED), property: "--picked", from: 1, to: 0, duration: "short", curve: "standard" },
           { part: "the new pick", on: "two days", target: at(day(22)), property: "--picked", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -183,42 +178,42 @@ export default page({
         back: "plays",
         sample: () => month(),
       },
-      { name: "The keyboard comes to the month", what: "Tab into the month: the keyboard's day, here the picked one, lights up over `short` on `standard`.", tracks: lights(at(PICKED), "the keyboard's day", 0, 1), reduced: "same", back: "cuts", sample: () => month() },
-      { name: "Focus leaves", what: "The keyboard leaves the month: its day goes back to rest over `short` on `standard`.", tracks: lights(at(day(15)), "the keyboard's day", 1, 0), reduced: "same", back: "cuts", sample: keyed() },
+      { name: "The keyboard comes to the month", what: "The keyboard's day lights up over `short` on `standard`.", tracks: lights(at(PICKED), "the keyboard's day", 0, 1), reduced: "same", back: "cuts", sample: () => month() },
+      { name: "Focus leaves", what: "Its day goes back to rest over `short` on `standard`.", tracks: lights(at(day(15)), "the keyboard's day", 1, 0), reduced: "same", back: "cuts", sample: keyed() },
       ...powerMoves(keyed("lit", TODAY)),
     ],
   },
   keyboard: {
     keys: [
-      { keys: ["←", "→", "h", "l"], does: "The day before or after, into the month around where it crosses, which slides in." },
-      { keys: ["↑", "↓", "k", "j"], does: "The same day a week before or after." },
-      { keys: ["Page Up", "Page Down"], does: "The same day a month before or after, held to the month's last." },
-      { keys: ["Home", "End"], does: "The first or the last day of the week, by the first weekday." },
-      { keys: ["Enter", "Space"], does: "Picks the keyboard's day, once per press." },
-      { keys: ["Tab", "Shift+Tab"], does: "Last month, the title, Next month, then the month: one stop, on its keyboard's day." },
-      { keys: ["Esc"], does: "With the year open, back to the month; otherwise the clock popup's." },
+      { keys: ["←", "→", "h", "l"], does: "a day; crossing a month slides it in" },
+      { keys: ["↑", "↓", "k", "j"], does: "a week" },
+      { keys: ["Page Up", "Page Down"], does: "a month, held to its last day" },
+      { keys: ["Home", "End"], does: "the week's first or last day" },
+      { keys: ["Enter", "Space"], does: "picks the keyboard's day" },
+      { keys: ["Tab", "Shift+Tab"], does: "Last month, the title, Next month, then the month" },
+      { keys: ["Esc"], does: "year open: back to the month; else the popup's" },
     ],
-    order: "The two arrows and the title between them, then the month as one stop. With the year open, its twelve months are one stop in the month's place: ← → a month, ↑ ↓ three, Enter picks.",
-    lands: "Tabbing into the month, on the picked day, else today. A day picked keeps the keyboard there; a month picked in the year lands on its day.",
+    order: "The arrows and the title, then the month as one stop; with the year open, its months are that stop.",
+    lands: "On the picked day, else today; a pick keeps the keyboard there.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "The month", for: "The header, the names, the week numbers' column and the days, each day's disc and a holiday's dot.", sample: () => month() },
-      { name: "The year", for: "Three months to a row and their gaps.", sample: () => month({ year: true }) },
+      { name: "The month", for: "header, names, week numbers, days, a disc, a dot", sample: () => month() },
+      { name: "The year", for: "three months to a row, and their gaps", sample: () => month({ year: true }) },
     ]),
     measures: [
-      { what: "A day, and a month of the year: a regular control.", token: "size-control_md" },
-      { what: "A day's disc, the header's height and the week numbers' column: a small control.", token: "size-control_sm" },
-      { what: "The names' row.", token: "space-s24" },
-      { what: "Between the header and the month, and between the year's months.", token: "space-s8" },
-      { what: "A disc in from its day's edge, and a holiday's dot, across and above the disc's foot.", token: "space-s4" },
-      { what: "Inside the title's sides.", token: "space-s12" },
-      { what: "How far a new month slides.", token: "space-s64" },
-      { what: "A day's number, `body`'s line.", token: "type-body-line" },
-      { what: "The title, `subheading`'s line.", token: "type-subheading-line" },
-      { what: "A day's disc and the arrows' corners.", token: "radius-full" },
-      { what: "The title's and a month of the year's corners.", token: "radius-control" },
+      { part: "Day, year's month", token: "size-control_md" },
+      { part: "Disc, header, week column", token: "size-control_sm" },
+      { part: "Names' row", token: "space-s24" },
+      { part: "Header to month, year's gaps", token: "space-s8" },
+      { part: "Disc inset, holiday dot", token: "space-s4" },
+      { part: "Title inset", token: "space-s12" },
+      { part: "New month's slide", token: "space-s64" },
+      { part: "Day number line", token: "type-body-line" },
+      { part: "Title line", token: "type-subheading-line" },
+      { part: "Disc, arrows' corner", token: "radius-full" },
+      { part: "Title, year's month corner", token: "radius-control" },
     ],
-    reflow: doesntApply("a calendar is one size at every window size: a small control and seven regular ones wide, the header and six weeks tall."),
+    reflow: doesntApply("one size at every window size."),
   },
 });

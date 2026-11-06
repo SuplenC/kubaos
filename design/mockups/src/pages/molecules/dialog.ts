@@ -8,10 +8,8 @@ import { button } from "../../lib/button.ts";
 import type { Words } from "../../lib/content.ts";
 import { centreIn, type DialogOptions, dialog, scrim } from "../../lib/dialog.ts";
 import { field, labelled } from "../../lib/field.ts";
-import { row, stack } from "../../lib/layout.ts";
-import { text } from "../../lib/text.ts";
-import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { row } from "../../lib/layout.ts";
+import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
 const TITLE: Words = { short: "Restart now?", long: "Restart now to finish installing the updates you downloaded?" };
 const BODY: Words = {
@@ -101,7 +99,7 @@ function live(): HTMLElement {
   const room = document.createElement("span");
   room.className = "k-dialog-room";
   room.dataset.live = "";
-  room.style.setProperty("--room", "calc(var(--size-dialog) + 2 * var(--space-s64))");
+  room.style.setProperty("--room", "100%");
   room.style.setProperty("--tall", "calc(var(--size-column) * 3 / 4)");
   const openers: [string, () => DialogOptions][] = [
     ["Restart…", () => QUESTION],
@@ -114,7 +112,7 @@ function live(): HTMLElement {
     opener.addEventListener("click", () => open(opener, options()));
     return opener;
   });
-  const behind = stack("s8", "start", row("s8", "centre", ...buttons), text("Each opens its dialog; Esc or Cancel closes it.", "small", "on_surface_variant"));
+  const behind = row("s8", "centre", ...buttons);
   behind.classList.add("k-dialog-behind");
   room.append(behind);
 
@@ -143,7 +141,7 @@ const DIALOG = "the dialog";
 
 const ARRIVES: Move = {
   name: "Opening",
-  what: "The scrim fades in over `long` on `emphasized_decel` as the dialog fades in with it, rising `space.s16` into the middle a whole device pixel at a time, so its edges stay sharp: a dialog arriving, looked at as it comes. Nothing flickers: a dialog isn't a light. Its buttons are lit as the keyboard lands on one. With reduced motion both fade in where they stay, capped at `short`, with no rise.",
+  what: "The scrim and dialog fade in over `long` on `emphasized_decel`, the dialog rising `space.s16`; reduced, a fade capped at `short`.",
   tracks: [
     { part: SCRIM, on: "a question", target: ".k-scrim", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: `${DIALOG}'s fade`, on: "a question", target: ".k-dialog", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
@@ -159,7 +157,7 @@ const ARRIVES: Move = {
 
 const LEAVES: Move = {
   name: "Closing",
-  what: "An answer, Esc or Cancel: the dialog and the scrim fade out together where they are over `medium` on `emphasized_accel`, already done with, and the keyboard is back on what opened it. With reduced motion the fade is capped at `short`.",
+  what: "Both fade out over `medium` on `emphasized_accel`; the keyboard goes back to what opened it.",
   tracks: [
     { part: SCRIM, on: "a question", target: ".k-scrim", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: DIALOG, on: "a question", target: ".k-dialog", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
@@ -172,46 +170,37 @@ const LEAVES: Move = {
   sample: () => still(QUESTION),
 };
 
-const DESCRIBED =
-  "`size.dialog` (500) wide, `space.s24` inside on every side, under its buttons too, at the content radius (`radius.content`, 16), raised to the ladder's step 3, a dialog's: `surface_container_high` by day and `surface_container_highest` at night, the step's contact and ambient layers of `shadow`, and the rim, a hairline of `on_surface` inside its edge at `elevation.rim`. Everything in it starts on one content edge, its padding's: a 24 symbol (`heading`'s) in `primary` and the title in `heading`, `on_surface`, `space.s12` apart on one row; the body in `body`, `on_surface_variant`, `space.s12` under them; what it asks for `space.s16` under the body; each across its whole width, under the symbol as well as the title; and its button bar `space.s24` under the last, across the same width, Cancel's label on the content's edge, its own padding hanging into the dialog's, and the last button's box ending on the right edge. Its words wrap in its width.";
-
-const HEIGHTS =
-  "It is never shorter than `aspect.dialog`, 5:2, of its width: 200, on the grid. A dialog that asks little, one line and its buttons, would be a strip; it stands as a card instead, its words at the top and its buttons at its foot, `space.s24` from the bottom as always, with the room it gains between them. A dialog with no buttons (a progress) keeps it too, its words at the top. Taller than that, it is as tall as what it holds. It is never taller than its room (the screen, or the window it opens over) less `space.s48` above and below, so the dimmed screen always shows round it. Past that only the middle scrolls, the body and what it lists or asks for, with no bar of its own: the symbol and title stay at the top and the buttons at the foot. While more is below, a hairline in the soft outline, a divider's, crosses the dialog's padding above the buttons, the middle scrolling under it; while more is above, the same one under the title. Each fades over `short` on `standard` as you reach its end.";
-
 export default page({
   level: "molecules",
   slug: "dialog",
   title: "Dialog and Scrim",
-  summary: "A question over a dimmed screen, raised to step 3: Cancel at the start, the actions at the end, the one Enter presses last.",
-  live,
-  description: [
-    "Rust `dialog::dialog`, `dialog::prompt` and `dialog::scrim`, QML `Dialog` and `Scrim`. Press one of the window's buttons: its dialog opens over the scrim with the keyboard in it. Tab goes round it, Esc or Cancel closes it, and the keyboard is back on the button.",
-    DESCRIBED,
-    "The buttons are a button bar (Molecules, Button bar): the dismiss button, Cancel, a Text button, at the start; the actions at the end, the one Enter presses last: the screen's one Filled button, a Tonal one for another way out before it (Shut down beside Restart), `space.s8` apart, all regular (`md`). A Danger dialog asks before a step that destroys something: the warning sign in `error` instead of the symbol, an edge of `error` at `opacity.danger_edge` over the rim, and its one action a Danger button naming what it does (Erase and install). A prompt asks for what only you can type (a password): a labelled field `space.s16` under the body, Enter in it doing what its action does; a wrong answer is the field's Invalid state and its note, and the dialog stays.",
-    HEIGHTS,
-    "The scrim is everything behind the dialog, dimmed: `scrim` at `opacity.scrim` over all of the window or the screen. It takes every press, hover and scroll, so none reaches what is behind, and a press on it does nothing: Esc or Cancel closes the dialog, so a stray press never loses what was typed.",
-    "Opening, the keyboard goes into the dialog: onto what it asks for, else onto Cancel on a Danger dialog, so Enter twice never destroys anything, else onto the last action. Tab and Shift+Tab go round its field and buttons and never leave it, scrolling a field in a scrolled middle into view `space.s12` clear of its edges. From a button, the arrows scroll a middle too tall to show whole by a line and the page keys by what it shows. Esc does what Cancel does. Closing puts the keyboard back on what opened it.",
-  ],
+  lede: "A question over a dimmed screen, raised to step 3, with the keyboard kept inside until it is answered.",
+  code: { rust: "dialog::dialog, dialog::prompt, dialog::scrim", qml: "Dialog, Scrim" },
+  stage: {
+    live,
+    hint: "press a button; Tab goes round, Esc closes",
+    daylight: true,
+  },
   variants: [
-    { name: "A question", for: "Ask before something that can't wait to be undone: Restart, with Shut down as another way out.", sample: () => still(QUESTION) },
-    { name: "Short", for: "One line and its buttons: the dialog keeps its least height, 5:2 of its width, the room it gains above its buttons.", sample: () => still(SHORT) },
-    { name: "Long", for: "More than its room shows: capped `space.s48` from the room's top and bottom, the title and buttons stay, the middle scrolls, with a hairline above the buttons and, scrolled, one under the title.", sample: () => capped(LONG, 0.5) },
-    { name: "Danger", for: "Ask before something is destroyed: the warning sign and its edge in `error`, a Danger action, the keyboard on Cancel.", sample: () => still(DANGER) },
-    { name: "A prompt", for: "Ask for what only you can type: the password, its field under the body.", sample: () => still(prompt()) },
-    { name: "A prompt, answered wrong", for: "The field Invalid with its note; the dialog stays and the keyboard stays in the field.", sample: () => still(prompt(true)) },
-    { name: "Waiting", for: "Nothing to answer yet (the system hasn't asked): the action disabled until it can be taken.", sample: () => still(prompt(false, true)) },
+    { name: "A question", for: "before something that can't wait to be undone", sample: () => still(QUESTION) },
+    { name: "Short", for: "keeps its least height, `aspect.dialog`", sample: () => still(SHORT) },
+    { name: "Long", for: "its middle scrolls; title and buttons stay", sample: () => capped(LONG, 0.5) },
+    { name: "Danger", for: "before destroying: `error` edge, the keyboard on Cancel", sample: () => still(DANGER) },
+    { name: "A prompt", for: "what only you can type", sample: () => still(prompt()) },
+    { name: "A prompt, answered wrong", for: "the field Invalid; the dialog and keyboard stay", sample: () => still(prompt(true)) },
+    { name: "Waiting", for: "the action disabled until it can be taken", sample: () => still(prompt(false, true)) },
   ],
-  sizes: doesntApply("a dialog is one width, `size.dialog`, and as tall as what it holds, between 5:2 of its width and its room less `space.s48` above and below."),
+  sizes: doesntApply("one width, `size.dialog`; as tall as it holds, within `aspect.dialog` and its room."),
   states: {
     shown: ["rest"],
     absent: {
-      lit: "a dialog isn't a control: its buttons and its field light, each as its own page says.",
-      pressed: "a press on it, or on the scrim, does nothing of its own.",
-      disabled: "a dialog is open or not there; an action that can't be taken yet is a disabled button (Waiting, above).",
-      selected: "it holds no choice of its own.",
-      loading: "what it asks is known as it opens; a step that takes a moment after the answer shows on the screen behind, once it has closed.",
-      empty: "a dialog always asks something.",
-      error: "a wrong answer is its field's Invalid state and note (A prompt, answered wrong, above); the dialog itself can't be wrong.",
+      lit: "not a control: its buttons and field light",
+      pressed: "a press on it or the scrim does nothing",
+      disabled: "open or not there",
+      selected: "holds no choice",
+      loading: "a slow step shows behind, once it has closed",
+      empty: "always asks something",
+      error: "a wrong answer is its field's Invalid state",
     },
     rows: [
       { name: "A question", cell: () => still(QUESTION) },
@@ -219,67 +208,65 @@ export default page({
       { name: "A prompt", cell: () => still(prompt()) },
       { name: "Long", cell: () => capped(LONG, 0.5) },
     ],
-    described: {
-      rest: "Open over its scrim, the keyboard on where it lands. At night `surface_container_highest`, the step's stronger shadow and the rim at `elevation.rim`; by day `surface_container_high`, the lighter shadow and the rim at `elevation.light_rim`. The scrim is the same black at `opacity.scrim` in both.",
+    looks: {
+      rest: "`surface_container_highest` at night, `…_high` by day, over `opacity.scrim`",
     },
   },
-  focus: doesntApply("the dialog has no line of its own: its buttons and its field light as their pages say. The keyboard lands on what it asks for, else Cancel on a Danger dialog, else the last action."),
+  focus: doesntApply("no line of its own: its buttons and field light as their pages say."),
   content: {
     text: [
       { name: "The title", words: TITLE, sample: (words: string) => still({ ...QUESTION, title: words }) },
       { name: "The body", words: BODY, sample: (words: string) => still({ ...QUESTION, body: words }) },
     ],
-    missingPicture: doesntApply("its symbol is always there: `info` unless it names one, and the warning sign on a Danger dialog."),
+    missingPicture: doesntApply("its symbol is always there: `info` unless named, the warning sign on Danger."),
     counts: [
-      { name: "One action", for: "Cancel and the action: Authenticate.", sample: () => still(prompt()) },
-      { name: "Two actions", for: "Another way out before the one Enter presses: Shut down, Restart.", sample: () => still(QUESTION) },
-      { name: "Stacked buttons", for: "Names too long for one line: the bar stacks, the one Enter presses on top and Cancel at the foot, each the dialog's full width, `space.s24` under the body as on one line.", sample: () => still(STACKED) },
-      { name: "Forty lines", for: "What it lists, more than its room shows: its middle scrolls, at its top, half way and at its end.", sample: () => row("s16", "start", capped(LONG), capped(LONG, 0.5), capped(LONG, 1)) },
+      { name: "One action", for: "Cancel and the action", sample: () => still(prompt()) },
+      { name: "Two actions", for: "another way out, before the Enter one", sample: () => still(QUESTION) },
+      { name: "Stacked buttons", for: "names too long: Enter's on top, Cancel at the foot", sample: () => still(STACKED) },
+      { name: "Forty lines", for: "its middle at the top, half way, the end", sample: () => row("s16", "start", capped(LONG), capped(LONG, 0.5), capped(LONG, 1)) },
     ],
   },
   motion: {
     arrives: [ARRIVES],
     leaves: [LEAVES],
-    between: doesntApply("a dialog doesn't change while it is open; its buttons and its field move between their own states."),
+    between: doesntApply("it doesn't change while open; its buttons and field move on their own."),
   },
   keyboard: {
     keys: [
-      { keys: ["Tab", "Shift+Tab"], does: "Round what it asks for and its buttons, from the last back to the first, scrolling a field in a scrolled middle into view; never out of the dialog while it is open." },
-      { keys: ["Up", "Down"], does: "From a button, scroll a middle too tall to show whole by a line." },
-      { keys: ["Page Up", "Page Down"], does: "From a button, scroll it by what it shows, less a line." },
-      { keys: ["Enter"], does: "Presses the button the keyboard is on, once per press; in the field, does what its action does." },
-      { keys: ["Space"], does: "Presses the button the keyboard is on; in the field, a space." },
-      { keys: ["Esc"], does: "Does what Cancel does: closes it without an answer." },
+      { keys: ["Tab", "Shift+Tab"], does: "round its field and buttons, never out" },
+      { keys: ["Up", "Down"], does: "from a button, scroll a tall middle a line" },
+      { keys: ["Page Up", "Page Down"], does: "from a button, scroll it a page" },
+      { keys: ["Enter"], does: "presses the button; in the field, its action" },
+      { keys: ["Space"], does: "presses the button; in the field, a space" },
+      { keys: ["Esc"], does: "does what Cancel does" },
     ],
-    order: "What it asks for, then Cancel, then the actions in order, round; a disabled action is skipped. Nothing behind the scrim is a stop while it is open.",
-    lands: "Opening: on what it asks for, else Cancel on a Danger dialog, else the last action. Closing: back on what opened it.",
+    order: "What it asks, Cancel, then the actions, round; a disabled action is skipped, nothing behind is a stop.",
+    lands: "Opening: what it asks, else Cancel on Danger, else the last action. Closing: back on what opened it.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "A prompt", for: "Its width, padding, the symbol and title, the gaps between the title, the body, the field and the buttons.", sample: () => still(prompt()) },
-      { name: "A question", for: "Two actions at the end and Cancel at the start.", sample: () => still(QUESTION) },
-      { name: "Short", for: "Its least height, the buttons at its foot.", sample: () => still(SHORT) },
-      { name: "Long", for: "Its most height in a short room, the rules at the middle's edges.", sample: () => capped(LONG, 0.5) },
+      { name: "A prompt", for: "width, padding, title, and the gaps down to the buttons", sample: () => still(prompt()) },
+      { name: "A question", for: "Cancel at the start, two actions at the end", sample: () => still(QUESTION) },
+      { name: "Short", for: "its least height", sample: () => still(SHORT) },
+      { name: "Long", for: "its most height, the rules at the middle's edges", sample: () => capped(LONG, 0.5) },
     ]),
     measures: [
-      { what: "Its width.", token: "size-dialog" },
-      { what: "Its least height: 5:2 of its width, 200.", token: "aspect-dialog" },
-      { what: "Its most height: its room less this above and below.", token: "space-s48" },
-      { what: "The rules at the middle's edges: one device pixel.", token: "stroke-hairline_device_px" },
-      { what: "Inside its edges on every side, under the buttons too, and above the buttons: the content's edge, which the symbol, the body, the field and Cancel's label start on.", token: "space-s24" },
-      { what: "How far Cancel, a Text button, hangs its box past the content's edge: its own padding.", token: "space-s12" },
-      { what: "Between the symbol and the title, and between the title and the body.", token: "space-s12" },
-      { what: "Above what it asks for.", token: "space-s16" },
-      { what: "Between buttons.", token: "space-s8" },
-      { what: "The symbol, `heading`'s.", token: "type-heading-icon" },
-      { what: "The title's line.", token: "type-heading-line" },
-      { what: "A button's height.", token: "size-control_md" },
-      { what: "Its corners.", token: "radius-content" },
-      { what: "The rim inside its edge: one device pixel.", token: "stroke-hairline_device_px" },
-      { what: "Its shadow's ambient layer: its drop.", token: "elevation-3-ambient-y" },
-      { what: "Its shadow's ambient layer: its blur.", token: "elevation-3-ambient-blur" },
-      { what: "How far under its place it starts as it opens.", token: "space-s16" },
+      { part: "Width", token: "size-dialog" },
+      { part: "Least height", token: "aspect-dialog" },
+      { part: "Clear of its room", token: "space-s48" },
+      { part: "Inset, above the buttons", token: "space-s24" },
+      { part: "Cancel's hang, gaps by the title", token: "space-s12" },
+      { part: "Above what it asks", token: "space-s16" },
+      { part: "Between buttons", token: "space-s8" },
+      { part: "Symbol", token: "type-heading-icon" },
+      { part: "Title line", token: "type-heading-line" },
+      { part: "Button", token: "size-control_md" },
+      { part: "Corner", token: "radius-content" },
+      { part: "Rim, the middle's rules", token: "stroke-hairline_device_px" },
+      { part: "Shadow drop", token: "elevation-3-ambient-y" },
+      { part: "Shadow blur", token: "elevation-3-ambient-blur" },
+      { part: "Rise as it opens", token: "space-s16" },
     ],
-    reflow: doesntApply("a dialog is `size.dialog` wide at every window size, in the middle of the scrim, which fills the window or the screen: the narrowest window, an app's minimum (`size.app_min_width`, 720), holds it with room."),
+    reflow: doesntApply("one width in the middle of the scrim; an app's least window holds it with room."),
   },
 });

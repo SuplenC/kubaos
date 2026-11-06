@@ -7,13 +7,15 @@ import { buttonBar } from "../../lib/button-bar.ts";
 import { type CardOptions, card } from "../../lib/card.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
-import { row, stack, within } from "../../lib/layout.ts";
+import { filling, flow, row, stack, within } from "../../lib/layout.ts";
 import { media } from "../../lib/media.ts";
 import { role } from "../../lib/radius.ts";
-import { text, wrapped } from "../../lib/text.ts";
+import { wrapped } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+
+/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
+const ACROSS = "calc(100% - var(--space-s24))";
 
 const TITLE: Words = { short: "Disk", long: "Samsung 990 Pro, the disk KubaOS installs on" };
 const BODY: Words = {
@@ -41,8 +43,8 @@ function withActions(): CardOptions {
 }
 
 /** A pressable card: the install's log, opened by a press. */
-function log(state: Shown = "rest", onPress: () => void = () => undefined): HTMLElement {
-  return card({ header: { glyph: "terminal", title: "Install log", subtitle: "312 lines · 2 warnings" }, onPress, ...stateOptions(state) });
+function log(state: Shown = "rest"): HTMLElement {
+  return card({ header: { glyph: "terminal", title: "Install log", subtitle: "312 lines · 2 warnings" }, onPress: () => undefined, ...stateOptions(state) });
 }
 
 /** A card holding a picture, `space.s16` in, at the row radius. */
@@ -53,13 +55,9 @@ function pictured(): HTMLElement {
   });
 }
 
-/** The live sample: a card with actions, and a pressable one that says it was pressed. */
+/** The live sample: a card with actions and a pressable one, beside a card holding a picture. */
 function live(): HTMLElement {
-  const said = text("Press the log's card, or Tab to it and press Enter.", "small", "on_surface_variant");
-  const pressed = log("rest", () => {
-    said.textContent = "The log opens in its own view.";
-  });
-  return within(COLUMN, stack("s16", "start", card(withActions()), pressed, said));
+  return within(ACROSS, filling(flow("s16", within(COLUMN, stack("s16", "start", card(withActions()), log())), within(HALF, pictured()))));
 }
 
 /** Two cards side by side in a grid, ending together. */
@@ -80,50 +78,45 @@ function cell(options: CardOptions, state: Shown): HTMLElement {
   return within("var(--size-thumbnail_width)", card({ ...options, onPress: () => undefined, ...stateOptions(state) }));
 }
 
-const DESCRIBED =
-  "A region of the page, so flat on it, with no shadow and no rim: elevation means floating above the page, and a card is part of it (`docs/DESIGN.md`, \"Elevation\"). Its fill is one container role above the surface it sits on: `surface_container` on a window's `surface`, `surface_container_high` on a panel's `surface_container`. Its edge is the sunken soft hairline (`outline_variant` at `opacity.outline_soft`), the list well's line, so the edge holds by day where the two tones are close. Being dragged is the one time a card is raised. Its corners are the content radius, `radius.content` (16): a card is a box of content inside a window or a panel, as a list well and a dialog are, a step under the window's or the panel's own 24. `space.s16` inside, as wide as its room; as tall as what it holds, or, in a grid, as its row, so cards side by side end together.";
-
 export default page({
   level: "molecules",
   slug: "card",
   title: "Card",
-  summary: "A surface inside the page that holds a group of things belonging together: a header, a body and its buttons.",
-  live,
-  description: [
-    "Rust `card::card`, QML `Card`. A group of controls or facts that belong together but aren't a list (a disk and what installing on it does, a proxy's details) sits in a card; a list of like items sits in a well (`List`), and the panel's own controls sit on the panel with nothing round them.",
-    DESCRIBED,
-    "What it holds runs top to bottom, `space.s16` apart: a header, then the body, then a button bar at its foot (`ButtonBar`), each as wide as the card's padding leaves. The header is its title in `subheading` (`on_surface`), breaking between words, after a symbol at the title's icon size (`subheading`'s 24) `space.s8` before it; and a line under it in `small`, `on_surface_variant`, `space.s4` below, from the card's padding. The button bar is the surface's: the card's action Tonal, since a page's one Filled action is the page's, not a card's.",
-    "A plain card takes no input and has no states: its controls are each a stop of their own. A pressable card is one press target as a whole (a log, a device to open): it lights as any control does, its tube (`primary` at `focus.tube`) inside its edge at its own corner with the glow outside at night; pressed, its tube runs white-hot and the glow brightens, and by day the tone tints its fill (`opacity.press_tint`). It holds no controls of its own, since a press anywhere on it is its press. Disabled, it keeps its resting surface and what it holds dims to `opacity.disabled_content`, with no line, no glow and no stop for Tab.",
-    "Nesting: a card or a well is never inside another; the container's padding is the only padding round it (`docs/DESIGN.md`, \"The container\"). A control in a card keeps its own role's corner (a button's 12). A picture filling the card less its `space.s16` takes the row radius, `radius.row` (8): the card's 16 less its 16 would leave no corner.",
-  ],
+  lede: "A surface inside the page holding things that belong together: a header, a body and its buttons.",
+  code: { rust: "card::card", qml: "Card" },
+  stage: {
+    live,
+    hint: "press the log's card, or Tab to it and Enter",
+    daylight: true,
+  },
   variants: [
-    { name: "A header and a body", for: "Facts that belong together: the disk, what installing on it does.", sample: () => within(COLUMN, card(DISK)) },
-    { name: "With a button bar", for: "Something to do about what it holds, at its foot.", sample: () => within(COLUMN, card(withActions())) },
-    { name: "Holding a picture", for: "A picture `space.s16` in, at the row radius.", sample: () => within(HALF, pictured()) },
-    { name: "Pressable", for: "One press target as a whole: a log, a device to open.", sample: () => within(COLUMN, log()) },
+    { name: "A header and a body", for: "facts that belong together", sample: () => within(COLUMN, card(DISK)) },
+    { name: "With a button bar", for: "something to do, at its foot, Tonal", sample: () => within(COLUMN, card(withActions())) },
+    { name: "Holding a picture", for: "`space.s16` in, at `radius.row`", sample: () => within(HALF, pictured()) },
+    { name: "Pressable", for: "one press target as a whole", sample: () => within(COLUMN, log()) },
   ],
-  sizes: doesntApply("a card has one padding and one corner, and is as wide as the room it is given: a column, a cell of a grid, a panel's body."),
+  sizes: doesntApply("one padding and one corner; as wide as its room."),
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],
     absent: {
-      selected: "a card picked from a set is a `ChoiceCard`, on its own page.",
-      loading: "what a card holds loads in its own parts, a `Skeleton` in their place; the card is there from the start.",
-      empty: "a card always holds something; an empty group is no card, and an empty list is the well's `EmptyList`.",
-      error: "an error is said by what it holds (an `ErrorBlock`, a field's Invalid state), never by the card.",
+      selected: "a card picked from a set is a `ChoiceCard`",
+      loading: "its parts load, a `Skeleton` in their place",
+      empty: "an empty list is the well's `EmptyList`",
+      error: "said by what it holds: an `ErrorBlock`",
     },
     rows: nonEmpty(ROWS.map(({ name, options }) => ({ name, cell: (state: MatrixState) => cell(options, state) }))),
-    described: {
-      rest: "Flat on the page: `surface_container` on the window's `surface`, its edge the soft hairline, with no shadow and no rim. A plain card is always this.",
-      lit: "Under the pointer or with the keyboard on it, here with the signs on: the tube, `primary` at `focus.tube`, inside its edge at its own corner, the glow outside. The fill and what it holds don't change. By day the tube with no glow.",
-      pressed: "Lit and pressed: the tube runs white-hot, to the core (`primary_core`), and the glow is `focus.pressed_glow` times the lit one; by day the tone tints its fill at `opacity.press_tint`. Letting go does what it does.",
-      disabled: "Its resting fill and edge kept; what it holds at `opacity.disabled_content`. No line, no glow, no press, no stop for Tab.",
+    looks: {
+      rest: "flat, `surface_container`, soft hairline, no shadow",
+      lit: "the `primary` tube inside its edge, glow at night",
+      pressed: "white-hot, glow × `focus.pressed_glow`; by day a tint",
+      disabled: "its fill kept, content at `opacity.disabled_content`, no Tab stop",
     },
   },
   focus: {
     tubes: [{ name: "Pressable card", tone: "accent", filled: false, content: false }],
     looks: {
-      lit: "At night at rest the sign burns: the tube inside the card's edge at `radius.content`, the glow outside it, every ring concentric with the corner. What it holds doesn't light.",
-      signsOff: "Still lit with the neon unpowered, by day always and at night while a power change has the lights out: the tube is `primary_glass`, with no glow.",
+      lit: "the tube inside its edge at `radius.content`, the glow outside",
+      signsOff: "the tube as `primary_glass`, no glow",
     },
     signsOff: (index: number) => cell(ROWS[index]!.options, "signs-off"),
   },
@@ -132,51 +125,51 @@ export default page({
       { name: "The title", words: TITLE, sample: (words: string) => within(HALF, card({ header: { glyph: "hard_drive", title: words, subtitle: "2 TB · NVMe" } })) },
       { name: "The body", words: BODY, sample: (words: string) => within(HALF, card({ header: { title: "Disk" }, body: [wrapped(words, "body", "on_surface")] })) },
     ],
-    missingPicture: doesntApply("a card draws no picture of its own: a picture in it is a `Media`, whose page shows one that is missing; its symbol is one of KubaOS Symbols, always there."),
+    missingPicture: doesntApply("a picture in it is a `Media`; its symbol is always there."),
     counts: [
-      { name: "A title alone", for: "The least a card holds: its header's one line.", sample: () => within(HALF, card({ header: { title: "Install log" } })) },
-      { name: "A header and a body", for: "The usual card.", sample: () => within(HALF, card(DISK)) },
-      { name: "Two side by side", for: "Cards in a grid share their row's height, so they end together.", sample: pair },
+      { name: "A title alone", for: "the least it holds", sample: () => within(HALF, card({ header: { title: "Install log" } })) },
+      { name: "A header and a body", for: "the usual card", sample: () => within(HALF, card(DISK)) },
+      { name: "Two side by side", for: "one row's height, ending together", sample: pair },
     ],
   },
   motion: {
-    arrives: doesntApply("a card comes with the page or the surface it is on."),
-    leaves: doesntApply("it goes with the page or the surface it is on."),
+    arrives: doesntApply("it comes with its page or surface."),
+    leaves: doesntApply("it goes with its page or surface."),
     between: [
-      { name: "Focus arrives", what: "A pressable card under the pointer or with the keyboard on it lights up over `short` on `standard`: its tube and glow fade in. Never the flicker.", tracks: lights(".k-card", "a pressable card", 0, 1), reduced: "same", back: "cuts", sample: () => cell(ROWS[0].options, "rest") },
-      { name: "Focus leaves", what: "It goes back to rest over `short` on `standard`.", tracks: lights(".k-card", "a pressable card", 1, 0), reduced: "same", back: "cuts", sample: () => cell(ROWS[0].options, "lit") },
-      { name: "Pressed", what: "A lit card pressed: over `micro` its tube runs white-hot and the glow brightens, and by day the tone tints it.", tracks: press(".k-card", "a pressable card"), reduced: "same", back: "plays", sample: () => cell(ROWS[0].options, "lit") },
+      { name: "Focus arrives", what: "The tube and glow fade in over `short` on `standard`.", tracks: lights(".k-card", "a pressable card", 0, 1), reduced: "same", back: "cuts", sample: () => cell(ROWS[0].options, "rest") },
+      { name: "Focus leaves", what: "Back to rest over `short` on `standard`.", tracks: lights(".k-card", "a pressable card", 1, 0), reduced: "same", back: "cuts", sample: () => cell(ROWS[0].options, "lit") },
+      { name: "Pressed", what: "Over `micro` the tube runs white-hot and the glow brightens; by day the tone tints it.", tracks: press(".k-card", "a pressable card"), reduced: "same", back: "plays", sample: () => cell(ROWS[0].options, "lit") },
       ...powerMoves(() => row("s16", "start", cell(ROWS[0].options, "lit"), within("var(--size-thumbnail_width)", card(DISK)))),
     ],
   },
   keyboard: {
     keys: [
-      { keys: ["Tab", "Shift+Tab"], does: "A pressable card is one stop in the surface's reading order. A plain card is none: its controls are each a stop, in reading order." },
-      { keys: ["Enter", "Space"], does: "Presses the pressable card the keyboard is on, once per press, never on key repeat." },
-      { keys: ["Esc"], does: "Nothing of the card's: it goes back one step, as the surface says." },
+      { keys: ["Tab", "Shift+Tab"], does: "pressable: one stop; plain: none, its controls are" },
+      { keys: ["Enter", "Space"], does: "presses a pressable card, once per press" },
+      { keys: ["Esc"], does: "nothing of its own: the surface's" },
     ],
-    order: "A disabled pressable card is skipped. Focus moving to it or away never moves anything: the line and the glow take no room.",
-    lands: "A card takes the keyboard only when the surface gives it: a surface starts on its first thing to do.",
+    order: "In the surface's reading order; a disabled pressable card is skipped.",
+    lands: "Only where the surface gives it the keyboard.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "With a button bar", for: "Its padding, the header's symbol, title and line, the gaps between its parts, and the bar.", sample: () => within(COLUMN, card(withActions())) },
-      { name: "Holding a picture", for: "The picture's corner, the row radius, `space.s16` in.", sample: () => within(HALF, pictured()) },
+      { name: "With a button bar", for: "padding, header, gaps, the bar", sample: () => within(COLUMN, card(withActions())) },
+      { name: "Holding a picture", for: "the picture's corner and inset", sample: () => within(HALF, pictured()) },
     ]),
     measures: [
-      { what: "Inside its edge, and between its header, body and button bar.", token: "space-s16" },
-      { what: "Its corners.", token: "radius-content" },
-      { what: "Its edge, the soft hairline.", token: "stroke-hairline_device_px" },
-      { what: "The header's symbol, `subheading`'s.", token: "type-subheading-icon" },
-      { what: "The title's line.", token: "type-subheading-line" },
-      { what: "Between the symbol and the title.", token: "space-s8" },
-      { what: "Between the title and the line under it.", token: "space-s4" },
-      { what: "The line under the title.", token: "type-small-line" },
-      { what: "The button bar's buttons, regular.", token: "size-control_md" },
-      { what: "Between two cards side by side.", token: "space-s16" },
+      { part: "Inset, gaps between parts", token: "space-s16" },
+      { part: "Corner", token: "radius-content" },
+      { part: "Edge", token: "stroke-hairline_device_px" },
+      { part: "Header symbol", token: "type-subheading-icon" },
+      { part: "Title line", token: "type-subheading-line" },
+      { part: "Symbol → title", token: "space-s8" },
+      { part: "Title → line", token: "space-s4" },
+      { part: "Line under the title", token: "type-small-line" },
+      { part: "Button bar's buttons", token: "size-control_md" },
+      { part: "Between two cards", token: "space-s16" },
     ],
     reflow: {
-      described: "A card is as wide as its room, its words breaking between them and its button bar stacking where its buttons don't fit (`ButtonBar`). In a grid it takes its cell and its row's height. Nothing in it is a fixed width.",
+      note: "As wide as its room: its words break and its button bar stacks; in a grid it takes its row's height.",
       sample: () => within("100%", card(withActions())),
     },
   },

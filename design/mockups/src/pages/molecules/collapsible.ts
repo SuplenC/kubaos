@@ -7,12 +7,14 @@ import { button } from "../../lib/button.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { type CollapsibleOptions, collapsible } from "../../lib/collapsible.ts";
 import { shown, type Words } from "../../lib/content.ts";
-import { row, stack, within } from "../../lib/layout.ts";
-import { text, wrapped } from "../../lib/text.ts";
+import { filling, flow, row, stack, within } from "../../lib/layout.ts";
+import { wrapped } from "../../lib/text.ts";
 import { el } from "../../site/dom.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+
+/** The stage's pane, less the room a lit control's glow throws past its edge, which it would otherwise scale down for. */
+const ACROSS = "calc(100% - var(--space-s24))";
 
 const TITLE: Words = { short: "Hyprland · pid 1203", long: "firefox -contentproc · pid 4127 · Isolated Web Content" };
 const SUMMARY: Words = { short: "3 · 310 MB", long: "92 threads · 2.1 GB resident · 4 % CPU" };
@@ -105,7 +107,7 @@ const RAIL_HINT = ".k-collapsible-rail > .k-hint";
 
 const OPENS: Move = {
   name: "Opening",
-  what: "Enter, Space or a press on the header: the room under it eases from nothing to what it holds over `medium` on `standard_decel`, as a list reordering settles, cutting what it holds and the rail as it goes, and the chevron turns a quarter, from right to down, over the same. Nothing moves above it; what is below moves down. With reduced motion the room is open at once, the chevron jumps, and what it holds fades in over `short` on `standard`.",
+  what: "The room eases open over `medium` on `standard_decel` as the chevron turns a quarter; only what is below moves.",
   tracks: [{ part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--collapsible-open", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
   reduced: [
     { part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--collapsible-open", from: 0, to: 1, duration: "instant", curve: "linear" },
@@ -117,7 +119,7 @@ const OPENS: Move = {
 
 const CLOSES: Move = {
   name: "Closing",
-  what: "Pressed again: the room eases shut over `short` on `standard_accel`, what it holds and the rail cut away from the bottom, the chevron turning back to point right. With reduced motion it is shut at once.",
+  what: "The room eases shut over `short` on `standard_accel`, what it holds cut from the bottom.",
   tracks: [{ part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--collapsible-open", from: 1, to: 0, duration: "short", curve: "standard_accel" }],
   reduced: [{ part: ROOM_PART, on: "a process", target: ".k-collapsible", property: "--collapsible-open", from: 1, to: 0, duration: "instant", curve: "linear" }],
   back: "cuts",
@@ -126,7 +128,7 @@ const CLOSES: Move = {
 
 const RAIL_LIGHTS: Move = {
   name: "The rail lights",
-  what: "The pointer onto the rail's strip: the line fades over `short` on `standard` from the unlit tone to the core with the content glow round it at night, the tone by day, and its hint, \"Close\" and the title, fades in beside it at the pointer's height, following the pointer down the rail. The pointer leaving plays it back.",
+  what: "The line fades to the core over `short` on `standard`, its hint beside the pointer.",
   tracks: [
     { part: "the rail's line", on: "an open process", target: RAIL, property: "--lit", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "the hint", on: "an open process", target: RAIL_HINT, property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -138,7 +140,7 @@ const RAIL_LIGHTS: Move = {
 
 const RAIL_CLOSES: Move = {
   name: "Closing from the rail",
-  what: "A press on the lit rail: the line goes toward `primary_flash` and its glow swells over `micro` at night, the tone tints the strip by day; letting go closes the part, the room easing shut over `short` on `standard_accel` with the rail cut away from the bottom and the chevron turning back to point right. Where the header has scrolled out of its scroll view, the view scrolls it back in at its nearest edge, smoothly, at once with reduced motion. With reduced motion the room is shut at once.",
+  what: "A press flares the line over `micro`, then it closes; a header scrolled away scrolls back into view.",
   tracks: [
     { part: "the rail, pressed", on: "an open process", target: RAIL, property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" },
     { part: ROOM_PART, on: "an open process", target: ".k-collapsible", property: "--collapsible-open", from: 1, to: 0, duration: "short", cue: "micro", curve: "standard_accel" },
@@ -155,52 +157,44 @@ const RAIL_CLOSES: Move = {
   },
 };
 
-const DESCRIBED =
-  "The header is a control as tall as a row (`size.row`, 44) at the control radius, filling its room, `space.s12` inside its sides: a chevron (`expand_more`, `body_strong`'s 20) at its start in `on_surface_variant`, then `space.s12` on its title in `body_strong`, `on_surface`, on one line ending in an ellipsis where it doesn't fit. An optional summary sits at its end, `space.s12` from the title, in `label`, `on_surface_variant`, one line up to half the header's width, ending in an ellipsis: \"12 · 4.1 GB\", \"3 devices\". It stays while the part is open; with none, the end is empty. It has no fill. Open, what it holds sits `space.s8` under the header and `space.s12` in at the end, and at the start in line with the title, past the chevron, so it brings no inset of its own.";
-
-const RAIL_DESCRIBED =
-  "Open, an unlit rail of neon runs down what it holds, centred under the chevron, from its top to its foot inside its padding, square at both ends: the tone at the spinner's ring's `opacity.spinner_track`, `tabs.rail` thick at night (2) and `tabs.rail_day` by day (3), whole device pixels, as the tabs' rail. It grows and shrinks with the room, which cuts it. Under the pointer it lights over `short`: at night the core with the content glow round it, by day the tone, with the signs off solid glass; a hint, \"Close\" and the title, sits `space.s8` past its strip at the pointer's height and follows it down the rail. Its strip is `size.collapsible_rail` (12) wide, centred on the line; a press anywhere on it closes the part, and where the header has scrolled out of its scroll view, the view scrolls it back in at its nearest edge, smoothly unless reduced motion is on. Pressed, at night the line goes toward `primary_flash` and its glow swells; by day the tone tints the strip at `opacity.press_tint`. It is no stop for Tab: the keyboard has the header.";
-
 export default page({
   level: "molecules",
   slug: "collapsible",
   title: "Collapsible",
-  summary: "A titled part that opens to show more: a header with a chevron that turns, a room that eases open under it, and a rail down what it holds that closes it.",
-  live: scrolled,
-  description: [
-    "Rust `collapsible::collapsible`, QML `Collapsible`. Press a header, or Tab to it and press Enter or Space. The first is open and longer than its scroll view: scroll down and press its rail, and it closes and scrolls its header back. The second holds two buttons, which Tab reaches only while it is open. The system monitor's process details.",
-    DESCRIBED,
-    RAIL_DESCRIBED,
-    "The chevron points right while it is closed and turns a quarter to point down as it opens, over the same time and curve as the room. The room eases from nothing to what it holds over `medium` on `standard_decel` and back over `short` on `standard_accel`, cutting what it holds while it moves; fully open it cuts nothing, so a lit control inside keeps its whole glow. The header never moves: what is below it moves down and back. The owner keeps whether it is open.",
-    "Its states follow the neon, as a Text button's: lit under the pointer or with the keyboard on it, the tube burns inside the header's edge, `primary` at `focus.tube`, with the glow outside at night; pressed, the tube runs white-hot and the glow brightens, and by day the tone tints the header (`opacity.press_tint`). The title and the chevron keep their colours. Disabled (no toggle), the title and the chevron are at `opacity.disabled_content`, and it takes no press and no stop for Tab; what it holds is the owner's to dim with it.",
-  ],
+  lede: "A titled part that opens to show more: a turning chevron, a room easing open, and a rail that closes it.",
+  code: { rust: "collapsible::collapsible", qml: "Collapsible" },
+  stage: {
+    live: () => within(ACROSS, filling(flow("s32", scrolled(), part({ open: true, summary: SUMMARY.short })))),
+    hint: "press a header; scroll and press the rail; or Tab and Enter",
+    daylight: true,
+  },
   variants: [
-    { name: "Closed", for: "Its title alone: what is behind it isn't needed until asked for.", sample: () => part() },
-    { name: "Open", for: "What it holds under the header, in line with the title, the rail down its start.", sample: () => part({ open: true }) },
-    { name: "With a summary", for: "What it holds, said in a few words at the header's end, closed and open.", sample: () => stack("s8", "start", part({ summary: SUMMARY.short }), part({ summary: SUMMARY.short, open: true })) },
+    { name: "Closed", for: "its title alone", sample: () => part() },
+    { name: "Open", for: "what it holds in line with the title, the rail beside", sample: () => part({ open: true }) },
+    { name: "With a summary", for: "a few words at the header's end, closed and open", sample: () => stack("s8", "start", part({ summary: SUMMARY.short }), part({ summary: SUMMARY.short, open: true })) },
   ],
-  sizes: doesntApply("the header is always a row tall (`size.row`), and the part fills the room it is given."),
+  sizes: doesntApply("the header is always `size.row` tall, the part fills its room."),
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],
     absent: {
-      selected: "open is its own row here: a collapsible isn't picked.",
-      loading: "what it holds is the owner's: a part still loading shows its own skeleton inside.",
-      empty: "a collapsible with nothing to show isn't drawn: its owner leaves it out.",
-      error: "it has no value to be wrong; what it holds shows its own errors.",
+      selected: "open is its own row here",
+      loading: "what it holds shows its own skeleton",
+      empty: "with nothing to show, its owner leaves it out",
+      error: "what it holds shows its own errors",
     },
     rows: nonEmpty(ROWS.map(({ name, open, rail }) => ({ name, cell: (state: MatrixState) => cell(open, rail, state) }))),
-    described: {
-      rest: "No fill; the title `on_surface`, the chevron and the summary `on_surface_variant`, the chevron right while closed and down while open. Open, the rail unlit, the tone at `opacity.spinner_track`. By day the same roles in daylight colours.",
-      lit: "Under the pointer or with the keyboard on the header, here with the signs on: the tube burns inside the header's edge, `primary` at `focus.tube`, with the glow outside. By day the tube with no glow. On the rail's row the rail under the pointer instead: its line the core with the content glow round it, the tone by day, and its hint beside it.",
-      pressed: "Lit and pressed: the tube runs white-hot, to the core, and the glow brightens to `focus.pressed_glow` times the lit one; by day the tone tints the header at `opacity.press_tint`. Letting go toggles it. On the rail's row the rail pressed: the line toward `primary_flash`, its glow swelled, and by day the strip tinted; letting go closes it.",
-      disabled: "The title, the chevron and the summary at `opacity.disabled_content`, and open the rail too; never lit, no press, no stop for Tab, and the rail takes no pointer. What it holds is dimmed by its owner.",
+    looks: {
+      rest: "no fill; open, the rail unlit at `opacity.spinner_track`",
+      lit: "the `primary` tube inside the header; the rail burns as the core",
+      pressed: "white-hot, glow × `focus.pressed_glow`; the rail toward `primary_flash`",
+      disabled: "words and chevron at `opacity.disabled_content`, no press, no Tab stop",
     },
   },
   focus: {
     tubes: [{ name: "The header", tone: "accent", filled: false, content: false }],
     looks: {
-      lit: "At night at rest, the signs burn: the tube inside the header's edge at the control radius, the glow outside it, or the rail's line burning as the core with the content glow round it. Pressed, the tube runs white-hot and the rail goes toward the flash.",
-      signsOff: "Still lit with the neon unpowered: by day always, and at night while a power change has the lights out. The tube and the rail's line are solid glass, `primary_glass`, with no glow.",
+      lit: "the tube at the control radius, glow outside; the rail's line burning",
+      signsOff: "the tube and rail as `primary_glass`, no glow",
     },
     signsOff: (index: number) => {
       const { open, rail } = ROWS[index]!;
@@ -212,56 +206,56 @@ export default page({
       { name: "The title", words: TITLE, sample: (words: string) => within(ROOM, collapsible({ title: words, content: details() })) },
       { name: "The summary", words: SUMMARY, sample: (words: string) => within(ROOM, collapsible({ title: shown(TITLE), summary: words, content: details() })) },
     ],
-    missingPicture: doesntApply("a collapsible draws no picture: its chevron is always there."),
+    missingPicture: doesntApply("it draws no picture: its chevron is always there."),
     counts: [
-      { name: "One line", for: "A single line under the header.", sample: () => within(ROOM, collapsible({ title: "Hyprland · pid 1203", content: wrapped("kuba · running · 18 threads · 310 MB", "small", "on_surface_variant"), open: true })) },
-      { name: "Several lines", for: "A process's command and state.", sample: () => part({ open: true }) },
-      { name: "Controls", for: "Buttons inside: Tab reaches them only while it is open, and their glow reaches past the room once it has settled.", sample: () => within(ROOM, collapsible({ title: "firefox · pid 4127", content: actions(), open: true })) },
-      { name: "Longer than its view", for: "A process's threads in a scroll view: the rail runs the whole length, and closing from it far down scrolls the header back.", sample: scrolled },
+      { name: "One line", for: "a single line under the header", sample: () => within(ROOM, collapsible({ title: "Hyprland · pid 1203", content: wrapped("kuba · running · 18 threads · 310 MB", "small", "on_surface_variant"), open: true })) },
+      { name: "Several lines", for: "a process's command and state", sample: () => part({ open: true }) },
+      { name: "Controls", for: "Tab reaches them only while it is open", sample: () => within(ROOM, collapsible({ title: "firefox · pid 4127", content: actions(), open: true })) },
+      { name: "Longer than its view", for: "closing from the rail scrolls the header back", sample: scrolled },
     ],
   },
   motion: {
-    arrives: doesntApply("a collapsible comes with the surface it is on."),
-    leaves: doesntApply("it goes with the surface it is on."),
+    arrives: doesntApply("it comes with its surface."),
+    leaves: doesntApply("it goes with its surface."),
     between: [
       OPENS,
       CLOSES,
       RAIL_LIGHTS,
       RAIL_CLOSES,
-      { name: "Focus arrives", what: "Under the pointer or with the keyboard on the header, it lights up over `short` on `standard`: the tube and the glow fade in.", tracks: lights(".k-collapsible-header", "two headers", 0, 1), reduced: "same", back: "cuts", sample: pair() },
-      { name: "Focus leaves", what: "It goes back to rest over `short` on `standard`.", tracks: lights(".k-collapsible-header", "two headers", 1, 0), reduced: "same", back: "cuts", sample: pair("lit") },
-      { name: "Pressed", what: "A lit header pressed: the tube runs white-hot and the glow brightens over `micro`, and back as it comes up; letting go toggles it.", tracks: press(".k-collapsible-header", "two headers"), reduced: "same", back: "plays", sample: pair("lit") },
+      { name: "Focus arrives", what: "The tube and glow fade in over `short` on `standard`.", tracks: lights(".k-collapsible-header", "two headers", 0, 1), reduced: "same", back: "cuts", sample: pair() },
+      { name: "Focus leaves", what: "Back to rest over `short` on `standard`.", tracks: lights(".k-collapsible-header", "two headers", 1, 0), reduced: "same", back: "cuts", sample: pair("lit") },
+      { name: "Pressed", what: "The tube runs white-hot and the glow brightens over `micro`, and back as it comes up.", tracks: press(".k-collapsible-header", "two headers"), reduced: "same", back: "plays", sample: pair("lit") },
       ...powerMoves(pair("lit")),
     ],
   },
   keyboard: {
     keys: [
-      { keys: ["Enter", "Space"], does: "On the header, opens it or closes it, once per press, never on key repeat." },
-      { keys: ["Tab", "Shift+Tab"], does: "To the header, then into what it holds while it is open; closed, what it holds is passed over." },
+      { keys: ["Enter", "Space"], does: "on the header, opens or closes it" },
+      { keys: ["Tab", "Shift+Tab"], does: "the header, then what it holds while open" },
     ],
-    order: "The header is one stop in the surface's reading order; open, the controls it holds follow it. The rail is the pointer's alone and no stop. A disabled one is skipped.",
-    lands: "On the header, open or shut: toggling never moves the keyboard into what it holds.",
+    order: "The header, then its controls while open; the rail is the pointer's alone, a disabled one skipped.",
+    lands: "On the header: toggling never moves the keyboard inside.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "Open", for: "The header's height and padding, the chevron, the summary, what it holds under it and the rail beside it.", sample: () => part({ open: true, summary: SUMMARY.short }) },
-      { name: "Closed", for: "The header alone.", sample: () => part() },
+      { name: "Open", for: "header, chevron, summary, what it holds, the rail", sample: () => part({ open: true, summary: SUMMARY.short }) },
+      { name: "Closed", for: "the header alone", sample: () => part() },
     ]),
     measures: [
-      { what: "The header's height, a row's.", token: "size-row" },
-      { what: "Inside the header's sides, between the chevron, the title and the summary, and what it holds in from its end; twice it and the chevron, what it holds in from its start.", token: "space-s12" },
-      { what: "What it holds under the header, and the rail's top under it; the rail's hint past its strip.", token: "space-s8" },
-      { what: "The title, `body_strong`'s line.", token: "type-body_strong-line" },
-      { what: "The summary, `label`'s line.", token: "type-label-line" },
-      { what: "The chevron, `body_strong`'s symbol.", token: "type-body_strong-icon" },
-      { what: "The rail's strip, which takes the pointer.", token: "size-collapsible_rail" },
-      { what: "The rail's line at night.", token: "tabs-rail" },
-      { what: "The rail's line by day.", token: "tabs-rail_day" },
-      { what: "The header's corners.", token: "radius-control" },
+      { part: "Header height", token: "size-row" },
+      { part: "Header inset, its gaps", token: "space-s12" },
+      { part: "Header → content, rail's hint", token: "space-s8" },
+      { part: "Title line", token: "type-body_strong-line" },
+      { part: "Summary line", token: "type-label-line" },
+      { part: "Chevron", token: "type-body_strong-icon" },
+      { part: "Rail's strip", token: "size-collapsible_rail" },
+      { part: "Rail at night", token: "tabs-rail" },
+      { part: "Rail by day", token: "tabs-rail_day" },
+      { part: "Header corner", token: "radius-control" },
     ],
     reflow: {
-      described: "A collapsible fills the room it is given at every window size; its title ends in an ellipsis where it doesn't fit, and what it holds wraps in the room.",
-      sample: () => within("100%", stack("s8", "start", collapsible({ title: shown(TITLE), content: details(), open: true }), text("A collapsible as wide as the window.", "small", "on_surface_variant"))),
+      note: "It fills its room: the title ends in an ellipsis, and what it holds wraps.",
+      sample: () => within("100%", collapsible({ title: shown(TITLE), content: details(), open: true })),
     },
   },
 });
