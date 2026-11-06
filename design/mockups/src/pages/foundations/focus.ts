@@ -9,18 +9,18 @@ import { button, filled, labelGlow, type Kind, type Size, SIZES, TONES } from ".
 import { shown, type Words } from "../../lib/content.ts";
 import { focusRing, glow, type Tone, toneColour, windowRing } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
-import { row, stack } from "../../lib/layout.ts";
+import { flow, row, stack } from "../../lib/layout.ts";
 import { nested, role } from "../../lib/radius.ts";
 import { text } from "../../lib/text.ts";
 import { length, names, number, raw } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
-import { type Curve, type Duration, type Easing, type Move, type NonEmpty, type Track } from "../../site/page.ts";
-import { foundation } from "../../site/legacy.ts";
+import { type Curve, type Duration, type Easing, foundation, type Move, type NonEmpty, type Track } from "../../site/page.ts";
 import { atScale, MODES, modeName, painted, swatch, table, themes, token } from "../../site/parts/swatches.ts";
 import { type ColourPath, paintBetween, palette, paletteName, themeName } from "../../site/recolour.ts";
 import { strikeSteps, milliseconds } from "../../site/recipe.ts";
 import { themeChange, toDark, toLight } from "../../site/sequences.ts";
 import { type Mode, SCALES, settings } from "../../site/settings.ts";
+import { across } from "./across.ts";
 
 /**
  * How a control is shown: at rest, lit in the look the scene gives it, or lit with the signs off
@@ -226,17 +226,17 @@ function cell(words: string, ...children: Element[]): HTMLElement {
 
 /** Every focus token, its value and what it is for. */
 const FOCUS_FOR: Record<string, string> = {
-  "focus-tube": "The tube's width on a control not filled with its tone, drawn rounded half up to whole device pixels.",
-  "focus-near": "How far out the near glow reaches, fading from its opacity at the edge to nothing.",
-  "focus-near_opacity": "The near glow's opacity at the control's edge.",
-  "focus-far": "How far out the far, faint glow reaches; nothing of the glow is past it.",
-  "focus-far_opacity": "The far glow's opacity at the control's edge.",
-  "focus-content_near": "How far the faint glow round lit content (a Text button's label and icon) reaches, the same at every size.",
-  "focus-content_glow": "That glow's opacity at the letters' and strokes' edge.",
-  "focus-offset": "The band a picture keeps round itself inside its own box where its neighbours leave no more room: a wallpaper thumbnail, the boot prompt's field. A focused one's glow is cut past it.",
-  "focus-label_near": "How far the tiny glow round a lit label on a fill (a Filled button's, at night) reaches.",
-  "focus-label_glow": "That glow's opacity at the letters' edge.",
-  "focus-pressed_glow": "A pressed control's glow: the lit glow this many times brighter.",
+  "focus-tube": "The tube's width on an unfilled control, rounded half up",
+  "focus-near": "The near glow's reach",
+  "focus-near_opacity": "The near glow's opacity at the edge",
+  "focus-far": "The far glow's reach; nothing is past it",
+  "focus-far_opacity": "The far glow's opacity at the edge",
+  "focus-content_near": "The reach of lit content's glow, the same at every size",
+  "focus-content_glow": "That glow's opacity at the letters",
+  "focus-offset": "The band a picture keeps round itself; its glow is cut past it",
+  "focus-label_near": "The reach of a lit label's glow on a fill",
+  "focus-label_glow": "That glow's opacity at the letters",
+  "focus-pressed_glow": "A pressed control's glow: lit, this many times brighter",
 };
 
 /** A focus token's value as the tokens write it: a length in logical pixels, or a number. */
@@ -246,32 +246,32 @@ function valueOf(name: string): string {
 }
 
 function focusTokens(): HTMLElement {
-  return table(
+  return across(table(
     ["Token", "Value", "For"],
     names("focus-").map((name) => [
       token(name.replace("-", ".")),
       label(valueOf(name), "mono", "on_surface"),
       prose(FOCUS_FOR[name] ?? "No words for this token: add them to `FOCUS_FOR`.", "body", FOCUS_FOR[name] ? "on_surface" : "error"),
     ]),
-  );
+  ));
 }
 
 /** What lights in each tone, as `docs/DESIGN.md` lists it. */
 const TONE_LIGHTS: Record<Tone, string> = {
-  accent: "Every control without a tone of its own: Filled, Tonal and Text buttons, fields, switches, checkboxes, radios, sliders, chips, lists, tiles.",
-  cold: "A ChoiceCard and a picked PictureChoice, where the accent already means picked; a Cold chip.",
-  error: "A Danger button or icon button; an Invalid field.",
-  success: "A control in the success tone.",
-  warning: "A control in the warning tone.",
-  sharing: "A control marking what is shared off the machine.",
-  burn_error: "A Danger button, burning.",
-  burn_success: "A Success button, burning.",
-  burn_warning: "A Warning button, burning.",
+  accent: "Every control with no tone of its own",
+  cold: "A ChoiceCard, a picked PictureChoice, a Cold chip",
+  error: "A Danger button or icon button, an Invalid field",
+  success: "A control in the success tone",
+  warning: "A control in the warning tone",
+  sharing: "What is shared off the machine",
+  burn_error: "A Danger button, burning",
+  burn_success: "A Success button, burning",
+  burn_warning: "A Warning button, burning",
 };
 
 /** Every tone's tube, its core and its unlit tone, in the theme and mode picked. */
 function toneTable(): HTMLElement {
-  return table(
+  return across(table(
     ["Tone", "Tube and glow", "Core, signs on", "Unlit, signs off", "Lights"],
     ALL_TONES.map((tone) => {
       const colour = toneColour(tone);
@@ -283,7 +283,7 @@ function toneTable(): HTMLElement {
         prose(TONE_LIGHTS[tone], "body", "on_surface"),
       ];
     }),
-  );
+  ));
 }
 
 /** The glow's opacity at the middle of each logical pixel out from the tube, as squares. */
@@ -299,7 +299,7 @@ function glowStrip(): HTMLElement {
     "div",
     "page-part",
     room(settings().theme, "dark", el("div", "f-glow-strip", el("div", ""), ...squares)),
-    table(["Logical pixels out", "Opacity"], values),
+    across(table(["Logical pixels out", "Opacity"], values)),
   );
 }
 
@@ -320,9 +320,11 @@ function strikeBars(): HTMLElement {
     "div",
     "page-part",
     room(settings().theme, "dark", bars),
-    table(
-      ["Step", "From", "Brightness"],
-      steps.map((step, i) => [label(String(i + 1), "mono", "on_surface"), label(`${(i * duration) / steps.length} ms`, "mono", "on_surface"), label(String(step), "mono", "on_surface")]),
+    across(
+      table(
+        ["Step", "From", "Brightness"],
+        steps.map((step, i) => [label(String(i + 1), "mono", "on_surface"), label(`${(i * duration) / steps.length} ms`, "mono", "on_surface"), label(String(step), "mono", "on_surface")]),
+      ),
     ),
   );
 }
@@ -442,34 +444,17 @@ function byName(name: string): Control {
   return found;
 }
 
-/**
- * The live sample's rows, each of controls of one height, so none sits off its row's line, and none
- * wider than a field, so the words beside it keep their room at every scale.
- */
+/** The live sample's rows, each of controls of one height, so none sits off its row's line. */
 const LIVE_ROWS: readonly (readonly string[])[] = [
-  ["Tonal button", "Text button"],
-  ["Filled button", "Danger button"],
-  ["Field"],
-  ["Invalid field"],
-  ["Checkbox", "Radio"],
-  ["Cold chip", "Switch, on"],
-  ["Tile, on"],
+  ["Tonal button", "Text button", "Filled button", "Danger button"],
+  ["Field", "Invalid field"],
+  ["Cold chip", "Checkbox", "Radio", "Switch, on", "Tile, on"],
   ["Picked card"],
 ];
 
-/** The live sample: every kind of control at rest, to Tab through. */
+/** The live sample: every kind of control at rest, to Tab through, on the surface it is drawn on. */
 function live(): HTMLElement {
-  const { theme, mode } = settings();
-  return room(
-    theme,
-    mode,
-    stack(
-      "s16",
-      "start",
-      prose("Tab through these: each lights up as focus arrives, a fade, and goes back to rest as it leaves.", "small", "on_surface_variant"),
-      ...LIVE_ROWS.map((names) => row("s16", "start", ...names.map((name) => byName(name).draw("rest")))),
-    ),
-  );
+  return stack("s16", "start", ...LIVE_ROWS.map((names) => flow("s16", ...names.map((name) => byName(name).draw("rest")))));
 }
 
 /** The kinds of a list, as a recipe says them. */
@@ -524,7 +509,7 @@ function focusMoves(): Move {
   });
   return {
     name: "Focus moves",
-    what: "Tab from one field to the next: the field focus leaves goes back to rest as the next lights up, both fades over `short` on `standard`, so for a moment both are half lit. Focus moving is never a power change, so nothing flickers. By day only the glass moves, the glow out.",
+    what: "One field fades out as the next lights up, over `short` on `standard`; nothing flickers, and by day only the glass moves.",
     tracks: [
       track("tube", "from", ".k-tube", 1, 0),
       track("glow", "from", ".k-glow", 1, 0),
@@ -555,7 +540,7 @@ function windowLights(): Move {
   });
   return {
     name: "The active window lights up",
-    what: "Focus moving to another window that is already open: a light-up, not a power change, so it fades as focus between controls does. The window that had it goes back to its inactive look over `short` on `standard` (its neutral border, `surface_container_highest` at `opacity.window_border`, and its neutral shadow, `shadow` at `opacity.window_shadow`), while the border of the one it moves to lights up as the tube, `primary`, its shadow becoming the glow in `primary` with it. The window's content never dims. Only a window appearing strikes its tube on, and a window closing goes off for good, through `neon.strike`. By day only the border's glass moves, the glow out.",
+    what: "A light-up, not a power change: tube and glow fade between windows over `short`, and the content never dims.",
     tracks: [
       track("tube and glow, leaving", "the window focus leaves: its border's tube and the glow its shadow draws", lit("from"), 1, 0),
       track("neutral shadow, back", "the window focus leaves: its shadow in `shadow` at `opacity.window_shadow`", shade("from"), 0, 1),
@@ -614,7 +599,7 @@ function deviceTable(): HTMLElement {
     [token("focus.far"), label("the far glow's reach, rounded up: the glow's room", "body", "on_surface"), ...SCALES.map((scale) => label(String(Math.ceil(length("focus-far") * scale)), "mono", "on_surface"))],
     [token("focus.content_near"), label("lit content's glow, rounded up", "body", "on_surface"), ...SCALES.map((scale) => label(String(Math.ceil(length("focus-content_near") * scale - 1e-3)), "mono", "on_surface"))],
   ];
-  return table(["Length", "What", ...SCALES.map((scale) => `${scale}×`)], rows);
+  return across(table(["Length", "What", ...SCALES.map((scale) => `${scale}×`)], rows));
 }
 
 /** The text a long-content sample shows, from the toolbar's length. */
@@ -624,70 +609,30 @@ export default foundation({
   level: "foundations",
   slug: "focus",
   title: "Focus",
-  summary: "Hovered or focused, a control is lit: a neon line inside its edge, in its tone, with a glow outside it while the signs are on, and the same line as unlit glass while they're off. It lights up with a fade; only a power change flickers.",
-  live,
-  description: [
-    "Hovering a control and focusing it from the keyboard are one state, lit, so focus is always seen: the lit control's edge is a neon line. The line is drawn inside the control's box, at its own corner, so nothing on it reaches past the box but the glow, and its shape never seems to grow. On a control not filled with its tone the line is the tube, `focus.tube` wide rounded half up to device pixels, over the control's own outline, so a field, a checkbox or a card has one line, recoloured. A control filled with its tone (a Filled or Danger button, a tile or a switch that is on) can't show a tube of its own colour, so the line inside the fill's edge is the tone's core, `stroke.thin` wide.",
-    "Lit has two looks, and the scene picks one, never the user. Signs on is the neon burning, at night while the lights burn: the tube in its tone, the core half way to white (`_core`), and the glow outside, a near one over `focus.near` and a faint far one over `focus.far`. Signs off is the same line as unlit glass with no glow, by day always and at night while a power change has the lights out. The glass is the tone unlit (`_unlit`, its OKLCH lightness × 0.6 and chroma × 1.2, fitted into sRGB by its chroma alone), always solid, one look on every control: on a control not filled with its tone (a Tonal or Text button, a field, an empty checkbox, a switch that is off, a chip) the tube is the tone's `_glass`, the tone unlit by night and its own line by day; on a fill it is a role of its kind (Filled's the unlit fill lifted 0.12 in lightness, the burning kinds' the tone unlit on their lit fill). A lit control is lit with the signs on or off, never gone.",
-    "The neon takes the control's tone: a Danger button's line and glow are its burning red, a Cold chip's the cold accent, a control with no tone of its own the accent. Content drawn in the control's own tone with nothing under it (a Text button's label and icon) lights with the line while the signs are on: its letters and strokes are the tone's core with a faint glow round them over `focus.content_near` from `focus.content_glow`; with the signs off, they are their own tone.",
-    "A control lights up as focus arrives, a fade over `short` on `standard`, and goes back to rest over `short` as it leaves; focus moving from one control to the next, or to another open window, is the same fade on both. The flicker, `neon.strike`, is for power changes only: the theme change, dark ⇄ light, a surface appearing and a definite off. In those, a lit control flickers down to its signs-off look and strikes back, while a control at rest just recolours. The glow is the control's, so whatever clips the control clips it, but it is cut only at an edge you can see. The active window is in the same family: Hyprland draws its border as the tube and its shadow as the glow.",
-  ],
+  lede: "Hovered or focused, a control is lit: a neon line inside its edge in its tone, a glow outside while the signs are on.",
+  stage: { live, hint: "Tab through them, or hover", daylight: true },
   tokens: [
-    { name: "The focus tokens", described: "Every token of the family, its value as the tokens write it, and what it is for.", sample: focusTokens },
-    {
-      name: "The tones and their cores",
-      described: "Each tone's tube and glow, its core with the signs on (the tone 50% toward white) and its unlit tone with them off (OKLCH lightness × 0.6, chroma × 1.2, gamut fitted), in the theme and mode picked: formulas of the live tone, never values. What lights in each.",
-      sample: toneTable,
-    },
-    {
-      name: "The glow, pixel by pixel",
-      described: "Outward from the tube, a square for each logical pixel at the glow's opacity at its middle: the near and far glows laid over one another, `1 − (1 − near)(1 − far)`, each `opacity × (1 − d / reach)²`, nothing past `focus.far`. The libraries draw it as bands a device pixel apart, so it lands on device pixels at every scale; here it is one mask per control, worked out per device pixel.",
-      sample: glowStrip,
-    },
-    {
-      name: "The flicker: neon.strike",
-      described: "A sign switching on: its brightness through ten even steps over `medium`, each held until the next. It stutters, then catches. Only a power change plays it: the theme change's and dark ⇄ light's lights striking on (their flicker out plays the steps backwards), a surface or window appearing, and a definite off. Hover, focus, press and focus moving never flicker: they light up with a fade.",
-      sample: strikeBars,
-    },
+    { name: "The focus tokens", note: "Every token of the family, by its value.", sample: focusTokens },
+    { name: "The tones and their cores", note: "The core is the tone 50% to white; unlit is lightness × 0.6, chroma × 1.2; formulas, never values.", sample: toneTable },
+    { name: "The glow, pixel by pixel", note: "Near and far laid over one another: `1 − (1 − near)(1 − far)`, each `opacity × (1 − d / reach)²`.", sample: glowStrip },
+    { name: "The flicker: neon.strike", note: "Ten even steps over `medium`, for power changes alone; hover, focus and press only fade.", sample: strikeBars },
   ],
   rules: [
-    {
-      name: "One line, inside the edge, on every kind of control",
-      described: "Every kind of control lit, in the look the mode picked gives it, its own box drawn dashed: the tube inside the edge of an unfilled one (Tonal and Text buttons, a field, an invalid field in red, a checkbox, a radio, a Cold chip, a picked card), the core inside the fill's edge of one filled with its tone (Filled and Danger buttons, a tile and a switch that are on). Nothing but the glow is past the dashed box. Tab through the controls in the description to light them live.",
-      sample: () => everyControl("dark"),
-    },
-    {
-      name: "The neon takes the control's tone",
-      described: "Each tone on a tile that is off (its tube) and on one filled with it (its core): with the signs on, the tube and glow in the tone, the core its tone half way to white; with them off, the tube is the tone's solid glass (`_glass`) and the core the `_unlit` itself, with no glow.",
-      sample: toneLooks,
-    },
-    {
-      name: "Content in its tone lights as a tube",
-      described: "A Text button at sm, md and lg. Lit with the signs on, its label and icon burn as `primary_core` under a faint near glow, `focus.content_near` from `focus.content_glow`, the same at every size, and no far glow; with the signs off, they are its rest label, `primary_rest`, and by day `primary`. At 2, the glow's three logical pixels are six device pixels round every letter. A Filled button's label takes only a tiny glow (`focus.label_near` from `focus.label_glow`); Tonal's and the burning kinds' labels don't glow.",
-      sample: litContent,
-    },
-    {
-      name: "Where a glow is cut, and where it isn't",
-      described: "The glow is the control's, so whatever clips the control clips it, but it is cut only at an edge you can see. A scroll with no visible edge of its own (a page's, a panel's: its box dashed) reaches `focus.far` past its box, so a resting field at its top keeps its whole glow; a field scrolled half out of it shows its glow trimmed where the scroll cuts. A card's, a well's, a menu's or a panel's own edge cuts it. In a grid, the tile drawn after the focused one covers its glow, and the one before shows under it.",
-      sample: cuts,
-    },
+    { name: "One line, inside the edge", note: "A tube inside an unfilled control's edge, a core inside a fill's; only glow passes the dashed box.", sample: () => everyControl("dark") },
+    { name: "The neon takes the tone", note: "Signs on, tube and glow in the tone; signs off, solid glass (`_glass`, `_unlit`) with no glow.", sample: toneLooks },
+    { name: "Content lights as a tube", note: "A Text button's label burns as `primary_core` under a faint glow; Filled's takes a tiny one, Tonal's none.", sample: litContent },
+    { name: "Where a glow is cut", note: "Only at an edge you can see: a card's, a well's, a panel's; a bare scroll keeps it whole.", sample: cuts },
     {
       name: "The active window's tube",
-      described: "Hyprland draws the active window's border as the tube, `primary` alone, over the neutral border (`surface_container_highest` at `opacity.window_border`), and its shadow as the glow in `primary`, falling off over `focus.far`; an inactive window keeps its neutral border and its shadow, `shadow` at `opacity.window_shadow`. The border is Hyprland's `border_size`, 2, drawn here the thin stroke wide, at the window's outer corner, the frame's surface radius less its 8 gap. Its content never dims.",
+      note: "Hyprland draws the border as the tube and the shadow as the glow, in `primary`; content never dims.",
       sample: () => el("div", "f-row", ...MODES.map((mode) => cell(modeName(mode), desktop(settings().theme, mode)))),
     },
   ],
-  modes: [
-    {
-      name: "Signs on and off, in dark and light",
-      described: "Every kind of control lit: at night the signs are on while the lights burn and off while a power change has them out; by day they are always off. The geometry is the same in every look.",
-      sample: looks,
-    },
-  ],
+  modes: [{ name: "Signs on and off", note: "By day always off; at night off only while a power change has the lights out.", sample: looks }],
   themes: [
     {
-      name: "The lines in every theme",
-      described: "One of each kind of line in each theme the toolbar paints in, in the mode picked: the tube, the lit label, the core on a fill, a burning Danger, a cold chip. Every core is a formula of the theme's tone.",
+      name: "The lines",
+      note: "Every core is a formula of the theme's tone.",
       sample: () =>
         el(
           "div",
@@ -706,20 +651,16 @@ export default foundation({
         ),
     },
     {
-      name: "The active window in every theme",
-      described: "The tube and its glow are the theme's `primary`; the neutral border and shadow follow the theme's containers.",
+      name: "The active window",
+      note: "Tube and glow are the theme's `primary`; the neutral border and shadow follow its containers.",
       sample: () => el("div", "f-row", ...themes().map((theme) => cell(theme.name, desktop(theme.slug, settings().mode)))),
     },
   ],
   scales: [
+    { name: "Every length", note: "The tube goes 2, 2, 2, 3 and the core 2, 3, 3, 4; the glow's mask is per device pixel.", sample: deviceTable },
     {
-      name: "Every length in device pixels",
-      described: "The tube rounds half up to whole device pixels, 2, 2, 2, 3; the core is the thin stroke, 2, 3, 3, 4; the glow's reach is its room, rounded up, and its mask is worked out per device pixel, so it lands on them at every scale.",
-      sample: deviceTable,
-    },
-    {
-      name: "The line at every scale",
-      described: "Each box is drawn at its own scale, whatever the toolbar's: the tube, the core and the lit label, with the signs on.",
+      name: "The line",
+      note: "Each box at its own scale, whatever the top bar picks.",
       sample: () =>
         el(
           "div",
@@ -731,7 +672,7 @@ export default foundation({
   content: [
     {
       name: "Long words, lit",
-      described: "A Text button's lit label in the toolbar's text length: the glow follows every letter, however many, and the tube keeps to the button's box as it grows. Pick long or translated in the toolbar.",
+      note: "The glow follows every letter, the tube the box: pick long in the top bar.",
       sample: () => cell("Dark · signs on", room(settings().theme, "dark", textButtons(shown(LONG), "lit"))),
     },
   ],
@@ -739,7 +680,7 @@ export default foundation({
     arrives: [
       {
         name: "Focus arrives",
-        what: "Hovered or focused, the control lights up: a fade over `short` on `standard`, never the flicker, which is for power changes. The tube, the core, the glow and the lit label fade in together: on a fill the core inside the fill's edge, on a Text button the label burning up to the core with its glow. By day the signs are off: only the glass fades in, and the glow and the lit label stay out.",
+        what: "The line, the glow and a lit label fade in over `short` on `standard`, never the flicker; by day the glass alone.",
         tracks: neon(0, 1, "short", "standard"),
         reduced: "same",
         daylight: glass(0, 1),
@@ -750,7 +691,7 @@ export default foundation({
     leaves: [
       {
         name: "Focus leaves",
-        what: "The pointer leaves or focus moves on: the tube, the core, the glow and the lit label fade out together over `short` on `standard`, the label back to its own tone; by day the glass alone.",
+        what: "They fade out together over `short` on `standard`; by day the glass alone.",
         tracks: neon(1, 0, "short", "standard"),
         reduced: "same",
         daylight: glass(1, 0),
@@ -768,9 +709,10 @@ export default foundation({
     ],
   },
   checks: [
-    { check: "The contrast check", holds: "Holds the tube against every surface it is drawn on (the page, a well, a panel, a card or a dialog, a field's fill, a picked card's), in the accent, the cold accent and the error colour (`[contrast]`)." },
-    { check: "The geometry check", holds: "Compares a focused control's box with its resting one: the tube and the glow take no room, so focus never moves layout." },
-    { check: "kubaos-tokens", holds: "Derives every `_core`, `_unlit` and `_glass` from its live tone." },
-    { check: "kubaos-ui and KubaOS.Components", holds: "Draw the glow as bands from the formula, one device pixel apart. Not built yet: the libraries still strike focus through `neon.strike`, draw the core outside a fill, light the neon in both modes, light Danger in the accent and leave a Text button's label as it is, and Hyprland strikes the active window's border; the mockups draw the rule, and the libraries take it with the rest of the neon change." },
+    { check: "The contrast check", holds: "holds the tube against every surface it is drawn on" },
+    { check: "The geometry check", holds: "the tube and glow take no room, so focus never moves layout" },
+    { check: "kubaos-tokens", holds: "derives every `_core`, `_unlit` and `_glass` from its live tone" },
+    { check: "kubaos-ui and KubaOS.Components", holds: "draw the glow as bands, one device pixel apart" },
+    { check: "Not built yet", holds: "the libraries still strike focus; Hyprland strikes the window's border" },
   ],
 });
