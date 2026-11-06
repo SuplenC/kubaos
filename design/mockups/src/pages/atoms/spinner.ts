@@ -7,8 +7,7 @@ import { filling, row, stack, within } from "../../lib/layout.ts";
 import { SPINNER_SIZES, type SpinnerSize, spinner } from "../../lib/spinner.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, nonEmpty } from "../../site/page.ts";
-import { page } from "../../site/legacy.ts";
+import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
 const DOING: Words = {
   short: "Connecting…",
@@ -17,11 +16,11 @@ const DOING: Words = {
 
 /** What each size is for. */
 const FOR: Record<SpinnerSize, string> = {
-  s16: "Beside `small` or `label` text: a running job's row in the Command menu.",
-  s20: "Beside `body` text: Kōbō's step that is running, a line saying what is going on.",
-  s24: "Beside a `subheading`.",
-  s32: "A page's or a panel's one spinner, above its words.",
-  s48: "A page's one spinner: a progress panel's, Kōbō's while it looks at the hardware.",
+  s16: "beside `small` or `label`: a job's row",
+  s20: "beside `body`: a line of what's going on",
+  s24: "beside a `subheading`",
+  s32: "a panel's one, above its words",
+  s48: "a page's one, a progress panel's",
 };
 
 /** A spinner beside a line of body text saying what is going on, in a row `space.s12` apart. */
@@ -34,37 +33,33 @@ function specimen(): HTMLElement {
   return row("s24", "centre", spinner("s16"), spinner("s20"), spinner("s24"), text("Poking at the hardware…", "body", "on_surface_variant"));
 }
 
-const DESCRIBED =
-  "A lit stretch of neon running round an unlit glass ring. The ring is the tone at `opacity.spinner_track`; the arc, `spinner.arc` of the ring with round ends, is the tone's core at night (`primary_core`, `error_core`) with the content glow round it (`focus.content_glow` fading out over `focus.content_near`), and the tone by day with no glow, as any lit line. Both are the thin stroke (`stroke.thin`, rounded half up to whole device pixels: 2, 3, 3, 4 at 1, 1.25, 1.5 and 2), the ring's middle a stroke in from the box. The arc turns once every `spinner.turn` (1.1 s) on `linear`, at one length: it never breathes, since a tube is lit or it isn't.";
-
 export default page<"loading">({
   level: "atoms",
   slug: "spinner",
   title: "Spinner",
-  summary: "Work that doesn't know how far it is: a lit stretch of neon turning round an unlit glass ring, an icon size across.",
-  live: () => stack("s32", "start", specimen(), row("s32", "centre", spinner("s32"), spinner("s48"), spinner("s20", "error"))),
-  description: [
-    "Rust `progress::spinner(look, size, seconds, color)`, QML `Spinner` (`size`, `color`, `running`). It is for work that can't say how far it has got; work that can is a progress bar. Only such work spins: a running animation makes every frame wait on the screen's refresh, typing's included, so a job that can say how far it is shows that instead.",
-    DESCRIBED,
-    "Reduce motion leaves it turning, at the same pace: it is the one move reduce motion keeps, since a spinner standing still reads as work that has hung.",
-    "The caller passes the time: Rust takes the seconds since the work began, QML runs its own clock while `running` and visible, so a spinner nobody sees costs no frames. It is `primary`, or `error` for work that destroys something (a danger action going down).",
-  ],
+  lede: "Work that can't say how far it is: a stretch of neon turning round a glass ring.",
+  code: { rust: "progress::spinner", qml: "Spinner" },
+  stage: {
+    live: () => row("s48", "centre", specimen(), spinner("s32"), spinner("s48"), spinner("s20", "error")),
+    hint: "it keeps turning under reduced motion",
+    daylight: true,
+  },
   variants: [
-    { name: "Beside text", for: "A line saying what is going on: 16, 20 or 24, the size of the text's icon.", sample: () => doing() },
-    { name: "A page's one", for: "Above its words, 32 or 48: a progress panel's.", sample: () => stack("s16", "centre", spinner("s48"), text("Looking at the hardware", "subheading")) },
-    { name: "Danger", for: "Work that destroys something, in `error`: a danger action going down.", sample: () => doing("Erasing the disk…", "error") },
+    { name: "Beside text", for: "a line saying what is going on", sample: () => doing() },
+    { name: "A page's one", for: "above its words, 32 or 48", sample: () => stack("s16", "centre", spinner("s48"), text("Looking at the hardware", "subheading")) },
+    { name: "Danger", for: "work that destroys something, in `error`", sample: () => doing("Erasing the disk…", "error") },
   ],
   sizes: nonEmpty(SPINNER_SIZES.map((size) => ({ name: size.slice(1), for: FOR[size], sample: () => spinner(size) }))),
   states: {
     shown: ["loading"],
     absent: {
-      rest: "a spinner shows only while its work runs; when the work ends it is replaced, by a mark of how it went or by what arrived.",
-      lit: "it takes no pointer and no focus, and isn't neon.",
-      pressed: "it takes no press.",
-      disabled: "work that can't run shows no spinner.",
-      selected: "it holds no choice.",
-      empty: "a spinner is always turning while it shows.",
-      error: "work that failed replaces its spinner with an `error` symbol; a danger spinner is a tone, not a state.",
+      rest: "it shows only while its work runs",
+      lit: "no pointer and no focus",
+      pressed: "it takes no press",
+      disabled: "work that can't run shows none",
+      selected: "it holds no choice",
+      empty: "it always turns while it shows",
+      error: "failed work swaps it for an `error` symbol",
     },
     rows: [
       { name: "16", cell: () => spinner("s16") },
@@ -73,42 +68,42 @@ export default page<"loading">({
       { name: "48", cell: () => spinner("s48") },
       { name: "Danger, 20", cell: () => spinner("s20", "error") },
     ],
-    described: {
-      loading: `Turning. ${DESCRIBED} By day the same, in the day's accent and red.`,
+    looks: {
+      loading: "`spinner.arc` of the ring turns every `spinner.turn` on `linear`",
     },
   },
-  focus: doesntApply("a spinner isn't a control: it takes no focus. Its arc is always lit, glowing at night."),
+  focus: doesntApply("not a control: no focus; its arc is always lit."),
   content: {
     text: [{ name: "What is going on", words: DOING, sample: (words: string) => doing(words) }],
-    missingPicture: doesntApply("a spinner is drawn."),
+    missingPicture: doesntApply("it is drawn."),
     counts: [
-      { name: "One", for: "A page's one spinner, or one line of work.", sample: () => doing() },
+      { name: "One", for: "a page's one, or one line of work", sample: () => doing() },
       {
         name: "Many",
-        for: "Each line of work that can't tell how far it is spins on its own: the Command menu's running jobs, each at 16 on the same clock.",
+        for: "each line of work its own, on one clock",
         sample: () => stack("s8", "start", row("s8", "centre", spinner("s16"), text("Updating KubaOS", "small", "on_surface_variant")), row("s8", "centre", spinner("s16"), text("Taking a snapshot", "small", "on_surface_variant"))),
       },
     ],
   },
   motion: {
-    arrives: doesntApply("a spinner shows at once with its work, already turning."),
+    arrives: doesntApply("it shows at once with its work, already turning."),
     leaves: doesntApply("it goes at once when its work ends, replaced in its place."),
     between: powerMoves(specimen),
   },
-  keyboard: doesntApply("a spinner takes no focus and no key; its line of words is read out."),
+  keyboard: doesntApply("no focus and no key; its line of words is read out."),
   measures: {
     samples: nonEmpty([
-      { name: "20", for: "Its box, an icon size.", sample: () => spinner("s20") },
-      { name: "Beside text", for: "The gap to its words.", sample: () => row("s12", "centre", spinner("s20"), text("Connecting…", "body", "on_surface_variant")) },
+      { name: "20", for: "its box", sample: () => spinner("s20") },
+      { name: "Beside text", for: "the gap to its words", sample: () => row("s12", "centre", spinner("s20"), text("Connecting…", "body", "on_surface_variant")) },
     ]),
     measures: [
-      { what: "The smallest spinner, beside small text.", token: "icon-s16" },
-      { what: "Beside body text.", token: "icon-s20" },
-      { what: "Beside a subheading.", token: "icon-s24" },
-      { what: "A page's one spinner.", token: "icon-s48" },
-      { what: "The ring's and the arc's stroke, before it is rounded to whole device pixels.", token: "stroke-thin" },
-      { what: "The gap between a spinner and its words.", token: "space-s12" },
+      { part: "16", token: "icon-s16" },
+      { part: "20", token: "icon-s20" },
+      { part: "24", token: "icon-s24" },
+      { part: "48", token: "icon-s48" },
+      { part: "Ring and arc stroke", token: "stroke-thin" },
+      { part: "Spinner → words", token: "space-s12" },
     ],
-    reflow: doesntApply("a spinner is its size at every window size; the words beside it wrap."),
+    reflow: doesntApply("its size at every window size; the words beside it wrap."),
   },
 });
