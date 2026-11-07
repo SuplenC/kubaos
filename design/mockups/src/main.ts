@@ -16,7 +16,7 @@ import { forgetPalettes } from "./site/recolour.ts";
 import { PAGES } from "./pages/index.ts";
 import { el, RELAYOUT } from "./site/dom.ts";
 import { type Frame, frame } from "./site/frame.ts";
-import { type Nav, nav } from "./site/nav.ts";
+import { nav } from "./site/nav.ts";
 import { type AnyPage, applies, isFoundation } from "./site/page.ts";
 import { recipes, stopPlayers } from "./site/parts/motion.ts";
 import { forgetRail, rail } from "./site/rail.ts";
@@ -61,28 +61,26 @@ function refit(): void {
   draw();
 }
 
-/** What the search holds, kept across pages, and the navigation it filters. */
-let query = "";
-let shownNav: Nav | null = null;
+const bar = toolbar();
 
-const bar = toolbar(
-  (typed) => {
-    query = typed;
-    shownNav?.filter(query);
-  },
-  () => {
-    const address = shownNav?.first();
-    if (address) location.hash = address;
-  },
-);
+/**
+ * The navigation, kept as pages change so its search and its scroll stay, beside the page and the
+ * rail of the page drawn now.
+ */
+const navigation = nav();
+const body = el("div", "site-body", navigation.element);
+let shownRail: HTMLElement | null = null;
 
 /**
  * The top bar's height, which wraps onto more lines in a narrow window, kept in
- * `--site-toolbar-height` so the navigation sticks just under it instead of sliding beneath it.
+ * `--site-toolbar-height` so the navigation sticks just under it, as tall as the window below it.
  */
 const toolbarHeight = new ResizeObserver(([entry]) => {
   const height = entry?.borderBoxSize[0]?.blockSize ?? 0;
   document.documentElement.style.setProperty("--site-toolbar-height", `${height}px`);
+  // The navigation is the window's height under the bar: its current row is brought into the room
+  // it has now.
+  navigation.select(picked());
 });
 
 function draw(): void {
@@ -96,9 +94,13 @@ function draw(): void {
   pageBox.replaceChildren(drawn?.container ?? el("p", "page-prose", "No pages yet."));
   if (CHROME) {
     bar.windows(page !== undefined && !isFoundation(page) && applies(page.measures.reflow));
-    shownNav = nav(page);
-    shownNav.filter(query);
-    site.replaceChildren(bar.element, el("div", "site-body", shownNav.element, pageBox, rail(drawn?.sections ?? [])));
+    const nextRail = rail(drawn?.sections ?? []);
+    if (shownRail) shownRail.replaceWith(nextRail);
+    else body.append(nextRail);
+    shownRail = nextRail;
+    if (pageBox.parentElement !== body) body.insertBefore(pageBox, nextRail);
+    if (bar.element.parentElement !== site || body.parentElement !== site) site.replaceChildren(bar.element, body);
+    navigation.select(page);
     toolbarHeight.disconnect();
     toolbarHeight.observe(bar.element);
   } else {
