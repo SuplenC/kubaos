@@ -78,10 +78,10 @@ export interface Wallpaper {
 export type Phase = "rest" | "awake" | "desktop";
 
 /**
- * What the sheet shows: waiting for a password or a finger, a finger on the reader, checking one,
- * after a wrong password, or after a finger the reader doesn't know.
+ * What the sheet shows: waiting for a password or a finger, checking one, after a wrong password,
+ * or after a finger the reader doesn't know.
  */
-export type Moment = "rest" | "reading" | "loading" | "error" | "unknown";
+export type Moment = "rest" | "loading" | "error" | "unknown";
 
 /** The kicker over the digits: where and which day, then the date. */
 export interface Kicker {
@@ -132,8 +132,7 @@ export const BAR_CLOCK: BarClock = { kanji: "月", date: "Mon 2 Nov" };
 /**
  * The password's field, as `moment` shows it: lit with the keyboard in it unless it is live. Its
  * `lock` has `lock_open` in `primary` laid over it, unseen, for the right password to turn to; with
- * a reader, `fingerprint` ends it in `primary`, in `cold` while a finger is on the reader, or in
- * `error` once a finger is unknown, with its own
+ * a reader, `fingerprint` ends it in `primary`, or in `error` once a finger is unknown, with its own
  * `lock_open` laid over it for a known finger to turn to. After a miss its placeholder is `error`,
  * what went wrong, until something is typed.
  */
@@ -162,7 +161,6 @@ export function lockField(moment: Moment, live = false, error = "", reader = tru
     // The CSS mixes the mark's colour from `--lock-reader-missed`, so a miss can animate it.
     print.style.removeProperty("--trailing");
     print.toggleAttribute("data-missed", moment === "unknown");
-    print.toggleAttribute("data-reading", moment === "reading");
     const open = document.createElement("span");
     open.className = "k-field-mark k-field-trailing k-lock-reader-open";
     open.append(icon("lock_open", "var(--type-body_large-icon)", "var(--color-primary)"));
