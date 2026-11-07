@@ -4,7 +4,7 @@
 // the live sample, or what the pinned state looks like. A sample wider than its pane is scaled down
 // to fit it, and its pane says by how much; with `?all`, the panes stack and nothing is scaled.
 
-import { el, label, relayout, sampleBox } from "../dom.ts";
+import { el, holdScaled, label, relayout, sampleBox } from "../dom.ts";
 import { applies, type DoesntApply, type Focus, LOOK_NAMES, STATE_NAMES, type Stage, type State, type States } from "../page.ts";
 import { ALL, type Mode, settings } from "../settings.ts";
 import { picker } from "./picker.ts";
@@ -117,10 +117,11 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
       // measure each box as drawn: one wider than its pane scrolls in it instead.
       const by = natural > room && room > 0 && !ALL ? room / natural : 1;
       scale.replaceChildren(...(by < 1 ? [label(`shown at ${Math.floor(by * 100)}%`, "label", "on_surface_variant")] : []));
-      if (by === 1) return;
-      inner.style.width = `${natural}px`;
-      inner.style.transform = `scale(${by})`;
-      outer.style.height = `${Math.floor(inner.offsetHeight * by)}px`;
+      if (by < 1) {
+        inner.style.width = `${natural}px`;
+        inner.style.transform = `scale(${by})`;
+      }
+      holdScaled(outer, inner, by);
     });
   };
   fitting.add(fit);

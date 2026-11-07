@@ -56,6 +56,37 @@ export function relayout(from: Element): void {
 
 export const RELAYOUT = "page-relayout";
 
+/** Each sample drawn scaled down, by its inner box: the box that holds it and by how much. */
+const scaled = new WeakMap<Element, { readonly outer: HTMLElement; readonly by: number }>();
+
+const growing = new ResizeObserver((entries) => {
+  for (const { target } of entries) {
+    const fit = scaled.get(target);
+    if (!fit || !target.isConnected) {
+      growing.unobserve(target);
+      continue;
+    }
+    fit.outer.style.height = `${Math.floor((target as HTMLElement).offsetHeight * fit.by)}px`;
+  }
+});
+
+/**
+ * Keeps `outer` as tall as `inner` drawn at `by`, for as long as it is shown. A transform takes no
+ * room, so `outer` holds it; a sample that grows while shown (a log opening under its buttons)
+ * grows the box with it rather than spilling over the page under it. `by` of 1 lets it go.
+ * `height`, `inner`'s own, read with the other boxes, saves a layout.
+ */
+export function holdScaled(outer: HTMLElement, inner: HTMLElement, by: number, height?: number): void {
+  if (by === 1) {
+    scaled.delete(inner);
+    growing.unobserve(inner);
+    return;
+  }
+  scaled.set(inner, { outer, by });
+  outer.style.height = `${Math.floor((height ?? inner.offsetHeight) * by)}px`;
+  growing.observe(inner);
+}
+
 /**
  * Marks `box` as holding a live sample: a wheel over it scrolls the page until the reader clicks
  * into it (`site/scroll.ts`).

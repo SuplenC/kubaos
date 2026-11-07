@@ -12,7 +12,7 @@
 
 import { type Align, probe } from "../../lib/probe.ts";
 import { length, number } from "../../lib/tokens.ts";
-import { el, label, prose, relayout, sampleBox } from "../dom.ts";
+import { el, holdScaled, label, prose, relayout, sampleBox } from "../dom.ts";
 import type { DoesntApply, Motion, Move, Track, Value } from "../page.ts";
 import { applies } from "../page.ts";
 import {
@@ -307,13 +307,15 @@ function refit(fits: readonly Fit[], oneToOne: boolean): boolean {
   let wider = false;
   fits.forEach(({ outer, inner }, i) => {
     const { width, height, room } = read[i]!;
-    if (width <= room || room <= 0) return;
-    wider = true;
-    if (oneToOne) return;
-    const by = room / width;
+    const by = width > room && room > 0 ? room / width : 1;
+    wider ||= by < 1;
+    if (oneToOne || by === 1) {
+      holdScaled(outer, inner, 1);
+      return;
+    }
     inner.style.transform = `scale(${by})`;
     outer.style.width = `${Math.floor(width * by)}px`;
-    outer.style.height = `${Math.floor(height * by)}px`;
+    holdScaled(outer, inner, by, height);
   });
   return wider;
 }
