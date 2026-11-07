@@ -433,20 +433,41 @@
   transition: --panel-dim var(--motion-medium) var(--easing-standard);
 }
 
-/* With reduce motion the live lock's frame doesn't slide: it stands in place while its glass fades,
-   in over `short` on waking and out over `short` going back to rest, then leaves at once. */
+/* With reduce motion the live lock slides and flies nothing, as the Lock page's reduced players
+   play it: the frame stands in place while its glass fades, the blur and the dim ease over `short`,
+   and the sheet fades in place. Waking, the clock stands awake at once and fades in; going back to
+   rest, everything fades out over `short`, then the frame, the sheet and the clock go to rest at once
+   and the clock fades back in (its fades are `liveLock`'s, in `pages/templates/locks.ts`). */
 [data-reduced] .k-lock[data-live] {
   transition:
     --framed 0s var(--motion-short),
-    --wake var(--motion-long) var(--easing-standard),
-    --clock-lift var(--motion-long) var(--easing-emphasized_decel);
+    --wake var(--motion-short) var(--easing-standard),
+    --clock-lift 0s var(--motion-short);
 }
 
 [data-reduced] .k-lock[data-live][data-phase="awake"] {
   transition:
     --framed 0s,
-    --wake var(--motion-long) var(--easing-emphasized_decel),
-    --clock-lift var(--motion-long) var(--easing-emphasized_decel);
+    --wake var(--motion-short) var(--easing-standard),
+    --clock-lift 0s;
+}
+
+[data-reduced] .k-lock[data-live] :is(.k-screen-dim, .k-lock-cutout) {
+  transition: --panel-dim var(--motion-short) var(--easing-standard);
+}
+
+[data-reduced] .k-lock[data-live] .k-sheet-part[data-live] {
+  opacity: 0;
+  transition:
+    --reveal 0s var(--motion-short),
+    opacity var(--motion-short) var(--easing-standard);
+}
+
+[data-reduced] .k-lock[data-live] .k-sheet-part[data-live][data-shown] {
+  opacity: 1;
+  transition:
+    --reveal 0s,
+    opacity var(--motion-short) var(--easing-standard);
 }
 
 [data-reduced] .k-lock[data-live] .k-screen-glass {

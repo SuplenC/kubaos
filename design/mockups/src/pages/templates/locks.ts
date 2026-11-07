@@ -142,9 +142,14 @@ export function twoScreens(): HTMLElement {
   return stack("s16", "centre", still({ phase: "rest" }), still({ phase: "awake" }));
 }
 
-/** A duration token in milliseconds, as the toolbar's speed divides it. */
+/**
+ * A duration token in milliseconds, as the toolbar's speed divides it. The token is a registered
+ * `<time>`, which the browser may give in seconds: `20s`, not `20000ms`.
+ */
 function millis(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  const value = raw(`duration-${name}`);
+  const amount = Number.parseFloat(value);
+  return (value.endsWith("ms") ? amount : amount * 1000) / settings().speed;
 }
 
 /** The wrong password's shake: `space.s12`, back `space.s8`, `space.s4`, each over `micro`, then home over `short`. */
@@ -157,6 +162,26 @@ function shakeFrames(): Keyframe[] {
     { "--jolt": "-2", offset: at(2), easing: raw("easing-standard") },
     { "--jolt": "1", offset: at(3), easing: raw("easing-standard_decel") },
     { "--jolt": "0", offset: 1 },
+  ];
+}
+
+/** Waking with reduce motion: the clock, already awake, fades in. */
+function clockFadesIn(): Keyframe[] {
+  return [
+    { opacity: 0, easing: raw("easing-standard") },
+    { opacity: 1 },
+  ];
+}
+
+/**
+ * Going back to rest with reduce motion: the clock fades out over `short`, stands at rest at once,
+ * and fades back in over `short`.
+ */
+function clockFadesHome(): Keyframe[] {
+  return [
+    { opacity: 1, offset: 0, easing: raw("easing-standard") },
+    { opacity: 0, offset: 0.5, easing: raw("easing-standard") },
+    { opacity: 1, offset: 1 },
   ];
 }
 
@@ -186,7 +211,9 @@ export function liveLock(wallpaper: Wallpaper = PURPLE_HOUR, size = SCREEN): HTM
     window.clearTimeout(idle);
     idle = window.setTimeout(rest, millis("lock_idle"));
   };
+  const clock = element.querySelector<HTMLElement>(".k-lock-clock")!;
   const setAwake = (on: boolean) => {
+    if (settings().reduced) clock.animate(on ? clockFadesIn() : clockFadesHome(), { duration: (on ? 1 : 2) * millis("short") });
     element.dataset.phase = on ? "awake" : "rest";
     element.toggleAttribute("data-open", on);
     for (const part of made.sheet.parts) part.toggleAttribute("data-shown", on);
