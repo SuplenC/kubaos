@@ -46,8 +46,8 @@ body {
   outline: max(1px, round(nearest, var(--focus-tube), 1px)) solid var(--color-primary);
 }
 
-/* The top bar: the brand, the settings' groups and the search, over the page and the floating
-   hints among it. It wraps onto more rows in a narrow window. */
+/* The top bar: the brand and the settings' groups, over the page and the floating hints among it.
+   It wraps onto more rows in a narrow window. */
 .site-toolbar {
   position: sticky;
   top: 0;
@@ -67,21 +67,6 @@ body {
   gap: var(--space-s8);
 }
 
-/* The search takes what room the controls leave on their row, `size.menu` at most, at the end of
-   it, and is as tall as they are. */
-.site-find {
-  flex: 1 1 calc(var(--size-menu) / 2);
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-.site-search {
-  --field-height: var(--size-control_sm);
-  flex: 0 1 var(--size-menu);
-  width: auto;
-  min-width: 0;
-}
-
 /* The navigation, the page and the rail: the page fills the room between the two. */
 .site-body {
   display: grid;
@@ -89,57 +74,97 @@ body {
   align-items: start;
 }
 
-/* The navigation and the rail stick under the top bar and scroll on their own when taller than
-   the window below it, so no link hides under the bar or past the window's foot. */
+/* The navigation and the rail stick under the top bar, so no link hides under the bar or past the
+   window's foot. */
 .site-nav,
 .site-rail {
   position: sticky;
   top: var(--site-toolbar-height, 0px);
-  max-height: calc(100vh - var(--site-toolbar-height, 0px));
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
 
-.site-nav {
-  gap: var(--space-s16);
-  padding: var(--space-s24) var(--space-s12);
-  border-right: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+.site-rail {
+  max-height: calc(100vh - var(--site-toolbar-height, 0px));
+  overflow-y: auto;
 }
 
+/* The navigation is SidebarPage's sidebar (`lib/sidebar-page.css`): a band `size.sidebar` wide in
+   `surface_container_low`, the window's height under the top bar, its rows `space.s12` in and
+   `space.s4` apart. The search field is its first part, then a hairline `space.s8` clear of the
+   field and of the rows, as under SidebarPage's Home. The rows scroll on their own under it, the
+   band's padding their scroll's padding and the thumb's room; the band's edges cut the glow. */
+.site-nav {
+  height: calc(100vh - var(--site-toolbar-height, 0px));
+  overflow: clip;
+  background: var(--color-surface_container_low);
+}
+
+.site-nav-head {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  padding: var(--space-s12) var(--space-s12) 0;
+}
+
+.site-nav-rule {
+  display: flex;
+  padding-top: var(--space-s8);
+}
+
+.site-nav-rule > .k-divider {
+  flex: 1;
+}
+
+.site-nav > .k-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.site-nav-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  padding: var(--space-s8) var(--space-s12) var(--space-s12);
+}
+
+/* A level: its heading where the rows' words start, `space.s4` over its rows, as they are apart. */
 .site-nav-level {
   display: flex;
   flex-direction: column;
+  gap: var(--space-s4);
 }
 
 .site-nav-level > .k-text {
-  padding: 0 var(--space-s12) var(--space-s4);
+  padding: 0 var(--space-s12);
 }
 
 .site-nav-level[hidden],
-.site-nav-link[hidden] {
+.site-nav .k-sp-row[hidden] {
   display: none;
 }
 
-.site-nav-link,
+/* The search field, the library's, with its key on a keycap at its end while it is empty and the
+   keyboard is elsewhere: `space.s12` in, as the field's words are from its start. */
+.site-search {
+  --end: calc(var(--space-s12) + var(--size-keycap) + var(--space-s8));
+}
+
+.site-search > .k-keycap {
+  position: absolute;
+  top: 50%;
+  right: var(--space-s12);
+  translate: 0 -50%;
+}
+
+.site-search:is(:focus, [data-filled]) > .k-keycap {
+  visibility: hidden;
+}
+
 .site-rail-link {
   display: block;
   color: var(--color-on_surface_variant);
   text-decoration: none;
-}
-
-.site-nav-link {
-  padding: var(--space-s4) var(--space-s12);
-  border-radius: var(--radius-row);
-}
-
-.site-nav-link:hover {
-  color: var(--color-on_surface);
-}
-
-.site-nav-link[aria-current="page"] {
-  background: var(--color-secondary_container);
-  color: var(--color-on_secondary_container);
 }
 
 .site-rail {
