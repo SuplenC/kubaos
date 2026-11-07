@@ -49,7 +49,7 @@ export default page({
   slug: "button-bar",
   title: "Button bar",
   lede: "The row of buttons that ends a surface: Cancel at the start, the actions at the end, the one Enter presses last.",
-  code: { rust: "button_bar::button_bar", qml: "ButtonBar", unbuilt: "Not built yet" },
+  code: { unbuilt: "Rust and QML: not built yet" },
   stage: {
     live: () => within("100%", filling(flow("s32", live(), inRoom(DANGER, PANEL)))),
     hint: "click a button, or Tab and Enter",

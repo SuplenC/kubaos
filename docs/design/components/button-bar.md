@@ -4,7 +4,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 ## `ButtonBar`
 
-Rust `button_bar::button_bar`; QML `ButtonBar`. Its mockup page is the source of truth: Molecules, Button bar, in `design/mockups/`.
+Rust `button_bar::button_bar` and QML `ButtonBar` once built: neither library has it yet (below). Its mockup page is the source of truth: Molecules, Button bar, in `design/mockups/`.
 
 The row of buttons that ends a surface (a dialog, a form in a well). It holds the rules of their order, kinds and spacing in one place, so every surface ends the same way:
 
@@ -20,4 +20,4 @@ The row of buttons that ends a surface (a dialog, a form in a well). It holds th
 
 **Motion.** None of its own: it arrives and leaves with its surface, and stacking cuts from one line to the stack as the room narrows.
 
-*Not built yet: neither library has a `ButtonBar`; a dialog lays its buttons out itself, as one line, its Cancel's box on the content's edge. The mockup draws the rule.*
+*Not built yet: neither `kubaos-ui` nor `KubaOS.Components` has a `ButtonBar`. A dialog lays its buttons out itself, in Rust `dialog::dialog` and `dialog::prompt` and in QML `Dialog`: one line 8 apart, the dismiss button first and a fill pushing the actions to the end, its Cancel's box on the content's edge. Neither hangs a Text button's padding or stacks in a small room. The mockup draws the rule.*
