@@ -11,12 +11,12 @@ pub const WALLPAPER_BLUR: &[u8] = include_bytes!("../assets/wallpaper-blur.jpg")
 pub const LOGO_MARK: &[u8] = include_bytes!("../assets/logo/kubaos-mark.svg");
 /// "KubaOS" (branding/svg/kubaos-wordmark.svg).
 pub const LOGO_WORDMARK: &[u8] = include_bytes!("../assets/logo/kubaos-wordmark.svg");
-/// The neon sign cut out of its wall, 1024x396, for the logo at large sizes
+/// The neon sign cut out of its wall, 1024x335, for the logo at large sizes
 /// (branding/png/kubaos-sign-1024.png).
 pub const LOGO_SIGN: &[u8] = include_bytes!("../assets/logo/kubaos-sign-1024.png");
 /// [`LOGO_SIGN`]'s width over its height. Views size the sign with it, so the layout holds still
 /// while the PNG decodes.
-pub const LOGO_SIGN_ASPECT: f32 = 1024.0 / 396.0;
+pub const LOGO_SIGN_ASPECT: f32 = 1024.0 / 335.0;
 
 /// Small Japanese accents above screen titles, like the shell's clock. Every character here must
 /// be in `kubaos-ui`'s M PLUS 1 subset (`crates/kubaos-ui/assets/fonts`).
