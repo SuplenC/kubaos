@@ -103,6 +103,11 @@
 
 .k-sp-row[data-kind="sub"] {
   height: var(--size-control_sm);
+}
+
+/* Where a sub-section's words start, past the symbols' column, and words lined up with them. */
+.k-sp-row[data-kind="sub"],
+.k-sp-sub-start {
   padding-left: calc(var(--space-s12) + var(--type-body-icon) + var(--space-s12));
 }
 
