@@ -276,15 +276,6 @@ const MISSES: Move = {
   sample: held("rest", PURPLE_HOUR, "unknown"),
 };
 
-const READS: Move = {
-  name: "A finger on the reader",
-  what: "While a finger is on the reader its mark fades to `cold`, and back as it lifts.",
-  tracks: [{ part: READER, on: ON, target: ".k-lock-reader", property: "--lock-reader-reading", from: 0, to: 1, duration: "short", curve: "standard" }],
-  reduced: "same",
-  back: "plays",
-  sample: held("awake"),
-};
-
 const KNOWN_AWAKE: Move = {
   name: "Unlocking with the fingerprint, awake",
   what: "From awake after a miss: the mark turns to `lock_open`, then Unlocking with the password.",
@@ -300,7 +291,7 @@ const KNOWN_AWAKE: Move = {
   sample: held("awake", PURPLE_HOUR, "unknown"),
 };
 
-type Shown = "rest" | "reading" | "loading" | "error";
+type Shown = "rest" | "loading" | "error";
 
 /** A state of the sheet after a finger: its miss is an unknown finger, not a wrong password. */
 const byFinger = (state: Shown) => (state === "error" ? "unknown" : state);
@@ -317,7 +308,7 @@ export default page({
   code: { unbuilt: "QML Lock: not built yet" },
   stage: {
     live: () => liveLock(),
-    hint: "click it and type, hold the fingerprint, or Esc",
+    hint: "click it and type, or Esc",
     daylight: doesntApply("it draws in its wallpaper's night scheme in either mode."),
   },
   variants: [
@@ -333,7 +324,7 @@ export default page({
   ],
   sizes: doesntApply("as large as its screen; the sheet is `size.panel` wide."),
   states: {
-    shown: ["rest", "reading", "loading", "error"],
+    shown: ["rest", "loading", "error"],
     absent: {
       lit: "the field is lit while awake",
       pressed: "a press wakes it",
@@ -347,7 +338,6 @@ export default page({
     ]),
     looks: {
       rest: "awake, the field empty and lit",
-      reading: "a finger on the reader: its mark in `cold`",
       loading: "an hourglass, Checking…",
       error: "the field shakes, or the reader's mark",
     },
@@ -369,7 +359,7 @@ export default page({
   motion: {
     arrives: [LOCKS, LOCKS_BARE],
     leaves: [UNLOCKS, TOUCHES, KNOWN_AWAKE],
-    between: [WAKES, RESTS, SHAKE, READS, MISSES],
+    between: [WAKES, RESTS, SHAKE, MISSES],
   },
   keyboard: {
     keys: [
