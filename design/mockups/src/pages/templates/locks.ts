@@ -187,8 +187,9 @@ function clockFadesHome(): Keyframe[] {
 
 /**
  * The lock, live: a key, a press or the reader wakes it, a printable key landing in the field;
- * Enter with a password shakes the field and says so in its placeholder, until the next key; Esc,
- * or `lock_idle` with nothing done, puts it back to rest.
+ * Enter with a password shakes the field and says so in its placeholder, until the next key; the
+ * pointer held on the reader's mark is a finger on the reader; Esc, or `lock_idle` with nothing
+ * done, puts it back to rest.
  */
 export function liveLock(wallpaper: Wallpaper = PURPLE_HOUR, size = SCREEN): HTMLElement {
   const made = lockOf({ wallpaper, size }, true);
@@ -272,5 +273,18 @@ export function liveLock(wallpaper: Wallpaper = PURPLE_HOUR, size = SCREEN): HTM
     if (!awake()) wake();
     else keepAwake();
   });
+  // The pointer held on the reader's mark stands in for a finger on the reader.
+  const reader = () => room.querySelector<HTMLElement>(".k-lock-reader");
+  // The field's input lies over the mark, so the press is found by where it lands.
+  element.addEventListener("pointerdown", (event) => {
+    const mark = reader();
+    if (!awake() || !mark) return;
+    const box = mark.getBoundingClientRect();
+    const on = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+    if (on) mark.toggleAttribute("data-reading", true);
+  });
+  const lift = () => reader()?.removeAttribute("data-reading");
+  element.addEventListener("pointerup", lift);
+  element.addEventListener("pointerleave", lift);
   return element;
 }

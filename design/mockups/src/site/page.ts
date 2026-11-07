@@ -81,6 +81,7 @@ export const STATES = [
   "lit",
   "pressed",
   "open",
+  "reading",
   "disabled",
   "selected",
   "loading",
@@ -89,13 +90,14 @@ export const STATES = [
 ] as const;
 export type State = (typeof STATES)[number];
 /** The states only some parts have: a page without one leaves it out with no word on why. */
-type Optional = "open";
+type Optional = "open" | "reading";
 
 export const STATE_NAMES: Record<State, string> = {
   rest: "Rest",
   lit: "Lit",
   pressed: "Pressed",
   open: "Open",
+  reading: "Reading",
   disabled: "Disabled",
   selected: "Selected",
   loading: "Loading",
