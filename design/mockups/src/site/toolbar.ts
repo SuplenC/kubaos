@@ -1,11 +1,10 @@
 // The top bar every page has: every setting the page is shown at, grouped under a label each as
-// the library's segmented controls (`tabs`), and the search over the pages on the right. Look is
+// the library's segmented controls (`tabs`). Look is
 // the mode (night, day, or both side by side on the stage) and the theme; Scale; Text, the words'
 // length; Motion, the speed and the flicker or reduced motion; Window, the size a template or a
-// screen's reflow is shown at, off on a page with none.
+// screen's reflow is shown at, off on a page with none. The search over the pages is the
+// navigation's (`nav.ts`).
 
-import { field } from "../lib/field.ts";
-import { keycap } from "../lib/keycap.ts";
 import { tabs } from "../lib/tabs.ts";
 import { el, label } from "./dom.ts";
 import { change, SCALES, type Settings, settings, SPEEDS, WINDOWS } from "./settings.ts";
@@ -73,31 +72,14 @@ function ratioNote(): HTMLElement | null {
   return el("div", "site-note", label(`Pixel ratio ${ratio}: zoom to ${zoom}% for exact pixels`, "small", "warning"));
 }
 
-/** The search over the pages: what is typed filters the navigation, and Enter opens the first left. */
-function search(onQuery: (query: string) => void, onEnter: () => void): HTMLElement {
-  const box = field({ placeholder: "Search", icon: "search", onInput: onQuery });
-  box.classList.add("site-search");
-  box.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") onEnter();
-  });
-  addEventListener("keydown", (event) => {
-    const typing = event.target instanceof HTMLElement && (event.target.isContentEditable || event.target.matches("input, textarea, [role=textbox]"));
-    // A sample that handles the key has prevented its default: the key is the sample's.
-    if (event.key !== "/" || typing || event.defaultPrevented) return;
-    event.preventDefault();
-    box.focus();
-  });
-  return el("div", "site-group site-find", box, keycap("/"));
-}
-
 export interface Toolbar {
   readonly element: HTMLElement;
   /** Turns the Window group on for a page that shows something in a window, off for one that doesn't. */
   windows(shown: boolean): void;
 }
 
-/** The top bar; `onQuery` and `onEnter` are the search's, over the navigation. */
-export function toolbar(onQuery: (query: string) => void, onEnter: () => void): Toolbar {
+/** The top bar. */
+export function toolbar(): Toolbar {
   const note = ratioNote();
   const windowGroup = (shown: boolean) =>
     group(
@@ -119,7 +101,6 @@ export function toolbar(onQuery: (query: string) => void, onEnter: () => void): 
     group("Motion", segmented("Speed", each("speed", SPEEDS, (s) => (s === 0.5 ? "½×" : `${s}×`))), segmented("Motion", MOTION)),
     windows,
     ...(note ? [note] : []),
-    search(onQuery, onEnter),
   );
   return {
     element,

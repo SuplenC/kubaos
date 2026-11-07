@@ -200,21 +200,33 @@ function glideScroll(view: HTMLElement, to: number): void {
 export function sidebarRow(kind: "section" | "sub", words: string, glyph: string | null, current: boolean, pinned?: Pinned): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "k-sp-row k-control";
-  button.dataset.kind = kind;
-  button.dataset.hot = "";
   button.tabIndex = -1;
-  button.toggleAttribute("data-current", current);
-  if (current) button.setAttribute("aria-current", "page");
-  pin(button, pinned);
+  return dressRow(button, kind, words, glyph, current, pinned);
+}
+
+/** A section's row that goes to the page at `href`: a sidebar of pages, the mockup site's own. */
+export function sidebarLink(words: string, glyph: string | null, current: boolean, href: string): HTMLAnchorElement {
+  const link = document.createElement("a");
+  link.href = href;
+  return dressRow(link, "section", words, glyph, current, undefined);
+}
+
+/** `element` drawn as a row of the sidebar: its symbol, its words, its states and its ring. */
+function dressRow<E extends HTMLElement>(element: E, kind: "section" | "sub", words: string, glyph: string | null, current: boolean, pinned: Pinned | undefined): E {
+  element.className = "k-sp-row k-control";
+  element.dataset.kind = kind;
+  element.dataset.hot = "";
+  element.toggleAttribute("data-current", current);
+  if (current) element.setAttribute("aria-current", "page");
+  pin(element, pinned);
   const name = clamped(words, kind === "section" ? "body" : "small");
   name.style.color = "var(--words)";
   const parts: Element[] = [];
   if (glyph) parts.push(icon(glyph, "var(--type-body-icon)", "var(--glyph)"));
   parts.push(filling(name));
-  button.append(filling(row("s12", "centre", ...parts)));
-  focusRing(button, "control", "accent", false).dataset.pressable = "";
-  return probe(button, { role: "component", name: "SidebarRow", variant: kind, fixed: FIXED_HEIGHT });
+  element.append(filling(row("s12", "centre", ...parts)));
+  focusRing(element, "control", "accent", false).dataset.pressable = "";
+  return probe(element, { role: "component", name: "SidebarRow", variant: kind, fixed: FIXED_HEIGHT });
 }
 
 /**
