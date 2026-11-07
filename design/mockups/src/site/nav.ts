@@ -1,6 +1,7 @@
 // The navigation: SidebarPage's sidebar (`lib/sidebar-page.ts`) holding the site's pages. Its
 // search field on top, a hairline, then every level that has pages, in order, its heading over a
-// section's row per page, the page shown current as SidebarPage's current section is. The rows
+// sub-section's row per page, the page shown current as SidebarPage's current sub-section is: its
+// words lit and the bar of neon beside it. The rows
 // scroll on their own under the field. What is typed filters them: a page whose title holds every
 // word typed stays, and a level with none left hides. `/` reaches the field unless a sample with
 // the keyboard takes that key, and Enter opens the first page left.
@@ -12,7 +13,7 @@ import { field } from "../lib/field.ts";
 import { keycap } from "../lib/keycap.ts";
 import { divider } from "../lib/layout.ts";
 import { scroll } from "../lib/scroll.ts";
-import { sidebarLink } from "../lib/sidebar-page.ts";
+import { putBar, sidebarLink, subBar } from "../lib/sidebar-page.ts";
 import { length } from "../lib/tokens.ts";
 import { pagesOf } from "../pages/index.ts";
 import { type AnyPage, LEVELS } from "./page.ts";
@@ -37,10 +38,13 @@ export function nav(): Nav {
   for (const level of LEVELS) {
     const pages = pagesOf(level.slug);
     if (pages.length === 0) continue;
-    const group = el("div", "site-nav-level", label(level.title, "label", "on_surface_variant"));
+    const heading = label(level.title, "label", "on_surface_variant");
+    heading.classList.add("k-sp-sub-start");
+    const subs = el("div", "k-sp-subs");
+    const group = el("div", "site-nav-level", heading, subs);
     for (const page of pages) {
-      const link = sidebarLink(page.title, null, false, `#/${page.level}/${page.slug}`);
-      group.append(link);
+      const link = sidebarLink("sub", page.title, null, false, `#/${page.level}/${page.slug}`);
+      subs.append(link);
       entries.push({ page, link, title: page.title.toLowerCase(), group });
     }
     groups.push(group);
@@ -48,11 +52,22 @@ export function nav(): Nav {
   const rows = el("div", "site-nav-rows", ...groups);
   const rowsScroll = scroll(rows, { height: "100%", above: 0, below: 0, noGutter: true });
   const view = rowsScroll.view;
+  const bar = subBar();
+  let current: HTMLAnchorElement | undefined;
+
+  /** The bar beside the current page's row, among its level's rows; none while it is filtered out. */
+  function placeBar(): void {
+    bar.hidden = !current || current.hidden;
+    if (!current || current.hidden) return;
+    current.parentElement!.append(bar);
+    putBar(bar, current);
+  }
 
   function filter(query: string): void {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
     for (const each of entries) each.link.hidden = !words.every((word) => each.title.includes(word));
     for (const group of groups) group.hidden = entries.every((each) => each.group !== group || each.link.hidden);
+    placeBar();
   }
 
   const search = field({
@@ -84,17 +99,18 @@ export function nav(): Nav {
   return {
     element,
     select(page) {
-      let shown: HTMLElement | undefined;
+      current = undefined;
       for (const each of entries) {
-        const current = each.page === page;
-        each.link.toggleAttribute("data-current", current);
-        if (current) {
+        const picked = each.page === page;
+        each.link.toggleAttribute("data-current", picked);
+        if (picked) {
           each.link.setAttribute("aria-current", "page");
-          shown = each.link;
+          current = each.link;
         } else each.link.removeAttribute("aria-current");
       }
-      if (!shown || shown.hidden) return;
-      const row = shown;
+      placeBar();
+      if (!current || current.hidden) return;
+      const row = current;
       // Once laid out: on load the navigation is put on the document after it is drawn.
       requestAnimationFrame(() => {
         const box = view.getBoundingClientRect();

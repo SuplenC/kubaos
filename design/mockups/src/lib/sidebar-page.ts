@@ -204,11 +204,27 @@ export function sidebarRow(kind: "section" | "sub", words: string, glyph: string
   return dressRow(button, kind, words, glyph, current, pinned);
 }
 
-/** A section's row that goes to the page at `href`: a sidebar of pages, the mockup site's own. */
-export function sidebarLink(words: string, glyph: string | null, current: boolean, href: string): HTMLAnchorElement {
+/** A row that goes to the page at `href`: a sidebar of pages, the mockup site's own. */
+export function sidebarLink(kind: "section" | "sub", words: string, glyph: string | null, current: boolean, href: string): HTMLAnchorElement {
   const link = document.createElement("a");
   link.href = href;
-  return dressRow(link, "section", words, glyph, current, undefined);
+  return dressRow(link, kind, words, glyph, current, undefined);
+}
+
+/** The bar beside the current sub-section, in the box of rows it is placed among. */
+export function subBar(): HTMLElement {
+  const bar = document.createElement("span");
+  bar.className = "k-sp-bar";
+  return bar;
+}
+
+/** Puts `bar` beside the sub-section's row `target` at once, with no glide. */
+export function putBar(bar: HTMLElement, target: HTMLElement): void {
+  const to = `${target.offsetTop}px`;
+  bar.dataset.still = "";
+  bar.style.setProperty("--bar-from", to);
+  bar.style.setProperty("--bar-to", to);
+  bar.style.setProperty("--bar-at", "1");
 }
 
 /** `element` drawn as a row of the sidebar: its symbol, its words, its states and its ring. */
@@ -256,8 +272,7 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
   let items: Item[] = [];
   let itemRows: HTMLButtonElement[] = [];
   let sideAt = options.sidebarRow ?? 0;
-  const bar = document.createElement("span");
-  bar.className = "k-sp-bar";
+  const bar = subBar();
 
   // The page: what scrolls, the rise a change of section plays on, and the find box over it.
   const rise = document.createElement("span");
@@ -350,15 +365,12 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
     });
     const target = subs[sub];
     if (!target) return;
-    const to = `${target.offsetTop}px`;
-    const drawn = getComputedStyle(bar).top;
     if (!glide || !bar.isConnected || ms("medium") === 0) {
-      bar.dataset.still = "";
-      bar.style.setProperty("--bar-from", to);
-      bar.style.setProperty("--bar-to", to);
-      bar.style.setProperty("--bar-at", "1");
+      putBar(bar, target);
       return;
     }
+    const to = `${target.offsetTop}px`;
+    const drawn = getComputedStyle(bar).top;
     delete bar.dataset.still;
     bar.style.transition = "none";
     bar.style.setProperty("--bar-from", drawn);
