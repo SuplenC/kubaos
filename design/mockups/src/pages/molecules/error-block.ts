@@ -6,6 +6,7 @@ import { shown, type Words } from "../../lib/content.ts";
 import { errorBlock } from "../../lib/error-block.ts";
 import { filling, row, stack, within } from "../../lib/layout.ts";
 import { log, type LogLine, logRoom } from "../../lib/log.ts";
+import { advance } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
@@ -33,9 +34,18 @@ function inRoom(element: HTMLElement): HTMLElement {
   return within(ROOM, element);
 }
 
+/** Says `words` on `toggle`: its label and the lit layer's copy of it, each measured anew. */
+function relabel(toggle: HTMLElement, words: string): void {
+  for (const label of toggle.querySelectorAll<HTMLElement>(".k-text")) {
+    label.textContent = words;
+    label.style.setProperty("--natural", String(advance("button", words)));
+  }
+}
+
 /**
- * The block as Kōbō's failed screen shows it: the error, the log under it when it is open, and the
- * screen's actions at its foot: Show log beside the error's own actions, Save log and Try again.
+ * The block as Kōbō's failed screen shows it: the error, the screen's actions under it (Show log
+ * beside the error's own actions, Save log and Try again), and the log under them when it is open,
+ * so opening it moves none of them.
  */
 function onScreen(open: boolean, live = false, width = ROOM): HTMLElement {
   const room = logRoom(log(INSTALL_LOG).box, open, "s16");
@@ -46,15 +56,15 @@ function onScreen(open: boolean, live = false, width = ROOM): HTMLElement {
     toggle.addEventListener("click", () => {
       const opening = room.style.getPropertyValue("--log-open") !== "1";
       room.style.setProperty("--log-open", opening ? "1" : "0");
-      toggle.querySelector(".k-text")!.textContent = opening ? "Hide log" : "Show log";
+      relabel(toggle, opening ? "Hide log" : "Show log");
     });
   }
-  return within(width, stack("s16", "start", filling(stack(0, "start", errorBlock(BUSY), room)), filling(foot)));
+  return within(width, stack(0, "start", filling(stack("s16", "start", filling(errorBlock(BUSY)), filling(foot))), room));
 }
 
 const OPENS: Move = {
   name: "The log opens",
-  what: "The room under the error opens to `size.log` over `medium` on `emphasized_decel`; what is under it moves down.",
+  what: "The room under the actions opens to `size.log` over `medium` on `emphasized_decel`; nothing above it moves.",
   tracks: [{ part: "the log's room", on: "the failed screen", target: ".k-log-room", property: "--log-open", from: 0, to: 1, duration: "medium", curve: "emphasized_decel" }],
   reduced: [
     { part: "the log's room", on: "the failed screen", target: ".k-log-room", property: "--log-open", from: 0, to: 1, duration: "instant", curve: "linear" },
@@ -78,7 +88,7 @@ export default page<"error">({
   variants: [
     { name: "A short message", for: "a sentence, in `subheading`", sample: () => inRoom(errorBlock(BUSY)) },
     { name: "A long message", for: "past 90 characters: `body_strong`", sample: () => inRoom(errorBlock(COMMAND)) },
-    { name: "With its log", for: "the log open, the screen's actions at its foot", sample: () => onScreen(true) },
+    { name: "With its log", for: "the screen's actions, the log open under them", sample: () => onScreen(true) },
   ],
   sizes: doesntApply("one size; its width is its room's."),
   states: {
@@ -114,14 +124,14 @@ export default page<"error">({
     leaves: doesntApply("trying again replaces it at once with the work's progress."),
     between: [OPENS, ...powerMoves(() => inRoom(errorBlock(BUSY)))],
   },
-  keyboard: doesntApply("it takes no key; the screen's actions round it do: Show log, Save log, Try again."),
+  keyboard: doesntApply("it takes no key; the screen's actions under it do: Show log, Save log, Try again."),
   measures: {
     samples: nonEmpty([
       { name: "Short", for: "padding, symbol, words, their gaps", sample: () => inRoom(errorBlock(BUSY)) },
-      { name: "With its log", for: "the gaps to the log and the actions", sample: () => onScreen(true) },
+      { name: "With its log", for: "the gaps to the actions and the log", sample: () => onScreen(true) },
     ]),
     measures: [
-      { part: "Inset, gaps to log and actions", token: "space-s16" },
+      { part: "Inset, gaps to actions and log", token: "space-s16" },
       { part: "Rail lane in, words past it", token: "space-s12" },
       { part: "Rail lane", token: "space-s4" },
       { part: "Rail at night", token: "banner-rail" },
