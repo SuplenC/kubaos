@@ -90,8 +90,7 @@ body {
 }
 
 /* The navigation is SidebarPage's sidebar (`lib/sidebar-page.css`): a band `size.sidebar` wide in
-   `surface_container_low`, the window's height under the top bar, its rows `space.s12` in and
-   `space.s4` apart. The search field is its first part, then a hairline `space.s8` clear of the
+   `surface_container_low`, the window's height under the top bar, its rows `space.s12` in. The search field is its first part, then a hairline `space.s8` clear of the
    field and of the rows, as under SidebarPage's Home. The rows scroll on their own under it, the
    band's padding their scroll's padding and the thumb's room; the band's edges cut the glow. */
 .site-nav {
@@ -128,7 +127,8 @@ body {
   padding: var(--space-s8) var(--space-s12) var(--space-s12);
 }
 
-/* A level: its heading where the rows' words start, `space.s4` over its rows, as they are apart. */
+/* A level: its heading where its rows' words start (`.k-sp-sub-start`), `space.s4` over its rows,
+   which sit together as a section's sub-sections do. */
 .site-nav-level {
   display: flex;
   flex-direction: column;
@@ -136,7 +136,7 @@ body {
 }
 
 .site-nav-level > .k-text {
-  padding: 0 var(--space-s12);
+  padding-right: var(--space-s12);
 }
 
 .site-nav-level[hidden],
