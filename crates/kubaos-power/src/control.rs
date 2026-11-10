@@ -14,6 +14,8 @@
 //! - [`Control`]: the stop now, what each [`Input`] changes, and the [`Effect`]s that follow.
 //! - [`Settle`]: a power source has to hold before it counts, so a dock that bounces power doesn't
 //!   swing the stop back and forth.
+//! - [`Recheck`]: when the stop's writes are checked again, after devices, power-profiles-daemon or
+//!   a resume.
 //!
 //! # Not here
 //!
@@ -337,18 +339,45 @@ pub const RECHECK: Duration = Duration::from_secs(1);
 /// events nonstop can't put it off for ever.
 pub const RECHECK_AT_MOST: Duration = Duration::from_secs(5);
 
-/// A check of the stop's writes, after devices came or power-profiles-daemon acted: once the burst
-/// of events has been quiet for [`RECHECK`], or [`RECHECK_AT_MOST`] after its first event.
+/// A check of the stop's writes, after devices came, power-profiles-daemon acted or the machine
+/// woke: once the burst of events has been quiet for [`RECHECK`], or [`RECHECK_AT_MOST`] after its
+/// first event. None comes while the machine sleeps.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Recheck {
     due: Option<Instant>,
     /// The first event of the burst.
     since: Option<Instant>,
+    /// Between logind's `PrepareForSleep(true)` and `(false)`, while systemd-sleep's hook holds
+    /// sleep-safe values in place.
+    asleep: bool,
 }
 
 impl Recheck {
-    /// Something changed at `now`.
+    /// The machine is going to sleep: no check is due until it wakes, so none writes the stop's
+    /// values back over the sleep hook's. The check after the wake covers any asked before it.
+    pub fn sleep(&mut self) {
+        self.asleep = true;
+        self.due = None;
+        self.since = None;
+    }
+
+    /// The machine woke at `now`: a check comes as after a device event, so the devices coming
+    /// back and the stop's writes put back over the sleep hook's are one check.
+    pub fn wake(&mut self, now: Instant) {
+        self.asleep = false;
+        self.ask(now);
+    }
+
+    /// Between [`Recheck::sleep`] and [`Recheck::wake`].
+    pub fn asleep(&self) -> bool {
+        self.asleep
+    }
+
+    /// Something changed at `now`; asleep, nothing is asked.
     pub fn ask(&mut self, now: Instant) {
+        if self.asleep {
+            return;
+        }
         let since = *self.since.get_or_insert(now);
         self.due = Some((now + RECHECK).min(since + RECHECK_AT_MOST));
     }

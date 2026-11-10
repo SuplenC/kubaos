@@ -586,3 +586,35 @@ fn the_warning_comes_with_the_drop_when_both_levels_are_met() {
     assert_eq!(warnings(&effects), [4]);
     assert_eq!(applied(&effects), [Stop::PowerSaver]);
 }
+
+#[test]
+fn no_check_comes_while_the_machine_sleeps_and_one_comes_a_second_after_it_wakes() {
+    let start = Instant::now();
+    let mut recheck = Recheck::default();
+    recheck.ask(start);
+
+    recheck.sleep();
+    recheck.ask(start + Duration::from_millis(500));
+
+    assert!(recheck.asleep());
+    assert!(!recheck.due(start + Duration::from_mins(1)));
+    assert_eq!(recheck.wait(start + Duration::from_mins(1)), None);
+
+    let woke = start + Duration::from_hours(1);
+    recheck.wake(woke);
+
+    assert!(!recheck.asleep());
+    assert!(!recheck.due(woke + Duration::from_millis(500)));
+    assert!(recheck.due(woke + RECHECK));
+    assert!(!recheck.due(woke + Duration::from_secs(5)));
+}
+
+#[test]
+fn a_wake_without_a_sleep_heard_still_checks_the_stops_writes() {
+    let start = Instant::now();
+    let mut recheck = Recheck::default();
+
+    recheck.wake(start);
+
+    assert!(recheck.due(start + RECHECK));
+}

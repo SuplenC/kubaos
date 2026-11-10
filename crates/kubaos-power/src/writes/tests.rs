@@ -363,3 +363,115 @@ fn a_refused_knob_is_left_alone_until_the_stop_changes() {
     let again: Vec<String> = refused.filter(writes()).iter().map(Write::arg).collect();
     assert!(again.contains(&"aspm=powersupersave".to_owned()));
 }
+
+/// Runs the root helper's `--sleep-safe` on `root`'s fake `/sys`, as systemd-sleep's hook does
+/// before a suspend; whether it exited 0, and its stdout.
+fn sleep_safe(root: &FakeRoot) -> (bool, String) {
+    let script = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../system/files/power/kubaos-power-write"
+    );
+    let output = std::process::Command::new("bash")
+        .arg(script)
+        .arg("--sleep-safe")
+        .env("KUBAOS_POWER_ROOT", root.dir.path())
+        .output()
+        .expect("run the helper");
+    (
+        output.status.success(),
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+    )
+}
+
+/// The laptop in Max Performance, as the stop leaves it.
+fn in_max_performance() -> FakeRoot {
+    let root = FakeRoot::laptop();
+    root.write(
+        "sys/module/pcie_aspm/parameters/policy",
+        "default [performance] powersave powersupersave",
+    );
+    root.write("sys/class/drm/card1/device/power_dpm_force_performance_level", "high");
+    for device in ["1-1", "1-3", "8-1.1.2"] {
+        root.write(&format!("sys/bus/usb/devices/{device}/power/control"), "on");
+    }
+    root
+}
+
+#[test]
+fn before_a_suspend_max_performance_drops_to_sleep_safe_values_input_devices_left_awake() {
+    let root = in_max_performance();
+
+    let (ok, said) = sleep_safe(&root);
+
+    assert!(ok, "{said}");
+    assert_eq!(root.read("sys/module/pcie_aspm/parameters/policy"), "default");
+    assert_eq!(
+        root.read("sys/class/drm/card1/device/power_dpm_force_performance_level"),
+        "auto"
+    );
+    for device in ["1-1", "1-3", "8-1.1.2"] {
+        assert_eq!(
+            root.read(&format!("sys/bus/usb/devices/{device}/power/control")),
+            "auto"
+        );
+    }
+    assert_eq!(root.read("sys/bus/usb/devices/7-1.1.3/power/control"), "on");
+    assert_eq!(root.read("sys/bus/usb/devices/3-2/power/control"), "on");
+    assert_eq!(
+        said.trim(),
+        "kubaos-power-write: sleep-safe: aspm=default gpu-dpm=card1:auto usb=1-1:auto usb=1-3:auto usb=8-1.1.2:auto"
+    );
+}
+
+#[test]
+fn after_the_wake_the_stops_writes_put_back_what_the_sleep_hook_changed() {
+    let root = in_max_performance();
+    assert!(sleep_safe(&root).0);
+    // The kernel shows the policies again with the new one in brackets; a plain file can't.
+    root.write(
+        "sys/module/pcie_aspm/parameters/policy",
+        "[default] performance powersave powersupersave",
+    );
+
+    let max = args(Stop::MaxPerformance, &Settings::default(), &root, Some(false));
+    let balanced = args(Stop::Balanced, &Settings::default(), &root, Some(true));
+
+    assert_eq!(
+        max,
+        [
+            "gpu-dpm=card1:high",
+            "aspm=performance",
+            "usb=1-1:on",
+            "usb=1-3:on",
+            "usb=8-1.1.2:on"
+        ]
+    );
+    assert_eq!(balanced, ["usb=8-1.1.2:on"]);
+}
+
+#[test]
+fn a_saver_stops_aspm_and_gpu_stay_for_a_suspend_and_only_the_devices_kept_awake_autosuspend() {
+    let root = FakeRoot::laptop();
+    let saver = args(Stop::SuperSaver, &Settings::default(), &root, Some(true));
+    assert!(helper(&root, &saver).0);
+
+    let (ok, said) = sleep_safe(&root);
+
+    assert!(ok, "{said}");
+    assert_eq!(said.trim(), "kubaos-power-write: sleep-safe: usb=8-1.1.2:auto");
+    assert_eq!(root.read("sys/module/pcie_aspm/parameters/policy"), "powersupersave");
+    assert_eq!(
+        root.read("sys/class/drm/card1/device/power_dpm_force_performance_level"),
+        "low"
+    );
+}
+
+#[test]
+fn a_machine_without_the_knobs_suspends_with_nothing_changed() {
+    let root = FakeRoot::empty();
+
+    let (ok, said) = sleep_safe(&root);
+
+    assert!(ok, "{said}");
+    assert_eq!(said.trim(), "kubaos-power-write: sleep-safe: nothing to change");
+}

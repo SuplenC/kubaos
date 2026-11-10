@@ -392,7 +392,8 @@ install_keyboard_writer() {
 # install_power_helper [--actions]: what the power stops (crates/kubaos-power)
 # need as root. The helper that writes their knobs in /sys, the polkit action
 # pkexec runs it under and the rule that lets an admin at the machine through
-# without a password; and amdgpu's FreeSync video modes, so the laptop panel
+# without a password; systemd-sleep's hook, which has the helper put
+# sleep-safe values in place before every suspend; and amdgpu's FreeSync video modes, so the laptop panel
 # drops to 60 Hz without a modeset. modprobe.d reaches the driver through the
 # initramfs, so while an installed kernel's initramfs lacks the file they
 # are all rebuilt; one that failed to build is rebuilt on the next run. With --actions (the first
@@ -406,6 +407,7 @@ install_power_helper() {
   local actions=0 initrd modules
   [[ ${1:-} == --actions || ! -e /usr/local/libexec/kubaos-power-write ]] && actions=1
   install_root_file "$FILES_DIR/power/kubaos-power-write" /usr/local/libexec/kubaos-power-write 0755
+  install_root_file "$FILES_DIR/power/kubaos-power-sleep" /usr/lib/systemd/system-sleep/kubaos-power 0755
   install_root_file "$FILES_DIR/polkit/org.kubaos.power.policy" /usr/share/polkit-1/actions/org.kubaos.power.policy 0644
   install_root_file "$FILES_DIR/polkit/50-kubaos-power.rules" /etc/polkit-1/rules.d/50-kubaos-power.rules 0644
   install_root_file "$FILES_DIR/modprobe.d/kubaos-amdgpu.conf" /etc/modprobe.d/kubaos-amdgpu.conf 0644
