@@ -6,6 +6,7 @@
 
 import { type AnyPage, applies, type DoesntApply, type Foundation, isFoundation, LEVELS, type Page, STATE_NAMES, type State, wordy } from "./page.ts";
 import { el, label, prose } from "./dom.ts";
+import { typeset } from "../lib/text.ts";
 import { content } from "./parts/content.ts";
 import { checks, shownAll } from "./parts/shown.ts";
 import { keyboard } from "./parts/keyboard.ts";
@@ -19,6 +20,7 @@ import { pair, specTable, titled } from "./parts/table.ts";
 import { tubes } from "./parts/tubes.ts";
 import { variants } from "./parts/variants.ts";
 import type { Section } from "./rail.ts";
+import { PAGES } from "../pages/index.ts";
 
 /** A page drawn: its container, and its sections for the rail. */
 export interface Drawn {
@@ -51,8 +53,27 @@ function header(page: AnyPage): HTMLElement {
     label(`${level} › ${page.title}`, "small", "on_surface_variant"),
     el("h1", "page-title", label(page.title, "display", "on_surface")),
     prose(page.lede, "body_large", "on_surface_variant"),
+    ...(!isFoundation(page) && page.from ? [builtFrom(page.from)] : []),
     ...(tags.length > 0 ? [el("div", "page-tags", ...tags)] : []),
   );
+}
+
+/** "Built from Pill.": each part the page is built from, a link to its page. */
+function builtFrom(slugs: readonly string[]): HTMLElement {
+  const links = slugs.map((slug) => {
+    const found = PAGES.find((each) => each.slug === slug);
+    if (!found) throw new Error(`built from ${slug}, which has no page`);
+    const link = el("a", "page-from-link", found.title);
+    link.setAttribute("href", `#/${found.level}/${found.slug}`);
+    return link;
+  });
+  const words: (Node | string)[] = ["Built from "];
+  links.forEach((link, index) => words.push(...(index === 0 ? [] : [index === links.length - 1 ? " and " : ", "]), link));
+  words.push(".");
+  const line = el("p", "page-prose page-from", ...words);
+  typeset(line, "body");
+  line.style.color = "var(--color-on_surface_variant)";
+  return line;
 }
 
 /** The names in code its component page gives, and what isn't built yet. */
