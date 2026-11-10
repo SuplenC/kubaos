@@ -317,8 +317,8 @@ pub fn values(name: &str) -> Option<Values> {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK
-        | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES | UNFREE | PREVIEW | BLUETOOTH_UNNAMED | DEPTH
-        | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => Some(Values::Bool),
+        | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES | UNFREE | PREVIEW | BLUETOOTH_UNNAMED
+        | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,
