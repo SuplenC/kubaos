@@ -113,7 +113,7 @@ draws from too:
 The photos keep their own colours.
 
 On a light background use the dark plate version or the black mark. Don't
-put the neon (photo or vector) on anything lighter than `#3d332b`: neon needs
+put the neon (photo or vector) on anything lighter than `#3b332d`: neon needs
 the dark.
 
 ## Clear space and size
@@ -136,6 +136,6 @@ the dark.
 "logo": {
   "type": "file",
   "source": "~/.config/fastfetch/kubaos.txt",
-  "color": { "1": "38;2;255;183;121", "2": "38;2;133;207;255" }
+  "color": { "1": "38;2;255;184;108", "2": "38;2;121;209;254" }
 }
 ```

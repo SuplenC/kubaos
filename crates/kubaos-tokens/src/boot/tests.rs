@@ -38,9 +38,9 @@ fn a_colour_is_set_as_its_three_channels_from_the_dark_palette() {
     assert_eq!(
         lines,
         [
-            "tokens.color.surface_container_lowest.r = 0.0784;",
+            "tokens.color.surface_container_lowest.r = 0.0745;",
             "tokens.color.surface_container_lowest.g = 0.0510;",
-            "tokens.color.surface_container_lowest.b = 0.0275;",
+            "tokens.color.surface_container_lowest.b = 0.0314;",
         ]
     );
 }
@@ -76,7 +76,7 @@ fn grubs_template_takes_colours_fonts_and_sums_at_grubs_scale() {
     let sum = grub_value(&tokens, root(), "size.row + space.s4 - type.body_strong.line").expect("a sum");
     let half = grub_value(&tokens, root(), "size.dialog/2").expect("half a size");
 
-    assert_eq!(colour, "#dac2b1");
+    assert_eq!(colour, "#d7c3b2");
     assert_eq!(font, "Geist Medium Regular 21");
     assert_eq!(mono, "Geist Mono Regular 18");
     assert_eq!(sum, "42");

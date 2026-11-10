@@ -66,17 +66,17 @@
     "kubaos-wallpapers": {
       "flake": false,
       "locked": {
-        "lastModified": 1792743307,
-        "narHash": "sha256-aqJPDlHiapqI2mzMh5ODtDbkhdK8DQLrGuTrKn17/I4=",
+        "lastModified": 1794350276,
+        "narHash": "sha256-DZPDO57RqNdjwv11JXmDEuPhc2KR2RMPdaYYUGfjJRk=",
         "owner": "SuplenC",
         "repo": "kubaos-wallpapers",
-        "rev": "a817336e531f443ce4f2d2a9fbd5a0122aacce76",
+        "rev": "9393b43ad545e537e67f059c7666f41801cd7a4b",
         "type": "github"
       },
       "original": {
         "owner": "SuplenC",
         "repo": "kubaos-wallpapers",
-        "rev": "a817336e531f443ce4f2d2a9fbd5a0122aacce76",
+        "rev": "9393b43ad545e537e67f059c7666f41801cd7a4b",
         "type": "github"
       }
     },

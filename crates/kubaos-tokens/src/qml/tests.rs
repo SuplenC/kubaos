@@ -74,8 +74,8 @@ fn type_styles_carry_their_size_line_weight_and_family() {
 fn both_fallback_palettes_are_written() {
     let singleton = render(&QmlTokens);
 
-    assert!(singleton.contains("primary: \"#ffb779\""));
-    assert!(singleton.contains("primary: \"#8b4c00\""));
+    assert!(singleton.contains("primary: \"#ffb86c\""));
+    assert!(singleton.contains("primary: \"#864f00\""));
 }
 
 #[test]
