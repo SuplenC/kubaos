@@ -16,7 +16,7 @@ import { forgetPalettes } from "./site/recolour.ts";
 import { PAGES } from "./pages/index.ts";
 import { el, RELAYOUT } from "./site/dom.ts";
 import { type Frame, frame } from "./site/frame.ts";
-import { nav } from "./site/nav.ts";
+import { type Nav, nav } from "./site/nav.ts";
 import { type AnyPage, applies, isFoundation } from "./site/page.ts";
 import { recipes, stopPlayers } from "./site/parts/motion.ts";
 import { forgetRail, rail } from "./site/rail.ts";
@@ -24,7 +24,7 @@ import { render } from "./site/render.ts";
 import { apply, CHROME, onChange, settings } from "./site/settings.ts";
 import { holdWheel, releaseWheel } from "./site/scroll.ts";
 import { settle } from "./site/settle.ts";
-import { toolbar } from "./site/toolbar.ts";
+import { type Toolbar, toolbar } from "./site/toolbar.ts";
 
 declare global {
   interface Window {
@@ -61,15 +61,21 @@ function refit(): void {
   draw();
 }
 
-const bar = toolbar();
-
 /**
- * The navigation, kept as pages change so its search and its scroll stay, beside the page and the
- * rail of the page drawn now.
+ * The top bar, and the navigation, kept as pages change so its search and its scroll stay, beside
+ * the page and the rail of the page drawn now. Both are drawn once the fonts have loaded: a label's
+ * width is measured from its font and kept, and one measured in the fallback font would leave its
+ * box, and what is laid from it (a tab's lit stretch), short of the words drawn.
  */
-const navigation = nav();
-const body = el("div", "site-body", navigation.element);
+let chrome: { readonly bar: Toolbar; readonly navigation: Nav; readonly body: HTMLElement } | null = null;
 let shownRail: HTMLElement | null = null;
+
+function drawChrome(): NonNullable<typeof chrome> {
+  if (chrome) return chrome;
+  const navigation = nav();
+  chrome = { bar: toolbar(), navigation, body: el("div", "site-body", navigation.element) };
+  return chrome;
+}
 
 /**
  * The top bar's height, which wraps onto more lines in a narrow window, kept in
@@ -80,7 +86,7 @@ const toolbarHeight = new ResizeObserver(([entry]) => {
   document.documentElement.style.setProperty("--site-toolbar-height", `${height}px`);
   // The navigation is the window's height under the bar: its current row is brought into the room
   // it has now.
-  navigation.select(picked());
+  chrome?.navigation.select(picked());
 });
 
 function draw(): void {
@@ -93,6 +99,7 @@ function draw(): void {
   const drawn = page ? render(page) : null;
   pageBox.replaceChildren(drawn?.container ?? el("p", "page-prose", "No pages yet."));
   if (CHROME) {
+    const { bar, navigation, body } = drawChrome();
     bar.windows(page !== undefined && !isFoundation(page) && applies(page.measures.reflow));
     const nextRail = rail(drawn?.sections ?? []);
     if (shownRail) shownRail.replaceWith(nextRail);
@@ -117,6 +124,8 @@ let painted: Painted = { theme: settings().theme, mode: settings().mode };
 
 async function start(): Promise<void> {
   await Promise.all([...document.fonts].map((face) => face.load()));
+  // Anything measured while the fonts loaded was measured in the fallback.
+  forgetWidths();
   fitDevicePixels();
   holdWheel();
   draw();
