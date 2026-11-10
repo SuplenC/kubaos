@@ -1,6 +1,6 @@
 # 5. Wallpaper depth: a background plate, so the city pushes in faster than the sky
 
-Status: proposed (2026-11-04). Supersedes the part of ADR 0004 that says the lock needs no filled-in background, and its rejection of LaMa.
+Status: accepted (2026-11-04). Supersedes the part of ADR 0004 that says the lock needs no filled-in background, and its rejection of LaMa.
 
 ## Context
 
