@@ -90,7 +90,8 @@ body {
 }
 
 /* The navigation is SidebarPage's sidebar (`lib/sidebar-page.css`): a band `size.sidebar` wide in
-   `surface_container_low`, the window's height under the top bar, its rows `space.s12` in. The search field is its first part, then a hairline `space.s8` clear of the
+   `surface_container_low`, the window's height under the top bar, its rows `space.s12` in and
+   `space.s4` apart. The search field is its first part, then a hairline `space.s8` clear of the
    field and of the rows, as under SidebarPage's Home. The rows scroll on their own under it, the
    band's padding their scroll's padding and the thumb's room; the band's edges cut the glow. */
 .site-nav {
@@ -123,20 +124,15 @@ body {
 .site-nav-rows {
   display: flex;
   flex-direction: column;
-  gap: var(--space-s16);
+  gap: var(--space-s4);
   padding: var(--space-s8) var(--space-s12) var(--space-s12);
 }
 
-/* A level: its heading where its rows' words start (`.k-sp-sub-start`), `space.s4` over its rows,
-   which sit together as a section's sub-sections do. */
-.site-nav-level {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-s4);
-}
-
-.site-nav-level > .k-text {
-  padding-right: var(--space-s12);
+/* A level: its section's row over its pages' rows, `space.s4` apart as SidebarPage's are, the
+   rows' own start in line with the section's words. It opens and shuts as a Collapsible does
+   (`.k-collapsible` in `lib/lib.css`). */
+.site-nav-level > .k-collapsible-body > .k-collapsible-content {
+  padding: var(--space-s4) 0 0;
 }
 
 .site-nav-level[hidden],

@@ -25,7 +25,7 @@ import { containerPadding, divider, filling, header, page, row, section, stack }
 import { type ListRowSpec, listRow, scaleOf, well } from "./list.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
 import { scroll } from "./scroll.ts";
-import { clamped, type Run, text } from "./text.ts";
+import { clamped, type Run, text, type TypeStyle } from "./text.ts";
 import { cubic, length, raw } from "./tokens.ts";
 import { popover } from "./tooltip.ts";
 import { settings } from "../site/settings.ts";
@@ -227,15 +227,39 @@ export function putBar(bar: HTMLElement, target: HTMLElement): void {
   bar.style.setProperty("--bar-at", "1");
 }
 
+/**
+ * A section's row that opens and shuts the rows under it, a sidebar of pages' level: its symbol, its
+ * words in `body_strong`, and at its end Collapsible's chevron, which turns as a `.k-collapsible`
+ * round it opens.
+ */
+export function sidebarFold(words: string, glyph: string | null): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  dressRow(button, "section", words, glyph, false, undefined, "body_strong");
+  button.dataset.fold = "";
+  const chevron = icon("expand_more", "var(--type-body-icon)", "var(--color-on_surface_variant)");
+  chevron.classList.add("k-collapsible-chevron");
+  button.querySelector(".k-row")!.append(chevron);
+  return button;
+}
+
 /** `element` drawn as a row of the sidebar: its symbol, its words, its states and its ring. */
-function dressRow<E extends HTMLElement>(element: E, kind: "section" | "sub", words: string, glyph: string | null, current: boolean, pinned: Pinned | undefined): E {
+function dressRow<E extends HTMLElement>(
+  element: E,
+  kind: "section" | "sub",
+  words: string,
+  glyph: string | null,
+  current: boolean,
+  pinned: Pinned | undefined,
+  style: TypeStyle = kind === "section" ? "body" : "small",
+): E {
   element.className = "k-sp-row k-control";
   element.dataset.kind = kind;
   element.dataset.hot = "";
   element.toggleAttribute("data-current", current);
   if (current) element.setAttribute("aria-current", "page");
   pin(element, pinned);
-  const name = clamped(words, kind === "section" ? "body" : "small");
+  const name = clamped(words, style);
   name.style.color = "var(--words)";
   const parts: Element[] = [];
   if (glyph) parts.push(icon(glyph, "var(--type-body-icon)", "var(--glyph)"));
