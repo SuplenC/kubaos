@@ -116,3 +116,9 @@ mockups/list-detail     design/mockups/src/pages/templates/list-detail.ts design
 mockups/panel-page  design/mockups/src/pages/templates/panel-page.ts
 mockups/backdrop    design/mockups/src/pages/templates/backdrop.ts
 mockups/lock        design/mockups/src/pages/templates/lock.ts design/mockups/src/pages/templates/locks.ts design/mockups/src/assets/lock
+mockups/control-center design/mockups/src/pages/shell/control-center.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
+mockups/control-center-toggles design/mockups/src/pages/shell/control-center-toggles.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
+mockups/control-center-capture design/mockups/src/pages/shell/control-center-capture.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
+mockups/control-center-wifi design/mockups/src/pages/shell/control-center-wifi.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
+mockups/control-center-bluetooth design/mockups/src/pages/shell/control-center-bluetooth.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
+mockups/control-center-keyboard design/mockups/src/pages/shell/control-center-keyboard.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
