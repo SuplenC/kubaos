@@ -1,0 +1,51 @@
+# 6. Suites on mise: current upstream toolchains, updated and upgraded per tool
+
+Status: proposed (2026-11-10). Amends ADR 0002: supersedes its rejection of mise, its rule that a Suite's toolchain comes from Nix by default, its `.envrc` Project pins, and its line that rollback restores Suites with everything else.
+
+## Context
+
+ADR 0002 builds a Suite's toolchain from the user flake's nixpkgs. That nixpkgs is a stable branch, and its dev tools run five to six months behind upstream (proto 0.56 against 0.63, uv 0.11 against 0.13, gopls 0.22 against 0.24); updating the lock doesn't help, because a stable branch never takes them. ADR 0002 rejected mise because imperative installs drift from the flake and can't be rolled back.
+
+mise has since been measured against what a Suite needs (mise v2026.11.6, its own docs at `jdx/mise` `docs/`, run with every home and `MISE_*` directory moved into a scratch folder). Its requests live in files: a fragment in `~/.config/mise/conf.d/` installs its tools, `mise upgrade` moves each tool within its request and `mise upgrade --bump` past it, rewriting the fragment (`docs/cli/upgrade.md`), and deleting a fragment makes its versions prunable (`docs/cli/prune.md`). A folder's `mise.toml` pins its own versions, and parents merge. Each install takes one to two seconds.
+
+Already decided with Kuba, and not reopened here: `kubaos suite update [NAME…]` makes patch-level updates and `kubaos suite upgrade [NAME…]` minor and major ones, each with a pick list without a name; for a 0.x tool a minor bump is an upgrade; versions are tracked per tool, not per Suite; `kubaos update` runs `kubaos suite update --all`, then lists the upgrades tool by tool and points to `kubaos suite upgrade`; and declarative stays the rule: a Suite's state is a file, deleting it uninstalls, and versions removed or replaced are pruned.
+
+## Decision
+
+**A Suite's toolchain comes from mise.** Each toolchain Suite is one file, `~/.config/mise/conf.d/kubaos-<name>.toml`, which KubaOS writes whole and deletes on removal, beside its record in `kubaos.d/suites/<name>.toml` (options and extras), which keeps driving the Suite's Nix half. Rustup stays the Rust toolchain's source and proto stays moon's; mise brings rustup and proto themselves. Suites that are not toolchains, such as wallpaper depth, keep their Nix module and get no mise file.
+
+**The file is `kubaos-<name>.toml`.** The prefix names who writes it, in a folder the user may also fill, and keeps KubaOS's fragments together in mise's alphabetical load order. Measured with `kubaos-python.toml`, it behaves as the `suite-` names tried before: `mise install` installs it, `mise outdated` names it as the source, and `mise upgrade --bump` rewrites it. mise's `--global` reads only `config.toml` (`docs/cli/upgrade.md`), so KubaOS runs mise without it, from a folder outside any project. The user's own `~/.config/mise/config.toml` loads after the fragments and wins (`docs/configuration.md`, "conf.d"; measured), as the user layer does everywhere else.
+
+**mise owns the shell's directory hook, and direnv leaves KubaOS's shell.** mise's docs call running the two together unsupported, because their hooks disagree about `PATH` (`docs/direnv.md`). The shell runs `mise activate zsh`, with mise's entries ahead of `~/.nix-profile/bin`. `use suite` pins and nix-direnv go: a Project pin is the folder's `mise.toml`, which `kubaos pin` writes, and a migration rewrites existing `use suite` lines. `use bwenv` becomes a `_.source` script in the project's `mise.toml` (`docs/environments/index.md`). A project with `use flake` loads its devshell with `nix develop`; this repository moves its everyday tools to a `mise.toml` and keeps its devshell for `nix develop` and CI. A user who wants direnv back can enable it in `home.nix`, unsupported.
+
+**mise comes from KubaOS's curated set, at a version each release pins.** It is built from the release's tagged source without the `self_update` feature, so `mise self-update` refuses (`docs/packaging.md`), and served from Cachix with the rest of the curated set. Only a KubaOS release moves it. The `kubaos` binary reads mise's JSON and passes its flags, so the two move together, and `kubaos rollback` of a release brings back the mise its `kubaos` was built against. mise ships several releases a week and removes flags on announced dates (`upgrade --local` in 2027.7.0, `use mise` in 2027.10.4), which a release catches before a user does.
+
+**Language servers, formatters, linters and debug adapters go to mise, in the Suite's file**, each its own tool with its own version: gopls, delve, vtsls, basedpyright, ruff, debugpy. They are the most stale part of the Suites today, and gopls built against an older Go misreads code for a newer one. A tool mise can't install as a release (a VS Code extension run as a debug adapter, such as PHP's) stays in the Suite's Nix module until it can. The Nix module keeps the rest: editor settings through `kubaos.nvim.suiteSpecs`, which take servers from `PATH` instead of Mason; session variables; linked Defaults files; activation steps; and the scaffolders, which take the toolchain from `PATH`.
+
+**PHP stays in Nix.** mise's `php` builds from source through a vfox or asdf plugin (`registry/php.toml`), which needs compilers and development headers installed as root, and a build from source for every patch update. Ubuntu's PHP 8.5 is one version, installed as root, and can't serve a pin. So the PHP Suite keeps its Nix-built PHP with Xdebug and composer per version, its tools stay in Nix, and it moves with the user's nixpkgs lock: its patch releases come with `kubaos update`'s lock update, not `kubaos suite update`. Its Project pins still go through mise: `kubaos pin php 8.3` realises that version's toolchain under a GC root of KubaOS's own and writes `php = "path:<root>"` to the folder's `mise.toml` (`docs/dev-tools/versions.md`); measured, mise runs it, `outdated` leaves it alone, and `prune` never touches it.
+
+**A request is written at major.minor precision**, for every tool: `node = "24.22"`, `go = "1.27"`, `uv = "0.13"`. Then the range a plain `mise upgrade` stays within is exactly the patch releases, for 0.x and 1.x tools alike, and `--bump` keeps that precision (measured: `uv = "0.12"` updates to 0.12.24 and bumps to `0.13`). `kubaos suite update` reads `mise outdated --json` and runs `mise upgrade <tool…>`; `kubaos suite upgrade` reads `mise outdated --bump --json` and runs `mise upgrade --bump <tool>@<major.minor>`, naming the target. A Suite's main toolchain, whose line the user chose (Node 24, Go 1.27), upgrades within that line; moving to another line is `kubaos suite configure --version`, and the upgrade list names a newer line when the catalog has one. Every other tool upgrades to its newest release. Both commands prune at once.
+
+**A failed install records nothing.** Under the state lock, `kubaos suite add` and `configure` first run `mise install <tool>@<request>…` with nothing written. If it fails, KubaOS uninstalls the versions that run added (a failed run keeps the tools that did install, measured) and exits non-zero. Only after it succeeds are the fragment, the lockfile and the record written, then the switch runs. A failed switch leaves the generation as it was, so KubaOS takes the record and the fragment back out and prunes.
+
+**Each Suite write ends with `mise lock --global`**, which locks the fragments' tools in `~/.config/mise/mise.lock` (`docs/dev-tools/mise-lock.md`, "Global lockfiles"; measured with a `conf.d` fragment). From then on `mise upgrade` keeps the lockfile current.
+
+**`kubaos rollback` undoes the versions an update moved, not the files.** Before its Suite step, `kubaos update` saves the Suite tools' lockfile entries, as it saves `flake.lock`. A rollback puts those entries back, runs `mise install --locked` and prunes. Measured: with the old entry back, mise selects the old version again and marks the newer one prunable. An update never changes a fragment, only `suite upgrade` and `configure` do, so rollback leaves the fragments and the records alone, as it leaves `kubaos.d/` alone today. A version pruned since is downloaded again, checked against the lockfile's checksum.
+
+## Consequences
+
+- Suites install current upstream releases the day they ship, and stop growing the Nix store. Their versions leave home-manager generations: rollback covers them through the lockfile, not a generation.
+- KubaOS has three package sources: apt, Nix and mise.
+- `home/pins.nix`, `config/direnv/lib/suite.sh`, `kubaos.suiteToolchains` and nix-direnv go, except the PHP toolchains, which pins realise on demand.
+- `docs/CONTRACTS.md` ("Suites", "Project pins"), `docs/USING.md` and `GLOSSARY.md`'s Project pin are rewritten as each piece lands.
+
+## Considered options
+
+- **Keep the Suites on nixpkgs, or move them to nixpkgs unstable.** Rejected: stable never takes the new tools, and unstable moves the whole home's package set to get them.
+- **Keep direnv for `use flake` projects beside mise.** Rejected: unsupported, and both hooks rewrite `PATH`.
+- **Keep direnv as the only hook and reach mise through its shims.** Supported, and `use flake` keeps working, but a shim runs mise on every call (measured at about 45 ms a call on top of the 6 to 11 ms the tool itself takes) and doesn't set `[env]`.
+- **mise from its own PPA through the package manifest, or `mise self-update`.** Rejected: a mise release would reach users before KubaOS was tested against it, and wouldn't roll back with a release.
+- **Language servers left in Nix.** Rejected: they are the most stale tools, and their versions are what `suite update` is for.
+- **Every tool, the main toolchain included, upgrading to its newest release.** Rejected: it would move a line the user chose, such as Node 24, without asking.
+- **Writing the fragment before the install, and deleting it on failure.** Rejected: the fragment is live config for every shell the moment it exists, and a crash between the two leaves a half-installed Suite.
+- **Rollback putting back the fragments as well.** Rejected: it would undo a `suite add`, `configure` or `upgrade` the user ran by name after the update, and leave their records behind.
