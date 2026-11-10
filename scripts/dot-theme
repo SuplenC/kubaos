@@ -49,7 +49,7 @@ MODE="${DOT_THEME_MODE:-dark}"
 # config/matugen/README.md).
 DEFAULT_WALLPAPER="shinjuku/kubaos-neon-sign.jpg"
 # Source color of DEFAULT_WALLPAPER, used when no image exists at all.
-DEFAULT_SEED="#cf7817"
+DEFAULT_SEED="#b87626"
 
 die() { printf 'dot-theme: %s\n' "$*" >&2; exit 1; }
 hint() { printf 'dot-theme: %s\n' "$*" >&2; }

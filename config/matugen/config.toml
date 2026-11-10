@@ -6,7 +6,7 @@
 version_check = false
 caching = false
 # Used when an image yields no usable color (the default wallpaper's source).
-fallback_color = "#cf7817"
+fallback_color = "#b87626"
 
 # The terminal's hues, ANSI 1 to 6 (design/tokens.toml, [terminal.hues]).
 # matugen derives red, on_red, red_container, ... for each and harmonizes
