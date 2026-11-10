@@ -150,12 +150,32 @@ impl Target for GrubTheme {
                 .split_once("}}")
                 .ok_or_else(|| invalid(format!("{GRUB_TEMPLATE}: a `{{{{` with no `}}}}` after it")))?;
             out.push_str(before);
-            out.push_str(&grub_value(tokens, root, expr.trim())?);
+            push_offset(&mut out, &grub_value(tokens, root, expr.trim())?);
             rest = after;
         }
         out.push_str(rest);
         Ok(out)
     }
+}
+
+/// Appends `value` to `out`. GRUB reads a position's offset as a sign and then digits, so
+/// `50%+-16` is no number: a negative value right after a sign takes that sign over, `+` to `-`
+/// and `-` to `+`.
+fn push_offset(out: &mut String, value: &str) {
+    if let Some(magnitude) = value.strip_prefix('-') {
+        let flipped = match out.chars().last() {
+            Some('+') => Some('-'),
+            Some('-') => Some('+'),
+            _ => None,
+        };
+        if let Some(sign) = flipped {
+            out.pop();
+            out.push(sign);
+            out.push_str(magnitude);
+            return;
+        }
+    }
+    out.push_str(value);
 }
 
 fn invalid(message: String) -> io::Error {

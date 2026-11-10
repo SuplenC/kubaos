@@ -3,6 +3,7 @@ use std::path::Path;
 
 use super::grub_value;
 use super::plymouth_value;
+use super::push_offset;
 use super::references;
 
 const TOKENS: &str = include_str!("../../../../design/tokens.toml");
@@ -80,6 +81,20 @@ fn grubs_template_takes_colours_fonts_and_sums_at_grubs_scale() {
     assert_eq!(mono, "Geist Mono Regular 18");
     assert_eq!(sum, "42");
     assert_eq!(half, "375");
+}
+
+#[test]
+fn a_negative_offset_takes_the_sign_before_it_over() {
+    let offset = |before: &str, value: &str| {
+        let mut out = before.to_owned();
+        push_offset(&mut out, value);
+        out
+    };
+
+    assert_eq!(offset("top = 50%+", "-16"), "top = 50%-16");
+    assert_eq!(offset("top = 50%-", "-16"), "top = 50%+16");
+    assert_eq!(offset("top = 50%+", "16"), "top = 50%+16");
+    assert_eq!(offset("width = ", "-16"), "width = -16");
 }
 
 #[test]

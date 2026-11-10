@@ -32,8 +32,8 @@ terminal-box: "terminal_box_*.png"
 # glow is its own clear space, and the menu right under it, room for four
 # entries.
 + image {
-  left = 50%-372
-  top = 50%-285
+  left = 50%-418
+  top = 50%-277
   file = "logo.png"
 }
 
@@ -45,7 +45,7 @@ terminal-box: "terminal_box_*.png"
 + boot_menu {
   left = 50%-375
   width = 750
-  top = 50%+3
+  top = 50%-5
   height = 282
   item_font = "Geist Medium Regular 21"
   selected_item_font = "Geist Medium Regular 21"
