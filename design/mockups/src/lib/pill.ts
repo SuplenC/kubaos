@@ -28,6 +28,10 @@ export interface PillOptions {
   readonly content: readonly Element[];
   /** A lone symbol: `space.s8` at each end instead of `space.s12`. */
   readonly lone: boolean;
+  /** The room at each end, as QML's `padding`, where a pill sets its own: the tray's `space.s4`. */
+  readonly end?: string;
+  /** The gap between its content, as QML's `spacing`, where a pill sets its own: `space.s4`, `space.s12`. */
+  readonly gap?: string | 0;
   readonly tone?: PillTone;
   /** Takes the pointer: lit under it, pressed, and its name in a hint. */
   readonly interactive?: boolean;
@@ -54,9 +58,10 @@ export function makePill(options: PillOptions): Pill {
   element.toggleAttribute("data-lone", options.lone);
   element.style.setProperty("--fill", tone.fill);
   element.style.setProperty("--ink", tone.ink);
+  if (options.end !== undefined) element.style.setProperty("--end", `var(--space-${options.end})`);
   const clip = document.createElement("span");
   clip.className = "k-pill-clip";
-  const line = row("s8", "centre", ...options.content);
+  const line = row(options.gap ?? "s8", "centre", ...options.content);
   clip.append(line);
   element.append(clip);
   if (options.interactive) {
