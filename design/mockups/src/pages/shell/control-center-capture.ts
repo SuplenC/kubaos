@@ -3,14 +3,14 @@
 // then volume, brightness and the power stops as compact sliders.
 
 import type { Words } from "../../lib/content.ts";
-import { stack, within } from "../../lib/layout.ts";
+import { filling, stack, within } from "../../lib/layout.ts";
 import { slider } from "../../lib/slider.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { capture, type Capture, POWER_ICONS, POWER_STOPS, sliders } from "./control-center-parts.ts";
 
 const ROOM = "calc(var(--size-panel) - 2 * var(--container-0-padding))";
-const inRoom = (...parts: HTMLElement[]) => within(ROOM, stack("s16", "start", ...parts));
+const inRoom = (...parts: HTMLElement[]) => within(ROOM, stack("s16", "start", ...parts.map(filling)));
 
 type Shown = "rest" | "lit" | "pressed" | "selected" | "error";
 
