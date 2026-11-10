@@ -9,9 +9,9 @@
 //! # Not here
 //!
 //! - The rows: `kubaos_power::status`, read by `kubaos_power::live`; the scheduler's report:
-//!   `kubaos_power::scheduler`. The stops' own Items, the charge limit, the low-battery drop, LAVD
-//!   on and off and the measurement: actions of the registry (`config/kotodama/kubaos.toml`), which
-//!   run `kubaos-power`.
+//!   `kubaos_power::scheduler`. The stops' own Items, the charge limit, the low-battery drop, the
+//!   critical-battery warning, LAVD on and off and the measurement: actions of the registry
+//!   (`config/kotodama/kubaos.toml`), which run `kubaos-power`.
 
 use kotodama_protocol::Action;
 use kotodama_protocol::Item;

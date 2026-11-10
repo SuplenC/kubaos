@@ -10,6 +10,7 @@
 //! kubaos-power panel-power-saving on|off  AMD's panel power saving in the saver stops
 //! kubaos-power charge-limit 80|90|100     how far the battery charges
 //! kubaos-power low-battery power-saver|super-saver|off|PERCENT
+//! kubaos-power critical-warning PERCENT|off
 //! kubaos-power panel STOP 60hz|vrr|native what the laptop panel does in a stop
 //! kubaos-power apply                      put a hand edit of power.toml to work
 //! kubaos-power scheduler [on|off]         which CPU scheduler runs and why; LAVD on or off
@@ -57,10 +58,10 @@ use kubaos_power::control::Input;
 use kubaos_power::control::Recheck;
 use kubaos_power::control::Settle;
 use kubaos_power::control::Toast;
+use kubaos_power::indexer;
 use kubaos_power::live;
 use kubaos_power::live::PPD_PATH;
 use kubaos_power::live::PPD_SERVICE;
-use kubaos_power::live::QUIET_UNIT;
 use kubaos_power::machine::Machine;
 use kubaos_power::measure;
 use kubaos_power::memory;
@@ -80,6 +81,7 @@ use kubaos_power::status;
 use kubaos_power::stop::Profile;
 use kubaos_power::stop::Source;
 use kubaos_power::stop::Stop;
+use kubaos_power::warning;
 use kubaos_power::writes;
 
 const USAGE: &str = "\
@@ -89,6 +91,7 @@ usage: kubaos power set super-saver|power-saver|balanced|performance|max-perform
        kubaos power panel-power-saving on|off
        kubaos power charge-limit 80|90|100
        kubaos power low-battery power-saver|super-saver|off|PERCENT
+       kubaos power critical-warning PERCENT|off
        kubaos power panel STOP 60hz|vrr|native
        kubaos power scheduler [on|off]
 
@@ -99,6 +102,7 @@ measure   the battery's average draw and what woke the machine most, as a report
 panel-power-saving  AMD's panel power saving in the saver stops; off for colour-accurate work
 charge-limit        how far the battery charges, in percent
 low-battery         where the stop drops at the low-battery level, or that level in percent
+critical-warning    the battery level of the toast and sound before the power-off at 2 %, or off
 panel     the laptop panel in a stop: 60 Hz, the native rate with VRR, or native
 apply     put a hand edit of the settings file to work
 scheduler which CPU scheduler runs and why; on runs LAVD (sched_ext) in each stop's mode, off
@@ -158,6 +162,7 @@ fn main() -> ExitCode {
         )),
         ["charge-limit", percent] => report_said(charge_limit(percent)),
         ["low-battery", what] => report_said(low_battery(what)),
+        ["critical-warning", what] => report_said(critical_warning(what)),
         ["panel", stop, mode] => report_said(set_panel(stop, mode)),
         ["apply"] => report_said(apply_file()),
         ["scheduler"] | ["scheduler", "status"] => {
@@ -373,6 +378,23 @@ fn low_battery(what: &str) -> Result<String, String> {
     )
 }
 
+fn critical_warning(what: &str) -> Result<String, String> {
+    let warning = settings::parse_critical_warning(what).map_err(|err| chain(&err))?;
+    change(
+        |path| settings::set_critical_warning(path, warning),
+        |_| match warning {
+            Some(percent) => format!(
+                "At {percent} % on battery, a toast and a sound warn that the laptop powers off at {} %.",
+                settings::UPOWER_ACTION_PERCENT
+            ),
+            None => format!(
+                "The critical-battery warning is off: the laptop still powers off at {} %, unannounced.",
+                settings::UPOWER_ACTION_PERCENT
+            ),
+        },
+    )
+}
+
 fn set_panel(stop: &str, mode: &str) -> Result<String, String> {
     let stop = Stop::from_id(stop).ok_or_else(|| format!("`{stop}` isn't a stop"))?;
     let mode = PanelMode::from_name(mode).ok_or_else(|| format!("`{mode}` isn't a panel mode: 60hz, vrr or native"))?;
@@ -496,6 +518,8 @@ enum Event {
     Percent(f64),
     /// The scheduler's unit changed state.
     Scheduler(UnitState),
+    /// The file indexer started or went, on the session bus.
+    Indexer(bool),
     /// A line on the socket, and where its answer goes.
     Ask(String, Sender<String>),
     Undo,
@@ -514,6 +538,10 @@ fn serve() -> Result<(), String> {
     follow_devices(events.clone());
     follow_scheduler(&bus, events.clone());
     listen(&runtime, events.clone())?;
+    let sent = events.clone();
+    indexer::follow_in_background(move |running| {
+        let _ = sent.send(Event::Indexer(running));
+    });
     let mut service = Service::new(bus, runtime, events);
     service.run(&received)
 }
@@ -771,6 +799,7 @@ impl Service {
                 self.input(Input::Source(source));
             }
             if self.recheck.due(Instant::now()) {
+                self.keep_indexer(indexer::running());
                 self.write_plan(false);
             }
         }
@@ -786,6 +815,7 @@ impl Service {
                 let memory = memory::path().map(|path| Memory::load(&path)).unwrap_or_default();
                 let source = Source::from_on_battery(on_battery);
                 let (mut control, effects) = Control::start(memory, source, profile, drop_of(&self.settings));
+                control.set_warning(self.settings.critical_warning);
                 let mut more = Vec::new();
                 if let Some(percent) = percent {
                     more = control.handle(Input::Percent(percent));
@@ -809,6 +839,12 @@ impl Service {
             }
             Event::Percent(percent) => self.input(Input::Percent(percent)),
             Event::Scheduler(now) => self.scheduler_changed(now),
+            Event::Indexer(running) => {
+                self.keep_indexer(running);
+                // A hold started the moment the name appears can meet an indexer not yet ready,
+                // and its unit then fails and goes.
+                self.recheck.ask(Instant::now());
+            }
             Event::Undo => self.input(Input::Undo),
             Event::Ask(line, reply) => {
                 let answer = self.ask(&line);
@@ -847,6 +883,7 @@ impl Service {
                 self.retry_scheduler = *line == "retry-scheduler";
                 if let Some(control) = &mut self.control {
                     control.set_drop(drop_of(&self.settings));
+                    control.set_warning(self.settings.critical_warning);
                     let stop = control.stop();
                     self.act(vec![Effect::Apply(stop)]);
                 }
@@ -893,7 +930,7 @@ impl Service {
         self.refused.clear();
         self.publish();
         self.apply_panel(&plan);
-        Self::quiet(plan.quiet_background);
+        indexer::keep(plan.quiet_background, indexer::running());
         self.write_plan(true);
     }
 
@@ -961,33 +998,10 @@ impl Service {
         }
     }
 
-    /// Holds the file indexer paused while `quiet`, through `localsearch inhibit` in a transient
-    /// unit, so stopping the unit lets it go and a crash of this service doesn't leave it paused.
-    fn quiet(quiet: bool) {
-        if !live::has_indexer() {
-            return;
-        }
-        let held = live::unit_active(QUIET_UNIT);
-        if quiet && !held {
-            let _ = Command::new("systemd-run")
-                .args([
-                    "--user",
-                    "--quiet",
-                    "--collect",
-                    &format!("--unit={QUIET_UNIT}"),
-                    "--",
-                    "localsearch",
-                    "inhibit",
-                    "sleep",
-                    "infinity",
-                ])
-                .stdin(Stdio::null())
-                .status();
-        } else if !quiet && held {
-            let _ = Command::new("systemctl")
-                .args(["--user", "stop", &format!("{QUIET_UNIT}.service")])
-                .stdin(Stdio::null())
-                .status();
+    /// The file indexer's hold as the stop now asks, for an indexer `running` or not.
+    fn keep_indexer(&self, running: bool) {
+        if let Some(control) = &self.control {
+            indexer::keep(Plan::for_stop(control.stop(), &self.settings).quiet_background, running);
         }
     }
 
@@ -1031,6 +1045,7 @@ impl Service {
                 let body = format!("{stop}, as you left it {}.", source.words());
                 thread::spawn(move || notify(title, &body, "low", None));
             }
+            Toast::Critical { percent } => warning::ring(percent),
             Toast::Dropped { to, from, percent } => {
                 let events = self.events.clone();
                 thread::spawn(move || {
