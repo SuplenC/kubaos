@@ -341,9 +341,12 @@ export function everyRight(state: Shown = "rest"): Element[] {
   return [recordingPill({ state }), idlePill({ state }), proxyPill(false, state), keyboardPill("US", state), updatePill(undefined, state), trayPill(), sysmonPill({ state }), bellPill(false, state), statusPill({ state }), powerButton(state)];
 }
 
-/** The right group on an ordinary day: the tray, the system monitor, the bell, status, power. */
+/**
+ * The right group on an ordinary day: the tray, the system monitor with its default readings (CPU
+ * and RAM), the bell, status, power.
+ */
 export function everydayRight(state: Shown = "rest"): Element[] {
-  return [trayPill(), sysmonPill({ state }), bellPill(false, state), statusPill({ state }), powerButton(state)];
+  return [trayPill(), sysmonPill({ readings: READINGS.slice(0, 2), state }), bellPill(false, state), statusPill({ state }), powerButton(state)];
 }
 
 /** The bar's row: the left group, the clock centred, the right group. */
