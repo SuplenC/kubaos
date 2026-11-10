@@ -25,6 +25,8 @@ Singleton {
     // The battery level in percent Keep awake ends at, on battery; 0 for none.
     readonly property int keepAwakeBattery: keepAwakeInfo.battery ?? 0
     readonly property bool keepAwake: (keepAwakeInfo.active ?? false) && (keepAwakeUntil === 0 || keepAwakeUntil > now)
+    // Whether Keep awake holds the lid too, so closing it does nothing.
+    readonly property bool keepAwakeLid: keepAwake && (keepAwakeInfo.lid ?? false)
 
     // The scheduled action: "lock", "suspend", "shutdown" or "reboot", and when
     // it comes, in seconds since the epoch.
@@ -112,7 +114,7 @@ Singleton {
     Process {
         id: keepAwakeCreator
 
-        command: ["sh", "-c", '[ -e "$1" ] || printf \'{"active":false,"until":0,"battery":0}\\n\' > "$1"', "sh", keepAwakeFile.path]
+        command: ["sh", "-c", '[ -e "$1" ] || printf \'{"active":false,"until":0,"battery":0,"lid":false}\\n\' > "$1"', "sh", keepAwakeFile.path]
         onExited: keepAwakeFile.reload()
     }
 

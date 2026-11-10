@@ -241,7 +241,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             }
             idle::CHOICE_KIND => idle::choose(&item.id, action, &self.runner),
             idle::KEEP_AWAKE_KIND if action == idle::KEEP && !self.registry.hides(&item.id) => {
-                idle::keep_awake(arguments, &self.runner)
+                idle::keep_awake(&item.id, arguments, &self.runner)
             }
             shell::KIND if !self.registry.hides(&item.id) => {
                 let file = shell::path().ok_or("There's no home folder to keep the setting in")?;

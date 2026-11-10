@@ -609,59 +609,76 @@ run = ["dot-session", "restart-shell"]
 # ~/.config/kubaos/desktop/idle/idle.toml through `kubaos-idle set`, which
 # restarts hypridle and says what changed in a toast.
 #
-# Keep awake: nothing locks, goes dark or suspends by itself, and closing the
-# lid doesn't lock or suspend, on battery and plugged in, as a logind idle
-# inhibitor hypridle honours and kubaos-idle's lid holder; the bar shows it
-# while on. Docked or with a second screen, the lid does what it always does.
+# Keep awake: nothing locks, goes dark or suspends by itself, as a logind idle
+# inhibitor hypridle honours; the bar shows it while on. Closing the lid does
+# what the lid setting says. "Keep awake with the lid closed" is asked for
+# apart and also holds the lid, through kubaos-idle's lid holder: closing it
+# does nothing, on battery and plugged in. Docked or with a second screen, the
+# lid does what it always does.
 # For a while or until turned off it never ends for the battery; "until the
 # battery is at N %" ends once on battery at N % or below, and plugged in it
-# stays on. "Keep awake for…" is the Extension's own Item (`keep-awake-for`,
-# crates/kotodama-kubaos/src/idle.rs), which checks what is typed after its
+# stays on. "Keep awake for…" and "Keep awake with the lid closed for…" are the
+# Extension's own Items (`keep-awake-for`, `keep-awake-lid-for`,
+# crates/kotodama-kubaos/src/idle.rs), which check what is typed after their
 # word: a while, `keep-awake 1h30m`, or a level from 1 % to 99 %,
-# `keep-awake 25%`. The `idle` id is the old "Toggle idle", so a `hide` of it
-# still works.
+# `keep-awake-lid 25%`. The `idle` id is the old "Toggle idle", so a `hide` of
+# it still works.
 
 [extensions.kubaos.actions.idle]
 title = "Keep awake until turned off"
-subtitle = "No auto-lock, screens off or suspend, lid included, till you stop it (SUPER + CTRL + I)"
+subtitle = "No auto-lock, screens off or suspend till you stop it; the lid does as set (SUPER + CTRL + I)"
 icon = "preferences-desktop-screensaver"
 keywords = ["caffeine", "keep awake", "no sleep", "hypridle", "auto lock", "toggle idle"]
 run = ["kubaos-idle", "awake", "on"]
 
 [extensions.kubaos.actions.keep-awake-1h]
 title = "Keep awake for 1 hour"
-subtitle = "No auto-lock, screens off or suspend, lid included, for an hour, then as before"
+subtitle = "No auto-lock, screens off or suspend for an hour, then as before; the lid does as set"
 icon = "preferences-desktop-screensaver"
 keywords = ["caffeine", "keep awake", "no sleep", "presentation"]
 run = ["kubaos-idle", "awake", "1h"]
 
 [extensions.kubaos.actions.keep-awake-2h]
 title = "Keep awake for 2 hours"
-subtitle = "No auto-lock, screens off or suspend, lid included, for two hours, then as before"
+subtitle = "No auto-lock, screens off or suspend for two hours, then as before; the lid does as set"
 icon = "preferences-desktop-screensaver"
 keywords = ["caffeine", "keep awake", "no sleep", "movie"]
 run = ["kubaos-idle", "awake", "2h"]
 
 [extensions.kubaos.actions.keep-awake-battery-40]
 title = "Keep awake until the battery is at 40 %"
-subtitle = "No auto-lock, screens off or suspend, lid included, till the battery is down to 40 %; plugged in, it stays on"
+subtitle = "No auto-lock, screens off or suspend till the battery is down to 40 %; plugged in, it stays on; the lid does as set"
 icon = "preferences-desktop-screensaver"
 keywords = ["caffeine", "keep awake", "no sleep", "battery level", "percent"]
 run = ["kubaos-idle", "awake", "until", "40%"]
 
 [extensions.kubaos.actions.keep-awake-battery-20]
 title = "Keep awake until the battery is at 20 %"
-subtitle = "No auto-lock, screens off or suspend, lid included, till the battery is down to 20 %; plugged in, it stays on"
+subtitle = "No auto-lock, screens off or suspend till the battery is down to 20 %; plugged in, it stays on; the lid does as set"
 icon = "preferences-desktop-screensaver"
 keywords = ["caffeine", "keep awake", "no sleep", "battery level", "percent"]
 run = ["kubaos-idle", "awake", "until", "20%"]
 
 [extensions.kubaos.actions.keep-awake-battery-10]
 title = "Keep awake until the battery is at 10 %"
-subtitle = "No auto-lock, screens off or suspend, lid included, till the battery is down to 10 %; plugged in, it stays on"
+subtitle = "No auto-lock, screens off or suspend till the battery is down to 10 %; plugged in, it stays on; the lid does as set"
 icon = "preferences-desktop-screensaver"
 keywords = ["caffeine", "keep awake", "no sleep", "battery level", "percent"]
 run = ["kubaos-idle", "awake", "until", "10%"]
+
+[extensions.kubaos.actions.keep-awake-lid]
+title = "Keep awake with the lid closed"
+subtitle = "As Keep awake, and closing the lid does nothing, on battery too, till you stop it"
+icon = "preferences-desktop-screensaver"
+keywords = ["caffeine", "keep awake", "no sleep", "lid closed", "clamshell"]
+run = ["kubaos-idle", "awake", "lid", "on"]
+
+[extensions.kubaos.actions.keep-awake-lid-battery-20]
+title = "Keep awake with the lid closed until the battery is at 20 %"
+subtitle = "As Keep awake, and closing the lid does nothing, till the battery is down to 20 %; plugged in, it stays on"
+icon = "preferences-desktop-screensaver"
+keywords = ["caffeine", "keep awake", "no sleep", "lid closed", "clamshell", "battery level", "percent"]
+run = ["kubaos-idle", "awake", "lid", "until", "20%"]
 
 [extensions.kubaos.actions.keep-awake-off]
 title = "Stop keeping awake"

@@ -11,7 +11,8 @@
 //! kubaos-idle apply                         put a hand edit of the file to work
 //! kubaos-idle awake DURATION|LEVEL|on|off|toggle
 //!                                           Keep awake for 1h, until the battery is at 20%, until
-//!                                           turned off, or no more
+//!                                           turned off, or no more; the lid does as set
+//! kubaos-idle awake lid DURATION|LEVEL|on   the same, and closing the lid does nothing
 //! kubaos-idle schedule lock|suspend|shutdown|reboot in DURATION | at TIME
 //!                                           once at a time, idle or not: 10m, 20:00,
 //!                                           friday 17:00; `lock in|at` is short for the lock
@@ -73,6 +74,7 @@ usage: kubaos-idle status
        kubaos-idle set lid suspend|lock|nothing [battery|ac]
        kubaos-idle reset | apply
        kubaos-idle awake DURATION|LEVEL|on|off|toggle
+       kubaos-idle awake lid DURATION|LEVEL|on
        kubaos-idle schedule lock|suspend|shutdown|reboot in DURATION | at TIME
        kubaos-idle schedule cancel
        kubaos-idle write | session | lid closed
@@ -83,9 +85,10 @@ set     after how long idle the screen locks, the screens go off, or it suspends
 reset   KubaOS's defaults: lock 5 min, screens off 10 min, suspend 30 min on battery only, the
         lid suspends on battery
 apply   put a hand edit of the settings file to work
-awake   Keep awake: nothing locks, turns off or suspends by itself, and closing the lid does
-        nothing, for a while (1h, 2h), until the battery is at a level (20%; plugged in it stays
-        on), or until turned off
+awake   Keep awake: nothing locks, turns off or suspends by itself, for a while (1h, 2h), until
+        the battery is at a level (20%; plugged in it stays on), or until turned off. Closing the
+        lid still does what it is set to. With `lid` first, closing the lid does nothing too, on
+        battery and plugged in
 schedule  lock, suspend, shut down or reboot once, idle or not, in a while (10m) or at a time
         (20:00, friday 17:00); one at a time, a new one replaces it. Keep awake doesn't hold it
         back. `lock in|at|cancel` is short for `schedule lock in|at` and `schedule cancel`
@@ -145,12 +148,9 @@ fn main() -> ExitCode {
         ["write"] => report(Toast::Idle, write_listeners()),
         ["session"] => session(),
         ["awake", "hold", until, battery] => report(Toast::KeepAwake, awake_hold(until, battery)),
-        ["awake", "on"] => report(Toast::KeepAwake, awake_start(awake::State::on(0))),
         ["awake", "off"] => report(Toast::KeepAwake, awake_off()),
         ["awake", "toggle"] => report(Toast::KeepAwake, awake_toggle()),
-        ["awake", "for" | "until", rest @ ..] | ["awake", rest @ ..] if !rest.is_empty() => {
-            report(Toast::KeepAwake, awake_for(&rest.join(" ")))
-        }
+        ["awake", rest @ ..] if !rest.is_empty() => report(Toast::KeepAwake, awake_asked(rest)),
         ["schedule" | "lock", "cancel"] => report(Toast::Scheduled(Action::Lock), schedule_cancel()),
         ["schedule", "fire", action, at] => report(Toast::Idle, schedule_fire(action, at)),
         ["schedule", "warn", secs, action, at] => report(Toast::Idle, schedule_warn(secs, action, at)),
@@ -281,6 +281,9 @@ fn status() {
                 "Keep awake: on until {}",
                 words::time_of_day(&at(keep.until), &now, format)
             );
+        }
+        if keep.lid {
+            println!("Keep awake holds the lid: closing it does nothing");
         }
     }
     let scheduled = runtime
@@ -464,13 +467,14 @@ fn run(command: &mut Command) -> Result<(), String> {
     Err(format!("{program} failed: {said}"))
 }
 
-/// Whether Keep awake holds now, as its state file says.
-fn kept_awake() -> bool {
-    kubaos_idle::runtime_dir()
-        .is_some_and(|runtime| awake::State::read(&awake::path(&runtime)).holds(Zoned::now().timestamp().as_second()))
+/// Whether a Keep awake holds the lid now, as its state file says.
+fn lid_held() -> bool {
+    kubaos_idle::runtime_dir().is_some_and(|runtime| {
+        awake::State::read(&awake::path(&runtime)).holds_lid(Zoned::now().timestamp().as_second())
+    })
 }
 
-/// Starts the lid's holder when the settings or Keep awake need one and none runs, and stops it
+/// Starts the lid's holder when the settings or a Keep awake need one and none runs, and stops it
 /// when it may end ([`lid::holder_ends`]); with a closed lid it stays and ends itself once the lid
 /// opens. `fresh` starts it over, so a login runs the holder of the kubaos-idle installed now.
 fn sync_lid_holder(settings: &Settings, fresh: bool) -> Result<(), String> {
@@ -478,13 +482,13 @@ fn sync_lid_holder(settings: &Settings, fresh: bool) -> Result<(), String> {
         stop_units(&[format!("{}.service", lid::UNIT)]);
     }
     let running = !fresh && unit_active(lid::UNIT);
-    let kept = kept_awake();
-    if lid::needs_holder(settings, kept) && !running {
+    let held = lid_held();
+    if lid::needs_holder(settings, held) && !running {
         let argv = [
             "systemd-inhibit",
             "--what=handle-lid-switch",
             "--who=KubaOS",
-            "--why=Your lid setting, or Keep awake (kubaos-idle)",
+            "--why=Your lid setting, or Keep awake with the lid closed (kubaos-idle)",
             "--mode=block",
             &this_program(),
             "lid",
@@ -492,7 +496,7 @@ fn sync_lid_holder(settings: &Settings, fresh: bool) -> Result<(), String> {
         ]
         .map(str::to_owned);
         run_unit(lid::UNIT, &argv)?;
-    } else if running && lid::holder_ends(settings, kept, logind_lid().is_some_and(|state| state.closed)) {
+    } else if running && lid::holder_ends(settings, held, logind_lid().is_some_and(|state| state.closed)) {
         stop_units(&[format!("{}.service", lid::UNIT)]);
     }
     Ok(())
@@ -553,7 +557,7 @@ fn lid_closed() -> Result<(), String> {
         &settings,
         docked,
         machine::power(Path::new(machine::POWER_SUPPLY)),
-        kept_awake(),
+        lid_held(),
     ) {
         LidAction::Suspend => suspend(),
         LidAction::Lock => lock_session()?,
@@ -575,21 +579,21 @@ fn lid_hold() -> Result<(), String> {
         if let (read, None) = load() {
             settings = read;
         }
-        let kept = kept_awake();
+        let held = lid_held();
         let Some(state) = logind_lid() else {
-            if !lid::needs_holder(&settings, kept) {
+            if !lid::needs_holder(&settings, held) {
                 return Ok(());
             }
             continue;
         };
-        if lid::holder_ends(&settings, kept, state.closed) {
+        if lid::holder_ends(&settings, held, state.closed) {
             return Ok(());
         }
         let action = lid::action(
             &settings,
             state.docked,
             machine::power(Path::new(machine::POWER_SUPPLY)),
-            kept,
+            held,
         );
         if recheck.tick(awake.elapsed(), state.closed, action) {
             suspend();
@@ -621,16 +625,18 @@ fn battery_now() -> Option<u8> {
     machine::battery(Path::new(machine::POWER_SUPPLY))
 }
 
-/// Keeps awake for a while or until the battery is at a level, as typed.
-fn awake_for(typed: &str) -> Result<(), String> {
-    match awake::Length::parse(typed).map_err(|err| chain(&err))? {
-        awake::Length::For(duration) => {
+/// Keeps awake as the words after `kubaos-idle awake` ask.
+fn awake_asked(words: &[&str]) -> Result<(), String> {
+    let asked = awake::Asked::parse(words).map_err(|err| chain(&err))?;
+    let state = match asked.length {
+        None => awake::State::on(0),
+        Some(awake::Length::For(duration)) => {
             let until = Zoned::now()
                 .checked_add(duration)
-                .map_err(|err| format!("{typed} from now is out of range: {err}"))?;
-            awake_start(awake::State::on(until.timestamp().as_second()))
+                .map_err(|err| format!("{} from now is out of range: {err}", words.join(" ")))?;
+            awake::State::on(until.timestamp().as_second())
         }
-        awake::Length::UntilBattery(level) => {
+        Some(awake::Length::UntilBattery(level)) => {
             let power = machine::power(Path::new(machine::POWER_SUPPLY));
             if let Some(percent) = battery_now().filter(|&percent| level.reached(power, Some(percent))) {
                 return Err(format!(
@@ -638,12 +644,14 @@ fn awake_for(typed: &str) -> Result<(), String> {
                     level.percent()
                 ));
             }
-            awake_start(awake::State::until_battery(level))
+            awake::State::until_battery(level)
         }
-    }
+    };
+    awake_start(if asked.lid { state.holding_lid() } else { state })
 }
 
-/// Keeps awake as `state` says, in place of any Keep awake before it, and holds the lid.
+/// Keeps awake as `state` says, in place of any Keep awake before it, and starts or lets go of the
+/// lid's holder as it asks.
 fn awake_start(state: awake::State) -> Result<(), String> {
     let path = awake::path(&runtime()?);
     stop_units(&[format!("{}.service", awake::UNIT)]);
@@ -683,25 +691,26 @@ fn awake_start(state: awake::State) -> Result<(), String> {
     sync_lid_holder(&settings, false)
         .map_err(|message| format!("Kept awake, but closing the lid still does what it did: {message}"))?;
     let now = Zoned::now();
-    let body = if let Some(level) = state.level() {
+    let length = if let Some(level) = state.level() {
         format!(
-            "On until the battery is at {} %; plugged in, it stays on. Nothing locks, goes dark or \
-             suspends by itself, and closing the lid doesn't lock or suspend, till then.",
+            "On until the battery is at {} %; plugged in, it stays on.",
             level.percent()
         )
     } else if state.until == 0 {
-        "On until you turn it off. Nothing locks, goes dark or suspends by itself, and closing the lid \
-         doesn't lock or suspend."
-            .to_owned()
+        "On until you turn it off.".to_owned()
     } else {
         format!(
-            "On for {}, until {}. Nothing locks, goes dark or suspends by itself, and closing the lid \
-             doesn't lock or suspend, till then.",
+            "On for {}, until {}.",
             words::left(state.until - now.timestamp().as_second()),
             words::time_of_day(&at(state.until), &now, clock_format())
         )
     };
-    say(Toast::KeepAwake, &body);
+    let holds = if state.lid {
+        "Nothing locks, goes dark or suspends by itself, and closing the lid does nothing, on battery too."
+    } else {
+        "Nothing locks, goes dark or suspends by itself. Closing the lid still does what it is set to."
+    };
+    say(Toast::KeepAwake, &format!("{length} {holds}"));
     Ok(())
 }
 
