@@ -1,0 +1,44 @@
+/* The screen frame as `config/quickshell/modules/frame/Frame.qml` draws it, with its reveal: 1 shown,
+   0 retracted under a fullscreen window. Its sides, its bar's room and its inner corners all go to
+   nothing with it; the bar slides up out of the screen and fades with it. */
+
+@property --revealed {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+.k-screen.shell-frame {
+  --frame-top: calc(var(--size-bar) * var(--revealed));
+  --frame-side: calc(var(--space-s8) * var(--revealed));
+}
+
+.shell-frame .k-frame {
+  border-radius: calc(var(--radius-surface) * var(--revealed));
+}
+
+.shell-frame .k-bar {
+  top: calc(var(--frame-top) - var(--size-bar));
+  left: var(--space-s8);
+  right: var(--space-s8);
+  height: var(--size-bar);
+  opacity: var(--revealed);
+}
+
+.shell-frame[data-fullscreen] {
+  --revealed: 0;
+}
+
+.shell-frame[data-live] {
+  transition: --revealed var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.shell-frame[data-live][data-fullscreen] {
+  transition: --revealed var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.shell-frame-desktop {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
