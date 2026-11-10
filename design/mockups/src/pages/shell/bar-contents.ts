@@ -1,5 +1,6 @@
-// The Bar pills page: every pill of `config/quickshell/modules/bar/` but the tray, the recording and
-// the workspaces, which have pages of their own. Each is the library's Pill holding its own content.
+// The Bar contents page: the pills `config/quickshell/modules/bar/` carries, but the tray, the
+// recording and the workspaces, which have pages of their own. Each is the library's Pill holding
+// its own content.
 
 import type { Words } from "../../lib/content.ts";
 import type { Shown } from "../../lib/control.ts";
@@ -86,10 +87,11 @@ const SYSMON_SAMPLE = () => sysmonPill({ readings: READINGS.slice(0, 2) });
 
 export default page<State>({
   level: "shell",
-  slug: "bar-pills",
-  title: "Bar pills",
-  lede: "Each pill of the bar, its content and its states: clock, status, bell, layout, keep awake, Proxy, update, preview, system monitor, power.",
+  slug: "bar-contents",
+  title: "Bar contents",
+  lede: "The pills the bar carries, each built from Pill: clock, status, bell, layout, Keep awake, Proxy, update, preview, system monitor.",
   code: { qml: "Clock, Status, Bell, KeyboardLayout, IdleIndicator, ProxyIndicator, UpdateIndicator, PreviewIndicator, SysmonPill" },
+  from: ["pill"],
   stage: { live, hint: "point at one; click US; right-click the monitor", daylight: true },
   variants: [
     { name: "Clock", for: "kanji `tertiary`, date `body`, time `mono_large`", sample: () => clockPill() },

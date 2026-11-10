@@ -224,6 +224,13 @@ body {
   max-width: none;
 }
 
+/* The library's parts a surface is built from, each a link to its page. */
+.page-from-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: var(--space-s4);
+}
+
 .page-tags {
   display: flex;
   flex-wrap: wrap;

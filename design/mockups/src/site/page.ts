@@ -343,6 +343,11 @@ export interface Page<S extends State = State> {
   /** One sentence: what it is. */
   readonly lede: Lede;
   readonly code: Code;
+  /**
+   * The library's parts it is built from, by their pages' slugs, for a page of a surface built
+   * from them: its header says "Built from" and links each.
+   */
+  readonly from?: NonEmpty<string>;
   readonly stage: Stage;
   readonly variants: readonly Variant[] | DoesntApply;
   readonly sizes: readonly Variant[] | DoesntApply;
