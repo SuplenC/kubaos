@@ -10,6 +10,7 @@ name = "kubaos-power"
 path = "src/main.rs"
 
 [dependencies]
+jiff.workspace = true
 kubaos-user-layer.workspace = true
 # The service's log, on stderr, which the journal keeps with each line's priority.
 log = "0.4"

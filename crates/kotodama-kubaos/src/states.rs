@@ -14,6 +14,7 @@
 //! | `proxy.local-network` | on: the kill switch lets the local network through | `U/desktop/network/proxy.toml`, on without it |
 //! | `notifications.dnd` | on: Do not disturb is on | `$XDG_RUNTIME_DIR/kubaos-dnd.json` |
 //! | `power.panel-power-saving` | on: panel power saving | `U/desktop/power/power.toml` |
+//! | `power.battery-notes` | on: the toasts when a sleep or a night went wrong | the same |
 //! | `power.scheduler` | `kernel` or `lavd` | the same |
 //! | `power.low-battery` | `power-saver`, `super-saver` or `off` | the same |
 //! | `power.critical-warning` | on: the critical-battery warning | the same |
@@ -90,6 +91,8 @@ pub const PROXY_LOCAL_NETWORK: &str = "proxy.local-network";
 pub const DND: &str = "notifications.dnd";
 /// Whether the saver stops dim the panel.
 pub const PANEL_POWER_SAVING: &str = "power.panel-power-saving";
+/// Whether a toast says when a sleep or a night on battery went wrong.
+pub const BATTERY_NOTES: &str = "power.battery-notes";
 /// The CPU scheduler's name in the power settings.
 pub const SCHEDULER: &str = "power.scheduler";
 /// Where the low-battery drop goes, or `off`.
@@ -292,6 +295,7 @@ impl States {
         }
         if let Ok(power) = kubaos_power::settings::Settings::load(&files.power) {
             self.set(PANEL_POWER_SAVING, Reading::Bool(power.panel_power_saving));
+            self.set(BATTERY_NOTES, Reading::Bool(power.battery_notes));
             self.set(SCHEDULER, Reading::Word(power.scheduler.name().to_owned()));
             let low_battery = power.low_battery_stop.map_or("off", |stop| stop.id());
             self.set(LOW_BATTERY, Reading::Word(low_battery.to_owned()));
@@ -313,8 +317,8 @@ pub fn values(name: &str) -> Option<Values> {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK
-        | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED | DEPTH
-        | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => Some(Values::Bool),
+        | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES | UNFREE | PREVIEW | BLUETOOTH_UNNAMED
+        | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,

@@ -30,6 +30,7 @@ fn the_defaults_drop_to_power_saver_at_20_and_charge_full() {
     assert_eq!(settings.low_battery_stop, Some(Stop::PowerSaver));
     assert_eq!(settings.charge_limit, ChargeLimit::Full);
     assert!(settings.panel_power_saving);
+    assert!(settings.battery_notes);
     assert_eq!(settings.usb_skip, Vec::<UsbId>::new());
 }
 
@@ -228,4 +229,21 @@ fn setting_the_critical_warning_out_of_range_changes_nothing() {
     assert!(set_critical_warning(&path, Some(2)).is_err());
 
     assert_eq!(fs::read_to_string(&path).expect("read"), "low_battery = 15\n");
+}
+
+#[test]
+fn battery_notes_off_is_a_line_and_on_removes_it() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let path = dir.path().join(FILE);
+    fs::write(&path, "# my comment\ncharge_limit = 80\n").expect("write");
+
+    let off = set_battery_notes(&path, false).expect("off");
+    let written = fs::read_to_string(&path).expect("read");
+    let on = set_battery_notes(&path, true).expect("on");
+
+    assert!(!off.battery_notes);
+    assert!(written.contains("battery_notes = false"));
+    assert!(written.contains("# my comment"));
+    assert!(on.battery_notes);
+    assert!(!fs::read_to_string(&path).expect("read").contains("battery_notes"));
 }
