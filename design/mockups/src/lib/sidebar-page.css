@@ -103,12 +103,13 @@
 
 .k-sp-row[data-kind="sub"] {
   height: var(--size-control_sm);
+  padding-left: calc(var(--space-s12) + var(--type-body-icon) + var(--space-s12));
 }
 
-/* Where a sub-section's words start, past the symbols' column, and words lined up with them. */
-.k-sp-row[data-kind="sub"],
-.k-sp-sub-start {
-  padding-left: calc(var(--space-s12) + var(--type-body-icon) + var(--space-s12));
+/* A fold (`sidebarFold`), a level over its rows: its words and symbol `on_surface` at rest, a step
+   up from the rows' `on_surface_variant`. */
+.k-sp-row[data-fold] {
+  --words: var(--color-on_surface);
 }
 
 .k-sp-row[data-current] {
