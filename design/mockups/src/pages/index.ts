@@ -77,9 +77,14 @@ import listDetail from "./templates/list-detail.ts";
 import lockPage from "./templates/lock.ts";
 import panelPage from "./templates/panel-page.ts";
 import sidebarPage from "./templates/sidebar-page.ts";
+import notificationCard from "./shell/notification-card.ts";
+import notificationGroup from "./shell/notification-group.ts";
+import notificationPeek from "./shell/notification-peek.ts";
+import notificationPopups from "./shell/notification-popups.ts";
+import notificationsPanel from "./shell/notifications-panel.ts";
 import stepRailPage from "./templates/step-rail-page.ts";
 
-export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, slider, tabs, select, popover, menu, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, media, pictureChoice, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll, progressBar, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard];
+export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, slider, tabs, select, popover, menu, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, media, pictureChoice, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll, progressBar, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard, notificationsPanel, notificationGroup, notificationCard, notificationPopups, notificationPeek];
 
 export function pagesOf(level: Level): AnyPage[] {
   return PAGES.filter((page) => page.level === level);
