@@ -37,12 +37,17 @@
   min-width: 0;
 }
 
-/* A bar alone, without its screen: the frame's surface under it, at the frame's glass. */
+/* A bar alone, without its screen: the frame's surface under it, at the frame's glass. It is a
+   screen's width and never narrower: squeezed into a narrow card, its right group would run over
+   the clock, which the bar does only on a screen too narrow for it. */
 .shell-bar-strip {
   position: relative;
   display: flex;
+  flex: none;
   box-sizing: border-box;
   width: var(--strip-width);
+  min-width: var(--strip-width);
+  max-width: none;
   height: var(--size-bar);
   padding: 0 var(--space-s8);
   background: rgb(from var(--color-surface) r g b / var(--opacity-frame));

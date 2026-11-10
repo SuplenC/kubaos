@@ -13,7 +13,6 @@ import { barScreen, CLOCK } from "./bar-parts.ts";
 type State = "rest" | "open";
 
 const LAPTOP = WINDOWS[2]!;
-const SMALL = { width: "var(--size-app_min_width)", height: "var(--size-app_min_height)" };
 
 interface FrameOptions {
   readonly width?: string;
@@ -26,7 +25,8 @@ interface FrameOptions {
 }
 
 function frame(options: FrameOptions = {}): HTMLElement {
-  const shown = barScreen(options.width ?? SMALL.width, options.height ?? SMALL.height, { clock: { countdown: CLOCK.countdown } });
+  // A laptop's screen: the narrowest the everyday bar fits without its pills meeting the clock.
+  const shown = barScreen(options.width ?? LAPTOP.width, options.height ?? LAPTOP.height, { clock: { countdown: CLOCK.countdown } });
   const element = shown.element;
   element.classList.add("shell-frame");
   element.toggleAttribute("data-fullscreen", options.fullscreen ?? false);
