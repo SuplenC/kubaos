@@ -253,6 +253,19 @@
               export SCCACHE_DIR=''${SCCACHE_DIR:-''${XDG_CACHE_HOME:-$HOME/.cache}/sccache}
             '';
           };
+          # The logo's tools, for `just branding` (branding/README.md, "Regenerating").
+          # nixpkgs' Pillow is built with libimagequant, which neon.py picks the
+          # boot layers' palettes with.
+          branding = pkgs.mkShell {
+            packages = [
+              pkgs.resvg
+              pkgs.imagemagick
+              (pkgs.python3.withPackages (p: [
+                p.pillow
+                p.numpy
+              ]))
+            ];
+          };
         }
       );
     };

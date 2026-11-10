@@ -127,6 +127,11 @@ design-parity:
 tokens:
     cargo run -q -p kubaos-tokens -- write
 
+# Render the logo and every picture made from it (branding/README.md, "Regenerating"): the vector marks, the neon sign's assets and boot layers, the boot screens' pictures, then the token outputs that measure them. In the flake's `branding` shell.
+branding:
+    nix develop .#branding -c branding/render.sh
+    cargo run -q -p kubaos-tokens -- write
+
 # After fixing literal design values: lower design/lint-baseline.toml to what the lint finds. It never raises a count.
 design-baseline:
     cargo run -q -p kubaos-design -- baseline

@@ -83,14 +83,15 @@ run it after `render.sh`. Kōbō carries copies of the mark, the wordmark and
 Change the drawing in `make.py` or the cut in `neon.py`, then run:
 
 ```sh
-PYTHON=python3 branding/render.sh
+just branding
 ```
 
-It runs `make.py`, renders the SVGs, writes `fastfetch.txt`, then runs
-`neon.py` and `boot.py`. It needs `resvg`, ImageMagick and a python3 (3.11 or
-later, for `tomllib`) with numpy and a Pillow built with libimagequant, as
-nixpkgs' is (`PYTHON` picks it). Don't hand-edit the SVGs or PNGs, they get
-overwritten.
+It runs `render.sh` in the flake's `branding` shell: `make.py`, the SVGs
+rendered, `fastfetch.txt`, then `neon.py` and `boot.py`. Then it writes the
+token outputs that measure the boot pictures. Outside that shell,
+`render.sh` needs `resvg`, ImageMagick and a python3 (3.11 or later, for
+`tomllib`) with numpy and a Pillow built with libimagequant (`PYTHON` picks
+it). Don't hand-edit the SVGs or PNGs, they get overwritten.
 
 ## Colours
 
