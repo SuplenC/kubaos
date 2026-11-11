@@ -526,7 +526,10 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
   shortcutsMade.element.classList.add("gl-info");
   const tip = document.createElement("span");
   tip.className = "gl-tip";
-  screen.append(bar, shortcutsMade.element, tip);
+  const controls = document.createElement("span");
+  controls.className = "gl-controls";
+  controls.append(bar, shortcutsMade.element);
+  screen.append(controls, tip);
 
   let tipFor: HTMLElement | null = null;
   const showTip = (control: HTMLElement) => {
@@ -690,7 +693,6 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     const folder = folders[S.folder]!;
     const now = document.createElement("span");
     now.className = "gl-bar-now";
-    now.hidden = !S.full;
     const before = iconButton({ icon: "chevron_left", label: "The picture before", kind: "Text", size: "Sm", hint: false, disabled: S.at[S.folder] === 0 });
     const after = iconButton({ icon: "chevron_right", label: "The picture after", kind: "Text", size: "Sm", hint: false, disabled: S.at[S.folder]! >= folder.pictures.length - 1 });
     tipOn(before, "The picture before", "←");
@@ -708,9 +710,17 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     now.append(before, ...words, after);
     const views = tabs({ choices: VIEWS.map((view) => ({ label: VIEW_NAMES[view] })), picked: VIEWS.indexOf(S.view), onPick: (index) => void setView(VIEWS[index]!) });
     views.querySelectorAll<HTMLElement>(".k-tab").forEach((tab, index) => tipOn(tab, VIEW_NAMES[VIEWS[index]!], String(index + 1)));
-    const stepper = button({ label: S.full ? "Back to the wall" : "Full screen", kind: "Text", size: "Sm", icon: "desktop_windows" });
-    tipOn(stepper, S.full ? "Back to the wall" : "Full screen", "F");
-    stepper.addEventListener("click", (event) => (event.stopPropagation(), void step(!S.full)));
+    // Both of the step's words, the one the bar isn't in shut to nothing.
+    const stepper = document.createElement("span");
+    stepper.className = "gl-step-pair";
+    for (const [label, full] of [["Full screen", true], ["Back to the wall", false]] as const) {
+      const made = button({ label, kind: "Text", size: "Sm", icon: "desktop_windows" });
+      tipOn(made, label, "F");
+      made.addEventListener("click", (event) => (event.stopPropagation(), void step(full)));
+      const cell = document.createElement("span");
+      cell.append(made);
+      stepper.append(cell);
+    }
     const actions = buttonBar({
       dismiss: "Cancel",
       actions: [...(S.view === "lock" ? [{ label: S.awake ? "Rest" : "Wake", kind: "Text" as const }] : []), { label: "Apply", kind: "Filled" }],
@@ -731,13 +741,28 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
       made.className = "gl-bar-rule";
       return made;
     };
-    bar.replaceChildren(...(S.full ? [now, rule()] : []), views, stepper, rule(), actions.element);
+    // The full screen's lead is always there, shut to nothing on the wall (`data-full`).
+    const lead = document.createElement("span");
+    lead.className = "gl-bar-lead";
+    const leadInner = document.createElement("span");
+    leadInner.append(now, rule());
+    lead.append(leadInner);
+    bar.replaceChildren(lead, views, stepper, rule(), actions.element);
     bar.toggleAttribute("data-lifted", S.full && S.view === "lock" && S.awake);
     if (tipFor && !tipFor.isConnected) hideTip(tipFor);
   };
 
+  /** The bar's full-screen look, at once or over the picture's step (`time`). */
+  const barFull = (full: boolean, time = 0) => {
+    screen.style.setProperty("--step-time", `${time}ms`);
+    screen.style.setProperty("--step-curve", curveOf(reducedFor(screen) ? "standard" : "emphasized_decel"));
+    screen.toggleAttribute("data-full", full);
+  };
+
   const draw = () => {
     screen.toggleAttribute("data-open", S.open);
+    screen.toggleAttribute("data-covering", !S.open);
+    barFull(S.full);
     screen.toggleAttribute("data-stills", S.stills);
     screen.style.setProperty("--out", S.full ? "1" : "0");
     drawWall();
@@ -819,7 +844,10 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     S.busy = true;
     S.full = full;
     drawBar();
-    await stepTo(full ? 1 : 0, full ? ms("slow") : ms("long"));
+    const time = full ? ms("slow") : ms("long");
+    // The bar changes with the picture's step, over its time and curve; with reduce motion a short fade.
+    barFull(full, reducedFor(screen) ? ms("short") : time);
+    await stepTo(full ? 1 : 0, time);
     S.busy = false;
   }
 
@@ -918,6 +946,10 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     // where the live desktop has it until the move eases it.
     screen.toggleAttribute("data-open", true);
     screen.toggleAttribute("data-stills", false);
+    // The controls are in their places from the first frame, covered by the desktop until its edge
+    // passes over them; with reduce motion they fade in with the room.
+    screen.toggleAttribute("data-covering", !reducedFor(screen));
+    barFull(false);
     drawWall();
     drawBar();
     // The stills are asked for now and land while the gallery opens.
@@ -929,7 +961,9 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     const opened = viewMoves("picture");
     // The bar shows the view the wall opens in, Picture, from the first frame.
     drawBar();
+    if (reducedFor(screen)) controls.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1 }], { duration: 2 * ms("short"), easing: curveOf("standard") });
     await Promise.all([opened, stepTo(0, ms("slow"))]);
+    screen.toggleAttribute("data-covering", false);
     S.busy = false;
   }
 
@@ -938,8 +972,12 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     // The lamp goes off as the picture grows back into the desktop; the bar and the shortcuts'
     // button fade, the bar keeping its words meanwhile.
     lightsOff();
-    screen.toggleAttribute("data-open", false);
     shortcutsMade.set(false);
+    // On the full screen the controls lie over the picture, which can't cover them: they go with a
+    // short fade, as they do with reduce motion; on the wall the growing picture covers them.
+    if (S.full || reducedFor(screen)) await ease(controls, "opacity", 0, ms("short"), "standard");
+    screen.toggleAttribute("data-covering", true);
+    screen.toggleAttribute("data-open", false);
     const toDesk = S.view === "desktop" ? Promise.resolve() : viewMoves("desktop");
     const stepped = S.full ? Promise.resolve() : stepTo(1, ms("slow"));
     S.full = true;
@@ -948,6 +986,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     shortcutsMade.set(false);
     settle();
     draw();
+    controls.style.removeProperty("opacity");
   }
 
   /** Enter: the picture in front of you becomes the desktop. */
