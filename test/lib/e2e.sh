@@ -3165,9 +3165,8 @@ c_suite_rust() {
     { echo "FAIL rust-analyzer should add its component and run: $(zrun "cd $project && rust-analyzer --version" 2>&1 | tail -3)"; return 1; }
   echo "ok   Neovim finds rust-analyzer and codelldb through exepath, codelldb with the LLDB of its extension; rust-analyzer adds its component on first run"
 
-  # mise's prune keeps a version a running process uses, and the builds above
-  # left sccache's server running from the Suite's sccache.
-  zrun 'sccache --stop-server' >/dev/null 2>&1 || true
+  # The builds above left sccache's server running from the Suite's sccache,
+  # which the removal stops before its prune.
   out="$(kz 'kubaos suite remove rust --foreground' 2>&1)" ||
     { echo "FAIL kubaos suite remove rust"; printf '%s\n' "$out" | tail -20; return 1; }
   grep -qE '^cache ~/.rustup \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" && [[ -f $settings && -f $project/src/main.rs ]] &&

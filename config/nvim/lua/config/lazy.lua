@@ -38,7 +38,7 @@ require("lazy").setup({
     { import = "lazyvim.plugins.extras.util.mini-hipatterns" },
     -- The extras' npm-based tools come from Nix (home/cli.nix): Mason installs
     -- them with npm, which only the Node Suite brings.
-    require("config.suite_tools").from_nix({
+    require("config.suite_tools").on_path({
       servers = { "jsonls", "yamlls", "dockerls", "docker_compose_language_service", "bashls" },
       packages = { "prettier", "markdownlint-cli2", "markdown-toc" },
     }),

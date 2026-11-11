@@ -94,6 +94,9 @@ pub struct Suite {
     pub mise: &'static [Tool],
     /// Where its toolchain comes from.
     pub toolchain: Toolchain,
+    /// Commands, run through mise, that stop a server one of its tools leaves running. mise's
+    /// prune never deletes a version a running process uses, so they run before one.
+    pub stop_servers: &'static [&'static [&'static str]],
     /// What its tools download or build outside the Nix store, which removal deletes only when
     /// asked.
     pub caches: &'static [Cache],
@@ -338,7 +341,7 @@ pub enum SuiteError {
     #[error("listing mise's tools")]
     Tools(#[source] MiseError),
     /// The Suite's files are written or deleted, but mise could not delete the versions nothing
-    /// selects any more.
+    /// selects any more, or stop a server of the Suite's tools before it did.
     #[error("pruning mise's unused versions")]
     Prune(#[source] MiseError),
     /// mise could not lock the Suite's tools, or install what the lockfile then names. The Suite
@@ -540,6 +543,7 @@ impl Suites {
         if moved {
             self.install(suite, &tools)?;
             self.commit(suite, changed.then_some(&config), &tools, &before)?;
+            self.stop_servers(suite);
             self.mise.prune().map_err(SuiteError::Prune)?;
         } else if changed {
             self.write(suite, &config)?;
@@ -571,6 +575,7 @@ impl Suites {
         self.write_lockfile(before.lockfile.as_deref())?;
         if !suite.mise.is_empty() {
             self.install(suite, &before.tools)?;
+            self.stop_servers(suite);
             self.mise.prune().map_err(SuiteError::Prune)?;
         }
         Ok(())
@@ -592,6 +597,9 @@ impl Suites {
             });
         }
         let dropped: Vec<String> = self.fragment(suite)?.into_iter().map(|t| t.tool).collect();
+        if !dropped.is_empty() {
+            self.stop_servers(suite);
+        }
         self.delete_record(suite)?;
         self.write_fragment(suite, &[])?;
         // HAZARD: unlock before pruning. While any global config is left (the user's
@@ -915,6 +923,14 @@ impl Suites {
         let _ = self.write_lockfile(before.lockfile.as_deref());
         if !suite.mise.is_empty() {
             let _ = self.mise.prune();
+        }
+    }
+
+    /// Stops the servers `suite`'s tools leave running, so a prune can delete their versions.
+    /// A server that isn't running is the usual case, so a failure is no error.
+    fn stop_servers(&self, suite: &Suite) {
+        for argv in suite.stop_servers {
+            let _ = self.mise.exec(argv);
         }
     }
 

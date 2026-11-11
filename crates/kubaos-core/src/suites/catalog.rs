@@ -57,6 +57,7 @@ const NODE: Suite = Suite {
         },
     ],
     toolchain: Toolchain::Mise,
+    stop_servers: &[],
     caches: &[
         Cache {
             path: ".npm",
@@ -69,6 +70,11 @@ const NODE: Suite = Suite {
         Cache {
             path: ".local/share/bun",
             description: "The packages `bun add --global` installed, and Bun's download cache.",
+        },
+        // Where the Suite on Nix had Bun keep its downloads; a removal lists it while a home has it.
+        Cache {
+            path: ".cache/bun",
+            description: "Bun's download cache, from the Node Suite on Nix.",
         },
     ],
     // Node's first, as `kubaos suite new` takes the first by default: it needs no extra.
@@ -139,6 +145,7 @@ const PYTHON: Suite = Suite {
         },
     ],
     toolchain: Toolchain::Upstream { manager: "uv" },
+    stop_servers: &[],
     caches: &[
         Cache {
             path: ".cache/uv",
@@ -181,6 +188,7 @@ const PHP: Suite = Suite {
     extras: &[],
     mise: &[],
     toolchain: Toolchain::Nix,
+    stop_servers: &[],
     caches: &[Cache {
         path: ".cache/composer",
         description: "composer's download cache.",
@@ -233,6 +241,7 @@ const PROTO: Suite = Suite {
         extra: None,
     }],
     toolchain: Toolchain::Upstream { manager: "proto" },
+    stop_servers: &[],
     caches: &[Cache {
         path: ".local/share/proto",
         description: "The tools, shims and plugins proto installed, moon among them.",
@@ -292,6 +301,7 @@ const GO: Suite = Suite {
         },
     ],
     toolchain: Toolchain::Mise,
+    stop_servers: &[],
     caches: &[
         Cache {
             path: "go",
@@ -383,6 +393,8 @@ const RUST: Suite = Suite {
         },
     ],
     toolchain: Toolchain::Upstream { manager: "rustup" },
+    // The server a build starts outlives it, on the sccache that started it.
+    stop_servers: &[&["sccache", "--stop-server"]],
     caches: &[
         Cache {
             path: ".rustup",
@@ -445,6 +457,7 @@ const WALLPAPER_DEPTH: Suite = Suite {
     extras: &[],
     mise: &[],
     toolchain: Toolchain::Nix,
+    stop_servers: &[],
     caches: &[Cache {
         path: ".cache/kubaos/wallpapers",
         description: "The cut-outs and clock places made for your own wallpapers.",
@@ -475,6 +488,7 @@ pub const TEST: Suite = Suite {
         extra: None,
     }],
     toolchain: Toolchain::Mise,
+    stop_servers: &[],
     caches: &[Cache {
         path: ".cache/kubaos-test-suite",
         description: "What `kubaos-test-suite run` writes.",

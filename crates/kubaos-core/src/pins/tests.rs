@@ -84,6 +84,7 @@ fn a_pin_of_a_suite_on_mise_is_its_main_tool_and_any_other_suite_is_refused() {
         name: "nix-only",
         mise: &[],
         toolchain: Toolchain::Nix,
+        stop_servers: &[],
         ..TEST
     };
     let unversioned = Suite {
@@ -448,6 +449,32 @@ fn every_pin_under_the_projects_root_is_listed_but_not_in_hidden_or_dependency_f
         [pin("2", &app.join(".mise.toml")), pin("3", &acme.join("mise.toml"))]
     );
     assert_eq!(statuses[0].selected.as_deref(), Some("2.0.0"));
+}
+
+#[test]
+fn a_folder_mise_does_not_trust_leaves_its_pins_unresolved_and_the_rest_are_listed() {
+    let h = home();
+    let acme = h.project("acme");
+    let shady = h.project("shady");
+    write(&acme.join("mise.toml"), "[tools]\nkubaos-test-tool = \"2\"\n");
+    write(&shady.join("mise.toml"), "[tools]\nkubaos-test-tool = \"3\"\n");
+    h.mise.distrust(shady.clone());
+
+    let found = h.pins.all().unwrap();
+    let statuses = h.pins.statuses(found.pins).unwrap();
+
+    assert_eq!(statuses.len(), 2);
+    assert_eq!(statuses[0].selected.as_deref(), Some("2.0.0"));
+    assert_eq!(statuses[0].unresolved, None);
+    assert_eq!(statuses[1].selected, None);
+    assert!(
+        statuses[1]
+            .unresolved
+            .as_deref()
+            .is_some_and(|why| why.contains("not trusted")),
+        "{:?}",
+        statuses[1].unresolved
+    );
 }
 
 #[test]

@@ -9,7 +9,7 @@ local packages = { "delve", "gofumpt", "goimports", "golangci-lint" }
 
 return {
   { import = "lazyvim.plugins.extras.lang.go" },
-  tools.from_nix({ servers = { "gopls" }, packages = packages }),
+  tools.on_path({ servers = { "gopls" }, packages = packages }),
   -- mason-nvim-dap installs the debug adapters dap is set up with unless told
   -- not to, and delve is the Suite's.
   {

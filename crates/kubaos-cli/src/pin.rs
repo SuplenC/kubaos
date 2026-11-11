@@ -439,6 +439,9 @@ fn describe(status: &PinStatus) -> String {
         (Some(_), Some(global)) => format!("installed: {global}"),
         (Some(_), None) => "installed".to_owned(),
     };
+    if let Some(reason) = &status.unresolved {
+        return format!("{global}; unresolved: {reason}");
+    }
     match (&status.selected, status.fetched) {
         (Some(version), true) => format!("{global}; {version}"),
         (Some(version), false) => format!("{global}; {version} not installed: `mise install` in the folder"),
@@ -461,6 +464,7 @@ fn status_json(status: &PinStatus) -> Value {
         "installed_version": status.global_version(),
         "selected": status.selected,
         "fetched": status.fetched,
+        "unresolved": status.unresolved,
     })
 }
 

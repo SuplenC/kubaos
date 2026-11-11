@@ -49,6 +49,7 @@ fn status(config: PathBuf, selected: Option<&str>, fetched: bool) -> PinStatus {
         installed: None,
         selected: selected.map(str::to_owned),
         fetched,
+        unresolved: None,
     }
 }
 
@@ -85,7 +86,14 @@ fn a_pin_reads_as_the_suites_state_and_the_version_mise_selects() {
         "Suite not installed; 3.0.0 not installed: `mise install` in the folder"
     );
     assert_eq!(
-        describe(&status(config, None, false)),
+        describe(&status(config.clone(), None, false)),
         "Suite not installed; another config in the folder wins"
+    );
+    assert_eq!(
+        describe(&PinStatus {
+            unresolved: Some("Config files in /p/mise.toml are not trusted.".into()),
+            ..status(config, None, false)
+        }),
+        "Suite not installed; unresolved: Config files in /p/mise.toml are not trusted."
     );
 }

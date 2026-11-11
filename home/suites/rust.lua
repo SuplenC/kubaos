@@ -21,7 +21,7 @@ end
 
 return {
   { import = "lazyvim.plugins.extras.lang.rust" },
-  tools.from_nix({ packages = packages }),
+  tools.on_path({ packages = packages }),
   -- LazyVim's Rust extra points the adapter at Mason's LLDB unless
   -- vim.g.rustaceanvim names one already, which it keeps.
   {

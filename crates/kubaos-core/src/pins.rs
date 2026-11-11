@@ -97,6 +97,9 @@ pub struct PinStatus {
     pub selected: Option<String>,
     /// Whether mise has that version installed.
     pub fetched: bool,
+    /// Why mise couldn't say which versions apply in the pin's folder (a config there it doesn't
+    /// trust, say), when it couldn't; `selected` is then `None`.
+    pub unresolved: Option<String>,
 }
 
 impl PinStatus {
@@ -338,25 +341,34 @@ impl Pins {
     }
 
     /// What each of `pins` stands for here: its Suite, the installed version, and the version
-    /// mise selects for it in its folder. mise runs once per folder.
+    /// mise selects for it in its folder. mise runs once per folder; a folder it fails in leaves
+    /// its pins unresolved, with mise's reason, and the rest are read as usual.
     ///
     /// # Errors
     ///
-    /// [`PinError::Resolve`] when mise fails, or [`PinError::Suites`].
+    /// [`PinError::Suites`] when a Suite's record can't be read.
     pub fn statuses(&self, pins: Vec<Pin>) -> Result<Vec<PinStatus>, PinError> {
-        let mut by_folder: BTreeMap<PathBuf, Vec<ListedVersion>> = BTreeMap::new();
+        let mut by_folder: BTreeMap<PathBuf, Result<Vec<ListedVersion>, String>> = BTreeMap::new();
         let mut statuses = Vec::new();
         for pin in pins {
             let folder = pin.config.parent().unwrap_or(&pin.config).to_path_buf();
-            if !by_folder.contains_key(&folder) {
-                let listed = self.current(&folder)?;
-                by_folder.insert(folder.clone(), listed);
-            }
-            let entry = by_folder[&folder]
-                .iter()
-                .find(|entry| entry.tool == pin.tool && entry.source.as_deref() == Some(pin.config.as_path()))
-                .cloned();
-            statuses.push(self.status(pin, entry.as_ref())?);
+            let listed = by_folder
+                .entry(folder.clone())
+                .or_insert_with(|| self.mise.current(&folder).map_err(|e| e.to_string()));
+            let status = match listed {
+                Ok(listed) => {
+                    let entry = listed
+                        .iter()
+                        .find(|entry| entry.tool == pin.tool && entry.source.as_deref() == Some(pin.config.as_path()))
+                        .cloned();
+                    self.status(pin, entry.as_ref())?
+                }
+                Err(reason) => PinStatus {
+                    unresolved: Some(reason.clone()),
+                    ..self.status(pin, None)?
+                },
+            };
+            statuses.push(status);
         }
         Ok(statuses)
     }
@@ -647,6 +659,7 @@ impl Pins {
             installed,
             selected: entry.map(|entry| entry.version.clone()),
             fetched: entry.is_some_and(|entry| entry.installed),
+            unresolved: None,
         })
     }
 }

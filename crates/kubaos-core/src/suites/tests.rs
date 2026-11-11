@@ -50,6 +50,7 @@ const DEMO: Suite = Suite {
     ],
     mise: &[],
     toolchain: Toolchain::Nix,
+    stop_servers: &[],
     caches: &[
         Cache {
             path: ".cache/demo",
@@ -94,6 +95,7 @@ pub(super) const DEMO_MISE: Suite = Suite {
         },
     ],
     toolchain: Toolchain::Mise,
+    stop_servers: &[],
     ..DEMO
 };
 
@@ -1431,6 +1433,24 @@ fn removing_unlocks_only_the_tools_no_other_config_asks_for_with_their_graphs() 
     assert!(
         !h.mise.calls()[added..].iter().any(|c| c.starts_with("mise lock")),
         "removal needs no network"
+    );
+}
+
+#[test]
+fn removing_the_rust_suite_stops_sccache_s_server_before_the_prune() {
+    let h = home();
+    let rust = catalog::find("rust").unwrap();
+    h.suites.add(rust, &OptionsChange::default()).unwrap();
+    let added = h.mise.calls().len();
+
+    h.suites.remove(rust, CachePolicy::Keep).unwrap();
+
+    let calls = &h.mise.calls()[added..];
+    let stop = calls.iter().position(|c| c == "mise exec -- sccache --stop-server");
+    let prune = calls.iter().position(|c| c == "mise prune --tools");
+    assert!(
+        matches!((stop, prune), (Some(stop), Some(prune)) if stop < prune),
+        "{calls:?}"
     );
 }
 

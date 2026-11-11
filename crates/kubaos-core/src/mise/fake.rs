@@ -37,7 +37,8 @@ struct State {
     calls: Vec<String>,
     /// Whether [`Mise::current`] fails.
     current_fails: bool,
-
+    /// A folder [`Mise::current`] fails in, as in one whose config mise doesn't trust.
+    untrusted: Option<PathBuf>,
     /// Whether [`Mise::lock`] fails, as it does when GitHub's rate limit is used up.
     lock_fails: bool,
 }
@@ -102,6 +103,10 @@ impl FakeMise {
 
     pub(crate) fn fail_lock(&self) {
         self.state().lock_fails = true;
+    }
+
+    pub(crate) fn distrust(&self, folder: PathBuf) {
+        self.state().untrusted = Some(folder);
     }
 
     pub(crate) fn fail_current(&self) {
@@ -364,6 +369,13 @@ impl Mise for FakeMise {
 
     fn current(&self, folder: &Path) -> Result<Vec<ListedVersion>, MiseError> {
         self.record(format!("mise ls --current --json in {}", folder.display()));
+        if self.state().untrusted.as_deref() == Some(folder) {
+            return Err(MiseError::Failed {
+                command: "ls --current --json".into(),
+                status: "exit status: 1".into(),
+                message: format!("Config files in {}/mise.toml are not trusted.", folder.display()),
+            });
+        }
         if self.state().current_fails {
             return Err(MiseError::Failed {
                 command: "ls --current --json".into(),
@@ -410,6 +422,11 @@ impl Mise for FakeMise {
 
     fn trust(&self, config: &Path) -> Result<(), MiseError> {
         self.record(format!("mise trust {}", config.display()));
+        Ok(())
+    }
+
+    fn exec(&self, argv: &[&str]) -> Result<(), MiseError> {
+        self.record(format!("mise exec -- {}", argv.join(" ")));
         Ok(())
     }
 

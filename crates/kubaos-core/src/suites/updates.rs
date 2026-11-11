@@ -167,6 +167,9 @@ impl Suites {
         self.mise
             .upgrade(&tools.into_iter().collect::<Vec<_>>())
             .map_err(SuiteError::Upgrade)?;
+        for s in &moved {
+            self.stop_servers(s.suite);
+        }
         self.mise.prune().map_err(SuiteError::Prune)?;
         Ok(moved)
     }
@@ -207,6 +210,9 @@ impl Suites {
         let bumped = self.mise.bump(&targets);
         let lines = self.follow_lines(before)?;
         bumped.map_err(SuiteError::Upgrade)?;
+        for s in &moved {
+            self.stop_servers(s.suite);
+        }
         self.mise.prune().map_err(SuiteError::Prune)?;
         Ok(Upgraded { moved, lines })
     }

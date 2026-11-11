@@ -6,11 +6,11 @@
 -- https://www.lazyvim.org/plugins/lsp
 local M = {}
 
--- The specs for a Suite's tools: `servers`, the lspconfig names LazyVim starts
+-- The specs for tools already on PATH: `servers`, the lspconfig names LazyVim starts
 -- from PATH instead of installing with Mason, and `packages`, the Mason
--- packages the extras ask for that the Suite installs itself.
+-- packages the extras ask for that come from somewhere else.
 ---@param tools { servers?: string[], packages?: string[] }
-function M.from_nix(tools)
+function M.on_path(tools)
   local servers = {}
   for _, name in ipairs(tools.servers or {}) do
     servers[name] = { mason = false }

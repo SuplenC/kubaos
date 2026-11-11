@@ -8,7 +8,7 @@ local tools = require("config.suite_tools")
 return {
   { import = "lazyvim.plugins.extras.lang.typescript" },
   { import = "lazyvim.plugins.extras.linting.eslint" },
-  tools.from_nix({
+  tools.on_path({
     servers = { "vtsls", "eslint" },
     packages = { "js-debug-adapter" },
   }),

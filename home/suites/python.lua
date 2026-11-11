@@ -15,7 +15,7 @@ vim.g.lazyvim_python_lsp = vim.g.lazyvim_python_lsp or "basedpyright"
 
 return {
   { import = "lazyvim.plugins.extras.lang.python" },
-  tools.from_nix({ servers = { "basedpyright", "ruff" }, packages = packages }),
+  tools.on_path({ servers = { "basedpyright", "ruff" }, packages = packages }),
   -- mason-nvim-dap installs the debug adapters dap is set up with unless told
   -- not to, and debugpy is the Suite's.
   {

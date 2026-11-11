@@ -153,6 +153,14 @@ pub trait Mise: fmt::Debug + Send + Sync {
     /// [`MiseError`] when mise can't start or fails, as it does with no lockfile.
     fn install_locked(&self) -> Result<(), MiseError>;
 
+    /// Runs `argv` with the tools the global configs select, as `mise exec -- <argv>`, keeping
+    /// what it prints.
+    ///
+    /// # Errors
+    ///
+    /// [`MiseError`] when mise can't start, or it or the command fails.
+    fn exec(&self, argv: &[&str]) -> Result<(), MiseError>;
+
     /// Deletes every installed version no tracked config selects, at once.
     ///
     /// # Errors
@@ -429,6 +437,12 @@ impl Mise for Cli {
 
     fn install_locked(&self) -> Result<(), MiseError> {
         self.run_shown(&["install", "--locked"])
+    }
+
+    fn exec(&self, argv: &[&str]) -> Result<(), MiseError> {
+        let mut call = vec!["exec", "--"];
+        call.extend(argv);
+        self.run_captured(&call).map(drop)
     }
 
     fn prune(&self) -> Result<(), MiseError> {
