@@ -114,6 +114,8 @@ export interface GalleryOptions {
   readonly size?: { readonly width: string; readonly height: string };
   /** The lamp lit with the signs off: a power change's dark beat, or by day. */
   readonly signsOff?: boolean;
+  /** The wall alone, for a move that plays on the pictures: no bar, placard or floors' list. */
+  readonly bare?: boolean;
 }
 
 /** The mode the gallery is drawn in: its pane's. */
@@ -313,8 +315,10 @@ function stills(): HTMLElement {
   return room;
 }
 
-function makeDesk(hung: Hung, view: View, mode: Mode, size: { readonly width: string; readonly height: string }): Desk {
-  const made = lock({ width: size.width, height: size.height, wallpaper: hung.wallpaper, phase: PHASES[view], bar: barButtons(), windows: [stills()] });
+function makeDesk(hung: Hung, view: View, mode: Mode, size: { readonly width: string; readonly height: string }, wakes: boolean): Desk {
+  // A picture of a desktop: its bar's pills still; only the lock in front can wake, so only it holds
+  // the password's sheet until another comes to the front.
+  const made = lock({ width: size.width, height: size.height, wallpaper: hung.wallpaper, phase: PHASES[view], bar: barButtons(false), windows: [stills()], sheet: wakes });
   const element = made.element;
   if (hung.video) {
     const loop = document.createElement("img");
@@ -328,15 +332,25 @@ function makeDesk(hung: Hung, view: View, mode: Mode, size: { readonly width: st
   return desk;
 }
 
+/** A scheme's palette in `mode`, its derived roles worked out once. */
+const palettes = new WeakMap<Palette, Map<Mode, Palette>>();
+function paletteIn(scheme: Palette, mode: Mode): Palette {
+  const known = palettes.get(scheme) ?? new Map<Mode, Palette>();
+  palettes.set(scheme, known);
+  const found = known.get(mode) ?? paletteOf(scheme, mode);
+  known.set(mode, found);
+  return found;
+}
+
 /** The palette a desktop is drawn in: its day scheme by day on the desktop, else its night. */
 function paletteFor(hung: Hung, view: View, mode: Mode): { palette: Palette; mode: Mode } {
   const day = view === "desktop" && mode === "light";
-  return { palette: paletteOf(day ? hung.day : hung.wallpaper.night, day ? "light" : "dark"), mode: day ? "light" : "dark" };
+  return { palette: paletteIn(day ? hung.day : hung.wallpaper.night, day ? "light" : "dark"), mode: day ? "light" : "dark" };
 }
 
 function paintDesk(desk: Desk, mode: Mode, moving: boolean): void {
   const next = paletteFor(desk.hung, desk.view, mode);
-  if (desk.palette && JSON.stringify(desk.palette) === JSON.stringify(next.palette)) return;
+  if (desk.palette === next.palette) return;
   if (moving) recolour(desk.element, desk.palette, next.palette, "dawn");
   else paint(desk.element, next.palette);
   desk.element.dataset.mode = next.mode;
@@ -346,7 +360,7 @@ function paintDesk(desk: Desk, mode: Mode, moving: boolean): void {
 /** The room's palette: the picture in front of you's scheme in the page's mode. */
 function roomPalette(hung: Hung | undefined, mode: Mode): Palette {
   const scheme = hung ? (mode === "light" ? hung.day : hung.wallpaper.night) : KABUKICHO_NIGHT;
-  return paletteOf(scheme, mode);
+  return paletteIn(scheme, mode);
 }
 
 /** The words over a picture: the folder, which of how many, in `label`, the 壁紙 accent first. */
@@ -410,6 +424,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
 
   // The pictures, a desktop each, and their places on the wall.
   const desks = new Map<HTMLElement, Desk>();
+  const makers = new Map<HTMLElement, (wakes: boolean) => Desk>();
   const arts: HTMLElement[][] = [];
   folders.forEach((folder, level) => {
     const floor = document.createElement("span");
@@ -442,16 +457,24 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
       lamp.className = "gl-lamp gl-room-only";
       const frame = document.createElement("span");
       frame.className = "gl-frame";
-      const desk = makeDesk(index === 0 && options.name ? { ...hung, name: options.name } : hung, S.view, mode, size);
-      if (S.flat.has(hung.name)) flatten(desk, true);
-      frame.append(desk.element);
+      // A picture's desktop is built when it first shows: the one in front and those either side
+      // at once, the rest while the gallery is idle, so the first frame waits on three, not all.
+      makers.set(art, (wakes: boolean) => {
+        const desk = makeDesk(index === 0 && options.name ? { ...hung, name: options.name } : hung, S.view, mode, size, wakes);
+        if (S.flat.has(hung.name)) flatten(desk, true);
+        frame.append(desk.element);
+        return desk;
+      });
       const placard = document.createElement("span");
       placard.className = "gl-placard gl-room-only";
       art.append(lamp, frame, placard);
-      desks.set(art, desk);
-      art.addEventListener("click", () => {
+      art.addEventListener("click", (event) => {
         if (!S.open || S.busy) return;
-        if (level === S.folder && index === S.at[level]) void step(true);
+        // The password's sheet, up on an awake lock, keeps its own clicks.
+        if (event.target instanceof Element && event.target.closest(".k-sheet-part")) return;
+        // The picture in front of you steps out to the full screen, and a click on it there steps
+        // back to the wall, as F does.
+        if (level === S.folder && index === S.at[level]) void step(!S.full);
         else {
           S.folder = level;
           move(index - S.at[level]!);
@@ -463,6 +486,21 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     arts.push(here);
   });
   const deskAt = () => desks.get(arts[S.folder]![S.at[S.folder]!]!);
+
+  /** Builds `art`'s desktop if it isn't yet, in the look the gallery is in. */
+  const ensure = (art: HTMLElement | undefined): void => {
+    if (!art || desks.has(art)) return;
+    const make = makers.get(art);
+    if (!make) return;
+    const desk = make(live || (options.awake ?? false));
+    desks.set(art, desk);
+    look(art, desk);
+  };
+  /** The picture in front of you and those either side, built. */
+  const ensureNear = (): void => {
+    const here = arts[S.folder]!;
+    for (let index = S.at[S.folder]! - 1; index <= S.at[S.folder]! + 1; index += 1) ensure(here[index]);
+  };
 
   // The floors' list at the wall's start.
   const floorsPanel = document.createElement("span");
@@ -519,6 +557,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
   };
   let lastRoom: Palette | undefined;
 
+  const bare = options.bare ?? false;
   const drawWall = () => {
     floors.style.setProperty("--floor", String(S.folder));
     arts.forEach((here, level) => {
@@ -530,9 +569,10 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
         const desk = desks.get(art);
         if (!desk) return;
         desk.element.style.setProperty("--aside", String(Math.max(-1, Math.min(1, index - S.at[level]!))));
-        if (on) drawPlacard(art, desk, level, index);
+        if (on && !bare) drawPlacard(art, desk, level, index);
       });
     });
+    if (bare) return;
     floorsPanel.replaceChildren(
       list(
         [...folders.keys()].reverse().map((level) => ({ title: folders[level]!.name, icon: folders[level]!.icon, detail: String(folders[level]!.pictures.length) })),
@@ -561,6 +601,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
   };
 
   const drawBar = () => {
+    if (bare) return;
     const hung = front();
     const folder = folders[S.folder]!;
     const now = document.createElement("span");
@@ -621,7 +662,11 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
 
   // Each picture's look in the current view, at once: the phase, the push and its colours.
   const settle = () => {
-    for (const [art, desk] of desks) {
+    for (const [art, desk] of desks) look(art, desk);
+    deskAt()?.element.toggleAttribute("data-live", !S.open);
+  };
+  function look(art: HTMLElement, desk: Desk): void {
+    {
       const main = art === arts[S.folder]![S.at[S.folder]!];
       desk.view = S.view;
       desk.element.dataset.phase = main && S.view === "lock" && S.awake ? "awake" : PHASES[S.view];
@@ -630,9 +675,10 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
       if (S.view === "picture") desk.element.style.setProperty("--push", main && !reducedFor(screen) ? "1" : "0");
       else desk.element.style.removeProperty("--push");
       paintDesk(desk, mode, false);
+      const level = arts.findIndex((here) => here.includes(art));
+      desk.element.style.setProperty("--aside", String(Math.max(-1, Math.min(1, arts[level]!.indexOf(art) - S.at[level]!))));
     }
-    deskAt()?.element.toggleAttribute("data-live", !S.open);
-  };
+  }
 
   // The moves.
 
@@ -717,6 +763,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     const was = deskAt();
     const from = lastRoom;
     S.at[S.folder] = to;
+    ensureNear();
     landOn(was, from);
   }
 
@@ -726,6 +773,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     const was = deskAt();
     const from = lastRoom;
     S.folder = level;
+    ensureNear();
     landOn(was, from);
   }
 
@@ -835,6 +883,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
       const from = lastRoom;
       S.folder = level;
       S.at[level] = index;
+      ensureNear();
       landOn(was, from);
       await wait(ms("long"));
     }
@@ -884,15 +933,29 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     });
   }
 
-  // The first frame: every picture in the view, the room in the front one's colours.
-  requestAnimationFrame(() => {
-    paintRoom(false);
-    settle();
-    for (const desk of desks.values()) paintDesk(desk, mode, false);
-  });
+  // The first frame: the pictures that show, the room in the front one's colours.
   paintRoom(false);
+  ensureNear();
   settle();
   draw();
+  requestAnimationFrame(() => {
+    paintRoom(false);
+    for (const desk of desks.values()) paintDesk(desk, modeOf(screen), false);
+  });
+  // A live gallery builds the rest of its wall while idle, one picture a time, so browsing never
+  // waits on one.
+  if (live) {
+    const idle = (work: () => void) => requestIdleCallback(work);
+    const rest = arts.flat().filter((art) => makers.has(art) && !desks.has(art));
+    const next = () => {
+      const art = rest.shift();
+      if (!art) return;
+      if (!S.busy) ensure(art);
+      else rest.push(art);
+      idle(next);
+    };
+    idle(next);
+  }
   if (options.shortcuts) shortcutsMade.set(true);
   return screen;
 }

@@ -119,9 +119,16 @@
   opacity: 1;
 }
 
+/* How lit a lamp is: 0 unlit, 1 burning over the picture in front of you. */
+@property --lamp {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 /* The lamp: a neon tube `space.s4` thick, `space.s32` over its picture, unlit but over the picture
-   in front of you, which it lights. By day nothing glows: an outline, and the tone over the one in
-   front of you. */
+   in front of you, which it lights (`--lamp`, over `short`). By day nothing glows: an outline, and
+   the tone over the one in front of you. */
 .gl-lamp {
   position: absolute;
   left: 50%;
@@ -130,32 +137,30 @@
   height: var(--space-s4);
   translate: -50% 0;
   border-radius: var(--radius-full);
-  background: var(--color-primary_unlit);
-  transition:
-    background-color var(--motion-short) var(--easing-standard),
-    box-shadow var(--motion-short) var(--easing-standard);
+  --off: var(--color-primary_unlit);
+  --on: var(--color-primary_core);
+  --glow: 1;
+  background: color-mix(in oklab, var(--on) calc(var(--lamp) * 100%), var(--off));
+  box-shadow:
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--lamp) * var(--glow))),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * var(--lamp) * var(--glow)));
+  transition: --lamp var(--motion-short) var(--easing-standard);
 }
 
 .gl-art[data-on] .gl-lamp {
-  background: var(--color-primary_core);
-  box-shadow:
-    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / var(--focus-near_opacity)),
-    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / var(--focus-far_opacity));
+  --lamp: 1;
 }
 
 .gl-screen[data-mode="light"] .gl-lamp {
-  background: var(--color-outline_variant);
-  box-shadow: none;
-}
-
-.gl-screen[data-mode="light"] .gl-art[data-on] .gl-lamp {
-  background: var(--color-primary);
+  --off: var(--color-outline_variant);
+  --on: var(--color-primary);
+  --glow: 0;
 }
 
 /* Lit with the signs off: the tube as unlit glass, no glow. */
 .gl-screen[data-signs-off] .gl-art[data-on] .gl-lamp {
-  background: var(--color-primary_glass);
-  box-shadow: none;
+  --on: var(--color-primary_glass);
+  --glow: 0;
 }
 
 /* The frame: the picture's box, its corner the surface's, a step back unless it is in front of

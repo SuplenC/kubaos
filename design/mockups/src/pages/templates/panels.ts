@@ -204,12 +204,16 @@ function words(said: string): HTMLElement {
   return element;
 }
 
-/** The twins' buttons along the bar, in their order: the system monitor, the bell, the status. */
-export function barButtons(): HTMLElement[] {
+/**
+ * The twins' buttons along the bar, in their order: the system monitor, the bell, the status. A
+ * picture of a bar (the wallpaper picker's desktops) draws them still: no pointer, no tooltip.
+ */
+export function barButtons(interactive = true): HTMLElement[] {
+  const live = (tooltip: string) => (interactive ? { interactive: true, tooltip } : {});
   return [
-    pill({ content: [paired(glyph("memory"), words("34%"))], lone: false, interactive: true, tooltip: "System" }),
-    pill({ content: [glyph("notifications")], lone: true, interactive: true, tooltip: "Notifications" }),
-    pill({ content: [glyph("wifi"), glyph("volume_up"), paired(glyph("battery_full"), words("87%"))], lone: false, interactive: true, tooltip: "Control center" }),
+    pill({ content: [paired(glyph("memory"), words("34%"))], lone: false, ...live("System") }),
+    pill({ content: [glyph("notifications")], lone: true, ...live("Notifications") }),
+    pill({ content: [glyph("wifi"), glyph("volume_up"), paired(glyph("battery_full"), words("87%"))], lone: false, ...live("Control center") }),
   ];
 }
 
