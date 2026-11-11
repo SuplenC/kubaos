@@ -52,7 +52,7 @@ function all(state: Shown = "rest"): HTMLElement {
 
 /** The system monitor, which offers Hide on a right click until the pointer leaves. */
 function liveSysmon(): HTMLElement {
-  const made = makePill({ content: sysmonContent(), lone: false, gap: "s12", interactive: true, tooltip: "CPU 37%  ·  61 °C  ·  RAM 11.2 GB of 15.6 GB" });
+  const made = makePill({ content: sysmonContent(), lone: false, gap: "s8", interactive: true, tooltip: "CPU 37%  ·  61 °C  ·  RAM 11.2 GB of 15.6 GB" });
   let offering = false;
   made.element.addEventListener("contextmenu", (event) => {
     event.preventDefault();
@@ -121,7 +121,7 @@ export default page<State>({
     { name: "Symbols and words", for: "`space.s12` ends, `space.s8` gaps", sample: () => statusPill() },
     { name: "A lone symbol", for: "`space.s8` round it: bell, Proxy, update", sample: () => bellPill() },
     { name: "Preview", for: "`space.s4` gap", sample: () => previewPill() },
-    { name: "System monitor", for: "`space.s12` between readings", sample: SYSMON_SAMPLE },
+    { name: "System monitor", for: "`space.s8` between readings", sample: SYSMON_SAMPLE },
   ],
   states: {
     shown: ["rest", "lit", "pressed"],
@@ -172,7 +172,7 @@ export default page<State>({
         reduced: [{ part: "width", on: "the system monitor", target: ".k-pill", property: "--grown", from: 0, to: 1, duration: "instant", curve: "standard_decel" }],
         back: "plays",
         sample: () => {
-          const made = makePill({ content: sysmonContent({ offering: true }), lone: false, gap: "s12" });
+          const made = makePill({ content: sysmonContent({ offering: true }), lone: false, gap: "s8" });
           made.element.style.setProperty("--from", "var(--size-thumbnail_height)");
           made.element.style.setProperty("--to", "var(--size-control_sm)");
           return made.element;
@@ -194,7 +194,8 @@ export default page<State>({
     ]),
     measures: [
       { part: "Height", token: "size-control_sm" },
-      { part: "Ends; between readings", token: "space-s12" },
+      { part: "Ends", token: "space-s12" },
+      { part: "Between readings", token: "space-s8" },
       { part: "Ends round a lone symbol; gaps", token: "space-s8" },
       { part: "Symbol to its words", token: "space-s4" },
       { part: "Symbols", token: "icon-s16" },

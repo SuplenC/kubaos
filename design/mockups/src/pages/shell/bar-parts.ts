@@ -253,7 +253,7 @@ export function sysmonContent(options: SysmonOptions = {}): Element[] {
 
 export function sysmonPill(options: SysmonOptions = {}): HTMLElement {
   const tip = options.offering ? "" : "CPU 37%  ·  61 °C  ·  RAM 11.2 GB of 15.6 GB";
-  return control(sysmonContent(options), tip, options.state ?? "rest", { gap: "s12" });
+  return control(sysmonContent(options), tip, options.state ?? "rest", { gap: "s8" });
 }
 
 // The tray.
