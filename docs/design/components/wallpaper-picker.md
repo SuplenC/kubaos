@@ -14,9 +14,13 @@ A gallery. Every picture of a folder hangs on one wall, a floor per folder (Kuba
 | The pictures' top edge | `scale.gallery_top` | 0.12 of the screen's height |
 | Between two pictures | `scale.gallery_gap` | 0.14 of the screen's width |
 | The lamp | `scale.gallery_lamp` | 0.5 of its picture's width, `space.s4` thick, `space.s32` over it |
-| Where the wall meets the floor | `scale.gallery_floor` | 0.86 of the screen's height |
+| The light's reach | `scale.gallery_light_width`, `scale.gallery_light_height` | 0.6 of the screen's width across, 1.0 of its height down |
+| Where the light has fallen to a quarter | `scale.gallery_light_falloff` | 0.35 of its reach |
 
-- **The lamp is a neon tube** over each picture: unlit (`primary_unlit`) but over the one in front of you, which burns at its core with the glow at night and lights the wall faintly under it; by day an outline, and the tone over the one in front. It strikes on as the gallery opens.
+- **The lamp is a neon tube** over each picture, in that picture's own primary, lit or unlit, so a lamp never changes colour: unlit its deep unlit tone, lit its core with the glow at night; by day an outline, and its tone while lit.
+- **The room's light is the lamp's.** One field over the whole screen, wall and floor alike, so it has no seam: a radial light from the lit lamp's middle, reaching `scale.gallery_light_width` of the screen across and `scale.gallery_light_height` down, fallen to a quarter at `scale.gallery_light_falloff` of its reach. Lit, it is the lamp's colour at `opacity.lamp_light`; with every lamp off, a grey at `opacity.lamp_dark`. One number, how lit the room is, drives the lamp, its light and the room's colours together, so they never part. By day nothing glows: the room is its surface and only the lamp shows its tone.
+- **Browsing is lights off, walk, lights on.** The lit lamp drops off over `short` and the room goes dark and neutral as the wall glides; once it lands, the new picture's lamp strikes over `strike`, the sign's flicker with Flicker on and its steps as fades with Steady, and the room lights in its colour. A step taken before the strike puts it off again, so the room stays dark while you move and only the lamp you stop at strikes. The light only ever goes between the dark grey and one lamp's colour, its chroma rising at that colour's hue, so no two pictures' hues mix. The same holds changing floors. Reduce motion fades the light down and up over `short`.
+- **The words and the bar follow the light:** every role of the room keeps its picture's hue, its chroma rising from none and its lightness from the tokens' own palette's as the room lights, so with the lamps off the bar, the name, the depth chip and the floors are the same neutral on every picture, and a new picture's colours come in as its lamp strikes.
 - **The one in front of you** is at full size with the ladder's top shadow; the others stand back to `scale.behind` at `opacity.subdued`. Under it the placard: the folder and which of how many in `label` after the 壁紙 accent, the name in `title`, its chips (`Current`, a video's, `Depth` in the cold tone or `Depth off`), and at its end the depth `Switch` with a line on why it says what it says. A picture with no cut-out has its switch disabled: "No cut-out: this picture is flat."
 - **The floors** are a `List` at the wall's start, the folder you are on current. An empty folder hangs one frame holding an `EmptyState` that names its folder's path.
 - **The colours follow the picture in front of you**: the room recolours to its scheme through grey over `recolour`, and each picture is drawn in its own.
@@ -37,9 +41,9 @@ Switching view turns every frame. The one in front plays the whole move: from th
 
 The one in front steps out to fill the screen (F, Space, the bar's Full screen, or a click on it; on the full screen a click on the picture steps back, as F does, while the bar's controls and an awake lock's password sheet keep their own clicks): the room grows round its frame over `slow` until it is the screen, its corner and shadow going, and back over `long`. The live desktop is that picture stepped out, so:
 
-- **Opening** steps the desktop back into its frame as the wall builds round it, its frame and bar sliding out as on the wall's picture.
-- **Enter** steps the picture in front of you out, turning it into the desktop.
-- **Esc** walks the wall back to the picture you had, then steps it out: the old wallpaper is back.
+- **Opening** steps the desktop back into its frame as the wall builds round it in a dark room, its frame and bar sliding out as on the wall's picture; the lamp strikes as it lands.
+- **Enter** steps the picture in front of you out, turning it into the desktop, the lamp going off as it grows.
+- **Esc** puts the lamp off, walks the wall back to the picture you had in the dark, then steps it out: the old wallpaper is back.
 
 ## The bar
 
