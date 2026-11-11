@@ -2,7 +2,7 @@
 // row: a symbol or a picture on a tinted square of one size, so a list of them reads as one set.
 
 import appIcon from "../../../../../branding/png/kubaos-icon-128.png?url";
-import photo from "../../../../../branding/photo/neon-sign-front@2x.jpg?url";
+import photo from "../../../../../branding/photo/neon-sign-lit.jpg?url";
 import type { Words } from "../../lib/content.ts";
 import { iconTile, measure, TILE_MEASURES, TILE_SIZES, type TileOptions, type TileSize } from "../../lib/icon-tile.ts";
 import { filling, flow, row, stack, within } from "../../lib/layout.ts";

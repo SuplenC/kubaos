@@ -2,7 +2,7 @@
 // it, holding a header, a body and a button bar; plain, it takes no
 // input, and pressable, the whole card is one press target in the state model.
 
-import photo from "../../../../../branding/photo/neon-sign-front@2x.jpg?url";
+import photo from "../../../../../branding/photo/neon-sign-banner.jpg?url";
 import { buttonBar } from "../../lib/button-bar.ts";
 import { type CardOptions, card } from "../../lib/card.ts";
 import { shown, type Words } from "../../lib/content.ts";

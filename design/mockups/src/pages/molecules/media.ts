@@ -1,7 +1,7 @@
 // The Media page: `docs/design/components/media.md`. A picture in a box of a fixed aspect that is
 // the same before, after and without the picture, cut at the corner its place gives it.
 
-import photo from "../../../../../branding/photo/neon-sign-front@2x.jpg?url";
+import photo from "../../../../../branding/photo/neon-sign-banner.jpg?url";
 import wallpaper from "../../../../../crates/kubaos-kobo/assets/wallpaper.jpg?url";
 import { button } from "../../lib/button.ts";
 import { card } from "../../lib/card.ts";

@@ -14,7 +14,7 @@ import { across } from "./across.ts";
 import appIcon from "../../../../../branding/png/kubaos-icon-128.png?url";
 // An app's icon with no plate, a star: a shape on its tile (`site/app-icons.ts`).
 import glyph from "../../assets/icon-tile/star.svg?url";
-import photo from "../../../../../branding/photo/neon-sign-front.png?url";
+import photo from "../../../../../branding/photo/neon-sign-lit.jpg?url";
 
 /** The symbols drawn by us where Tabler has none, how each is drawn, and its Tabler relatives in the set. */
 const OURS: Record<string, { readonly drawn: string; readonly relatives: readonly string[] }> = {
