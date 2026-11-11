@@ -19,7 +19,7 @@ import { type MenuEntry, menu } from "../../lib/menu.ts";
 import { panelPage } from "../../lib/panel-page.ts";
 import { probe } from "../../lib/probe.ts";
 import { nested, role } from "../../lib/radius.ts";
-import { advance, clamped, text } from "../../lib/text.ts";
+import { advance, centreFor, clamped, text } from "../../lib/text.ts";
 import { popover, tooltip } from "../../lib/tooltip.ts";
 import { onScreen } from "../templates/panels.ts";
 
@@ -621,6 +621,7 @@ export function panel(options: PanelOptions = {}): HTMLElement {
     if (line) {
       line.textContent = words;
       line.style.setProperty("--natural", String(advance("small", words)));
+      centreFor(line, "small", words);
     }
     clear.hidden = count() === 0;
   }

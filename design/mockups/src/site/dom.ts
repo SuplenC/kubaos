@@ -1,6 +1,6 @@
 // Small helpers for the page's own words and boxes: the parts the mocked elements sit among.
 
-import { advance, type TypeStyle, typeset } from "../lib/text.ts";
+import { advance, centreFor, type TypeStyle, typeset } from "../lib/text.ts";
 
 /** An element of `tag` with `className`, holding `children`. */
 export function el<K extends keyof HTMLElementTagNameMap>(
@@ -29,6 +29,7 @@ export function label(words: string, style: TypeStyle, color = "on_surface_varia
   const element = el("span", "k-text", words);
   typeset(element, style);
   element.style.setProperty("--natural", String(advance(style, words)));
+  centreFor(element, style, words);
   element.style.color = `var(--color-${color})`;
   return element;
 }

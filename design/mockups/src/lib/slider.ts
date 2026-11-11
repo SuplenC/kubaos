@@ -30,7 +30,7 @@ import { focusRing } from "./focus.ts";
 import { withHint } from "./hint.ts";
 import { icon } from "./icon.ts";
 import { probe, variant } from "./probe.ts";
-import { advance, shaped, text, type TypeStyle, typeset } from "./text.ts";
+import { advance, centreFor, shaped, text, type TypeStyle, typeset } from "./text.ts";
 import { length, raw } from "./tokens.ts";
 
 export const SLIDER_SIZES = ["Regular", "Compact"] as const;
@@ -260,6 +260,7 @@ export function slider(options: SliderOptions): HTMLElement {
       typeset(each, kind);
       each.toggleAttribute("data-shaped", shaped(said));
       each.style.setProperty("--natural", String(advance(kind, said)));
+      centreFor(each, kind, said);
     }
     const widest = numeric() ? Math.max(advance(kind, said), advance(kind, options.widest ?? "100%")) : advance(kind, said);
     const labelLeft = width - px("space-s12") - widest * scale;

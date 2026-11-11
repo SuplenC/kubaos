@@ -9,7 +9,7 @@ import "./fonts.css";
 import "./motion.css";
 import "./lib/lib.css";
 import "./site/site.css";
-import { forgetWidths } from "./lib/text.ts";
+import { forgetWidths, shareRows } from "./lib/text.ts";
 import { forgetLengths } from "./lib/tokens.ts";
 import { type Painted, paintPage, playChange } from "./site/change.ts";
 import { forgetPalettes } from "./site/recolour.ts";
@@ -122,11 +122,25 @@ function draw(): void {
 /** The theme and mode the page is painted in now, so a change knows where it starts. */
 let painted: Painted = { theme: settings().theme, mode: settings().mode };
 
+/**
+ * Lines side by side share a baseline (`shareRows`): set once a frame after anything is drawn, so a
+ * sample a player or a live part draws later shares it too.
+ */
+let sharing = 0;
+const rowsDrawn = new MutationObserver(() => {
+  if (sharing) return;
+  sharing = requestAnimationFrame(() => {
+    sharing = 0;
+    shareRows(document);
+  });
+});
+
 async function start(): Promise<void> {
   await Promise.all([...document.fonts].map((face) => face.load()));
   // Anything measured while the fonts loaded was measured in the fallback.
   forgetWidths();
   fitDevicePixels();
+  rowsDrawn.observe(document.body, { childList: true, subtree: true });
   holdWheel();
   draw();
   paintPage([document.documentElement, pageBox], painted);
