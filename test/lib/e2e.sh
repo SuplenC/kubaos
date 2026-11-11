@@ -3470,6 +3470,47 @@ c_suite_node() {
   grep -qxE 'node = "26\.[0-9]+"' "$frag" && grep -qx 'bun = "1.4"' "$frag" && [[ $(node_at /) == 26 ]] && on_shims ||
     { echo "FAIL kubaos suite add node: not Node 26 with vtsls and Bun"; cat "$frag"; return 1; }
   echo "ok   kubaos suite add node: the default line, 26, with vtsls and Bun"
+
+  # vtsls behind, as a lock taken before a newer release leaves it: mise
+  # locks VERSION while the fragment asks for it exactly, then the fragment
+  # and the entry's specifier go back to REQUEST, which VERSION still meets,
+  # and mise installs what the lockfile selects. An npm tool's lock entry
+  # carries its dependency graph, which mise installs to a folder of its own,
+  # so update and upgrade must leave that folder installed, or every shell
+  # warns the tool is missing.
+  vtsls_at() {
+    local lock="$USER_HOME/.config/mise/mise.lock" log="$LOGS/suite_node-vtsls-$2.log"
+    as_user sed -i "s/^\"$vtsls_re\" = .*/\"npm:@vtsls\/language-server\" = \"$2\"/" "$frag"
+    zrun 'cd / && MISE_YES=1 mise lock --global' >"$log" 2>&1 || return 1
+    as_user sed -i "s/^\"$vtsls_re\" = .*/\"npm:@vtsls\/language-server\" = \"$1\"/" "$frag"
+    as_user sed -i "/^\[\[tools.\"$vtsls_re\"\]\]/,/^\[\[/ s/^specifiers = \[\"$2\"\]/specifiers = [\"$1\"]/" "$lock"
+    grep -qx "specifiers = \[\"$1\"\]" "$lock" &&
+      zrun 'cd / && MISE_YES=1 mise install && MISE_YES=1 mise prune --tools' >>"$log" 2>&1 &&
+      [[ $(vtsls_now) == "$2" ]]
+  }
+  vtsls_now() { zrun "cd / && mise current '$vtsls'"; }
+  # The newest line but one has a patch release before its last, for the
+  # update; the upgrade moves past that line to the newest.
+  local vtsls='npm:@vtsls/language-server' vtsls_re='npm:@vtsls\/language-server' versions newest line old_patch last_patch
+  versions="$(zrun "cd / && mise ls-remote '$vtsls'" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$')"
+  newest="$(tail -1 <<<"$versions")"
+  line="$(grep -vE "^${newest%.*}\." <<<"$versions" | tail -1)"
+  line="${line%.*}"
+  last_patch="$(grep -E "^${line//./\\.}\." <<<"$versions" | tail -1)"
+  old_patch="$(grep -E "^${line//./\\.}\." <<<"$versions" | tail -2 | head -1)"
+  [[ -n $line && $old_patch != "$last_patch" ]] || { echo "FAIL no vtsls line with two patch releases on npm: $(tr '\n' ' ' <<<"$versions")"; return 1; }
+  vtsls_at "$line" "$old_patch" || { echo "FAIL setting vtsls to $old_patch"; tail -5 "$LOGS/suite_node-vtsls-$old_patch.log"; return 1; }
+  quiet_shell "vtsls locked at $old_patch, before the update" || return 1
+  out="$(kz 'kubaos suite update node' 2>&1)" ||
+    { echo "FAIL kubaos suite update node"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(vtsls_now) == "$last_patch" ]] || { echo "FAIL update: vtsls is $(vtsls_now), not $last_patch"; printf '%s\n' "$out"; return 1; }
+  quiet_shell "kubaos suite update node, vtsls $old_patch → $last_patch" || return 1
+  out="$(kz 'kubaos suite upgrade node --no-switch' 2>&1)" ||
+    { echo "FAIL kubaos suite upgrade node"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx "\"npm:@vtsls/language-server\" = \"${newest%.*}\"" "$frag" && [[ $(vtsls_now) == "$newest" ]] ||
+    { echo "FAIL upgrade: vtsls is $(vtsls_now), not $newest at ${newest%.*}"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  quiet_shell "kubaos suite upgrade node, vtsls $last_patch → $newest" || return 1
+  echo "ok   kubaos suite update moves vtsls $old_patch → $last_patch and upgrade → $newest, and a shell starts quiet after each"
   expect_ok "kubaos suite remove node again" kz 'kubaos suite remove node --foreground' || return 1
   rm -rf "$project" "$bunproject" "$pinned" "$mine" "$globalpkg" "$USER_HOME/.cache/my-npmrc"
 }
