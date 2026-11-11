@@ -66,18 +66,20 @@ FADE_Y = 185
 
 # The switch-on order; kubaos.script strikes the groups in this order.
 GROUPS = ("ku", "ba", "dakuten", "kuba", "os")
-# How far a group's share of the wall glow reaches past its glass, in the
-# photo's pixels. One Gaussian would hand the glow from one group to the next
-# over a few pixels (the ratio of two Gaussians is a steep logistic), which
-# shows as a seam when one of them is dark. Summed over growing radii the
-# tails fall off slowly, so the handover is as wide as the gap between groups.
-GLOW_SIGMAS = (92.0, 245.0, 610.0)
-# How far apart two colours' chromas are before the glow stops counting as
-# the same tube's, squared: the dakuten's blue and the amber are about 0.4
-# apart (no share), "Kuba"'s warm white and the amber about 0.15 (a tenth).
-COLOUR_SPREAD = 0.01
-COLOUR_BLUR = 12.0
-LIKENESS_FLOOR = 0.02
+# The radii a tube's glow is measured over, in the photo's pixels: how the
+# light falls off from the glass is the mix of the glass blurred by each that
+# best gives back the light the lit photo has over the off one.
+GLOW_SIGMAS = (6.0, 16.0, 40.0, 100.0, 245.0)
+# Glass brighter than this has run out of range in the photo and says nothing
+# about how its light falls off.
+CLIPPED = 0.92
+# The wall's grain has colour noise of its own; blurred by this, only the
+# glow's colour is left.
+COLOUR_BLUR = 3.0
+# How sharply a group keeps to light of its own colour: the power its
+# likeness to the wall's colour is raised to. At 6 the amber tubes take a
+# hundredth of the dakuten's blue.
+COLOUR_POWER = 6
 # The dead glass is the off photo at this brightness, so the sign shows
 # faintly before it strikes instead of standing out as a grey sign.
 DEAD_LIGHT = 0.35
@@ -195,47 +197,44 @@ def tube_groups(im: np.ndarray) -> dict[str, np.ndarray]:
     return {g: lit & (np.asarray(Image.fromarray(m).resize((w, h), Image.NEAREST)) > 0.5) for g, m in groups.items()}
 
 
-def glass_mask(tubes: dict[str, np.ndarray], sigma: float) -> np.ndarray:
-    """Every group's glass, softened by `sigma` so its edge isn't jagged."""
-    return np.clip(blur(sum(t.astype(np.float32) for t in tubes.values()), sigma) * 2, 0, 1)
-
-
-def chroma(rgb: np.ndarray) -> np.ndarray:
-    """Colour without brightness: each channel's part of the sum."""
-    return rgb / np.maximum(rgb.sum(axis=-1, keepdims=True), 1e-4)
-
-
-def group_shares(tubes: dict[str, np.ndarray], im: np.ndarray) -> dict[str, np.ndarray]:
+def group_shares(tubes: dict[str, np.ndarray], lit: np.ndarray, off: np.ndarray) -> dict[str, np.ndarray]:
     """Each group's share of every pixel's light, summing to one.
 
-    On the glass the share is the group that owns it. Off the glass it comes
-    from each group's glass blurred wide, so the boundary between two groups
-    follows the tubes' shapes and blends over tens of pixels, weighed by how
-    close the pixel's colour is to the group's: the wall round the dakuten
-    glows blue, and by distance alone ク and バ would light some of that blue
-    before the dakuten strikes.
+    A group's light at a pixel falls off from its glass the way the glow on
+    the wall does, measured on the photos. A falloff steeper than the real one
+    hands the wall next to a dark tube to that tube, and cuts the lit
+    neighbour's glow off around it.
+
+    On the wall a group only takes light of its own colour: the wall round the
+    dakuten glows blue, and by distance alone ク and バ would light some of
+    that blue before the dakuten strikes. In its own glass, which burns white,
+    a group takes whatever is there.
     """
-    glass = glass_mask(tubes, 3.0)
-    sharp = {g: blur(t.astype(np.float32), 3.0) for g, t in tubes.items()}
-    # The wall's grain has colour noise of its own; blurred, only the glow's
-    # colour is left.
-    here = chroma(np.dstack([blur(im[..., c], COLOUR_BLUR) for c in range(3)]))
-    wide = {}
+    gain = np.clip(lit - off, 0, None)
+    unclipped = lit.max(axis=2) < CLIPPED
+    spread = [{g: blur(t.astype(np.float32), s) for g, t in tubes.items()} for s in GLOW_SIGMAS]
+    reach = np.stack([sum(sp.values())[unclipped] for sp in spread], axis=1)
+    use = list(range(len(GLOW_SIGMAS)))
+    # Least squares with no negative part: a radius that would take light
+    # away is left out, and the rest are fitted again.
+    while True:
+        mix = np.linalg.lstsq(reach[:, use], gain.max(axis=2)[unclipped], rcond=None)[0]
+        if (mix >= 0).all():
+            break
+        use.pop(int(np.argmin(mix)))
+    eps = 1e-7
+    light = {g: sum(k * spread[i][g] for i, k in zip(use, mix)) + eps for g in tubes}
+    total = sum(light.values())
+    here = np.dstack([blur(gain[..., c], COLOUR_BLUR) for c in range(3)])
+    here /= np.linalg.norm(here, axis=2, keepdims=True) + 1e-4
+    share = {}
     for g, t in tubes.items():
-        own = chroma(im[t].mean(axis=0))
-        likeness = np.exp(-((here - own) ** 2).sum(axis=-1) / COLOUR_SPREAD)
-        # On the dim wall far from every tube no colour is like any group's,
-        # and the shares would follow noise; the floor hands those pixels back
-        # to distance alone.
-        likeness = LIKENESS_FLOOR + (1 - LIKENESS_FLOOR) * likeness
-        wide[g] = sum(blur(t.astype(np.float32), s) for s in GLOW_SIGMAS) * likeness
-    eps = 1e-6
-    sharp_sum = sum(sharp.values()) + eps
-    wide_sum = sum(wide.values()) + eps
-    return {
-        g: glass * sharp[g] / sharp_sum + (1 - glass) * (wide[g] + eps / len(GROUPS)) / wide_sum
-        for g in tubes
-    }
+        near = (blur(t.astype(np.float32), 16.0) * unclipped)[..., None]
+        own = (gain * near).sum(axis=(0, 1))
+        alike = (here @ (own / np.linalg.norm(own))) ** COLOUR_POWER
+        share[g] = light[g] * (alike + (1 - alike) * (light[g] / total) ** 2)
+    total = sum(share.values())
+    return {g: m / total for g, m in share.items()}
 
 
 def edge_fade(h: int, w: int, fade_x: float, fade_y: float) -> np.ndarray:
@@ -260,8 +259,8 @@ class Sign:
         self.rgb, a = cut_out(im)
         self.fade = edge_fade(*a.shape, FADE_X, FADE_Y)
         self.alpha = a * self.fade
-        self.shares = group_shares(tubes, im)
         self.off = load(OFF)[rows]
+        self.shares = group_shares(tubes, im, self.off)
 
     def tubes_width(self) -> float:
         return TUBES_X[1] - TUBES_X[0]
@@ -281,42 +280,53 @@ class Sign:
     def layers(self) -> dict[str, np.ndarray]:
         """The dead glass, then one layer per group, in drawing order.
 
-        Each group's layer is what turns the splash with the groups before it
-        lit into the splash with it lit too, drawn over the splash's dark at
-        full opacity. Layers that each carried their share of the light as
-        alpha would stack darker than the photo wherever two groups share the
-        glow, since two half-alpha layers over each other don't make a whole.
-        Drawn in order, these add up to the lit sign exactly, so the lit sprite
-        the script swaps to once the sign is on doesn't pop.
+        Each group's layer is what turns the sign with the groups before it
+        lit into the sign with it lit too, drawn over them at full opacity.
+        Layers that each carried their share of the light as alpha would stack
+        darker than the photo wherever two groups share the glow, since two
+        half-alpha layers over each other don't make a whole. Drawn in order,
+        these add up to the lit sign, so the lit sprite the script swaps to
+        once the sign is on doesn't pop. They carry no background of their
+        own, so they do so over any colour the splash draws under them.
         """
-        dead = self.dead()
-        before = over_deep(dead)
-        lit = over_deep(self.lit())
-        out = {"base": dead}
-        share = np.zeros(before.shape[:2], np.float32)
-        start = before
+        dead = premultiplied(self.dead())
+        lit = premultiplied(self.lit())
+        out = {"base": self.dead()}
+        share = np.zeros(dead.shape[:2], np.float32)
+        before = dead
         for g in GROUPS:
             share = share + self.shares[g]
-            after = start + share[..., None] * (lit - start)
+            after = dead + share[..., None] * (lit - dead)
             out[g] = step(before, after)
             before = after
         return out
 
 
-def over_deep(rgba: np.ndarray) -> np.ndarray:
-    """A straight-alpha layer drawn over the splash's dark, as RGB."""
-    deep = np.array(DEEP, np.float32) / 255
-    return rgba[..., :3] * rgba[..., 3:] + deep * (1 - rgba[..., 3:])
+def premultiplied(rgba: np.ndarray) -> np.ndarray:
+    """Colour times alpha: the form in which a mix of two layers, drawn over
+    anything, is the mix of the two drawn over it."""
+    return np.dstack([rgba[..., :3] * rgba[..., 3:], rgba[..., 3]])
 
 
 def step(before: np.ndarray, after: np.ndarray) -> np.ndarray:
-    """The layer that, drawn over `before` at full opacity, gives `after`. Its
-    alpha is the least that reaches `after` from `before`, so where nothing
-    changes it is clear."""
-    gain = np.clip(after - before, 0, None)
-    room = np.maximum(1 - before, 1e-6)
-    a = np.clip((gain / room).max(axis=2), 0, 1)
-    rgb = (after - before * (1 - a[..., None])) / np.maximum(a, 1e-6)[..., None]
+    """The straight-alpha layer that, drawn over `before`, gives `after`, both
+    premultiplied. Its alpha is the least that gets there, so where nothing
+    changes it is clear: enough to let the right amount of the background
+    through, to carry the light the group adds, and to hide what the dead
+    glass has more of than the lit (its grey's blue under an amber tube)."""
+    was, now = before[..., :3], after[..., :3]
+    a = np.clip(
+        np.maximum.reduce(
+            [
+                (after[..., 3] - before[..., 3]) / np.maximum(1 - before[..., 3], 1e-6),
+                ((now - was) / np.maximum(1 - was, 1e-6)).max(axis=2),
+                np.where(was > now + 1 / 255, 1 - now / np.maximum(was, 1e-6), 0).max(axis=2),
+            ]
+        ),
+        0,
+        1,
+    )
+    rgb = (now - was * (1 - a[..., None])) / np.maximum(a, 1e-6)[..., None]
     return np.dstack([np.clip(rgb, 0, 1), a])
 
 

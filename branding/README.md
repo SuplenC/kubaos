@@ -35,12 +35,13 @@ and the glow they throw on the wall stay and the dark wall goes. For the boot
 splash it also splits the sign into its five groups of tubes, in switch-on
 order: ク, バ, the dakuten, Kuba, OS. Each tube is a connected piece of lit
 glass and goes to its group by where its centre falls; the dakuten is the
-blue one. A group's share of the wall glow comes from its glass blurred wide,
-weighed by how close the wall's colour is to the group's, so a lit group next
-to a dark one fades out across the wall instead of ending in a seam, and the
-blue round the dakuten stays dark until it strikes. The layers are the steps
-between the splash with one more group lit, so drawn in order they add up to
-the lit sign exactly.
+blue one. A group's share of the wall glow follows how the light falls off
+from its glass, measured on the lit and the off photo, and how close the wall's
+colour is to the group's, so a lit group's glow carries on past a dark
+neighbour instead of stopping short of it, and the blue round the dakuten
+stays dark until it strikes. The layers are the steps between the sign with
+one more group lit and carry no background, so drawn in order they add up to
+the lit sign over whatever colour is under them.
 
 ## Files
 
