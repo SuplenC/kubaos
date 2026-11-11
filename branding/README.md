@@ -26,6 +26,13 @@ the vector lockups in `svg/` as references, and are released under CC0:
   over the name.
 - `photo/neon-sign-banner.jpg`: the sign on a long dark wall, the README
   banner.
+- `photo/neon-sign-states/`: the same sign switching on, a FLUX 3 video from
+  the off and the lit photo. `switch-on.mp4` is the film; `off.jpg`, then
+  `ku.jpg`, `ba.jpg`, `dakuten.jpg`, `kuba.jpg` and `os.jpg` are its steady
+  moments, each with that group of tubes and the ones before it lit,
+  1920x1080 and laid over the lit photo. The `spare-` stills are moments
+  nothing uses: the film lights "Kuba" a letter at a time (`spare-k`,
+  `spare-ku`, `spare-kub`) and O before S (`spare-o`).
 
 The same sign on a wall in a Shinjuku back alley is the default wallpaper
 (`shinjuku/kubaos-neon-sign.jpg` in kubaos-wallpapers).
@@ -35,13 +42,19 @@ and the glow they throw on the wall stay and the dark wall goes. For the boot
 splash it also splits the sign into its five groups of tubes, in switch-on
 order: ク, バ, the dakuten, Kuba, OS. Each tube is a connected piece of lit
 glass and goes to its group by where its centre falls; the dakuten is the
-blue one. A group's share of the wall glow follows how the light falls off
-from its glass, measured on the lit and the off photo, and how close the wall's
-colour is to the group's, so a lit group's glow carries on past a dark
-neighbour instead of stopping short of it, and the blue round the dakuten
-stays dark until it strikes. The layers are the steps between the sign with
-one more group lit and carry no background, so drawn in order they add up to
-the lit sign over whatever colour is under them.
+blue one. How much of a pixel's light is on once a group has struck comes
+from the stills in `photo/neon-sign-states/`: what the still with that group
+lit has gained over the dark one, out of what the lit one has, counted only
+where it is the colour the pixel burns in the photo. So a lit group's glow
+carries on past a dark neighbour instead of stopping short of it, and the blue
+round the dakuten stays dark until it strikes. The layers are the steps
+between the sign with one more group lit and carry no background, so drawn in
+order they add up to the lit sign over whatever colour is under them.
+
+`switch.py` cuts the same stills into two clips of the sign switching on and
+off, with no background. Each group strikes as a whole tube, stuttering
+between its dark and its lit still; the film's own strike, light crawling
+along the glass, is left out.
 
 ## Files
 
@@ -50,6 +63,7 @@ the lit sign over whatever colour is under them.
 | `photo/` | The photos, above. |
 | `png/kubaos-sign-1024.png` | The sign cut out of the wall, transparent, 1024x335. Anywhere the logo is big, on the dark. |
 | `png/kubaos-sign-mark-1024.png`, `-stacked-1024.png` | クバ alone, and over the name, cut out the same way, 1024 wide. |
+| `video/kubaos-sign-on.webm`, `-off.webm` | The sign switching on, a group at a time, and off, the last group first: 1920x1080, 60 frames a second, VP9 with alpha. Over any dark colour. |
 | `png/kubaos-hero.jpg` | The README banner: the banner photo, wall and all, 1600x667. |
 | `png/kubaos-splash-1920x1080.png` | The sign on the dark, as the boot splash shows it once it's on. |
 | `svg/kubaos-mark.svg` | The vector mark alone, neon, transparent background. About boxes, anything too small for the photo. |
@@ -81,16 +95,17 @@ run it after `render.sh`. Kōbō carries copies of the mark, the wordmark and
 
 ## Regenerating
 
-Change the drawing in `make.py` or the cut in `neon.py`, then run:
+Change the drawing in `make.py`, the cut in `neon.py` or the strike in
+`switch.py`, then run:
 
 ```sh
 just branding
 ```
 
 It runs `render.sh` in the flake's `branding` shell: `make.py`, the SVGs
-rendered, `fastfetch.txt`, then `neon.py` and `boot.py`. Then it writes the
+rendered, `fastfetch.txt`, then `neon.py`, `switch.py` and `boot.py`. Then it writes the
 token outputs that measure the boot pictures. Outside that shell,
-`render.sh` needs `resvg`, ImageMagick and a python3 (3.11 or later, for
+`render.sh` needs `resvg`, ImageMagick, ffmpeg with libvpx and a python3 (3.11 or later, for
 `tomllib`) with numpy and a Pillow built with libimagequant (`PYTHON` picks
 it). Don't hand-edit the SVGs or PNGs, they get overwritten.
 

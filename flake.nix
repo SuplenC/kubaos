@@ -260,6 +260,7 @@
             packages = [
               pkgs.resvg
               pkgs.imagemagick
+              pkgs.ffmpeg-headless
               (pkgs.python3.withPackages (p: [
                 p.pillow
                 p.numpy

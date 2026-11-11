@@ -17,7 +17,6 @@ Needs python3 with Pillow and numpy:
 """
 
 import tomllib
-from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -31,6 +30,11 @@ PHOTO = HERE / "photo"
 LIT = PHOTO / "neon-sign-lit.jpg"
 OFF = PHOTO / "neon-sign-off.jpg"
 BANNER = PHOTO / "neon-sign-banner.jpg"
+# The same sign filmed switching on: one still per group, each with that group
+# and the ones before it lit, 1920x1080 with the sign across the full width.
+# They say how the light spreads as the groups strike, a lit tube's shine on
+# the dead glass beside it included.
+STATES = PHOTO / "neon-sign-states"
 PNG = HERE / "png"
 PLY = REPO / "system/files/plymouth/kubaos"
 GRUB = REPO / "system/files/grub/kubaos"
@@ -46,13 +50,6 @@ DEEP = tuple(int(_deep[i : i + 2], 16) for i in (0, 2, 4))
 TUBE = 0.6
 TUBES_X = (322, 2797)
 TUBES_Y = (393, 898)
-# Which group a tube belongs to, by the column its centre falls in: ク's curve
-# reaches under バ, so no empty column parts the two, but their tubes' centres
-# do. The dakuten is the one blue tube.
-KU_END = 600
-BA_END = 1000
-KUBA_END = 2165
-
 # Wall darker than this is cut away; the warm glow the tubes throw on the
 # wall around them stays, as part of the sign.
 FLOOR = 0.05
@@ -66,20 +63,18 @@ FADE_Y = 185
 
 # The switch-on order; kubaos.script strikes the groups in this order.
 GROUPS = ("ku", "ba", "dakuten", "kuba", "os")
-# The radii a tube's glow is measured over, in the photo's pixels: how the
-# light falls off from the glass is the mix of the glass blurred by each that
-# best gives back the light the lit photo has over the off one.
-GLOW_SIGMAS = (6.0, 16.0, 40.0, 100.0, 245.0)
-# Glass brighter than this has run out of range in the photo and says nothing
-# about how its light falls off.
-CLIPPED = 0.92
-# The wall's grain has colour noise of its own; blurred by this, only the
-# glow's colour is left.
-COLOUR_BLUR = 3.0
-# How sharply a group keeps to light of its own colour: the power its
-# likeness to the wall's colour is raised to. At 6 the amber tubes take a
-# hundredth of the dakuten's blue.
-COLOUR_POWER = 6
+# The stills are a film's frames and carry its noise; blurred by this, in the
+# photo's pixels, what is left is the light.
+STATE_BLUR = 4.0
+# Light a group adds below this says nothing about whose it is: there the
+# share falls back to the group's place in the order.
+STATE_FLOOR = 0.02
+# How alike the light a pixel has gained and the colour it burns have to be,
+# as the cosine between the two colours, to count as its own: the film's
+# white-hot glass against the photo's is over 0.95 and counts in full, amber
+# falling on the dakuten's blue glass is under 0.5 and doesn't count.
+UNLIKE = 0.55
+ALIKE = 0.9
 # The dead glass is the off photo at this brightness, so the sign shows
 # faintly before it strikes instead of standing out as a grey sign.
 DEAD_LIGHT = 0.35
@@ -138,103 +133,46 @@ def cut_out(im: np.ndarray, floor: float = FLOOR) -> tuple[np.ndarray, np.ndarra
     return rgb, a
 
 
-def pieces(mask: np.ndarray) -> list[tuple[np.ndarray, np.ndarray]]:
-    """The mask's connected pieces, as index arrays (rows, columns)."""
-    seen = np.zeros(mask.shape, bool)
-    h, w = mask.shape
-    out = []
-    for y, x in zip(*np.nonzero(mask)):
-        if seen[y, x]:
-            continue
-        seen[y, x] = True
-        todo, piece = deque([(y, x)]), []
-        while todo:
-            cy, cx = todo.popleft()
-            piece.append((cy, cx))
-            for ny, nx in ((cy + 1, cx), (cy - 1, cx), (cy, cx + 1), (cy, cx - 1)):
-                if 0 <= ny < h and 0 <= nx < w and mask[ny, nx] and not seen[ny, nx]:
-                    seen[ny, nx] = True
-                    todo.append((ny, nx))
-        out.append(tuple(np.array(piece).T))
+def state(name: str, like: np.ndarray) -> np.ndarray:
+    """A still of the switch-on, laid over the photo: the stills hold the photo
+    at their width, centred, so the middle rows scaled back up are its pixels."""
+    im = Image.open(STATES / f"{name}.jpg").convert("RGB")
+    h, w, _ = like.shape
+    rows = round(im.width * h / w)
+    top = (im.height - rows) // 2
+    im = im.crop((0, top, im.width, top + rows)).resize((w, h), Image.BICUBIC)
+    px = np.asarray(im).astype(np.float32) / 255
+    return np.dstack([blur(px[..., c], STATE_BLUR) for c in range(3)])
+
+
+def hue(rgb: np.ndarray) -> np.ndarray:
+    """Colour without brightness, as a direction."""
+    return rgb / (np.linalg.norm(rgb, axis=2, keepdims=True) + 1e-4)
+
+
+def lit_so_far(lit: np.ndarray, off: np.ndarray) -> dict[str, np.ndarray]:
+    """How much of each pixel's light is on once a group has struck, from none
+    to all: what the still with that group lit has gained over the dark one,
+    out of what the fully lit one has. It follows the film, so a lit group's
+    glow carries on past a dark neighbour instead of stopping short of it.
+
+    The light a still has gained only counts where it is the colour the pixel
+    burns in the photo: amber falling on the dakuten's dead glass is not the
+    dakuten striking, and would tint it blue before it does."""
+    dark = state("off", lit)
+    burns = hue(np.dstack([blur(c, STATE_BLUR) for c in np.moveaxis(np.clip(lit - off, 0, None), 2, 0)]))
+    full = np.clip(state(GROUPS[-1], lit) - dark, 0, None).sum(axis=2)
+    out, so_far = {}, np.zeros_like(full)
+    for i, g in enumerate(GROUPS):
+        gained = np.clip(state(g, lit) - dark, 0, None)
+        t = np.clip(((hue(gained) * burns).sum(axis=2) - UNLIKE) / (ALIKE - UNLIKE), 0, 1)
+        alike = t * t * (3 - 2 * t)
+        share = (gained.sum(axis=2) * alike + STATE_FLOOR * (i + 1) / len(GROUPS)) / (full + STATE_FLOOR)
+        # A group never takes light back from the ones before it, and the last
+        # one leaves the sign fully lit.
+        so_far = np.maximum(so_far, np.clip(share, 0, 1)) if i < len(GROUPS) - 1 else np.ones_like(full)
+        out[g] = so_far
     return out
-
-
-def tube_groups(im: np.ndarray) -> dict[str, np.ndarray]:
-    """Which lit glass belongs to which group. Each tube is a connected piece
-    of lit glass, and goes to a group by the column its centre falls in; the
-    dakuten is the one blue tube. A tube's highlights can break off it in
-    small pieces, which go to the group of the tube they sit nearest. The
-    pieces are found at half size, where it takes a fraction of a second."""
-    h, w, _ = im.shape
-    lit = im.max(axis=2) > TUBE
-    half = np.asarray(Image.fromarray(lit.astype(np.float32)).resize((w // 2, h // 2), Image.BOX)) > 0.5
-    colour = np.asarray(Image.fromarray((im * 255).astype(np.uint8)).resize((w // 2, h // 2), Image.BOX))
-    groups = {g: np.zeros(half.shape, np.float32) for g in GROUPS}
-    small = []
-    for ys, xs in pieces(half):
-        # A tube is a long piece of glass; a few hundred pixels at half size
-        # is a highlight that broke off one.
-        if len(ys) < 1000:
-            small.append((ys, xs))
-            continue
-        rgb = colour[ys, xs].astype(np.float32)
-        x = xs.mean() * 2
-        if (rgb[:, 2] - rgb[:, 0]).mean() > 75:
-            g = "dakuten"
-        elif x < KU_END:
-            g = "ku"
-        elif x < BA_END:
-            g = "ba"
-        elif x < KUBA_END:
-            g = "kuba"
-        else:
-            g = "os"
-        groups[g][ys, xs] = 1
-    near = {g: blur(m, 20) for g, m in groups.items()}
-    for ys, xs in small:
-        g = max(GROUPS, key=lambda g: near[g][ys, xs].sum())
-        groups[g][ys, xs] = 1
-    return {g: lit & (np.asarray(Image.fromarray(m).resize((w, h), Image.NEAREST)) > 0.5) for g, m in groups.items()}
-
-
-def group_shares(tubes: dict[str, np.ndarray], lit: np.ndarray, off: np.ndarray) -> dict[str, np.ndarray]:
-    """Each group's share of every pixel's light, summing to one.
-
-    A group's light at a pixel falls off from its glass the way the glow on
-    the wall does, measured on the photos. A falloff steeper than the real one
-    hands the wall next to a dark tube to that tube, and cuts the lit
-    neighbour's glow off around it.
-
-    On the wall a group only takes light of its own colour: the wall round the
-    dakuten glows blue, and by distance alone ク and バ would light some of
-    that blue before the dakuten strikes. In its own glass, which burns white,
-    a group takes whatever is there.
-    """
-    gain = np.clip(lit - off, 0, None)
-    unclipped = lit.max(axis=2) < CLIPPED
-    spread = [{g: blur(t.astype(np.float32), s) for g, t in tubes.items()} for s in GLOW_SIGMAS]
-    reach = np.stack([sum(sp.values())[unclipped] for sp in spread], axis=1)
-    use = list(range(len(GLOW_SIGMAS)))
-    # Least squares with no negative part: a radius that would take light
-    # away is left out, and the rest are fitted again.
-    while True:
-        mix = np.linalg.lstsq(reach[:, use], gain.max(axis=2)[unclipped], rcond=None)[0]
-        if (mix >= 0).all():
-            break
-        use.pop(int(np.argmin(mix)))
-    eps = 1e-7
-    light = {g: sum(k * spread[i][g] for i, k in zip(use, mix)) + eps for g in tubes}
-    total = sum(light.values())
-    here = np.dstack([blur(gain[..., c], COLOUR_BLUR) for c in range(3)])
-    here /= np.linalg.norm(here, axis=2, keepdims=True) + 1e-4
-    share = {}
-    for g, t in tubes.items():
-        near = (blur(t.astype(np.float32), 16.0) * unclipped)[..., None]
-        own = (gain * near).sum(axis=(0, 1))
-        alike = (here @ (own / np.linalg.norm(own))) ** COLOUR_POWER
-        share[g] = light[g] * (alike + (1 - alike) * (light[g] / total) ** 2)
-    total = sum(share.values())
-    return {g: m / total for g, m in share.items()}
 
 
 def edge_fade(h: int, w: int, fade_x: float, fade_y: float) -> np.ndarray:
@@ -254,13 +192,12 @@ class Sign:
 
     def __init__(self) -> None:
         rows = slice(TUBES_Y[0] - PAD_Y, TUBES_Y[1] + PAD_Y)
-        im = load(LIT)[rows]
-        tubes = tube_groups(im)
-        self.rgb, a = cut_out(im)
+        lit, off = load(LIT), load(OFF)
+        self.rgb, a = cut_out(lit[rows])
         self.fade = edge_fade(*a.shape, FADE_X, FADE_Y)
         self.alpha = a * self.fade
-        self.off = load(OFF)[rows]
-        self.shares = group_shares(tubes, im, self.off)
+        self.lit_so_far = {g: m[rows] for g, m in lit_so_far(lit, off).items()}
+        self.off = off[rows]
 
     def tubes_width(self) -> float:
         return TUBES_X[1] - TUBES_X[0]
@@ -292,11 +229,9 @@ class Sign:
         dead = premultiplied(self.dead())
         lit = premultiplied(self.lit())
         out = {"base": self.dead()}
-        share = np.zeros(dead.shape[:2], np.float32)
         before = dead
         for g in GROUPS:
-            share = share + self.shares[g]
-            after = dead + share[..., None] * (lit - dead)
+            after = dead + self.lit_so_far[g][..., None] * (lit - dead)
             out[g] = step(before, after)
             before = after
         return out
