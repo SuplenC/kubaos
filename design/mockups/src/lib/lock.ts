@@ -305,32 +305,37 @@ export function lock(options: LockOptions): Lock {
     const flat = { scale, left: (width - seen.width * scale) / 2, top: (height - seen.height * scale) / 2 };
     const pushed = pushedCover(flat, width, height, element.closest("[data-reduced]") ? 1 : number("scale-push"));
     const cap = capHeight();
-    // The clock is the screen's share (`scale.lock_clock`, `scale.lock_clock_width`, and on a portrait
-    // screen as large as makes the time it shows `scale.lock_clock_portrait` of the width, so it
-    // changes size a little as the minutes turn), its kicker the clock's
-    // (`scale.lock_date`, `scale.lock_date_gap`, the portrait pair), never under
-    // `size.lock_date_least`: `type.clock_rest` and `type.clock_date` are the 1080 tall screen's.
+    // The clock is the screen's share (`scale.lock_clock`, `scale.lock_clock_width`; on a portrait
+    // screen sized from the width, below), its kicker the clock's (`scale.lock_date`,
+    // `scale.lock_date_gap`, the portrait pair), never under `size.lock_date_least`:
+    // `type.clock_rest` and `type.clock_date` are the 1080 tall screen's.
     const portrait = height > width;
     const reference = token("type-clock_rest-size");
+    const margin = token("space-s32");
     // Each on whole pixels of the screen it is drawn on.
-    const whole = (v: number) => Math.round(v / px) * px;
-    const restSize = whole(
-      portrait
-        ? (number("scale-lock_clock_portrait") * width * length("type-clock_rest-size")) / digitsWidth(time)
-        : Math.min(number("scale-lock_clock") * height, number("scale-lock_clock_width") * width),
-    );
+    const whole = (v: number) => Math.floor(v / px + 0.5) * px;
+    // On a portrait screen the clock's size is set once from the width: the widest time it can show
+    // fills the width less `space.s32` either side, so no time ever leaves the screen and the size
+    // never changes as the minutes turn; a narrower time is simply drawn narrower, as on a wide one.
+    const restSize = portrait
+      ? Math.floor(((width - 2 * margin) * length("type-clock_rest-size")) / widestRest(twelve) / px) * px
+      : whole(Math.min(number("scale-lock_clock") * height, number("scale-lock_clock_width") * width));
     const grown = restSize / reference;
-    const kickerSize = whole(Math.max(token("size-lock_date_least"), number(portrait ? "scale-lock_date_portrait" : "scale-lock_date") * restSize));
+    // The kicker, the clock's share, shrunk to fit the width less `space.s32` either side should a
+    // long date need it, and never under `size.lock_date_least`.
+    const wanted = Math.max(token("size-lock_date_least"), number(portrait ? "scale-lock_date_portrait" : "scale-lock_date") * restSize);
+    const wantedWidth = ((placeNatural + dateNatural) * wanted * px) / token("type-clock_date-size");
+    const kickerSize = whole(Math.max(token("size-lock_date_least"), wantedWidth > width - 2 * margin ? (wanted * (width - 2 * margin)) / wantedWidth : wanted));
     const kickerGrown = kickerSize / token("type-clock_date-size");
     const kickerGap = whole(number(portrait ? "scale-lock_date_gap_portrait" : "scale-lock_date_gap") * restSize);
     const kickerWidth = Math.ceil(placeNatural * kickerGrown * px - 0.001) + Math.ceil(dateNatural * kickerGrown * px - 0.001);
     const natural = digitsWidth(time) * grown;
     const restDigits = Math.ceil(natural * px - 0.001);
-    const margin = token("space-s32");
     const half = Math.max(kickerWidth, restDigits) / 2;
     const spot = portrait ? (wallpaper.portrait ?? wallpaper.clock) : wallpaper.clock;
+    // Held `space.s32` inside the edges; a clock or kicker wider than that room is centred.
     const restOn = (cover: Cover) => ({
-      cx: Math.min(width - margin - half, Math.max(margin + half, cover.left + spot.x * seen.width * cover.scale)),
+      cx: margin + half > width - margin - half ? width / 2 : Math.min(width - margin - half, Math.max(margin + half, cover.left + spot.x * seen.width * cover.scale)),
       top: Math.round(cover.top + spot.y * seen.height * cover.scale - cap * restSize),
     });
     const restFlat = restOn(flat);
@@ -490,6 +495,25 @@ function digitsWidth(time: string): number {
   meter.remove();
   if (document.fonts.status === "loaded") digitWidths.set(time, width);
   return width;
+}
+
+const widestRests = new Map<boolean, number>();
+
+/**
+ * The widest time the rest clock can show, in logical pixels at `type.clock_rest`, read off the font
+ * figure by figure: the widest hour, the colon and the widest minute. The figures are proportional,
+ * so no one digit is the widest in every place.
+ */
+function widestRest(twelve: boolean): number {
+  const known = widestRests.get(twelve);
+  if (known !== undefined) return known;
+  const figure = new Map<string, number>([...":0123456789"].map((c) => [c, digitsWidth(c)]));
+  const widthOf = (words: string) => [...words].reduce((sum, c) => sum + figure.get(c)!, 0);
+  const hours = twelve ? Array.from({ length: 12 }, (_, h) => String(h + 1)) : Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
+  const minutes = Array.from({ length: 60 }, (_, m) => String(m).padStart(2, "0"));
+  const most = Math.max(...hours.map(widthOf)) + figure.get(":")! + Math.max(...minutes.map(widthOf));
+  if (document.fonts.status === "loaded") widestRests.set(twelve, most);
+  return most;
 }
 
 let cap: number | null = null;

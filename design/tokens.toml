@@ -376,7 +376,7 @@ use = "The shell's built lock clock, over its password field."
 # The lock at rest is the wallpaper and its clock alone, the clock as large as
 # a poster's. Its size is the screen's share, not this: `scale.lock_clock`
 # of the screen's height, at most `scale.lock_clock_width` of its width, and on
-# a portrait screen its digits `scale.lock_clock_portrait` of the width. 384
+# a portrait screen as large as fits its widest time in the width. 384
 # is what that comes to on a 1080 tall screen, the reference the rest is
 # drawn at. Geist Light's figures are 0.726 of the size tall. Its line is its
 # size, so the digits sit on the grid wherever the lock places them.
@@ -850,11 +850,10 @@ near = 1.05
 clock_awake = 0.2
 # The lock's rest clock, its type's size as a share of the screen: of its height on a wide screen,
 # 384 on a 1080 tall one, 512 on 1440, 768 on 2160; never more than its width's share, so a screen
-# too narrow for that takes the width (384 on 1920 by 1200); and on a portrait screen as large as
-# makes the time it shows that share of the width, so its size follows the minutes a little.
+# too narrow for that takes the width (384 on 1920 by 1200). On a portrait screen it is sized once
+# from the width, the widest time it can show filling the width less `space.s32` either side.
 lock_clock = 0.3556
 lock_clock_width = 0.2
-lock_clock_portrait = 0.9
 # The kicker over it, as shares of the clock's size: the date's size (20 beside 384), and the gap
 # from the digits' cap top to the kicker's baseline (40 beside 384); on a portrait screen bigger and
 # higher, so it reads over a tall picture (48 and 104 beside 416).
