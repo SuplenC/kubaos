@@ -54,8 +54,11 @@ export interface Result {
   readonly row: ListRowSpec;
   /** What kind of Item it is, and the Alias the query named it by: Application · ff. */
   readonly kind: string;
-  /** Its Action panel: the first runs with Enter, the rest by their keys. */
-  readonly actions: readonly { readonly title: string; readonly keys: string }[];
+  /**
+   * Its Action panel: the first runs with Enter, the rest by their keys; a Contributed Action names
+   * the Extension offering it, which heads its group.
+   */
+  readonly actions: readonly { readonly title: string; readonly keys: string; readonly group?: string }[];
   /** The keys the row takes, at the pane's foot. */
   readonly hints: readonly KeyHint[];
 }
@@ -107,9 +110,11 @@ function paneContent(result: Result): HTMLElement {
     gap("s8"),
     text(result.kind, "label", "on_surface_variant"),
   );
-  const actions = result.actions.map((action, index) =>
-    row("s8", "centre", filling(clamped(action.title, "body", index === 0 ? "on_surface" : "on_surface_variant")), row("s4", "centre", ...keys(action.keys).map(keycap))),
-  );
+  const actions = result.actions.flatMap((action, index) => {
+    const line = row("s8", "centre", filling(clamped(action.title, "body", index === 0 ? "on_surface" : "on_surface_variant")), row("s4", "centre", ...keys(action.keys).map(keycap)));
+    const heads = action.group !== undefined && action.group !== result.actions[index - 1]?.group;
+    return heads ? [stack(0, "start", gap("s8"), text(action.group ?? "", "label", "on_surface_variant")), line] : [line];
+  });
   const list = stack("s8", "start", text("Actions", "label", "on_surface_variant"), ...actions.map(filling));
   const content = stack(0, "start", filling(top), gap("s24"), filling(list), fillingHeight(document.createElement("span")), gap("s16"), keyHints(result.hints));
   content.classList.add("k-menu-pane-content");
@@ -178,6 +183,20 @@ export interface MenuOptions {
   readonly query?: string;
   /** The row selected, by its index. */
   readonly current?: number;
+  /** The head's row in place of the search field: a View's Back and filter or title, an app's chip. */
+  readonly head?: HTMLElement;
+  /** Under the head, `space.s12` clear: the jobs still running. */
+  readonly under?: HTMLElement;
+  /** Over the Results in the list's room, `space.s12` clear: an app's intro card. */
+  readonly above?: HTMLElement;
+  /** The body in place of the Results and the pane: a form, a detail or a progress View. */
+  readonly body?: HTMLElement;
+  /** The footer's line in place of the keys: a question, a failure, the problems. */
+  readonly footer?: HTMLElement;
+  /** The footer's keys beside the pane, in place of select, Actions and Esc's. */
+  readonly hints?: readonly KeyHint[];
+  /** Over the body's foot, `space.s12` clear of the footer's hairline: the Action panel, a Toast. */
+  readonly over?: readonly HTMLElement[];
 }
 
 /**
@@ -190,32 +209,43 @@ export interface MenuOptions {
 export function commandMenu(options: MenuOptions, measures: MenuMeasures): HTMLElement {
   // A sample of a few rows only where the pane doesn't show: beside it the body keeps the screen's
   // rows, eight at the least, which the pane's symbol, words, Actions and keys are drawn to fit.
-  const few = measures.pane > 0 ? undefined : options.rows;
+  const few = measures.pane > 0 && !options.body ? undefined : options.rows;
   const pitch = length("size-row_two_line") + length("space-s4");
   const body = few ? few * pitch - length("space-s4") : measures.body;
   const search = field({ placeholder: "Search apps, projects and windows. Sums work too", icon: "search", ...(options.query ? { value: options.query } : {}), pinned: "lit" });
+  const above = options.above ? [filling(options.above), gap("s12")] : [];
   const list = scrollingList(
     options.results.map((each) => each.row),
-    { height: px(body), slides: true, current: options.current ?? 0, fieldKeys: true, vimKeys: false },
+    { height: options.above ? "100%" : px(body), slides: true, current: options.current ?? 0, fieldKeys: true, vimKeys: false },
   );
-  const parts: Element[] = [filling(options.results.length > 0 ? list : noResults(body, options.query ?? ""))];
-  const shownPane = measures.pane > 0 ? pane(measures.pane) : null;
+  const shown = options.results.length > 0 ? list : noResults(body, options.query ?? "");
+  const results = stack(0, "start", ...above, options.above ? fillingHeight(filling(shown)) : filling(shown));
+  if (options.above) results.style.height = px(body);
+  const parts: Element[] = [filling(results)];
+  const shownPane = measures.pane > 0 && !options.body ? pane(measures.pane) : null;
   if (shownPane) parts.push(shownPane.box);
-  const middle = row("s12", "start", ...parts);
+  const middle = options.body ? stack(0, "start", filling(fillingHeight(options.body))) : row("s12", "start", ...parts);
   middle.classList.add("k-menu-body");
-  const hints: readonly KeyHint[] = shownPane
-    ? [["↑↓", "Select"], ["⌃K", "Actions"], ["Esc", "Close"]]
-    : (options.results[options.current ?? 0]?.hints ?? [["Esc", "Close"]]);
+  middle.style.height = px(body);
+  const escape: KeyHint = ["Esc", options.query ? "Clear" : "Close"];
+  const hints: readonly KeyHint[] = shownPane ? (options.hints ?? [["↑↓", "Select"], ["⌃K", "Actions"], escape]) : (options.hints ?? options.results[options.current ?? 0]?.hints ?? [escape]);
   const rule = document.createElement("span");
   rule.className = "k-menu-rule";
   rule.append(divider());
-  const foot = row(0, "centre", keyHints(hints));
+  const foot = row(0, "centre", options.footer ?? keyHints(hints));
   foot.classList.add("k-menu-footer");
   const panel = document.createElement("span");
-  panel.className = "k-menu";
+  panel.className = "k-command";
   panel.tabIndex = 0;
   workedOut(panel, "size-column").style.width = px(measures.width);
-  panel.append(stack("s12", "start", filling(search), filling(middle), rule, filling(foot)));
+  const head = options.head ?? search;
+  panel.append(stack("s12", "start", filling(head), ...(options.under ? [filling(options.under)] : []), filling(middle), rule, filling(foot)));
+  if (options.over?.length) {
+    const over = document.createElement("span");
+    over.className = "k-menu-over";
+    over.append(...options.over);
+    panel.append(over);
+  }
   if (shownPane) {
     let at = options.current ?? 0;
     shownPane.show(options.results[at] ?? null, false);
@@ -227,7 +257,8 @@ export function commandMenu(options: MenuOptions, measures: MenuMeasures): HTMLE
     }).observe(list, { attributes: true, attributeFilter: ["data-current"], subtree: true });
   }
   panel.addEventListener("keydown", (event) => {
-    if ((event.target !== panel && event.target !== search) || event.key === "Tab") return;
+    const typed = event.target instanceof Node && event.target !== panel && head.contains(event.target);
+    if ((event.target !== panel && !typed) || event.key === "Tab") return;
     event.preventDefault();
     list.dispatchEvent(new KeyboardEvent("keydown", { key: event.key, ctrlKey: event.ctrlKey, repeat: event.repeat }));
   });

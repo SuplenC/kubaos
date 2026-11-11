@@ -89,8 +89,13 @@ import shellFrame from "./shell/frame.ts";
 import shellRecording from "./shell/recording.ts";
 import shellTray from "./shell/tray.ts";
 import shellWorkspaces from "./shell/workspaces-page.ts";
+import shellMenu from "./shell/menu.ts";
+import shellMenuActions from "./shell/menu-actions.ts";
+import shellMenuViews from "./shell/menu-views.ts";
+import shellMenuForm from "./shell/menu-form.ts";
+import shellMenuFooter from "./shell/menu-footer.ts";
 
-export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, slider, tabs, select, popover, menu, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, notificationCard, notificationGroup, media, pictureChoice, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll, progressBar, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, shellBar, shellContents, shellWorkspaces, shellTray, shellRecording, shellFrame, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard, notificationsPanel, popupStack, notificationPeek];
+export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, slider, tabs, select, popover, menu, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, notificationCard, notificationGroup, media, pictureChoice, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll, progressBar, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, shellBar, shellContents, shellWorkspaces, shellTray, shellRecording, shellFrame, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard, notificationsPanel, popupStack, notificationPeek, shellMenu, shellMenuActions, shellMenuViews, shellMenuForm, shellMenuFooter];
 
 export function pagesOf(level: Level): AnyPage[] {
   return PAGES.filter((page) => page.level === level);
