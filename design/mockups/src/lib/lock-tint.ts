@@ -96,6 +96,20 @@ function under(data: ImageData, box: Box, cover: Cover): string[] {
 export function tintFor(picture: HTMLImageElement, box: Box, cover: Cover): string | null {
   const data = pixelsOf(picture);
   if (!data) return null;
+  // The same picture under the same box is the same tint: read once, as a lock is placed again on
+  // every resize and many locks show one picture.
+  const key = [picture.src, ...[box.x, box.y, box.width, box.height, cover.left, cover.top].map((v) => Math.round(v * 2)), cover.scale.toFixed(5)].join("|");
+  const known = tints.get(key);
+  if (known !== undefined) return known;
+  const made = tintOf(data, box, cover);
+  tints.set(key, made);
+  return made;
+}
+
+const tints = new Map<string, string>();
+
+/** The tint, worked out from the pixels under `box`. */
+function tintOf(data: ImageData, box: Box, cover: Cover): string {
   let [a, b, weight, chroma] = [0, 0, 0, 0];
   for (const colour of under(data, box, cover)) {
     const { c, h } = toLch(colour);

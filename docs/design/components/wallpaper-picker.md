@@ -35,7 +35,7 @@ Switching view turns every frame. The one in front plays the whole move: from th
 
 ## Stepping out
 
-The one in front steps out to fill the screen (F, Space, or the bar's Full screen): the room grows round its frame over `slow` until it is the screen, its corner and shadow going, and back over `long`. The live desktop is that picture stepped out, so:
+The one in front steps out to fill the screen (F, Space, the bar's Full screen, or a click on it; on the full screen a click on the picture steps back, as F does, while the bar's controls and an awake lock's password sheet keep their own clicks): the room grows round its frame over `slow` until it is the screen, its corner and shadow going, and back over `long`. The live desktop is that picture stepped out, so:
 
 - **Opening** steps the desktop back into its frame as the wall builds round it, its frame and bar sliding out as on the wall's picture.
 - **Enter** steps the picture in front of you out, turning it into the desktop.

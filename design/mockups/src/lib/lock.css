@@ -227,7 +227,7 @@
 }
 
 /* The clock: the digits' box, their cap height down to their baseline, with the kicker
-   `space.s16` above it. It flies one path, from the rest clock in `type.clock_rest` where the
+   `space.s40` over its cap top, to its baseline. It flies one path, from the rest clock in `type.clock_rest` where the
    wallpaper puts it to the bar's time in `type.body` where the pill puts it, its size, its place
    and its colour moving together: `--flown` is how far along it stands. Waking takes it
    `scale.clock_awake` of the way (`--clock-lift`) and docking the rest from there (`--dock`), so an
@@ -275,9 +275,12 @@
   opacity: 0;
 }
 
+/* The kicker stands `space.s40` over the digits, measured as the eye does: from the digits' cap
+   top, which is their box's, to the kicker's baseline (`--kicker-base`, its depth in its line, read
+   off the font), so its descenders and its line's leading don't count. */
 .k-lock-clock > .k-lock-kicker {
   position: absolute;
-  top: calc(-1 * (var(--space-s16) + var(--kicker-height)));
+  top: round(nearest, calc(-1 * (var(--space-s40) + var(--kicker-base, var(--kicker-height)))), 1px);
   left: calc(round(down, calc(var(--cx) - var(--kicker-width) / 2), 1px) - round(down, calc(var(--cx) - var(--digits-width) / 2), 1px));
   width: max-content;
 }
