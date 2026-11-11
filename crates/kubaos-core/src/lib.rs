@@ -8,6 +8,7 @@ pub mod demo;
 pub mod engine;
 pub mod event;
 pub mod keyboard;
+pub mod mise;
 pub mod packages;
 pub mod pins;
 pub mod preview;

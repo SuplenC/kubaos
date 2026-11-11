@@ -83,6 +83,11 @@ rec {
     };
   });
 
+  # The Suites' toolchain manager, pinned with the release and unable to
+  # update itself (home/curated/mise.nix). home/shell.nix installs it and
+  # runs its shell hook.
+  mise = pkgs.callPackage ./curated/mise.nix { };
+
   # The tokens' generator, and the outputs it writes that the repo doesn't
   # keep: KubaOS.Components' singletons, and the configs and Lua the home
   # links (design/package.nix).

@@ -8,11 +8,13 @@
 //!   kubaos suite remove NAME [--purge-caches] [--no-switch] [--detach | --foreground]
 //!   kubaos suite new NAME PROJECT [--with SCAFFOLDER]
 //!
-//! `add`, `configure` and `remove` write or delete `kubaos.d/suites/<name>.toml`, then switch.
-//! They never write to a user-layer file that exists. `remove` shows the size of each cache and
-//! deletes them only with `--purge-caches`, and lists the user-layer files that mention the
-//! Suite. `new` creates a project in the Projects root with an installed Suite. Exit codes: 0 ok,
-//! 1 the work failed, 2 usage.
+//! `add`, `configure` and `remove` write or delete `kubaos.d/suites/<name>.toml`, and a Suite's
+//! fragment of mise's config with the tools mise installs first, then switch. When that switch
+//! fails, `add` and `configure` put a Suite with mise tools back as it was. They never write to a
+//! user-layer file that exists. `remove` shows the size of each cache and deletes them only with
+//! `--purge-caches`, and lists the user-layer files that mention the Suite. `list` and `show` read
+//! the versions installed from mise. `new` creates a project in the Projects root with an
+//! installed Suite. Exit codes: 0 ok, 1 the work failed, 2 usage.
 //!
 //! # Owns
 //!
@@ -23,12 +25,15 @@
 //! - The Suites, their files, caches and scaffolders: `kubaos_core::suites`.
 //! - Wiring `home.nix`: `package.rs`. The switch: `job.rs`.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::ExitCode;
 
 use clap::Args;
 use clap::Subcommand;
+use kubaos_core::mise::ToolRequest;
 use kubaos_core::state::Paths;
+use kubaos_core::suites::Before;
 use kubaos_core::suites::CachePolicy;
 use kubaos_core::suites::CacheUse;
 use kubaos_core::suites::OptionsChange;
@@ -36,6 +41,7 @@ use kubaos_core::suites::Seeded;
 use kubaos_core::suites::Suite;
 use kubaos_core::suites::SuiteConfig;
 use kubaos_core::suites::Suites;
+use kubaos_core::suites::ToolState;
 use kubaos_core::suites::Toolchain;
 use kubaos_core::suites::catalog;
 use serde_json::Value;
@@ -43,7 +49,9 @@ use serde_json::json;
 
 use crate::job;
 use crate::job::SwitchMode;
+use crate::job::chain;
 use crate::job::report;
+use crate::out::err;
 use crate::out::out;
 use crate::package;
 use crate::usage_error;
@@ -216,11 +224,12 @@ fn add(
         Err(e) => return report(e),
     };
     out!("added the {} Suite ({})", suite.title, describe(&added.config));
+    print_tools(&added.tools);
     print_seeds(paths, &added.seeds);
     if no_switch {
         return ExitCode::SUCCESS;
     }
-    job::switch(paths, mode)
+    switch_or_restore(paths, suites, suite, mode, &added.before)
 }
 
 fn configure(
@@ -248,11 +257,36 @@ fn configure(
     } else {
         out!("the {} Suite is already {}", suite.title, describe(&configured.config));
     }
+    print_tools(&configured.tools);
     print_seeds(paths, &configured.seeds);
     if no_switch || !(configured.changed || wired) {
         return ExitCode::SUCCESS;
     }
-    job::switch(paths, mode)
+    switch_or_restore(paths, suites, suite, mode, &configured.before)
+}
+
+/// Switches; when the switch fails, a Suite with mise tools goes back to `before`, so its tools
+/// never outlive the generation that was meant to use them. A detached switch isn't waited for,
+/// and a Suite without mise tools keeps its record for the next switch, as before an add.
+fn switch_or_restore(paths: &Paths, suites: &Suites, suite: &Suite, mode: SwitchMode, before: &Before) -> ExitCode {
+    let code = job::switch(paths, mode);
+    if code == ExitCode::SUCCESS || suite.mise.is_empty() || !mode.waits() {
+        return code;
+    }
+    match suites.restore(suite, before) {
+        Ok(()) => err!(
+            "kubaos: the switch failed, so the {} Suite is back as it was",
+            suite.title
+        ),
+        Err(e) => {
+            err!(
+                "kubaos: the switch failed, and putting the {} Suite back failed too",
+                suite.title
+            );
+            return report(e);
+        }
+    }
+    code
 }
 
 fn remove(
@@ -319,6 +353,7 @@ fn list(suites: &Suites, json: bool) -> ExitCode {
         Ok(installed) => installed,
         Err(e) => return report(e),
     };
+    let tools = tools_or_warn(suites, catalog::all().filter(|s| installed.contains_key(s.name)));
     let mut rows: Vec<Value> = catalog::all()
         .map(|suite| {
             let config = installed.get(suite.name);
@@ -329,6 +364,7 @@ fn list(suites: &Suites, json: bool) -> ExitCode {
                 "installed": config.is_some(),
                 "version": config.and_then(|c| c.version.clone()),
                 "extras": config.map(|c| c.extras.iter().cloned().collect::<Vec<_>>()).unwrap_or_default(),
+                "tools": tools_json(tools.get(suite.name)),
                 "scaffolders": if config.is_some() { scaffolders(suite) } else { json!([]) },
             })
         })
@@ -345,6 +381,9 @@ fn list(suites: &Suites, json: bool) -> ExitCode {
             .get(suite.name)
             .map_or_else(|| "not installed".to_owned(), describe);
         out!("{}  {}  ({state})", suite.name, suite.description);
+        for tool in tools.get(suite.name).into_iter().flatten() {
+            out!("  {}", describe_tool(tool));
+        }
     }
     for name in installed.keys().filter(|name| catalog::find(name).is_none()) {
         out!("{name}  (suites/{name}.toml: not a KubaOS Suite, its packages still install)");
@@ -359,6 +398,8 @@ fn show(paths: &Paths, suites: &Suites, suite: &Suite, json: bool) -> ExitCode {
     };
     let caches = suites.caches(suite);
     let mentions = suites.mentions(suite);
+    let tools = tools_or_warn(suites, [suite]);
+    let tools = tools.get(suite.name);
     if json {
         let value = json!({
             "name": suite.name,
@@ -366,6 +407,7 @@ fn show(paths: &Paths, suites: &Suites, suite: &Suite, json: bool) -> ExitCode {
             "description": suite.description,
             "toolchain": match suite.toolchain {
                 Toolchain::Nix => "nix",
+                Toolchain::Mise => "mise",
                 Toolchain::Upstream { manager } => manager,
                 _ => "other",
             },
@@ -377,6 +419,7 @@ fn show(paths: &Paths, suites: &Suites, suite: &Suite, json: bool) -> ExitCode {
             })).collect::<Vec<_>>(),
             "installed": config.is_some(),
             "config": config,
+            "tools": tools_json(tools),
             "caches": caches.iter().map(|c| json!({
                 "path": c.path,
                 "description": c.description,
@@ -395,6 +438,9 @@ fn show(paths: &Paths, suites: &Suites, suite: &Suite, json: bool) -> ExitCode {
     match &config {
         Some(config) => out!("installed: {}", describe(config)),
         None => out!("not installed"),
+    }
+    for tool in tools.into_iter().flatten() {
+        out!("tool {}", describe_tool(tool));
     }
     if !suite.versions.is_empty() {
         out!("versions: {}", suite.versions.join(", "));
@@ -425,6 +471,44 @@ fn scaffolders(suite: &Suite) -> Value {
         .iter()
         .map(|s| json!({ "id": s.id, "label": s.label }))
         .collect()
+}
+
+/// The mise tools of `of`, by Suite name; none, with a warning, when mise can't list them, so a
+/// listing still shows the rest.
+fn tools_or_warn<'a>(suites: &Suites, of: impl IntoIterator<Item = &'a Suite>) -> BTreeMap<&'a str, Vec<ToolState>> {
+    suites.tools(of).unwrap_or_else(|e| {
+        err!("kubaos: the Suites' tool versions are missing: {}", chain(&e));
+        BTreeMap::new()
+    })
+}
+
+fn tools_json(tools: Option<&Vec<ToolState>>) -> Value {
+    tools
+        .into_iter()
+        .flatten()
+        .map(|t| {
+            json!({
+                "tool": t.tool,
+                "request": t.request,
+                "version": t.version,
+                "installed": t.installed,
+            })
+        })
+        .collect()
+}
+
+/// "node 24.22: 24.22.1", or "node 24.22: not installed".
+fn describe_tool(tool: &ToolState) -> String {
+    match (&tool.version, tool.installed) {
+        (Some(version), true) => format!("{} {}: {version}", tool.tool, tool.request),
+        _ => format!("{} {}: not installed", tool.tool, tool.request),
+    }
+}
+
+fn print_tools(tools: &[ToolRequest]) {
+    for tool in tools {
+        out!("mise: {} {}", tool.tool, tool.request);
+    }
 }
 
 fn print_seeds(paths: &Paths, seeds: &Seeded) {

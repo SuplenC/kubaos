@@ -1,5 +1,5 @@
-# zsh: KubaOS's shell, with oh-my-zsh, fzf, atuin, direnv, zoxide and the
-# oh-my-posh prompt.
+# zsh: KubaOS's shell, with oh-my-zsh, fzf, atuin, direnv, mise, zoxide and
+# the oh-my-posh prompt.
 #
 # programs.zsh writes ~/.zshrc, ~/.zshenv and ~/.zprofile. Order of
 # programs.zsh.initContent (lower runs first):
@@ -8,7 +8,7 @@
 #   900   FZF_CTRL_R_COMMAND="" (keeps fzf off Ctrl-R)
 #   910   fzf (Ctrl-T, Alt-C)
 #   1000  aliases, oh-my-posh
-#   1010  direnv hook, atuin (Ctrl-R)
+#   1010  direnv hook, mise's hook, atuin (Ctrl-R)
 #   1890  the Proxy's variables, while it is on
 #   1900  the user layer's zshrc (~/.config/kubaos/terminal/zsh/zshrc)
 #   1950  the greeting: fastfetch in a new Ghostty window
@@ -19,9 +19,14 @@
 # ~/.cache/kubaos/zsh; deleting that folder is always safe.
 #
 # PATH entries live in home.sessionPath, not here: ~/.local/bin and cargo's in
-# dev.nix, each installed Suite's in its module under suites/.
+# dev.nix, each installed Suite's in its module under suites/. mise's hook is
+# the exception: before each prompt it puts the tools of the Suites' mise
+# fragments (~/.config/mise/conf.d/kubaos-*.toml) and of the folder's own
+# mise.toml at the front of PATH, ahead of ~/.nix-profile/bin, so a tool's
+# own commands are never shadowed by a Nix one of the same name.
 {
   config,
+  kubaosPkgs,
   pkgs,
   lib,
   ...
@@ -47,9 +52,14 @@ let
   # The suffix names the script's format (each print given the config), so
   # scripts cached in an older one are never sourced again.
   ompKey = builtins.substring 0 16 (builtins.hashString "sha256" "${omp}-print-config");
+  mise = lib.getExe kubaosPkgs.mise;
 in
 {
-  home.packages = [ pkgs.oh-my-posh ];
+  # mise is the curated set's, so only a KubaOS release moves it.
+  home.packages = [
+    pkgs.oh-my-posh
+    kubaosPkgs.mise
+  ];
 
   # XDG_CONFIG_HOME and friends come from xdg.enable (default.nix).
   home.sessionVariables.EDITOR = "nvim";
@@ -100,7 +110,7 @@ in
     };
 
     initContent = lib.mkMerge [
-      # Forking oh-my-posh, atuin, fzf, direnv and zoxide for their init
+      # Forking oh-my-posh, atuin, fzf, direnv, mise and zoxide for their init
       # scripts cost 7 ms of each start in the harness. `_kubaos_init NAME
       # CMD...` sources NAME's cached output of CMD, and runs CMD to write it
       # when the file is missing or empty.
@@ -218,11 +228,21 @@ in
         precmd_functions=(_dot_omp_init ''${precmd_functions:#_dot_omp_init})
       ''
 
-      # Where the direnv and atuin modules put their hooks.
+      # Where the direnv and atuin modules put their hooks. mise's hook is
+      # added after direnv's, so it runs after it before each prompt and
+      # its entries end up first on PATH.
+      # HAZARD: mise and direnv both rewrite PATH, which mise calls
+      # unsupported. Here direnv only ever adds a `use suite` pin or a
+      # `use flake` devshell, which a Suite on mise doesn't use.
       (lib.mkOrder 1010 ''
         ${cachedInit "direnv" [
           (lib.getExe config.programs.direnv.package)
           "hook"
+          "zsh"
+        ]}
+        ${cachedInit "mise" [
+          mise
+          "activate"
           "zsh"
         ]}
         if [[ $options[zle] = on ]]; then

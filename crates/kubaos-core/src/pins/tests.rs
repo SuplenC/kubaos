@@ -3,6 +3,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use super::Fetch;
 use super::Hidden;
@@ -10,6 +11,7 @@ use super::Pin;
 use super::PinError;
 use super::Pins;
 use super::Tangle;
+use crate::mise::fake::FakeMise;
 use crate::state::Paths;
 use crate::suites::OptionsChange;
 use crate::suites::Suites;
@@ -220,7 +222,7 @@ fn resolving_a_folder_that_does_not_exist_is_an_error() {
 fn a_pinned_version_that_is_not_installed_is_fetched_on_first_use() {
     let h = home();
     let acme = h.project("acme");
-    Suites::new(&h.paths).add(&TEST, &OptionsChange::default()).unwrap();
+    suites(&h.paths).add(&TEST, &OptionsChange::default()).unwrap();
     h.toolchain("3", &h.root.join("store/kubaos-test-suite-3"));
 
     let status = h.pins.status(pin("test", "3", &acme.join(".envrc"))).unwrap();
@@ -237,7 +239,7 @@ fn a_pinned_version_already_in_the_store_is_used_from_there() {
     let acme = h.project("acme");
     let out = h.root.join("store/kubaos-test-suite-1");
     fs::create_dir_all(&out).unwrap();
-    Suites::new(&h.paths).add(&TEST, &OptionsChange::default()).unwrap();
+    suites(&h.paths).add(&TEST, &OptionsChange::default()).unwrap();
     h.toolchain("1", &out);
 
     let status = h.pins.status(pin("test", "1", &acme.join(".envrc"))).unwrap();
@@ -569,4 +571,9 @@ fn every_pin_under_the_projects_root_is_listed_but_not_in_hidden_or_dependency_f
             pin("test", "2", &app.join(".envrc"))
         ]
     );
+}
+
+/// The Suites of `paths`, with a mise that installs in memory.
+fn suites(paths: &Paths) -> Suites {
+    Suites::with_mise(paths, Arc::new(FakeMise::new(paths.mise_config().join("conf.d"))))
 }

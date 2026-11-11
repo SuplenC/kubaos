@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# The test Suite's mise tool (test/mise/README.md): the versions it offers,
+# one per Suite version and a patch release of the first, so a request of `1`
+# resolves to 1.0.1.
+set -euo pipefail
+echo "1.0.0 1.0.1 2.0.0 3.0.0"

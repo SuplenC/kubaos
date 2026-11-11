@@ -14,9 +14,13 @@ use kubaos_user_layer::App;
 
 use super::Cache;
 use super::Extra;
+#[cfg(any(test, feature = "test-suite"))]
+use super::Request;
 use super::Scaffolder;
 use super::Seed;
 use super::Suite;
+#[cfg(any(test, feature = "test-suite"))]
+use super::Tool;
 use super::Toolchain;
 
 /// The Suites KubaOS ships, by name.
@@ -33,6 +37,7 @@ const NODE: Suite = Suite {
         description: "Adds Bun, its package manager and its test runner.",
         default: true,
     }],
+    mise: &[],
     toolchain: Toolchain::Nix,
     caches: &[
         Cache {
@@ -89,6 +94,7 @@ const PYTHON: Suite = Suite {
     description: "uv for Pythons and venvs, basedpyright, ruff and debugpy, set up in Neovim.",
     versions: &[],
     extras: &[],
+    mise: &[],
     toolchain: Toolchain::Upstream { manager: "uv" },
     caches: &[
         Cache {
@@ -130,6 +136,7 @@ const PHP: Suite = Suite {
     description: "PHP with Xdebug, composer, phpactor, php-cs-fixer and phpcs, set up in Neovim.",
     versions: &["8.5", "8.4", "8.3", "8.2"],
     extras: &[],
+    mise: &[],
     toolchain: Toolchain::Nix,
     caches: &[Cache {
         path: ".cache/composer",
@@ -175,6 +182,7 @@ const PROTO: Suite = Suite {
     description: "proto, the toolchain manager that pins each project's tools in its .prototools, and moon, the monorepo build system, which proto installs on first use.",
     versions: &[],
     extras: &[],
+    mise: &[],
     toolchain: Toolchain::Upstream { manager: "proto" },
     caches: &[Cache {
         path: ".local/share/proto",
@@ -201,6 +209,7 @@ const GO: Suite = Suite {
     description: "Go with gopls, gofumpt, goimports, golangci-lint and delve, and Neovim's Go support.",
     versions: &["1.26", "1.27", "1.25"],
     extras: &[],
+    mise: &[],
     toolchain: Toolchain::Nix,
     caches: &[
         Cache {
@@ -259,6 +268,7 @@ const RUST: Suite = Suite {
         description: "Links with wild instead of mold: faster relinks, before its 1.0.",
         default: false,
     }],
+    mise: &[],
     toolchain: Toolchain::Upstream { manager: "rustup" },
     caches: &[
         Cache {
@@ -320,6 +330,7 @@ const WALLPAPER_DEPTH: Suite = Suite {
     description: "Cuts the foreground out of each wallpaper of your own as you set it, so the lock's clock stands behind it; with its models, about 700 MB.",
     versions: &[],
     extras: &[],
+    mise: &[],
     toolchain: Toolchain::Nix,
     caches: &[Cache {
         path: ".cache/kubaos/wallpapers",
@@ -332,19 +343,25 @@ const WALLPAPER_DEPTH: Suite = Suite {
 
 /// A Suite with one of everything, for the test harness and the unit tests. Its Nix module is
 /// `home/suites/test.nix`. Version 3 is never installed by a check, so a Project pin of it shows
-/// a toolchain fetched on first use.
+/// a toolchain fetched on first use. Its mise tool, `kubaos-test-tool`, comes from the asdf plugin
+/// in `test/mise/`, which the harness links into mise first.
 #[cfg(any(test, feature = "test-suite"))]
 pub const TEST: Suite = Suite {
     name: "test",
     title: "Test",
-    description: "KubaOS's own test Suite: a script, an environment variable, a PATH entry and a Neovim setting.",
+    description: "KubaOS's own test Suite: a script, a mise tool, an environment variable, a PATH entry and a Neovim setting.",
     versions: &["1", "2", "3"],
     extras: &[Extra {
         name: "greeting",
         description: "Adds kubaos-test-suite-greet.",
         default: false,
     }],
-    toolchain: Toolchain::Nix,
+    mise: &[Tool {
+        name: "kubaos-test-tool",
+        request: Request::Suite,
+        extra: None,
+    }],
+    toolchain: Toolchain::Mise,
     caches: &[Cache {
         path: ".cache/kubaos-test-suite",
         description: "What `kubaos-test-suite run` writes.",

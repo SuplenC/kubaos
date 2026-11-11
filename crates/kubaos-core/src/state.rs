@@ -71,6 +71,7 @@ pub struct Paths {
     state: PathBuf,
     data: PathBuf,
     projects: PathBuf,
+    mise: PathBuf,
 }
 
 /// `HOME` is not set, so no path under it can be found.
@@ -80,7 +81,7 @@ pub struct NoHomeError(());
 
 impl Paths {
     /// The paths for the current user, from `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`,
-    /// `XDG_DATA_HOME` and [`PROJECTS_VAR`].
+    /// `XDG_DATA_HOME`, [`PROJECTS_VAR`] and `MISE_CONFIG_DIR`.
     ///
     /// # Errors
     ///
@@ -90,6 +91,9 @@ impl Paths {
         let mut paths = Self::from_vars(var("HOME"), var("XDG_CONFIG_HOME"), var("XDG_STATE_HOME"))?;
         if let Some(data) = var("XDG_DATA_HOME") {
             paths = paths.with_data_home(data);
+        }
+        if let Some(mise) = var("MISE_CONFIG_DIR") {
+            paths = paths.with_mise_config(mise);
         }
         Ok(match var(PROJECTS_VAR) {
             Some(projects) => paths.with_projects_root(projects),
@@ -116,6 +120,7 @@ impl Paths {
             state: state.join("kubaos"),
             data: home.join(".local/share"),
             projects: home.join(PROJECTS_ROOT),
+            mise: config.join("mise"),
             config,
             home,
         })
@@ -125,6 +130,13 @@ impl Paths {
     #[must_use]
     pub fn with_projects_root(mut self, root: impl Into<PathBuf>) -> Self {
         self.projects = self.home.join(root.into());
+        self
+    }
+
+    /// The same paths with mise's config folder, `MISE_CONFIG_DIR`, at `dir`.
+    #[must_use]
+    pub fn with_mise_config(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.mise = dir.into();
         self
     }
 
@@ -166,6 +178,25 @@ impl Paths {
     /// `<suite>/<version>`, `~/.local/share/kubaos/toolchains`. `home/pins.nix` writes them.
     pub fn toolchains(&self) -> PathBuf {
         self.data.join("kubaos/toolchains")
+    }
+
+    /// mise's config folder, `~/.config/mise` unless `MISE_CONFIG_DIR` moves it. The user's own
+    /// `config.toml` is there, and a Suite's fragment is `conf.d/kubaos-<name>.toml` in it.
+    pub fn mise_config(&self) -> &Path {
+        &self.mise
+    }
+
+    /// The fragment of mise's config that holds the Suite `name`'s tools,
+    /// `~/.config/mise/conf.d/kubaos-<name>.toml`. mise loads `conf.d/` in name order, and the
+    /// user's `config.toml` after it, so the user's requests win.
+    pub fn mise_fragment(&self, name: &str) -> PathBuf {
+        self.mise.join("conf.d").join(format!("kubaos-{name}.toml"))
+    }
+
+    /// mise's global lockfile, `~/.config/mise/mise.lock`, which `mise lock --global` writes
+    /// after each Suite change and `mise upgrade` keeps current.
+    pub fn mise_lock(&self) -> PathBuf {
+        self.mise.join("mise.lock")
     }
 
     /// The user flake, `~/.config/kubaos/home`.

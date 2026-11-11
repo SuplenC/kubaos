@@ -74,7 +74,7 @@ c_path() {
 # Every tool docs/CONTRACTS.md lists ("Packages: who installs what") that
 # the image installs, resolved in a login shell, with its owner checked.
 # Hyprland is the PPA's, from apt.
-NIX_TOOLS=(qs ghostty nvim tmux tms lazygit yazi fzf zoxide atuin direnv eza bat fd rg delta dust dysk
+NIX_TOOLS=(qs ghostty nvim tmux tms lazygit yazi fzf zoxide atuin direnv mise eza bat fd rg delta dust dysk
   btop jq yq xh tldr just glow gh fastfetch lazydocker hyperfine
   oh-my-posh matugen home-manager non-nixos-gpu-setup gpu-screen-recorder satty kubaos-files kubaos-bluetooth
   kubaos-automount kubaos-phone ripdrag)
@@ -2529,6 +2529,11 @@ cpu_pct() {
 
 # has_bin NAME: whether the home profile has NAME.
 has_bin() { [[ -x $USER_HOME/.nix-profile/bin/$1 ]]; }
+# link_test_tool: link the test Suite's mise plugin (test/mise/), so
+# `kubaos suite add test` can install kubaos-test-tool with no network.
+link_test_tool() {
+  expect_ok "mise plugins link kubaos-test-tool" zrun "mise plugins link --force kubaos-test-tool '$REPO/test/mise/kubaos-test-tool'"
+}
 # kz CMD: CMD in a login zsh with Nix's own bin on PATH, which home-manager
 # runs `nix` from; the harness's login zsh doesn't source nix-daemon.sh.
 # /usr/local/bin goes first, so `kubaos` is /out/kubaos, built with the test
@@ -2744,12 +2749,15 @@ c_preview() {
 # so every file kubaos writes into kubaos.d/ must reach git's index for Nix to
 # see it. Add, configure, scaffold and remove it, with a user override in
 # ~/.config/kubaos/editor/nvim/ that must win throughout, and nothing of the Suite
-# left in the generation afterwards. Switches run --foreground, as in packages.
+# left in the generation or in mise afterwards. Its mise tool comes from the
+# plugin in test/mise/. Switches run --foreground, as in packages.
 c_suites() {
   local u="$USER_HOME/.config/kubaos/home" layer="$USER_HOME/.config/kubaos" out gen
   local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/test-suite.lua"
   local cache="$USER_HOME/.cache/kubaos-test-suite" project="$USER_HOME/Projects/test-suite-demo"
+  local frag="$USER_HOME/.config/mise/conf.d/kubaos-test.toml" installs="$USER_HOME/.local/share/mise/installs/kubaos-test-tool"
   install_kubaos || return 1
+  link_test_tool || return 1
   user_flake "$u" || return 1
   as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
   rm -rf "$mine" "$cache" "$project"
@@ -2777,6 +2785,10 @@ c_suites() {
   zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.local/share/kubaos-test-suite/bin" ||
     { echo "FAIL the Suite's PATH entry is missing"; return 1; }
   echo "ok   its package, environment variable and PATH entry"
+  grep -qx 'kubaos-test-tool = "1"' "$frag" && [[ $(zlogin 'kubaos-test-tool') == 1.0.1 ]] ||
+    { echo "FAIL its mise tool: no request in $frag, or kubaos-test-tool isn't 1.0.1"; cat "$frag"; return 1; }
+  [[ -s $USER_HOME/.config/mise/mise.lock ]] || { echo "FAIL mise lock --global wrote no lockfile"; return 1; }
+  echo "ok   its mise tool: requested in ~/.config/mise/conf.d/kubaos-test.toml, locked, 1.0.1 on PATH"
   [[ -f $mine ]] && grep -q 'created ~/.config/kubaos/editor/nvim/plugins/test-suite.lua' <<<"$out" ||
     { echo "FAIL the missing user-layer file was not seeded"; printf '%s\n' "$out"; return 1; }
   out="$(opts)"
@@ -2798,6 +2810,8 @@ c_suites() {
     { echo "FAIL configure wrote to the user's file"; printf '%s\n' "$out"; return 1; }
   out="$(opts)"
   [[ $out == "mine 2" ]] || { echo "FAIL after configure: $out (want the user's greeting, the Suite's version 2)"; return 1; }
+  [[ $(zlogin 'kubaos-test-tool') == 2.0.0 && ! -e $installs/1.0.1 ]] ||
+    { echo "FAIL configure: kubaos-test-tool isn't 2.0.0, or 1.0.1 wasn't pruned"; ls "$installs"; return 1; }
   echo "ok   kubaos suite configure --version 2 --extra greeting: applied, the user's file untouched and still winning"
 
   out="$(kz 'kubaos suite new test test-suite-demo' 2>&1)" ||
@@ -2830,7 +2844,15 @@ c_suites() {
   ! has_bin kubaos-test-suite && ! has_bin kubaos-test-suite-greet || { echo "FAIL the Suite's commands are still on PATH"; return 1; }
   out="$(opts)"
   [[ $out == "mine nil" ]] || { echo "FAIL after remove, Neovim has: $out"; return 1; }
-  echo "ok   no leftovers in the generation: packages, environment, PATH, Neovim setting and Suite file all gone"
+  [[ ! -e $frag ]] && [[ -z $(ls -A "$installs" 2>/dev/null) ]] ||
+    { echo "FAIL the Suite's mise fragment or its tool's versions are left"; ls -A "$installs"; return 1; }
+  echo "ok   no leftovers in the generation or in mise: packages, environment, PATH, Neovim setting, Suite file, fragment and versions all gone"
+
+  out="$(kz 'KUBAOS_TEST_TOOL_FAIL=1.0.1 kubaos suite add test --no-switch' 2>&1)" &&
+    { echo "FAIL kubaos suite add succeeded though its mise tool failed to install"; printf '%s\n' "$out"; return 1; }
+  [[ ! -e $u/kubaos.d/suites/test.toml && ! -e $frag ]] && [[ -z $(ls -A "$installs" 2>/dev/null) ]] ||
+    { echo "FAIL a failed install left a record, a fragment or a version behind"; printf '%s\n' "$out"; return 1; }
+  echo "ok   a failed mise install: exit non-zero, and no record, fragment or version left"
 
   out="$(kz 'kubaos suite add test --no-switch && kubaos suite remove test --purge-caches --no-switch' 2>&1)" ||
     { echo "FAIL add + remove --purge-caches"; printf '%s\n' "$out" | tail -20; return 1; }
@@ -2851,6 +2873,7 @@ c_pins() {
   local u="$USER_HOME/.config/kubaos/home" acme="$USER_HOME/Projects/acme" out entry drv3 out3
   local typo="$USER_HOME/Projects/typo"
   install_kubaos || return 1
+  link_test_tool || return 1
   user_flake "$u" || return 1
   as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
   rm -rf "$acme" "$typo"

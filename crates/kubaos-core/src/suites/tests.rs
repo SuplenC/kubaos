@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use kubaos_user_layer::App;
 
@@ -9,6 +10,7 @@ use super::Cache;
 use super::CachePolicy;
 use super::Extra;
 use super::OptionsChange;
+use super::Request;
 use super::ScaffoldError;
 use super::Scaffolder;
 use super::Seed;
@@ -16,9 +18,13 @@ use super::Suite;
 use super::SuiteConfig;
 use super::SuiteError;
 use super::Suites;
+use super::Tool;
+use super::ToolState;
 use super::Toolchain;
 use super::catalog;
 use super::default_config;
+use crate::mise::ToolRequest;
+use crate::mise::fake::FakeMise;
 use crate::state::Paths;
 use crate::state::StateDir;
 
@@ -42,6 +48,7 @@ const DEMO: Suite = Suite {
             default: false,
         },
     ],
+    mise: &[],
     toolchain: Toolchain::Nix,
     caches: &[
         Cache {
@@ -66,22 +73,63 @@ const DEMO: Suite = Suite {
     mentions: &["demo", "demo-ls"],
 };
 
+/// [`DEMO`] with mise tools: its main toolchain on the Suite's version, a language server with
+/// the `lsp` extra and a formatter with `fmt`.
+const DEMO_MISE: Suite = Suite {
+    mise: &[
+        Tool {
+            name: "demo-lang",
+            request: Request::Suite,
+            extra: None,
+        },
+        Tool {
+            name: "demo-ls",
+            request: Request::Fixed("0.5"),
+            extra: Some("lsp"),
+        },
+        Tool {
+            name: "demo-fmt",
+            request: Request::Fixed("3.1"),
+            extra: Some("fmt"),
+        },
+    ],
+    toolchain: Toolchain::Mise,
+    ..DEMO
+};
+
 struct Home {
     _tmp: tempfile::TempDir,
     paths: Paths,
     suites: Suites,
+    mise: Arc<FakeMise>,
 }
 
 fn home() -> Home {
     let tmp = tempfile::tempdir().unwrap();
     let paths = Paths::from_vars(Some(tmp.path().as_os_str().to_owned()), None, None).unwrap();
     fs::create_dir_all(paths.flake()).unwrap();
-    let suites = Suites::new(&paths);
+    let mise = Arc::new(FakeMise::new(paths.mise_config().join("conf.d")));
+    let suites = Suites::with_mise(&paths, Arc::clone(&mise) as Arc<dyn crate::mise::Mise>);
     Home {
         _tmp: tmp,
         paths,
         suites,
+        mise,
     }
+}
+
+fn fragment(h: &Home) -> PathBuf {
+    h.paths.mise_fragment("demo")
+}
+
+fn requests(pairs: &[(&str, &str)]) -> Vec<ToolRequest> {
+    pairs
+        .iter()
+        .map(|(tool, request)| ToolRequest {
+            tool: (*tool).to_owned(),
+            request: (*request).to_owned(),
+        })
+        .collect()
 }
 
 fn write(path: &Path, contents: &str) {
@@ -753,5 +801,321 @@ fn every_seed_is_a_commented_example_that_mentions_its_suite() {
                 seed.path
             );
         }
+    }
+}
+
+#[test]
+fn a_suite_without_mise_tools_never_runs_mise() {
+    let h = home();
+
+    h.suites.add(&DEMO, &OptionsChange::default()).unwrap();
+    h.suites
+        .configure(
+            &DEMO,
+            &OptionsChange {
+                version: Some("2".into()),
+                ..OptionsChange::default()
+            },
+        )
+        .unwrap();
+    let tools = h.suites.tools([&DEMO]).unwrap();
+    h.suites.remove(&DEMO, CachePolicy::Keep).unwrap();
+
+    assert!(h.mise.calls().is_empty(), "{:?}", h.mise.calls());
+    assert!(tools.is_empty(), "{tools:?}");
+    assert!(!fragment(&h).exists());
+}
+
+#[test]
+fn adding_installs_the_tools_first_then_writes_the_fragment_and_the_record() {
+    let h = home();
+
+    let added = h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+
+    assert_eq!(added.tools, requests(&[("demo-lang", "1"), ("demo-ls", "0.5")]));
+    assert_eq!(
+        h.mise.calls(),
+        [
+            "mise ls --json",
+            "mise install demo-lang@1 demo-ls@0.5",
+            "mise lock --global"
+        ]
+    );
+    assert_eq!(h.mise.installed(), ["demo-lang@1.0.3", "demo-ls@0.5.2"]);
+    assert!(suite_file(&h).exists());
+    let text = fs::read_to_string(fragment(&h)).unwrap();
+    assert!(text.starts_with('#'), "the fragment says who writes it: {text}");
+    assert!(text.contains("demo-lang = \"1\"\ndemo-ls = \"0.5\""), "{text}");
+    assert_eq!(added.before.config, None);
+}
+
+#[test]
+fn the_fragment_holds_tools_and_no_setting() {
+    let h = home();
+
+    h.suites
+        .add(
+            &DEMO_MISE,
+            &OptionsChange {
+                enable: vec!["fmt".into()],
+                ..OptionsChange::default()
+            },
+        )
+        .unwrap();
+
+    let table: toml::Table = toml::from_str(&fs::read_to_string(fragment(&h)).unwrap()).unwrap();
+    assert_eq!(table.keys().collect::<Vec<_>>(), ["tools"]);
+    assert_eq!(fragment(&h).file_name().unwrap(), "kubaos-demo.toml");
+    assert_eq!(
+        fragment(&h).parent().unwrap(),
+        h.paths.config_home().join("mise/conf.d")
+    );
+}
+
+#[test]
+fn a_failed_install_leaves_no_fragment_no_record_and_no_leftover_versions() {
+    let h = home();
+    h.mise.preinstall("demo-lang", "1.0.0");
+    h.mise.fail_on("demo-ls");
+
+    let err = h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap_err();
+
+    assert!(matches!(err, SuiteError::Install { .. }), "{err:?}");
+    assert!(!suite_file(&h).exists());
+    assert!(!fragment(&h).exists());
+    assert_eq!(
+        h.mise.installed(),
+        ["demo-lang@1.0.0"],
+        "only what was there before stays"
+    );
+    assert!(
+        h.mise.calls().contains(&"mise uninstall demo-lang@1.0.3".to_owned()),
+        "{:?}",
+        h.mise.calls()
+    );
+    assert!(!h.mise.calls().iter().any(|c| c.starts_with("mise lock")));
+}
+
+#[test]
+fn removing_deletes_the_fragment_and_prunes_at_once() {
+    let h = home();
+    h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+
+    h.suites.remove(&DEMO_MISE, CachePolicy::Keep).unwrap();
+
+    assert!(!fragment(&h).exists());
+    assert!(!suite_file(&h).exists());
+    assert!(h.mise.installed().is_empty(), "{:?}", h.mise.installed());
+    assert_eq!(
+        h.mise.calls()[3..],
+        ["mise prune --tools", "mise lock --global"],
+        "{:?}",
+        h.mise.calls()
+    );
+}
+
+#[test]
+fn removing_leaves_the_user_s_own_mise_config_alone() {
+    let h = home();
+    let own = h.paths.mise_config().join("config.toml");
+    write(&own, "[tools]\ndemo-lang = \"2\"\n\n[settings]\nexperimental = true\n");
+    h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+
+    h.suites.remove(&DEMO_MISE, CachePolicy::Keep).unwrap();
+
+    assert_eq!(
+        fs::read_to_string(&own).unwrap(),
+        "[tools]\ndemo-lang = \"2\"\n\n[settings]\nexperimental = true\n"
+    );
+}
+
+#[test]
+fn configuring_a_new_version_installs_it_and_prunes_the_old_one() {
+    let h = home();
+    h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+
+    let configured = h
+        .suites
+        .configure(
+            &DEMO_MISE,
+            &OptionsChange {
+                version: Some("2".into()),
+                ..OptionsChange::default()
+            },
+        )
+        .unwrap();
+
+    assert!(configured.changed);
+    assert_eq!(configured.tools, requests(&[("demo-lang", "2"), ("demo-ls", "0.5")]));
+    assert_eq!(h.mise.installed(), ["demo-lang@2.1.0", "demo-ls@0.5.2"]);
+    assert_eq!(
+        configured.before.tools,
+        requests(&[("demo-lang", "1"), ("demo-ls", "0.5")])
+    );
+}
+
+#[test]
+fn configuring_keeps_the_requests_an_upgrade_moved() {
+    let h = home();
+    h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+    write(&fragment(&h), "[tools]\ndemo-lang = \"1.0\"\ndemo-ls = \"0.4\"\n");
+
+    let configured = h
+        .suites
+        .configure(
+            &DEMO_MISE,
+            &OptionsChange {
+                enable: vec!["fmt".into()],
+                ..OptionsChange::default()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(
+        configured.tools,
+        requests(&[("demo-lang", "1.0"), ("demo-ls", "0.4"), ("demo-fmt", "3.1")])
+    );
+}
+
+#[test]
+fn configuring_to_the_same_options_runs_no_install() {
+    let h = home();
+    h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+    let calls = h.mise.calls().len();
+
+    let configured = h.suites.configure(&DEMO_MISE, &OptionsChange::default()).unwrap();
+
+    assert!(!configured.changed);
+    assert_eq!(h.mise.calls().len(), calls, "{:?}", h.mise.calls());
+}
+
+#[test]
+fn a_failed_configure_changes_nothing() {
+    let h = home();
+    h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+    let record = fs::read_to_string(suite_file(&h)).unwrap();
+    let before = fs::read_to_string(fragment(&h)).unwrap();
+    h.mise.fail_on("demo-fmt");
+
+    let err = h
+        .suites
+        .configure(
+            &DEMO_MISE,
+            &OptionsChange {
+                version: Some("2".into()),
+                enable: vec!["fmt".into()],
+                ..OptionsChange::default()
+            },
+        )
+        .unwrap_err();
+
+    assert!(matches!(err, SuiteError::Install { .. }), "{err:?}");
+    assert_eq!(fs::read_to_string(suite_file(&h)).unwrap(), record);
+    assert_eq!(fs::read_to_string(fragment(&h)).unwrap(), before);
+    assert_eq!(h.mise.installed(), ["demo-lang@1.0.3", "demo-ls@0.5.2"]);
+}
+
+#[test]
+fn restoring_after_a_failed_switch_takes_an_add_back_out() {
+    let h = home();
+    let added = h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+
+    h.suites.restore(&DEMO_MISE, &added.before).unwrap();
+
+    assert!(!suite_file(&h).exists());
+    assert!(!fragment(&h).exists());
+    assert!(h.mise.installed().is_empty(), "{:?}", h.mise.installed());
+}
+
+#[test]
+fn restoring_after_a_failed_switch_puts_a_configure_back() {
+    let h = home();
+    let added = h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+    let record = fs::read_to_string(suite_file(&h)).unwrap();
+    let configured = h
+        .suites
+        .configure(
+            &DEMO_MISE,
+            &OptionsChange {
+                version: Some("2".into()),
+                ..OptionsChange::default()
+            },
+        )
+        .unwrap();
+
+    h.suites.restore(&DEMO_MISE, &configured.before).unwrap();
+
+    assert_eq!(fs::read_to_string(suite_file(&h)).unwrap(), record);
+    assert_eq!(h.suites.tools([&DEMO_MISE]).unwrap()["demo"].len(), added.tools.len());
+    assert_eq!(h.mise.installed(), ["demo-lang@1.0.3", "demo-ls@0.5.2"]);
+}
+
+#[test]
+fn tools_reads_each_suite_s_versions_from_mise() {
+    let h = home();
+    h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+
+    let tools = h.suites.tools([&DEMO_MISE, &DEMO]).unwrap();
+
+    assert_eq!(
+        tools["demo"],
+        [
+            ToolState {
+                tool: "demo-lang".into(),
+                request: "1".into(),
+                version: Some("1.0.3".into()),
+                installed: true,
+            },
+            ToolState {
+                tool: "demo-ls".into(),
+                request: "0.5".into(),
+                version: Some("0.5.2".into()),
+                installed: true,
+            },
+        ]
+    );
+    assert_eq!(h.mise.calls().last().map(String::as_str), Some("mise ls --json"));
+}
+
+#[test]
+fn the_test_suite_installs_through_mise() {
+    let h = home();
+
+    let added = h.suites.add(&catalog::TEST, &OptionsChange::default()).unwrap();
+    h.suites.remove(&catalog::TEST, CachePolicy::Keep).unwrap();
+
+    assert_eq!(catalog::TEST.toolchain, Toolchain::Mise);
+    assert_eq!(added.tools, requests(&[("kubaos-test-tool", "1")]));
+    assert_eq!(h.mise.installed(), Vec::<String>::new());
+    assert!(!h.paths.mise_fragment("test").exists());
+}
+
+#[test]
+fn every_mise_tool_in_the_catalog_is_well_formed() {
+    for suite in catalog::all() {
+        let name = suite.name;
+        let mut tools = BTreeSet::new();
+        for tool in suite.mise {
+            assert!(tools.insert(tool.name), "{name}: {} twice", tool.name);
+            if let Some(extra) = tool.extra {
+                assert!(suite.extras.iter().any(|e| e.name == extra), "{name}: no extra {extra}");
+            }
+            match tool.request {
+                Request::Suite => assert!(!suite.versions.is_empty(), "{name}: {} takes no version", tool.name),
+                Request::Fixed(request) => {
+                    let parts: Vec<&str> = request.split('.').collect();
+                    assert!(
+                        parts.len() == 2 && parts.iter().all(|p| p.parse::<u32>().is_ok()),
+                        "{name}: {} asks for {request:?}, not major.minor",
+                        tool.name
+                    );
+                }
+            }
+        }
+        assert_eq!(
+            suite.toolchain == Toolchain::Mise,
+            suite.mise.iter().any(|t| t.request == Request::Suite),
+            "{name}: a Suite's toolchain is mise's when its main tool is"
+        );
     }
 }
