@@ -57,3 +57,30 @@ export function withTooltip(control: HTMLElement, tip: HTMLElement, options: Tip
   tip.toggleAttribute("data-shown", options.shown ?? false);
   return room;
 }
+
+/** Which of the control's ends a floating card lines up with: its start, or its end near a window's edge. */
+export type TipHeld = "start" | "end";
+
+export interface FloatOptions {
+  readonly side?: TipSide;
+  readonly held?: TipHeld;
+  /** Shown whatever the pointer and the keyboard do: a sample of the card over its control. */
+  readonly shown?: boolean;
+}
+
+/**
+ * `control` with its card, `tip`, floating `space.s8` below it (or above), lined up with its start
+ * (or its end, for a control at a panel's end, so the card stays on the panel), taking no room in the
+ * layout: the toolbar or header around the control never moves. It shows while the control is
+ * hovered, focused from the keyboard or pinned lit, and fades over `short`. Returns the anchor that
+ * holds both, which goes where the control would.
+ */
+export function floatingTooltip(control: HTMLElement, tip: HTMLElement, options: FloatOptions = {}): HTMLElement {
+  const anchor = document.createElement("span");
+  anchor.className = "k-tip-anchor";
+  tip.dataset.side = options.side ?? "below";
+  tip.dataset.held = options.held ?? "start";
+  tip.toggleAttribute("data-shown", options.shown ?? false);
+  anchor.append(control, tip);
+  return anchor;
+}

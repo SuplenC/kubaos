@@ -1353,6 +1353,45 @@
   transition: none;
 }
 
+/* A floating tooltip (`floatingTooltip` in `lib/tooltip.ts`): the card hangs `space.s8` below its
+   control (or above), lined up with its start or its end, over whatever is there; the anchor is the
+   control's own size, so nothing round it moves. */
+.k-tip-anchor {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+
+.k-tip-anchor > .k-tooltip {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + var(--space-s8));
+  left: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.k-tip-anchor > .k-tooltip[data-side="above"] {
+  top: auto;
+  bottom: calc(100% + var(--space-s8));
+}
+
+.k-tip-anchor > .k-tooltip[data-held="end"] {
+  left: auto;
+  right: 0;
+}
+
+.k-tip-anchor:has(> .k-control:is(:hover, :focus-visible, [data-pinned])) > .k-tooltip,
+.k-tip-anchor > .k-tooltip[data-shown] {
+  opacity: 1;
+}
+
+.k-tip-anchor:has(> .k-control[data-pinned]) > .k-tooltip,
+.k-tip-anchor > .k-tooltip[data-shown] {
+  transition: none;
+}
+
 /* One line, or `--lines`, in the room the text is given, the last ending in an ellipsis where the
    words don't fit; never wider than its words. */
 .k-text[data-clamped] {

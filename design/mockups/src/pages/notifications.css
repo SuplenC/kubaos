@@ -1,0 +1,57 @@
+/* The notifications panel's own boxes (`notifications.ts`), which the shell's panel and PanelPage's
+   example of it share: its list under the section labels, and the keys in its bottom right corner. */
+
+/* A list of groups, `space.s8` apart, under its section labels. */
+.k-notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  width: 100%;
+}
+
+.k-notif-label {
+  display: flex;
+  align-items: flex-end;
+}
+
+.k-notif-label:not(:first-child) {
+  margin-top: var(--space-s8);
+}
+
+/* The panel: from the bar to the bottom edge whatever it holds, its keys in the bottom right corner. */
+.k-notif-panel {
+  position: relative;
+  min-height: var(--sheet-room);
+}
+
+.k-notif-panel > .k-panel-body {
+  flex: 1 1 auto;
+}
+
+.k-tip-anchor.k-notif-keys {
+  position: absolute;
+  z-index: 2;
+  right: var(--space-s16);
+  bottom: var(--space-s16);
+}
+
+.k-notif-nothing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--sheet-room) - var(--size-control_sm) * 4);
+}
+
+
+/* A sample's room: a card or a group as wide as the popups hold them. */
+.k-notif-room {
+  display: block;
+  box-sizing: border-box;
+  width: calc(var(--size-panel) - var(--space-s8) * 2);
+  max-width: 100%;
+}
+
+.k-notif-room[data-tall] {
+  padding-bottom: var(--notif-overhang, 0);
+}
+

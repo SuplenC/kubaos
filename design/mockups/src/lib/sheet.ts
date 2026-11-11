@@ -86,6 +86,16 @@ export interface SheetOptions {
   readonly edge: Edge;
   /** How far open it is drawn, 0 to 1: a picture of it opening. */
   readonly reveal?: number;
+  /**
+   * On the top edge, hung from the frame's top right corner rather than the edge's middle, flush
+   * with the right edge: the popup stack and the bell's peek.
+   */
+  readonly corner?: boolean;
+  /**
+   * On the right edge, how far below the bar it starts (a length's CSS), rather than hanging from it:
+   * a stack under another panel. It then meets the right edge through a fillet at both ends.
+   */
+  readonly start?: string;
 }
 
 /** A sheet: its surface for the glass layer, and its content's box for the layer above. */
@@ -108,6 +118,11 @@ export function sheet(options: SheetOptions): Sheet {
   const parts = [surface, box];
   for (const part of parts) {
     part.dataset.edge = options.edge;
+    part.toggleAttribute("data-corner", options.corner === true && options.edge === "top");
+    if (options.start !== undefined && options.edge === "right") {
+      part.dataset.start = "";
+      part.style.setProperty("--sheet-start", options.start);
+    }
     if (options.reveal !== undefined) part.style.setProperty("--reveal", String(options.reveal));
   }
   // The sheet's depth and its span along the edge are its content's size, which only layout knows,

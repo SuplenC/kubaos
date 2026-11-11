@@ -128,14 +128,15 @@ export default page({
   },
   variants: [
     { name: "No tabs, no footer", for: "a header over one body: the system monitor", sample: () => onScreen(system()) },
-    { name: "With a footer", for: "an action under the body: Mark all read", sample: () => onScreen(notifications()) },
+    { name: "With a footer", for: "an action under the body", sample: () => onScreen(system({ footer: true })) },
+    { name: "A status for a pun", for: "the notifications: their count, never shifting", sample: () => onScreen(notifications()) },
     { name: "With tabs", for: "views under the header: the control center", sample: () => onScreen(controlCenter()) },
     { name: "Sized to its content", for: "hangs from the top edge's middle: the clock", sample: clockOnScreen },
   ],
   sizes: [
     { name: "As tall as its content", for: "ends in a fillet into the right edge", sample: () => onScreen(system({ count: 2 })) },
     { name: "Up to the room", for: "meets the frame's bottom edge; the body scrolls", sample: () => onScreen(notifications({ count: 8 })) },
-    { name: "Up to the room, scrolled", for: "the header fade on; the footer band stays", sample: () => onScreen(notifications({ count: 8, down: 0.5, fadePinned: true })) },
+    { name: "Up to the room, scrolled", for: "the header fade on; the bands stay", sample: () => onScreen(notifications({ count: 8, down: 0.5, fadePinned: true })) },
   ],
   states: {
     shown: ["rest", "empty", "loading", "error"],
@@ -163,7 +164,7 @@ export default page({
     missingPicture: doesntApply("it draws no picture; a row missing its icon keeps its tile."),
     counts: [
       { name: "None", for: "its empty state; the header doesn't move", sample: () => onScreen(notifications({ state: "empty" })) },
-      { name: "One", for: "as short as a sheet with a body gets", sample: () => onScreen(notifications({ count: 1 })) },
+      { name: "One", for: "as short as a sheet with a body gets", sample: () => onScreen(system({ count: 1 })) },
       { name: "Many", for: "the body scrolls, the bands stay", sample: () => onScreen(notifications({ count: 8, down: 1, fadePinned: true })) },
     ],
   },
@@ -188,7 +189,7 @@ export default page({
     samples: nonEmpty([
       { name: "The system monitor", for: "width, padding, the header band", sample: () => onScreen(system()) },
       { name: "The control center", for: "the tabs and the body under them", sample: () => onScreen(controlCenter()) },
-      { name: "The notifications", for: "the footer band", sample: () => onScreen(notifications()) },
+      { name: "The system monitor, footer", for: "the footer band", sample: () => onScreen(system({ footer: true })) },
     ]),
     measures: [
       { part: "Panel's width", token: "size-panel" },
