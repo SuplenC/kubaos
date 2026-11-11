@@ -70,7 +70,11 @@ export default page({
   lede: "A labelled action: six kinds by what it is for, three sizes, an icon before or after or none.",
   code: { rust: "button::button(label)", qml: "Button" },
   stage: { live: kinds, hint: "hover it, or Tab to it", daylight: true },
-  variants: nonEmpty(KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind, "Md") }))),
+  variants: nonEmpty([
+    ...KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind, "Md") })),
+    { name: "Holding its alternatives' width", for: "Show and Hide one width: it never moves", sample: () => row("s16", "centre", button({ label: "Show", kind: "Text", size: "Sm", alternatives: ["Show", "Hide"], disclosure: false }), button({ label: "Hide", kind: "Text", size: "Sm", alternatives: ["Show", "Hide"], disclosure: true })) },
+    { name: "Disclosing", for: "a chevron that turns with what it opens", sample: () => row("s16", "centre", button({ label: "More", kind: "Tonal", size: "Sm", disclosure: false }), button({ label: "More", kind: "Tonal", size: "Sm", disclosure: true })) },
+  ]),
   sizes: nonEmpty(SIZES.map((size) => ({ name: size.toLowerCase(), for: SIZE_FOR[size], sample: () => sample("Filled", size) }))),
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],

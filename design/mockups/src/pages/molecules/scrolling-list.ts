@@ -10,10 +10,10 @@ import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { WELL_ROOM } from "./list.ts";
 
 /** Five two-line rows and their gaps, inside the well's padding: the control center's Wi-Fi tab. */
-const FIVE = "calc(5 * var(--size-row_two_line) + 4 * var(--space-s4) + 2 * var(--space-s8))";
+const FIVE = "calc(5 * var(--size-row_two_line) + 4 * var(--space-s4) + 2 * var(--space-s12))";
 
 /** Three, for a well in a short room. */
-const THREE = "calc(3 * var(--size-row_two_line) + 2 * var(--space-s4) + 2 * var(--space-s8))";
+const THREE = "calc(3 * var(--size-row_two_line) + 2 * var(--space-s4) + 2 * var(--space-s12))";
 
 const NAMES = ["Hoshi 5G", "Kissa", "Station Free Wi-Fi", "Pierogarnia", "DIRECT-7Q-Printer", "Neko Guest", "Library", "Tram 12", "Kawa i Herbata", "Orange_Swiatlowod_4F2A", "Mieszkanie 3", "eduroam"];
 const BARS = ["wifi", "network_wifi_3_bar", "network_wifi_3_bar", "network_wifi_2_bar", "network_wifi_2_bar", "network_wifi_2_bar", "network_wifi_1_bar", "network_wifi_1_bar", "network_wifi_1_bar", "network_wifi_1_bar", "network_wifi_1_bar", "network_wifi_1_bar"];
@@ -130,7 +130,8 @@ export default page({
     ]),
     measures: [
       { part: "Well corners", token: "radius-content" },
-      { part: "Scroll padding, thumb rail inset", token: "space-s8" },
+      { part: "Scroll padding, sides", token: "space-s12" },
+      { part: "Thumb rail inset", token: "space-s8" },
       { part: "Row gap, thumb inset", token: "space-s4" },
       { part: "Thumb width", token: "size-scrollbar" },
       { part: "Row height", token: "size-row_two_line" },

@@ -14,7 +14,7 @@ import { focusRing, type Tone, toneColour } from "./focus.ts";
 import { icon } from "./icon.ts";
 import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe, variant } from "./probe.ts";
-import { type TypeStyle, text } from "./text.ts";
+import { advance, type TypeStyle, text } from "./text.ts";
 
 export const KINDS = ["Filled", "Tonal", "Text", "Danger", "Success", "Warning"] as const;
 export type Kind = (typeof KINDS)[number];
@@ -151,6 +151,16 @@ export interface ButtonOptions {
   readonly trailing?: boolean;
   readonly disabled?: boolean;
   readonly pinned?: Pinned;
+  /**
+   * The labels it changes between (Show and Hide): it holds the widest one's width whichever it
+   * says, so it keeps its place and size as it flips.
+   */
+  readonly alternatives?: readonly string[];
+  /**
+   * It discloses something: an `expand_more` chevron after the label, turned a half while what it
+   * discloses is open (`--disclosed`, 0 to 1), with it over `medium` on `standard`.
+   */
+  readonly disclosure?: boolean;
 }
 
 /** A symbol in a box as wide as itself and as tall as the label's line beside it. */
@@ -211,13 +221,22 @@ export function button(options: ButtonOptions): HTMLButtonElement {
   element.style.setProperty("--padding", `var(--space-${kind === "Text" ? m.textPadding : m.padding})`);
   const shown = "var(--shown)";
   const label = text(options.label, m.label);
+  label.classList.add("k-button-label");
   label.style.color = shown;
-  const glyph = options.icon ? iconInLine(options.icon, m.label, shown) : null;
-  const children = glyph ? (options.trailing ? [label, glyph] : [glyph, label]) : [label];
+  if (options.alternatives?.length) {
+    element.dataset.held = "";
+    const widest = Math.max(...[options.label, ...options.alternatives].map((words) => advance(m.label, words)));
+    label.style.setProperty("--natural", String(widest));
+  }
+  const disclosing = options.disclosure !== undefined;
+  if (disclosing) element.style.setProperty("--disclosed", options.disclosure ? "1" : "0");
+  const glyph = disclosing ? iconInLine("expand_more", m.label, shown) : options.icon ? iconInLine(options.icon, m.label, shown) : null;
+  glyph?.classList.toggle("k-button-chevron", disclosing);
+  const children = glyph ? (options.trailing || disclosing ? [label, glyph] : [glyph, label]) : [label];
   const content = row(m.gap, "start", ...children);
   element.append(content);
   lightKind(element, kind, "control", content);
-  const placement = !options.icon ? "" : options.trailing ? "trailing-icon" : "leading-icon";
+  const placement = disclosing ? "disclosure" : !options.icon ? "" : options.trailing ? "trailing-icon" : "leading-icon";
   return probe(element, { role: "component", name: "Button", variant: variant(kind, size, placement), fixed: FIXED_HEIGHT });
 }
 
