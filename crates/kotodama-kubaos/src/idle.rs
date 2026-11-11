@@ -156,11 +156,8 @@ impl Setting {
     }
 
     fn item(self) -> Item {
-        let choose = Action::new(CHOOSE, "Choose").arguments(vec![Argument {
-            name: VALUE.to_owned(),
-            placeholder: Some(self.placeholder().to_owned()),
-            optional: true,
-        }]);
+        let choose = Action::new(CHOOSE, "Choose")
+            .arguments(vec![Argument::new(VALUE).placeholder(self.placeholder()).optional()]);
         Item {
             id: self.id().to_owned(),
             kind: kind(KIND),
@@ -173,6 +170,7 @@ impl Setting {
             hidden: false,
             app_only: false,
             weak_keywords: Vec::new(),
+            yields: false,
             actions: vec![choose],
         }
     }
@@ -275,11 +273,7 @@ fn typed_keep_awake(
     placeholder: &str,
     keywords: &[&str],
 ) -> Item {
-    let keep = Action::new(KEEP, "Keep awake").arguments(vec![Argument {
-        name: VALUE.to_owned(),
-        placeholder: Some(placeholder.to_owned()),
-        optional: false,
-    }]);
+    let keep = Action::new(KEEP, "Keep awake").arguments(vec![Argument::new(VALUE).placeholder(placeholder)]);
     Item {
         id: id.to_owned(),
         kind: kind(KEEP_AWAKE_KIND),
@@ -292,6 +286,7 @@ fn typed_keep_awake(
         hidden: false,
         app_only: false,
         weak_keywords: Vec::new(),
+        yields: false,
         actions: vec![keep],
     }
 }
@@ -409,6 +404,7 @@ fn list(setting: Setting, settings: &Settings) -> View {
             hidden: false,
             app_only: false,
             weak_keywords: Vec::new(),
+            yields: false,
             actions: vec![
                 Action::new(BOTH, "On battery and plugged in"),
                 Action::new(BATTERY, "On battery only"),

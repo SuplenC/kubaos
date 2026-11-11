@@ -286,6 +286,7 @@ impl Entry {
             hidden: false,
             app_only: false,
             weak_keywords: Vec::new(),
+            yields: false,
             actions: vec![action],
         }
     }
@@ -388,11 +389,10 @@ fn arguments(table: &Table) -> Result<Vec<Argument>, String> {
             let Value::Table(argument) = value else {
                 return Err(shape());
             };
-            Ok(Argument {
-                name: string(argument, "name")?.ok_or_else(shape)?,
-                placeholder: string(argument, "placeholder")?,
-                optional: boolean(argument, "optional")?,
-            })
+            let mut built = Argument::new(string(argument, "name")?.ok_or_else(shape)?);
+            built.placeholder = string(argument, "placeholder")?;
+            built.optional = boolean(argument, "optional")?;
+            Ok(built)
         })
         .collect()
 }

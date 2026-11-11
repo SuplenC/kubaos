@@ -283,15 +283,12 @@ fn installed_item(suite: &Suite, config: Option<&SuiteConfig>) -> Item {
 
 /// Configure…, with the version when the Suite has a choice, then each extra, `on` or `off`.
 fn configure_action(suite: &Suite) -> Action {
-    let version = (!suite.versions.is_empty()).then(|| Argument {
-        name: VERSION.to_owned(),
-        placeholder: Some(suite.versions.join(", ")),
-        optional: true,
-    });
-    let extras = suite.extras.iter().map(|extra| Argument {
-        name: extra.name.to_owned(),
-        placeholder: Some(format!("{ON} or {OFF}")),
-        optional: true,
+    let version =
+        (!suite.versions.is_empty()).then(|| Argument::new(VERSION).placeholder(suite.versions.join(", ")).optional());
+    let extras = suite.extras.iter().map(|extra| {
+        Argument::new(extra.name)
+            .placeholder(format!("{ON} or {OFF}"))
+            .optional()
     });
     Action::new(CONFIGURE, "Configure…").arguments(version.into_iter().chain(extras).collect())
 }
@@ -335,11 +332,7 @@ fn new_item(suite: &Suite, scaffolder: &Scaffolder) -> Item {
     let title = format!("{}…", scaffolder.label);
     let mut keywords = keywords(suite);
     keywords.extend(["new project", "create", "scaffold", "template"].map(str::to_owned));
-    let argument = Argument {
-        name: PROJECT.to_owned(),
-        placeholder: Some("hello".to_owned()),
-        optional: false,
-    };
+    let argument = Argument::new(PROJECT).placeholder("hello");
     item(
         new_id(suite, scaffolder),
         title.clone(),
@@ -377,6 +370,7 @@ fn item(id: String, title: String, subtitle: String, icon: &str, keywords: Vec<S
         hidden: false,
         app_only: false,
         weak_keywords: Vec::new(),
+        yields: false,
         actions,
     }
 }

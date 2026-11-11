@@ -73,6 +73,7 @@ pub fn item() -> Item {
         hidden: false,
         app_only: false,
         weak_keywords: Vec::new(),
+        yields: false,
         actions: vec![Action::new(SHOW, "Show")],
     }
 }
@@ -102,6 +103,7 @@ pub fn scheduler_item() -> Item {
         hidden: false,
         app_only: false,
         weak_keywords: Vec::new(),
+        yields: false,
         actions: vec![Action::new(SHOW, "Show")],
     }
 }
@@ -129,6 +131,7 @@ pub fn drain_item() -> Item {
         hidden: false,
         app_only: false,
         weak_keywords: Vec::new(),
+        yields: false,
         actions: vec![Action::new(SHOW, "Show")],
     }
 }
@@ -156,6 +159,7 @@ pub fn drain_view(drain: &Drain) -> View {
             hidden: false,
             app_only: false,
             weak_keywords: Vec::new(),
+            yields: false,
             actions: Vec::new(),
         })
         .collect();
@@ -184,6 +188,7 @@ pub fn scheduler_view(report: &Report) -> View {
         hidden: false,
         app_only: false,
         weak_keywords: Vec::new(),
+        yields: false,
         actions: Vec::new(),
     };
     let running = row(
@@ -223,6 +228,7 @@ pub fn view(now: &Now) -> View {
             hidden: false,
             app_only: false,
             weak_keywords: Vec::new(),
+            yields: false,
             actions: Vec::new(),
         })
         .collect();

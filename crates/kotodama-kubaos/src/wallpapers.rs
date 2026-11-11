@@ -190,6 +190,7 @@ fn item(id: &str, shown: Shown) -> Item {
         hidden: false,
         app_only: false,
         weak_keywords: Vec::new(),
+        yields: false,
         actions: actions(shown),
     }
 }
