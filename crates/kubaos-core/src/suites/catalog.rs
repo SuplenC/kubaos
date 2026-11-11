@@ -216,16 +216,22 @@ const PHP: Suite = Suite {
     ],
 };
 
-/// proto and moon. Its Nix module is `home/suites/proto.nix`. proto is a version manager itself, so
-/// the Suite has no versions and no Project pins: a project pins its tools, moon and proto among
-/// them, in its `.prototools`.
+/// proto from mise, and moon through proto. Its Nix module is `home/suites/proto.nix`.
+///
+/// proto is its project's release binary, from aqua. It is a version manager itself, so the Suite
+/// has no versions and no Project pins: a project pins its tools, moon and proto among them, in
+/// its `.prototools`, and proto installs them into its own home.
 const PROTO: Suite = Suite {
     name: "proto",
     title: "proto + moon",
-    description: "proto, the toolchain manager that pins each project's tools in its .prototools, and moon, the monorepo build system, which proto installs on first use.",
+    description: "proto, the toolchain manager that pins each project's tools in its .prototools, and moon, the monorepo build system, which proto installs for each workspace.",
     versions: &[],
     extras: &[],
-    mise: &[],
+    mise: &[Tool {
+        name: "aqua:moonrepo/proto",
+        request: Request::Fixed("0.63"),
+        extra: None,
+    }],
     toolchain: Toolchain::Upstream { manager: "proto" },
     caches: &[Cache {
         path: ".local/share/proto",

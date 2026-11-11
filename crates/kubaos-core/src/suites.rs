@@ -146,7 +146,8 @@ pub enum Toolchain {
     /// mise, from the Suite's tools.
     Mise,
     /// The language's own manager, which the Suite installs (through its Nix module, or as one of
-    /// its mise tools) and drives, where that is the norm (rustup for Rust, uv for Python).
+    /// its mise tools) and drives, where that is the norm (rustup for Rust, uv for Python, proto
+    /// for moon).
     Upstream { manager: &'static str },
 }
 

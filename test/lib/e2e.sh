@@ -3430,6 +3430,134 @@ c_suite_python() {
   rm -rf "$project" "$mine"
 }
 
+# The proto + moon Suite (crates/kubaos-core/src/suites/catalog.rs,
+# home/suites/proto.nix): proto from mise (network: mise downloads proto, and
+# proto downloads moon, an older proto and Node 22 for a project). A home from
+# before mise moves onto it through the migration; proto's shims come first on
+# PATH in a login and an interactive shell, so a folder's .prototools pins
+# win there over the Node Suite's Node and the Suite's elsewhere; a moon
+# workspace is scaffolded; an upgrade moves proto alone; removal leaves
+# nothing of it in mise or the generation, and a fresh add installs it again.
+c_suite_proto() {
+  local u="$USER_HOME/.config/kubaos/home" project="$USER_HOME/Projects/moon-demo" pinned="$USER_HOME/Projects/proto-pinned"
+  local frag="$USER_HOME/.config/mise/conf.d/kubaos-proto.toml" pathconf="$USER_HOME/.config/mise/conf.d/kubaos-proto_path.toml"
+  local proto_home="$USER_HOME/.local/share/proto" installs="$USER_HOME/.local/share/mise/installs"
+  local shims="$USER_HOME/.local/share/mise/shims" migration=("$REPO"/migrations/user/*-proto-on-mise.sh)
+  local out before gen path moon i
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$project" "$pinned" "$proto_home"
+  mise_state() { cat "$frag" 2>/dev/null; find "$installs" -mindepth 2 -maxdepth 2 -type d | sort; }
+  # index_of ENTRY LINES: ENTRY's line number in LINES, or nothing.
+  index_of() { grep -nxF -- "$1" <<<"$2" | head -1 | cut -d: -f1; }
+  # node_at DIR SHELL: the major of the Node SHELL (zrun or zlogin) runs in DIR.
+  node_at() { "$2" "cd $1 && node -p 'process.versions.node.split(\".\")[0]'" 2>/dev/null; }
+
+  # A home as the Suite on Nix left it: the record, no fragment, and a proto
+  # that `proto upgrade` put in proto's own bin folder.
+  as_user install -d "$u/kubaos.d/suites" "$proto_home/bin"
+  printf 'extras = []\n' | as_user tee "$u/kubaos.d/suites/proto.toml" >/dev/null
+  printf '#!/bin/sh\necho stale proto\n' | as_user tee "$proto_home/bin/proto" >/dev/null
+  chmod +x "$proto_home/bin/proto"
+  out="$(kz 'kubaos switch --foreground' 2>&1)" ||
+    { echo "FAIL the switch with the old proto record"; printf '%s\n' "$out" | tail -20; return 1; }
+  gone_from_generation "nixpkgs' proto" '-proto-[0-9]' || return 1
+  ! has_bin proto && ! has_bin moon && has_bin kubaos-moon-new && [[ -L $pathconf ]] ||
+    { echo "FAIL the switch: proto or moon in the Nix profile, or no scaffolder or kubaos-proto_path.toml"; return 1; }
+  out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+    { echo "FAIL the proto-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx "deleted $proto_home/bin/proto: proto comes from mise, and moves with kubaos suite update" <<<"$out" ||
+    { echo "FAIL the migration didn't delete proto's own bin/proto:"; printf '%s\n' "$out"; return 1; }
+  before="$(mise_state)"
+  out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+    { echo "FAIL the proto-on-mise migration, run again"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx '"aqua:moonrepo/proto" = "0.63"' "$frag" && [[ $(mise_state) == "$before" && ! -e $proto_home/bin/proto ]] &&
+    [[ $(cat "$u/kubaos.d/suites/proto.toml") == 'extras = []' ]] ||
+    { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  [[ $(zrun 'whence -p proto') == "$shims/proto" && $(zrun 'proto --version') == "proto 0.63."* ]] ||
+    { echo "FAIL proto isn't mise's 0.63 through its shim: $(zrun 'whence -p proto; proto --version' 2>&1 | tr '\n' ' ')"; return 1; }
+  echo "ok   the proto-on-mise migration: the record gets its fragment and proto 0.63 through the shims, the stale bin/proto deleted, the record kept, a rerun changes nothing"
+
+  [[ $(zrun 'print -r -- "$PROTO_HOME $PROTO_VERSION_CHECK"') == "$proto_home 0" ]] ||
+    { echo "FAIL PROTO_HOME or PROTO_VERSION_CHECK: $(zrun 'print -r -- "$PROTO_HOME $PROTO_VERSION_CHECK"')"; return 1; }
+  path="$(zrun 'print -r -- $PATH' | tr ':' '\n')"
+  local ps ms nb pb
+  ps="$(index_of "$proto_home/shims" "$path")" ms="$(index_of "$shims" "$path")"
+  nb="$(index_of "$USER_HOME/.nix-profile/bin" "$path")" pb="$(index_of "$proto_home/bin" "$path")"
+  [[ -n $ps && -n $ms && -n $nb && -n $pb ]] && ((ps < ms && ms < nb && ms < pb)) ||
+    { echo "FAIL a login shell's PATH: want proto's shims, then mise's, then Nix's tools, proto's bin after mise's shims:"; printf '%s\n' "$path"; return 1; }
+  path="$(zlogin 'print -r -- $PATH' | tr ':' '\n')"
+  [[ $(head -1 <<<"$path") == "$proto_home/shims" ]] && grep -q "^$installs/aqua-moonrepo-proto/" <<<"$path" ||
+    { echo "FAIL an interactive zsh's PATH doesn't start with proto's shims, ahead of mise's own entries:"; printf '%s\n' "$path" | head -6; return 1; }
+  echo "ok   proto's shims first on PATH: ahead of mise's shims and Nix's tools in a login shell, of mise's own entries in an interactive one; PROTO_HOME set, the version check off"
+
+  out="$(kz 'kubaos suite new proto moon-demo' 2>&1)" ||
+    { echo "FAIL kubaos suite new proto moon-demo"; printf '%s\n' "$out" | tail -20; return 1; }
+  moon="$(sed -n 's/^moon = "\([0-9.]*\)"$/\1/p' "$project/.prototools" 2>/dev/null)"
+  [[ -d $project/.git && -f $project/.moon/workspace.yml && -n $moon ]] &&
+    [[ $(zrun "cd $project && whence -p moon") == "$proto_home/shims/moon" && $(zrun "cd $project && moon --version") == "moon $moon" ]] ||
+    { echo "FAIL the moon workspace: git, .moon/workspace.yml, .prototools pinning moon, or that moon through proto's shim"; ls -la "$project"; cat "$project/.prototools"; return 1; }
+  echo "ok   kubaos suite new proto moon-demo: a git repository with .moon/workspace.yml and .prototools pinning moon $moon, which runs through proto's shim"
+
+  # A project pinning an older proto and moon, and Node, beside the Node Suite.
+  as_user install -d "$u/kubaos.d/suites" "$pinned"
+  printf 'version = "26"\nextras = []\n' | as_user tee "$u/kubaos.d/suites/node.toml" >/dev/null
+  out="$(kz 'kubaos suite configure node --foreground' 2>&1)" ||
+    { echo "FAIL installing the Node Suite at 26"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(zrun 'vtsls --version' 2>/dev/null) == [0-9]* ]] ||
+    { echo "FAIL the Node Suite's vtsls beside proto: $(zrun 'vtsls --version' 2>&1 | tail -3)"; printf '%s\n' "$out" | tail -20; return 1; }
+  printf 'proto = "0.62.3"\nmoon = "2.6.3"\nnode = "22"\n' | as_user tee "$pinned/.prototools" >/dev/null
+  out="$(zrun "cd $pinned && proto trust && proto install" 2>&1)" ||
+    { echo "FAIL proto install in the pinned folder"; printf '%s\n' "$out" | tail -20; return 1; }
+  for i in zrun zlogin; do
+    [[ $($i "cd $pinned && moon --version") == "moon 2.6.3" && $($i "cd $pinned && proto run proto -- --version") == "proto 0.62.3" ]] ||
+      { echo "FAIL $i: the folder's moon 2.6.3 or proto 0.62.3: $($i "cd $pinned && moon --version; proto run proto -- --version" 2>&1 | tr '\n' ' ')"; return 1; }
+    [[ $(node_at "$pinned" $i) == 22 && $(node_at "$project" $i) == 26 && $(node_at "$USER_HOME" $i) == 26 ]] ||
+      { echo "FAIL $i: want Node 22 in the pinned folder, the Suite's 26 in moon-demo and the home: $(node_at "$pinned" $i) $(node_at "$project" $i) $(node_at "$USER_HOME" $i)"; return 1; }
+  done
+  [[ $(zlogin "cd $pinned && proto --version") == "proto 0.63."* ]] ||
+    { echo "FAIL plain proto in the pinned folder isn't the Suite's"; return 1; }
+  echo "ok   a folder pinning proto 0.62.3, moon 2.6.3 and Node 22 runs them there in a login and an interactive shell (proto through proto run), the Node Suite's 26 everywhere else"
+  expect_ok "kubaos suite remove node" kz 'kubaos suite remove node --foreground' || return 1
+
+  # An upgrade, from a fragment asking for 0.62.
+  as_user sed -i 's/"0\.63"/"0.62"/' "$frag"
+  zrun 'cd / && MISE_YES=1 mise install && MISE_YES=1 mise lock --global && MISE_YES=1 mise prune --tools' >"$LOGS/proto-behind.log" 2>&1 &&
+    [[ $(zrun 'proto --version') == "proto 0.62."* ]] ||
+    { echo "FAIL setting proto back to 0.62"; tail -5 "$LOGS/proto-behind.log"; return 1; }
+  out="$(kz 'kubaos suite upgrade proto --no-switch' 2>&1)" ||
+    { echo "FAIL kubaos suite upgrade proto"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^upgraded proto: aqua:moonrepo/proto 0\.62 → 0\.63 \(0\.63\.[0-9]+\)$' <<<"$out" && grep -qx '"aqua:moonrepo/proto" = "0.63"' "$frag" &&
+    [[ $(zrun 'proto --version') == "proto 0.63."* && -z $(find "$installs/aqua-moonrepo-proto" -mindepth 1 -maxdepth 1 -type d -name '0.62*') ]] ||
+    { echo "FAIL upgrade: not 0.62 → 0.63 in the fragment with 0.62 pruned"; printf '%s\n' "$out"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite upgrade proto: 0.62 → 0.63, the fragment rewritten, 0.62 pruned"
+
+  out="$(kz 'kubaos suite remove proto --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove proto"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^cache ~/.local/share/proto \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" && [[ -f $project/.moon/workspace.yml ]] ||
+    { echo "FAIL remove: proto's folder's size, or the project"; printf '%s\n' "$out"; return 1; }
+  [[ ! -e $frag && ! -e $pathconf && ! -e $shims/proto && -z $(find "$installs/aqua-moonrepo-proto" -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
+    { echo "FAIL remove: the fragment, kubaos-proto_path.toml, the shim or a version is left"; find "$installs" -mindepth 2 -maxdepth 2 -type d; return 1; }
+  gone_from_generation "the proto Suite's scaffolder" '-kubaos-moon-new$' || return 1
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  ! grep -qE 'PROTO_HOME|PROTO_VERSION_CHECK|proto/shims' "$gen/home-path/etc/profile.d/hm-session-vars.sh" &&
+    ! zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$proto_home/shims" ||
+    { echo "FAIL the Suite's variables or PATH entries are left"; return 1; }
+  echo "ok   kubaos suite remove proto: fragment, defaults, version and shim gone, proto's folder kept, the project untouched, nothing of it left in the generation"
+
+  out="$(kz 'kubaos suite add proto --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add proto"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx '"aqua:moonrepo/proto" = "0.63"' "$frag" && [[ $(zrun 'proto --version') == "proto 0.63."* && -L $pathconf ]] ||
+    { echo "FAIL kubaos suite add proto: not proto 0.63 with its defaults"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite add proto: proto 0.63 again"
+  out="$(kz 'kubaos suite remove proto --purge-caches --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove proto --purge-caches"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ ! -e $proto_home ]] || { echo "FAIL remove --purge-caches left proto's folder"; return 1; }
+  echo "ok   kubaos suite remove proto --purge-caches: proto's folder gone"
+  rm -rf "$project" "$pinned"
+}
+
 # The user layer: test/user-layer-check, which the VM bench also
 # runs on an installed system. Commits to the checkout, so it runs after the
 # other checks but the update ones, which start from a clone of it.
@@ -4368,7 +4496,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node suite_python dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node suite_python suite_proto dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

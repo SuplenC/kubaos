@@ -7,7 +7,7 @@
 #   test/run e2e [--only a,b] [--keep]  every check, PASS/FAIL table, exit 1 on failure;
 #                                       builds the kubaos CLI for Linux first when the
 #                                       packages, preview, suites, pins, suite_rust, suite_go, suite_node,
-#                                       suite_python or keyboard check runs
+#                                       suite_python, suite_proto or keyboard check runs
 #   test/run shell                     login zsh as kuba after a fresh switch
 #   test/run bitwarden                  Vaultwarden + kubaos bitwarden + mise env
 #   test/run shots [--hyprland] [--dir NAME | --out PATH] [--size WxH] [--scale N]
@@ -159,7 +159,7 @@ cmd_e2e() {
     shift
   done
   hold_checkout
-  if [[ -z $only || ,$only, =~ ,(packages|preview|suites|pins|suite_rust|suite_go|suite_node|suite_python|keyboard|wallpaper_depth|update_edge|update_stable|rollback), ]]; then
+  if [[ -z $only || ,$only, =~ ,(packages|preview|suites|pins|suite_rust|suite_go|suite_node|suite_python|suite_proto|keyboard|wallpaper_depth|update_edge|update_stable|rollback), ]]; then
     build_kubaos
   fi
   if ((keep)); then

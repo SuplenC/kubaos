@@ -68,6 +68,7 @@ impl FakeMise {
                 ("pypi:basedpyright", vec!["1.40.2"]),
                 ("aqua:astral-sh/ruff", vec!["0.17.4"]),
                 ("pypi:debugpy", vec!["1.8.22"]),
+                ("aqua:moonrepo/proto", vec!["0.62.3", "0.63.2"]),
             ]),
             state: Mutex::default(),
         }

@@ -52,7 +52,13 @@ end
 local HOME = "/home/kuba"
 
 test("mise's shims come after ~/.local/bin and before Nix's tools", function()
-  local env = session({ HOME = HOME, XDG_DATA_HOME = false, MISE_DATA_DIR = false, PATH = "/usr/bin:/bin" })
+  local env = session({
+    HOME = HOME,
+    XDG_DATA_HOME = false,
+    MISE_DATA_DIR = false,
+    PROTO_HOME = false,
+    PATH = "/usr/bin:/bin",
+  })
   same(
     env.PATH,
     "/home/kuba/.local/bin:/home/kuba/.local/share/mise/shims:/home/kuba/.nix-profile/bin:"
@@ -62,8 +68,10 @@ test("mise's shims come after ~/.local/bin and before Nix's tools", function()
 end)
 
 test("the shims follow MISE_DATA_DIR, then XDG_DATA_HOME, as mise does", function()
-  local moved = session({ HOME = HOME, XDG_DATA_HOME = "/data", MISE_DATA_DIR = "/m", PATH = "/usr/bin" })
-  local xdg = session({ HOME = HOME, XDG_DATA_HOME = "/data", MISE_DATA_DIR = "", PATH = "/usr/bin" })
+  local moved =
+    session({ HOME = HOME, XDG_DATA_HOME = "/data", MISE_DATA_DIR = "/m", PROTO_HOME = false, PATH = "/usr/bin" })
+  local xdg =
+    session({ HOME = HOME, XDG_DATA_HOME = "/data", MISE_DATA_DIR = "", PROTO_HOME = false, PATH = "/usr/bin" })
   same(moved.PATH:match("^[^:]*:([^:]*)"), "/m/shims", "with MISE_DATA_DIR")
   same(xdg.PATH:match("^[^:]*:([^:]*)"), "/data/mise/shims", "with XDG_DATA_HOME and an empty MISE_DATA_DIR")
 end)
@@ -73,11 +81,28 @@ test("an entry the login shell already put on PATH is moved, not repeated", func
     HOME = HOME,
     XDG_DATA_HOME = false,
     MISE_DATA_DIR = false,
+    PROTO_HOME = false,
     PATH = "/home/kuba/go/bin:/home/kuba/.local/share/mise/shims:/usr/bin",
   })
   local _, shims = env.PATH:gsub("/mise/shims", "")
   same(shims, 1, "shims entries")
   same(env.PATH:match("/home/kuba/go/bin.*$"), "/home/kuba/go/bin:/usr/bin", "the rest, in its order")
+end)
+
+test("with the proto Suite, proto's shims come before mise's", function()
+  local env = session({
+    HOME = HOME,
+    XDG_DATA_HOME = false,
+    MISE_DATA_DIR = false,
+    PROTO_HOME = "/home/kuba/.local/share/proto",
+    PATH = "/home/kuba/.local/share/mise/shims:/home/kuba/.local/share/proto/shims:/usr/bin",
+  })
+  same(
+    env.PATH,
+    "/home/kuba/.local/bin:/home/kuba/.local/share/proto/shims:/home/kuba/.local/share/mise/shims:"
+      .. "/home/kuba/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/bin",
+    "PATH"
+  )
 end)
 
 os.exit(failed == 0 and 0 or 1)

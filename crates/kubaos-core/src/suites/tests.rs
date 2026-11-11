@@ -986,6 +986,53 @@ fn a_node_record_from_before_mise_gets_its_fragment_on_configure_and_keeps_its_v
 }
 
 #[test]
+fn the_proto_suite_installs_proto_from_mise_at_its_request_on_add_and_configure() {
+    let h = home();
+    let proto = catalog::find("proto").unwrap();
+
+    let added = h.suites.add(proto, &OptionsChange::default()).unwrap();
+    let configured = h.suites.configure(proto, &OptionsChange::default()).unwrap();
+
+    let want = requests(&[("aqua:moonrepo/proto", "0.63")]);
+    assert!(super::same_tools(&added.tools, &want), "{:?}", added.tools);
+    assert!(super::same_tools(&configured.tools, &want), "{:?}", configured.tools);
+    assert_eq!(added.config.version, None, "a project's .prototools pins proto");
+    let fragment = fs::read_to_string(h.paths.mise_fragment("proto")).unwrap();
+    assert!(fragment.contains("\"aqua:moonrepo/proto\" = \"0.63\""), "{fragment}");
+    assert_eq!(
+        h.mise.installed(),
+        ["aqua:moonrepo/proto@0.63.2"],
+        "configure with nothing changed installs nothing more"
+    );
+}
+
+#[test]
+fn a_proto_record_from_before_mise_gets_its_fragment_on_configure_and_keeps_its_options() {
+    let h = home();
+    let proto = catalog::find("proto").unwrap();
+    let record = h.paths.state_dir().suite_file("proto");
+    write(&record, "extras = []\n");
+
+    let configured = h.suites.configure(proto, &OptionsChange::default()).unwrap();
+    let again = h.suites.configure(proto, &OptionsChange::default()).unwrap();
+
+    assert!(!configured.changed, "the record stays as it was");
+    assert_eq!(configured.config.version, None);
+    assert!(configured.config.extras.is_empty());
+    assert!(super::same_tools(
+        &configured.tools,
+        &requests(&[("aqua:moonrepo/proto", "0.63")])
+    ));
+    assert!(h.paths.mise_fragment("proto").is_file());
+    assert!(super::same_tools(&again.tools, &configured.tools));
+    assert_eq!(
+        h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
+        1,
+        "a second run installs nothing"
+    );
+}
+
+#[test]
 fn every_seed_is_a_commented_example_that_mentions_its_suite() {
     for suite in catalog::all() {
         for seed in suite.seeds {
