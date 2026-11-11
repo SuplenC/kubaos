@@ -40,6 +40,8 @@ use kubaos_core::update::event::ProgramResult;
 use kubaos_core::update::event::Prompt;
 use kubaos_core::update::event::Restart;
 use kubaos_core::update::event::Sink;
+use kubaos_core::update::event::SuiteChanges;
+use kubaos_core::update::event::SuiteTool;
 use kubaos_core::update::event::Summary;
 use kubaos_core::update::event::UpdateEvent;
 use kubaos_core::update::firmware::Firmware;
@@ -353,6 +355,7 @@ impl Text {
         for program in &summary.programs {
             out.push_str(&row(program.program.title(), &self.program(program)));
         }
+        out.push_str(&self.suite_rows(&summary.suites));
         if !summary.firmware.is_empty() {
             out.push_str(&self.firmware_rows(&summary.firmware));
         }
@@ -412,6 +415,34 @@ impl Text {
         let more = total.saturating_sub(shown);
         if more > 0 {
             let _ = writeln!(out, "{indent}{}", s.dim(&format!("and {more} more")));
+        }
+        out
+    }
+
+    /// The summary's `Suites` rows: the tools moved or put back, or the failure; then the
+    /// `Upgrades` waiting and the command that installs them.
+    fn suite_rows(&self, suites: &SuiteChanges) -> String {
+        let s = self.style;
+        let mut out = String::new();
+        let moved = if suites.updated.is_empty() {
+            &suites.restored
+        } else {
+            &suites.updated
+        };
+        if let Some(error) = &suites.error {
+            out.push_str(&self.rows("Suites", [s.red(&format!("failed: {error}"))], 1, 1));
+        } else if !moved.is_empty() {
+            let n = moved.len();
+            out.push_str(&self.rows("Suites", moved.iter().map(SuiteTool::describe), n, n));
+        }
+        if !suites.upgrades.is_empty() {
+            let lines = suites
+                .upgrades
+                .iter()
+                .map(SuiteTool::describe)
+                .chain(std::iter::once("kubaos suite upgrade installs them".to_owned()));
+            let n = suites.upgrades.len() + 1;
+            out.push_str(&self.rows("Upgrades", lines, n, n));
         }
         out
     }

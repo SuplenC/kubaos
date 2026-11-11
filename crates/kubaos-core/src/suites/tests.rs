@@ -75,7 +75,7 @@ const DEMO: Suite = Suite {
 
 /// [`DEMO`] with mise tools: its main toolchain on the Suite's version, a language server with
 /// the `lsp` extra and a formatter with `fmt`.
-const DEMO_MISE: Suite = Suite {
+pub(super) const DEMO_MISE: Suite = Suite {
     mise: &[
         Tool {
             name: "demo-lang",
@@ -97,14 +97,14 @@ const DEMO_MISE: Suite = Suite {
     ..DEMO
 };
 
-struct Home {
+pub(super) struct Home {
     _tmp: tempfile::TempDir,
-    paths: Paths,
-    suites: Suites,
-    mise: Arc<FakeMise>,
+    pub(super) paths: Paths,
+    pub(super) suites: Suites,
+    pub(super) mise: Arc<FakeMise>,
 }
 
-fn home() -> Home {
+pub(super) fn home() -> Home {
     let tmp = tempfile::tempdir().unwrap();
     let paths = Paths::from_vars(Some(tmp.path().as_os_str().to_owned()), None, None).unwrap();
     fs::create_dir_all(paths.flake()).unwrap();
@@ -118,11 +118,11 @@ fn home() -> Home {
     }
 }
 
-fn fragment(h: &Home) -> PathBuf {
+pub(super) fn fragment(h: &Home) -> PathBuf {
     h.paths.mise_fragment("demo")
 }
 
-fn requests(pairs: &[(&str, &str)]) -> Vec<ToolRequest> {
+pub(super) fn requests(pairs: &[(&str, &str)]) -> Vec<ToolRequest> {
     pairs
         .iter()
         .map(|(tool, request)| ToolRequest {
@@ -132,7 +132,7 @@ fn requests(pairs: &[(&str, &str)]) -> Vec<ToolRequest> {
         .collect()
 }
 
-fn write(path: &Path, contents: &str) {
+pub(super) fn write(path: &Path, contents: &str) {
     fs::create_dir_all(path.parent().expect("a parent")).expect("create the parent");
     fs::write(path, contents).expect("write the file");
 }
@@ -141,7 +141,7 @@ fn extras(names: &[&str]) -> BTreeSet<String> {
     names.iter().map(|n| (*n).to_owned()).collect()
 }
 
-fn suite_file(h: &Home) -> PathBuf {
+pub(super) fn suite_file(h: &Home) -> PathBuf {
     h.paths.state_dir().suite_file("demo")
 }
 
@@ -832,12 +832,13 @@ fn adding_installs_the_tools_first_then_writes_the_fragment_and_the_record() {
 
     let added = h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
 
-    assert_eq!(added.tools, requests(&[("demo-lang", "1"), ("demo-ls", "0.5")]));
+    assert_eq!(added.tools, requests(&[("demo-lang", "1.0"), ("demo-ls", "0.5")]));
     assert_eq!(
         h.mise.calls(),
         [
+            "mise latest demo-lang@1",
             "mise ls --json",
-            "mise install demo-lang@1 demo-ls@0.5",
+            "mise install demo-lang@1.0 demo-ls@0.5",
             "mise lock --global"
         ]
     );
@@ -845,7 +846,7 @@ fn adding_installs_the_tools_first_then_writes_the_fragment_and_the_record() {
     assert!(suite_file(&h).exists());
     let text = fs::read_to_string(fragment(&h)).unwrap();
     assert!(text.starts_with('#'), "the fragment says who writes it: {text}");
-    assert!(text.contains("demo-lang = \"1\"\ndemo-ls = \"0.5\""), "{text}");
+    assert!(text.contains("demo-lang = \"1.0\"\ndemo-ls = \"0.5\""), "{text}");
     assert_eq!(added.before.config, None);
 }
 
@@ -907,7 +908,7 @@ fn removing_deletes_the_fragment_and_prunes_at_once() {
     assert!(!suite_file(&h).exists());
     assert!(h.mise.installed().is_empty(), "{:?}", h.mise.installed());
     assert_eq!(
-        h.mise.calls()[3..],
+        h.mise.calls()[4..],
         ["mise prune --tools", "mise lock --global"],
         "{:?}",
         h.mise.calls()
@@ -946,11 +947,16 @@ fn configuring_a_new_version_installs_it_and_prunes_the_old_one() {
         .unwrap();
 
     assert!(configured.changed);
-    assert_eq!(configured.tools, requests(&[("demo-lang", "2"), ("demo-ls", "0.5")]));
+    assert_eq!(configured.tools, requests(&[("demo-lang", "2.1"), ("demo-ls", "0.5")]));
+    assert_eq!(
+        configured.config.version.as_deref(),
+        Some("2"),
+        "the record keeps the line"
+    );
     assert_eq!(h.mise.installed(), ["demo-lang@2.1.0", "demo-ls@0.5.2"]);
     assert_eq!(
         configured.before.tools,
-        requests(&[("demo-lang", "1"), ("demo-ls", "0.5")])
+        requests(&[("demo-lang", "1.0"), ("demo-ls", "0.5")])
     );
 }
 
@@ -1062,7 +1068,7 @@ fn tools_reads_each_suite_s_versions_from_mise() {
         [
             ToolState {
                 tool: "demo-lang".into(),
-                request: "1".into(),
+                request: "1.0".into(),
                 version: Some("1.0.3".into()),
                 installed: true,
             },
@@ -1085,7 +1091,7 @@ fn the_test_suite_installs_through_mise() {
     h.suites.remove(&catalog::TEST, CachePolicy::Keep).unwrap();
 
     assert_eq!(catalog::TEST.toolchain, Toolchain::Mise);
-    assert_eq!(added.tools, requests(&[("kubaos-test-tool", "1")]));
+    assert_eq!(added.tools, requests(&[("kubaos-test-tool", "1.0")]));
     assert_eq!(h.mise.installed(), Vec::<String>::new());
     assert!(!h.paths.mise_fragment("test").exists());
 }

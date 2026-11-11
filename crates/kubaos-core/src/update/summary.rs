@@ -42,6 +42,7 @@ impl Summary {
             && self.programs.iter().all(|p| {
                 p.waiting.is_none() && !matches!(p.result, ProgramResult::Updated { .. } | ProgramResult::Failed { .. })
             })
+            && self.suites.is_empty()
             && self.firmware.is_empty()
             && self.restart == Restart::None
     }
@@ -89,6 +90,30 @@ impl Summary {
                 lines.push(format!("{name} {waiting} waits for a KubaOS release"));
             }
         }
+        if !self.suites.updated.is_empty() {
+            lines.push(counted(
+                self.suites.updated.len(),
+                "1 Suite tool updated",
+                "{n} Suite tools updated",
+            ));
+        }
+        if !self.suites.restored.is_empty() {
+            lines.push(counted(
+                self.suites.restored.len(),
+                "1 Suite tool put back",
+                "{n} Suite tools put back",
+            ));
+        }
+        if !self.suites.upgrades.is_empty() {
+            lines.push(counted(
+                self.suites.upgrades.len(),
+                "1 Suite tool upgrade waits: kubaos suite upgrade",
+                "{n} Suite tool upgrades wait: kubaos suite upgrade",
+            ));
+        }
+        if self.suites.error.is_some() {
+            lines.push("The Suites' tools failed to update: the log says why".to_owned());
+        }
         if !self.firmware.is_empty() {
             lines.push(format!("Firmware: {}", self.firmware.detail()));
         }
@@ -96,6 +121,7 @@ impl Summary {
             lines.push(counted(self.migrations.len(), "1 migration ran", "{n} migrations ran"));
         }
         let failed = self.firmware.with(FirmwareOutcome::Failed).next().is_some()
+            || self.suites.error.is_some()
             || self
                 .programs
                 .iter()

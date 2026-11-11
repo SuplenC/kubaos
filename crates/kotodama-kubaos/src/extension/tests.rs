@@ -362,7 +362,10 @@ fn an_installed_suites_items_come_after_the_power_status_and_run_in_the_terminal
 
     let ids = ids(&extension);
     let after = always().len() - 1;
-    assert_eq!(ids[after..], ["suite:test", "suite-new:test:new"]);
+    assert_eq!(
+        ids[after..],
+        ["suite:test", "suite-new:test:new", "suites:update", "suites:upgrade"]
+    );
     assert_eq!(ran, Ok(Ran::Close));
     assert_eq!(
         extension.runner.launched.borrow()[0].0,

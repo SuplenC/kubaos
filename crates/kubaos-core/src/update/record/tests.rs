@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::path::PathBuf;
 
 use super::Channel;
@@ -53,12 +54,28 @@ fn history_lines_read_back_and_junk_is_skipped() {
         to_commit: "bbb".into(),
         to_version: "0.1.1".into(),
         lock: Some(PathBuf::from("/home/kuba/.local/state/kubaos/locks/1.lock")),
+        mise_lock: Some(PathBuf::from("/home/kuba/.local/state/kubaos/locks/1.mise.lock")),
     };
     let no_lock = HistoryEntry {
         lock: None,
+        mise_lock: None,
         ..entry.clone()
     };
     let text = format!("{}garbage\n\n{}", entry.line(), no_lock.line());
 
     assert_eq!(parse_history(&text), [entry, no_lock]);
+}
+
+#[test]
+fn a_history_line_without_saved_suite_entries_reads_with_none() {
+    let line = "2026-10-22T10:00:00Z\taaa\t0.1.0\tbbb\t0.1.1\t/home/kuba/.local/state/kubaos/locks/1.lock\n";
+
+    let entries = parse_history(line);
+
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].mise_lock, None);
+    assert_eq!(
+        entries[0].lock.as_deref(),
+        Some(Path::new("/home/kuba/.local/state/kubaos/locks/1.lock"))
+    );
 }

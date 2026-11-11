@@ -18,6 +18,8 @@ use kubaos_core::update::event::ProgramResult;
 use kubaos_core::update::event::Prompt;
 use kubaos_core::update::event::Release;
 use kubaos_core::update::event::Restart;
+use kubaos_core::update::event::SuiteChanges;
+use kubaos_core::update::event::SuiteTool;
 use kubaos_core::update::event::Summary;
 use kubaos_core::update::event::UpdateEvent;
 use kubaos_core::update::firmware::Firmware;
@@ -303,6 +305,7 @@ fn edge_update() -> Vec<UpdateEvent> {
                     waiting: Some("2.36.0".into()),
                 },
             ],
+            suites: SuiteChanges::default(),
             reloaded: vec!["reloaded Hyprland".into(), "restarting Quickshell".into()],
             firmware: applied_firmware(),
             restart: Restart::None,
@@ -712,4 +715,47 @@ fn a_needed_relogin_is_the_next_step_with_its_reason() {
     assert!(shown.contains(
         "  Next          log out and back in: Hyprland was updated, and the running one is the old version\n"
     ));
+}
+
+fn suite_tool(from: Option<&str>, to: &str) -> SuiteTool {
+    SuiteTool {
+        suite: "go".into(),
+        tool: "gopls".into(),
+        from: from.map(Into::into),
+        to: to.into(),
+    }
+}
+
+#[test]
+fn the_suites_rows_list_the_tools_moved_then_the_upgrades_and_their_command() {
+    let shown = summary_text(|s| {
+        s.suites.updated = vec![suite_tool(Some("0.22.1"), "0.22.3")];
+        s.suites.upgrades = vec![suite_tool(Some("0.22"), "0.24")];
+    });
+
+    assert!(
+        shown.contains(
+            "  Suites        go: gopls 0.22.1 → 0.22.3\n  \
+             Upgrades      go: gopls 0.22 → 0.24\n                \
+             kubaos suite upgrade installs them\n"
+        ),
+        "{shown}"
+    );
+}
+
+#[test]
+fn a_failed_suite_step_says_so_on_its_row() {
+    let shown = summary_text(|s| s.suites.error = Some("moving the Suites' tools with mise".into()));
+
+    assert!(
+        shown.contains("  Suites        failed: moving the Suites' tools with mise\n"),
+        "{shown}"
+    );
+}
+
+#[test]
+fn a_rollback_lists_the_suite_tools_it_put_back() {
+    let shown = summary_text(|s| s.suites.restored = vec![suite_tool(None, "0.22.1")]);
+
+    assert!(shown.contains("  Suites        go: gopls 0.22.1\n"), "{shown}");
 }

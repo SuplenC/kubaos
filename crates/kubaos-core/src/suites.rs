@@ -33,6 +33,8 @@
 //! - The Nix side: `home/suites.nix`, `home/state.nix` and `home/suites/<name>.nix`.
 
 pub mod catalog;
+mod lockfile;
+mod updates;
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -53,6 +55,10 @@ use kubaos_user_layer::App;
 use serde::Deserialize;
 use serde::Serialize;
 
+pub use self::updates::Available;
+pub use self::updates::Reach;
+pub use self::updates::SuiteUpdates;
+pub use self::updates::Upgraded;
 use crate::mise;
 use crate::mise::ListedVersion;
 use crate::mise::Mise;
@@ -123,7 +129,8 @@ pub struct Tool {
 /// The version a [`Tool`] asks mise for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Request {
-    /// The Suite's chosen version: its main toolchain.
+    /// The Suite's chosen version: its main toolchain. The record keeps the line as chosen
+    /// (`24`), and the fragment asks for the line's newest major.minor (`24.22`).
     Suite,
     /// This request, at major.minor precision (`0.13`), so a plain `mise upgrade` stays within
     /// its patch releases.
@@ -333,6 +340,19 @@ pub enum SuiteError {
     /// The Suite's files are written or deleted, but mise could not write its lockfile.
     #[error("locking mise's tools")]
     MiseLock(#[source] MiseError),
+    /// mise could not read which of the Suites' tools have newer releases.
+    #[error("asking mise for newer releases")]
+    Outdated(#[source] MiseError),
+    /// mise could not move the Suites' tools; the tools it moved before failing stay moved.
+    #[error("moving the Suites' tools with mise")]
+    Upgrade(#[source] MiseError),
+    /// mise's lockfile, or the entries an update saved from it, are not TOML.
+    #[error("reading {}", path.display())]
+    Lockfile {
+        path: PathBuf,
+        #[source]
+        source: toml_edit::TomlError,
+    },
     /// The Suite file is written, but a missing user-layer file could not be created.
     #[error("creating {}", path.display())]
     Seed {
@@ -470,7 +490,7 @@ impl Suites {
             config: None,
             tools: self.fragment(suite)?,
         };
-        let tools = wanted_tools(suite, &config, &[]);
+        let tools = wanted_tools(suite, &config, &[], |tool, line| self.narrow(suite, tool, line))?;
         self.install(suite, &tools)?;
         if let Err(e) = self
             .write_fragment(suite, &tools)
@@ -513,7 +533,9 @@ impl Suites {
             config: Some(current),
             tools: self.fragment(suite)?,
         };
-        let tools = wanted_tools(suite, &config, &before.tools);
+        let tools = wanted_tools(suite, &config, &before.tools, |tool, line| {
+            self.narrow(suite, tool, line)
+        })?;
         if tools != before.tools {
             self.install(suite, &tools)?;
             self.write_fragment(suite, &tools)?;
@@ -737,6 +759,22 @@ impl Suites {
         })
     }
 
+    /// The request for the main tool `tool` of `suite` on the chosen `line`: the major.minor of
+    /// the line's newest release (`24` asks for `24.22`), so a plain update takes only its patch
+    /// releases. A line with no release mise knows of, or whose newest release isn't numbered
+    /// major.minor.something, stays as chosen.
+    fn narrow(&self, suite: &Suite, tool: &str, line: &str) -> Result<String, SuiteError> {
+        let latest = self.mise.latest(tool, line).map_err(|source| SuiteError::Install {
+            suite: suite.name.to_owned(),
+            source,
+        })?;
+        Ok(latest
+            .as_deref()
+            .and_then(major_minor)
+            .filter(|request| on_line(request, line))
+            .unwrap_or_else(|| line.to_owned()))
+    }
+
     /// The tools `suite`'s fragment asks for, in the order it lists them; none without a
     /// fragment. A request that isn't a plain string is mise's to read and is left out.
     fn fragment(&self, suite: &Suite) -> Result<Vec<ToolRequest>, SuiteError> {
@@ -918,28 +956,47 @@ struct Fragment {
 /// The tools `suite` asks mise for with `config`. A request in `current`, the fragment as it is,
 /// stays while it is on the line the Suite asks for, so a request `mise upgrade --bump` moved is
 /// kept: for the main toolchain, while it starts with the chosen version; for any other tool,
-/// always.
-fn wanted_tools(suite: &Suite, config: &SuiteConfig, current: &[ToolRequest]) -> Vec<ToolRequest> {
-    suite
-        .mise
-        .iter()
-        .filter(|tool| tool.extra.is_none_or(|extra| config.extras.contains(extra)))
-        .filter_map(|tool| {
-            let default = match tool.request {
-                Request::Suite => config.version.clone()?,
-                Request::Fixed(request) => request.to_owned(),
-            };
-            let kept = current.iter().find(|t| t.tool == tool.name).map(|t| &t.request);
-            let request = match kept {
-                Some(kept) if tool.request != Request::Suite || on_line(kept, &default) => kept.clone(),
-                _ => default,
-            };
-            Some(ToolRequest {
-                tool: tool.name.to_owned(),
-                request,
-            })
-        })
-        .collect()
+/// always. The main toolchain's request on a new line is what `narrow` makes of the line.
+fn wanted_tools(
+    suite: &Suite,
+    config: &SuiteConfig,
+    current: &[ToolRequest],
+    mut narrow: impl FnMut(&str, &str) -> Result<String, SuiteError>,
+) -> Result<Vec<ToolRequest>, SuiteError> {
+    let mut tools = Vec::new();
+    for tool in suite.mise {
+        if tool.extra.is_some_and(|extra| !config.extras.contains(extra)) {
+            continue;
+        }
+        let kept = current.iter().find(|t| t.tool == tool.name).map(|t| t.request.clone());
+        let request = match (tool.request, kept) {
+            (Request::Fixed(_), Some(kept)) => kept,
+            (Request::Fixed(request), None) => request.to_owned(),
+            (Request::Suite, kept) => {
+                let Some(line) = &config.version else {
+                    continue;
+                };
+                match kept {
+                    Some(kept) if on_line(&kept, line) => kept,
+                    _ => narrow(tool.name, line)?,
+                }
+            }
+        };
+        tools.push(ToolRequest {
+            tool: tool.name.to_owned(),
+            request,
+        });
+    }
+    Ok(tools)
+}
+
+/// `version`'s major.minor, `24.22` of `24.22.1`, when its first two parts are numbers and a
+/// third follows.
+fn major_minor(version: &str) -> Option<String> {
+    let mut parts = version.splitn(3, '.');
+    let (major, minor, _rest) = (parts.next()?, parts.next()?, parts.next()?);
+    let numeric = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+    (numeric(major) && numeric(minor)).then(|| format!("{major}.{minor}"))
 }
 
 /// Whether `request` is `line` or a narrower request within it: `24.22` is on `24`.

@@ -7,6 +7,8 @@
 //!   kubaos suite configure NAME [--version V] [--extra E]... [--no-extra E]... [--no-switch] [...]
 //!   kubaos suite remove NAME [--purge-caches] [--no-switch] [--detach | --foreground]
 //!   kubaos suite new NAME PROJECT [--with SCAFFOLDER]
+//!   kubaos suite update [NAME...] [--all] [--json]
+//!   kubaos suite upgrade [NAME...] [--all] [--json] [--no-switch] [--detach | --foreground]
 //!
 //! `add`, `configure` and `remove` write or delete `kubaos.d/suites/<name>.toml`, and a Suite's
 //! fragment of mise's config with the tools mise installs first, then switch. When that switch
@@ -14,7 +16,8 @@
 //! user-layer file that exists. `remove` shows the size of each cache and deletes them only with
 //! `--purge-caches`, and lists the user-layer files that mention the Suite. `list` and `show` read
 //! the versions installed from mise. `new` creates a project in the Projects root with an
-//! installed Suite. Exit codes: 0 ok, 1 the work failed, 2 usage.
+//! installed Suite. `update` and `upgrade` move the Suites' tools on (`suite/updates.rs`). Exit
+//! codes: 0 ok, 1 the work failed, 2 usage.
 //!
 //! # Owns
 //!
@@ -55,6 +58,8 @@ use crate::out::err;
 use crate::out::out;
 use crate::package;
 use crate::usage_error;
+
+mod updates;
 
 #[derive(Subcommand)]
 pub enum SuiteCmd {
@@ -119,6 +124,46 @@ pub enum SuiteCmd {
         #[arg(long = "with", value_name = "SCAFFOLDER")]
         scaffolder: Option<String>,
     },
+    /// Move installed Suites' tools to their newest patch releases. Without a name or --all,
+    /// pick from the Suites that have some.
+    Update {
+        #[command(flatten)]
+        chosen: ChosenArgs,
+    },
+    /// Move installed Suites' tools to their newest minor and major releases, then switch when a
+    /// Suite's version moves. Without a name or --all, pick from the Suites that have some.
+    Upgrade {
+        #[command(flatten)]
+        chosen: ChosenArgs,
+        /// Only record a Suite's new version; the next switch applies it.
+        #[arg(long)]
+        no_switch: bool,
+        #[command(flatten)]
+        mode: SwitchMode,
+    },
+}
+
+/// The Suites `update` and `upgrade` move.
+#[derive(Args)]
+pub struct ChosenArgs {
+    /// The Suites to move.
+    names: Vec<String>,
+    /// Every installed Suite with something newer.
+    #[arg(long, conflicts_with = "names")]
+    all: bool,
+    /// Only list what is newer, as JSON, and change nothing.
+    #[arg(long)]
+    json: bool,
+}
+
+impl ChosenArgs {
+    fn into_chosen(self) -> updates::Chosen {
+        updates::Chosen {
+            names: self.names,
+            all: self.all,
+            json: self.json,
+        }
+    }
 }
 
 /// The options `add` and `configure` share.
@@ -191,6 +236,17 @@ pub fn main(cmd: SuiteCmd) -> ExitCode {
         } => with_suite(&name, |suite| {
             new(&paths, &suites, suite, &project, scaffolder.as_deref())
         }),
+        SuiteCmd::Update { chosen } => updates::update(&suites, &chosen.into_chosen()),
+        SuiteCmd::Upgrade {
+            chosen,
+            no_switch,
+            mode,
+        } => updates::upgrade(
+            &paths,
+            &suites,
+            &chosen.into_chosen(),
+            &updates::AfterUpgrade { no_switch, mode },
+        ),
     }
 }
 

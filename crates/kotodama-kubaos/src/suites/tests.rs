@@ -186,7 +186,14 @@ fn an_installed_suite_has_a_new_project_item_a_scaffolder_after_it() {
 
     let new = item(&suites, "suite-new:test:new");
 
-    assert_eq!(ids(&suites), [&NOT_INSTALLED[..], &["suite-new:test:new"]].concat());
+    assert_eq!(
+        ids(&suites),
+        [
+            &NOT_INSTALLED[..],
+            &["suite-new:test:new", "suites:update", "suites:upgrade"]
+        ]
+        .concat()
+    );
     assert_eq!(new.kind.name(), KIND);
     assert_eq!(new.title, "New Test project…");
     assert_eq!(new.actions.len(), 1);
@@ -313,6 +320,39 @@ fn ids_name_every_item_a_suite_may_have() {
             "suite:wallpaper-depth",
             "suite:test",
             "suite-new:test:new",
+            "suites:update",
+            "suites:upgrade",
         ]
     );
+}
+
+#[test]
+fn update_and_upgrade_suites_are_listed_only_while_a_suite_with_mise_tools_is_installed() {
+    let none = Installed::default();
+    let test = installed("1");
+
+    assert!(!ids(&none).iter().any(|id| id.starts_with("suites:")));
+    assert_eq!(item(&test, "suites:update").title, "Update Suites…");
+    assert_eq!(item(&test, "suites:upgrade").title, "Upgrade Suites…");
+    assert_eq!(actions(&test, "suites:update"), [UPDATE]);
+    assert_eq!(actions(&test, "suites:upgrade"), [UPGRADE]);
+    for id in ["suites:update", "suites:upgrade"] {
+        let keywords = item(&test, id).keywords;
+        assert!(keywords.contains(&"toolchain".to_owned()), "{id}: {keywords:?}");
+    }
+}
+
+#[test]
+fn update_and_upgrade_suites_run_their_pick_list_in_the_terminal() {
+    let suites = installed("1");
+
+    let update = launched(&suites, "suites:update", UPDATE, &[]);
+    let upgrade = launched(&suites, "suites:upgrade", UPGRADE, &[]);
+    let crossed = launched(&suites, "suites:update", UPGRADE, &[]);
+    let without = launched(&Installed::default(), "suites:update", UPDATE, &[]);
+
+    assert_eq!(update.as_deref(), Ok("kubaos suite update"));
+    assert_eq!(upgrade.as_deref(), Ok("kubaos suite upgrade"));
+    assert_eq!(crossed, Err("`suites:update` has no Action `upgrade`".to_owned()));
+    assert_eq!(without, Err("`suites:update` has no Action `update`".to_owned()));
 }

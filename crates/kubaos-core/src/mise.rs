@@ -102,6 +102,37 @@ pub trait Mise: fmt::Debug + Send + Sync {
     /// [`MiseError`] when mise can't start, fails or prints something else.
     fn outdated(&self, bump: bool) -> Result<Vec<OutdatedTool>, MiseError>;
 
+    /// The newest release of `tool` that `prefix` selects (`24` selects `24.22.1`), or `None`
+    /// when none does.
+    ///
+    /// # Errors
+    ///
+    /// [`MiseError`] when mise can't start or fails.
+    fn latest(&self, tool: &str, prefix: &str) -> Result<Option<String>, MiseError>;
+
+    /// Moves each of `tools` to the newest release its request allows, leaving every config as
+    /// it is.
+    ///
+    /// # Errors
+    ///
+    /// [`MiseError`] when mise can't start or fails; the tools moved before the failure stay.
+    fn upgrade(&self, tools: &[String]) -> Result<(), MiseError>;
+
+    /// Moves each tool past its request to the release `request` selects, and rewrites the
+    /// config that asks for the tool to ask for `request`.
+    ///
+    /// # Errors
+    ///
+    /// [`MiseError`] when mise can't start or fails; the tools moved before the failure stay.
+    fn bump(&self, targets: &[ToolRequest]) -> Result<(), MiseError>;
+
+    /// Installs every tool the configs ask for at the version the lockfile names.
+    ///
+    /// # Errors
+    ///
+    /// [`MiseError`] when mise can't start or fails, as it does with no lockfile.
+    fn install_locked(&self) -> Result<(), MiseError>;
+
     /// Deletes every installed version no tracked config selects, at once.
     ///
     /// # Errors
@@ -151,6 +182,8 @@ pub enum MiseError {
 pub struct Cli {
     program: OsString,
     cwd: PathBuf,
+    /// Whether an install's progress goes to this process's stderr, where a person sees it.
+    shown: bool,
 }
 
 impl Default for Cli {
@@ -166,7 +199,16 @@ impl Cli {
         Self {
             program: "mise".into(),
             cwd: PathBuf::from("/"),
+            shown: true,
         }
+    }
+
+    /// Keeps what mise prints to itself, for a caller that reports in its own stream; a failure
+    /// still carries mise's last line.
+    #[must_use]
+    pub fn quiet(mut self) -> Self {
+        self.shown = false;
+        self
     }
 
     /// The mise at `program`.
@@ -192,8 +234,11 @@ impl Cli {
     }
 
     /// Runs mise with its output on this process's stderr, where a person sees an install's
-    /// progress.
+    /// progress, unless it is [`Cli::quiet`].
     fn run_shown(&self, args: &[&str]) -> Result<(), MiseError> {
+        if !self.shown {
+            return self.run_captured(args).map(drop);
+        }
         let status = self
             .command(args)
             .stdout(Stdio::from(io::stderr()))
@@ -270,6 +315,36 @@ impl Mise for Cli {
             command: args.join(" "),
             source,
         })
+    }
+
+    fn latest(&self, tool: &str, prefix: &str) -> Result<Option<String>, MiseError> {
+        let spec = format!("{tool}@{prefix}");
+        let out = self.run_captured(&["latest", &spec])?;
+        let latest = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+        Ok((!latest.is_empty()).then_some(latest))
+    }
+
+    fn upgrade(&self, tools: &[String]) -> Result<(), MiseError> {
+        if tools.is_empty() {
+            return Ok(());
+        }
+        let mut args = vec!["upgrade"];
+        args.extend(tools.iter().map(String::as_str));
+        self.run_shown(&args)
+    }
+
+    fn bump(&self, targets: &[ToolRequest]) -> Result<(), MiseError> {
+        if targets.is_empty() {
+            return Ok(());
+        }
+        let specs: Vec<String> = targets.iter().map(ToString::to_string).collect();
+        let mut args = vec!["upgrade", "--bump"];
+        args.extend(specs.iter().map(String::as_str));
+        self.run_shown(&args)
+    }
+
+    fn install_locked(&self) -> Result<(), MiseError> {
+        self.run_shown(&["install", "--locked"])
     }
 
     fn prune(&self) -> Result<(), MiseError> {
