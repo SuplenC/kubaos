@@ -52,7 +52,14 @@ let
   # The suffix names the script's format (each print given the config), so
   # scripts cached in an older one are never sourced again.
   ompKey = builtins.substring 0 16 (builtins.hashString "sha256" "${omp}-print-config");
-  mise = lib.getExe kubaosPkgs.mise;
+  # `mise activate zsh` writes the PATH it was run with into its first two
+  # lines; cached, they would bring back that PATH in every later shell. The
+  # rest is the same for every shell, and its `_mise_hook --force` sets PATH
+  # from mise's configs as the shell starts.
+  miseActivate = pkgs.writeShellScript "mise-activate-zsh" ''
+    set -euo pipefail
+    ${lib.getExe kubaosPkgs.mise} activate zsh | ${lib.getExe pkgs.gnused} -e '/^export __MISE_ORIG_PATH=/d' -e '/^export PATH=/d'
+  '';
 in
 {
   # mise is the curated set's, so only a KubaOS release moves it.
@@ -240,11 +247,7 @@ in
           "hook"
           "zsh"
         ]}
-        ${cachedInit "mise" [
-          mise
-          "activate"
-          "zsh"
-        ]}
+        ${cachedInit "mise" [ miseActivate ]}
         if [[ $options[zle] = on ]]; then
           ${cachedInit "atuin" (
             [
