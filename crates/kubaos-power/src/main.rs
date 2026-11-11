@@ -16,6 +16,7 @@
 //! kubaos-power panel STOP 60hz|vrr|native what the laptop panel does in a stop
 //! kubaos-power apply                      put a hand edit of power.toml to work
 //! kubaos-power scheduler [on|off]         which CPU scheduler runs and why; LAVD on or off
+//! kubaos-power background-yields on|off   build tools and Nix's builds at a lower priority
 //! ```
 //!
 //! A change to the settings says what it came to on stdout and in a toast, and the service puts
@@ -24,8 +25,8 @@
 //! # Owns
 //!
 //! - The command line, the service's loop and threads (the bus, the scheduler's unit, the socket,
-//!   the toasts), and doing what [`Control`] decides: power-profiles-daemon, the root helper,
-//!   Hyprland, the indexer.
+//!   the toasts, background work's watch), and doing what [`Control`] decides:
+//!   power-profiles-daemon, the root helper, Hyprland, the indexer.
 //!
 //! # Not here
 //!
@@ -92,6 +93,7 @@ use kubaos_power::stop::Source;
 use kubaos_power::stop::Stop;
 use kubaos_power::warning;
 use kubaos_power::writes;
+use kubaos_power::yields;
 
 const USAGE: &str = "\
 usage: kubaos power set super-saver|power-saver|balanced|performance|max-performance
@@ -105,6 +107,7 @@ usage: kubaos power set super-saver|power-saver|balanced|performance|max-perform
        kubaos power critical-warning PERCENT|off
        kubaos power panel STOP 60hz|vrr|native
        kubaos power scheduler [on|off]
+       kubaos power background-yields on|off
 
 set       move the power slider to a stop; each power source remembers its own
 undo      undo the low-battery drop
@@ -119,8 +122,10 @@ low-battery         where the stop drops at the low-battery level, or that level
 critical-warning    the battery level of the toast and sound before the power-off at 2 %, or off
 panel     the laptop panel in a stop: 60 Hz, the native rate with VRR, or native
 apply     put a hand edit of the settings file to work
-scheduler which CPU scheduler runs and why; on runs LAVD (sched_ext) in each stop's mode, off
-          leaves Linux's own (EEVDF)
+scheduler which CPU scheduler runs and why, and what background work yields; on runs LAVD
+          (sched_ext) in each stop's mode, off leaves Linux's own (EEVDF)
+background-yields   build tools and Nix's builds at nice 19, so the desktop stays smooth; off
+                    gives a build you're waiting on the CPU back
 
 Settings: ~/.config/kubaos/desktop/power/power.toml";
 
@@ -200,6 +205,19 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         ["scheduler", on @ ("on" | "off")] => report_said(set_scheduler(*on == "on")),
+        ["background-yields", on @ ("on" | "off")] => report_said(change(
+            |path| settings::set_background_yields(path, *on == "on"),
+            |_| {
+                if *on == "on" {
+                    format!(
+                        "Background work yields: build tools you start and Nix's builds run at nice {}.",
+                        yields::NICE
+                    )
+                } else {
+                    "Background work doesn't yield: builds running now get the CPU back.".to_owned()
+                }
+            },
+        )),
         ["-h" | "--help" | "help"] => {
             println!("{USAGE}");
             ExitCode::SUCCESS
@@ -615,7 +633,9 @@ fn serve() -> Result<(), String> {
     indexer::follow_in_background(move |running| {
         let _ = sent.send(Event::Indexer(running));
     });
-    let mut service = Service::new(bus, runtime, events);
+    let (yielding, watched) = mpsc::channel();
+    follow_yields(watched);
+    let mut service = Service::new(bus, runtime, events, yielding);
     service.run(&received)
 }
 
@@ -871,10 +891,79 @@ fn answer(stream: UnixStream, events: &Sender<Event>) {
     let _ = writeln!(stream, "{reply}");
 }
 
+/// Follows the setting sent on `on`: while background work yields, demotes the user's build tools
+/// as they start; when it stops yielding, puts the ones still demoted back through the root helper.
+fn follow_yields(on: mpsc::Receiver<bool>) {
+    thread::spawn(move || {
+        let proc = Path::new("/proc");
+        let uid = rustix::process::getuid().as_raw();
+        let mut watch = yields::Watch::default();
+        let Ok(mut yielding) = on.recv() else {
+            return;
+        };
+        loop {
+            if !yielding {
+                watch.forget();
+                match on.recv() {
+                    Ok(now) => yielding = now,
+                    Err(_) => return,
+                }
+                continue;
+            }
+            for process in watch.scan(proc, uid) {
+                yields::demote(proc, process.pid);
+            }
+            match on.recv_timeout(yields::SCAN) {
+                Ok(true) | Err(RecvTimeoutError::Timeout) => {}
+                Ok(false) => {
+                    unyield(proc, uid);
+                    yielding = false;
+                }
+                Err(RecvTimeoutError::Disconnected) => return,
+            }
+        }
+    });
+}
+
+/// Puts the user's processes that yield back to nice 0: lowering a nice takes root. It runs on
+/// the watch's thread, after its last scan, so no demotion lands after it.
+fn unyield(proc: &Path, uid: u32) {
+    let processes = yields::processes(proc);
+    let pids: Vec<u32> = yields::demoted(&processes)
+        .into_iter()
+        .filter(|process| process.uid == uid)
+        .map(|process| process.pid)
+        .collect();
+    if pids.is_empty() || !Path::new(HELPER).exists() {
+        return;
+    }
+    match helper(&[writes::Write::Unyield(pids).arg()]) {
+        Ok(output) if output.status.success() => {}
+        Ok(output) => log::warn!(
+            "couldn't put background work back to nice 0: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ),
+        Err(err) => log::error!("couldn't run pkexec: {err}"),
+    }
+}
+
+/// Runs the root helper with `args`. pkexec runs without its own agent: an admin at the machine
+/// needs no password (`system/files/polkit/50-kubaos-power.rules`).
+fn helper(args: &[String]) -> std::io::Result<std::process::Output> {
+    Command::new(PKEXEC)
+        .arg("--disable-internal-agent")
+        .arg(HELPER)
+        .args(args)
+        .stdin(Stdio::null())
+        .output()
+}
+
 struct Service {
     bus: zbus::blocking::Connection,
     runtime: PathBuf,
     events: Sender<Event>,
+    /// The background-yields setting, to the watch's thread.
+    yielding: Sender<bool>,
     machine: Machine,
     settings: Settings,
     control: Option<Control>,
@@ -897,8 +986,14 @@ struct Service {
 }
 
 impl Service {
-    fn new(bus: zbus::blocking::Connection, runtime: PathBuf, events: Sender<Event>) -> Service {
+    fn new(
+        bus: zbus::blocking::Connection,
+        runtime: PathBuf,
+        events: Sender<Event>,
+        yielding: Sender<bool>,
+    ) -> Service {
         let (settings, problem) = load_settings();
+        let _ = yielding.send(settings.background_yields);
         if let Some(problem) = problem {
             notify(
                 "Power",
@@ -911,6 +1006,7 @@ impl Service {
             bus,
             runtime,
             events,
+            yielding,
             machine: Machine::real(),
             settings,
             control: None,
@@ -1047,6 +1143,9 @@ impl Service {
                 let (settings, problem) = load_settings();
                 if let Some(problem) = problem {
                     return format!("error {problem}");
+                }
+                if settings.background_yields != self.settings.background_yields {
+                    let _ = self.yielding.send(settings.background_yields);
                 }
                 self.settings = settings;
                 self.retry_scheduler = *line == "retry-scheduler";
@@ -1189,8 +1288,7 @@ impl Service {
         }
     }
 
-    /// The writes, through the root helper. pkexec runs without its own agent: an admin at the
-    /// machine needs no password (`system/files/polkit/50-kubaos-power.rules`).
+    /// The writes, through the root helper.
     fn write(&mut self, writes: &[writes::Write]) {
         if !Path::new(HELPER).exists() {
             if !self.helper_said {
@@ -1199,13 +1297,8 @@ impl Service {
             }
             return;
         }
-        let output = Command::new(PKEXEC)
-            .arg("--disable-internal-agent")
-            .arg(HELPER)
-            .args(writes.iter().map(writes::Write::arg))
-            .stdin(Stdio::null())
-            .output();
-        match output {
+        let args: Vec<String> = writes.iter().map(writes::Write::arg).collect();
+        match helper(&args) {
             Ok(output) if output.status.success() => {}
             Ok(output) => {
                 let said = String::from_utf8_lossy(&output.stderr);

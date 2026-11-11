@@ -129,6 +129,7 @@ fn helper(root: &FakeRoot, args: &[String]) -> (bool, String) {
         .arg(script)
         .args(args)
         .env("KUBAOS_POWER_ROOT", root.dir.path())
+        .env_remove("PKEXEC_UID")
         .output()
         .expect("run the helper");
     (
@@ -474,4 +475,48 @@ fn a_machine_without_the_knobs_suspends_with_nothing_changed() {
 
     assert!(ok, "{said}");
     assert_eq!(said.trim(), "kubaos-power-write: sleep-safe: nothing to change");
+}
+
+#[test]
+fn nix_daemons_drop_in_follows_the_setting_and_nothing_is_asked_once_it_does() {
+    let root = FakeRoot::laptop();
+    root.write(crate::machine::NIX_UNIT, "[Service]\n");
+    let off = Settings::parse("background_yields = false\n").expect("parses");
+
+    let missing = args(Stop::Balanced, &Settings::default(), &root, Some(true));
+    root.write(crate::machine::NIX_DROP_IN, "[Service]\nNice=19\n");
+    let in_place = args(Stop::Balanced, &Settings::default(), &root, Some(true));
+    let turned_off = args(Stop::Balanced, &off, &root, Some(true));
+
+    assert!(missing.contains(&"yields=on".to_owned()));
+    assert!(!in_place.iter().any(|arg| arg.starts_with("yields=")));
+    assert!(turned_off.contains(&"yields=off".to_owned()));
+}
+
+#[test]
+fn a_machine_without_nix_daemon_is_asked_nothing_about_it() {
+    let root = FakeRoot::laptop();
+
+    let args = args(Stop::Balanced, &Settings::default(), &root, Some(true));
+
+    assert!(!args.iter().any(|arg| arg.starts_with("yields=")));
+}
+
+#[test]
+fn putting_processes_back_names_them_for_the_helper() {
+    assert_eq!(Write::Unyield(vec![4242, 4243]).arg(), "unyield=4242,4243");
+}
+
+#[test]
+fn the_helper_refuses_a_yield_it_cant_check() {
+    let root = FakeRoot::laptop();
+    let asked = ["yields=maybe", "yields=on", "unyield=12;rm", "unyield=4242"].map(str::to_owned);
+
+    let (ok, said) = helper(&root, &asked);
+
+    assert!(!ok);
+    assert!(said.contains("yields=maybe isn't on or off"), "{said}");
+    assert!(said.contains("there's no nix-daemon.service"), "{said}");
+    assert!(said.contains("unyield=12;rm isn't a list of processes"), "{said}");
+    assert!(said.contains("there's no caller"), "{said}");
 }

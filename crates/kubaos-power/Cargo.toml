@@ -14,6 +14,8 @@ jiff.workspace = true
 kubaos-user-layer.workspace = true
 # The service's log, on stderr, which the journal keeps with each line's priority.
 log = "0.4"
+# Lowers background work's priority (`setpriority`) without `unsafe`.
+rustix = { version = "1", features = ["process"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

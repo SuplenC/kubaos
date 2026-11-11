@@ -24,6 +24,12 @@
 #                                      stopped and disabled
 #   scheduler=reset                    lets a LAVD that crashed until systemd gave
 #                                      up on it start again
+#   yields=on|off                      nix-daemon and its builds at nice 19 and the
+#                                      lowest best-effort I/O priority, through a
+#                                      drop-in, its threads reniced now; off takes
+#                                      the drop-in away and puts them back
+#   unyield=PID[,PID...]               the caller's processes at nice 19 back to 0,
+#                                      every thread, which only root may do
 #
 # The power service (`kubaos-power serve`, crates/kubaos-power) runs it through
 # pkexec (polkit action org.kubaos.power.write, system/files/polkit/), with
@@ -59,6 +65,13 @@ SYS="$ROOT/sys"
 SCX_UNIT=kubaos-scx.service
 LAVD="$ROOT/usr/local/libexec/kubaos-scx-lavd"
 LAVD_ENV="$ROOT/var/lib/kubaos/scx-lavd.env"
+# Background work yields (crates/kubaos-power/src/yields.rs, whose NICE is the
+# same). The drop-in is there only while it does, so builds yield from boot on.
+PROC="$ROOT/proc"
+NIX_UNIT=nix-daemon.service
+NIX_UNIT_FILE="$ROOT/etc/systemd/system/$NIX_UNIT"
+NIX_DROP_IN="$ROOT/etc/systemd/system/$NIX_UNIT.d/kubaos-yields.conf"
+YIELD_NICE=19
 
 usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
 
@@ -268,6 +281,96 @@ LAVD_ARGS=$args"
   fi
 }
 
+# nice_of TID: a thread's nice, the 19th field of its stat. The name, the
+# second, may hold spaces, so the fields count from after its last `)`.
+nice_of() {
+  local stat fields
+  stat="$(read_value "$PROC/$1/stat")" || return 1
+  read -ra fields <<<"${stat##*) }"
+  printf '%s' "${fields[16]}"
+}
+
+# nix_threads: every thread in nix-daemon's cgroup and the build cgroups under it.
+nix_threads() {
+  local cgroup file
+  cgroup="$(systemctl show --property=ControlGroup --value "$NIX_UNIT" 2>/dev/null)" || return 0
+  [[ -n $cgroup && -d $SYS/fs/cgroup$cgroup ]] || return 0
+  while IFS= read -r -d '' file; do
+    cat -- "$file" 2>/dev/null || true
+  done < <(find "$SYS/fs/cgroup$cgroup" -name cgroup.threads -print0 2>/dev/null)
+}
+
+# yield_thread TID: below nice 19 to nice 19, with the lowest best-effort I/O
+# priority. A thread gone meanwhile is no failure.
+yield_thread() {
+  local nice
+  nice="$(nice_of "$1")" || return 0
+  ((nice < YIELD_NICE)) || return 0
+  renice --priority "$YIELD_NICE" -p "$1" >/dev/null 2>&1 || return 0
+  ionice -c 2 -n 7 -p "$1" 2>/dev/null || true
+}
+
+# unyield_thread TID: at nice 19 back to 0, its I/O priority following nice
+# again. A thread at another nice was set by someone else and stays.
+unyield_thread() {
+  local nice
+  nice="$(nice_of "$1")" || return 0
+  ((nice == YIELD_NICE)) || return 0
+  renice --priority 0 -p "$1" >/dev/null 2>&1 || return 0
+  ionice -c 0 -p "$1" 2>/dev/null || true
+}
+
+# yields on|off: nix-daemon's drop-in written or removed, systemd reloaded so
+# its CPUWeight applies to the running unit, and its threads reniced now,
+# since Nice= and the I/O class reach only processes it starts.
+yields() {
+  local want="$1" text tid changed=0
+  [[ $want =~ ^(on|off)$ ]] || { fail "yields=$want isn't on or off"; return; }
+  [[ -e $NIX_UNIT_FILE ]] || { fail "there's no $NIX_UNIT"; return; }
+  text="# Written by kubaos-power-write: Nix's builds yield to the desktop
+# (background_yields in power.toml).
+[Service]
+Nice=$YIELD_NICE
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUWeight=10"
+  if [[ $want == on && "$(read_value "$NIX_DROP_IN" || true)" != "$text" ]]; then
+    if ! { mkdir -p -- "${NIX_DROP_IN%/*}" && printf '%s\n' "$text" >"$NIX_DROP_IN.new" &&
+      chmod 0644 -- "$NIX_DROP_IN.new" && mv -f -- "$NIX_DROP_IN.new" "$NIX_DROP_IN"; } 2>/dev/null; then
+      fail "couldn't write $NIX_DROP_IN"
+      return
+    fi
+    changed=1
+  elif [[ $want == off && -e $NIX_DROP_IN ]]; then
+    rm -f -- "$NIX_DROP_IN" || { fail "couldn't remove $NIX_DROP_IN"; return; }
+    changed=1
+  fi
+  ((changed)) && { systemctl daemon-reload 2>/dev/null || fail "systemd couldn't reload $NIX_UNIT's drop-in"; }
+  while read -r tid; do
+    [[ $tid =~ ^[0-9]+$ ]] || continue
+    if [[ $want == on ]]; then yield_thread "$tid"; else unyield_thread "$tid"; fi
+  done < <(nix_threads)
+}
+
+# unyield PIDS: each of pkexec's caller's processes back to nice 0, every
+# thread at nice 19. Raising a nice needs no root and the power service does
+# it itself; lowering it does, as RLIMIT_NICE is 0.
+unyield() {
+  local value="$1" pid tid list
+  [[ $value =~ ^[0-9]{1,7}(,[0-9]{1,7}){0,4095}$ ]] || { fail "unyield=$value isn't a list of processes"; return; }
+  [[ ${PKEXEC_UID:-} =~ ^[0-9]+$ ]] || { fail "unyield= puts back pkexec's caller's processes, and there's no caller"; return; }
+  IFS=, read -ra list <<<"$value"
+  for pid in "${list[@]}"; do
+    # A process gone meanwhile is no failure; one of another user is.
+    [[ -d $PROC/$pid ]] || continue
+    [[ "$(stat -c %u -- "$PROC/$pid" 2>/dev/null)" == "$PKEXEC_UID" ]] ||
+      { fail "process $pid isn't the caller's"; continue; }
+    for tid in "$PROC/$pid"/task/*; do
+      [[ -e $tid ]] && unyield_thread "${tid##*/}"
+    done
+  done
+}
+
 # sleep_safe: the --sleep-safe values, each only where the stop left
 # something else. Saver stops' values stay: they already reach s0i3.
 #
@@ -348,6 +451,8 @@ for arg in "$@"; do
     charge-profile) charge_profile "$value" ;;
     charge-end) charge_end "$value" ;;
     scheduler) scheduler "$value" ;;
+    yields) yields "$value" ;;
+    unyield) unyield "$value" ;;
     *) fail "${arg%%=*} isn't a knob" ;;
   esac
   ((failed)) && printf 'failed %s\n' "$arg"

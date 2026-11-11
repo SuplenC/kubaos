@@ -20,9 +20,9 @@
 //! clock and the firmware's platform profile), and sets them again when the power source
 //! changes; [`Plan`] says what to expect of them, for `status`, and the service writes the rest
 //! after ppd, so its values are the last word. The user's settings change the panel and the clock
-//! cap per stop, and panel power saving and the CPU scheduler everywhere: LAVD runs only when the
-//! settings turn it on, and then in the stop's mode (`powersave+` packs the work on the fewest,
-//! most efficient cores).
+//! cap per stop, and panel power saving and the CPU scheduler everywhere: LAVD runs unless the
+//! settings turn it off, in the stop's mode (`powersave+` packs the work on the fewest, most
+//! efficient cores).
 //!
 //! # Owns
 //!

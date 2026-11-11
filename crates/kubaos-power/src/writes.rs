@@ -8,7 +8,7 @@
 //! # Owns
 //!
 //! - [`Write`] and its argument, and [`for_plan`]: which devices a row reaches, the USB skip list
-//!   applied.
+//!   applied, and whether nix-daemon's builds yield as the settings say.
 //!
 //! # Not here
 //!
@@ -53,6 +53,10 @@ pub enum Write {
     /// The CPU scheduler: scx_lavd in a mode (`powersave:4,16`, [`crate::scheduler::asked`]),
     /// `off` for the kernel's own, or `reset` to let a LAVD that kept crashing start again.
     Scheduler(String),
+    /// nix-daemon and its builds yield, or not: its drop-in, and its threads' nice now.
+    NixYields(bool),
+    /// The user's processes that yield, back to nice 0, which takes root.
+    Unyield(Vec<u32>),
 }
 
 impl Write {
@@ -75,6 +79,11 @@ impl Write {
             Write::TuxedoCharge(profile) => format!("charge-profile={profile}"),
             Write::ChargeEnd { battery, percent } => format!("charge-end={battery}:{percent}"),
             Write::Scheduler(value) => format!("scheduler={value}"),
+            Write::NixYields(on) => format!("yields={}", if *on { "on" } else { "off" }),
+            Write::Unyield(pids) => {
+                let pids: Vec<String> = pids.iter().map(u32::to_string).collect();
+                format!("unyield={}", pids.join(","))
+            }
         }
     }
 }
@@ -194,6 +203,12 @@ pub fn for_plan(
         }
     }
     writes.extend(charge(machine, settings.charge_limit));
+    if machine
+        .nix_yields()
+        .is_some_and(|yields| yields != settings.background_yields)
+    {
+        writes.push(Write::NixYields(settings.background_yields));
+    }
     writes
 }
 

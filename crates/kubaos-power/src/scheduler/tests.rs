@@ -15,6 +15,10 @@ fn lavd_on() -> Settings {
     Settings::parse("scheduler = \"lavd\"\n").expect("parses")
 }
 
+fn lavd_off() -> Settings {
+    Settings::parse("scheduler = \"kernel\"\n").expect("parses")
+}
+
 fn plan(stop: Stop, settings: &Settings) -> Plan {
     Plan::for_stop(stop, settings)
 }
@@ -97,7 +101,7 @@ fn an_asked_value_comes_to_lavds_command_line() {
 fn with_lavd_off_and_never_on_nothing_is_asked() {
     let root = FakeRoot::laptop();
 
-    let writes = writes(&plan(Stop::Balanced, &Settings::default()), &root.machine(), false);
+    let writes = writes(&plan(Stop::Balanced, &lavd_off()), &root.machine(), false);
 
     assert_eq!(writes, Vec::<Write>::new());
 }
@@ -108,7 +112,7 @@ fn turning_lavd_off_stops_it_while_its_mode_is_still_there() {
     root.install_lavd();
     asked_before(&root, "autopilot");
 
-    let writes = writes(&plan(Stop::Balanced, &Settings::default()), &root.machine(), false);
+    let writes = writes(&plan(Stop::Balanced, &lavd_off()), &root.machine(), false);
 
     assert_eq!(args(&writes), ["scheduler=off"]);
 }
@@ -258,7 +262,7 @@ fn the_last_error_is_lavds_exit_and_a_clean_stop_isnt_one() {
 fn lavd_off_reports_the_kernels_own_scheduler_and_agrees() {
     let root = FakeRoot::laptop();
 
-    let report = report(&plan(Stop::Balanced, &Settings::default()), &root.machine(), None, None);
+    let report = report(&plan(Stop::Balanced, &lavd_off()), &root.machine(), None, None);
 
     assert_eq!(report.running, "Linux's own (EEVDF)");
     assert!(report.agrees);

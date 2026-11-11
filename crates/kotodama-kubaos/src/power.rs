@@ -1,7 +1,7 @@
 //! "Power: what this stop does" in the menu: the stop now, with every layer it sets as a row,
 //! what it wants and what the machine says, read live when the Item runs. "CPU scheduler: status"
-//! beside it: which scheduler runs, why, and what is behind it. "What's draining the battery": the
-//! draw now and the top wakers, a short answer.
+//! beside it: which scheduler runs, why, what is behind it, and what background work yields.
+//! "What's draining the battery": the draw now and the top wakers, a short answer.
 //!
 //! # Owns
 //!
@@ -11,9 +11,9 @@
 //!
 //! - The rows: `kubaos_power::status`, read by `kubaos_power::live`; the scheduler's report:
 //!   `kubaos_power::scheduler`; the drain's answer: `kubaos_power::report`. The stops' own Items,
-//!   the charge limit, the low-battery drop, the critical-battery warning, LAVD on and off, the
-//!   measurement, the battery report and its toasts: actions of the registry
-//!   (`config/kotodama/kubaos.toml`), which run `kubaos-power`.
+//!   the charge limit, the low-battery drop, the critical-battery warning, LAVD on and off,
+//!   background work yielding on and off, the measurement, the battery report and its toasts:
+//!   actions of the registry (`config/kotodama/kubaos.toml`), which run `kubaos-power`.
 
 use kotodama_protocol::Action;
 use kotodama_protocol::Item;
@@ -85,7 +85,9 @@ pub fn scheduler_item() -> Item {
         kind: kind(SCHEDULER_KIND),
         identity: None,
         title: "CPU scheduler: status".to_owned(),
-        subtitle: Some("Which CPU scheduler runs, Linux's own or LAVD, and why".to_owned()),
+        subtitle: Some(
+            "Which CPU scheduler runs, Linux's own or LAVD, and why, and what background work yields".to_owned(),
+        ),
         icon: Some(SCHEDULER_ICON.to_owned()),
         keyword: None,
         keywords: [
@@ -97,6 +99,9 @@ pub fn scheduler_item() -> Item {
             "sched ext",
             "eevdf",
             "power stop",
+            "background work",
+            "yield",
+            "nice",
         ]
         .map(str::to_owned)
         .to_vec(),

@@ -211,6 +211,11 @@ impl SchedExt {
 pub const LAVD_ENV: &str = "var/lib/kubaos/scx-lavd.env";
 /// scx_lavd, linked to KubaOS's build by `install_scx` (`system/lib.sh`).
 pub const LAVD_BIN: &str = "usr/local/libexec/kubaos-scx-lavd";
+/// Nix's daemon, as the Nix installer puts its unit.
+pub const NIX_UNIT: &str = "etc/systemd/system/nix-daemon.service";
+/// The drop-in the root helper writes while background work yields: nix-daemon and its builds at
+/// a lower priority.
+pub const NIX_DROP_IN: &str = "etc/systemd/system/nix-daemon.service.d/kubaos-yields.conf";
 
 impl Machine {
     /// The real machine.
@@ -437,6 +442,12 @@ impl Machine {
     /// Whether scx_lavd is installed.
     pub fn has_lavd(&self) -> bool {
         self.path(LAVD_BIN).exists()
+    }
+
+    /// Whether Nix's builds yield: the root helper's drop-in for nix-daemon is in place. `None`
+    /// without nix-daemon.
+    pub fn nix_yields(&self) -> Option<bool> {
+        self.path(NIX_UNIT).exists().then(|| self.path(NIX_DROP_IN).exists())
     }
 
     fn batteries(&self) -> Vec<String> {

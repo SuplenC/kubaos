@@ -31,6 +31,7 @@ fn the_defaults_drop_to_power_saver_at_20_and_charge_full() {
     assert_eq!(settings.charge_limit, ChargeLimit::Full);
     assert!(settings.panel_power_saving);
     assert!(settings.battery_notes);
+    assert!(settings.background_yields);
     assert_eq!(settings.usb_skip, Vec::<UsbId>::new());
 }
 
@@ -116,19 +117,26 @@ fn every_change_lands_in_the_file() {
 }
 
 #[test]
-fn lavd_is_off_until_the_user_turns_it_on() {
+fn lavd_is_on_until_the_user_turns_it_off() {
     let (_dir, path) = file("# Measured first.\ncharge_limit = 100\n");
 
-    let on = set_scheduler(&path, CpuScheduler::Lavd).expect("on");
-    let text = fs::read_to_string(&path).expect("read");
     let off = set_scheduler(&path, CpuScheduler::Kernel).expect("off");
+    let text = fs::read_to_string(&path).expect("read");
+    let on = set_scheduler(&path, CpuScheduler::Lavd).expect("on");
     let after = fs::read_to_string(&path).expect("read");
 
-    assert_eq!(Settings::default().scheduler, CpuScheduler::Kernel);
-    assert_eq!(on.scheduler, CpuScheduler::Lavd);
-    assert_eq!(text, "# Measured first.\ncharge_limit = 100\nscheduler = \"lavd\"\n");
+    assert_eq!(Settings::default().scheduler, CpuScheduler::Lavd);
     assert_eq!(off.scheduler, CpuScheduler::Kernel);
+    assert_eq!(text, "# Measured first.\ncharge_limit = 100\nscheduler = \"kernel\"\n");
+    assert_eq!(on.scheduler, CpuScheduler::Lavd);
     assert_eq!(after, "# Measured first.\ncharge_limit = 100\n");
+}
+
+#[test]
+fn a_file_that_names_lavd_keeps_it() {
+    let settings = Settings::parse("scheduler = \"lavd\"\n").expect("parses");
+
+    assert_eq!(settings.scheduler, CpuScheduler::Lavd);
 }
 
 #[test]
@@ -246,4 +254,21 @@ fn battery_notes_off_is_a_line_and_on_removes_it() {
     assert!(written.contains("# my comment"));
     assert!(on.battery_notes);
     assert!(!fs::read_to_string(&path).expect("read").contains("battery_notes"));
+}
+
+#[test]
+fn background_yields_off_is_a_line_and_on_removes_it() {
+    let (_dir, path) = file("# my comment\ncharge_limit = 80\n");
+
+    let off = set_background_yields(&path, false).expect("off");
+    let written = fs::read_to_string(&path).expect("read");
+    let on = set_background_yields(&path, true).expect("on");
+
+    assert!(!off.background_yields);
+    assert_eq!(written, "# my comment\ncharge_limit = 80\nbackground_yields = false\n");
+    assert!(on.background_yields);
+    assert_eq!(
+        fs::read_to_string(&path).expect("read"),
+        "# my comment\ncharge_limit = 80\n"
+    );
 }

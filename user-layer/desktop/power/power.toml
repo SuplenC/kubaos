@@ -23,12 +23,17 @@
 # at 2 %, once each time it runs down, locked or not. From 3 to 20, or "off":
 # critical_warning = 5
 #
-# The CPU scheduler: "kernel" (Linux's own, EEVDF) or "lavd" (scx_lavd through sched_ext, which
-# puts input, the compositor and audio first, in a mode that follows the stop: powersave on the
-# fewest cores in Super Saver, powersave in Power Saver, autopilot in Balanced, performance above).
-# If LAVD fails, the kernel goes back to its own by itself. `kubaos power scheduler` says which
-# runs and why:
-# scheduler = "kernel"
+# The CPU scheduler: "lavd" (scx_lavd through sched_ext, which puts input, the compositor and
+# audio first, in a mode that follows the stop: powersave on the fewest cores in Super Saver,
+# powersave in Power Saver, autopilot in Balanced, performance above) or "kernel" (Linux's own,
+# EEVDF). If LAVD fails, the kernel goes back to its own by itself. `kubaos power scheduler` says
+# which runs and why:
+# scheduler = "lavd"
+#
+# Background work yields: compilers and build tools you start (cargo, rustc, make, gcc, clang,
+# the linkers) and Nix's builds run at nice 19, so the desktop, audio and the app you're in stay
+# smooth while they use every core. A build you're waiting on gets the CPU back with false:
+# background_yields = true
 #
 # A toast when a sleep over 30 min stayed out of deep sleep, or the laptop stayed awake over an
 # hour with the lid closed, on battery, with a button to `kubaos power report`. Silent when all is

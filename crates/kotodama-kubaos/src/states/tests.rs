@@ -330,7 +330,8 @@ fn the_power_settings_are_read_from_their_file_with_its_defaults() {
     let defaults = machine.read();
     machine.write(
         "config/kubaos/desktop/power/power.toml",
-        "panel_power_saving = false\nbattery_notes = false\nscheduler = \"lavd\"\nlow_battery_stop = \"off\"\ncritical_warning = \"off\"\n",
+        "panel_power_saving = false\nbattery_notes = false\nscheduler = \"kernel\"\nbackground_yields = false\n\
+         low_battery_stop = \"off\"\ncritical_warning = \"off\"\n",
     );
     let set = machine.read();
     machine.write("config/kubaos/desktop/power/power.toml", "scheduler = \"fifo\"\n");
@@ -338,12 +339,14 @@ fn the_power_settings_are_read_from_their_file_with_its_defaults() {
 
     assert_eq!(defaults.get(PANEL_POWER_SAVING), Some(&on(true)));
     assert_eq!(defaults.get(BATTERY_NOTES), Some(&on(true)));
-    assert_eq!(defaults.get(SCHEDULER), Some(&word("kernel")));
+    assert_eq!(defaults.get(SCHEDULER), Some(&word("lavd")));
+    assert_eq!(defaults.get(BACKGROUND_YIELDS), Some(&on(true)));
     assert_eq!(defaults.get(LOW_BATTERY), Some(&word("power-saver")));
     assert_eq!(defaults.get(CRITICAL_WARNING), Some(&on(true)));
     assert_eq!(set.get(PANEL_POWER_SAVING), Some(&on(false)));
     assert_eq!(set.get(BATTERY_NOTES), Some(&on(false)));
-    assert_eq!(set.get(SCHEDULER), Some(&word("lavd")));
+    assert_eq!(set.get(SCHEDULER), Some(&word("kernel")));
+    assert_eq!(set.get(BACKGROUND_YIELDS), Some(&on(false)));
     assert_eq!(set.get(LOW_BATTERY), Some(&word("off")));
     assert_eq!(set.get(CRITICAL_WARNING), Some(&on(false)));
     assert_eq!(broken.get(SCHEDULER), None);
@@ -443,6 +446,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         PANEL_POWER_SAVING,
         CRITICAL_WARNING,
         BATTERY_NOTES,
+        BACKGROUND_YIELDS,
         UNFREE,
         KEEP_AWAKE,
         PROXY,

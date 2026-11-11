@@ -14,11 +14,12 @@
 //! - The stops ([`stop`]) and what each sets ([`plan`], the one place a stop becomes its settings),
 //!   the user's settings ([`settings`]), what the service remembers ([`memory`]) and tells the
 //!   shell ([`runtime`]), which stop to be on ([`control`]), what to write on this machine
-//!   ([`machine`], [`writes`], [`panel`]), the CPU scheduler ([`scheduler`]), the file indexer's
-//!   pause ([`indexer`]), the critical-battery warning ([`warning`]), `status` ([`status`], read
-//!   live by [`live`]), `measure` ([`measure`]), and the battery's history: its file ([`history`]),
-//!   what is read for it ([`reading`]), when it is written and when a toast comes ([`recorder`]),
-//!   and the report and the menu's short answer on it ([`report`]).
+//!   ([`machine`], [`writes`], [`panel`]), the CPU scheduler ([`scheduler`]), background work's
+//!   lower priority ([`yields`]), the file indexer's pause ([`indexer`]), the critical-battery
+//!   warning ([`warning`]), `status` ([`status`], read live by [`live`]), `measure` ([`measure`]),
+//!   and the battery's history: its file ([`history`]), what is read for it ([`reading`]), when it
+//!   is written and when a toast comes ([`recorder`]), and the report and the menu's short answer
+//!   on it ([`report`]).
 //!
 //! # Not here
 //!
@@ -49,6 +50,7 @@ pub mod status;
 pub mod stop;
 pub mod warning;
 pub mod writes;
+pub mod yields;
 
 #[cfg(test)]
 mod fake;
