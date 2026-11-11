@@ -11,6 +11,7 @@ import { meter } from "../../lib/meter.ts";
 import { sparkline, minute } from "../../lib/meter.ts";
 import { makePill, type Pill, type PillOptions, paired, pill } from "../../lib/pill.ts";
 import { type Screen, screen } from "../../lib/sheet.ts";
+import { widestTime } from "../../lib/lock.ts";
 import { advance, clamped, text } from "../../lib/text.ts";
 import { length } from "../../lib/tokens.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
@@ -35,6 +36,20 @@ function control(content: Element[], tooltip: string, state: Shown, options: Int
 
 export const CLOCK = { kanji: "火", date: "Tue 27 Oct", time: "21:47", countdown: "Vacation 52 d 2 h" } as const;
 
+/**
+ * A pinned countdown as the clock says it, `seconds` left: to the minute as the clock beside it
+ * ("52 d 2 h", "3 h 12 min", "12 min"), and under a minute its seconds ("0:45"), never its name alone.
+ */
+export function countdownWords(name: string, seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (days > 0) return `${name} ${days} d ${hours} h`;
+  if (hours > 0) return `${name} ${hours} h ${minutes} min`;
+  if (minutes > 0) return `${name} ${minutes} min`;
+  return `${name} 0:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 export interface ClockOptions {
   readonly countdown?: string;
   readonly date?: string;
@@ -42,13 +57,25 @@ export interface ClockOptions {
   readonly state?: Shown;
 }
 
-/** The weekday's kanji in `accent`, the date in `body`, the time in `mono_large`, a countdown after. */
+/**
+ * The time in `body`, Geist's own proportional figures, centred in a slot as wide as the widest
+ * time a 24-hour clock shows, as the lock's bar clock is: the pill keeps its width as the minutes
+ * turn, and the bar's steps never meet a wider time than they were laid out for.
+ */
+export function clockTime(time: string = CLOCK.time, color = "on_surface"): HTMLElement {
+  const shown = text(time, "body", color);
+  shown.classList.add("shell-clock-time");
+  shown.style.setProperty("--slot", String(widestTime("body", false)));
+  return shown;
+}
+
+/** The weekday's kanji in `accent`, the date in `body`, the time in its slot, a countdown after. */
 export function clockPill(options: ClockOptions = {}): HTMLElement {
   return control(clockContent(options), "Tuesday, 27 October 2026", options.state ?? "rest");
 }
 
 export function clockContent(options: ClockOptions = {}): Element[] {
-  const parts: Element[] = [text(CLOCK.kanji, "accent", "tertiary"), text(options.date ?? CLOCK.date, "body", "on_surface_variant"), text(options.time ?? CLOCK.time, "mono_large", "on_surface")];
+  const parts: Element[] = [text(CLOCK.kanji, "accent", "tertiary"), text(options.date ?? CLOCK.date, "body", "on_surface_variant"), clockTime(options.time)];
   if (options.countdown) parts.push(text(options.countdown, "body", "tertiary"));
   return parts;
 }
@@ -400,7 +427,7 @@ export function compactClock(options: CompactClock = {}): HTMLElement {
   if (options.kanji ?? true) parts.push(text(CLOCK.kanji, "accent", ink("tertiary")));
   const date = options.date ?? "full";
   if (date !== "none") parts.push(text(date === "full" ? CLOCK.date : "Tue 27", "body", ink("on_surface_variant")));
-  parts.push(text(CLOCK.time, "mono_large", ink("on_surface")));
+  parts.push(clockTime(CLOCK.time, ink("on_surface")));
   if (options.countdown) parts.push(text(CLOCK.countdown, "body", ink("tertiary")));
   return control(parts, recording ? "Recording. Tuesday, 27 October 2026" : "Tuesday, 27 October 2026", options.state ?? "rest", recording ? { tone: "recording" } : {});
 }
