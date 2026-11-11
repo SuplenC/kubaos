@@ -438,7 +438,7 @@ Each component has a page of its own under `design/components/`: its constructor
 **Keys**
 
 - [Keycap and KeyHints](design/components/keycap.md)
-- [RollingNumber](design/components/rolling-number.md)
+- [Shortcuts](design/components/shortcuts.md)
 
 **Inputs**
 

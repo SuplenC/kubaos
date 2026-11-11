@@ -10,9 +10,10 @@
 // with its control's lit state. It never takes the pointer.
 
 import { raise, type Step } from "./elevation.ts";
-import { stack } from "./layout.ts";
+import { keycap, keys } from "./keycap.ts";
+import { row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
-import { wrapped } from "./text.ts";
+import { text, wrapped } from "./text.ts";
 
 /**
  * `content` on a popover `size.menu` wide, raised to `step`, at the control radius: `space.s4`
@@ -32,6 +33,20 @@ export function tooltip(title: string, body: string, extra?: Element): HTMLEleme
   card.className = "k-tooltip";
   card.append(popover(4, stack("s8", "start", words, ...(extra ? [extra] : []))));
   return probe(card, { role: "component", name: "Tooltip", variant: "", fixed: { width: true, height: false } });
+}
+
+/**
+ * The card for a control its name says enough about, with its key: the name in `body_strong` and
+ * the key's keycaps `space.s12` after it, on one line, `space.s4` apart, as wide as they are. Every
+ * control that has a key and no words to add takes it, so a surface can drop its key hints.
+ */
+export function keyTooltip(title: string, combination: string): HTMLElement {
+  const caps = row("s4", "centre", ...keys(combination).map(keycap));
+  const card = document.createElement("span");
+  card.className = "k-tooltip";
+  card.dataset.line = "";
+  card.append(popover(4, row("s12", "centre", text(title, "body_strong"), caps)));
+  return probe(card, { role: "component", name: "Tooltip", variant: "key", fixed: { width: false, height: true } });
 }
 
 /** Where a card floats from its control: above it, or below where there is no room above. */

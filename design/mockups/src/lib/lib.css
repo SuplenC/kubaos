@@ -1350,6 +1350,55 @@
   --fill-night: var(--color-surface_container_high);
 }
 
+/* A tooltip's name and key on one line: as wide as they are, `size.menu` at most. */
+.k-tooltip[data-line] > .k-popover {
+  width: max-content;
+  max-width: var(--size-menu);
+}
+
+/* The shortcuts popover (`lib/shortcuts.ts`): `size.panel` wide, each row as tall as a compact row,
+   its keys in a column at its end. */
+.k-popover.k-shortcuts {
+  --popover-width: var(--size-panel);
+}
+
+.k-shortcut-groups,
+.k-shortcut-group,
+.k-shortcut {
+  align-self: stretch;
+}
+
+.k-shortcut {
+  justify-content: space-between;
+  min-height: var(--size-row_compact);
+}
+
+.k-shortcut-keys {
+  flex: none;
+}
+
+/* Over its button, `space.s8` above it from its start, fading in over `long` as a panel arrives and
+   out over `medium`; its button's tooltip stays away while it is open. */
+.k-shortcuts-anchor > .k-shortcuts {
+  position: absolute;
+  z-index: 4;
+  bottom: calc(100% + var(--space-s8));
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.k-shortcuts-anchor[data-open] > .k-shortcuts {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.k-shortcuts-anchor[data-open] > .k-tooltip {
+  visibility: hidden;
+}
+
 .k-popover:has(> .k-menu) {
   padding: var(--space-s4);
 }
