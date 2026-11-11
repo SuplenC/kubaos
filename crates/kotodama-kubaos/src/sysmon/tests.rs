@@ -96,6 +96,26 @@ fn ram_is_answered_in_the_top_row() {
 }
 
 #[test]
+fn ram_says_how_much_zswap_holds_and_in_how_little() {
+    let dir = machine();
+    write(
+        dir.path(),
+        "proc/meminfo",
+        "MemTotal: 16777216 kB\nMemAvailable: 4194304 kB\nSwapTotal: 8388608 kB\nSwapFree: 4194304 kB\n\
+         Zswap: 1048576 kB\nZswapped: 3145728 kB\n",
+    );
+    let mut monitor = Monitor::new(dir.path(), None);
+
+    let results = monitor.live("ram", NOW);
+
+    let subtitle = results[0].item.subtitle.as_deref().unwrap_or_default();
+    assert!(
+        subtitle.ends_with(" · swap 4.0 GB of 8.0 GB · zswap 3.0 GB in 1.0 GB"),
+        "{subtitle}"
+    );
+}
+
+#[test]
 fn the_battery_says_its_draw_and_time_left() {
     let dir = machine();
     let mut monitor = Monitor::new(dir.path(), None);
