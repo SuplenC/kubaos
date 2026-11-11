@@ -159,8 +159,8 @@ export default page({
     daylight: doesntApply("it draws in its wallpaper's night scheme in either mode."),
   },
   variants: [
-    { name: "Rest, a cut-out", for: "Shinjuku: towers before the digits' feet", sample: () => still({ phase: "rest", wallpaper: PURPLE_HOUR }) },
-    { name: "Rest, a dark sky", for: "Tokyo Tower: the spire crosses a digit", sample: () => still({ phase: "rest", wallpaper: TOWER }) },
+    { name: "Rest, a cut-out", for: "Shinjuku: the skyline clips the digits", sample: () => still({ phase: "rest", wallpaper: PURPLE_HOUR }) },
+    { name: "Rest, a dark sky", for: "Tokyo Tower: centred like the rest", sample: () => still({ phase: "rest", wallpaper: TOWER }) },
     { name: "Rest, no cut-out", for: "Shibuya, as a picture of your own", sample: () => still({ phase: "rest", wallpaper: SHIBUYA }) },
     { name: "Awake", for: "frame in, picture blurred, the sheet up", sample: () => still({ phase: "awake", wallpaper: PURPLE_HOUR }) },
     { name: "Awake, no cut-out", for: "Shibuya, in its own night scheme", sample: () => still({ phase: "awake", wallpaper: SHIBUYA }) },
@@ -229,6 +229,8 @@ export default page({
     measures: [
       { part: "Rest clock, of screen height", token: "scale-lock_clock" },
       { part: "Rest clock, of screen width", token: "scale-lock_clock_width" },
+      { part: "Digits' baseline, of screen height", token: "scale-lock_clock_base" },
+      { part: "The same, portrait", token: "scale-lock_clock_base_portrait" },
       { part: "Portrait: widest time → edges", token: "space-s32" },
       { part: "Rest clock at 1080", token: "type-clock_rest-size" },
       { part: "Awake clock's step", token: "scale-clock_awake" },
@@ -252,7 +254,7 @@ export default page({
       { part: "Awake blur", token: "size-lock_blur" },
     ],
     reflow: {
-      note: "The picture covers the screen; the clock keeps its place on it, `space.s32` inside the edges.",
+      note: "The picture covers the screen; the clock stays centred, its baseline the screen's share of its height down.",
       sample: reflow,
     },
   },

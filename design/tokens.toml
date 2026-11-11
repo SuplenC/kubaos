@@ -855,6 +855,11 @@ clock_awake = 0.2
 # from the width, the widest time it can show filling the width less `space.s32` either side.
 lock_clock = 0.3556
 lock_clock_width = 0.2
+# Where the lock's rest clock stands, the same on every wallpaper: centred, its digits' baseline
+# this share of the screen's height down, on a wide screen and on a portrait one. Only the clock's
+# tint and the city's clipping differ between wallpapers.
+lock_clock_base = 0.5024
+lock_clock_base_portrait = 0.4
 # The kicker over it, as shares of the clock's size: the date's size (20 beside 384), and the gap
 # from the digits' cap top to the kicker's baseline (40 beside 384); on a portrait screen bigger and
 # higher, so it reads over a tall picture (48 and 104 beside 416).

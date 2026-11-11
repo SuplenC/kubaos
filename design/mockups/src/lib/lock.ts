@@ -2,8 +2,8 @@
 // alone, drawn on a screen with its frame (`lib/sheet.ts`).
 //
 // At rest it is the wallpaper and its clock: the digits in `type.clock_rest` under a kicker line
-// (where and which day, then the date), placed on the picture where the wallpaper says, and the
-// picture's foreground cut-out, where it has one, drawn over the digits so the city stands in front
+// (where and which day, then the date), centred on the screen with their baseline `scale.lock_clock_base`
+// of its height down (the same place on every wallpaper), and the picture's foreground cut-out, where it has one, drawn over the digits so the city stands in front
 // of the clock. The digits and the kicker are a light tint of the picture behind the digits, so
 // they read as part of it, the kicker lifted off it by a halo of `surface` round each letter.
 //
@@ -65,16 +65,6 @@ export interface Wallpaper {
   readonly depth?: Depth;
   /** The roles matugen derives from it in its night scheme. */
   readonly night: NightScheme;
-  /**
-   * Where the rest clock stands on it: the middle of its digits' baseline, as shares of the
-   * picture's width and height, so it keeps its place against the city however the screen crops it.
-   */
-  readonly clock: { readonly x: number; readonly y: number };
-  /**
-   * Where it stands on a portrait screen, which crops the picture to a tall strip and makes the
-   * clock as wide as the strip: higher, in the sky. The wide place when it has none.
-   */
-  readonly portrait?: { readonly x: number; readonly y: number };
 }
 
 /**
@@ -285,10 +275,8 @@ export function lock(options: LockOptions): Lock {
   }
   hang(shown, rising);
 
-  // The rest clock's place is the picture's, which only the picture's size and the screen's know:
-  // the screen crops the picture as `object-fit: cover` does, the push scales that round the middle
-  // of the screen's bottom edge, and the clock follows the sky on the desktop's picture and the
-  // pushed one: it stands in front of the sky and behind the city.
+  // The rest clock stands in the screen's place, the same on every wallpaper, in front of the sky
+  // and behind the city; the city's cut-out clips the digits wherever it happens to cross them.
   // The clock's tint is the picture's colour under the digits at rest, read off the picture
   // itself. The bar's clock is where the pill's layout puts its time, which only layout knows.
   // Placing reads the layout and writes styles; done for every lock at once in phases (`placeAll`),
@@ -329,18 +317,13 @@ export function lock(options: LockOptions): Lock {
     const kickerSize = whole(Math.max(token("size-lock_date_least"), wantedWidth > width - 2 * margin ? (wanted * (width - 2 * margin)) / wantedWidth : wanted));
     const kickerGrown = kickerSize / token("type-clock_date-size");
     const kickerGap = whole(number(portrait ? "scale-lock_date_gap_portrait" : "scale-lock_date_gap") * restSize);
-    const kickerWidth = Math.ceil(placeNatural * kickerGrown * px - 0.001) + Math.ceil(dateNatural * kickerGrown * px - 0.001);
     const natural = digitsWidth(time) * grown;
     const restDigits = Math.ceil(natural * px - 0.001);
-    const half = Math.max(kickerWidth, restDigits) / 2;
-    const spot = portrait ? (wallpaper.portrait ?? wallpaper.clock) : wallpaper.clock;
-    // Held `space.s32` inside the edges; a clock or kicker wider than that room is centred.
-    const restOn = (cover: Cover) => ({
-      cx: margin + half > width - margin - half ? width / 2 : Math.min(width - margin - half, Math.max(margin + half, cover.left + spot.x * seen.width * cover.scale)),
-      top: Math.round(cover.top + spot.y * seen.height * cover.scale - cap * restSize),
-    });
-    const restFlat = restOn(flat);
-    const rest = restOn(pushed);
+    // One place on every wallpaper, the screen's, not the picture's: centred, its digits' baseline
+    // `scale.lock_clock_base` of the screen's height down (`scale.lock_clock_base_portrait` on a
+    // portrait screen). A city with depth clips the digits wherever it happens to stand over them.
+    const base = number(portrait ? "scale-lock_clock_base_portrait" : "scale-lock_clock_base") * height;
+    const rest = { cx: width / 2, top: Math.round(base - cap * restSize) };
     clock.style.setProperty("--digits-natural", String(natural));
     clock.style.setProperty("--rest-size", `${restSize}px`);
     clock.style.setProperty("--kicker-size", `${kickerSize}px`);
@@ -351,10 +334,7 @@ export function lock(options: LockOptions): Lock {
     clock.style.setProperty("--cap-height", String(cap));
     clock.style.setProperty("--bar-natural", String(advance("body", time)));
     clock.style.setProperty("--middle", `${width / 2}px`);
-    clock.style.setProperty("--rest-cx-flat", `${restFlat.cx}px`);
-    clock.style.setProperty("--rest-top-flat", `${restFlat.top}px`);
-    clock.style.setProperty("--rest-cx-pushed", `${rest.cx}px`);
-    clock.style.setProperty("--rest-top-pushed", `${rest.top}px`);
+    clock.style.setProperty("--rest-top-at", `${rest.top}px`);
     clock.style.setProperty("--city-flat-left", `${flat.left}px`);
     clock.style.setProperty("--city-flat-top", `${flat.top}px`);
     clock.style.setProperty("--city-flat-width", `${seen.width * flat.scale}px`);
