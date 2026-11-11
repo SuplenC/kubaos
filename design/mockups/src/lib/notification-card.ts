@@ -56,6 +56,11 @@ export interface CardOptions {
   readonly opens?: boolean;
   /** Answers the pointer and Enter: unfolds and folds itself. */
   readonly live?: boolean;
+  /**
+   * The unread dot on its tile, while it is unread: where read and unread sit side by side, as in the
+   * panel and the peek. A popup is new by being one, so the card it opens into has none.
+   */
+  readonly dot?: boolean;
   /** Takes Tab itself, as a card alone on a page does; in a list the list has the keyboard. */
   readonly focusable?: boolean;
   /** What a click on a card that opens its stack does. */
@@ -120,7 +125,7 @@ export function card(note: Note, options: CardOptions = {}): HTMLElement {
   const tile = document.createElement("span");
   tile.className = "k-notif-tile";
   tile.append(iconTile({ glyph: note.critical ? "warning" : "notifications", size: "Sm", danger: note.critical ?? false, ...(note.photo ? { photo: note.photo } : {}) }));
-  if (note.unread) tile.append(badge({ accent: true }));
+  if (note.unread && (options.dot ?? true)) tile.append(badge({ accent: true }));
   const app = clamped(note.app || "Notification", "label");
   app.classList.add("k-notif-app");
   const who = document.createElement("span");

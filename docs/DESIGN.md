@@ -464,7 +464,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Badge and BadgedIcon](design/components/badge.md)
 - [Skeleton](design/components/skeleton.md)
 - [Card and ChoiceCard](design/components/card.md)
-- [NotificationCard](design/components/notification-card.md)
+- [NotificationCard and NotificationPopup](design/components/notification-card.md)
 - [NotificationGroup](design/components/notification-group.md)
 - [Media](design/components/media.md)
 - [PictureChoice](design/components/picture-choice.md)
