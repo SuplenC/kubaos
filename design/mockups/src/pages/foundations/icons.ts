@@ -23,6 +23,7 @@ const OURS: Record<string, { readonly drawn: string; readonly relatives: readonl
   wifi_find: { drawn: "Tabler's Wi-Fi fan, stopped 2 units clear of its search", relatives: ["wifi", "search"] },
   bluetooth_searching: { drawn: "Tabler's bluetooth-x, a magnifier for its x", relatives: ["bluetooth", "search"] },
   star_filled: { drawn: "Tabler's star filled, its outline kept", relatives: ["star"] },
+  more: { drawn: "New, the mockups' alone so far: three dots on the grid, the bar's ⋯", relatives: ["expand_more"] },
 };
 
 /** The sizes a symbol is drawn at beside text, in the set's cells. */
