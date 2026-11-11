@@ -71,6 +71,7 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
   element.toggleAttribute("data-raised", (options.fan ?? 0) > 0);
 
   const slots: HTMLElement[] = [];
+  const shades: HTMLElement[] = [];
   const faces: CardElement[] = [];
   notes.forEach((note, k) => {
     const slot = document.createElement("span");
@@ -103,9 +104,15 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
       slot.append(tucked);
     }
     if (k < fanCount) {
+      // Its shadow, straight under it on what holds it: in a layer under every card, so it falls on
+      // the list and the gaps, never on the card beside it or the unread dot that card's tile carries.
+      const shade = document.createElement("span");
+      shade.className = "k-notif-slot k-notif-shade";
+      for (const name of ["--k-rx", "--k-ry", "--k-spread"]) shade.style.setProperty(name, slot.style.getPropertyValue(name));
       const lift = document.createElement("span");
       lift.className = "k-notif-lift";
-      slot.prepend(lift);
+      shade.append(lift);
+      shades.push(shade);
     }
     slot.append(face);
     slots.push(slot);
@@ -143,7 +150,7 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
   under.style.setProperty("--k-inset", `calc(var(--space-s8) * ${edges})`);
   under.hidden = edges === 0;
 
-  element.append(under, catcher, ...slots, moreLine, heading);
+  element.append(under, catcher, ...shades, ...slots, moreLine, heading);
 
   /** The cards' heights and where each sits spread, as the CSS works the boxes out from. */
   const layout = () => {
@@ -158,7 +165,8 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
       y += h + gap;
       return at;
     });
-    slots.forEach((slot, k) => {
+    [...slots, ...shades].forEach((slot, at) => {
+      const k = at < slots.length ? at : at - slots.length;
       slot.style.setProperty("--k-off", `${offsets[k]}px`);
       slot.style.setProperty("--k-h", `${heights[k]}px`);
     });

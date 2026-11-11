@@ -294,7 +294,7 @@
    foot and the two slivers under its rounded corners. So a lit card's glow runs round the stack
    instead of washing over the cards behind it, with no edge of its own cut across them. The card
    above is `space.s8` wider each side and `space.s8` higher, its corner the card's. */
-.k-notif-group[data-stacked]:not([data-raised], [data-open]) > .k-notif-slot:not([data-newest], .k-notif-catcher, .k-notif-more) {
+.k-notif-group[data-stacked]:not([data-raised], [data-open]) > .k-notif-slot:not([data-newest], .k-notif-catcher, .k-notif-more, .k-notif-shade) {
   --cw: calc(var(--notif-corner) - var(--space-s8));
   --cy: calc(var(--h0) - var(--space-s8) - var(--notif-corner));
   z-index: var(--rest-z);
@@ -366,6 +366,12 @@
 .k-notif-catcher {
   z-index: 0;
   --h0: var(--rest-h);
+}
+
+/* The spread cards' shadows, under every card. */
+.k-notif-shade {
+  z-index: 1;
+  pointer-events: none;
 }
 
 .k-notif-group[data-open] > .k-notif-catcher {
