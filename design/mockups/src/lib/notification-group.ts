@@ -10,6 +10,8 @@ import { chip } from "./chip.ts";
 import { fill, row } from "./layout.ts";
 import { type CardElement, card, CORNER, type Note } from "./notification-card.ts";
 import { raise } from "./elevation.ts";
+import { raw } from "./tokens.ts";
+import { settings } from "../site/settings.ts";
 import { probe } from "./probe.ts";
 import { clamped, text } from "./text.ts";
 
@@ -28,6 +30,11 @@ export interface GroupOptions {
   /** Its preview spreading or tucking in, for an owner fading the rows behind it. */
   readonly onRaise?: (raised: boolean) => void;
   readonly onOpen?: (open: boolean) => void;
+}
+
+/** The duration token `name` in milliseconds under the speed setting. */
+function ms(name: string): number {
+  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
 }
 
 /** A group with what its owner moves it by. */
@@ -121,7 +128,14 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
   heading.style.zIndex = String((count + 2) * 3);
   heading.toggleAttribute("data-shown", open);
 
-  element.append(...slots, moreLine, heading);
+  // Under the cards, the whole preview, gaps included, from the newest card's top to the line under
+  // the spread: the pointer crossing from one spread card to the next never leaves the group. It
+  // grows and shrinks with `--fan`, so it follows the cards as they move, and goes while it is open.
+  const catcher = document.createElement("span");
+  catcher.className = "k-notif-catcher k-notif-slot";
+  for (const [name, value] of [["--k-rx", "0px"], ["--k-ry", "0px"], ["--k-spread", "1"], ["--k-off", "0px"]]) catcher.style.setProperty(name!, value!);
+
+  element.append(catcher, ...slots, moreLine, heading);
 
   /** The cards' heights and where each sits spread, as the CSS works the boxes out from. */
   const layout = () => {
@@ -149,6 +163,9 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
     moreLine.style.setProperty("--k-spread", "1");
     moreLine.style.setProperty("--k-off", `${(offsets[fanLast] ?? 0) + (heights[fanLast] ?? 0) + gap}px`);
     moreLine.style.setProperty("--k-h", "0px");
+    const spread = (offsets[fanLast] ?? 0) + (heights[fanLast] ?? 0);
+    const line = (moreLine.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0;
+    catcher.style.setProperty("--k-h", `${more > 0 ? spread + gap + line : spread}px`);
   };
   new ResizeObserver(layout).observe(element);
   for (const face of faces) new ResizeObserver(layout).observe(face);
@@ -178,6 +195,7 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
   let armed = false;
   let shut = false;
   let dwell = 0;
+  let settle = 0;
   const preview = (on: boolean) => {
     refade();
     element.toggleAttribute("data-fanning", on);
@@ -192,18 +210,26 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
   });
   if (options.live && count > 1) {
     element.addEventListener("pointerenter", () => {
-      if (open || shut) return;
+      window.clearTimeout(settle);
+      if (open || shut || armed) return;
       window.clearTimeout(dwell);
       dwell = window.setTimeout(() => {
         armed = true;
         if (!open) preview(true);
-      }, Number.parseFloat(getComputedStyle(element).getPropertyValue("--motion-medium")) || 250);
+      }, ms("medium"));
     });
+    // Let go once the hover has settled, `duration.instant` later (a turn of the event loop), not as
+    // it changes: a card moving under the pointer or the catcher growing can pass it between parts
+    // of the group on the way, and letting go there would tuck the preview the moment it spreads.
     element.addEventListener("pointerleave", () => {
-      window.clearTimeout(dwell);
-      shut = false;
-      if (armed) preview(false);
-      armed = false;
+      window.clearTimeout(settle);
+      settle = window.setTimeout(() => {
+        if (element.matches(":hover")) return;
+        window.clearTimeout(dwell);
+        shut = false;
+        if (armed) preview(false);
+        armed = false;
+      }, ms("instant"));
     });
     // A click on the tucked edges or the preview under the newest card opens the group.
     element.addEventListener("click", (event) => {
