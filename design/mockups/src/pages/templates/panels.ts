@@ -6,7 +6,6 @@
 
 import "./panels.css";
 import wallpaper from "../../../../../crates/kubaos-kobo/assets/wallpaper.jpg?url";
-import { button } from "../../lib/button.ts";
 import { calendar } from "../../lib/calendar.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { emptyState } from "../../lib/empty-state.ts";
@@ -142,8 +141,6 @@ export interface PanelChoice {
   readonly subtitle?: string;
   readonly down?: number;
   readonly fadePinned?: boolean;
-  /** A footer band with its action, as a sample of the band. */
-  readonly footer?: boolean;
   /** The header's actions left out: a panel with none. */
   readonly bare?: boolean;
   /** Its first action pinned lit, as with the keyboard on it. */
@@ -153,7 +150,6 @@ export interface PanelChoice {
 export function system(choice: PanelChoice = {}): PanelPage {
   return panelPage({
     ...options(choice, "system", [action("terminal", "Open btop", choice.lit)], systemBody(choice.state, choice.count)),
-    ...(choice.footer ? { footer: [button({ label: "Open btop", kind: "Tonal", size: "Sm" })] } : {}),
   });
 }
 
