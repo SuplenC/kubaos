@@ -9,6 +9,7 @@ import { button } from "./button.ts";
 import { chip } from "./chip.ts";
 import { fill, row } from "./layout.ts";
 import { type CardElement, card, CORNER, type Note } from "./notification-card.ts";
+import { raise } from "./elevation.ts";
 import { probe } from "./probe.ts";
 import { clamped, text } from "./text.ts";
 
@@ -59,6 +60,7 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
   element.style.setProperty("--fan", String(options.fan ?? 0));
   element.style.setProperty("--opening", open ? "1" : "0");
   element.toggleAttribute("data-open", open);
+  element.toggleAttribute("data-stacked", count > 1);
   element.toggleAttribute("data-raised", (options.fan ?? 0) > 0);
 
   const slots: HTMLElement[] = [];
@@ -72,6 +74,7 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
     slot.style.setProperty("--k-spread", k < fanCount ? "1" : "0");
     slot.style.zIndex = String((count - k) * 3 + 1);
     slot.toggleAttribute("data-newest", k === 0);
+    slot.toggleAttribute("data-lowest", k === edges && k > 0);
     const face = card(note, {
       count: k === 0 && !open ? count : 1,
       opens: k === 0 && count > 1,
@@ -82,8 +85,13 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
       onDismiss: () => options.onDismiss?.(k === 0 && !open ? -1 : k),
     }) as CardElement;
     if (k > 0) {
-      const tucked = document.createElement("span");
-      tucked.className = "k-notif-edge";
+      // A tucked card stands on the ladder's step 1, so its peek reads against the panel by day and
+      // by night; the card above casts its contact layer onto it, cut to its shape.
+      const tucked = raise(document.createElement("span"), 1);
+      tucked.className += " k-notif-edge";
+      const cast = document.createElement("span");
+      cast.className = "k-notif-cast";
+      tucked.append(cast);
       slot.append(tucked);
     }
     if (k < fanCount) {
@@ -95,16 +103,6 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
     slots.push(slot);
     faces.push(face);
   });
-
-  // Each card's shadow cast onto the edges tucked under it.
-  const casts: HTMLElement[] = [];
-  for (let k = 0; k < edges; k++) {
-    const cast = document.createElement("span");
-    cast.className = "k-notif-cast";
-    cast.style.zIndex = String((count - k) * 3 - 1);
-    cast.append(document.createElement("span"));
-    casts.push(cast);
-  }
 
   const more = count - fanCount;
   const moreLine = document.createElement("span");
@@ -123,7 +121,7 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
   heading.style.zIndex = String((count + 2) * 3);
   heading.toggleAttribute("data-shown", open);
 
-  element.append(...slots, ...casts, moreLine, heading);
+  element.append(...slots, moreLine, heading);
 
   /** The cards' heights and where each sits spread, as the CSS works the boxes out from. */
   const layout = () => {
@@ -151,20 +149,6 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
     moreLine.style.setProperty("--k-spread", "1");
     moreLine.style.setProperty("--k-off", `${(offsets[fanLast] ?? 0) + (heights[fanLast] ?? 0) + gap}px`);
     moreLine.style.setProperty("--k-h", "0px");
-    // The cast shadows: card k's, cut to the edges under it.
-    casts.forEach((cast, k) => {
-      const below = Math.min(k + 1, edges);
-      const top = below * gap;
-      cast.style.left = `${below * gap}px`;
-      cast.style.right = `${below * gap}px`;
-      cast.style.top = `${top}px`;
-      cast.style.height = `${h0 + (edges - below) * gap}px`;
-      const shadow = cast.firstElementChild as HTMLElement;
-      shadow.style.left = `${k * gap - below * gap}px`;
-      shadow.style.width = `calc(100% + ${2 * (below - k) * gap}px)`;
-      shadow.style.top = `${k * gap - top}px`;
-      shadow.style.height = `${h0}px`;
-    });
   };
   new ResizeObserver(layout).observe(element);
   for (const face of faces) new ResizeObserver(layout).observe(face);
