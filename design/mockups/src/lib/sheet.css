@@ -242,6 +242,46 @@
   mask: radial-gradient(var(--sheet-flare) var(--sheet-base) at 100% 0, transparent 100%, #000 calc(100% + 1px));
 }
 
+/* A corner sheet: on the top edge, flush with the right edge. It curves into the top edge at its
+   start and into the right edge under it, through a fillet that grows with its depth, as one into a
+   perpendicular edge does; its one far corner is the bottom left. */
+.k-sheet-part[data-edge="top"][data-corner] {
+  left: auto;
+  right: var(--frame-side);
+}
+
+.k-sheet-surface[data-edge="top"][data-corner] {
+  border-radius: 0 0 0 var(--sheet-far);
+}
+
+.k-sheet-surface[data-edge="top"][data-corner]::after {
+  top: 100%;
+  left: auto;
+  right: 0;
+  width: var(--sheet-flare);
+  height: var(--sheet-into);
+  mask: radial-gradient(var(--sheet-flare) var(--sheet-into) at 0 100%, transparent 100%, #000 calc(100% + 1px));
+}
+
+/* A right-edge sheet starting below the bar, under another panel: both its ends are short of a
+   perpendicular edge, so each meets the right edge through a base fillet, and both far corners round. */
+.k-sheet-part[data-edge="right"][data-start] {
+  top: calc(var(--frame-top) + var(--sheet-start));
+}
+
+.k-sheet-surface[data-edge="right"][data-start] {
+  border-radius: var(--sheet-far) 0 0 var(--sheet-far);
+}
+
+.k-sheet-surface[data-edge="right"][data-start]::before {
+  top: auto;
+  bottom: 100%;
+  right: 0;
+  width: var(--sheet-base);
+  height: var(--sheet-flare);
+  mask: radial-gradient(var(--sheet-base) var(--sheet-flare) at 0 0, transparent 100%, #000 calc(100% + 1px));
+}
+
 /* The content's box cuts what isn't out yet; its content rides on the far edge, so it slides out
    from under the frame, and fades in a beat after the surface moves: from a fifth of the way open
    to three quarters. */

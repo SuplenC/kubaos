@@ -1,9 +1,12 @@
 // The bell's peek: `config/quickshell/modules/notifications/Peek.qml`. The most recent unread
-// notifications in the popups' place while the bar asks for it, with one-click actions on them.
+// notifications in the popup stack's place while the bar asks for it, with one-click actions on them.
 
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
-import { BUILD, cornerOnScreen, group, type Note, peekFooter, SIGNAL, SLACK, stackOf } from "./notification-parts.ts";
+import type { Note } from "../../lib/notification-card.ts";
+import { group } from "../../lib/notification-group.ts";
+import { BUILD, SIGNAL, SLACK } from "../notifications.ts";
+import { cornerOnScreen, peekFooter, stackOf } from "./notification-parts.ts";
 
 type Shown = "rest" | "lit" | "open";
 
@@ -20,7 +23,7 @@ const ON = "the peek";
 
 const OPENS: Move = {
   name: "Opens",
-  what: "The bar asks for it: it grows down from the corner as the popups' sheet does.",
+  what: "The bar asks for it: it grows down from the corner as the popup stack's sheet does.",
   tracks: [{ part: "the sheet", on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" }],
   reduced: [{ part: "the sheet", on: ON, target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
   back: "cuts",
@@ -40,7 +43,7 @@ export default page<Shown>({
   level: "shell",
   slug: "notification-peek",
   title: "Notification peek",
-  lede: "The bell's peek: the latest unread, in the popups' place, with Mark all read and Clear.",
+  lede: "The bell's peek: the latest unread, in the popup stack's place, with Mark all read and Clear.",
   code: { qml: "Peek" },
   stage: {
     live: () => peek({ live: true }),

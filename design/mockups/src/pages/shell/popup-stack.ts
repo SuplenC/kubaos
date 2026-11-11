@@ -1,15 +1,22 @@
-// The notification popups: `config/quickshell/modules/notifications/Popups.qml`, `ToastList.qml`,
-// `PopupHold.qml` and `PopupsBelow.qml`. New notifications in the frame's top right corner, one
-// app's in a group, each leaving when its time is up unless the pointer holds the stack.
+// The PopupStack page: `docs/design/components/popup-stack.md`, the shell's `Popups.qml`,
+// `ToastList.qml`, `PopupHold.qml` and `PopupsBelow.qml` today. New notifications on a corner sheet in
+// the frame's top right, one app's in a group, each leaving when its time is up unless the pointer
+// holds the stack; critical ones under a panel that covers the corner.
 
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { ALL } from "../../site/settings.ts";
-import { BATTERY, BUILD, cornerOnScreen, CRITICAL, group, type GroupOptions, type Note, SLACK, stackOf, UPDATE } from "./notification-parts.ts";
+import type { Note } from "../../lib/notification-card.ts";
+import { group, type GroupOptions } from "../../lib/notification-group.ts";
+import { BATTERY, BUILD, CRITICAL, SLACK, UPDATE } from "../notifications.ts";
+import { belowOnScreen, cornerOnScreen, stackOf } from "./notification-parts.ts";
 
 type Shown = "rest" | "lit" | "open";
 
-/** The popups' timeout: the shell's setting, `Settings.notificationTimeout`, not a design token. */
+/**
+ * How long a popup shows: the shell's setting, `Settings.notificationTimeout` (its default here), not a
+ * design token; a notification may ask for its own.
+ */
 const TIMEOUT = 6000;
 
 /** A stack of popups on the screen's corner, each group a popup. */
@@ -99,22 +106,22 @@ const IN_STATE = (state: Shown) => popups([[BUILD], [BATTERY]], { remaining: sta
 
 export default page<Shown>({
   level: "shell",
-  slug: "notification-popups",
-  title: "Notification popups",
+  slug: "popup-stack",
+  title: "PopupStack",
   lede: "New notifications in the frame's top right corner, each gone when its time is up.",
-  code: { qml: "Popups" },
+  code: { qml: "PopupStack", unbuilt: "QML: still Popups and ToastList" },
   stage: {
     live,
     hint: "point at the stack to hold it",
     daylight: true,
   },
   variants: [
-    { name: "One", for: "a card with its time left", sample: () => popups([[BUILD]], { remaining: 0.7 }) },
+    { name: "One", for: "its time left; its length from Settings", sample: () => popups([[BUILD]], { remaining: 0.7 }) },
     { name: "Several apps", for: "a group each, at most five", sample: () => popups([[BUILD], [BATTERY]], { remaining: 0.7 }) },
     { name: "A burst from one app", for: "one stack, its count", sample: () => popups([SLACK, [BUILD]], { remaining: 0.7 }) },
     { name: "Previewed", for: "the preview hangs past the corner", sample: () => popups([SLACK, [BUILD]], { fan: 1 }) },
     { name: "Critical", for: "no time left: it stays until acted on", sample: () => popups([[CRITICAL], [BUILD]], { remaining: 0.7 }) },
-    { name: "Critical under a panel", for: "a stack under the open panel", sample: () => popups([[CRITICAL]]) },
+    { name: "Critical under a panel", for: "under an open panel; its pill toggles it", sample: () => belowOnScreen([[CRITICAL]], true) },
   ],
   sizes: doesntApply("`size.panel` wide; as tall as its cards."),
   states: {

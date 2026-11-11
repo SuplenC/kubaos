@@ -1,0 +1,330 @@
+/* The notification card and group (`lib/notification-card.ts`, `lib/notification-group.ts`). */
+
+@property --unfold {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --fan {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --opening {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --remaining {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+/* The card: flat on what holds it, one container role above it, its corners the panel's surface
+   radius `space.s8` in. A card a click does something on is a control in the state model: hover
+   and the keyboard light the accent's tube inside its edge, and pressed, by day, the tone tints its
+   fill as under a pressable card (`.k-card.k-control`). Its own buttons light theirs instead. */
+.k-notif-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  border-radius: var(--notif-corner);
+  background-color: var(--color-surface_container);
+  --fg: var(--color-on_surface);
+  --fg-muted: var(--color-on_surface_variant);
+  outline: none;
+}
+
+.k-notif-card[data-critical] {
+  background-color: var(--color-error_container);
+  --fg: var(--color-on_error_container);
+  --fg-muted: rgb(from var(--color-on_error_container) r g b / var(--opacity-subdued_text));
+}
+
+.k-notif-card.k-control {
+  cursor: pointer;
+  --tint-tone: var(--color-primary);
+  background-image: linear-gradient(
+    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press))),
+    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)))
+  );
+}
+
+.k-notif-card.k-control:not([data-pinned]):has(.k-notif-dismiss:hover, .k-notif-buttons:hover) {
+  --lit: 0;
+  --press: 0;
+}
+
+/* The header band, a small control tall, `space.s8` in from the top and the far corner. */
+.k-notif-band {
+  display: flex;
+  align-items: center;
+  height: var(--size-control_sm);
+  margin: var(--space-s8) var(--space-s8) 0 var(--space-s12);
+}
+
+.k-notif-who {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-s8);
+  min-width: 0;
+  margin-right: var(--space-s8);
+}
+
+.k-notif-who > .k-notif-app {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--fg);
+}
+
+.k-notif-who > .k-notif-when {
+  color: var(--fg-muted);
+}
+
+.k-notif-tile {
+  position: relative;
+  display: block;
+  flex: none;
+}
+
+.k-notif-tile > .k-badge {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  translate: -50% -50%;
+}
+
+.k-notif-chevron {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control_sm);
+  height: var(--size-control_sm);
+}
+
+/* The dismiss button keeps its room at rest, so the band never moves. */
+.k-notif-card:not(:hover, [data-hovered], [data-selected], [data-pinned]) .k-notif-dismiss {
+  visibility: hidden;
+}
+
+/* Under the band, across the card: the summary, the body, then the buttons. */
+.k-notif-words {
+  display: flex;
+  flex-direction: column;
+  margin: var(--space-s8) var(--space-s12) var(--space-s12);
+}
+
+.k-notif-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
+}
+
+/* Unfolding: the text's box from its folded height to its whole one, cut to it on the way. */
+.k-notif-card[data-open] .k-notif-text {
+  height: round(nearest, calc(var(--folded) + (var(--full) - var(--folded)) * var(--unfold)), 1px);
+  overflow: hidden;
+}
+
+.k-notif-card[data-open] .k-notif-text > .k-text {
+  --lines: 999 !important;
+}
+
+.k-notif-card[data-unfolding] {
+  transition:
+    --unfold var(--motion-medium) var(--easing-standard_decel),
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+.k-notif-card[data-folding] {
+  transition:
+    --unfold var(--motion-short) var(--easing-standard_accel),
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+/* With reduce motion the text's room takes its height at once and the words fade in over `short`. */
+[data-reduced] .k-notif-card[data-unfolding],
+[data-reduced] .k-notif-card[data-folding] {
+  transition:
+    --unfold 0s,
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+[data-reduced] .k-notif-card[data-unfolding] .k-notif-text,
+[data-reduced] .k-notif-card[data-folding] .k-notif-text {
+  animation: k-notif-faded var(--motion-short) var(--easing-standard);
+}
+
+@keyframes k-notif-faded {
+  from {
+    opacity: 0;
+  }
+}
+
+.k-notif-summary {
+  color: var(--fg);
+}
+
+.k-notif-body {
+  color: var(--fg-muted);
+}
+
+.k-notif-buttons {
+  display: flex;
+  gap: var(--space-s8);
+  margin-top: var(--space-s12);
+}
+
+/* A row of text buttons starts its first label on the text's edge, its box out in the padding. */
+.k-notif-buttons[data-text-only] {
+  margin-left: calc(-1 * var(--space-s12));
+}
+
+/* A popup's time left, a thin line along the bottom inside the padding. */
+.k-notif-time-left {
+  position: absolute;
+  bottom: 0;
+  left: var(--space-s12);
+  width: round(down, calc((100% - 2 * var(--space-s12)) * var(--remaining)), 1px);
+  height: max(1px, round(nearest, var(--stroke-thin), 1px));
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+}
+
+/* A group: at rest a stack, its newest card over one or two narrower edges `space.s8` apart; spread
+   into a preview by `--fan`; opened under its heading by `--opening`. Every box is worked out here
+   from the cards' heights, which `notification-parts.ts` measures. */
+.k-notif-group {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: round(nearest, calc(var(--rest-h) + (var(--open-h) - var(--rest-h)) * var(--opening)), 1px);
+  z-index: 0;
+  --under: calc(var(--size-control_sm) + var(--space-s8));
+  transition:
+    --fan var(--motion-short) var(--easing-standard_accel),
+    --opening var(--motion-short) var(--easing-standard_accel);
+}
+
+.k-notif-group[data-fanning] {
+  transition:
+    --fan var(--motion-medium) var(--easing-standard_decel),
+    --opening var(--motion-short) var(--easing-standard_accel);
+}
+
+.k-notif-group[data-open] {
+  transition:
+    --fan var(--motion-short) var(--easing-standard_accel),
+    --opening var(--motion-medium) var(--easing-standard_decel);
+}
+
+.k-notif-group[data-raised] {
+  z-index: 1;
+}
+
+/* With reduce motion it takes each state at once, its cards fading in over `short`. */
+[data-reduced] .k-notif-group {
+  transition: none;
+}
+
+[data-reduced] .k-notif-group[data-refade] > .k-notif-slot {
+  animation: k-notif-faded var(--motion-short) var(--easing-standard);
+}
+
+.k-notif-slot {
+  position: absolute;
+  --sp: calc(var(--fan) * var(--k-spread));
+  --fx: calc(var(--k-rx) * (1 - var(--sp)));
+  --fy: calc(var(--k-ry) + (var(--k-off) - var(--k-ry)) * var(--sp));
+  --fh: calc(var(--h0) + (var(--k-h) - var(--h0)) * var(--sp));
+  --reveal: clamp(0, 1 - (1 - max(var(--sp), var(--opening))) * 5, 1);
+  left: round(nearest, calc(var(--fx) * (1 - var(--opening))), 1px);
+  right: round(nearest, calc(var(--fx) * (1 - var(--opening))), 1px);
+  top: round(nearest, calc(var(--fy) + (var(--under) + var(--k-off) - var(--fy)) * var(--opening)), 1px);
+  height: round(nearest, calc(var(--fh) + (var(--k-h) - var(--fh)) * var(--opening)), 1px);
+}
+
+/* A tucked card's edge, its newest's height, under its face until the face has spread. */
+.k-notif-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--notif-corner);
+  background: var(--color-surface_container);
+}
+
+/* Each previewed card's own shadow, straight under it on the list: the ladder's step 1 at rest
+   rising to step 2 as it spreads, both layers of it, gone as the group opens. */
+.k-notif-lift {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--notif-corner);
+  --shown: calc(var(--fan) * (1 - var(--opening)));
+  box-shadow:
+    0 calc(var(--elevation-1-contact-y) + (var(--elevation-2-contact-y) - var(--elevation-1-contact-y)) * var(--fan))
+      calc(var(--elevation-1-contact-blur) + (var(--elevation-2-contact-blur) - var(--elevation-1-contact-blur)) * var(--fan))
+      rgb(from var(--color-shadow) r g b / calc(var(--elevation-contact-opacity) * var(--shown))),
+    0 calc(var(--elevation-1-ambient-y) + (var(--elevation-2-ambient-y) - var(--elevation-1-ambient-y)) * var(--fan))
+      calc(var(--elevation-1-ambient-blur) + (var(--elevation-2-ambient-blur) - var(--elevation-1-ambient-blur)) * var(--fan))
+      rgb(from var(--color-shadow) r g b / calc(var(--elevation-ambient-opacity) * var(--shown)));
+}
+
+/* Each card's shadow cast onto the edges tucked under it, cut to them: the ladder's step 1. */
+.k-notif-cast {
+  position: absolute;
+  overflow: hidden;
+}
+
+.k-notif-cast > span {
+  position: absolute;
+  display: block;
+  border-radius: var(--notif-corner);
+  --shown: calc((1 - var(--fan)) * (1 - var(--opening)));
+  box-shadow:
+    0 var(--elevation-1-contact-y) var(--elevation-1-contact-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-contact-opacity) * var(--shown))),
+    0 var(--elevation-1-ambient-y) var(--elevation-1-ambient-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-ambient-opacity) * var(--shown)));
+}
+
+.k-notif-slot > .k-notif-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: var(--reveal);
+}
+
+.k-notif-slot[data-newest] > .k-notif-card {
+  opacity: 1;
+}
+
+.k-notif-more {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  opacity: calc(var(--reveal) * (1 - var(--opening)));
+  pointer-events: none;
+}
+
+.k-notif-heading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--size-control_sm);
+  opacity: clamp(0, (var(--opening) - 0.5) * 2, 1);
+}
+
+.k-notif-heading:not([data-shown]) {
+  visibility: hidden;
+}
