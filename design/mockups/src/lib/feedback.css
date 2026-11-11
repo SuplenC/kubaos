@@ -57,9 +57,13 @@
   transition: --progress var(--motion-short) var(--easing-linear);
 }
 
+/* Stretching fills a stack's width; across a row it would pin the bar to the row's top, since its
+   height is fixed, so in a row it lines up as the row does: its centre on the row's centre line,
+   with the symbols and the figures beside it. */
 .k-row > .k-progress {
   flex: 1 1 0;
   min-width: 0;
+  align-self: auto;
 }
 
 .k-progress[data-danger] {
