@@ -117,6 +117,8 @@ export interface LockOptions {
   readonly bar?: readonly Element[];
   /** The desktop's windows, tiled in the frame. */
   readonly windows?: readonly Element[];
+  /** The password's sheet; false for a lock that is only ever at rest: a picture of one. */
+  readonly sheet?: boolean;
 }
 
 export interface Lock {
@@ -267,7 +269,7 @@ export function lock(options: LockOptions): Lock {
   // The desktop's windows stand in front of the city: they are the still's top layer.
   (element.querySelector(".k-lock-cutout") ?? clock).after(windows);
 
-  const content = sheetContent(moment, options.error ?? "", options.live ?? false, options.reader ?? true);
+  const content = options.sheet === false ? document.createElement("span") : sheetContent(moment, options.error ?? "", options.live ?? false, options.reader ?? true);
   const rising = sheet({ content, edge: "bottom", ...(options.live ? {} : { reveal: options.phase === "awake" ? 1 : 0 }) });
   if (options.live) {
     for (const part of rising.parts) {
@@ -283,9 +285,12 @@ export function lock(options: LockOptions): Lock {
   // pushed one: it stands in front of the sky and behind the city.
   // The clock's tint is the picture's colour under the digits at rest, read off the picture
   // itself. The bar's clock is where the pill's layout puts its time, which only layout knows.
-  const place = () => {
+  // Placing reads the layout and writes styles; done for every lock at once in phases (`placeAll`),
+  // reads then writes, so a page of many locks is laid out a few times, not once a lock.
+  function* place(): Generator<void, void, void> {
     const width = element.clientWidth;
     const height = element.clientHeight;
+    const pillWidth = bar.pill.offsetWidth;
     if (width === 0) return;
     // Until the picture has arrived the clock is placed on the screen as if it were the picture.
     const seen = picture.naturalWidth > 0 ? { width: picture.naturalWidth, height: picture.naturalHeight } : { width, height };
@@ -319,19 +324,39 @@ export function lock(options: LockOptions): Lock {
     clock.style.setProperty("--city-flat-width", `${seen.width * flat.scale}px`);
     clock.style.setProperty("--city-flat-height", `${seen.height * flat.scale}px`);
     bar.time.style.setProperty("--slot", String(widestTime("body", twelve)));
-    placeBarTime(element, bar, clock);
+    bar.pill.style.setProperty("--pill-width", `${pillWidth}px`);
+    const mark = document.createElement("span");
+    mark.className = "k-lock-baseline";
+    bar.time.append(mark);
+    // The kicker stands on its baseline, which only the font knows: the date's, its Latin words.
+    const kickerMark = document.createElement("span");
+    kickerMark.className = "k-lock-baseline";
+    const date = kicker.querySelector(".k-lock-date")!;
+    date.append(kickerMark);
+    yield;
+    const measured = measureBarTime(element, bar, mark);
+    const zoom = element.offsetWidth / (element.getBoundingClientRect().width || 1);
+    const kickerBase = (kickerMark.getBoundingClientRect().bottom - kicker.getBoundingClientRect().top) * zoom;
+    yield;
+    mark.remove();
+    kickerMark.remove();
+    if (measured) {
+      clock.style.setProperty("--bar-cx", measured.cx);
+      clock.style.setProperty("--bar-base", measured.base);
+    }
+    if (kickerBase > 0) clock.style.setProperty("--kicker-base", `${kickerBase.toFixed(3)}px`);
 
     const restDigitsBox = { x: rest.cx - restDigits / 2, y: rest.top, width: restDigits, height: cap * token("type-clock_rest-size") };
     const tint = tintFor(picture, restDigitsBox, pushed);
     if (tint) clock.style.setProperty("--digits-tint", tint);
     else clock.style.removeProperty("--digits-tint");
-
-  };
-  const watch = new ResizeObserver(place);
+  }
+  placers.set(element, place);
+  placers.set(bar.pill, place);
   watch.observe(element);
   watch.observe(bar.pill);
-  picture.addEventListener("load", place);
-  void document.fonts.ready.then(place);
+  picture.addEventListener("load", () => later(place));
+  void document.fonts.ready.then(() => later(place));
 
   probe(element, { role: "component", name: "Lock", variant: variant(options.phase, wallpaper.depth && "cutout"), fixed: { width: false, height: false, holds: true } });
   return { element, screen: shown, sheet: rising, content };
@@ -339,24 +364,43 @@ export function lock(options: LockOptions): Lock {
 
 /**
  * Where the bar's time is, for the clock to land on: its middle across the screen, and its
- * baseline under the pill's top, read off the pill's layout. The pill is centred on the bar's
- * band, so CSS places it from `--bar-shift` as the band slides.
+ * baseline (`mark`'s bottom) under the pill's top, read off the pill's layout. The pill is centred
+ * on the bar's band, so CSS places it from `--bar-shift` as the band slides.
  */
-function placeBarTime(element: HTMLElement, bar: { pill: HTMLElement; time: HTMLElement }, clock: HTMLElement): void {
-  bar.pill.style.setProperty("--pill-width", `${bar.pill.offsetWidth}px`);
+function measureBarTime(element: HTMLElement, bar: { pill: HTMLElement; time: HTMLElement }, mark: HTMLElement): { cx: string; base: string } | null {
   const screenBox = element.getBoundingClientRect();
-  if (screenBox.width === 0) return;
+  if (screenBox.width === 0) return null;
   // The screen may be drawn zoomed to fit a stage: its layout's pixels, not the viewport's.
   const zoom = element.offsetWidth / screenBox.width;
   const timeBox = bar.time.getBoundingClientRect();
   const pillBox = bar.pill.getBoundingClientRect();
-  const mark = document.createElement("span");
-  mark.className = "k-lock-baseline";
-  bar.time.append(mark);
   const baseline = mark.getBoundingClientRect().bottom;
-  mark.remove();
-  clock.style.setProperty("--bar-cx", `${((timeBox.left + timeBox.width / 2 - screenBox.left) * zoom).toFixed(3)}px`);
-  clock.style.setProperty("--bar-base", `${((baseline - pillBox.top) * zoom).toFixed(3)}px`);
+  return { cx: `${((timeBox.left + timeBox.width / 2 - screenBox.left) * zoom).toFixed(3)}px`, base: `${((baseline - pillBox.top) * zoom).toFixed(3)}px` };
+}
+
+/** Each lock's placing, by the elements whose size moves it. */
+const placers = new WeakMap<Element, () => Generator<void, void, void>>();
+
+/** Places every lock in `jobs` together: each runs to its next phase before any runs further. */
+function placeAll(jobs: Iterable<() => Generator<void, void, void>>): void {
+  let running = [...new Set(jobs)].map((job) => job());
+  while (running.length > 0) running = running.filter((step) => !step.next().done);
+}
+
+const watch = new ResizeObserver((entries) => placeAll(entries.flatMap((entry) => placers.get(entry.target) ?? [])));
+
+const waiting = new Set<() => Generator<void, void, void>>();
+
+/** Places `job`'s lock on the next frame, with every other waiting there. */
+function later(job: () => Generator<void, void, void>): void {
+  if (waiting.size === 0) {
+    requestAnimationFrame(() => {
+      const jobs = [...waiting];
+      waiting.clear();
+      placeAll(jobs);
+    });
+  }
+  waiting.add(job);
 }
 
 /** Where `object-fit: cover` draws a picture on a screen: its scale and its top left corner. */
@@ -403,13 +447,18 @@ function pxOf(element: HTMLElement): number {
  * The digits' width in `type.clock_rest`, in logical pixels, read off the font as it lays them
  * out: the canvas `advance` measures with can't draw a font this large at its precision.
  */
+const digitWidths = new Map<string, number>();
+
 function digitsWidth(time: string): number {
+  const known = digitWidths.get(time);
+  if (known !== undefined) return known;
   const meter = document.createElement("span");
   meter.className = "k-lock-meter";
   meter.textContent = time;
   document.documentElement.append(meter);
   const width = meter.getBoundingClientRect().width;
   meter.remove();
+  if (document.fonts.status === "loaded") digitWidths.set(time, width);
   return width;
 }
 

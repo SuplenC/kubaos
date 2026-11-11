@@ -74,19 +74,19 @@ const CANCELLING: Move = {
   name: "Cancelling",
   what: "Esc: the wall walks back to the picture you had, then it grows into the desktop.",
   tracks: [
-    { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 2, to: 0, duration: "long", curve: "spring" },
+    { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 0, duration: "long", curve: "spring" },
     ...after("long", [stepOut(0, 1, "slow"), ...toDesktop(MAIN, ".gl-floor:first-child .gl-art:first-child"), barFades(1, 0, "medium", "emphasized_accel")]),
   ],
   reduced: [
     { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 2, to: 0, duration: "instant", cue: "short", curve: "standard" },
+    { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
     { part: "stepping out", on: ROOM, target: ".gl-screen", property: "--out", from: 0, to: 1, duration: "instant", cue: "short", curve: "standard" },
     ...after("short", toDesktopReduced(MAIN, ".gl-floor:first-child .gl-art:first-child")),
     { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
     barFades(1, 0, "short", "standard"),
   ],
   back: "cuts",
-  sample: held({ at: 2 }),
+  sample: held({ at: 1 }),
 };
 
 const TO_DESKTOP: Move = {
@@ -95,7 +95,7 @@ const TO_DESKTOP: Move = {
   tracks: nonEmpty([...toDesktop(MAIN, FRONT), ...toDesktop(OTHERS, SIDES, false)]),
   reduced: nonEmpty([...toDesktopReduced(MAIN, FRONT), ...toDesktopReduced(OTHERS, SIDES)]),
   back: "cuts",
-  sample: held({ at: 2, view: "picture" }),
+  sample: held({ bare: true, at: 2, view: "picture" }),
 };
 
 const LOCKS: Move = {
@@ -104,7 +104,7 @@ const LOCKS: Move = {
   tracks: [...locking(MAIN, FRONT), ...sideToLock(OTHERS, SIDES)],
   reduced: [...lockingReduced(MAIN, FRONT), ...sideToLock(OTHERS, SIDES, true)],
   back: "cuts",
-  sample: held({ at: 2, view: "desktop" }),
+  sample: held({ bare: true, at: 2, view: "desktop" }),
 };
 
 const UNLOCKS: Move = {
@@ -113,7 +113,7 @@ const UNLOCKS: Move = {
   tracks: [...touching(MAIN, FRONT), ...sideToDesktop(OTHERS, SIDES)],
   reduced: [...touchingReduced(MAIN, FRONT), ...sideToDesktop(OTHERS, SIDES, true)],
   back: "cuts",
-  sample: held({ at: 2, view: "lock" }),
+  sample: held({ bare: true, at: 2, view: "lock" }),
 };
 
 const TO_LOCK: Move = {
@@ -122,7 +122,7 @@ const TO_LOCK: Move = {
   tracks: nonEmpty([...pictureToLock(MAIN, FRONT), ...pictureToLock(OTHERS, SIDES, false)]),
   reduced: nonEmpty([...pictureToLock(MAIN, FRONT, true, true), ...pictureToLock(OTHERS, SIDES, false, true)]),
   back: "cuts",
-  sample: held({ at: 2, view: "picture" }),
+  sample: held({ bare: true, at: 2, view: "picture" }),
 };
 
 const WAKES: Move = {
@@ -131,7 +131,7 @@ const WAKES: Move = {
   tracks: waking(MAIN, FRONT),
   reduced: wakingReduced(MAIN, FRONT),
   back: "cuts",
-  sample: held({ at: 2, view: "lock" }),
+  sample: held({ bare: true, at: 2, view: "lock" }),
 };
 
 const FULL: Move = {
@@ -144,7 +144,7 @@ const FULL: Move = {
     { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",
-  sample: held({ at: 2, view: "desktop" }),
+  sample: held({ bare: true, at: 2, view: "desktop" }),
 };
 
 const WALL = "the wall";
@@ -162,12 +162,12 @@ const BROWSES: Move = {
     { part: "the push", on: "the picture left", target: `${OLD} .k-lock`, property: "--push", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
     { part: "its frame", on: "the picture reached", target: `${NEW} .gl-frame`, property: "scale", from: { scale: "behind" }, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: "its frame", on: "the picture left", target: `${OLD} .gl-frame`, property: "scale", from: 1, to: { scale: "behind" }, duration: "long", curve: "emphasized_decel" },
-    { part: "its lamp", on: "the picture reached", target: `${NEW} .gl-lamp`, property: "background-color", from: { color: "primary_unlit" }, to: { color: "primary_core" }, duration: "short", curve: "standard" },
-    { part: "its lamp", on: "the picture left", target: `${OLD} .gl-lamp`, property: "background-color", from: { color: "primary_core" }, to: { color: "primary_unlit" }, duration: "short", curve: "standard" },
+    { part: "its lamp", on: "the picture reached", target: `${NEW} .gl-lamp`, property: "--lamp", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "its lamp", on: "the picture left", target: `${OLD} .gl-lamp`, property: "--lamp", from: 1, to: 0, duration: "short", curve: "standard" },
   ],
   reduced: [{ part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 2, duration: "instant", curve: "standard" }],
   back: "cuts",
-  sample: held({ at: 1 }),
+  sample: held({ bare: true, at: 1 }),
 };
 
 const FLATTENS: Move = {
@@ -176,7 +176,7 @@ const FLATTENS: Move = {
   tracks: [{ part: "the depth", on: MAIN, target: `${FRONT} .k-lock`, property: "--depth", from: 1, to: 0, duration: "long", curve: "emphasized_decel" }],
   reduced: [{ part: "the depth", on: MAIN, target: `${FRONT} .k-lock`, property: "--depth", from: 1, to: 0, duration: "instant", curve: "standard" }],
   back: "plays",
-  sample: held({ at: 2 }),
+  sample: held({ bare: true, at: 2 }),
 };
 
 /** A view's gallery in `state`. */
@@ -278,6 +278,7 @@ export default page<Shown>({
       { keys: ["↑", "↓"], does: "the floor above or below" },
       { keys: ["1", "2", "3"], does: "Picture, Desktop, Lock" },
       { keys: ["F", "Space"], does: "full screen, and back to the wall" },
+      { keys: ["Click"], does: "on the front picture: full screen; there, back to the wall" },
       { keys: ["D"], does: "depth on or off, on a picture with it" },
       { keys: ["W"], does: "in Lock: wakes it, or lets it rest" },
       { keys: ["Enter"], does: "applies the one in front" },
