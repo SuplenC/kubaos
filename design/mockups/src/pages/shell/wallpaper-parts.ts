@@ -35,7 +35,7 @@ import { barButtons } from "../templates/panels.ts";
 import { fromAwake, fromAwakeReduced, locking, lockingReduced, resting, reducedRest, touching, touchingReduced, waking, wakingReduced } from "../templates/lock-moves.ts";
 import { PURPLE_HOUR, SCREEN, SHIBUYA, TOWER } from "../templates/locks.ts";
 import { wallpaper as kabukicho } from "./bar-parts.ts";
-import sign from "../../../../../branding/photo/neon-sign-front@2x.jpg?url";
+import sign from "../../../../../branding/photo/neon-sign-banner.jpg?url";
 import hero from "../../../../../branding/png/kubaos-hero.jpg?url";
 import { HERO_DAY, HERO_NIGHT, KABUKICHO_DAY, KABUKICHO_NIGHT, PURPLE_DAY, SHIBUYA_DAY, SIGN_DAY, SIGN_NIGHT, TOWER_DAY } from "./wallpaper-schemes.ts";
 

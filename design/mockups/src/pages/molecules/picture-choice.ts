@@ -3,7 +3,7 @@
 // its foot, picked with the accent's line and its mark, lit with the cold tube.
 
 import hero from "../../../../../branding/png/kubaos-hero.jpg?url";
-import photo from "../../../../../branding/photo/neon-sign-front@2x.jpg?url";
+import photo from "../../../../../branding/photo/neon-sign-banner.jpg?url";
 import blurred from "../../../../../crates/kubaos-kobo/assets/wallpaper-blur.jpg?url";
 import wallpaper from "../../../../../crates/kubaos-kobo/assets/wallpaper.jpg?url";
 import { choiceGroup, type Picks } from "../../lib/card.ts";

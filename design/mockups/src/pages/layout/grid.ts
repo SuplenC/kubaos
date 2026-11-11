@@ -2,7 +2,7 @@
 // The two-way layouts: equal columns, columns of set shares, and children that wrap onto new lines.
 // Every column's edge lands on a whole device pixel.
 
-import photo from "../../../../../branding/photo/neon-sign-front@2x.jpg?url";
+import photo from "../../../../../branding/photo/neon-sign-banner.jpg?url";
 import { card } from "../../lib/card.ts";
 import { chip } from "../../lib/chip.ts";
 import { shown, type Words } from "../../lib/content.ts";
