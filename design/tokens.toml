@@ -212,6 +212,9 @@ row_two_line = 56
 # A table's row: a line of body text with 4 above and below, so a list of readings (the
 # system monitor's processes) stays dense and each row is still easy to hit.
 row_compact = 28
+# The least the lock's kicker shrinks to on a small screen, its size: the smallest text the
+# interface draws.
+lock_date_least = 12
 # A menu's width: an item's symbol, its words and a shortcut's keycaps side by side.
 menu = 240
 chip = 24
@@ -371,8 +374,11 @@ family = "sans"
 use = "The shell's built lock clock, over its password field."
 
 # The lock at rest is the wallpaper and its clock alone, the clock as large as
-# a poster's: Geist Light's figures are 0.726 of the size tall, so 384 draws
-# digits about 280 tall, under a third of a 960 tall screen. Its line is its
+# a poster's. Its size is the screen's share, not this: `scale.lock_clock`
+# of the screen's height, at most `scale.lock_clock_width` of its width, and on
+# a portrait screen its digits `scale.lock_clock_portrait` of the width. 384
+# is what that comes to on a 1080 tall screen, the reference the rest is
+# drawn at. Geist Light's figures are 0.726 of the size tall. Its line is its
 # size, so the digits sit on the grid wherever the lock places them.
 [type.clock_rest]
 size = 384
@@ -382,10 +388,11 @@ weight = "light"
 family = "sans"
 use = "The lock screen's clock at rest, the wallpaper round it."
 
-# The kicker above the lock's clock, a step up from a page's accent so it holds its own over a
-# picture under digits 280 tall: one line in two families, where and which day in M PLUS 1, then
-# the date in Geist, each 20 on a 24 line, medium, at rest and awake alike. Two styles, since a
-# style has one family and Geist draws no kanji.
+# The kicker above the lock's clock: one line in two families, where and which day in M PLUS 1,
+# then the date in Geist, medium, at rest and awake alike. Two styles, since a style has one family
+# and Geist draws no kanji. Its size is the clock's share, `scale.lock_date` of it
+# (`scale.lock_date_portrait` on a portrait screen), never under `size.lock_date_least`; 20 on a
+# 24 line is what that comes to beside the 384 clock of a 1080 tall screen.
 [type.clock_place]
 size = 20
 line = 24
@@ -848,6 +855,20 @@ near = 1.05
 # share of the path: its size, its place and its colour all that far from the rest clock's toward
 # the bar's time, so it stays big, keeps most of the picture's tint, and unlocking flies the rest.
 clock_awake = 0.2
+# The lock's rest clock, its type's size as a share of the screen: of its height on a wide screen,
+# 384 on a 1080 tall one, 512 on 1440, 768 on 2160; never more than its width's share, so a screen
+# too narrow for that takes the width (384 on 1920 by 1200); and on a portrait screen as large as
+# makes the time it shows that share of the width, so its size follows the minutes a little.
+lock_clock = 0.3556
+lock_clock_width = 0.2
+lock_clock_portrait = 0.9
+# The kicker over it, as shares of the clock's size: the date's size (20 beside 384), and the gap
+# from the digits' cap top to the kicker's baseline (40 beside 384); on a portrait screen bigger and
+# higher, so it reads over a tall picture (48 and 104 beside 416).
+lock_date = 0.0521
+lock_date_gap = 0.1042
+lock_date_portrait = 0.115
+lock_date_gap_portrait = 0.25
 # A picture on the wallpaper picker's wall: its height, a share of the screen's,
 # 16:10 as the screen is, so the desktop drawn in it is the screen scaled by
 # this much. Large enough to judge the picture, small enough that its

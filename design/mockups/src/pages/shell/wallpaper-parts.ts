@@ -49,13 +49,15 @@ export interface Hung {
 
 /** The clock of a picture of no depth: in front, a little above the middle (the Lock's Shibuya). */
 const FRONT = { x: 0.5, y: 0.56 };
+/** The same on a portrait screen: higher, in the strip's upper part. */
+const FRONT_PORTRAIT = { x: 0.5, y: 0.4 };
 
-export const KABUKICHO: Hung = { name: "Kabukicho rain", wallpaper: { name: "Kabukicho rain", picture: kabukicho, clock: FRONT, night: KABUKICHO_NIGHT }, day: KABUKICHO_DAY };
+export const KABUKICHO: Hung = { name: "Kabukicho rain", wallpaper: { name: "Kabukicho rain", picture: kabukicho, clock: FRONT, portrait: FRONT_PORTRAIT, night: KABUKICHO_NIGHT }, day: KABUKICHO_DAY };
 export const PURPLE: Hung = { name: "Shinjuku purple hour", wallpaper: PURPLE_HOUR, day: PURPLE_DAY };
 export const BLUE: Hung = { name: "Tokyo Tower blue hour", wallpaper: TOWER, day: TOWER_DAY };
-export const SIGN: Hung = { name: "Neon sign", wallpaper: { name: "Neon sign", picture: sign, clock: FRONT, night: SIGN_NIGHT }, day: SIGN_DAY, video: true };
+export const SIGN: Hung = { name: "Neon sign", wallpaper: { name: "Neon sign", picture: sign, clock: FRONT, portrait: FRONT_PORTRAIT, night: SIGN_NIGHT }, day: SIGN_DAY, video: true };
 export const RAIN: Hung = { name: "Shibuya rainy corner", wallpaper: SHIBUYA, day: SHIBUYA_DAY };
-export const HERO: Hung = { name: "kubaos-hero", wallpaper: { name: "kubaos-hero", picture: hero, clock: FRONT, night: HERO_NIGHT }, day: HERO_DAY };
+export const HERO: Hung = { name: "kubaos-hero", wallpaper: { name: "kubaos-hero", picture: hero, clock: FRONT, portrait: FRONT_PORTRAIT, night: HERO_NIGHT }, day: HERO_DAY };
 
 export interface Folder {
   readonly name: string;

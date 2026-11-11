@@ -70,6 +70,11 @@ export interface Wallpaper {
    * picture's width and height, so it keeps its place against the city however the screen crops it.
    */
   readonly clock: { readonly x: number; readonly y: number };
+  /**
+   * Where it stands on a portrait screen, which crops the picture to a tall strip and makes the
+   * clock as wide as the strip: higher, in the sky. The wide place when it has none.
+   */
+  readonly portrait?: { readonly x: number; readonly y: number };
 }
 
 /**
@@ -300,18 +305,43 @@ export function lock(options: LockOptions): Lock {
     const flat = { scale, left: (width - seen.width * scale) / 2, top: (height - seen.height * scale) / 2 };
     const pushed = pushedCover(flat, width, height, element.closest("[data-reduced]") ? 1 : number("scale-push"));
     const cap = capHeight();
-    const kickerWidth = Math.ceil(placeNatural * px - 0.001) + Math.ceil(dateNatural * px - 0.001);
-    const natural = digitsWidth(time);
+    // The clock is the screen's share (`scale.lock_clock`, `scale.lock_clock_width`, and on a portrait
+    // screen as large as makes the time it shows `scale.lock_clock_portrait` of the width, so it
+    // changes size a little as the minutes turn), its kicker the clock's
+    // (`scale.lock_date`, `scale.lock_date_gap`, the portrait pair), never under
+    // `size.lock_date_least`: `type.clock_rest` and `type.clock_date` are the 1080 tall screen's.
+    const portrait = height > width;
+    const reference = token("type-clock_rest-size");
+    // Each on whole pixels of the screen it is drawn on.
+    const whole = (v: number) => Math.round(v / px) * px;
+    const restSize = whole(
+      portrait
+        ? (number("scale-lock_clock_portrait") * width * length("type-clock_rest-size")) / digitsWidth(time)
+        : Math.min(number("scale-lock_clock") * height, number("scale-lock_clock_width") * width),
+    );
+    const grown = restSize / reference;
+    const kickerSize = whole(Math.max(token("size-lock_date_least"), number(portrait ? "scale-lock_date_portrait" : "scale-lock_date") * restSize));
+    const kickerGrown = kickerSize / token("type-clock_date-size");
+    const kickerGap = whole(number(portrait ? "scale-lock_date_gap_portrait" : "scale-lock_date_gap") * restSize);
+    const kickerWidth = Math.ceil(placeNatural * kickerGrown * px - 0.001) + Math.ceil(dateNatural * kickerGrown * px - 0.001);
+    const natural = digitsWidth(time) * grown;
     const restDigits = Math.ceil(natural * px - 0.001);
     const margin = token("space-s32");
     const half = Math.max(kickerWidth, restDigits) / 2;
+    const spot = portrait ? (wallpaper.portrait ?? wallpaper.clock) : wallpaper.clock;
     const restOn = (cover: Cover) => ({
-      cx: Math.min(width - margin - half, Math.max(margin + half, cover.left + wallpaper.clock.x * seen.width * cover.scale)),
-      top: Math.round(cover.top + wallpaper.clock.y * seen.height * cover.scale - cap * token("type-clock_rest-size")),
+      cx: Math.min(width - margin - half, Math.max(margin + half, cover.left + spot.x * seen.width * cover.scale)),
+      top: Math.round(cover.top + spot.y * seen.height * cover.scale - cap * restSize),
     });
     const restFlat = restOn(flat);
     const rest = restOn(pushed);
     clock.style.setProperty("--digits-natural", String(natural));
+    clock.style.setProperty("--rest-size", `${restSize}px`);
+    clock.style.setProperty("--kicker-size", `${kickerSize}px`);
+    clock.style.setProperty("--kicker-line", `${(token("type-clock_date-line") * kickerGrown).toFixed(3)}px`);
+    clock.style.setProperty("--kicker-gap", `${kickerGap}px`);
+    clock.style.setProperty("--place-natural", String(placeNatural * kickerGrown));
+    clock.style.setProperty("--date-natural", String(dateNatural * kickerGrown));
     clock.style.setProperty("--cap-height", String(cap));
     clock.style.setProperty("--bar-natural", String(advance("body", time)));
     clock.style.setProperty("--middle", `${width / 2}px`);
@@ -346,7 +376,7 @@ export function lock(options: LockOptions): Lock {
     }
     if (kickerBase > 0) clock.style.setProperty("--kicker-base", `${kickerBase.toFixed(3)}px`);
 
-    const restDigitsBox = { x: rest.cx - restDigits / 2, y: rest.top, width: restDigits, height: cap * token("type-clock_rest-size") };
+    const restDigitsBox = { x: rest.cx - restDigits / 2, y: rest.top, width: restDigits, height: cap * restSize };
     const tint = tintFor(picture, restDigitsBox, pushed);
     if (tint) clock.style.setProperty("--digits-tint", tint);
     else clock.style.removeProperty("--digits-tint");
