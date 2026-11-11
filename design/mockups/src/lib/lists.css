@@ -87,7 +87,8 @@
 }
 
 /* A well its rows scroll in, `--height` tall: they run right up to its edge and are cut by its own
-   rounded shape, the `space.s8` above the first and below the last its scroll padding. There is
+   rounded shape, `space.s12` in at its sides and the `space.s12` above the first and below the last
+   its scroll padding. There is
    no bar of the browser's; the thumb is the well's own. */
 .k-list[data-scrolls] {
   height: var(--height);
@@ -109,7 +110,7 @@
 .k-list-pane > .k-live-rows {
   box-sizing: border-box;
   width: 100%;
-  padding: var(--space-s8);
+  padding: var(--space-s12);
 }
 
 /* The thumb: `size.scrollbar` wide, a pill in the outline variant (the outline under the pointer
@@ -546,4 +547,86 @@
   outline: var(--stroke-hairline_device_px) solid var(--sunken-line);
   outline-offset: calc(-1 * var(--stroke-hairline_device_px));
   overflow: clip;
+}
+
+/* A section's label among the rows (`listLabel`): `space.s12` in, and after rows `space.s12` clear
+   of them besides the `space.s4` they carry. */
+.k-list-label {
+  display: block;
+  flex: none;
+  align-self: stretch;
+  padding-inline: var(--space-s12);
+}
+
+.k-list-label[data-after] {
+  padding-block-start: var(--space-s12);
+}
+
+/* A note (`listNote`) and a disclosure line (`listDisclosure`): a one-line row's height, the words
+   `space.s12` in; the disclosure's button at the line's end, its label's own padding the end's. */
+.k-list-note,
+.k-list-disclosure {
+  display: flex;
+  flex: none;
+  align-items: center;
+  align-self: stretch;
+  gap: var(--space-s8);
+  box-sizing: border-box;
+  height: var(--size-row);
+  padding-inline-start: var(--space-s12);
+}
+
+.k-list-note > :first-child,
+.k-list-disclosure > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.k-list-disclosure {
+  cursor: pointer;
+}
+
+/* The keys on the line light its button, as a row is lit. */
+.k-list-disclosure[data-current] > .k-control {
+  --lit: 1;
+}
+
+/* The forget × (`forget`): centred on the tick's room, quiet until the row or the × is lit. */
+.k-list-forget {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  opacity: 0;
+  transition: opacity var(--motion-micro) var(--easing-standard);
+}
+
+.k-list-row:is([data-current], [data-pinned]) .k-list-forget,
+.k-list-forget:is(:hover, :focus-visible, [data-pinned]) {
+  opacity: 1;
+}
+
+/* The add mark (`adds`): shown on the current row alone. */
+.k-list-add {
+  opacity: 0;
+}
+
+.k-list-row:is([data-current], [data-pinned]) .k-list-add {
+  opacity: 1;
+}
+
+/* A row lifted by a drag, and the line where it lands. */
+.k-list-row[data-lifted] {
+  opacity: var(--opacity-subdued);
+}
+
+.k-list-drop {
+  margin-block: calc((var(--space-s4) + var(--stroke-thin)) / -2);
+  display: block;
+  flex: none;
+  align-self: stretch;
+  height: var(--stroke-thin);
+  margin-inline: var(--space-s12);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
 }

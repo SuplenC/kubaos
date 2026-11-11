@@ -76,6 +76,18 @@
   top: round(nearest, calc((var(--line) - var(--icon-size)) / 2), 1px);
 }
 
+/* A disclosing button's chevron (`disclosure`), turned a half while what it discloses is open,
+   turning with it over `medium` on `standard`. */
+.k-button-chevron > .k-icon {
+  rotate: calc(var(--disclosed, 0) * 180deg);
+  transition: rotate var(--motion-medium) var(--easing-standard);
+}
+
+/* A button holding its alternatives' width (`alternatives`): the label centred in it. */
+.k-button[data-held] .k-button-label {
+  text-align: center;
+}
+
 .k-row,
 .k-stack {
   display: flex;

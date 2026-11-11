@@ -3,7 +3,8 @@
 // `EmptyList` (`docs/design/components/list.md`). Its look is `lists.css`.
 //
 // The well is a content box, at the content radius, `space.s8` inside, its rows `space.s4` apart,
-// so a row's corners are concentric inside it at the row radius. A row is `space.s16` in, so its
+// so a row's corners are concentric inside it at the row radius; a well whose rows scroll pads them
+// `space.s12`, its sides and its scroll padding alike. A row is `space.s16` in, so its
 // words start `space.s24` from the well's edge.
 //
 // A row is `size.row` tall with one line and `size.row_two_line` with two: a leading symbol or
@@ -14,11 +15,18 @@
 // passed over.
 //
 // A scrolling list's rows scroll right up to the well's edge, cut by its rounded shape, the
-// `space.s8` above the first row and below the last its scroll padding, and its thumb floats in
+// `space.s12` above the first row and below the last its scroll padding, and its thumb floats in
 // the well's padding at its end.
+//
+// Between the rows a well may hold a section's label, a note, and a disclosure line over a drawer
+// of rows; a row that can be forgotten keeps a quiet × in its tick's room; a list that reorders
+// lifts the dragged row and draws a drop line where it lands; a list that adds marks its current
+// row with a +.
 
 import "./lists.css";
+import { button } from "./button.ts";
 import { type ChipKind, chip } from "./chip.ts";
+import { iconButton } from "./icon-button.ts";
 import { icon, missingIcon } from "./icon.ts";
 import { iconTile } from "./icon-tile.ts";
 import { keycap, keys } from "./keycap.ts";
@@ -82,6 +90,15 @@ export type ListRowSpec = RowTaking & {
   readonly loading?: boolean;
   /** How much of its words' room a loading row's title takes; its subtitle that much of it again. */
   readonly share?: number;
+  /**
+   * Saved, so it can be forgotten: a quiet × over its tick's room, shown while the row is lit or the
+   * × is, and Delete on the row does the same. A network known, a device paired.
+   */
+  readonly forget?: () => void;
+  /** Lifted by a drag, drawn at `opacity.subdued` so the row it passes over shows through. */
+  readonly lifted?: boolean;
+  /** Taking it adds it: a + in its tick's room while it is the current row. */
+  readonly adds?: boolean;
 };
 
 /** A state a row is pinned in, as the specimens pin them: the keyboard on it, or pressed. */
@@ -154,13 +171,33 @@ function ends(spec: ListRowSpec): Element[] {
     parts.push(toggle);
   }
   if (spec.opens) parts.push(icon("chevron_right", "var(--type-body_strong-icon)", "var(--muted)"));
-  else if (spec.checked !== undefined) {
+  else if (spec.checked !== undefined || spec.forget || spec.adds) {
     const room = document.createElement("span");
     room.className = "k-list-check";
     if (spec.checked) room.append(icon("check", "var(--type-body_strong-icon)", "var(--tick)"));
+    else if (spec.adds) {
+      const mark = icon("add", "var(--type-body_strong-icon)", "var(--title)");
+      mark.classList.add("k-list-add");
+      room.append(mark);
+    } else if (spec.forget) room.append(forgetButton(spec.forget));
     parts.push(room);
   }
   return parts;
+}
+
+/**
+ * The × that forgets a saved row: a Text sm icon button centred on the tick's room, quiet until the
+ * row or the × itself is lit, fading over `micro`. Its press is its own, not the row's.
+ */
+function forgetButton(forget: () => void): HTMLElement {
+  const made = iconButton({ icon: "close", label: "Forget", kind: "Text", size: "Sm", hint: false });
+  made.classList.add("k-list-forget");
+  made.tabIndex = -1;
+  made.addEventListener("click", (event) => {
+    event.stopPropagation();
+    forget();
+  });
+  return made;
 }
 
 /** A loading row's skeletons: the tile, then its title and subtitle as shares of their room. */
@@ -185,6 +222,8 @@ export function listRow(spec: ListRowSpec, current = false, pinned?: RowPinned):
   item.toggleAttribute("data-danger", spec.danger ?? false);
   item.toggleAttribute("data-picked", spec.checked === true);
   item.toggleAttribute("data-clear", (spec.clear ?? false) && spec.tile === true);
+  item.toggleAttribute("data-lifted", spec.lifted ?? false);
+  item.toggleAttribute("data-forget", spec.forget !== undefined);
   const inert = spec.disabled === true || spec.loading === true;
   item.toggleAttribute("data-current", current && !inert);
   if (pinned && !inert) item.dataset.pinned = pinned;
@@ -214,6 +253,7 @@ export function listRow(spec: ListRowSpec, current = false, pinned?: RowPinned):
 
 /** Whether a row can take the keyboard: one that isn't disabled, loading or a note. */
 export function takes(element: Element | undefined): element is HTMLElement {
+  if (element instanceof HTMLElement && element.classList.contains("k-list-disclosure")) return true;
   return element instanceof HTMLElement && element.classList.contains("k-list-row") && element.getAttribute("aria-disabled") !== "true" && !element.hasAttribute("data-loading");
 }
 
@@ -294,7 +334,7 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
     at = item;
     show();
     if (!pane) return;
-    const inset = length("space-s8") * scaleOf(box);
+    const inset = length("space-s12") * scaleOf(box);
     const top = offsetIn(item, pane) - inset;
     const bottom = offsetIn(item, pane) + item.offsetHeight + inset;
     if (top < pane.scrollTop) pane.scrollTop = top;
@@ -323,7 +363,7 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
     const item = rows[Math.max(0, index())];
     if (!item || !pane) return rows.length;
     const gap = length("space-s4") * scaleOf(box);
-    const room = pane.clientHeight - 2 * length("space-s8") * scaleOf(box);
+    const room = pane.clientHeight - 2 * length("space-s12") * scaleOf(box);
     return Math.max(1, Math.floor((room + gap) / (item.offsetHeight + gap)));
   }
 
@@ -337,7 +377,7 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
 
   /** The row of the list under `event`, if it can be taken. */
   function rowAt(event: Event): HTMLElement | null {
-    const item = (event.target as Element).closest<HTMLElement>(".k-list-row");
+    const item = (event.target as Element).closest<HTMLElement>(".k-list-row, .k-list-disclosure");
     return item && takes(item) && rowsOf().includes(item) ? item : null;
   }
 
@@ -432,8 +472,22 @@ export function scaleOf(element: Element): number {
 }
 
 /** `rows` in a well, as tall as they are: `List` holding `ListRows`. */
-export function list(specs: readonly ListRowSpec[], options: ListOptions = {}): HTMLElement {
-  const rows = specs.map((spec, index) => listRow(spec, index === options.current, index === options.current ? options.pinned : undefined));
+/**
+ * What a well holds: a row, or one of the parts between rows (`listLabel`, `listNote`,
+ * `listDisclosure`, `dropLine`), which the keys pass over but for a disclosure line.
+ */
+export type ListItem = ListRowSpec | HTMLElement;
+
+/** `items` drawn: each spec a row, the keyboard on the one at `current`; a part as it is. */
+function itemsOf(items: readonly ListItem[], options: ListOptions): HTMLElement[] {
+  return items.map((item, index) => {
+    if (item instanceof HTMLElement) return item;
+    return listRow(item, index === options.current, index === options.current ? options.pinned : undefined);
+  });
+}
+
+export function list(specs: readonly ListItem[], options: ListOptions = {}): HTMLElement {
+  const rows = itemsOf(specs, options);
   const box = well("List", rowStack(rows));
   listRows(box, null, () => rows, options);
   return box;
@@ -453,8 +507,8 @@ export interface ScrollingOptions extends ListOptions {
  * `ListRows`. The rows run up to the well's edge, cut by its own rounded shape; the thumb floats in
  * the well's padding at its end while they are taller than it.
  */
-export function scrollingList(specs: readonly ListRowSpec[], options: ScrollingOptions): HTMLElement {
-  const rows = specs.map((spec, index) => listRow(spec, index === options.current, index === options.current ? options.pinned : undefined));
+export function scrollingList(specs: readonly ListItem[], options: ScrollingOptions): HTMLElement {
+  const rows = itemsOf(specs, options);
   const { pane, thumb, box } = scrolled("ScrollingList", rowStack(rows), options);
   listRows(box, pane, () => rows, options);
   if (options.down !== undefined) {
@@ -563,4 +617,68 @@ export function emptyList(message: string): HTMLElement {
   room.className = "k-list-empty";
   room.append(words);
   return well("EmptyList", room);
+}
+
+/**
+ * A section's label among a well's rows: `label` in `on_surface_variant`, `space.s12` in as a row's
+ * words are; after rows, `space.s12` clear of them besides the `space.s4` they carry. The keys pass
+ * over it.
+ */
+export function listLabel(words: string, afterRows: boolean): HTMLElement {
+  const label = document.createElement("span");
+  label.className = "k-list-label";
+  label.toggleAttribute("data-after", afterRows);
+  label.append(clamped(words, "label", "on_surface_variant"));
+  return probe(label, { role: "component", name: "ListLabel", variant: afterRows ? "after-rows" : "", fixed: { width: false, height: true } });
+}
+
+/**
+ * A note among a well's rows, where rows would be: one line of `body` a one-line row tall, its words
+ * `space.s12` in; `on_surface_variant`, or `error` when it says something failed. The keys pass
+ * over it.
+ */
+export function listNote(words: string, failed = false): HTMLElement {
+  const line = document.createElement("span");
+  line.className = "k-list-note";
+  line.append(clamped(words, "body", failed ? "error" : "on_surface_variant"));
+  return probe(line, { role: "component", name: "ListNote", variant: failed ? "failed" : "", fixed: { width: false, height: true } });
+}
+
+export interface DisclosureOptions {
+  /** The drawer under it open: the button says Hide, its chevron turned. */
+  readonly open: boolean;
+  /** What a press, or Enter with the keys on the line, does: opens or closes the drawer. */
+  readonly onToggle?: (open: boolean) => void;
+}
+
+/**
+ * A disclosure line over a drawer of rows: a note's words, then a Text sm button at the line's end
+ * saying Show or Hide, holding the wider label's width so it never moves, its chevron turning with
+ * the drawer. The keys reach it as a row's, lighting its button.
+ */
+export function listDisclosure(words: string, options: DisclosureOptions): HTMLElement {
+  let open = options.open;
+  const line = document.createElement("span");
+  line.className = "k-list-disclosure";
+  line.setAttribute("role", "option");
+  const toggle = button({ label: open ? "Hide" : "Show", kind: "Text", size: "Sm", alternatives: ["Show", "Hide"], disclosure: open });
+  toggle.tabIndex = -1;
+  line.append(clamped(words, "body", "on_surface_variant"), toggle);
+  line.addEventListener("click", () => {
+    open = !open;
+    toggle.style.setProperty("--disclosed", open ? "1" : "0");
+    for (const label of toggle.querySelectorAll<HTMLElement>(".k-button-label")) label.textContent = open ? "Hide" : "Show";
+    options.onToggle?.(open);
+  });
+  return probe(line, { role: "component", name: "ListDisclosure", variant: open ? "open" : "", fixed: { width: false, height: true } });
+}
+
+/**
+ * Where a dragged row lands: a pill `stroke.thin` thick in `primary`, in the gap before the row it
+ * goes before, inset `space.s12` as the rows' words are.
+ */
+export function dropLine(): HTMLElement {
+  const line = document.createElement("span");
+  line.className = "k-list-drop";
+  return probe(line, { role: "component", name: "ListDropLine", variant: "", fixed: { width: false, height: true } });
 }

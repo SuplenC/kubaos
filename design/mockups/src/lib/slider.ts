@@ -11,7 +11,8 @@
 // softer accent (`secondary`, its content `on_secondary`) over `short`, the icon is the toggled
 // one and the value reads as a name; the fill stays where the value is (a muted volume's level,
 // the sensor's on Auto). Moving the value (a drag, a key, the wheel) leaves Toggled from where it
-// is. On a slider with stops the icon steps through them instead, its name the stop it goes to.
+// is. On a slider with stops the icon steps through them instead, its name the stop it goes to;
+// each stop may have a symbol of its own, which the circle shows while the slider is on it.
 //
 // Steps show as dots on both sides of the fill, each in its side's colour; the mark the value rests
 // on, a stop or a sticky point it holds at, turns solid and pops in. No dot is drawn under the icon
@@ -51,6 +52,11 @@ export interface SliderOptions {
   readonly stops?: number;
   /** The stop it is on, from 0. */
   readonly index?: number;
+  /**
+   * Each stop's own symbol, in the icon's circle while the slider is on it: the power stops'. None
+   * keeps `icon` on every stop.
+   */
+  readonly icons?: readonly string[];
   /** Each stop's name, the one nearest the value shown. */
   readonly names?: readonly string[];
   /** The number shown in place of the percentage, as the owner reads the value. */
@@ -182,7 +188,8 @@ export function slider(options: SliderOptions): HTMLElement {
   /** Draws what Toggled changes: the fill's tone, the icon, and the button's name and hint. */
   function drawToggle(): void {
     root.style.setProperty("--toggled", toggled ? "1" : "0");
-    glyph.replaceChildren(icon(toggled && toggle ? toggle.icon : options.icon, "var(--type-label-icon)", "var(--on-fill)"));
+    const symbol = toggled && toggle ? toggle.icon : stepping && options.icons?.[index] ? options.icons[index]! : options.icon;
+    glyph.replaceChildren(icon(symbol, "var(--type-label-icon)", "var(--on-fill)"));
     if (toggle && button) button.setAttribute("aria-pressed", String(toggled));
     nameIcon();
   }
@@ -351,7 +358,7 @@ export function slider(options: SliderOptions): HTMLElement {
 
   function stepTo(to: number): void {
     index = Math.max(0, Math.min(last, to));
-    nameIcon();
+    drawToggle();
     settle();
   }
 
@@ -389,7 +396,10 @@ export function slider(options: SliderOptions): HTMLElement {
       if (!dragging) return;
       dragging = false;
       delete root.dataset.dragging;
-      if (stepping) index = Math.round(shown * last);
+      if (stepping) {
+        index = Math.round(shown * last);
+        drawToggle();
+      }
       nameIcon();
       settle();
     };

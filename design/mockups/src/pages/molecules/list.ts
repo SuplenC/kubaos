@@ -5,7 +5,7 @@
 
 import type { Words } from "../../lib/content.ts";
 import { filling, flow, within } from "../../lib/layout.ts";
-import { type ListOptions, type ListRowSpec, list, type RowPinned } from "../../lib/list.ts";
+import { dropLine, type ListItem, listDisclosure, listLabel, listNote, type ListOptions, type ListRowSpec, list, type RowPinned } from "../../lib/list.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
@@ -29,6 +29,14 @@ const NETWORKS: readonly ListRowSpec[] = [
   { title: "Kissa", subtitle: "Secured · WPA3", subtitleIcon: "lock", icon: "network_wifi_3_bar", checked: false },
   { title: "Station Free Wi-Fi", subtitle: "Open", icon: "network_wifi_1_bar", checked: false },
 ];
+
+const forget = () => undefined;
+
+/** Known and Nearby under their labels, the saved one forgettable, Nearby empty. */
+const SECTIONS = (): ListItem[] => [listLabel("Known", false), NETWORKS[0]!, { ...NETWORKS[1]!, forget }, listLabel("Nearby", true), listNote("No other networks in range")];
+
+/** Devices that send no name, in a drawer under their line. */
+const UNNAMED: readonly ListRowSpec[] = ["4C:2F:9A:01:BE:77", "D8:3A:DD:5E:10:C2"].map((title) => ({ title, subtitle: "Not paired", icon: "bluetooth", tile: true, checked: false }));
 
 /** A settings app's pages: each row opens a page of its own, so it ends in a chevron and never ticks. */
 const PAGES: readonly ListRowSpec[] = [
@@ -65,7 +73,7 @@ const ROWS: readonly { readonly name: string; readonly spec: ListRowSpec }[] = [
 type MatrixState = "rest" | "lit" | "pressed" | "selected" | "disabled";
 
 /** `specs` in a well as wide as a panel's body. */
-function well(specs: readonly ListRowSpec[], options: ListOptions = {}): HTMLElement {
+function well(specs: readonly ListItem[], options: ListOptions = {}): HTMLElement {
   return within(WELL_ROOM, list(specs, options));
 }
 
@@ -149,6 +157,13 @@ export default page({
     { name: "Chips and a detail", for: "facts at a glance, then a machine's name", sample: () => well([{ title: "Samsung 990 Pro", subtitle: "2 TB · NVMe", icon: "hard_drive", chips: [{ kind: "Accent", label: "Default" }], detail: "nvme0n1" }, { title: "WD Blue", subtitle: "500 GB · SATA", icon: "hard_drive", chips: [{ kind: "Neutral", label: "Too small" }], detail: "sda" }]) },
     { name: "The Command menu's", for: "tall, clear, tight; one selection slides between rows", sample: () => well(RESULTS, { slides: true }) },
     { name: "Loading", for: "a scan with nothing found yet", sample: () => well([{ title: "", loading: true, share: 0.6 }, { title: "", loading: true, share: 0.45 }, { title: "", loading: true, share: 0.75 }]) },
+    { name: "Sections and a note", for: "labels over their rows; a note where none are", sample: () => well(SECTIONS()) },
+    { name: "A failed note", for: "in `error`: what went wrong", sample: () => well([listLabel("Nearby", false), listNote("Discovery failed: the adapter is busy", true)]) },
+    { name: "A drawer, closed", for: "its line says what it holds; Show", sample: () => well([NETWORKS[2]!, listDisclosure("2 unnamed devices", { open: false })]) },
+    { name: "A drawer, open", for: "Hide, its chevron turned; the rows under it", sample: () => well([listDisclosure("2 unnamed devices", { open: true }), ...UNNAMED]) },
+    { name: "Forget ×, on a saved row", for: "quiet until the row is lit; Delete too", sample: () => well(SECTIONS(), { current: 2, pinned: "lit", focused: true }) },
+    { name: "Reordering", for: "the dragged row lifted, the drop line where it lands", sample: () => well([dropLine(), LAYOUTS[0]!, { ...LAYOUTS[1]!, lifted: true }, LAYOUTS[2]!]) },
+    { name: "Adding", for: "a + where the tick would be, on the current row", sample: () => well([{ title: "Polish", subtitle: "pl", icon: "keyboard", tile: true, adds: true }, { title: "Polish (legacy)", subtitle: "pl(legacy)", icon: "keyboard", tile: true, adds: true }], { current: 0, focused: true }) },
     { name: "With the keyboard", for: "the well's tube lit, and its row", sample: () => well(NETWORKS, { current: 1, focused: true }) },
   ],
   sizes: [
@@ -243,8 +258,10 @@ export default page({
       { keys: ["Page Down", "Page Up"], does: "a page of rows, held at the ends" },
       { keys: ["Enter"], does: "takes the row: picks, opens or turns it" },
       { keys: ["Alt+↑", "Alt+↓"], does: "the owner's: moves a row in a reorderable list" },
+      { keys: ["Delete"], does: "forgets a saved row, as its × does" },
+      { keys: ["Enter"], does: "on a disclosure line: Show or Hide" },
     ],
-    order: "One stop for Tab; disabled and loading rows are passed over.",
+    order: "One stop for Tab; disabled and loading rows, labels and notes are passed over.",
     lands: "On its picked row, else the row it was last on, else its first.",
   },
   measures: {
@@ -253,11 +270,17 @@ export default page({
       { name: "One-line rows", for: "height, the 20 symbol, keycaps", sample: () => well(POWER) },
       { name: "The Command menu's", for: "a tall row's md tile, tight words, keycaps", sample: () => well(RESULTS) },
       { name: "Chips and a detail", for: "a chip, a detail, the tick's room", sample: () => well([ROWS[3]!.spec]) },
+      { name: "Sections, a note, a drawer", for: "labels, the note, the disclosure line", sample: () => well([...SECTIONS(), listDisclosure("2 unnamed devices", { open: false })]) },
     ]),
     measures: [
       { part: "One-line row", token: "size-row" },
       { part: "Two-line or tall row", token: "size-row_two_line" },
       { part: "Well padding", token: "space-s8" },
+      { part: "Label, note, disclosure inset", token: "space-s12" },
+      { part: "Label clear of rows above", token: "space-s12" },
+      { part: "Note and disclosure line", token: "size-row" },
+      { part: "Forget ×, Show and Hide", token: "size-control_sm" },
+      { part: "Drop line", token: "stroke-thin" },
       { part: "Row inset, after a `clear` tile", token: "space-s16" },
       { part: "Between a row's parts", token: "space-s12" },
       { part: "Between rows, title → subtitle, keycaps", token: "space-s4" },
