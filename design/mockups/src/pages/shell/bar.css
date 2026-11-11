@@ -93,10 +93,11 @@
   border: max(var(--stroke-hairline_device_px), round(nearest, var(--stroke-thin), var(--stroke-hairline_device_px))) solid var(--color-error);
 }
 
-/* A system monitor reading: as wide as "100%" at least, its text at the right. */
+/* A system monitor reading: as wide as "100%" at least, so the pill keeps its width as the numbers
+   change; its text at the left, straight after its symbol, the room it doesn't use after it. */
 .shell-reading {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   flex: none;
   min-width: round(up, calc(var(--widest) * var(--px) - 0.001px), 1px);
 }

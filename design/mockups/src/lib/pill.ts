@@ -7,6 +7,10 @@
 // `lib.css`), lit only by the pointer: it is never a stop for Tab, so a panel's keyboard focus never
 // wanders into the bar. Its name shows in a hint under it while it is lit. When its content changes
 // width it eases to the new width over `medium`, cutting its content at its own edge meanwhile.
+//
+// A symbol and its own value (a reading, a battery's share, a count down) are one thing in the row:
+// `space.s4` apart, the value straight after its symbol (`paired`). Room a value is held to, so its
+// neighbours stay put as it changes, falls after it, never between it and its symbol.
 
 import { pin, type Pinned } from "./control.ts";
 import { focusRing, type Tone } from "./focus.ts";
@@ -44,6 +48,11 @@ export interface Pill {
   readonly element: HTMLElement;
   /** Puts `content` in it, easing its width from the old content's to the new's. */
   readonly change: (content: readonly Element[]) => void;
+}
+
+/** A symbol and its own value, `space.s4` apart: one thing in a pill's row. */
+export function paired(symbol: Element, value: Element): HTMLElement {
+  return row("s4", "centre", symbol, value);
 }
 
 /** A pill as an element, for a sample that never changes its content. */

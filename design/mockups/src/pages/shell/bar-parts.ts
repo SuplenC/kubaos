@@ -8,10 +8,9 @@ import { badgedIcon } from "../../lib/badge.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { icon } from "../../lib/icon.ts";
 import { iconButton } from "../../lib/icon-button.ts";
-import { row } from "../../lib/layout.ts";
 import { meter } from "../../lib/meter.ts";
 import { sparkline, minute } from "../../lib/meter.ts";
-import { makePill, type Pill, type PillOptions, pill } from "../../lib/pill.ts";
+import { makePill, type Pill, type PillOptions, paired, pill } from "../../lib/pill.ts";
 import { type Screen, screen } from "../../lib/sheet.ts";
 import { advance, clamped, text } from "../../lib/text.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
@@ -74,7 +73,7 @@ export function statusContent(options: StatusOptions = {}): Element[] {
   if (battery) {
     const tone = battery.low ? "error" : battery.charging ? "primary" : "on_surface_variant";
     const name = battery.charging ? "battery_charging_full" : `battery_${Math.min(3, Math.floor(battery.percent / 25))}_bar`;
-    parts.push(row("s4", "centre", glyph(name, tone), text(`${battery.percent}%`, "mono", "on_surface")));
+    parts.push(paired(glyph(name, tone), text(`${battery.percent}%`, "mono", "on_surface")));
   }
   return parts;
 }
@@ -112,7 +111,7 @@ export interface IdleOptions {
 export function idleContent(options: IdleOptions): Element[] {
   const parts: Element[] = [];
   if (options.keepAwake ?? true) parts.push(glyph("coffee", "tertiary"));
-  if (options.scheduled) parts.push(glyph(options.scheduled.icon, "tertiary"), text(options.scheduled.left, "mono", "on_surface"));
+  if (options.scheduled) parts.push(paired(glyph(options.scheduled.icon, "tertiary"), text(options.scheduled.left, "mono", "on_surface")));
   return parts;
 }
 
@@ -171,7 +170,7 @@ export function recordingContent(options: RecordingOptions = {}): Element[] {
   const dot = document.createElement("span");
   dot.className = "shell-dot";
   dot.toggleAttribute("data-hollow", options.replay ?? false);
-  return [dot, text(options.replay ? "Replay 30 s" : (options.elapsed ?? "1:23"), "mono", "on_error_container")];
+  return [paired(dot, text(options.replay ? "Replay 30 s" : (options.elapsed ?? "1:23"), "mono", "on_error_container"))];
 }
 
 export function recordingPill(options: RecordingOptions = {}): HTMLElement {
@@ -217,7 +216,7 @@ function tintOf(level: number): string {
   return level === 2 ? "error" : level === 1 ? "warning" : "on_surface_variant";
 }
 
-/** A reading's words, right-aligned in a box as wide as "100%" at least. */
+/** A reading's words, in a box as wide as "100%" at least, the room it doesn't use after them. */
 function readingWords(reading: Reading): HTMLElement {
   const box = document.createElement("span");
   box.className = "shell-reading";
@@ -231,22 +230,22 @@ function readingShape(seed: number): (second: number) => number {
 }
 
 export function sysmonContent(options: SysmonOptions = {}): Element[] {
-  if (options.offering) return [row("s4", "centre", glyph("visibility_off"), text("Hide", "label", "on_surface"))];
+  if (options.offering) return [paired(glyph("visibility_off"), text("Hide", "label", "on_surface"))];
   const style = options.style ?? "numbers";
   const parts: Element[] = (options.readings ?? READINGS).map((reading, index) => {
     const level = reading.level ?? 0;
     const ink = level > 0 ? tintOf(level) : "primary";
-    const shown: Element[] = [glyph(reading.icon, tintOf(level))];
+    let value: Element;
     if (style === "bars" && !reading.unscaled) {
       const bar = meter([{ share: reading.fill, color: ink }]);
       bar.dataset.compact = "";
-      shown.push(bar);
+      value = bar;
     } else if (style === "sparklines") {
-      shown.push(sparkline({ samples: minute(600_000, readingShape(index)), color: ink, inline: true }).box);
+      value = sparkline({ samples: minute(600_000, readingShape(index)), color: ink, inline: true }).box;
     } else {
-      shown.push(readingWords(reading));
+      value = readingWords(reading);
     }
-    return row("s4", "centre", ...shown);
+    return paired(glyph(reading.icon, tintOf(level)), value);
   });
   if (options.fullDisk) parts.push(glyph("hard_drive", "error"));
   return parts;
