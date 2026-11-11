@@ -17,7 +17,7 @@ import { iconButton } from "../../lib/icon-button.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { keyHints } from "../../lib/keycap.ts";
 import { container, fill, filling, gap, grid, header, row, stack } from "../../lib/layout.ts";
-import { dropLine, type ListItem, listDisclosure, listLabel, listNote, type ListRowSpec, listRow, type RowPinned, scrolled, scrollingList } from "../../lib/list.ts";
+import { dropLine, type ListItem, listDisclosure, listLabel, listNote, type ListRowSpec, listRow, listRows, type RowPinned, scrolled, scrollingList } from "../../lib/list.ts";
 import { hang, screen, sheet } from "../../lib/sheet.ts";
 import { slider } from "../../lib/slider.ts";
 import { switchControl } from "../../lib/switch.ts";
@@ -380,10 +380,14 @@ export const LAYOUTS: readonly { readonly name: string; readonly spelling: strin
 
 export interface KeyboardOptions {
   readonly layouts?: readonly { readonly name: string; readonly spelling: string }[];
-  /** The layout typed with. */
+  /** The layout typed with: its row ticked. */
   readonly active?: number;
-  /** The focused row, the toolbar's. */
+  /** The row the keys are on, lit as any list's, which the toolbar acts on; none at rest. */
   readonly selected?: number;
+  /** How the row the keys are on is pinned: lit, or pressed. */
+  readonly pinned?: RowPinned;
+  /** A row taken, by a press or Enter: the live sample types with it. */
+  readonly onTake?: (index: number) => void;
   readonly accents?: boolean;
   /** The Mac accents tooltip shown. */
   readonly explaining?: boolean;
@@ -401,17 +405,23 @@ function accentsChip(on: boolean, explaining: boolean): HTMLElement {
   return stack("s8", "start", tip, made);
 }
 
-/** The layouts' well: the rows, the default first on its star, and the toolbar at its foot. */
+/**
+ * The layouts' well: the rows, and the toolbar at its foot. It is a list as the radio tabs' are: the
+ * first row is the default by its place alone, the layout typed with is ticked, and the row under
+ * the pointer or the keys is lit, nothing at rest.
+ */
 export function keyboardTab(options: KeyboardOptions = {}): HTMLElement {
   const layouts = options.layouts ?? LAYOUTS;
   const active = options.active ?? 0;
   const selected = options.selected ?? -1;
   const rows: HTMLElement[] = [];
+  const parts: HTMLElement[] = [];
   layouts.forEach((layout, index) => {
     const lifted = options.drag?.from === index;
-    const made = listRow({ title: layout.name, subtitle: layout.spelling, icon: index === 0 ? "star_filled" : "keyboard", tile: true, accent: index === 0, checked: index === active, lifted }, index === selected || lifted);
-    if (options.drag && options.drag.to === index && options.drag.to < options.drag.from) rows.push(dropLine());
-    rows.push(filling(made));
+    const made = listRow({ title: layout.name, subtitle: layout.spelling, icon: "keyboard", tile: true, accent: index === active, checked: index === active, lifted }, index === selected || lifted, index === selected ? (options.pinned ?? "lit") : undefined);
+    if (options.drag && options.drag.to === index && options.drag.to < options.drag.from) parts.push(dropLine());
+    rows.push(made);
+    parts.push(filling(made));
   });
   const toolbar = row(
     "s4",
@@ -427,8 +437,13 @@ export function keyboardTab(options: KeyboardOptions = {}): HTMLElement {
   grow.className = "cc-grow";
   const column = document.createElement("span");
   column.className = "cc-keys";
-  column.append(...rows, grow, filling(toolbar));
+  column.append(...parts, grow, filling(toolbar));
   const box = wellOf(column);
+  const pane = box.querySelector<HTMLElement>(".k-list-pane");
+  listRows(box, pane, () => rows, {
+    ...(selected >= 0 ? { current: selected, pinned: options.pinned ?? "lit", focused: true } : {}),
+    ...(options.onTake ? { onTake: options.onTake } : {}),
+  });
   if (!options.problem) return box;
   return stack("s12", "start", filling(box), clamped(options.problem, "body", "error"));
 }

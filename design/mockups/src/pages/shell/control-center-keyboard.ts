@@ -1,6 +1,8 @@
 // The control center's Output and Keyboard tabs (`OutputList.qml`, `KeyboardList.qml`,
-// `KeyboardAddView.qml`): the audio outputs, the default checked; the keyboard layouts, the default
-// first on a star, with the toolbar at the well's foot, and "Add a language" in the same well.
+// `KeyboardAddView.qml`): the audio outputs, the default checked; the keyboard layouts, a list as
+// the radio tabs' are (the first the default by its place, the one typed with ticked on an accent tile, the row under
+// the pointer or the keys lit), with the toolbar at the well's foot, and "Add a language" in the
+// same well.
 
 import type { Words } from "../../lib/content.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
@@ -13,11 +15,20 @@ const keys = (options: KeyboardOptions = {}) => alone(keyboardTab(options));
 
 const FOUR = [...LAYOUTS, { name: "Polish", spelling: "pl" }, { name: "Japanese", spelling: "jp" }];
 
-/** The stage: + opens the add view in the well; Back goes back. */
+/** The stage: a row taken types with it, its tick moving; + opens the add view; Back goes back. */
 function live(): HTMLElement {
-  const room = alone(keyboardTab({ selected: 1 }));
+  let active = 0;
+  const room = alone(keyboardTab());
   const draw = (adding: boolean) => {
-    const made = adding ? addView() : keyboardTab({ selected: 1 });
+    const made = adding
+      ? addView()
+      : keyboardTab({
+          active,
+          onTake: (index) => {
+            active = index;
+            draw(false);
+          },
+        });
     const target = adding ? made.querySelector<HTMLElement>(".k-button") : [...made.querySelectorAll<HTMLElement>(".k-button")].find((each) => each.getAttribute("aria-label") === "Add a language");
     target?.addEventListener("click", () => draw(!adding));
     room.replaceChildren(made);
@@ -31,13 +42,13 @@ function cell(state: Shown): HTMLElement {
     case "rest":
       return keys();
     case "lit":
-      return keys({ selected: 1, explaining: true });
+      return keys({ selected: 1 });
     case "pressed":
-      return keys({ drag: { from: 1, to: 0 }, selected: 1 });
+      return keys({ selected: 1, pinned: "pressed" });
     case "selected":
-      return keys({ selected: 1, active: 1 });
+      return keys({ active: 1 });
     case "disabled":
-      return keys({ layouts: FOUR, selected: 0 });
+      return keys({ layouts: FOUR });
     case "loading":
       return alone(addView({ empty: "searching", query: "" }));
     case "empty":
@@ -55,11 +66,12 @@ export default page<Shown>({
   title: "Output and Keyboard tabs",
   lede: "The audio outputs, and the keyboard layouts with their toolbar and the add view in one well.",
   code: { qml: "KeyboardList" },
-  stage: { live, hint: "press + to add a language; Back returns", daylight: true },
+  stage: { live, hint: "point at a layout; press it to type with it; + adds", daylight: true },
   variants: [
     { name: "Outputs", for: "the default checked, its line says so", sample: () => alone(outputs()) },
-    { name: "Layouts", for: "the default on a star, the one typed checked", sample: () => keys() },
-    { name: "A row focused", for: "the toolbar acts on it", sample: () => keys({ selected: 1 }) },
+    { name: "Layouts", for: "the first is the default; the one typed ticked", sample: () => keys() },
+    { name: "The keys on a row", for: "lit as any list's; the toolbar acts on it", sample: () => keys({ selected: 1 }) },
+    { name: "Typing with the second", for: "its tick; the first stays the default", sample: () => keys({ active: 1 }) },
     { name: "Mac accents' tooltip", for: "what the chip does, its keys", sample: () => keys({ explaining: true }) },
     { name: "Dragging a layout", for: "lifted; the drop line where it lands", sample: () => keys({ drag: { from: 1, to: 0 }, selected: 1 }) },
     { name: "Add a language", for: "Back, the search, its matches", sample: () => alone(addView()) },
@@ -70,10 +82,10 @@ export default page<Shown>({
     absent: {},
     rows: [{ name: "Keyboard tab", cell }],
     looks: {
-      rest: "the default's star `primary`; the one typed checked",
-      lit: "the chip lit: its tooltip over it",
-      pressed: "a row dragged at `opacity.subdued`; the drop line `primary`",
-      selected: "typing with the second: its check",
+      rest: "no row lit; the one typed with ticked",
+      lit: "the row under the pointer or keys, as any list's",
+      pressed: "the lit row's fill presses",
+      selected: "typing with the second: the tick moves, the order stays",
       disabled: "four layouts, the most: + off",
       loading: "the add view while the search starts",
       empty: "no layout matches",
@@ -94,7 +106,7 @@ export default page<Shown>({
       { name: "A layout's name", words: NAME, sample: (words: string) => keys({ layouts: [LAYOUTS[0]!, { name: words, spelling: "us(altgr-intl)" }] }) },
       { name: "An output's name", words: { short: "WH-1000XM4", long: "Built-in Audio Analog Stereo, Headphones on the front jack" }, sample: (words: string) => alone(outputs([OUTPUTS[0]!, { ...OUTPUTS[1]!, title: words }])) },
     ],
-    missingPicture: doesntApply("every row's symbol is fixed: a star, a keyboard, a speaker."),
+    missingPicture: doesntApply("every row's symbol is fixed: a keyboard, a speaker."),
     counts: [
       { name: "One layout", for: "× and the arrows off", sample: () => keys({ layouts: LAYOUTS.slice(0, 1), selected: 0 }) },
       { name: "Four layouts", for: "the most: + off", sample: () => keys({ layouts: FOUR }) },
@@ -116,7 +128,7 @@ export default page<Shown>({
       { keys: ["↑", "↓", "Ctrl+J", "Ctrl+K"], does: "through the layouts or outputs" },
       { keys: ["Enter"], does: "types with the layout; an output becomes default" },
       { keys: ["Alt+↑", "Alt+↓", "Shift+J", "Shift+K"], does: "moves the focused layout" },
-      { keys: ["d"], does: "makes it the default" },
+      { keys: ["d"], does: "makes it the default: moves it to the top" },
       { keys: ["x", "Delete"], does: "removes it" },
       { keys: ["Tab"], does: "on to the toolbar" },
       { keys: ["←", "Esc"], does: "in the add view: back to the layouts" },
