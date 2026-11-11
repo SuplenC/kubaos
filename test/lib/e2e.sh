@@ -3105,8 +3105,8 @@ c_suite_go() {
   [[ $(zlogin 'whence -p gopls') == "$installs/go-golang-org-x-tools-gopls/"*/bin/gopls ]] ||
     { echo "FAIL an interactive zsh doesn't put mise's own entries ahead of the shims: $(zlogin 'whence -p gopls')"; return 1; }
   # mise's hook would point GOBIN at the bin of the Go it activates; the
-  # Suite's default for mise leaves it to Go, whose own is ~/go/bin.
-  [[ -z $(zlogin 'print -r -- "$GOBIN"; go env GOBIN') && $(zlogin 'go env GOPATH') == "$USER_HOME/go" ]] ||
+  # Suite's default for mise leaves it unset, and Go's own is ~/go/bin.
+  [[ -z $(zlogin 'print -r -- "$GOBIN"') && $(zlogin 'go env GOBIN') == "$USER_HOME/go/bin" ]] ||
     { echo "FAIL go install doesn't go to ~/go/bin: $(zlogin 'go env GOBIN GOPATH' | tr '\n' ' ')"; return 1; }
   echo "ok   ~/go/bin on PATH and Go's own GOBIN; the shims ahead of ~/.nix-profile/bin, behind mise's hook in an interactive zsh"
 
@@ -3141,8 +3141,10 @@ c_suite_go() {
   grep -qE '^cache ~/.cache/go-build \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" &&
     grep -qx '  ~/.config/kubaos/editor/nvim/plugins/go.lua' <<<"$out" && [[ -f $project/main.go ]] ||
     { echo "FAIL remove: the build cache's size, the user's go.lua, or the project"; printf '%s\n' "$out"; return 1; }
-  [[ ! -e $frag && -z $(compgen -G "$installs/go*") && -z $(compgen -G "$installs/aqua-*") ]] ||
-    { echo "FAIL remove: the fragment or a version is left"; ls "$installs"; return 1; }
+  # A pruned tool keeps its folder and mise's .mise.backend.toml in it; its
+  # versions are the folders inside.
+  [[ ! -e $frag && -z $(find "$installs"/go* "$installs"/aqua-* -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
+    { echo "FAIL remove: the fragment or a version is left"; ls -R "$installs" | head -40; return 1; }
   for t in "${tools[@]}" kubaos-go-new; do
     [[ ! -e $shims/$t ]] && ! zrun "whence -p $t" >/dev/null || { echo "FAIL $t is still on PATH"; return 1; }
   done
