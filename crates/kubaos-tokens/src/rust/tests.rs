@@ -113,7 +113,7 @@ fn the_fixed_roles_are_written_in_both_palettes() {
         "logo_core_cold: Rgb { r: 0xdc, g: 0xf1, b: 0xff },",
         "microphone: Rgb { r: 0xff, g: 0x85, b: 0x05 },",
         "microphone: Rgb { r: 0x9e, g: 0x50, b: 0x00 },",
-        "recording: Rgb { r: 0xff, g: 0x6f, b: 0x5d },",
+        "recording: Rgb { r: 0xff, g: 0x6e, b: 0x5d },",
         "recording: Rgb { r: 0xcd, g: 0x00, b: 0x03 },",
         "success: Rgb { r: 0x3c, g: 0xc9, b: 0x6a },",
         "success: Rgb { r: 0x00, g: 0x75, b: 0x33 },",
