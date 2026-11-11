@@ -7,13 +7,14 @@ import wallpaper from "../../../../../crates/kubaos-kobo/assets/wallpaper.jpg?ur
 import { badgedIcon } from "../../lib/badge.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { icon } from "../../lib/icon.ts";
-import { iconButton } from "../../lib/icon-button.ts";
 import { meter } from "../../lib/meter.ts";
 import { sparkline, minute } from "../../lib/meter.ts";
 import { makePill, type Pill, type PillOptions, paired, pill } from "../../lib/pill.ts";
 import { type Screen, screen } from "../../lib/sheet.ts";
 import { advance, clamped, text } from "../../lib/text.ts";
+import { length } from "../../lib/tokens.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
+import { settings } from "../../site/settings.ts";
 import { workspaces, type WorkspacesOptions, SHOTS_GROUPS } from "./workspaces.ts";
 
 export { wallpaper };
@@ -150,12 +151,9 @@ export function updatePill(count?: number, state: Shown = "rest"): HTMLElement {
 
 export const BRANCH = "issue-228-live-preview";
 
+/** The live preview: its symbol alone, on the cold tint, the branch in its hint. */
 export function previewPill(branch = BRANCH, state: Shown = "rest"): HTMLElement {
-  const name = clamped(branch, "label", "cold");
-  name.classList.add("shell-preview-name");
-  const made = control([icon("code", "var(--type-label-icon)", "var(--color-cold)"), name], `Live preview of feature/${branch}. Click to go back to the release`, state, { tone: "preview", gap: "s4" });
-  made.classList.add("shell-preview");
-  return made;
+  return control([icon("code", "var(--icon-s16)", "var(--color-cold)")], `Live preview of feature/${branch}. Click to go back to the release`, state, { tone: "preview", lone: true });
 }
 
 // Recording.
@@ -306,12 +304,6 @@ export function trayPill(apps: readonly TrayApp[] = TRAY, pinned?: { index: numb
   return pill({ lone: false, end: "s4", gap: 0, content: apps.map((app, index) => trayItem(app, pinned?.index === index ? pinned.state : undefined)) });
 }
 
-// The power button.
-
-export function powerButton(state: Shown = "rest"): HTMLElement {
-  return iconButton({ icon: "power_settings_new", label: "Power", kind: "Tonal", size: "Sm", ...stateOptions(state) });
-}
-
 // The window title.
 
 export const TITLE = "kubaos — nvim config/quickshell/modules/bar/Workspaces.qml";
@@ -323,58 +315,332 @@ export function title(words = TITLE): HTMLElement {
   return box;
 }
 
-// The whole bar.
+// The ⋯: the tray's apps, and what folds in with them, behind one symbol.
 
-export interface BarOptions {
-  readonly workspaces?: WorkspacesOptions;
-  readonly preview?: boolean;
-  readonly title?: string;
-  readonly clock?: ClockOptions;
-  /** The right group, left to right; the everyday one when left out. */
-  readonly right?: readonly Element[];
+export function morePill(state: Shown = "rest"): HTMLElement {
+  return control([glyph("more")], "Tray apps, the update and the preview", state, { lone: true });
+}
+
+// The system monitor, compact: its readings as rings in one circle, the rim CPU.
+
+/** A compact reading: its share 0–1 and its step against its limit. */
+export interface Load {
+  readonly share: number;
+  readonly level?: 0 | 1 | 2;
+}
+
+const RIM_TONES = ["primary", "cold", "on_surface_variant"] as const;
+export const LOADS: readonly Load[] = READINGS.map((reading) => ({ share: reading.fill }));
+
+/**
+ * CPU, RAM and temperature as rings edge to edge in the pill's circle, CPU its rim: each ring
+ * `space.s4` less a device hairline thick, their middles `space.s4` apart, so a hairline parts them;
+ * each over its track at `opacity.spinner_track`, `warning` near its limit and `error` past it.
+ */
+export function rimPill(loads: readonly Load[] = LOADS, state: Shown = "rest"): HTMLElement {
+  const scale = settings().scale;
+  const side = length("size-control_sm");
+  const step = length("space-s4");
+  const stroke = step - 1 / scale;
+  const middle = side / 2;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${side} ${side}`);
+  svg.classList.add("shell-rim");
+  svg.innerHTML = loads
+    .map((load, index) => {
+      const tone = load.level === 2 ? "error" : load.level === 1 ? "warning" : RIM_TONES[index]!;
+      const radius = middle - stroke / 2 - step * index;
+      const ring = `cx="${middle}" cy="${middle}" r="${radius}" fill="none" stroke-width="${stroke}"`;
+      return `<circle ${ring} class="shell-rim-track" style="--tone: var(--color-${tone})"/>` +
+        (load.share > 0 ? `<circle ${ring} class="shell-rim-arc" style="--tone: var(--color-${tone})" pathLength="100" stroke-dasharray="${(load.share * 100).toFixed(2)} 100" transform="rotate(-90 ${middle} ${middle})"/>` : "");
+    })
+    .join("");
+  const made = control([svg], `CPU ${Math.round(loads[0]!.share * 100)}%  ·  RAM ${Math.round((loads[1]?.share ?? 0) * 100)}%  ·  61 °C`, state, { lone: true });
+  made.classList.add("shell-rim-pill");
+  return made;
+}
+
+// The status pill as it sheds.
+
+export interface ShedOptions {
+  /** How far it has shed: 0 all, 1 the battery's share gone, then a symbol from the left each, 5 the battery alone. */
+  readonly shed?: number;
+  /** The bell, its own half, leading. */
+  readonly bell?: boolean;
+  /** The ⋯, its own half, before the bell. */
+  readonly more?: boolean;
   readonly state?: Shown;
 }
 
-/** The right group as the shots' stand-ins fill it: everything on. */
-export function everyRight(state: Shown = "rest"): Element[] {
-  return [recordingPill({ state }), idlePill({ state }), proxyPill(false, state), keyboardPill("US", state), updatePill(undefined, state), trayPill(), sysmonPill({ state }), bellPill(false, state), statusPill({ state }), powerButton(state)];
+export function shedStatus(options: ShedOptions = {}): HTMLElement {
+  const shed = options.shed ?? 0;
+  const parts: Element[] = [];
+  if (options.more) parts.push(glyph("more"));
+  if (options.bell) parts.push(glyph("notifications"));
+  parts.push(...["balance", "signal_wifi_4_bar", "bluetooth", "volume_up"].slice(Math.max(0, shed - 1)).map((name) => glyph(name)));
+  parts.push(shed === 0 ? paired(glyph("battery_2_bar"), text("64%", "mono", "on_surface")) : glyph("battery_2_bar"));
+  return control(parts, "Home 5G  ·  Volume 60%  ·  Battery 64%", options.state ?? "rest", { lone: parts.length === 1 });
+}
+
+// The clock as it compacts.
+
+export interface CompactClock {
+  readonly kanji?: boolean;
+  readonly date?: "full" | "day" | "none";
+  readonly countdown?: boolean;
+  /** Recording merged into it: the recording pill's look, its dot leading. */
+  readonly recording?: boolean;
+  readonly state?: Shown;
+}
+
+export function compactClock(options: CompactClock = {}): HTMLElement {
+  const recording = options.recording ?? false;
+  const ink = (role: string) => (recording ? "on_error_container" : role);
+  const parts: Element[] = [];
+  if (recording) {
+    const dot = document.createElement("span");
+    dot.className = "shell-dot";
+    parts.push(dot);
+  }
+  if (options.kanji ?? true) parts.push(text(CLOCK.kanji, "accent", ink("tertiary")));
+  const date = options.date ?? "full";
+  if (date !== "none") parts.push(text(date === "full" ? CLOCK.date : "Tue 27", "body", ink("on_surface_variant")));
+  parts.push(text(CLOCK.time, "mono_large", ink("on_surface")));
+  if (options.countdown) parts.push(text(CLOCK.countdown, "body", ink("tertiary")));
+  return control(parts, recording ? "Recording. Tuesday, 27 October 2026" : "Tuesday, 27 October 2026", options.state ?? "rest", recording ? { tone: "recording" } : {});
+}
+
+// The whole bar: what it holds, and the order it gives way in as it narrows.
+
+/** What the bar holds at full width. */
+export interface BarContent {
+  readonly recording: boolean;
+  readonly keepAwake: boolean;
+  readonly proxy: boolean;
+  readonly layout: boolean;
+  readonly update: boolean;
+  readonly preview: boolean;
+  readonly tray: boolean;
+  readonly countdown: boolean;
+  readonly title: string;
+  readonly readings: 2 | 3;
+  readonly borrowed: boolean;
+}
+
+/** Every pill at once, as the shots' stand-ins hold them. */
+export const EVERYTHING: BarContent = { recording: true, keepAwake: true, proxy: true, layout: true, update: true, preview: true, tray: true, countdown: true, title: TITLE, readings: 3, borrowed: true };
+/** An ordinary day: the tray, the system monitor's two default readings, the bell, status. */
+export const EVERYDAY: BarContent = { recording: false, keepAwake: false, proxy: false, layout: false, update: false, preview: false, tray: true, countdown: false, title: TITLE, readings: 2, borrowed: false };
+
+/** How far each part has given way. */
+interface BarState {
+  title: boolean;
+  layout: boolean;
+  countdown: boolean;
+  idle: boolean;
+  date: "full" | "day" | "none";
+  recording: "time" | "dot" | "clock";
+  tray: "open" | "folded";
+  update: boolean;
+  preview: boolean;
+  name: boolean;
+  ghosts: boolean;
+  sysmon: "numbers" | "rings";
+  shed: number;
+  current: boolean;
+  bell: boolean;
+  tight: boolean;
+  more: boolean;
+  tighter: boolean;
+}
+
+const FULL: BarState = { title: true, layout: true, countdown: true, idle: true, date: "full", recording: "time", tray: "open", update: true, preview: true, name: true, ghosts: true, sysmon: "numbers", shed: 0, current: false, bell: false, tight: false, more: false, tighter: false };
+
+/** Where a rung's part sits: the left, the right, or the clock in the middle. */
+type Side = "left" | "right" | "clock";
+
+/** One step of giving way: the side it frees, what it says, and what it changes. */
+export interface Rung {
+  readonly side: Side;
+  readonly says: string;
+  readonly apply: (state: BarState) => void;
 }
 
 /**
- * The right group on an ordinary day: the tray, the system monitor with its default readings (CPU
- * and RAM), the bell, status, power.
+ * The order the bar gives way in, Kuba's and its proposals: the title first, then the layout; what
+ * only shows state before what opens something; the clock, the system monitor, status and the bell
+ * always there, and the recording's dot never gone. A rung is taken only while its side runs short
+ * of the clock's clear space (a clock rung, while either side does), and nothing else goes while
+ * the title still shows.
  */
-export function everydayRight(state: Shown = "rest"): Element[] {
-  return [trayPill(), sysmonPill({ readings: READINGS.slice(0, 2), state }), bellPill(false, state), statusPill({ state }), powerButton(state)];
+export const RUNGS: readonly Rung[] = [
+  { side: "left", says: "Title gone", apply: (s) => void (s.title = false) },
+  { side: "left", says: "Keyboard layout goes", apply: (s) => void (s.layout = false) },
+  { side: "clock", says: "Countdown goes", apply: (s) => void (s.countdown = false) },
+  { side: "left", says: "Keep awake and Proxy go", apply: (s) => void (s.idle = false) },
+  { side: "clock", says: "Date drops the month", apply: (s) => void (s.date = "day") },
+  { side: "clock", says: "Date goes", apply: (s) => void (s.date = "none") },
+  { side: "left", says: "Recording keeps its dot", apply: (s) => void (s.recording = "dot") },
+  { side: "right", says: "Tray apps fold into ⋯", apply: (s) => void (s.tray = "folded") },
+  { side: "left", says: "Update joins ⋯", apply: (s) => void (s.update = false) },
+  { side: "left", says: "Preview joins ⋯", apply: (s) => void (s.preview = false) },
+  { side: "left", says: "Group name goes", apply: (s) => void (s.name = false) },
+  { side: "left", says: "Ghosts go", apply: (s) => void (s.ghosts = false) },
+  { side: "right", says: "System monitor turns to rings", apply: (s) => void (s.sysmon = "rings") },
+  { side: "right", says: "Battery % goes", apply: (s) => void (s.shed = 1) },
+  { side: "right", says: "Power mode goes", apply: (s) => void (s.shed = 2) },
+  { side: "right", says: "Network goes", apply: (s) => void (s.shed = 3) },
+  { side: "right", says: "Bluetooth goes", apply: (s) => void (s.shed = 4) },
+  { side: "right", says: "Sound goes", apply: (s) => void (s.shed = 5) },
+  { side: "left", says: "Workspaces: the current one alone", apply: (s) => void (s.current = true) },
+  { side: "right", says: "Bell joins the status pill", apply: (s) => void (s.bell = true) },
+  { side: "left", says: "Recording moves onto the clock", apply: (s) => void (s.recording = "clock") },
+  { side: "clock", says: "Clock: space.s16 clear, kanji goes", apply: (s) => void (s.tight = true) },
+  { side: "right", says: "⋯ folds into the status pill", apply: (s) => void (s.more = true) },
+  { side: "clock", says: "Clock: space.s8 clear", apply: (s) => void (s.tighter = true) },
+];
+
+function stateOf(taken: ReadonlySet<number>): BarState {
+  const state = { ...FULL };
+  RUNGS.forEach((rung, index) => taken.has(index) && rung.apply(state));
+  return state;
 }
 
-/** The bar's row: the left group, the clock centred, the right group. */
-export function barRow(options: BarOptions = {}): HTMLElement {
-  const state = options.state ?? "rest";
+/** The workspaces as the state shows them: every group, or the shown one alone. */
+function workspacesFor(content: BarContent, state: BarState, options: WorkspacesOptions = {}): HTMLElement {
+  if (state.current) return workspaces({ groups: [{ block: 0, spaces: [{ id: 2, occupied: true }] }], active: 2 });
+  const own = state.ghosts ? SHOTS_GROUPS[0]! : { ...SHOTS_GROUPS[0]!, spaces: SHOTS_GROUPS[0]!.spaces.slice(0, 2) };
+  const desk = SHOTS_GROUPS[1]!;
+  const borrowed = { ...desk, ...(state.name ? {} : { name: "" }), spaces: state.ghosts ? desk.spaces : desk.spaces.slice(0, 1) };
+  return workspaces({ groups: content.borrowed ? [own, borrowed] : [own], ...options });
+}
+
+interface Drawn {
+  readonly row: HTMLElement;
+  readonly left: HTMLElement;
+  readonly clock: HTMLElement;
+  readonly right: HTMLElement;
+  readonly title: HTMLElement | null;
+}
+
+/** The bar's row in `state`: the left, the clock centred, the right. */
+function draw(content: BarContent, state: BarState, shown: Shown, options: WorkspacesOptions = {}): Drawn {
   const left = document.createElement("span");
   left.className = "shell-bar-left";
-  left.append(workspaces({ groups: SHOTS_GROUPS, ...options.workspaces }));
-  if (options.preview) left.append(previewPill(BRANCH, state));
-  if (options.title !== "") left.append(title(options.title));
+  left.append(workspacesFor(content, state, options));
+  if (content.preview && state.preview) left.append(previewPill(BRANCH, shown));
+  if (content.recording && state.recording !== "clock") left.append(state.recording === "dot" ? recordingDot(shown) : recordingPill({ state: shown }));
+  if (content.keepAwake && state.idle) left.append(idlePill({ state: shown }));
+  if (content.proxy && state.idle) left.append(proxyPill(false, shown));
+  if (content.layout && state.layout) left.append(keyboardPill("US", shown));
+  if (content.update && state.update) left.append(updatePill(undefined, shown));
+  const titled = content.title !== "" && state.title ? title(content.title) : null;
+  if (titled) left.append(titled);
+  const clock = compactClock({ kanji: !state.tight, date: state.date, countdown: content.countdown && state.countdown, recording: content.recording && state.recording === "clock", state: shown });
   const right = document.createElement("span");
   right.className = "shell-bar-right";
-  right.append(...(options.right ?? everydayRight(state)));
-  const bar = document.createElement("span");
-  bar.className = "shell-bar-row";
-  bar.append(left, clockPill({ ...options.clock, state }), right);
-  return bar;
+  const folded = state.tray === "folded" || (content.update && !state.update) || (content.preview && !state.preview);
+  if (!state.more) right.append(content.tray && !folded ? trayPill() : morePill(shown));
+  right.append(state.sysmon === "rings" ? rimPill(LOADS.slice(0, 3), shown) : sysmonPill({ readings: READINGS.slice(0, content.readings), state: shown }));
+  if (!state.bell) right.append(bellPill(false, shown));
+  right.append(shedStatus({ shed: state.shed, bell: state.bell, more: state.more, state: shown }));
+  const row = document.createElement("span");
+  row.className = "shell-bar-row";
+  row.style.setProperty("--clear", `var(--space-${state.tighter ? "s8" : state.tight ? "s16" : "s40"})`);
+  row.append(left, clock, right);
+  return { row, left, clock, right, title: titled };
 }
 
-/** The bar on a screen `width` by `height`, its frame round the wallpaper. */
-export function barScreen(width: string, height: string, options: BarOptions = {}): Screen {
-  return screen({ width, height, wallpaper, bar: [barRow(options)] });
+/** The recording's dot alone, its time in its hint. */
+function recordingDot(shown: Shown): HTMLElement {
+  const dot = document.createElement("span");
+  dot.className = "shell-dot";
+  const made = control([dot], "Recording 1:23. Click to stop", shown, { tone: "recording", end: "s12" });
+  return made;
 }
 
-/** The bar alone, `width` wide, on the frame's glass. */
-export function barStrip(width: string, options: BarOptions = {}): HTMLElement {
+/** A rung's state's fit at `width` logical pixels, measured where the page draws. */
+interface Measured {
+  readonly leftFits: boolean;
+  readonly rightFits: boolean;
+  readonly titleRoom: number;
+}
+
+function measure(width: number, content: BarContent, state: BarState): Measured {
+  const host = document.createElement("span");
+  host.style.cssText = "position:absolute;visibility:hidden;left:0;top:0";
   const strip = document.createElement("span");
   strip.className = "shell-bar-strip";
-  strip.style.setProperty("--strip-width", width);
-  strip.append(barRow(options));
+  strip.style.setProperty("--strip-width", `calc(${width} * var(--px))`);
+  const drawn = draw(content, { ...state, title: false }, "rest");
+  strip.append(drawn.row);
+  host.append(strip);
+  (document.getElementById("page") ?? document.body).append(host);
+  const scale = Number(getComputedStyle(host).getPropertyValue("--scale")) || 1;
+  const of = (element: Element) => element.getBoundingClientRect().width / scale;
+  const gap = length("space-s8");
+  // Each side's own pills and their gaps: its grid column shrinks with the bar, its pills don't.
+  const need = (side: HTMLElement) => {
+    const items = [...side.children];
+    return items.reduce((sum, each) => sum + of(each), 0) + gap * (items.length - 1);
+  };
+  const leftNeed = need(drawn.left);
+  const rightNeed = need(drawn.right);
+  const clockWidth = of(drawn.clock);
+  host.remove();
+  const clear = length(state.tighter ? "space-s8" : state.tight ? "space-s16" : "space-s40");
+  const half = (width - 2 * gap - clockWidth) / 2;
+  return { leftFits: leftNeed + clear <= half, rightFits: rightNeed + clear <= half, titleRoom: half - clear - leftNeed - length("space-s12") };
+}
+
+/** The rungs the bar takes at `width` logical pixels to clear its centred clock, and its state. */
+export function fitBar(width: number, content: BarContent): { readonly taken: ReadonlySet<number>; readonly state: BarState; readonly fits: boolean } {
+  const taken = new Set<number>();
+  let got = measure(width, content, stateOf(taken));
+  const fits = () => got.leftFits && got.rightFits;
+  for (let index = 1; index < RUNGS.length && !fits(); index++) {
+    const side = RUNGS[index]!.side;
+    const short = side === "left" ? !got.leftFits : side === "right" ? !got.rightFits : true;
+    if (!short) continue;
+    taken.add(index);
+    got = measure(width, content, stateOf(taken));
+  }
+  // The title goes first: once anything else has given way, or under space.s48 × 2 of room.
+  if (taken.size > 0 || got.titleRoom < 2 * length("space-s48")) taken.add(0);
+  return { taken, state: stateOf(taken), fits: fits() };
+}
+
+export interface BarOptions {
+  /** The bar's width in logical pixels. */
+  readonly width: number;
+  readonly content?: BarContent;
+  readonly workspaces?: WorkspacesOptions;
+  readonly state?: Shown;
+}
+
+/** The bar alone, `width` logical pixels wide, on the frame's glass, given way as far as it needs. */
+export function barStrip(options: BarOptions): HTMLElement {
+  const content = options.content ?? EVERYDAY;
+  const { state } = fitBar(options.width, content);
+  const strip = document.createElement("span");
+  strip.className = "shell-bar-strip";
+  strip.style.setProperty("--strip-width", `calc(${options.width} * var(--px))`);
+  strip.append(draw(content, state, options.state ?? "rest", options.workspaces).row);
   return strip;
+}
+
+/** The bar on a screen `width` logical pixels by `height` (a length's CSS), its frame round the wallpaper. */
+export function barScreen(width: number, height: string, options: Omit<BarOptions, "width"> = {}): Screen {
+  const content = options.content ?? EVERYDAY;
+  // Inside the frame's sides, as a strip of the screen's width is inside its own.
+  const { state } = fitBar(width, content);
+  return screen({ width: `calc(${width} * var(--px))`, height, wallpaper, bar: [draw(content, state, options.state ?? "rest", options.workspaces).row] });
+}
+
+/** A window size's width in logical pixels. */
+export function logicalWidth(css: string): number {
+  const calc = /calc\((\d+) \* var\(--px\)\)/.exec(css);
+  if (calc) return Number(calc[1]);
+  const token = /var\(--([a-z0-9_-]+)\)/.exec(css);
+  return token ? length(token[1]!) : 0;
 }

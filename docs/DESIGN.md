@@ -498,6 +498,7 @@ Each component has a page of its own under `design/components/`: its constructor
 
 - [Sheet](design/components/sheet.md)
 - [Pill](design/components/pill.md)
+- [Bar](design/components/bar.md)
 
 ### Rules every component keeps
 
