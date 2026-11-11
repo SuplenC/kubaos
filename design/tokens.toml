@@ -389,10 +389,11 @@ family = "sans"
 use = "The lock screen's clock at rest, the wallpaper round it."
 
 # The kicker above the lock's clock: one line in two families, where and which day in M PLUS 1,
-# then the date in Geist, medium, at rest and awake alike. Two styles, since a style has one family
-# and Geist draws no kanji. Its size is the clock's share, `scale.lock_date` of it
-# (`scale.lock_date_portrait` on a portrait screen), never under `size.lock_date_least`; 20 on a
-# 24 line is what that comes to beside the 384 clock of a 1080 tall screen.
+# then the date in Geist, medium. Two styles, since a style has one family and Geist draws no
+# kanji. Its size and its gap are the clock's share as the clock is drawn now, at rest, awake and
+# along its flight alike: `scale.lock_date` and `scale.lock_date_gap` of it (the portrait pair on a
+# portrait screen), never under `size.lock_date_least`; 20 on a 24 line is what that comes to beside
+# the 384 rest clock of a 1080 tall screen, about 16 beside it awake.
 [type.clock_place]
 size = 20
 line = 24
