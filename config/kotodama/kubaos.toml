@@ -1157,16 +1157,15 @@ run = ["kubaos", "update", "--turn-off", "nix"]
 shown_when = { state = "update.nix", is = true }
 
 # Project pins (`kubaos pin`, crates/kubaos-core/src/pins.rs): a Suite
-# version for a folder and everything below it, as `use suite NAME VERSION`
-# in its .envrc. They run in a terminal, which says what the pin changes and
-# whether the version is fetched on the first cd. A typed folder may start
-# with ~.
+# version for a folder and everything below it, as the Suite's tool in its
+# mise.toml. They run in a terminal, which shows mise installing the version
+# and says what the pin changes. A typed folder may start with ~.
 
 [extensions.kubaos.actions.pin]
 title = "Pin a Suite version…"
 subtitle = "This folder uses Node 22: a version for a folder and everything in it"
 icon = "view-pin"
-keywords = ["project pin", "suite", "version", "envrc", "direnv", "legacy", "nvm", "toolchain"]
+keywords = ["project pin", "suite", "version", "mise.toml", "mise", "legacy", "nvm", "toolchain"]
 keyword = "pin"
 run = ["kubaos", "pin", "{suite}", "{version}", "{folder}"]
 arguments = [
@@ -1180,7 +1179,7 @@ terminal = true
 title = "Unpin a Suite version…"
 subtitle = "The folder goes back to the installed version"
 icon = "list-remove"
-keywords = ["project pin", "suite", "version", "envrc", "direnv", "remove"]
+keywords = ["project pin", "suite", "version", "mise.toml", "mise", "remove"]
 keyword = "unpin"
 run = ["kubaos", "unpin", "{suite}", "{folder}"]
 arguments = [{ name = "suite", placeholder = "node" }, { name = "folder", placeholder = "~/Projects/acme" }]
@@ -1188,9 +1187,9 @@ terminal = true
 
 [extensions.kubaos.actions.pins]
 title = "Project pins"
-subtitle = "Every pinned Suite version under ~/Projects, and whether it's in the store yet"
+subtitle = "Every pinned Suite version under ~/Projects, and whether mise has it installed"
 icon = "view-pin"
-keywords = ["project pin", "suite", "version", "envrc", "direnv", "list"]
+keywords = ["project pin", "suite", "version", "mise.toml", "mise", "list"]
 run = ["kubaos", "pins", "--all"]
 terminal = true
 

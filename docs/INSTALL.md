@@ -139,7 +139,7 @@ stays the lock screen (hypridle's `lock_cmd` already falls back to it) and
 `hyprpolkitagent` stays the polkit agent (the in-shell agent is off by
 default).
 
-**SSH, git signing or `.envrc` secrets don't work.** `kubaos bitwarden check`,
+**SSH, git signing or a project's Bitwarden variables don't work.** `kubaos bitwarden check`,
 then `docs/SECRETS.md`, Troubleshooting.
 
 **home-manager: "path ... does not exist" or a new config dir is ignored.**

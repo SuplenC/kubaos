@@ -216,7 +216,7 @@
       #
       # rustfmt is the nightly one (rustfmtNightly). RUSTFMT points `cargo fmt`
       # and rust-analyzer at it, and it comes first on PATH for an editor that
-      # runs `rustfmt` itself; editors get the shell through direnv (.envrc).
+      # runs `rustfmt` itself; an editor started from `nix develop` gets it.
       # `just fmt` and `just fmt-check` refuse a rustfmt that isn't nightly.
       #
       # Cargo compiles through sccache, its cache under ~/.cache/sccache, so a

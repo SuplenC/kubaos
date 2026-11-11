@@ -605,8 +605,9 @@ fn module_versions(text: &str) -> Vec<String> {
 }
 
 #[test]
-fn every_suite_s_module_declares_the_versions_of_its_catalog_entry() {
-    for suite in catalog::all() {
+fn a_suite_its_module_builds_declares_the_versions_of_its_catalog_entry() {
+    let from_mise = |suite: &Suite| suite.mise.iter().any(|tool| tool.request == Request::Suite);
+    for suite in catalog::all().filter(|suite| !from_mise(suite)) {
         assert_eq!(
             module_versions(&module(suite)),
             suite.versions,

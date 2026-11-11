@@ -8,10 +8,11 @@
 # - kubaos-test-suite-greet, with the `greeting` extra.
 # - KUBAOS_TEST_SUITE_VERSION, and ~/.local/share/kubaos-test-suite/bin on PATH.
 # - A Neovim setting in the Defaults: LazyVim's opts gain kubaos_test_suite.
-# - kubaos-test-suite at each version for Project pins (pins.nix), declared
-#   only while the Suite is installed, so a real home never lists it. Its
-#   command is in a `bin` output beside `out`, as most nixpkgs toolchains'
-#   are, so the pins check covers a toolchain that isn't `out`.
+# - kubaos-test-suite's command is in a `bin` output beside `out`, as most
+#   nixpkgs toolchains' are.
+#
+# Project pins of the test Suite pin its mise tool, kubaos-test-tool
+# (test/mise/), not this package.
 {
   config,
   lib,
@@ -21,13 +22,6 @@
 let
   suite = config.kubaos.suites.test or null;
   version = if suite == null || suite.version == null then "1" else suite.version;
-  # The catalog's versions (crates/kubaos-core/src/suites/catalog.rs).
-  versions = [
-    "1"
-    "2"
-    "3"
-  ];
-
   scriptAt =
     version:
     pkgs.writeShellScript "kubaos-test-suite" ''
@@ -71,6 +65,5 @@ in
     kubaos.nvim.suiteSpecs = [
       ''{ "LazyVim/LazyVim", opts = { kubaos_test_suite = { greeting = "from the test Suite", version = "${version}" } } }''
     ];
-    kubaos.suiteToolchains.test = lib.genAttrs versions toolchainAt;
   };
 }

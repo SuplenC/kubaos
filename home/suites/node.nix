@@ -10,8 +10,7 @@
 # cache stays at its own ~/.npm and Bun's is ~/.cache/bun. The catalog lists
 # all four as the Suite's caches.
 #
-# `kubaos-node-new DIR` is the Node + TypeScript scaffolder. Every Node major
-# is a toolchain for Project pins, installed or not.
+# `kubaos-node-new DIR` is the Node + TypeScript scaffolder.
 {
   config,
   lib,
@@ -100,7 +99,6 @@ let
 in
 {
   config = lib.mkMerge [
-    { kubaos.suiteToolchains.node = lib.genAttrs versions nodeAt; }
     (lib.mkIf (suite != null) {
       home.packages = [
         node

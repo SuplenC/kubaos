@@ -3,15 +3,17 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
 
-use kubaos_core::pins::Fetch;
+use kubaos_core::pins::Leftover;
+use kubaos_core::pins::LeftoverKind;
 use kubaos_core::pins::Pin;
 use kubaos_core::pins::PinStatus;
-use kubaos_core::pins::Resolution;
 use kubaos_core::state::Paths;
+use kubaos_core::suites::catalog;
 
+use super::describe;
 use super::expand_tilde;
+use super::leftover_json;
 use super::normalize;
-use super::resolution_json;
 use super::status_json;
 
 #[test]
@@ -35,31 +37,55 @@ fn dots_in_a_folder_are_worked_out_from_the_text_as_cd_does() {
     assert_eq!(normalize(Path::new("/p/acme/")), Path::new("/p/acme"));
 }
 
+fn status(config: PathBuf, selected: Option<&str>, fetched: bool) -> PinStatus {
+    PinStatus {
+        pin: Pin {
+            suite: "test".to_owned(),
+            tool: "kubaos-test-tool".to_owned(),
+            version: "3".to_owned(),
+            config,
+        },
+        suite: catalog::find("go").expect("a shipped Suite"),
+        installed: None,
+        selected: selected.map(str::to_owned),
+        fetched,
+    }
+}
+
 #[test]
 fn json_carries_a_path_that_is_not_utf8() {
     let folder = PathBuf::from(OsStr::from_bytes(b"/p/caf\xe9"));
-    let envrc = folder.join(".envrc");
-    let pin = Pin {
-        suite: "test".to_owned(),
-        version: "1".to_owned(),
-        envrc: envrc.clone(),
-    };
-    let status = PinStatus {
-        pin: pin.clone(),
-        suite: None,
-        installed: None,
-        toolchain: Fetch::Missing,
-    };
-    let resolution = Resolution {
-        nearest: Some(envrc),
-        pins: vec![pin],
-        hidden: Vec::new(),
+    let left = Leftover {
+        envrc: folder.join(".envrc"),
+        line: 2,
+        kind: LeftoverKind::Bwenv {
+            projects: vec!["web".into()],
+        },
     };
 
-    let one = resolution_json(&folder, &resolution, std::slice::from_ref(&status));
-    let row = status_json(&status);
+    let row = status_json(&status(folder.join("mise.toml"), Some("3.0.0"), true));
+    let left = leftover_json(&left);
 
-    assert_eq!(one["folder"], "/p/caf\u{fffd}");
-    assert_eq!(one["pins"][0]["envrc"], "/p/caf\u{fffd}/.envrc");
-    assert_eq!(row["envrc"], "/p/caf\u{fffd}/.envrc");
+    assert_eq!(row["config"], "/p/caf\u{fffd}/mise.toml");
+    assert_eq!(row["selected"], "3.0.0");
+    assert_eq!(left["envrc"], "/p/caf\u{fffd}/.envrc");
+    assert_eq!(left["kind"], "bwenv");
+}
+
+#[test]
+fn a_pin_reads_as_the_suites_state_and_the_version_mise_selects() {
+    let config = PathBuf::from("/p/mise.toml");
+
+    assert_eq!(
+        describe(&status(config.clone(), Some("3.0.0"), true)),
+        "Suite not installed; 3.0.0"
+    );
+    assert_eq!(
+        describe(&status(config.clone(), Some("3.0.0"), false)),
+        "Suite not installed; 3.0.0 not installed: `mise install` in the folder"
+    );
+    assert_eq!(
+        describe(&status(config, None, false)),
+        "Suite not installed; another config in the folder wins"
+    );
 }

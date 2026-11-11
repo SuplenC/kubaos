@@ -174,10 +174,10 @@ impl Paths {
         self.state.join("backups")
     }
 
-    /// The toolchain of every Suite version a Project pin can name, one file per version at
-    /// `<suite>/<version>`, `~/.local/share/kubaos/toolchains`. `home/pins.nix` writes them.
-    pub fn toolchains(&self) -> PathBuf {
-        self.data.join("kubaos/toolchains")
+    /// The script a project's `mise.toml` sources for its Bitwarden variables,
+    /// `~/.local/share/kubaos/bwenv.sh`. `home/secrets.nix` writes it.
+    pub fn bwenv_script(&self) -> PathBuf {
+        self.data.join("kubaos/bwenv.sh")
     }
 
     /// mise's config folder, `~/.config/mise` unless `MISE_CONFIG_DIR` moves it. The user's own

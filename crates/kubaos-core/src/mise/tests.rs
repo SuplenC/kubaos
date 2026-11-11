@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use super::ListedVersion;
 use super::OutdatedTool;
 use super::ToolRequest;
+use super::last_line;
 use super::parse_list;
 use super::parse_outdated;
 
@@ -88,4 +89,22 @@ fn mise_outdated_json_reads_as_one_entry_per_tool() {
 fn nothing_installed_reads_as_no_versions() {
     assert_eq!(parse_list(b"{}").unwrap(), []);
     assert_eq!(parse_outdated(b"{}").unwrap(), []);
+}
+
+#[test]
+fn a_failure_is_the_line_before_the_version_and_the_hint_mise_ends_with() {
+    let stderr = "mise ERROR error parsing config file: ~/p/mise.toml\n\
+                  mise ERROR Config files in ~/p/mise.toml are not trusted.\n\
+                  Trust them with `mise trust`. See https://mise.jdx.dev/cli/trust.html for more information.\n\
+                  mise ERROR Version: 2026.11.6 linux-x64 (1980-01-01)\n\
+                  mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information\n";
+
+    assert_eq!(
+        last_line(stderr),
+        "Trust them with `mise trust`. See https://mise.jdx.dev/cli/trust.html for more information."
+    );
+    assert_eq!(
+        last_line("mise ERROR no version of x\n\n"),
+        "mise ERROR no version of x"
+    );
 }

@@ -73,7 +73,7 @@ An optional, KubaOS-managed setup that the user can install, configure and later
 _Avoid_: Toolchain, language pack, dev environment
 
 **Project pin**:
-A per-folder choice of a **Suite**'s version that applies to that folder and everything below it, overriding the globally installed version.
+A per-folder choice of a **Suite**'s version that applies to that folder and everything below it, overriding the globally installed version. It is the Suite's main tool in the folder's `mise.toml` (`node = "22"`).
 _Avoid_: Local version, override, `.tool-versions`
 
 ## Workspace

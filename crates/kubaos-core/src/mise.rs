@@ -2,13 +2,14 @@
 //!
 //! KubaOS runs mise from the filesystem's root, outside any project, and never with `--global`,
 //! which reads only the user's own `config.toml`: a Suite's tools live in its fragment in
-//! `conf.d/`, which mise loads with every other config (`Paths::mise_config`).
+//! `conf.d/`, which mise loads with every other config (`Paths::mise_config`). The one exception
+//! is [`Mise::current`], which runs in a project's folder to read its Project pins.
 //!
 //! # Owns
 //!
 //! - The [`Mise`] seam and its real implementation, [`Cli`], which runs the `mise` on `PATH`.
-//! - Reading mise's JSON: the versions `mise ls --json` lists and the updates `mise outdated
-//!   --json` finds.
+//! - Reading mise's JSON: the versions `mise ls --json` lists, the ones `mise ls --current --json`
+//!   selects in a folder, and the updates `mise outdated --json` finds.
 //!
 //! # Not here
 //!
@@ -19,6 +20,7 @@ use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt;
 use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
@@ -94,6 +96,23 @@ pub trait Mise: fmt::Debug + Send + Sync {
     ///
     /// [`MiseError`] when mise can't start, fails or prints something else.
     fn list(&self) -> Result<Vec<ListedVersion>, MiseError>;
+
+    /// The version of each tool mise selects in `folder`, from the folder's configs, its parents'
+    /// and the global ones, with the config each comes from. mise runs in the folder, which
+    /// records the folder's configs as tracked, so [`Mise::prune`] keeps the versions they select
+    /// while they exist.
+    ///
+    /// # Errors
+    ///
+    /// [`MiseError`] when mise can't start, fails or prints something else.
+    fn current(&self, folder: &Path) -> Result<Vec<ListedVersion>, MiseError>;
+
+    /// Trusts `config`, so mise loads the parts of it that run code or set the environment.
+    ///
+    /// # Errors
+    ///
+    /// [`MiseError`] when mise can't start or fails.
+    fn trust(&self, config: &Path) -> Result<(), MiseError>;
 
     /// The tools with a newer release: within their request, or past it with `bump`.
     ///
@@ -219,11 +238,15 @@ impl Cli {
     }
 
     fn command(&self, args: &[&str]) -> Command {
+        self.command_in(&self.cwd, args)
+    }
+
+    fn command_in(&self, cwd: &Path, args: &[&str]) -> Command {
         let mut command = Command::new(&self.program);
         // `MISE_YES` answers mise's own prompts (prune's, a plugin's install) as a script must.
         command
             .args(args)
-            .current_dir(&self.cwd)
+            .current_dir(cwd)
             .env("MISE_YES", "1")
             .stdin(Stdio::null());
         command
@@ -259,7 +282,12 @@ impl Cli {
 
     /// Runs mise and keeps what it prints.
     fn run_captured(&self, args: &[&str]) -> Result<Output, MiseError> {
-        let out = self.command(args).output().map_err(|source| MiseError::Spawn {
+        self.capture(self.command(args), args)
+    }
+
+    /// Runs `command`, mise with `args`, and keeps what it prints.
+    fn capture(&self, mut command: Command, args: &[&str]) -> Result<Output, MiseError> {
+        let out = command.output().map_err(|source| MiseError::Spawn {
             program: self.program_name(),
             source,
         })?;
@@ -302,6 +330,25 @@ impl Mise for Cli {
             command: args.join(" "),
             source,
         })
+    }
+
+    fn current(&self, folder: &Path) -> Result<Vec<ListedVersion>, MiseError> {
+        let args = ["ls", "--current", "--json"];
+        // HAZARD: no `MISE_YES` here. mise answers its trust prompt with it, so reading a cloned
+        // project's folder would trust the hooks and environment of its config unasked.
+        let mut command = self.command_in(folder, &args);
+        command.env_remove("MISE_YES");
+        let out = self.capture(command, &args)?;
+        parse_list(&out.stdout).map_err(|source| MiseError::Output {
+            command: args.join(" "),
+            source,
+        })
+    }
+
+    fn trust(&self, config: &Path) -> Result<(), MiseError> {
+        let mut command = self.command(&["trust"]);
+        command.arg(config);
+        self.capture(command, &["trust", &config.to_string_lossy()]).map(drop)
     }
 
     fn outdated(&self, bump: bool) -> Result<Vec<OutdatedTool>, MiseError> {
@@ -427,12 +474,13 @@ pub fn parse_outdated(json: &[u8]) -> Result<Vec<OutdatedTool>, serde_json::Erro
         .collect())
 }
 
-/// The last line `stderr` holds, which is where mise says what failed.
+/// The last line `stderr` holds, which is where mise says what failed, before the two lines its
+/// errors end with: its version, and how to see more.
 fn last_line(stderr: &str) -> String {
     stderr
         .lines()
         .map(str::trim)
-        .rfind(|line| !line.is_empty())
+        .rfind(|line| !line.is_empty() && !line.contains("ERROR Version:") && !line.contains("MISE_VERBOSE"))
         .unwrap_or_default()
         .to_owned()
 }

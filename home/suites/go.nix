@@ -1,11 +1,10 @@
 # The Go Suite (crates/kubaos-core/src/suites/catalog.rs, GO): Go from the
 # user's nixpkgs at the chosen version, its tools, and LazyVim's Go extra.
-# Installs nothing without kubaos.d/suites/go.toml; its toolchains for Project
-# pins are declared in every home.
+# Installs nothing without kubaos.d/suites/go.toml.
 #
 # - go, at the version kubaos.d/suites/go.toml names, with GOTOOLCHAIN=local:
 #   a go.mod asking for a newer Go fails with a message instead of go
-#   downloading one past Nix, and a Project pin is the way to another version.
+#   downloading one past Nix.
 # - gopls, gofumpt, goimports (gotools), golangci-lint and delve (dlv), from
 #   nixpkgs, which LazyVim's Go extra finds on PATH instead of installing its
 #   own copies through Mason (go.lua).
@@ -86,8 +85,6 @@ let
 in
 {
   config = lib.mkMerge [
-    { kubaos.suiteToolchains.go = toolchains; }
-
     (lib.mkIf (suite != null) {
       home.packages = [
         go

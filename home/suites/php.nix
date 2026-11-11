@@ -9,8 +9,7 @@
 # its home (config, auth.json) stays where composer keeps it.
 #
 # `kubaos-php-new DIR` is the plain composer scaffolder; Laravel's is
-# composer's own `create-project`. Every PHP 8 release is a toolchain for
-# Project pins, with its composer, installed or not.
+# composer's own `create-project`.
 {
   config,
   lib,
@@ -39,8 +38,8 @@ let
         xdebug.start_with_request = trigger
       '';
     };
-  # PHP and the composer that runs on it, so a pinned folder's composer
-  # resolves dependencies for the pinned PHP.
+  # PHP and the composer that runs on it, so composer resolves dependencies
+  # for this PHP.
   toolchainAt =
     version:
     let
@@ -98,7 +97,6 @@ let
 in
 {
   config = lib.mkMerge [
-    { kubaos.suiteToolchains.php = lib.genAttrs versions toolchainAt; }
     (lib.mkIf (suite != null) {
       home.packages = [
         (toolchainAt version)

@@ -87,7 +87,7 @@ enum Cmd {
         #[command(subcommand)]
         cmd: suite::SuiteCmd,
     },
-    /// Pin a Suite version for a folder and everything below it, in its .envrc.
+    /// Pin a Suite version for a folder and everything below it, in its mise.toml.
     Pin(pin::PinArgs),
     /// Remove a folder's pin of a Suite.
     Unpin(pin::UnpinArgs),

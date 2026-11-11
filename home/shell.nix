@@ -1,5 +1,5 @@
-# zsh: KubaOS's shell, with oh-my-zsh, fzf, atuin, direnv, mise, zoxide and
-# the oh-my-posh prompt.
+# zsh: KubaOS's shell, with oh-my-zsh, fzf, atuin, mise, zoxide and the
+# oh-my-posh prompt.
 #
 # programs.zsh writes ~/.zshrc, ~/.zshenv and ~/.zprofile. Order of
 # programs.zsh.initContent (lower runs first):
@@ -8,7 +8,7 @@
 #   900   FZF_CTRL_R_COMMAND="" (keeps fzf off Ctrl-R)
 #   910   fzf (Ctrl-T, Alt-C)
 #   1000  aliases, oh-my-posh
-#   1010  direnv hook, mise's hook, atuin (Ctrl-R)
+#   1010  mise's hook, atuin (Ctrl-R)
 #   1890  the Proxy's variables, while it is on
 #   1900  the user layer's zshrc (~/.config/kubaos/terminal/zsh/zshrc)
 #   1950  the greeting: fastfetch in a new Ghostty window
@@ -22,8 +22,12 @@
 # dev.nix, each installed Suite's in its module under suites/. mise's hook is
 # the exception: before each prompt it puts the tools of the Suites' mise
 # fragments (~/.config/mise/conf.d/kubaos-*.toml) and of the folder's own
-# mise.toml at the front of PATH, ahead of ~/.nix-profile/bin, so a tool's
-# own commands are never shadowed by a Nix one of the same name.
+# mise.toml (its Project pins) at the front of PATH, ahead of
+# ~/.nix-profile/bin, so a tool's own commands are never shadowed by a Nix one
+# of the same name, and sets the folder's [env]. It is the only directory
+# hook: direnv isn't installed, since mise calls running the two together
+# unsupported (both rewrite PATH). A project with a flake devshell runs
+# `nix develop`.
 {
   config,
   kubaosPkgs,
@@ -117,7 +121,7 @@ in
     };
 
     initContent = lib.mkMerge [
-      # Forking oh-my-posh, atuin, fzf, direnv, mise and zoxide for their init
+      # Forking oh-my-posh, atuin, fzf, mise and zoxide for their init
       # scripts cost 7 ms of each start in the harness. `_kubaos_init NAME
       # CMD...` sources NAME's cached output of CMD, and runs CMD to write it
       # when the file is missing or empty.
@@ -235,18 +239,8 @@ in
         precmd_functions=(_dot_omp_init ''${precmd_functions:#_dot_omp_init})
       ''
 
-      # Where the direnv and atuin modules put their hooks. mise's hook is
-      # added after direnv's, so it runs after it before each prompt and
-      # its entries end up first on PATH.
-      # HAZARD: mise and direnv both rewrite PATH, which mise calls
-      # unsupported. Here direnv only ever adds a `use suite` pin or a
-      # `use flake` devshell, which a Suite on mise doesn't use.
+      # Where the atuin module puts its hook.
       (lib.mkOrder 1010 ''
-        ${cachedInit "direnv" [
-          (lib.getExe config.programs.direnv.package)
-          "hook"
-          "zsh"
-        ]}
         ${cachedInit "mise" [ miseActivate ]}
         if [[ $options[zle] = on ]]; then
           ${cachedInit "atuin" (
@@ -355,13 +349,6 @@ in
   # falls back to its plain theme meanwhile.
   xdg.configFile."atuin/themes/matugen.toml".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.local/state/theme/atuin.toml";
-
-  programs.direnv = {
-    enable = true;
-    # Initialised from the cache in initContent.
-    enableZshIntegration = false;
-    nix-direnv.enable = true;
-  };
 
   programs.zoxide = {
     enable = true;

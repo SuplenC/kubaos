@@ -1,4 +1,4 @@
-# Plain CLI tools. zsh/fzf/zoxide/atuin/direnv/oh-my-posh live in shell.nix,
+# Plain CLI tools. zsh/fzf/zoxide/atuin/mise/oh-my-posh live in shell.nix,
 # tmux/tms/ghostty in terminal.nix. lazygit, btop, nvim and git configs come
 # from config/ (links.nix), so they are installed as packages only (no
 # programs.<x>.settings).

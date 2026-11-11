@@ -1,6 +1,7 @@
 //! A mise for the tests: it knows a few versions of each tool, installs and uninstalls them in
-//! memory, reads the fragments in `conf.d/` as the real one reads its configs, and keeps the
-//! global lockfile beside them in the shape mise writes (`lockfile_version = 4`).
+//! memory, reads the fragments in `conf.d/` and, in a folder, the `mise.toml` files of the folder
+//! and those above it (`.mise.toml` and the `.local` ones too) as the real one reads its configs,
+//! and keeps the global lockfile beside them in the shape mise writes (`lockfile_version = 4`).
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -34,6 +35,8 @@ struct State {
     tracked: Vec<PathBuf>,
     /// Every call, as `mise <args>`.
     calls: Vec<String>,
+    /// Whether [`Mise::current`] fails.
+    current_fails: bool,
 }
 
 impl FakeMise {
@@ -69,6 +72,14 @@ impl FakeMise {
     /// Tracks a config outside `conf.d/`, as mise tracks a project's once it has read it there.
     pub(crate) fn track(&self, config: PathBuf) {
         self.state().tracked.push(config);
+    }
+
+    pub(crate) fn tracked(&self) -> Vec<PathBuf> {
+        self.state().tracked.clone()
+    }
+
+    pub(crate) fn fail_current(&self) {
+        self.state().current_fails = true;
     }
 
     pub(crate) fn installed(&self) -> Vec<String> {
@@ -325,6 +336,57 @@ impl Mise for FakeMise {
         Ok(())
     }
 
+    fn current(&self, folder: &Path) -> Result<Vec<ListedVersion>, MiseError> {
+        self.record(format!("mise ls --current --json in {}", folder.display()));
+        if self.state().current_fails {
+            return Err(MiseError::Failed {
+                command: "ls --current --json".into(),
+                status: "exit status: 1".into(),
+                message: "the fake fails".into(),
+            });
+        }
+        let mut configs = Vec::new();
+        for dir in folder.ancestors() {
+            for name in ["mise.local.toml", ".mise.local.toml", "mise.toml", ".mise.toml"] {
+                let config = dir.join(name);
+                if config.is_file() {
+                    configs.push(config);
+                }
+            }
+        }
+        {
+            let mut state = self.state();
+            for config in &configs {
+                if !state.tracked.contains(config) {
+                    state.tracked.push(config.clone());
+                }
+            }
+        }
+        let installed = self.state().installed.clone();
+        let mut listed: Vec<ListedVersion> = Vec::new();
+        let project = configs.iter().flat_map(|path| tools_of(path));
+        for (tool, request, path) in project.chain(self.requested()) {
+            if listed.iter().any(|l| l.tool == tool) {
+                continue;
+            }
+            let version = self.select(&tool, &request).unwrap_or_else(|| request.clone());
+            listed.push(ListedVersion {
+                installed: installed.contains(&(tool.clone(), version.clone())),
+                tool,
+                version,
+                requested: Some(request),
+                source: Some(path),
+            });
+        }
+        listed.sort_by(|a, b| a.tool.cmp(&b.tool));
+        Ok(listed)
+    }
+
+    fn trust(&self, config: &Path) -> Result<(), MiseError> {
+        self.record(format!("mise trust {}", config.display()));
+        Ok(())
+    }
+
     fn prune(&self) -> Result<(), MiseError> {
         self.record("mise prune --tools".into());
         let tracked: Vec<(String, String, PathBuf)> = self
@@ -332,6 +394,7 @@ impl Mise for FakeMise {
             .tracked
             .clone()
             .iter()
+            .filter(|path| path.is_file())
             .flat_map(|path| tools_of(path))
             .collect();
         let selected: BTreeSet<(String, String)> = self
@@ -366,7 +429,8 @@ fn on(version: &str, request: &str) -> bool {
     version == request || version.starts_with(&format!("{request}."))
 }
 
-/// The tools the config at `path` asks for, with the config.
+/// The tools the config at `path` asks for, with the config. A request that isn't a string is
+/// left out, as KubaOS leaves it to the user.
 fn tools_of(path: &Path) -> Vec<(String, String, PathBuf)> {
     let text = fs::read_to_string(path).expect("read a config");
     let table: toml::Table = toml::from_str(&text).expect("a config is TOML");
@@ -375,13 +439,7 @@ fn tools_of(path: &Path) -> Vec<(String, String, PathBuf)> {
         .and_then(|t| t.as_table())
         .into_iter()
         .flatten()
-        .map(|(tool, request)| {
-            (
-                tool.clone(),
-                request.as_str().expect("a string").to_owned(),
-                path.to_path_buf(),
-            )
-        })
+        .filter_map(|(tool, request)| Some((tool.clone(), request.as_str()?.to_owned(), path.to_path_buf())))
         .collect()
 }
 

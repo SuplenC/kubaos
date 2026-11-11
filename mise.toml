@@ -1,0 +1,7 @@
+# Tools for this checkout that a KubaOS home doesn't have already: mise's
+# shell hook puts them on PATH here. `just`, and the Rust Suite's toolchain,
+# cargo-nextest and sccache, come with the home. The toolchain `just check`
+# and CI run on, with the nightly rustfmt (RUSTFMT), is the flake's devshell:
+# `nix develop` (flake.nix).
+[tools]
+actionlint = "1.7"
