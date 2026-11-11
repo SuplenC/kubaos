@@ -135,16 +135,29 @@ packages = ["btrfs-progs", "snapper", "inotify-tools"]
 # libde265 decodes the HEVC inside an iPhone's HEIC. papers and
 # gnome-font-viewer bring the PDF and font thumbnailers with the viewers. File
 # Roller does the extracting, with 7zip and unar for 7z and RAR, since unrar
-# is non-free. python3-nautilus runs the right-click extensions. The gstreamer
-# plugins are the codecs Showtime plays with, which --no-install-recommends
-# would leave out.
+# is non-free. python3-nautilus runs the right-click extensions.
 [group.files]
 summary = "The file manager, its thumbnailers and viewers"
 packages = [
   "nautilus", "gnome-sushi", "gvfs-backends", "gvfs-fuse", "udisks2",
   "glycin-thumbnailers", "libheif-plugin-libde265", "ffmpegthumbnailer",
   "papers", "gnome-font-viewer", "file-roller", "7zip", "unar", "python3-nautilus",
-  "loupe", "showtime", "gstreamer1.0-plugins-good", "gstreamer1.0-libav",
+  "loupe", "showtime",
+]
+
+# The codecs Showtime, Sushi and the thumbnailers play with, all through
+# GStreamer, which --no-install-recommends would leave out. libav is FFmpeg's
+# decoders. plugins-bad reads MPEG-TS, HLS and DASH and has the parsers the
+# hardware decoders need; plugins-extra is Ubuntu's package for `va`, the
+# decoders on the GPU; plugins-ugly reads WMV and WMA (ASF). gstreamer1.0-tools
+# is `gst-inspect-1.0`, which says what a machine can play. ffmpeg is the
+# converter, and what `scripts/dot-theme` cuts a video wallpaper's poster with.
+[group.media]
+summary = "Video and audio codecs, and ffmpeg"
+packages = [
+  "gstreamer1.0-plugins-good", "gstreamer1.0-libav", "gstreamer1.0-plugins-bad",
+  "gstreamer1.0-plugins-extra", "gstreamer1.0-plugins-ugly", "gstreamer1.0-tools",
+  "ffmpeg",
 ]
 
 [group.fonts]

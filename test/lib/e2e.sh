@@ -3801,7 +3801,8 @@ c_files() {
 
   for want in inode/directory:org.gnome.Nautilus application/zip:org.gnome.Nautilus \
     application/x-7z-compressed:org.gnome.Nautilus image/png:org.gnome.Loupe image/heic:org.gnome.Loupe \
-    video/mp4:org.gnome.Showtime application/pdf:org.gnome.Papers; do
+    video/mp4:org.gnome.Showtime video/mp2t:org.gnome.Showtime video/x-ms-wmv:org.gnome.Showtime \
+    application/pdf:org.gnome.Papers; do
     out="$(as_user xdg-mime query default "${want%%:*}" 2>&1)"
     if [[ $out != "${want#*:}.desktop" ]]; then
       echo "FAIL xdg-mime's default for ${want%%:*} is '$out', not ${want#*:}.desktop"
@@ -3875,6 +3876,75 @@ for path in sys.argv[1:]:
   ((bad)) || echo "ok   Tidy Downloads leaves today's files, and the daily timer runs only when it's on"
 
   rm -rf "$stub" "$dir" "$USER_HOME/Downloads/report.pdf"
+  return "$bad"
+}
+
+# The codecs (the `media` group of `system/packages.toml`). ffmpeg writes a
+# one-second file of each format and GStreamer, which Showtime, Sushi and the
+# thumbnailers play through, decodes it to the end. Each file has one stream:
+# with two, playbin plays the one it can and a missing decoder is only a
+# warning. Decoding on the GPU needs one, so that is checked on the laptop.
+codec_sample() { # codec_sample FILE FFMPEG_ARGS...: a second of test video, or of a tone for an audio codec
+  local file="$1" source=(-f lavfi -i "testsrc2=size=128x72:rate=25" -pix_fmt yuv420p)
+  shift
+  [[ " $* " == *" -c:a "* ]] && source=(-f lavfi -i "sine=frequency=440:sample_rate=48000")
+  as_user ffmpeg -nostdin -loglevel error -y "${source[@]}" -t 1 "$@" "$file"
+}
+
+c_codecs() {
+  local dir bad=0 row file out rc
+  # The file, named for its codec and container, then ffmpeg's encoder for it.
+  local formats=(
+    "h264.mp4 -c:v libx264"
+    "h264.mov -c:v libx264"
+    "h264.m4v -c:v libx264"
+    "h264.ts -c:v libx264"
+    "h264.flv -c:v libx264"
+    "h264.3gp -c:v libx264"
+    "hevc.mkv -c:v libx265"
+    "hevc.mp4 -c:v libx265 -tag:v hvc1"
+    "av1.mkv -c:v libsvtav1"
+    "av1.mp4 -c:v libsvtav1"
+    "vp9.webm -c:v libvpx-vp9"
+    "vp8.webm -c:v libvpx"
+    "prores.mov -c:v prores_ks -pix_fmt yuv422p10le"
+    "mpeg4.avi -c:v mpeg4"
+    "mpeg2.mpg -c:v mpeg2video"
+    "theora.ogv -c:v libtheora"
+    "wmv.wmv -c:v wmv2"
+    "mp3.mp3 -c:a libmp3lame"
+    "aac.m4a -c:a aac"
+    "alac.m4a -c:a alac"
+    "flac.flac -c:a flac"
+    "opus.opus -c:a libopus"
+    "vorbis.ogg -c:a libvorbis"
+    "ac3.ac3 -c:a ac3"
+    "eac3.eac3 -c:a eac3"
+    "wma.wma -c:a wmav2"
+    "pcm.wav -c:a pcm_s16le"
+  )
+  dir="$(as_user mktemp -d)"
+
+  for row in "${formats[@]}"; do
+    file="$dir/${row%% *}"
+    # shellcheck disable=SC2086 # The row's encoder arguments are words.
+    if ! out="$(codec_sample "$file" ${row#* } 2>&1)"; then
+      echo "FAIL ffmpeg wrote no ${row%% *}: $out"
+      bad=1
+      continue
+    fi
+    rc=0
+    out="$(as_user timeout 30 gst-launch-1.0 playbin3 "uri=file://$file" \
+      video-sink=fakesink audio-sink=fakesink 2>&1)" || rc=$?
+    if ((rc)) || grep -qE '^(WARNING|ERROR)|[Mm]issing' <<<"$out"; then
+      echo "FAIL GStreamer can't play ${row%% *} (exit $rc):"
+      grep -E 'WARNING|ERROR|[Mm]issing' <<<"$out" | sort -u | head -3
+      bad=1
+    fi
+  done
+  ((bad)) || echo "ok   GStreamer decodes ${#formats[@]} formats ffmpeg wrote, from H.264 in MP4 to WMA"
+
+  rm -rf "$dir"
   return "$bad"
 }
 
@@ -4703,7 +4773,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node suite_python suite_proto dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files codecs automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node suite_python suite_proto dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

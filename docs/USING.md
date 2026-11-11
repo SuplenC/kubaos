@@ -58,7 +58,7 @@ In Files:
 - `Ctrl + H` shows hidden files, `Ctrl + L` takes a path, `Ctrl + 1` / `Ctrl + 2` switch list and grid.
 - Thumbnails cover images (HEIC and AVIF too), videos, PDFs and fonts, on network shares and phones as well. Files picks up the wallpaper's colours when it starts.
 
-Images open in Loupe, videos in Showtime, PDFs in Papers.
+Images open in Loupe, videos in Showtime, PDFs in Papers. The codecs come installed: H.264, HEVC, AV1, VP9, ProRes, MPEG-2 and WMV video, and AAC, MP3, FLAC, Opus, AC-3 and WMA audio, in MP4, MKV, WebM, MOV, AVI, MPEG-TS and the rest, decoded on the GPU where it can. `ffmpeg` converts between them, and `gst-inspect-1.0` lists what the machine can play.
 
 yazi opens from `SUPER + CTRL + F` or "Yazi" in the Command menu (your home folder), "Open folder in yazi…" (`open-folder` then a path, any folder, or a file, which opens in its folder with the cursor on it), "Open With" → Yazi in Files, or `y` in a shell: yazi in that terminal, and when you quit it, the shell `cd`s to where you ended up. Plain `yazi` leaves the shell where it was. `kubaos-files open [PATH|URI]...` does the same from a terminal: paths, `~`, and `file://` URIs, several at once as tabs.
 
