@@ -14,13 +14,17 @@ import {
   BRANCH,
   CLOCK,
   clockPill,
+  compactClock,
   idlePill,
   keyboardPill,
-  powerButton,
+  LOADS,
+  morePill,
   previewPill,
   proxyPill,
   quietBell,
   READINGS,
+  rimPill,
+  shedStatus,
   statusPill,
   sysmonContent,
   sysmonPill,
@@ -39,7 +43,8 @@ const ROWS: readonly { name: string; make: (state: Shown) => HTMLElement }[] = [
   { name: "Update", make: (state) => updatePill(undefined, state) },
   { name: "Live preview", make: (state) => previewPill(BRANCH, state) },
   { name: "System monitor", make: (state) => sysmonPill({ state }) },
-  { name: "Power", make: (state) => powerButton(state) },
+  { name: "System monitor, compact", make: (state) => rimPill(LOADS, state) },
+  { name: "More", make: (state) => morePill(state) },
 ];
 
 const LAYOUT: Words = { short: "US", long: "PL-prog" };
@@ -80,7 +85,7 @@ function liveLayout(): HTMLElement {
 }
 
 function live(): HTMLElement {
-  return row("s8", "centre", clockPill({ countdown: CLOCK.countdown }), liveLayout(), idlePill(), proxyPill(), updatePill(), liveSysmon(), bellPill(), statusPill(), powerButton());
+  return row("s8", "centre", previewPill(), idlePill(), proxyPill(), liveLayout(), updatePill(), clockPill({ countdown: CLOCK.countdown }), morePill(), liveSysmon(), rimPill(), bellPill(), statusPill());
 }
 
 const SYSMON_SAMPLE = () => sysmonPill({ readings: READINGS.slice(0, 2) });
@@ -89,7 +94,7 @@ export default page<State>({
   level: "shell",
   slug: "bar-contents",
   title: "Bar contents",
-  lede: "The pills the bar carries, each built from Pill: clock, status, bell, layout, Keep awake, Proxy, update, preview, system monitor.",
+  lede: "The pills the bar carries, each built from Pill: clock, status, bell, ⋯, system monitor, layout, Keep awake, Proxy, update, preview.",
   code: { qml: "Clock, Status, Bell, KeyboardLayout, IdleIndicator, ProxyIndicator, UpdateIndicator, PreviewIndicator, SysmonPill" },
   from: ["pill"],
   stage: { live, hint: "point at one; click US; right-click the monitor", daylight: true },
@@ -108,19 +113,27 @@ export default page<State>({
     { name: "Proxy failing", for: "a key with the error dot", sample: () => proxyPill(true) },
     { name: "Update, a release", for: "a dot", sample: () => updatePill() },
     { name: "Update, security", for: "counted", sample: () => updatePill(3) },
-    { name: "Live preview", for: "a cold pill naming the branch", sample: () => previewPill() },
+    { name: "Live preview", for: "its symbol on the cold tint, the branch in its hint", sample: () => previewPill() },
+    { name: "More", for: "⋯, a new symbol: tray apps, update, preview", sample: () => morePill() },
     { name: "System monitor, numbers", for: "the default", sample: () => sysmonPill() },
     { name: "System monitor, bars", for: "a compact Meter each", sample: () => sysmonPill({ style: "bars" }) },
     { name: "System monitor, sparklines", for: "the last minute each", sample: () => sysmonPill({ style: "sparklines" }) },
     { name: "Close to a limit", for: "symbol and words in `warning`", sample: () => sysmonPill({ readings: [READINGS[0]!, { ...READINGS[2]!, text: "82°", level: 1 }] }) },
     { name: "Past a limit, a full disk", for: "`error`, and a red drive", sample: () => sysmonPill({ readings: [{ ...READINGS[0]!, text: "97%", level: 2 }, READINGS[1]!], fullDisk: true }) },
     { name: "Offering Hide", for: "a right click, until the pointer leaves", sample: () => sysmonPill({ offering: true, state: "lit" }) },
-    { name: "Power", for: "a Tonal sm `IconButton`, not a pill", sample: () => powerButton() },
+    { name: "System monitor, compact", for: "rings edge to edge, the rim CPU", sample: () => rimPill() },
+    { name: "Compact, RAM near its limit", for: "its ring in `warning`", sample: () => rimPill([LOADS[0]!, { share: 0.88, level: 1 }, LOADS[2]!]) },
+    { name: "Compact, CPU past its limit", for: "the rim in `error`", sample: () => rimPill([{ share: 0.97, level: 2 }, LOADS[1]!, LOADS[2]!]) },
+    { name: "Status, shedding", for: "the share gone, then symbols from the left", sample: () => shedStatus({ shed: 3 }) },
+    { name: "Status, the bell in it", for: "its own half leading: under 640", sample: () => shedStatus({ shed: 5, bell: true }) },
+    { name: "Status with ⋯ and bell", for: "at 360", sample: () => shedStatus({ shed: 5, bell: true, more: true }) },
+    { name: "Clock, compacting", for: "the date gone, the kanji kept", sample: () => compactClock({ date: "none" }) },
+    { name: "Clock while recording", for: "under 640: the recording pill's look, its dot leading", sample: () => compactClock({ kanji: false, date: "none", recording: true }) },
   ],
   sizes: [
     { name: "Symbols and words", for: "`space.s12` ends, `space.s8` gaps", sample: () => statusPill() },
     { name: "A lone symbol", for: "`space.s8` round it: bell, Proxy, update", sample: () => bellPill() },
-    { name: "Preview", for: "`space.s4` gap", sample: () => previewPill() },
+    { name: "Compact system monitor", for: "a `size.control_sm` circle, rings edge to edge", sample: () => rimPill() },
     { name: "System monitor", for: "`space.s8` between readings", sample: SYSMON_SAMPLE },
   ],
   states: {
@@ -143,7 +156,7 @@ export default page<State>({
     tubes: [
       { name: "Every pill", tone: "accent", filled: false, content: false },
       { name: "Live preview", tone: "cold", filled: false, content: false },
-      { name: "Power", tone: "accent", filled: true, content: false },
+      { name: "Clock while recording", tone: "error", filled: false, content: false },
     ],
     looks: { lit: "the tube inside the edge, the glow outside", signsOff: "the tube as glass, no glow" },
     signsOff: (index: number) => ROWS[index]!.make("signs-off"),
@@ -151,7 +164,7 @@ export default page<State>({
   content: {
     text: [
       { name: "The layout's code", words: LAYOUT, sample: (words: string) => keyboardPill(words) },
-      { name: "The branch", words: { short: "fix", long: BRANCH }, sample: (words: string) => previewPill(words) },
+      { name: "The branch, in the hint", words: { short: "fix", long: BRANCH }, sample: (words: string) => previewPill(words, "lit") },
       { name: "The countdown", words: COUNTDOWN, sample: (words: string) => clockPill({ countdown: words }) },
     ],
     missingPicture: doesntApply("its symbols are KubaOS Symbols, always there."),
@@ -203,7 +216,7 @@ export default page<State>({
       { part: "Readings' line", token: "type-mono-line" },
       { part: "A meter's width", token: "size-control_sm" },
       { part: "A meter's height", token: "size-progress" },
-      { part: "Branch, at most", token: "size-bar_label" },
+      { part: "Compact rings, middle to middle", token: "space-s4" },
     ],
     reflow: doesntApply("as wide as its content at every window size."),
   },

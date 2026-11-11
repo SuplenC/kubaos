@@ -10,8 +10,15 @@ const drawings = import.meta.glob<string>("../../../../crates/kubaos-ui/assets/s
   eager: true,
 });
 
+// Symbols the mockups draw before the libraries have them: new ones, waiting to join the set.
+const fresh = import.meta.glob<string>("../assets/symbols/*.svg", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+
 const byName = new Map(
-  Object.entries(drawings).map(([path, svg]) => [path.replace(/^.*\/(.*)\.svg$/, "$1"), svg]),
+  [...Object.entries(drawings), ...Object.entries(fresh)].map(([path, svg]) => [path.replace(/^.*\/(.*)\.svg$/, "$1"), svg]),
 );
 
 /** Every symbol's name. */

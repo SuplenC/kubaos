@@ -14,17 +14,15 @@
 .shell-bar-left {
   display: flex;
   align-items: center;
+  gap: var(--space-s8);
   min-width: 0;
-  /* The title stops `space.s40` before the clock. */
-  padding-right: var(--space-s40);
-}
-
-.shell-bar-left > .shell-preview {
-  margin-left: var(--space-s8);
+  /* Clear of the clock by `--clear`: space.s40, less at the narrowest. */
+  padding-right: var(--clear, var(--space-s40));
 }
 
 .shell-bar-left > .shell-title {
-  margin-left: var(--space-s12);
+  /* space.s12 after the pills: the row's gap and a step more. */
+  margin-left: var(--space-s4);
   min-width: 0;
   flex: 0 1 auto;
 }
@@ -35,6 +33,7 @@
   justify-content: flex-end;
   gap: var(--space-s8);
   min-width: 0;
+  padding-left: var(--clear, var(--space-s40));
 }
 
 /* A bar alone, without its screen: the frame's surface under it, at the frame's glass. It is a
@@ -169,4 +168,38 @@
 .shell-screen-strip {
   display: block;
 }
-.shell-preview-name { max-width: var(--size-bar_label); }
+
+/* The system monitor, compact: its rings fill the circle edge to edge, the rim CPU. */
+/* Over a lone pill's own ends: the circle is the rings, nothing round them. */
+.k-pill.shell-rim-pill[data-lone] {
+  --end: 0px;
+}
+
+.shell-rim {
+  display: block;
+  width: var(--size-control_sm);
+  height: var(--size-control_sm);
+}
+
+.shell-rim-track {
+  stroke: var(--tone);
+  stroke-opacity: var(--opacity-spinner_track);
+}
+
+.shell-rim-arc {
+  stroke: var(--tone);
+  stroke-linecap: round;
+}
+
+/* The bar's steps: each bar at its own size, scrolling sideways in its row where it is wider than
+   the page. */
+.shell-steps {
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.shell-steps-live {
+  max-width: 100%;
+  overflow-x: auto;
+}

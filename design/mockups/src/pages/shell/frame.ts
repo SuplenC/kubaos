@@ -8,7 +8,7 @@ import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { WINDOWS, windowSize } from "../../site/settings.ts";
 import { system } from "../templates/panels.ts";
-import { barScreen, CLOCK } from "./bar-parts.ts";
+import { barScreen, logicalWidth } from "./bar-parts.ts";
 
 type State = "rest" | "open";
 
@@ -26,7 +26,7 @@ interface FrameOptions {
 
 function frame(options: FrameOptions = {}): HTMLElement {
   // A laptop's screen: the narrowest the everyday bar fits without its pills meeting the clock.
-  const shown = barScreen(options.width ?? LAPTOP.width, options.height ?? LAPTOP.height, { clock: { countdown: CLOCK.countdown } });
+  const shown = barScreen(logicalWidth(options.width ?? LAPTOP.width), options.height ?? LAPTOP.height);
   const element = shown.element;
   element.classList.add("shell-frame");
   element.toggleAttribute("data-fullscreen", options.fullscreen ?? false);
