@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Renders every generated branding asset: the vector marks (make.py, then
 # branding/png/), the terminal logo (fastfetch.txt), the neon-sign photo assets
-# (neon.py) and the boot assets (boot.py, into system/files/).
+# (neon.py), the sign's switch-on and switch-off clips (switch.py) and the boot
+# assets (boot.py, into system/files/).
 #
 #   branding/render.sh
 #
-# Needs resvg, ImageMagick (magick) and a python3 (3.11 or later) with Pillow
-# and numpy; PYTHON picks the interpreter (default python3). Then run
+# Needs resvg, ImageMagick (magick), ffmpeg with libvpx and a python3 (3.11 or
+# later) with Pillow and numpy; PYTHON picks the interpreter (default python3). Then run
 # `cargo run -p kubaos-tokens -- write`, which measures boot.py's pictures for
 # GRUB's theme.
 set -euo pipefail
@@ -31,5 +32,6 @@ deep=$("$python" -c 'import tomllib; print(tomllib.load(open("../design/tokens.t
 resvg -h 512 --background "$deep" svg/kubaos-stacked.svg png/kubaos-stacked-dark.png
 "$python" fastfetch.py > fastfetch.txt
 "$python" neon.py
+"$python" switch.py
 "$python" boot.py
-echo "rendered png/, fastfetch.txt and the boot assets"
+echo "rendered png/, video/, fastfetch.txt and the boot assets"
