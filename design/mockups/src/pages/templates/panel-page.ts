@@ -1,7 +1,7 @@
 // The Sheet and PanelPage page: `docs/design/components/sheet.md` and `panel-page.md`. A shell panel
 // growing out of the screen frame, its twins taking the surface over from one another, and the
 // template inside it: the header band with its pun, the tabs, the body that alone scrolls under its
-// fade, and the footer band.
+// fade, and the footer band a panel may have, though none does today.
 
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { powerMoves } from "../../site/moves.ts";
@@ -119,7 +119,7 @@ export default page({
   level: "templates",
   slug: "panel-page",
   title: "Sheet and PanelPage",
-  lede: "A shell panel growing out of the screen frame, and the template inside it: header, tabs, body, footer.",
+  lede: "A shell panel growing out of the screen frame, and the template inside it: header, tabs, body.",
   code: { rust: "sheet::sheet", qml: "Sheet", unbuilt: "QML PanelPage: not built yet" },
   stage: {
     live,
@@ -127,8 +127,7 @@ export default page({
     daylight: true,
   },
   variants: [
-    { name: "No tabs, no footer", for: "a header over one body: the system monitor", sample: () => onScreen(system()) },
-    { name: "With a footer", for: "an action under the body", sample: () => onScreen(system({ footer: true })) },
+    { name: "No tabs", for: "a header over one body: the system monitor", sample: () => onScreen(system()) },
     { name: "A status for a pun", for: "the notifications: their count, never shifting", sample: () => onScreen(notifications()) },
     { name: "With tabs", for: "views under the header: the control center", sample: () => onScreen(controlCenter()) },
     { name: "Sized to its content", for: "hangs from the top edge's middle: the clock", sample: clockOnScreen },
@@ -182,21 +181,20 @@ export default page({
       { keys: ["Enter", "Space"], does: "presses what the keyboard is on" },
       { keys: ["Esc"], does: "back a step in the body, then closes" },
     ],
-    order: "The header's buttons, tabs, body, footer, round; the bar's pills are never stops.",
+    order: "The header's buttons, tabs, body, any footer, round; the bar's pills are never stops.",
     lands: "Opening, on the panel's first thing to do; closing, back on the window that had it.",
   },
   measures: {
     samples: nonEmpty([
       { name: "The system monitor", for: "width, padding, the header band", sample: () => onScreen(system()) },
       { name: "The control center", for: "the tabs and the body under them", sample: () => onScreen(controlCenter()) },
-      { name: "The system monitor, footer", for: "the footer band", sample: () => onScreen(system({ footer: true })) },
     ]),
     measures: [
       { part: "Panel's width", token: "size-panel" },
       { part: "Padding, gaps, the header fade", token: "space-s16" },
       { part: "Title's line", token: "type-heading-line" },
       { part: "Pun's line", token: "type-small-line" },
-      { part: "Header's buttons, tabs, footer action", token: "size-control_sm" },
+      { part: "Header's buttons, tabs", token: "size-control_sm" },
       { part: "Between buttons; frame's sides, foot", token: "space-s8" },
       { part: "Scroll's reach past its sides", token: "focus-far" },
       { part: "Body's thumb", token: "size-scrollbar" },
