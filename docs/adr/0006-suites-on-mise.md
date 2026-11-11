@@ -1,6 +1,6 @@
 # 6. Suites on mise: current upstream toolchains, updated and upgraded per tool
 
-Status: proposed (2026-11-10). Amends ADR 0002: supersedes its rejection of mise, its rule that a Suite's toolchain comes from Nix by default, its `.envrc` Project pins, and its line that rollback restores Suites with everything else.
+Status: accepted (2026-11-11). Amends ADR 0002: supersedes its rejection of mise, its rule that a Suite's toolchain comes from Nix by default, its `.envrc` Project pins, and its line that rollback restores Suites with everything else.
 
 ## Context
 
@@ -15,6 +15,8 @@ Already decided with Kuba, and not reopened here: `kubaos suite update [NAME…]
 **A Suite's toolchain comes from mise.** Each toolchain Suite is one file, `~/.config/mise/conf.d/kubaos-<name>.toml`, which KubaOS writes whole and deletes on removal, beside its record in `kubaos.d/suites/<name>.toml` (options and extras), which keeps driving the Suite's Nix half. Rustup stays the Rust toolchain's source and proto stays moon's; mise brings rustup and proto themselves. Suites that are not toolchains, such as wallpaper depth, keep their Nix module and get no mise file.
 
 **The file is `kubaos-<name>.toml`.** The prefix names who writes it, in a folder the user may also fill, and keeps KubaOS's fragments together in mise's alphabetical load order. Measured with `kubaos-python.toml`, it behaves as the `suite-` names tried before: `mise install` installs it, `mise outdated` names it as the source, and `mise upgrade --bump` rewrites it. mise's `--global` reads only `config.toml` (`docs/cli/upgrade.md`), so KubaOS runs mise without it, from a folder outside any project. The user's own `~/.config/mise/config.toml` loads after the fragments and wins (`docs/configuration.md`, "conf.d"; measured), as the user layer does everywhere else.
+
+**A Suite wires the base and leaves the rest to the user.** It installs the toolchain and its tools, connects them to the editor and the shell, and ships sane defaults for them. Whatever a tool lets its user configure stays the user's: KubaOS writes no setting the user can't override from their own files, and a default of KubaOS's may differ from the language's own where that serves the setup, never as a lock.
 
 **mise owns the shell's directory hook, and direnv leaves KubaOS's shell.** mise's docs call running the two together unsupported, because their hooks disagree about `PATH` (`docs/direnv.md`). The shell runs `mise activate zsh`, with mise's entries ahead of `~/.nix-profile/bin`. `use suite` pins and nix-direnv go: a Project pin is the folder's `mise.toml`, which `kubaos pin` writes, and a migration rewrites existing `use suite` lines. `use bwenv` becomes a `_.source` script in the project's `mise.toml` (`docs/environments/index.md`). A project with `use flake` loads its devshell with `nix develop`; this repository moves its everyday tools to a `mise.toml` and keeps its devshell for `nix develop` and CI. A user who wants direnv back can enable it in `home.nix`, unsupported.
 
