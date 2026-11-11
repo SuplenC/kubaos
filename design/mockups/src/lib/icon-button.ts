@@ -24,6 +24,8 @@ export interface IconButtonOptions {
   readonly pinned?: Pinned;
   /** Whether its hint is drawn: a state matrix leaves it out, since it floats over the row below. */
   readonly hint?: boolean;
+  /** Its hint above it whatever the room: a button in a toolbar at a container's foot. */
+  readonly hintAbove?: boolean;
 }
 
 export function iconButton(options: IconButtonOptions): HTMLButtonElement {
@@ -44,6 +46,6 @@ export function iconButton(options: IconButtonOptions): HTMLButtonElement {
   slot.append(icon(options.icon, `var(--type-${style}-icon)`, "var(--shown)"));
   element.append(slot);
   lightKind(element, kind, "full", slot);
-  if (options.hint ?? true) withHint(element, options.label);
+  if (options.hint ?? true) withHint(element, options.label, options.hintAbove ? { side: "above" } : {});
   return probe(element, { role: "component", name: "IconButton", variant: variant(kind, size), fixed: { width: true, height: true } });
 }

@@ -87,6 +87,8 @@
   box-sizing: border-box;
   height: 100%;
   padding: var(--space-s12);
+  /* The well's own edge cuts the toolbar's glow; clipped here too, it makes nothing to scroll. */
+  overflow: clip;
 }
 
 .cc-keys > .cc-grow {
