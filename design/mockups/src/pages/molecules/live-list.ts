@@ -12,8 +12,8 @@ import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { WELL_ROOM } from "./list.ts";
 
 /** Five two-line rows and their gaps, inside the well's padding. */
-const FIVE = "calc(5 * var(--size-row_two_line) + 4 * var(--space-s4) + 2 * var(--space-s8))";
-const THREE = "calc(3 * var(--size-row_two_line) + 2 * var(--space-s4) + 2 * var(--space-s8))";
+const FIVE = "calc(5 * var(--size-row_two_line) + 4 * var(--space-s4) + 2 * var(--space-s12))";
+const THREE = "calc(3 * var(--size-row_two_line) + 2 * var(--space-s4) + 2 * var(--space-s12))";
 
 /** A network as a scan finds it, its signal from 0 to 4 bars. */
 function network(title: string, bars: number, secured = true, connected = false): LiveRowSpec {
@@ -270,7 +270,7 @@ export default page({
     measures: [
       { part: "Row in its room", token: "size-row_two_line" },
       { part: "Gap in each room", token: "space-s4" },
-      { part: "Well padding", token: "space-s8" },
+      { part: "Well padding", token: "space-s12" },
       { part: "Well corner", token: "radius-content" },
     ],
     reflow: {

@@ -47,7 +47,7 @@ function muted(size: SliderSize = "Regular", extra: Partial<SliderOptions> = {})
 
 /** The power profiles: five stops, resting on Balanced, the icon stepping from high to low. */
 function profiles(size: SliderSize = "Regular", extra: Partial<SliderOptions> = {}): SliderOptions {
-  return { icon: "balance", size, stops: 5, index: 2, names: NAMES, ...extra };
+  return { icon: "balance", size, stops: 5, index: 2, names: NAMES, icons: ["bedtime", "eco", "balance", "bolt", "rocket_launch"], ...extra };
 }
 
 /** Volume boosted up to 150%, holding at 100% while a drag passes it. */
@@ -170,6 +170,7 @@ export default page({
   variants: [
     { name: "Continuous", for: "any value: volume, brightness; reads as a percentage", sample: () => boxed(volume()) },
     { name: "With stops", for: "one of a few named choices in order: power profiles", sample: () => boxed(profiles()) },
+    { name: "A symbol per stop", for: "each stop's own in the circle: the power stops", sample: () => within(ROOM, stack("s16", "start", ...[0, 2, 4].map((index) => slider(profiles("Regular", { index }))))) },
     { name: "With a sticky point", for: "a volume boost to 150%, holding at 100%", sample: () => boxed(boosted()) },
     {
       name: "Toggled",
