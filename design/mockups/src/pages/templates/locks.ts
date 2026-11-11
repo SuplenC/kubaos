@@ -56,7 +56,7 @@ export const TOWER: Wallpaper = {
 export const SHIBUYA: Wallpaper = {
   name: "Shibuya, a rainy corner",
   picture: shibuya,
-  // No cut-out: the clock stands in front, over its shade, its feet in the top of the そば sign so
+  // No cut-out: the clock stands in front of the picture, its feet in the top of the そば sign so
   // the digits cross the building fronts and the 三平酒寮 sign above the shops, not the people. On a
   // portrait screen, which has no sky, over the darkest band: the facade and its 渋谷店 sign
   // between the top signs and the lit shopfronts, its feet just above the そば sign, so its date
