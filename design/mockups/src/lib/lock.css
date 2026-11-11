@@ -307,6 +307,8 @@
   line-height: calc(var(--type-clock_rest-size) * var(--k));
   letter-spacing: calc(var(--spread) / var(--letters, 1) * var(--px));
   text-box: trim-both cap alphabetic;
+  /* Its box is its caps, placed by the lock: none of a line's centring above them. */
+  padding-top: 0;
   color: color-mix(in oklab, var(--color-on_surface) calc(var(--flown) * 100%), var(--digits-tint, var(--color-on_surface)));
   /* While the clock flies above the frame it is still behind the city: the city's alpha, laid where
      the city stands on the screen as it pushes in, is taken out of the digits, so they are cut

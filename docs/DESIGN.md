@@ -120,6 +120,8 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 | `keycap` | 11 / 20 | medium, Geist Mono | The key on a `Keycap`, on the keycap's 20 line so it centres in it. |
 | `mono_large` | 14 / 20 | regular, Geist Mono | A command or key that is the subject of its line. |
 
+**A line of text is centred on its cap height:** in a control, a pill, a row or any box that centres one line, the capitals and figures sit in the middle of the box, descenders hanging below, ignored, with the baseline on a whole device pixel.
+
 **Tabular figures** (`tabular` on a style, OpenType `tnum`) make every figure one width, so a number that changes in place keeps its width: `label_number` has them. A clock keeps its proportional figures: the lock's two clocks and the bar's time, which the lock's clock flies into, are drawn with Geist's own figures, and the bar's clock pill eases to its new width as a minute changes it (`docs/design/components/pill.md`). QML turns the feature on (`font.features`, which Qt applies only to shaped text, so such a style is always shaped). iced's text (0.14) has no font features, so iced draws the figures proportional, and a component showing a changing number holds it in a box as wide as its widest value, ending in one place.
 
 A single-line control's label takes the control's content box as its line height (a 40 button has a 24 line inside 8 + 8 padding), so the label centres on the grid with no centring arithmetic.
