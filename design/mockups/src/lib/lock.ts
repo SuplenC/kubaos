@@ -395,7 +395,7 @@ const widest = new Map<string, number>();
  * the font, 00:00 to 23:59, or 1:00 to 12:59 for a 12-hour clock. The figures are proportional, so
  * no one digit is the widest in every place.
  */
-function widestTime(style: TypeStyle, twelve: boolean): number {
+export function widestTime(style: TypeStyle, twelve: boolean): number {
   const key = `${style}|${twelve ? "12" : "24"}`;
   const known = widest.get(key);
   if (known !== undefined) return known;

@@ -203,3 +203,11 @@
   max-width: 100%;
   overflow-x: auto;
 }
+
+/* The clock's time, centred in a slot as wide as the widest time it shows (`clockTime`). */
+.shell-clock-time {
+  --time-width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+  --slot-width: round(up, calc(var(--slot) * var(--px) - 0.001px), 1px);
+  width: var(--slot-width);
+  padding-inline-start: round(down, calc((var(--slot-width) - var(--time-width)) / 2), 1px);
+}
