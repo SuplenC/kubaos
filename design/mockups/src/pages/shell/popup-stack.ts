@@ -1,170 +1,155 @@
 // The PopupStack page: `docs/design/components/popup-stack.md`, the shell's `Popups.qml`,
 // `ToastList.qml`, `PopupHold.qml` and `PopupsBelow.qml` today. New notifications on a corner sheet in
-// the frame's top right, one app's in a group, each leaving when its time is up unless the pointer
-// holds the stack; critical ones under a panel that covers the corner.
+// the frame's top right, each a two-line NotificationPopup with its own time, one per app; a critical
+// one as today's full card, and critical ones under a panel that covers the corner.
 
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
-import { ALL } from "../../site/settings.ts";
-import type { Note } from "../../lib/notification-card.ts";
-import { group, type GroupOptions } from "../../lib/notification-group.ts";
-import { BATTERY, BUILD, CRITICAL, SLACK, UPDATE } from "../notifications.ts";
-import { belowOnScreen, cornerOnScreen, stackOf } from "./notification-parts.ts";
+import type { PopupNote } from "../../lib/notification-popup.ts";
+import { ANIA, BATTERY, BUILD, CRITICAL, KUBA_TWO, MARCO, OLA, UPDATE } from "../notifications.ts";
+import { belowOnScreen, popupStackOnScreen } from "./notification-parts.ts";
 
-type Shown = "rest" | "lit" | "open";
+type Shown = "rest" | "lit" | "selected" | "open";
 
-/**
- * How long a popup shows: the shell's setting, `Settings.notificationTimeout` (its default here), not a
- * design token; a notification may ask for its own.
- */
-const TIMEOUT = 6000;
+const SIGNAL: PopupNote = { ...KUBA_TWO, main: "Reply" };
+/** A burst: four apps, Slack sending three, one after another. */
+const BURST: readonly PopupNote[] = [BUILD, OLA, SIGNAL, ANIA, MARCO, BATTERY];
+/** The stack as that burst leaves it, newest first. */
+const SETTLED: readonly PopupNote[] = [BATTERY, { ...MARCO, count: 3 }, SIGNAL, BUILD];
+const LEFT = [0.95, 0.8, 0.55, 0.3];
 
-/** A stack of popups on the screen's corner, each group a popup. */
-function popups(groups: readonly (readonly Note[])[], options: GroupOptions & { remaining?: number; unfolded?: boolean } = {}): HTMLElement {
-  const made = groups.map((notes, index) => {
-    const each = group(notes, { ...options, popup: true, fan: index === 0 ? (options.fan ?? 0) : 0 });
-    if (options.remaining !== undefined) each.style.setProperty("--remaining", String(options.remaining));
-    if (options.unfolded && index === 0) requestAnimationFrame(() => each.cards()[0]?.press());
-    return each;
-  });
-  return cornerOnScreen(stackOf(...made));
-}
+const still = (notes: readonly PopupNote[], extra: Parameters<typeof popupStackOnScreen>[0] = {}) => popupStackOnScreen({ notes, remaining: LEFT, unread: true, ...extra });
 
-/**
- * The corner live: the popups run their time down and leave, held while the pointer is on the stack,
- * and new ones slide in once it is empty.
- */
-function live(): HTMLElement {
-  const stack = stackOf();
-  const screen = cornerOnScreen(stack);
-  const runs: Animation[] = [];
-  let held = false;
-  const batches: (readonly Note[])[][] = [[[BUILD], [BATTERY]], [SLACK, [UPDATE]]];
-  let next = 0;
+const STACK = ".k-popup-slot:first-child";
+const INNER = ".k-popup-slot:first-child > .k-popup-inner";
+const ON = "the newest popup";
 
-  function arrive(): void {
-    const batch = batches[next++ % batches.length]!;
-    for (const notes of batch) {
-      const each = group(notes, { popup: true, live: true, onDismiss: () => leave(each) });
-      each.classList.add("k-notif-arriving");
-      stack.append(each);
-      const run = each.animate([{ "--remaining": "1" }, { "--remaining": "0" }], { duration: TIMEOUT, fill: "forwards" });
-      runs.push(run);
-      if (held) run.pause();
-      run.finished.then(() => leave(each), () => {});
-    }
-  }
-
-  function leave(each: HTMLElement): void {
-    if (each.classList.contains("k-notif-leaving")) return;
-    each.classList.remove("k-notif-arriving");
-    each.classList.add("k-notif-leaving");
-    each.addEventListener("animationend", () => {
-      each.remove();
-      if (stack.children.length === 0) window.setTimeout(arrive, TIMEOUT / 4);
-    }, { once: true });
-  }
-
-  stack.addEventListener("pointerenter", () => {
-    held = true;
-    for (const run of runs) if (run.playState === "running") run.pause();
-  });
-  stack.addEventListener("pointerleave", () => {
-    held = false;
-    for (const run of runs) if (run.playState === "paused") run.play();
-  });
-  if (!ALL) requestAnimationFrame(arrive);
-  else arrive();
-  return screen;
-}
-
-const SLIDES_IN: Move = {
+const ARRIVES: Move = {
   name: "A popup arrives",
-  what: "It slides in from the right as it fades in; the others close up under it.",
+  what: "It slides in from the right as it fades in; the others make room under it.",
   tracks: [
-    { part: "the slide", on: "Build finished", target: ".k-notif-stack > *", property: "--slide-by", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
-    { part: "the fade", on: "Build finished", target: ".k-notif-stack > *", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the slide", on: ON, target: INNER, property: "--slide-by", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "its room", on: ON, target: STACK, property: "--room", from: 0, to: 1, duration: "medium", curve: "standard_decel" },
   ],
-  reduced: [{ part: "the fade", on: "Build finished", target: ".k-notif-stack > *", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+  reduced: [
+    { part: "its room", on: ON, target: STACK, property: "--room", from: 0, to: 1, duration: "instant", curve: "linear" },
+    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+  ],
   back: "cuts",
-  sample: () => popups([[BUILD]]),
+  sample: () => still(SETTLED),
 };
 
-const SLIDES_OUT: Move = {
-  name: "A popup leaves",
-  what: "Its time is up, it is dismissed or acted on: out two `space.s64`s to the right, fading.",
+const DISMISSED: Move = {
+  name: "Dismissed",
+  what: "× or Delete: it slides out to the right, then those below close the gap.",
   tracks: [
-    { part: "the slide", on: "Build finished", target: ".k-notif-stack > *", property: "--slide-by", from: 0, to: 2, duration: "medium", curve: "emphasized_accel" },
-    { part: "the fade", on: "Build finished", target: ".k-notif-stack > *", property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_accel" },
+    { part: "the slide", on: ON, target: INNER, property: "--slide-by", from: 0, to: 2, duration: "medium", curve: "emphasized_accel" },
+    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_accel" },
+    { part: "its room", on: ON, target: STACK, property: "--room", from: 1, to: 0, duration: "medium", cue: "medium", curve: "standard_decel" },
   ],
-  reduced: [{ part: "the fade", on: "Build finished", target: ".k-notif-stack > *", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" }],
+  reduced: [
+    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" },
+    { part: "its room", on: ON, target: STACK, property: "--room", from: 1, to: 0, duration: "instant", cue: "short", curve: "linear" },
+  ],
   back: "cuts",
-  sample: () => popups([[BUILD]]),
+  sample: () => still(SETTLED),
 };
 
-const IN_STATE = (state: Shown) => popups([[BUILD], [BATTERY]], { remaining: state === "lit" ? 0.45 : 0.8, unfolded: state === "open" });
+const TIME_UP: Move = {
+  name: "Its time is up",
+  what: "It slides up as it fades, and those below close the gap at once.",
+  tracks: [
+    { part: "the rise", on: ON, target: INNER, property: "--rise", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
+    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_accel" },
+    { part: "its room", on: ON, target: STACK, property: "--room", from: 1, to: 0, duration: "medium", curve: "standard_decel" },
+  ],
+  reduced: [
+    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" },
+    { part: "its room", on: ON, target: STACK, property: "--room", from: 1, to: 0, duration: "instant", cue: "short", curve: "linear" },
+  ],
+  back: "cuts",
+  sample: () => still(SETTLED),
+};
+
+const IN_STATE = (state: Shown) =>
+  still(SETTLED, {
+    ...(state === "lit" ? { pinned: { at: 1, as: "pointed" as const } } : {}),
+    ...(state === "selected" ? { pinned: { at: 1, as: "lit" as const } } : {}),
+    ...(state === "open" ? { open: 1 } : {}),
+  });
 
 export default page<Shown>({
   level: "shell",
   slug: "popup-stack",
   title: "PopupStack",
-  lede: "New notifications in the frame's top right corner, each gone when its time is up.",
+  lede: "New notifications in the frame's top right corner, two lines each, each leaving when its time is up.",
   code: { qml: "PopupStack", unbuilt: "QML: still Popups and ToastList" },
   stage: {
-    live,
-    hint: "point at the stack to hold it",
+    live: () => popupStackOnScreen({ schedule: BURST }),
+    hint: "point at one to hold all; click opens; × or Delete",
     daylight: true,
   },
   variants: [
-    { name: "One", for: "its time left; its length from Settings", sample: () => popups([[BUILD]], { remaining: 0.7 }) },
-    { name: "Several apps", for: "a group each, at most five", sample: () => popups([[BUILD], [BATTERY]], { remaining: 0.7 }) },
-    { name: "A burst from one app", for: "one stack, its count", sample: () => popups([SLACK, [BUILD]], { remaining: 0.7 }) },
-    { name: "Previewed", for: "the preview hangs past the corner", sample: () => popups([SLACK, [BUILD]], { fan: 1 }) },
-    { name: "Critical", for: "no time left: it stays until acted on", sample: () => popups([[CRITICAL], [BUILD]], { remaining: 0.7 }) },
+    { name: "One", for: "its time left; its length from Settings", sample: () => still([BUILD]) },
+    { name: "Four apps", for: "one popup per app, newest first", sample: () => still(SETTLED) },
+    { name: "Several from one app", for: "Slack's three: the count, the newest's words", sample: () => still([{ ...MARCO, count: 3 }]) },
+    { name: "One opened", for: "its card in place; its time held", sample: () => still(SETTLED, { open: 1 }) },
+    { name: "Critical among them", for: "today's full card, no timer", sample: () => still([CRITICAL, { ...MARCO, count: 3 }, BUILD]) },
     { name: "Critical under a panel", for: "under an open panel; its pill toggles it", sample: () => belowOnScreen([[CRITICAL]], true) },
   ],
-  sizes: doesntApply("`size.panel` wide; as tall as its cards."),
+  sizes: doesntApply("`size.panel` wide; as tall as its popups."),
   states: {
-    shown: ["rest", "lit", "open"],
+    shown: ["rest", "lit", "selected", "open"],
     absent: {
-      pressed: "the press is its cards'",
+      pressed: "a press opens a popup",
       disabled: "shown or gone",
-      selected: "it never takes the keyboard",
       loading: "a popup arrives whole",
       empty: "no popups: the corner closes, or the peek shows",
       error: "a critical popup is a variant",
     },
-    rows: [{ name: "Two apps", cell: (state) => IN_STATE(state) }],
+    rows: [{ name: "Four apps", cell: (state) => IN_STATE(state) }],
     looks: {
-      rest: "each line running down",
-      lit: "held: every line stopped, a new one waits",
-      open: "a card unfolded; the corner grows",
+      rest: "each line running down on its own",
+      lit: "pointer on one: its ×; every line held",
+      selected: "keyboard on one: its tube and ×",
+      open: "one opened into its card; its line held",
     },
   },
-  focus: doesntApply("it never takes the keyboard."),
+  focus: doesntApply("its popups light their own tube: NotificationPopup's page."),
   content: {
-    text: doesntApply("its words are its cards'."),
-    missingPicture: doesntApply("its pictures are its cards' tiles."),
+    text: doesntApply("its words are its popups'."),
+    missingPicture: doesntApply("its popups show their app's symbol, never an image."),
     counts: [
-      { name: "None", for: "the corner closes", sample: () => cornerOnScreen(stackOf()) },
-      { name: "One", for: "one card", sample: () => popups([[BUILD]]) },
-      { name: "Five apps", for: "the most it shows", sample: () => popups([[BUILD], [BATTERY], SLACK, [CRITICAL], [UPDATE]], { remaining: 0.7 }) },
+      { name: "None", for: "the corner closes", sample: () => popupStackOnScreen({ notes: [] }) },
+      { name: "One", for: "one popup", sample: () => still([BUILD]) },
+      { name: "Five apps", for: "one each, newest first", sample: () => still([UPDATE, BATTERY, { ...MARCO, count: 3 }, SIGNAL, BUILD], { remaining: [1, 0.9, 0.7, 0.5, 0.3] }) },
     ],
   },
   motion: {
-    arrives: [SLIDES_IN],
-    leaves: [SLIDES_OUT],
-    between: powerMoves(() => popups([[BUILD]], { remaining: 0.7 })),
+    arrives: [ARRIVES],
+    leaves: [DISMISSED, TIME_UP],
+    between: powerMoves(() => still([BUILD])),
   },
-  keyboard: doesntApply("it never takes the keyboard: the pointer and its buttons do; right-click opens a card's menu."),
+  keyboard: {
+    keys: [
+      { keys: ["Tab", "Shift+Tab"], does: "each popup, newest first, then a critical card" },
+      { keys: ["Enter"], does: "opens the popup into its card, or folds it" },
+      { keys: ["Delete"], does: "dismisses it" },
+      { keys: ["Esc"], does: "folds an opened one" },
+    ],
+    order: "Its popups are stops for Tab, newest first; it never takes the keyboard by itself.",
+    lands: "A popup arriving leaves the keyboard where it was.",
+  },
   measures: {
-    samples: nonEmpty([{ name: "Two apps", for: "padding, gap, width", sample: () => popups([[BUILD], [BATTERY]], { remaining: 0.6 }) }]),
+    samples: nonEmpty([{ name: "Four apps", for: "padding, gap, width", sample: () => still(SETTLED) }]),
     measures: [
       { part: "Width", token: "size-panel" },
-      { part: "Inside, between popups", token: "space-s8" },
+      { part: "In from the sheet's edges", token: "space-s8" },
+      { part: "Between popups", token: "space-s4" },
       { part: "Slide in, one step", token: "space-s64" },
+      { part: "Rise when its time is up", token: "space-s24" },
       { part: "Time left's line", token: "stroke-thin" },
-      { part: "Corner", token: "radius-surface" },
     ],
     reflow: doesntApply("it keeps its corner and `size.panel` on every screen."),
   },

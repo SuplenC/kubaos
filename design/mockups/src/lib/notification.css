@@ -411,3 +411,124 @@
 .k-notif-heading:not([data-shown]) {
   visibility: hidden;
 }
+
+/* A notification popup (`lib/notification-popup.ts`): two lines on the card's fill at its corner, its
+   height running from theirs to the card's it opens into as `--open` goes 0 to 1. */
+@property --open {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.k-notif-pop {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: round(nearest, calc(var(--face-h, 0px) + (var(--full-h, 0px) - var(--face-h, 0px)) * var(--open)), 1px);
+  border-radius: var(--notif-corner);
+  background: var(--color-surface_container);
+  outline: none;
+  cursor: pointer;
+  transition: --open var(--motion-short) var(--easing-standard_accel);
+}
+
+.k-notif-pop[data-opening] {
+  transition: --open var(--motion-medium) var(--easing-emphasized_decel);
+}
+
+.k-notif-pop[data-open] {
+  cursor: default;
+}
+
+.k-notif-pop-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.k-notif-pop-face-room,
+.k-notif-pop-full {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+/* The two lines give way to the card in the first quarter of the opening; the card shows from there. */
+.k-notif-pop-face-room {
+  opacity: clamp(0, 1 - var(--open) * 4, 1);
+}
+
+.k-notif-pop-full {
+  opacity: clamp(0, (var(--open) - 0.25) / 0.5, 1);
+}
+
+.k-notif-pop:not([data-open]) .k-notif-pop-full {
+  pointer-events: none;
+}
+
+.k-notif-pop[data-open] .k-notif-pop-face-room {
+  pointer-events: none;
+}
+
+.k-notif-pop-full > .k-notif-card {
+  background-color: transparent;
+}
+
+/* The tile, the two lines `space.s12` after it, and the end a small control tall; `space.s8` in from
+   the top, the foot and the far corner, `space.s12` from the near one. */
+.k-notif-pop-face {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: var(--space-s12);
+  align-items: center;
+  padding: var(--space-s8) var(--space-s8) var(--space-s8) var(--space-s12);
+}
+
+.k-notif-pop-lines {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.k-notif-pop-end {
+  display: grid;
+  place-items: center end;
+  min-width: var(--size-control_sm);
+  height: var(--size-control_sm);
+}
+
+.k-notif-pop-end > * {
+  grid-area: 1 / 1;
+}
+
+.k-notif-pop-meta {
+  padding-right: var(--space-s4);
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.k-notif-pop-dismiss {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+/* Under the pointer, or with the keyboard on it, its dismiss takes the app and the time's place. */
+.k-notif-pop:is(:hover, :focus-visible, [data-pointed], [data-pinned]) .k-notif-pop-meta {
+  opacity: 0;
+}
+
+.k-notif-pop:is(:hover, :focus-visible, [data-pointed], [data-pinned]) .k-notif-pop-dismiss {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* With reduce motion it takes its height at once, and the card fades in over `short`. */
+[data-reduced] .k-notif-pop {
+  transition: none;
+}
+
+[data-reduced] .k-notif-pop[data-opening] .k-notif-pop-full {
+  animation: k-notif-faded var(--motion-short) var(--easing-standard);
+}

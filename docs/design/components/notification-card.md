@@ -1,4 +1,4 @@
-# NotificationCard
+# NotificationCard and NotificationPopup
 
 Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#components) has the rules every component keeps, its variant words and the fixed measures the geometry check holds it to.
 
@@ -8,7 +8,7 @@ QML `NotificationCard`. Its mockup page is the source of truth: Molecules, Notif
 
 One notification, the same card in the `PopupStack`, the bell's peek and the notifications panel. It lies flat on what holds it on `surface_container`, `error_container` for a critical one; its corners are the panel's surface radius `space.s8` in (16).
 
-- **The header band**, a small control tall (32), `space.s8` from the top and from the far corner: the app's icon or the notification's image on a `Sm` `IconTile` `space.s12` in, an accent `Badge` dot on its top right corner while unread, the app's name in `label` on one line (Notification when it has none), a `Chip` with the count on a stack's newest card, and the day and time it came in `small` and `on_surface_variant`, `space.s8` apart. At the band's end the dismiss, a Text sm `IconButton` with its hint (Dismiss, or Dismiss all N on a stack), shown while the card is lit, its room kept at rest so the band never moves; before it, while the text is cut off, a chevron in a box as big as the dismiss.
+- **The header band**, a small control tall (32), `space.s8` from the top and from the far corner: the app's icon or the notification's image on a `Sm` `IconTile` `space.s12` in, an accent `Badge` dot on its top right corner while unread where read and unread sit side by side (the panel, the peek; never as a popup, which is new by being one), the app's name in `label` on one line (Notification when it has none), a `Chip` with the count on a stack's newest card, and the day and time it came in `small` and `on_surface_variant`, `space.s8` apart. At the band's end the dismiss, a Text sm `IconButton` with its hint (Dismiss, or Dismiss all N on a stack), shown while the card is lit, its room kept at rest so the band never moves; before it, while the text is cut off, a chevron in a box as big as the dismiss.
 - **The words**, `space.s8` under the band and `space.s12` in at the sides: the summary in `body_strong` and the body in `body` and `on_surface_variant` `space.s4` under it, two lines each while folded, each cut after the last whole word that fits with the ellipsis (`Text`).
 - **The buttons**, `space.s12` under the words, `space.s8` apart, all sm: the main action Filled (Danger on a critical card), the others Text, then Mark read while it is unread, unless the sender offers its own. A row of Text buttons starts its first label on the words' edge, its box out in the padding. `space.s12` below them is the card's foot.
 - **A popup's time left**, a `stroke.thin` line in `primary` along its foot inside the padding, from full to nothing while it shows; its length is the shell's setting, `Settings.notificationTimeout`, not a token. A critical card has none: it stays until it is acted on.
@@ -18,3 +18,15 @@ One notification, the same card in the `PopupStack`, the bell's peek and the not
 **Motion.** Unfolding, the text's room opens to its whole height over `medium` on `standard_decel`, the whole text laid out and cut to the room as it goes; folding closes it over `short` on `standard_accel`, and the ellipsis comes back once it has closed. What holds the card moves with it. With reduce motion the room takes its height at once and the words fade in over `short`.
 
 **Keys.** It is never a Tab stop: what holds it has the keyboard. Enter or Space unfolds or folds it, or opens a stack; Shift+Enter runs its main action; Esc folds it, and folded, goes on to what holds it. A right click opens its menu: its actions, then Open, Dismiss and Clear all.
+
+## `NotificationPopup`
+
+QML `NotificationPopup`. Its mockup page is the source of truth: Molecules, NotificationPopup, in `design/mockups/`. *Not built yet: the shell's popups are full cards.*
+
+A new notification in the `PopupStack`, two lines and quiet: its own part rather than a card's variant, since it has its own states, keys and motion, and opens into the `NotificationCard` it stands for. On the card's fill at the card's corner, as wide as the stack holds it, `space.s8` in from its top, its foot and its far corner and `space.s12` from the near one: a `Sm` `IconTile` with the app's symbol (never the notification's image), or for several from one app their count in the symbol's place (`body_strong`, 99+ past 99); `space.s12` after it, the title in `label` over one line of the body in `small` and `on_surface_variant`, each on one line; and at its end the app and the time in `small`. It has no unread dot. Its time left is a `stroke.thin` hairline in `primary` at its foot, which its stack runs and holds.
+
+**States.** Under the pointer it stays two lines and only its dismiss, a Text sm `IconButton` with its hint, takes the app and the time's place. With the keyboard on it, the accent's tube lights inside its edge and the dismiss shows. Open, it is its card in place: today's `NotificationCard`, its count chip on a group, no dot; its time held until it folds.
+
+**Motion.** Opening, its height runs from its two lines' to the card's over `medium` on `emphasized_decel`, the two lines giving way in the first quarter and the card showing from there; folding takes `short` on `standard_accel`. The dismiss and the app and the time cross over `short` on `standard`. With reduce motion it takes its height at once and the card fades in over `short`.
+
+**Keys.** Tab reaches it; Enter opens or folds it; Delete dismisses it; Esc folds it. A click opens it, and open, a second click on its words folds it, as a click outside it does; its card's buttons run their actions.

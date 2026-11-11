@@ -711,6 +711,13 @@
   height: var(--icon);
 }
 
+/* A count in the symbol's place, centred on whole device pixels as the symbol is. */
+.k-icon-tile > .k-icon-tile-count {
+  position: absolute;
+  left: round(down, calc((var(--side) - round(up, calc(var(--natural) * var(--px) - 0.001px), 1px)) / 2), 1px);
+  top: round(down, calc((var(--side) - var(--t-line)) / 2), 1px);
+}
+
 /* An app's picture, scaled so its drawing's box fits `--fit` whole, the box snapped to whole
    device pixels and centred as the symbol is; the picture's own margin runs past the box, and the
    tile clips it. The shares (`--box-*`, `--picture-*`, of the box's long side) are its

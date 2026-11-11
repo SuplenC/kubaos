@@ -7,13 +7,16 @@ import "./notification-parts.css";
 import "../notifications.css";
 import { button } from "../../lib/button.ts";
 import { type MenuEntry, menu } from "../../lib/menu.ts";
-import type { Note } from "../../lib/notification-card.ts";
+import { badgedIcon } from "../../lib/badge.ts";
+import { card, type Note } from "../../lib/notification-card.ts";
+import { notificationPopup, type PopupElement, type PopupNote, type PopupPinned } from "../../lib/notification-popup.ts";
 import { type GroupElement, group } from "../../lib/notification-group.ts";
 import { panelPage } from "../../lib/panel-page.ts";
 import { hang, sheet } from "../../lib/sheet.ts";
 import { advance, centreFor, text } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { BUILD, clearButton, dndButton, KUBAOS, keysButton, SIGNAL, SLACK, status } from "../notifications.ts";
+import { ALL } from "../../site/settings.ts";
 import { CORNER_WIDTH, desk, onScreen, system } from "../templates/panels.ts";
 
 /** `shown` in a room as wide as the popups hold a card. */
@@ -322,5 +325,175 @@ export function belowOnScreen(critical: readonly (readonly Note[])[], live = fal
     requestAnimationFrame(() => show(true));
     buttons[0]?.addEventListener("click", () => show((open = !open)));
   }
+  return room.element;
+}
+
+/** A popup or a critical card in the stack: its slot, which opens and closes the room it takes. */
+interface Popped {
+  readonly slot: HTMLElement;
+  readonly shown: HTMLElement;
+  note: PopupNote;
+  count: number;
+  run: Animation | null;
+  open: boolean;
+  pop: PopupElement | null;
+}
+
+export interface PopupStackOptions {
+  /** Drawn still: these popups, newest first, a critical one as its full card. */
+  readonly notes?: readonly PopupNote[];
+  /** Each one's time left, by its place. */
+  readonly remaining?: readonly number[];
+  /** The popup at this place opened, or pinned under the pointer or the keyboard. */
+  readonly open?: number;
+  readonly pinned?: { readonly at: number; readonly as: PopupPinned };
+  /** Live: these arrive one by one, `space`-paced, each running its own time down; again once all have gone. */
+  readonly schedule?: readonly PopupNote[];
+  /** The bell's dot shown, as while anything is unread. */
+  readonly unread?: boolean;
+  readonly height?: string;
+}
+
+/** How long a popup shows: the shell's setting, `Settings.notificationTimeout`, never a token. */
+export const POPUP_TIMEOUT = 6000;
+/** How far apart a live burst arrives, a sample's pace. */
+const ARRIVALS = 1100;
+
+/**
+ * The popup stack on its corner sheet: two-line popups, one per app, newest first, a critical one as
+ * today's full card. Live, each popup runs its own time down and leaves by itself; the pointer on any
+ * popup holds every one's time, and an open popup's stays held until it folds. Another from an app
+ * already showing joins its popup: the newest's words, the count in the symbol's place, its time from
+ * the whole again, its place kept. The bell carries the unread dot while anything is unread.
+ */
+export function popupStackOnScreen(options: PopupStackOptions = {}): HTMLElement {
+  const stack = document.createElement("span");
+  stack.className = "k-popup-stack";
+  const { screen: room, buttons } = desk(CORNER_WIDTH, options.height ?? "var(--size-app_height)");
+  hang(room, sheet({ content: stack, edge: "top", corner: true }));
+  // The bell's unread dot, on its symbol's top right corner.
+  const bell = buttons[1]?.querySelector("svg");
+  let dot: HTMLElement | null = null;
+  if (bell) {
+    const badged = badgedIcon({ name: "notifications", accent: true, badged: true });
+    badged.querySelector("svg")?.replaceWith(bell.cloneNode(true));
+    bell.replaceWith(badged);
+    dot = badged.querySelector<HTMLElement>(".k-badge");
+  }
+  let unread = 0;
+  const mark = (by: number) => {
+    unread = Math.max(0, unread + by);
+    if (dot) dot.style.visibility = unread > 0 || (options.unread ?? false) ? "visible" : "hidden";
+  };
+  mark(0);
+
+  const live = new Set<Popped>();
+  let held = false;
+  const reduced = () => room.element.closest("[data-reduced]") !== null;
+
+  /** The pointer anywhere on the stack holds every timer; an open popup's stays held until it folds. */
+  const sync = () => {
+    for (const each of live) {
+      if (!each.run) continue;
+      if (held || each.open) each.run.pause();
+      else if (each.run.playState === "paused") each.run.play();
+    }
+  };
+  stack.addEventListener("pointerenter", () => ((held = true), sync()));
+  stack.addEventListener("pointerleave", () => ((held = false), sync()));
+
+  function leave(each: Popped, how: "side" | "up"): void {
+    if (!live.has(each)) return;
+    live.delete(each);
+    each.run?.cancel();
+    // Dismissed or acted on, it is read; its time running out leaves it unread in the history.
+    if (how === "side") mark(-each.count);
+    const inner = each.slot.firstElementChild as HTMLElement;
+    inner.classList.remove("k-popup-in");
+    inner.classList.add(how === "side" ? "k-popup-out-side" : "k-popup-out-up");
+    const close = () => {
+      each.slot.setAttribute("data-shut", "");
+      if (reduced()) each.slot.remove();
+      else each.slot.addEventListener("transitionend", () => each.slot.remove(), { once: true });
+      if (live.size === 0 && options.schedule) window.setTimeout(() => play(options.schedule!), ARRIVALS);
+    };
+    // Its time up, it rises as those below close the gap; a dismiss slides it out first.
+    if (how === "up" && !reduced()) close();
+    else inner.addEventListener("animationend", (event) => event.animationName.includes("fade") && close(), { once: false });
+    sync();
+  }
+
+  function place(note: PopupNote, index: number, animate: boolean): Popped {
+    const inner = document.createElement("span");
+    inner.className = "k-popup-inner";
+    const slot = document.createElement("span");
+    slot.className = "k-popup-slot";
+    slot.append(inner);
+    const each: Popped = { slot, shown: inner, note, count: note.count ?? 1, run: null, open: false, pop: null };
+    if (note.critical) {
+      const shown = card(note, { dot: false, onDismiss: () => leave(each, "side") });
+      shown.tabIndex = 0;
+      shown.addEventListener("keydown", (event) => event.key === "Delete" && leave(each, "side"));
+      inner.append(shown);
+    } else {
+      const pop = notificationPopup(note, {
+        live: true,
+        ...(options.remaining?.[index] !== undefined ? { remaining: options.remaining[index]! } : {}),
+        ...(options.pinned?.at === index ? { pinned: options.pinned.as } : {}),
+        open: options.open === index,
+        onDismiss: () => leave(each, "side"),
+        onAct: () => leave(each, "side"),
+        onToggle: (open) => {
+          each.open = open;
+          if (open) for (const other of live) if (other !== each && other.open) other.pop?.setOpen(false);
+          sync();
+        },
+      });
+      each.pop = pop;
+      each.open = options.open === index;
+      inner.append(pop);
+      if (animate) {
+        each.run = pop.animate([{ "--remaining": "1" }, { "--remaining": "0" }], { duration: POPUP_TIMEOUT, fill: "forwards" });
+        each.run.finished.then(() => leave(each, "up"), () => {});
+      }
+    }
+    // The slot's room is its popup's height, which only layout knows, closing as `--room` goes to 0.
+    new ResizeObserver(() => slot.style.setProperty("--slot-h", `${inner.offsetHeight}px`)).observe(inner);
+    return each;
+  }
+
+  function arrive(note: PopupNote): void {
+    mark(1);
+    const same = note.critical ? undefined : [...live].find((each) => !each.note.critical && each.note.app === note.app);
+    if (same) {
+      same.count += 1;
+      same.note = { ...note, count: same.count };
+      same.pop?.update(same.note);
+      if (same.run) same.run.currentTime = 0;
+      sync();
+      return;
+    }
+    const each = place(note, -1, true);
+    each.slot.setAttribute("data-shut", "");
+    stack.prepend(each.slot);
+    live.add(each);
+    requestAnimationFrame(() => {
+      each.slot.removeAttribute("data-shut");
+      each.shown.classList.add("k-popup-in");
+    });
+    sync();
+  }
+
+  let timers: number[] = [];
+  function play(list: readonly PopupNote[]): void {
+    for (const id of timers) window.clearTimeout(id);
+    timers = list.map((note, at) => window.setTimeout(() => arrive(note), ALL ? 0 : at * ARRIVALS));
+  }
+
+  for (const [index, note] of (options.notes ?? []).entries()) {
+    const each = place(note, index, false);
+    stack.append(each.slot);
+  }
+  if (options.schedule) play(options.schedule);
   return room.element;
 }

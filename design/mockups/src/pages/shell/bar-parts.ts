@@ -112,8 +112,13 @@ export function statusPill(options: StatusOptions = {}): HTMLElement {
 
 // The bell.
 
-export function bellPill(dnd = false, state: Shown = "rest"): HTMLElement {
-  return control([glyph(dnd ? "notifications_off" : "notifications")], "", state, { lone: true });
+/**
+ * The bell, crossed out under Do not disturb, the accent's unread dot on its symbol's corner while
+ * anything is unread: the popups carry no dot, since a popup is new by being one.
+ */
+export function bellPill(dnd = false, state: Shown = "rest", unread = false): HTMLElement {
+  const name = dnd ? "notifications_off" : "notifications";
+  return control([unread ? badgedIcon({ name, accent: true, badged: true }) : glyph(name)], "", state, { lone: true });
 }
 
 /** The bell with its hint: only with nothing unread. */
