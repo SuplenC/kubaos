@@ -29,6 +29,7 @@
 // It always draws in the night scheme matugen derives from its wallpaper, whatever the mode.
 
 import "./lock.css";
+import { cityOf, plateOf } from "./depth-picture.ts";
 import { type NightScheme, paintNight, tintFor } from "./lock-tint.ts";
 import { field, fieldRoom } from "./field.ts";
 import { icon } from "./icon.ts";
@@ -74,8 +75,9 @@ export interface Wallpaper {
 /**
  * At rest, awake with the password's sheet up, or the desktop: the still of it the lock plays its
  * locking and unlocking on, the frame and the bar as the shell draws them and the clock in the bar.
+ * Or the picture alone, pushed in with its city off the sky: the wallpaper picker's wall.
  */
-export type Phase = "rest" | "awake" | "desktop";
+export type Phase = "rest" | "awake" | "desktop" | "picture";
 
 /**
  * What the sheet shows: waiting for a password or a finger, checking one, after a wrong password,
@@ -253,12 +255,13 @@ export function lock(options: LockOptions): Lock {
   dim.after(clock);
 
   if (wallpaper.depth) {
-    const plate = document.createElement("img");
-    plate.className = "k-lock-plate";
-    plate.src = wallpaper.depth.plate;
-    plate.alt = "";
+    const plate = plateOf(wallpaper.depth.plate);
+    plate.classList.add("k-lock-plate");
     picture.after(plate);
-    clock.after(cutout(wallpaper.picture, wallpaper.depth.cutout));
+    const city = cityOf(wallpaper.picture, wallpaper.depth.cutout);
+    city.classList.add("k-lock-cutout");
+    city.firstElementChild!.classList.add("k-lock-city");
+    clock.after(city);
     clock.style.setProperty("--city", `url("${wallpaper.depth.cutout}")`);
   }
   // The desktop's windows stand in front of the city: they are the still's top layer.
@@ -369,23 +372,6 @@ interface Cover {
  */
 function pushedCover(cover: Cover, width: number, height: number, push: number): Cover {
   return { scale: cover.scale * push, left: width / 2 + (cover.left - width / 2) * push, top: height + (cover.top - height) * push };
-}
-
-/**
- * The city: the picture itself drawn through the cut-out's alpha, so where the city is opaque it is
- * the picture's own pixels and the lock's first frame is the desktop's picture exactly. The mask
- * is on the picture and the blur on the box round it, so the city's edge blurs with it.
- */
-function cutout(picture: string, alpha: string): HTMLElement {
-  const box = document.createElement("span");
-  box.className = "k-lock-cutout";
-  const city = document.createElement("img");
-  city.className = "k-lock-city";
-  city.src = picture;
-  city.alt = "";
-  city.style.setProperty("mask-image", `url("${alpha}")`);
-  box.append(city);
-  return box;
 }
 
 const widest = new Map<string, number>();
