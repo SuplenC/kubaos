@@ -3,7 +3,7 @@
 // SidebarPage, the template it sits in.
 
 import "./layout.css";
-import photo from "../../../../../branding/photo/neon-sign-front@2x.jpg?url";
+import photo from "../../../../../branding/photo/neon-sign-banner.jpg?url";
 import { button } from "../../lib/button.ts";
 import { chip } from "../../lib/chip.ts";
 import { shown, type Words } from "../../lib/content.ts";
