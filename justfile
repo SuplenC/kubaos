@@ -86,10 +86,23 @@ _nightly-rustfmt:
       exit 1
     fi
 
-# Clippy, both passes: the code with -D warnings, then every target (tests, examples, benches) with unwrap allowed, since tests may unwrap. The lints are `[workspace.lints]` in Cargo.toml.
-lint:
-    cargo clippy --workspace --locked -- -D warnings
-    cargo clippy --workspace --locked --all-targets -- -D warnings -A clippy::unwrap_used
+# Clippy, both passes: the code with -D warnings, then every target (tests, examples, benches) with unwrap allowed, since tests may unwrap. The lints are `[workspace.lints]` in Cargo.toml. It runs `cargo-clippy` from PATH rather than `cargo clippy`, which takes the one in ~/.cargo/bin first: rustup's, on a machine or a runner with rustup.
+lint: _pinned-clippy
+    cargo-clippy clippy --workspace --locked -- -D warnings
+    cargo-clippy clippy --workspace --locked --all-targets -- -D warnings -A clippy::unwrap_used
+
+# Each clippy release adds and changes lints, so the recipes refuse one at another Rust than rust-toolchain.toml's: what passes here passes in CI.
+_pinned-clippy:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pinned="$(sed -n 's/^channel = "\([0-9]*\.[0-9]*\)\.[0-9]*"$/\1/p' rust-toolchain.toml)"
+    # Clippy numbers its releases 0.1.N for Rust 1.N.
+    clippy="$(cargo-clippy clippy --version)"
+    minor="${clippy#clippy 0.1.}"
+    if [[ ${minor%% *} != "${pinned#1.}" ]]; then
+      echo "$(command -v cargo-clippy) is $clippy, but rust-toolchain.toml names Rust $pinned: run this in \`nix develop\`, or set its \`channel\` to the dev shell's \`rustc --version\`" >&2
+      exit 1
+    fi
 
 # Cargo tests, the shell harness (Docker) and the engine end-to-end test.
 test:

@@ -95,7 +95,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 
 ### Lints
 
-- **Clippy is clean under `-D warnings`, with `pedantic` on.** Every crate takes the root `Cargo.toml`'s `[workspace.lints]` with `[lints] workspace = true`. `just lint` runs the two passes: the code with `-D warnings`, then every target with `-D warnings -A clippy::unwrap_used`, since tests may unwrap. `vendor/` isn't a member, so neither pass lints it. Source: M-STATIC-VERIFICATION.
+- **Clippy is clean under `-D warnings`, with `pedantic` on.** Every crate takes the root `Cargo.toml`'s `[workspace.lints]` with `[lints] workspace = true`. `just lint` runs the two passes: the code with `-D warnings`, then every target with `-D warnings -A clippy::unwrap_used`, since tests may unwrap. `vendor/` isn't a member, so neither pass lints it. Each clippy release adds lints, so `just lint` runs the dev shell's clippy and refuses one at another Rust than `rust-toolchain.toml` names; that file pins rustup, outside the dev shell, to the dev shell's Rust, and moves with it when a nixpkgs update moves Rust. Source: M-STATIC-VERIFICATION.
 - **Silence a lint with `#[expect(lint, reason = "…")]`**, at the narrowest item. `#[allow]` is for generated code and macro output only, and carries a reason too. Clippy `allow_attributes`, `allow_attributes_without_reason`. Source: M-LINT-OVERRIDE-EXPECT.
 - Beyond pedantic: `allow_attributes`, `allow_attributes_without_reason`, `clone_on_ref_ptr`, `dbg_macro`, `manual_let_else`, `mod_module_files`, `print_stderr`, `print_stdout`, `return_self_not_must_use`, `todo`, `undocumented_unsafe_blocks`, `unimplemented`, `unwrap_used` (off in tests). The `[workspace.lints]` of Kotodama's root `Cargo.toml` is the reference set.
 
