@@ -86,7 +86,7 @@ fn the_fixed_roles_are_written_in_both_palettes() {
         "logo_core_cold: \"#dcf1ff\"",
         "microphone: \"#ff8505\"",
         "microphone: \"#9e5000\"",
-        "recording: \"#ff6f5d\"",
+        "recording: \"#ff6e5d\"",
         "recording: \"#cd0003\"",
         "success: \"#3cc96a\"",
         "success: \"#007533\"",
