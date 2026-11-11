@@ -536,14 +536,15 @@ impl Suites {
         let tools = wanted_tools(suite, &config, &before.tools, |tool, line| {
             self.narrow(suite, tool, line)
         })?;
-        if tools != before.tools {
+        let moved = !same_tools(&tools, &before.tools);
+        if moved {
             self.install(suite, &tools)?;
             self.write_fragment(suite, &tools)?;
         }
         if changed {
             self.write(suite, &config)?;
         }
-        if tools != before.tools {
+        if moved {
             self.mise.lock().map_err(SuiteError::MiseLock)?;
             self.mise.prune().map_err(SuiteError::Prune)?;
         }
@@ -997,6 +998,12 @@ fn major_minor(version: &str) -> Option<String> {
     let (major, minor, _rest) = (parts.next()?, parts.next()?, parts.next()?);
     let numeric = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
     (numeric(major) && numeric(minor)).then(|| format!("{major}.{minor}"))
+}
+
+/// Whether `a` and `b` ask for the same tools at the same requests. A fragment reads back with
+/// its tools sorted by name, the catalog lists them in its own order.
+fn same_tools(a: &[ToolRequest], b: &[ToolRequest]) -> bool {
+    a.iter().collect::<BTreeSet<_>>() == b.iter().collect::<BTreeSet<_>>()
 }
 
 /// Whether `request` is `line` or a narrower request within it: `24.22` is on `24`.

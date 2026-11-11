@@ -740,7 +740,7 @@ fn kubaos_ships_the_rust_and_go_suites() {
         catalog::find("rust").map(|s| s.toolchain),
         Some(Toolchain::Upstream { manager: "rustup" })
     );
-    assert_eq!(catalog::find("go").map(|s| s.toolchain), Some(Toolchain::Nix));
+    assert_eq!(catalog::find("go").map(|s| s.toolchain), Some(Toolchain::Mise));
 }
 
 #[test]
@@ -773,10 +773,72 @@ fn rust_scaffolds_a_binary_a_library_and_a_workspace() {
 }
 
 #[test]
-fn go_installs_the_version_nixpkgs_builds_its_go_tools_with_by_default() {
+fn go_installs_the_newest_go_line_by_default() {
     let go = catalog::find("go").unwrap();
 
-    assert_eq!(default_config(go).version.as_deref(), Some("1.26"));
+    assert_eq!(default_config(go).version.as_deref(), Some("1.27"));
+}
+
+#[test]
+fn the_go_suite_installs_go_at_its_line_and_each_tool_at_its_own_request() {
+    let h = home();
+    let go = catalog::find("go").unwrap();
+
+    let added = h.suites.add(go, &OptionsChange::default()).unwrap();
+    let configured = h
+        .suites
+        .configure(
+            go,
+            &OptionsChange {
+                version: Some("1.26".to_owned()),
+                ..OptionsChange::default()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(
+        added.tools,
+        requests(&[
+            ("go", "1.27"),
+            ("go:golang.org/x/tools/gopls", "0.24"),
+            ("go:golang.org/x/tools/cmd/goimports", "0.52"),
+            ("aqua:mvdan/gofumpt", "0.12"),
+            ("aqua:golangci/golangci-lint", "2.15"),
+            ("aqua:go-delve/delve", "1.27"),
+        ])
+    );
+    assert_eq!(configured.tools.first(), Some(&requests(&[("go", "1.26")])[0]));
+    assert_eq!(configured.tools[1..], added.tools[1..]);
+    assert!(
+        fs::read_to_string(h.paths.mise_fragment("go"))
+            .unwrap()
+            .contains("go = \"1.26\"")
+    );
+}
+
+#[test]
+fn a_go_record_from_before_mise_gets_its_fragment_on_configure_and_keeps_its_version() {
+    let h = home();
+    let go = catalog::find("go").unwrap();
+    write(
+        &h.paths.state_dir().suite_file("go"),
+        "version = \"1.25\"\nextras = []\n",
+    );
+
+    let configured = h.suites.configure(go, &OptionsChange::default()).unwrap();
+    let again = h.suites.configure(go, &OptionsChange::default()).unwrap();
+
+    assert!(!configured.changed, "the record stays as it was");
+    assert_eq!(configured.config.version.as_deref(), Some("1.25"));
+    assert_eq!(configured.tools.len(), go.mise.len());
+    assert_eq!(configured.tools.first(), Some(&requests(&[("go", "1.25")])[0]));
+    assert!(h.paths.mise_fragment("go").is_file());
+    assert_eq!(again.tools, configured.tools);
+    assert_eq!(
+        h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
+        1,
+        "a second run installs nothing"
+    );
 }
 
 #[test]

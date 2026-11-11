@@ -19,15 +19,22 @@
 # ~/.cache/kubaos/zsh; deleting that folder is always safe.
 #
 # PATH entries live in home.sessionPath, not here: ~/.local/bin and cargo's in
-# dev.nix, each installed Suite's in its module under suites/. mise's hook is
-# the exception: before each prompt it puts the tools of the Suites' mise
-# fragments (~/.config/mise/conf.d/kubaos-*.toml) and of the folder's own
-# mise.toml (its Project pins) at the front of PATH, ahead of
-# ~/.nix-profile/bin, so a tool's own commands are never shadowed by a Nix one
-# of the same name, and sets the folder's [env]. It is the only directory
-# hook: direnv isn't installed, since mise calls running the two together
-# unsupported (both rewrite PATH). A project with a flake devshell runs
-# `nix develop`.
+# dev.nix, each installed Suite's in its module under suites/; mise's shims are
+# the session variables' last line, below. mise's hook is the exception: before
+# each prompt it puts the tools of the Suites' mise fragments
+# (~/.config/mise/conf.d/kubaos-*.toml) and of the folder's own mise.toml (its
+# Project pins) at the front of PATH, ahead of ~/.nix-profile/bin, so a tool's
+# own commands are never shadowed by a Nix one of the same name, and sets the
+# folder's [env]. It is the only directory hook: direnv isn't installed, since
+# mise calls running the two together unsupported (both rewrite PATH). A
+# project with a flake devshell runs `nix develop`.
+#
+# Only an interactive zsh runs the hook, so a program started any other way
+# (Neovim from the launcher, a script, `zsh -c`) finds a Suite's tools through
+# mise's shims: the shims folder is on the session's PATH, ahead of
+# ~/.nix-profile/bin (config/hypr/env.lua keeps that order in the graphical
+# session), and the hook leaves it behind its own entries. A shim runs mise,
+# which picks the version the folder's configs ask for.
 {
   config,
   kubaosPkgs,
@@ -60,6 +67,9 @@ let
   # lines; cached, they would bring back that PATH in every later shell. The
   # rest is the same for every shell, and its `_mise_hook --force` sets PATH
   # from mise's configs as the shell starts.
+  # mise's shims folder, as mise finds it: under MISE_DATA_DIR when that is
+  # set, else XDG_DATA_HOME's mise.
+  miseShims = "\${MISE_DATA_DIR:-\${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims";
   miseActivate = pkgs.writeShellScript "mise-activate-zsh" ''
     set -euo pipefail
     ${lib.getExe kubaosPkgs.mise} activate zsh | ${lib.getExe pkgs.gnused} -e '/^export __MISE_ORIG_PATH=/d' -e '/^export PATH=/d'
@@ -74,6 +84,18 @@ in
 
   # XDG_CONFIG_HOME and friends come from xdg.enable (default.nix).
   home.sessionVariables.EDITOR = "nvim";
+  home.sessionPath = [ miseShims ];
+
+  # A shim is a link to the mise that made it, a store path. mise remakes the
+  # shims of the tools it installs or prunes, but not when a release moves
+  # mise itself, so the switch remakes them all: 40 ms, nothing downloaded. A
+  # mise config it can't read fails the reshim, not the switch.
+  home.activation.miseReshim = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    if [[ -d "${miseShims}" ]]; then
+      (cd / && run ${lib.getExe kubaosPkgs.mise} reshim) ||
+        warnEcho "mise reshim failed: run it once mise's config reads again"
+    fi
+  '';
 
   programs.zsh = {
     enable = true;

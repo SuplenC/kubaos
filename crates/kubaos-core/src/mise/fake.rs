@@ -55,6 +55,12 @@ impl FakeMise {
                 ("demo-fmt", vec!["3.1.0"]),
                 ("demo-nightly", vec!["nightly"]),
                 ("kubaos-test-tool", vec!["1.0.0", "1.0.1", "2.0.0", "3.0.0"]),
+                ("go", vec!["1.25.9", "1.26.10", "1.27.3"]),
+                ("go:golang.org/x/tools/gopls", vec!["0.24.0"]),
+                ("go:golang.org/x/tools/cmd/goimports", vec!["0.52.0"]),
+                ("aqua:mvdan/gofumpt", vec!["0.12.0"]),
+                ("aqua:golangci/golangci-lint", vec!["2.15.0"]),
+                ("aqua:go-delve/delve", vec!["1.27.2"]),
             ]),
             state: Mutex::default(),
         }

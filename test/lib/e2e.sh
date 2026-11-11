@@ -69,6 +69,7 @@ c_path() {
   prev="$(grep -nxF -- /usr/bin <<<"$path_lines" | head -1 | cut -d: -f1)"
   ((i < prev)) || { echo "FAIL ~/.nix-profile/bin comes after /usr/bin"; return 1; }
   echo "ok   ~/.nix-profile/bin before /usr/bin"
+  as_user lua5.5 "$REPO/test/lua/env_test.lua" "$REPO" || { echo "FAIL test/lua/env_test.lua"; return 1; }
 }
 
 # Every tool docs/CONTRACTS.md lists ("Packages: who installs what") that
@@ -3041,28 +3042,73 @@ c_suite_rust() {
   rm -rf "$USER_HOME/.rustup" "$USER_HOME/.config/kubaos/editor/nvim/plugins/rust.lua"
 }
 
-# The Go Suite (home/suites/go.nix): Go and its tools, a project scaffolded
-# and run (no network: the standard library only), Neovim's Go support taking
-# Nix's tools instead of Mason's, and nothing of it left in the generation
-# after removal.
+# The Go Suite (crates/kubaos-core/src/suites/catalog.rs, home/suites/go.nix):
+# Go and its tools from mise, which downloads them (Go, gofumpt,
+# golangci-lint and delve) or builds them (gopls, goimports). A home from
+# before mise moves onto it through the migration at its version; configure
+# moves Go's line and prunes the old one; a project is scaffolded and run;
+# a login shell and Neovim without mise's hook find the tools through the
+# shims; removal leaves nothing of it in mise or the generation, and a fresh
+# add installs the default line.
 c_suite_go() {
   local u="$USER_HOME/.config/kubaos/home" project="$USER_HOME/Projects/go-demo" out gen t
   local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/go.lua"
+  local frag="$USER_HOME/.config/mise/conf.d/kubaos-go.toml" defaults="$USER_HOME/.config/mise/conf.d/kubaos-go_defaults.toml"
+  local installs="$USER_HOME/.local/share/mise/installs" shims="$USER_HOME/.local/share/mise/shims"
+  local migration=("$REPO"/migrations/user/*-go-on-mise.sh)
+  local tools=(go gofmt gopls gofumpt goimports golangci-lint dlv)
   install_kubaos || return 1
   user_flake "$u" || return 1
   as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
   rm -rf "$project" "$mine"
+  # on_shims: each Go tool resolves to its shim in a login shell, which runs
+  # no mise hook.
+  on_shims() {
+    local t
+    for t in "${tools[@]}"; do
+      [[ $(zrun "whence -p $t") == "$shims/$t" ]] || { echo "FAIL $t is not mise's shim in a login shell: $(zrun "whence -p $t")"; return 1; }
+    done
+  }
 
-  out="$(kz 'kubaos suite add go --foreground' 2>&1)" ||
-    { echo "FAIL kubaos suite add go"; printf '%s\n' "$out" | tail -20; return 1; }
-  for t in go gopls gofumpt goimports golangci-lint dlv kubaos-go-new; do
-    has_bin "$t" || { echo "FAIL $t not on PATH"; return 1; }
+  # A home as the Suite on Nix left it: the record, no fragment, and the
+  # session's GOTOOLCHAIN=local, under which the old Go would build nothing.
+  as_user install -d "$u/kubaos.d/suites"
+  printf 'version = "1.26"\nextras = []\n' | as_user tee "$u/kubaos.d/suites/go.toml" >/dev/null
+  out="$(kz 'kubaos switch --foreground' 2>&1)" ||
+    { echo "FAIL the switch with the old Go record"; printf '%s\n' "$out" | tail -20; return 1; }
+  gone_from_generation "the Go Suite's Nix toolchain" '-(go-1\.[0-9.]+|gopls|gofumpt|gotools|golangci-lint|delve)(-|$)' || return 1
+  has_bin kubaos-go-new && [[ -L $defaults ]] || { echo "FAIL the module's scaffolder or mise defaults are missing"; return 1; }
+  for _ in 1 2; do
+    out="$(kz "GOTOOLCHAIN=local KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+      { echo "FAIL the go-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
   done
-  [[ $(zrun 'go env GOVERSION') == go1.26.* && $(zrun 'print -r -- "$GOTOOLCHAIN"') == local ]] ||
-    { echo "FAIL want Go 1.26 with GOTOOLCHAIN=local: $(zrun 'go env GOVERSION GOTOOLCHAIN' | tr '\n' ' ')"; return 1; }
-  zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/go/bin" || { echo "FAIL ~/go/bin is not on PATH"; return 1; }
+  grep -qx 'go = "1.26"' "$frag" && grep -qx '"go:golang.org/x/tools/gopls" = "0.24"' "$frag" &&
+    grep -q 'already version 1.26' <<<"$out" && grep -qx 'version = "1.26"' "$u/kubaos.d/suites/go.toml" ||
+    { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  [[ $(zrun 'go env GOVERSION') == go1.26.* && -z $(zrun 'print -r -- "$GOTOOLCHAIN$GOBIN"') ]] ||
+    { echo "FAIL want Go 1.26 with no GOTOOLCHAIN or GOBIN: $(zrun 'go env GOVERSION GOTOOLCHAIN GOBIN' | tr '\n' ' ')"; return 1; }
+  on_shims || return 1
+  echo "ok   the go-on-mise migration: a 1.26 record gets its fragment and tools at 1.26 through the shims, the record kept, a rerun changes nothing"
+
+  out="$(kz 'kubaos suite configure go --version 1.27 --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite configure go --version 1.27"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(zrun 'go env GOVERSION') == go1.27.* && -z $(compgen -G "$installs/go/1.26*") ]] ||
+    { echo "FAIL configure: not Go 1.27, or 1.26 wasn't pruned"; ls "$installs/go"; return 1; }
   [[ -f $mine ]] || { echo "FAIL plugins/go.lua was not seeded"; return 1; }
-  echo "ok   kubaos suite add go: Go 1.26 with GOTOOLCHAIN=local, its tools, ~/go/bin on PATH, the seeded go.lua"
+  echo "ok   kubaos suite configure go --version 1.27: Go 1.27, 1.26 pruned, the seeded go.lua"
+
+  local path
+  path="$(zrun 'print -r -- $PATH' | tr ':' '\n')"
+  grep -qx "$USER_HOME/go/bin" <<<"$path" || { echo "FAIL ~/go/bin is not on PATH"; return 1; }
+  (($(grep -nxF -- "$shims" <<<"$path" | cut -d: -f1) < $(grep -nxF -- "$USER_HOME/.nix-profile/bin" <<<"$path" | cut -d: -f1))) ||
+    { echo "FAIL mise's shims don't come before ~/.nix-profile/bin in a login shell:"; printf '%s\n' "$path"; return 1; }
+  [[ $(zlogin 'whence -p gopls') == "$installs/go-golang-org-x-tools-gopls/"*/bin/gopls ]] ||
+    { echo "FAIL an interactive zsh doesn't put mise's own entries ahead of the shims: $(zlogin 'whence -p gopls')"; return 1; }
+  # mise's hook would point GOBIN at the bin of the Go it activates; the
+  # Suite's default for mise leaves it to Go, whose own is ~/go/bin.
+  [[ -z $(zlogin 'print -r -- "$GOBIN"; go env GOBIN') && $(zlogin 'go env GOPATH') == "$USER_HOME/go" ]] ||
+    { echo "FAIL go install doesn't go to ~/go/bin: $(zlogin 'go env GOBIN GOPATH' | tr '\n' ' ')"; return 1; }
+  echo "ok   ~/go/bin on PATH and Go's own GOBIN; the shims ahead of ~/.nix-profile/bin, behind mise's hook in an interactive zsh"
 
   out="$(kz 'kubaos suite new go go-demo' 2>&1)" ||
     { echo "FAIL kubaos suite new go go-demo"; printf '%s\n' "$out" | tail -20; return 1; }
@@ -3070,29 +3116,48 @@ c_suite_go() {
     grep -qx 'module go-demo' "$project/go.mod" ||
     { echo "FAIL the scaffolded project doesn't run"; ls -la "$project"; return 1; }
   [[ -z $(zrun "cd $project && gofumpt -l . && goimports -l .") ]] || { echo "FAIL the scaffolded main.go isn't formatted"; return 1; }
-  echo "ok   kubaos suite new go go-demo: a module under git whose main package runs and is formatted"
+  zrun "cd $project && golangci-lint run ./... && dlv version" >/dev/null 2>&1 ||
+    { echo "FAIL golangci-lint or dlv in the project"; zrun "cd $project && golangci-lint run ./...; dlv version" 2>&1 | tail -5; return 1; }
+  echo "ok   kubaos suite new go go-demo: a module under git whose main package runs, is formatted, lints clean, and dlv runs"
+
+  out="$(kz "kubaos pin go 1.26 '$project'" 2>&1)" ||
+    { echo "FAIL kubaos pin go 1.26"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(zrun "cd $project && go env GOVERSION") == go1.26.* && $(zrun 'go env GOVERSION') == go1.27.* ]] ||
+    { echo "FAIL the pin: Go $(zrun "cd $project && go env GOVERSION") in the project, $(zrun 'go env GOVERSION') outside"; return 1; }
+  expect_ok "kubaos unpin go" kz "kubaos unpin go '$project'" || return 1
+  echo "ok   kubaos pin go 1.26: the project runs Go 1.26 through the shims, the home 1.27"
 
   cache_lock nvim
-  out="$(zrun "nvim --headless +'lua io.write(\"\\nMASON \", table.concat(LazyVim.opts(\"mason.nvim\").ensure_installed, \",\"), \"\\nGOPLS \", tostring(LazyVim.opts(\"nvim-lspconfig\").servers.gopls.mason))' +qa" 2>&1 | tr -d '\r')"
+  out="$(zrun "nvim --headless +'lua io.write(\"\\nMASON \", table.concat(LazyVim.opts(\"mason.nvim\").ensure_installed, \",\"), \"\\nGOPLS \", tostring(LazyVim.opts(\"nvim-lspconfig\").servers.gopls.mason), \"\\nPATHS \", vim.fn.exepath(\"gopls\"), \" \", vim.fn.exepath(\"dlv\"))' +qa" 2>&1 | tr -d '\r')"
   grep -qx 'GOPLS false' <<<"$out" && grep -q '^MASON ' <<<"$out" &&
-    ! grep '^MASON ' <<<"$out" | grep -qwE 'delve|gofumpt|goimports|golangci-lint' ||
-    { echo "FAIL Mason would install Go tools Nix has:"; printf '%s\n' "$out" | grep -E '^(MASON|GOPLS)'; return 1; }
-  echo "ok   LazyVim's Go extra uses Nix's gopls, gofumpt, goimports, golangci-lint and delve, not Mason's"
+    ! grep '^MASON ' <<<"$out" | grep -qwE 'delve|gofumpt|goimports|golangci-lint' &&
+    grep -qx "PATHS $shims/gopls $shims/dlv" <<<"$out" ||
+    { echo "FAIL Neovim without mise's hook doesn't take gopls and dlv from the shims, or Mason would install Go tools:"; printf '%s\n' "$out" | grep -E '^(MASON|GOPLS|PATHS)'; return 1; }
+  [[ $(zrun "cd $project && gopls version") == golang.org/x/tools/gopls* ]] || { echo "FAIL gopls through its shim"; return 1; }
+  echo "ok   Neovim started without mise's hook finds gopls and dlv through the shims; LazyVim's Go extra asks Mason for none"
 
   out="$(kz 'kubaos suite remove go --foreground' 2>&1)" ||
     { echo "FAIL kubaos suite remove go"; printf '%s\n' "$out" | tail -20; return 1; }
   grep -qE '^cache ~/.cache/go-build \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" &&
     grep -qx '  ~/.config/kubaos/editor/nvim/plugins/go.lua' <<<"$out" && [[ -f $project/main.go ]] ||
     { echo "FAIL remove: the build cache's size, the user's go.lua, or the project"; printf '%s\n' "$out"; return 1; }
-  gone_from_generation "the Go Suite's packages" '-(go-1\.[0-9.]+|gopls|gofumpt|gotools|golangci-lint|delve|kubaos-go-new)(-|$)' || return 1
-  for t in go gopls dlv kubaos-go-new; do
-    ! has_bin "$t" || { echo "FAIL $t is still on PATH"; return 1; }
+  [[ ! -e $frag && -z $(compgen -G "$installs/go*") && -z $(compgen -G "$installs/aqua-*") ]] ||
+    { echo "FAIL remove: the fragment or a version is left"; ls "$installs"; return 1; }
+  for t in "${tools[@]}" kubaos-go-new; do
+    [[ ! -e $shims/$t ]] && ! zrun "whence -p $t" >/dev/null || { echo "FAIL $t is still on PATH"; return 1; }
   done
+  gone_from_generation "the Go Suite's packages" '-(kubaos-go-new|kubaos-go_defaults\.toml)(-|$)' || return 1
   gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
-  ! grep -qs GOTOOLCHAIN "$gen/home-path/etc/profile.d/hm-session-vars.sh" &&
-    ! grep -qF lang.go "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
-    { echo "FAIL the Suite's environment or Neovim extra is left"; return 1; }
-  echo "ok   kubaos suite remove go: the build cache kept with its size, go.lua listed, the project untouched, nothing of the Suite in the generation"
+  [[ ! -e $defaults ]] && ! grep -qF lang.go "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
+    { echo "FAIL the Suite's mise defaults or Neovim extra are left"; return 1; }
+  echo "ok   kubaos suite remove go: fragment, versions and shims gone, the build cache kept, go.lua listed, the project untouched, nothing of it left in the generation"
+
+  out="$(kz 'kubaos suite add go --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add go"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx 'go = "1.27"' "$frag" && [[ $(zrun 'go env GOVERSION') == go1.27.* ]] && on_shims ||
+    { echo "FAIL kubaos suite add go: not Go 1.27 with every tool"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite add go: the default line, 1.27, and every tool"
+  expect_ok "kubaos suite remove go again" kz 'kubaos suite remove go --foreground' || return 1
   rm -rf "$project" "$mine"
 }
 

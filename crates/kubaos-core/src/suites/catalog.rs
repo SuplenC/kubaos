@@ -14,12 +14,10 @@ use kubaos_user_layer::App;
 
 use super::Cache;
 use super::Extra;
-#[cfg(any(test, feature = "test-suite"))]
 use super::Request;
 use super::Scaffolder;
 use super::Seed;
 use super::Suite;
-#[cfg(any(test, feature = "test-suite"))]
 use super::Tool;
 use super::Toolchain;
 
@@ -197,20 +195,52 @@ const PROTO: Suite = Suite {
     mentions: &["proto", "moon", "moonrepo", ".prototools", "moon.yml"],
 };
 
-/// Go from nixpkgs, with gopls, gofumpt, goimports, golangci-lint and delve. Its Nix module is
-/// `home/suites/go.nix`.
+/// Go from mise, with gopls, gofumpt, goimports, golangci-lint and delve, each its own mise tool.
+/// Its Nix module is `home/suites/go.nix`.
 ///
-/// The default version is the one nixpkgs builds its Go tools with, so they come from the binary
-/// cache; a newer one builds gopls, gofumpt, goimports and golangci-lint again with it, since they
-/// read code only up to the Go they were built with.
+/// gofumpt, golangci-lint and delve are release binaries from aqua. gopls and goimports publish
+/// none, so mise's `go:` backend builds them with the Go it installs beside them. One that needs a
+/// newer Go than the chosen line to build (gopls 0.24 needs 1.27) has Go fetch that toolchain for
+/// the build, which `GOTOOLCHAIN=local` refuses: KubaOS leaves `GOTOOLCHAIN` unset.
 const GO: Suite = Suite {
     name: "go",
     title: "Go",
     description: "Go with gopls, gofumpt, goimports, golangci-lint and delve, and Neovim's Go support.",
-    versions: &["1.26", "1.27", "1.25"],
+    versions: &["1.27", "1.26", "1.25"],
     extras: &[],
-    mise: &[],
-    toolchain: Toolchain::Nix,
+    mise: &[
+        Tool {
+            name: "go",
+            request: Request::Suite,
+            extra: None,
+        },
+        Tool {
+            name: "go:golang.org/x/tools/gopls",
+            request: Request::Fixed("0.24"),
+            extra: None,
+        },
+        Tool {
+            name: "go:golang.org/x/tools/cmd/goimports",
+            request: Request::Fixed("0.52"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:mvdan/gofumpt",
+            request: Request::Fixed("0.12"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:golangci/golangci-lint",
+            request: Request::Fixed("2.15"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:go-delve/delve",
+            request: Request::Fixed("1.27"),
+            extra: None,
+        },
+    ],
+    toolchain: Toolchain::Mise,
     caches: &[
         Cache {
             path: "go",
