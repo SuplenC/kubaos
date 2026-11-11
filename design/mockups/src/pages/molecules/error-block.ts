@@ -6,7 +6,7 @@ import { shown, type Words } from "../../lib/content.ts";
 import { errorBlock } from "../../lib/error-block.ts";
 import { filling, row, stack, within } from "../../lib/layout.ts";
 import { log, type LogLine, logRoom } from "../../lib/log.ts";
-import { advance } from "../../lib/text.ts";
+import { advance, centreFor } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
@@ -39,6 +39,7 @@ function relabel(toggle: HTMLElement, words: string): void {
   for (const label of toggle.querySelectorAll<HTMLElement>(".k-text")) {
     label.textContent = words;
     label.style.setProperty("--natural", String(advance("button", words)));
+    centreFor(label, "button", words);
   }
 }
 

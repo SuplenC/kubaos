@@ -54,6 +54,7 @@ function font(style: TypeStyle): Meter {
 /** Forgets every width and font measured: the tokens changed. */
 export function forgetWidths(): void {
   widths.clear();
+  masses.clear();
   fonts.clear();
 }
 
@@ -116,6 +117,101 @@ export function typeset(element: HTMLElement, style: TypeStyle): void {
   }
 }
 
+/** Where a line's ink sits: its centre's height above the baseline in ems, and how much ink. */
+interface Mass {
+  readonly height: number;
+  readonly ink: number;
+}
+
+const masses = new Map<string, Mass>();
+/** The size the ink is drawn at to be weighed, in pixels: enough rows to place its centre finely. */
+const WEIGHED_AT = 64;
+let scale: CanvasRenderingContext2D | null = null;
+
+/**
+ * Where `words`' ink sits in `style`: the centre of its mass above the baseline, weighed from the
+ * glyphs Geist draws, descenders left out. The eye reads a line as centred when that mass is, so
+ * "21:47" sits on its figures' middle and "Continue" nearer its lowercase's.
+ */
+export function inkMass(style: TypeStyle, words: string): Mass {
+  const key = `${style}|${words}`;
+  const known = masses.get(key);
+  if (known !== undefined) return known;
+  scale ??= document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  if (!scale) throw new Error("no 2D canvas to weigh text with");
+  scale.font = font(style).font.replace(/[\d.]+px/, `${WEIGHED_AT}px`);
+  const width = Math.max(1, Math.ceil(scale.measureText(words).width));
+  const height = WEIGHED_AT * 2;
+  const baseline = Math.round(WEIGHED_AT * 1.5);
+  scale.canvas.width = width;
+  scale.canvas.height = height;
+  scale.font = font(style).font.replace(/[\d.]+px/, `${WEIGHED_AT}px`);
+  scale.fillStyle = "#000";
+  scale.textBaseline = "alphabetic";
+  scale.fillText(words, 0, baseline);
+  const pixels = scale.getImageData(0, 0, width, baseline).data;
+  let sum = 0;
+  let moment = 0;
+  for (let y = 0; y < baseline; y++) {
+    let row = 0;
+    for (let x = 0; x < width; x++) row += pixels[(y * width + x) * 4 + 3]!;
+    sum += row;
+    moment += row * (y + 0.5);
+  }
+  const mass = sum === 0 ? { height: 0, ink: 0 } : { height: (baseline - moment / sum) / WEIGHED_AT, ink: sum / 255 / (WEIGHED_AT * WEIGHED_AT) };
+  masses.set(key, mass);
+  return mass;
+}
+
+/** The size `style` is drawn at, in logical pixels. */
+function sizeOf(style: TypeStyle): number {
+  const meter = font(style);
+  return Number.parseFloat(/([\d.]+)px/.exec(meter.font)![1]!) / meter.times;
+}
+
+/** Centres `element`'s line for the eye on `words` in `style`, its words now (`.k-text` in `lib.css`). */
+export function centreFor(element: HTMLElement, style: TypeStyle, words: string): void {
+  const mass = inkMass(style, words);
+  element.style.setProperty("--mass", String(mass.height));
+  element.dataset.ink = String(mass.ink * sizeOf(style) ** 2);
+  element.dataset.size = String(sizeOf(style));
+  element.dataset.mass = String(mass.height);
+}
+
+/**
+ * Lines side by side in one row share one baseline: each is set on the row's mass, every line's
+ * weighed by its ink, so a clock pill's date and time don't sit a pixel apart. A row inside a row
+ * takes the outer's.
+ */
+export function shareRows(root: ParentNode): void {
+  const rows = [...root.querySelectorAll<HTMLElement>(".k-row")];
+  for (const row of rows.reverse()) {
+    const lines: HTMLElement[] = [];
+    const walk = (at: Element) => {
+      for (const child of at.children) {
+        if (child.matches(".k-text")) {
+          if (!child.matches("[data-wrapped], [data-clamped='lines']") && (child as HTMLElement).dataset.mass !== undefined) lines.push(child as HTMLElement);
+        } else if (child.matches(".k-row, .k-figure") || ![...child.classList].some((name) => name.startsWith("k-"))) {
+          // Into the row's own wrappers only: another part (a chip beside a chip) keeps its own line.
+          walk(child);
+        }
+      }
+    };
+    walk(row);
+    if (lines.length < 2) continue;
+    let ink = 0;
+    let moment = 0;
+    for (const line of lines) {
+      const weight = Number(line.dataset.ink);
+      ink += weight;
+      moment += weight * Number(line.dataset.mass) * Number(line.dataset.size);
+    }
+    if (ink === 0) continue;
+    const shared = moment / ink;
+    for (const line of lines) line.style.setProperty("--mass", String(shared / Number(line.dataset.size)));
+  }
+}
+
 /** `words` in `style`, in the colour role `color`. */
 export function text(words: string, style: TypeStyle, color = "on_surface"): HTMLElement {
   const element = probe(document.createElement("span"), { role: "text" });
@@ -123,6 +219,7 @@ export function text(words: string, style: TypeStyle, color = "on_surface"): HTM
   element.textContent = words;
   typeset(element, style);
   element.style.setProperty("--natural", String(advance(style, words)));
+  centreFor(element, style, words);
   element.style.color = `var(--color-${color})`;
   element.toggleAttribute("data-shaped", shaped(words));
   return element;

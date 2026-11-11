@@ -21,16 +21,16 @@
   white-space: pre;
 }
 
-/* A line of text is centred on its cap height: its box stays the style's line tall, and the line is
-   trimmed to its caps and baseline (`text-box`) and set down so the caps sit in the middle of it.
-   A box centred on the line then centres the capitals and the figures, which Geist's taller ascent
-   than descent would otherwise leave high; descenders hang below, ignored. The baseline lands on
-   the whole device pixel nearest the middle, as the browser draws it there anyway: placed between
-   two, it would snap down and take the caps low. Wrapped text keeps its leading, and a part that
-   trims its own text says so. */
+/* A line of text is centred for the eye: the centre of its ink's mass above the baseline, weighed
+   from the glyphs (`--mass`, in ems, `inkMass` in `text.ts`), sits in the middle of its box, so
+   "21:47" centres on its figures and "Continue" nearer its lowercase; descenders are left out.
+   Lines side by side in one row share the row's mass, and so one baseline. The box stays the
+   style's line tall: the line is trimmed to its caps and baseline (`text-box`) and set down so the
+   baseline lands on the whole device pixel nearest that, where the browser draws it anyway. Wrapped
+   text keeps its leading, and a part that trims its own text says so. */
 :where(.k-text:not([data-wrapped], [data-clamped="lines"])) {
   box-sizing: border-box;
-  padding-top: calc(round(nearest, calc((var(--t-line) + 1cap) / 2), 1px) - 1cap);
+  padding-top: calc(round(nearest, calc(var(--t-line) / 2 + var(--mass, 0.35) * var(--t-size)), 1px) - 1cap);
   text-box: trim-both cap alphabetic;
 }
 
