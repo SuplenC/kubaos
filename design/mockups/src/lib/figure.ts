@@ -3,7 +3,7 @@
 // text starts at its left edge: what sits beside it holds still as the digits change. Only digits
 // are held; a colon, a sign or a unit takes its own width.
 
-import { advance, text, type TypeStyle } from "./text.ts";
+import { advance, centreFor, text, type TypeStyle } from "./text.ts";
 
 /** `words` with every digit a 0: the widest the same shape gets. */
 export function widest(words: string): string {
@@ -25,6 +25,7 @@ export function tick(box: HTMLElement, style: TypeStyle, words: string): void {
   if (!(shown instanceof HTMLElement)) return;
   shown.textContent = words;
   shown.style.setProperty("--natural", String(advance(style, words)));
+  centreFor(shown, style, words);
   hold(box, style, words);
 }
 
