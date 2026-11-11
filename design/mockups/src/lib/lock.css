@@ -227,7 +227,8 @@
 }
 
 /* The clock: the digits' box, their cap height down to their baseline, with the kicker
-   `space.s40` over its cap top, to its baseline. It flies one path, from the rest clock in `type.clock_rest` where the
+   `scale.lock_date_gap` of the clock over its cap top, to its baseline. Its size is the screen's
+   share (`--rest-size`), and `type.clock_rest` the 1080 tall screen's. It flies one path, from the rest clock where the
    wallpaper puts it to the bar's time in `type.body` where the pill puts it, its size, its place
    and its colour moving together: `--flown` is how far along it stands. Waking takes it
    `scale.clock_awake` of the way (`--clock-lift`) and docking the rest from there (`--dock`), so an
@@ -241,16 +242,18 @@
   display: block;
   --woken: calc(var(--clock-lift) * var(--scale-clock_awake));
   --flown: calc(var(--woken) + (1 - var(--woken)) * var(--dock));
-  --k: calc(1 + (var(--type-body-size) / var(--type-clock_rest-size) - 1) * var(--flown));
+  /* The rest clock's size, the screen's share (`lib/lock.ts`); `type.clock_rest` until it is placed. */
+  --rest: var(--rest-size, var(--type-clock_rest-size));
+  --k: calc(1 + (var(--type-body-size) / var(--rest) - 1) * var(--flown));
   /* Geist Light's figures are a little narrower than Regular's, so as the clock flies its letters
      spread by what the bar's time is wider, an even share after each: it lands as wide as the bar's
      time, each figure within a fifth of a logical pixel of the bar's. */
-  --spread: calc((var(--bar-natural, 0) - var(--digits-natural) * var(--type-body-size) / var(--type-clock_rest-size)) * var(--flown));
+  --spread: calc((var(--bar-natural, 0) - var(--digits-natural) * var(--type-body-size) / var(--rest)) * var(--flown));
   --digits-width: round(up, calc((var(--digits-natural) * var(--k) + var(--spread)) * var(--px) - 0.001px), 1px);
-  --digits-height: calc(var(--cap-height) * var(--type-clock_rest-size) * var(--k));
+  --digits-height: calc(var(--cap-height) * var(--rest) * var(--k));
   /* The kicker keeps its rest sizes all along the flight, each word's box on whole device pixels as
      a text's box is. */
-  --kicker-height: max(var(--type-clock_place-line), var(--type-clock_date-line));
+  --kicker-height: var(--kicker-line, max(var(--type-clock_place-line), var(--type-clock_date-line)));
   --place-width: round(up, calc(var(--place-natural, 0) * var(--px) - 0.001px), 1px);
   --date-width: round(up, calc(var(--date-natural, 0) * var(--px) - 0.001px), 1px);
   --kicker-width: calc(var(--place-width) + var(--date-width));
@@ -275,12 +278,12 @@
   opacity: 0;
 }
 
-/* The kicker stands `space.s40` over the digits, measured as the eye does: from the digits' cap
+/* The kicker stands its gap (`--kicker-gap`, `scale.lock_date_gap` of the clock) over the digits, measured as the eye does: from the digits' cap
    top, which is their box's, to the kicker's baseline (`--kicker-base`, its depth in its line, read
    off the font), so its descenders and its line's leading don't count. */
 .k-lock-clock > .k-lock-kicker {
   position: absolute;
-  top: round(nearest, calc(-1 * (var(--space-s40) + var(--kicker-base, var(--kicker-height)))), 1px);
+  top: round(nearest, calc(-1 * (var(--kicker-gap, var(--space-s40)) + var(--kicker-base, var(--kicker-height)))), 1px);
   left: calc(round(down, calc(var(--cx) - var(--kicker-width) / 2), 1px) - round(down, calc(var(--cx) - var(--digits-width) / 2), 1px));
   width: max-content;
 }
@@ -304,13 +307,15 @@
 
 .k-lock .k-lock-place {
   width: var(--place-width);
-  font-size: var(--type-clock_place-size);
+  font-size: var(--kicker-size, var(--type-clock_place-size));
+  line-height: var(--kicker-height);
   color: color-mix(in oklab, var(--color-primary) calc(var(--flown) * 100%), var(--tint));
 }
 
 .k-lock .k-lock-date {
   width: var(--date-width);
-  font-size: var(--type-clock_date-size);
+  font-size: var(--kicker-size, var(--type-clock_date-size));
+  line-height: var(--kicker-height);
   color: color-mix(in oklab, var(--color-on_surface_variant) calc(var(--flown) * 100%), rgb(from var(--tint) r g b / var(--opacity-clock_date)));
 }
 
@@ -323,8 +328,8 @@
   left: 0;
   width: 100%;
   height: auto;
-  font-size: calc(var(--type-clock_rest-size) * var(--k));
-  line-height: calc(var(--type-clock_rest-size) * var(--k));
+  font-size: calc(var(--rest) * var(--k));
+  line-height: calc(var(--rest) * var(--k));
   letter-spacing: calc(var(--spread) / var(--letters, 1) * var(--px));
   text-box: trim-both cap alphabetic;
   /* Its box is its caps, placed by the lock: none of a line's centring above them. */

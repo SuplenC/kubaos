@@ -35,8 +35,10 @@ export const PURPLE_HOUR: Wallpaper = {
   name: "Shinjuku, purple hour",
   picture: purple,
   depth: { cutout: purpleCutout, plate: purplePlate },
-  // The digits stand in the sky, their feet behind the towers along the skyline.
+  // The digits stand in the sky, their feet behind the towers along the skyline; on a portrait
+  // screen higher, over the towers' tops, the Docomo spire crossing their feet.
   clock: { x: 0.5, y: 0.512 },
+  portrait: { x: 0.5, y: 0.4 },
   night: { primary: "#d7baff", on_primary: "#420d7f", primary_container: "#7b4fb9", on_primary_container: "#ffffff", secondary: "#d3bdee", on_secondary: "#392950", secondary_container: "#503f68", on_secondary_container: "#ebd9ff", tertiary: "#ebc160", on_tertiary: "#3f2e00", tertiary_container: "#816100", on_tertiary_container: "#ffffff", cold: "#ebc160", on_cold: "#3f2e00", cold_container: "#816100", on_cold_container: "#ffffff", surface: "#151219", on_surface: "#e8e0ea", surface_variant: "#4b4451", on_surface_variant: "#cdc3d3", surface_dim: "#151219", surface_bright: "#3c383f", surface_container_lowest: "#100d13", surface_container_low: "#1d1a21", surface_container: "#221e25", surface_container_high: "#2c2930", surface_container_highest: "#37333b", outline: "#968e9d", outline_variant: "#4b4451", shadow: "#000000", scrim: "#000000", inverse_surface: "#e8e0ea", inverse_on_surface: "#332f36", inverse_primary: "#7347b0" },
 };
 
@@ -44,16 +46,20 @@ export const TOWER: Wallpaper = {
   name: "Tokyo Tower, blue hour",
   picture: tower,
   depth: { cutout: towerCutout, plate: towerPlate },
-  // The tower's spire crosses the last digit; the kicker stays clear of it.
+  // The tower's spire crosses the last digit; the kicker stays clear of it. On a portrait screen
+  // the digits fill the strip's sky over the city, the tower at its edge.
   clock: { x: 0.445, y: 0.47 },
+  portrait: { x: 0.5, y: 0.4 },
   night: { primary: "#9cccf5", on_primary: "#003450", primary_container: "#1b5174", on_primary_container: "#dbedff", secondary: "#b7c9da", on_secondary: "#213240", secondary_container: "#3a4b5a", on_secondary_container: "#d4e6f8", tertiary: "#f0be74", on_tertiary: "#442b00", tertiary_container: "#694604", on_tertiary_container: "#ffe7ca", cold: "#f0be74", on_cold: "#442b00", cold_container: "#694604", on_cold_container: "#ffe7ca", surface: "#111416", on_surface: "#e2e2e5", surface_variant: "#41474e", on_surface_variant: "#c1c7cf", surface_dim: "#111416", surface_bright: "#37393c", surface_container_lowest: "#0c0e11", surface_container_low: "#191c1e", surface_container: "#1e2022", surface_container_high: "#282a2d", surface_container_highest: "#333538", outline: "#8b9198", outline_variant: "#41474e", shadow: "#000000", scrim: "#000000", inverse_surface: "#e2e2e5", inverse_on_surface: "#2e3133", inverse_primary: "#316387" },
 };
 
 export const SHIBUYA: Wallpaper = {
   name: "Shibuya, a rainy corner",
   picture: shibuya,
-  // No cut-out: the clock stands in front, a little above the middle, its shade under it.
+  // No cut-out: the clock stands in front, a little above the middle, its shade under it; on a
+  // portrait screen, which has no sky, in the signs' upper third.
   clock: { x: 0.5, y: 0.56 },
+  portrait: { x: 0.5, y: 0.32 },
   night: { primary: "#5ae7dd", on_primary: "#003734", primary_container: "#33cbc1", on_primary_container: "#00312e", secondary: "#9fd0ca", on_secondary: "#003734", secondary_container: "#20514d", on_secondary_container: "#bceee8", tertiary: "#ffc7a4", on_tertiary: "#512400", tertiary_container: "#ffa05f", on_tertiary_container: "#481f00", cold: "#ffc7a4", on_cold: "#512400", cold_container: "#ffa05f", on_cold_container: "#481f00", surface: "#0e1514", on_surface: "#dde4e2", surface_variant: "#3c4948", on_surface_variant: "#bbcac7", surface_dim: "#0e1514", surface_bright: "#343a39", surface_container_lowest: "#090f0f", surface_container_low: "#161d1c", surface_container: "#1a2120", surface_container_high: "#252b2a", surface_container_highest: "#2f3635", outline: "#859491", outline_variant: "#3c4948", shadow: "#000000", scrim: "#000000", inverse_surface: "#dde4e2", inverse_on_surface: "#2b3231", inverse_primary: "#006a64" },
 };
 
