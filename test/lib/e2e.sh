@@ -2942,10 +2942,11 @@ c_pins() {
     { echo "FAIL kubaos pins --all:"; printf '%s\n' "$out"; return 1; }
   echo "ok   nested: new-app's own pin (2) wins there, old-app keeps 3; kubaos pins --all lists both"
 
-  out="$(kz "kubaos pin test 9 $typo" 2>&1)" && { echo "FAIL kubaos pin test 9 succeeded"; printf '%s\n' "$out"; return 1; }
+  out="$(kz "KUBAOS_TEST_TOOL_FAIL=9 kubaos pin test 9 $typo" 2>&1)" &&
+    { echo "FAIL kubaos pin test 9 succeeded"; printf '%s\n' "$out"; return 1; }
   [[ ! -e $typo/mise.toml ]] && grep -qF 'installing kubaos-test-tool@9 with mise' <<<"$out" ||
     { echo "FAIL a version mise can't install should write nothing and say so"; printf '%s\n' "$out"; return 1; }
-  echo "ok   kubaos pin test 9: mise can't install it, so nothing is written"
+  echo "ok   kubaos pin test 9, whose install fails: nothing is written"
 
   printf 'use suite test 2\nuse bwenv demo\n' | as_user tee "$legacy/.envrc" >/dev/null
   printf 'use flake\nuse suite node 22\n' | as_user tee "$nixonly/.envrc" >/dev/null
