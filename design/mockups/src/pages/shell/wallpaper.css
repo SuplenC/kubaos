@@ -10,6 +10,15 @@
   initial-value: 0;
 }
 
+/* How lit the room is: 1 the lamp over the picture in front of you burning and its light on the
+   room in its colour, 0 every lamp off and the room dark and neutral. One number drives the lamp,
+   the light and the room's colours together, so they never part. */
+@property --room-lit {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 /* Which picture of a floor is in front of you, and which floor: the wall and the floors glide to it. */
 @property --at {
   syntax: "<number>";
@@ -58,29 +67,36 @@
   inset: 0;
   transform-origin: 50% calc(var(--pic-top) + var(--pic-height) / 2);
   transform: translateY(calc((var(--screen-height) / 2 - var(--pic-top) - var(--pic-height) / 2) * var(--out))) scale(var(--zoom));
-  background: linear-gradient(
-    var(--color-surface_container_lowest),
-    var(--color-surface) calc(var(--scale-gallery_floor) * 100%),
-    var(--color-surface_container_low) calc(var(--scale-gallery_floor) * 100%),
-    var(--color-surface_container_lowest)
-  );
+  /* The lamp's middle, where the light comes from: the lamp over the picture in front of you,
+     which the wall puts at the screen's middle, `space.s32` over the picture's top edge. */
+  --lamp-x: calc(var(--screen-width) / 2);
+  --lamp-y: calc(var(--pic-top) - var(--space-s32) + var(--space-s4) / 2);
+  /* Its light: the lit lamp's colour, its chroma and its strength rising with `--room-lit` at its
+     own hue, so it goes from the dark room's grey to the lamp's colour and never through another
+     hue; grey at `opacity.lamp_dark` with every lamp off, the colour at `opacity.lamp_light` lit. */
+  --light-strength: calc(var(--opacity-lamp_dark) + (var(--opacity-lamp_light) - var(--opacity-lamp_dark)) * var(--room-lit));
+  --light-grey: oklch(from var(--color-on_surface) l 0 none);
+  --light: oklch(from color-mix(in oklch, var(--glow, var(--color-primary)) calc(var(--room-lit) * 100%), var(--light-grey)) l c h / var(--light-strength));
+  --light-quarter: oklch(from var(--light) l c h / calc(alpha / 4));
+  /* One field over the whole room, wall and floor alike, from the lamp, so nothing has a seam. */
+  background:
+    radial-gradient(
+      calc(var(--screen-width) * var(--scale-gallery_light_width)) calc(var(--screen-height) * var(--scale-gallery_light_height)) at var(--lamp-x) var(--lamp-y),
+      var(--light),
+      var(--light-quarter) calc(var(--scale-gallery_light_falloff) * 100%),
+      transparent
+    ),
+    var(--color-surface_container_lowest);
+}
+
+/* By day nothing glows: the room is its surface, and only the lamp shows its tone. */
+.gl-screen[data-mode="light"] .gl-room {
+  --light-strength: 0;
 }
 
 /* What belongs to the room alone fades as you step out: the lamps, the words, the floors. */
 .gl-room-only {
   opacity: calc(1 - var(--out));
-}
-
-/* The lamp's light on the wall, at night: its tone, faint, falling off from above the picture. */
-.gl-wash {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(calc(var(--pic-width) * 0.8) calc(var(--screen-height) * 0.6) at 50% calc(var(--pic-top) - var(--space-s24)), rgb(from var(--color-primary) r g b / var(--opacity-tint)), transparent);
-}
-
-.gl-screen[data-mode="light"] .gl-wash {
-  display: none;
 }
 
 /* A floor per folder, one above the other; the floor you are on fills the room. */
@@ -119,16 +135,17 @@
   opacity: 1;
 }
 
-/* How lit a lamp is: 0 unlit, 1 burning over the picture in front of you. */
+/* How lit a lamp is: the room's light over the lamp that lights it, 0 over every other. */
 @property --lamp {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
 }
 
-/* The lamp: a neon tube `space.s4` thick, `space.s32` over its picture, unlit but over the picture
-   in front of you, which it lights (`--lamp`, over `short`). By day nothing glows: an outline, and
-   the tone over the one in front of you. */
+/* The lamp: a neon tube `space.s4` thick, `space.s32` over its picture, in its own picture's
+   colour (`--lamp-tone`, its primary) whether lit or not: unlit its deep unlit tone, lit its core
+   with the glow. Only the lamp over the picture in front of you lights, with the room. By day
+   nothing glows: an outline, and the tone while lit. */
 .gl-lamp {
   position: absolute;
   left: 50%;
@@ -137,29 +154,29 @@
   height: var(--space-s4);
   translate: -50% 0;
   border-radius: var(--radius-full);
-  --off: var(--color-primary_unlit);
-  --on: var(--color-primary_core);
+  --tone: var(--lamp-tone, var(--color-primary));
+  --off: oklch(from var(--tone) calc(l * 0.6) calc(c * 1.2) h);
+  --on: color-mix(in srgb, var(--tone), white 50%);
   --glow: 1;
   background: color-mix(in oklab, var(--on) calc(var(--lamp) * 100%), var(--off));
   box-shadow:
-    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--lamp) * var(--glow))),
-    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * var(--lamp) * var(--glow)));
-  transition: --lamp var(--motion-short) var(--easing-standard);
+    0 0 var(--focus-near) rgb(from var(--tone) r g b / calc(var(--focus-near_opacity) * var(--lamp) * var(--glow))),
+    0 0 var(--focus-far) rgb(from var(--tone) r g b / calc(var(--focus-far_opacity) * var(--lamp) * var(--glow)));
 }
 
-.gl-art[data-on] .gl-lamp {
-  --lamp: 1;
+.gl-art[data-lit] .gl-lamp {
+  --lamp: var(--room-lit);
 }
 
 .gl-screen[data-mode="light"] .gl-lamp {
   --off: var(--color-outline_variant);
-  --on: var(--color-primary);
+  --on: var(--tone);
   --glow: 0;
 }
 
 /* Lit with the signs off: the tube as unlit glass, no glow. */
-.gl-screen[data-signs-off] .gl-art[data-on] .gl-lamp {
-  --on: var(--color-primary_glass);
+.gl-screen[data-signs-off] .gl-art[data-lit] .gl-lamp {
+  --on: oklch(from var(--tone) calc(l * 0.6 + 0.12) calc(c * 1.2) h);
   --glow: 0;
 }
 
