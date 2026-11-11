@@ -37,19 +37,29 @@ function after(phase: Duration, tracks: readonly Track<Easing>[]): Track<Easing>
   });
 }
 
+/** The room's light, `--room-lit`: the lamp over the front picture, its light and the room's colours. */
+const LIGHT = "the light";
+const lightOff = (cue?: Duration): Track<Easing> => ({ part: LIGHT, on: ROOM, target: ".gl-screen", property: "--room-lit", from: 1, to: 0, duration: "short", ...(cue ? { cue } : {}), curve: "emphasized_accel" });
+const lightOffCalm = (cue?: Duration): Track<Easing> => ({ part: LIGHT, on: ROOM, target: ".gl-screen", property: "--room-lit", from: 1, to: 0, duration: "short", ...(cue ? { cue } : {}), curve: "standard" });
+/** The lamp strikes on: the sign's flicker over `strike`; its steps as fades with Steady. */
+const lightOn = (cue: Duration | NonEmpty<Duration>, steady = false): Track => ({ part: LIGHT, on: ROOM, target: ".gl-screen", property: "--room-lit", from: 0, to: 1, duration: "strike", cue, curve: steady ? "linear" : "neon.strike" });
+const lightOnCalm = (cue: Duration | NonEmpty<Duration>): Track<Easing> => ({ part: LIGHT, on: ROOM, target: ".gl-screen", property: "--room-lit", from: 0, to: 1, duration: "short", cue, curve: "standard" });
+
 const stepOut = (from: number, to: number, duration: Duration): Track<Easing> => ({ part: "stepping out", on: ROOM, target: ".gl-screen", property: "--out", from, to, duration, curve: "emphasized_decel" });
 const barFades = (from: number, to: number, duration: Duration, curve: Easing): Track<Easing> => ({ part: "the bar", on: ROOM, target: ".gl-bar, .gl-info", property: "opacity", from, to, duration, curve });
 
 const OPENING: Move = {
   name: "Opening",
-  what: "Super+Ctrl+Space: the desktop steps back into its frame as the wall builds round it.",
-  tracks: [stepOut(1, 0, "slow"), ...toPicture(MAIN, FRONT), ...toPicture(OTHERS, SIDES, false), barFades(0, 1, "long", "emphasized_decel")],
+  what: "Super+Ctrl+Space: the desktop steps back into its dark room; its lamp strikes as it lands.",
+  tracks: [stepOut(1, 0, "slow"), ...toPicture(MAIN, FRONT), ...toPicture(OTHERS, SIDES, false), barFades(0, 1, "long", "emphasized_decel"), lightOn("slow")],
+  unflickered: [stepOut(1, 0, "slow"), ...toPicture(MAIN, FRONT), ...toPicture(OTHERS, SIDES, false), barFades(0, 1, "long", "emphasized_decel"), lightOn("slow", true) as Track<Easing>],
   reduced: [
     { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "stepping out", on: ROOM, target: ".gl-screen", property: "--out", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
     ...after("short", toPictureReduced(MAIN, FRONT)),
     { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
     barFades(0, 1, "short", "standard"),
+    lightOnCalm("short"),
   ],
   back: "cuts",
   sample: held({ open: false }),
@@ -57,10 +67,11 @@ const OPENING: Move = {
 
 const APPLYING: Move = {
   name: "Applying",
-  what: "Enter: the picture in front of you grows into the desktop as the wall goes.",
-  tracks: [stepOut(0, 1, "slow"), ...toDesktop(MAIN, FRONT), ...toDesktop(OTHERS, SIDES, false), barFades(1, 0, "medium", "emphasized_accel")],
+  what: "Enter: the lamp goes off as the picture in front of you grows into the desktop.",
+  tracks: [lightOff(), stepOut(0, 1, "slow"), ...toDesktop(MAIN, FRONT), ...toDesktop(OTHERS, SIDES, false), barFades(1, 0, "medium", "emphasized_accel")],
   reduced: [
     { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    lightOffCalm(),
     { part: "stepping out", on: ROOM, target: ".gl-screen", property: "--out", from: 0, to: 1, duration: "instant", cue: "short", curve: "standard" },
     ...after("short", toDesktopReduced(MAIN, FRONT)),
     { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
@@ -72,12 +83,14 @@ const APPLYING: Move = {
 
 const CANCELLING: Move = {
   name: "Cancelling",
-  what: "Esc: the wall walks back to the picture you had, then it grows into the desktop.",
+  what: "Esc: the lamp goes off, the wall walks back in the dark, the old picture grows into the desktop.",
   tracks: [
+    lightOff(),
     { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 0, duration: "long", curve: "spring" },
     ...after("long", [stepOut(0, 1, "slow"), ...toDesktop(MAIN, ".gl-floor:first-child .gl-art:first-child"), barFades(1, 0, "medium", "emphasized_accel")]),
   ],
   reduced: [
+    lightOffCalm(),
     { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
     { part: "stepping out", on: ROOM, target: ".gl-screen", property: "--out", from: 0, to: 1, duration: "instant", cue: "short", curve: "standard" },
@@ -151,10 +164,15 @@ const WALL = "the wall";
 const OLD = ".gl-floor:first-child .gl-art:nth-child(2)";
 const NEW = ".gl-floor:first-child .gl-art:nth-child(3)";
 
+const OLD_LAMP: Track<Easing> = { part: "its lamp", on: "the picture left", target: `${OLD} .gl-lamp`, property: "--lamp", from: 1, to: 0, duration: "short", curve: "emphasized_accel" };
+const newLamp = (steady: boolean): Track => ({ part: "its lamp", on: "the picture reached", target: `${NEW} .gl-lamp`, property: "--lamp", from: 0, to: 1, duration: "strike", cue: "long", curve: steady ? "linear" : "neon.strike" });
+
 const BROWSES: Move = {
   name: "Browsing",
-  what: "→: the wall glides a step, each city ahead of its sky; the one reached lifts.",
+  what: "→: lights off, the wall glides a step in the dark, the new lamp strikes in its colour.",
   tracks: [
+    lightOff(),
+    OLD_LAMP,
     { part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 2, duration: "long", curve: "spring" },
     { part: "its city's lead", on: "the picture reached", target: `${NEW} .k-lock`, property: "--aside", from: 1, to: 0, duration: "long", curve: "spring" },
     { part: "its city's lead", on: "the picture left", target: `${OLD} .k-lock`, property: "--aside", from: 0, to: -1, duration: "long", curve: "spring" },
@@ -162,10 +180,29 @@ const BROWSES: Move = {
     { part: "the push", on: "the picture left", target: `${OLD} .k-lock`, property: "--push", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
     { part: "its frame", on: "the picture reached", target: `${NEW} .gl-frame`, property: "scale", from: { scale: "behind" }, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: "its frame", on: "the picture left", target: `${OLD} .gl-frame`, property: "scale", from: 1, to: { scale: "behind" }, duration: "long", curve: "emphasized_decel" },
-    { part: "its lamp", on: "the picture reached", target: `${NEW} .gl-lamp`, property: "--lamp", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: "its lamp", on: "the picture left", target: `${OLD} .gl-lamp`, property: "--lamp", from: 1, to: 0, duration: "short", curve: "standard" },
+    lightOn("long"),
+    newLamp(false),
   ],
-  reduced: [{ part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 2, duration: "instant", curve: "standard" }],
+  unflickered: [
+    lightOff(),
+    OLD_LAMP,
+    { part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 2, duration: "long", curve: "spring" },
+    { part: "its city's lead", on: "the picture reached", target: `${NEW} .k-lock`, property: "--aside", from: 1, to: 0, duration: "long", curve: "spring" },
+    { part: "its city's lead", on: "the picture left", target: `${OLD} .k-lock`, property: "--aside", from: 0, to: -1, duration: "long", curve: "spring" },
+    { part: "the push", on: "the picture reached", target: `${NEW} .k-lock`, property: "--push", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: "the push", on: "the picture left", target: `${OLD} .k-lock`, property: "--push", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: "its frame", on: "the picture reached", target: `${NEW} .gl-frame`, property: "scale", from: { scale: "behind" }, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: "its frame", on: "the picture left", target: `${OLD} .gl-frame`, property: "scale", from: 1, to: { scale: "behind" }, duration: "long", curve: "emphasized_decel" },
+    lightOn("long", true) as Track<Easing>,
+    newLamp(true) as Track<Easing>,
+  ],
+  reduced: [
+    lightOffCalm(),
+    { ...OLD_LAMP, curve: "standard" },
+    { part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 2, duration: "instant", cue: "short", curve: "standard" },
+    lightOnCalm("short"),
+    { part: "its lamp", on: "the picture reached", target: `${NEW} .gl-lamp`, property: "--lamp", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
+  ],
   back: "cuts",
   sample: held({ bare: true, at: 1 }),
 };
@@ -300,7 +337,11 @@ export default page<Shown>({
       { part: "Lamp's width", token: "scale-gallery_lamp" },
       { part: "Lamp's height", token: "space-s4" },
       { part: "Lamp over its picture", token: "space-s32" },
-      { part: "Wall's foot", token: "scale-gallery_floor" },
+      { part: "Light's reach across", token: "scale-gallery_light_width" },
+      { part: "Light's reach down", token: "scale-gallery_light_height" },
+      { part: "Light at a quarter", token: "scale-gallery_light_falloff" },
+      { part: "Light, lit", token: "opacity-lamp_light" },
+      { part: "Light, dark", token: "opacity-lamp_dark" },
       { part: "Picture → placard", token: "space-s24" },
       { part: "Frame's corner", token: "radius-surface" },
       { part: "A picture stepped back", token: "scale-behind" },

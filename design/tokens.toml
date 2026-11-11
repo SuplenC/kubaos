@@ -741,6 +741,12 @@ locked = 0.50
 placeholder_text = 0.85
 # An accent colour as a faint fill under itself: a tag, a done step.
 tint = 0.16
+# The wallpaper picker's room lit by the lamp over the picture in front of you,
+# at night: the light's strength at the lamp, in the lamp's own colour.
+lamp_light = 0.28
+# The same room with the lamps off: the light a grey this strong, so the room
+# goes darker and neutral but never black.
+lamp_dark = 0.06
 # A picture that sits back while another is picked: the wallpaper picker's
 # thumbnails not under the keyboard. A slider's step the fill has passed, on
 # the fill, as low as keeps 3:1 there in both modes.
@@ -847,8 +853,13 @@ gallery_top = 0.12
 gallery_gap = 0.14
 # The lamp over a picture, a neon tube a share of its picture's width.
 gallery_lamp = 0.5
-# Where the wall meets the floor, a share of the screen's height down.
-gallery_floor = 0.86
+# The lamp's light on the room, one field from the lit lamp: how far it reaches
+# across, a share of the screen's width, and down, a share of its height.
+gallery_light_width = 0.6
+gallery_light_height = 1.0
+# Where along its reach the light has fallen to a quarter of its strength at
+# the lamp, a share of the reach: it falls fast near the lamp, then slowly.
+gallery_light_falloff = 0.35
 
 # Shadows: offset down and blur in logical pixels, and the shadow's opacity
 # of the `shadow` role.

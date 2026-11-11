@@ -29,7 +29,7 @@ import { text } from "../../lib/text.ts";
 import { keyTooltip } from "../../lib/tooltip.ts";
 import type { Duration, Easing, Track } from "../../site/page.ts";
 import { bezier, css, cueOf, leads, milliseconds, strikeSteps } from "../../site/recipe.ts";
-import { type ColourPath, type Palette, paint, paintBetween, paletteOf } from "../../site/recolour.ts";
+import { type ColourPath, oklch, type Palette, paint, paintBetween, palette, paletteOf } from "../../site/recolour.ts";
 import { type Mode, settings } from "../../site/settings.ts";
 import { barButtons } from "../templates/panels.ts";
 import { fromAwake, fromAwakeReduced, locking, lockingReduced, resting, reducedRest, touching, touchingReduced, waking, wakingReduced } from "../templates/lock-moves.ts";
@@ -357,6 +357,18 @@ function paintDesk(desk: Desk, mode: Mode, moving: boolean): void {
   desk.palette = next.palette;
 }
 
+/** Each role's OKLCH lightness in the tokens' own palette: the dark room's neutral, the same for
+    every picture. */
+const neutrals = new Map<Mode, Map<string, number>>();
+function neutralLightness(mode: Mode): Map<string, number> {
+  const known = neutrals.get(mode);
+  if (known) return known;
+  const found = new Map<string, number>();
+  for (const [role, value] of Object.entries(palette("neon", mode))) if (/^#[0-9a-f]{6}$/i.test(value)) found.set(role, oklch(value).l);
+  neutrals.set(mode, found);
+  return found;
+}
+
 /** The room's palette: the picture in front of you's scheme in the page's mode. */
 function roomPalette(hung: Hung | undefined, mode: Mode): Palette {
   const scheme = hung ? (mode === "light" ? hung.day : hung.wallpaper.night) : KABUKICHO_NIGHT;
@@ -415,11 +427,9 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
 
   const room = document.createElement("span");
   room.className = "gl-room";
-  const wash = document.createElement("span");
-  wash.className = "gl-wash gl-room-only";
   const floors = document.createElement("span");
   floors.className = "gl-floors";
-  room.append(wash, floors);
+  room.append(floors);
   screen.append(room);
 
   // The pictures, a desktop each, and their places on the wall.
@@ -546,16 +556,88 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     if (options.tip === name) requestAnimationFrame(() => requestAnimationFrame(() => showTip(control)));
   };
 
-  // Painting and drawing what the state says.
-  const paintRoom = (moving: boolean, from?: Palette) => {
+  // Painting. The room and its words take the front picture's colours as far as the room is lit
+  // (`--room-lit`): every role keeps its hue, its chroma rising from none and its lightness from the
+  // tokens' own palette's, so with the lamps off every picture's room is the same neutral room,
+  // and a new picture's colours come in only as its lamp strikes, never through another hue.
+  const paintRoom = () => {
     mode = modeOf(screen);
     screen.dataset.mode = mode;
     const to = roomPalette(front(), mode);
-    if (moving && from) recolour(screen, from, to, "through grey");
-    else paint(screen, to);
-    lastRoom = to;
+    const zero = neutralLightness(mode);
+    for (const [role, value] of Object.entries(to)) {
+      const l0 = zero.get(role);
+      screen.style.setProperty(
+        `--color-${role}`,
+        l0 === undefined || !/^#[0-9a-f]{6}$/i.test(value) ? value : `oklch(from ${value} calc(l * var(--room-lit) + ${l0.toFixed(4)} * (1 - var(--room-lit))) calc(c * var(--room-lit)) h)`,
+      );
+    }
+    screen.style.setProperty("--glow", to.primary ?? "");
   };
-  let lastRoom: Palette | undefined;
+  /** Every lamp in its own picture's primary, lit or not: a lamp never changes colour. */
+  const paintLamps = () => {
+    arts.forEach((here, level) =>
+      here.forEach((art, index) => {
+        const hung = folders[level]!.pictures[index];
+        if (hung) art.querySelector<HTMLElement>(".gl-lamp")?.style.setProperty("--lamp-tone", roomPalette(hung, modeOf(screen)).primary ?? "");
+      }),
+    );
+  };
+
+  // The light: lights off, walk, lights on. One number, `--room-lit`, on the screen: the lamp over
+  // the picture in front of you burns with it, its light lies on the room with it, and the room's
+  // colours come in with it.
+  let litArt: HTMLElement | undefined;
+  let lightRun: Animation | undefined;
+  let strikeTimer = 0;
+  const litNow = () => Number.parseFloat(getComputedStyle(screen).getPropertyValue("--room-lit")) || 0;
+  /** The lamp goes off with a quick drop, over `short`, and the room goes dark and neutral. */
+  const lightsOff = () => {
+    window.clearTimeout(strikeTimer);
+    const from = litNow();
+    lightRun?.cancel();
+    screen.style.setProperty("--room-lit", "0");
+    if (from > 0) lightRun = screen.animate([{ "--room-lit": String(from) }, { "--room-lit": "0" }], { duration: ms("short"), easing: curveOf(reducedFor(screen) ? "standard" : "emphasized_accel") });
+  };
+  /** The lamp over the picture in front of you strikes on: the neon sign's flicker over `strike`,
+      its steps as fades with Steady, and a fade over `short` with reduce motion. */
+  const strike = () => {
+    const art = arts[S.folder]?.[S.at[S.folder]!];
+    if (!art || !front() || !S.open) return;
+    lightRun?.cancel();
+    litArt?.removeAttribute("data-lit");
+    art.setAttribute("data-lit", "");
+    litArt = art;
+    paintRoom();
+    screen.style.setProperty("--room-lit", "1");
+    if (reducedFor(screen)) {
+      lightRun = screen.animate([{ "--room-lit": "0" }, { "--room-lit": "1" }], { duration: ms("short"), easing: curveOf("standard") });
+      return;
+    }
+    const steps = strikeSteps();
+    const easing = settings().flicker ? "step-end" : "linear";
+    lightRun = screen.animate(
+      [{ "--room-lit": "0", offset: 0, easing }, ...steps.map((value, i) => ({ "--room-lit": String(value), offset: (i + 1) / (steps.length + 1), easing })), { "--room-lit": "1", offset: 1 }],
+      { duration: ms("strike") },
+    );
+  };
+  /** Strikes once the walk has landed; every step before then puts it off again, so only the lamp
+      you stop at strikes, and the room stays dark while you move. */
+  const strikeAfter = (delay: number) => {
+    window.clearTimeout(strikeTimer);
+    strikeTimer = window.setTimeout(strike, delay);
+  };
+  /** The room lit at once on the picture in front of you: a still, or a gallery drawn open. */
+  const litAtOnce = () => {
+    const art = arts[S.folder]?.[S.at[S.folder]!];
+    litArt?.removeAttribute("data-lit");
+    if (art && front()) {
+      art.setAttribute("data-lit", "");
+      litArt = art;
+    }
+    screen.style.setProperty("--room-lit", S.open && front() ? "1" : "0");
+    paintRoom();
+  };
 
   const bare = options.bare ?? false;
   const drawWall = () => {
@@ -761,24 +843,26 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
       settle();
     }
     const was = deskAt();
-    const from = lastRoom;
     S.at[S.folder] = to;
     ensureNear();
-    landOn(was, from);
+    lightsOff();
+    landOn(was);
+    strikeAfter(reducedFor(screen) ? ms("short") : ms("long"));
   }
 
   function pickFolder(level: number): void {
     if (!S.open || S.busy || level === S.folder || level < 0 || level >= folders.length) return;
     if ((S.view !== "picture" || S.full) && folders[level]!.pictures.length === 0) return;
     const was = deskAt();
-    const from = lastRoom;
     S.folder = level;
     ensureNear();
-    landOn(was, from);
+    lightsOff();
+    landOn(was);
+    strikeAfter(reducedFor(screen) ? ms("short") : ms("long"));
   }
 
   /** A new picture in front of you: the wall slides, the one you leave sinks back, this one lifts. */
-  function landOn(was: Desk | undefined, from: Palette | undefined): void {
+  function landOn(was: Desk | undefined): void {
     const now = deskAt();
     const reduced = reducedFor(screen);
     if (S.view === "picture" && !reduced) {
@@ -787,7 +871,6 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     }
     drawWall();
     drawBar();
-    paintRoom(true, from);
   }
 
   /** D: the city settles onto the sky or lifts off it; on a lock its clock fades out and back. */
@@ -837,15 +920,22 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     drawBar();
     // The stills are asked for now and land while the gallery opens.
     window.setTimeout(() => screen.toggleAttribute("data-stills", (S.stills = true)), ms("medium") + ms("slow") + ms("short"));
-    const lamp = arts[S.folder]![S.at[S.folder]!]!.querySelector<HTMLElement>(".gl-lamp")!;
-    if (!reducedFor(screen)) lamp.animate(strikeSteps().map((value) => ({ opacity: value })), { duration: ms("strike"), easing: "step-end", delay: ms("slow") });
-    await Promise.all([viewMoves("picture"), stepTo(0, ms("slow"))]);
+    // The room starts dark; the lamp strikes as the desktop lands in its frame.
+    lightRun?.cancel();
+    screen.style.setProperty("--room-lit", "0");
+    strikeAfter(reducedFor(screen) ? ms("short") : ms("slow"));
+    const opened = viewMoves("picture");
+    // The bar shows the view the wall opens in, Picture, from the first frame.
+    drawBar();
+    await Promise.all([opened, stepTo(0, ms("slow"))]);
     S.busy = false;
   }
 
   /** Steps out to the desktop of the picture in front of you, and shuts. */
   async function close(): Promise<void> {
-    // The bar and the shortcuts' button fade as the picture grows; the bar keeps its words meanwhile.
+    // The lamp goes off as the picture grows back into the desktop; the bar and the shortcuts'
+    // button fade, the bar keeping its words meanwhile.
+    lightsOff();
     screen.toggleAttribute("data-open", false);
     shortcutsMade.set(false);
     const toDesk = S.view === "desktop" ? Promise.resolve() : viewMoves("desktop");
@@ -880,11 +970,11 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
         await stepTo(0, ms("long"));
       }
       const was = deskAt();
-      const from = lastRoom;
+      lightsOff();
       S.folder = level;
       S.at[level] = index;
       ensureNear();
-      landOn(was, from);
+      landOn(was);
       await wait(ms("long"));
     }
     await close();
@@ -933,13 +1023,15 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     });
   }
 
-  // The first frame: the pictures that show, the room in the front one's colours.
-  paintRoom(false);
+  // The first frame: the pictures that show, the room lit on the front one, or dark while shut.
   ensureNear();
+  litAtOnce();
+  paintLamps();
   settle();
   draw();
   requestAnimationFrame(() => {
-    paintRoom(false);
+    paintRoom();
+    paintLamps();
     for (const desk of desks.values()) paintDesk(desk, modeOf(screen), false);
   });
   // A live gallery builds the rest of its wall while idle, one picture a time, so browsing never
