@@ -229,7 +229,7 @@ export default page({
     measures: [
       { part: "Rest clock, of screen height", token: "scale-lock_clock" },
       { part: "Rest clock, of screen width", token: "scale-lock_clock_width" },
-      { part: "Portrait digits, of width", token: "scale-lock_clock_portrait" },
+      { part: "Portrait: widest time → edges", token: "space-s32" },
       { part: "Rest clock at 1080", token: "type-clock_rest-size" },
       { part: "Awake clock's step", token: "scale-clock_awake" },
       { part: "Kicker, of the clock", token: "scale-lock_date" },
