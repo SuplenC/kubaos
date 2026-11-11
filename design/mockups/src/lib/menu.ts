@@ -27,6 +27,8 @@ export interface MenuItemSpec {
   readonly checked?: boolean;
   readonly danger?: boolean;
   readonly disabled?: boolean;
+  /** It opens a submenu: a chevron at its end says so. */
+  readonly submenu?: boolean;
 }
 
 /** An entry of a menu: an item, or the hairline between two groups. */
@@ -65,8 +67,12 @@ export function menuItem(spec: MenuItemSpec, current = false, pinned?: ItemPinne
     if (spec.checked) check.append(icon("check", "var(--icon-s16)", ink));
     parts.push(check);
   }
+  if (spec.submenu) {
+    item.setAttribute("aria-haspopup", "menu");
+    parts.push(icon("chevron_right", "var(--icon-s16)", ink));
+  }
   item.append(filling(row("s8", "centre", ...parts)));
-  const words_ = variant(spec.icon && "icon", spec.checked !== undefined && "check", spec.danger && "danger");
+  const words_ = variant(spec.icon && "icon", spec.checked !== undefined && "check", spec.danger && "danger", spec.submenu && "submenu");
   return probe(item, { role: "component", name: "MenuItem", variant: words_, fixed: FIXED_HEIGHT });
 }
 
