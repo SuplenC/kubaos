@@ -6,10 +6,10 @@
 #                                       test tools into the dotfiles-nix volume
 #   test/run e2e [--only a,b] [--keep]  every check, PASS/FAIL table, exit 1 on failure;
 #                                       builds the kubaos CLI for Linux first when the
-#                                       packages, preview, suites, pins, suite_rust, suite_go
-#                                       or keyboard check runs
+#                                       packages, preview, suites, pins, suite_rust, suite_go, suite_node,
+#                                       suite_python, suite_proto or keyboard check runs
 #   test/run shell                     login zsh as kuba after a fresh switch
-#   test/run bitwarden                  Vaultwarden + kubaos bitwarden + direnv
+#   test/run bitwarden                  Vaultwarden + kubaos bitwarden + mise env
 #   test/run shots [--hyprland] [--dir NAME | --out PATH] [--size WxH] [--scale N]
 #                  [--wallpaper SET/FILE]
 #                                       start a headless session (sway, or Hyprland
@@ -22,6 +22,8 @@
 #   test/run nuke [--yes]               clean, then delete the harness's volumes
 #
 # DOTFILES_SRC=<checkout> tests another copy of the repo (default: this one).
+# GITHUB_TOKEN / MISE_GITHUB_TOKEN, when set, reach mise in the container
+# (docs/TESTING.md, "GitHub's rate limit").
 # Runs of different checkouts run side by side; runs of one checkout take turns,
 # and say they are waiting (docs/TESTING.md, "Concurrent runs").
 # DOTFILES_TEST_MEM / DOTFILES_TEST_CPUS: container limits (12g / 8).
@@ -67,10 +69,18 @@ compose() { docker compose -f "$HERE/compose.yaml" "$@"; }
 # the container (harness.sh, trust_local_inputs).
 # shellcheck source=test/lib/local-inputs.sh
 . "$HERE/lib/local-inputs.sh"
-# run_dotfiles ARGS...: `compose run` of the dotfiles service with them.
+# run_dotfiles ARGS...: `compose run` of the dotfiles service with them. A GitHub
+# token already in the caller's environment (GITHUB_TOKEN, MISE_GITHUB_TOKEN) goes
+# in by name, `-e NAME`, so its value is in no argument list, file or image layer;
+# mise's calls to GitHub's API in the container then use it.
 run_dotfiles() {
+  local tokens=() name
+  for name in GITHUB_TOKEN MISE_GITHUB_TOKEN; do
+    [[ -n ${!name:-} ]] && tokens+=(-e "$name")
+  done
   local_input_mounts "$DOTFILES_SRC"
-  compose run ${LOCAL_INPUT_MOUNTS[@]+"${LOCAL_INPUT_MOUNTS[@]}"} -e DOTFILES_LOCAL_INPUTS="$LOCAL_INPUTS" "$@"
+  compose run ${LOCAL_INPUT_MOUNTS[@]+"${LOCAL_INPUT_MOUNTS[@]}"} ${tokens[@]+"${tokens[@]}"} \
+    -e DOTFILES_LOCAL_INPUTS="$LOCAL_INPUTS" "$@"
 }
 elapsed() { printf '%dm%02ds' $((SECONDS / 60)) $((SECONDS % 60)); }
 
@@ -159,7 +169,7 @@ cmd_e2e() {
     shift
   done
   hold_checkout
-  if [[ -z $only || ,$only, =~ ,(packages|preview|suites|pins|suite_rust|suite_go|keyboard|wallpaper_depth|update_edge|update_stable|rollback), ]]; then
+  if [[ -z $only || ,$only, =~ ,(packages|preview|suites|pins|suite_rust|suite_go|suite_node|suite_python|suite_proto|keyboard|wallpaper_depth|update_edge|update_stable|rollback), ]]; then
     build_kubaos
   fi
   if ((keep)); then

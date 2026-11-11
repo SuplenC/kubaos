@@ -1,8 +1,9 @@
 //! The Suites in the menu: one Item a Suite of the catalog, which installs it, or configures and
-//! removes it once installed, and one "New <Suite> project…" Item a scaffolder of an installed
-//! Suite. Whether a Suite is installed is its file in the state directory,
-//! `kubaos.d/suites/<name>.toml`, read with the states, so its change comes back through their
-//! watch in `main.rs`.
+//! removes it once installed, one "New <Suite> project…" Item a scaffolder of an installed
+//! Suite, and, while a Suite with mise tools is installed, "Update Suites…" and "Upgrade
+//! Suites…", whose terminal asks which Suites to move. Whether a Suite is installed is its file in
+//! the state directory, `kubaos.d/suites/<name>.toml`, read with the states, so its change comes
+//! back through their watch in `main.rs`.
 //!
 //! Each Action runs `kubaos suite` in a terminal, which shows the switch, the caches a removal
 //! keeps and the user-layer files that mention the Suite. What the menu can check, a version or
@@ -47,11 +48,19 @@ pub const CONFIGURE: &str = "configure";
 pub const REMOVE: &str = "remove";
 /// Creates a project with one of an installed Suite's scaffolders.
 pub const NEW: &str = "new";
+/// Moves the installed Suites' tools to their newest patch releases.
+pub const UPDATE: &str = "update";
+/// Moves the installed Suites' tools to their newest minor and major releases.
+pub const UPGRADE: &str = "upgrade";
 
 /// A Suite's Item is this and its name, `suite:go`.
 const PREFIX: &str = "suite:";
 /// A scaffolder's Item is this, its Suite's name and its id, `suite-new:go:module`.
 const NEW_PREFIX: &str = "suite-new:";
+/// The Item that updates the Suites' tools.
+const UPDATE_ID: &str = "suites:update";
+/// The Item that upgrades the Suites' tools.
+const UPGRADE_ID: &str = "suites:upgrade";
 /// The Argument of the version, in the Configure Action.
 const VERSION: &str = "version";
 /// The Argument of the project's name, in a scaffolder's Action.
@@ -62,6 +71,7 @@ const OFF: &str = "off";
 
 const ICON: &str = "applications-development";
 const NEW_ICON: &str = "folder-new";
+const UPDATE_ICON: &str = "system-software-update";
 
 /// What the state directory says of each Suite of the catalog that is installed, by name: its
 /// options, or `None` while its file doesn't read.
@@ -103,7 +113,8 @@ impl Installed {
     }
 
     /// The Items of every Suite of the catalog, each followed by its scaffolders' while it is
-    /// installed, in the catalog's order.
+    /// installed, in the catalog's order; then "Update Suites…" and "Upgrade Suites…" while an
+    /// installed Suite has mise tools.
     pub fn items(&self) -> Vec<Item> {
         let mut items = Vec::new();
         for suite in catalog::all() {
@@ -115,7 +126,15 @@ impl Installed {
                 }
             }
         }
+        if self.has_mise_tools() {
+            items.extend([update_item(), upgrade_item()]);
+        }
         items
+    }
+
+    /// Whether an installed Suite has tools mise installs, which update and upgrade move.
+    fn has_mise_tools(&self) -> bool {
+        catalog::all().any(|suite| !suite.mise.is_empty() && self.suites.contains_key(suite.name))
     }
 
     /// Runs `action` on the Suite Item `id` with `arguments`, in `terminal`; the error is what the
@@ -134,7 +153,12 @@ impl Installed {
         runner: &impl Runner,
     ) -> Result<Ran, String> {
         let unknown = || format!("`{id}` has no Action `{action}`");
-        let command = if let Some(name) = id.strip_prefix(PREFIX) {
+        let command = if matches!((id, action), (UPDATE_ID, UPDATE) | (UPGRADE_ID, UPGRADE)) {
+            if !self.has_mise_tools() {
+                return Err(unknown());
+            }
+            kubaos(&[action])
+        } else if let Some(name) = id.strip_prefix(PREFIX) {
             let suite = catalog::find(name).ok_or_else(unknown)?;
             match (self.suites.contains_key(suite.name), action) {
                 (false, INSTALL) => kubaos(&["add", suite.name]),
@@ -176,6 +200,7 @@ pub fn ids() -> Vec<String> {
             let scaffolders = suite.scaffolders.iter().map(|scaffolder| new_id(suite, scaffolder));
             std::iter::once(format!("{PREFIX}{}", suite.name)).chain(scaffolders)
         })
+        .chain([UPDATE_ID.to_owned(), UPGRADE_ID.to_owned()])
         .collect()
 }
 
@@ -269,6 +294,40 @@ fn configure_action(suite: &Suite) -> Action {
         optional: true,
     });
     Action::new(CONFIGURE, "Configure…").arguments(version.into_iter().chain(extras).collect())
+}
+
+/// "Update Suites…": a terminal lists the Suites with patch releases and asks which to update.
+fn update_item() -> Item {
+    item(
+        UPDATE_ID.to_owned(),
+        "Update Suites…".to_owned(),
+        "Patch releases of your Suites' tools; kubaos update does this too".to_owned(),
+        UPDATE_ICON,
+        moving_keywords(&["update", "patch"]),
+        vec![Action::new(UPDATE, "Update Suites…")],
+    )
+}
+
+/// "Upgrade Suites…": a terminal lists the Suites with minor and major releases and asks which
+/// to upgrade.
+fn upgrade_item() -> Item {
+    item(
+        UPGRADE_ID.to_owned(),
+        "Upgrade Suites…".to_owned(),
+        "Minor and major releases of your Suites' tools and toolchains".to_owned(),
+        UPDATE_ICON,
+        moving_keywords(&["upgrade", "bump", "major", "minor", "new version"]),
+        vec![Action::new(UPGRADE, "Upgrade Suites…")],
+    )
+}
+
+/// The words "Update Suites…" and "Upgrade Suites…" are found by, beside `extra`.
+fn moving_keywords(extra: &[&str]) -> Vec<String> {
+    ["suite", "suites", "toolchain", "language server", "mise", "tools"]
+        .iter()
+        .chain(extra)
+        .map(|&word| word.to_owned())
+        .collect()
 }
 
 /// The Item of one scaffolder of an installed Suite.

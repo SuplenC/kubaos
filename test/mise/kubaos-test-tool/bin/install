@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Installs the test Suite's mise tool, kubaos-test-tool, at
+# $ASDF_INSTALL_VERSION into $ASDF_INSTALL_PATH, with no network. It fails
+# while $KUBAOS_TEST_TOOL_FAIL names that version, so a check can see what a
+# failed install leaves behind.
+set -euo pipefail
+if [[ ${KUBAOS_TEST_TOOL_FAIL:-} == "$ASDF_INSTALL_VERSION" ]]; then
+  echo "kubaos-test-tool $ASDF_INSTALL_VERSION fails to install, as KUBAOS_TEST_TOOL_FAIL asks" >&2
+  exit 1
+fi
+mkdir -p "$ASDF_INSTALL_PATH/bin"
+printf '#!/usr/bin/env bash\necho %q\n' "$ASDF_INSTALL_VERSION" >"$ASDF_INSTALL_PATH/bin/kubaos-test-tool"
+chmod +x "$ASDF_INSTALL_PATH/bin/kubaos-test-tool"

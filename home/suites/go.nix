@@ -1,16 +1,21 @@
-# The Go Suite (crates/kubaos-core/src/suites/catalog.rs, GO): Go from the
-# user's nixpkgs at the chosen version, its tools, and LazyVim's Go extra.
-# Installs nothing without kubaos.d/suites/go.toml; its toolchains for Project
-# pins are declared in every home.
+# The Go Suite (crates/kubaos-core/src/suites/catalog.rs, GO): everything of it
+# but Go and its tools, which mise installs from the Suite's fragment,
+# ~/.config/mise/conf.d/kubaos-go.toml, and puts on PATH (shell.nix). Installs
+# nothing without kubaos.d/suites/go.toml.
 #
-# - go, at the version kubaos.d/suites/go.toml names, with GOTOOLCHAIN=local:
-#   a go.mod asking for a newer Go fails with a message instead of go
-#   downloading one past Nix, and a Project pin is the way to another version.
-# - gopls, gofumpt, goimports (gotools), golangci-lint and delve (dlv), from
-#   nixpkgs, which LazyVim's Go extra finds on PATH instead of installing its
-#   own copies through Mason (go.lua).
-# - ~/go/bin on PATH, for what `go install` puts there.
-# - kubaos-go-new, the scaffolder.
+# - LazyVim's Go extra (go.lua), on the Suite's gopls, gofumpt, goimports,
+#   golangci-lint and delve instead of Mason's copies.
+# - ~/go/bin on PATH, for what `go install` builds.
+# - A default for mise, kubaos-go_defaults.toml in its conf.d (a `_` no
+#   Suite's name has, so it is never a Suite's fragment): mise leaves GOBIN
+#   alone. By default mise points GOBIN at the bin of the Go it
+#   activates, so what `go install` built would be pruned with that Go at the
+#   next patch update; this way it goes to Go's own default, ~/go/bin. The
+#   user's ~/.config/mise/config.toml loads after it and wins.
+# - kubaos-go-new, the scaffolder, which runs the go on PATH.
+#
+# Go's own settings stay the user's: the Suite sets no GOPATH, GOBIN, GOFLAGS
+# or GOTOOLCHAIN, so `go env -w` and the environment decide them.
 {
   config,
   lib,
@@ -19,58 +24,28 @@
 }:
 let
   suite = config.kubaos.suites.go or null;
-  # The catalog's versions, the default first.
-  versions = [
-    "1.26"
-    "1.27"
-    "1.25"
-  ];
-  attrOf = version: "go_" + lib.replaceStrings [ "." ] [ "_" ] version;
-  # A version the user's nixpkgs has dropped (gone, or an alias that throws
-  # once it reaches end of life) has no toolchain rather than failing the
-  # home.
-  available =
-    version: pkgs ? ${attrOf version} && (builtins.tryEval pkgs.${attrOf version}.drvPath).success;
-  toolchains = lib.genAttrs (lib.filter available versions) (version: pkgs.${attrOf version});
-
-  version = if suite == null || suite.version == null then lib.head versions else suite.version;
-  go =
-    toolchains.${version}
-      or (throw "kubaos.d/suites/go.toml: your nixpkgs has no Go ${version}; choose another with `kubaos suite configure go --version`");
-
-  # gopls, golangci-lint, gofumpt and goimports read code with the go/parser
-  # and go/types of the Go they were built with, and refuse or misread code
-  # for a newer one. nixpkgs builds them with its default Go, so a newer
-  # chosen version builds them again with it: about a minute, once. delve
-  # stays as it is: the Go versions it debugs are its own release's.
-  newerThanNixpkgs = lib.versionOlder (lib.versions.majorMinor pkgs.go.version) version;
-  builder = pkgs."buildGo${lib.replaceStrings [ "." ] [ "" ] version}Module";
-  withChosenGo =
-    tool:
-    if newerThanNixpkgs then
-      tool.override (
-        lib.mapAttrs (_: _: builder) (
-          lib.filterAttrs (name: _: lib.hasPrefix "buildGo" name) (lib.functionArgs tool.override)
-        )
-      )
-    else
-      tool;
+  miseDefaults = (pkgs.formats.toml { }).generate "kubaos-go_defaults.toml" {
+    settings.go_set_gobin = false;
+  };
 
   newProject = pkgs.writeShellApplication {
     name = "kubaos-go-new";
-    runtimeInputs = [ go ];
     text = ''
       # kubaos-go-new PATH NAME: a Go module called NAME at PATH, under git,
-      # with a main package.
+      # with a main package, made by the go on PATH.
       if (($# != 2)); then
         echo "usage: kubaos-go-new PATH NAME" >&2
         exit 2
+      fi
+      if ! command -v go >/dev/null; then
+        echo "kubaos-go-new: no go on PATH; \`kubaos suite configure go\` installs it again" >&2
+        exit 1
       fi
       path=$1 name=$2
       mkdir -- "$path"
       cd -- "$path"
       git init --quiet
-      GOTOOLCHAIN=local go mod init "$name"
+      go mod init "$name"
       cat >main.go <<EOF
       package main
 
@@ -85,23 +60,11 @@ let
 
 in
 {
-  config = lib.mkMerge [
-    { kubaos.suiteToolchains.go = toolchains; }
+  config = lib.mkIf (suite != null) {
+    home.packages = [ newProject ];
+    home.sessionPath = [ "${config.home.homeDirectory}/go/bin" ];
+    xdg.configFile."mise/conf.d/kubaos-go_defaults.toml".source = miseDefaults;
 
-    (lib.mkIf (suite != null) {
-      home.packages = [
-        go
-        (withChosenGo pkgs.gopls)
-        (withChosenGo pkgs.gofumpt)
-        (withChosenGo pkgs.gotools)
-        (withChosenGo pkgs.golangci-lint)
-        pkgs.delve
-        newProject
-      ];
-      home.sessionVariables.GOTOOLCHAIN = "local";
-      home.sessionPath = [ "${config.home.homeDirectory}/go/bin" ];
-
-      kubaos.nvim.suiteSpecs = [ ''dofile("${./go.lua}")'' ];
-    })
-  ];
+    kubaos.nvim.suiteSpecs = [ ''dofile("${./go.lua}")'' ];
+  };
 }

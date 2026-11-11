@@ -16,7 +16,7 @@
 //!
 //! - Logging in and unlocking through `bw` ([`login`], [`logout`]).
 //! - What a pull writes ([`pull`]) and the read-only check ([`check`]).
-//! - The project env cache in the keyring ([`env`]), which `use bwenv` in an `.envrc` reads.
+//! - The project env cache in the keyring ([`env`]), which a project's `mise.toml` reads.
 //! - The non-secret config (`~/.config/dot-bw/config`) and what the last pull found ([`Overview`]),
 //!   which Kōbō shows.
 //!

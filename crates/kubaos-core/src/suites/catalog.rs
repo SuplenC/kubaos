@@ -14,15 +14,21 @@ use kubaos_user_layer::App;
 
 use super::Cache;
 use super::Extra;
+use super::Request;
 use super::Scaffolder;
 use super::Seed;
 use super::Suite;
+use super::Tool;
 use super::Toolchain;
 
 /// The Suites KubaOS ships, by name.
 pub const SHIPPED: &[Suite] = &[RUST, GO, NODE, PYTHON, PHP, PROTO, WALLPAPER_DEPTH];
 
-/// Node and Bun. Its Nix module is `home/suites/node.nix`.
+/// Node from mise, with Bun (the `bun` extra) and vtsls, each its own mise tool. Its Nix module is
+/// `home/suites/node.nix`.
+///
+/// Node and Bun are their projects' release binaries; vtsls ships only on npm, so mise's `npm:`
+/// backend installs it, running the Node it installs beside it.
 const NODE: Suite = Suite {
     name: "node",
     title: "Node",
@@ -33,7 +39,25 @@ const NODE: Suite = Suite {
         description: "Adds Bun, its package manager and its test runner.",
         default: true,
     }],
-    toolchain: Toolchain::Nix,
+    mise: &[
+        Tool {
+            name: "node",
+            request: Request::Suite,
+            extra: None,
+        },
+        Tool {
+            name: "npm:@vtsls/language-server",
+            request: Request::Fixed("0.3"),
+            extra: None,
+        },
+        Tool {
+            name: "bun",
+            request: Request::Fixed("1.4"),
+            extra: Some("bun"),
+        },
+    ],
+    toolchain: Toolchain::Mise,
+    stop_servers: &[],
     caches: &[
         Cache {
             path: ".npm",
@@ -44,12 +68,13 @@ const NODE: Suite = Suite {
             description: "The packages `npm install --global` installed.",
         },
         Cache {
-            path: ".cache/bun",
-            description: "Bun's download cache.",
-        },
-        Cache {
             path: ".local/share/bun",
-            description: "The packages `bun add --global` installed.",
+            description: "The packages `bun add --global` installed, and Bun's download cache.",
+        },
+        // Where the Suite on Nix had Bun keep its downloads; a removal lists it while a home has it.
+        Cache {
+            path: ".cache/bun",
+            description: "Bun's download cache, from the Node Suite on Nix.",
         },
     ],
     // Node's first, as `kubaos suite new` takes the first by default: it needs no extra.
@@ -82,14 +107,45 @@ const NODE: Suite = Suite {
     ],
 };
 
-/// Python through uv. Its Nix module is `home/suites/python.nix`.
+/// Python through uv, with basedpyright, ruff and debugpy, each its own mise tool. Its Nix module
+/// is `home/suites/python.nix`.
+///
+/// The Suite has no versions: uv installs each project's Python, from its `.python-version` and
+/// `requires-python`. uv and ruff are release binaries from aqua. basedpyright and debugpy publish
+/// none, so mise's `pypi:` backend installs each into a venv of its own with the Suite's uv, on the
+/// Python uv finds (the system's, or a Python uv installed); basedpyright's wheel brings its own
+/// Node. mise finds that uv only in the same install or in the fragment, so uv stays in the
+/// Suite's tools and a `pypi:` tool is never installed without it.
 const PYTHON: Suite = Suite {
     name: "python",
     title: "Python",
     description: "uv for Pythons and venvs, basedpyright, ruff and debugpy, set up in Neovim.",
     versions: &[],
     extras: &[],
+    mise: &[
+        Tool {
+            name: "aqua:astral-sh/uv",
+            request: Request::Fixed("0.13"),
+            extra: None,
+        },
+        Tool {
+            name: "pypi:basedpyright",
+            request: Request::Fixed("1.40"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:astral-sh/ruff",
+            request: Request::Fixed("0.17"),
+            extra: None,
+        },
+        Tool {
+            name: "pypi:debugpy",
+            request: Request::Fixed("1.8"),
+            extra: None,
+        },
+    ],
     toolchain: Toolchain::Upstream { manager: "uv" },
+    stop_servers: &[],
     caches: &[
         Cache {
             path: ".cache/uv",
@@ -130,7 +186,9 @@ const PHP: Suite = Suite {
     description: "PHP with Xdebug, composer, phpactor, php-cs-fixer and phpcs, set up in Neovim.",
     versions: &["8.5", "8.4", "8.3", "8.2"],
     extras: &[],
+    mise: &[],
     toolchain: Toolchain::Nix,
+    stop_servers: &[],
     caches: &[Cache {
         path: ".cache/composer",
         description: "composer's download cache.",
@@ -166,16 +224,24 @@ const PHP: Suite = Suite {
     ],
 };
 
-/// proto and moon. Its Nix module is `home/suites/proto.nix`. proto is a version manager itself, so
-/// the Suite has no versions and no Project pins: a project pins its tools, moon and proto among
-/// them, in its `.prototools`.
+/// proto from mise, and moon through proto. Its Nix module is `home/suites/proto.nix`.
+///
+/// proto is its project's release binary, from aqua. It is a version manager itself, so the Suite
+/// has no versions and no Project pins: a project pins its tools, moon and proto among them, in
+/// its `.prototools`, and proto installs them into its own home.
 const PROTO: Suite = Suite {
     name: "proto",
     title: "proto + moon",
-    description: "proto, the toolchain manager that pins each project's tools in its .prototools, and moon, the monorepo build system, which proto installs on first use.",
+    description: "proto, the toolchain manager that pins each project's tools in its .prototools, and moon, the monorepo build system, which proto installs for each workspace.",
     versions: &[],
     extras: &[],
+    mise: &[Tool {
+        name: "aqua:moonrepo/proto",
+        request: Request::Fixed("0.63"),
+        extra: None,
+    }],
     toolchain: Toolchain::Upstream { manager: "proto" },
+    stop_servers: &[],
     caches: &[Cache {
         path: ".local/share/proto",
         description: "The tools, shims and plugins proto installed, moon among them.",
@@ -189,19 +255,53 @@ const PROTO: Suite = Suite {
     mentions: &["proto", "moon", "moonrepo", ".prototools", "moon.yml"],
 };
 
-/// Go from nixpkgs, with gopls, gofumpt, goimports, golangci-lint and delve. Its Nix module is
-/// `home/suites/go.nix`.
+/// Go from mise, with gopls, gofumpt, goimports, golangci-lint and delve, each its own mise tool.
+/// Its Nix module is `home/suites/go.nix`.
 ///
-/// The default version is the one nixpkgs builds its Go tools with, so they come from the binary
-/// cache; a newer one builds gopls, gofumpt, goimports and golangci-lint again with it, since they
-/// read code only up to the Go they were built with.
+/// gofumpt, golangci-lint and delve are release binaries from aqua. gopls and goimports publish
+/// none, so mise's `go:` backend builds them with the Go it installs beside them. One that needs a
+/// newer Go than the chosen line to build (gopls 0.24 needs 1.27) has Go fetch that toolchain for
+/// the build, which `GOTOOLCHAIN=local` refuses: KubaOS leaves `GOTOOLCHAIN` unset.
 const GO: Suite = Suite {
     name: "go",
     title: "Go",
     description: "Go with gopls, gofumpt, goimports, golangci-lint and delve, and Neovim's Go support.",
-    versions: &["1.26", "1.27", "1.25"],
+    versions: &["1.27", "1.26", "1.25"],
     extras: &[],
-    toolchain: Toolchain::Nix,
+    mise: &[
+        Tool {
+            name: "go",
+            request: Request::Suite,
+            extra: None,
+        },
+        Tool {
+            name: "go:golang.org/x/tools/gopls",
+            request: Request::Fixed("0.24"),
+            extra: None,
+        },
+        Tool {
+            name: "go:golang.org/x/tools/cmd/goimports",
+            request: Request::Fixed("0.52"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:mvdan/gofumpt",
+            request: Request::Fixed("0.12"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:golangci/golangci-lint",
+            request: Request::Fixed("2.15"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:go-delve/delve",
+            request: Request::Fixed("1.27"),
+            extra: None,
+        },
+    ],
+    toolchain: Toolchain::Mise,
+    stop_servers: &[],
     caches: &[
         Cache {
             path: "go",
@@ -247,7 +347,10 @@ const GO: Suite = Suite {
 /// clang with mold. Its Nix module is `home/suites/rust.nix`.
 ///
 /// It has no versions: rustup installs the toolchain a project's `rust-toolchain.toml` names on
-/// first use, and stable everywhere else, so that file is the per-project pin.
+/// first use, and stable everywhere else, so that file is the per-project pin. mise installs
+/// rustup itself, not mise's own `rust`, which sets `RUSTUP_TOOLCHAIN` and so outranks that file.
+/// Every tool is a release binary: aqua's where its registry has one, else the project's GitHub
+/// release. codelldb is its VS Code extension, which carries the adapter and its own LLDB.
 const RUST: Suite = Suite {
     name: "rust",
     title: "Rust",
@@ -259,7 +362,39 @@ const RUST: Suite = Suite {
         description: "Links with wild instead of mold: faster relinks, before its 1.0.",
         default: false,
     }],
+    mise: &[
+        Tool {
+            name: "aqua:rust-lang/rustup",
+            request: Request::Fixed("1.29"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:nextest-rs/nextest/cargo-nextest",
+            request: Request::Fixed("0.9"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:mozilla/sccache",
+            request: Request::Fixed("0.19"),
+            extra: None,
+        },
+        Tool {
+            name: "github:vadimcn/codelldb",
+            request: Request::Fixed("1.12"),
+            extra: None,
+        },
+        // wild's repository moved here from davidlattimore/wild. Under the old name, mise asks
+        // GitHub's API where it went on every install, to match the release's attestations, and
+        // fails once the calls GitHub allows without a token are used up.
+        Tool {
+            name: "github:wild-linker/wild",
+            request: Request::Fixed("0.11"),
+            extra: Some("wild"),
+        },
+    ],
     toolchain: Toolchain::Upstream { manager: "rustup" },
+    // The server a build starts outlives it, on the sccache that started it.
+    stop_servers: &[&["sccache", "--stop-server"]],
     caches: &[
         Cache {
             path: ".rustup",
@@ -320,7 +455,9 @@ const WALLPAPER_DEPTH: Suite = Suite {
     description: "Cuts the foreground out of each wallpaper of your own as you set it, so the lock's clock stands behind it; with its models, about 700 MB.",
     versions: &[],
     extras: &[],
+    mise: &[],
     toolchain: Toolchain::Nix,
+    stop_servers: &[],
     caches: &[Cache {
         path: ".cache/kubaos/wallpapers",
         description: "The cut-outs and clock places made for your own wallpapers.",
@@ -332,19 +469,26 @@ const WALLPAPER_DEPTH: Suite = Suite {
 
 /// A Suite with one of everything, for the test harness and the unit tests. Its Nix module is
 /// `home/suites/test.nix`. Version 3 is never installed by a check, so a Project pin of it shows
-/// a toolchain fetched on first use.
+/// a toolchain fetched on first use. Its mise tool, `kubaos-test-tool`, comes from the asdf plugin
+/// in `test/mise/`, which the harness links into mise first.
 #[cfg(any(test, feature = "test-suite"))]
 pub const TEST: Suite = Suite {
     name: "test",
     title: "Test",
-    description: "KubaOS's own test Suite: a script, an environment variable, a PATH entry and a Neovim setting.",
+    description: "KubaOS's own test Suite: a script, a mise tool, an environment variable, a PATH entry and a Neovim setting.",
     versions: &["1", "2", "3"],
     extras: &[Extra {
         name: "greeting",
         description: "Adds kubaos-test-suite-greet.",
         default: false,
     }],
-    toolchain: Toolchain::Nix,
+    mise: &[Tool {
+        name: "kubaos-test-tool",
+        request: Request::Suite,
+        extra: None,
+    }],
+    toolchain: Toolchain::Mise,
+    stop_servers: &[],
     caches: &[Cache {
         path: ".cache/kubaos-test-suite",
         description: "What `kubaos-test-suite run` writes.",

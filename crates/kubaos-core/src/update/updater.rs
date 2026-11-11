@@ -3,14 +3,14 @@
 //!
 //! An update, in order: the lock and a free-space check; fetching `origin` into the checkout,
 //! which is the network check; the release policy's pick; showing it and asking; a snapper
-//! snapshot, the user's `flake.lock` saved and the update recorded in the history; apt; moving
-//! `release`; the Hyprland pin, the package manifest and the system migrations; `nix flake update`
-//! of the user flake; relinking what `system/` took from KubaOS's nixpkgs; the switch; the
-//! Bitwarden check; Bitwarden desktop and the Nix daemon moved on within their series, each a
-//! phase whose failure is only a warning; the user migrations; firmware through fwupd; and the
-//! new release record. Packages first, then migrations, which are written against the new
-//! packages. Firmware comes last: it never stops an update, and the question it may ask comes
-//! once the rest is done.
+//! snapshot, the user's `flake.lock` and the Suites' lockfile entries saved and the update recorded
+//! in the history; apt; moving `release`; the Hyprland pin, the package manifest and the system
+//! migrations; `nix flake update` of the user flake; relinking what `system/` took from KubaOS's
+//! nixpkgs; the switch; the Suites' tools moved to their newest patch releases; the Bitwarden
+//! check; Bitwarden desktop and the Nix daemon moved on within their series, each a phase whose
+//! failure is only a warning; the user migrations; firmware through fwupd; and the new release
+//! record. Packages first, then migrations, which are written against the new packages. Firmware
+//! comes last: it never stops an update, and the question it may ask comes once the rest is done.
 //!
 //! Each stage is a [`Phase`] of the progress stream (`event.rs`). Programs run with their output
 //! captured: every line goes to the run's log and to the stream, never to the terminal directly.
@@ -36,6 +36,7 @@ use std::fs::TryLockError;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -88,6 +89,8 @@ use crate::apt::Manifest;
 use crate::apt::ManifestError;
 use crate::apt::manifest::MANIFEST;
 use crate::engine::files::utc_datetime;
+use crate::mise;
+use crate::mise::Mise;
 use crate::state::Paths;
 use crate::state::write_atomic;
 
@@ -296,6 +299,8 @@ pub struct Updater<'a, M: Machine> {
     sys: SystemPaths,
     user: Paths,
     now: SystemTime,
+    /// The mise that moves the Suites' tools.
+    mise: Arc<dyn Mise>,
 }
 
 impl<'a, M: Machine> Updater<'a, M> {
@@ -309,7 +314,15 @@ impl<'a, M: Machine> Updater<'a, M> {
             sys,
             user,
             now,
+            mise: Arc::new(mise::Cli::new().quiet()),
         }
+    }
+
+    /// Moves the Suites' tools with `mise` instead of the `mise` on `PATH`.
+    #[must_use]
+    pub fn with_mise(mut self, mise: Arc<dyn Mise>) -> Self {
+        self.mise = mise;
+        self
     }
 
     /// Sends what the updater does to `sink`, as [`UpdateEvent`]s.
@@ -435,6 +448,11 @@ impl<'a, M: Machine> Updater<'a, M> {
                 .j
                 .warn("that update saved no flake.lock: your packages stay where they are"),
         }
+        let mise_lock = entry.mise_lock.clone().filter(|lock| lock.is_file());
+        if mise_lock.is_some() {
+            self.j
+                .note("Your Suites' tools go back to the versions they had before that update");
+        }
         if confirm == Confirm::Ask && !self.confirm("Roll back?") {
             return Err(UpdateError::Declined);
         }
@@ -460,6 +478,10 @@ impl<'a, M: Machine> Updater<'a, M> {
             u.report_reloaded();
             Ok(nix_packages)
         })?;
+        let suites = mise_lock
+            .as_deref()
+            .map(|saved| self.restore_suites(saved))
+            .unwrap_or_default();
         let refs = self.refs();
         let rolled_back = Installed {
             version: Version::parse(&entry.from_version).unwrap_or(installed.version.clone()),
@@ -489,6 +511,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             nix_packages,
             migrations: Vec::new(),
             programs: Vec::new(),
+            suites,
             reloaded: self.j.reloaded.clone(),
             firmware: Firmware::default(),
             restart: Restart::None,
@@ -960,10 +983,15 @@ impl<'a, M: Machine> Updater<'a, M> {
             self.date(),
             installed.version
         );
-        self.phase(Phase::Snapshot, |u| {
+        let suites_saved = self.phase(Phase::Snapshot, |u| {
             u.snapshot(&description);
             let lock = u.save_lock()?;
-            u.record_history(installed, target, lock)
+            let mise_lock = u.save_suite_locks().map_err(|e| {
+                u.j.warn(format!("the Suites' lockfile entries aren't saved: {}", chain(&e)));
+            });
+            let saved = mise_lock.is_ok();
+            u.record_history(installed, target, lock, mise_lock.ok().flatten())?;
+            Ok(saved)
         })?;
         self.phase(Phase::SystemPackages, |u| u.upgrade_apt(packages))?;
         if let Some(target) = target {
@@ -992,6 +1020,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             u.report_reloaded();
             Ok(nix_packages)
         })?;
+        let suites = self.update_suites(suites_saved);
         let programs: Vec<_> = [self.update_bitwarden(), self.update_nix()]
             .into_iter()
             .flatten()
@@ -1021,6 +1050,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             nix_packages,
             migrations,
             programs,
+            suites,
             reloaded: self.j.reloaded.clone(),
             firmware,
             restart,
@@ -1152,12 +1182,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         }
         let dir = self.user.saved_locks();
         fs::create_dir_all(&dir).map_err(UpdateError::io(&dir))?;
-        let mut saved = dir.join(format!("{}.lock", self.unix()));
-        let mut n = 1;
-        while saved.exists() {
-            saved = dir.join(format!("{}-{n}.lock", self.unix()));
-            n += 1;
-        }
+        let saved = self.saved_lock_path("lock");
         fs::copy(&lock, &saved).map_err(UpdateError::io(&saved))?;
         Ok(Some(saved))
     }
@@ -1167,6 +1192,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         installed: &Installed,
         target: Option<&Target>,
         lock: Option<PathBuf>,
+        mise_lock: Option<PathBuf>,
     ) -> Result<(), UpdateError> {
         let path = self.sys.history();
         let entry = HistoryEntry {
@@ -1179,6 +1205,7 @@ impl<'a, M: Machine> Updater<'a, M> {
                 .unwrap_or(&installed.version)
                 .to_string(),
             lock,
+            mise_lock,
         };
         let text = read_or_empty(&path)? + &entry.line();
         self.write_root(&path, &text)
@@ -1553,6 +1580,7 @@ mod firmware;
 mod manifest;
 mod nix;
 mod program;
+mod suites;
 
 #[cfg(test)]
 mod tests;

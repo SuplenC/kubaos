@@ -1,14 +1,14 @@
-# zsh: KubaOS's shell, with oh-my-zsh, fzf, atuin, direnv, zoxide and the
+# zsh: KubaOS's shell, with oh-my-zsh, fzf, atuin, mise, zoxide and the
 # oh-my-posh prompt.
 #
 # programs.zsh writes ~/.zshrc, ~/.zshenv and ~/.zprofile. Order of
 # programs.zsh.initContent (lower runs first):
-#   550   the init cache (_kubaos_init, below)
+#   550   the init cache (_kubaos_init, below); mise's first hook-env starts
 #   800   oh-my-zsh (plugins: git, no theme), compinit from a cached dump
 #   900   FZF_CTRL_R_COMMAND="" (keeps fzf off Ctrl-R)
 #   910   fzf (Ctrl-T, Alt-C)
 #   1000  aliases, oh-my-posh
-#   1010  direnv hook, atuin (Ctrl-R)
+#   1010  mise's hook, atuin (Ctrl-R)
 #   1890  the Proxy's variables, while it is on
 #   1900  the user layer's zshrc (~/.config/kubaos/terminal/zsh/zshrc)
 #   1950  the greeting: fastfetch in a new Ghostty window
@@ -19,9 +19,25 @@
 # ~/.cache/kubaos/zsh; deleting that folder is always safe.
 #
 # PATH entries live in home.sessionPath, not here: ~/.local/bin and cargo's in
-# dev.nix, each installed Suite's in its module under suites/.
+# dev.nix, each installed Suite's in its module under suites/; mise's shims are
+# the session variables' last line, below. mise's hook is the exception: before
+# each prompt it puts the tools of the Suites' mise fragments
+# (~/.config/mise/conf.d/kubaos-*.toml) and of the folder's own mise.toml (its
+# Project pins) at the front of PATH, ahead of ~/.nix-profile/bin, so a tool's
+# own commands are never shadowed by a Nix one of the same name, and sets the
+# folder's [env]. It is the only directory hook: direnv isn't installed, since
+# mise calls running the two together unsupported (both rewrite PATH). A
+# project with a flake devshell runs `nix develop`.
+#
+# Only an interactive zsh runs the hook, so a program started any other way
+# (Neovim from the launcher, a script, `zsh -c`) finds a Suite's tools through
+# mise's shims: the shims folder is on the session's PATH, ahead of
+# ~/.nix-profile/bin (config/hypr/env.lua keeps that order in the graphical
+# session), and the hook leaves it behind its own entries. A shim runs mise,
+# which picks the version the folder's configs ask for.
 {
   config,
+  kubaosPkgs,
   pkgs,
   lib,
   ...
@@ -47,12 +63,47 @@ let
   # The suffix names the script's format (each print given the config), so
   # scripts cached in an older one are never sourced again.
   ompKey = builtins.substring 0 16 (builtins.hashString "sha256" "${omp}-print-config");
+  mise = lib.getExe kubaosPkgs.mise;
+  # `mise activate zsh` writes the PATH it was run with into its first two
+  # lines; cached, they would bring back that PATH in every later shell. The
+  # rest is the same for every shell. Its `_mise_hook --force`, which sets
+  # PATH and the folder's [env] from mise's configs as the shell starts,
+  # becomes `_kubaos_mise_first`, which takes the run started at order 550.
+  # mise's shims folder, as mise finds it: under MISE_DATA_DIR when that is
+  # set, else XDG_DATA_HOME's mise.
+  miseShims = "\${MISE_DATA_DIR:-\${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims";
+  miseActivate = pkgs.writeShellScript "mise-activate-zsh" ''
+    set -euo pipefail
+    ${mise} activate zsh | ${lib.getExe pkgs.gnused} -e '/^export __MISE_ORIG_PATH=/d' -e '/^export PATH=/d' \
+      -e 's/^_mise_hook --force$/_kubaos_mise_first/'
+  '';
 in
 {
-  home.packages = [ pkgs.oh-my-posh ];
+  # mise is the curated set's, so only a KubaOS release moves it.
+  home.packages = [
+    pkgs.oh-my-posh
+    kubaosPkgs.mise
+  ];
 
   # XDG_CONFIG_HOME and friends come from xdg.enable (default.nix).
   home.sessionVariables.EDITOR = "nvim";
+  # After the session variables' end, where targets.genericLinux sources
+  # Nix's nix.sh, which puts ~/.nix-profile/bin first: home.sessionPath would
+  # land behind it. hm-session-vars runs once a session, so this prepends once.
+  home.sessionVariablesExtra = lib.mkAfter ''
+    export PATH="${miseShims}:$PATH"
+  '';
+
+  # A shim is a link to the mise that made it, a store path. mise remakes the
+  # shims of the tools it installs or prunes, but not when a release moves
+  # mise itself, so the switch remakes them all: 40 ms, nothing downloaded. A
+  # mise config it can't read fails the reshim, not the switch.
+  home.activation.miseReshim = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    if [[ -d "${miseShims}" ]]; then
+      (cd / && run ${mise} reshim) ||
+        warnEcho "mise reshim failed: run it once mise's config reads again"
+    fi
+  '';
 
   programs.zsh = {
     enable = true;
@@ -100,7 +151,7 @@ in
     };
 
     initContent = lib.mkMerge [
-      # Forking oh-my-posh, atuin, fzf, direnv and zoxide for their init
+      # Forking oh-my-posh, atuin, fzf, mise and zoxide for their init
       # scripts cost 7 ms of each start in the harness. `_kubaos_init NAME
       # CMD...` sources NAME's cached output of CMD, and runs CMD to write it
       # when the file is missing or empty.
@@ -121,6 +172,35 @@ in
             mv -f -- "$file.$$" "$file"
           fi
           source "$file"
+        }
+
+        # The hook-env run mise's activation starts the shell with (order
+        # 1010) is mise's whole cost at start, about 20 ms, nearly all of it
+        # mise's own start-up. Started here, it runs beside oh-my-zsh,
+        # compinit, fzf and oh-my-posh instead of after them. It is given the
+        # variables the activation exports before its own run, since mise
+        # keeps a hash of every MISE_* variable in the session it writes, and
+        # a different one makes the next prompt's hook a full run.
+        typeset -g _kubaos_mise_path=$PATH _kubaos_mise_pwd=$PWD
+        exec {_kubaos_mise_fd}< <(MISE_SHELL=zsh __MISE_ORIG_PATH=''${__MISE_ORIG_PATH:-$PATH} \
+          __MISE_ZSH_PRECMD_RUN=0 __MISE_ZSH_CHPWD_RAN=0 \
+          exec ${mise} hook-env --shell-pid $$ -s zsh --force)
+        # The activation calls this where mise's own script runs the hook.
+        # HAZARD: the run's output is only right for the PATH and folder it
+        # started with: mise puts its entries ahead of that PATH, and an
+        # entry added since would be lost. The hook runs again when either
+        # changed.
+        function _kubaos_mise_first() {
+          local out
+          if [[ $PATH == "$_kubaos_mise_path" && $PWD == "$_kubaos_mise_pwd" ]]; then
+            IFS= read -r -d ''' -u $_kubaos_mise_fd out
+            eval "$out"
+          else
+            _mise_hook --force
+          fi
+          exec {_kubaos_mise_fd}<&-
+          unset _kubaos_mise_fd _kubaos_mise_path _kubaos_mise_pwd
+          unfunction _kubaos_mise_first
         }
       '')
 
@@ -218,13 +298,9 @@ in
         precmd_functions=(_dot_omp_init ''${precmd_functions:#_dot_omp_init})
       ''
 
-      # Where the direnv and atuin modules put their hooks.
+      # Where the atuin module puts its hook.
       (lib.mkOrder 1010 ''
-        ${cachedInit "direnv" [
-          (lib.getExe config.programs.direnv.package)
-          "hook"
-          "zsh"
-        ]}
+        ${cachedInit "mise" [ miseActivate ]}
         if [[ $options[zle] = on ]]; then
           ${cachedInit "atuin" (
             [
@@ -332,13 +408,6 @@ in
   # falls back to its plain theme meanwhile.
   xdg.configFile."atuin/themes/matugen.toml".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.local/state/theme/atuin.toml";
-
-  programs.direnv = {
-    enable = true;
-    # Initialised from the cache in initContent.
-    enableZshIntegration = false;
-    nix-direnv.enable = true;
-  };
 
   programs.zoxide = {
     enable = true;

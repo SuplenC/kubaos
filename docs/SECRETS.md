@@ -167,12 +167,17 @@ Leaving the name out drops the wildcard block's other settings for it too: a `us
 
 ## Daily use
 
-```sh
-cd ~/Projects/myapp
-echo 'use bwenv myapp' >> .envrc && direnv allow   # once per project
+Once per project, in its `mise.toml`, then `mise trust` in the folder (a config that sets the environment needs it):
+
+```toml
+[env]
+KUBAOS_BWENV = "myapp"
+_.source = { path = "~/.local/share/kubaos/bwenv.sh", redact = true }
 ```
 
-Every `cd` into the project then exports the variables from the keyring. One `secret-tool` call does it, and `direnv export` with 5 variables took 22 ms in the test container. Nothing talks to Bitwarden on `cd`. If the keyring has nothing for the project, direnv prints `run: kubaos bitwarden env pull myapp` and exports nothing.
+`KUBAOS_BWENV` takes several projects, separated by spaces. mise's shell hook sources the script, which `home/secrets.nix` writes, each time it works out the folder's environment: on every `cd` into the project or within it, and after its config changes, never on a prompt where nothing changed. The script exports each project's variables from the keyring with one `kubaos bitwarden env export` call, about 10 ms; nothing talks to Bitwarden on `cd`, and leaving the project unsets them. `redact = true` keeps the values out of what mise prints. If the keyring has nothing for the project, the script prints `run: kubaos bitwarden env pull myapp` and exports nothing.
+
+An `.envrc` line `use bwenv myapp` under `~/Projects` becomes these lines in the folder's `mise.toml` when KubaOS updates, trusted; `kubaos pins` names any it left.
 
 | Command | What |
 |---|---|
@@ -180,7 +185,7 @@ Every `cd` into the project then exports the variables from the keyring. One `se
 | `kubaos bitwarden env refresh` | pull every project the keyring already has |
 | `kubaos bitwarden env list` | projects and variable names, never values |
 | `kubaos bitwarden env clear myapp` / `--all` | forget a project or all of them |
-| `kubaos bitwarden env export myapp` | the project's `NAME=VALUE` records, NUL-separated, from the keyring alone (what `use bwenv` reads) |
+| `kubaos bitwarden env export myapp` | the project's `NAME=VALUE` records, NUL-separated, from the keyring alone (what the script a `mise.toml` sources reads) |
 | `kubaos bitwarden refresh` | after any vault change: SSH, git, gh, all projects (about 15 s). "Refresh from Bitwarden" in the Command menu |
 | `kubaos bitwarden check` | no bw call: is the agent up, which files exist |
 | `dot-u2f-enroll --list` / `--remove N` | your enrolled keys |
@@ -196,7 +201,7 @@ The GNOME keyring: tty autologin means nobody types the login password, so nothi
 ## Rotation
 
 - **SSH key**: in Bitwarden, create a new SSH key item with the same fields. Change the old item's `signing` to `verify`. Add the new public key on GitHub and servers, then `kubaos bitwarden refresh`. Delete the old item once nothing uses it. Its `.pub` and Host block disappear on the next refresh.
-- **Env secret**: change the field in Bitwarden, then `kubaos bitwarden env pull <project>` and `cd .` (or `direnv reload`).
+- **Env secret**: change the field in Bitwarden, then `kubaos bitwarden env pull <project>` and `cd` out of the project and back in.
 - **gh token**: put the new token in `gh-token` (or the item `KUBAOS_BW_GH_ITEM` names), `kubaos bitwarden refresh --only gh`.
 - **Master password**: change it in the web vault. Nothing here stores it.
 - **Security key**: `dot-u2f-enroll` with the new key, `dot-u2f-enroll --remove N` for the old one, and do the same in the web vault.
@@ -340,6 +345,6 @@ The finger stopped working (a cut, a bandage): the PIN works at sudo and polkit,
 - **The finger never works, the PIN does.** `dot-u2f-enroll --info`: "fingerprints: none yet" means none are enrolled (`ykman fido fingerprints add`). "N scans left" counts down to the PIN lockout.
 - **`dot-u2f-enroll`: "no FIDO key found".** `ls -l /dev/hidraw*` should show a `+` (ACL) on the key's node. If not, you're not on the active seat (over ssh, say), or udev didn't tag it: `udevadm info /dev/hidrawN | grep SECURITY_TOKEN`.
 - **Lock screen ignores the key.** `ls -l /usr/local/lib/security/pam_u2f.so` must point into `/nix/store` (else `system/70-bitwarden.sh` again). Test without locking: `dot-u2f-enroll --test-lock`. A PIN-only key can't unlock the lock screen.
-- **direnv: "can't read the keyring".** gnome-keyring isn't running (Hyprland starts it) or you dismissed its unlock prompt. `secret-tool search --all service dotfiles-env` should list your entries.
+- **Entering a project: "can't read the keyring".** gnome-keyring isn't running (Hyprland starts it) or you dismissed its unlock prompt. `secret-tool search --all service dotfiles-env` should list your entries.
 - **Keys stopped working after a hostname change.** Credentials are bound to `pam://<hostname>`. Enroll the keys again.
 - **Check a PAM file without risking a lockout:** `sudo pamtester sudo $USER authenticate` from a second tty.

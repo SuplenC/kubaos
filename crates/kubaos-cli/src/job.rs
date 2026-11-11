@@ -81,6 +81,13 @@ pub struct SwitchMode {
     foreground: bool,
 }
 
+impl SwitchMode {
+    /// Whether the command waits for the switch to end, and so knows whether it succeeded.
+    pub fn waits(self) -> bool {
+        !self.detach
+    }
+}
+
 /// What `kubaos switch` switches the home to: without a flag, the home as it stands.
 #[derive(Args, Clone, Debug)]
 #[group(multiple = false)]

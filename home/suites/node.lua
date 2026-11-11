@@ -1,12 +1,14 @@
 -- The Node Suite's Neovim settings, part of the Defaults while the Suite is
 -- installed (home/suites/node.nix): LazyVim's TypeScript and eslint extras,
--- run on the Suite's vtsls, eslint server and js-debug.
+-- run on the vtsls mise installs for the Suite, eslint's server and js-debug,
+-- which Neovim finds on PATH: mise's own entries in a shell, its shims when
+-- started from the launcher.
 local tools = require("config.suite_tools")
 
 return {
   { import = "lazyvim.plugins.extras.lang.typescript" },
   { import = "lazyvim.plugins.extras.linting.eslint" },
-  tools.from_nix({
+  tools.on_path({
     servers = { "vtsls", "eslint" },
     packages = { "js-debug-adapter" },
   }),

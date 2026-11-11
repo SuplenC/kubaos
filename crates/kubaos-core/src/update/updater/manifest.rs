@@ -37,6 +37,7 @@ use crate::update::event::Command;
 use crate::update::event::GroupChange;
 use crate::update::event::Phase;
 use crate::update::event::Restart;
+use crate::update::event::SuiteChanges;
 use crate::update::event::Summary;
 use crate::update::event::UpdateEvent;
 use crate::update::firmware::Firmware;
@@ -175,6 +176,7 @@ impl<M: Machine> Updater<'_, M> {
             nix_packages: None,
             migrations: Vec::new(),
             programs: Vec::new(),
+            suites: SuiteChanges::default(),
             reloaded: Vec::new(),
             firmware: Firmware::default(),
             restart: Restart::None,

@@ -1,5 +1,5 @@
 # shellcheck shell=bash disable=SC2015,SC2016
-# test/run bitwarden: `kubaos bitwarden` and `use bwenv` against a real Vaultwarden
+# test/run bitwarden: `kubaos bitwarden` and a project's Bitwarden variables in its mise.toml against a real Vaultwarden
 # (compose service vaultwarden, https://vw on the private network). Sourced
 # by test/lib/entry after harness.sh; prepare() has run.
 #
@@ -262,7 +262,7 @@ c_bw_folder() {
   return "$bad"
 }
 
-c_bw_direnv() {
+c_bw_mise_env() {
   local out t0 bad=0
   out="$(bzsh 'kubaos bitwarden env list')"
   printf '%s\n' "$out"
@@ -272,17 +272,18 @@ c_bw_direnv() {
   done
   grep -q 'bad-name' <<<"$out" && { echo "FAIL a non-shell field name was imported"; bad=1; }
   install -d -o "$USER_NAME" -g "$USER_NAME" "$DEMO"
-  echo 'use bwenv demo' | as_user tee "$DEMO/.envrc" >/dev/null
-  bzsh "cd $DEMO && direnv allow" >/dev/null 2>&1
-  # cd in an interactive zsh: direnv's chpwd hook exports, leaving unloads.
+  printf '[env]\nKUBAOS_BWENV = "demo"\n_.source = { path = "~/.local/share/kubaos/bwenv.sh", redact = true }\n' |
+    as_user tee "$DEMO/mise.toml" >/dev/null
+  bzsh "cd $DEMO && mise trust" >/dev/null 2>&1
+  # cd in an interactive zsh: mise's chpwd hook sources the script, leaving unloads.
   out="$(bw_env script -qec "zsh -l -i -c 'cd $DEMO; print -r -- \"DB=\$DATABASE_URL\"; print -r -- \"TOK=\$API_TOKEN\"; print -r -- \"\$TLS_KEY\" | wc -l; cd /; print -r -- \"AFTER=\${DATABASE_URL:-unset}\"'" /dev/null 2>/dev/null | tr -d '\r')"
   grep -qx 'DB=postgres://demo:pw@db:5432/demo' <<<"$out" || { echo "FAIL DATABASE_URL on cd"; printf '%s\n' "$out"; bad=1; }
   grep -qxF "TOK=$TOKEN_VALUE" <<<"$out" || { echo "FAIL API_TOKEN not intact"; bad=1; }
   grep -qx '4' <<<"$out" || { echo "FAIL multi-line TLS_KEY not intact"; bad=1; }
   grep -qx 'AFTER=unset' <<<"$out" || { echo "FAIL variables stay after leaving the dir"; bad=1; }
   t0="$(now)"
-  bzsh "cd $DEMO && for i in 1 2 3 4 5; do direnv export zsh >/dev/null 2>&1; done"
-  echo "     direnv export: $(awk -v s="$(since "$t0")" 'BEGIN { printf "%.0f", s * 1000 / 5 }') ms per run"
+  bzsh "cd $DEMO && for i in 1 2 3 4 5; do mise env -s zsh >/dev/null 2>&1; done"
+  echo "     mise env: $(awk -v s="$(since "$t0")" 'BEGIN { printf "%.0f", s * 1000 / 5 }') ms per run"
   [[ ! -e /tmp/pwned ]] || { echo "FAIL a vault value was executed"; bad=1; }
   ((bad == 0)) && echo "ok   cd exports 4 variables intact (metacharacters, multi-line), leaving unloads them"
   return "$bad"
@@ -307,7 +308,7 @@ bitwarden_main() {
   local c t0
   t0="$(now)"
   say "bitwarden checks against Vaultwarden at $VW_URL"
-  for c in bw_server bw_seed bw_session bw_setup bw_files bw_folder bw_direnv bw_alias; do
+  for c in bw_server bw_seed bw_session bw_setup bw_files bw_folder bw_mise_env bw_alias; do
     check "$c" "c_$c"
     # Each step needs the one before it.
     ((FAILED)) && break

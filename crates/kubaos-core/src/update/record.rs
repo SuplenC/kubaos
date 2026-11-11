@@ -279,6 +279,9 @@ pub struct HistoryEntry {
     pub to_version: String,
     /// The user's `flake.lock` as it was before the update, when there was one.
     pub lock: Option<PathBuf>,
+    /// The Suites' entries in mise's lockfile as they were before the update, when there were
+    /// any.
+    pub mise_lock: Option<PathBuf>,
 }
 
 impl HistoryEntry {
@@ -293,6 +296,7 @@ impl HistoryEntry {
             to_commit: next()?,
             to_version: next()?,
             lock: next().filter(|lock| !lock.is_empty()).map(PathBuf::from),
+            mise_lock: next().filter(|lock| !lock.is_empty()).map(PathBuf::from),
         };
         (!entry.from_commit.is_empty()).then_some(entry)
     }
@@ -300,8 +304,9 @@ impl HistoryEntry {
     /// The entry as a line of the history, with its newline.
     pub fn line(&self) -> String {
         let lock = self.lock.as_deref().map(Path::to_string_lossy).unwrap_or_default();
+        let mise_lock = self.mise_lock.as_deref().map(Path::to_string_lossy).unwrap_or_default();
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{lock}\n",
+            "{}\t{}\t{}\t{}\t{}\t{lock}\t{mise_lock}\n",
             self.date, self.from_commit, self.from_version, self.to_commit, self.to_version
         )
     }

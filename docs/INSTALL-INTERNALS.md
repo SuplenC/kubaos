@@ -51,9 +51,9 @@ kubaos suite add NAME [--version V] [--extra E]... [--no-switch] [--detach|--for
 kubaos suite configure NAME [--version V] [--extra E]... [--no-extra E]... [--no-switch] [...]
 kubaos suite remove NAME [--purge-caches] [--no-switch] [--detach|--foreground]
 kubaos suite new NAME PROJECT [--with SCAFFOLDER]     a project in the Projects root
-kubaos pin SUITE VERSION [FOLDER]                     a Project pin in FOLDER's .envrc, then direnv allow
-kubaos unpin SUITE [FOLDER]                           remove FOLDER's pin of SUITE
-kubaos pins [FOLDER | --all] [--json]                 the pins in effect in FOLDER (an object), or all under the Projects root (an array)
+kubaos pin SUITE VERSION [FOLDER]                     install VERSION with mise, then pin it in FOLDER's mise.toml
+kubaos unpin SUITE [FOLDER]                           remove FOLDER's pin of SUITE, then prune
+kubaos pins [FOLDER | --all] [--json]                 the pins in effect in FOLDER, or all under the Projects root, and the .envrc lines left
 kubaos switch [--detach|--foreground]                 queue a switch of the user flake
 kubaos job list [--json] | kubaos job follow ID       switch jobs
 ```

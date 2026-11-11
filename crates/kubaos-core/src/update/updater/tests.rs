@@ -1365,3 +1365,4 @@ fn an_update_without_a_live_preview_has_no_such_phase() {
 mod firmware;
 mod manifest;
 mod programs;
+mod suites;

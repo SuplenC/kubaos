@@ -5,6 +5,8 @@ use crate::update::event::ProgramChange;
 use crate::update::event::ProgramResult;
 use crate::update::event::Release;
 use crate::update::event::Restart;
+use crate::update::event::SuiteChanges;
+use crate::update::event::SuiteTool;
 use crate::update::event::Summary;
 use crate::update::firmware::Firmware;
 use crate::update::firmware::FirmwareOutcome;
@@ -40,6 +42,7 @@ fn quiet() -> Summary {
             },
             waiting: None,
         }],
+        suites: SuiteChanges::default(),
         reloaded: vec!["reloaded Hyprland".into()],
         firmware: Firmware::default(),
         restart: Restart::None,
@@ -145,4 +148,53 @@ fn a_failed_part_asks_for_attention_and_points_at_the_log() {
     assert_eq!(notification.title, "KubaOS updated, still at Shinjuku 0.1.0");
     assert_eq!(notification.body, "Nix failed to update: the log says why");
     assert!(notification.urgent);
+}
+
+fn tool(from: &str, to: &str) -> SuiteTool {
+    SuiteTool {
+        suite: "go".into(),
+        tool: "gopls".into(),
+        from: Some(from.into()),
+        to: to.into(),
+    }
+}
+
+#[test]
+fn a_moved_suite_tool_or_a_waiting_upgrade_is_a_change() {
+    let changes: [fn(&mut Summary); 3] = [
+        |s| s.suites.updated = vec![tool("0.22.1", "0.22.3")],
+        |s| s.suites.upgrades = vec![tool("0.22", "0.24")],
+        |s| s.suites.error = Some("mise failed".into()),
+    ];
+
+    for change in changes {
+        let mut summary = quiet();
+        change(&mut summary);
+        assert!(!summary.changed_nothing(), "{summary:?}");
+    }
+}
+
+#[test]
+fn the_notification_counts_the_suite_tools_and_points_at_the_upgrade() {
+    let mut summary = quiet();
+    summary.suites.updated = vec![tool("0.22.1", "0.22.3"), tool("1.27.0", "1.27.2")];
+    summary.suites.upgrades = vec![tool("0.22", "0.24")];
+
+    let notification = summary.notification();
+
+    assert_eq!(
+        notification.body,
+        "2 Suite tools updated\n1 Suite tool upgrade waits: kubaos suite upgrade"
+    );
+    assert!(!notification.urgent);
+}
+
+#[test]
+fn a_suite_tool_reads_as_suite_tool_and_its_versions() {
+    assert_eq!(tool("0.22", "0.24").describe(), "go: gopls 0.22 → 0.24");
+    let fresh = SuiteTool {
+        from: None,
+        ..tool("", "0.24.0")
+    };
+    assert_eq!(fresh.describe(), "go: gopls 0.24.0");
 }

@@ -1,6 +1,6 @@
 //! The VPN's secrets: in the Bitwarden vault, the one place they are kept, and copied into the
-//! GNOME keyring, where `on` reads them without bw or the master password, as `use bwenv` reads
-//! a project's variables.
+//! GNOME keyring, where `on` reads them without bw or the master password, as a project's
+//! `mise.toml` reads its variables.
 //!
 //! In the vault, one secure note (`kubaos-proxy`, or the profile's `vault_item`) holds them as
 //! hidden fields. A WireGuard VPN's are `private-key`, and `preshared-key <peer's public key>` for

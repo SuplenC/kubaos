@@ -1,16 +1,16 @@
--- Specs for a Suite whose language servers and tools come from Nix
--- (home/suites/*.lua). LazyVim's language extras ask Mason for them otherwise,
+-- Specs for a Suite whose language servers and tools it installs itself,
+-- from Nix or mise (home/suites/*.lua). LazyVim's language extras ask Mason for them otherwise,
 -- and Mason's copies would shadow the Suite's: Mason downloads its own, and
 -- puts its bin/ first on Neovim's PATH.
 -- https://github.com/mason-org/mason.nvim#configuration
 -- https://www.lazyvim.org/plugins/lsp
 local M = {}
 
--- The specs for a Suite's tools: `servers`, the lspconfig names LazyVim starts
+-- The specs for tools already on PATH: `servers`, the lspconfig names LazyVim starts
 -- from PATH instead of installing with Mason, and `packages`, the Mason
--- packages the extras ask for that the Suite installs itself.
+-- packages the extras ask for that come from somewhere else.
 ---@param tools { servers?: string[], packages?: string[] }
-function M.from_nix(tools)
+function M.on_path(tools)
   local servers = {}
   for _, name in ipairs(tools.servers or {}) do
     servers[name] = { mason = false }

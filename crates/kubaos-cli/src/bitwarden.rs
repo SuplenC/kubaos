@@ -9,7 +9,7 @@
 //!   kubaos bitwarden env list [project]    projects and variable names, never values
 //!   kubaos bitwarden env clear <project>... | --all
 //!   kubaos bitwarden env export <project>  NAME=VALUE records, NUL-separated, from the keyring
-//!                                          alone: what `use bwenv` in an .envrc reads
+//!                                          alone: what a project's mise.toml sources
 //!
 //! The output is the old `dot-bw-setup`'s: `==>` a part, `ok`, `!!` something that needs you
 //! (on stderr), `xx` the reason it stopped. Exit codes: 0 ok, 1 it stopped, 2 usage.
@@ -61,7 +61,7 @@ pub enum BitwardenCmd {
     },
     /// No bw at all: is the SSH agent up, and what is set up.
     Check,
-    /// Project env: vault to GNOME keyring to direnv.
+    /// Project env: vault to GNOME keyring to a project's mise.toml.
     Env {
         #[command(subcommand)]
         cmd: EnvCmd,
@@ -184,7 +184,7 @@ impl Colours {
         }
         self.print(&Line::Info(String::new()));
         self.print(&Line::Info(
-            "Re-run after vault changes: kubaos bitwarden refresh. In a project: echo 'use bwenv <project>' >> .envrc"
+            "Re-run after vault changes: kubaos bitwarden refresh. In a project: KUBAOS_BWENV and its _.source in the [env] of its mise.toml (docs/SECRETS.md)"
                 .into(),
         ));
     }

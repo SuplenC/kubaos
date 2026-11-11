@@ -6,7 +6,7 @@ local tools = require("config.suite_tools")
 
 return {
   { import = "lazyvim.plugins.extras.lang.php" },
-  tools.from_nix({
+  tools.on_path({
     servers = { "phpactor" },
     packages = { "phpcs", "php-cs-fixer" },
   }),
