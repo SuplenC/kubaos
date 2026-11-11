@@ -1,0 +1,79 @@
+/* A picture with its depth (`lib/depth-picture.ts`). */
+
+/* How far it is pushed in: 0 the picture at 1:1, 1 pushed in, the picture to `scale.push` and the
+   city to `scale.near`. */
+@property --push {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far the city stands off the sky: 1 with depth on, 0 flat on it. */
+@property --depth {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+/* How far the city stands ahead of its sky as the picture slides past. */
+@property --city-lead {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+.k-depth-picture {
+  position: relative;
+  display: block;
+  flex: none;
+  overflow: hidden;
+  --pushed: calc(1 + (var(--scale-push) - 1) * var(--push));
+  /* The city's scale: the picture's, and `scale.near`'s lead over it as far as depth is on. */
+  --neared: calc(var(--pushed) + (var(--scale-near) - var(--scale-push)) * var(--push) * var(--depth));
+}
+
+/* Every layer the box's size, the picture as `cover` lays it, all grown round the middle of the
+   bottom edge, where the city stands: its roofs only ever grow over the sky. */
+.k-depth-picture > .k-depth-photo,
+.k-depth-picture > .k-depth-plate,
+.k-depth-picture > .k-depth-city {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: 50% 100%;
+}
+
+.k-depth-picture > .k-depth-photo,
+.k-depth-picture > .k-depth-plate {
+  scale: var(--pushed);
+}
+
+/* The plate comes in with the push, so at 1:1 the layers are the picture exactly. */
+.k-depth-picture > .k-depth-plate {
+  opacity: calc(var(--push) * var(--depth));
+}
+
+.k-depth-picture > .k-depth-city {
+  scale: var(--neared);
+  translate: var(--city-lead) 0;
+}
+
+/* The cut-out's alpha laid on the picture as `cover` lays the picture, so the city lies exactly
+   over itself. */
+.k-depth-city-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mask-size: cover;
+  mask-position: 50% 50%;
+  mask-repeat: no-repeat;
+}
+
+/* Depth off, once it has settled: nothing but the picture is drawn. */
+.k-depth-picture[data-flat] > :is(.k-depth-plate, .k-depth-city) {
+  visibility: hidden;
+}

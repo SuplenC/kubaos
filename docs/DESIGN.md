@@ -471,6 +471,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [NotificationGroup](design/components/notification-group.md)
 - [Media](design/components/media.md)
 - [PictureChoice](design/components/picture-choice.md)
+- [DepthPicture](design/components/depth-picture.md)
 
 **Feedback**
 
