@@ -52,8 +52,44 @@ c_login_shell() {
     grep -qF -- "$want" <<<"$out" || { echo "FAIL interactive zsh lacks: $want"; printf '%s\n' "$out"; return 1; }
   done
   echo "ok   functions, atuin on Ctrl-R, mise's hook"
+  mise_first_prompt || return 1
   grep -q 'hyprland-autostart.zsh' "$USER_HOME/.zprofile" || { echo "FAIL .zprofile doesn't source the autostart snippet"; return 1; }
   echo "ok   .zprofile sources system/files/hyprland-autostart.zsh"
+}
+
+# mise_first_prompt: in a folder whose trusted mise.toml puts a tool on PATH,
+# sets a variable and sources a script, an interactive zsh has all three at
+# its first prompt, from one hook-env run (the one started early, which the
+# script sourced once tells), loses them on `cd ~` and gets them back below
+# the folder.
+mise_first_prompt() {
+  local dir="$USER_HOME/Projects/mise-hook" out want
+  rm -rf "$dir"
+  as_user install -d "$dir/bin" "$dir/sub"
+  printf '#!/bin/sh\n' | as_user tee "$dir/bin/kubaos-hook-tool" >/dev/null
+  as_user chmod +x "$dir/bin/kubaos-hook-tool"
+  printf 'echo run >>"%s/runs"\n' "$dir" | as_user tee "$dir/count.sh" >/dev/null
+  printf '[env]\nKUBAOS_HOOK = "on"\n_.path = ["./bin"]\n_.source = "./count.sh"\n' |
+    as_user tee "$dir/mise.toml" >/dev/null
+  zrun "mise trust '$dir/mise.toml'" >/dev/null 2>&1 || { echo "FAIL mise trust $dir/mise.toml"; return 1; }
+
+  zsh_pty "cd '$dir' && zsh -i" <<<'exit' >/dev/null
+  [[ $(wc -l <"$dir/runs") == 1 ]] ||
+    { echo "FAIL starting in a mise folder ran mise's env $(wc -l <"$dir/runs") times before the first prompt, not once"; return 1; }
+  out="$(printf '%s\n' \
+    'print -r -- "first E=$KUBAOS_HOOK T=${commands[kubaos-hook-tool]} early=${+functions[_kubaos_mise_first]}${+_kubaos_mise_fd}"' \
+    'print -r -- "ahead $(( path[(I)'"$dir"'/bin] < path[(I)$HOME/.nix-profile/bin] ))"' \
+    'cd ~' \
+    'print -r -- "home E=${KUBAOS_HOOK-unset} T=${commands[kubaos-hook-tool]-none}"' \
+    "cd '$dir/sub'" \
+    'print -r -- "back E=$KUBAOS_HOOK T=${commands[kubaos-hook-tool]}"' \
+    exit | zsh_pty "cd '$dir' && zsh -i")"
+  for want in "first E=on T=$dir/bin/kubaos-hook-tool early=00" 'ahead 1' 'home E=unset T=none' \
+    "back E=on T=$dir/bin/kubaos-hook-tool"; do
+    grep -qF -- "$want" <<<"$out" || { echo "FAIL mise's hook: no line \`$want\`:"; grep -a -E '^(first|ahead|home|back) ' <<<"$out"; return 1; }
+  done
+  rm -rf "$dir"
+  echo "ok   mise's hook: a folder's mise.toml is on at the first prompt from one hook-env, ahead of ~/.nix-profile/bin, off on cd ~ and on again below it"
 }
 
 c_path() {

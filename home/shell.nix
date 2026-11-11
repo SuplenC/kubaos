@@ -3,7 +3,7 @@
 #
 # programs.zsh writes ~/.zshrc, ~/.zshenv and ~/.zprofile. Order of
 # programs.zsh.initContent (lower runs first):
-#   550   the init cache (_kubaos_init, below)
+#   550   the init cache (_kubaos_init, below); mise's first hook-env starts
 #   800   oh-my-zsh (plugins: git, no theme), compinit from a cached dump
 #   900   FZF_CTRL_R_COMMAND="" (keeps fzf off Ctrl-R)
 #   910   fzf (Ctrl-T, Alt-C)
@@ -63,16 +63,19 @@ let
   # The suffix names the script's format (each print given the config), so
   # scripts cached in an older one are never sourced again.
   ompKey = builtins.substring 0 16 (builtins.hashString "sha256" "${omp}-print-config");
+  mise = lib.getExe kubaosPkgs.mise;
   # `mise activate zsh` writes the PATH it was run with into its first two
   # lines; cached, they would bring back that PATH in every later shell. The
-  # rest is the same for every shell, and its `_mise_hook --force` sets PATH
-  # from mise's configs as the shell starts.
+  # rest is the same for every shell. Its `_mise_hook --force`, which sets
+  # PATH and the folder's [env] from mise's configs as the shell starts,
+  # becomes `_kubaos_mise_first`, which takes the run started at order 550.
   # mise's shims folder, as mise finds it: under MISE_DATA_DIR when that is
   # set, else XDG_DATA_HOME's mise.
   miseShims = "\${MISE_DATA_DIR:-\${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims";
   miseActivate = pkgs.writeShellScript "mise-activate-zsh" ''
     set -euo pipefail
-    ${lib.getExe kubaosPkgs.mise} activate zsh | ${lib.getExe pkgs.gnused} -e '/^export __MISE_ORIG_PATH=/d' -e '/^export PATH=/d'
+    ${mise} activate zsh | ${lib.getExe pkgs.gnused} -e '/^export __MISE_ORIG_PATH=/d' -e '/^export PATH=/d' \
+      -e 's/^_mise_hook --force$/_kubaos_mise_first/'
   '';
 in
 {
@@ -97,7 +100,7 @@ in
   # mise config it can't read fails the reshim, not the switch.
   home.activation.miseReshim = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     if [[ -d "${miseShims}" ]]; then
-      (cd / && run ${lib.getExe kubaosPkgs.mise} reshim) ||
+      (cd / && run ${mise} reshim) ||
         warnEcho "mise reshim failed: run it once mise's config reads again"
     fi
   '';
@@ -169,6 +172,35 @@ in
             mv -f -- "$file.$$" "$file"
           fi
           source "$file"
+        }
+
+        # The hook-env run mise's activation starts the shell with (order
+        # 1010) is mise's whole cost at start, about 20 ms, nearly all of it
+        # mise's own start-up. Started here, it runs beside oh-my-zsh,
+        # compinit, fzf and oh-my-posh instead of after them. It is given the
+        # variables the activation exports before its own run, since mise
+        # keeps a hash of every MISE_* variable in the session it writes, and
+        # a different one makes the next prompt's hook a full run.
+        typeset -g _kubaos_mise_path=$PATH _kubaos_mise_pwd=$PWD
+        exec {_kubaos_mise_fd}< <(MISE_SHELL=zsh __MISE_ORIG_PATH=''${__MISE_ORIG_PATH:-$PATH} \
+          __MISE_ZSH_PRECMD_RUN=0 __MISE_ZSH_CHPWD_RAN=0 \
+          exec ${mise} hook-env --shell-pid $$ -s zsh --force)
+        # The activation calls this where mise's own script runs the hook.
+        # HAZARD: the run's output is only right for the PATH and folder it
+        # started with: mise puts its entries ahead of that PATH, and an
+        # entry added since would be lost. The hook runs again when either
+        # changed.
+        function _kubaos_mise_first() {
+          local out
+          if [[ $PATH == "$_kubaos_mise_path" && $PWD == "$_kubaos_mise_pwd" ]]; then
+            IFS= read -r -d ''' -u $_kubaos_mise_fd out
+            eval "$out"
+          else
+            _mise_hook --force
+          fi
+          exec {_kubaos_mise_fd}<&-
+          unset _kubaos_mise_fd _kubaos_mise_path _kubaos_mise_pwd
+          unfunction _kubaos_mise_first
         }
       '')
 
