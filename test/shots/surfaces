@@ -143,3 +143,7 @@ mockups/sysmon      design/mockups/src/pages/shell/sysmon.ts design/mockups/src/
 mockups/sysmon-processes design/mockups/src/pages/shell/sysmon-processes.ts design/mockups/src/pages/shell/sysmon-parts.ts design/mockups/src/pages/shell/sysmon.css
 mockups/clock       design/mockups/src/pages/shell/clock.ts design/mockups/src/pages/shell/clock-parts.ts design/mockups/src/pages/shell/clock.css
 mockups/clock-settings design/mockups/src/pages/shell/clock-settings.ts design/mockups/src/pages/shell/clock-parts.ts design/mockups/src/pages/shell/clock.css
+mockups/wallpaper   design/mockups/src/pages/shell/wallpaper.ts design/mockups/src/pages/shell/wallpaper-parts.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts
+mockups/power-menu  design/mockups/src/pages/shell/power-menu.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts
+mockups/osd         design/mockups/src/pages/shell/osd.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts
+mockups/polkit      design/mockups/src/pages/shell/polkit.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts
