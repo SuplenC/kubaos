@@ -75,7 +75,9 @@
 .k-screen.k-lock {
   --push: 1;
   --pushed: calc(1 + (var(--scale-push) - 1) * var(--push));
-  --neared: calc(1 + (var(--scale-near) - 1) * var(--push));
+  /* The city's scale: the picture's, and `scale.near`'s lead over it as far as depth is on
+     (`--depth`, `lib/depth-picture.css`), so turning depth off settles the city onto the sky. */
+  --neared: calc(var(--pushed) + (var(--scale-near) - var(--scale-push)) * var(--push) * var(--depth));
   /* Out, an edge is past the screen's edge by its own thickness and the fillet its inner corners
      curve through, so neither the edge nor its corners leave a pixel on the screen. The top edge is
      the thin edge or the bar, whichever reaches further in. */
@@ -95,6 +97,21 @@
   --barred: 1;
   --dock: 1;
   --push: 0;
+}
+
+/* The picture alone, as the wallpaper picker's wall hangs it: no frame, no bar and no clock, the
+   picture pushed in and its city off the sky, as at rest. */
+.k-lock[data-phase="picture"] .k-lock-clock {
+  opacity: 0;
+}
+
+/* Depth off, once it has settled: the picture alone, and the clock in front of it, uncut. */
+.k-lock[data-flat] :is(.k-lock-plate, .k-lock-cutout) {
+  visibility: hidden;
+}
+
+.k-lock[data-flat] .k-lock-clock {
+  --city-cut: 0;
 }
 
 /* With reduce motion nothing pushes: the lock holds the desktop's 1:1 picture, and only fades. */
@@ -121,7 +138,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: var(--push);
+  opacity: calc(var(--push) * var(--depth));
 }
 
 /* The frame's shadow goes with it, as strong as the frame is in. `shadow.panel` falls far past the
@@ -329,7 +346,7 @@
     calc(var(--city-flat-width) * var(--neared) * var(--city-cut)) calc(var(--city-flat-height) * var(--neared) * var(--city-cut));
   mask-position:
     0 0,
-    calc(var(--middle) + (var(--city-flat-left) - var(--middle)) * var(--neared) - var(--clock-left)) calc(var(--screen-height) + (var(--city-flat-top) - var(--screen-height)) * var(--neared) - var(--clock-top));
+    calc(var(--middle) + (var(--city-flat-left) - var(--middle)) * var(--neared) + var(--city-lead) - var(--clock-left)) calc(var(--screen-height) + (var(--city-flat-top) - var(--screen-height)) * var(--neared) - var(--clock-top));
 }
 
 /* The city: the picture through the cut-out's alpha, in front of the clock, pushed in to
@@ -343,6 +360,8 @@
   display: block;
   transform-origin: 50% 100%;
   scale: var(--neared);
+  /* Ahead of its sky while its picture slides past the wallpaper picker's wall. */
+  translate: var(--city-lead) 0;
   filter: blur(calc(var(--size-lock_blur) * var(--wake) / var(--neared))) brightness(calc(1 - var(--opacity-panel_scrim) * var(--panel-dim)));
   pointer-events: none;
 }
