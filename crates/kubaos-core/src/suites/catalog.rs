@@ -24,7 +24,11 @@ use super::Toolchain;
 /// The Suites KubaOS ships, by name.
 pub const SHIPPED: &[Suite] = &[RUST, GO, NODE, PYTHON, PHP, PROTO, WALLPAPER_DEPTH];
 
-/// Node and Bun. Its Nix module is `home/suites/node.nix`.
+/// Node from mise, with Bun (the `bun` extra) and vtsls, each its own mise tool. Its Nix module is
+/// `home/suites/node.nix`.
+///
+/// Node and Bun are their projects' release binaries; vtsls ships only on npm, so mise's `npm:`
+/// backend installs it, running the Node it installs beside it.
 const NODE: Suite = Suite {
     name: "node",
     title: "Node",
@@ -35,8 +39,24 @@ const NODE: Suite = Suite {
         description: "Adds Bun, its package manager and its test runner.",
         default: true,
     }],
-    mise: &[],
-    toolchain: Toolchain::Nix,
+    mise: &[
+        Tool {
+            name: "node",
+            request: Request::Suite,
+            extra: None,
+        },
+        Tool {
+            name: "npm:@vtsls/language-server",
+            request: Request::Fixed("0.3"),
+            extra: None,
+        },
+        Tool {
+            name: "bun",
+            request: Request::Fixed("1.4"),
+            extra: Some("bun"),
+        },
+    ],
+    toolchain: Toolchain::Mise,
     caches: &[
         Cache {
             path: ".npm",
@@ -47,12 +67,8 @@ const NODE: Suite = Suite {
             description: "The packages `npm install --global` installed.",
         },
         Cache {
-            path: ".cache/bun",
-            description: "Bun's download cache.",
-        },
-        Cache {
             path: ".local/share/bun",
-            description: "The packages `bun add --global` installed.",
+            description: "The packages `bun add --global` installed, and Bun's download cache.",
         },
     ],
     // Node's first, as `kubaos suite new` takes the first by default: it needs no extra.

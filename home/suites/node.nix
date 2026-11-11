@@ -1,16 +1,21 @@
-# The Node Suite: Node at the chosen version, Bun (the `bun` extra), the
-# TypeScript language server (vtsls), the JavaScript debugger, and LazyVim's
-# TypeScript and eslint extras (node.lua). prettier and eslint's language
-# server (vscode-langservers-extracted) are everyone's (home/cli.nix). Nothing
-# until kubaos.d/suites/node.toml exists; the metadata is the `node` entry in
-# crates/kubaos-core/src/suites/catalog.rs.
+# The Node Suite (crates/kubaos-core/src/suites/catalog.rs, NODE): everything
+# of it but Node, Bun and vtsls, which mise installs from the Suite's fragment,
+# ~/.config/mise/conf.d/kubaos-node.toml, and puts on PATH (shell.nix).
+# Installs nothing without kubaos.d/suites/node.toml.
 #
-# Global installs land in the home, not the read-only Nix store: npm's under
-# ~/.local/share/npm, Bun's under ~/.local/share/bun, both on PATH. npm's
-# cache stays at its own ~/.npm and Bun's is ~/.cache/bun. The catalog lists
-# all four as the Suite's caches.
-#
-# `kubaos-node-new DIR` is the Node + TypeScript scaffolder.
+# - LazyVim's TypeScript and eslint extras (node.lua), on the Suite's vtsls,
+#   eslint's server (home/cli.nix, everyone's) and the JavaScript debugger
+#   instead of Mason's copies.
+# - The JavaScript debugger, js-debug, from nixpkgs: it ships as a VS Code
+#   extension and a tarball of JavaScript, no program mise can install.
+# - Where global installs land, outside the folder of the Node or Bun mise
+#   activates, which the next patch update would prune: npm's in
+#   ~/.local/share/npm and Bun's in ~/.local/share/bun, both on PATH. npm's
+#   is `prefix` in a global npmrc (NPM_CONFIG_GLOBALCONFIG), so the user's
+#   ~/.npmrc and a project's .npmrc win over it; Bun's is BUN_INSTALL, which
+#   `[install]` in the user's bunfig wins over. Bun's download cache is in
+#   BUN_INSTALL too.
+# - kubaos-node-new, the scaffolder, which runs the node and npm on PATH.
 {
   config,
   lib,
@@ -20,18 +25,8 @@
 let
   suite = config.kubaos.suites.node or null;
   home = config.home.homeDirectory;
-
-  # The catalog's versions, the default (the active LTS) first: every
-  # nodejs_NN this nixpkgs builds. 20 is past its end of life, and nixpkgs
-  # refuses it.
-  versions = [
-    "26"
-    "24"
-    "22"
-  ];
-  version = if suite == null || suite.version == null then lib.head versions else suite.version;
-  nodeAt = version: pkgs."nodejs_${version}";
-  node = nodeAt version;
+  npmGlobals = "${home}/.local/share/npm";
+  bunGlobals = "${home}/.local/share/bun";
 
   # LazyVim's TypeScript extra starts Mason's `js-debug-adapter`; nixpkgs'
   # build of the same server is `js-debug`.
@@ -45,7 +40,6 @@ let
   # https://nodejs.org/api/typescript.html
   newProject = pkgs.writeShellApplication {
     name = "kubaos-node-new";
-    runtimeInputs = [ node ];
     text = ''
       # kubaos-node-new DIR: a Node + TypeScript app in DIR, which must not
       # exist: src/index.ts, `npm start` runs it, `npm run check` type-checks.
@@ -53,6 +47,12 @@ let
         echo "usage: kubaos-node-new DIR" >&2
         exit 2
       fi
+      for tool in node npm; do
+        if ! command -v "$tool" >/dev/null; then
+          echo "kubaos-node-new: no $tool on PATH; \`kubaos suite configure node\` installs it again" >&2
+          exit 1
+        fi
+      done
       dir=$1
       name=$(basename -- "$dir" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9._\n-' '-')
       mkdir -- "$dir"
@@ -101,22 +101,19 @@ in
   config = lib.mkMerge [
     (lib.mkIf (suite != null) {
       home.packages = [
-        node
-        pkgs.vtsls
         jsDebugAdapter
         newProject
       ];
-      home.sessionVariables.NPM_CONFIG_PREFIX = "${home}/.local/share/npm";
-      home.sessionPath = [ "${home}/.local/share/npm/bin" ];
+      xdg.configFile."npm/npmrc".text = ''
+        prefix=${npmGlobals}
+      '';
+      home.sessionVariables.NPM_CONFIG_GLOBALCONFIG = "${config.xdg.configHome}/npm/npmrc";
+      home.sessionPath = [ "${npmGlobals}/bin" ];
       kubaos.nvim.suiteSpecs = [ ''dofile("${./node.lua}")'' ];
     })
     (lib.mkIf (suite != null && lib.elem "bun" suite.extras) {
-      home.packages = [ pkgs.bun ];
-      home.sessionVariables = {
-        BUN_INSTALL = "${home}/.local/share/bun";
-        BUN_INSTALL_CACHE_DIR = "${home}/.cache/bun";
-      };
-      home.sessionPath = [ "${home}/.local/share/bun/bin" ];
+      home.sessionVariables.BUN_INSTALL = bunGlobals;
+      home.sessionPath = [ "${bunGlobals}/bin" ];
     })
   ];
 }

@@ -2950,18 +2950,18 @@ c_pins() {
   echo "ok   kubaos pin test 9, whose install fails: nothing is written"
 
   printf 'use suite test 2\nuse bwenv demo\n' | as_user tee "$legacy/.envrc" >/dev/null
-  printf 'use flake\nuse suite node 22\n' | as_user tee "$nixonly/.envrc" >/dev/null
+  printf 'use flake\nuse suite php 8.3\n' | as_user tee "$nixonly/.envrc" >/dev/null
   out="$(zrun "KUBAOS_DIR='$REPO' KUBAOS_BACKUPS='$USER_HOME/.local/state/kubaos/backups' PATH=/usr/local/bin:\$PATH bash -euo pipefail '$REPO/migrations/user/1794388664-project-pins-on-mise.sh'" 2>&1)" ||
     { echo "FAIL the project-pins-on-mise migration"; printf '%s\n' "$out"; return 1; }
   # shellcheck disable=SC2088 # kubaos prints paths under the home with a literal ~.
-  [[ ! -e $legacy/.envrc && $(cat "$nixonly/.envrc") == $'use flake\nuse suite node 22' ]] &&
+  [[ ! -e $legacy/.envrc && $(cat "$nixonly/.envrc") == $'use flake\nuse suite php 8.3' ]] &&
     grep -qx 'kubaos-test-tool = "2"' "$legacy/mise.toml" && grep -qx 'KUBAOS_BWENV = "demo"' "$legacy/mise.toml" &&
-    grep -qF '~/Projects/nixonly/.envrc:2: nothing reads `use suite node 22`' <<<"$out" ||
+    grep -qF '~/Projects/nixonly/.envrc:2: nothing reads `use suite php 8.3`' <<<"$out" ||
     { echo "FAIL the migration:"; printf '%s\n' "$out"; cat "$legacy/mise.toml"; return 1; }
   out="$(zlogin "cd $legacy; print -r -- V=\$(kubaos-test-tool) B=\$KUBAOS_BWENV" 2>&1)"
   grep -qx 'V=2.0.0 B=demo' <<<"$out" ||
     { echo "FAIL cd into the migrated folder: want 2.0.0 and KUBAOS_BWENV=demo, trusted"; printf '%s\n' "$out"; return 1; }
-  echo "ok   the migration: use suite and use bwenv moved to a trusted mise.toml, the .envrc deleted; node's line left and named"
+  echo "ok   the migration: use suite and use bwenv moved to a trusted mise.toml, the .envrc deleted; php's line left and named"
 
   out="$(kz "kubaos unpin test $acme" 2>&1)" || { echo "FAIL kubaos unpin"; printf '%s\n' "$out"; return 1; }
   [[ ! -e $acme/mise.toml && ! -e $installs/3.0.0 && $(version_at "$acme/old-app") == 1.0.1 && $(version_at "$acme/new-app") == 2.0.0 ]] ||
@@ -3168,6 +3168,146 @@ c_suite_go() {
   echo "ok   kubaos suite add go: the default line, 1.27, and every tool"
   expect_ok "kubaos suite remove go again" kz 'kubaos suite remove go --foreground' || return 1
   rm -rf "$project" "$mine" "$pinned"
+}
+
+# The Node Suite (crates/kubaos-core/src/suites/catalog.rs, home/suites/node.nix):
+# Node, vtsls and Bun from mise, which downloads them (vtsls from npm). A home
+# from before mise moves onto it through the migration at its version and
+# extras; configure moves Node's line and prunes the old one; global installs
+# land outside mise's folders; projects are scaffolded and run; a pin holds a
+# folder of its own; Neovim without mise's hook finds vtsls through the shims;
+# removal leaves nothing of it in mise or the generation, and a fresh add
+# installs the default line.
+c_suite_node() {
+  local u="$USER_HOME/.config/kubaos/home" project="$USER_HOME/Projects/node-demo" bunproject="$USER_HOME/Projects/bun-demo"
+  local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/node-suite.lua" npmrc="$USER_HOME/.config/npm/npmrc"
+  local frag="$USER_HOME/.config/mise/conf.d/kubaos-node.toml" pinned="$USER_HOME/Projects/node-pinned"
+  local installs="$USER_HOME/.local/share/mise/installs" shims="$USER_HOME/.local/share/mise/shims"
+  local globalpkg="$USER_HOME/.cache/kubaos-node-global" migration=("$REPO"/migrations/user/*-node-on-mise.sh)
+  local tools=(node npm npx vtsls bun bunx) out gen t path
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$project" "$bunproject" "$pinned" "$mine" "$globalpkg"
+  # on_shims: each Node tool resolves to its shim in a login shell, which runs
+  # no mise hook; the container's apt Node in /usr/bin comes after them.
+  on_shims() {
+    local t
+    for t in "${tools[@]}"; do
+      [[ $(zrun "whence -p $t") == "$shims/$t" ]] || { echo "FAIL $t is not mise's shim in a login shell: $(zrun "whence -p $t")"; return 1; }
+    done
+  }
+  # node_at DIR: the major of the Node a login shell runs in DIR.
+  node_at() { zrun "cd $1 && node -p 'process.versions.node.split(\".\")[0]'"; }
+
+  # A home as the Suite on Nix left it: the record at 24 with Bun, no
+  # fragment, and the session's NPM_CONFIG_PREFIX and BUN_INSTALL_CACHE_DIR.
+  as_user install -d "$u/kubaos.d/suites"
+  printf 'version = "24"\nextras = ["bun"]\n' | as_user tee "$u/kubaos.d/suites/node.toml" >/dev/null
+  out="$(kz 'kubaos switch --foreground' 2>&1)" ||
+    { echo "FAIL the switch with the old Node record"; printf '%s\n' "$out" | tail -20; return 1; }
+  gone_from_generation "the Node Suite's Nix toolchain" '-(vtsls|bun)-[0-9]' || return 1
+  for t in node npm vtsls bun; do
+    ! has_bin "$t" || { echo "FAIL $t is still in the home's packages"; return 1; }
+  done
+  has_bin kubaos-node-new && has_bin js-debug-adapter && [[ -L $npmrc ]] ||
+    { echo "FAIL the module's scaffolder, debugger or global npmrc is missing"; return 1; }
+  for _ in 1 2; do
+    out="$(kz "NPM_CONFIG_PREFIX='$USER_HOME/.local/share/npm' BUN_INSTALL_CACHE_DIR='$USER_HOME/.cache/bun' KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+      { echo "FAIL the node-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
+  done
+  grep -qxE 'node = "24\.[0-9]+"' "$frag" && grep -qx '"npm:@vtsls/language-server" = "0.3"' "$frag" && grep -qx 'bun = "1.4"' "$frag" &&
+    grep -q 'already version 24' <<<"$out" && grep -qx 'version = "24"' "$u/kubaos.d/suites/node.toml" ||
+    { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  [[ $(node_at /) == 24 ]] || { echo "FAIL want Node 24: $(zrun 'node --version')"; return 1; }
+  on_shims || return 1
+  echo "ok   the node-on-mise migration: a 24 record with Bun gets its fragment and Node 24, vtsls and Bun through the shims, the record kept, a rerun changes nothing"
+
+  out="$(kz 'kubaos suite configure node --version 26 --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite configure node --version 26"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(node_at /) == 26 && -z $(find "$installs/node" -mindepth 1 -maxdepth 1 -name '24*') ]] ||
+    { echo "FAIL configure: not Node 26, or 24 wasn't pruned"; ls "$installs/node"; return 1; }
+  [[ -f $mine ]] || { echo "FAIL plugins/node-suite.lua was not seeded"; return 1; }
+  grep -qxE 'node = "26\.[0-9]+"' "$frag" || { echo "FAIL configure: the fragment doesn't ask for Node 26:"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite configure node --version 26: Node 26, 24 pruned, the seeded node-suite.lua"
+
+  path="$(zrun 'print -r -- $PATH' | tr ':' '\n')"
+  grep -qx "$USER_HOME/.local/share/npm/bin" <<<"$path" && grep -qx "$USER_HOME/.local/share/bun/bin" <<<"$path" ||
+    { echo "FAIL npm's or Bun's global bin is not on PATH"; return 1; }
+  [[ $(zlogin 'npm prefix -g') == "$USER_HOME/.local/share/npm" && -z $(zlogin 'print -r -- "$NPM_CONFIG_PREFIX$BUN_INSTALL_CACHE_DIR"') &&
+    $(zlogin 'print -r -- $BUN_INSTALL') == "$USER_HOME/.local/share/bun" ]] ||
+    { echo "FAIL npm's prefix or Bun's folder: $(zlogin 'npm prefix -g; env' | grep -E '^/|NPM_|BUN_' | tr '\n' ' ')"; return 1; }
+  printf 'prefix=%s\n' "$USER_HOME/.cache/my-npm" | as_user tee "$USER_HOME/.cache/my-npmrc" >/dev/null
+  [[ $(zlogin "NPM_CONFIG_USERCONFIG='$USER_HOME/.cache/my-npmrc' npm prefix -g") == "$USER_HOME/.cache/my-npm" ]] ||
+    { echo "FAIL a user's npmrc doesn't win over the Suite's prefix"; return 1; }
+  as_user install -d "$globalpkg/bin"
+  printf '{"name":"kubaos-node-global","version":"1.0.0","bin":{"kubaos-node-global":"bin/hello.js"}}\n' | as_user tee "$globalpkg/package.json" >/dev/null
+  printf '#!/usr/bin/env node\nconsole.log("global " + process.versions.node.split(".")[0]);\n' | as_user tee "$globalpkg/bin/hello.js" >/dev/null
+  out="$(zlogin "npm install --global --install-links --no-fund --no-audit '$globalpkg' && kubaos-node-global" 2>&1)"
+  [[ -x $USER_HOME/.local/share/npm/bin/kubaos-node-global ]] && grep -qx 'global 26' <<<"$out" &&
+    [[ -z $(find "$installs/node" -path '*/lib/node_modules/kubaos-node-global' 2>/dev/null) ]] ||
+    { echo "FAIL npm install --global: not in ~/.local/share/npm, or not run from PATH"; printf '%s\n' "$out"; return 1; }
+  zlogin 'npm uninstall --global kubaos-node-global' >/dev/null 2>&1
+  echo "ok   npm's and Bun's global bins on PATH, outside mise's folders; npm's prefix is a global npmrc a user's own npmrc wins over"
+
+  out="$(kz 'kubaos suite new node node-demo' 2>&1)" ||
+    { echo "FAIL kubaos suite new node node-demo"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(zrun "cd $project && npm start --silent") == "Hello from Node" ]] && zrun "cd $project && npm run check --silent" >/dev/null 2>&1 &&
+    grep -qE '"@types/node": "\^?26\.' "$project/package.json" ||
+    { echo "FAIL the scaffolded Node app doesn't run or type-check"; ls -la "$project"; zrun "cd $project && npm run check" 2>&1 | tail -5; return 1; }
+  # mise reads no .nvmrc by default: the folder's mise.toml is its pin.
+  printf '22\n' | as_user tee "$project/.nvmrc" >/dev/null
+  [[ $(node_at "$project") == 26 ]] || { echo "FAIL an .nvmrc changed the Node in the project"; return 1; }
+  out="$(kz 'kubaos suite new node bun-demo --with bun' 2>&1)" ||
+    { echo "FAIL kubaos suite new node bun-demo --with bun"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(zrun "cd $bunproject && bun run --silent ." 2>&1) == "Hello via Bun!" ]] ||
+    { echo "FAIL the scaffolded Bun app doesn't run"; ls -la "$bunproject"; return 1; }
+  echo "ok   kubaos suite new node: a Node + TypeScript app that runs and type-checks, an .nvmrc ignored; --with bun: a Bun app that runs"
+
+  as_user install -d "$pinned"
+  out="$(kz "kubaos pin node 22 '$pinned'" 2>&1)" ||
+    { echo "FAIL kubaos pin node 22"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(cat "$pinned/mise.toml") == $'[tools]\nnode = "22"' && $(node_at "$pinned") == 22 && $(node_at /) == 26 ]] ||
+    { echo "FAIL the pin: Node $(node_at "$pinned") in the folder, $(node_at /) outside:"; cat "$pinned/mise.toml"; return 1; }
+  expect_ok "kubaos unpin node" kz "kubaos unpin node '$pinned'" || return 1
+  [[ -f $frag && ! -e $pinned/mise.toml ]] || { echo "FAIL unpin took the Suite's fragment, or left the folder's mise.toml"; return 1; }
+  echo "ok   kubaos pin node 22: the folder's mise.toml, Node 22 there through the shims, the home 26"
+
+  cache_lock nvim
+  out="$(zrun "nvim --headless +'lua io.write(\"\\nMASON \", table.concat(LazyVim.opts(\"mason.nvim\").ensure_installed, \",\"), \"\\nVTSLS \", tostring(LazyVim.opts(\"nvim-lspconfig\").servers.vtsls.mason), \"\\nPATHS \", vim.fn.exepath(\"vtsls\"), \" \", vim.fn.exepath(\"js-debug-adapter\"), \" \", vim.fn.exepath(\"vscode-eslint-language-server\"))' +qa" 2>&1 | tr -d '\r')"
+  grep -qx 'VTSLS false' <<<"$out" && grep -q '^MASON ' <<<"$out" &&
+    ! grep '^MASON ' <<<"$out" | grep -qwE 'vtsls|js-debug-adapter|eslint-lsp' &&
+    grep -qx "PATHS $shims/vtsls $USER_HOME/.nix-profile/bin/js-debug-adapter $USER_HOME/.nix-profile/bin/vscode-eslint-language-server" <<<"$out" ||
+    { echo "FAIL Neovim without mise's hook doesn't take vtsls from the shims and the debugger and eslint from Nix, or Mason would install them:"; printf '%s\n' "$out" | grep -E '^(MASON|VTSLS|PATHS)'; return 1; }
+  [[ $(zrun "cd $project && vtsls --version") == [0-9]* ]] || { echo "FAIL vtsls through its shim: $(zrun "cd $project && vtsls --version" 2>&1)"; return 1; }
+  echo "ok   Neovim started without mise's hook finds vtsls through the shims and js-debug and eslint's server in Nix; Mason installs none of them"
+
+  out="$(kz 'kubaos suite remove node --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove node"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^cache ~/.npm \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" &&
+    grep -qx '  ~/.config/kubaos/editor/nvim/plugins/node-suite.lua' <<<"$out" && [[ -f $project/src/index.ts ]] ||
+    { echo "FAIL remove: npm's cache's size, the user's node-suite.lua, or the project"; printf '%s\n' "$out"; return 1; }
+  # A pruned tool keeps its folder and mise's .mise.backend.toml in it; its
+  # versions are the folders inside.
+  [[ ! -e $frag && -z $(find "$installs"/node "$installs"/bun "$installs"/npm-* -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
+    { echo "FAIL remove: the fragment or a version is left"; find "$installs" -mindepth 2 -maxdepth 2 -type d; return 1; }
+  for t in "${tools[@]}"; do
+    [[ ! -e $shims/$t && $(zrun "whence -p $t") != "$USER_HOME"/* ]] || { echo "FAIL $t is still on PATH: $(zrun "whence -p $t")"; return 1; }
+  done
+  gone_from_generation "the Node Suite's packages" '-(kubaos-node-new|js-debug-adapter)(-|$)' || return 1
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  [[ ! -e $npmrc ]] && ! grep -qsE 'NPM_CONFIG_GLOBALCONFIG|BUN_INSTALL' "$gen/home-path/etc/profile.d/hm-session-vars.sh" &&
+    ! grep -qF lang.typescript "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
+    { echo "FAIL the Suite's global npmrc, environment or Neovim extra is left"; return 1; }
+  echo "ok   kubaos suite remove node: fragment, versions and shims gone, npm's cache kept, node-suite.lua listed, the project untouched, nothing of it left in the generation"
+
+  out="$(kz 'kubaos suite add node --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add node"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qxE 'node = "26\.[0-9]+"' "$frag" && grep -qx 'bun = "1.4"' "$frag" && [[ $(node_at /) == 26 ]] && on_shims ||
+    { echo "FAIL kubaos suite add node: not Node 26 with vtsls and Bun"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite add node: the default line, 26, with vtsls and Bun"
+  expect_ok "kubaos suite remove node again" kz 'kubaos suite remove node --foreground' || return 1
+  rm -rf "$project" "$bunproject" "$pinned" "$mine" "$globalpkg" "$USER_HOME/.cache/my-npmrc"
 }
 
 # The user layer: test/user-layer-check, which the VM bench also
@@ -4108,7 +4248,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

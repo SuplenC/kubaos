@@ -842,6 +842,72 @@ fn a_go_record_from_before_mise_gets_its_fragment_on_configure_and_keeps_its_ver
 }
 
 #[test]
+fn the_node_suite_installs_node_at_its_line_vtsls_and_bun_with_its_extra() {
+    let h = home();
+    let node = catalog::find("node").unwrap();
+
+    let added = h.suites.add(node, &OptionsChange::default()).unwrap();
+    let configured = h
+        .suites
+        .configure(
+            node,
+            &OptionsChange {
+                version: Some("22".to_owned()),
+                disable: vec!["bun".to_owned()],
+                ..OptionsChange::default()
+            },
+        )
+        .unwrap();
+
+    assert!(super::same_tools(
+        &added.tools,
+        &requests(&[("node", "26.13"), ("npm:@vtsls/language-server", "0.3"), ("bun", "1.4"),])
+    ));
+    assert!(super::same_tools(
+        &configured.tools,
+        &requests(&[("node", "22.23"), ("npm:@vtsls/language-server", "0.3")])
+    ));
+    let fragment = fs::read_to_string(h.paths.mise_fragment("node")).unwrap();
+    assert!(fragment.contains("node = \"22.23\""), "{fragment}");
+    assert!(!fragment.contains("bun"), "{fragment}");
+    assert!(
+        !h.mise
+            .installed()
+            .iter()
+            .any(|v| v.starts_with("bun@") || v.starts_with("node@26")),
+        "Bun and Node 26 are pruned: {:?}",
+        h.mise.installed()
+    );
+}
+
+#[test]
+fn a_node_record_from_before_mise_gets_its_fragment_on_configure_and_keeps_its_version_and_extras() {
+    let h = home();
+    let node = catalog::find("node").unwrap();
+    write(
+        &h.paths.state_dir().suite_file("node"),
+        "version = \"24\"\nextras = [\"bun\"]\n",
+    );
+
+    let configured = h.suites.configure(node, &OptionsChange::default()).unwrap();
+    let again = h.suites.configure(node, &OptionsChange::default()).unwrap();
+
+    assert!(!configured.changed, "the record stays as it was");
+    assert_eq!(configured.config.version.as_deref(), Some("24"));
+    assert!(super::same_tools(
+        &configured.tools,
+        &requests(&[("node", "24.22"), ("npm:@vtsls/language-server", "0.3"), ("bun", "1.4"),])
+    ));
+    assert!(h.paths.mise_fragment("node").is_file());
+    assert!(super::same_tools(&again.tools, &configured.tools));
+    assert_eq!(
+        h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
+        1,
+        "a second run installs nothing"
+    );
+}
+
+#[test]
 fn every_seed_is_a_commented_example_that_mentions_its_suite() {
     for suite in catalog::all() {
         for seed in suite.seeds {

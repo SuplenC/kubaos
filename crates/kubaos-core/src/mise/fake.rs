@@ -61,6 +61,9 @@ impl FakeMise {
                 ("aqua:mvdan/gofumpt", vec!["0.12.0"]),
                 ("aqua:golangci/golangci-lint", vec!["2.15.0"]),
                 ("aqua:go-delve/delve", vec!["1.27.2"]),
+                ("node", vec!["22.23.4", "24.22.2", "26.13.0"]),
+                ("npm:@vtsls/language-server", vec!["0.3.0"]),
+                ("bun", vec!["1.4.4"]),
             ]),
             state: Mutex::default(),
         }
