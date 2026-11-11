@@ -15,7 +15,7 @@ const NETWORK: readonly MenuEntry[] = [
   { label: "Enable Networking", checked: true },
   { label: "Enable Wi-Fi", checked: true },
   "separator",
-  { label: "VPN Connections" },
+  { label: "VPN Connections", submenu: true },
   { label: "Connection Information", disabled: true },
   "separator",
   { label: "Edit Connections…" },
