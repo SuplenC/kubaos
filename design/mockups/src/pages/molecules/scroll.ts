@@ -108,7 +108,7 @@ export default page({
       {
         name: "The fade comes",
         what: "Leaving its top, the fade comes in over `micro` on `standard`; back at the top it goes.",
-        tracks: [{ part: "the header fade", on: "the notifications", target: ".k-header-fade", property: "--faded", from: 0, to: 1, duration: "micro", curve: "standard" }],
+        tracks: [{ part: "the header fade", on: "the notifications", target: ".k-scroll", property: "--faded", from: 0, to: 1, duration: "micro", curve: "standard" }],
         reduced: "same",
         back: "plays",
         sample: () => panel({ down: 0.3 }),

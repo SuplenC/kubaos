@@ -45,10 +45,10 @@
   initial-value: 0;
 }
 
-/* How much a header fade shows, 0 at rest to 1 scrolled. */
+/* How much a header fade shows, 0 at rest to 1 scrolled: set on the scroll's box, read by its view. */
 @property --faded {
   syntax: "<number>";
-  inherits: false;
+  inherits: true;
   initial-value: 0;
 }
 
@@ -504,31 +504,43 @@
   --scroll-thumb-lit: 1;
 }
 
-/* A header fade: over the gap above the scroll, the gap in `surface`, then `space.s16` fading to
-   nothing, across the scroll's box but the thumb's width at its end. It fades in and out over
-   `micro` as the content leaves its top and comes back. */
-.k-header-fade {
-  position: absolute;
-  z-index: 1;
-  left: 0;
-  right: var(--size-scrollbar);
-  top: calc(-1 * var(--gap));
-  display: block;
-  height: calc(var(--gap) + var(--space-s16));
-  background: linear-gradient(var(--color-surface) var(--gap), rgb(from var(--color-surface) r g b / 0));
-  opacity: var(--faded);
-  pointer-events: none;
+/* A header fade: what scrolls under the header fades out, rather than a band painted over it. While
+   the content is away from its top, the view's own content is masked: hidden over the gap above the
+   box, then fading in over `space.s16` below its top. A mask, not a fill, so whatever passes under the
+   header goes, a lit control's tube and glow included, and the panel's glass shows through as it does
+   everywhere else, with no band of opaque `surface` laid over it. It fades in and out over `micro`.
+   The HeaderFade itself is the part that names the gap, and draws nothing. */
+.k-scroll {
+  --faded: 0;
   transition: --faded var(--motion-micro) var(--easing-standard);
 }
 
-.k-scroll[data-scrolled] > .k-header-fade,
-.k-header-fade[data-pinned] {
+.k-scroll[data-scrolled]:has(> .k-header-fade),
+.k-scroll[data-fade-pinned] {
   --faded: 1;
 }
 
-.k-header-fade[data-pinned],
-[data-sequence] .k-header-fade {
+.k-scroll[data-fade-pinned],
+[data-sequence] .k-scroll {
   transition: none;
+}
+
+.k-scroll:has(> .k-header-fade) > .k-scroll-view {
+  mask-image: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / calc(1 - var(--faded))) var(--above),
+    #000 calc(var(--above) + var(--space-s16))
+  );
+}
+
+.k-header-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(-1 * var(--gap));
+  display: block;
+  height: calc(var(--gap) + var(--space-s16));
+  pointer-events: none;
 }
 
 /* A shell panel as the samples show a scroll in: `surface` at the surface radius, as every shell panel, `space.s16`
