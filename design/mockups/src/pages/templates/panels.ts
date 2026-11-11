@@ -16,7 +16,7 @@ import { fill, filling, row, stack } from "../../lib/layout.ts";
 import { type ListRowSpec, list } from "../../lib/list.ts";
 import { meter } from "../../lib/meter.ts";
 import { type PanelPage, type PanelPageOptions, panelPage } from "../../lib/panel-page.ts";
-import { pill } from "../../lib/pill.ts";
+import { paired, pill } from "../../lib/pill.ts";
 import { icon } from "../../lib/icon.ts";
 import { type Edge, hang, type Screen, screen, sheet, type Twins, twins } from "../../lib/sheet.ts";
 import { text } from "../../lib/text.ts";
@@ -189,9 +189,9 @@ function words(said: string): HTMLElement {
 /** The twins' buttons along the bar, in their order: the system monitor, the bell, the status. */
 export function barButtons(): HTMLElement[] {
   return [
-    pill({ content: [glyph("memory"), words("34%")], lone: false, interactive: true, tooltip: "System" }),
+    pill({ content: [paired(glyph("memory"), words("34%"))], lone: false, interactive: true, tooltip: "System" }),
     pill({ content: [glyph("notifications")], lone: true, interactive: true, tooltip: "Notifications" }),
-    pill({ content: [glyph("wifi"), glyph("volume_up"), glyph("battery_full"), words("87%")], lone: false, interactive: true, tooltip: "Control center" }),
+    pill({ content: [glyph("wifi"), glyph("volume_up"), paired(glyph("battery_full"), words("87%"))], lone: false, interactive: true, tooltip: "Control center" }),
   ];
 }
 

@@ -7,7 +7,7 @@ import type { Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { icon } from "../../lib/icon.ts";
 import { row, stack } from "../../lib/layout.ts";
-import { makePill, type PillOptions, type PillTone, pill } from "../../lib/pill.ts";
+import { makePill, type PillOptions, type PillTone, paired, pill } from "../../lib/pill.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
@@ -26,14 +26,15 @@ function words(said: string): HTMLElement {
   return element;
 }
 
-const STATUS = (): Element[] => [glyph("wifi"), glyph("volume_up"), glyph("battery_full"), words("87%")];
+const STATUS = (): Element[] => [glyph("wifi"), glyph("volume_up"), paired(glyph("battery_full"), words("87%"))];
+const RECORDING = (): Element[] => [paired(glyph("screen_record"), words("0:42"))];
 
 /** The bar's groups, as its right end lays them out. */
 function bar(state: Shown = "rest"): HTMLElement {
   return row(
     "s8",
     "centre",
-    pill({ content: [glyph("screen_record"), words("0:42")], lone: false, tone: "recording", interactive: true, tooltip: "Stop recording", ...stateOptions(state) }),
+    pill({ content: RECORDING(), lone: false, tone: "recording", interactive: true, tooltip: "Stop recording", ...stateOptions(state) }),
     pill({ content: [words("Preview")], lone: false, tone: "preview" }),
     pill({ content: [words("PL")], lone: false, interactive: true, tooltip: "Keyboard layout", ...stateOptions(state) }),
     pill({ content: STATUS(), lone: false, interactive: true, tooltip: "Wi-Fi Home 5G · Volume 60% · Battery 87%", ...stateOptions(state) }),
@@ -62,7 +63,7 @@ type MatrixState = "rest" | "lit" | "pressed";
 const ROWS: readonly { name: string; options: Omit<PillOptions, "content">; content: () => Element[] }[] = [
   { name: "Symbols and words", options: { lone: false, interactive: true }, content: STATUS },
   { name: "A lone symbol", options: { lone: true, interactive: true }, content: () => [glyph("notifications")] },
-  { name: "Recording", options: { lone: false, interactive: true, tone: "recording" }, content: () => [glyph("screen_record"), words("0:42")] },
+  { name: "Recording", options: { lone: false, interactive: true, tone: "recording" }, content: RECORDING },
 ];
 
 function cell(index: number, state: Shown): HTMLElement {
@@ -72,7 +73,7 @@ function cell(index: number, state: Shown): HTMLElement {
 
 const TONES: readonly { name: string; tone: PillTone; for: string; content: () => Element[] }[] = [
   { name: "The bar's", tone: "neutral", for: "every group: `surface_container`, `on_surface`", content: STATUS },
-  { name: "Recording", tone: "recording", for: "recording: `error_container`, `on_error_container`", content: () => [glyph("screen_record"), words("0:42")] },
+  { name: "Recording", tone: "recording", for: "recording: `error_container`, `on_error_container`", content: RECORDING },
   { name: "Preview", tone: "preview", for: "a preview build: `cold` tint, `cold` words", content: () => [words("Preview")] },
 ];
 
@@ -120,7 +121,7 @@ export default page({
     missingPicture: doesntApply("its symbols are KubaOS Symbols, always there."),
     counts: [
       { name: "One", for: "a lone symbol", sample: () => pill({ content: [glyph("notifications")], lone: true }) },
-      { name: "Many", for: "symbols and words `space.s8` apart", sample: () => pill({ content: STATUS(), lone: false }) },
+      { name: "Many", for: "`space.s8` apart; a symbol and its value `space.s4`", sample: () => pill({ content: STATUS(), lone: false }) },
       { name: "A badged symbol", for: "a `BadgedIcon`'s room is part of its content", sample: () => pill({ content: [badgedIcon({ name: "system_update_alt", badged: true, count: 3 })], lone: true }) },
     ],
   },
@@ -157,6 +158,7 @@ export default page({
       { part: "Height", token: "size-control_sm" },
       { part: "Ends, symbols and words", token: "space-s12" },
       { part: "Ends round a lone symbol, gaps", token: "space-s8" },
+      { part: "A symbol to its value", token: "space-s4" },
       { part: "Symbols", token: "icon-s16" },
       { part: "Words' line", token: "type-button_small-line" },
     ],
