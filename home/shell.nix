@@ -84,7 +84,12 @@ in
 
   # XDG_CONFIG_HOME and friends come from xdg.enable (default.nix).
   home.sessionVariables.EDITOR = "nvim";
-  home.sessionPath = [ miseShims ];
+  # After the session variables' end, where targets.genericLinux sources
+  # Nix's nix.sh, which puts ~/.nix-profile/bin first: home.sessionPath would
+  # land behind it. hm-session-vars runs once a session, so this prepends once.
+  home.sessionVariablesExtra = lib.mkAfter ''
+    export PATH="${miseShims}:$PATH"
+  '';
 
   # A shim is a link to the mise that made it, a store path. mise remakes the
   # shims of the tools it installs or prunes, but not when a release moves
