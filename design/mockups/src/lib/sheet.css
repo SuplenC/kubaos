@@ -3,7 +3,8 @@
    corners at the surface radius. The frame and the sheets' surfaces are opaque `surface` inside one
    layer at `opacity.frame`, which casts `shadow.panel` once; what sits on them is in the layer above
    at full opacity. While a panel is open the desktop under the layer is dimmed by `scrim` at
-   `opacity.panel_scrim`, fading over `medium` on `standard`. */
+   `opacity.panel_scrim`, or at a dialog's darker `opacity.scrim` (the power menu), fading over
+   `medium` on `standard`. */
 
 /* How far a sheet is open, 0 to 1: its depth is this share of its content's. */
 @property --reveal {
@@ -59,8 +60,13 @@
   position: absolute;
   inset: 0;
   display: block;
-  background: rgb(from var(--color-scrim) r g b / calc(var(--opacity-panel_scrim) * var(--panel-dim)));
+  background: rgb(from var(--color-scrim) r g b / calc(var(--screen-dim, var(--opacity-panel_scrim)) * var(--panel-dim)));
   transition: --panel-dim var(--motion-medium) var(--easing-standard);
+}
+
+/* A dialog over the desktop (the power menu) dims it as a dialog does, darker than a panel. */
+.k-screen[data-dim="dialog"] {
+  --screen-dim: var(--opacity-scrim);
 }
 
 .k-screen[data-open] > .k-screen-dim {
