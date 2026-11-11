@@ -284,23 +284,6 @@
 /* The kicker stands its gap (`--kicker-gap`, `scale.lock_date_gap` of the clock, scaling with it) over the digits, measured as the eye does: from the digits' cap
    top, which is their box's, to the kicker's baseline (`--kicker-base`, its depth in its line, read
    off the font), so its descenders and its line's leading don't count. */
-/* A clock in front of its picture (no cut-out, or depth off) stands over a soft shade of `surface`,
-   `opacity.clock_shade` over the digits and the kicker, fading to nothing past them, so
-   both read over busy signs. It goes as the clock flies to the bar. */
-.k-lock:is([data-bare], [data-flat]) .k-lock-clock::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  left: -35%;
-  right: -35%;
-  top: calc(-1 * (var(--kicker-gap, var(--space-s40)) * var(--k) + var(--kicker-height)) - var(--digits-height) * 0.5);
-  bottom: calc(-0.5 * var(--digits-height));
-  /* Full strength over the digits and the kicker, falling off only past them. */
-  --shade: rgb(from var(--color-surface) r g b / calc(var(--opacity-clock_shade) * (1 - var(--flown))));
-  background: radial-gradient(closest-side, var(--shade), var(--shade) 60%, rgb(from var(--color-surface) r g b / calc(var(--opacity-clock_shade) * 0.4 * (1 - var(--flown)))) 82%, transparent);
-  pointer-events: none;
-}
-
 .k-lock-clock > .k-lock-kicker {
   position: absolute;
   top: round(nearest, calc(-1 * (var(--kicker-gap, var(--space-s40)) * var(--k) + var(--kicker-base-share, 1.2) * var(--kicker-rest) * var(--kicker-k))), 1px);
