@@ -14,7 +14,7 @@
 #   ~/.nix-profile/bin as links to the rustup mise installed: rustup runs as
 #   the tool it is called by. Its release ships rustup alone; its installer
 #   would put the proxies and a second rustup in ~/.cargo/bin, outside mise.
-# - rust-analyzer: a proxy that adds the component to the active toolchain the
+# - rust-analyzer: a wrapper of rustup's proxy that adds the component to the active toolchain the
 #   first time, since no rustup profile has it.
 # - codelldb, the debug adapter: a link to the adapter in the VS Code extension
 #   mise unpacks, which finds its own LLDB beside it.
@@ -42,9 +42,10 @@ let
   suite = config.kubaos.suites.rust or null;
   extras = if suite == null then [ ] else suite.extras;
 
-  # HAZARD: mise's `latest` link in a tool's installs folder points at its
-  # newest installed version, and follows every install and prune, which keep
-  # only the fragment's version. Its `global` link would name the fragment's
+  # HAZARD: link through mise's `latest` link, never a version's folder, which
+  # the next `kubaos suite update` prunes. `latest` points at the tool's newest
+  # installed version and follows every install and prune, which keep only the
+  # fragment's version. Its `global` link would name the fragment's
   # version itself, but mise makes it only on a config-wide install, and
   # `kubaos suite add` installs before it writes the fragment. MISE_DATA_DIR is
   # mise's default here, as everywhere in the home (shell.nix).
