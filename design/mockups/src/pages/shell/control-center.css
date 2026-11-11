@@ -63,32 +63,6 @@
   min-height: 0;
 }
 
-/* A section's label in a radio well: `label` in `on_surface_variant`, `space.s12` in as a row's
-   words are, and `space.s12` clear of rows above it besides the `space.s4` they carry. */
-.cc-label {
-  display: block;
-  padding-inline: var(--space-s12);
-}
-
-.cc-label[data-after] {
-  padding-block-start: var(--space-s12);
-}
-
-/* A note or a disclosure line in a radio well: a one-line row's height, its words `space.s12` in. */
-.cc-line {
-  display: flex;
-  align-items: center;
-  gap: var(--space-s8);
-  box-sizing: border-box;
-  height: var(--size-row);
-  padding-inline-start: var(--space-s12);
-}
-
-.cc-line > :first-child {
-  flex: 1;
-  min-width: 0;
-}
-
 /* The connection form in the well, centred down it. */
 .cc-form {
   display: flex;
@@ -100,8 +74,9 @@
 }
 
 .cc-status {
+  display: flex;
+  justify-content: center;
   min-height: var(--type-small-line);
-  text-align: center;
 }
 
 /* The keyboard tab's well: the layouts down to the toolbar at its foot, `space.s12` in. */
@@ -116,19 +91,6 @@
 
 .cc-keys > .cc-grow {
   flex: 1;
-}
-
-/* Where a dragged layout lands: a hairline in the gap between two rows, inset as their words. */
-.cc-drop {
-  display: block;
-  height: var(--stroke-thin);
-  margin-inline: var(--space-s12);
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-}
-
-.cc-lifted {
-  opacity: var(--opacity-subdued);
 }
 
 /* The list and the form in one well, the form over the list's place. */

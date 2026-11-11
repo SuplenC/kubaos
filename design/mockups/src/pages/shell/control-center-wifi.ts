@@ -140,7 +140,7 @@ export default page<Shown>({
     keys: [
       { keys: ["j", "k", "↑", "↓"], does: "through the networks" },
       { keys: ["Enter"], does: "Known: connects; Nearby: opens the form" },
-      { keys: ["Delete"], does: "forgets a saved network" },
+      { keys: ["Delete"], does: "forgets a saved network, as its × does" },
       { keys: ["Tab", "Shift+Tab"], does: "in the form: field, Cancel, Connect" },
       { keys: ["Enter"], does: "in the form: Connect" },
       { keys: ["Esc"], does: "in the form: back to the list" },
@@ -154,6 +154,7 @@ export default page<Shown>({
       { name: "The form", for: "the tile, the gaps, the buttons", sample: () => form() },
     ]),
     measures: [
+      { part: "Well's padding", token: "space-s12" },
       { part: "A network's row", token: "size-row_two_line" },
       { part: "Between rows", token: "space-s4" },
       { part: "Label clear of rows above", token: "space-s12" },
