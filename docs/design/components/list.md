@@ -6,7 +6,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `list::list`; QML `List`. Its mockup page is the source of truth, with `ListRow` and `ListRows`: Molecules, List, ListRow and ListRows, in `design/mockups/`.
 
-Rows in a well: the content radius (16), padding 8, rows 4 apart, so the rows take 16 − 8 = 8, the row radius (concentric). The focus tube lights the well's edge; the row shows where the keyboard is.
+Rows in a well: the content radius (16), padding 8, rows 4 apart, so the rows take 16 − 8 = 8, the row radius (concentric). A plain `List` keeps the 8 for those corners; only a list whose rows scroll (`ScrollingList`, `LiveList`) pads them 12, as its section says. The focus tube lights the well's edge; the row shows where the keyboard is.
 
 *Not built yet: both libraries draw the well at the surface radius (24), 12 inside, and its rows at 24 − 12 = 12 with 12 inside their sides; the mockup draws the rule.*
 
@@ -16,7 +16,7 @@ Rows in a well: the content radius (16), padding 8, rows 4 apart, so the rows ta
 
 Rust `list::scrolling_list`; QML `ScrollingList`. Its mockup page is the source of truth: Molecules, ScrollingList, in `design/mockups/`.
 
-A `List` whose rows scroll inside its well, as tall as its place makes it. The well pads its rows 12 (`space.s12`): in from its sides, and the 12 above the first row and below the last as the scroll's padding (`DESIGN.md`, "Rules every component keeps"). The padding is the list's own, `ScrollingList`'s and `LiveList`'s alike, and whatever else the well holds keeps it too: the keyboard layouts' toolbar at its foot, the add view, a form that takes the list's place. The rows scroll right up to the well's edge and are cut by its own rounded shape. The well's hairline and focus tube are drawn over the rows. In QML it holds a `ListRows` (or a `LiveList`) beside whatever else the well holds, 12 in at the sides and down its whole height, and the view's `topMargin` and `bottomMargin` are the 12.
+A `List` whose rows scroll inside its well, as tall as its place makes it. Unlike a plain `List`'s 8, the well pads its rows 12 (`space.s12`), its rows cut by its rounded edge as they scroll rather than set concentric in it: in from its sides, and the 12 above the first row and below the last as the scroll's padding (`DESIGN.md`, "Rules every component keeps"). The padding is the list's own, `ScrollingList`'s and `LiveList`'s alike, and whatever else the well holds keeps it too: the keyboard layouts' toolbar at its foot, the add view, a form that takes the list's place. The rows scroll right up to the well's edge and are cut by its own rounded shape. The well's hairline and focus tube are drawn over the rows. In QML it holds a `ListRows` (or a `LiveList`) beside whatever else the well holds, 12 in at the sides and down its whole height, and the view's `topMargin` and `bottomMargin` are the 12.
 
 **States:** resting, and focused: the tube on the well's edge while the list has the keyboard.
 

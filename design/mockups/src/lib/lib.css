@@ -275,6 +275,12 @@
   transition: opacity var(--motion-short) var(--easing-standard);
 }
 
+/* Above its control (`side`): asked for, or no room below in the box that cuts or scrolls it. */
+.k-hint[data-side="above"] {
+  top: auto;
+  bottom: calc(100% + var(--space-s8));
+}
+
 /* A bubble on its own, shown as itself: in the flow, where its sample puts it. */
 :not(.k-hinted) > .k-hint {
   position: relative;

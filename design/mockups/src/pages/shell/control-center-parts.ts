@@ -428,10 +428,10 @@ export function keyboardTab(options: KeyboardOptions = {}): HTMLElement {
     "centre",
     accentsChip(options.accents ?? true, options.explaining ?? false),
     fill(),
-    iconButton({ icon: "arrow_upward", label: "Move up", kind: "Text", size: "Sm", disabled: !(selected > 0) }),
-    iconButton({ icon: "arrow_downward", label: "Move down", kind: "Text", size: "Sm", disabled: !(selected >= 0 && selected < layouts.length - 1) }),
-    iconButton({ icon: "add", label: "Add a language", kind: "Tonal", size: "Sm", disabled: layouts.length >= 4 }),
-    iconButton({ icon: "close", label: "Remove", kind: "Text", size: "Sm", disabled: !(selected >= 0 && layouts.length > 1) }),
+    iconButton({ icon: "arrow_upward", label: "Move up", kind: "Text", size: "Sm", hintAbove: true, disabled: !(selected > 0) }),
+    iconButton({ icon: "arrow_downward", label: "Move down", kind: "Text", size: "Sm", hintAbove: true, disabled: !(selected >= 0 && selected < layouts.length - 1) }),
+    iconButton({ icon: "add", label: "Add a language", kind: "Tonal", size: "Sm", hintAbove: true, disabled: layouts.length >= 4 }),
+    iconButton({ icon: "close", label: "Remove", kind: "Text", size: "Sm", hintAbove: true, disabled: !(selected >= 0 && layouts.length > 1) }),
   );
   const grow = document.createElement("span");
   grow.className = "cc-grow";
