@@ -1,16 +1,16 @@
 //! What `status` asks outside `/sys`: power-profiles-daemon's profile, Hyprland's laptop panel,
-//! `iw`'s Wi-Fi power saving, the indexer's pause, the scheduler's unit and its journal, and the
-//! stop the service published. The command line and the Command menu's "Power: what this stop
-//! does" and "CPU scheduler: status" read it here.
+//! `iw`'s Wi-Fi power saving, the file indexer, the scheduler's unit and its journal, the processes
+//! that yield, and the stop the service published. The command line and the Command menu's
+//! "Power: what this stop does" and "CPU scheduler: status" read it here.
 //!
 //! # Owns
 //!
 //! - [`read`] and [`scheduler`], and the questions they ask: [`profile`], [`laptop_panel`],
-//!   [`wifi_power_save`], [`indexer_paused`], [`scheduler_unit`], [`lavd_exit`].
+//!   [`wifi_power_save`], [`scheduler_unit`], [`lavd_exit`], [`unit_active`].
 //!
 //! # Not here
 //!
-//! - The rows and their words: [`crate::status`].
+//! - The rows and their words: [`crate::status`]. The file indexer: [`crate::indexer`].
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -19,6 +19,7 @@ use std::process::Stdio;
 
 use serde_json::Value;
 
+use crate::indexer;
 use crate::machine::Machine;
 use crate::plan::Plan;
 use crate::runtime;
@@ -32,9 +33,7 @@ use crate::status::Row;
 use crate::stop::Profile;
 use crate::stop::Source;
 use crate::stop::Stop;
-
-/// The transient user unit that holds the file indexer paused.
-pub const QUIET_UNIT: &str = "kubaos-power-quiet";
+use crate::yields;
 
 /// power-profiles-daemon's bus name, path and interface since 0.20.
 pub const PPD_SERVICE: &str = "org.freedesktop.UPower.PowerProfiles";
@@ -79,7 +78,7 @@ pub fn read(settings: &Settings, problem: Option<&str>, machine: &Machine) -> No
                 (interface, on)
             })
             .collect(),
-        indexer_paused: indexer_paused(),
+        indexer: indexer::read(),
         scheduler_unit: scheduler_unit(),
         scheduler_exit: lavd_exit(),
     };
@@ -120,6 +119,14 @@ pub fn read(settings: &Settings, problem: Option<&str>, machine: &Machine) -> No
     }
 }
 
+/// The stop now, without the rows: what the service published, which asks nobody, else
+/// power-profiles-daemon.
+pub fn stop() -> Stop {
+    let published = runtime::file().and_then(|file| Published::load(&file));
+    let profile = if published.is_some() { None } else { profile() };
+    stop_now(published.as_ref(), profile)
+}
+
 /// The stop the service published, else the one power-profiles-daemon's profile is named after.
 fn stop_now(published: Option<&Published>, profile: Option<Profile>) -> Stop {
     published
@@ -128,12 +135,18 @@ fn stop_now(published: Option<&Published>, profile: Option<Profile>) -> Stop {
         .unwrap_or(Stop::Balanced)
 }
 
-/// Which CPU scheduler runs and why, for the stop now under `settings`.
+/// Which CPU scheduler runs and why, for the stop now under `settings`, and what background work
+/// yields.
 pub fn scheduler(settings: &Settings, machine: &Machine) -> scheduler::Report {
     let published = runtime::file().and_then(|file| Published::load(&file));
     let profile = if published.is_some() { None } else { profile() };
     let plan = Plan::for_stop(stop_now(published.as_ref(), profile), settings);
-    scheduler::report(&plan, machine, scheduler_unit().as_ref(), lavd_exit().as_deref())
+    let mut report = scheduler::report(&plan, machine, scheduler_unit().as_ref(), lavd_exit().as_deref());
+    let processes = yields::processes(Path::new("/proc"));
+    report
+        .details
+        .extend(yields::details(settings.background_yields, machine, &processes));
+    report
 }
 
 /// The scheduler's unit, from `systemctl show`, which needs no root; `None` when systemctl can't
@@ -219,22 +232,6 @@ pub fn wifi_power_save(interface: &str) -> Option<bool> {
         "Power save: off" => Some(false),
         _ => None,
     }
-}
-
-/// Whether the machine has the file indexer, `localsearch`.
-pub fn has_indexer() -> bool {
-    Command::new("sh")
-        .args(["-c", "command -v localsearch"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
-}
-
-/// Whether the file indexer is held paused; `None` without one.
-pub fn indexer_paused() -> Option<bool> {
-    has_indexer().then(|| unit_active(QUIET_UNIT))
 }
 
 /// Whether the systemd user unit `unit`'s service runs.

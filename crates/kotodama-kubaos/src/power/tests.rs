@@ -68,7 +68,8 @@ fn the_scheduler_item_is_found_by_its_names() {
     assert_eq!(item.title, "CPU scheduler: status");
     assert!(item.keywords.contains(&"lavd".to_owned()));
     assert!(item.keywords.contains(&"eevdf".to_owned()));
-    assert_eq!(ids(), [ID, SCHEDULER_ID]);
+    assert!(item.keywords.contains(&"background work".to_owned()));
+    assert_eq!(ids(), [ID, SCHEDULER_ID, DRAIN_ID]);
 }
 
 #[test]
@@ -108,6 +109,48 @@ fn the_scheduler_view_says_which_runs_and_why_then_the_details() {
             ),
             ("Setting: LAVD on (scheduler = \"lavd\" in power.toml)", None),
             ("Service: kubaos-scx.service: activating (auto-restart)", None),
+        ]
+    );
+}
+
+#[test]
+fn the_drain_item_is_found_by_what_people_type() {
+    let item = drain_item();
+
+    assert_eq!(item.id, DRAIN_ID);
+    assert_eq!(item.title, "What's draining the battery");
+    assert!(item.keywords.contains(&"battery drain".to_owned()));
+}
+
+#[test]
+fn the_drain_view_has_a_row_a_line_of_the_answer() {
+    let drain = Drain {
+        on_battery: true,
+        watts: Some(7.1),
+        percent: Some(64.0),
+        stop: "Power Saver".to_owned(),
+        wakers: Some(kubaos_power::history::Wakers {
+            secs: 600,
+            irqs: vec![("24 amdgpu".to_owned(), 120.0)],
+            procs: vec![("qs".to_owned(), 30.0)],
+        }),
+    };
+
+    let view = drain_view(&drain);
+
+    let ViewContent::List { items, .. } = view.content else {
+        panic!("a list");
+    };
+    let rows: Vec<(&str, Option<&str>)> = items
+        .iter()
+        .map(|item| (item.title.as_str(), item.subtitle.as_deref()))
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            ("Drawing 7.1 W now", Some("Power Saver, 64 % left")),
+            ("qs: 30 a second", Some("A process waking")),
+            ("24 amdgpu: 120 a second", Some("An interrupt line")),
         ]
     );
 }

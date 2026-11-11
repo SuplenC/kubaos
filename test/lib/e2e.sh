@@ -46,20 +46,56 @@ c_login_shell() {
     return 1
   fi
   echo "ok   zsh -l -i: no output, no warnings"
-  out="$(as_user script -qec "zsh -l -i -c 'whence -w y eza glow _dot_omp_init; [[ -n \$ATUIN_SESSION ]] && echo atuin; (( \${+functions[_direnv_hook]} )) && echo direnv; bindkey \"^R\"'" /dev/null | tr -d '\r')"
+  out="$(as_user script -qec "zsh -l -i -c 'whence -w y eza glow _dot_omp_init; [[ -n \$ATUIN_SESSION ]] && echo atuin; (( \${+functions[_mise_hook]} )) && echo mise; bindkey \"^R\"'" /dev/null | tr -d '\r')"
   local want
-  for want in 'y: function' 'eza: function' 'glow: function' '_dot_omp_init: function' atuin direnv 'atuin-search'; do
+  for want in 'y: function' 'eza: function' 'glow: function' '_dot_omp_init: function' atuin mise 'atuin-search'; do
     grep -qF -- "$want" <<<"$out" || { echo "FAIL interactive zsh lacks: $want"; printf '%s\n' "$out"; return 1; }
   done
-  echo "ok   functions, atuin on Ctrl-R, direnv hook"
+  echo "ok   functions, atuin on Ctrl-R, mise's hook"
+  mise_first_prompt || return 1
   grep -q 'hyprland-autostart.zsh' "$USER_HOME/.zprofile" || { echo "FAIL .zprofile doesn't source the autostart snippet"; return 1; }
   echo "ok   .zprofile sources system/files/hyprland-autostart.zsh"
+}
+
+# mise_first_prompt: in a folder whose trusted mise.toml puts a tool on PATH,
+# sets a variable and sources a script, an interactive zsh has all three at
+# its first prompt, from one hook-env run (the one started early, which the
+# script sourced once tells), loses them on `cd ~` and gets them back below
+# the folder.
+mise_first_prompt() {
+  local dir="$USER_HOME/Projects/mise-hook" out want
+  rm -rf "$dir"
+  as_user install -d "$dir/bin" "$dir/sub"
+  printf '#!/bin/sh\n' | as_user tee "$dir/bin/kubaos-hook-tool" >/dev/null
+  as_user chmod +x "$dir/bin/kubaos-hook-tool"
+  printf 'echo run >>"%s/runs"\n' "$dir" | as_user tee "$dir/count.sh" >/dev/null
+  printf '[env]\nKUBAOS_HOOK = "on"\n_.path = ["./bin"]\n_.source = "./count.sh"\n' |
+    as_user tee "$dir/mise.toml" >/dev/null
+  zrun "mise trust '$dir/mise.toml'" >/dev/null 2>&1 || { echo "FAIL mise trust $dir/mise.toml"; return 1; }
+
+  zsh_pty "cd '$dir' && zsh -i" <<<'exit' >/dev/null
+  [[ $(wc -l <"$dir/runs") == 1 ]] ||
+    { echo "FAIL starting in a mise folder ran mise's env $(wc -l <"$dir/runs") times before the first prompt, not once"; return 1; }
+  out="$(printf '%s\n' \
+    'print -r -- "first E=$KUBAOS_HOOK T=${commands[kubaos-hook-tool]} early=${+functions[_kubaos_mise_first]}${+_kubaos_mise_fd}"' \
+    'print -r -- "ahead $(( path[(I)'"$dir"'/bin] < path[(I)$HOME/.nix-profile/bin] ))"' \
+    'cd ~' \
+    'print -r -- "home E=${KUBAOS_HOOK-unset} T=${commands[kubaos-hook-tool]-none}"' \
+    "cd '$dir/sub'" \
+    'print -r -- "back E=$KUBAOS_HOOK T=${commands[kubaos-hook-tool]}"' \
+    exit | zsh_pty "cd '$dir' && zsh -i")"
+  for want in "first E=on T=$dir/bin/kubaos-hook-tool early=00" 'ahead 1' 'home E=unset T=none' \
+    "back E=on T=$dir/bin/kubaos-hook-tool"; do
+    grep -qF -- "$want" <<<"$out" || { echo "FAIL mise's hook: no line \`$want\`:"; grep -a -E '^(first|ahead|home|back) ' <<<"$out"; return 1; }
+  done
+  rm -rf "$dir"
+  echo "ok   mise's hook: a folder's mise.toml is on at the first prompt from one hook-env, ahead of ~/.nix-profile/bin, off on cd ~ and on again below it"
 }
 
 c_path() {
   local path_lines h="$USER_HOME" i want prev=-1 idx
   path_lines="$(zlogin 'print -l $path' 2>/dev/null)"
-  for want in "$h/.local/bin" "$h/.cargo/bin" "$h/.local/share/proto/shims" "$h/.local/share/proto/bin" "$h/.nix-profile/bin" /usr/bin; do
+  for want in "$h/.local/bin" "$h/.nix-profile/bin" /usr/bin; do
     idx="$(grep -nxF -- "$want" <<<"$path_lines" | head -1 | cut -d: -f1)"
     [[ -n $idx ]] || { echo "FAIL PATH lacks $want"; printf '%s\n' "$path_lines"; return 1; }
     echo "ok   PATH[$idx] $want"
@@ -69,13 +105,14 @@ c_path() {
   prev="$(grep -nxF -- /usr/bin <<<"$path_lines" | head -1 | cut -d: -f1)"
   ((i < prev)) || { echo "FAIL ~/.nix-profile/bin comes after /usr/bin"; return 1; }
   echo "ok   ~/.nix-profile/bin before /usr/bin"
+  as_user lua5.5 "$REPO/test/lua/env_test.lua" "$REPO" || { echo "FAIL test/lua/env_test.lua"; return 1; }
 }
 
 # Every tool docs/CONTRACTS.md lists ("Packages: who installs what") that
 # the image installs, resolved in a login shell, with its owner checked.
 # Hyprland is the PPA's, from apt.
-NIX_TOOLS=(qs ghostty nvim tmux tms lazygit yazi fzf zoxide atuin direnv eza bat fd rg delta dust dysk
-  btop jq yq xh tldr just glow gh fastfetch lazydocker bacon cargo-nextest hyperfine sccache wild
+NIX_TOOLS=(qs ghostty nvim tmux tms lazygit yazi fzf zoxide atuin mise eza bat fd rg delta dust dysk
+  btop jq yq xh tldr just glow gh fastfetch lazydocker hyperfine
   oh-my-posh matugen home-manager non-nixos-gpu-setup gpu-screen-recorder satty kubaos-files kubaos-bluetooth
   kubaos-automount kubaos-phone ripdrag)
 APT_TOOLS=(foot fuzzel wl-copy grim slurp playerctl socat qalc notify-send brightnessctl clang mold
@@ -341,6 +378,29 @@ c_nvim() {
     fi
     echo "ok   nvim $f ($(grep -m1 '^FT=' <<<"$msgs")): no errors"
   done
+  nvim_tools_from_nix
+}
+
+# The shared extras' npm-based tools on a home with no Suite: each server
+# attaches and runs Nix's program, markdownlint-cli2 flags a broken file, and
+# Mason installs none of them (it would need npm, which only the Node Suite has).
+nvim_tools_from_nix() {
+  local out name bad=0 nix="$USER_HOME/.nix-profile/bin/"
+  out="$(zrun "cd ~/Projects/dotfiles && nvim --headless +'luafile test/nvim/tools.lua' +qa!" 2>&1 | tr -d '\r')"
+  grep -q '^MASON ' <<<"$out" &&
+    ! grep '^MASON ' <<<"$out" | grep -qwE 'prettier|markdownlint-cli2|markdown-toc' ||
+    { echo "FAIL Mason would install a tool Nix has: $(grep '^MASON ' <<<"$out")"; bad=1; }
+  for name in jsonls yamlls dockerls docker_compose_language_service bashls; do
+    grep -qF "SERVER $name false $nix" <<<"$out" ||
+      { echo "FAIL $name: want Mason off and Nix's server attached, got: $(grep "^SERVER $name " <<<"$out")"; bad=1; }
+  done
+  for name in prettier markdownlint-cli2 markdown-toc; do
+    grep -qxF "TOOL $name $nix$name" <<<"$out" || { echo "FAIL $name isn't Nix's: $(grep "^TOOL $name " <<<"$out")"; bad=1; }
+  done
+  grep -qE '^LINT markdownlint-cli2 [1-9]' <<<"$out" ||
+    { echo "FAIL markdownlint-cli2 flagged nothing: $(grep '^LINT ' <<<"$out")"; bad=1; }
+  if ((bad)); then printf '%s\n' "$out" | tail -20; return 1; fi
+  echo "ok   the extras' npm-based tools are Nix's: JSON, YAML, Dockerfile, Compose and bash servers attach, markdownlint-cli2 lints, Mason installs none"
 }
 
 GHOSTTY_UNIT=$USER_HOME/.config/systemd/user/app-com.mitchellh.ghostty.service
@@ -445,11 +505,11 @@ c_zsh_start() {
 
   rm -rf "$zcache"
   zsh_pty 'zsh -i -c exit' >/dev/null
-  for f in fzf atuin direnv zoxide omp zcompdump; do
+  for f in fzf atuin mise zoxide omp zcompdump; do
     n="$(find "$zcache" -maxdepth 1 -name "$f-*" -size +0 2>/dev/null | wc -l)"
     ((n >= 1)) || { echo "FAIL no cached $f under ~/.cache/kubaos/zsh after deleting it"; ls -la "$zcache"; bad=1; }
   done
-  ((bad)) || echo "ok   deleting ~/.cache/kubaos/zsh: the next start writes fzf, atuin, direnv, zoxide, oh-my-posh and the dump again"
+  ((bad)) || echo "ok   deleting ~/.cache/kubaos/zsh: the next start writes fzf, atuin, mise, zoxide, oh-my-posh and the dump again"
   if ! cmp -s <(as_user "$USER_HOME/.nix-profile/bin/atuin" init zsh --disable-up-arrow) \
     "$(find "$zcache" -name 'atuin-*.zsh' | head -1)"; then
     echo "FAIL the cached atuin init isn't what \`atuin init zsh --disable-up-arrow\` prints"
@@ -575,7 +635,7 @@ c_links() {
   [[ -d $USER_HOME/Pictures/wallpapers && ! -L $USER_HOME/Pictures/wallpapers ]] ||
     { echo "FAIL ~/Pictures/wallpapers isn't a real folder"; bad=1; }
   [[ -f $USER_HOME/.config/tmux-nix/plugins.conf ]] || { echo "FAIL no ~/.config/tmux-nix/plugins.conf"; bad=1; }
-  [[ -f $USER_HOME/.config/direnv/lib/bwenv.sh ]] || { echo "FAIL no direnv bwenv.sh"; bad=1; }
+  [[ -f $USER_HOME/.local/share/kubaos/bwenv.sh ]] || { echo "FAIL no ~/.local/share/kubaos/bwenv.sh"; bad=1; }
   ((bad == 0)) && echo "ok   $n_files default files and $(ls "$REPO"/scripts | wc -l) scripts from the store"
   return "$bad"
 }
@@ -670,7 +730,7 @@ c_shellcheck() {
       *.sh) files+=("$f") ;;
       *) head -1 "$f" | grep -qE '^#!.*\b(ba)?sh\b' && files+=("$f") ;;
     esac
-  done < <(as_user git -C "$REPO" ls-files scripts system migrations test config crates/self-imports .claude/hooks | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp)$')
+  done < <(as_user git -C "$REPO" ls-files scripts system migrations test config home/suites crates/self-imports .claude/hooks | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp)$')
   echo "     ${#files[@]} files"
   # Gate on warnings and errors; info and style notes are listed, not fatal.
   local out notes
@@ -2506,11 +2566,25 @@ cpu_pct() {
 
 # has_bin NAME: whether the home profile has NAME.
 has_bin() { [[ -x $USER_HOME/.nix-profile/bin/$1 ]]; }
+# link_test_tool: link the test Suite's mise plugin (test/mise/), so
+# `kubaos suite add test` can install kubaos-test-tool with no network.
+link_test_tool() {
+  expect_ok "mise plugins link kubaos-test-tool" zrun "mise plugins link --force kubaos-test-tool '$REPO/test/mise/kubaos-test-tool'"
+}
 # kz CMD: CMD in a login zsh with Nix's own bin on PATH, which home-manager
 # runs `nix` from; the harness's login zsh doesn't source nix-daemon.sh.
 # /usr/local/bin goes first, so `kubaos` is /out/kubaos, built with the test
 # Suite, and not the home's.
 kz() { zrun ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; PATH=/usr/local/bin:\$PATH; $1"; }
+# quiet_shell WHAT: an interactive zsh, as a terminal opens one, starts with no
+# `mise WARN` or `mise ERROR` line, which a person would see before every
+# prompt. WHAT names the state the Suite is in.
+quiet_shell() {
+  local out
+  out="$(zlogin 'true' 2>&1 | grep -E 'mise (WARN|ERROR)')" || true
+  [[ -z $out ]] || { echo "FAIL $1: an interactive zsh starts with mise's complaints:"; printf '%s
+' "$out"; return 1; }
+}
 
 # The state directory and switch jobs, through the kubaos binary
 # test/run built (/out/kubaos) and a user flake like the installer's, with the
@@ -2721,12 +2795,15 @@ c_preview() {
 # so every file kubaos writes into kubaos.d/ must reach git's index for Nix to
 # see it. Add, configure, scaffold and remove it, with a user override in
 # ~/.config/kubaos/editor/nvim/ that must win throughout, and nothing of the Suite
-# left in the generation afterwards. Switches run --foreground, as in packages.
+# left in the generation or in mise afterwards. Its mise tool comes from the
+# plugin in test/mise/. Switches run --foreground, as in packages.
 c_suites() {
   local u="$USER_HOME/.config/kubaos/home" layer="$USER_HOME/.config/kubaos" out gen
   local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/test-suite.lua"
   local cache="$USER_HOME/.cache/kubaos-test-suite" project="$USER_HOME/Projects/test-suite-demo"
+  local frag="$USER_HOME/.config/mise/conf.d/kubaos-test.toml" installs="$USER_HOME/.local/share/mise/installs/kubaos-test-tool"
   install_kubaos || return 1
+  link_test_tool || return 1
   user_flake "$u" || return 1
   as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
   rm -rf "$mine" "$cache" "$project"
@@ -2754,6 +2831,11 @@ c_suites() {
   zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.local/share/kubaos-test-suite/bin" ||
     { echo "FAIL the Suite's PATH entry is missing"; return 1; }
   echo "ok   its package, environment variable and PATH entry"
+  grep -qx 'kubaos-test-tool = "1.0"' "$frag" && [[ $(zlogin 'kubaos-test-tool') == 1.0.1 ]] ||
+    { echo "FAIL its mise tool: no request 1.0 in $frag, or kubaos-test-tool isn't 1.0.1"; cat "$frag"; return 1; }
+  [[ -s $USER_HOME/.config/mise/mise.lock ]] || { echo "FAIL mise lock --global wrote no lockfile"; return 1; }
+  quiet_shell "kubaos suite add test" || return 1
+  echo "ok   its mise tool: requested in ~/.config/mise/conf.d/kubaos-test.toml, locked, 1.0.1 on PATH"
   [[ -f $mine ]] && grep -q 'created ~/.config/kubaos/editor/nvim/plugins/test-suite.lua' <<<"$out" ||
     { echo "FAIL the missing user-layer file was not seeded"; printf '%s\n' "$out"; return 1; }
   out="$(opts)"
@@ -2767,6 +2849,29 @@ c_suites() {
   [[ $out == "mine 1" ]] || { echo "FAIL the user's override in $mine doesn't win: $out"; return 1; }
   echo "ok   the user's override of the same setting wins"
 
+  # A patch release behind: the lockfile at 1.0.0, installed, and 1.0.1 pruned.
+  as_user sed -i 's/"1\.0\.1"/"1.0.0"/' "$USER_HOME/.config/mise/mise.lock"
+  zrun 'cd / && MISE_YES=1 mise install --locked && MISE_YES=1 mise prune --tools' >"$LOGS/suites-behind.log" 2>&1 &&
+    [[ $(zlogin 'kubaos-test-tool') == 1.0.0 && ! -e $installs/1.0.1 ]] ||
+    { echo "FAIL setting kubaos-test-tool a patch release behind"; tail -5 "$LOGS/suites-behind.log"; return 1; }
+  out="$(kz 'kubaos suite update --json' 2>&1)"
+  grep -q '"current": "1.0.0"' <<<"$out" && grep -q '"latest": "1.0.1"' <<<"$out" ||
+    { echo "FAIL kubaos suite update --json doesn't list 1.0.0 → 1.0.1"; printf '%s\n' "$out"; return 1; }
+  out="$(kz 'kubaos suite update' 2>&1 </dev/null)" &&
+    { echo "FAIL kubaos suite update with no name and no terminal didn't refuse"; printf '%s\n' "$out"; return 1; }
+  out="$(kz 'kubaos suite update test' 2>&1)" ||
+    { echo "FAIL kubaos suite update test"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx 'updated test: kubaos-test-tool 1.0.0 → 1.0.1' <<<"$out" &&
+    [[ $(zlogin 'kubaos-test-tool') == 1.0.1 && ! -e $installs/1.0.0 ]] && grep -qx 'kubaos-test-tool = "1.0"' "$frag" ||
+    { echo "FAIL update: kubaos-test-tool isn't 1.0.1 with 1.0.0 pruned and the request kept"; printf '%s\n' "$out"; ls "$installs"; return 1; }
+  echo "ok   kubaos suite update test: 1.0.0 → 1.0.1, 1.0.0 pruned, the fragment unchanged; --json lists it, no terminal and no name refuses"
+  out="$(kz 'kubaos suite upgrade test --no-switch' 2>&1)" ||
+    { echo "FAIL kubaos suite upgrade test"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx 'kubaos-test-tool = "3.0"' "$frag" && grep -qx 'version = "3"' "$u/kubaos.d/suites/test.toml" &&
+    [[ $(zlogin 'kubaos-test-tool') == 3.0.0 && ! -e $installs/1.0.1 ]] ||
+    { echo "FAIL upgrade: not on 3.0 in the fragment and 3 in the record, or 1.0.1 not pruned"; printf '%s\n' "$out"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite upgrade test: the fragment asks for 3.0, the record takes version 3, 1.0.1 pruned"
+
   out="$(kz 'kubaos suite configure test --version 2 --extra greeting --foreground' 2>&1)" ||
     { echo "FAIL kubaos suite configure test"; printf '%s\n' "$out" | tail -20; return 1; }
   [[ $(zrun 'kubaos-test-suite version') == 2 ]] && has_bin kubaos-test-suite-greet ||
@@ -2775,6 +2880,8 @@ c_suites() {
     { echo "FAIL configure wrote to the user's file"; printf '%s\n' "$out"; return 1; }
   out="$(opts)"
   [[ $out == "mine 2" ]] || { echo "FAIL after configure: $out (want the user's greeting, the Suite's version 2)"; return 1; }
+  [[ $(zlogin 'kubaos-test-tool') == 2.0.0 && ! -e $installs/1.0.1 ]] ||
+    { echo "FAIL configure: kubaos-test-tool isn't 2.0.0, or 1.0.1 wasn't pruned"; ls "$installs"; return 1; }
   echo "ok   kubaos suite configure --version 2 --extra greeting: applied, the user's file untouched and still winning"
 
   out="$(kz 'kubaos suite new test test-suite-demo' 2>&1)" ||
@@ -2807,7 +2914,15 @@ c_suites() {
   ! has_bin kubaos-test-suite && ! has_bin kubaos-test-suite-greet || { echo "FAIL the Suite's commands are still on PATH"; return 1; }
   out="$(opts)"
   [[ $out == "mine nil" ]] || { echo "FAIL after remove, Neovim has: $out"; return 1; }
-  echo "ok   no leftovers in the generation: packages, environment, PATH, Neovim setting and Suite file all gone"
+  [[ ! -e $frag ]] && [[ -z $(ls -A "$installs" 2>/dev/null) ]] ||
+    { echo "FAIL the Suite's mise fragment or its tool's versions are left"; ls -A "$installs"; return 1; }
+  echo "ok   no leftovers in the generation or in mise: packages, environment, PATH, Neovim setting, Suite file, fragment and versions all gone"
+
+  out="$(kz 'KUBAOS_TEST_TOOL_FAIL=1.0.1 kubaos suite add test --no-switch' 2>&1)" &&
+    { echo "FAIL kubaos suite add succeeded though its mise tool failed to install"; printf '%s\n' "$out"; return 1; }
+  [[ ! -e $u/kubaos.d/suites/test.toml && ! -e $frag ]] && [[ -z $(ls -A "$installs" 2>/dev/null) ]] ||
+    { echo "FAIL a failed install left a record, a fragment or a version behind"; printf '%s\n' "$out"; return 1; }
+  echo "ok   a failed mise install: exit non-zero, and no record, fragment or version left"
 
   out="$(kz 'kubaos suite add test --no-switch && kubaos suite remove test --purge-caches --no-switch' 2>&1)" ||
     { echo "FAIL add + remove --purge-caches"; printf '%s\n' "$out" | tail -20; return 1; }
@@ -2819,101 +2934,835 @@ c_suites() {
   rm -rf "$mine" "$project" "$u/.git"
 }
 
-# Project pins: `kubaos pin` and the `use suite` direnv function
-# (config/direnv/lib/suite.sh), with the test Suite installed at version 1 and
-# folders under ~/Projects/acme pinned to others. Version 3 is in no
-# generation, so its first use fetches it into the store. Each cd is in an
-# interactive zsh, whose direnv hook loads the folder as a terminal would.
+# Project pins: `kubaos pin` and mise's shell hook, with the test Suite
+# installed at version 1 (kubaos-test-tool 1.0.1, from test/mise/) and
+# folders under ~/Projects/acme pinned to others. Each cd is in an
+# interactive zsh, whose mise hook loads the folder as a terminal would.
+# Then the migration of `use suite` and `use bwenv` lines from .envrc files.
 c_pins() {
-  local u="$USER_HOME/.config/kubaos/home" acme="$USER_HOME/Projects/acme" out entry drv3 out3
-  local typo="$USER_HOME/Projects/typo"
+  local u="$USER_HOME/.config/kubaos/home" acme="$USER_HOME/Projects/acme" out
+  local typo="$USER_HOME/Projects/typo" legacy="$USER_HOME/Projects/legacy" nixonly="$USER_HOME/Projects/nixonly"
+  local installs="$USER_HOME/.local/share/mise/installs/kubaos-test-tool"
   install_kubaos || return 1
+  link_test_tool || return 1
   user_flake "$u" || return 1
   as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
-  rm -rf "$acme" "$typo"
-  as_user install -d "$acme/old-app/src" "$acme/new-app" "$acme/other-app" "$typo"
-  # at DIR: direnv's log and `V=<kubaos-test-suite version>` in DIR, then `H=<…>` back in the home.
+  rm -rf "$acme" "$typo" "$legacy" "$nixonly"
+  as_user install -d "$acme/old-app/src" "$acme/new-app" "$typo" "$legacy" "$nixonly"
+  # at DIR: `V=<kubaos-test-tool's version>` in DIR, then `H=<…>` back in the home.
   at() {
-    zsh_pty "zsh -l -i -c 'cd $1; print -r -- V=\$(kubaos-test-suite version); cd; print -r -- H=\$(kubaos-test-suite version)'"
+    zlogin "cd $1; print -r -- V=\$(kubaos-test-tool); cd; print -r -- H=\$(kubaos-test-tool)" 2>&1
   }
-  # version_at DIR: kubaos-test-suite's version in DIR.
+  # version_at DIR: kubaos-test-tool's version in DIR.
   version_at() { at "$1" | sed -n 's/^V=//p'; }
 
   out="$(kz 'kubaos suite add test --foreground' 2>&1)" ||
     { echo "FAIL kubaos suite add test"; printf '%s\n' "$out" | tail -20; return 1; }
-  entry="$USER_HOME/.local/share/kubaos/toolchains/test/3"
-  { IFS= read -r drv3 && IFS= read -r out3; } <"$entry" && [[ $drv3 == /nix/store/*.drv!bin && $out3 == /nix/store/*-bin ]] ||
-    { echo "FAIL no toolchain entry for the test Suite's version 3 at $entry"; return 1; }
-  "$NIX_BIN/nix-store" --delete "$out3" >/dev/null 2>&1 || true
-  [[ ! -e $out3 ]] || { echo "FAIL $out3 is still in the store, so version 3 can't show a first fetch"; return 1; }
-  [[ -e ${drv3%!bin} ]] || { echo "FAIL the generation doesn't keep ${drv3%!bin}"; return 1; }
-  echo "ok   the test Suite installed at 1; version 3 has a toolchain entry for its bin output, its derivation kept, the output not in the store"
+  [[ ! -e $installs/3.0.0 ]] || { echo "FAIL kubaos-test-tool 3.0.0 is installed before any pin"; return 1; }
+  echo "ok   the test Suite installed at 1, kubaos-test-tool 3.0.0 not installed"
 
   out="$(kz "kubaos pin test 3 $acme" 2>&1)" || { echo "FAIL kubaos pin test 3"; printf '%s\n' "$out"; return 1; }
-  [[ $(cat "$acme/.envrc") == 'use suite test 3' ]] && grep -q 'fetches it the first time' <<<"$out" ||
-    { echo "FAIL kubaos pin wrote:"; cat "$acme/.envrc"; printf '%s\n' "$out"; return 1; }
+  [[ $(cat "$acme/mise.toml") == $'[tools]\nkubaos-test-tool = "3"' && -x $installs/3.0.0/bin/kubaos-test-tool ]] &&
+    grep -qF 'pinned the Test Suite to 3 for ~/Projects/acme, in a new ~/Projects/acme/mise.toml' <<<"$out" ||
+    { echo "FAIL kubaos pin wrote:"; cat "$acme/mise.toml"; printf '%s\n' "$out"; ls -A "$installs"; return 1; }
   out="$(kz "kubaos pins $acme/old-app/src" 2>&1)"
-  grep -qF 'test 3  from ~/Projects/acme/.envrc  (installed: 1; fetched on first use)' <<<"$out" ||
+  grep -qF 'test 3  from ~/Projects/acme/mise.toml  (installed: 1; 3.0.0)' <<<"$out" ||
     { echo "FAIL kubaos pins below the pin:"; printf '%s\n' "$out"; return 1; }
-  echo "ok   kubaos pin test 3 ~/Projects/acme: the .envrc line, and kubaos pins sees it two folders down"
+  echo "ok   kubaos pin test 3 ~/Projects/acme: 3.0.0 installed first, then the mise.toml, and kubaos pins sees it two folders down"
 
   out="$(at "$acme/old-app/src")"
-  [[ $(sed -n 's/^V=//p' <<<"$out") == 3 && $(sed -n 's/^H=//p' <<<"$out") == 1 ]] ||
-    { echo "FAIL cd ~/Projects/acme/old-app/src should give 3, the home 1:"; printf '%s\n' "$out"; return 1; }
-  grep -q 'fetching test 3 into the Nix store' <<<"$out" && [[ -e $out3 ]] ||
-    { echo "FAIL version 3 was not fetched on first use"; printf '%s\n' "$out"; return 1; }
-  local roots="$acme/.direnv/suites/test" inode
-  [[ $(readlink "$roots/3-bin") == "$out3" ]] ||
-    { echo "FAIL no GC root ~/Projects/acme/.direnv/suites/test/3-bin for version 3"; ls -la "$roots" 2>&1; return 1; }
-  echo "ok   cd ~/Projects/acme/old-app/src: version 3, fetched into the store on first use and kept by a GC root; leaving gives 1 back"
-  # nix-store --add-root replaces the link, so an unchanged inode means the load realised nothing.
-  inode="$(stat -c %i "$roots/3-bin")"
-  out="$(at "$acme/old-app")"
-  [[ $(sed -n 's/^V=//p' <<<"$out") == 3 && $(stat -c %i "$roots/3-bin") == "$inode" ]] ||
-    { echo "FAIL the second cd should use version 3 as it is, realising nothing"; printf '%s\n' "$out"; return 1; }
-  echo "ok   the next cd uses it as it is, without asking Nix"
+  [[ $(sed -n 's/^V=//p' <<<"$out") == 3.0.0 && $(sed -n 's/^H=//p' <<<"$out") == 1.0.1 ]] ||
+    { echo "FAIL cd ~/Projects/acme/old-app/src should give 3.0.0, the home 1.0.1:"; printf '%s\n' "$out"; return 1; }
+  echo "ok   cd ~/Projects/acme/old-app/src: 3.0.0; leaving gives 1.0.1 back"
 
-  kz "kubaos pin test 2 $acme" >/dev/null 2>&1 && [[ $(version_at "$acme/old-app") == 2 && $(ls "$roots") == 2-bin ]] ||
-    { echo "FAIL re-pinning to 2 should leave only the 2-bin root"; ls -la "$roots"; return 1; }
-  kz "kubaos pin test 3 $acme" >/dev/null 2>&1 && [[ $(version_at "$acme/old-app") == 3 && $(ls "$roots") == 3-bin ]] ||
-    { echo "FAIL re-pinning to 3 should leave only the 3-bin root"; ls -la "$roots"; return 1; }
-  echo "ok   re-pinning drops the old version's GC root"
+  zrun 'cd / && MISE_YES=1 mise prune --tools' >/dev/null 2>&1
+  [[ -x $installs/3.0.0/bin/kubaos-test-tool ]] ||
+    { echo "FAIL mise prune deleted 3.0.0, which ~/Projects/acme/mise.toml pins"; ls -A "$installs"; return 1; }
+  echo "ok   mise prune keeps the pinned 3.0.0: kubaos pin made mise track the file"
 
-  printf 'source_up\n' | as_user tee "$acme/new-app/.envrc" >/dev/null
   out="$(kz "kubaos pin test 2 $acme/new-app" 2>&1)" || { echo "FAIL kubaos pin test 2"; printf '%s\n' "$out"; return 1; }
-  [[ $(version_at "$acme/new-app") == 2 ]] || { echo "FAIL the nearer pin (2) doesn't win in new-app"; at "$acme/new-app"; return 1; }
-  printf 'export OTHER=1\n' | as_user tee "$acme/other-app/.envrc" >/dev/null
-  zrun "direnv allow $acme/other-app" >/dev/null 2>&1
-  out="$(kz "kubaos pins $acme/other-app" 2>&1)"
-  [[ $(version_at "$acme/other-app") == 1 ]] && grep -qF "doesn't reach here: ~/Projects/acme/other-app/.envrc has no \`source_up\`" <<<"$out" ||
-    { echo "FAIL other-app's .envrc without source_up: want 1, said so by kubaos pins"; printf '%s\n' "$out"; return 1; }
+  [[ $(version_at "$acme/new-app") == 2.0.0 && $(version_at "$acme/old-app") == 3.0.0 ]] ||
+    { echo "FAIL the nearer pin (2) should win in new-app, 3 stay in old-app"; at "$acme/new-app"; return 1; }
   out="$(kz 'kubaos pins --all' 2>&1)"
   # shellcheck disable=SC2088 # kubaos prints paths under the home with a literal ~.
   grep -qF '~/Projects/acme  test 3' <<<"$out" && grep -qF '~/Projects/acme/new-app  test 2' <<<"$out" ||
     { echo "FAIL kubaos pins --all:"; printf '%s\n' "$out"; return 1; }
-  echo "ok   nested: new-app's own pin (2, after source_up) wins; other-app's .envrc without source_up keeps 1, and kubaos pins says why"
+  echo "ok   nested: new-app's own pin (2) wins there, old-app keeps 3; kubaos pins --all lists both"
 
-  printf 'use suite test 9\n' | as_user tee "$typo/.envrc" >/dev/null
-  zrun "direnv allow $typo" >/dev/null 2>&1
-  out="$(at "$typo")"
-  grep -qF 'the test Suite has no version 9 (it has: 1, 2, 3)' <<<"$out" && [[ $(sed -n 's/^V=//p' <<<"$out") == 1 ]] ||
-    { echo "FAIL use suite test 9 should say which versions there are and leave 1"; printf '%s\n' "$out"; return 1; }
-  echo "ok   use suite test 9: the versions there are, and the installed one stays"
-  # The entry appearing while a shell is in the folder, as a switch would add it, reloads it.
-  out="$(zsh_pty "zsh -l -i -c 'cd $typo; cp $USER_HOME/.local/share/kubaos/toolchains/test/3 $USER_HOME/.local/share/kubaos/toolchains/test/9; _direnv_hook; print -r -- V=\$(kubaos-test-suite version)'")"
-  rm -f "$USER_HOME/.local/share/kubaos/toolchains/test/9"
-  [[ $(sed -n 's/^V=//p' <<<"$out") == 3 ]] ||
-    { echo "FAIL a shell in the folder should reload once the entry for 9 appears"; printf '%s\n' "$out"; return 1; }
-  echo "ok   a shell already in the folder reloads when the missing entry appears"
+  out="$(kz "KUBAOS_TEST_TOOL_FAIL=9 kubaos pin test 9 $typo" 2>&1)" &&
+    { echo "FAIL kubaos pin test 9 succeeded"; printf '%s\n' "$out"; return 1; }
+  [[ ! -e $typo/mise.toml ]] && grep -qF 'installing kubaos-test-tool@9 with mise' <<<"$out" ||
+    { echo "FAIL a version mise can't install should write nothing and say so"; printf '%s\n' "$out"; return 1; }
+  echo "ok   kubaos pin test 9, whose install fails: nothing is written"
+
+  printf 'use suite test 2\nuse bwenv demo\n' | as_user tee "$legacy/.envrc" >/dev/null
+  printf 'use flake\nuse suite php 8.3\n' | as_user tee "$nixonly/.envrc" >/dev/null
+  out="$(zrun "KUBAOS_DIR='$REPO' KUBAOS_BACKUPS='$USER_HOME/.local/state/kubaos/backups' PATH=/usr/local/bin:\$PATH bash -euo pipefail '$REPO/migrations/user/1794388664-project-pins-on-mise.sh'" 2>&1)" ||
+    { echo "FAIL the project-pins-on-mise migration"; printf '%s\n' "$out"; return 1; }
+  # shellcheck disable=SC2088 # kubaos prints paths under the home with a literal ~.
+  [[ ! -e $legacy/.envrc && $(cat "$nixonly/.envrc") == $'use flake\nuse suite php 8.3' ]] &&
+    grep -qx 'kubaos-test-tool = "2"' "$legacy/mise.toml" && grep -qx 'KUBAOS_BWENV = "demo"' "$legacy/mise.toml" &&
+    grep -qF '~/Projects/nixonly/.envrc:2: nothing reads `use suite php 8.3`' <<<"$out" ||
+    { echo "FAIL the migration:"; printf '%s\n' "$out"; cat "$legacy/mise.toml"; return 1; }
+  out="$(zlogin "cd $legacy; print -r -- V=\$(kubaos-test-tool) B=\$KUBAOS_BWENV" 2>&1)"
+  grep -qx 'V=2.0.0 B=demo' <<<"$out" ||
+    { echo "FAIL cd into the migrated folder: want 2.0.0 and KUBAOS_BWENV=demo, trusted"; printf '%s\n' "$out"; return 1; }
+  echo "ok   the migration: use suite and use bwenv moved to a trusted mise.toml, the .envrc deleted; php's line left and named"
 
   out="$(kz "kubaos unpin test $acme" 2>&1)" || { echo "FAIL kubaos unpin"; printf '%s\n' "$out"; return 1; }
-  [[ ! -e $acme/.envrc && ! -e $acme/.direnv && $(version_at "$acme/old-app") == 1 && $(version_at "$acme/new-app") == 2 ]] ||
-    { echo "FAIL after unpin: want no ~/Projects/acme/.envrc nor .direnv, 1 in old-app, 2 in new-app"; printf '%s\n' "$out"; return 1; }
-  echo "ok   kubaos unpin test ~/Projects/acme: the .envrc and its GC roots gone, old-app back to 1, new-app keeps its own 2"
+  [[ ! -e $acme/mise.toml && ! -e $installs/3.0.0 && $(version_at "$acme/old-app") == 1.0.1 && $(version_at "$acme/new-app") == 2.0.0 ]] ||
+    { echo "FAIL after unpin: want no ~/Projects/acme/mise.toml nor 3.0.0, 1.0.1 in old-app, 2.0.0 in new-app"; printf '%s\n' "$out"; ls -A "$installs"; return 1; }
+  echo "ok   kubaos unpin test ~/Projects/acme: the mise.toml gone, 3.0.0 pruned, old-app back to 1.0.1, new-app keeps 2.0.0"
 
-  rm -rf "$acme" "$typo"
+  rm -rf "$acme" "$typo" "$legacy" "$nixonly"
   out="$(kz 'kubaos suite remove test --foreground' 2>&1)" ||
     { echo "FAIL kubaos suite remove test"; printf '%s\n' "$out" | tail -20; return 1; }
+}
+
+# gone_from_generation WHAT PATTERN: fails, naming WHAT, when a store path of
+# the home's current generation (its .drv files aside) matches the extended
+# regex PATTERN.
+gone_from_generation() {
+  local gen left
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  left="$("$NIX_BIN/nix-store" -qR "$gen" | grep -v '\.drv$' | grep -E -- "$2" || true)"
+  [[ -z $left ]] || { echo "FAIL $1 still in the generation:"; printf '%s\n' "$left"; return 1; }
+}
+
+# The Rust Suite (crates/kubaos-core/src/suites/catalog.rs,
+# home/suites/rust.nix): rustup, cargo-nextest, sccache, codelldb and wild
+# from mise, rustup's proxies in ~/.nix-profile/bin linked to that rustup, and
+# the stable toolchain rustup downloads on first use, with the minimal
+# profile (network). A home from before mise moves onto it through the
+# migration with its extras; a folder's rust-toolchain.toml still picks the
+# toolchain under mise's hook; a project is scaffolded and built with sccache
+# and mold, then wild; the user's own cargo settings and environment win over
+# the Suite's defaults; Neovim finds rust-analyzer and codelldb through
+# exepath; removal leaves nothing of it in mise or the generation, and a
+# fresh add seeds rustup's and cargo's settings without a download.
+c_suite_rust() {
+  local u="$USER_HOME/.config/kubaos/home" project="$USER_HOME/Projects/rust-demo" ws="$USER_HOME/Projects/rust-ws"
+  local pinned="$USER_HOME/Projects/rust-pinned" out gen t
+  local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/rust.lua"
+  local cargo_config="$USER_HOME/.cargo/config.toml" defaults="$USER_HOME/.cargo/kubaos.toml"
+  local settings="$USER_HOME/.rustup/settings.toml" frag="$USER_HOME/.config/mise/conf.d/kubaos-rust.toml"
+  local installs="$USER_HOME/.local/share/mise/installs" shims="$USER_HOME/.local/share/mise/shims"
+  local migration=("$REPO"/migrations/user/*-rust-on-mise.sh)
+  local proxies=(rustup cargo rustc rustfmt cargo-clippy rust-analyzer codelldb)
+  local folders=(aqua-rust-lang-rustup aqua-nextest-rs-nextest-cargo-nextest aqua-mozilla-sccache github-vadimcn-codelldb github-wild-linker-wild)
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$project" "$ws" "$pinned" "$mine" "$USER_HOME/.rustup" "$USER_HOME/.cargo"
+  # linker_of BIN: the linker that wrote BIN, from its .comment section, in lowercase.
+  linker_of() { readelf -p .comment "$1" | grep -oiE 'mold|wild' | head -1 | tr '[:upper:]' '[:lower:]'; }
+  # rustc_line DIR [ENV]: rustc's command line in a clean `cargo build -v` in DIR, with ENV before it.
+  rustc_line() { zrun "cd $1 && cargo clean -q && ${2:-} cargo build -v 2>&1" | grep -F 'Running `' | tail -1; }
+  # versions_left: the tool versions mise still has of the Suite. A pruned tool
+  # keeps its folder and mise's .mise.backend.toml in it.
+  versions_left() { find "${folders[@]/#/$installs/}" -mindepth 1 -maxdepth 1 -type d 2>/dev/null; }
+
+  # A home as the Suite on Nix left it: the record with the wild extra, no
+  # fragment, and rustup's settings as that Suite wrote them, but for the
+  # minimal profile, so the check downloads less.
+  as_user install -d "$u/kubaos.d/suites" "$USER_HOME/.rustup"
+  printf 'extras = ["wild"]\n' | as_user tee "$u/kubaos.d/suites/rust.toml" >/dev/null
+  printf 'version = "12"\ndefault_toolchain = "stable"\nprofile = "minimal"\n' | as_user tee "$settings" >/dev/null
+  out="$(kz 'kubaos switch --foreground' 2>&1)" ||
+    { echo "FAIL the switch with the old Rust record"; printf '%s\n' "$out" | tail -20; return 1; }
+  gone_from_generation "the Rust Suite's Nix tools" '-(rustup|cargo-nextest|sccache|wild-unwrapped)-[0-9]' || return 1
+  has_bin kubaos-rust-workspace && has_bin bacon && [[ -L $USER_HOME/.nix-profile/bin/cargo && -L $defaults ]] ||
+    { echo "FAIL the module's scaffolder, bacon, rustup's proxies or cargo's defaults are missing"; return 1; }
+  for _ in 1 2; do
+    out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+      { echo "FAIL the rust-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
+  done
+  quiet_shell "the rust-on-mise migration" || return 1
+  grep -qx '"aqua:rust-lang/rustup" = "1.29"' "$frag" && grep -qx '"github:wild-linker/wild" = "0.11"' "$frag" &&
+    grep -qF 'already extras: wild' <<<"$out" && [[ $(cat "$u/kubaos.d/suites/rust.toml") == 'extras = ["wild"]' ]] ||
+    { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  grep -qx 'auto_self_update = "disable"' "$settings" && grep -qx 'profile = "minimal"' "$settings" ||
+    { echo "FAIL the migration should turn rustup's self-update off and keep the rest:"; cat "$settings"; return 1; }
+  [[ $(readlink -f "$USER_HOME/.nix-profile/bin/cargo") == "$installs"/aqua-rust-lang-rustup/1.29.*/rustup ]] ||
+    { echo "FAIL cargo isn't a proxy of mise's rustup: $(readlink -f "$USER_HOME/.nix-profile/bin/cargo")"; return 1; }
+  echo "ok   the rust-on-mise migration: a record with wild gets its fragment and tools, the record kept, self-update off, a rerun changes nothing"
+
+  [[ $(zrun 'rustc --version') == 'rustc 1.'* && -d $USER_HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu ]] ||
+    { echo "FAIL the first rustc should download stable into ~/.rustup: $(zrun 'rustc --version' 2>&1 | tail -3)"; return 1; }
+  [[ -z $(zlogin 'print -r -- "$RUSTUP_HOME$CARGO_HOME$RUSTUP_TOOLCHAIN"') && $(zlogin 'rustup show home') == "$USER_HOME/.rustup" ]] ||
+    { echo "FAIL mise's hook sets RUSTUP_HOME, CARGO_HOME or RUSTUP_TOOLCHAIN: $(zlogin 'env | grep -E "^(RUSTUP|CARGO)_"')"; return 1; }
+  zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.cargo/bin" && [[ $(zrun 'print -r -- "$SCCACHE_CACHE_SIZE"') == 10G ]] ||
+    { echo "FAIL ~/.cargo/bin is not on PATH, or SCCACHE_CACHE_SIZE is not 10G"; return 1; }
+  # rustup itself is mise's, ahead of its link; every other proxy is a link to it.
+  for t in "${proxies[@]:1}"; do
+    [[ $(zlogin "whence -p $t") == "$USER_HOME/.nix-profile/bin/$t" ]] || { echo "FAIL $t is not the Suite's link: $(zlogin "whence -p $t")"; return 1; }
+  done
+  [[ $(zlogin 'whence -p rustup') == "$installs"/aqua-rust-lang-rustup/1.29.*/rustup ]] ||
+    { echo "FAIL rustup is not mise's in an interactive zsh: $(zlogin 'whence -p rustup')"; return 1; }
+  for t in cargo-nextest sccache wild; do
+    [[ $(zrun "whence -p $t") == "$shims/$t" ]] || { echo "FAIL $t is not mise's shim in a login shell: $(zrun "whence -p $t")"; return 1; }
+  done
+  [[ $(zlogin 'whence -p cargo-nextest') == "$installs/aqua-nextest-rs-nextest-cargo-nextest/"* ]] ||
+    { echo "FAIL an interactive zsh doesn't put mise's own entries ahead of the shims: $(zlogin 'whence -p cargo-nextest')"; return 1; }
+  echo "ok   stable downloaded into ~/.rustup on first use; no RUSTUP_HOME, CARGO_HOME or RUSTUP_TOOLCHAIN; rustup's proxies are the Suite's links, the tools mise's"
+
+  zrun 'rustup toolchain link kubaos-check "$(rustc --print sysroot)"' >/dev/null || { echo "FAIL rustup toolchain link"; return 1; }
+  as_user install -d "$pinned"
+  printf '[toolchain]\nchannel = "kubaos-check"\n' | as_user tee "$pinned/rust-toolchain.toml" >/dev/null
+  [[ $(zlogin "cd $pinned && rustup show active-toolchain") == 'kubaos-check '* && $(zlogin 'rustup show active-toolchain') == stable-* ]] ||
+    { echo "FAIL rust-toolchain.toml should pick the toolchain: $(zlogin "cd $pinned && rustup show active-toolchain")"; return 1; }
+  zrun 'rustup toolchain uninstall kubaos-check' >/dev/null 2>&1
+  echo "ok   a folder's rust-toolchain.toml picks its toolchain under mise's hook, stable outside"
+
+  out="$(kz 'kubaos suite configure rust --no-extra wild --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite configure rust --no-extra wild"; printf '%s\n' "$out" | tail -20; return 1; }
+  ! grep -q wild "$frag" && [[ -z $(find "$installs/github-wild-linker-wild" -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
+    { echo "FAIL configure: wild is left in the fragment or installed"; cat "$frag"; return 1; }
+  grep -qx 'rustc-wrapper = "sccache"' "$defaults" && grep -qF 'link-arg=-fuse-ld=mold' "$defaults" ||
+    { echo "FAIL ~/.cargo/kubaos.toml without wild:"; cat "$defaults"; return 1; }
+  [[ -f $cargo_config && ! -L $cargo_config ]] && grep -qx 'include = \["kubaos.toml"\]' "$cargo_config" ||
+    { echo "FAIL ~/.cargo/config.toml should be the user's file, including kubaos.toml:"; ls -l "$cargo_config"; cat "$cargo_config"; return 1; }
+  [[ -f $mine ]] || { echo "FAIL plugins/rust.lua was not seeded"; return 1; }
+  echo "ok   kubaos suite configure rust --no-extra wild: wild pruned, cargo's defaults on mold, ~/.cargo/config.toml the user's and including them, the seeded rust.lua"
+
+  out="$(kz 'kubaos suite new rust rust-demo' 2>&1)" ||
+    { echo "FAIL kubaos suite new rust rust-demo"; printf '%s\n' "$out" | tail -20; return 1; }
+  out="$(rustc_line "$project")"
+  grep -qF sccache <<<"$out" && grep -qF -- '-C linker=clang' <<<"$out" && grep -qF -- '-fuse-ld=mold' <<<"$out" &&
+    [[ $(zrun "$project/target/debug/rust-demo") == 'Hello, world!' && $(linker_of "$project/target/debug/rust-demo") == mold && -d $project/.git ]] ||
+    { echo "FAIL rust-demo should build through sccache and link with clang and mold, and run:"; printf '%s\n' "$out"; return 1; }
+  zrun "cd $project && cargo nextest --version && bacon --version" >/dev/null 2>&1 ||
+    { echo "FAIL cargo nextest or bacon in the project"; zrun "cd $project && cargo nextest --version; bacon --version" 2>&1 | tail -5; return 1; }
+  out="$(kz 'kubaos suite new rust rust-ws --with workspace' 2>&1)" && zrun "cd $ws && cargo check -q" >/dev/null 2>&1 &&
+    grep -qx 'members = \["crates/\*"\]' "$ws/Cargo.toml" && [[ -f $ws/crates/rust-ws/src/lib.rs ]] ||
+    { echo "FAIL the workspace scaffolder"; printf '%s\n' "$out" | tail -10; return 1; }
+  echo "ok   kubaos suite new rust: a binary under git built through sccache, linked by clang with mold, and run; cargo nextest and bacon; a workspace that checks"
+
+  as_user cp "$cargo_config" "$cargo_config.kept"
+  printf '\n[build]\nrustc-wrapper = ""\n\n[target.x86_64-unknown-linux-gnu]\nlinker = "cc"\n' | as_user tee -a "$cargo_config" >/dev/null
+  out="$(rustc_line "$project")"
+  ! grep -qF sccache <<<"$out" && grep -qF -- '-C linker=cc' <<<"$out" ||
+    { echo "FAIL the user's ~/.cargo/config.toml should win over kubaos.toml:"; printf '%s\n' "$out"; return 1; }
+  as_user mv "$cargo_config.kept" "$cargo_config"
+  out="$(rustc_line "$project" 'RUSTC_WRAPPER=')"
+  ! grep -qF sccache <<<"$out" || { echo "FAIL RUSTC_WRAPPER= should drop sccache:"; printf '%s\n' "$out"; return 1; }
+  echo "ok   the user's own ~/.cargo/config.toml and RUSTC_WRAPPER win over the Suite's defaults"
+
+  out="$(kz 'kubaos suite configure rust --extra wild --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite configure rust --extra wild"; printf '%s\n' "$out" | tail -20; return 1; }
+  out="$(rustc_line "$project")"
+  grep -qF 'link-arg=--ld-path=wild' "$defaults" && ! grep -qF mold "$defaults" && [[ $(linker_of "$project/target/debug/rust-demo") == wild ]] ||
+    { echo "FAIL with the wild extra, rust-demo should link with wild:"; cat "$defaults"; printf '%s\n' "$out"; return 1; }
+  echo "ok   the wild extra installs wild, and rust-demo links with it through its shim"
+
+  cache_lock nvim
+  out="$(zrun "cd $project && nvim --headless +'lua local a = vim.g.rustaceanvim.dap.adapter(); io.write(\"\\nMASON \", table.concat(LazyVim.opts(\"mason.nvim\").ensure_installed, \",\"), \"\\nPATHS \", vim.fn.exepath(\"rust-analyzer\"), \" \", vim.fn.exepath(\"codelldb\"), \"\\nLIBLLDB \", a.executable.args[2])' +qa" 2>&1 | tr -d '\r')"
+  grep -qx "PATHS $USER_HOME/.nix-profile/bin/rust-analyzer $USER_HOME/.nix-profile/bin/codelldb" <<<"$out" &&
+    grep -q '^MASON ' <<<"$out" && ! grep '^MASON ' <<<"$out" | grep -qw codelldb &&
+    [[ -f $(sed -n 's/^LIBLLDB //p' <<<"$out") ]] ||
+    { echo "FAIL Neovim should find rust-analyzer and codelldb through exepath, codelldb's own LLDB, and ask Mason for neither:"; printf '%s\n' "$out" | grep -E '^(MASON|PATHS|LIBLLDB)|rror'; return 1; }
+  [[ $(zrun "cd $project && rust-analyzer --version") == rust-analyzer* ]] ||
+    { echo "FAIL rust-analyzer should add its component and run: $(zrun "cd $project && rust-analyzer --version" 2>&1 | tail -3)"; return 1; }
+  echo "ok   Neovim finds rust-analyzer and codelldb through exepath, codelldb with the LLDB of its extension; rust-analyzer adds its component on first run"
+
+  # The builds above left sccache's server running from the Suite's sccache,
+  # which the removal stops before its prune.
+  out="$(kz 'kubaos suite remove rust --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove rust"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^cache ~/.rustup \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" && [[ -f $settings && -f $project/src/main.rs ]] &&
+    grep -qx '  ~/.config/kubaos/editor/nvim/plugins/rust.lua' <<<"$out" ||
+    { echo "FAIL remove: ~/.rustup's size or keeping it, the user's rust.lua, or the project"; printf '%s\n' "$out"; return 1; }
+  [[ ! -e $frag && -z $(versions_left) ]] || { echo "FAIL remove: the fragment or a version is left"; versions_left; return 1; }
+  for t in "${proxies[@]}" bacon kubaos-rust-workspace cargo-nextest sccache wild; do
+    [[ ! -e $shims/$t ]] && ! zrun "whence -p $t" >/dev/null || { echo "FAIL $t is still on PATH"; return 1; }
+  done
+  gone_from_generation "the Rust Suite's packages" '-(kubaos-rustup-proxies|rust-analyzer|bacon-[0-9.]+|kubaos-rust-workspace|kubaos\.toml)(-|$)' || return 1
+  [[ -f $cargo_config && -f $defaults && ! -L $defaults ]] && ! grep -qE 'sccache|mold|wild' "$defaults" ||
+    { echo "FAIL remove: ~/.cargo/config.toml should stay, with an empty kubaos.toml for its include"; ls -l "$USER_HOME/.cargo"; cat "$defaults"; return 1; }
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  ! zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.cargo/bin" &&
+    ! grep -qs SCCACHE "$gen/home-path/etc/profile.d/hm-session-vars.sh" &&
+    ! grep -qF lang.rust "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
+    { echo "FAIL ~/.cargo/bin on PATH, the Suite's environment or its Neovim extra is left"; return 1; }
+  echo "ok   kubaos suite remove rust: fragment, versions and links gone, ~/.rustup kept with its size shown, rust.lua listed, the user's config.toml kept with an empty kubaos.toml, nothing of it left in the generation"
+
+  rm -rf "$USER_HOME/.rustup" "$USER_HOME/.cargo"
+  out="$(kz 'kubaos suite add rust --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add rust"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx '"aqua:rust-lang/rustup" = "1.29"' "$frag" && ! grep -q wild "$frag" &&
+    [[ $(readlink -f "$USER_HOME/.nix-profile/bin/cargo") == "$installs"/aqua-rust-lang-rustup/1.29.*/rustup ]] ||
+    { echo "FAIL kubaos suite add rust: the fragment, or cargo isn't a proxy of mise's rustup"; cat "$frag"; return 1; }
+  grep -qx 'default_toolchain = "stable"' "$settings" && grep -qx 'profile = "default"' "$settings" &&
+    grep -qx 'auto_self_update = "disable"' "$settings" && [[ ! -e $USER_HOME/.rustup/toolchains ]] ||
+    { echo "FAIL rustup's settings, or a toolchain downloaded at the switch:"; cat "$settings"; return 1; }
+  [[ -f $cargo_config && ! -L $cargo_config && -L $defaults ]] && grep -qx 'include = \["kubaos.toml"\]' "$cargo_config" &&
+    grep -qF 'link-arg=-fuse-ld=mold' "$defaults" ||
+    { echo "FAIL cargo's settings after a fresh add:"; ls -l "$USER_HOME/.cargo"; return 1; }
+  echo "ok   kubaos suite add rust: every tool but wild, rustup's settings (stable, default profile, no self-update) and cargo's, nothing downloaded"
+  expect_ok "kubaos suite remove rust again" kz 'kubaos suite remove rust --foreground' || return 1
+  rm -rf "$project" "$ws" "$pinned" "$mine" "$USER_HOME/.rustup" "$USER_HOME/.cargo"
+}
+
+# The Go Suite (crates/kubaos-core/src/suites/catalog.rs, home/suites/go.nix):
+# Go and its tools from mise, which downloads them (Go, gofumpt,
+# golangci-lint and delve) or builds them (gopls, goimports). A home from
+# before mise moves onto it through the migration at its version; configure
+# moves Go's line and prunes the old one; a project is scaffolded and run;
+# a login shell and Neovim without mise's hook find the tools through the
+# shims; removal leaves nothing of it in mise or the generation, and a fresh
+# add installs the default line.
+c_suite_go() {
+  local u="$USER_HOME/.config/kubaos/home" project="$USER_HOME/Projects/go-demo" out gen t
+  local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/go.lua"
+  local frag="$USER_HOME/.config/mise/conf.d/kubaos-go.toml" defaults="$USER_HOME/.config/mise/conf.d/kubaos-go_defaults.toml"
+  local installs="$USER_HOME/.local/share/mise/installs" shims="$USER_HOME/.local/share/mise/shims"
+  local migration=("$REPO"/migrations/user/*-go-on-mise.sh)
+  local tools=(go gofmt gopls gofumpt goimports golangci-lint dlv)
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$project" "$mine"
+  # on_shims: each Go tool resolves to its shim in a login shell, which runs
+  # no mise hook.
+  on_shims() {
+    local t
+    for t in "${tools[@]}"; do
+      [[ $(zrun "whence -p $t") == "$shims/$t" ]] || { echo "FAIL $t is not mise's shim in a login shell: $(zrun "whence -p $t")"; return 1; }
+    done
+  }
+
+  # A home as the Suite on Nix left it: the record, no fragment, and the
+  # session's GOTOOLCHAIN=local, under which the old Go would build nothing.
+  as_user install -d "$u/kubaos.d/suites"
+  printf 'version = "1.26"\nextras = []\n' | as_user tee "$u/kubaos.d/suites/go.toml" >/dev/null
+  out="$(kz 'kubaos switch --foreground' 2>&1)" ||
+    { echo "FAIL the switch with the old Go record"; printf '%s\n' "$out" | tail -20; return 1; }
+  gone_from_generation "the Go Suite's Nix toolchain" '-(go-1\.[0-9.]+|gopls|gofumpt|gotools|golangci-lint|delve)(-|$)' || return 1
+  has_bin kubaos-go-new && [[ -L $defaults ]] || { echo "FAIL the module's scaffolder or mise defaults are missing"; return 1; }
+  for _ in 1 2; do
+    out="$(kz "GOTOOLCHAIN=local KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+      { echo "FAIL the go-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
+  done
+  quiet_shell "the go-on-mise migration" || return 1
+  grep -qx 'go = "1.26"' "$frag" && grep -qx '"go:golang.org/x/tools/gopls" = "0.24"' "$frag" &&
+    grep -q 'already version 1.26' <<<"$out" && grep -qx 'version = "1.26"' "$u/kubaos.d/suites/go.toml" ||
+    { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  [[ $(zrun 'go env GOVERSION') == go1.26.* && -z $(zrun 'print -r -- "$GOTOOLCHAIN$GOBIN"') ]] ||
+    { echo "FAIL want Go 1.26 with no GOTOOLCHAIN or GOBIN: $(zrun 'go env GOVERSION GOTOOLCHAIN GOBIN' | tr '\n' ' ')"; return 1; }
+  on_shims || return 1
+  echo "ok   the go-on-mise migration: a 1.26 record gets its fragment and tools at 1.26 through the shims, the record kept, a rerun changes nothing"
+
+  out="$(kz 'kubaos suite configure go --version 1.27 --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite configure go --version 1.27"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(zrun 'go env GOVERSION') == go1.27.* && -z $(compgen -G "$installs/go/1.26*") ]] ||
+    { echo "FAIL configure: not Go 1.27, or 1.26 wasn't pruned"; ls "$installs/go"; return 1; }
+  [[ -f $mine ]] || { echo "FAIL plugins/go.lua was not seeded"; return 1; }
+  grep -qx 'go = "1.27"' "$frag" || { echo "FAIL configure: the fragment doesn't ask for go 1.27:"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite configure go --version 1.27: Go 1.27, 1.26 pruned, the seeded go.lua"
+
+  local path
+  path="$(zrun 'print -r -- $PATH' | tr ':' '\n')"
+  grep -qx "$USER_HOME/go/bin" <<<"$path" || { echo "FAIL ~/go/bin is not on PATH"; return 1; }
+  (($(grep -nxF -- "$shims" <<<"$path" | cut -d: -f1) < $(grep -nxF -- "$USER_HOME/.nix-profile/bin" <<<"$path" | cut -d: -f1))) ||
+    { echo "FAIL mise's shims don't come before ~/.nix-profile/bin in a login shell:"; printf '%s\n' "$path"; return 1; }
+  [[ $(zlogin 'whence -p gopls') == "$installs/go-golang-org-x-tools-gopls/"*/bin/gopls ]] ||
+    { echo "FAIL an interactive zsh doesn't put mise's own entries ahead of the shims: $(zlogin 'whence -p gopls')"; return 1; }
+  # mise's hook would point GOBIN at the bin of the Go it activates; the
+  # Suite's default for mise leaves it unset, and Go's own is ~/go/bin.
+  [[ -z $(zlogin 'print -r -- "$GOBIN"') && $(zlogin 'go env GOBIN') == "$USER_HOME/go/bin" ]] ||
+    { echo "FAIL go install doesn't go to ~/go/bin: $(zlogin 'go env GOBIN GOPATH' | tr '\n' ' ')"; return 1; }
+  echo "ok   ~/go/bin on PATH and Go's own GOBIN; the shims ahead of ~/.nix-profile/bin, behind mise's hook in an interactive zsh"
+
+  out="$(kz 'kubaos suite new go go-demo' 2>&1)" ||
+    { echo "FAIL kubaos suite new go go-demo"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ -d $project/.git && $(zrun "cd $project && go run .") == "Hello from go-demo" ]] &&
+    grep -qx 'module go-demo' "$project/go.mod" ||
+    { echo "FAIL the scaffolded project doesn't run"; ls -la "$project"; return 1; }
+  [[ -z $(zrun "cd $project && gofumpt -l . && goimports -l .") ]] || { echo "FAIL the scaffolded main.go isn't formatted"; return 1; }
+  zrun "cd $project && golangci-lint run ./... && dlv version" >/dev/null 2>&1 ||
+    { echo "FAIL golangci-lint or dlv in the project"; zrun "cd $project && golangci-lint run ./...; dlv version" 2>&1 | tail -5; return 1; }
+  echo "ok   kubaos suite new go go-demo: a module under git whose main package runs, is formatted, lints clean, and dlv runs"
+
+  # A folder of its own: in go-demo, whose go.mod asks for the Go that made
+  # it, Go 1.26 would switch to that toolchain itself.
+  local pinned="$USER_HOME/Projects/go-pinned"
+  as_user install -d "$pinned"
+  out="$(kz "kubaos pin go 1.26 '$pinned'" 2>&1)" ||
+    { echo "FAIL kubaos pin go 1.26"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(zrun "cd $pinned && go env GOVERSION") == go1.26.* && $(zrun 'go env GOVERSION') == go1.27.* ]] ||
+    { echo "FAIL the pin: Go $(zrun "cd $pinned && go env GOVERSION") in the folder, $(zrun 'go env GOVERSION') outside"; return 1; }
+  expect_ok "kubaos unpin go" kz "kubaos unpin go '$pinned'" || return 1
+  [[ -f $frag ]] || { echo "FAIL unpin took the Suite's fragment"; return 1; }
+  echo "ok   kubaos pin go 1.26: the folder runs Go 1.26 through the shims, the home 1.27"
+
+  cache_lock nvim
+  out="$(zrun "nvim --headless +'lua io.write(\"\\nMASON \", table.concat(LazyVim.opts(\"mason.nvim\").ensure_installed, \",\"), \"\\nGOPLS \", tostring(LazyVim.opts(\"nvim-lspconfig\").servers.gopls.mason), \"\\nPATHS \", vim.fn.exepath(\"gopls\"), \" \", vim.fn.exepath(\"dlv\"))' +qa" 2>&1 | tr -d '\r')"
+  grep -qx 'GOPLS false' <<<"$out" && grep -q '^MASON ' <<<"$out" &&
+    ! grep '^MASON ' <<<"$out" | grep -qwE 'delve|gofumpt|goimports|golangci-lint' &&
+    grep -qx "PATHS $shims/gopls $shims/dlv" <<<"$out" ||
+    { echo "FAIL Neovim without mise's hook doesn't take gopls and dlv from the shims, or Mason would install Go tools:"; printf '%s\n' "$out" | grep -E '^(MASON|GOPLS|PATHS)'; return 1; }
+  [[ $(zrun "cd $project && gopls version") == golang.org/x/tools/gopls* ]] || { echo "FAIL gopls through its shim"; return 1; }
+  echo "ok   Neovim started without mise's hook finds gopls and dlv through the shims; LazyVim's Go extra asks Mason for none"
+
+  grep -qx 'go = "1.27"' "$frag" || { echo "FAIL before remove, the fragment is gone or moved:"; ls -la "$(dirname "$frag")"; cat "$frag"; return 1; }
+  out="$(kz 'kubaos suite remove go --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove go"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^cache ~/.cache/go-build \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" &&
+    grep -qx '  ~/.config/kubaos/editor/nvim/plugins/go.lua' <<<"$out" && [[ -f $project/main.go ]] ||
+    { echo "FAIL remove: the build cache's size, the user's go.lua, or the project"; printf '%s\n' "$out"; return 1; }
+  # A pruned tool keeps its folder and mise's .mise.backend.toml in it; its
+  # versions are the folders inside.
+  [[ ! -e $frag && -z $(find "$installs"/go* "$installs"/aqua-* -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
+    { echo "FAIL remove: the fragment or a version is left"; find "$installs" -mindepth 2 -maxdepth 2 -type d; return 1; }
+  for t in "${tools[@]}" kubaos-go-new; do
+    [[ ! -e $shims/$t ]] && ! zrun "whence -p $t" >/dev/null || { echo "FAIL $t is still on PATH"; return 1; }
+  done
+  gone_from_generation "the Go Suite's packages" '-(kubaos-go-new|kubaos-go_defaults\.toml)(-|$)' || return 1
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  [[ ! -e $defaults ]] && ! grep -qF lang.go "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
+    { echo "FAIL the Suite's mise defaults or Neovim extra are left"; return 1; }
+  echo "ok   kubaos suite remove go: fragment, versions and shims gone, the build cache kept, go.lua listed, the project untouched, nothing of it left in the generation"
+
+  out="$(kz 'kubaos suite add go --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add go"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx 'go = "1.27"' "$frag" && [[ $(zrun 'go env GOVERSION') == go1.27.* ]] && on_shims ||
+    { echo "FAIL kubaos suite add go: not Go 1.27 with every tool"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite add go: the default line, 1.27, and every tool"
+  expect_ok "kubaos suite remove go again" kz 'kubaos suite remove go --foreground' || return 1
+  rm -rf "$project" "$mine" "$pinned"
+}
+
+# The Node Suite (crates/kubaos-core/src/suites/catalog.rs, home/suites/node.nix):
+# Node, vtsls and Bun from mise, which downloads them (vtsls from npm). A home
+# from before mise moves onto it through the migration at its version and
+# extras; configure moves Node's line and prunes the old one; global installs
+# land outside mise's folders; projects are scaffolded and run; a pin holds a
+# folder of its own; Neovim without mise's hook finds vtsls through the shims;
+# removal leaves nothing of it in mise or the generation, and a fresh add
+# installs the default line.
+c_suite_node() {
+  local u="$USER_HOME/.config/kubaos/home" project="$USER_HOME/Projects/node-demo" bunproject="$USER_HOME/Projects/bun-demo"
+  local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/node-suite.lua" npmrc="$USER_HOME/.config/npm/npmrc"
+  local frag="$USER_HOME/.config/mise/conf.d/kubaos-node.toml" pinned="$USER_HOME/Projects/node-pinned"
+  local installs="$USER_HOME/.local/share/mise/installs" shims="$USER_HOME/.local/share/mise/shims"
+  local globalpkg="$USER_HOME/.cache/kubaos-node-global" migration=("$REPO"/migrations/user/*-node-on-mise.sh)
+  local tools=(node npm npx vtsls bun bunx) out gen t path
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$project" "$bunproject" "$pinned" "$mine" "$globalpkg"
+  # on_shims: each Node tool resolves to its shim in a login shell, which runs
+  # no mise hook; the container's apt Node in /usr/bin comes after them.
+  on_shims() {
+    local t
+    for t in "${tools[@]}"; do
+      [[ $(zrun "whence -p $t") == "$shims/$t" ]] || { echo "FAIL $t is not mise's shim in a login shell: $(zrun "whence -p $t")"; return 1; }
+    done
+  }
+  # node_at DIR: the major of the Node a login shell runs in DIR.
+  node_at() { zrun "cd $1 && node -p 'process.versions.node.split(\".\")[0]'"; }
+
+  # A home as the Suite on Nix left it: the record at 24 with Bun, no
+  # fragment, and the session's NPM_CONFIG_PREFIX and BUN_INSTALL_CACHE_DIR.
+  as_user install -d "$u/kubaos.d/suites"
+  printf 'version = "24"\nextras = ["bun"]\n' | as_user tee "$u/kubaos.d/suites/node.toml" >/dev/null
+  out="$(kz 'kubaos switch --foreground' 2>&1)" ||
+    { echo "FAIL the switch with the old Node record"; printf '%s\n' "$out" | tail -20; return 1; }
+  gone_from_generation "the Node Suite's Nix toolchain" '-(vtsls|bun)-[0-9]' || return 1
+  for t in node npm vtsls bun; do
+    ! has_bin "$t" || { echo "FAIL $t is still in the home's packages"; return 1; }
+  done
+  has_bin kubaos-node-new && has_bin js-debug-adapter && [[ -L $npmrc ]] ||
+    { echo "FAIL the module's scaffolder, debugger or global npmrc is missing"; return 1; }
+  for _ in 1 2; do
+    out="$(kz "NPM_CONFIG_PREFIX='$USER_HOME/.local/share/npm' BUN_INSTALL_CACHE_DIR='$USER_HOME/.cache/bun' KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+      { echo "FAIL the node-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
+  done
+  quiet_shell "the node-on-mise migration" || return 1
+  grep -qxE 'node = "24\.[0-9]+"' "$frag" && grep -qx '"npm:@vtsls/language-server" = "0.3"' "$frag" && grep -qx 'bun = "1.4"' "$frag" &&
+    grep -q 'already version 24' <<<"$out" && grep -qx 'version = "24"' "$u/kubaos.d/suites/node.toml" ||
+    { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  [[ $(node_at /) == 24 ]] || { echo "FAIL want Node 24: $(zrun 'node --version')"; return 1; }
+  on_shims || return 1
+  echo "ok   the node-on-mise migration: a 24 record with Bun gets its fragment and Node 24, vtsls and Bun through the shims, the record kept, a rerun changes nothing"
+
+  out="$(kz 'kubaos suite configure node --version 26 --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite configure node --version 26"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(node_at /) == 26 && -z $(find "$installs/node" -mindepth 1 -maxdepth 1 -name '24*') ]] ||
+    { echo "FAIL configure: not Node 26, or 24 wasn't pruned"; ls "$installs/node"; return 1; }
+  [[ -f $mine ]] || { echo "FAIL plugins/node-suite.lua was not seeded"; return 1; }
+  grep -qxE 'node = "26\.[0-9]+"' "$frag" || { echo "FAIL configure: the fragment doesn't ask for Node 26:"; cat "$frag"; return 1; }
+  quiet_shell "kubaos suite configure node --version 26" || return 1
+  echo "ok   kubaos suite configure node --version 26: Node 26, 24 pruned, the seeded node-suite.lua"
+
+  path="$(zrun 'print -r -- $PATH' | tr ':' '\n')"
+  grep -qx "$USER_HOME/.local/share/npm/bin" <<<"$path" && grep -qx "$USER_HOME/.local/share/bun/bin" <<<"$path" ||
+    { echo "FAIL npm's or Bun's global bin is not on PATH"; return 1; }
+  [[ $(zlogin 'npm prefix -g') == "$USER_HOME/.local/share/npm" && -z $(zlogin 'print -r -- "$NPM_CONFIG_PREFIX$BUN_INSTALL_CACHE_DIR"') &&
+    $(zlogin 'print -r -- $BUN_INSTALL') == "$USER_HOME/.local/share/bun" ]] ||
+    { echo "FAIL npm's prefix or Bun's folder: $(zlogin 'npm prefix -g; env' | grep -E '^/|NPM_|BUN_' | tr '\n' ' ')"; return 1; }
+  printf 'prefix=%s\n' "$USER_HOME/.cache/my-npm" | as_user tee "$USER_HOME/.cache/my-npmrc" >/dev/null
+  [[ $(zlogin "NPM_CONFIG_USERCONFIG='$USER_HOME/.cache/my-npmrc' npm prefix -g") == "$USER_HOME/.cache/my-npm" ]] ||
+    { echo "FAIL a user's npmrc doesn't win over the Suite's prefix"; return 1; }
+  as_user install -d "$globalpkg/bin"
+  printf '{"name":"kubaos-node-global","version":"1.0.0","bin":{"kubaos-node-global":"bin/hello.js"}}\n' | as_user tee "$globalpkg/package.json" >/dev/null
+  printf '#!/usr/bin/env node\nconsole.log("global " + process.versions.node.split(".")[0]);\n' | as_user tee "$globalpkg/bin/hello.js" >/dev/null
+  out="$(zlogin "npm install --global --install-links --no-fund --no-audit '$globalpkg' && kubaos-node-global" 2>&1)"
+  [[ -x $USER_HOME/.local/share/npm/bin/kubaos-node-global ]] && grep -qx 'global 26' <<<"$out" &&
+    [[ -z $(find "$installs/node" -path '*/lib/node_modules/kubaos-node-global' 2>/dev/null) ]] ||
+    { echo "FAIL npm install --global: not in ~/.local/share/npm, or not run from PATH"; printf '%s\n' "$out"; return 1; }
+  zlogin 'npm uninstall --global kubaos-node-global' >/dev/null 2>&1
+  echo "ok   npm's and Bun's global bins on PATH, outside mise's folders; npm's prefix is a global npmrc a user's own npmrc wins over"
+
+  out="$(kz 'kubaos suite new node node-demo' 2>&1)" ||
+    { echo "FAIL kubaos suite new node node-demo"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(zrun "cd $project && npm start --silent") == "Hello from Node" ]] && zrun "cd $project && npm run check --silent" >/dev/null 2>&1 &&
+    grep -qE '"@types/node": "\^?26\.' "$project/package.json" ||
+    { echo "FAIL the scaffolded Node app doesn't run or type-check"; ls -la "$project"; zrun "cd $project && npm run check" 2>&1 | tail -5; return 1; }
+  # mise reads no .nvmrc by default: the folder's mise.toml is its pin.
+  printf '22\n' | as_user tee "$project/.nvmrc" >/dev/null
+  [[ $(node_at "$project") == 26 ]] || { echo "FAIL an .nvmrc changed the Node in the project"; return 1; }
+  out="$(kz 'kubaos suite new node bun-demo --with bun' 2>&1)" ||
+    { echo "FAIL kubaos suite new node bun-demo --with bun"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(zrun "cd $bunproject && bun run --silent ." 2>&1) == "Hello via Bun!" ]] ||
+    { echo "FAIL the scaffolded Bun app doesn't run"; ls -la "$bunproject"; return 1; }
+  echo "ok   kubaos suite new node: a Node + TypeScript app that runs and type-checks, an .nvmrc ignored; --with bun: a Bun app that runs"
+
+  as_user install -d "$pinned"
+  out="$(kz "kubaos pin node 22 '$pinned'" 2>&1)" ||
+    { echo "FAIL kubaos pin node 22"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(cat "$pinned/mise.toml") == $'[tools]\nnode = "22"' && $(node_at "$pinned") == 22 && $(node_at /) == 26 ]] ||
+    { echo "FAIL the pin: Node $(node_at "$pinned") in the folder, $(node_at /) outside:"; cat "$pinned/mise.toml"; return 1; }
+  expect_ok "kubaos unpin node" kz "kubaos unpin node '$pinned'" || return 1
+  [[ -f $frag && ! -e $pinned/mise.toml ]] || { echo "FAIL unpin took the Suite's fragment, or left the folder's mise.toml"; return 1; }
+  echo "ok   kubaos pin node 22: the folder's mise.toml, Node 22 there through the shims, the home 26"
+
+  cache_lock nvim
+  out="$(zrun "nvim --headless +'lua io.write(\"\\nMASON \", table.concat(LazyVim.opts(\"mason.nvim\").ensure_installed, \",\"), \"\\nVTSLS \", tostring(LazyVim.opts(\"nvim-lspconfig\").servers.vtsls.mason), \"\\nPATHS \", vim.fn.exepath(\"vtsls\"), \" \", vim.fn.exepath(\"js-debug-adapter\"), \" \", vim.fn.exepath(\"vscode-eslint-language-server\"))' +qa" 2>&1 | tr -d '\r')"
+  grep -qx 'VTSLS false' <<<"$out" && grep -q '^MASON ' <<<"$out" &&
+    ! grep '^MASON ' <<<"$out" | grep -qwE 'vtsls|js-debug-adapter|eslint-lsp' &&
+    grep -qx "PATHS $shims/vtsls $USER_HOME/.nix-profile/bin/js-debug-adapter $USER_HOME/.nix-profile/bin/vscode-eslint-language-server" <<<"$out" ||
+    { echo "FAIL Neovim without mise's hook doesn't take vtsls from the shims and the debugger and eslint from Nix, or Mason would install them:"; printf '%s\n' "$out" | grep -E '^(MASON|VTSLS|PATHS)'; return 1; }
+  [[ $(zrun "cd $project && vtsls --version") == [0-9]* ]] || { echo "FAIL vtsls through its shim: $(zrun "cd $project && vtsls --version" 2>&1)"; return 1; }
+  echo "ok   Neovim started without mise's hook finds vtsls through the shims and js-debug and eslint's server in Nix; Mason installs none of them"
+
+  out="$(kz 'kubaos suite remove node --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove node"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^cache ~/.npm \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" &&
+    grep -qx '  ~/.config/kubaos/editor/nvim/plugins/node-suite.lua' <<<"$out" && [[ -f $project/src/index.ts ]] ||
+    { echo "FAIL remove: npm's cache's size, the user's node-suite.lua, or the project"; printf '%s\n' "$out"; return 1; }
+  # A pruned tool keeps its folder and mise's .mise.backend.toml in it; its
+  # versions are the folders inside.
+  [[ ! -e $frag && -z $(find "$installs"/node "$installs"/bun "$installs"/npm-* -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
+    { echo "FAIL remove: the fragment or a version is left"; find "$installs" -mindepth 2 -maxdepth 2 -type d; return 1; }
+  for t in "${tools[@]}"; do
+    [[ ! -e $shims/$t && $(zrun "whence -p $t") != "$USER_HOME"/* ]] || { echo "FAIL $t is still on PATH: $(zrun "whence -p $t")"; return 1; }
+  done
+  gone_from_generation "the Node Suite's packages" '-(kubaos-node-new|js-debug-adapter)(-|$)' || return 1
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  [[ ! -e $npmrc ]] && ! grep -qsE 'NPM_CONFIG_GLOBALCONFIG|BUN_INSTALL' "$gen/home-path/etc/profile.d/hm-session-vars.sh" &&
+    ! grep -qF lang.typescript "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
+    { echo "FAIL the Suite's global npmrc, environment or Neovim extra is left"; return 1; }
+  echo "ok   kubaos suite remove node: fragment, versions and shims gone, npm's cache kept, node-suite.lua listed, the project untouched, nothing of it left in the generation"
+
+  out="$(kz 'kubaos suite add node --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add node"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qxE 'node = "26\.[0-9]+"' "$frag" && grep -qx 'bun = "1.4"' "$frag" && [[ $(node_at /) == 26 ]] && on_shims ||
+    { echo "FAIL kubaos suite add node: not Node 26 with vtsls and Bun"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite add node: the default line, 26, with vtsls and Bun"
+
+  # vtsls behind, as a lock taken before a newer release leaves it: mise
+  # locks VERSION while the fragment asks for it exactly, then the fragment
+  # and the entry's specifier go back to REQUEST, which VERSION still meets,
+  # and mise installs what the lockfile selects. An npm tool's lock entry
+  # carries its dependency graph, which mise installs to a folder of its own,
+  # so update and upgrade must leave that folder installed, or every shell
+  # warns the tool is missing.
+  vtsls_at() {
+    local lock="$USER_HOME/.config/mise/mise.lock" log="$LOGS/suite_node-vtsls-$2.log"
+    as_user sed -i "s/^\"$vtsls_re\" = .*/\"npm:@vtsls\/language-server\" = \"$2\"/" "$frag"
+    zrun 'cd / && MISE_YES=1 mise lock --global' >"$log" 2>&1 || return 1
+    as_user sed -i "s/^\"$vtsls_re\" = .*/\"npm:@vtsls\/language-server\" = \"$1\"/" "$frag"
+    as_user sed -i "/^\[\[tools.\"$vtsls_re\"\]\]/,/^\[\[/ s/^specifiers = \[\"$2\"\]/specifiers = [\"$1\"]/" "$lock"
+    grep -qx "specifiers = \[\"$1\"\]" "$lock" &&
+      zrun 'cd / && MISE_YES=1 mise install && MISE_YES=1 mise prune --tools' >>"$log" 2>&1 &&
+      [[ $(vtsls_now) == "$2" ]]
+  }
+  vtsls_now() { zrun "cd / && mise current '$vtsls'"; }
+  # The newest line but one has a patch release before its last, for the
+  # update; the upgrade moves past that line to the newest.
+  local vtsls='npm:@vtsls/language-server' vtsls_re='npm:@vtsls\/language-server' versions newest line old_patch last_patch
+  versions="$(zrun "cd / && mise ls-remote '$vtsls'" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$')"
+  newest="$(tail -1 <<<"$versions")"
+  line="$(grep -vE "^${newest%.*}\." <<<"$versions" | tail -1)"
+  line="${line%.*}"
+  last_patch="$(grep -E "^${line//./\\.}\." <<<"$versions" | tail -1)"
+  old_patch="$(grep -E "^${line//./\\.}\." <<<"$versions" | tail -2 | head -1)"
+  [[ -n $line && $old_patch != "$last_patch" ]] || { echo "FAIL no vtsls line with two patch releases on npm: $(tr '\n' ' ' <<<"$versions")"; return 1; }
+  vtsls_at "$line" "$old_patch" || { echo "FAIL setting vtsls to $old_patch"; tail -5 "$LOGS/suite_node-vtsls-$old_patch.log"; return 1; }
+  quiet_shell "vtsls locked at $old_patch, before the update" || return 1
+  out="$(kz 'kubaos suite update node' 2>&1)" ||
+    { echo "FAIL kubaos suite update node"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(vtsls_now) == "$last_patch" ]] || { echo "FAIL update: vtsls is $(vtsls_now), not $last_patch"; printf '%s\n' "$out"; return 1; }
+  quiet_shell "kubaos suite update node, vtsls $old_patch → $last_patch" || return 1
+  out="$(kz 'kubaos suite upgrade node --no-switch' 2>&1)" ||
+    { echo "FAIL kubaos suite upgrade node"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx "\"npm:@vtsls/language-server\" = \"${newest%.*}\"" "$frag" && [[ $(vtsls_now) == "$newest" ]] ||
+    { echo "FAIL upgrade: vtsls is $(vtsls_now), not $newest at ${newest%.*}"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  quiet_shell "kubaos suite upgrade node, vtsls $last_patch → $newest" || return 1
+  echo "ok   kubaos suite update moves vtsls $old_patch → $last_patch and upgrade → $newest, and a shell starts quiet after each"
+  expect_ok "kubaos suite remove node again" kz 'kubaos suite remove node --foreground' || return 1
+  rm -rf "$project" "$bunproject" "$pinned" "$mine" "$globalpkg" "$USER_HOME/.cache/my-npmrc"
+}
+
+# The Python Suite (crates/kubaos-core/src/suites/catalog.rs,
+# home/suites/python.nix): uv, ruff, basedpyright and debugpy from mise, which
+# downloads uv and ruff and installs basedpyright and debugpy into venvs with
+# that uv (network). A home from before mise moves onto it through the
+# migration; a project is scaffolded and checked, and uv installs a Python of
+# its own that runs; a login shell and Neovim without mise's hook find the
+# tools through the shims, and debugpy's adapter answers DAP; removal leaves
+# nothing of it in mise or the generation, and a fresh add installs it again.
+c_suite_python() {
+  local u="$USER_HOME/.config/kubaos/home" project="$USER_HOME/Projects/py-demo" out gen t before
+  local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/python-suite.lua"
+  local frag="$USER_HOME/.config/mise/conf.d/kubaos-python.toml" uvbin="$USER_HOME/.local/share/uv/bin"
+  local installs="$USER_HOME/.local/share/mise/installs" shims="$USER_HOME/.local/share/mise/shims"
+  local migration=("$REPO"/migrations/user/*-python-on-mise.sh)
+  local tools=(uv uvx ruff basedpyright basedpyright-langserver debugpy debugpy-adapter)
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$project" "$mine" "$USER_HOME/.local/share/uv" "$USER_HOME/.cache/uv"
+  on_shims() {
+    local t
+    for t in "${tools[@]}"; do
+      [[ $(zrun "whence -p $t") == "$shims/$t" ]] || { echo "FAIL $t is not mise's shim in a login shell: $(zrun "whence -p $t")"; return 1; }
+    done
+  }
+  # The fragment and the installed versions, to tell whether a run changed
+  # anything.
+  mise_state() { cat "$frag" 2>/dev/null; find "$installs" -mindepth 2 -maxdepth 2 -type d | sort; }
+
+  # A home as the Suite on Nix left it: the record and no fragment.
+  as_user install -d "$u/kubaos.d/suites"
+  printf 'extras = []\n' | as_user tee "$u/kubaos.d/suites/python.toml" >/dev/null
+  out="$(kz 'kubaos switch --foreground' 2>&1)" ||
+    { echo "FAIL the switch with the old Python record"; printf '%s\n' "$out" | tail -20; return 1; }
+  gone_from_generation "the Python Suite's Nix tools" '-(uv|ruff|basedpyright|debugpy|debugpy-adapter)-[0-9]' || return 1
+  ! has_bin uv && ! has_bin debugpy-adapter || { echo "FAIL uv or debugpy-adapter is still in the Nix profile"; return 1; }
+  out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+    { echo "FAIL the python-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
+  before="$(mise_state)"
+  out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+    { echo "FAIL the python-on-mise migration, run again"; printf '%s\n' "$out" | tail -20; return 1; }
+  quiet_shell "the python-on-mise migration" || return 1
+  grep -qx '"aqua:astral-sh/uv" = "0.13"' "$frag" && grep -qx '"pypi:debugpy" = "1.8"' "$frag" &&
+    [[ $(mise_state) == "$before" && $(cat "$u/kubaos.d/suites/python.toml") == 'extras = []' ]] ||
+    { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  on_shims || return 1
+  [[ $(zrun 'uv --version') == "uv 0.13."* && $(zrun 'ruff --version') == "ruff 0.17."* && $(zrun 'basedpyright --version') == *"basedpyright 1.40."* ]] ||
+    { echo "FAIL the tools' versions: $(zrun 'uv --version; ruff --version; basedpyright --version' 2>&1 | tr '\n' ' ')"; return 1; }
+  echo "ok   the python-on-mise migration: the record gets its fragment, uv, ruff, basedpyright and debugpy through the shims, the record kept, a rerun changes nothing"
+
+  local path
+  path="$(zrun 'print -r -- $PATH' | tr ':' '\n')"
+  grep -qx "$uvbin" <<<"$path" && [[ $(zrun 'print -r -- "$UV_TOOL_BIN_DIR $UV_PYTHON_BIN_DIR"') == "$uvbin $uvbin" ]] ||
+    { echo "FAIL uv's command folder is not on PATH or not its default: $(zrun 'print -r -- "$UV_TOOL_BIN_DIR $UV_PYTHON_BIN_DIR"')"; return 1; }
+  out="$(zrun 'uv python install 3.13 && python3.13 -c "import ssl, sqlite3, ctypes, readline; print(\"PY\", ssl.OPENSSL_VERSION)"' 2>&1)"
+  grep -q '^PY OpenSSL' <<<"$out" && [[ -L $uvbin/python3.13 ]] ||
+    { echo "FAIL a Python uv installed doesn't run from ~/.local/share/uv/bin:"; printf '%s\n' "$out" | tail -10; return 1; }
+  echo "ok   uv's commands in ~/.local/share/uv/bin on PATH; the Python uv installed runs on the system's loader with ssl, sqlite3, ctypes and readline"
+
+  out="$(kz 'kubaos suite new python py-demo' 2>&1)" ||
+    { echo "FAIL kubaos suite new python py-demo"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ -d $project/.git && -f $project/pyproject.toml && $(zrun "cd $project && uv run --quiet py-demo") == "Hello from py-demo!" ]] ||
+    { echo "FAIL the scaffolded project doesn't run"; ls -la "$project"; zrun "cd $project && uv run py-demo" 2>&1 | tail -5; return 1; }
+  out="$(zrun "cd $project && ruff check . && ruff format --check . && basedpyright src" 2>&1)" ||
+    { echo "FAIL ruff or basedpyright in the project"; printf '%s\n' "$out" | tail -10; return 1; }
+  [[ $(zrun "cd $project && whence -p ruff") == "$shims/ruff" ]] || { echo "FAIL the project's venv put a ruff ahead of the Suite's"; return 1; }
+  echo "ok   kubaos suite new python py-demo: a uv project under git whose command runs, lints, is formatted and type-checks clean"
+
+  out="$(kz "kubaos pin python 3.13 '$project'" 2>&1)" && { echo "FAIL kubaos pin python succeeded"; return 1; }
+  grep -q 'has no versions to pin' <<<"$out" && [[ ! -e $project/mise.toml ]] ||
+    { echo "FAIL kubaos pin python: want a refusal and no mise.toml"; printf '%s\n' "$out"; return 1; }
+  echo "ok   kubaos pin python refuses: a project's Python is uv's"
+
+  cache_lock nvim
+  out="$(zrun "nvim --headless +'lua io.write(\"\\nMASON \", table.concat(LazyVim.opts(\"mason.nvim\").ensure_installed, \",\"), \"\\nLSP \", tostring(LazyVim.opts(\"nvim-lspconfig\").servers.basedpyright.mason), \" \", tostring(LazyVim.opts(\"nvim-lspconfig\").servers.ruff.mason), \"\\nPATHS \", vim.fn.exepath(\"basedpyright-langserver\"), \" \", vim.fn.exepath(\"ruff\"), \" \", vim.fn.exepath(\"debugpy-adapter\"))' +qa" 2>&1 | tr -d '\r')"
+  grep -qx 'LSP false false' <<<"$out" && grep -q '^MASON ' <<<"$out" &&
+    ! grep '^MASON ' <<<"$out" | grep -qwE 'basedpyright|ruff|debugpy' &&
+    grep -qx "PATHS $shims/basedpyright-langserver $shims/ruff $shims/debugpy-adapter" <<<"$out" ||
+    { echo "FAIL Neovim without mise's hook doesn't take the Python tools from the shims, or Mason would install them:"; printf '%s\n' "$out" | grep -E '^(MASON|LSP|PATHS)'; return 1; }
+  # The adapter nvim-dap-python starts: a DAP initialize request on its stdin
+  # gets a successful response. The adapter drops a reply it hasn't sent when
+  # its stdin closes, so stdin stays open a while after the request.
+  local request='{"seq":1,"type":"request","command":"initialize","arguments":{"adapterID":"debugpy","clientID":"kubaos"}}'
+  printf 'Content-Length: %d\r\n\r\n%s' "${#request}" "$request" | as_user tee "$USER_HOME/.cache/dap-initialize" >/dev/null
+  out="$(zrun "{ cat '$USER_HOME/.cache/dap-initialize'; sleep 5; } | timeout 20 debugpy-adapter" 2>&1 | tr -d '\r')"
+  rm -f "$USER_HOME/.cache/dap-initialize"
+  grep -qE '"command": ?"initialize"' <<<"$out" && grep -qE '"success": ?true' <<<"$out" ||
+    { echo "FAIL debugpy-adapter didn't answer DAP's initialize:"; printf '%s\n' "$out" | tail -10; return 1; }
+  echo "ok   Neovim started without mise's hook finds basedpyright, ruff and debugpy-adapter through the shims; Mason installs none; the adapter answers DAP"
+
+  out="$(kz 'kubaos suite remove python --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove python"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^cache ~/.local/share/uv \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" &&
+    grep -qx '  ~/.config/kubaos/editor/nvim/plugins/python-suite.lua' <<<"$out" && [[ -f $project/pyproject.toml ]] ||
+    { echo "FAIL remove: uv's folder's size, the user's python-suite.lua, or the project"; printf '%s\n' "$out"; return 1; }
+  # A pruned tool keeps its folder and mise's .mise.backend.toml in it; its
+  # versions are the folders inside.
+  [[ ! -e $frag && -z $(find "$installs"/aqua-astral-sh-* "$installs"/pypi-* -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
+    { echo "FAIL remove: the fragment or a version is left"; find "$installs" -mindepth 2 -maxdepth 2 -type d; return 1; }
+  for t in "${tools[@]}"; do
+    [[ ! -e $shims/$t ]] && ! zrun "whence -p $t" >/dev/null || { echo "FAIL $t is still on PATH"; return 1; }
+  done
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  ! grep -qF lang.python "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" &&
+    [[ -z $(zrun 'print -r -- "$UV_TOOL_BIN_DIR$UV_PYTHON_BIN_DIR"') ]] && ! zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$uvbin" ||
+    { echo "FAIL the Suite's uv variables, PATH entry or Neovim extra are left"; return 1; }
+  echo "ok   kubaos suite remove python: fragment, versions and shims gone, uv's folder kept, python-suite.lua listed, the project untouched, nothing of it left in the generation"
+
+  out="$(kz 'kubaos suite add python --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add python"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx '"pypi:basedpyright" = "1.40"' "$frag" && on_shims ||
+    { echo "FAIL kubaos suite add python: not every tool"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite add python: every tool again"
+  out="$(kz 'kubaos suite remove python --purge-caches --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove python --purge-caches"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ ! -e $USER_HOME/.local/share/uv && ! -e $USER_HOME/.cache/uv ]] ||
+    { echo "FAIL remove --purge-caches left uv's folders"; printf '%s\n' "$out"; return 1; }
+  echo "ok   kubaos suite remove python --purge-caches: uv's Pythons, tools and cache gone"
+  rm -rf "$project" "$mine"
+}
+
+# The proto + moon Suite (crates/kubaos-core/src/suites/catalog.rs,
+# home/suites/proto.nix): proto from mise (network: mise downloads proto, and
+# proto downloads moon, an older proto and Node 22 for a project). A home from
+# before mise moves onto it through the migration; proto's shims come first on
+# PATH in a login and an interactive shell, so a folder's .prototools pins
+# win there over the Node Suite's Node and the Suite's elsewhere; a moon
+# workspace is scaffolded; an upgrade moves proto alone; removal leaves
+# nothing of it in mise or the generation, and a fresh add installs it again.
+c_suite_proto() {
+  local u="$USER_HOME/.config/kubaos/home" project="$USER_HOME/Projects/moon-demo" pinned="$USER_HOME/Projects/proto-pinned"
+  local frag="$USER_HOME/.config/mise/conf.d/kubaos-proto.toml" pathconf="$USER_HOME/.config/mise/conf.d/kubaos-proto_path.toml"
+  local proto_home="$USER_HOME/.local/share/proto" installs="$USER_HOME/.local/share/mise/installs"
+  local shims="$USER_HOME/.local/share/mise/shims" migration=("$REPO"/migrations/user/*-proto-on-mise.sh)
+  local out before gen path moon i
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$project" "$pinned" "$proto_home"
+  mise_state() { cat "$frag" 2>/dev/null; find "$installs" -mindepth 2 -maxdepth 2 -type d | sort; }
+  # index_of ENTRY LINES: ENTRY's line number in LINES, or nothing.
+  index_of() { grep -nxF -- "$1" <<<"$2" | head -1 | cut -d: -f1; }
+  # node_at DIR SHELL: the major of the Node SHELL (zrun or zlogin) runs in DIR.
+  node_at() { "$2" "cd $1 && node -p 'process.versions.node.split(\".\")[0]'" 2>/dev/null; }
+
+  # A home as the Suite on Nix left it: the record, no fragment, and a proto
+  # that `proto upgrade` put in proto's own bin folder.
+  as_user install -d "$u/kubaos.d/suites" "$proto_home/bin"
+  printf 'extras = []\n' | as_user tee "$u/kubaos.d/suites/proto.toml" >/dev/null
+  printf '#!/bin/sh\necho stale proto\n' | as_user tee "$proto_home/bin/proto" >/dev/null
+  chmod +x "$proto_home/bin/proto"
+  out="$(kz 'kubaos switch --foreground' 2>&1)" ||
+    { echo "FAIL the switch with the old proto record"; printf '%s\n' "$out" | tail -20; return 1; }
+  gone_from_generation "nixpkgs' proto" '-proto-[0-9]' || return 1
+  ! has_bin proto && ! has_bin moon && has_bin kubaos-moon-new && [[ -L $pathconf ]] ||
+    { echo "FAIL the switch: proto or moon in the Nix profile, or no scaffolder or kubaos-proto_path.toml"; return 1; }
+  out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+    { echo "FAIL the proto-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx "deleted $proto_home/bin/proto: proto comes from mise, and moves with kubaos suite update" <<<"$out" ||
+    { echo "FAIL the migration didn't delete proto's own bin/proto:"; printf '%s\n' "$out"; return 1; }
+  before="$(mise_state)"
+  out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+    { echo "FAIL the proto-on-mise migration, run again"; printf '%s\n' "$out" | tail -20; return 1; }
+  quiet_shell "the proto-on-mise migration" || return 1
+  grep -qx '"aqua:moonrepo/proto" = "0.63"' "$frag" && [[ $(mise_state) == "$before" && ! -e $proto_home/bin/proto ]] &&
+    [[ $(cat "$u/kubaos.d/suites/proto.toml") == 'extras = []' ]] ||
+    { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  [[ $(zrun 'whence -p proto') == "$shims/proto" && $(zrun 'proto --version') == "proto 0.63."* ]] ||
+    { echo "FAIL proto isn't mise's 0.63 through its shim: $(zrun 'whence -p proto; proto --version' 2>&1 | tr '\n' ' ')"; return 1; }
+  echo "ok   the proto-on-mise migration: the record gets its fragment and proto 0.63 through the shims, the stale bin/proto deleted, the record kept, a rerun changes nothing"
+
+  [[ $(zrun 'print -r -- "$PROTO_HOME $PROTO_VERSION_CHECK"') == "$proto_home 0" ]] ||
+    { echo "FAIL PROTO_HOME or PROTO_VERSION_CHECK: $(zrun 'print -r -- "$PROTO_HOME $PROTO_VERSION_CHECK"')"; return 1; }
+  path="$(zrun 'print -r -- $PATH' | tr ':' '\n')"
+  local ps ms nb pb
+  ps="$(index_of "$proto_home/shims" "$path")" ms="$(index_of "$shims" "$path")"
+  nb="$(index_of "$USER_HOME/.nix-profile/bin" "$path")" pb="$(index_of "$proto_home/bin" "$path")"
+  [[ -n $ps && -n $ms && -n $nb && -n $pb ]] && ((ps < ms && ms < nb && ms < pb)) ||
+    { echo "FAIL a login shell's PATH: want proto's shims, then mise's, then Nix's tools, proto's bin after mise's shims:"; printf '%s\n' "$path"; return 1; }
+  path="$(zlogin 'print -r -- $PATH' | tr ':' '\n')"
+  [[ $(head -1 <<<"$path") == "$proto_home/shims" ]] && grep -q "^$installs/aqua-moonrepo-proto/" <<<"$path" ||
+    { echo "FAIL an interactive zsh's PATH doesn't start with proto's shims, ahead of mise's own entries:"; printf '%s\n' "$path" | head -6; return 1; }
+  echo "ok   proto's shims first on PATH: ahead of mise's shims and Nix's tools in a login shell, of mise's own entries in an interactive one; PROTO_HOME set, the version check off"
+
+  out="$(kz 'kubaos suite new proto moon-demo' 2>&1)" ||
+    { echo "FAIL kubaos suite new proto moon-demo"; printf '%s\n' "$out" | tail -20; return 1; }
+  moon="$(sed -n 's/^moon = "\([0-9.]*\)"$/\1/p' "$project/.prototools" 2>/dev/null)"
+  [[ -d $project/.git && -f $project/.moon/workspace.yml && -n $moon ]] &&
+    [[ $(zrun "cd $project && whence -p moon") == "$proto_home/shims/moon" && $(zrun "cd $project && moon --version") == "moon $moon" ]] ||
+    { echo "FAIL the moon workspace: git, .moon/workspace.yml, .prototools pinning moon, or that moon through proto's shim"; ls -la "$project"; cat "$project/.prototools"; return 1; }
+  echo "ok   kubaos suite new proto moon-demo: a git repository with .moon/workspace.yml and .prototools pinning moon $moon, which runs through proto's shim"
+
+  # A project pinning an older proto and moon, and Node, beside the Node Suite.
+  as_user install -d "$u/kubaos.d/suites" "$pinned"
+  printf 'version = "26"\nextras = []\n' | as_user tee "$u/kubaos.d/suites/node.toml" >/dev/null
+  out="$(kz 'kubaos suite configure node --foreground' 2>&1)" ||
+    { echo "FAIL installing the Node Suite at 26"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(zrun 'vtsls --version' 2>/dev/null) == [0-9]* ]] ||
+    { echo "FAIL the Node Suite's vtsls beside proto: $(zrun 'vtsls --version' 2>&1 | tail -3)"; printf '%s\n' "$out" | tail -20; return 1; }
+  printf 'proto = "0.62.3"\nmoon = "2.6.3"\nnode = "22"\n' | as_user tee "$pinned/.prototools" >/dev/null
+  out="$(zrun "cd $pinned && proto trust && proto install" 2>&1)" ||
+    { echo "FAIL proto install in the pinned folder"; printf '%s\n' "$out" | tail -20; return 1; }
+  for i in zrun zlogin; do
+    [[ $($i "cd $pinned && moon --version") == "moon 2.6.3" && $($i "cd $pinned && proto run proto -- --version") == "proto 0.62.3" ]] ||
+      { echo "FAIL $i: the folder's moon 2.6.3 or proto 0.62.3: $($i "cd $pinned && moon --version; proto run proto -- --version" 2>&1 | tr '\n' ' ')"; return 1; }
+    [[ $(node_at "$pinned" $i) == 22 && $(node_at "$project" $i) == 26 && $(node_at "$USER_HOME" $i) == 26 ]] ||
+      { echo "FAIL $i: want Node 22 in the pinned folder, the Suite's 26 in moon-demo and the home: $(node_at "$pinned" $i) $(node_at "$project" $i) $(node_at "$USER_HOME" $i)"; return 1; }
+  done
+  [[ $(zlogin "cd $pinned && proto --version") == "proto 0.63."* ]] ||
+    { echo "FAIL plain proto in the pinned folder isn't the Suite's"; return 1; }
+  echo "ok   a folder pinning proto 0.62.3, moon 2.6.3 and Node 22 runs them there in a login and an interactive shell (proto through proto run), the Node Suite's 26 everywhere else"
+  expect_ok "kubaos suite remove node" kz 'kubaos suite remove node --foreground' || return 1
+
+  # An upgrade, from a fragment asking for 0.62.
+  as_user sed -i 's/"0\.63"/"0.62"/' "$frag"
+  zrun 'cd / && MISE_YES=1 mise install && MISE_YES=1 mise lock --global && MISE_YES=1 mise prune --tools' >"$LOGS/proto-behind.log" 2>&1 &&
+    [[ $(zrun 'proto --version') == "proto 0.62."* ]] ||
+    { echo "FAIL setting proto back to 0.62"; tail -5 "$LOGS/proto-behind.log"; return 1; }
+  out="$(kz 'kubaos suite upgrade proto --no-switch' 2>&1)" ||
+    { echo "FAIL kubaos suite upgrade proto"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^upgraded proto: aqua:moonrepo/proto 0\.62 → 0\.63 \(0\.63\.[0-9]+\)$' <<<"$out" && grep -qx '"aqua:moonrepo/proto" = "0.63"' "$frag" &&
+    [[ $(zrun 'proto --version') == "proto 0.63."* && -z $(find "$installs/aqua-moonrepo-proto" -mindepth 1 -maxdepth 1 -type d -name '0.62*') ]] ||
+    { echo "FAIL upgrade: not 0.62 → 0.63 in the fragment with 0.62 pruned"; printf '%s\n' "$out"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite upgrade proto: 0.62 → 0.63, the fragment rewritten, 0.62 pruned"
+
+  out="$(kz 'kubaos suite remove proto --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove proto"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^cache ~/.local/share/proto \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" && [[ -f $project/.moon/workspace.yml ]] ||
+    { echo "FAIL remove: proto's folder's size, or the project"; printf '%s\n' "$out"; return 1; }
+  [[ ! -e $frag && ! -e $pathconf && ! -e $shims/proto && -z $(find "$installs/aqua-moonrepo-proto" -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
+    { echo "FAIL remove: the fragment, kubaos-proto_path.toml, the shim or a version is left"; find "$installs" -mindepth 2 -maxdepth 2 -type d; return 1; }
+  gone_from_generation "the proto Suite's scaffolder" '-kubaos-moon-new$' || return 1
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  ! grep -qE 'PROTO_HOME|PROTO_VERSION_CHECK|proto/shims' "$gen/home-path/etc/profile.d/hm-session-vars.sh" &&
+    ! zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$proto_home/shims" ||
+    { echo "FAIL the Suite's variables or PATH entries are left"; return 1; }
+  echo "ok   kubaos suite remove proto: fragment, defaults, version and shim gone, proto's folder kept, the project untouched, nothing of it left in the generation"
+
+  out="$(kz 'kubaos suite add proto --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add proto"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx '"aqua:moonrepo/proto" = "0.63"' "$frag" && [[ $(zrun 'proto --version') == "proto 0.63."* && -L $pathconf ]] ||
+    { echo "FAIL kubaos suite add proto: not proto 0.63 with its defaults"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite add proto: proto 0.63 again"
+  out="$(kz 'kubaos suite remove proto --purge-caches --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove proto --purge-caches"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ ! -e $proto_home ]] || { echo "FAIL remove --purge-caches left proto's folder"; return 1; }
+  echo "ok   kubaos suite remove proto --purge-caches: proto's folder gone"
+  rm -rf "$project" "$pinned"
 }
 
 # The user layer: test/user-layer-check, which the VM bench also
@@ -2952,7 +3801,8 @@ c_files() {
 
   for want in inode/directory:org.gnome.Nautilus application/zip:org.gnome.Nautilus \
     application/x-7z-compressed:org.gnome.Nautilus image/png:org.gnome.Loupe image/heic:org.gnome.Loupe \
-    video/mp4:org.gnome.Showtime application/pdf:org.gnome.Papers; do
+    video/mp4:org.gnome.Showtime video/mp2t:org.gnome.Showtime video/x-ms-wmv:org.gnome.Showtime \
+    application/pdf:org.gnome.Papers; do
     out="$(as_user xdg-mime query default "${want%%:*}" 2>&1)"
     if [[ $out != "${want#*:}.desktop" ]]; then
       echo "FAIL xdg-mime's default for ${want%%:*} is '$out', not ${want#*:}.desktop"
@@ -3026,6 +3876,75 @@ for path in sys.argv[1:]:
   ((bad)) || echo "ok   Tidy Downloads leaves today's files, and the daily timer runs only when it's on"
 
   rm -rf "$stub" "$dir" "$USER_HOME/Downloads/report.pdf"
+  return "$bad"
+}
+
+# The codecs (the `media` group of `system/packages.toml`). ffmpeg writes a
+# one-second file of each format and GStreamer, which Showtime, Sushi and the
+# thumbnailers play through, decodes it to the end. Each file has one stream:
+# with two, playbin plays the one it can and a missing decoder is only a
+# warning. Decoding on the GPU needs one, so that is checked on the laptop.
+codec_sample() { # codec_sample FILE FFMPEG_ARGS...: a second of test video, or of a tone for an audio codec
+  local file="$1" source=(-f lavfi -i "testsrc2=size=128x72:rate=25" -pix_fmt yuv420p)
+  shift
+  [[ " $* " == *" -c:a "* ]] && source=(-f lavfi -i "sine=frequency=440:sample_rate=48000")
+  as_user ffmpeg -nostdin -loglevel error -y "${source[@]}" -t 1 "$@" "$file"
+}
+
+c_codecs() {
+  local dir bad=0 row file out rc
+  # The file, named for its codec and container, then ffmpeg's encoder for it.
+  local formats=(
+    "h264.mp4 -c:v libx264"
+    "h264.mov -c:v libx264"
+    "h264.m4v -c:v libx264"
+    "h264.ts -c:v libx264"
+    "h264.flv -c:v libx264"
+    "h264.3gp -c:v libx264"
+    "hevc.mkv -c:v libx265"
+    "hevc.mp4 -c:v libx265 -tag:v hvc1"
+    "av1.mkv -c:v libsvtav1"
+    "av1.mp4 -c:v libsvtav1"
+    "vp9.webm -c:v libvpx-vp9"
+    "vp8.webm -c:v libvpx"
+    "prores.mov -c:v prores_ks -pix_fmt yuv422p10le"
+    "mpeg4.avi -c:v mpeg4"
+    "mpeg2.mpg -c:v mpeg2video"
+    "theora.ogv -c:v libtheora"
+    "wmv.wmv -c:v wmv2"
+    "mp3.mp3 -c:a libmp3lame"
+    "aac.m4a -c:a aac"
+    "alac.m4a -c:a alac"
+    "flac.flac -c:a flac"
+    "opus.opus -c:a libopus"
+    "vorbis.ogg -c:a libvorbis"
+    "ac3.ac3 -c:a ac3"
+    "eac3.eac3 -c:a eac3"
+    "wma.wma -c:a wmav2"
+    "pcm.wav -c:a pcm_s16le"
+  )
+  dir="$(as_user mktemp -d)"
+
+  for row in "${formats[@]}"; do
+    file="$dir/${row%% *}"
+    # shellcheck disable=SC2086 # The row's encoder arguments are words.
+    if ! out="$(codec_sample "$file" ${row#* } 2>&1)"; then
+      echo "FAIL ffmpeg wrote no ${row%% *}: $out"
+      bad=1
+      continue
+    fi
+    rc=0
+    out="$(as_user timeout 30 gst-launch-1.0 playbin3 "uri=file://$file" \
+      video-sink=fakesink audio-sink=fakesink 2>&1)" || rc=$?
+    if ((rc)) || grep -qE '^(WARNING|ERROR)|[Mm]issing' <<<"$out"; then
+      echo "FAIL GStreamer can't play ${row%% *} (exit $rc):"
+      grep -E 'WARNING|ERROR|[Mm]issing' <<<"$out" | sort -u | head -3
+      bad=1
+    fi
+  done
+  ((bad)) || echo "ok   GStreamer decodes ${#formats[@]} formats ffmpeg wrote, from H.264 in MP4 to WMA"
+
+  rm -rf "$dir"
   return "$bad"
 }
 
@@ -3181,6 +4100,21 @@ c_phone() {
 
 c_user_layer() {
   zrun "'$REPO/test/user-layer-check' '$REPO'"
+}
+
+# The wallpaper-depth Suite's hook on its own, in a scratch home with
+# systemd-run, the tool and matugen stubbed: what kubaos-depth-queue starts,
+# when it skips, the wait for AC power, when dot-theme calls it, and the
+# settings through the built kubaos (`kubaos depth`).
+c_wallpaper_depth() {
+  [[ -x /out/kubaos ]] || { echo "FAIL no /out/kubaos (test/run e2e builds it)"; return 1; }
+  as_user bash "$REPO/test/wallpaper-depth-test" "$REPO" /out/kubaos || { echo "FAIL test/wallpaper-depth-test"; return 1; }
+}
+
+# scripts/dot-hypr-lid on its own, with hyprctl stubbed: what the laptop panel
+# does under the lid.
+c_hypr_lid() {
+  as_user bash "$REPO/test/hypr-lid-test" "$REPO" || { echo "FAIL test/hypr-lid-test"; return 1; }
 }
 
 # scripts/dot-config on its own, in a scratch home: seeding, the README
@@ -3344,6 +4278,8 @@ c_update_edge() {
   ! grep -q $'\e' <<<"$out" || { echo "FAIL escape codes in the update's output off a terminal"; return 1; }
   grep -q '^  ✓ Home' <<<"$out" && grep -q '^  Undo  *kubaos rollback$' <<<"$out" ||
     { echo "FAIL the update's output has no Home phase or no summary:"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -q '^  Apt  ' <<<"$out" && grep -q '^  Nix packages  ' <<<"$out" ||
+    { echo "FAIL the summary has no Apt or no Nix packages row:"; printf '%s\n' "$out" | tail -20; return 1; }
   log="$(ls "$UPD_STATE"/update/*-update.log 2>/dev/null | tail -1)"
   [[ -n $log ]] && grep -q '2000000000-harness-user.sh' "$log" ||
     { echo "FAIL no update log in $UPD_STATE/update naming the migrations"; return 1; }
@@ -3361,6 +4297,9 @@ c_update_edge() {
     { echo "FAIL kubaos update --json, again"; printf '%s\n' "$out" | tail -30; return 1; }
   jq -e . >/dev/null <<<"$out" && [[ $(tail -1 <<<"$out" | jq -r .type) == summary ]] ||
     { echo "FAIL kubaos update --json isn't JSON lines ending in a summary:"; printf '%s\n' "$out" | tail -10; return 1; }
+  # The same home again: the switch keeps the generation, so the diff is known and empty.
+  tail -1 <<<"$out" | jq -e '.nix_packages == []' >/dev/null ||
+    { echo "FAIL the second update's summary doesn't say no Nix package changed:"; tail -1 <<<"$out"; return 1; }
   grep -q 'newest release of its channel' <<<"$out" && [[ $(release_of) == "$head" ]] ||
     { echo "FAIL the second update moved release or didn't say it is current"; printf '%s\n' "$out" | tail -20; return 1; }
   [[ $(lines "$UPD_SYSTEM_LOG") == 1 && $(lines "$UPD_USER_LOG") == 1 ]] ||
@@ -3834,7 +4773,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins dot_config warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files codecs automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node suite_python suite_proto dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

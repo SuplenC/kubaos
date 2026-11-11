@@ -9,5 +9,5 @@ ModuleName=script
 ImageDir=/usr/share/plymouth/themes/kubaos
 ScriptFile=/usr/share/plymouth/themes/kubaos/kubaos.script
 # Console text (Esc, or a boot that falls back to details): a note on the splash's dark.
-ConsoleLogTextColor=0xdac2b1
-ConsoleLogBackgroundColor=0x140d07
+ConsoleLogTextColor=0xd7c3b2
+ConsoleLogBackgroundColor=0x130d08

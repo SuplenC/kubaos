@@ -286,3 +286,71 @@ fn a_dry_run_records_nothing() {
 
     assert!(!Path::new(&m.path("apt-installed")).exists());
 }
+
+/// The lines of `system/*.sh` that install apt packages outside the manifest, each for a reason
+/// `docs/CONTRACTS.md` gives ("The package manifest", "Install"): the installers themselves, the
+/// running kernel's headers, and grub-btrfs with what builds it while Ubuntu doesn't package it.
+const OUTSIDE_THE_MANIFEST: [(&str, &str); 7] = [
+    (
+        "lib.sh",
+        r#"sudo_run env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get install -y --no-install-recommends "${missing[@]}""#,
+    ),
+    (
+        "lib.sh",
+        r#"sudo_run apt-get install -y --no-install-recommends "${missing[@]}""#,
+    ),
+    ("manifest.sh", r#"apt_install "${all[@]}""#),
+    ("30-hardware.sh", r#"apt_install "$@""#),
+    (
+        "30-hardware.sh",
+        r#"((${#headers[@]} == 0)) || apt_install_fresh "${headers[@]}""#,
+    ),
+    ("20-base.sh", "apt_install grub-btrfs"),
+    ("20-base.sh", "apt_install make"),
+];
+
+/// Whether a script's line installs apt packages: a call of `apt_install` or `apt_install_fresh`,
+/// or apt itself, not a definition or a comment.
+fn installs(line: &str) -> bool {
+    if line.starts_with('#') || line.ends_with("() {") {
+        return false;
+    }
+    let words: Vec<&str> = line.split_whitespace().collect();
+    words.iter().any(|w| matches!(*w, "apt_install" | "apt_install_fresh"))
+        || words
+            .windows(2)
+            .any(|pair| matches!(pair[0], "apt-get" | "apt") && pair[1] == "install")
+}
+
+/// What a forgotten migration can't leave behind: every apt package a system script installs is
+/// in `system/packages.toml`, which every update brings the machine in line with, unless it is a
+/// downloaded `.deb` or one of the few lines above.
+#[test]
+fn the_system_scripts_install_apt_packages_only_through_the_manifest() {
+    let system = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../system");
+    let mut outside = Vec::new();
+    for entry in fs::read_dir(&system).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|e| e != "sh") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        for line in fs::read_to_string(&path).unwrap().lines().map(str::trim) {
+            if installs(line) && !line.contains(".deb\"") {
+                outside.push((name.clone(), line.to_owned()));
+            }
+        }
+    }
+    outside.sort();
+    let mut allowed: Vec<(String, String)> = OUTSIDE_THE_MANIFEST
+        .iter()
+        .map(|(file, line)| ((*file).to_owned(), (*line).to_owned()))
+        .collect();
+    allowed.sort();
+
+    assert_eq!(
+        outside, allowed,
+        "a system script installs apt packages outside system/packages.toml: put them in a group \
+         and install it with group_install, so kubaos update installs them on earlier machines too"
+    );
+}

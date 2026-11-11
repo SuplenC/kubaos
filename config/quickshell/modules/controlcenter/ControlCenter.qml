@@ -61,19 +61,20 @@ K.Sheet {
         }
     }
 
-    // Each radio scans only while its tab shows. Wi-Fi scans about every 30 s, for a few seconds,
-    // as long as NetworkManager's scan takes, and not while its form connects. Bluetooth discovers
-    // for 20 s every 45 s, and goes on while its form shows, so the device being paired stays.
+    // Each radio scans only while its tab shows. Wi-Fi's scanner stays on all that time, its form
+    // included: Quickshell asks NetworkManager for a scan at most every 10 s, and NetworkManager
+    // holds scans back while a connection activates.
+    // HAZARD: Quickshell lists a network that isn't saved only while the scanner is on; turning it
+    // off between scans, or while the form is open, drops those networks from Nearby and the form.
+    readonly property bool wifiScanning: root.shown && root.tab === 0 && Net.wifiEnabled
+
+    onWifiScanningChanged: Net.setScanning(root.wifiScanning)
+
+    // Bluetooth discovers for 20 s every 45 s, and goes on while its form shows, so the device
+    // being paired stays.
     // HAZARD: BlueZ forgets a device it hasn't heard for 30 s (`TemporaryTimeout`); a gap between
     // discoveries longer than that empties Nearby before the next one and fills it again, every
     // time.
-    ScanPulse {
-        active: root.shown && root.tab === 0 && Net.wifiEnabled && !wifi.formOpen
-        every: 30000
-        window: 5000
-        onScanningChanged: Net.setScanning(scanning)
-    }
-
     ScanPulse {
         active: root.shown && root.tab === 1 && Bt.enabled
         every: 45000

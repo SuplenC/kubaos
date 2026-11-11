@@ -6,7 +6,8 @@
 //!
 //! - [`Machine`]: finding the CPU's policies, the GPUs, the laptop panels, the PCIe ASPM policy,
 //!   the USB devices, the Wi-Fi interfaces, the charge limit and the battery, and reading each; the
-//!   CPUs' cores and how fast each can go, sched_ext's state, and the scheduler's files.
+//!   CPUs' cores and how fast each can go, sched_ext's state, the scheduler's files, and what a
+//!   history sample reads: the displays, the backlight, the CPU's times and the suspend counters.
 //!
 //! # Not here
 //!
@@ -115,7 +116,63 @@ pub struct BatteryNow {
     /// The draw in watts, while discharging.
     pub watts: Option<f64>,
     pub percent: Option<f64>,
+    /// The energy left, in watt-hours, when the battery reports it ([`Machine::battery`]).
+    pub wh: Option<f64>,
     pub discharging: bool,
+}
+
+/// The laptop panel and the other screens, from the DRM connectors.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Displays {
+    /// Whether the laptop panel is lit (`dpms`); `None` without one.
+    pub panel_on: Option<bool>,
+    /// A screen other than the panel is connected, which logind counts as docked too.
+    pub external: bool,
+}
+
+/// `/sys/power/suspend_stats`' hardware-sleep counters, in microseconds; `None` for a file that
+/// isn't there. [`crate::reading::hw_sleep_between`] says what they come to.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HwSleep {
+    pub total_us: Option<u64>,
+    pub last_us: Option<u64>,
+    pub max_us: Option<u64>,
+}
+
+/// The CPU's time since boot, from `/proc/stat`, in the kernel's ticks.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CpuTimes {
+    pub total: u64,
+    /// Idle and waiting for I/O.
+    pub idle: u64,
+}
+
+impl CpuTimes {
+    /// How busy the CPU was since `before`, in percent of all its threads; `None` when no tick
+    /// passed.
+    pub fn busy_since(self, before: CpuTimes) -> Option<f64> {
+        let total = self.total.checked_sub(before.total).filter(|total| *total > 0)?;
+        let idle = self.idle.checked_sub(before.idle)?.min(total);
+        Some((total - idle) as f64 * 100.0 / total as f64)
+    }
+
+    /// The first line of `/proc/stat`'s `text`: `cpu  user nice system idle iowait irq …`. Only the
+    /// first eight columns count: the kernel counts guest time in user time already.
+    pub fn parse(text: &str) -> Option<CpuTimes> {
+        let numbers: Vec<u64> = text
+            .lines()
+            .next()?
+            .strip_prefix("cpu ")?
+            .split_whitespace()
+            .take(8)
+            .map(str::parse)
+            .collect::<Result<_, _>>()
+            .ok()?;
+        Some(CpuTimes {
+            total: numbers.iter().sum(),
+            idle: numbers.get(3)? + numbers.get(4)?,
+        })
+    }
 }
 
 /// The TUXEDO platform device's charging profile.
@@ -154,6 +211,11 @@ impl SchedExt {
 pub const LAVD_ENV: &str = "var/lib/kubaos/scx-lavd.env";
 /// scx_lavd, linked to KubaOS's build by `install_scx` (`system/lib.sh`).
 pub const LAVD_BIN: &str = "usr/local/libexec/kubaos-scx-lavd";
+/// Nix's daemon, as the Nix installer puts its unit.
+pub const NIX_UNIT: &str = "etc/systemd/system/nix-daemon.service";
+/// The drop-in the root helper writes while background work yields: nix-daemon and its builds at
+/// a lower priority.
+pub const NIX_DROP_IN: &str = "etc/systemd/system/nix-daemon.service.d/kubaos-yields.conf";
 
 impl Machine {
     /// The real machine.
@@ -382,6 +444,12 @@ impl Machine {
         self.path(LAVD_BIN).exists()
     }
 
+    /// Whether Nix's builds yield: the root helper's drop-in for nix-daemon is in place. `None`
+    /// without nix-daemon.
+    pub fn nix_yields(&self) -> Option<bool> {
+        self.path(NIX_UNIT).exists().then(|| self.path(NIX_DROP_IN).exists())
+    }
+
     fn batteries(&self) -> Vec<String> {
         self.list("sys/class/power_supply", |_| true)
             .into_iter()
@@ -391,6 +459,9 @@ impl Machine {
     }
 
     /// The laptop battery now: the draw from `power_now`, or `current_now` times `voltage_now`.
+    ///
+    /// The energy is `energy_now`, or `charge_now` at the design voltage, as UPower has it: a
+    /// voltage that falls with the charge would count that fall as energy lost.
     pub fn battery(&self) -> Option<BatteryNow> {
         let battery = self.batteries().into_iter().next()?;
         let at = |file: &str| self.read_at(&format!("sys/class/power_supply/{battery}/{file}"));
@@ -404,8 +475,69 @@ impl Machine {
         Some(BatteryNow {
             watts,
             percent: micro("capacity"),
+            wh: micro("energy_now").map(|uwh| uwh / 1e6).or_else(|| {
+                let volts = micro("voltage_min_design").or_else(|| micro("voltage_now"))?;
+                Some(micro("charge_now")? * volts / 1e12)
+            }),
             discharging,
         })
+    }
+
+    /// The laptop panel's state and whether another screen is connected. The kernel's `status` and
+    /// `dpms` files show what it has cached: reading them probes nothing and wakes no screen.
+    pub fn displays(&self) -> Displays {
+        let mut displays = Displays::default();
+        let connectors = self.list("sys/class/drm", |name| {
+            name.split_once('-').is_some_and(|(card, _)| is_card(card))
+        });
+        for connector in connectors {
+            if self.read_at(&format!("sys/class/drm/{connector}/status")).as_deref() != Some("connected") {
+                continue;
+            }
+            if connector
+                .split_once('-')
+                .is_some_and(|(_, name)| name.starts_with("eDP-"))
+            {
+                displays.panel_on = self
+                    .read_at(&format!("sys/class/drm/{connector}/dpms"))
+                    .map(|dpms| dpms == "On");
+            } else {
+                displays.external = true;
+            }
+        }
+        displays
+    }
+
+    /// The first backlight's level, in percent of its range. `brightness` is the value asked for,
+    /// which the kernel has at hand; `actual_brightness` would ask the hardware.
+    pub fn brightness(&self) -> Option<u8> {
+        let name = self.list("sys/class/backlight", |_| true).into_iter().next()?;
+        let at = |file: &str| {
+            self.read_at(&format!("sys/class/backlight/{name}/{file}"))?
+                .parse::<f64>()
+                .ok()
+        };
+        let max = at("max_brightness").filter(|max| *max > 0.0)?;
+        Some((at("brightness")? * 100.0 / max).round().clamp(0.0, 100.0) as u8)
+    }
+
+    /// The CPU's times, from `/proc/stat`.
+    pub fn cpu_times(&self) -> Option<CpuTimes> {
+        CpuTimes::parse(&self.read_at("proc/stat")?)
+    }
+
+    /// The hardware-sleep counters of `/sys/power/suspend_stats`.
+    pub fn hw_sleep(&self) -> HwSleep {
+        let at = |file: &str| {
+            self.read_at(&format!("sys/power/suspend_stats/{file}"))?
+                .parse::<u64>()
+                .ok()
+        };
+        HwSleep {
+            total_us: at("total_hw_sleep"),
+            last_us: at("last_hw_sleep"),
+            max_us: at("max_hw_sleep"),
+        }
     }
 
     /// `/proc/interrupts`'s text.

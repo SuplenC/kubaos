@@ -7,13 +7,28 @@ local user_layer = require("user_layer")
 local home = os.getenv("HOME") or ""
 
 -- PATH: dot-* scripts and Nix tools must be reachable from binds even if
--- Hyprland was started from a context that skipped the login shell.
+-- Hyprland was started from a context that skipped the login shell. mise's
+-- shims come before Nix's tools, as in a login shell (home/shell.nix), so
+-- what the launcher starts runs a Suite's tools. With the proto Suite
+-- (PROTO_HOME set, home/suites/proto.nix), proto's shims come before mise's,
+-- so a project's .prototools pins win in it.
 do
-  local wanted = {
-    home .. "/.local/bin",
-    home .. "/.nix-profile/bin",
-    "/nix/var/nix/profiles/default/bin",
-  }
+  -- A variable that is unset or empty is nil, as the shell's `${VAR:-…}` reads it.
+  local function set(name)
+    local value = os.getenv(name)
+    if value ~= "" then
+      return value
+    end
+  end
+  local mise_data = set("MISE_DATA_DIR") or ((set("XDG_DATA_HOME") or (home .. "/.local/share")) .. "/mise")
+  local wanted = { home .. "/.local/bin" }
+  local proto_home = set("PROTO_HOME")
+  if proto_home then
+    table.insert(wanted, proto_home .. "/shims")
+  end
+  table.insert(wanted, mise_data .. "/shims")
+  table.insert(wanted, home .. "/.nix-profile/bin")
+  table.insert(wanted, "/nix/var/nix/profiles/default/bin")
   local current = os.getenv("PATH") or "/usr/local/bin:/usr/bin:/bin"
   local seen, parts = {}, {}
   for _, dir in ipairs(wanted) do

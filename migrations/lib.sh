@@ -16,3 +16,16 @@ kubaos_backup() {
   cp -a -- "$file" "$dest"
   echo "backed up $file to $dest"
 }
+
+# kubaos_suite_to_mise NAME: moves the installed Suite NAME onto mise, for the
+# release that moves its toolchain there. The switch before the migration
+# has taken the Suite's Nix packages away already; `kubaos suite configure`
+# with no options installs its mise tools at the version and extras its
+# record names, then writes its fragment, leaving the record as it is.
+# Without a record there is nothing to move. A second run finds the fragment
+# as it wants it and installs nothing.
+kubaos_suite_to_mise() {
+  local suite="$1"
+  [[ -e "$KUBAOS_USER_FLAKE/kubaos.d/suites/$suite.toml" ]] || return 0
+  kubaos suite configure "$suite" --no-switch
+}

@@ -473,3 +473,148 @@ fn a_device_that_never_goes_quiet_is_checked_after_5_seconds_at_most() {
 
     assert_eq!(checked, [50, 100]);
 }
+
+/// A control on battery with the warning at 5 %.
+fn warning_on_battery() -> Control {
+    let mut control = on(Source::Battery, Memory::default());
+    control.set_warning(Some(5));
+    control
+}
+
+/// The warnings among `effects`, by the percent each says.
+fn warnings(effects: &[Effect]) -> Vec<u8> {
+    toasts(effects)
+        .iter()
+        .filter_map(|toast| match toast {
+            Toast::Critical { percent } => Some(*percent),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn the_warning_fires_at_its_level_and_not_above() {
+    let mut control = warning_on_battery();
+
+    assert_eq!(warnings(&control.handle(Input::Percent(5.4))), [0_u8; 0]);
+    assert_eq!(warnings(&control.handle(Input::Percent(5.0))), [5]);
+}
+
+#[test]
+fn the_warning_fires_once_a_discharge() {
+    let mut control = warning_on_battery();
+
+    assert_eq!(warnings(&control.handle(Input::Percent(5.0))), [5]);
+
+    for percent in [4.0, 3.0, 5.0, 6.0, 5.0, 2.0] {
+        assert_eq!(
+            warnings(&control.handle(Input::Percent(percent))),
+            [0_u8; 0],
+            "{percent}"
+        );
+    }
+}
+
+#[test]
+fn plugging_in_resets_the_warning_for_the_next_discharge() {
+    let mut control = warning_on_battery();
+    control.handle(Input::Percent(5.0));
+
+    assert_eq!(warnings(&control.handle(Input::Source(Source::Ac))), [0_u8; 0]);
+    assert_eq!(warnings(&control.handle(Input::Percent(4.0))), [0_u8; 0]);
+    assert_eq!(warnings(&control.handle(Input::Source(Source::Battery))), [4]);
+}
+
+#[test]
+fn a_dock_bouncing_under_settle_never_reaches_the_warning() {
+    let mut settle = Settle::default();
+    let at = Instant::now();
+    let mut control = warning_on_battery();
+    control.handle(Input::Percent(5.0));
+
+    settle.observe(Source::Ac, Source::Battery, at);
+    settle.observe(Source::Battery, Source::Battery, at + Duration::from_secs(1));
+
+    assert_eq!(settle.due(at + SETTLE), None);
+    assert_eq!(warnings(&control.handle(Input::Percent(4.0))), [0_u8; 0]);
+}
+
+#[test]
+fn a_start_already_under_the_level_warns_at_the_first_percent() {
+    let (mut control, effects) = Control::start(Memory::default(), Source::Battery, Some(Profile::PowerSaver), DROP);
+    control.set_warning(Some(5));
+
+    assert_eq!(warnings(&effects), [0_u8; 0]);
+    assert_eq!(warnings(&control.handle(Input::Percent(3.0))), [3]);
+}
+
+#[test]
+fn a_restart_remembers_no_warning_from_the_memory() {
+    let mut first = warning_on_battery();
+    first.handle(Input::Percent(3.0));
+
+    let profile = first.stop().profile();
+    let (mut next, _) = Control::start(first.memory(), Source::Battery, Some(profile), DROP);
+    next.set_warning(Some(5));
+
+    assert_eq!(warnings(&next.handle(Input::Percent(3.0))), [3]);
+}
+
+#[test]
+fn off_never_warns() {
+    let mut control = on(Source::Battery, Memory::default());
+    control.set_warning(None);
+
+    assert_eq!(warnings(&control.handle(Input::Percent(3.0))), [0_u8; 0]);
+}
+
+#[test]
+fn plugged_in_never_warns() {
+    let mut control = on(Source::Ac, Memory::default());
+    control.set_warning(Some(5));
+
+    assert_eq!(warnings(&control.handle(Input::Percent(3.0))), [0_u8; 0]);
+}
+
+#[test]
+fn the_warning_comes_with_the_drop_when_both_levels_are_met() {
+    let mut control = warning_on_battery();
+    control.handle(Input::Set(Stop::Balanced));
+
+    let effects = control.handle(Input::Percent(4.0));
+
+    assert_eq!(warnings(&effects), [4]);
+    assert_eq!(applied(&effects), [Stop::PowerSaver]);
+}
+
+#[test]
+fn no_check_comes_while_the_machine_sleeps_and_one_comes_a_second_after_it_wakes() {
+    let start = Instant::now();
+    let mut recheck = Recheck::default();
+    recheck.ask(start);
+
+    recheck.sleep();
+    recheck.ask(start + Duration::from_millis(500));
+
+    assert!(recheck.asleep());
+    assert!(!recheck.due(start + Duration::from_mins(1)));
+    assert_eq!(recheck.wait(start + Duration::from_mins(1)), None);
+
+    let woke = start + Duration::from_hours(1);
+    recheck.wake(woke);
+
+    assert!(!recheck.asleep());
+    assert!(!recheck.due(woke + Duration::from_millis(500)));
+    assert!(recheck.due(woke + RECHECK));
+    assert!(!recheck.due(woke + Duration::from_secs(5)));
+}
+
+#[test]
+fn a_wake_without_a_sleep_heard_still_checks_the_stops_writes() {
+    let start = Instant::now();
+    let mut recheck = Recheck::default();
+
+    recheck.wake(start);
+
+    assert!(recheck.due(start + RECHECK));
+}

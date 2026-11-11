@@ -20,7 +20,7 @@
     # so a new set reaches machines with a KubaOS release: bump the rev, then
     # `nix flake update kubaos-wallpapers`.
     kubaos-wallpapers = {
-      url = "github:SuplenC/kubaos-wallpapers/a817336e531f443ce4f2d2a9fbd5a0122aacce76";
+      url = "github:SuplenC/kubaos-wallpapers/9393b43ad545e537e67f059c7666f41801cd7a4b";
       flake = false;
     };
 
@@ -216,7 +216,7 @@
       #
       # rustfmt is the nightly one (rustfmtNightly). RUSTFMT points `cargo fmt`
       # and rust-analyzer at it, and it comes first on PATH for an editor that
-      # runs `rustfmt` itself; editors get the shell through direnv (.envrc).
+      # runs `rustfmt` itself; an editor started from `nix develop` gets it.
       # `just fmt` and `just fmt-check` refuse a rustfmt that isn't nightly.
       #
       # Cargo compiles through sccache, its cache under ~/.cache/sccache, so a
@@ -252,10 +252,28 @@
             PLAYWRIGHT_BROWSERS_PATH = pkgs.playwright-driver.browsers-chromium;
             PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
             RUSTFMT = pkgs.lib.getExe' rustfmt-nightly "rustfmt";
+            # ONNX Runtime for `kubaos-depth`, which loads it at run time
+            # (crates/kubaos-depth/src/models.rs): its tests with the real
+            # models (docs/TESTING.md) and a `cargo run` find it here.
+            ORT_DYLIB_PATH = "${pkgs.lib.getLib pkgs.onnxruntime}/lib/libonnxruntime.so";
             RUSTC_WRAPPER = pkgs.lib.getExe pkgs.sccache;
             shellHook = ''
               export SCCACHE_DIR=''${SCCACHE_DIR:-''${XDG_CACHE_HOME:-$HOME/.cache}/sccache}
             '';
+          };
+          # The logo's tools, for `just branding` (branding/README.md, "Regenerating").
+          # nixpkgs' Pillow is built with libimagequant, which neon.py picks the
+          # boot layers' palettes with.
+          branding = pkgs.mkShell {
+            packages = [
+              pkgs.resvg
+              pkgs.imagemagick
+              pkgs.ffmpeg-headless
+              (pkgs.python3.withPackages (p: [
+                p.pillow
+                p.numpy
+              ]))
+            ];
           };
         }
       );

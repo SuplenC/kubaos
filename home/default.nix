@@ -18,7 +18,6 @@
     ./proxy.nix
     ./menu.nix
     ./phone.nix
-    ./pins.nix
     ./secrets.nix
     ./session.nix
     ./setup.nix

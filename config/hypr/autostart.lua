@@ -68,11 +68,12 @@ hl.on("hyprland.start", function()
   -- user's idle settings. `kubaos-idle session` writes hypridle's listeners
   -- from them, holds the lid when its setting isn't logind's, then becomes
   -- hypridle. Without kubaos-idle, plain hypridle, on the last listeners
-  -- written.
+  -- written. It is the session's only hypridle: `system/50-hyprland.sh`
+  -- masks the packaged hypridle.service, which would start another.
   start("command -v kubaos-idle >/dev/null && exec kubaos-idle session || exec hypridle")
 
   -- Runs `dot-hypr-lid sync` at login and on every monitor hotplug, so the
-  -- laptop panel comes back when the last external goes with the lid closed.
+  -- laptop panel stays right when a monitor comes or goes with the lid closed.
   start("dot-hypr-workspaces")
 
   if POLKIT_AGENT == "auto" then

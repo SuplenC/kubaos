@@ -5,13 +5,15 @@
 //! what the user flake builds. An update fetches `origin`, lets the channel's release policy pick
 //! the commit `release` moves to, upgrades apt, brings the apt packages in line with the release's
 //! package manifest (`crate::apt`), runs the system migrations not run yet, updates
-//! and switches the user flake, then runs the user migrations. `/var/lib/kubaos/release` records
-//! what is installed and `update-history` what each update changed, which `rollback` undoes.
+//! and switches the user flake, runs the user migrations, then updates firmware through fwupd.
+//! `/var/lib/kubaos/release` records what is installed and `update-history` what each update
+//! changed, which `rollback` undoes.
 //!
 //! # Owns
 //!
 //! - [`Updater`], the steps; the release-policy seam (`policy.rs`) and the git reading it uses.
-//! - What an update reports as it runs (`event.rs`), and its log (`journal.rs`).
+//! - What an update reports as it runs (`event.rs`), what its summary condenses to (`summary.rs`),
+//!   the home's Nix packages a switch changed (`closure.rs`), and its log (`journal.rs`).
 //! - The files under `/etc/kubaos` and `/var/lib/kubaos`, and the user's update state.
 //!
 //! # Not here
@@ -19,16 +21,22 @@
 //! - The home-manager switch: `switch.rs`. Writing the records at install: `engine/install.rs`.
 //! - Rendering the events on a terminal: `kubaos-cli`'s `update/render.rs`.
 
+pub mod bitwarden;
+pub mod closure;
 pub mod event;
+pub mod firmware;
 pub mod git;
 pub mod hyprland;
 mod journal;
 pub mod machine;
 pub mod migrations;
+pub mod nix;
 pub mod notice;
 pub mod policy;
+pub mod programs;
 pub mod record;
 pub mod security;
+pub mod summary;
 pub mod version;
 
 mod updater;

@@ -82,8 +82,8 @@ fn type_styles_run_largest_first() {
 fn the_fallback_palettes_carry_matugens_default_colours() {
     let module = module();
 
-    assert!(module.contains("primary: Rgb { r: 0xff, g: 0xb7, b: 0x79 },"));
-    assert!(module.contains("primary: Rgb { r: 0x8b, g: 0x4c, b: 0x00 },"));
+    assert!(module.contains("primary: Rgb { r: 0xff, g: 0xb8, b: 0x6c },"));
+    assert!(module.contains("primary: Rgb { r: 0x86, g: 0x4f, b: 0x00 },"));
 }
 
 #[test]

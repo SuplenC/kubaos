@@ -53,6 +53,9 @@ rec {
   kubaos-power = callCrate ../crates/kubaos-power/package.nix;
   # The Proxy's command and service, the work network's switch (home/proxy.nix).
   kubaos-proxy = callCrate ../crates/kubaos-proxy/package.nix;
+  # The wallpaper-depth Suite's tool: a wallpaper's cut-out and the lock
+  # clock's place and tint. The Suite installs it (home/suites/wallpaper-depth.nix).
+  kubaos-depth = callCrate ../crates/kubaos-depth/package.nix;
   # The design specimen, the Command menu's "Design specimen" (home/desktop.nix).
   kubaos-specimen = callCrate ../crates/kubaos-specimen/package.nix;
 
@@ -79,6 +82,11 @@ rec {
       platforms = lib.platforms.all;
     };
   });
+
+  # The Suites' toolchain manager, pinned with the release and unable to
+  # update itself (home/curated/mise.nix). home/shell.nix installs it and
+  # runs its shell hook.
+  mise = pkgs.callPackage ./curated/mise.nix { };
 
   # The tokens' generator, and the outputs it writes that the repo doesn't
   # keep: KubaOS.Components' singletons, and the configs and Lua the home

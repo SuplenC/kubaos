@@ -1,32 +1,26 @@
 //! Project pins: a folder's choice of a Suite's version, for that folder and everything below it.
 //!
-//! A pin is a line in the folder's `.envrc`, `use suite <name> <version>`, which the direnv
-//! function KubaOS ships (`config/direnv/lib/suite.sh`) turns into that version's toolchain on
-//! PATH. direnv loads only the nearest `.envrc` above the current folder, and a parent's only
-//! where that file says `source_up`, so a pin covers the folders below it up to the next `.envrc`
-//! that doesn't source it. Within what direnv loads, the last pin of a Suite wins.
-//!
-//! Every version a pin can name has a toolchain entry in the home (`home/pins.nix`): the
-//! derivation, and the output its `bin/` is in. A version nobody uses costs nothing but the
-//! derivation; the direnv function realises it, from the binary cache or by building it, on first
-//! use.
+//! A pin is the Suite's main tool in the `[tools]` table of the folder's `mise.toml`
+//! (`node = "22"`). mise's shell hook puts the version it selects on PATH, ahead of the installed
+//! Suite's: the nearest config that names the tool wins, and every folder below it inherits it.
+//! Only a Suite whose toolchain comes from mise, a mise tool that takes the Suite's version, can
+//! be pinned.
 //!
 //! # Owns
 //!
-//! - Reading `.envrc` files the way direnv runs them, to the pins in effect in a folder
-//!   ([`Pins::resolve`]), and listing the pins under the Projects root ([`Pins::all`]).
-//! - What a pin stands for on this machine: the installed Suite's version, and whether the
-//!   toolchain is in the store ([`Pins::status`]).
-//! - Writing and removing pin lines, and allowing the result in direnv ([`Pins::pin`],
-//!   [`Pins::unpin`]).
+//! - The pins in effect in a folder, from mise's own resolution ([`Pins::resolve`]), and every pin
+//!   under the Projects root ([`Pins::all`]).
+//! - Writing and removing a pin, keeping the rest of the file ([`Pins::pin`], [`Pins::unpin`]).
+//! - The `.envrc` lines direnv used to read, `use suite` and `use bwenv`: finding the ones left
+//!   ([`Leftover`]) and moving them to the folder's `mise.toml` ([`Pins::migrate`]).
 //!
 //! # Not here
 //!
 //! - The Suites and their installed versions: `suites.rs`.
-//! - The direnv function and the toolchain entries: `config/direnv/lib/suite.sh`, `home/pins.nix`.
+//! - Running mise: `mise.rs`.
+//! - The script a `use bwenv` becomes, which reads the keyring: `home/secrets.nix`.
 
 use std::collections::BTreeMap;
-use std::ffi::OsString;
 use std::fs;
 use std::fs::File;
 use std::io;
@@ -36,10 +30,20 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
-use std::process::Command;
-use std::process::Stdio;
+use std::sync::Arc;
+use std::time::SystemTime;
 
+use toml_edit::DocumentMut;
+use toml_edit::Item;
+use toml_edit::TableLike;
+
+use crate::mise;
+use crate::mise::ListedVersion;
+use crate::mise::Mise;
+use crate::mise::MiseError;
+use crate::mise::ToolRequest;
 use crate::state::Paths;
+use crate::suites::Request;
 use crate::suites::Suite;
 use crate::suites::SuiteConfig;
 use crate::suites::SuiteError;
@@ -47,67 +51,55 @@ use crate::suites::Suites;
 use crate::suites::catalog;
 use crate::suites::is_suite_name;
 
-/// The file direnv loads, and the one a pin is written to.
+/// The file a new pin is written to.
+pub const MISE_TOML: &str = "mise.toml";
+
+/// The configs of a folder a person writes and mise reads, in the order a pin is looked for in
+/// them. A pin goes into the first that names the tool, or into [`MISE_TOML`].
+pub const CONFIG_NAMES: &[&str] = &[MISE_TOML, ".mise.toml", "mise.local.toml", ".mise.local.toml"];
+
+/// The file direnv loaded, whose `use suite` and `use bwenv` lines nothing reads any more.
 pub const ENVRC: &str = ".envrc";
 
-/// How deep below the Projects root [`Pins::all`] looks: a pin goes on a group of projects or on
-/// one, rarely deeper.
+/// The variable that names a folder's Bitwarden projects for the script its `mise.toml` sources
+/// ([`Paths::bwenv_script`]).
+pub const BWENV_VAR: &str = "KUBAOS_BWENV";
+
+/// How deep below the Projects root [`Pins::all`] and [`Pins::migrate`] look: a pin goes on a
+/// group of projects or on one, rarely deeper.
 pub const SCAN_DEPTH: usize = 4;
 
 /// Folders [`Pins::all`] never enters, besides hidden ones: dependencies and build output, which
 /// hold no pins of the user's and can be huge.
 const SKIPPED: &[&str] = &["node_modules", "target", "vendor", "dist", "build"];
 
-/// One pin line: `use suite <suite> <version>` in `envrc`.
+/// One pin: `<tool> = "<version>"` in `config`, where `tool` is the Suite's main tool.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pin {
     pub suite: String,
+    /// mise's name for the Suite's main tool.
+    pub tool: String,
+    /// The version asked for, as the file says it.
     pub version: String,
-    /// The `.envrc` the line is in.
-    pub envrc: PathBuf,
-}
-
-/// A pin in an `.envrc` above the folder that direnv never loads there, because a nearer `.envrc`
-/// doesn't `source_up`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Hidden {
-    pub pin: Pin,
-    /// The highest `.envrc` direnv loads for the folder, which would need `source_up`.
-    pub by: PathBuf,
-}
-
-/// The pins in effect in a folder.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Resolution {
-    /// The `.envrc` direnv loads for the folder, if any.
-    pub nearest: Option<PathBuf>,
-    /// One pin per Suite, the one that wins, by Suite name.
-    pub pins: Vec<Pin>,
-    /// Pins above that don't reach the folder, for Suites it has no pin of.
-    pub hidden: Vec<Hidden>,
-}
-
-/// Where a pinned version's toolchain is.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Fetch {
-    /// In the Nix store, at `path`.
-    InStore { path: PathBuf },
-    /// Not in the store yet: the direnv function fetches it the first time it loads the pin.
-    OnFirstUse,
-    /// The home has no toolchain for this Suite and version: the Suite has no such version, or
-    /// the home predates it and needs a switch. The direnv function says so and changes nothing.
-    Missing,
+    /// The config the pin is in.
+    pub config: PathBuf,
 }
 
 /// What a pin stands for on this machine.
 #[derive(Clone, Debug)]
 pub struct PinStatus {
     pub pin: Pin,
-    /// The Suite, when this build of KubaOS knows it.
-    pub suite: Option<&'static Suite>,
+    pub suite: &'static Suite,
     /// The Suite's options, when it is installed.
     pub installed: Option<SuiteConfig>,
-    pub toolchain: Fetch,
+    /// The exact version mise selects for the pin, or `None` when another config's pin of the
+    /// tool wins in the pin's own folder.
+    pub selected: Option<String>,
+    /// Whether mise has that version installed.
+    pub fetched: bool,
+    /// Why mise couldn't say which versions apply in the pin's folder (a config there it doesn't
+    /// trust, say), when it couldn't; `selected` is then `None`.
+    pub unresolved: Option<String>,
 }
 
 impl PinStatus {
@@ -115,49 +107,100 @@ impl PinStatus {
     pub fn global_version(&self) -> Option<&str> {
         self.installed.as_ref()?.version.as_deref()
     }
+}
 
-    /// Whether the pin names the version the whole home has anyway.
-    pub fn is_global(&self) -> bool {
-        self.global_version() == Some(self.pin.version.as_str())
-    }
+/// An `.envrc` line from before pins moved to mise, which nothing reads now.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Leftover {
+    pub envrc: PathBuf,
+    /// The line's number, from 1.
+    pub line: usize,
+    pub kind: LeftoverKind,
+}
+
+/// What a [`Leftover`] line asked for.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LeftoverKind {
+    /// `use suite <suite> <version>`.
+    Suite { suite: String, version: String },
+    /// `use bwenv <project>…`.
+    Bwenv { projects: Vec<String> },
+}
+
+/// The pins in effect in a folder.
+#[derive(Clone, Debug, Default)]
+pub struct Resolution {
+    /// One per Suite, the one that wins, by tool.
+    pub pins: Vec<PinStatus>,
+    /// `use suite` and `use bwenv` lines in the `.envrc` files of the folder and those above it.
+    pub leftovers: Vec<Leftover>,
+}
+
+/// Every pin under the Projects root.
+#[derive(Clone, Debug, Default)]
+pub struct Found {
+    /// By config, then by tool.
+    pub pins: Vec<Pin>,
+    /// `use suite` and `use bwenv` lines in an `.envrc` under the root.
+    pub leftovers: Vec<Leftover>,
 }
 
 /// What [`Pins::pin`] did.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pinned {
-    pub envrc: PathBuf,
-    /// Whether the `.envrc` is new.
+    pub config: PathBuf,
+    /// Whether the config is new.
     pub created: bool,
-    /// The version the folder's `.envrc` pinned before, if any.
+    /// The version the config pinned before, if any.
     pub previous: Option<String>,
+    /// The pin of the tool mise selects in the folder now, which is another config's when one of
+    /// higher precedence in the folder names the tool too.
+    pub applies: Option<Pin>,
 }
 
 /// What [`Pins::unpin`] did.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unpinned {
-    pub envrc: PathBuf,
+    pub config: PathBuf,
     /// The version that was pinned.
     pub version: String,
-    /// Whether the `.envrc` held nothing else, and so is deleted.
+    /// Whether the config held nothing else, and so is deleted.
     pub deleted: bool,
 }
 
-/// Reading, writing or allowing a pin failed.
+/// What [`Pins::migrate`] did to one `.envrc`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Migrated {
+    pub envrc: PathBuf,
+    pub config: PathBuf,
+    /// The pins moved, as `(suite, version)`.
+    pub pins: Vec<(String, String)>,
+    /// The `use suite` lines whose Suite the config already pinned, dropped for the config's pin,
+    /// which mise put first on PATH all along.
+    pub kept: Vec<(String, String)>,
+    /// The Bitwarden projects moved.
+    pub bwenv: Vec<String>,
+    /// Whether the `.envrc` held nothing else, and so is deleted.
+    pub envrc_deleted: bool,
+}
+
+/// Reading, writing or applying a pin failed.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum PinError {
     #[error("{} is not a folder", path.display())]
     NotAFolder { path: PathBuf },
+    #[error("no Suite is called {suite} (`kubaos suite list`)")]
+    UnknownSuite { suite: String },
+    /// The Suite's toolchain doesn't come from mise yet, so mise can't pin it.
+    #[error("the {suite} Suite's toolchain doesn't come from mise yet, so it can't be pinned")]
+    NotOnMise { suite: String },
     #[error("the {suite} Suite has no versions to pin")]
     Unversioned { suite: String },
-    #[error("the {suite} Suite has no version {version:?} (it has: {})", known.join(", "))]
-    UnknownVersion {
-        suite: String,
-        version: String,
-        known: Vec<String>,
-    },
-    /// The folder's own `.envrc` has no pin of the Suite. `applies_from` is the `.envrc` whose
-    /// pin of it is in effect there, if one is.
+    #[error("{version:?} is not a version: use letters, digits, `.`, `_` and `-`")]
+    InvalidVersion { version: String },
+    /// The folder's own configs don't pin the Suite. `applies_from` is the config whose pin of it
+    /// is in effect there, if one is.
     #[error("{} pins no {suite} version", folder.display())]
     NotPinned {
         suite: String,
@@ -170,172 +213,182 @@ pub enum PinError {
         #[source]
         source: io::Error,
     },
+    #[error("{} is not TOML", path.display())]
+    Parse {
+        path: PathBuf,
+        #[source]
+        source: toml_edit::TomlError,
+    },
     #[error("writing {}", path.display())]
     Write {
         path: PathBuf,
         #[source]
         source: io::Error,
     },
-    /// The `.envrc` is written, but `direnv` could not be started to allow it.
-    #[error("running `direnv allow {}`", path.display())]
-    Allow {
+    /// The config names the tool in a way only the user should change; nothing is written.
+    #[error("{} pins {tool} in a way kubaos leaves to you: {why}; edit it by hand", config.display())]
+    Tangled { tool: String, config: PathBuf, why: Tangle },
+    /// mise could not install the version; nothing is written.
+    #[error("installing {tool}@{version} with mise")]
+    Install {
+        tool: String,
+        version: String,
+        #[source]
+        source: MiseError,
+    },
+    /// The config is written, but mise could not say which versions apply in the folder.
+    #[error("asking mise which versions apply in {}", folder.display())]
+    Resolve {
+        folder: PathBuf,
+        #[source]
+        source: MiseError,
+    },
+    /// The config is written, but mise could not delete the versions nothing selects any more.
+    #[error("pruning mise's unused versions")]
+    Prune(#[source] MiseError),
+    /// The config is written, but mise could not trust it.
+    #[error("trusting {} in mise", path.display())]
+    Trust {
         path: PathBuf,
         #[source]
-        source: io::Error,
+        source: MiseError,
     },
-    /// The `.envrc` is written, but `direnv allow` failed, or was killed (no code).
-    #[error("`direnv allow {}` exited with {}", path.display(), code.map_or_else(|| "a signal".to_owned(), |c| format!("code {c}")))]
-    AllowFailed { path: PathBuf, code: Option<i32> },
     /// The installed Suites could not be read.
     #[error("reading the installed Suites")]
     Suites(#[source] SuiteError),
-    /// The `.envrc`'s pin of the Suite is not a lone, top-level line, so changing it could break
-    /// the file's shell. Nothing is written; `line` counts from 1.
-    #[error("{}:{line} pins the {suite} Suite in a way kubaos leaves to you: {why}; edit it by hand", envrc.display())]
-    Tangled {
-        suite: String,
-        envrc: PathBuf,
-        line: usize,
-        why: Tangle,
-    },
 }
 
-/// Why a pin line is left to the user.
+/// Why a pin is left to the user.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Tangle {
-    /// The file pins the Suite more than once, as an `if` and its `else` do.
-    #[error("the file pins it more than once")]
-    Repeated,
-    #[error("the line is indented")]
-    Indented,
-    /// The line is between an `if`, `for`, `while`, `until`, `case`, `select` or `{` and its end.
-    #[error("the line is inside a block")]
-    InBlock,
+    /// The tool's entry is a table or a list, with options or several versions.
+    #[error("its entry is not a plain version")]
+    NotAString,
+    #[error("`tools` is not a table")]
+    ToolsNotATable,
 }
 
-/// One line of an `.envrc`, as far as pins go.
+/// One line of an `.envrc`, as far as the old pins go.
 #[derive(Debug, PartialEq, Eq)]
 enum Line {
     Pin { suite: String, version: String },
-    SourceUp,
+    Bwenv { projects: Vec<String> },
     Other,
 }
 
-/// The Project pins of one user: the `.envrc` files they live in, the toolchain entries of the
-/// home, and the installed Suites they override.
+/// The Project pins of one user: the configs they live in, mise, and the installed Suites they
+/// override.
 #[derive(Clone, Debug)]
 pub struct Pins {
     suites: Suites,
-    toolchains: PathBuf,
     projects: PathBuf,
-    /// The `direnv` command: the program, then any arguments before `allow`.
-    direnv: Vec<OsString>,
+    backups: PathBuf,
+    mise_config: PathBuf,
+    /// [`Paths::bwenv_script`], as a `mise.toml` names it: under `~` when it is in the home, so
+    /// a project's file reads the same for everyone who uses KubaOS.
+    bwenv_script: String,
+    mise: Arc<dyn Mise>,
 }
 
 impl Pins {
-    /// The Project pins of the user `paths` describes, allowed with the `direnv` on PATH.
+    /// The Project pins of the user `paths` describes, with the `mise` on `PATH`.
     #[must_use]
     pub fn new(paths: &Paths) -> Self {
+        Self::with_mise(paths, Arc::new(mise::Cli::new()))
+    }
+
+    /// The Project pins of the user `paths` describes, with `mise` reading and installing them.
+    #[must_use]
+    pub fn with_mise(paths: &Paths, mise: Arc<dyn Mise>) -> Self {
         Self {
-            suites: Suites::new(paths),
-            toolchains: paths.toolchains(),
+            suites: Suites::with_mise(paths, Arc::clone(&mise)),
             projects: paths.projects_root(),
-            direnv: vec![OsString::from("direnv")],
+            backups: paths.backups(),
+            mise_config: paths.mise_config().to_path_buf(),
+            bwenv_script: match paths.bwenv_script().strip_prefix(paths.home()) {
+                Ok(rest) => format!("~/{}", rest.display()),
+                Err(_) => paths.bwenv_script().display().to_string(),
+            },
+            mise,
         }
     }
 
-    /// The same, allowing `.envrc` files with `command` (a program and its first arguments)
-    /// instead of `direnv`.
-    #[must_use]
-    pub fn with_direnv(mut self, command: impl IntoIterator<Item = impl Into<OsString>>) -> Self {
-        self.direnv = command.into_iter().map(Into::into).collect();
-        self
-    }
-
-    /// The pins in effect in `folder`, as direnv loads them there.
+    /// The pins in effect in `folder`, as mise selects them there, and the `.envrc` lines left in
+    /// the folder and above it.
     ///
     /// # Errors
     ///
-    /// [`PinError::NotAFolder`], or [`PinError::Read`] when an `.envrc` direnv would load cannot
-    /// be read.
+    /// [`PinError::NotAFolder`], [`PinError::Resolve`] when mise fails (an untrusted config in
+    /// the folder, say), or a failed read.
     pub fn resolve(&self, folder: &Path) -> Result<Resolution, PinError> {
         if !folder.is_dir() {
             return Err(PinError::NotAFolder {
                 path: folder.to_path_buf(),
             });
         }
-        let Some(nearest) = nearest_envrc(folder) else {
-            return Ok(Resolution::default());
-        };
-        let mut effective = BTreeMap::new();
-        let mut loaded = Vec::new();
-        load(&nearest, &mut effective, &mut loaded)?;
-
-        let highest = loaded.iter().min_by_key(|path| path.components().count()).cloned();
-        let mut hidden = Vec::new();
-        if let Some(highest) = highest {
-            let above = highest.parent().and_then(Path::parent);
-            for envrc in above.into_iter().flat_map(envrcs_from) {
-                for pin in read_pins(&envrc)? {
-                    let shadowed =
-                        effective.contains_key(&pin.suite) || hidden.iter().any(|h: &Hidden| h.pin.suite == pin.suite);
-                    if !shadowed {
-                        hidden.push(Hidden {
-                            pin,
-                            by: highest.clone(),
-                        });
-                    }
-                }
+        let listed = self.current(folder)?;
+        let mut pins = Vec::new();
+        for entry in listed {
+            if let Some(pin) = self.project_pin(&entry) {
+                pins.push(self.status(pin, Some(&entry))?);
             }
         }
-        Ok(Resolution {
-            nearest: Some(nearest),
-            pins: effective.into_values().collect(),
-            hidden,
-        })
-    }
-
-    /// What `pin` stands for here: its Suite, the installed version, and where its toolchain is.
-    ///
-    /// # Errors
-    ///
-    /// [`PinError::Suites`] when the Suite's file cannot be read.
-    pub fn status(&self, pin: Pin) -> Result<PinStatus, PinError> {
-        let suite = catalog::find(&pin.suite);
-        let installed = match suite {
-            Some(suite) => self.suites.config(suite).map_err(PinError::Suites)?,
-            None => None,
-        };
-        let toolchain = self.fetch(&pin.suite, &pin.version);
-        Ok(PinStatus {
-            pin,
-            suite,
-            installed,
-            toolchain,
-        })
-    }
-
-    /// Pins `suite` at `version` in `folder`: replaces the folder's `.envrc` line for the Suite,
-    /// or adds one at the end, creating the file when missing, then allows it in direnv. The
-    /// file's other lines stay as they are. A new file under another `.envrc` starts with
-    /// `source_up`, so the folder keeps what that one sets. Only a lone, top-level pin line is
-    /// replaced: one the file repeats, indents or puts in a block is left to the user.
-    ///
-    /// # Errors
-    ///
-    /// [`PinError::NotAFolder`], a version the Suite doesn't have, [`PinError::Tangled`], a
-    /// failed read or write; or, with the file written, a failed `direnv allow`.
-    pub fn pin(&self, suite: &Suite, version: &str, folder: &Path) -> Result<Pinned, PinError> {
-        if suite.versions.is_empty() {
-            return Err(PinError::Unversioned {
-                suite: suite.name.to_owned(),
-            });
+        let mut leftovers = Vec::new();
+        for envrc in folder.ancestors().map(|dir| dir.join(ENVRC)).filter(|p| p.is_file()) {
+            leftovers.extend(read_leftovers(&envrc)?);
         }
-        if !suite.versions.contains(&version) {
-            return Err(PinError::UnknownVersion {
-                suite: suite.name.to_owned(),
+        Ok(Resolution { pins, leftovers })
+    }
+
+    /// What each of `pins` stands for here: its Suite, the installed version, and the version
+    /// mise selects for it in its folder. mise runs once per folder; a folder it fails in leaves
+    /// its pins unresolved, with mise's reason, and the rest are read as usual.
+    ///
+    /// # Errors
+    ///
+    /// [`PinError::Suites`] when a Suite's record can't be read.
+    pub fn statuses(&self, pins: Vec<Pin>) -> Result<Vec<PinStatus>, PinError> {
+        let mut by_folder: BTreeMap<PathBuf, Result<Vec<ListedVersion>, String>> = BTreeMap::new();
+        let mut statuses = Vec::new();
+        for pin in pins {
+            let folder = pin.config.parent().unwrap_or(&pin.config).to_path_buf();
+            let listed = by_folder
+                .entry(folder.clone())
+                .or_insert_with(|| self.mise.current(&folder).map_err(|e| e.to_string()));
+            let status = match listed {
+                Ok(listed) => {
+                    let entry = listed
+                        .iter()
+                        .find(|entry| entry.tool == pin.tool && entry.source.as_deref() == Some(pin.config.as_path()))
+                        .cloned();
+                    self.status(pin, entry.as_ref())?
+                }
+                Err(reason) => PinStatus {
+                    unresolved: Some(reason.clone()),
+                    ..self.status(pin, None)?
+                },
+            };
+            statuses.push(status);
+        }
+        Ok(statuses)
+    }
+
+    /// Pins `suite` at `version` in `folder`: installs that version with mise first, then sets the
+    /// Suite's main tool in the folder's config that names it already, or in its `mise.toml`,
+    /// created when missing. The file's other entries, comments and layout stay. Then mise reads
+    /// the folder, which also tracks the config, so pruning keeps the version while it exists.
+    ///
+    /// # Errors
+    ///
+    /// A Suite that isn't on mise or has no versions, an invalid version,
+    /// [`PinError::NotAFolder`], [`PinError::Tangled`], a failed read, parse or write, or
+    /// [`PinError::Install`], all with nothing written; or, with the file written,
+    /// [`PinError::Resolve`].
+    pub fn pin(&self, suite: &Suite, version: &str, folder: &Path) -> Result<Pinned, PinError> {
+        let tool = main_tool(suite)?;
+        if !is_version(version) {
+            return Err(PinError::InvalidVersion {
                 version: version.to_owned(),
-                known: suite.versions.iter().map(|v| (*v).to_owned()).collect(),
             });
         }
         if !folder.is_dir() {
@@ -343,239 +396,519 @@ impl Pins {
                 path: folder.to_path_buf(),
             });
         }
-        let envrc = folder.join(ENVRC);
-        let current = read_envrc(&envrc)?;
+        let config = config_for(folder, tool)?;
+        let current = read_config(&config)?;
         let created = current.is_none();
         let text = current.unwrap_or_default();
-        let line = format!("use suite {} {version}", suite.name);
+        let mut doc = parse_config(&config, &text)?;
+        let previous = set_tool(&mut doc, &config, tool, version)?;
 
-        let found = pin_line(&envrc, &text, suite.name)?;
-        let mut out: Vec<String> = text.lines().map(str::to_owned).collect();
-        let previous = found.map(|(at, old)| {
-            out[at] = replace_pin(&out[at], &line);
-            old
-        });
-        let above = folder.parent().and_then(nearest_envrc);
-        if created && above.is_some() {
-            out.push("source_up".to_owned());
+        self.mise
+            .install(&[ToolRequest {
+                tool: tool.to_owned(),
+                request: version.to_owned(),
+            }])
+            .map_err(|source| PinError::Install {
+                tool: tool.to_owned(),
+                version: version.to_owned(),
+                source,
+            })?;
+        let rendered = doc.to_string();
+        if rendered != text {
+            write_config(&config, &rendered)?;
         }
-        if previous.is_none() {
-            out.push(line);
-        }
-        if created || out.join("\n") != text.trim_end_matches('\n') {
-            write_envrc(&envrc, &out)?;
-        }
-        self.allow(&envrc)?;
+        let applies = self
+            .current(folder)?
+            .iter()
+            .filter(|entry| entry.tool == tool)
+            .find_map(|entry| self.project_pin(entry));
         Ok(Pinned {
-            envrc,
+            config,
             created,
             previous,
+            applies,
         })
     }
 
-    /// Removes `folder`'s pin of the Suite called `suite`: its line in the folder's `.envrc`,
-    /// and the GC roots the direnv function made for it in the folder's `.direnv/`. A file left
-    /// with nothing but blank lines and a bare `source_up` is deleted; otherwise it is allowed
-    /// again.
+    /// Removes `folder`'s pin of the Suite called `suite` from the folder's config that holds it,
+    /// then prunes, so mise deletes the version when nothing else selects it. A config left with
+    /// nothing in it is deleted.
     ///
     /// # Errors
     ///
-    /// [`PinError::NotPinned`] when the folder's own `.envrc` has no such line,
-    /// [`PinError::Tangled`], a failed read or write, or, with the file written, a failed
-    /// `direnv allow`.
+    /// An unknown Suite or one not on mise, [`PinError::NotPinned`] when none of the folder's
+    /// configs pins it, [`PinError::Tangled`], a failed read, parse or write, or, with the file
+    /// written, [`PinError::Prune`].
     pub fn unpin(&self, suite: &str, folder: &Path) -> Result<Unpinned, PinError> {
+        let known = catalog::find(suite).ok_or_else(|| PinError::UnknownSuite {
+            suite: suite.to_owned(),
+        })?;
+        let tool = main_tool(known)?;
         if !folder.is_dir() {
             return Err(PinError::NotAFolder {
                 path: folder.to_path_buf(),
             });
         }
-        let envrc = folder.join(ENVRC);
-        let text = read_envrc(&envrc)?.unwrap_or_default();
-        let found = pin_line(&envrc, &text, suite)?;
-        let Some((at, version)) = found else {
+        let config = config_for(folder, tool)?;
+        let text = read_config(&config)?.unwrap_or_default();
+        let mut doc = parse_config(&config, &text)?;
+        let Some(version) = remove_tool(&mut doc, &config, tool)? else {
             let applies_from = self
                 .resolve(folder)?
                 .pins
                 .into_iter()
-                .find(|pin| pin.suite == suite)
-                .map(|pin| pin.envrc);
+                .find(|status| status.pin.tool == tool)
+                .map(|status| status.pin.config);
             return Err(PinError::NotPinned {
                 suite: suite.to_owned(),
                 folder: folder.to_path_buf(),
                 applies_from,
             });
         };
-        let out: Vec<String> = text
-            .lines()
-            .enumerate()
-            .filter(|&(i, _)| i != at)
-            .map(|(_, line)| line.to_owned())
-            .collect();
-        // A file of a bare `source_up` alone loads what the folder would load without it.
-        let deleted = out
-            .iter()
-            .all(|line| matches!(line.trim(), "" | "source_up" | "source_up_if_exists"));
-        Self::remove_roots(folder, suite);
+        let rendered = doc.to_string();
+        let deleted = rendered.trim().is_empty();
         if deleted {
-            fs::remove_file(&envrc).map_err(|source| PinError::Write {
-                path: envrc.clone(),
+            fs::remove_file(&config).map_err(|source| PinError::Write {
+                path: config.clone(),
                 source,
             })?;
         } else {
-            write_envrc(&envrc, &out)?;
-            self.allow(&envrc)?;
+            write_config(&config, &rendered)?;
         }
+        self.mise.prune().map_err(PinError::Prune)?;
         Ok(Unpinned {
-            envrc,
+            config,
             version,
             deleted,
         })
     }
 
-    /// Every pin line in an `.envrc` under the Projects root, [`SCAN_DEPTH`] folders deep at
-    /// most, by path. Hidden folders, dependency and build folders, and links are not entered.
+    /// Every pin in a config under the Projects root, [`SCAN_DEPTH`] folders deep at most, and
+    /// every `.envrc` line left from before. Hidden folders, dependency and build folders, and
+    /// links are not entered.
     ///
     /// # Errors
     ///
-    /// [`PinError::Read`] when an `.envrc` cannot be read. A folder that cannot be listed is
-    /// skipped.
-    pub fn all(&self) -> Result<Vec<Pin>, PinError> {
-        let mut envrcs = Vec::new();
-        find_envrcs(&self.projects, SCAN_DEPTH, &mut envrcs);
-        envrcs.sort();
-        let mut pins = Vec::new();
-        for envrc in envrcs {
-            pins.extend(read_pins(&envrc)?);
+    /// A config or `.envrc` that can't be read, or a config that isn't TOML. A folder that can't
+    /// be listed is skipped.
+    pub fn all(&self) -> Result<Found, PinError> {
+        let mut files = Vec::new();
+        find_files(&self.projects, SCAN_DEPTH, &mut files);
+        files.sort();
+        let mut found = Found::default();
+        for file in files {
+            if file.file_name().is_some_and(|name| name == ENVRC) {
+                found.leftovers.extend(read_leftovers(&file)?);
+            } else {
+                found.pins.extend(read_pins(&file)?);
+            }
         }
-        Ok(pins)
+        Ok(found)
     }
 
-    /// Deletes the GC roots of `suite` in `folder`'s `.direnv/suites/<suite>/`, which
-    /// `config/direnv/lib/suite.sh` makes, and the folders it leaves empty. The roots only keep
-    /// toolchains from the garbage collector, so one that can't be deleted is left.
-    fn remove_roots(folder: &Path, suite: &str) {
-        if !is_suite_name(suite) {
-            return;
+    /// Moves every `use suite` and `use bwenv` line in an `.envrc` under the Projects root to the
+    /// folder's config: a pin becomes the Suite's main tool in `[tools]`, and `use bwenv
+    /// <project>…` becomes `KUBAOS_BWENV` and a `_.source` of [`Paths::bwenv_script`] in
+    /// `[env]`, trusted in mise since the user wrote the line. Only a lone, top-level line
+    /// moves, of a Suite on mise; any other stays where it is, for [`Pins::all`] to report.
+    /// Each file is backed up under [`Paths::backups`] before it changes, and an `.envrc` left
+    /// with nothing but comments, blank lines and `source_up` is deleted. Running it again
+    /// changes nothing.
+    ///
+    /// # Errors
+    ///
+    /// A failed read, parse, backup, write or trust; the files before it are migrated.
+    pub fn migrate(&self) -> Result<Vec<Migrated>, PinError> {
+        let mut files = Vec::new();
+        find_files(&self.projects, SCAN_DEPTH, &mut files);
+        files.retain(|file| file.file_name().is_some_and(|name| name == ENVRC));
+        files.sort();
+        let stamp = backup_stamp();
+        let mut migrated = Vec::new();
+        for envrc in files {
+            if let Some(done) = self.migrate_envrc(&envrc, &stamp)? {
+                migrated.push(done);
+            }
         }
-        let direnv = folder.join(".direnv");
-        let suites = direnv.join("suites");
-        let _ = fs::remove_dir_all(suites.join(suite));
-        let _ = fs::remove_dir(&suites);
-        let _ = fs::remove_dir(&direnv);
+        Ok(migrated)
     }
 
-    /// Where the toolchain of `suite` at `version` is, from the home's toolchain entry: the
-    /// derivation on the first line, the output on the second.
-    fn fetch(&self, suite: &str, version: &str) -> Fetch {
-        if !is_suite_name(suite) || !is_version(version) {
-            return Fetch::Missing;
+    fn migrate_envrc(&self, envrc: &Path, stamp: &str) -> Result<Option<Migrated>, PinError> {
+        let text = read_config(envrc)?.unwrap_or_default();
+        let lines: Vec<&str> = text.lines().collect();
+        let movable = movable_lines(&lines);
+        if movable.is_empty() {
+            return Ok(None);
         }
-        let Ok(entry) = fs::read_to_string(self.toolchains.join(suite).join(version)) else {
-            return Fetch::Missing;
+        let folder = envrc.parent().unwrap_or(envrc);
+        let mut configs: BTreeMap<PathBuf, (String, DocumentMut)> = BTreeMap::new();
+        let mut done = Migrated {
+            envrc: envrc.to_path_buf(),
+            config: folder.join(MISE_TOML),
+            pins: Vec::new(),
+            kept: Vec::new(),
+            bwenv: Vec::new(),
+            envrc_deleted: false,
         };
-        let Some(out) = entry.lines().nth(1).filter(|out| !out.is_empty()) else {
-            return Fetch::Missing;
-        };
-        let path = PathBuf::from(out);
-        if fs::symlink_metadata(&path).is_ok() {
-            Fetch::InStore { path }
-        } else {
-            Fetch::OnFirstUse
+        let mut moved = Vec::new();
+        for (at, line) in movable {
+            match line {
+                Line::Pin { suite, version } => {
+                    let Some(tool) = catalog::find(&suite).and_then(|suite| main_tool(suite).ok()) else {
+                        continue;
+                    };
+                    let config = config_for(folder, tool)?;
+                    let (_, doc) = load_doc(&mut configs, &config)?;
+                    if tool_entry(doc, &config, tool)?.is_some() {
+                        done.kept.push((suite, version));
+                    } else {
+                        set_tool(doc, &config, tool, &version)?;
+                        done.pins.push((suite, version));
+                        done.config = config;
+                    }
+                }
+                Line::Bwenv { projects } => {
+                    let config = folder.join(MISE_TOML);
+                    let (_, doc) = load_doc(&mut configs, &config)?;
+                    if !set_bwenv(doc, &projects, &self.bwenv_script) {
+                        continue;
+                    }
+                    done.bwenv.extend(projects);
+                    done.config = config;
+                }
+                Line::Other => continue,
+            }
+            moved.push(at);
         }
-    }
+        if moved.is_empty() {
+            return Ok(None);
+        }
 
-    /// Runs `direnv allow envrc`, so the next prompt in the folder loads the file without asking.
-    fn allow(&self, envrc: &Path) -> Result<(), PinError> {
-        let Some((program, args)) = self.direnv.split_first() else {
-            return Ok(());
-        };
-        let status = Command::new(program)
-            .args(args)
-            .arg("allow")
-            .arg(envrc)
-            .stdin(Stdio::null())
-            .status()
-            .map_err(|source| PinError::Allow {
+        backup(&self.backups, stamp, envrc)?;
+        for (config, (text, doc)) in &configs {
+            let rendered = doc.to_string();
+            if rendered != *text {
+                backup(&self.backups, stamp, config)?;
+                write_config(config, &rendered)?;
+            }
+        }
+        let rest: Vec<&str> = lines
+            .iter()
+            .enumerate()
+            .filter(|(at, _)| !moved.contains(at))
+            .map(|(_, line)| *line)
+            .collect();
+        done.envrc_deleted = rest.iter().all(|line| {
+            let line = line.trim();
+            line.is_empty() || line.starts_with('#') || matches!(line, "source_up" | "source_up_if_exists")
+        });
+        if done.envrc_deleted {
+            fs::remove_file(envrc).map_err(|source| PinError::Write {
                 path: envrc.to_path_buf(),
                 source,
             })?;
-        if !status.success() {
-            return Err(PinError::AllowFailed {
-                path: envrc.to_path_buf(),
-                code: status.code(),
-            });
+        } else {
+            let mut kept = rest.join("\n");
+            kept.push('\n');
+            write_config(envrc, &kept)?;
         }
-        Ok(())
+        for (suite, _) in done.pins.iter().chain(&done.kept) {
+            remove_roots(folder, suite);
+        }
+        if !done.bwenv.is_empty() {
+            self.mise.trust(&done.config).map_err(|source| PinError::Trust {
+                path: done.config.clone(),
+                source,
+            })?;
+        }
+        Ok(Some(done))
+    }
+
+    /// The versions mise selects in `folder`.
+    fn current(&self, folder: &Path) -> Result<Vec<ListedVersion>, PinError> {
+        self.mise.current(folder).map_err(|source| PinError::Resolve {
+            folder: folder.to_path_buf(),
+            source,
+        })
+    }
+
+    /// The pin `entry` of `mise ls --current` stands for: a Suite's main tool from a project's
+    /// config, not mise's global configs or KubaOS's fragments.
+    fn project_pin(&self, entry: &ListedVersion) -> Option<Pin> {
+        let config = entry.source.as_ref()?;
+        if config.starts_with(&self.mise_config) || config.starts_with("/etc") {
+            return None;
+        }
+        let suite = suite_of_tool(&entry.tool)?;
+        Some(Pin {
+            suite: suite.name.to_owned(),
+            tool: entry.tool.clone(),
+            version: entry.requested.clone()?,
+            config: config.clone(),
+        })
+    }
+
+    fn status(&self, pin: Pin, entry: Option<&ListedVersion>) -> Result<PinStatus, PinError> {
+        let suite = catalog::find(&pin.suite).ok_or_else(|| PinError::UnknownSuite {
+            suite: pin.suite.clone(),
+        })?;
+        let installed = self.suites.config(suite).map_err(PinError::Suites)?;
+        Ok(PinStatus {
+            pin,
+            suite,
+            installed,
+            selected: entry.map(|entry| entry.version.clone()),
+            fetched: entry.is_some_and(|entry| entry.installed),
+            unresolved: None,
+        })
     }
 }
 
-/// Whether `version` is one plain word a pin line can hold: letters, digits, `.`, `_` and `-`.
+/// The tool a pin of `suite` sets: its main toolchain, the mise tool that takes the Suite's
+/// version.
+///
+/// # Errors
+///
+/// [`PinError::NotOnMise`] when the Suite has versions but no mise tool takes them, or
+/// [`PinError::Unversioned`] when it has no versions.
+pub fn main_tool(suite: &Suite) -> Result<&'static str, PinError> {
+    if let Some(tool) = suite.mise.iter().find(|tool| tool.request == Request::Suite) {
+        return Ok(tool.name);
+    }
+    let name = suite.name.to_owned();
+    if suite.versions.is_empty() {
+        Err(PinError::Unversioned { suite: name })
+    } else {
+        Err(PinError::NotOnMise { suite: name })
+    }
+}
+
+/// The Suite whose main tool is `tool`.
+fn suite_of_tool(tool: &str) -> Option<&'static Suite> {
+    catalog::all().find(|suite| main_tool(suite).is_ok_and(|main| main == tool))
+}
+
+/// Whether `version` is one plain word mise can take as a request: letters, digits, `.`, `_` and
+/// `-`.
 fn is_version(version: &str) -> bool {
     !version.is_empty()
-        && !version.starts_with('.')
+        && !version.starts_with(['.', '-'])
         && version
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
 }
 
-/// Adds `envrc`'s pins to `effective`, in the order direnv runs its lines, and the files it loads
-/// to `loaded`. `source_up` loads the nearest `.envrc` above the file's folder at that point.
-fn load(envrc: &Path, effective: &mut BTreeMap<String, Pin>, loaded: &mut Vec<PathBuf>) -> Result<(), PinError> {
-    loaded.push(envrc.to_path_buf());
-    let text = read_envrc(envrc)?.unwrap_or_default();
-    for line in text.lines() {
-        match parse(line) {
-            Line::Pin { suite, version } => {
-                let pin = Pin {
-                    suite: suite.clone(),
-                    version,
-                    envrc: envrc.to_path_buf(),
-                };
-                effective.insert(suite, pin);
-            }
-            Line::SourceUp => {
-                let above = envrc.parent().and_then(Path::parent).and_then(nearest_envrc);
-                if let Some(above) = above {
-                    load(&above, effective, loaded)?;
-                }
-            }
-            Line::Other => {}
+/// The config of `folder` that names `tool`, in [`CONFIG_NAMES`] order, or its `mise.toml`.
+fn config_for(folder: &Path, tool: &str) -> Result<PathBuf, PinError> {
+    for name in CONFIG_NAMES {
+        let config = folder.join(name);
+        let Some(text) = read_config(&config)? else {
+            continue;
+        };
+        if tool_entry(&parse_config(&config, &text)?, &config, tool)?.is_some() {
+            return Ok(config);
         }
     }
-    Ok(())
+    Ok(folder.join(MISE_TOML))
 }
 
-/// The `.envrc` in `folder` or the nearest folder above it.
-fn nearest_envrc(folder: &Path) -> Option<PathBuf> {
-    envrcs_from(folder).next()
+/// The pins in `config`'s `[tools]`, by tool. An entry that isn't a plain version is mise's to
+/// read and is left out.
+fn read_pins(config: &Path) -> Result<Vec<Pin>, PinError> {
+    let text = read_config(config)?.unwrap_or_default();
+    let doc = parse_config(config, &text)?;
+    let Some(tools) = doc.get("tools").and_then(Item::as_table_like) else {
+        return Ok(Vec::new());
+    };
+    let mut pins: Vec<Pin> = tools
+        .iter()
+        .filter_map(|(tool, item)| {
+            let suite = suite_of_tool(tool)?;
+            Some(Pin {
+                suite: suite.name.to_owned(),
+                tool: tool.to_owned(),
+                version: item.as_str()?.to_owned(),
+                config: config.to_path_buf(),
+            })
+        })
+        .collect();
+    pins.sort_by(|a, b| a.tool.cmp(&b.tool));
+    Ok(pins)
 }
 
-/// Every `.envrc` in `folder` and the folders above it, nearest first.
-fn envrcs_from(folder: &Path) -> impl Iterator<Item = PathBuf> + '_ {
-    folder
-        .ancestors()
-        .map(|dir| dir.join(ENVRC))
-        .filter(|envrc| envrc.is_file())
+/// The version `doc` pins `tool` at, or `None` when it doesn't name the tool.
+///
+/// # Errors
+///
+/// [`PinError::Tangled`] when `tools` isn't a table or the tool's entry isn't a plain version.
+fn tool_entry(doc: &DocumentMut, config: &Path, tool: &str) -> Result<Option<String>, PinError> {
+    let Some(tools) = doc.get("tools") else {
+        return Ok(None);
+    };
+    let tools = tools
+        .as_table_like()
+        .ok_or_else(|| tangled(tool, config, Tangle::ToolsNotATable))?;
+    let Some(item) = tools.get(tool) else {
+        return Ok(None);
+    };
+    match item.as_str() {
+        Some(version) => Ok(Some(version.to_owned())),
+        None => Err(tangled(tool, config, Tangle::NotAString)),
+    }
 }
 
-/// The pin lines of `envrc`, in order.
-fn read_pins(envrc: &Path) -> Result<Vec<Pin>, PinError> {
-    let text = read_envrc(envrc)?.unwrap_or_default();
+/// Sets `tool` to `version` in `doc`'s `[tools]`, keeping the entry's comments; the version it
+/// pinned before, if any.
+fn set_tool(doc: &mut DocumentMut, config: &Path, tool: &str, version: &str) -> Result<Option<String>, PinError> {
+    let previous = tool_entry(doc, config, tool)?;
+    let tools = tools_of(doc, config, tool)?;
+    match tools.get_mut(tool).and_then(Item::as_value_mut) {
+        Some(value) => {
+            let decor = value.decor().clone();
+            *value = version.into();
+            *value.decor_mut() = decor;
+        }
+        None => {
+            tools.insert(tool, toml_edit::value(version));
+        }
+    }
+    Ok(previous)
+}
+
+/// Removes `tool` from `doc`'s `[tools]`, and the table when that leaves it empty; the version it
+/// pinned, or `None` when it named none.
+fn remove_tool(doc: &mut DocumentMut, config: &Path, tool: &str) -> Result<Option<String>, PinError> {
+    let Some(version) = tool_entry(doc, config, tool)? else {
+        return Ok(None);
+    };
+    let tools = tools_of(doc, config, tool)?;
+    tools.remove(tool);
+    if tools.is_empty() {
+        doc.remove("tools");
+    }
+    Ok(Some(version))
+}
+
+/// `doc`'s `[tools]`, made when missing.
+fn tools_of<'a>(doc: &'a mut DocumentMut, config: &Path, tool: &str) -> Result<&'a mut dyn TableLike, PinError> {
+    doc.entry("tools")
+        .or_insert_with(toml_edit::table)
+        .as_table_like_mut()
+        .ok_or_else(|| tangled(tool, config, Tangle::ToolsNotATable))
+}
+
+fn tangled(tool: &str, config: &Path, why: Tangle) -> PinError {
+    PinError::Tangled {
+        tool: tool.to_owned(),
+        config: config.to_path_buf(),
+        why,
+    }
+}
+
+/// Sets `doc`'s `[env]` to source `script` for `projects`, as a `use bwenv` line did.
+/// `false`, with nothing changed, when `[env]` already sources a script or names
+/// [`BWENV_VAR`], which the user's own config then decides.
+fn set_bwenv(doc: &mut DocumentMut, projects: &[String], script: &str) -> bool {
+    if let Some(env) = doc.get("env") {
+        let Some(env) = env.as_table_like() else {
+            return false;
+        };
+        let sources = env
+            .get("_")
+            .is_some_and(|directives| directives.as_table_like().is_none_or(|d| d.contains_key("source")));
+        if sources || env.contains_key(BWENV_VAR) {
+            return false;
+        }
+    }
+    let env = doc
+        .entry("env")
+        .or_insert_with(toml_edit::table)
+        .as_table_like_mut()
+        .expect("`env` was just checked to be a table");
+    env.insert(BWENV_VAR, toml_edit::value(projects.join(" ")));
+    let mut source = toml_edit::InlineTable::new();
+    source.insert("path", script.into());
+    source.insert("redact", true.into());
+    let directives = env.entry("_").or_insert_with(|| {
+        let mut directives = toml_edit::Table::new();
+        directives.set_dotted(true);
+        Item::Table(directives)
+    });
+    let Some(directives) = directives.as_table_like_mut() else {
+        return false;
+    };
+    directives.insert("source", toml_edit::value(source));
+    true
+}
+
+/// The config at `path` from `configs`, read and parsed the first time it is asked for.
+fn load_doc<'a>(
+    configs: &'a mut BTreeMap<PathBuf, (String, DocumentMut)>,
+    path: &Path,
+) -> Result<&'a mut (String, DocumentMut), PinError> {
+    if !configs.contains_key(path) {
+        let text = read_config(path)?.unwrap_or_default();
+        let doc = parse_config(path, &text)?;
+        configs.insert(path.to_path_buf(), (text, doc));
+    }
+    Ok(configs.get_mut(path).expect("the config was just loaded"))
+}
+
+fn parse_config(path: &Path, text: &str) -> Result<DocumentMut, PinError> {
+    text.parse().map_err(|source| PinError::Parse {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+/// The `use suite` and `use bwenv` lines of `envrc`.
+fn read_leftovers(envrc: &Path) -> Result<Vec<Leftover>, PinError> {
+    let text = read_config(envrc)?.unwrap_or_default();
     Ok(text
         .lines()
-        .filter_map(|line| match parse(line) {
-            Line::Pin { suite, version } => Some(Pin {
-                suite,
-                version,
+        .enumerate()
+        .filter_map(|(at, line)| {
+            let kind = match parse(line) {
+                Line::Pin { suite, version } => LeftoverKind::Suite { suite, version },
+                Line::Bwenv { projects } => LeftoverKind::Bwenv { projects },
+                Line::Other => return None,
+            };
+            Some(Leftover {
                 envrc: envrc.to_path_buf(),
-            }),
-            _ => None,
+                line: at + 1,
+                kind,
+            })
         })
         .collect())
 }
 
-/// The `.envrc` files under `dir`, `depth` folders deep at most.
-fn find_envrcs(dir: &Path, depth: usize, found: &mut Vec<PathBuf>) {
+/// The `use suite` and `use bwenv` lines of an `.envrc` that can move, by index: lone, top-level
+/// lines, not indented or inside a block, and not a Suite pinned twice (an `if` and its `else`).
+fn movable_lines(lines: &[&str]) -> Vec<(usize, Line)> {
+    let mut movable = Vec::new();
+    let mut seen = BTreeMap::<String, usize>::new();
+    let mut depth = 0_i32;
+    for (at, line) in lines.iter().enumerate() {
+        let parsed = parse(line);
+        if let Line::Pin { suite, .. } = &parsed {
+            *seen.entry(suite.clone()).or_default() += 1;
+        }
+        let top_level = depth == 0 && !line.starts_with(char::is_whitespace);
+        if top_level && parsed != Line::Other {
+            movable.push((at, parsed));
+        }
+        depth = (depth + nesting(line)).max(0);
+    }
+    movable.retain(|(_, line)| match line {
+        Line::Pin { suite, .. } => seen.get(suite) == Some(&1),
+        _ => true,
+    });
+    movable
+}
+
+/// Every config named in [`CONFIG_NAMES`] and every `.envrc` under `dir`, `depth` folders deep at
+/// most.
+fn find_files(dir: &Path, depth: usize, found: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
@@ -585,16 +918,17 @@ fn find_envrcs(dir: &Path, depth: usize, found: &mut Vec<PathBuf>) {
         };
         let name = entry.file_name();
         let name = name.to_string_lossy();
-        if kind.is_file() && name == ENVRC {
+        if kind.is_file() && (name == ENVRC || CONFIG_NAMES.contains(&name.as_ref())) {
             found.push(entry.path());
         } else if kind.is_dir() && depth > 0 && !name.starts_with('.') && !SKIPPED.contains(&name.as_ref()) {
-            find_envrcs(&entry.path(), depth - 1, found);
+            find_files(&entry.path(), depth - 1, found);
         }
     }
 }
 
-/// What one `.envrc` line does for pins. The line is split into words as the shell would split a
-/// simple command: on blanks, quotes removed, a word starting with `#` ending the line.
+/// What one `.envrc` line does, as far as the old pins go. The line is split into words as the
+/// shell would split a simple command: on blanks, quotes removed, a word starting with `#` ending
+/// the line.
 fn parse(line: &str) -> Line {
     let words: Vec<&str> = line
         .split_whitespace()
@@ -602,49 +936,25 @@ fn parse(line: &str) -> Line {
         .map(unquote)
         .collect();
     match words.as_slice() {
-        ["use", "suite", suite, version] => Line::Pin {
+        ["use", "suite", suite, version] if is_version(version) => Line::Pin {
             suite: (*suite).to_owned(),
             version: (*version).to_owned(),
         },
-        ["source_up" | "source_up_if_exists"]
-        | ["source_up" | "source_up_if_exists", ".envrc" | "&&" | "||" | ";", ..] => Line::SourceUp,
+        ["use", "bwenv", projects @ ..] if !projects.is_empty() && projects.iter().all(|p| is_bwenv_project(p)) => {
+            Line::Bwenv {
+                projects: projects.iter().map(|p| (*p).to_owned()).collect(),
+            }
+        }
         _ => Line::Other,
     }
 }
 
-/// The one line of `text` that pins `suite`, by index, with its version; `None` when there is
-/// none.
-///
-/// # Errors
-///
-/// [`PinError::Tangled`] when the file pins the Suite more than once, or the line is indented
-/// or inside a block, where replacing or removing it could break the shell around it.
-fn pin_line(envrc: &Path, text: &str, suite: &str) -> Result<Option<(usize, String)>, PinError> {
-    let tangled = |at: usize, why| PinError::Tangled {
-        suite: suite.to_owned(),
-        envrc: envrc.to_path_buf(),
-        line: at + 1,
-        why,
-    };
-    let mut found = None;
-    let mut depth = 0_i32;
-    for (at, line) in text.lines().enumerate() {
-        if let Line::Pin { suite: name, version } = parse(line)
-            && name == suite
-        {
-            if found.is_some() {
-                return Err(tangled(at, Tangle::Repeated));
-            }
-            found = Some((at, version, line.starts_with(char::is_whitespace), depth > 0));
-        }
-        depth = (depth + nesting(line)).max(0);
-    }
-    match found {
-        None => Ok(None),
-        Some((at, _, true, _)) => Err(tangled(at, Tangle::Indented)),
-        Some((at, _, _, true)) => Err(tangled(at, Tangle::InBlock)),
-        Some((at, version, false, false)) => Ok(Some((at, version))),
-    }
+/// Whether `project` is a plain word a `KUBAOS_BWENV` list can hold.
+fn is_bwenv_project(project: &str) -> bool {
+    !project.is_empty()
+        && project
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '/'))
 }
 
 /// How many shell blocks `line` opens, less how many it closes, counting its words as the
@@ -663,20 +973,6 @@ fn nesting(line: &str) -> i32 {
         .sum()
 }
 
-/// `original`, a pin line, as `line` with the original's indentation and trailing comment.
-fn replace_pin(original: &str, line: &str) -> String {
-    let indent = &original[..original.len() - original.trim_start().len()];
-    let comment = original
-        .char_indices()
-        .find(|&(at, c)| c == '#' && original[..at].ends_with(char::is_whitespace))
-        .map_or("", |(at, _)| &original[at..]);
-    if comment.is_empty() {
-        format!("{indent}{line}")
-    } else {
-        format!("{indent}{line} {comment}")
-    }
-}
-
 /// `word` without the single or double quotes around it.
 fn unquote(word: &str) -> &str {
     for quote in ['"', '\''] {
@@ -687,36 +983,72 @@ fn unquote(word: &str) -> &str {
     word
 }
 
-/// The text of `envrc`, or `None` when there is none.
-fn read_envrc(envrc: &Path) -> Result<Option<String>, PinError> {
-    match fs::read_to_string(envrc) {
+/// Deletes the GC roots `use suite` made for `suite` in `folder`'s `.direnv/suites/<suite>/`, and
+/// the folders it leaves empty. They only kept toolchains from Nix's garbage collector, so one
+/// that can't be deleted is left.
+fn remove_roots(folder: &Path, suite: &str) {
+    if !is_suite_name(suite) {
+        return;
+    }
+    let direnv = folder.join(".direnv");
+    let suites = direnv.join("suites");
+    let _ = fs::remove_dir_all(suites.join(suite));
+    let _ = fs::remove_dir(&suites);
+    let _ = fs::remove_dir(&direnv);
+}
+
+/// The text of `path`, or `None` when there is none.
+fn read_config(path: &Path) -> Result<Option<String>, PinError> {
+    match fs::read_to_string(path) {
         Ok(text) => Ok(Some(text)),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(source) => Err(PinError::Read {
-            path: envrc.to_path_buf(),
+            path: path.to_path_buf(),
             source,
         }),
     }
 }
 
-/// Writes `lines` to `envrc`, through a temporary file and a rename. A linked `.envrc` is written
-/// where it points, so the link stays, and an existing file keeps its mode.
-fn write_envrc(envrc: &Path, lines: &[String]) -> Result<(), PinError> {
+/// The folder a migration's backups go under: the time, in seconds since 1970.
+fn backup_stamp() -> String {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+        .to_string()
+}
+
+/// Copies `file`, when it exists, to `backups/<stamp>/<its absolute path>`, as `kubaos_backup`
+/// in `migrations/lib.sh` lays them out.
+fn backup(backups: &Path, stamp: &str, file: &Path) -> Result<(), PinError> {
+    if !file.exists() {
+        return Ok(());
+    }
+    let relative = file.strip_prefix("/").unwrap_or(file);
+    let dest = backups.join(stamp).join(relative);
     let write_err = |source| PinError::Write {
-        path: envrc.to_path_buf(),
+        path: dest.clone(),
         source,
     };
-    let target = match fs::symlink_metadata(envrc) {
-        Ok(meta) if meta.is_symlink() => fs::canonicalize(envrc).map_err(write_err)?,
-        _ => envrc.to_path_buf(),
+    fs::create_dir_all(dest.parent().unwrap_or(backups)).map_err(write_err)?;
+    fs::copy(file, &dest).map(drop).map_err(write_err)
+}
+
+/// Writes `text` to `path`, through a temporary file and a rename. A linked file is written where
+/// it points, so the link stays, and an existing file keeps its mode.
+fn write_config(path: &Path, text: &str) -> Result<(), PinError> {
+    let write_err = |source| PinError::Write {
+        path: path.to_path_buf(),
+        source,
+    };
+    let target = match fs::symlink_metadata(path) {
+        Ok(meta) if meta.is_symlink() => fs::canonicalize(path).map_err(write_err)?,
+        _ => path.to_path_buf(),
     };
     let mode = fs::metadata(&target).ok().map(|meta| meta.permissions().mode());
-    let mut text = lines.join("\n");
-    text.push('\n');
     let mut tmp = target.as_os_str().to_owned();
     tmp.push(format!(".tmp-{}", process::id()));
     let tmp = PathBuf::from(tmp);
-    replace_with(&target, &tmp, &text, mode).map_err(|e| {
+    replace_with(&target, &tmp, text, mode).map_err(|e| {
         let _ = fs::remove_file(&tmp);
         write_err(e)
     })
@@ -730,8 +1062,8 @@ fn replace_with(target: &Path, tmp: &Path, text: &str, mode: Option<u32>) -> io:
         options.mode(mode);
     }
     let mut file = options.open(tmp)?;
-    // HAZARD: set the mode before the text goes in. A private `.envrc` would otherwise be
-    // readable by others, with its secrets, until the rename.
+    // HAZARD: set the mode before the text goes in. A private config would otherwise be readable
+    // by others, with whatever secrets it holds, until the rename.
     if let Some(mode) = mode {
         file.set_permissions(fs::Permissions::from_mode(mode))?;
     }

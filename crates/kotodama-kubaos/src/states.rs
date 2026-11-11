@@ -14,11 +14,20 @@
 //! | `proxy.local-network` | on: the kill switch lets the local network through | `U/desktop/network/proxy.toml`, on without it |
 //! | `notifications.dnd` | on: Do not disturb is on | `$XDG_RUNTIME_DIR/kubaos-dnd.json` |
 //! | `power.panel-power-saving` | on: panel power saving | `U/desktop/power/power.toml` |
+//! | `power.battery-notes` | on: the toasts when a sleep or a night went wrong | the same |
 //! | `power.scheduler` | `kernel` or `lavd` | the same |
+//! | `power.background-yields` | on: build tools and Nix's builds run at a lower priority | the same |
 //! | `power.low-battery` | `power-saver`, `super-saver` or `off` | the same |
+//! | `power.critical-warning` | on: the critical-battery warning | the same |
 //! | `nix.unfree` | on: the user's nixpkgs takes unfree packages | `U/home/kubaos.d/nixpkgs.toml` |
 //! | `kubaos.preview` | on: the home is a live preview of a KubaOS checkout | `S/kubaos/preview.json` names one |
+//! | `kubaos.suites.<name>` | on: the catalog's Suite `<name>` is installed | `U/home/kubaos.d/suites/<name>.toml` exists |
 //! | `bluetooth.unnamed` | on: Bluetooth lists the devices that send no name | `S/quickshell/kubaos.json` |
+//! | `wallpapers.depth` | on: the wallpaper-depth Suite cuts out the user's own pictures | `U/desktop/wallpapers/depth.toml` |
+//! | `wallpapers.depth-skipped` | on: the current wallpaper is in depth's skip list | the same, and `~/.local/state/theme/wallpaper` |
+//! | `update.firmware` | on: `kubaos update` updates firmware | `U/desktop/update/no-firmware` doesn't exist |
+//! | `update.bitwarden` | on: `kubaos update` moves Bitwarden desktop on within its series | `U/desktop/update/no-bitwarden` doesn't exist |
+//! | `update.nix` | on: `kubaos update` moves Nix on within its minor | `U/desktop/update/no-nix` doesn't exist |
 //!
 //! `U` is the user layer, `~/.config/kubaos`; `S` is `XDG_STATE_HOME`, `~/.local/state`. A state
 //! whose file can't be read has no reading, and an action that names it shows whatever it declares.
@@ -27,12 +36,14 @@
 //!
 //! - The state names and what each reads as ([`values`]), reading them all ([`States::read`]), and
 //!   the files they come from ([`Places::files`]).
+//! - Holding the installed Suites' options, read with the states, for the Suite Items.
 //!
 //! # Not here
 //!
 //! - Which action shows in which state: `shown_when` in [`crate::registry`].
 //! - Watching the files: `main.rs`.
 //! - The files' formats: the crates that write them.
+//! - Reading a Suite's file, and the Suite Items: [`crate::suites`].
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -48,11 +59,18 @@ use kubaos_core::preview::PreviewFile;
 use kubaos_core::state::DIR_NAME as STATE_DIR;
 use kubaos_core::state::NIXPKGS_FILE;
 use kubaos_core::state::Paths;
+use kubaos_core::state::StateDir;
 use kubaos_core::state::user_flake;
+use kubaos_core::suites::catalog;
 use kubaos_core::unfree::Setting as UnfreeSetting;
 use kubaos_core::unfree::Unfree;
+use kubaos_core::update::programs::Part;
+use kubaos_core::update::programs::Switches;
 use kubaos_core::update::record::SystemPaths;
+use kubaos_core::wallpaper_depth;
 use kubaos_user_layer::App;
+
+use crate::suites::Installed;
 
 /// Whether the daily Downloads tidy is on.
 pub const TIDY_DAILY: &str = "files.tidy-daily";
@@ -74,19 +92,37 @@ pub const PROXY_LOCAL_NETWORK: &str = "proxy.local-network";
 pub const DND: &str = "notifications.dnd";
 /// Whether the saver stops dim the panel.
 pub const PANEL_POWER_SAVING: &str = "power.panel-power-saving";
+/// Whether a toast says when a sleep or a night on battery went wrong.
+pub const BATTERY_NOTES: &str = "power.battery-notes";
 /// The CPU scheduler's name in the power settings.
 pub const SCHEDULER: &str = "power.scheduler";
+/// Whether build tools and Nix's builds yield to the desktop.
+pub const BACKGROUND_YIELDS: &str = "power.background-yields";
 /// Where the low-battery drop goes, or `off`.
 pub const LOW_BATTERY: &str = "power.low-battery";
+/// Whether the critical-battery warning is on.
+pub const CRITICAL_WARNING: &str = "power.critical-warning";
 /// Whether the user's nixpkgs takes unfree packages.
 pub const UNFREE: &str = "nix.unfree";
 /// Whether the home is a live preview of a KubaOS checkout rather than the release.
 pub const PREVIEW: &str = "kubaos.preview";
 /// Whether the control center's Bluetooth tab lists the devices in range that send no name.
 pub const BLUETOOTH_UNNAMED: &str = "bluetooth.unnamed";
+/// Whether the wallpaper-depth Suite cuts out the user's own pictures.
+pub const DEPTH: &str = "wallpapers.depth";
+/// Whether the current wallpaper is in wallpaper depth's skip list.
+pub const DEPTH_SKIPPED: &str = "wallpapers.depth-skipped";
+/// Whether `kubaos update` updates firmware through fwupd.
+pub const FIRMWARE: &str = "update.firmware";
+/// Whether `kubaos update` moves Bitwarden desktop to the newest release of its series.
+pub const UPDATE_BITWARDEN: &str = "update.bitwarden";
+/// Whether `kubaos update` moves Nix to the newest patch release of its minor.
+pub const UPDATE_NIX: &str = "update.nix";
 
 /// What starts the state of an optional package group, `packages.chrome`.
 const PACKAGES: &str = "packages.";
+/// What starts the state of a Suite of the catalog, `kubaos.suites.go`.
+const SUITES: &str = "kubaos.suites.";
 
 /// The CPU schedulers' names in the power settings, `kubaos_power::settings::CpuScheduler::ALL`'s.
 const SCHEDULERS: &[&str] = &["kernel", "lavd"];
@@ -138,6 +174,7 @@ pub enum Reading {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct States {
     readings: BTreeMap<String, Reading>,
+    suites: Installed,
 }
 
 impl States {
@@ -148,6 +185,7 @@ impl States {
         states.read_packages(places);
         if let Some(config) = &places.config_home {
             states.read_user_layer(config);
+            states.read_depth(&wallpaper_depth::path(config), places.wallpaper.as_deref());
         }
         if let Some(active) = places.keep_awake.as_deref().and_then(kept_awake) {
             states.set(KEEP_AWAKE, Reading::Bool(active));
@@ -172,6 +210,18 @@ impl States {
         self.readings.get(name)
     }
 
+    /// The Suites of the catalog that are installed, with their options.
+    pub fn suites(&self) -> &Installed {
+        &self.suites
+    }
+
+    /// These states with `suites` installed, and each Suite's state read from them.
+    #[must_use]
+    pub fn with_suites(mut self, suites: Installed) -> Self {
+        self.set_suites(suites);
+        self
+    }
+
     /// These states with `name` read as `reading`.
     #[must_use]
     pub fn with(mut self, name: impl Into<String>, reading: Reading) -> Self {
@@ -181,6 +231,35 @@ impl States {
 
     fn set(&mut self, name: impl Into<String>, reading: Reading) {
         self.readings.insert(name.into(), reading);
+    }
+
+    /// Holds `suites` and reads each catalog Suite's state from them; a Suite whose file doesn't
+    /// read has no reading.
+    fn set_suites(&mut self, suites: Installed) {
+        for suite in catalog::all() {
+            let name = format!("{SUITES}{}", suite.name);
+            match suites.is_installed(suite.name) {
+                Some(installed) => self.set(name, Reading::Bool(installed)),
+                None => {
+                    self.readings.remove(&name);
+                }
+            }
+        }
+        self.suites = suites;
+    }
+
+    /// Depth's switch from its settings, and whether they skip the current wallpaper, as the
+    /// theme records it in `wallpaper`. Neither reads while the settings don't, and the second
+    /// not while the record doesn't.
+    fn read_depth(&mut self, settings: &Path, wallpaper: Option<&Path>) {
+        let Ok(depth) = wallpaper_depth::Settings::load(settings) else {
+            return;
+        };
+        self.set(DEPTH, Reading::Bool(depth.enabled));
+        if let Some(Ok(current)) = wallpaper.map(wallpaper_depth::current_wallpaper) {
+            let skipped = current.is_some_and(|picture| depth.skips(&picture));
+            self.set(DEPTH_SKIPPED, Reading::Bool(skipped));
+        }
     }
 
     /// Each optional group the manifest lists, on or off by the user's choice or its default, and
@@ -211,15 +290,22 @@ impl States {
         self.set(AUTOMOUNT, Reading::Bool(files.automount.automount()));
         self.set(GREETING, Reading::Bool(!files.no_greeting.exists()));
         self.set(PHONE_LINK, Reading::Bool(files.phone.is_on()));
+        self.set(FIRMWARE, Reading::Bool(files.updates.is_on(Part::Firmware)));
+        self.set(UPDATE_BITWARDEN, Reading::Bool(files.updates.is_on(Part::Bitwarden)));
+        self.set(UPDATE_NIX, Reading::Bool(files.updates.is_on(Part::Nix)));
         if let Ok(keyboard) = keyboard_settings::Settings::load(&files.keyboard) {
             self.set(MAC_ACCENTS, Reading::Bool(keyboard.mac_accents));
         }
         if let Ok(power) = kubaos_power::settings::Settings::load(&files.power) {
             self.set(PANEL_POWER_SAVING, Reading::Bool(power.panel_power_saving));
+            self.set(BATTERY_NOTES, Reading::Bool(power.battery_notes));
             self.set(SCHEDULER, Reading::Word(power.scheduler.name().to_owned()));
+            self.set(BACKGROUND_YIELDS, Reading::Bool(power.background_yields));
             let low_battery = power.low_battery_stop.map_or("off", |stop| stop.id());
             self.set(LOW_BATTERY, Reading::Word(low_battery.to_owned()));
+            self.set(CRITICAL_WARNING, Reading::Bool(power.critical_warning.is_some()));
         }
+        self.set_suites(Installed::read(&StateDir::new(&files.state_dir)));
         if let Ok(unfree) = UnfreeSetting::read(&files.state_dir) {
             self.set(UNFREE, Reading::Bool(unfree == Unfree::Allowed));
         }
@@ -235,8 +321,10 @@ pub fn values(name: &str) -> Option<Values> {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK
-        | DND | PANEL_POWER_SAVING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED => Some(Values::Bool),
+        | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES | BACKGROUND_YIELDS | UNFREE | PREVIEW
+        | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
+        _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,
     }
 }
@@ -260,6 +348,8 @@ pub struct Places {
     pub preview: Option<PathBuf>,
     /// What the shell's panels remember, `~/.local/state/quickshell/kubaos.json`.
     pub shell_state: Option<PathBuf>,
+    /// The theme's record of the current wallpaper, `~/.local/state/theme/wallpaper`.
+    pub wallpaper: Option<PathBuf>,
 }
 
 impl Places {
@@ -275,6 +365,9 @@ impl Places {
             dnd: kubaos_idle::runtime_dir().map(|runtime| runtime.join(DND_FILE)),
             preview: Paths::from_env().ok().map(|paths| paths.preview()),
             shell_state: Paths::from_env().ok().map(|paths| paths.shell_state()),
+            wallpaper: std::env::var_os("HOME")
+                .filter(|home| !home.is_empty())
+                .map(|home| wallpaper_depth::wallpaper_file(Path::new(&home))),
         }
     }
 
@@ -288,11 +381,17 @@ impl Places {
                 user_layer.automount.path().to_path_buf(),
                 user_layer.no_greeting,
                 user_layer.phone.path().to_path_buf(),
+                user_layer.updates.path(Part::Firmware),
+                user_layer.updates.path(Part::Bitwarden),
+                user_layer.updates.path(Part::Nix),
                 user_layer.keyboard,
                 user_layer.power,
                 user_layer.state_dir.join(NIXPKGS_FILE),
                 user_layer.network.join(kubaos_proxy::paths::PROFILE),
+                wallpaper_depth::path(config),
             ]);
+            let state_dir = StateDir::new(&user_layer.state_dir);
+            files.extend(catalog::all().map(|suite| state_dir.suite_file(suite.name)));
         }
         files.extend(
             self.keep_awake
@@ -301,6 +400,7 @@ impl Places {
                 .chain(&self.dnd)
                 .chain(&self.preview)
                 .chain(&self.shell_state)
+                .chain(&self.wallpaper)
                 .cloned(),
         );
         files
@@ -313,6 +413,8 @@ struct Files {
     automount: kubaos_automount::settings::Settings,
     no_greeting: PathBuf,
     phone: kubaos_phone::setting::Setting,
+    /// The switches of the update's parts: Bitwarden, Nix and firmware, `U/desktop/update`.
+    updates: Switches,
     keyboard: PathBuf,
     power: PathBuf,
     /// The user flake's state directory, `U/home/kubaos.d`.
@@ -328,6 +430,7 @@ impl Files {
             automount: kubaos_automount::settings::Settings::new(config),
             no_greeting: kubaos_user_layer::dir(config, App::Zsh).join(NO_GREETING),
             phone: kubaos_phone::setting::Setting::new(config),
+            updates: Switches::new(config),
             keyboard: keyboard_settings::path(config),
             power: kubaos_user_layer::dir(config, App::Power).join(kubaos_power::settings::FILE),
             state_dir: user_flake(config).join(STATE_DIR),

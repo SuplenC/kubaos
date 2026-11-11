@@ -193,7 +193,7 @@ bind("SUPER + CTRL + W", "Control center (Wi-Fi)", qs("controlcenter", "wifi"))
 bind("SUPER + N", "Notifications", qs("notifications", "toggle"))
 bind("SUPER + CTRL + comma", "Do not disturb", qs("notifications", "toggleDnd"))
 bind("SUPER + SHIFT + comma", "Clear notifications", qs("notifications", "clear"))
-bind("SUPER + CTRL + ALT + R", "Restart Quickshell", "qs kill; sleep 0.5; qs")
+bind("SUPER + CTRL + ALT + R", "Restart Quickshell", "dot-session restart-shell")
 
 -- Theme / wallpaper (dot-theme is owned by the theme part of the repo).
 bind("SUPER + CTRL + Space", "Wallpaper picker", qs("wallpaper", "toggle"))
@@ -201,8 +201,9 @@ bind("SUPER + SHIFT + CTRL + Space", "Next wallpaper", "dot-theme next")
 bind("SUPER + CTRL + ALT + Space", "Switch wallpaper folder", "dot-theme toggle-folder")
 
 -- Keep awake on until turned off, or off: nothing locks, goes dark or
--- suspends by itself meanwhile (crates/kubaos-idle). hypridle keeps running,
--- so a lock asked for and the lock before a suspend still work.
+-- suspends by itself, meanwhile, and closing the lid still does what it is set
+-- to (crates/kubaos-idle). hypridle keeps running, so a lock asked for and the
+-- lock before a suspend still work.
 bind("SUPER + CTRL + I", "Keep awake on/off", "kubaos-idle awake toggle")
 
 ---------------------------------------------------------------------------
@@ -319,14 +320,17 @@ bind("XF86AudioPrev", "Previous track", "playerctl previous", locked)
 bind("XF86AudioStop", "Stop", "playerctl stop", locked)
 
 ---------------------------------------------------------------------------
--- Lid: turn the laptop panel off when closed with an external connected,
--- back on when opened (scripts/dot-hypr-lid). Suspend on lid close is
--- logind's job (battery only, system/ owns the drop-in) while the idle
--- settings say the same; when they don't, kubaos-idle holds the lid away
--- from logind and `kubaos-idle lid closed` does what they say. It does
--- nothing while logind has the lid.
+-- Lid: turn the laptop panel off when closed, back on when opened
+-- (scripts/dot-hypr-lid). Suspend on lid close is logind's job (battery only,
+-- system/ owns the drop-in) while the idle settings say the same and no Keep
+-- awake holds the lid; otherwise kubaos-idle holds the lid away from logind
+-- and `kubaos-idle lid closed` does what they say, or nothing while a Keep
+-- awake holds the lid. It does nothing while logind has the lid.
+--
+-- HAZARD: the panel goes first. `kubaos-idle lid closed` can suspend, and a
+-- `dot-hypr-lid close` left waiting behind it would run after the wake.
 -- Check the switch name with: hyprctl devices  (section "Switches").
 ---------------------------------------------------------------------------
 
-bind("switch:on:Lid Switch", "Lid closed", "kubaos-idle lid closed; dot-hypr-lid close", locked)
+bind("switch:on:Lid Switch", "Lid closed", "dot-hypr-lid close; kubaos-idle lid closed", locked)
 bind("switch:off:Lid Switch", "Lid opened", "dot-hypr-lid open", locked)

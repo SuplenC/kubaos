@@ -25,8 +25,13 @@
 # the lid never does anything. Outside your session logind does what the lid did before
 # (/etc/systemd/logind.conf.d/lid.conf): suspend on battery, nothing plugged in.
 #
-# Keep awake (Command menu, or SUPER + CTRL + I) holds all of this off for a while; a lock
-# you schedule with "Lock in…" or "Lock at…" still comes.
+# Keep awake (Command menu, or SUPER + CTRL + I) holds the waits off, on battery and plugged in:
+# for a while, until you turn it off, or until the battery is at a level ("keep-awake 20%").
+# Closing the lid still does what `lid` says. "Keep awake with the lid closed" holds the lid off
+# as well, so closing it does nothing ("keep-awake-lid 2h"). A lock you schedule with "Lock in…"
+# or "Lock at…" still comes.
+#
+# While the lid is closed and the laptop stays awake, its panel is off.
 #
 # Full docs: docs/CONTRACTS.md, "Defaults and the user layer"
 # (https://github.com/SuplenC/kubaos/blob/main/docs/CONTRACTS.md).

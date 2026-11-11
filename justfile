@@ -86,10 +86,23 @@ _nightly-rustfmt:
       exit 1
     fi
 
-# Clippy, both passes: the code with -D warnings, then every target (tests, examples, benches) with unwrap allowed, since tests may unwrap. The lints are `[workspace.lints]` in Cargo.toml.
-lint:
-    cargo clippy --workspace --locked -- -D warnings
-    cargo clippy --workspace --locked --all-targets -- -D warnings -A clippy::unwrap_used
+# Clippy, both passes: the code with -D warnings, then every target (tests, examples, benches) with unwrap allowed, since tests may unwrap. The lints are `[workspace.lints]` in Cargo.toml. It runs `cargo-clippy` from PATH rather than `cargo clippy`, which takes the one in ~/.cargo/bin first: rustup's, on a machine or a runner with rustup.
+lint: _pinned-clippy
+    cargo-clippy clippy --workspace --locked -- -D warnings
+    cargo-clippy clippy --workspace --locked --all-targets -- -D warnings -A clippy::unwrap_used
+
+# Each clippy release adds and changes lints, so the recipes refuse one at another Rust than rust-toolchain.toml's: what passes here passes in CI.
+_pinned-clippy:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pinned="$(sed -n 's/^channel = "\([0-9]*\.[0-9]*\)\.[0-9]*"$/\1/p' rust-toolchain.toml)"
+    # Clippy numbers its releases 0.1.N for Rust 1.N.
+    clippy="$(cargo-clippy clippy --version)"
+    minor="${clippy#clippy 0.1.}"
+    if [[ ${minor%% *} != "${pinned#1.}" ]]; then
+      echo "$(command -v cargo-clippy) is $clippy, but rust-toolchain.toml names Rust $pinned: run this in \`nix develop\`, or set its \`channel\` to the dev shell's \`rustc --version\`" >&2
+      exit 1
+    fi
 
 # Cargo tests, the shell harness (Docker) and the engine end-to-end test.
 test:
@@ -153,6 +166,11 @@ _mockups-deps:
 
 # Write the token outputs a checkout keeps (docs/DESIGN.md, "Where the outputs are generated"): the checked-in boot files after a change to design/tokens.toml, and the ones git ignores (Tokens.qml, the terminals' tokens, Hyprland's tokens.lua), which the Nix build writes for the home, for an editor or a test reading them from the checkout. The crates' build scripts write their own.
 tokens:
+    cargo run -q -p kubaos-tokens -- write
+
+# Render the logo and every picture made from it (branding/README.md, "Regenerating"): the vector marks, the neon sign's assets and boot layers, the boot screens' pictures, then the token outputs that measure them. In the flake's `branding` shell.
+branding:
+    nix develop .#branding -c branding/render.sh
     cargo run -q -p kubaos-tokens -- write
 
 # After fixing literal design values: lower design/lint-baseline.toml to what the lint finds. It never raises a count.

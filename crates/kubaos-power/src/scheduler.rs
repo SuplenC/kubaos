@@ -332,7 +332,7 @@ pub fn report(plan: &Plan, machine: &Machine, unit: Option<&UnitState>, exit: Op
         "Setting".to_owned(),
         match plan.scheduler {
             Scheduler::Kernel => "LAVD off (scheduler = \"kernel\" in power.toml)".to_owned(),
-            Scheduler::Lavd(_) => "LAVD on (scheduler = \"lavd\" in power.toml)".to_owned(),
+            Scheduler::Lavd(_) => "LAVD on (scheduler = \"lavd\", the default)".to_owned(),
         },
     )];
     if let (Scheduler::Lavd(mode), Some(want)) = (plan.scheduler, &want) {

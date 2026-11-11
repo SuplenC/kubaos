@@ -70,6 +70,10 @@ pub const POPUP_INTERVAL: Duration = Duration::from_secs(1);
 pub const AFTER_RESTART: Duration = Duration::from_millis(500);
 /// The stream file, in `$XDG_RUNTIME_DIR`.
 pub const STREAM_FILE: &str = "kubaos-sysmon.json";
+/// The power service's file beside it, which says the stop it is on.
+pub const POWER_FILE: &str = "kubaos-power.json";
+/// The stops that already save power, where a drain alert can't offer one.
+const SAVER_STOPS: [&str; 2] = ["super-saver", "power-saver"];
 
 /// How often the shell wants samples.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -138,6 +142,10 @@ pub struct Server {
     problem: Option<String>,
     modified: Option<SystemTime>,
     stream: Option<PathBuf>,
+    /// The power service's file, beside the stream file.
+    power: Option<PathBuf>,
+    /// Where `/proc` is, to tell a running power service from the file of a killed one.
+    root: PathBuf,
     mode: Mode,
     /// The last sample's alert conditions want a process scan.
     culprits: bool,
@@ -151,14 +159,17 @@ impl Server {
     /// A server sampling under `root`, with the settings in `dir` and the stream file at `stream`.
     #[must_use]
     pub fn new(root: impl Into<PathBuf>, dir: Option<PathBuf>, stream: Option<PathBuf>) -> Self {
+        let root = root.into();
         let mut server = Server {
-            sampler: Sampler::new(root),
+            sampler: Sampler::new(root.clone()),
             alerts: Alerts::default(),
             settings_path: dir.map(|dir| dir.join(settings::FILE)),
             settings: Settings::default(),
             problem: None,
             modified: None,
+            power: stream.as_deref().and_then(Path::parent).map(|dir| dir.join(POWER_FILE)),
             stream,
+            root,
             mode: Mode::default(),
             culprits: false,
             light: None,
@@ -199,7 +210,8 @@ impl Server {
         }
         if self.settings.alerts {
             self.culprits = Alerts::wants_processes(&sample, &self.settings.thresholds);
-            for alert in self.alerts.check(&sample, &self.settings.thresholds, now) {
+            let saving = self.saving(&sample);
+            for alert in self.alerts.check(&sample, &self.settings.thresholds, saving, now) {
                 let mut line = serde_json::to_value(&alert).unwrap_or_default();
                 line["type"] = json!("alert");
                 lines.push(line.to_string());
@@ -213,6 +225,34 @@ impl Server {
             self.light = Some(sample);
         }
         lines
+    }
+
+    /// Whether the power service is on a saver stop, read only while the battery discharges: the
+    /// drain alert is the one that asks.
+    fn saving(&self, sample: &Sample) -> bool {
+        let discharging = sample
+            .battery
+            .as_ref()
+            .is_some_and(|battery| battery.status == "Discharging");
+        if !discharging {
+            return false;
+        }
+        let Some(published) = self
+            .power
+            .as_deref()
+            .and_then(|path| fs::read_to_string(path).ok())
+            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+        else {
+            return false;
+        };
+        let on_saver = published["stop"]
+            .as_str()
+            .is_some_and(|stop| SAVER_STOPS.contains(&stop));
+        let running = published["pid"].as_u64().is_some_and(|pid| {
+            fs::read_to_string(self.root.join(format!("proc/{pid}/comm")))
+                .is_ok_and(|comm| comm.trim_end() == "kubaos-power")
+        });
+        on_saver && running
     }
 
     /// Answers one request line at `now`, and says when the next sample is due. The lines are the

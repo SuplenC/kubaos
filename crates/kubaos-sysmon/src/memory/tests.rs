@@ -13,6 +13,8 @@ Shmem:           1048576 kB
 SReclaimable:    1048576 kB
 SwapTotal:       8388608 kB
 SwapFree:        6291456 kB
+Zswap:            524288 kB
+Zswapped:        1572864 kB
 ";
 
 #[test]
@@ -45,4 +47,19 @@ fn the_cache_never_counts_more_than_is_available() {
 #[test]
 fn a_file_without_a_total_is_no_memory() {
     assert!(parse_meminfo("MemFree: 12 kB\n").is_none());
+}
+
+#[test]
+fn zswap_counts_its_pool_and_what_it_holds() {
+    let memory = parse_meminfo(MEMINFO).expect("memory");
+
+    assert_eq!(memory.zswap, GIB / 2);
+    assert_eq!(memory.zswapped, 3 * GIB / 2);
+}
+
+#[test]
+fn a_kernel_without_zswap_reads_as_an_empty_pool() {
+    let memory = parse_meminfo("MemTotal: 1000 kB\nMemAvailable: 100 kB\n").expect("memory");
+
+    assert_eq!((memory.zswap, memory.zswapped), (0, 0));
 }

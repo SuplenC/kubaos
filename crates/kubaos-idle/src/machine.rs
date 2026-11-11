@@ -1,6 +1,7 @@
-//! What the idle settings read from the machine: the power source, logind's lid and dock, and
-//! whether the Hyprland session the holders belong to still runs. The readers take their folders
-//! and the programs' output as arguments, so they are tested on files of the tests' own.
+//! What the idle settings read from the machine: the power source and the battery's level,
+//! logind's lid and dock, and whether the Hyprland session the holders belong to still runs. The
+//! readers take their folders and the programs' output as arguments, so they are tested on files
+//! of the tests' own.
 //!
 //! # Owns
 //!
@@ -8,7 +9,8 @@
 //!
 //! # Not here
 //!
-//! - Running `busctl`: `main.rs`. What the lid does with them: [`crate::lid`].
+//! - Running `busctl`: `main.rs`. What the lid does with them: [`crate::lid`]. When the battery
+//!   ends a Keep awake: [`crate::awake`].
 
 use std::fs;
 use std::path::Path;
@@ -36,6 +38,44 @@ pub fn power(supplies: &Path) -> Power {
         }
     }
     if any_battery { Power::Battery } else { Power::Ac }
+}
+
+/// The machine's battery level in percent, its batteries combined; `None` without one that
+/// reports a charge. A battery of a device (a mouse's, `scope` `Device`) or an empty bay (`present`
+/// `0`) isn't the machine's. Batteries that all report their energy combine by it, so a full small
+/// one and an empty big one don't read half full, as UPower combines them; otherwise their
+/// `capacity` is averaged.
+pub fn battery(supplies: &Path) -> Option<u8> {
+    let entries = fs::read_dir(supplies).ok()?;
+    let (mut capacities, mut count) = (0_u64, 0_u64);
+    let mut energies = Some((0_u64, 0_u64));
+    for entry in entries.flatten() {
+        let read = |name: &str| fs::read_to_string(entry.path().join(name)).ok();
+        let word = |name: &str| read(name).map(|text| text.trim().to_owned());
+        let number = |name: &str| read(name).and_then(|text| text.trim().parse::<u64>().ok());
+        if word("type").as_deref() != Some("Battery")
+            || word("scope").as_deref() == Some("Device")
+            || word("present").as_deref() == Some("0")
+        {
+            continue;
+        }
+        let Some(capacity) = number("capacity") else {
+            continue;
+        };
+        capacities += capacity.min(100);
+        count += 1;
+        energies = energies
+            .zip(number("energy_now").zip(number("energy_full").filter(|&full| full > 0)))
+            .map(|((now, full), (more_now, more_full))| (now + more_now, full + more_full));
+    }
+    if count == 0 {
+        return None;
+    }
+    let percent = match energies {
+        Some((now, full)) => (now.min(full) * 100 + full / 2) / full,
+        None => (capacities + count / 2) / count,
+    };
+    u8::try_from(percent).ok()
 }
 
 /// What logind says about the lid, from `busctl get-property org.freedesktop.login1

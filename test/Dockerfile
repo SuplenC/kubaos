@@ -45,6 +45,8 @@ COPY system/files/apt/ /opt/dotfiles/system/files/apt/
 COPY system/files/netplan/ /opt/dotfiles/system/files/netplan/
 COPY system/files/logind.conf.d/ /opt/dotfiles/system/files/logind.conf.d/
 COPY system/files/sysctl.d/ /opt/dotfiles/system/files/sysctl.d/
+COPY system/files/tmpfiles.d/kubaos-zswap.conf /opt/dotfiles/system/files/tmpfiles.d/
+COPY system/files/NetworkManager/conf.d/ /opt/dotfiles/system/files/NetworkManager/conf.d/
 COPY system/files/systemd/system.conf.d/ /opt/dotfiles/system/files/systemd/system.conf.d/
 COPY system/files/systemd/user.conf.d/ /opt/dotfiles/system/files/systemd/user.conf.d/
 COPY system/files/proxy/ /opt/dotfiles/system/files/proxy/

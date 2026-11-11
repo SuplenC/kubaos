@@ -2,8 +2,8 @@
 
 The logo is a neon sign: クバ in amber tubes, the dakuten as a blue tube on
 the same sign, then "Kuba" in white and "OS" in amber, on a dark wall. The
-photo of it (`photo/`) is the logo wherever it shows large: the boot splash,
-where it switches on, the GRUB menu, Kōbō's welcome screen, the README.
+photos of it (`photo/`) are the logo wherever it shows large: the boot
+splash, where it switches on, the GRUB menu, Kōbō's welcome screen, the README.
 
 Small sizes can't carry a photo, so they use the vector mark: クバ drawn as
 neon strokes in `make.py`, with the wordmark in a geometric round-stroke
@@ -13,29 +13,58 @@ path, so the SVGs render the same everywhere.
 
 Rules for the name and the voice are in `docs/BRAND.md`.
 
-## The photo
+## The photos
 
-`photo/neon-sign-front.png` is the sign, front-on. It was generated with
-ChatGPT for KubaOS and is released under CC0. `photo/neon-sign-front@2x.jpg`
-is the master everything is drawn from: the photo upscaled with Upscayl's
-remacri model (`photo/upscale.sh`). The angled shot of the same sign is the
-default wallpaper (`shinjuku/kubaos-neon-sign.jpg` in kubaos-wallpapers).
+The photos were generated with FLUX 3 (Black Forest Labs) for KubaOS, from
+the vector lockups in `svg/` as references, and are released under CC0:
+
+- `photo/neon-sign-lit.jpg`: the sign, front-on and lit, 3136x1344. The
+  master the sign's assets are drawn from.
+- `photo/neon-sign-off.jpg`: the same sign switched off, every tube where the
+  lit one has it. The boot splash's dead glass.
+- `photo/neon-mark-lit.jpg`, `photo/neon-stacked-lit.jpg`: クバ alone, and
+  over the name.
+- `photo/neon-sign-banner.jpg`: the sign on a long dark wall, the README
+  banner.
+- `photo/neon-sign-states/`: the same sign switching on, a FLUX 3 video from
+  the off and the lit photo. `switch-on.mp4` is the film; `off.jpg`, then
+  `ku.jpg`, `ba.jpg`, `dakuten.jpg`, `kuba.jpg` and `os.jpg` are its steady
+  moments, each with that group of tubes and the ones before it lit,
+  1920x1080 and laid over the lit photo. The `spare-` stills are moments
+  nothing uses: the film lights "Kuba" a letter at a time (`spare-k`,
+  `spare-ku`, `spare-kub`) and O before S (`spare-o`).
+
+The same sign on a wall in a Shinjuku back alley is the default wallpaper
+(`shinjuku/kubaos-neon-sign.jpg` in kubaos-wallpapers).
 
 `neon.py` cuts the sign out of the wall: alpha from brightness, so the tubes
 and the glow they throw on the wall stay and the dark wall goes. For the boot
 splash it also splits the sign into its five groups of tubes, in switch-on
-order: ク, バ, the dakuten, Kuba, OS. Each group owns the glass it lights.
-Its share of the wall glow comes from its glass blurred wide, so a lit group
-next to a dark one fades out across the wall instead of ending in a seam.
+order: ク, バ, the dakuten, Kuba, OS. Each tube is a connected piece of lit
+glass and goes to its group by where its centre falls; the dakuten is the
+blue one. How much of a pixel's light is on once a group has struck comes
+from the stills in `photo/neon-sign-states/`: what the still with that group
+lit has gained over the dark one, out of what the lit one has, counted only
+where it is the colour the pixel burns in the photo. So a lit group's glow
+carries on past a dark neighbour instead of stopping short of it, and the blue
+round the dakuten stays dark until it strikes. The layers are the steps
+between the sign with one more group lit and carry no background, so drawn in
+order they add up to the lit sign over whatever colour is under them.
+
+`switch.py` cuts the same stills into two clips of the sign switching on and
+off, with no background. Each group strikes as a whole tube, stuttering
+between its dark and its lit still; the film's own strike, light crawling
+along the glass, is left out.
 
 ## Files
 
 | File | Use it for |
 |---|---|
-| `photo/neon-sign-front.png` | The source photo. |
-| `photo/neon-sign-front@2x.jpg` | The upscaled master, 3072x2048. |
-| `png/kubaos-sign-1024.png` | The sign cut out of the wall, transparent, 1024x396. Anywhere the logo is big, on the dark. |
-| `png/kubaos-hero.jpg` | The README banner: the photo, wall and all, 1600x667. |
+| `photo/` | The photos, above. |
+| `png/kubaos-sign-1024.png` | The sign cut out of the wall, transparent, 1024x335. Anywhere the logo is big, on the dark. |
+| `png/kubaos-sign-mark-1024.png`, `-stacked-1024.png` | クバ alone, and over the name, cut out the same way, 1024 wide. |
+| `video/kubaos-sign-on.webm`, `-off.webm` | The sign switching on, a group at a time, and off, the last group first: 1920x1080, 60 frames a second, VP9 with alpha. Over any dark colour. |
+| `png/kubaos-hero.jpg` | The README banner: the banner photo, wall and all, 1600x667. |
 | `png/kubaos-splash-1920x1080.png` | The sign on the dark, as the boot splash shows it once it's on. |
 | `svg/kubaos-mark.svg` | The vector mark alone, neon, transparent background. About boxes, anything too small for the photo. |
 | `svg/kubaos-icon.svg` | App icon: the mark on a dark rounded tile with the desktop's amber-to-blue border. |
@@ -66,17 +95,19 @@ run it after `render.sh`. Kōbō carries copies of the mark, the wordmark and
 
 ## Regenerating
 
-Change the drawing in `make.py` or the cut in `neon.py`, then run:
+Change the drawing in `make.py`, the cut in `neon.py` or the strike in
+`switch.py`, then run:
 
 ```sh
-PYTHON=python3 branding/render.sh
+just branding
 ```
 
-It runs `make.py`, renders the SVGs, writes `fastfetch.txt`, then runs
-`neon.py` and `boot.py`. It needs `resvg`, ImageMagick and a python3 (3.11 or
-later, for `tomllib`) with Pillow and numpy (`PYTHON` picks it). Only a new source photo needs
-`photo/upscale.sh` first, which needs Upscayl. Don't hand-edit the SVGs or
-PNGs, they get overwritten.
+It runs `render.sh` in the flake's `branding` shell: `make.py`, the SVGs
+rendered, `fastfetch.txt`, then `neon.py`, `switch.py` and `boot.py`. Then it writes the
+token outputs that measure the boot pictures. Outside that shell,
+`render.sh` needs `resvg`, ImageMagick, ffmpeg with libvpx and a python3 (3.11 or later, for
+`tomllib`) with numpy and a Pillow built with libimagequant (`PYTHON` picks
+it). Don't hand-edit the SVGs or PNGs, they get overwritten.
 
 ## Colours
 
@@ -95,10 +126,10 @@ draws from too:
 | `surface_container_lowest` | Dark plates, the boot splash and GRUB |
 | `logo_core_warm`, `logo_core_cold` | The lit core inside the amber and the blue tubes |
 
-The photo keeps its own colours.
+The photos keep their own colours.
 
 On a light background use the dark plate version or the black mark. Don't
-put the neon (photo or vector) on anything lighter than `#3d332b`: neon needs
+put the neon (photo or vector) on anything lighter than `#3b332d`: neon needs
 the dark.
 
 ## Clear space and size
@@ -121,6 +152,6 @@ the dark.
 "logo": {
   "type": "file",
   "source": "~/.config/fastfetch/kubaos.txt",
-  "color": { "1": "38;2;255;183;121", "2": "38;2;133;207;255" }
+  "color": { "1": "38;2;255;184;108", "2": "38;2;121;209;254" }
 }
 ```

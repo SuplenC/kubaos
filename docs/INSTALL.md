@@ -67,11 +67,9 @@ system/30-hardware.sh
 sudo reboot          # enroll the MOK on the blue screen if it asked for a password
 system/30-hardware.sh   # second run: confirms modules + power profiles
 
-# 2. Toolchains, outside Nix on purpose.
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup component add rust-analyzer clippy
-bash <(curl -fsSL https://moonrepo.dev/install/proto.sh)
-proto install moon
+# 2. The languages you write, as Suites (`kubaos suite list`).
+kubaos suite add rust
+kubaos suite add go
 ```
 
 The MOK screen, the fingerprint enrollment and what to verify are in the hard way's sections 1, 7 and 8 below: same scripts, same steps.
@@ -96,10 +94,12 @@ and, when one is out, Upgrade to <codename>. The bar shows a marker while
 an update waits. `docs/USING.md` ("Updating") says what each step does and
 how to go back further.
 
-Each update also reports newer Bitwarden desktop and CLI releases
-(`system/70-bitwarden.sh --check-updates`) and prints the new version and
-sha256 lines. Paste them into `70-bitwarden.sh` on the dev machine and
-release them.
+Each update moves Bitwarden desktop to the newest release of its series and
+Nix to the newest patch release of its minor by itself (`docs/USING.md`,
+"Updating"). It reports a newer bw CLI and a new Bitwarden desktop series
+(`system/70-bitwarden.sh --check-updates`) with the new version and sha256
+lines: paste them into `70-bitwarden.sh` on the dev machine and release
+them. A new Nix minor is a bump of `system/60-nix.sh`'s pin.
 
 ## Troubleshooting
 
@@ -139,7 +139,7 @@ stays the lock screen (hypridle's `lock_cmd` already falls back to it) and
 `hyprpolkitagent` stays the polkit agent (the in-shell agent is off by
 default).
 
-**SSH, git signing or `.envrc` secrets don't work.** `kubaos bitwarden check`,
+**SSH, git signing or a project's Bitwarden variables don't work.** `kubaos bitwarden check`,
 then `docs/SECRETS.md`, Troubleshooting.
 
 **home-manager: "path ... does not exist" or a new config dir is ignored.**
@@ -440,13 +440,11 @@ starts from Hyprland's autostart (`qs`, no systemd unit).
 /run/opengl-driver`; Ghostty (`SUPER+Return`) and the bar render;
 `hyprctl monitors` shows every screen on the dock at its preferred mode.
 
-Then, outside Nix on purpose:
+Then the languages you write, as Suites (`kubaos suite list`):
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup component add rust-analyzer clippy
-bash <(curl -fsSL https://moonrepo.dev/install/proto.sh)
-proto install moon
+kubaos suite add rust
+kubaos suite add go
 ```
 
 ### 11. `system/70-bitwarden.sh`, then `kubaos bitwarden setup`
@@ -458,7 +456,8 @@ system/70-bitwarden.sh
 Installs the official Bitwarden desktop `.deb` and the standalone `bw` CLI
 from github.com/bitwarden/clients, both pinned to a version and checked
 against a sha256 in the script (no apt repo exists, and the app doesn't
-self-update on Linux). Then `libsecret-tools`, `libpam-u2f`, `pamu2fcfg`,
+self-update on Linux; `kubaos update` moves the desktop app on within its
+series). Then `libsecret-tools`, `libpam-u2f`, `pamu2fcfg`,
 `pamtester`, and the security key for sudo, polkit and the lock screen:
 
 - two lines above `@include common-auth` in `/etc/pam.d/sudo`, `sudo-i` and

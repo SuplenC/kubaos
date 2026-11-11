@@ -392,7 +392,8 @@ install_keyboard_writer() {
 # install_power_helper [--actions]: what the power stops (crates/kubaos-power)
 # need as root. The helper that writes their knobs in /sys, the polkit action
 # pkexec runs it under and the rule that lets an admin at the machine through
-# without a password; and amdgpu's FreeSync video modes, so the laptop panel
+# without a password; systemd-sleep's hook, which has the helper put
+# sleep-safe values in place before every suspend; and amdgpu's FreeSync video modes, so the laptop panel
 # drops to 60 Hz without a modeset. modprobe.d reaches the driver through the
 # initramfs, so while an installed kernel's initramfs lacks the file they
 # are all rebuilt; one that failed to build is rebuilt on the next run. With --actions (the first
@@ -406,6 +407,7 @@ install_power_helper() {
   local actions=0 initrd modules
   [[ ${1:-} == --actions || ! -e /usr/local/libexec/kubaos-power-write ]] && actions=1
   install_root_file "$FILES_DIR/power/kubaos-power-write" /usr/local/libexec/kubaos-power-write 0755
+  install_root_file "$FILES_DIR/power/kubaos-power-sleep" /usr/lib/systemd/system-sleep/kubaos-power 0755
   install_root_file "$FILES_DIR/polkit/org.kubaos.power.policy" /usr/share/polkit-1/actions/org.kubaos.power.policy 0644
   install_root_file "$FILES_DIR/polkit/50-kubaos-power.rules" /etc/polkit-1/rules.d/50-kubaos-power.rules 0644
   install_root_file "$FILES_DIR/modprobe.d/kubaos-amdgpu.conf" /etc/modprobe.d/kubaos-amdgpu.conf 0644
@@ -584,6 +586,46 @@ install_inotify_limits() {
   fi
 }
 
+# install_zswap: compressed swap in RAM in front of the swap file
+# (system/files/tmpfiles.d/kubaos-zswap.conf), which systemd-tmpfiles applies
+# at every boot, and applied at once on a booted machine. The update goes on
+# when the kernel refuses it: the machine swaps as it did, and says so.
+# 20-base.sh runs it, and a migration on machines installed before it.
+install_zswap() {
+  install_root_file "$FILES_DIR/tmpfiles.d/kubaos-zswap.conf" /etc/tmpfiles.d/kubaos-zswap.conf 0644
+  if ((!IMAGE_BUILD)) && has_systemd && ! in_container; then
+    sudo_run systemd-tmpfiles --create /etc/tmpfiles.d/kubaos-zswap.conf ||
+      warn "zswap stays off until the next boot: the kernel refused /etc/tmpfiles.d/kubaos-zswap.conf"
+  fi
+}
+
+# install_arp_per_interface: each interface answers ARP only for its own
+# addresses (system/files/sysctl.d/60-kubaos-arp.conf), so a cable and Wi-Fi on
+# one network don't take each other's address as a conflict. Applied at once on
+# a booted machine, as install_inotify_limits is. 20-base.sh runs it, and a
+# migration on machines installed before it.
+install_arp_per_interface() {
+  install_root_file "$FILES_DIR/sysctl.d/60-kubaos-arp.conf" /etc/sysctl.d/60-kubaos-arp.conf 0644
+  if ((!IMAGE_BUILD)) && has_systemd && ! in_container; then
+    sudo_run sysctl -q -p /etc/sysctl.d/60-kubaos-arp.conf
+  fi
+}
+
+# install_connectivity_check: NetworkManager's internet check
+# (system/files/NetworkManager/conf.d/50-kubaos-connectivity.conf), which moves
+# traffic off a link that is up with no internet behind it. A running
+# NetworkManager rereads its configuration files without touching a connection.
+# 20-base.sh runs it, and a migration on machines installed before it.
+install_connectivity_check() {
+  local dest=/etc/NetworkManager/conf.d/50-kubaos-connectivity.conf changed=0
+  same_content "$FILES_DIR/NetworkManager/conf.d/50-kubaos-connectivity.conf" "$dest" || changed=1
+  install_root_file "$FILES_DIR/NetworkManager/conf.d/50-kubaos-connectivity.conf" "$dest" 0644
+  if ((changed && !IMAGE_BUILD)) && has_systemd && ! in_container &&
+    systemctl is-active -q NetworkManager.service; then
+    sudo_run nmcli general reload conf
+  fi
+}
+
 # file_locked FILE: whether a process holds a lock on FILE, from the kernel's lock table. It is
 # read-only and sees flock and fcntl locks alike; unattended-upgrade takes an fcntl one, which
 # `flock -n` on the file would not notice.
@@ -621,6 +663,34 @@ retire_ubuntu_updaters() {
     apt-daily.service apt-daily-upgrade.service; do
     boot_unit "$unit" disable
     boot_unit "$unit" mask
+  done
+}
+
+# retire_packaged_hypridle: hypridle runs only as `kubaos-idle session` starts it from
+# `config/hypr/autostart.lua`, after writing its listeners. Ubuntu's hypridle package enables its
+# own user unit, hypridle.service, in /etc/systemd/user/graphical-session.target.wants, so every
+# Hyprland session (hyprland-session.target binds graphical-session.target) would start a second
+# hypridle on the same config, and every lock, screens-off and suspend would fire twice.
+#
+# The unit is disabled and masked for every user (/etc/systemd/user/hypridle.service ->
+# /dev/null): a mask holds across package upgrades, which only re-enable a unit that isn't masked,
+# and needs nothing from a user's home. A packaged hypridle running in a session now stops, leaving
+# the one kubaos-idle started. 50-hyprland.sh runs it, and a migration on machines installed
+# before it.
+retire_packaged_hypridle() {
+  local state user
+  state="$(systemctl --global is-enabled hypridle.service 2>/dev/null || true)"
+  if [[ "$state" == masked ]]; then
+    ok "hypridle.service is masked for every user"
+  else
+    [[ "$state" == enabled ]] && sudo_run systemctl --global disable hypridle.service
+    sudo_run systemctl --global mask hypridle.service
+  fi
+  ((!IMAGE_BUILD)) && has_systemd || return 0
+  for user in $(loginctl list-users --no-legend 2>/dev/null | awk '{print $2}'); do
+    as_root systemctl --user --machine="$user@" is-active -q hypridle.service 2>/dev/null || continue
+    sudo_run systemctl --user --machine="$user@" stop hypridle.service ||
+      warn "couldn't stop $user's packaged hypridle; it doesn't start again from the next login"
   done
 }
 

@@ -6,9 +6,11 @@
 //! # Owns
 //!
 //! - The registry, the toggles, the keyboard layouts, the wallpaper sets, the user folders, the
-//!   mounted drives, the workspace groups by desk position, and what each of their Actions runs.
+//!   mounted drives, the workspace groups by desk position, the Suites of the catalog (install,
+//!   configure, remove, and a "New <Suite> project…" a scaffolder of an installed one), and what
+//!   each of their Actions runs.
 //! - The states the registry's actions are shown in, read from their files: `states`.
-//! - The idle settings' Items and their choice lists.
+//! - The idle settings' Items and their choice lists, and the typed Keep awakes.
 //! - The shell's settings the menu changes: the focus stutter, always showing the bell.
 //! - "Power: what this stop does", the power stop's layers read live.
 //! - "Proxy status", the work network's parts and its tunnel read live.
@@ -38,6 +40,7 @@ pub mod registry;
 pub mod run;
 pub mod shell;
 pub mod states;
+pub mod suites;
 pub mod sysmon;
 pub mod toggles;
 pub mod updates;

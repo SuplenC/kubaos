@@ -36,7 +36,7 @@ require_sudo
 # The base system's groups of system/packages.toml.
 BASE_GROUPS=(
   tools network proxy audio session graphics microcode laptop dock fingerprint
-  build snapshots files fonts fallback shell
+  build snapshots files media fonts fallback shell
 )
 
 step "apt update"
@@ -102,6 +102,11 @@ fi
 info "Wi-Fi: nmtui (or: nmcli device wifi connect <SSID> --ask), then unplug the cable."
 
 # --------------------------------------------------------------------------
+step "Network: cable first, Wi-Fi standing by"
+install_arp_per_interface
+install_connectivity_check
+
+# --------------------------------------------------------------------------
 step "Proxy: the work network's root helper (polkit, pkexec)"
 install_proxy_helper
 
@@ -147,6 +152,10 @@ info "takes effect after the next reboot (restarting logind would end your sessi
 # --------------------------------------------------------------------------
 step "inotify: room for every program that watches files"
 install_inotify_limits
+
+# --------------------------------------------------------------------------
+step "zswap: swap compressed in RAM before it reaches the disk"
+install_zswap
 
 # --------------------------------------------------------------------------
 step "Short shutdown and boot: 10 s stop timeouts, no wait for the network, no console palette"

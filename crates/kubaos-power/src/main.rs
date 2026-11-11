@@ -7,12 +7,16 @@
 //! kubaos-power undo                       the low-battery drop's Undo
 //! kubaos-power status                     what the stop does, every row read live
 //! kubaos-power measure [--seconds N]      the battery's draw and the top wakeups, as a report
+//! kubaos-power report [--days N] [--json] what the battery's history comes to
+//! kubaos-power battery-notes on|off       the toasts when a sleep or a night went wrong
 //! kubaos-power panel-power-saving on|off  AMD's panel power saving in the saver stops
 //! kubaos-power charge-limit 80|90|100     how far the battery charges
 //! kubaos-power low-battery power-saver|super-saver|off|PERCENT
+//! kubaos-power critical-warning PERCENT|off
 //! kubaos-power panel STOP 60hz|vrr|native what the laptop panel does in a stop
 //! kubaos-power apply                      put a hand edit of power.toml to work
 //! kubaos-power scheduler [on|off]         which CPU scheduler runs and why; LAVD on or off
+//! kubaos-power background-yields on|off   build tools and Nix's builds at a lower priority
 //! ```
 //!
 //! A change to the settings says what it came to on stdout and in a toast, and the service puts
@@ -21,8 +25,8 @@
 //! # Owns
 //!
 //! - The command line, the service's loop and threads (the bus, the scheduler's unit, the socket,
-//!   the toasts), and doing what [`Control`] decides: power-profiles-daemon, the root helper,
-//!   Hyprland, the indexer.
+//!   the toasts, background work's watch), and doing what [`Control`] decides:
+//!   power-profiles-daemon, the root helper, Hyprland, the indexer.
 //!
 //! # Not here
 //!
@@ -57,16 +61,23 @@ use kubaos_power::control::Input;
 use kubaos_power::control::Recheck;
 use kubaos_power::control::Settle;
 use kubaos_power::control::Toast;
+use kubaos_power::history;
+use kubaos_power::indexer;
 use kubaos_power::live;
 use kubaos_power::live::PPD_PATH;
 use kubaos_power::live::PPD_SERVICE;
-use kubaos_power::live::QUIET_UNIT;
 use kubaos_power::machine::Machine;
 use kubaos_power::measure;
 use kubaos_power::memory;
 use kubaos_power::memory::Memory;
 use kubaos_power::panel;
 use kubaos_power::plan::Plan;
+use kubaos_power::reading;
+use kubaos_power::reading::Edge;
+use kubaos_power::recorder;
+use kubaos_power::recorder::Facts;
+use kubaos_power::recorder::Note;
+use kubaos_power::report::Report;
 use kubaos_power::runtime;
 use kubaos_power::runtime::Published;
 use kubaos_power::scheduler;
@@ -80,29 +91,41 @@ use kubaos_power::status;
 use kubaos_power::stop::Profile;
 use kubaos_power::stop::Source;
 use kubaos_power::stop::Stop;
+use kubaos_power::warning;
 use kubaos_power::writes;
+use kubaos_power::yields;
 
 const USAGE: &str = "\
 usage: kubaos power set super-saver|power-saver|balanced|performance|max-performance
        kubaos power undo | status | apply
        kubaos power measure [--seconds N]
+       kubaos power report [--days N] [--json]
+       kubaos power battery-notes on|off
        kubaos power panel-power-saving on|off
        kubaos power charge-limit 80|90|100
        kubaos power low-battery power-saver|super-saver|off|PERCENT
+       kubaos power critical-warning PERCENT|off
        kubaos power panel STOP 60hz|vrr|native
        kubaos power scheduler [on|off]
+       kubaos power background-yields on|off
 
 set       move the power slider to a stop; each power source remembers its own
 undo      undo the low-battery drop
 status    what the stop does, every layer read live, and what this machine lacks
 measure   the battery's average draw and what woke the machine most, as a report (default 120 s)
+report    the battery's history: long stretches, what went wrong first, the average draw and the
+          top wakers (default the last 7 days)
+battery-notes       the toasts when a sleep or a night went wrong
 panel-power-saving  AMD's panel power saving in the saver stops; off for colour-accurate work
 charge-limit        how far the battery charges, in percent
 low-battery         where the stop drops at the low-battery level, or that level in percent
+critical-warning    the battery level of the toast and sound before the power-off at 2 %, or off
 panel     the laptop panel in a stop: 60 Hz, the native rate with VRR, or native
 apply     put a hand edit of the settings file to work
-scheduler which CPU scheduler runs and why; on runs LAVD (sched_ext) in each stop's mode, off
-          leaves Linux's own (EEVDF)
+scheduler which CPU scheduler runs and why, and what background work yields; on runs LAVD
+          (sched_ext) in each stop's mode, off leaves Linux's own (EEVDF)
+background-yields   build tools and Nix's builds at nice 19, so the desktop stays smooth; off
+                    gives a build you're waiting on the CPU back
 
 Settings: ~/.config/kubaos/desktop/power/power.toml";
 
@@ -114,6 +137,7 @@ const UPOWER_SERVICE: &str = "org.freedesktop.UPower";
 const UPOWER_PATH: &str = "/org/freedesktop/UPower";
 const DISPLAY_DEVICE: &str = "/org/freedesktop/UPower/devices/DisplayDevice";
 const SYSTEMD: &str = "org.freedesktop.systemd1";
+const LOGIND: &str = "org.freedesktop.login1";
 
 #[expect(
     clippy::print_stdout,
@@ -146,6 +170,20 @@ fn main() -> ExitCode {
             }
             _ => usage(),
         },
+        ["report", rest @ ..] => match report_options(rest) {
+            Some((days, json)) => report_history(days, json),
+            None => usage(),
+        },
+        ["battery-notes", on @ ("on" | "off")] => report_said(change(
+            |path| settings::set_battery_notes(path, *on == "on"),
+            |_| {
+                if *on == "on" {
+                    "A toast says when a sleep or a night went wrong.".to_owned()
+                } else {
+                    "No more toasts about the battery's nights; `kubaos power report` still has them.".to_owned()
+                }
+            },
+        )),
         ["panel-power-saving", on @ ("on" | "off")] => report_said(change(
             |path| settings::set_panel_power_saving(path, *on == "on"),
             |_| {
@@ -158,6 +196,7 @@ fn main() -> ExitCode {
         )),
         ["charge-limit", percent] => report_said(charge_limit(percent)),
         ["low-battery", what] => report_said(low_battery(what)),
+        ["critical-warning", what] => report_said(critical_warning(what)),
         ["panel", stop, mode] => report_said(set_panel(stop, mode)),
         ["apply"] => report_said(apply_file()),
         ["scheduler"] | ["scheduler", "status"] => {
@@ -166,6 +205,19 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         ["scheduler", on @ ("on" | "off")] => report_said(set_scheduler(*on == "on")),
+        ["background-yields", on @ ("on" | "off")] => report_said(change(
+            |path| settings::set_background_yields(path, *on == "on"),
+            |_| {
+                if *on == "on" {
+                    format!(
+                        "Background work yields: build tools you start and Nix's builds run at nice {}.",
+                        yields::NICE
+                    )
+                } else {
+                    "Background work doesn't yield: builds running now get the CPU back.".to_owned()
+                }
+            },
+        )),
         ["-h" | "--help" | "help"] => {
             println!("{USAGE}");
             ExitCode::SUCCESS
@@ -373,6 +425,23 @@ fn low_battery(what: &str) -> Result<String, String> {
     )
 }
 
+fn critical_warning(what: &str) -> Result<String, String> {
+    let warning = settings::parse_critical_warning(what).map_err(|err| chain(&err))?;
+    change(
+        |path| settings::set_critical_warning(path, warning),
+        |_| match warning {
+            Some(percent) => format!(
+                "At {percent} % on battery, a toast and a sound warn that the laptop powers off at {} %.",
+                settings::UPOWER_ACTION_PERCENT
+            ),
+            None => format!(
+                "The critical-battery warning is off: the laptop still powers off at {} %, unannounced.",
+                settings::UPOWER_ACTION_PERCENT
+            ),
+        },
+    )
+}
+
 fn set_panel(stop: &str, mode: &str) -> Result<String, String> {
     let stop = Stop::from_id(stop).ok_or_else(|| format!("`{stop}` isn't a stop"))?;
     let mode = PanelMode::from_name(mode).ok_or_else(|| format!("`{mode}` isn't a panel mode: 60hz, vrr or native"))?;
@@ -465,6 +534,42 @@ fn measure(seconds: u64) {
     }
 }
 
+/// `--days N` and `--json` in any order: the days and whether JSON; `None` for anything else.
+fn report_options(args: &[&str]) -> Option<(i64, bool)> {
+    let mut days = kubaos_power::report::DEFAULT_DAYS;
+    let mut json = false;
+    let mut args = args.iter();
+    while let Some(arg) = args.next() {
+        match *arg {
+            "--json" => json = true,
+            "--days" => days = args.next()?.parse().ok().filter(|days| *days > 0)?,
+            _ => return None,
+        }
+    }
+    Some((days, json))
+}
+
+#[expect(
+    clippy::print_stdout,
+    reason = "The report is the command's output, for the person who asked or the program reading it."
+)]
+fn report_history(days: i64, json: bool) -> ExitCode {
+    let now = history::now();
+    let entries = history::path().map_or_else(Vec::new, |path| {
+        history::read(&path, kubaos_power::report::since(days, now))
+    });
+    let report = Report::of(&entries, days, now);
+    if json {
+        match serde_json::to_string_pretty(&report) {
+            Ok(text) => println!("{text}"),
+            Err(err) => return self::report(Err(chain(&err))),
+        }
+    } else {
+        print!("{}", report.text(&jiff::tz::TimeZone::system()));
+    }
+    ExitCode::SUCCESS
+}
+
 // ----- The bus ----------------------------------------------------------------------------------
 
 fn ppd(bus: &zbus::blocking::Connection) -> zbus::Result<zbus::blocking::Proxy<'static>> {
@@ -496,6 +601,14 @@ enum Event {
     Percent(f64),
     /// The scheduler's unit changed state.
     Scheduler(UnitState),
+    /// The file indexer started or went, on the session bus.
+    Indexer(bool),
+    /// logind's `PrepareForSleep`: `true` as the machine goes to sleep, `false` once it woke.
+    Sleep(bool),
+    /// The battery and the suspend counters as logind said the machine goes to sleep.
+    GoingToSleep(Edge),
+    /// UPower's lid: `true` closed.
+    Lid(bool),
     /// A line on the socket, and where its answer goes.
     Ask(String, Sender<String>),
     Undo,
@@ -513,8 +626,16 @@ fn serve() -> Result<(), String> {
     follow_bus(&bus, &events)?;
     follow_devices(events.clone());
     follow_scheduler(&bus, events.clone());
+    follow_sleep(&bus, events.clone());
+    follow_lid(&bus, events.clone());
     listen(&runtime, events.clone())?;
-    let mut service = Service::new(bus, runtime, events);
+    let sent = events.clone();
+    indexer::follow_in_background(move |running| {
+        let _ = sent.send(Event::Indexer(running));
+    });
+    let (yielding, watched) = mpsc::channel();
+    follow_yields(watched);
+    let mut service = Service::new(bus, runtime, events, yielding);
     service.run(&received)
 }
 
@@ -647,6 +768,72 @@ fn follow_scheduler(bus: &zbus::blocking::Connection, events: Sender<Event>) {
     });
 }
 
+/// Follows logind's `PrepareForSleep` on the system bus. systemd-sleep's hook
+/// (`system/files/power/kubaos-power-sleep`) puts sleep-safe values in place before a suspend, and
+/// the service puts the stop's back once the machine woke. Without logind the stop's values come
+/// back at the next device event or stop.
+fn follow_sleep(bus: &zbus::blocking::Connection, events: Sender<Event>) {
+    let bus = bus.clone();
+    thread::spawn(move || {
+        let follow = || -> zbus::Result<()> {
+            let manager = zbus::blocking::Proxy::new(
+                &bus,
+                LOGIND,
+                "/org/freedesktop/login1",
+                "org.freedesktop.login1.Manager",
+            )?;
+            let machine = Machine::real();
+            for signal in manager.receive_signal("PrepareForSleep")? {
+                if let Ok(start) = signal.body().deserialize::<bool>() {
+                    // HAZARD: read on this thread, at once. systemd-sleep freezes the session soon
+                    // after the signal, and the loop may be busy with a stop's writes until then;
+                    // a read that came after the thaw would put the sleep's start after its end.
+                    if start {
+                        let _ = events.send(Event::GoingToSleep(Edge::read(&machine, history::now())));
+                    }
+                    let _ = events.send(Event::Sleep(start));
+                }
+            }
+            Ok(())
+        };
+        if let Err(err) = follow() {
+            log::warn!(
+                "couldn't follow logind's sleep ({}); after a resume the stop comes back at the next device event",
+                chain(&err)
+            );
+        }
+    });
+}
+
+/// Follows UPower's lid on the system bus, which it sends when the lid moves, so nothing polls for
+/// it: where it stands at the start, then every change. Without one, the history leaves the lid
+/// out.
+fn follow_lid(bus: &zbus::blocking::Connection, events: Sender<Event>) {
+    let bus = bus.clone();
+    thread::spawn(move || {
+        let follow = || -> zbus::Result<()> {
+            let upower = zbus::blocking::Proxy::new(&bus, UPOWER_SERVICE, UPOWER_PATH, UPOWER_SERVICE)?;
+            if !upower.get_property::<bool>("LidIsPresent")? {
+                return Ok(());
+            }
+            let changes = upower.receive_property_changed::<bool>("LidIsClosed");
+            let _ = events.send(Event::Lid(upower.get_property("LidIsClosed")?));
+            for change in changes {
+                if let Ok(closed) = change.get() {
+                    let _ = events.send(Event::Lid(closed));
+                }
+            }
+            Ok(())
+        };
+        if let Err(err) = follow() {
+            log::warn!(
+                "couldn't follow the lid ({}); the battery's history leaves it out",
+                chain(&err)
+            );
+        }
+    });
+}
+
 /// The scheduler's unit as systemd has it now, read through `properties`, its
 /// `org.freedesktop.DBus.Properties`; a property that doesn't read stays empty.
 fn unit_state(properties: &zbus::blocking::Proxy<'_>) -> UnitState {
@@ -704,10 +891,79 @@ fn answer(stream: UnixStream, events: &Sender<Event>) {
     let _ = writeln!(stream, "{reply}");
 }
 
+/// Follows the setting sent on `on`: while background work yields, demotes the user's build tools
+/// as they start; when it stops yielding, puts the ones still demoted back through the root helper.
+fn follow_yields(on: mpsc::Receiver<bool>) {
+    thread::spawn(move || {
+        let proc = Path::new("/proc");
+        let uid = rustix::process::getuid().as_raw();
+        let mut watch = yields::Watch::default();
+        let Ok(mut yielding) = on.recv() else {
+            return;
+        };
+        loop {
+            if !yielding {
+                watch.forget();
+                match on.recv() {
+                    Ok(now) => yielding = now,
+                    Err(_) => return,
+                }
+                continue;
+            }
+            for process in watch.scan(proc, uid) {
+                yields::demote(proc, process.pid);
+            }
+            match on.recv_timeout(yields::SCAN) {
+                Ok(true) | Err(RecvTimeoutError::Timeout) => {}
+                Ok(false) => {
+                    unyield(proc, uid);
+                    yielding = false;
+                }
+                Err(RecvTimeoutError::Disconnected) => return,
+            }
+        }
+    });
+}
+
+/// Puts the user's processes that yield back to nice 0: lowering a nice takes root. It runs on
+/// the watch's thread, after its last scan, so no demotion lands after it.
+fn unyield(proc: &Path, uid: u32) {
+    let processes = yields::processes(proc);
+    let pids: Vec<u32> = yields::demoted(&processes)
+        .into_iter()
+        .filter(|process| process.uid == uid)
+        .map(|process| process.pid)
+        .collect();
+    if pids.is_empty() || !Path::new(HELPER).exists() {
+        return;
+    }
+    match helper(&[writes::Write::Unyield(pids).arg()]) {
+        Ok(output) if output.status.success() => {}
+        Ok(output) => log::warn!(
+            "couldn't put background work back to nice 0: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ),
+        Err(err) => log::error!("couldn't run pkexec: {err}"),
+    }
+}
+
+/// Runs the root helper with `args`. pkexec runs without its own agent: an admin at the machine
+/// needs no password (`system/files/polkit/50-kubaos-power.rules`).
+fn helper(args: &[String]) -> std::io::Result<std::process::Output> {
+    Command::new(PKEXEC)
+        .arg("--disable-internal-agent")
+        .arg(HELPER)
+        .args(args)
+        .stdin(Stdio::null())
+        .output()
+}
+
 struct Service {
     bus: zbus::blocking::Connection,
     runtime: PathBuf,
     events: Sender<Event>,
+    /// The background-yields setting, to the watch's thread.
+    yielding: Sender<bool>,
     machine: Machine,
     settings: Settings,
     control: Option<Control>,
@@ -723,11 +979,21 @@ struct Service {
     scheduler_unit: Option<UnitState>,
     /// LAVD was just turned on: the next stop's writes let a LAVD that kept crashing start again.
     retry_scheduler: bool,
+    /// A stop's writes came while the machine went to sleep and were held for its wake.
+    held_stop: bool,
+    /// The battery's history.
+    log: recorder::Log,
 }
 
 impl Service {
-    fn new(bus: zbus::blocking::Connection, runtime: PathBuf, events: Sender<Event>) -> Service {
+    fn new(
+        bus: zbus::blocking::Connection,
+        runtime: PathBuf,
+        events: Sender<Event>,
+        yielding: Sender<bool>,
+    ) -> Service {
         let (settings, problem) = load_settings();
+        let _ = yielding.send(settings.background_yields);
         if let Some(problem) = problem {
             notify(
                 "Power",
@@ -740,6 +1006,7 @@ impl Service {
             bus,
             runtime,
             events,
+            yielding,
             machine: Machine::real(),
             settings,
             control: None,
@@ -750,17 +1017,26 @@ impl Service {
             refused: writes::Refused::default(),
             scheduler_unit: None,
             retry_scheduler: false,
+            held_stop: false,
+            log: recorder::Log::new(
+                Machine::real(),
+                history::path(),
+                runtime::dir().map(|dir| dir.join(reading::KEEP_AWAKE_FILE)),
+            ),
         }
     }
 
     fn run(&mut self, received: &mpsc::Receiver<Event>) -> Result<(), String> {
         loop {
             let now = Instant::now();
-            let wait = [self.settle.wait(now), self.recheck.wait(now)]
-                .into_iter()
-                .flatten()
-                .min()
-                .unwrap_or(Duration::from_hours(1));
+            // A power source on its way to counting brings its stop's writes, which cover the
+            // recheck: waiting for it keeps a resume on another source from writing the old stop.
+            let wait = self
+                .settle
+                .wait(now)
+                .or_else(|| self.recheck.wait(now))
+                .unwrap_or(Duration::from_hours(1))
+                .min(self.log.wait(now).unwrap_or(Duration::MAX));
             match received.recv_timeout(wait) {
                 Ok(Event::Lost(what)) => return Err(format!("lost {what} on the system bus")),
                 Ok(event) => self.hear(event),
@@ -770,9 +1046,14 @@ impl Service {
             if let Some(source) = self.settle.due(Instant::now()) {
                 self.input(Input::Source(source));
             }
-            if self.recheck.due(Instant::now()) {
-                self.write_plan(false);
+            let now = Instant::now();
+            if self.settle.wait(now).is_none() && self.recheck.due(now) {
+                self.keep_indexer(indexer::running());
+                let at_stop = std::mem::take(&mut self.held_stop);
+                self.write_plan(at_stop);
             }
+            let notes = self.log.tick(Instant::now());
+            self.notes(notes);
         }
     }
 
@@ -786,6 +1067,7 @@ impl Service {
                 let memory = memory::path().map(|path| Memory::load(&path)).unwrap_or_default();
                 let source = Source::from_on_battery(on_battery);
                 let (mut control, effects) = Control::start(memory, source, profile, drop_of(&self.settings));
+                control.set_warning(self.settings.critical_warning);
                 let mut more = Vec::new();
                 if let Some(percent) = percent {
                     more = control.handle(Input::Percent(percent));
@@ -809,6 +1091,25 @@ impl Service {
             }
             Event::Percent(percent) => self.input(Input::Percent(percent)),
             Event::Scheduler(now) => self.scheduler_changed(now),
+            Event::Indexer(running) => {
+                self.keep_indexer(running);
+                // A hold started the moment the name appears can meet an indexer not yet ready,
+                // and its unit then fails and goes.
+                self.recheck.ask(Instant::now());
+            }
+            Event::Sleep(true) => self.recheck.sleep(),
+            Event::Sleep(false) => {
+                self.recheck.wake(Instant::now());
+                self.log.woke(Instant::now());
+            }
+            Event::GoingToSleep(edge) => {
+                let notes = self.log.going_to_sleep(edge);
+                self.notes(notes);
+            }
+            Event::Lid(closed) => {
+                let notes = self.log.lid(closed);
+                self.notes(notes);
+            }
             Event::Undo => self.input(Input::Undo),
             Event::Ask(line, reply) => {
                 let answer = self.ask(&line);
@@ -843,10 +1144,14 @@ impl Service {
                 if let Some(problem) = problem {
                     return format!("error {problem}");
                 }
+                if settings.background_yields != self.settings.background_yields {
+                    let _ = self.yielding.send(settings.background_yields);
+                }
                 self.settings = settings;
                 self.retry_scheduler = *line == "retry-scheduler";
                 if let Some(control) = &mut self.control {
                     control.set_drop(drop_of(&self.settings));
+                    control.set_warning(self.settings.critical_warning);
                     let stop = control.stop();
                     self.act(vec![Effect::Apply(stop)]);
                 }
@@ -883,6 +1188,14 @@ impl Service {
                 Effect::Toast(toast) => self.toast(toast),
             }
         }
+        if let Some(control) = &self.control {
+            let facts = Facts {
+                on_battery: control.source() == Source::Battery,
+                stop: control.stop().id(),
+                dropped_from: control.dropped_from().map(Stop::id),
+            };
+            self.log.follow(&facts, Instant::now());
+        }
         self.publish();
     }
 
@@ -893,7 +1206,7 @@ impl Service {
         self.refused.clear();
         self.publish();
         self.apply_panel(&plan);
-        Self::quiet(plan.quiet_background);
+        indexer::keep(plan.quiet_background, indexer::running());
         self.write_plan(true);
     }
 
@@ -917,10 +1230,17 @@ impl Service {
     /// The stop's writes that the machine lacks now: all of them at a stop (`at_stop`), the
     /// scheduler last, as restarting it takes longest; on a recheck, the ones a new device or
     /// power-profiles-daemon undid, never the scheduler.
+    ///
+    /// Between logind's sleep and wake it writes nothing, so nothing lands over the sleep hook's
+    /// values; a stop's writes wait for the check after the wake.
     fn write_plan(&mut self, at_stop: bool) {
         let Some(stop) = self.control.as_ref().map(Control::stop) else {
             return;
         };
+        if self.recheck.asleep() {
+            self.held_stop |= at_stop;
+            return;
+        }
         let plan = Plan::for_stop(stop, &self.settings);
         let mut writes = writes::for_plan(&plan, &self.settings, &self.machine, &live::wifi_power_save);
         if at_stop {
@@ -961,38 +1281,14 @@ impl Service {
         }
     }
 
-    /// Holds the file indexer paused while `quiet`, through `localsearch inhibit` in a transient
-    /// unit, so stopping the unit lets it go and a crash of this service doesn't leave it paused.
-    fn quiet(quiet: bool) {
-        if !live::has_indexer() {
-            return;
-        }
-        let held = live::unit_active(QUIET_UNIT);
-        if quiet && !held {
-            let _ = Command::new("systemd-run")
-                .args([
-                    "--user",
-                    "--quiet",
-                    "--collect",
-                    &format!("--unit={QUIET_UNIT}"),
-                    "--",
-                    "localsearch",
-                    "inhibit",
-                    "sleep",
-                    "infinity",
-                ])
-                .stdin(Stdio::null())
-                .status();
-        } else if !quiet && held {
-            let _ = Command::new("systemctl")
-                .args(["--user", "stop", &format!("{QUIET_UNIT}.service")])
-                .stdin(Stdio::null())
-                .status();
+    /// The file indexer's hold as the stop now asks, for an indexer `running` or not.
+    fn keep_indexer(&self, running: bool) {
+        if let Some(control) = &self.control {
+            indexer::keep(Plan::for_stop(control.stop(), &self.settings).quiet_background, running);
         }
     }
 
-    /// The writes, through the root helper. pkexec runs without its own agent: an admin at the
-    /// machine needs no password (`system/files/polkit/50-kubaos-power.rules`).
+    /// The writes, through the root helper.
     fn write(&mut self, writes: &[writes::Write]) {
         if !Path::new(HELPER).exists() {
             if !self.helper_said {
@@ -1001,13 +1297,8 @@ impl Service {
             }
             return;
         }
-        let output = Command::new(PKEXEC)
-            .arg("--disable-internal-agent")
-            .arg(HELPER)
-            .args(writes.iter().map(writes::Write::arg))
-            .stdin(Stdio::null())
-            .output();
-        match output {
+        let args: Vec<String> = writes.iter().map(writes::Write::arg).collect();
+        match helper(&args) {
             Ok(output) if output.status.success() => {}
             Ok(output) => {
                 let said = String::from_utf8_lossy(&output.stderr);
@@ -1031,6 +1322,7 @@ impl Service {
                 let body = format!("{stop}, as you left it {}.", source.words());
                 thread::spawn(move || notify(title, &body, "low", None));
             }
+            Toast::Critical { percent } => warning::ring(percent),
             Toast::Dropped { to, from, percent } => {
                 let events = self.events.clone();
                 thread::spawn(move || {
@@ -1041,6 +1333,22 @@ impl Service {
                     }
                 });
             }
+        }
+    }
+
+    /// Shows the toasts about a sleep or a night gone wrong, unless the settings turned them off;
+    /// each one's button opens the report.
+    fn notes(&self, notes: Vec<Note>) {
+        if !self.settings.battery_notes {
+            return;
+        }
+        for note in notes {
+            let runtime = self.runtime.clone();
+            thread::spawn(move || {
+                if notify(Note::TITLE, &note.text(), "normal", Some(Note::ACTION)) {
+                    open_report(&runtime);
+                }
+            });
         }
     }
 
@@ -1058,6 +1366,22 @@ impl Service {
             log::error!("couldn't write {}: {err}", path.display());
         }
     }
+}
+
+/// Opens the report in a terminal through Hyprland, as a keybind would, so it runs with the
+/// session's environment, in the terminal the Command menu's "Battery report" uses
+/// (`config/kotodama/kubaos.toml`).
+fn open_report(runtime: &Path) {
+    let Some(signature) = running_hyprland(runtime) else {
+        return;
+    };
+    let exec = "hl.dsp.exec_cmd([[ghostty --class=dot.float --wait-after-command=true -e kubaos power report]])";
+    let _ = Command::new("hyprctl")
+        .args(["-i", &signature, "dispatch", exec])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
 }
 
 /// The instance signature of this user's running Hyprland: its lock file under the runtime dir

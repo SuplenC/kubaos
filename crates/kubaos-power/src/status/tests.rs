@@ -1,5 +1,6 @@
 use super::*;
 use crate::fake::FakeRoot;
+use crate::indexer;
 use crate::stop::Stop;
 
 fn live() -> Live {
@@ -8,10 +9,23 @@ fn live() -> Live {
         source: Some(Source::Battery),
         panel: Some((120.0, false)),
         wifi: vec![("wlp99s0".to_owned(), Some(true))],
-        indexer_paused: Some(false),
+        indexer: Some(indexer::State::Running),
         scheduler_unit: None,
         scheduler_exit: None,
     }
+}
+
+/// The "Background work" row of `stop` with the indexer in `state`.
+fn background(stop: Stop, state: indexer::State) -> Row {
+    let root = FakeRoot::laptop();
+    let settings = Settings::default();
+    let plan = Plan::for_stop(stop, &settings);
+    let live = Live {
+        indexer: Some(state),
+        ..live()
+    };
+
+    find(&rows(&plan, &settings, &root.machine(), &live), "Background work").clone()
 }
 
 fn find<'a>(rows: &'a [Row], name: &str) -> &'a Row {
@@ -21,7 +35,7 @@ fn find<'a>(rows: &'a [Row], name: &str) -> &'a Row {
 #[test]
 fn power_saver_on_the_laptop_today_shows_what_ppd_did_and_what_is_missing() {
     let root = FakeRoot::laptop();
-    let settings = Settings::default();
+    let settings = Settings::parse("scheduler = \"kernel\"\n").expect("parses");
     let plan = Plan::for_stop(Stop::PowerSaver, &settings);
 
     let rows = rows(&plan, &settings, &root.machine(), &live());
@@ -140,4 +154,38 @@ fn a_disagreement_is_marked_in_the_text() {
         text("Power: Super Saver", &rows),
         "Power: Super Saver\n\nPCIe ASPM  powersupersave  (now default  ✗)\n"
     );
+}
+
+#[test]
+fn a_paused_indexer_on_a_saver_stop_agrees() {
+    let row = background(Stop::PowerSaver, indexer::State::Paused);
+
+    assert_eq!(row.now.as_deref(), Some("indexer paused"));
+    assert_eq!(row.agrees, Some(true));
+}
+
+#[test]
+fn a_running_indexer_on_a_saver_stop_is_marked() {
+    let row = background(Stop::PowerSaver, indexer::State::Running);
+
+    assert_eq!(row.now.as_deref(), Some("indexer running"));
+    assert_eq!(row.agrees, Some(false));
+}
+
+// Regression: #352.
+#[test]
+fn an_indexer_that_isnt_running_is_called_that_and_marked_in_no_stop() {
+    for stop in [Stop::PowerSaver, Stop::Balanced] {
+        let row = background(stop, indexer::State::NotRunning);
+
+        assert_eq!(row.now.as_deref(), Some("indexer not running"));
+        assert_eq!(row.agrees, Some(true));
+    }
+}
+
+#[test]
+fn a_paused_indexer_on_a_normal_stop_is_marked() {
+    let row = background(Stop::Balanced, indexer::State::Paused);
+
+    assert_eq!(row.agrees, Some(false));
 }

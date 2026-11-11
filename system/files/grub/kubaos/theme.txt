@@ -17,7 +17,7 @@
 # desktop's own scale on the laptop's 2880x1800 panel; a 1080p screen shows it
 # half as large again as its desktop.
 title-text: ""
-desktop-color: "#140d07"
+desktop-color: "#130d08"
 desktop-image: "background.png"
 desktop-image-scale-method: "stretch"
 terminal-font: "Geist Mono Regular 18"
@@ -32,8 +32,8 @@ terminal-box: "terminal_box_*.png"
 # glow is its own clear space, and the menu right under it, room for four
 # entries.
 + image {
-  left = 50%-372
-  top = 50%-285
+  left = 50%-418
+  top = 50%-277
   file = "logo.png"
 }
 
@@ -45,12 +45,12 @@ terminal-box: "terminal_box_*.png"
 + boot_menu {
   left = 50%-375
   width = 750
-  top = 50%+3
+  top = 50%-5
   height = 282
   item_font = "Geist Medium Regular 21"
   selected_item_font = "Geist Medium Regular 21"
-  item_color = "#f0dfd4"
-  selected_item_color = "#ffd9bb"
+  item_color = "#ede0d6"
+  selected_item_color = "#ffdec0"
   item_height = 30
   item_padding = 0
   item_spacing = 42
@@ -70,7 +70,7 @@ terminal-box: "terminal_box_*.png"
   height = 24
   align = "center"
   font = "Geist Regular 18"
-  color = "#dac2b1"
+  color = "#d7c3b2"
   text = "Booting in %d s. Any key stops the clock."
 }
 

@@ -52,6 +52,7 @@ impl Machine {
             dnd: Some(root.join("run/kubaos-dnd.json")),
             preview: Some(root.join("state/kubaos/preview.json")),
             shell_state: Some(root.join("state/quickshell/kubaos.json")),
+            wallpaper: Some(root.join("home/.local/state/theme/wallpaper")),
         }
     }
 
@@ -159,6 +160,23 @@ fn the_phone_link_is_on_while_its_file_exists() {
 
     assert_eq!(before.get(PHONE_LINK), Some(&on(false)));
     assert_eq!(after.get(PHONE_LINK), Some(&on(true)));
+}
+
+#[test]
+fn each_part_of_the_update_is_on_until_its_off_file_exists() {
+    let machine = Machine::new();
+
+    let before = machine.read();
+    machine.write("config/kubaos/desktop/update/no-nix", "");
+    machine.write("config/kubaos/desktop/update/no-firmware", "");
+    let after = machine.read();
+
+    for state in [UPDATE_BITWARDEN, UPDATE_NIX, FIRMWARE] {
+        assert_eq!(before.get(state), Some(&on(true)), "{state}");
+    }
+    assert_eq!(after.get(UPDATE_BITWARDEN), Some(&on(true)));
+    assert_eq!(after.get(UPDATE_NIX), Some(&on(false)));
+    assert_eq!(after.get(FIRMWARE), Some(&on(false)));
 }
 
 #[test]
@@ -312,18 +330,25 @@ fn the_power_settings_are_read_from_their_file_with_its_defaults() {
     let defaults = machine.read();
     machine.write(
         "config/kubaos/desktop/power/power.toml",
-        "panel_power_saving = false\nscheduler = \"lavd\"\nlow_battery_stop = \"off\"\n",
+        "panel_power_saving = false\nbattery_notes = false\nscheduler = \"kernel\"\nbackground_yields = false\n\
+         low_battery_stop = \"off\"\ncritical_warning = \"off\"\n",
     );
     let set = machine.read();
     machine.write("config/kubaos/desktop/power/power.toml", "scheduler = \"fifo\"\n");
     let broken = machine.read();
 
     assert_eq!(defaults.get(PANEL_POWER_SAVING), Some(&on(true)));
-    assert_eq!(defaults.get(SCHEDULER), Some(&word("kernel")));
+    assert_eq!(defaults.get(BATTERY_NOTES), Some(&on(true)));
+    assert_eq!(defaults.get(SCHEDULER), Some(&word("lavd")));
+    assert_eq!(defaults.get(BACKGROUND_YIELDS), Some(&on(true)));
     assert_eq!(defaults.get(LOW_BATTERY), Some(&word("power-saver")));
+    assert_eq!(defaults.get(CRITICAL_WARNING), Some(&on(true)));
     assert_eq!(set.get(PANEL_POWER_SAVING), Some(&on(false)));
-    assert_eq!(set.get(SCHEDULER), Some(&word("lavd")));
+    assert_eq!(set.get(BATTERY_NOTES), Some(&on(false)));
+    assert_eq!(set.get(SCHEDULER), Some(&word("kernel")));
+    assert_eq!(set.get(BACKGROUND_YIELDS), Some(&on(false)));
     assert_eq!(set.get(LOW_BATTERY), Some(&word("off")));
+    assert_eq!(set.get(CRITICAL_WARNING), Some(&on(false)));
     assert_eq!(broken.get(SCHEDULER), None);
 }
 
@@ -343,6 +368,60 @@ fn unfree_packages_are_on_until_the_user_flakes_setting_turns_them_off() {
 }
 
 #[test]
+fn a_suite_is_on_while_its_file_is_in_the_state_directory_and_unknown_when_it_does_not_read() {
+    let machine = Machine::new();
+    let file = "config/kubaos/home/kubaos.d/suites/test.toml";
+
+    let missing = machine.read();
+    machine.write(file, "version = \"2\"\n");
+    let installed = machine.read();
+    machine.write(file, "version = [");
+    let broken = machine.read();
+
+    assert_eq!(missing.get("kubaos.suites.test"), Some(&on(false)));
+    assert_eq!(installed.get("kubaos.suites.test"), Some(&on(true)));
+    assert_eq!(installed.suites().is_installed("test"), Some(true));
+    assert_eq!(broken.get("kubaos.suites.test"), None);
+}
+
+#[test]
+fn wallpaper_depth_is_on_until_its_settings_turn_it_off_and_unknown_when_they_do_not_read() {
+    let machine = Machine::new();
+    let file = "config/kubaos/desktop/wallpapers/depth.toml";
+
+    let missing = machine.read();
+    machine.write(file, "enabled = false\n");
+    let off = machine.read();
+    machine.write(file, "enabled = maybe\n");
+    let broken = machine.read();
+
+    assert_eq!(missing.get(DEPTH), Some(&on(true)));
+    assert_eq!(off.get(DEPTH), Some(&on(false)));
+    assert_eq!(broken.get(DEPTH), None);
+    assert_eq!(broken.get(DEPTH_SKIPPED), None);
+}
+
+#[test]
+fn the_current_wallpaper_is_skipped_while_depths_skip_list_names_it() {
+    let machine = Machine::new();
+    let settings = "config/kubaos/desktop/wallpapers/depth.toml";
+    let wallpaper = "home/.local/state/theme/wallpaper";
+
+    let no_wallpaper = machine.read();
+    machine.write(wallpaper, "/p/tower.jpg\n");
+    let not_listed = machine.read();
+    machine.write(settings, "skip = [\"/p/tower.jpg\"]\n");
+    let listed = machine.read();
+    machine.write(wallpaper, "/p/harbour.jpg\n");
+    let another = machine.read();
+
+    assert_eq!(no_wallpaper.get(DEPTH_SKIPPED), Some(&on(false)));
+    assert_eq!(not_listed.get(DEPTH_SKIPPED), Some(&on(false)));
+    assert_eq!(listed.get(DEPTH_SKIPPED), Some(&on(true)));
+    assert_eq!(another.get(DEPTH_SKIPPED), Some(&on(false)));
+}
+
+#[test]
 fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
     let machine = Machine::new();
     let places = Places {
@@ -352,6 +431,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         dnd: None,
         preview: None,
         shell_state: None,
+        wallpaper: None,
         ..machine.places()
     };
 
@@ -364,6 +444,9 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         MAC_ACCENTS,
         PHONE_LINK,
         PANEL_POWER_SAVING,
+        CRITICAL_WARNING,
+        BATTERY_NOTES,
+        BACKGROUND_YIELDS,
         UNFREE,
         KEEP_AWAKE,
         PROXY,
@@ -371,6 +454,12 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         DND,
         PREVIEW,
         BLUETOOTH_UNNAMED,
+        DEPTH,
+        DEPTH_SKIPPED,
+        FIRMWARE,
+        UPDATE_BITWARDEN,
+        UPDATE_NIX,
+        "kubaos.suites.test",
     ] {
         assert_eq!(states.get(name), None, "{name}");
     }
@@ -392,9 +481,15 @@ fn every_file_a_state_is_read_from_is_watched() {
         "config/kubaos/terminal/zsh/no-greeting",
         "config/kubaos/desktop/keyboard/keyboard.toml",
         "config/kubaos/desktop/phone/phone-link",
+        "config/kubaos/desktop/update/no-firmware",
+        "config/kubaos/desktop/update/no-bitwarden",
+        "config/kubaos/desktop/update/no-nix",
         "config/kubaos/desktop/power/power.toml",
         "config/kubaos/home/kubaos.d/nixpkgs.toml",
+        "config/kubaos/home/kubaos.d/suites/test.toml",
         "config/kubaos/desktop/network/proxy.toml",
+        "config/kubaos/desktop/wallpapers/depth.toml",
+        "home/.local/state/theme/wallpaper",
         "run/kubaos-keep-awake.json",
         "run/kubaos-proxy.json",
         "run/kubaos-dnd.json",
@@ -414,7 +509,10 @@ fn a_state_name_is_one_of_the_probes_or_a_package_group() {
     assert_eq!(values(UNFREE), Some(Values::Bool));
     assert_eq!(values(PREVIEW), Some(Values::Bool));
     assert_eq!(values(BLUETOOTH_UNNAMED), Some(Values::Bool));
+    assert_eq!(values(FIRMWARE), Some(Values::Bool));
     assert_eq!(values(SCHEDULER), Some(Values::Words(&["kernel", "lavd"])));
+    assert_eq!(values("kubaos.suites.test"), Some(Values::Bool));
+    assert_eq!(values("kubaos.suites.nope"), None);
     assert_eq!(values("packages."), None);
     assert_eq!(values("chrome"), None);
 }

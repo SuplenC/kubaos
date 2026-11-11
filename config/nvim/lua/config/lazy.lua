@@ -31,14 +31,17 @@ require("lazy").setup({
     { import = "lazyvim.plugins.extras.lang.git" },
     { import = "lazyvim.plugins.extras.lang.json" },
     { import = "lazyvim.plugins.extras.lang.markdown" },
-    { import = "lazyvim.plugins.extras.lang.rust" },
     { import = "lazyvim.plugins.extras.lang.toml" },
-    { import = "lazyvim.plugins.extras.lang.typescript" },
     { import = "lazyvim.plugins.extras.lang.yaml" },
-    { import = "lazyvim.plugins.extras.linting.eslint" },
     { import = "lazyvim.plugins.extras.test.core" },
     { import = "lazyvim.plugins.extras.util.dot" },
     { import = "lazyvim.plugins.extras.util.mini-hipatterns" },
+    -- The extras' npm-based tools come from Nix (home/cli.nix): Mason installs
+    -- them with npm, which only the Node Suite brings.
+    require("config.suite_tools").on_path({
+      servers = { "jsonls", "yamlls", "dockerls", "docker_compose_language_service", "bashls" },
+      packages = { "prettier", "markdownlint-cli2", "markdown-toc" },
+    }),
     -- The installed Suites' extras and settings (home/suites.nix writes the file).
     require("kubaos.suites"),
     -- KubaOS's plugins, then the user layer's plugins/*.lua

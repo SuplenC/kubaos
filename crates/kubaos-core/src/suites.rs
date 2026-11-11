@@ -4,18 +4,23 @@
 //! A Suite has two halves. Its Nix module, `home/suites/<name>.nix`, declares what it installs:
 //! packages, environment variables, PATH entries and its editor settings in the Defaults. Its
 //! metadata, a [`Suite`] in [`catalog`], says what the tool needs to know: its options (a version,
-//! extras), where its toolchain comes from, its caches, the user-layer files it seeds and the
-//! projects it scaffolds.
+//! extras), its mise tools, where its toolchain comes from, its caches, the user-layer files it
+//! seeds and the projects it scaffolds.
 //!
-//! Installing a Suite writes `kubaos.d/suites/<name>.toml` with its options, and removing it
-//! deletes the file; the next switch applies either. The tool never writes to a user-layer file
-//! that exists: it only creates a missing one, from the Suite's commented example. Removal deletes
-//! caches only when asked, and never touches a project or a user-layer file.
+//! Installing a Suite writes its record, `kubaos.d/suites/<name>.toml`, with its options, and
+//! removing it deletes the record; the next switch applies either. A Suite with mise tools also
+//! has a fragment of mise's config, `conf.d/kubaos-<name>.toml`, written whole: its tools are
+//! installed first, with nothing written, and the fragment and the record are written only once
+//! they are, so a failed install leaves nothing behind. Removal deletes the fragment and prunes
+//! the versions nothing selects any more. The tool never writes to a user-layer file that exists:
+//! it only creates a missing one, from the Suite's commented example. Removal deletes caches only
+//! when asked, and never touches a project or a user-layer file.
 //!
 //! # Owns
 //!
 //! - The Suite metadata ([`Suite`]) and the catalog of every Suite.
-//! - Writing, reading and deleting Suite files, under the state directory's edit lock.
+//! - Writing, reading and deleting Suite records and their mise fragments, under the state
+//!   directory's edit lock, and the mise calls each change makes.
 //! - Seeding user-layer files, sizing and purging caches, and finding the user-layer files that
 //!   mention a Suite.
 //! - Running a Suite's scaffolders in the Projects root.
@@ -24,9 +29,12 @@
 //!
 //! - Reading the state directory's packages: `state.rs`.
 //! - The switch that applies a Suite file: `switch.rs`.
+//! - Running mise: `mise.rs`.
 //! - The Nix side: `home/suites.nix`, `home/state.nix` and `home/suites/<name>.nix`.
 
 pub mod catalog;
+mod lockfile;
+mod updates;
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -41,11 +49,21 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
+use std::sync::Arc;
 
 use kubaos_user_layer::App;
 use serde::Deserialize;
 use serde::Serialize;
 
+pub use self::updates::Available;
+pub use self::updates::Reach;
+pub use self::updates::SuiteUpdates;
+pub use self::updates::Upgraded;
+use crate::mise;
+use crate::mise::ListedVersion;
+use crate::mise::Mise;
+use crate::mise::MiseError;
+use crate::mise::ToolRequest;
 use crate::state::GitError;
 use crate::state::Paths;
 use crate::state::ReadError;
@@ -71,8 +89,14 @@ pub struct Suite {
     pub versions: &'static [&'static str],
     /// The parts that can be turned on and off.
     pub extras: &'static [Extra],
+    /// The tools mise installs for it, in its fragment. A Suite without any is installed by its
+    /// Nix module alone.
+    pub mise: &'static [Tool],
     /// Where its toolchain comes from.
     pub toolchain: Toolchain,
+    /// Commands, run through mise, that stop a server one of its tools leaves running. mise's
+    /// prune never deletes a version a running process uses, so they run before one.
+    pub stop_servers: &'static [&'static [&'static str]],
     /// What its tools download or build outside the Nix store, which removal deletes only when
     /// asked.
     pub caches: &'static [Cache],
@@ -94,14 +118,39 @@ pub struct Extra {
     pub default: bool,
 }
 
+/// A tool mise installs for a Suite.
+#[derive(Clone, Copy, Debug)]
+pub struct Tool {
+    /// mise's name for it: a registry name (`node`) or a backend's (`aqua:astral-sh/uv`).
+    pub name: &'static str,
+    /// The version a new install asks for.
+    pub request: Request,
+    /// The extra that installs it, or `None` when it is always installed.
+    pub extra: Option<&'static str>,
+}
+
+/// The version a [`Tool`] asks mise for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Request {
+    /// The Suite's chosen version: its main toolchain. The record keeps the line as chosen
+    /// (`24`), and the fragment asks for the line's newest major.minor (`24.22`).
+    Suite,
+    /// This request, at major.minor precision (`0.13`), so a plain `mise upgrade` stays within
+    /// its patch releases.
+    Fixed(&'static str),
+}
+
 /// Where a Suite's toolchain comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Toolchain {
     /// nixpkgs, through the Suite's Nix module.
     Nix,
-    /// The language's own manager, which the Nix module installs and the Suite drives, where
-    /// that is the norm (rustup for Rust).
+    /// mise, from the Suite's tools.
+    Mise,
+    /// The language's own manager, which the Suite installs (through its Nix module, or as one of
+    /// its mise tools) and drives, where that is the norm (rustup for Rust, uv for Python, proto
+    /// for moon).
     Upstream { manager: &'static str },
 }
 
@@ -178,16 +227,48 @@ pub struct Seeded {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Added {
     pub config: SuiteConfig,
+    /// The tools its fragment asks mise for.
+    pub tools: Vec<ToolRequest>,
     pub seeds: Seeded,
+    /// The Suite as it was, for [`Suites::restore`] when the switch fails.
+    pub before: Before,
 }
 
 /// What [`Suites::configure`] did.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Configured {
     pub config: SuiteConfig,
-    /// Whether the file changed, and so a switch has something to do.
+    /// The tools its fragment asks mise for.
+    pub tools: Vec<ToolRequest>,
+    /// Whether the record changed, and so a switch has something to do.
     pub changed: bool,
     pub seeds: Seeded,
+    /// The Suite as it was, for [`Suites::restore`] when the switch fails.
+    pub before: Before,
+}
+
+/// A Suite's record and fragment, and mise's global lockfile, as an add, configure or upgrade
+/// found them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Before {
+    /// Its options, or `None` when it was not installed.
+    pub config: Option<SuiteConfig>,
+    /// Its fragment's tools, empty when it had no fragment.
+    pub tools: Vec<ToolRequest>,
+    /// The global lockfile's text, or `None` when there was none.
+    pub lockfile: Option<String>,
+}
+
+/// One tool of an installed Suite, as its fragment asks for it and mise lists it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ToolState {
+    pub tool: String,
+    /// What the fragment asks for.
+    pub request: String,
+    /// The version mise selects for it, or `None` when mise lists none.
+    pub version: Option<String>,
+    /// Whether that version is installed.
+    pub installed: bool,
 }
 
 /// One cache folder and how much it holds.
@@ -248,6 +329,42 @@ pub enum SuiteError {
         #[source]
         source: io::Error,
     },
+    /// mise could not install the Suite's tools. Nothing is written, and the versions the
+    /// install added are uninstalled.
+    #[error("installing the {suite} Suite's tools with mise")]
+    Install {
+        suite: String,
+        #[source]
+        source: MiseError,
+    },
+    /// mise could not list its tools.
+    #[error("listing mise's tools")]
+    Tools(#[source] MiseError),
+    /// The Suite's files are written or deleted, but mise could not delete the versions nothing
+    /// selects any more, or stop a server of the Suite's tools before it did.
+    #[error("pruning mise's unused versions")]
+    Prune(#[source] MiseError),
+    /// mise could not lock the Suite's tools, or install what the lockfile then names. The Suite
+    /// is put back as it was.
+    #[error("locking the {suite} Suite's tools with mise; the Suite is back as it was")]
+    MiseLock {
+        suite: String,
+        #[source]
+        source: MiseError,
+    },
+    /// mise could not read which of the Suites' tools have newer releases.
+    #[error("asking mise for newer releases")]
+    Outdated(#[source] MiseError),
+    /// mise could not move the Suites' tools; the tools it moved before failing stay moved.
+    #[error("moving the Suites' tools with mise")]
+    Upgrade(#[source] MiseError),
+    /// mise's lockfile, or the entries an update saved from it, are not TOML.
+    #[error("reading {}", path.display())]
+    Lockfile {
+        path: PathBuf,
+        #[source]
+        source: toml_edit::TomlError,
+    },
     /// The Suite file is written, but a missing user-layer file could not be created.
     #[error("creating {}", path.display())]
     Seed {
@@ -291,6 +408,9 @@ pub enum ScaffoldError {
         #[source]
         source: io::Error,
     },
+    /// The scaffolder's command isn't on `PATH`: the Suite's tools aren't installed.
+    #[error("{program} isn't on PATH; `kubaos suite configure {suite}` installs the Suite's tools again")]
+    NotOnPath { program: String, suite: String },
     /// The scaffolder could not be started.
     #[error("starting {program}")]
     Spawn {
@@ -306,27 +426,38 @@ pub enum ScaffoldError {
     NothingMade { path: PathBuf },
 }
 
-/// The Suites of one user: their files in the state directory, the user layer they seed, the
-/// caches in the home and the Projects root they scaffold into.
+/// The Suites of one user: their records in the state directory, their fragments of mise's
+/// config, the user layer they seed, the caches in the home and the Projects root they scaffold
+/// into.
 #[derive(Clone, Debug)]
 pub struct Suites {
+    paths: Paths,
     state: StateDir,
     lock: PathBuf,
     home: PathBuf,
     user_layer: PathBuf,
     projects: PathBuf,
+    mise: Arc<dyn Mise>,
 }
 
 impl Suites {
-    /// The Suites of the user `paths` describes.
+    /// The Suites of the user `paths` describes, with the `mise` on `PATH`.
     #[must_use]
     pub fn new(paths: &Paths) -> Self {
+        Self::with_mise(paths, Arc::new(mise::Cli::new()))
+    }
+
+    /// The Suites of the user `paths` describes, with `mise` running their tools.
+    #[must_use]
+    pub fn with_mise(paths: &Paths, mise: Arc<dyn Mise>) -> Self {
         Self {
+            paths: paths.clone(),
             state: paths.state_dir(),
             lock: paths.edit_lock(),
             home: paths.home().to_path_buf(),
             user_layer: paths.user_layer(),
             projects: paths.projects_root(),
+            mise,
         }
     }
 
@@ -351,16 +482,17 @@ impl Suites {
     ///
     /// [`SuiteError::Read`] when its file cannot be read or parsed.
     pub fn config(&self, suite: &Suite) -> Result<Option<SuiteConfig>, SuiteError> {
-        read_config(&self.state.suite_file(suite.name)).map_err(SuiteError::Read)
+        self.state.suite_config(suite.name).map_err(SuiteError::Read)
     }
 
-    /// Installs `suite` with its default options changed by `change`: writes its file and seeds
-    /// its missing user-layer files. The switch that applies it is the caller's.
+    /// Installs `suite` with its default options changed by `change`. Its mise tools are
+    /// installed first; only then are its fragment, mise's lockfile and its record written, and
+    /// its missing user-layer files seeded. The switch that applies it is the caller's.
     ///
     /// # Errors
     ///
-    /// [`SuiteError::AlreadyInstalled`], an unknown version or extra, or a failed lock, read,
-    /// write, seed or git sync.
+    /// [`SuiteError::AlreadyInstalled`], an unknown version or extra, a failed install (which
+    /// leaves nothing behind), or a failed lock, read, write, seed, git sync or mise call.
     pub fn add(&self, suite: &Suite, change: &OptionsChange) -> Result<Added, SuiteError> {
         let _lock = self.lock()?;
         if self.config(suite)?.is_some() {
@@ -369,18 +501,31 @@ impl Suites {
             });
         }
         let config = apply(suite, default_config(suite), change)?;
-        self.write(suite, &config)?;
+        let before = self.before(suite, None)?;
+        let tools = wanted_tools(suite, &config, &[], |tool, line| self.narrow(suite, tool, line))?;
+        self.install(suite, &tools)?;
+        self.commit(suite, Some(&config), &tools, &before)?;
+        if !tools.is_empty() {
+            self.mise.prune().map_err(SuiteError::Prune)?;
+        }
         let seeds = self.seed(suite)?;
-        Ok(Added { config, seeds })
+        Ok(Added {
+            config,
+            tools,
+            seeds,
+            before,
+        })
     }
 
     /// Changes the options of the installed `suite` by `change`, and seeds its missing user-layer
-    /// files.
+    /// files. Tools the change adds or moves are installed first, the fragment and the record
+    /// written after, and the versions it no longer asks for pruned. A request `mise upgrade`
+    /// moved in the fragment stays while it is still on the Suite's line.
     ///
     /// # Errors
     ///
-    /// [`SuiteError::NotInstalled`], an unknown version or extra, or a failed lock, read, write,
-    /// seed or git sync.
+    /// [`SuiteError::NotInstalled`], an unknown version or extra, a failed install (which
+    /// changes nothing), or a failed lock, read, write, seed, git sync or mise call.
     pub fn configure(&self, suite: &Suite, change: &OptionsChange) -> Result<Configured, SuiteError> {
         let _lock = self.lock()?;
         let Some(current) = self.config(suite)? else {
@@ -390,19 +535,60 @@ impl Suites {
         };
         let config = apply(suite, current.clone(), change)?;
         let changed = config != current;
-        if changed {
+        let before = self.before(suite, Some(current))?;
+        let tools = wanted_tools(suite, &config, &before.tools, |tool, line| {
+            self.narrow(suite, tool, line)
+        })?;
+        let moved = !same_tools(&tools, &before.tools);
+        if moved {
+            self.install(suite, &tools)?;
+            self.commit(suite, changed.then_some(&config), &tools, &before)?;
+            self.stop_servers(suite);
+            self.mise.prune().map_err(SuiteError::Prune)?;
+        } else if changed {
             self.write(suite, &config)?;
         }
         let seeds = self.seed(suite)?;
-        Ok(Configured { config, changed, seeds })
+        Ok(Configured {
+            config,
+            tools,
+            changed,
+            seeds,
+            before,
+        })
     }
 
-    /// Uninstalls `suite`: deletes its file, and its caches as `caches` says. The user layer and
-    /// the Projects root stay as they are; the user-layer files that mention the Suite are listed.
+    /// Puts `suite` back as `before` found it, after the switch that followed an add or a
+    /// configure failed: its record and fragment as they were, or gone when it was not
+    /// installed, with the versions they no longer ask for pruned.
     ///
     /// # Errors
     ///
-    /// [`SuiteError::NotInstalled`], or a failed lock, read, delete, purge or git sync.
+    /// A failed lock, write, git sync or mise call.
+    pub fn restore(&self, suite: &Suite, before: &Before) -> Result<(), SuiteError> {
+        let _lock = self.lock()?;
+        self.write_fragment(suite, &before.tools)?;
+        match &before.config {
+            Some(config) => self.write(suite, config)?,
+            None => self.delete_record(suite)?,
+        }
+        self.write_lockfile(before.lockfile.as_deref())?;
+        if !suite.mise.is_empty() {
+            self.install(suite, &before.tools)?;
+            self.stop_servers(suite);
+            self.mise.prune().map_err(SuiteError::Prune)?;
+        }
+        Ok(())
+    }
+
+    /// Uninstalls `suite`: deletes its record and its fragment, prunes the versions nothing
+    /// selects any more, and deletes its caches as `caches` says. The user layer and the
+    /// Projects root stay as they are; the user-layer files that mention the Suite are listed.
+    ///
+    /// # Errors
+    ///
+    /// [`SuiteError::NotInstalled`], or a failed lock, read, delete, purge, git sync or mise
+    /// call.
     pub fn remove(&self, suite: &Suite, caches: CachePolicy) -> Result<Removed, SuiteError> {
         let _lock = self.lock()?;
         if self.config(suite)?.is_none() {
@@ -410,9 +596,19 @@ impl Suites {
                 suite: suite.name.to_owned(),
             });
         }
-        let path = self.state.suite_file(suite.name);
-        fs::remove_file(&path).map_err(|source| SuiteError::Write { path, source })?;
-        self.state.sync_git().map_err(SuiteError::Git)?;
+        let dropped: Vec<String> = self.fragment(suite)?.into_iter().map(|t| t.tool).collect();
+        if !dropped.is_empty() {
+            self.stop_servers(suite);
+        }
+        self.delete_record(suite)?;
+        self.write_fragment(suite, &[])?;
+        // HAZARD: unlock before pruning. While any global config is left (the user's
+        // config.toml, a Suite's defaults in conf.d), mise reads the global lockfile with it,
+        // and prune keeps every version the lockfile still lists.
+        if !dropped.is_empty() {
+            self.unlock(&dropped)?;
+            self.mise.prune().map_err(SuiteError::Prune)?;
+        }
 
         let sized = self.caches(suite);
         let mut purged = Vec::new();
@@ -430,6 +626,38 @@ impl Suites {
             purged,
             mentions: self.mentions(suite),
         })
+    }
+
+    /// The tools of each of `suites` that has a fragment, as the fragment asks for them and mise
+    /// lists them, by Suite name. mise runs once, and not at all when none has a fragment.
+    ///
+    /// # Errors
+    ///
+    /// [`SuiteError::Read`] when a fragment can't be read, or [`SuiteError::Tools`] when mise
+    /// can't list its tools.
+    pub fn tools<'a>(
+        &self,
+        suites: impl IntoIterator<Item = &'a Suite>,
+    ) -> Result<BTreeMap<&'a str, Vec<ToolState>>, SuiteError> {
+        let mut requested = BTreeMap::new();
+        for suite in suites {
+            let tools = self.fragment(suite)?;
+            if !tools.is_empty() {
+                requested.insert(suite.name, tools);
+            }
+        }
+        if requested.is_empty() {
+            return Ok(BTreeMap::new());
+        }
+        let listed = self.mise.list().map_err(SuiteError::Tools)?;
+        Ok(requested
+            .into_iter()
+            .map(|(name, tools)| {
+                let fragment = self.paths.mise_fragment(name);
+                let states = tools.into_iter().map(|t| tool_state(t, &fragment, &listed)).collect();
+                (name, states)
+            })
+            .collect())
     }
 
     /// The caches of `suite`, with their sizes. A cache inside the Projects root, or holding it,
@@ -497,9 +725,18 @@ impl Suites {
             .current_dir(&self.projects)
             .stdin(Stdio::null())
             .status()
-            .map_err(|source| ScaffoldError::Spawn {
-                program: program_name.clone(),
-                source,
+            .map_err(|source| {
+                if source.kind() == io::ErrorKind::NotFound {
+                    ScaffoldError::NotOnPath {
+                        program: program_name.clone(),
+                        suite: suite.name.to_owned(),
+                    }
+                } else {
+                    ScaffoldError::Spawn {
+                        program: program_name.clone(),
+                        source,
+                    }
+                }
             })?;
         if !status.success() {
             return Err(ScaffoldError::Failed {
@@ -511,6 +748,190 @@ impl Suites {
             return Err(ScaffoldError::NothingMade { path });
         }
         Ok(path)
+    }
+
+    /// Installs `tools` with mise. When the install fails, the versions it added (a failed run
+    /// keeps the tools that did install) are uninstalled again, as far as mise can, so a failure
+    /// leaves mise as it found it.
+    fn install(&self, suite: &Suite, tools: &[ToolRequest]) -> Result<(), SuiteError> {
+        if tools.is_empty() {
+            return Ok(());
+        }
+        let before = installed_versions(&self.mise.list().map_err(SuiteError::Tools)?);
+        let Err(source) = self.mise.install(tools) else {
+            return Ok(());
+        };
+        if let Ok(after) = self.mise.list() {
+            let added: Vec<ToolRequest> = installed_versions(&after)
+                .into_iter()
+                .filter(|v| !before.contains(v))
+                .collect();
+            let _ = self.mise.uninstall(&added);
+        }
+        Err(SuiteError::Install {
+            suite: suite.name.to_owned(),
+            source,
+        })
+    }
+
+    /// The request for the main tool `tool` of `suite` on the chosen `line`: the major.minor of
+    /// the line's newest release (`24` asks for `24.22`), so a plain update takes only its patch
+    /// releases. A line with no release mise knows of, or whose newest release isn't numbered
+    /// major.minor.something, stays as chosen.
+    fn narrow(&self, suite: &Suite, tool: &str, line: &str) -> Result<String, SuiteError> {
+        let latest = self.mise.latest(tool, line).map_err(|source| SuiteError::Install {
+            suite: suite.name.to_owned(),
+            source,
+        })?;
+        Ok(latest
+            .as_deref()
+            .and_then(major_minor)
+            .filter(|request| on_line(request, line))
+            .unwrap_or_else(|| line.to_owned()))
+    }
+
+    /// The tools `suite`'s fragment asks for, in the order it lists them; none without a
+    /// fragment. A request that isn't a plain string is mise's to read and is left out.
+    fn fragment(&self, suite: &Suite) -> Result<Vec<ToolRequest>, SuiteError> {
+        let path = self.paths.mise_fragment(suite.name);
+        let text = match fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(SuiteError::Read(ReadError::read(&path)(e))),
+        };
+        let fragment: Fragment = toml::from_str(&text).map_err(|e| SuiteError::Read(ReadError::parse(&path)(e)))?;
+        Ok(fragment
+            .tools
+            .into_iter()
+            .filter_map(|(tool, request)| match request {
+                toml::Value::String(request) => Some(ToolRequest { tool, request }),
+                _ => None,
+            })
+            .collect())
+    }
+
+    /// Writes `suite`'s fragment whole, with a header saying who writes it, or deletes it when
+    /// `tools` is empty.
+    fn write_fragment(&self, suite: &Suite, tools: &[ToolRequest]) -> Result<(), SuiteError> {
+        let path = self.paths.mise_fragment(suite.name);
+        let write_err = |source| SuiteError::Write {
+            path: path.clone(),
+            source,
+        };
+        if tools.is_empty() {
+            return match fs::remove_file(&path) {
+                Err(e) if e.kind() != io::ErrorKind::NotFound => Err(write_err(e)),
+                _ => Ok(()),
+            };
+        }
+        let fragment = Fragment {
+            tools: tools
+                .iter()
+                .map(|t| (t.tool.clone(), toml::Value::String(t.request.clone())))
+                .collect(),
+        };
+        let body = toml::to_string(&fragment).map_err(|e| write_err(io::Error::other(e)))?;
+        let header = format!(
+            "# The {title} Suite's tools, as `kubaos suite` installed them. The kubaos command rewrites this\n\
+             # file: change it with `kubaos suite configure {name}`, and remove it with `kubaos suite remove {name}`.\n\
+             # Your own ~/.config/mise/config.toml loads after it, so what you set there wins.\n",
+            title = suite.title,
+            name = suite.name,
+        );
+        if let Some(dir) = path.parent() {
+            fs::create_dir_all(dir).map_err(write_err)?;
+        }
+        write_atomic(&path, &format!("{header}{body}")).map_err(write_err)
+    }
+
+    /// Deletes `suite`'s record and records that in git.
+    fn delete_record(&self, suite: &Suite) -> Result<(), SuiteError> {
+        let path = self.state.suite_file(suite.name);
+        match fs::remove_file(&path) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => return Err(SuiteError::Write { path, source: e }),
+            _ => {}
+        }
+        self.state.sync_git().map(drop).map_err(SuiteError::Git)
+    }
+
+    /// `suite` as it is now, with its record's options `config`, for [`Suites::restore`].
+    fn before(&self, suite: &Suite, config: Option<SuiteConfig>) -> Result<Before, SuiteError> {
+        Ok(Before {
+            config,
+            tools: self.fragment(suite)?,
+            lockfile: self.read_lockfile()?,
+        })
+    }
+
+    /// Writes `suite`'s fragment with `tools`, and its record with `config` when one is given,
+    /// then locks the tools and installs what the lockfile names. When a step fails, the Suite
+    /// goes back as `before` found it, lockfile and all, so it ends either fully changed or not
+    /// at all.
+    fn commit(
+        &self,
+        suite: &Suite,
+        config: Option<&SuiteConfig>,
+        tools: &[ToolRequest],
+        before: &Before,
+    ) -> Result<(), SuiteError> {
+        let dropped: Vec<String> = before
+            .tools
+            .iter()
+            .filter(|old| !tools.iter().any(|t| t.tool == old.tool))
+            .map(|t| t.tool.clone())
+            .collect();
+        let done = self
+            .write_fragment(suite, tools)
+            .and_then(|()| config.map_or(Ok(()), |config| self.write(suite, config)))
+            .and_then(|()| self.settle(suite, tools, &dropped));
+        if let Err(e) = done {
+            self.put_back(suite, before);
+            return Err(e);
+        }
+        Ok(())
+    }
+
+    /// Locks `tools`, which `suite`'s fragment now asks for, forgets the `dropped` ones nothing
+    /// asks for any more, and installs the tools again under the lockfile.
+    fn settle(&self, suite: &Suite, tools: &[ToolRequest], dropped: &[String]) -> Result<(), SuiteError> {
+        let lock_err = |source| SuiteError::MiseLock {
+            suite: suite.name.to_owned(),
+            source,
+        };
+        self.unlock(dropped)?;
+        if tools.is_empty() {
+            return Ok(());
+        }
+        let names: Vec<String> = tools.iter().map(|t| t.tool.clone()).collect();
+        self.mise.lock(&names).map_err(lock_err)?;
+        // HAZARD: install again once locked. An npm tool's lock entry holds its dependency
+        // graph, which mise installs to a folder of its own, so the install made before the lock
+        // isn't the one the lockfile selects, and every shell warns that the tool is missing.
+        self.mise.install(tools).map_err(lock_err)
+    }
+
+    /// Puts `suite` back as `before` found it, after a failed add or configure: its fragment,
+    /// its record and the lockfile, then prunes the versions the failed run added. Each step is
+    /// tried whatever the last did, and their errors are dropped: the error that led here is
+    /// the one to report.
+    fn put_back(&self, suite: &Suite, before: &Before) {
+        let _ = self.write_fragment(suite, &before.tools);
+        let _ = match &before.config {
+            Some(config) => self.write(suite, config),
+            None => self.delete_record(suite),
+        };
+        let _ = self.write_lockfile(before.lockfile.as_deref());
+        if !suite.mise.is_empty() {
+            let _ = self.mise.prune();
+        }
+    }
+
+    /// Stops the servers `suite`'s tools leave running, so a prune can delete their versions.
+    /// A server that isn't running is the usual case, so a failure is no error.
+    fn stop_servers(&self, suite: &Suite) {
+        for argv in suite.stop_servers {
+            let _ = self.mise.exec(argv);
+        }
     }
 
     fn lock(&self) -> Result<File, SuiteError> {
@@ -608,6 +1029,101 @@ fn expand(argv: &[&str], name: &str, path: &Path) -> Vec<OsString> {
         .collect()
 }
 
+/// A Suite's fragment of mise's config: only its tools. KubaOS writes no setting there, so
+/// every setting stays the user's.
+#[derive(Serialize, Deserialize)]
+struct Fragment {
+    #[serde(default)]
+    tools: toml::Table,
+}
+
+/// The tools `suite` asks mise for with `config`. A request in `current`, the fragment as it is,
+/// stays while it is on the line the Suite asks for, so a request `mise upgrade --bump` moved is
+/// kept: for the main toolchain, while it starts with the chosen version; for any other tool,
+/// always. The main toolchain's request on a new line is what `narrow` makes of the line.
+fn wanted_tools(
+    suite: &Suite,
+    config: &SuiteConfig,
+    current: &[ToolRequest],
+    mut narrow: impl FnMut(&str, &str) -> Result<String, SuiteError>,
+) -> Result<Vec<ToolRequest>, SuiteError> {
+    let mut tools = Vec::new();
+    for tool in suite.mise {
+        if tool.extra.is_some_and(|extra| !config.extras.contains(extra)) {
+            continue;
+        }
+        let kept = current.iter().find(|t| t.tool == tool.name).map(|t| t.request.clone());
+        let request = match (tool.request, kept) {
+            (Request::Fixed(_), Some(kept)) => kept,
+            (Request::Fixed(request), None) => request.to_owned(),
+            (Request::Suite, kept) => {
+                let Some(line) = &config.version else {
+                    continue;
+                };
+                match kept {
+                    Some(kept) if on_line(&kept, line) => kept,
+                    _ => narrow(tool.name, line)?,
+                }
+            }
+        };
+        tools.push(ToolRequest {
+            tool: tool.name.to_owned(),
+            request,
+        });
+    }
+    Ok(tools)
+}
+
+/// `version`'s major.minor, `24.22` of `24.22.1`, when its first two parts are numbers and a
+/// third follows.
+fn major_minor(version: &str) -> Option<String> {
+    let mut parts = version.splitn(3, '.');
+    let (major, minor, _rest) = (parts.next()?, parts.next()?, parts.next()?);
+    let numeric = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+    (numeric(major) && numeric(minor)).then(|| format!("{major}.{minor}"))
+}
+
+/// Whether `a` and `b` ask for the same tools at the same requests. A fragment reads back with
+/// its tools sorted by name, the catalog lists them in its own order.
+fn same_tools(a: &[ToolRequest], b: &[ToolRequest]) -> bool {
+    a.iter().collect::<BTreeSet<_>>() == b.iter().collect::<BTreeSet<_>>()
+}
+
+/// Whether `request` is `line` or a narrower request within it: `24.22` is on `24`.
+fn on_line(request: &str, line: &str) -> bool {
+    request == line || request.strip_prefix(line).is_some_and(|rest| rest.starts_with('.'))
+}
+
+/// The versions in `listed` that are installed, as `tool@version`.
+fn installed_versions(listed: &[ListedVersion]) -> BTreeSet<ToolRequest> {
+    listed
+        .iter()
+        .filter(|v| v.installed)
+        .map(|v| ToolRequest {
+            tool: v.tool.clone(),
+            request: v.version.clone(),
+        })
+        .collect()
+}
+
+/// `tool` as the fragment at `fragment` asks for it, with the version mise selects for it there.
+fn tool_state(tool: ToolRequest, fragment: &Path, listed: &[ListedVersion]) -> ToolState {
+    let selected = listed
+        .iter()
+        .find(|v| v.tool == tool.tool && v.source.as_deref().is_some_and(|source| same_file(source, fragment)));
+    ToolState {
+        version: selected.map(|v| v.version.clone()),
+        installed: selected.is_some_and(|v| v.installed),
+        tool: tool.tool,
+        request: tool.request,
+    }
+}
+
+/// Whether `a` and `b` name the same file, links resolved.
+fn same_file(a: &Path, b: &Path) -> bool {
+    a == b || matches!((fs::canonicalize(a), fs::canonicalize(b)), (Ok(a), Ok(b)) if a == b)
+}
+
 /// Whether `name` is a Suite name: lowercase letters, digits and `-`, starting with a letter.
 pub fn is_suite_name(name: &str) -> bool {
     let mut chars = name.chars();
@@ -626,6 +1142,18 @@ fn is_project_name(name: &str) -> bool {
 /// to.
 fn is_plain_relative(path: &str) -> bool {
     !path.is_empty() && Path::new(path).components().all(|c| matches!(c, Component::Normal(_)))
+}
+
+impl StateDir {
+    /// The options of the Suite `name` as its file holds them, or `None` when it is not
+    /// installed.
+    ///
+    /// # Errors
+    ///
+    /// [`ReadError`] when the file exists but cannot be read or parsed.
+    pub fn suite_config(&self, name: &str) -> Result<Option<SuiteConfig>, ReadError> {
+        read_config(&self.suite_file(name))
+    }
 }
 
 fn read_config(path: &Path) -> Result<Option<SuiteConfig>, ReadError> {

@@ -9,6 +9,7 @@ use crate::fake::FakeBus;
 use crate::fake::FakeRunner;
 use crate::states::Reading;
 use crate::states::States;
+use crate::suites::Installed;
 
 fn configured(text: &str) -> Extension<FakeBus, FakeRunner> {
     let mut extension = Extension::new(FakeBus::default(), FakeRunner::default());
@@ -28,15 +29,29 @@ fn ids(extension: &Extension<FakeBus, FakeRunner>) -> Vec<String> {
     extension.items().map(|item| item.id).collect()
 }
 
-/// The Items the Extension always sends, in order: the toggles, the idle settings, then the
-/// power stop's status and the Proxy's.
-fn always() -> Vec<&'static str> {
+/// The Items the Extension always sends, in order: the toggles, the idle settings, the shell's,
+/// the power stop's status and the Proxy's, then the Suites', none of them installed.
+fn always() -> Vec<String> {
     toggles::ids()
         .into_iter()
         .chain(crate::idle::ids())
         .chain(crate::shell::ids())
         .chain(crate::power::ids())
         .chain(crate::proxy::ids())
+        .map(str::to_owned)
+        .chain(
+            [
+                "suite:rust",
+                "suite:go",
+                "suite:node",
+                "suite:python",
+                "suite:php",
+                "suite:proto",
+                "suite:wallpaper-depth",
+                "suite:test",
+            ]
+            .map(str::to_owned),
+        )
         .collect()
 }
 
@@ -330,4 +345,78 @@ fn the_states_choose_which_half_of_a_pair_is_sent() {
     assert_eq!(&unknown[..2], ["chrome-off", "chrome-on"]);
     assert_eq!(installed.first().map(String::as_str), Some("chrome-off"));
     assert!(!installed.contains(&"chrome-on".to_owned()));
+}
+
+fn with_test_suite(text: &str) -> Extension<FakeBus, FakeRunner> {
+    let mut extension = configured(text);
+    let config = kubaos_core::suites::SuiteConfig::default();
+    extension.set_states(States::default().with_suites(Installed::default().with("test", Some(config))));
+    extension
+}
+
+#[test]
+fn an_installed_suites_items_come_after_the_power_status_and_run_in_the_terminal() {
+    let mut extension = with_test_suite(r#"terminal = ["ghostty", "-e"]"#);
+
+    let ran = extension.run(suites::REMOVE, &item(suites::KIND, "suite:test"), &BTreeMap::new());
+
+    let ids = ids(&extension);
+    let after = always().len() - 1;
+    assert_eq!(
+        ids[after..],
+        ["suite:test", "suite-new:test:new", "suites:update", "suites:upgrade"]
+    );
+    assert_eq!(ran, Ok(Ran::Close));
+    assert_eq!(
+        extension.runner.launched.borrow()[0].0,
+        ["ghostty", "-e", "kubaos", "suite", "remove", "test"]
+    );
+}
+
+#[test]
+fn hide_takes_out_a_suite_item_and_its_run() {
+    let mut extension = with_test_suite(r#"hide = ["suite-new:test:new"]"#);
+    let typed = BTreeMap::from([("name".to_owned(), "hello".to_owned())]);
+
+    let ran = extension.run(suites::NEW, &item(suites::KIND, "suite-new:test:new"), &typed);
+
+    assert!(!ids(&extension).contains(&"suite-new:test:new".to_owned()));
+    assert!(ids(&extension).contains(&"suite:test".to_owned()));
+    assert!(ran.is_err());
+    assert!(extension.runner.launched.borrow().is_empty());
+}
+
+#[test]
+fn an_action_may_not_take_a_suite_items_id() {
+    let mut extension = Extension::new(FakeBus::default(), FakeRunner::default());
+
+    let problems = extension.configure(
+        &toml::from_str("[actions.\"suite:test\"]\ntitle = \"Mine\"\nrun = [\"true\"]").expect("the test's config"),
+    );
+
+    assert_eq!(problems.len(), 1, "{problems:?}");
+}
+
+#[test]
+fn an_action_is_shown_by_whether_a_suite_is_installed() {
+    let mut extension = configured(
+        r#"
+        [actions.test-tip]
+        title = "Test tip"
+        run = ["true"]
+        shown_when = { state = "kubaos.suites.test", is = true }
+        "#,
+    );
+
+    extension.set_states(States::default().with_suites(Installed::default()));
+    let missing = ids(&extension);
+    extension.set_states(States::default().with_suites(Installed::default().with("test", None)));
+    let unreadable = ids(&extension);
+    let config = kubaos_core::suites::SuiteConfig::default();
+    extension.set_states(States::default().with_suites(Installed::default().with("test", Some(config))));
+    let installed = ids(&extension);
+
+    assert!(!missing.contains(&"test-tip".to_owned()));
+    assert!(unreadable.contains(&"test-tip".to_owned()));
+    assert!(installed.contains(&"test-tip".to_owned()));
 }

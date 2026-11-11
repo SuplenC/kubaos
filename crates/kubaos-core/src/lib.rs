@@ -8,6 +8,7 @@ pub mod demo;
 pub mod engine;
 pub mod event;
 pub mod keyboard;
+pub mod mise;
 pub mod packages;
 pub mod pins;
 pub mod preview;
@@ -19,6 +20,7 @@ pub mod suites;
 pub mod switch;
 pub mod unfree;
 pub mod update;
+pub mod wallpaper_depth;
 
 pub use kubaos_phone as phone;
 

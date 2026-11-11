@@ -9,11 +9,12 @@
 //!
 //! # Not here
 //!
-//! - Asking power-profiles-daemon, Hyprland and `iw`: `main.rs`, which hands the answers in as
-//!   [`Live`].
+//! - Asking power-profiles-daemon, Hyprland, `iw` and the indexer: [`crate::live`], which hands the
+//!   answers in as [`Live`].
 
 use std::fmt::Write as _;
 
+use crate::indexer;
 use crate::machine::Machine;
 use crate::panel::Target;
 use crate::plan::Epp;
@@ -46,8 +47,8 @@ pub struct Live {
     pub panel: Option<(f64, bool)>,
     /// Whether each Wi-Fi interface saves power, as `iw` says.
     pub wifi: Vec<(String, Option<bool>)>,
-    /// Whether the file indexer is held paused, `None` without one.
-    pub indexer_paused: Option<bool>,
+    /// What the file indexer is doing, `None` without one.
+    pub indexer: Option<indexer::State>,
     /// The scheduler's unit as systemd tells it, `None` when it can't be asked.
     pub scheduler_unit: Option<UnitState>,
     /// LAVD's last exit message, from the journal.
@@ -129,9 +130,8 @@ pub fn rows(plan: &Plan, settings: &Settings, machine: &Machine, live: &Live) ->
         } else {
             "normal"
         },
-        live.indexer_paused
-            .map(|paused| if paused { "indexer paused" } else { "indexer running" }.to_owned()),
-        live.indexer_paused.map(|paused| paused == plan.quiet_background),
+        live.indexer.map(|indexer| indexer.words().to_owned()),
+        live.indexer.map(|indexer| indexer.agrees(plan.quiet_background)),
     ));
     rows.push(charge(settings, machine));
     rows

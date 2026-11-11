@@ -125,8 +125,11 @@ restart_shell() {
   while [[ $(qs ipc call session locked 2>/dev/null) == true ]]; do
     sleep 2
   done
-  qs kill >/dev/null 2>&1 || return 0
-  wait_gone qs ipc show
+  # Every Quickshell, by process: `qs kill` reaches one instance, and the
+  # supervisor it runs under relaunches the shell it sees die, so a kill by
+  # instance leaves one shell running beside the new one.
+  pkill -u "$(id -u)" -x .quickshell-wra || return 0
+  wait_gone pgrep -u "$(id -u)" -x .quickshell-wra
   # HAZARD: close the lock before exec. Quickshell would hold it for as long
   # as it runs, and every later restart would skip.
   exec 9>&-

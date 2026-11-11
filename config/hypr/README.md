@@ -30,7 +30,7 @@ Your own settings go in `~/.config/kubaos/desktop/hypr/` (`hyprland.lua`, `hypri
 
 Scripts (in `scripts/`, linked to `~/.local/bin`): `dot-hypr-workspaces`
 (event-socket listener, runs `dot-hypr-lid sync` on hotplug), `dot-hypr-lid`
-(laptop panel off when the lid closes with an external connected),
+(laptop panel off when the lid closes),
 `dot-hypr-on-ac` (used by hypridle), `dot-hypr-screenshot` (a region shot freezes the
 screen with hyprpicker, then crops the selection from a grim capture taken first).
 
@@ -238,9 +238,13 @@ the file, keeping its comments; "Open workspace groups settings" opens it.
 
 ## Lid
 
-`switch:on/off:Lid Switch` binds call `dot-hypr-lid`. It turns `eDP-1` off
-only when another monitor is active, via a flag file in
-`$XDG_RUNTIME_DIR/dot-hypr/` that `monitors.lua` reads, then `hyprctl reload`.
+`switch:on/off:Lid Switch` binds call `dot-hypr-lid`. With another monitor
+active it disables `eDP-1`, via a flag file in `$XDG_RUNTIME_DIR/dot-hypr/`
+that `monitors.lua` reads, then `hyprctl reload`. As the only monitor, the
+panel is powered off with DPMS instead, so the session keeps its output and
+windows; hypridle's commands run `dot-hypr-lid sync` after lighting the
+screens, so they don't light it under the closed lid. A key press or a mouse
+move does, on purpose: it is the way back if the lid's opening is ever missed.
 If the switch has another name on this machine, check `hyprctl devices` and
 fix the two binds at the bottom of `keybinds.lua`. Suspend on lid close is
 logind's job (battery only), configured in `system/`, while the idle

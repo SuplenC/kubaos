@@ -3,11 +3,14 @@
 //!
 //! An update, in order: the lock and a free-space check; fetching `origin` into the checkout,
 //! which is the network check; the release policy's pick; showing it and asking; a snapper
-//! snapshot, the user's `flake.lock` saved and the update recorded in the history; apt; moving
-//! `release`; the Hyprland pin, the package manifest and the system migrations; `nix flake update`
-//! of the user flake; relinking what `system/` took from KubaOS's nixpkgs; the switch; the
-//! Bitwarden check; the user migrations; and the new release record. Packages first, then
-//! migrations, which are written against the new packages.
+//! snapshot, the user's `flake.lock` and the Suites' lockfile entries saved and the update recorded
+//! in the history; apt; moving `release`; the Hyprland pin, the package manifest and the system
+//! migrations; `nix flake update` of the user flake; relinking what `system/` took from KubaOS's
+//! nixpkgs; the switch; the Suites' tools moved to their newest patch releases; the Bitwarden
+//! check; Bitwarden desktop and the Nix daemon moved on within their series, each a phase whose
+//! failure is only a warning; the user migrations; firmware through fwupd; and the new release
+//! record. Packages first, then migrations, which are written against the new packages. Firmware
+//! comes last: it never stops an update, and the question it may ask comes once the rest is done.
 //!
 //! Each stage is a [`Phase`] of the progress stream (`event.rs`). Programs run with their output
 //! captured: every line goes to the run's log and to the stream, never to the terminal directly.
@@ -21,7 +24,9 @@
 //! - Which release to move to: `policy.rs`. The files' formats: `record.rs`, `notice.rs`.
 //! - Running programs and the switch: `machine.rs` and `switch.rs`.
 //! - The package manifest's phase, its status and `kubaos packages enable|disable`:
-//!   `updater/manifest.rs`.
+//!   `updater/manifest.rs`. The firmware phase: `updater/firmware.rs`.
+//! - The Bitwarden and Nix phases: `updater/bitwarden.rs`, `updater/nix.rs`, and what they share,
+//!   `updater/program.rs`.
 //! - The events and the log: `event.rs` and `journal.rs`.
 
 use std::collections::BTreeSet;
@@ -31,11 +36,15 @@ use std::fs::TryLockError;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
+use self::firmware::Staging;
+use super::closure;
 use super::event::Command;
+use super::event::PackageChange;
 use super::event::Phase;
 use super::event::Preview;
 use super::event::Prompt;
@@ -45,6 +54,8 @@ use super::event::Sink;
 use super::event::Summary;
 use super::event::UpdateEvent;
 use super::event::chain;
+use super::firmware::Firmware;
+use super::firmware::FirmwareOutcome;
 use super::git::GitRefs;
 use super::git::RemoteRefs;
 use super::hyprland;
@@ -78,6 +89,8 @@ use crate::apt::Manifest;
 use crate::apt::ManifestError;
 use crate::apt::manifest::MANIFEST;
 use crate::engine::files::utc_datetime;
+use crate::mise;
+use crate::mise::Mise;
 use crate::state::Paths;
 use crate::state::write_atomic;
 
@@ -204,6 +217,7 @@ pub enum Confirm {
 pub struct UpdateOptions {
     confirm: Confirm,
     packages_only: bool,
+    stage_firmware: bool,
 }
 
 impl UpdateOptions {
@@ -231,6 +245,20 @@ impl UpdateOptions {
     #[must_use]
     pub fn no_packages_only(mut self) -> Self {
         self.packages_only = false;
+        self
+    }
+
+    /// Offers to stage the firmware that installs at the next reboot, for a user at the terminal.
+    #[must_use]
+    pub fn stage_firmware(mut self) -> Self {
+        self.stage_firmware = true;
+        self
+    }
+
+    /// Only reports the firmware that waits for a reboot, as when nobody is there to answer.
+    #[must_use]
+    pub fn no_stage_firmware(mut self) -> Self {
+        self.stage_firmware = false;
         self
     }
 }
@@ -271,6 +299,8 @@ pub struct Updater<'a, M: Machine> {
     sys: SystemPaths,
     user: Paths,
     now: SystemTime,
+    /// The mise that moves the Suites' tools.
+    mise: Arc<dyn Mise>,
 }
 
 impl<'a, M: Machine> Updater<'a, M> {
@@ -284,7 +314,15 @@ impl<'a, M: Machine> Updater<'a, M> {
             sys,
             user,
             now,
+            mise: Arc::new(mise::Cli::new().quiet()),
         }
+    }
+
+    /// Moves the Suites' tools with `mise` instead of the `mise` on `PATH`.
+    #[must_use]
+    pub fn with_mise(mut self, mise: Arc<dyn Mise>) -> Self {
+        self.mise = mise;
+        self
     }
 
     /// Sends what the updater does to `sink`, as [`UpdateEvent`]s.
@@ -410,6 +448,11 @@ impl<'a, M: Machine> Updater<'a, M> {
                 .j
                 .warn("that update saved no flake.lock: your packages stay where they are"),
         }
+        let mise_lock = entry.mise_lock.clone().filter(|lock| lock.is_file());
+        if mise_lock.is_some() {
+            self.j
+                .note("Your Suites' tools go back to the versions they had before that update");
+        }
         if confirm == Confirm::Ask && !self.confirm("Roll back?") {
             return Err(UpdateError::Declined);
         }
@@ -422,17 +465,23 @@ impl<'a, M: Machine> Updater<'a, M> {
         if entry.from_commit != installed.commit {
             self.phase(Phase::Release, |u| u.move_release(&entry.from_commit))?;
         }
-        self.phase(Phase::Home, |u| {
+        let nix_packages = self.phase(Phase::Home, |u| {
             if let Some(lock) = &lock {
                 let dest = u.user.flake_lock();
                 u.j.step("Putting your flake.lock back");
                 fs::copy(lock, &dest).map_err(UpdateError::io(&dest))?;
             }
             u.relink()?;
+            let before = u.home_generation();
             u.switch()?;
+            let nix_packages = u.diff_home(before);
             u.report_reloaded();
-            Ok(())
+            Ok(nix_packages)
         })?;
+        let suites = mise_lock
+            .as_deref()
+            .map(|saved| self.restore_suites(saved))
+            .unwrap_or_default();
         let refs = self.refs();
         let rolled_back = Installed {
             version: Version::parse(&entry.from_version).unwrap_or(installed.version.clone()),
@@ -456,10 +505,15 @@ impl<'a, M: Machine> Updater<'a, M> {
             channel: rolled_back.channel,
             changes: Vec::new(),
             packages: 0,
+            upgraded: Vec::new(),
             apt: Vec::new(),
             inputs: Vec::new(),
+            nix_packages,
             migrations: Vec::new(),
+            programs: Vec::new(),
+            suites,
             reloaded: self.j.reloaded.clone(),
+            firmware: Firmware::default(),
             restart: Restart::None,
             restart_reason: None,
             undo: None,
@@ -799,6 +853,28 @@ impl<'a, M: Machine> Updater<'a, M> {
         }
     }
 
+    /// The home-manager generation the home is on, from home-manager's GC root; none before the
+    /// first switch.
+    fn home_generation(&self) -> Option<PathBuf> {
+        fs::read_link(self.user.home_generation()).ok()
+    }
+
+    /// The Nix packages the switch moved, from `before` to the generation the home is on now:
+    /// empty when the switch kept the generation, none when either generation is unknown or the
+    /// diff fails, which only the log says.
+    fn diff_home(&mut self, before: Option<PathBuf>) -> Option<Vec<PackageChange>> {
+        let (before, after) = (before?, self.home_generation()?);
+        if before == after {
+            return Some(Vec::new());
+        }
+        self.j.step("Listing the Nix packages that changed");
+        let cmd = Cmd::user("nix")
+            .args(["store", "diff-closures"])
+            .arg(&before)
+            .arg(&after);
+        self.quiet(&cmd).ok().map(|out| closure::parse_diff(&out))
+    }
+
     /// Reports what the session reloaded after the switch as the running phase's result.
     fn report_reloaded(&mut self) {
         if !self.j.reloaded.is_empty() {
@@ -890,6 +966,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             u.review(installed, target)
         })?;
         let packages = preview.packages;
+        let upgraded = preview.upgrades.clone();
         let changes = preview.changes.clone();
         self.j.emit(&UpdateEvent::Preview(preview));
         // An upgrade always asks: it moves to a new Ubuntu-and-nixpkgs pairing.
@@ -906,10 +983,15 @@ impl<'a, M: Machine> Updater<'a, M> {
             self.date(),
             installed.version
         );
-        self.phase(Phase::Snapshot, |u| {
+        let suites_saved = self.phase(Phase::Snapshot, |u| {
             u.snapshot(&description);
             let lock = u.save_lock()?;
-            u.record_history(installed, target, lock)
+            let mise_lock = u.save_suite_locks().map_err(|e| {
+                u.j.warn(format!("the Suites' lockfile entries aren't saved: {}", chain(&e)));
+            });
+            let saved = mise_lock.is_ok();
+            u.record_history(installed, target, lock, mise_lock.ok().flatten())?;
+            Ok(saved)
         })?;
         self.phase(Phase::SystemPackages, |u| u.upgrade_apt(packages))?;
         if let Some(target) = target {
@@ -929,29 +1011,32 @@ impl<'a, M: Machine> Updater<'a, M> {
             migrations.extend(self.run_system_migrations()?);
         }
         self.phase(Phase::Inputs, |u| u.update_inputs(&flake))?;
-        self.phase(Phase::Home, |u| {
+        let nix_packages = self.phase(Phase::Home, |u| {
             u.relink()?;
+            let before = u.home_generation();
             u.switch()?;
+            let nix_packages = u.diff_home(before);
             u.check_bitwarden();
             u.report_reloaded();
-            Ok(())
+            Ok(nix_packages)
         })?;
+        let suites = self.update_suites(suites_saved);
+        let programs: Vec<_> = [self.update_bitwarden(), self.update_nix()]
+            .into_iter()
+            .flatten()
+            .collect();
         if !opts.packages_only {
             migrations.extend(self.run_user_migrations()?);
         }
+        let firmware = self.update_firmware(if opts.stage_firmware && opts.confirm == Confirm::Ask {
+            Staging::Ask
+        } else {
+            Staging::Report
+        });
 
         let now = self.record(installed, target)?;
         self.clear_available(&now)?;
-        let (restart, restart_reason) = if self.sys.root().join("var/run/reboot-required").exists() {
-            (Restart::Reboot, Some("an updated package asks for it".to_owned()))
-        } else if relogin {
-            (
-                Restart::Relogin,
-                Some("Hyprland was updated, and the running one is the old version".to_owned()),
-            )
-        } else {
-            (Restart::None, None)
-        };
+        let (restart, restart_reason) = self.restart(&firmware, relogin);
         let summary = Summary {
             command: kind.command(),
             from: release_of(installed),
@@ -959,10 +1044,15 @@ impl<'a, M: Machine> Updater<'a, M> {
             channel: now.channel,
             changes,
             packages,
+            upgraded,
             apt,
             inputs: self.j.inputs.clone(),
+            nix_packages,
             migrations,
+            programs,
+            suites,
             reloaded: self.j.reloaded.clone(),
+            firmware,
             restart,
             restart_reason,
             undo: Some(UNDO.to_owned()),
@@ -970,6 +1060,23 @@ impl<'a, M: Machine> Updater<'a, M> {
         };
         self.j.emit(&UpdateEvent::Summary(summary));
         Ok(())
+    }
+
+    /// What the user has to do for the update to apply in full, and why: a reboot when a package
+    /// or staged firmware asks for one, else a new login when the Hyprland pin moved.
+    fn restart(&self, firmware: &Firmware, relogin: bool) -> (Restart, Option<String>) {
+        if self.sys.root().join("var/run/reboot-required").exists() {
+            (Restart::Reboot, Some("an updated package asks for it".to_owned()))
+        } else if firmware.with(FirmwareOutcome::Staged).next().is_some() {
+            (Restart::Reboot, Some("firmware is staged to install at it".to_owned()))
+        } else if relogin {
+            (
+                Restart::Relogin,
+                Some("Hyprland was updated, and the running one is the old version".to_owned()),
+            )
+        } else {
+            (Restart::None, None)
+        }
     }
 
     /// What the update brings: the release's commits, the apt packages, whether the Hyprland pin
@@ -987,6 +1094,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             apt: Vec::new(),
             hyprland_pin: false,
             migrations: Vec::new(),
+            upgrades: Vec::new(),
         };
         // The manifest the phase will read: the release's, once it is checked out.
         let mut manifest = Manifest::read(&self.sys.manifest()).ok().flatten();
@@ -1023,7 +1131,15 @@ impl<'a, M: Machine> Updater<'a, M> {
         let simulated = self
             .quiet(&Cmd::user("apt-get").args(["-s", "-q", "upgrade", "--with-new-pkgs"]))
             .unwrap_or_default();
-        preview.packages = simulated.lines().filter(|line| line.starts_with("Inst ")).count();
+        preview.upgrades = security::candidates(&simulated)
+            .into_iter()
+            .map(|c| PackageChange {
+                name: c.name,
+                from: c.installed,
+                to: Some(c.version),
+            })
+            .collect();
+        preview.packages = preview.upgrades.len();
         let mut detail = vec![count(preview.packages, "apt package")];
         if preview.to.is_some() {
             detail.push(count(preview.changes.len(), "commit"));
@@ -1066,12 +1182,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         }
         let dir = self.user.saved_locks();
         fs::create_dir_all(&dir).map_err(UpdateError::io(&dir))?;
-        let mut saved = dir.join(format!("{}.lock", self.unix()));
-        let mut n = 1;
-        while saved.exists() {
-            saved = dir.join(format!("{}-{n}.lock", self.unix()));
-            n += 1;
-        }
+        let saved = self.saved_lock_path("lock");
         fs::copy(&lock, &saved).map_err(UpdateError::io(&saved))?;
         Ok(Some(saved))
     }
@@ -1081,6 +1192,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         installed: &Installed,
         target: Option<&Target>,
         lock: Option<PathBuf>,
+        mise_lock: Option<PathBuf>,
     ) -> Result<(), UpdateError> {
         let path = self.sys.history();
         let entry = HistoryEntry {
@@ -1093,6 +1205,7 @@ impl<'a, M: Machine> Updater<'a, M> {
                 .unwrap_or(&installed.version)
                 .to_string(),
             lock,
+            mise_lock,
         };
         let text = read_or_empty(&path)? + &entry.line();
         self.write_root(&path, &text)
@@ -1302,7 +1415,8 @@ impl<'a, M: Machine> Updater<'a, M> {
         ))
     }
 
-    /// Reports newer Bitwarden releases, which are pinned downloads, not apt packages.
+    /// Reports newer releases of the bw CLI, a pinned download, not an apt package. Bitwarden
+    /// desktop has a phase of its own, so the script's line about it is left out.
     fn check_bitwarden(&mut self) {
         let script = self.sys.checkout().join("system/70-bitwarden.sh");
         if !script.is_file() {
@@ -1427,10 +1541,13 @@ fn count(n: usize, what: &str) -> String {
     }
 }
 
-/// A release `system/70-bitwarden.sh --check-updates` reports, from its `!!` lines: "bw CLI
-/// 2025.2.0 is out (pinned: 2025.1.0)".
+/// A release of the bw CLI `system/70-bitwarden.sh --check-updates` reports, from its `!!` lines:
+/// "bw CLI 2025.2.0 is out (pinned: 2025.1.0)".
 fn bitwarden_news(line: &str) -> Option<String> {
     let text = line.trim().strip_prefix("!!")?.trim();
+    if text.starts_with("Bitwarden desktop") {
+        return None;
+    }
     let text = text.split(". New pins").next().unwrap_or(text);
     Some(format!("Bitwarden: {text}"))
 }
@@ -1458,7 +1575,12 @@ fn write_user(path: &Path, text: &str) -> Result<(), UpdateError> {
     write_atomic(path, text).map_err(UpdateError::io(path))
 }
 
+mod bitwarden;
+mod firmware;
 mod manifest;
+mod nix;
+mod program;
+mod suites;
 
 #[cfg(test)]
 mod tests;

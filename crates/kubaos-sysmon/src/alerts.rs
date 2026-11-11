@@ -36,6 +36,9 @@ pub const FULL_FOR_MS: u64 = 10_000;
 pub const DRAIN_FOR_MS: u64 = 30_000;
 /// The least time between two of the same alert, in ms.
 pub const REPEAT_AFTER_MS: u64 = 10 * 60_000;
+/// The least share of the CPU's load the busiest process has to carry to be named: below a third,
+/// stopping it leaves most of the load running, so naming it would blame the wrong thing.
+const NAMED_SHARE: f32 = 1.0 / 3.0;
 
 /// An alert, as the shell notifies it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,9 +66,10 @@ pub struct Alerts {
 }
 
 impl Alerts {
-    /// The alerts that fire on `sample`, at `now` in ms.
-    pub fn check(&mut self, sample: &Sample, thresholds: &Thresholds, now: u64) -> Vec<Alert> {
-        let over = conditions(sample, thresholds);
+    /// The alerts that fire on `sample`, at `now` in ms; `saving` while the power stop already is
+    /// a saver one, which a drain can't be sent to again.
+    pub fn check(&mut self, sample: &Sample, thresholds: &Thresholds, saving: bool, now: u64) -> Vec<Alert> {
+        let over = conditions(sample, thresholds, saving);
         self.since.retain(|id, _| over.iter().any(|(over, _, _)| over == id));
         self.holding.retain(|id| over.iter().any(|(over, _, _)| over == id));
         let mut alerts = Vec::new();
@@ -87,14 +91,14 @@ impl Alerts {
     /// Whether a condition holds, so the next sample should scan the processes to name the
     /// culprit.
     pub fn wants_processes(sample: &Sample, thresholds: &Thresholds) -> bool {
-        conditions(sample, thresholds)
+        conditions(sample, thresholds, false)
             .iter()
             .any(|(id, _, _)| !id.starts_with("disk:"))
     }
 }
 
 /// Each condition that holds in `sample`: its id, how long it must hold, and its alert.
-fn conditions(sample: &Sample, thresholds: &Thresholds) -> Vec<(String, u64, Alert)> {
+fn conditions(sample: &Sample, thresholds: &Thresholds, saving: bool) -> Vec<(String, u64, Alert)> {
     let mut over = Vec::new();
     if let Some(temp) = sample.cpu.temp.filter(|temp| *temp >= thresholds.cpu_temp) {
         let (body, action, action_label) = busiest(sample);
@@ -183,26 +187,29 @@ fn conditions(sample: &Sample, thresholds: &Thresholds) -> Vec<(String, u64, Ale
                 id: "battery".to_owned(),
                 title: format!("Battery draining fast ({watts:.0} W)"),
                 body,
-                action: "power-saver".to_owned(),
-                action_label: "Power saver".to_owned(),
+                action: if saving { "open" } else { "power-saver" }.to_owned(),
+                action_label: if saving { "Open system monitor" } else { "Power saver" }.to_owned(),
             },
         ));
     }
     over
 }
 
-/// The process using the most CPU, as an alert's body and action.
+/// What keeps the CPU busy, as an alert's body and action: the busiest process when it carries a
+/// real share of the load, or else the load itself.
 fn busiest(sample: &Sample) -> (String, String, String) {
-    match sample
-        .top
-        .as_ref()
-        .and_then(|top| top.cpu.first())
-        .filter(|process| process.cpu >= 1.0)
-    {
+    let usage = sample.cpu.usage.unwrap_or(0.0);
+    let top = sample.top.as_ref().and_then(|top| top.cpu.first());
+    match top.filter(|process| process.cpu >= 1.0 && process.cpu >= usage * NAMED_SHARE) {
         Some(process) => (
             format!("{} uses {:.0} % of the CPU", process.name, process.cpu),
             format!("process:{}", process.pid),
             format!("Show {}", process.name),
+        ),
+        None if usage >= 1.0 => (
+            format!("The CPU is {usage:.0} % busy across many processes"),
+            "open".to_owned(),
+            "Open system monitor".to_owned(),
         ),
         None => (
             "No single process stands out".to_owned(),

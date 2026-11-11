@@ -30,6 +30,8 @@ fn the_defaults_drop_to_power_saver_at_20_and_charge_full() {
     assert_eq!(settings.low_battery_stop, Some(Stop::PowerSaver));
     assert_eq!(settings.charge_limit, ChargeLimit::Full);
     assert!(settings.panel_power_saving);
+    assert!(settings.battery_notes);
+    assert!(settings.background_yields);
     assert_eq!(settings.usb_skip, Vec::<UsbId>::new());
 }
 
@@ -115,19 +117,26 @@ fn every_change_lands_in_the_file() {
 }
 
 #[test]
-fn lavd_is_off_until_the_user_turns_it_on() {
+fn lavd_is_on_until_the_user_turns_it_off() {
     let (_dir, path) = file("# Measured first.\ncharge_limit = 100\n");
 
-    let on = set_scheduler(&path, CpuScheduler::Lavd).expect("on");
-    let text = fs::read_to_string(&path).expect("read");
     let off = set_scheduler(&path, CpuScheduler::Kernel).expect("off");
+    let text = fs::read_to_string(&path).expect("read");
+    let on = set_scheduler(&path, CpuScheduler::Lavd).expect("on");
     let after = fs::read_to_string(&path).expect("read");
 
-    assert_eq!(Settings::default().scheduler, CpuScheduler::Kernel);
-    assert_eq!(on.scheduler, CpuScheduler::Lavd);
-    assert_eq!(text, "# Measured first.\ncharge_limit = 100\nscheduler = \"lavd\"\n");
+    assert_eq!(Settings::default().scheduler, CpuScheduler::Lavd);
     assert_eq!(off.scheduler, CpuScheduler::Kernel);
+    assert_eq!(text, "# Measured first.\ncharge_limit = 100\nscheduler = \"kernel\"\n");
+    assert_eq!(on.scheduler, CpuScheduler::Lavd);
     assert_eq!(after, "# Measured first.\ncharge_limit = 100\n");
+}
+
+#[test]
+fn a_file_that_names_lavd_keeps_it() {
+    let settings = Settings::parse("scheduler = \"lavd\"\n").expect("parses");
+
+    assert_eq!(settings.scheduler, CpuScheduler::Lavd);
 }
 
 #[test]
@@ -155,5 +164,111 @@ fn the_tuxedo_profiles_stand_for_80_90_and_100() {
     assert_eq!(
         ChargeLimit::from_tuxedo_profile("high_capacity"),
         Some(ChargeLimit::Full)
+    );
+}
+
+#[test]
+fn the_critical_warning_defaults_to_five_percent() {
+    assert_eq!(Settings::default().critical_warning, Some(5));
+}
+
+#[test]
+fn the_critical_warning_reads_a_percent_or_off() {
+    let level = Settings::parse("critical_warning = 8\n").expect("parses");
+    let off = Settings::parse("critical_warning = \"off\"\n").expect("parses");
+
+    assert_eq!(level.critical_warning, Some(8));
+    assert_eq!(off.critical_warning, None);
+}
+
+#[test]
+fn the_critical_warning_refuses_anything_else_in_the_file() {
+    for text in [
+        "critical_warning = 2\n",
+        "critical_warning = 21\n",
+        "critical_warning = -5\n",
+        "critical_warning = \"soon\"\n",
+        "critical_warning = true\n",
+    ] {
+        assert!(
+            matches!(Settings::parse(text), Err(SettingsError::NotACriticalWarning(_))),
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn the_critical_warning_parses_what_the_command_is_given() {
+    assert_eq!(parse_critical_warning("off").expect("off"), None);
+    assert_eq!(parse_critical_warning("7").expect("7"), Some(7));
+    assert_eq!(parse_critical_warning("7%").expect("7%"), Some(7));
+
+    for text in ["2", "21", "on", ""] {
+        assert!(parse_critical_warning(text).is_err(), "{text:?}");
+    }
+}
+
+#[test]
+fn setting_the_critical_warning_keeps_the_comments_and_the_default_removes_the_key() {
+    let (_dir, path) = file("# mine\nlow_battery = 15\n");
+
+    let off = set_critical_warning(&path, None).expect("off");
+    assert_eq!(off.critical_warning, None);
+    assert!(
+        fs::read_to_string(&path)
+            .expect("read")
+            .contains("critical_warning = \"off\"")
+    );
+
+    let level = set_critical_warning(&path, Some(8)).expect("8");
+    assert_eq!(level.critical_warning, Some(8));
+
+    let default = set_critical_warning(&path, Some(DEFAULT_CRITICAL_WARNING)).expect("the default");
+    let text = fs::read_to_string(&path).expect("read");
+    assert_eq!(default.critical_warning, Some(DEFAULT_CRITICAL_WARNING));
+    assert!(!text.contains("critical_warning"), "{text}");
+    assert!(text.contains("# mine"), "{text}");
+}
+
+#[test]
+fn setting_the_critical_warning_out_of_range_changes_nothing() {
+    let (_dir, path) = file("low_battery = 15\n");
+
+    assert!(set_critical_warning(&path, Some(2)).is_err());
+
+    assert_eq!(fs::read_to_string(&path).expect("read"), "low_battery = 15\n");
+}
+
+#[test]
+fn battery_notes_off_is_a_line_and_on_removes_it() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let path = dir.path().join(FILE);
+    fs::write(&path, "# my comment\ncharge_limit = 80\n").expect("write");
+
+    let off = set_battery_notes(&path, false).expect("off");
+    let written = fs::read_to_string(&path).expect("read");
+    let on = set_battery_notes(&path, true).expect("on");
+
+    assert!(!off.battery_notes);
+    assert!(written.contains("battery_notes = false"));
+    assert!(written.contains("# my comment"));
+    assert!(on.battery_notes);
+    assert!(!fs::read_to_string(&path).expect("read").contains("battery_notes"));
+}
+
+#[test]
+fn background_yields_off_is_a_line_and_on_removes_it() {
+    let (_dir, path) = file("# my comment\ncharge_limit = 80\n");
+
+    let off = set_background_yields(&path, false).expect("off");
+    let written = fs::read_to_string(&path).expect("read");
+    let on = set_background_yields(&path, true).expect("on");
+
+    assert!(!off.background_yields);
+    assert_eq!(written, "# my comment\ncharge_limit = 80\nbackground_yields = false\n");
+    assert!(on.background_yields);
+    assert_eq!(
+        fs::read_to_string(&path).expect("read"),
+        "# my comment\ncharge_limit = 80\n"
     );
 }

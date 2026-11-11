@@ -65,13 +65,19 @@ kind = "scripts"
 #
 # `shown_when = { state = "<state>", is = <value> }` lists an action only
 # while the state reads as the value, and `is_not` only while it doesn't, so
-# of an on/off pair only the half that applies shows. The Extension reads the
+# of an on/off pair only the half that applies shows; a list of them,
+# `shown_when = [{ ... }, { ... }]`, lists it only while each holds. The Extension reads the
 # states from their files and reads them again when one changes
 # (crates/kotodama-kubaos/src/states.rs, docs/CONTRACTS.md): `packages.<group>`,
 # `files.tidy-daily`, `files.automount`, `terminal.greeting`,
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
 # `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
-# `nix.unfree`, `kubaos.preview` and `bluetooth.unnamed`, true or false;
+# `power.critical-warning`, `power.battery-notes`,
+# `nix.unfree`, `kubaos.preview`, `kubaos.suites.<name>` (the Suite is
+# installed), `bluetooth.unnamed`, `update.firmware`, `update.bitwarden`,
+# `update.nix`, `wallpapers.depth` (the wallpaper-depth Suite cuts out your own
+# pictures) and `wallpapers.depth-skipped` (the current wallpaper is in its skip
+# list), true or false;
 # `power.scheduler` ("kernel", "lavd") and `power.low-battery` ("power-saver",
 # "super-saver", "off"). While a state can't be read, the action shows.
 #
@@ -313,6 +319,76 @@ icon = "video-x-generic"
 keywords = ["video wallpaper", "motion", "still"]
 run = ["qs", "ipc", "call", "wallpaper", "animate", "never"]
 
+# Wallpaper depth, the lock's clock behind the city (kubaos depth), listed
+# only while the wallpaper-depth Suite is installed. Each applies at once and
+# is kept in ~/.config/kubaos/desktop/wallpapers/depth.toml.
+
+[extensions.kubaos.actions.wallpaper-depth-on]
+title = "Turn wallpaper depth on"
+subtitle = "Cut-outs of your own wallpapers put the lock's clock behind the city"
+icon = "preferences-desktop-wallpaper"
+keywords = ["cut-out", "lock screen", "clock", "parallax"]
+run = ["kubaos", "depth", "on"]
+shown_when = [
+  { state = "kubaos.suites.wallpaper-depth", is = true },
+  { state = "wallpapers.depth", is = false },
+]
+
+[extensions.kubaos.actions.wallpaper-depth-off]
+title = "Turn wallpaper depth off"
+subtitle = "The lock's clock in front of your own wallpapers; KubaOS's keep theirs"
+icon = "preferences-desktop-wallpaper"
+keywords = ["cut-out", "lock screen", "clock", "parallax"]
+run = ["kubaos", "depth", "off"]
+shown_when = [
+  { state = "kubaos.suites.wallpaper-depth", is = true },
+  { state = "wallpapers.depth", is = true },
+]
+
+[extensions.kubaos.actions.wallpaper-depth-redo]
+title = "Redo this wallpaper's cut-out"
+subtitle = "Runs wallpaper depth on the current wallpaper again, once plugged in"
+icon = "view-refresh"
+keywords = ["wallpaper depth", "cut-out", "lock screen", "again"]
+run = ["kubaos", "depth", "redo"]
+shown_when = [
+  { state = "kubaos.suites.wallpaper-depth", is = true },
+  { state = "wallpapers.depth", is = true },
+  { state = "wallpapers.depth-skipped", is = false },
+]
+
+[extensions.kubaos.actions.wallpaper-depth-skip]
+title = "No cut-out on this wallpaper"
+subtitle = "The lock's clock stays in front of the current wallpaper"
+icon = "preferences-desktop-wallpaper"
+keywords = ["wallpaper depth", "lock screen", "clock", "skip"]
+run = ["kubaos", "depth", "skip"]
+shown_when = [
+  { state = "kubaos.suites.wallpaper-depth", is = true },
+  { state = "wallpapers.depth-skipped", is = false },
+]
+
+[extensions.kubaos.actions.wallpaper-depth-unskip]
+title = "Cut this wallpaper out again"
+subtitle = "Gives the current wallpaper its cut-out back"
+icon = "preferences-desktop-wallpaper"
+keywords = ["wallpaper depth", "lock screen", "clock"]
+run = ["kubaos", "depth", "unskip"]
+shown_when = [
+  { state = "kubaos.suites.wallpaper-depth", is = true },
+  { state = "wallpapers.depth-skipped", is = true },
+]
+
+[extensions.kubaos.actions.wallpaper-depth-push]
+title = "Set the lock's push"
+subtitle = "How far the wallpaper comes toward you as the lock comes up: 0 to 0.05, 0.025 by default"
+icon = "system-lock-screen"
+keywords = ["wallpaper depth", "lock screen", "zoom", "motion"]
+keyword = "lock-push"
+run = ["kubaos", "depth", "push", "{share}"]
+arguments = [{ name = "share", placeholder = "0.025" }]
+shown_when = { state = "kubaos.suites.wallpaper-depth", is = true }
+
 # The pointer, in the wallpaper's colours (kubaos cursor). Each applies at
 # once and is kept in ~/.config/kubaos/desktop/cursor/cursor.toml.
 
@@ -514,7 +590,7 @@ title = "Restart Quickshell"
 subtitle = "The bar, panels and lock screen. Off and on again, the classic"
 icon = "view-refresh"
 keywords = ["shell", "bar", "reload"]
-run = ["sh", "-c", "qs kill; sleep 0.5; exec qs"]
+run = ["dot-session", "restart-shell"]
 
 # "Focus stutter: on/off" is the Extension's own Item (crates/kotodama-kubaos,
 # shell.rs): Enter turns the focus tube's neon strike off or back on, on
@@ -533,43 +609,80 @@ run = ["sh", "-c", "qs kill; sleep 0.5; exec qs"]
 # ~/.config/kubaos/desktop/idle/idle.toml through `kubaos-idle set`, which
 # restarts hypridle and says what changed in a toast.
 #
-# Keep awake: nothing locks, goes dark or suspends by itself for a while, as
-# a logind idle inhibitor hypridle honours; the bar shows it while on. The
-# `idle` id is the old "Toggle idle", so a `hide` of it still works.
+# Keep awake: nothing locks, goes dark or suspends by itself, as a logind idle
+# inhibitor hypridle honours; the bar shows it while on. Closing the lid does
+# what the lid setting says. "Keep awake with the lid closed" is asked for
+# apart and also holds the lid, through kubaos-idle's lid holder: closing it
+# does nothing, on battery and plugged in. Docked or with a second screen, the
+# lid does what it always does.
+# For a while or until turned off it never ends for the battery; "until the
+# battery is at N %" ends once on battery at N % or below, and plugged in it
+# stays on. "Keep awake for…" and "Keep awake with the lid closed for…" are the
+# Extension's own Items (`keep-awake-for`, `keep-awake-lid-for`,
+# crates/kotodama-kubaos/src/idle.rs), which check what is typed after their
+# word: a while, `keep-awake 1h30m`, or a level from 1 % to 99 %,
+# `keep-awake-lid 25%`. The `idle` id is the old "Toggle idle", so a `hide` of
+# it still works.
 
 [extensions.kubaos.actions.idle]
 title = "Keep awake until turned off"
-subtitle = "No auto-lock, screens off or suspend till you stop it (SUPER + CTRL + I)"
+subtitle = "No auto-lock, screens off or suspend till you stop it; the lid does as set (SUPER + CTRL + I)"
 icon = "preferences-desktop-screensaver"
 keywords = ["caffeine", "keep awake", "no sleep", "hypridle", "auto lock", "toggle idle"]
 run = ["kubaos-idle", "awake", "on"]
 
 [extensions.kubaos.actions.keep-awake-1h]
 title = "Keep awake for 1 hour"
-subtitle = "No auto-lock, screens off or suspend for an hour, then as before"
+subtitle = "No auto-lock, screens off or suspend for an hour, then as before; the lid does as set"
 icon = "preferences-desktop-screensaver"
 keywords = ["caffeine", "keep awake", "no sleep", "presentation"]
 run = ["kubaos-idle", "awake", "1h"]
 
 [extensions.kubaos.actions.keep-awake-2h]
 title = "Keep awake for 2 hours"
-subtitle = "No auto-lock, screens off or suspend for two hours, then as before"
+subtitle = "No auto-lock, screens off or suspend for two hours, then as before; the lid does as set"
 icon = "preferences-desktop-screensaver"
 keywords = ["caffeine", "keep awake", "no sleep", "movie"]
 run = ["kubaos-idle", "awake", "2h"]
 
-[extensions.kubaos.actions.keep-awake-for]
-title = "Keep awake for…"
-subtitle = "As long as you say: 30m, 3h, 1h30m"
+[extensions.kubaos.actions.keep-awake-battery-40]
+title = "Keep awake until the battery is at 40 %"
+subtitle = "No auto-lock, screens off or suspend till the battery is down to 40 %; plugged in, it stays on; the lid does as set"
 icon = "preferences-desktop-screensaver"
-keywords = ["caffeine", "keep awake", "no sleep"]
-keyword = "keep-awake"
-run = ["kubaos-idle", "awake", "for", "{duration}"]
-arguments = [{ name = "duration", placeholder = "30m" }]
+keywords = ["caffeine", "keep awake", "no sleep", "battery level", "percent"]
+run = ["kubaos-idle", "awake", "until", "40%"]
+
+[extensions.kubaos.actions.keep-awake-battery-20]
+title = "Keep awake until the battery is at 20 %"
+subtitle = "No auto-lock, screens off or suspend till the battery is down to 20 %; plugged in, it stays on; the lid does as set"
+icon = "preferences-desktop-screensaver"
+keywords = ["caffeine", "keep awake", "no sleep", "battery level", "percent"]
+run = ["kubaos-idle", "awake", "until", "20%"]
+
+[extensions.kubaos.actions.keep-awake-battery-10]
+title = "Keep awake until the battery is at 10 %"
+subtitle = "No auto-lock, screens off or suspend till the battery is down to 10 %; plugged in, it stays on; the lid does as set"
+icon = "preferences-desktop-screensaver"
+keywords = ["caffeine", "keep awake", "no sleep", "battery level", "percent"]
+run = ["kubaos-idle", "awake", "until", "10%"]
+
+[extensions.kubaos.actions.keep-awake-lid]
+title = "Keep awake with the lid closed"
+subtitle = "As Keep awake, and closing the lid does nothing, on battery too, till you stop it"
+icon = "preferences-desktop-screensaver"
+keywords = ["caffeine", "keep awake", "no sleep", "lid closed", "clamshell"]
+run = ["kubaos-idle", "awake", "lid", "on"]
+
+[extensions.kubaos.actions.keep-awake-lid-battery-20]
+title = "Keep awake with the lid closed until the battery is at 20 %"
+subtitle = "As Keep awake, and closing the lid does nothing, till the battery is down to 20 %; plugged in, it stays on"
+icon = "preferences-desktop-screensaver"
+keywords = ["caffeine", "keep awake", "no sleep", "lid closed", "clamshell", "battery level", "percent"]
+run = ["kubaos-idle", "awake", "lid", "until", "20%"]
 
 [extensions.kubaos.actions.keep-awake-off]
 title = "Stop keeping awake"
-subtitle = "Lock, screens off and suspend after a time idle again"
+subtitle = "Lock, screens off, suspend and the lid as set again"
 icon = "preferences-desktop-screensaver"
 keywords = ["caffeine", "keep awake", "auto lock", "idle"]
 run = ["kubaos-idle", "awake", "off"]
@@ -956,6 +1069,26 @@ keywords = ["release", "codename", "do-release-upgrade"]
 run = ["kubaos", "upgrade"]
 terminal = true
 
+# Firmware through fwupd and the LVFS, the last phase of kubaos update: what
+# needs no reboot installs, what does is staged on a yes in the terminal. On by
+# default; off is the flag file desktop/update/no-firmware of the user layer.
+
+[extensions.kubaos.actions.firmware-on]
+title = "Firmware updates on"
+subtitle = "kubaos update installs firmware from the LVFS, and asks before staging what needs a reboot"
+icon = "system-software-update"
+keywords = ["firmware", "fwupd", "lvfs", "bios", "uefi", "dock", "update"]
+run = ["kubaos", "update", "--turn-on", "firmware"]
+shown_when = { state = "update.firmware", is = false }
+
+[extensions.kubaos.actions.firmware-off]
+title = "Firmware updates off"
+subtitle = "kubaos update leaves firmware alone; sudo fwupdmgr update still does it by hand"
+icon = "system-software-update"
+keywords = ["firmware", "fwupd", "lvfs", "bios", "uefi", "dock", "update"]
+run = ["kubaos", "update", "--turn-off", "firmware"]
+shown_when = { state = "update.firmware", is = true }
+
 [extensions.kubaos.actions.rollback]
 title = "Roll back last update"
 subtitle = "The KubaOS release and your flake.lock from before it. Like it never happened"
@@ -986,22 +1119,58 @@ run = ["kubaos", "channel", "{channel}"]
 arguments = [{ name = "channel", placeholder = "stable or edge" }]
 terminal = true
 
+# What kubaos update keeps current beyond apt and the user flake
+# (`kubaos update --turn-on|--turn-off`, the flag files in
+# U/desktop/update/). Both on by default; a new series or minor always waits
+# for a KubaOS release.
+
+[extensions.kubaos.actions.update-bitwarden-on]
+title = "Bitwarden updates on"
+subtitle = "Every update moves Bitwarden desktop to the newest release of its series, checked against GitHub's digest"
+icon = "system-software-update"
+keywords = ["kubaos update", "password manager", "vault", "series", "automatic"]
+run = ["kubaos", "update", "--turn-on", "bitwarden"]
+shown_when = { state = "update.bitwarden", is = false }
+
+[extensions.kubaos.actions.update-bitwarden-off]
+title = "Bitwarden updates off"
+subtitle = "Updates leave Bitwarden desktop at its version until a KubaOS release moves it"
+icon = "system-software-update"
+keywords = ["kubaos update", "password manager", "vault", "pin", "hold"]
+run = ["kubaos", "update", "--turn-off", "bitwarden"]
+shown_when = { state = "update.bitwarden", is = true }
+
+[extensions.kubaos.actions.update-nix-on]
+title = "Nix updates on"
+subtitle = "Every update moves the Nix daemon to the newest patch release of its minor and restarts it"
+icon = "system-software-update"
+keywords = ["kubaos update", "nix-daemon", "patch release", "automatic"]
+run = ["kubaos", "update", "--turn-on", "nix"]
+shown_when = { state = "update.nix", is = false }
+
+[extensions.kubaos.actions.update-nix-off]
+title = "Nix updates off"
+subtitle = "Updates leave the Nix daemon at its version until a KubaOS release moves it"
+icon = "system-software-update"
+keywords = ["kubaos update", "nix-daemon", "pin", "hold"]
+run = ["kubaos", "update", "--turn-off", "nix"]
+shown_when = { state = "update.nix", is = true }
+
 # Project pins (`kubaos pin`, crates/kubaos-core/src/pins.rs): a Suite
-# version for a folder and everything below it, as `use suite NAME VERSION`
-# in its .envrc. They run in a terminal, which says what the pin changes and
-# whether the version is fetched on the first cd. A typed folder may start
-# with ~.
+# version for a folder and everything below it, as the Suite's tool in its
+# mise.toml. They run in a terminal, which shows mise installing the version
+# and says what the pin changes. A typed folder may start with ~.
 
 [extensions.kubaos.actions.pin]
 title = "Pin a Suite version…"
-subtitle = "This folder uses Node 18: a version for a folder and everything in it"
+subtitle = "This folder uses Node 22: a version for a folder and everything in it"
 icon = "view-pin"
-keywords = ["project pin", "suite", "version", "envrc", "direnv", "legacy", "nvm", "toolchain"]
+keywords = ["project pin", "suite", "version", "mise.toml", "mise", "legacy", "nvm", "toolchain"]
 keyword = "pin"
 run = ["kubaos", "pin", "{suite}", "{version}", "{folder}"]
 arguments = [
   { name = "suite", placeholder = "node" },
-  { name = "version", placeholder = "18" },
+  { name = "version", placeholder = "22" },
   { name = "folder", placeholder = "~/Projects/acme" },
 ]
 terminal = true
@@ -1010,7 +1179,7 @@ terminal = true
 title = "Unpin a Suite version…"
 subtitle = "The folder goes back to the installed version"
 icon = "list-remove"
-keywords = ["project pin", "suite", "version", "envrc", "direnv", "remove"]
+keywords = ["project pin", "suite", "version", "mise.toml", "mise", "remove"]
 keyword = "unpin"
 run = ["kubaos", "unpin", "{suite}", "{folder}"]
 arguments = [{ name = "suite", placeholder = "node" }, { name = "folder", placeholder = "~/Projects/acme" }]
@@ -1018,9 +1187,9 @@ terminal = true
 
 [extensions.kubaos.actions.pins]
 title = "Project pins"
-subtitle = "Every pinned Suite version under ~/Projects, and whether it's in the store yet"
+subtitle = "Every pinned Suite version under ~/Projects, and whether mise has it installed"
 icon = "view-pin"
-keywords = ["project pin", "suite", "version", "envrc", "direnv", "list"]
+keywords = ["project pin", "suite", "version", "mise.toml", "mise", "list"]
 run = ["kubaos", "pins", "--all"]
 terminal = true
 
@@ -1341,7 +1510,9 @@ arguments = [{ name = "setting", placeholder = "cpu-temp, ram, disk or battery-d
 # of them still works. "Power: what this stop does" is the Extension's own
 # Item (`power-status`): every layer of the stop, as the machine has it now;
 # so is "CPU scheduler: status" (`cpu-scheduler-status`): which scheduler
-# runs, Linux's own or LAVD, and why.
+# runs, Linux's own or LAVD, and why, and what background work yields now;
+# and "What's draining the battery"
+# (`battery-drain`): the draw now, the stop and what wakes the machine most.
 # The settings Items write ~/.config/kubaos/desktop/power/power.toml through
 # `kubaos-power`, which puts them to work at once and says so in a toast.
 
@@ -1420,6 +1591,31 @@ keyword = "low-battery"
 run = ["kubaos-power", "low-battery", "{percent}"]
 arguments = [{ name = "percent", placeholder = "20" }]
 
+[extensions.kubaos.actions.critical-warning-on]
+title = "Critical battery warning on"
+subtitle = "At 5 % on battery, a toast and a sound warn that the laptop powers off at 2 %"
+icon = "battery-caution"
+keywords = ["power off", "shutdown", "empty battery", "alert", "sound", "5 percent"]
+run = ["kubaos-power", "critical-warning", "5"]
+shown_when = { state = "power.critical-warning", is = false }
+
+[extensions.kubaos.actions.critical-warning-off]
+title = "Critical battery warning off"
+subtitle = "No toast or sound before the laptop powers off at 2 %"
+icon = "battery-caution"
+keywords = ["power off", "shutdown", "empty battery", "alert", "sound"]
+run = ["kubaos-power", "critical-warning", "off"]
+shown_when = { state = "power.critical-warning", is = true }
+
+[extensions.kubaos.actions.critical-warning-level]
+title = "Critical battery warning at…"
+subtitle = "The battery level of the toast and sound before the power-off at 2 %, from 3 to 20 %"
+icon = "battery-caution"
+keywords = ["power off", "shutdown", "empty battery", "threshold", "percent"]
+keyword = "critical-warning"
+run = ["kubaos-power", "critical-warning", "{percent}"]
+arguments = [{ name = "percent", placeholder = "5" }]
+
 [extensions.kubaos.actions.panel-power-saving-off]
 title = "Panel power saving off"
 subtitle = "True colours in every stop, for colour-accurate work: the saver stops leave the panel's backlight alone"
@@ -1475,6 +1671,30 @@ terminal = true
 run = ["kubaos", "power", "measure", "--seconds", "{seconds}"]
 arguments = [{ name = "seconds", placeholder = "300" }]
 
+[extensions.kubaos.actions.battery-report]
+title = "Battery report"
+subtitle = "The last week on battery: what went wrong first, long stretches, the average draw and what woke the machine"
+icon = "battery"
+keywords = ["battery history", "battery drain", "battery life", "deep sleep", "suspend", "overnight", "watts", "wakeups"]
+terminal = true
+run = ["kubaos", "power", "report"]
+
+[extensions.kubaos.actions.battery-notes-off]
+title = "Battery toasts off"
+subtitle = "No toast when a sleep missed deep sleep or the laptop stayed awake with the lid closed. The battery report still has them"
+icon = "battery"
+keywords = ["battery notes", "battery notification", "deep sleep", "suspend", "lid closed"]
+run = ["kubaos-power", "battery-notes", "off"]
+shown_when = { state = "power.battery-notes", is = true }
+
+[extensions.kubaos.actions.battery-notes-on]
+title = "Battery toasts on"
+subtitle = "A toast when a sleep missed deep sleep or the laptop stayed awake with the lid closed, with a button to the battery report"
+icon = "battery"
+keywords = ["battery notes", "battery notification", "deep sleep", "suspend", "lid closed"]
+run = ["kubaos-power", "battery-notes", "on"]
+shown_when = { state = "power.battery-notes", is = false }
+
 [extensions.kubaos.actions.cpu-scheduler-lavd-on]
 title = "CPU scheduler: LAVD on"
 subtitle = "scx_lavd puts input, the compositor and audio first, in each power stop's mode. If it fails, Linux's own scheduler takes over by itself"
@@ -1490,3 +1710,19 @@ icon = "cpu"
 keywords = ["cpu scheduler", "lavd", "scx", "sched_ext", "eevdf", "default scheduler", "off"]
 run = ["kubaos-power", "scheduler", "off"]
 shown_when = { state = "power.scheduler", is = "lavd" }
+
+[extensions.kubaos.actions.background-yields-on]
+title = "Background work yields: on"
+subtitle = "Build tools you start and Nix's builds run at nice 19, so the desktop, audio and your app stay smooth while they use every core"
+icon = "cpu"
+keywords = ["background work", "yield", "nice", "priority", "build", "compile", "cargo", "nix", "responsiveness", "on"]
+run = ["kubaos-power", "background-yields", "on"]
+shown_when = { state = "power.background-yields", is = false }
+
+[extensions.kubaos.actions.background-yields-off]
+title = "Background work yields: off"
+subtitle = "For a build you're waiting on: compilers and Nix's builds get the CPU back at once, the running ones too"
+icon = "cpu"
+keywords = ["background work", "yield", "nice", "priority", "build", "compile", "cargo", "nix", "faster build", "off"]
+run = ["kubaos-power", "background-yields", "off"]
+shown_when = { state = "power.background-yields", is = true }

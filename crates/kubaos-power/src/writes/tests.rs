@@ -129,6 +129,7 @@ fn helper(root: &FakeRoot, args: &[String]) -> (bool, String) {
         .arg(script)
         .args(args)
         .env("KUBAOS_POWER_ROOT", root.dir.path())
+        .env_remove("PKEXEC_UID")
         .output()
         .expect("run the helper");
     (
@@ -362,4 +363,160 @@ fn a_refused_knob_is_left_alone_until_the_stop_changes() {
     refused.clear();
     let again: Vec<String> = refused.filter(writes()).iter().map(Write::arg).collect();
     assert!(again.contains(&"aspm=powersupersave".to_owned()));
+}
+
+/// Runs the root helper's `--sleep-safe` on `root`'s fake `/sys`, as systemd-sleep's hook does
+/// before a suspend; whether it exited 0, and its stdout.
+fn sleep_safe(root: &FakeRoot) -> (bool, String) {
+    let script = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../system/files/power/kubaos-power-write"
+    );
+    let output = std::process::Command::new("bash")
+        .arg(script)
+        .arg("--sleep-safe")
+        .env("KUBAOS_POWER_ROOT", root.dir.path())
+        .output()
+        .expect("run the helper");
+    (
+        output.status.success(),
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+    )
+}
+
+/// The laptop in Max Performance, as the stop leaves it.
+fn in_max_performance() -> FakeRoot {
+    let root = FakeRoot::laptop();
+    root.write(
+        "sys/module/pcie_aspm/parameters/policy",
+        "default [performance] powersave powersupersave",
+    );
+    root.write("sys/class/drm/card1/device/power_dpm_force_performance_level", "high");
+    for device in ["1-1", "1-3", "8-1.1.2"] {
+        root.write(&format!("sys/bus/usb/devices/{device}/power/control"), "on");
+    }
+    root
+}
+
+#[test]
+fn before_a_suspend_max_performance_drops_to_sleep_safe_values_input_devices_left_awake() {
+    let root = in_max_performance();
+
+    let (ok, said) = sleep_safe(&root);
+
+    assert!(ok, "{said}");
+    assert_eq!(root.read("sys/module/pcie_aspm/parameters/policy"), "default");
+    assert_eq!(
+        root.read("sys/class/drm/card1/device/power_dpm_force_performance_level"),
+        "auto"
+    );
+    for device in ["1-1", "1-3", "8-1.1.2"] {
+        assert_eq!(
+            root.read(&format!("sys/bus/usb/devices/{device}/power/control")),
+            "auto"
+        );
+    }
+    assert_eq!(root.read("sys/bus/usb/devices/7-1.1.3/power/control"), "on");
+    assert_eq!(root.read("sys/bus/usb/devices/3-2/power/control"), "on");
+    assert_eq!(
+        said.trim(),
+        "kubaos-power-write: sleep-safe: aspm=default gpu-dpm=card1:auto usb=1-1:auto usb=1-3:auto usb=8-1.1.2:auto"
+    );
+}
+
+#[test]
+fn after_the_wake_the_stops_writes_put_back_what_the_sleep_hook_changed() {
+    let root = in_max_performance();
+    assert!(sleep_safe(&root).0);
+    // The kernel shows the policies again with the new one in brackets; a plain file can't.
+    root.write(
+        "sys/module/pcie_aspm/parameters/policy",
+        "[default] performance powersave powersupersave",
+    );
+
+    let max = args(Stop::MaxPerformance, &Settings::default(), &root, Some(false));
+    let balanced = args(Stop::Balanced, &Settings::default(), &root, Some(true));
+
+    assert_eq!(
+        max,
+        [
+            "gpu-dpm=card1:high",
+            "aspm=performance",
+            "usb=1-1:on",
+            "usb=1-3:on",
+            "usb=8-1.1.2:on"
+        ]
+    );
+    assert_eq!(balanced, ["usb=8-1.1.2:on"]);
+}
+
+#[test]
+fn a_saver_stops_aspm_and_gpu_stay_for_a_suspend_and_only_the_devices_kept_awake_autosuspend() {
+    let root = FakeRoot::laptop();
+    let saver = args(Stop::SuperSaver, &Settings::default(), &root, Some(true));
+    assert!(helper(&root, &saver).0);
+
+    let (ok, said) = sleep_safe(&root);
+
+    assert!(ok, "{said}");
+    assert_eq!(said.trim(), "kubaos-power-write: sleep-safe: usb=8-1.1.2:auto");
+    assert_eq!(root.read("sys/module/pcie_aspm/parameters/policy"), "powersupersave");
+    assert_eq!(
+        root.read("sys/class/drm/card1/device/power_dpm_force_performance_level"),
+        "low"
+    );
+}
+
+#[test]
+fn a_machine_without_the_knobs_suspends_with_nothing_changed() {
+    let root = FakeRoot::empty();
+
+    let (ok, said) = sleep_safe(&root);
+
+    assert!(ok, "{said}");
+    assert_eq!(said.trim(), "kubaos-power-write: sleep-safe: nothing to change");
+}
+
+#[test]
+fn nix_daemons_drop_in_follows_the_setting_and_nothing_is_asked_once_it_does() {
+    let root = FakeRoot::laptop();
+    root.write(crate::machine::NIX_UNIT, "[Service]\n");
+    let off = Settings::parse("background_yields = false\n").expect("parses");
+
+    let missing = args(Stop::Balanced, &Settings::default(), &root, Some(true));
+    root.write(crate::machine::NIX_DROP_IN, "[Service]\nNice=19\n");
+    let in_place = args(Stop::Balanced, &Settings::default(), &root, Some(true));
+    let turned_off = args(Stop::Balanced, &off, &root, Some(true));
+
+    assert!(missing.contains(&"yields=on".to_owned()));
+    assert!(!in_place.iter().any(|arg| arg.starts_with("yields=")));
+    assert!(turned_off.contains(&"yields=off".to_owned()));
+}
+
+#[test]
+fn a_machine_without_nix_daemon_is_asked_nothing_about_it() {
+    let root = FakeRoot::laptop();
+
+    let args = args(Stop::Balanced, &Settings::default(), &root, Some(true));
+
+    assert!(!args.iter().any(|arg| arg.starts_with("yields=")));
+}
+
+#[test]
+fn putting_processes_back_names_them_for_the_helper() {
+    assert_eq!(Write::Unyield(vec![4242, 4243]).arg(), "unyield=4242,4243");
+}
+
+#[test]
+fn the_helper_refuses_a_yield_it_cant_check() {
+    let root = FakeRoot::laptop();
+    let asked = ["yields=maybe", "yields=on", "unyield=12;rm", "unyield=4242"].map(str::to_owned);
+
+    let (ok, said) = helper(&root, &asked);
+
+    assert!(!ok);
+    assert!(said.contains("yields=maybe isn't on or off"), "{said}");
+    assert!(said.contains("there's no nix-daemon.service"), "{said}");
+    assert!(said.contains("unyield=12;rm isn't a list of processes"), "{said}");
+    assert!(said.contains("there's no caller"), "{said}");
 }

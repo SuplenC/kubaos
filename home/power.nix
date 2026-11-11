@@ -3,7 +3,9 @@
 # power source, keeps the stop each source last had, and puts the rest of each
 # stop to work: the root helper's sysfs writes
 # (/usr/local/libexec/kubaos-power-write, system/30-hardware.sh), the laptop
-# panel's refresh and VRR through Hyprland, and the file indexer's pause.
+# panel's refresh and VRR through Hyprland, and the file indexer's pause. It
+# plays the sound of the critical-battery warning, which goes at a fixed path
+# under ~/.local/share, as the clock's does; pw-play is Ubuntu's PipeWire.
 #
 # The slider and the bar read $XDG_RUNTIME_DIR/kubaos-power.json, which the
 # service keeps; `kubaos power set …` reaches it on kubaos-power.sock beside
@@ -19,6 +21,9 @@ let
 in
 {
   home.packages = [ kubaosPkgs.kubaos-power ];
+
+  xdg.dataFile."kubaos/power/critical.oga".source =
+    "${pkgs.sound-theme-freedesktop}/share/sounds/freedesktop/stereo/dialog-warning.oga";
 
   systemd.user.services.kubaos-power = {
     Unit = {

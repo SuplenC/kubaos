@@ -171,6 +171,7 @@ impl UserFolders {
             hidden: false,
             app_only: false,
             weak_keywords: Vec::new(),
+            yields: false,
             actions: vec![Action::new(OPEN, "Open"), Action::new(YAZI, "Open in yazi")],
         }
     }

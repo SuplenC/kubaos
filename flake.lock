@@ -49,11 +49,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793225053,
-        "narHash": "sha256-2YLwsdmf2wJ4spNtLvpqwCfPzovtwsjzu2Aet1yYnzw=",
+        "lastModified": 1794409317,
+        "narHash": "sha256-HoUojZkPFnclgDI08638mpHVrECQvH4NMcPxhZYtnho=",
         "owner": "SuplenC",
         "repo": "kotodama",
-        "rev": "8ef29c77f18f5b4d69b802fc49162cf01bbe72db",
+        "rev": "1a4754b7c213bf6b4bc5cc57cbe6eabc9cfc9fb0",
         "type": "github"
       },
       "original": {
@@ -66,17 +66,17 @@
     "kubaos-wallpapers": {
       "flake": false,
       "locked": {
-        "lastModified": 1792743307,
-        "narHash": "sha256-aqJPDlHiapqI2mzMh5ODtDbkhdK8DQLrGuTrKn17/I4=",
+        "lastModified": 1794350276,
+        "narHash": "sha256-DZPDO57RqNdjwv11JXmDEuPhc2KR2RMPdaYYUGfjJRk=",
         "owner": "SuplenC",
         "repo": "kubaos-wallpapers",
-        "rev": "a817336e531f443ce4f2d2a9fbd5a0122aacce76",
+        "rev": "9393b43ad545e537e67f059c7666f41801cd7a4b",
         "type": "github"
       },
       "original": {
         "owner": "SuplenC",
         "repo": "kubaos-wallpapers",
-        "rev": "a817336e531f443ce4f2d2a9fbd5a0122aacce76",
+        "rev": "9393b43ad545e537e67f059c7666f41801cd7a4b",
         "type": "github"
       }
     },

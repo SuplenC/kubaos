@@ -37,12 +37,12 @@
 # and blue from 0 to 1; lengths in logical pixels; durations in milliseconds. Change them
 # in design/tokens.toml and run `cargo run -p kubaos-tokens -- write`.
 tokens.boot.plymouth_2x_from = 1600;
-tokens.color.on_surface_variant.r = 0.8549;
-tokens.color.on_surface_variant.g = 0.7608;
-tokens.color.on_surface_variant.b = 0.6941;
-tokens.color.surface_container_lowest.r = 0.0784;
+tokens.color.on_surface_variant.r = 0.8431;
+tokens.color.on_surface_variant.g = 0.7647;
+tokens.color.on_surface_variant.b = 0.6980;
+tokens.color.surface_container_lowest.r = 0.0745;
 tokens.color.surface_container_lowest.g = 0.0510;
-tokens.color.surface_container_lowest.b = 0.0275;
+tokens.color.surface_container_lowest.b = 0.0314;
 tokens.duration.medium = 300;
 tokens.duration.micro = 100;
 tokens.duration.short = 200;

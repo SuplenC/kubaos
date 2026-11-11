@@ -37,8 +37,10 @@ use crate::update::event::Command;
 use crate::update::event::GroupChange;
 use crate::update::event::Phase;
 use crate::update::event::Restart;
+use crate::update::event::SuiteChanges;
 use crate::update::event::Summary;
 use crate::update::event::UpdateEvent;
+use crate::update::firmware::Firmware;
 use crate::update::machine::Cmd;
 use crate::update::machine::Machine;
 
@@ -168,10 +170,15 @@ impl<M: Machine> Updater<'_, M> {
             channel: self.channel(&installed),
             changes: Vec::new(),
             packages: 0,
+            upgraded: Vec::new(),
             apt,
             inputs: Vec::new(),
+            nix_packages: None,
             migrations: Vec::new(),
+            programs: Vec::new(),
+            suites: SuiteChanges::default(),
             reloaded: Vec::new(),
+            firmware: Firmware::default(),
             restart: Restart::None,
             restart_reason: None,
             undo: None,

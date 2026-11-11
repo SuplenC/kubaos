@@ -1,0 +1,20 @@
+# Your wallpapers' depth: ~/.config/kubaos/desktop/wallpapers/depth.toml, read by the
+# wallpaper-depth Suite (`kubaos suite add wallpaper-depth`) at every wallpaper change and
+# login, and by the lock. The Command menu's wallpaper-depth Items change the lines below
+# and apply at once, as `kubaos depth` does; a hand edit, at the next wallpaper or lock.
+#
+# Depth for your own pictures: cut-outs that put the lock's clock behind the city.
+# KubaOS's own wallpapers ship theirs whatever this says. Default true.
+# enabled = true
+#
+# How far the wallpaper comes toward you as the lock comes up, the share the picture
+# grows by: 0 holds it still, 0.05 at most. Default 0.025.
+# push = 0.025
+#
+# Pictures that never get a cut-out, by path, shipped or your own. "No cut-out on this
+# wallpaper" in the Command menu adds the current one; "Cut this wallpaper out again"
+# takes it out.
+# skip = ["/home/you/Pictures/wallpapers/harbour.jpg"]
+#
+# Full docs: docs/CONTRACTS.md, "Wallpaper depth"
+# (https://github.com/SuplenC/kubaos/blob/main/docs/CONTRACTS.md).

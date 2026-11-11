@@ -123,7 +123,7 @@ Takeaways: oh-my-zsh costs a few milliseconds once its cache exists, and the who
 | NetworkManager + wpa_supplicant | Keep | iwd backend | iwd 3.10 in Ubuntu. Reports of MT7921/MT7922 (`mt7921e`) failing 5 GHz 4-way handshakes under iwd while wpa_supplicant works ([NixOS Discourse](https://discourse.nixos.org/t/unsolved-mt7921-iwd-4-way-handshake-timeout-reason-15-on-5ghz-wpa-supplicant-works-fine/77470), [Arch forum](https://bbs.archlinux.org/viewtopic.php?id=305030)); one Framework MT7922 owner reports faster boot-time connect with iwd ([Framework forum](https://community.frame.work/t/responded-mt7922-wifi-slow-to-start-on-boot/42605/12)). Gain is seconds at connect; risk is a broken link | Profiles must be recreated |
 | power-profiles-daemon | Keep | tuned-ppd | Ubuntu 26.04 ships ppd 0.30 (default) and tuned-ppd 2.25.1. A Fedora 44 test on Panther Lake measured ~19% lower benchmark scores with tuned-ppd than with ppd ([comss.ru](https://www.comss.ru/page.php?id=21569), secondary source, Intel). ppd drives `platform_profile` plus amd-pstate EPP, which is what tuxedo-drivers exposes | None |
 | Docker Engine | Keep (user choice) | Podman | Noted only | n/a |
-| 8 GB swapfile, zswap off | Config tweak (optional) | enable zswap | Ubuntu 26.04 kernel: `# CONFIG_ZSWAP_DEFAULT_ON is not set`, default compressor `lzo`, `CONFIG_ZRAM=m`; Ubuntu does not set up zram by default. With 64 GB RAM swap is rarely touched; zswap compresses pages in RAM in front of the existing swapfile, which matters only under pressure (big Rust builds + Docker). zram would duplicate the swapfile's role | Kernel parameter only; easy to revert |
+| 8 GB swapfile behind zswap (zstd) | Keep | zram | Ubuntu 26.04 kernel: `# CONFIG_ZSWAP_DEFAULT_ON is not set`, default compressor `lzo`, zstd a module, `CONFIG_ZRAM=m`; Ubuntu does not set up zram by default. Swap is busy even with 64 GB RAM: one 31-hour session paged out 41 GiB and read 26 GiB back through LUKS. zswap keeps those pages compressed in RAM in front of the swapfile (`/etc/tmpfiles.d/kubaos-zswap.conf`); zram would duplicate the swapfile's role | n/a |
 | systemd-oomd | Keep off | enable it | Hyprland is started from tty1 without uwsm, so apps are not in per-app scopes; oomd acts on cgroups and would kill the whole session scope. The kernel OOM killer picks single processes | n/a |
 | Kernel | Keep | HWE | `linux-image-generic` and `linux-image-generic-hwe-26.04` both point to 7.0.0-38 today; Strix Point is supported. `30-hardware.sh` already handles HWE headers if you switch later | None now |
 | I/O scheduler | Keep | none | NVMe uses `none` by default; nothing to gain | None |
@@ -138,9 +138,8 @@ Ranked by benefit over effort. None of these is urgent; the current set already 
 
 Expected gain: about 20 to 25% faster incremental debug rebuilds on large binaries in this test (0.4 s per rebuild on helix); upstream reports 2.3 to 2.5x faster linking than mold on linker-only benchmarks. Effort: small. Risk: pre-1.0 linker bugs; fall back to mold.
 
-- `home/dev.nix`: in `linuxTarget`, replace `"link-arg=-fuse-ld=mold"` with `"link-arg=--ld-path=${lib.getExe pkgs.wild-unwrapped}"`. Use `wild-unwrapped`, not `wild`: the wrapped variant is a nixpkgs bintools wrapper meant for Nix stdenv, and on Ubuntu the pure binary is what clang should call. Keep `linker = "clang"` (clang from apt).
+- `kubaos suite configure rust --extra wild`: mise installs wild's release (`github:wild-linker/wild`), and the Rust Suite's cargo defaults, `~/.cargo/kubaos.toml` (`home/suites/rust.nix`), pass `link-arg=--ld-path=wild` instead of `-fuse-ld=mold`; clang finds wild on PATH. `linker = "clang"` (clang from apt) stays.
 - Keep `mold` in `system/20-base.sh` as the fallback. For a one-off build with mold: `CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=mold" cargo build`.
-- Update the comment at the top of `home/dev.nix` ("clang and mold come from apt") and add `wild` to the Nix list in `docs/CONTRACTS.md`, "Packages: who installs what" (lead owns that file).
 - Verify on the laptop: `readelf --string-dump .comment target/debug/<bin> | grep -i wild`, then `cargo build --timings` on a large Rust workspace with both linkers.
 
 ### 2. Replace duf with dysk (Switch, low priority)
@@ -150,14 +149,7 @@ Gain: a maintained tool instead of one with no release or merge for over a year.
 - `home/cli.nix`: replace `duf` with `dysk`.
 - `docs/CONTRACTS.md` and `docs/PLAN.md` ("Tools in `cli.nix`"): rename duf to dysk.
 
-### 3. Enable zswap (Config tweak, optional)
-
-Gain: smoother behaviour only under memory pressure; nothing in normal use. Effort: small.
-
-- `system/20-base.sh`: write `/etc/default/grub.d/90-zswap.cfg` containing `GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT zswap.enabled=1"` (use the existing `write_root_file` helper), then `update-grub` (the script already runs it later in the snapper section, so place this step before that).
-- Check after reboot: `cat /sys/module/zswap/parameters/enabled` prints `Y`. Leave the compressor at the kernel default (`lzo`) unless you have confirmed that `zstd` or `lz4` is built into the kernel and not a module; a missing module makes zswap fall back or stay off at boot.
-
-### 4. Add difftastic as a difftool (optional addition)
+### 3. Add difftastic as a difftool (optional addition)
 
 Gain: syntax-aware diffs on demand; delta stays the pager. Effort: trivial.
 
@@ -194,5 +186,4 @@ Gain: syntax-aware diffs on demand; delta stays the pager. Effort: trivial.
 
 - Any number on the real machine (x86_64 Strix Point): all timings above are arm64 Docker on a Mac, with other containers running.
 - That the TUXEDO's Wi-Fi card is actually an MT7922, and iwd behaviour on it.
-- Which zswap compressors are built in (not modules) in the amd64 Ubuntu 7.0 kernel.
 - Whether wild 0.8.0 (nixpkgs 26.05) handles every crate of a large Rust workspace; upstream 0.10.0 is newer and is what its benchmarks use.

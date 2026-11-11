@@ -1,5 +1,5 @@
-//! Project env: the vault's variables for a project, cached in the GNOME keyring, where
-//! `use bwenv <project>` in an `.envrc` reads them (`home/secrets.nix`) without bw or the
+//! Project env: the vault's variables for a project, cached in the GNOME keyring, where the
+//! script a project's `mise.toml` sources reads them (`home/secrets.nix`) without bw or the
 //! master password.
 //!
 //! In the vault: every custom field of every item in the folder `env/<project>` (the prefix is
@@ -169,7 +169,7 @@ pub fn projects(host: &mut dyn Host) -> Result<Vec<String>, Error> {
     Ok(list(host, None)?.into_keys().collect())
 }
 
-/// A project's variables from the keyring alone, for `use bwenv`.
+/// A project's variables from the keyring alone, for the script a project's `mise.toml` sources.
 ///
 /// # Errors
 ///

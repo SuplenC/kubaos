@@ -1,0 +1,9 @@
+# The Rust of the dev shell, which takes it from nixpkgs at flake.lock's
+# commit, for rustup outside it: an editor's rust-analyzer and rustfmt, a
+# worktree's builds, and the `cargo-clippy` in ~/.cargo/bin that cargo finds
+# before the dev shell's. `just lint` fails while this names another version
+# than the dev shell's clippy, so a nixpkgs update that moves Rust moves it too.
+[toolchain]
+channel = "1.95.0"
+profile = "default"
+components = ["rust-analyzer", "rust-src"]

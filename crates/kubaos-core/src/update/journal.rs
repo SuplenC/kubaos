@@ -186,6 +186,18 @@ impl<'a> Journal<'a> {
         });
     }
 
+    /// Ends the running phase as [`Journal::phase_end`] does, for a phase whose failure doesn't
+    /// stop the run: the run's `failed` event, should a later step fail, names neither it nor its
+    /// program's output.
+    pub fn phase_end_optional(&mut self, ok: bool) {
+        let failed = self.failed;
+        self.phase_end(ok);
+        if !ok {
+            self.failed = failed;
+            self.tail.clear();
+        }
+    }
+
     pub fn step(&mut self, text: impl Into<String>) {
         self.emit(&UpdateEvent::Step { text: text.into() });
     }
