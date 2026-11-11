@@ -81,7 +81,8 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
     slot.style.setProperty("--k-spread", k < fanCount ? "1" : "0");
     slot.style.zIndex = String((count - k) * 3 + 1);
     slot.toggleAttribute("data-newest", k === 0);
-    slot.toggleAttribute("data-lowest", k === edges && k > 0);
+    // At rest a tucked card draws over the newest card's glow, the one above it over it in turn.
+    slot.style.setProperty("--rest-z", String(count * 3 + 1 + count - k));
     const face = card(note, {
       count: k === 0 && !open ? count : 1,
       opens: k === 0 && count > 1,
@@ -135,7 +136,14 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
   catcher.className = "k-notif-catcher k-notif-slot";
   for (const [name, value] of [["--k-rx", "0px"], ["--k-ry", "0px"], ["--k-spread", "1"], ["--k-off", "0px"]]) catcher.style.setProperty(name!, value!);
 
-  element.append(catcher, ...slots, moreLine, heading);
+  // The stack's one shadow on what holds it, under every card: the ladder's step 1 from its lowest
+  // edge, so no tucked card sinks another under its own shadow.
+  const under = document.createElement("span");
+  under.className = "k-notif-under";
+  under.style.setProperty("--k-inset", `calc(var(--space-s8) * ${edges})`);
+  under.hidden = edges === 0;
+
+  element.append(under, catcher, ...slots, moreLine, heading);
 
   /** The cards' heights and where each sits spread, as the CSS works the boxes out from. */
   const layout = () => {

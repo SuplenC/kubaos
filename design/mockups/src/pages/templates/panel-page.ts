@@ -87,7 +87,7 @@ const TURN_BACK: Move = {
 const FADE: Move = {
   name: "The fade comes",
   what: "The body leaves its top: the header fade comes in, so nothing is cut flat.",
-  tracks: [{ part: "the header fade", on: "the notifications", target: ".k-header-fade", property: "--faded", from: 0, to: 1, duration: "micro", curve: "standard" }],
+  tracks: [{ part: "the header fade", on: "the notifications", target: ".k-scroll", property: "--faded", from: 0, to: 1, duration: "micro", curve: "standard" }],
   reduced: "same",
   back: "plays",
   sample: () => onScreen(notifications({ down: 0.3 })),

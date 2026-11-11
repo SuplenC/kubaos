@@ -2,18 +2,19 @@
 // `KubaOS.Components`' `Scroll` and `HeaderFade` (`docs/design/components/scroll.md`).
 //
 // A scroll has no edge of its own, so it reaches past its box into the room around it: as far as a
-// glow reaches (`focus.far`) at its sides, and above and below up to the part of the panel there,
-// with its content that far in. The content lines up with what is around it, a resting control at
+// glow reaches (`focus.far`) at its sides, and above and below up to the part of the panel there
+// and never less than a glow's reach, with its content that far in. The content lines up with what is around it, a resting control at
 // its edge keeps its whole glow, content scrolled past its box shows in that room and stops at the
 // part beside it, and the panel's own edge cuts whatever passes it. Content that runs to its end
 // leaves `space.s16` there for the thumb: `size.scrollbar` wide on the box's end, a pill in
 // `outline_variant` (`outline` under the pointer and while dragged), along the whole room it shows,
 // only while the content is taller than its room.
 //
-// A header fade lies over the gap between a panel's header and the scroll under it: while the
-// content is scrolled from its top, the gap stays clear in `surface` and the content fades into it
-// over the next `space.s16`, rather than being cut flat under the header's words. It spans the
-// scroll's box but the thumb's width at its end, and fades in and out over `micro`.
+// A header fade fades out what scrolls under a panel's header: while the content is scrolled from its
+// top, the view's content is masked out over the gap above its box and fades back in over the next
+// `space.s16`, rather than being cut flat under the header's words. A mask, never a fill: a lit
+// control's tube and glow go with the rest, and the panel's glass shows through unchanged. It spans
+// the view's whole reach, and fades in and out over `micro`.
 
 import "./lists.css";
 import { probe } from "./probe.ts";
@@ -47,7 +48,9 @@ export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTM
   const box = document.createElement("span");
   box.className = "k-scroll";
   box.style.setProperty("--height", options.height);
-  const reach = (room: string | 0 | undefined) => (room === 0 ? "0px" : room ? `var(--space-${room})` : "var(--focus-far)");
+  // Room above and below reaches at least as far as a glow, so a lit control at the top or the foot
+  // keeps its whole glow; the panel's or the window's edge past it cuts what goes further.
+  const reach = (room: string | 0 | undefined) => (room === 0 ? "0px" : room ? `max(var(--space-${room}), var(--focus-far))` : "var(--focus-far)");
   box.style.setProperty("--above", reach(options.above));
   box.style.setProperty("--below", reach(options.below));
   box.toggleAttribute("data-no-gutter", options.noGutter ?? false);
@@ -63,7 +66,7 @@ export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTM
   box.append(view, thumb);
   if (options.fade) {
     const fade = headerFade(options.fade);
-    fade.toggleAttribute("data-pinned", options.fadePinned ?? false);
+    box.toggleAttribute("data-fade-pinned", options.fadePinned ?? false);
     box.append(fade);
   }
 

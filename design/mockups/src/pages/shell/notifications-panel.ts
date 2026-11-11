@@ -59,7 +59,7 @@ const RECEDES: Move = {
 const FADE: Move = {
   name: "The fade comes",
   what: "The list leaves its top: the header fade comes in over the gap under the header.",
-  tracks: [{ part: "the header fade", on: ON, target: ".k-header-fade", property: "--faded", from: 0, to: 1, duration: "micro", curve: "standard" }],
+  tracks: [{ part: "the header fade", on: ON, target: ".k-scroll", property: "--faded", from: 0, to: 1, duration: "micro", curve: "standard" }],
   reduced: "same",
   back: "plays",
   sample: () => panelOnScreen(),
