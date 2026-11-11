@@ -237,13 +237,63 @@ export function wrapped(words: string, style: TypeStyle, color = "on_surface"): 
 
 /**
  * `words` in `style` kept to `lines` lines in the room they are given, the last one ending in an
- * ellipsis where the words don't fit: `kubaos-ui`'s `text::line` for one, QML's `maximumLines`.
+ * ellipsis where the words don't fit: `kubaos-ui`'s `text::line` for one, QML's `maximumLines`. Past
+ * one line the cut falls after the last whole word that fits with the ellipsis, never inside a word
+ * (`wholeWords`).
  */
 export function clamped(words: string, style: TypeStyle, color = "on_surface", lines = 1): HTMLElement {
   const element = text(words, style, color);
   element.dataset.clamped = lines === 1 ? "line" : "lines";
   element.style.setProperty("--lines", String(lines));
+  if (lines > 1) wholeWords(element, words);
   return element;
+}
+
+/** Each multi-line clamp's fitting, by its element, so an owner that laid it out anew can fit it again. */
+const fittings = new WeakMap<HTMLElement, () => void>();
+
+/**
+ * Keeps `element`, a multi-line clamp, to the words that fit its `--lines` lines whole, an ellipsis
+ * after the last: the most words that fit with the ellipsis, found by halving how many stay. A comma or a colon left at the cut goes with it. It fits
+ * again whenever its width or its `--lines` changes, and holds every word when they all fit.
+ */
+function wholeWords(element: HTMLElement, words: string): void {
+  let width = -1;
+  let most = -1;
+  const fit = (again = false) => {
+    const style = getComputedStyle(element);
+    const lines = Number.parseFloat(style.getPropertyValue("--lines")) || 1;
+    if (!again && element.clientWidth === width && lines === most) return;
+    width = element.clientWidth;
+    most = lines;
+    element.textContent = words;
+    const room = lines * Number.parseFloat(style.lineHeight) + 0.5;
+    if (element.scrollHeight <= room) return;
+    const all = words.split(/\s+/);
+    const cut = (count: number) => `${all.slice(0, count).join(" ").replace(/[,;:]$/, "")}…`;
+    let low = 1;
+    let high = all.length - 1;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      element.textContent = cut(middle);
+      if (element.scrollHeight <= room) low = middle;
+      else high = middle - 1;
+    }
+    element.textContent = cut(low);
+  };
+  element.dataset.words = words;
+  fittings.set(element, () => fit(true));
+  new ResizeObserver(() => fit()).observe(element);
+}
+
+/** Lays every multi-line clamp in `root` out whole again, as its words, before its owner measures it. */
+export function unclamp(root: ParentNode): void {
+  for (const element of root.querySelectorAll<HTMLElement>("[data-clamped='lines'][data-words]")) element.textContent = element.dataset.words ?? "";
+}
+
+/** Fits every multi-line clamp in `root` again, once its owner has measured it. */
+export function refit(root: ParentNode): void {
+  for (const element of root.querySelectorAll<HTMLElement>("[data-clamped='lines']")) fittings.get(element)?.();
 }
 
 /** A run of a text's characters, from `start` up to `end`, drawn in another colour. */

@@ -4,9 +4,10 @@
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { windowSize } from "../../site/settings.ts";
-import { cornerOnScreen, dndTip, KUBAOS, noteMenu, panelOnScreen, type PanelOptions, room, SIGNAL, BUILD, type Section } from "./notification-parts.ts";
+import { BUILD, KUBAOS, SIGNAL } from "../notifications.ts";
+import { cornerOnScreen, noteMenu, panelOnScreen, type PanelOptions, type Section } from "./notification-parts.ts";
 
-type Shown = "rest" | "open" | "selected" | "empty";
+type Shown = "rest" | "lit" | "open" | "empty";
 
 const READ: readonly Section[] = [
   { label: "New", groups: [] },
@@ -50,7 +51,7 @@ const RECEDES: Move = {
   name: "The list sits back",
   what: "A group's preview spreads: the other rows fade by `opacity.recede`, those it covers go.",
   tracks: [{ part: "the rows behind", on: ON, target: ".k-notif-behind", property: "--recede", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
-  reduced: [{ part: "the rows behind", on: ON, target: ".k-notif-behind", property: "--recede", from: 0, to: 1, duration: "instant", curve: "linear" }],
+  reduced: [{ part: "the rows behind", on: ON, target: ".k-notif-behind", property: "--recede", from: 0, to: 1, duration: "short", curve: "standard" }],
   back: "plays",
   sample: () => panelOnScreen(),
 };
@@ -68,7 +69,7 @@ const IN_STATE = (state: Shown, extra: PanelOptions = {}) =>
   panelOnScreen({
     ...extra,
     ...(state === "open" ? { opened: [0] } : {}),
-    ...(state === "selected" ? { selected: 0 } : {}),
+    ...(state === "lit" ? { selected: 0 } : {}),
     ...(state === "empty" ? { sections: NONE } : {}),
   });
 
@@ -93,15 +94,15 @@ export default page<Shown>({
     { name: "Do not disturb on", for: "its button filled; the line says why", sample: () => panelOnScreen({ dnd: true }) },
     { name: "A card unfolded", for: "its whole text; one at a time", sample: () => panelOnScreen({ unfolded: 1, selected: 1 }) },
     { name: "A group previewed", for: "the rest sit back", sample: () => panelOnScreen({ fanned: 0 }) },
-    { name: "The keys", for: "the keys button's card", sample: () => panelOnScreen({ keys: true }) },
-    { name: "Do not disturb's card", for: "under its button: why, or what turns it on", sample: () => room(dndTip(false)) },
+    { name: "The keys", for: "the keys button's card, floating above it", sample: () => panelOnScreen({ keys: true }) },
+    { name: "Do not disturb's card", for: "floats under its button: what turns it on", sample: () => panelOnScreen({ dndTip: true }) },
     { name: "A card's menu", for: "right-click: actions, Open, Dismiss, Clear all", sample: () => cornerOnScreen(noteMenu(BUILD, 0)) },
   ],
   sizes: doesntApply("`size.panel` wide, from the bar to the frame's foot."),
   states: {
-    shown: ["rest", "open", "selected", "empty"],
+    shown: ["rest", "lit", "open", "empty"],
     absent: {
-      lit: "its buttons and cards light on their own",
+      selected: "the keyboard on a row is lit",
       pressed: "a press inside does nothing; outside closes it",
       disabled: "open or gone",
       loading: "the history is there when it opens",
@@ -111,7 +112,7 @@ export default page<Shown>({
     looks: {
       rest: "header, line, New then Earlier",
       open: "a group opened under its heading",
-      selected: "the keyboard's tube on a row",
+      lit: "the keyboard on a row: its tube",
       empty: "Nothing new., centred; Clear all goes",
     },
   },
@@ -128,7 +129,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING],
     leaves: [CLOSING],
-    between: [RECEDES, FADE, ...powerMoves(() => IN_STATE("selected"))],
+    between: [RECEDES, FADE, ...powerMoves(() => IN_STATE("lit"))],
   },
   keyboard: {
     keys: [

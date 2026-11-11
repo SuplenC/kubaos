@@ -20,6 +20,7 @@ import { paired, pill } from "../../lib/pill.ts";
 import { icon } from "../../lib/icon.ts";
 import { type Edge, hang, type Screen, screen, sheet, type Twins, twins } from "../../lib/sheet.ts";
 import { text } from "../../lib/text.ts";
+import { clearButton, dndButton, keysButton, sectionList, status } from "../notifications.ts";
 
 export const PUNS: Record<"system" | "notifications" | "control" | "clock", Words> = {
   system: { short: "Nothing's on fire. Yet.", long: "Nothing's on fire yet, but that browser is eating memory like it's paid by the gigabyte." },
@@ -96,14 +97,22 @@ export function systemBody(state: BodyState = "rest", count = PROCESSES.length):
   );
 }
 
-export function notificationsBody(state: BodyState = "rest", count = NOTES.length): HTMLElement {
-  return stated(
-    state,
-    () => list(NOTES.slice(0, count)),
-    NOTES,
-    { icon: "notifications", title: "Nothing new", body: "Silence. Enjoy it while it lasts." },
-    { message: "The notification daemon stopped answering.", hint: "Restart the shell with Super+Shift+R." },
-  );
+/**
+ * The notifications panel's body as the shell draws it: New then Earlier, one app's in a group of the
+ * library's cards; `count` groups of them, past four with Slack's opened, so the list runs past the
+ * room. With nothing at all it says so in one quiet line, as the panel does; loading and broken are
+ * the template's.
+ */
+export function notificationsBody(state: BodyState = "rest", count = 4): HTMLElement {
+  if (state === "empty") {
+    const nothing = document.createElement("span");
+    nothing.className = "k-notif-nothing";
+    nothing.append(text("Nothing new.", "body", "on_surface_variant"));
+    return nothing;
+  }
+  if (state !== "rest")
+    return stated(state, () => document.createElement("span"), NOTES, { icon: "notifications", title: "", body: "" }, { message: "The notification daemon stopped answering.", hint: "Restart the shell with Super+Shift+R." });
+  return sectionList(count);
 }
 
 export function controlBody(state: BodyState = "rest", count = NETWORKS.length): HTMLElement {
@@ -133,6 +142,7 @@ export interface PanelChoice {
   readonly subtitle?: string;
   readonly down?: number;
   readonly fadePinned?: boolean;
+  /** A footer band with its action, as a sample of the band. */
   readonly footer?: boolean;
   /** The header's actions left out: a panel with none. */
   readonly bare?: boolean;
@@ -141,15 +151,27 @@ export interface PanelChoice {
 }
 
 export function system(choice: PanelChoice = {}): PanelPage {
-  return panelPage(options(choice, "system", [action("terminal", "Open btop", choice.lit)], systemBody(choice.state, choice.count)));
+  return panelPage({
+    ...options(choice, "system", [action("terminal", "Open btop", choice.lit)], systemBody(choice.state, choice.count)),
+    ...(choice.footer ? { footer: [button({ label: "Open btop", kind: "Tonal", size: "Sm" })] } : {}),
+  });
 }
 
+/**
+ * The notifications panel as the shell draws it: its status where another panel's pun goes, Do not
+ * disturb with its card and Clear all in the header, the groups, and the keys button floating in the
+ * bottom right corner; no footer. It runs from the bar to the frame's foot.
+ */
 export function notifications(choice: PanelChoice = {}): PanelPage {
-  const footer = choice.footer ?? true;
-  return panelPage({
-    ...options(choice, "notifications", [action("dark_mode", "Do not disturb", choice.lit), action("clear_all", "Clear all")], notificationsBody(choice.state, choice.count)),
-    ...(footer && (choice.state ?? "rest") === "rest" ? { footer: [button({ label: "Mark all read", kind: "Tonal", size: "Sm" })] } : {}),
+  const dnd = dndButton(false, choice.lit ?? false);
+  if (choice.lit) dnd.button.dataset.pinned = "lit";
+  const page = panelPage({
+    ...options(choice, "notifications", [dnd.anchor, clearButton()], notificationsBody(choice.state, choice.count)),
+    subtitle: choice.subtitle ?? status(5, 7),
   });
+  page.element.classList.add("k-notif-panel");
+  page.element.append(keysButton());
+  return page;
 }
 
 export function controlCenter(choice: PanelChoice = {}): PanelPage {

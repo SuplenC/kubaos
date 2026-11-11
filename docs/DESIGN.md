@@ -467,6 +467,8 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Badge and BadgedIcon](design/components/badge.md)
 - [Skeleton](design/components/skeleton.md)
 - [Card and ChoiceCard](design/components/card.md)
+- [NotificationCard](design/components/notification-card.md)
+- [NotificationGroup](design/components/notification-group.md)
 - [Media](design/components/media.md)
 - [PictureChoice](design/components/picture-choice.md)
 
@@ -500,6 +502,7 @@ Each component has a page of its own under `design/components/`: its constructor
 **Panels and the bar**
 
 - [Sheet](design/components/sheet.md)
+- [PopupStack](design/components/popup-stack.md)
 - [Pill](design/components/pill.md)
 - [Bar](design/components/bar.md)
 
