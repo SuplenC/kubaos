@@ -314,8 +314,22 @@
   box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--fg) r g b / calc(var(--elevation-rim) * var(--lift)));
 }
 
+/* The container roles as the group's surface has them, before a card re-bases them. */
+.k-notif-group {
+  --role-high: var(--color-surface_container_high);
+  --role-highest: var(--color-surface_container_highest);
+  --role-bright: var(--color-surface_bright);
+}
+
+/* A card that lifts a role at night lifts what it holds with it: inside it every container role steps
+   up as its own fill does, so its count chip (`surface_container_high`), its icon tile
+   (`surface_container_highest`) and anything else filled one step or more above the card stay that
+   far above it on whatever step the card stands. By day nothing lifts, and nothing moves. */
 .k-notif-slot > .k-notif-card:not([data-critical]) {
-  background-color: color-mix(in srgb, var(--color-surface_container), var(--color-surface_container_high) calc(var(--elevation-lighter) * var(--lift) * 100%));
+  --step: calc(var(--elevation-lighter) * var(--lift));
+  --color-surface_container_high: color-mix(in srgb, var(--role-high), var(--role-highest) calc(var(--step) * 100%));
+  --color-surface_container_highest: color-mix(in srgb, var(--role-highest), var(--role-bright) calc(var(--step) * 100%));
+  background-color: color-mix(in srgb, var(--color-surface_container), var(--role-high) calc(var(--step) * 100%));
 }
 
 /* Each spread card's own shadow, straight under it on the list: the ladder's step 1 at rest rising
