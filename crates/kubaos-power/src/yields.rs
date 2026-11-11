@@ -7,10 +7,11 @@
 //!                    └▶ the service's watch, every 2 s ─▶ the user's build tools at nice 19
 //! ```
 //!
-//! Nice is the lever because both CPU schedulers honour it: scx_lavd weighs a task by its nice and
-//! ignores cgroup `cpu.weight`, and EEVDF weighs both. Nothing goes to `SCHED_IDLE` or the idle
-//! I/O class: a build starved while it holds a lock (the Nix store's) would stall whatever waits
-//! on that lock, and nice 19 still yields without starving.
+//! Nice is the lever because scx_lavd ignores cgroup `cpu.weight` and EEVDF weighs both. Under
+//! EEVDF it is what keeps a frame on time beside a build in the same cgroup; under LAVD, whose
+//! latency criticality decides first, a reniced build measured no different. Nothing goes to
+//! `SCHED_IDLE` or the idle I/O class: a build starved while it holds a lock (the Nix store's)
+//! would stall whatever waits on that lock, and nice 19 still yields without starving.
 //!
 //! A process inherits its parent's nice, so reaching `cargo` or `make` within one scan reaches
 //! every compiler it starts after, and a program `cargo run` starts runs at nice 19 too. Raising
