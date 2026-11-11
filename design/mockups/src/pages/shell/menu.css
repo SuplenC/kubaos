@@ -1,0 +1,28 @@
+/* The Command menu's pages (`menu-parts.ts`): what its build lays out by its own measures. */
+
+/* The head's row: as tall as the field, whatever it holds. */
+.m-head {
+  height: var(--size-control_md);
+}
+
+/* A form's column: `size.column` wide at most, centred in the body. */
+.m-form {
+  width: min(100%, var(--size-column));
+  margin-inline: auto;
+}
+
+/* A progress View's room: the panel centred down the body. */
+.m-progress {
+  justify-content: center;
+}
+
+/* How far the Action panel still has to rise, 1 where it starts `space.s8` low and 0 in place. */
+@property --actions-drop {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.m-actions {
+  translate: 0 round(nearest, var(--actions-drop) * var(--space-s8), 1px);
+}

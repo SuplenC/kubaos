@@ -22,7 +22,7 @@
 }
 
 /* The Command menu's panel: the frame's glass, which Hyprland blurs behind, in the soft hairline. */
-.k-menu {
+.k-command {
   position: relative;
   display: flex;
   box-sizing: border-box;
@@ -34,7 +34,7 @@
   translate: 0 calc(round(nearest, var(--menu-drop) * var(--space-s8), 1px) * -1);
 }
 
-.k-menu > .k-stack {
+.k-command > .k-stack {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -97,7 +97,7 @@
   background: var(--color-surface_container_lowest);
 }
 
-.k-menu-screen > .k-menu {
+.k-menu-screen > .k-command {
   position: absolute;
 }
 
@@ -136,4 +136,24 @@
 /* The detail's words keep `space.s16` clear of the scroll's thumb at their end. */
 .k-setup-words {
   padding-right: var(--space-s16);
+}
+
+/* What floats over the body's foot, `space.s12` clear of the footer's hairline and inside the
+   panel's padding: the Action panel at the right, a Toast centred. */
+.k-menu-over {
+  position: absolute;
+  inset-inline: var(--space-s12);
+  bottom: calc(var(--space-s12) * 3 + var(--size-control_sm));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.k-menu-over > * {
+  pointer-events: auto;
+}
+
+.k-menu-over > .k-toast {
+  align-self: center;
 }
