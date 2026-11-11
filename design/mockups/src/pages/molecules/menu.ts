@@ -80,6 +80,7 @@ export default page({
     { name: "Choices", for: "one of a few, checked; each item keeps the check's room", sample: () => onPopover(choices(3), 3) },
     { name: "MenuItem, with keys", for: "a shortcut's keys as keycaps at its end", sample: () => alone({ label: "Copy path", icon: "content_paste", keys: "Ctrl+C" }) },
     { name: "MenuItem, danger", for: "destroys something: in `error`", sample: () => alone({ label: "Quit", icon: "logout", danger: true }) },
+    { name: "MenuItem, opening a submenu", for: "a chevron at its end: the tray's VPN Connections", sample: () => alone({ label: "VPN Connections", submenu: true }) },
   ],
   sizes: doesntApply("an item is a small control tall; a menu as tall as its items, as wide as its popover."),
   states: {
