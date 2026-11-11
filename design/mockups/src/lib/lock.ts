@@ -195,7 +195,8 @@ function sheetContent(moment: Moment, error: string, live: boolean, reader: bool
 function kickerLine(kicker: Kicker): HTMLElement {
   const place = text(kicker.place, "clock_place");
   const date = text(` · ${kicker.date}`, "clock_date");
-  for (const words of [place, date]) words.style.removeProperty("color");
+  // Their colours, sizes and lines are the CSS's: they scale with the clock.
+  for (const words of [place, date]) for (const property of ["color", "--t-size", "--t-line"]) words.style.removeProperty(property);
   place.classList.add("k-lock-place");
   date.classList.add("k-lock-date");
   const line = row(0, "centre", place, date);
@@ -370,8 +371,11 @@ export function lock(options: LockOptions): Lock {
     date.append(kickerMark);
     yield;
     const measured = measureBarTime(element, bar, mark);
-    const zoom = element.offsetWidth / (element.getBoundingClientRect().width || 1);
-    const kickerBase = (kickerMark.getBoundingClientRect().bottom - kicker.getBoundingClientRect().top) * zoom;
+    const kickerBox = kicker.getBoundingClientRect();
+    // Its baseline's depth below its top as a share of its size, so it holds at whatever size the
+    // kicker is drawn (the size in the screen's pixels, the box as the viewport draws it).
+    const kickerFont = Number.parseFloat(getComputedStyle(date).fontSize) * (kickerBox.width / ((kicker as HTMLElement).offsetWidth || kickerBox.width || 1));
+    const kickerBase = kickerFont > 0 ? (kickerMark.getBoundingClientRect().bottom - kickerBox.top) / kickerFont : 0;
     yield;
     mark.remove();
     kickerMark.remove();
@@ -379,7 +383,7 @@ export function lock(options: LockOptions): Lock {
       clock.style.setProperty("--bar-cx", measured.cx);
       clock.style.setProperty("--bar-base", measured.base);
     }
-    if (kickerBase > 0) clock.style.setProperty("--kicker-base", `${kickerBase.toFixed(3)}px`);
+    if (kickerBase > 0) clock.style.setProperty("--kicker-base-share", kickerBase.toFixed(5));
 
     const restDigitsBox = { x: rest.cx - restDigits / 2, y: rest.top, width: restDigits, height: cap * restSize };
     const tint = tintFor(picture, restDigitsBox, pushed);

@@ -56,10 +56,12 @@ export const TOWER: Wallpaper = {
 export const SHIBUYA: Wallpaper = {
   name: "Shibuya, a rainy corner",
   picture: shibuya,
-  // No cut-out: the clock stands in front, a little above the middle, its shade under it; on a
-  // portrait screen, which has no sky, in the signs' upper third.
+  // No cut-out: the clock stands in front, a little above the middle, its shade under it. On a
+  // portrait screen, which has no sky, over the darkest band: the facade and its 渋谷店 sign
+  // between the top signs and the lit shopfronts, its feet just above the そば sign, so its date
+  // stands as far down the screen as Shinjuku's and Tokyo Tower's.
   clock: { x: 0.5, y: 0.56 },
-  portrait: { x: 0.5, y: 0.32 },
+  portrait: { x: 0.5, y: 0.4 },
   night: { primary: "#5ae7dd", on_primary: "#003734", primary_container: "#33cbc1", on_primary_container: "#00312e", secondary: "#9fd0ca", on_secondary: "#003734", secondary_container: "#20514d", on_secondary_container: "#bceee8", tertiary: "#ffc7a4", on_tertiary: "#512400", tertiary_container: "#ffa05f", on_tertiary_container: "#481f00", cold: "#ffc7a4", on_cold: "#512400", cold_container: "#ffa05f", on_cold_container: "#481f00", surface: "#0e1514", on_surface: "#dde4e2", surface_variant: "#3c4948", on_surface_variant: "#bbcac7", surface_dim: "#0e1514", surface_bright: "#343a39", surface_container_lowest: "#090f0f", surface_container_low: "#161d1c", surface_container: "#1a2120", surface_container_high: "#252b2a", surface_container_highest: "#2f3635", outline: "#859491", outline_variant: "#3c4948", shadow: "#000000", scrim: "#000000", inverse_surface: "#dde4e2", inverse_on_surface: "#2b3231", inverse_primary: "#006a64" },
 };
 

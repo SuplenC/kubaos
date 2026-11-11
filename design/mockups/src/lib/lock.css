@@ -251,11 +251,14 @@
   --spread: calc((var(--bar-natural, 0) - var(--digits-natural) * var(--type-body-size) / var(--rest)) * var(--flown));
   --digits-width: round(up, calc((var(--digits-natural) * var(--k) + var(--spread)) * var(--px) - 0.001px), 1px);
   --digits-height: calc(var(--cap-height) * var(--rest) * var(--k));
-  /* The kicker keeps its rest sizes all along the flight, each word's box on whole device pixels as
-     a text's box is. */
-  --kicker-height: var(--kicker-line, max(var(--type-clock_place-line), var(--type-clock_date-line)));
-  --place-width: round(up, calc(var(--place-natural, 0) * var(--px) - 0.001px), 1px);
-  --date-width: round(up, calc(var(--date-natural, 0) * var(--px) - 0.001px), 1px);
+  /* The kicker scales with the clock's size as it is now, awake and along the flight as at rest
+     (`--k`), never under `size.lock_date_least`; each word's box on whole device pixels as a
+     text's box is. */
+  --kicker-rest: var(--kicker-size, var(--type-clock_date-size));
+  --kicker-k: max(var(--k), var(--size-lock_date_least) / var(--kicker-rest));
+  --kicker-height: calc(var(--kicker-line, max(var(--type-clock_place-line), var(--type-clock_date-line))) * var(--kicker-k));
+  --place-width: round(up, calc(var(--place-natural, 0) * var(--kicker-k) * var(--px) - 0.001px), 1px);
+  --date-width: round(up, calc(var(--date-natural, 0) * var(--kicker-k) * var(--px) - 0.001px), 1px);
   --kicker-width: calc(var(--place-width) + var(--date-width));
   --bar-top: calc(var(--bar-shift) + (var(--size-bar) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-body-size));
   /* The rest place moves with the picture as it pushes in: where the wallpaper puts the clock on
@@ -278,12 +281,12 @@
   opacity: 0;
 }
 
-/* The kicker stands its gap (`--kicker-gap`, `scale.lock_date_gap` of the clock) over the digits, measured as the eye does: from the digits' cap
+/* The kicker stands its gap (`--kicker-gap`, `scale.lock_date_gap` of the clock, scaling with it) over the digits, measured as the eye does: from the digits' cap
    top, which is their box's, to the kicker's baseline (`--kicker-base`, its depth in its line, read
    off the font), so its descenders and its line's leading don't count. */
 .k-lock-clock > .k-lock-kicker {
   position: absolute;
-  top: round(nearest, calc(-1 * (var(--kicker-gap, var(--space-s40)) + var(--kicker-base, var(--kicker-height)))), 1px);
+  top: round(nearest, calc(-1 * (var(--kicker-gap, var(--space-s40)) * var(--k) + var(--kicker-base-share, 1.2) * var(--kicker-rest) * var(--kicker-k))), 1px);
   left: calc(round(down, calc(var(--cx) - var(--kicker-width) / 2), 1px) - round(down, calc(var(--cx) - var(--digits-width) / 2), 1px));
   width: max-content;
 }
@@ -307,15 +310,17 @@
 
 .k-lock .k-lock-place {
   width: var(--place-width);
-  font-size: var(--kicker-size, var(--type-clock_place-size));
-  line-height: var(--kicker-height);
+  /* Its text's size and line, which its ink's centring and its box are worked out from too. */
+  --t-size: calc(var(--kicker-rest) * var(--kicker-k));
+  --t-line: var(--kicker-height);
   color: color-mix(in oklab, var(--color-primary) calc(var(--flown) * 100%), var(--tint));
 }
 
 .k-lock .k-lock-date {
   width: var(--date-width);
-  font-size: var(--kicker-size, var(--type-clock_date-size));
-  line-height: var(--kicker-height);
+  /* Its text's size and line, which its ink's centring and its box are worked out from too. */
+  --t-size: calc(var(--kicker-rest) * var(--kicker-k));
+  --t-line: var(--kicker-height);
   color: color-mix(in oklab, var(--color-on_surface_variant) calc(var(--flown) * 100%), rgb(from var(--tint) r g b / var(--opacity-clock_date)));
 }
 
