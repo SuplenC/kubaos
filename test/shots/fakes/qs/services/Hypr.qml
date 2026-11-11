@@ -33,6 +33,12 @@ QtObject {
     function step(monitor: var, direction: int, fallback: int): void {
     }
 
+    // The screen a workspace is on, as the service reads it: the stand-in's workspaces carry their
+    // monitor, and none is ever moved.
+    function monitorNameOf(workspace: var): string {
+        return workspace?.monitor?.name ?? "";
+    }
+
     function isStale(id: int): bool {
         return false;
     }
