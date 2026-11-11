@@ -1216,7 +1216,11 @@ burn_recording = "oklch(0.55 0.22 29)"
 # The fixed palette's text roles: each burning tone, its lightness moved only as
 # far as it takes to hold 4.5:1 on every surface text sits on. By night the
 # neon tones mostly hold as they are; by day each darkens at its own hue.
-error = { from = "burn_error", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
+# By day the error is also the fill under a danger row's white label, subdued for its
+# subtitle. Fitted to the surfaces alone it lands right on 4.5:1 there and leaves that
+# subtitle a hair under, so by day it starts at 93% of the tone's lightness, which holds
+# both with room.
+error = { dark = { from = "burn_error", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }, light = { from = "burn_error", lightness = 0.93, text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] } }
 success = { from = "burn_success", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
 warning = { from = "burn_warning", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
 sharing = { from = "burn_sharing", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
