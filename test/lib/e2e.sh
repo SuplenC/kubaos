@@ -2785,8 +2785,8 @@ c_suites() {
   zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.local/share/kubaos-test-suite/bin" ||
     { echo "FAIL the Suite's PATH entry is missing"; return 1; }
   echo "ok   its package, environment variable and PATH entry"
-  grep -qx 'kubaos-test-tool = "1"' "$frag" && [[ $(zlogin 'kubaos-test-tool') == 1.0.1 ]] ||
-    { echo "FAIL its mise tool: no request in $frag, or kubaos-test-tool isn't 1.0.1"; cat "$frag"; return 1; }
+  grep -qx 'kubaos-test-tool = "1.0"' "$frag" && [[ $(zlogin 'kubaos-test-tool') == 1.0.1 ]] ||
+    { echo "FAIL its mise tool: no request 1.0 in $frag, or kubaos-test-tool isn't 1.0.1"; cat "$frag"; return 1; }
   [[ -s $USER_HOME/.config/mise/mise.lock ]] || { echo "FAIL mise lock --global wrote no lockfile"; return 1; }
   echo "ok   its mise tool: requested in ~/.config/mise/conf.d/kubaos-test.toml, locked, 1.0.1 on PATH"
   [[ -f $mine ]] && grep -q 'created ~/.config/kubaos/editor/nvim/plugins/test-suite.lua' <<<"$out" ||
@@ -2801,6 +2801,29 @@ c_suites() {
   out="$(opts)"
   [[ $out == "mine 1" ]] || { echo "FAIL the user's override in $mine doesn't win: $out"; return 1; }
   echo "ok   the user's override of the same setting wins"
+
+  # A patch release behind: the lockfile at 1.0.0, installed, and 1.0.1 pruned.
+  as_user sed -i 's/"1\.0\.1"/"1.0.0"/' "$USER_HOME/.config/mise/mise.lock"
+  zrun 'cd / && MISE_YES=1 mise install --locked && MISE_YES=1 mise prune --tools' >"$LOGS/suites-behind.log" 2>&1 &&
+    [[ $(zlogin 'kubaos-test-tool') == 1.0.0 && ! -e $installs/1.0.1 ]] ||
+    { echo "FAIL setting kubaos-test-tool a patch release behind"; tail -5 "$LOGS/suites-behind.log"; return 1; }
+  out="$(kz 'kubaos suite update --json' 2>&1)"
+  grep -q '"current": "1.0.0"' <<<"$out" && grep -q '"latest": "1.0.1"' <<<"$out" ||
+    { echo "FAIL kubaos suite update --json doesn't list 1.0.0 → 1.0.1"; printf '%s\n' "$out"; return 1; }
+  out="$(kz 'kubaos suite update' 2>&1 </dev/null)" &&
+    { echo "FAIL kubaos suite update with no name and no terminal didn't refuse"; printf '%s\n' "$out"; return 1; }
+  out="$(kz 'kubaos suite update test' 2>&1)" ||
+    { echo "FAIL kubaos suite update test"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx 'updated test: kubaos-test-tool 1.0.0 → 1.0.1' <<<"$out" &&
+    [[ $(zlogin 'kubaos-test-tool') == 1.0.1 && ! -e $installs/1.0.0 ]] && grep -qx 'kubaos-test-tool = "1.0"' "$frag" ||
+    { echo "FAIL update: kubaos-test-tool isn't 1.0.1 with 1.0.0 pruned and the request kept"; printf '%s\n' "$out"; ls "$installs"; return 1; }
+  echo "ok   kubaos suite update test: 1.0.0 → 1.0.1, 1.0.0 pruned, the fragment unchanged; --json lists it, no terminal and no name refuses"
+  out="$(kz 'kubaos suite upgrade test --no-switch' 2>&1)" ||
+    { echo "FAIL kubaos suite upgrade test"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx 'kubaos-test-tool = "3.0"' "$frag" && grep -qx 'version = "3"' "$u/kubaos.d/suites/test.toml" &&
+    [[ $(zlogin 'kubaos-test-tool') == 3.0.0 && ! -e $installs/1.0.1 ]] ||
+    { echo "FAIL upgrade: not on 3.0 in the fragment and 3 in the record, or 1.0.1 not pruned"; printf '%s\n' "$out"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite upgrade test: the fragment asks for 3.0, the record takes version 3, 1.0.1 pruned"
 
   out="$(kz 'kubaos suite configure test --version 2 --extra greeting --foreground' 2>&1)" ||
     { echo "FAIL kubaos suite configure test"; printf '%s\n' "$out" | tail -20; return 1; }
