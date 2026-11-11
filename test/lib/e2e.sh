@@ -2983,63 +2983,175 @@ gone_from_generation() {
   [[ -z $left ]] || { echo "FAIL $1 still in the generation:"; printf '%s\n' "$left"; return 1; }
 }
 
-# The Rust Suite (home/suites/rust.nix): rustup and the cargo tools, cargo's
-# config with mold and then wild, rustup's default set without a download,
-# rust-analyzer as the wrapper that adds the component, and nothing of it left
-# in the generation after removal. No toolchain is downloaded, so no cargo
-# runs.
+# The Rust Suite (crates/kubaos-core/src/suites/catalog.rs,
+# home/suites/rust.nix): rustup, cargo-nextest, sccache, codelldb and wild
+# from mise, rustup's proxies in ~/.nix-profile/bin linked to that rustup, and
+# the stable toolchain rustup downloads on first use, with the minimal
+# profile (network). A home from before mise moves onto it through the
+# migration with its extras; a folder's rust-toolchain.toml still picks the
+# toolchain under mise's hook; a project is scaffolded and built with sccache
+# and mold, then wild; the user's own cargo settings and environment win over
+# the Suite's defaults; Neovim finds rust-analyzer and codelldb through
+# exepath; removal leaves nothing of it in mise or the generation, and a
+# fresh add seeds rustup's and cargo's settings without a download.
 c_suite_rust() {
-  local u="$USER_HOME/.config/kubaos/home" out gen t
-  local cargo_config="$USER_HOME/.cargo/config.toml" settings="$USER_HOME/.rustup/settings.toml"
+  local u="$USER_HOME/.config/kubaos/home" project="$USER_HOME/Projects/rust-demo" ws="$USER_HOME/Projects/rust-ws"
+  local pinned="$USER_HOME/Projects/rust-pinned" out gen t
+  local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/rust.lua"
+  local cargo_config="$USER_HOME/.cargo/config.toml" defaults="$USER_HOME/.cargo/kubaos.toml"
+  local settings="$USER_HOME/.rustup/settings.toml" frag="$USER_HOME/.config/mise/conf.d/kubaos-rust.toml"
+  local installs="$USER_HOME/.local/share/mise/installs" shims="$USER_HOME/.local/share/mise/shims"
+  local migration=("$REPO"/migrations/user/*-rust-on-mise.sh)
+  local proxies=(rustup cargo rustc rustfmt cargo-clippy rust-analyzer codelldb)
+  local folders=(aqua-rust-lang-rustup aqua-nextest-rs-nextest-cargo-nextest aqua-mozilla-sccache github-vadimcn-codelldb github-davidlattimore-wild)
   install_kubaos || return 1
   user_flake "$u" || return 1
   as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
-  rm -rf "$USER_HOME/.rustup" "$USER_HOME/.config/kubaos/editor/nvim/plugins/rust.lua"
+  rm -rf "$project" "$ws" "$pinned" "$mine" "$USER_HOME/.rustup" "$USER_HOME/.cargo"
+  # linker_of BIN: the linker that wrote BIN, from its .comment section, in lowercase.
+  linker_of() { readelf -p .comment "$1" | grep -oiE 'mold|wild' | head -1 | tr '[:upper:]' '[:lower:]'; }
+  # rustc_line DIR [ENV]: rustc's command line in a clean `cargo build -v` in DIR, with ENV before it.
+  rustc_line() { zrun "cd $1 && cargo clean -q && ${2:-} cargo build -v 2>&1" | grep -F 'Running `' | tail -1; }
+  # versions_left: the tool versions mise still has of the Suite. A pruned tool
+  # keeps its folder and mise's .mise.backend.toml in it.
+  versions_left() { find "${folders[@]/#/$installs/}" -mindepth 1 -maxdepth 1 -type d 2>/dev/null; }
 
-  out="$(kz 'kubaos suite add rust --foreground' 2>&1)" ||
-    { echo "FAIL kubaos suite add rust"; printf '%s\n' "$out" | tail -20; return 1; }
-  for t in rustup cargo rustc rust-analyzer bacon cargo-nextest sccache wild kubaos-rust-workspace; do
-    has_bin "$t" || { echo "FAIL $t not on PATH"; return 1; }
+  # A home as the Suite on Nix left it: the record with the wild extra, no
+  # fragment, and rustup's settings as that Suite wrote them, but for the
+  # minimal profile, so the check downloads less.
+  as_user install -d "$u/kubaos.d/suites" "$USER_HOME/.rustup"
+  printf 'extras = ["wild"]\n' | as_user tee "$u/kubaos.d/suites/rust.toml" >/dev/null
+  printf 'version = "12"\ndefault_toolchain = "stable"\nprofile = "minimal"\n' | as_user tee "$settings" >/dev/null
+  out="$(kz 'kubaos switch --foreground' 2>&1)" ||
+    { echo "FAIL the switch with the old Rust record"; printf '%s\n' "$out" | tail -20; return 1; }
+  gone_from_generation "the Rust Suite's Nix tools" '-(rustup|cargo-nextest|sccache|wild-unwrapped)-[0-9]' || return 1
+  has_bin kubaos-rust-workspace && has_bin bacon && [[ -L $USER_HOME/.nix-profile/bin/cargo && -L $defaults ]] ||
+    { echo "FAIL the module's scaffolder, bacon, rustup's proxies or cargo's defaults are missing"; return 1; }
+  for _ in 1 2; do
+    out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+      { echo "FAIL the rust-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
   done
-  [[ $(readlink -f "$USER_HOME/.nix-profile/bin/rust-analyzer") == /nix/store/*-rust-analyzer/bin/rust-analyzer ]] ||
-    { echo "FAIL rust-analyzer is rustup's proxy, not the wrapper that adds the component"; return 1; }
-  zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.cargo/bin" ||
-    { echo "FAIL ~/.cargo/bin is not on PATH"; return 1; }
-  [[ $(zrun 'print -r -- "$SCCACHE_CACHE_SIZE"') == 10G ]] || { echo "FAIL SCCACHE_CACHE_SIZE is not 10G"; return 1; }
-  echo "ok   kubaos suite add rust: rustup, its proxies, the rust-analyzer wrapper, bacon, cargo-nextest, sccache, wild, ~/.cargo/bin on PATH"
-  grep -q 'rustc-wrapper = ".*/bin/sccache"' "$cargo_config" && grep -qF 'link-arg=-fuse-ld=mold' "$cargo_config" ||
-    { echo "FAIL ~/.cargo/config.toml:"; cat "$cargo_config"; return 1; }
-  grep -qx 'default_toolchain = "stable"' "$settings" && grep -qx 'profile = "default"' "$settings" &&
-    [[ ! -e $USER_HOME/.rustup/toolchains ]] ||
-    { echo "FAIL rustup's settings, or a toolchain downloaded at the switch:"; cat "$settings"; return 1; }
-  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
-  grep -qF 'lazyvim.plugins.extras.lang.rust' "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
-    { echo "FAIL LazyVim's Rust extra is not in the Defaults"; return 1; }
-  [[ -f $USER_HOME/.config/kubaos/editor/nvim/plugins/rust.lua ]] || { echo "FAIL plugins/rust.lua was not seeded"; return 1; }
-  echo "ok   cargo's config (sccache, clang with mold), rustup's default (stable) with nothing downloaded, LazyVim's Rust extra, the seeded rust.lua"
+  grep -qx '"aqua:rust-lang/rustup" = "1.29"' "$frag" && grep -qx '"github:davidlattimore/wild" = "0.11"' "$frag" &&
+    grep -qF 'already extras: wild' <<<"$out" && [[ $(cat "$u/kubaos.d/suites/rust.toml") == 'extras = ["wild"]' ]] ||
+    { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  grep -qx 'auto_self_update = "disable"' "$settings" && grep -qx 'profile = "minimal"' "$settings" ||
+    { echo "FAIL the migration should turn rustup's self-update off and keep the rest:"; cat "$settings"; return 1; }
+  [[ $(readlink -f "$USER_HOME/.nix-profile/bin/cargo") == "$installs"/aqua-rust-lang-rustup/1.29.*/rustup ]] ||
+    { echo "FAIL cargo isn't a proxy of mise's rustup: $(readlink -f "$USER_HOME/.nix-profile/bin/cargo")"; return 1; }
+  echo "ok   the rust-on-mise migration: a record with wild gets its fragment and tools, the record kept, self-update off, a rerun changes nothing"
+
+  [[ $(zrun 'rustc --version') == 'rustc 1.'* && -d $USER_HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu ]] ||
+    { echo "FAIL the first rustc should download stable into ~/.rustup: $(zrun 'rustc --version' 2>&1 | tail -3)"; return 1; }
+  [[ -z $(zlogin 'print -r -- "$RUSTUP_HOME$CARGO_HOME$RUSTUP_TOOLCHAIN"') && $(zlogin 'rustup show home') == "$USER_HOME/.rustup" ]] ||
+    { echo "FAIL mise's hook sets RUSTUP_HOME, CARGO_HOME or RUSTUP_TOOLCHAIN: $(zlogin 'env | grep -E "^(RUSTUP|CARGO)_"')"; return 1; }
+  zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.cargo/bin" && [[ $(zrun 'print -r -- "$SCCACHE_CACHE_SIZE"') == 10G ]] ||
+    { echo "FAIL ~/.cargo/bin is not on PATH, or SCCACHE_CACHE_SIZE is not 10G"; return 1; }
+  # rustup itself is mise's, ahead of its link; every other proxy is a link to it.
+  for t in "${proxies[@]:1}"; do
+    [[ $(zlogin "whence -p $t") == "$USER_HOME/.nix-profile/bin/$t" ]] || { echo "FAIL $t is not the Suite's link: $(zlogin "whence -p $t")"; return 1; }
+  done
+  [[ $(zlogin 'whence -p rustup') == "$installs"/aqua-rust-lang-rustup/1.29.*/rustup ]] ||
+    { echo "FAIL rustup is not mise's in an interactive zsh: $(zlogin 'whence -p rustup')"; return 1; }
+  for t in cargo-nextest sccache wild; do
+    [[ $(zrun "whence -p $t") == "$shims/$t" ]] || { echo "FAIL $t is not mise's shim in a login shell: $(zrun "whence -p $t")"; return 1; }
+  done
+  [[ $(zlogin 'whence -p cargo-nextest') == "$installs/aqua-nextest-rs-nextest-cargo-nextest/"* ]] ||
+    { echo "FAIL an interactive zsh doesn't put mise's own entries ahead of the shims: $(zlogin 'whence -p cargo-nextest')"; return 1; }
+  echo "ok   stable downloaded into ~/.rustup on first use; no RUSTUP_HOME, CARGO_HOME or RUSTUP_TOOLCHAIN; rustup's proxies are the Suite's links, the tools mise's"
+
+  zrun 'rustup toolchain link kubaos-check "$(rustc --print sysroot)"' >/dev/null || { echo "FAIL rustup toolchain link"; return 1; }
+  as_user install -d "$pinned"
+  printf '[toolchain]\nchannel = "kubaos-check"\n' | as_user tee "$pinned/rust-toolchain.toml" >/dev/null
+  [[ $(zlogin "cd $pinned && rustup show active-toolchain") == 'kubaos-check '* && $(zlogin 'rustup show active-toolchain') == stable-* ]] ||
+    { echo "FAIL rust-toolchain.toml should pick the toolchain: $(zlogin "cd $pinned && rustup show active-toolchain")"; return 1; }
+  zrun 'rustup toolchain uninstall kubaos-check' >/dev/null 2>&1
+  echo "ok   a folder's rust-toolchain.toml picks its toolchain under mise's hook, stable outside"
+
+  out="$(kz 'kubaos suite configure rust --no-extra wild --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite configure rust --no-extra wild"; printf '%s\n' "$out" | tail -20; return 1; }
+  ! grep -q wild "$frag" && [[ -z $(find "$installs/github-davidlattimore-wild" -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
+    { echo "FAIL configure: wild is left in the fragment or installed"; cat "$frag"; return 1; }
+  grep -qx 'rustc-wrapper = "sccache"' "$defaults" && grep -qF 'link-arg=-fuse-ld=mold' "$defaults" ||
+    { echo "FAIL ~/.cargo/kubaos.toml without wild:"; cat "$defaults"; return 1; }
+  [[ -f $cargo_config && ! -L $cargo_config ]] && grep -qx 'include = \["kubaos.toml"\]' "$cargo_config" ||
+    { echo "FAIL ~/.cargo/config.toml should be the user's file, including kubaos.toml:"; ls -l "$cargo_config"; cat "$cargo_config"; return 1; }
+  [[ -f $mine ]] || { echo "FAIL plugins/rust.lua was not seeded"; return 1; }
+  echo "ok   kubaos suite configure rust --no-extra wild: wild pruned, cargo's defaults on mold, ~/.cargo/config.toml the user's and including them, the seeded rust.lua"
+
+  out="$(kz 'kubaos suite new rust rust-demo' 2>&1)" ||
+    { echo "FAIL kubaos suite new rust rust-demo"; printf '%s\n' "$out" | tail -20; return 1; }
+  out="$(rustc_line "$project")"
+  grep -qF sccache <<<"$out" && grep -qF -- '-C linker=clang' <<<"$out" && grep -qF -- '-fuse-ld=mold' <<<"$out" &&
+    [[ $(zrun "$project/target/debug/rust-demo") == 'Hello, world!' && $(linker_of "$project/target/debug/rust-demo") == mold && -d $project/.git ]] ||
+    { echo "FAIL rust-demo should build through sccache and link with clang and mold, and run:"; printf '%s\n' "$out"; return 1; }
+  zrun "cd $project && cargo nextest --version && bacon --version" >/dev/null 2>&1 ||
+    { echo "FAIL cargo nextest or bacon in the project"; zrun "cd $project && cargo nextest --version; bacon --version" 2>&1 | tail -5; return 1; }
+  out="$(kz 'kubaos suite new rust rust-ws --with workspace' 2>&1)" && zrun "cd $ws && cargo check -q" >/dev/null 2>&1 &&
+    grep -qx 'members = \["crates/\*"\]' "$ws/Cargo.toml" && [[ -f $ws/crates/rust-ws/src/lib.rs ]] ||
+    { echo "FAIL the workspace scaffolder"; printf '%s\n' "$out" | tail -10; return 1; }
+  echo "ok   kubaos suite new rust: a binary under git built through sccache, linked by clang with mold, and run; cargo nextest and bacon; a workspace that checks"
+
+  as_user cp "$cargo_config" "$cargo_config.kept"
+  printf '\n[build]\nrustc-wrapper = ""\n\n[target.x86_64-unknown-linux-gnu]\nlinker = "cc"\n' | as_user tee -a "$cargo_config" >/dev/null
+  out="$(rustc_line "$project")"
+  ! grep -qF sccache <<<"$out" && grep -qF -- '-C linker=cc' <<<"$out" ||
+    { echo "FAIL the user's ~/.cargo/config.toml should win over kubaos.toml:"; printf '%s\n' "$out"; return 1; }
+  as_user mv "$cargo_config.kept" "$cargo_config"
+  out="$(rustc_line "$project" 'RUSTC_WRAPPER=')"
+  ! grep -qF sccache <<<"$out" || { echo "FAIL RUSTC_WRAPPER= should drop sccache:"; printf '%s\n' "$out"; return 1; }
+  echo "ok   the user's own ~/.cargo/config.toml and RUSTC_WRAPPER win over the Suite's defaults"
 
   out="$(kz 'kubaos suite configure rust --extra wild --foreground' 2>&1)" ||
     { echo "FAIL kubaos suite configure rust --extra wild"; printf '%s\n' "$out" | tail -20; return 1; }
-  grep -q 'link-arg=--ld-path=/nix/store/.*/bin/wild"' "$cargo_config" && ! grep -qF mold "$cargo_config" ||
-    { echo "FAIL with the wild extra, ~/.cargo/config.toml:"; cat "$cargo_config"; return 1; }
-  echo "ok   the wild extra links with wild"
+  out="$(rustc_line "$project")"
+  grep -qF 'link-arg=--ld-path=wild' "$defaults" && ! grep -qF mold "$defaults" && [[ $(linker_of "$project/target/debug/rust-demo") == wild ]] ||
+    { echo "FAIL with the wild extra, rust-demo should link with wild:"; cat "$defaults"; printf '%s\n' "$out"; return 1; }
+  echo "ok   the wild extra installs wild, and rust-demo links with it through its shim"
+
+  cache_lock nvim
+  out="$(zrun "cd $project && nvim --headless +'lua local a = vim.g.rustaceanvim.dap.adapter(); io.write(\"\\nMASON \", table.concat(LazyVim.opts(\"mason.nvim\").ensure_installed, \",\"), \"\\nPATHS \", vim.fn.exepath(\"rust-analyzer\"), \" \", vim.fn.exepath(\"codelldb\"), \"\\nLIBLLDB \", a.executable.args[2])' +qa" 2>&1 | tr -d '\r')"
+  grep -qx "PATHS $USER_HOME/.nix-profile/bin/rust-analyzer $USER_HOME/.nix-profile/bin/codelldb" <<<"$out" &&
+    grep -q '^MASON ' <<<"$out" && ! grep '^MASON ' <<<"$out" | grep -qw codelldb &&
+    [[ -f $(sed -n 's/^LIBLLDB //p' <<<"$out") ]] ||
+    { echo "FAIL Neovim should find rust-analyzer and codelldb through exepath, codelldb's own LLDB, and ask Mason for neither:"; printf '%s\n' "$out" | grep -E '^(MASON|PATHS|LIBLLDB)|rror'; return 1; }
+  [[ $(zrun "cd $project && rust-analyzer --version") == rust-analyzer* ]] ||
+    { echo "FAIL rust-analyzer should add its component and run: $(zrun "cd $project && rust-analyzer --version" 2>&1 | tail -3)"; return 1; }
+  echo "ok   Neovim finds rust-analyzer and codelldb through exepath, codelldb with the LLDB of its extension; rust-analyzer adds its component on first run"
 
   out="$(kz 'kubaos suite remove rust --foreground' 2>&1)" ||
     { echo "FAIL kubaos suite remove rust"; printf '%s\n' "$out" | tail -20; return 1; }
-  grep -qE '^cache ~/.rustup \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" && [[ -f $settings ]] ||
-    { echo "FAIL remove: ~/.rustup not shown with its size, or not kept"; printf '%s\n' "$out"; return 1; }
-  gone_from_generation "the Rust Suite's packages" '-(rustup|rust-analyzer|bacon|cargo-nextest|sccache|wild-unwrapped|kubaos-rust-workspace)-' || return 1
-  for t in rustup cargo rust-analyzer bacon sccache wild; do
-    ! has_bin "$t" || { echo "FAIL $t is still on PATH"; return 1; }
+  grep -qE '^cache ~/.rustup \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" && [[ -f $settings && -f $project/src/main.rs ]] &&
+    grep -qx '  ~/.config/kubaos/editor/nvim/plugins/rust.lua' <<<"$out" ||
+    { echo "FAIL remove: ~/.rustup's size or keeping it, the user's rust.lua, or the project"; printf '%s\n' "$out"; return 1; }
+  [[ ! -e $frag && -z $(versions_left) ]] || { echo "FAIL remove: the fragment or a version is left"; versions_left; return 1; }
+  for t in "${proxies[@]}" bacon kubaos-rust-workspace cargo-nextest sccache wild; do
+    [[ ! -e $shims/$t ]] && ! zrun "whence -p $t" >/dev/null || { echo "FAIL $t is still on PATH"; return 1; }
   done
-  [[ ! -e $cargo_config ]] && ! zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.cargo/bin" ||
-    { echo "FAIL ~/.cargo/config.toml or ~/.cargo/bin on PATH is left"; return 1; }
+  gone_from_generation "the Rust Suite's packages" '-(kubaos-rustup-proxies|rust-analyzer|bacon-[0-9.]+|kubaos-rust-workspace|kubaos\.toml)(-|$)' || return 1
+  [[ -f $cargo_config && -f $defaults && ! -L $defaults ]] && ! grep -qE 'sccache|mold|wild' "$defaults" ||
+    { echo "FAIL remove: ~/.cargo/config.toml should stay, with an empty kubaos.toml for its include"; ls -l "$USER_HOME/.cargo"; cat "$defaults"; return 1; }
   gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
-  ! grep -qs SCCACHE "$gen/home-path/etc/profile.d/hm-session-vars.sh" &&
+  ! zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.cargo/bin" &&
+    ! grep -qs SCCACHE "$gen/home-path/etc/profile.d/hm-session-vars.sh" &&
     ! grep -qF lang.rust "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
-    { echo "FAIL the Suite's environment or Neovim extra is left"; return 1; }
-  echo "ok   kubaos suite remove rust: ~/.rustup kept with its size shown, nothing of the Suite left in the generation"
-  rm -rf "$USER_HOME/.rustup" "$USER_HOME/.config/kubaos/editor/nvim/plugins/rust.lua"
+    { echo "FAIL ~/.cargo/bin on PATH, the Suite's environment or its Neovim extra is left"; return 1; }
+  echo "ok   kubaos suite remove rust: fragment, versions and links gone, ~/.rustup kept with its size shown, rust.lua listed, the user's config.toml kept with an empty kubaos.toml, nothing of it left in the generation"
+
+  rm -rf "$USER_HOME/.rustup" "$USER_HOME/.cargo"
+  out="$(kz 'kubaos suite add rust --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add rust"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx '"aqua:rust-lang/rustup" = "1.29"' "$frag" && ! grep -q wild "$frag" &&
+    [[ $(readlink -f "$USER_HOME/.nix-profile/bin/cargo") == "$installs"/aqua-rust-lang-rustup/1.29.*/rustup ]] ||
+    { echo "FAIL kubaos suite add rust: the fragment, or cargo isn't a proxy of mise's rustup"; cat "$frag"; return 1; }
+  grep -qx 'default_toolchain = "stable"' "$settings" && grep -qx 'profile = "default"' "$settings" &&
+    grep -qx 'auto_self_update = "disable"' "$settings" && [[ ! -e $USER_HOME/.rustup/toolchains ]] ||
+    { echo "FAIL rustup's settings, or a toolchain downloaded at the switch:"; cat "$settings"; return 1; }
+  [[ -f $cargo_config && ! -L $cargo_config && -L $defaults ]] && grep -qx 'include = \["kubaos.toml"\]' "$cargo_config" &&
+    grep -qF 'link-arg=-fuse-ld=mold' "$defaults" ||
+    { echo "FAIL cargo's settings after a fresh add:"; ls -l "$USER_HOME/.cargo"; return 1; }
+  echo "ok   kubaos suite add rust: every tool but wild, rustup's settings (stable, default profile, no self-update) and cargo's, nothing downloaded"
+  expect_ok "kubaos suite remove rust again" kz 'kubaos suite remove rust --foreground' || return 1
+  rm -rf "$project" "$ws" "$pinned" "$mine" "$USER_HOME/.rustup" "$USER_HOME/.cargo"
 }
 
 # The Go Suite (crates/kubaos-core/src/suites/catalog.rs, home/suites/go.nix):

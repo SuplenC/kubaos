@@ -337,7 +337,10 @@ const GO: Suite = Suite {
 /// clang with mold. Its Nix module is `home/suites/rust.nix`.
 ///
 /// It has no versions: rustup installs the toolchain a project's `rust-toolchain.toml` names on
-/// first use, and stable everywhere else, so that file is the per-project pin.
+/// first use, and stable everywhere else, so that file is the per-project pin. mise installs
+/// rustup itself, not mise's own `rust`, which sets `RUSTUP_TOOLCHAIN` and so outranks that file.
+/// Every tool is a release binary: aqua's where its registry has one, else the project's GitHub
+/// release. codelldb is its VS Code extension, which carries the adapter and its own LLDB.
 const RUST: Suite = Suite {
     name: "rust",
     title: "Rust",
@@ -349,7 +352,33 @@ const RUST: Suite = Suite {
         description: "Links with wild instead of mold: faster relinks, before its 1.0.",
         default: false,
     }],
-    mise: &[],
+    mise: &[
+        Tool {
+            name: "aqua:rust-lang/rustup",
+            request: Request::Fixed("1.29"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:nextest-rs/nextest/cargo-nextest",
+            request: Request::Fixed("0.9"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:mozilla/sccache",
+            request: Request::Fixed("0.19"),
+            extra: None,
+        },
+        Tool {
+            name: "github:vadimcn/codelldb",
+            request: Request::Fixed("1.12"),
+            extra: None,
+        },
+        Tool {
+            name: "github:davidlattimore/wild",
+            request: Request::Fixed("0.11"),
+            extra: Some("wild"),
+        },
+    ],
     toolchain: Toolchain::Upstream { manager: "rustup" },
     caches: &[
         Cache {

@@ -69,6 +69,11 @@ impl FakeMise {
                 ("aqua:astral-sh/ruff", vec!["0.17.4"]),
                 ("pypi:debugpy", vec!["1.8.22"]),
                 ("aqua:moonrepo/proto", vec!["0.62.3", "0.63.2"]),
+                ("aqua:rust-lang/rustup", vec!["1.28.2", "1.29.3"]),
+                ("aqua:nextest-rs/nextest/cargo-nextest", vec!["0.9.151"]),
+                ("aqua:mozilla/sccache", vec!["0.19.0"]),
+                ("github:vadimcn/codelldb", vec!["1.12.3"]),
+                ("github:davidlattimore/wild", vec!["0.11.0"]),
             ]),
             state: Mutex::default(),
         }

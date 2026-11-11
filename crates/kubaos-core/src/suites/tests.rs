@@ -851,6 +851,69 @@ fn rust_scaffolds_a_binary_a_library_and_a_workspace() {
 }
 
 #[test]
+fn the_rust_suite_installs_rustup_and_each_tool_at_its_own_request_and_wild_with_its_extra() {
+    let h = home();
+    let rust = catalog::find("rust").unwrap();
+    let base = requests(&[
+        ("aqua:rust-lang/rustup", "1.29"),
+        ("aqua:nextest-rs/nextest/cargo-nextest", "0.9"),
+        ("aqua:mozilla/sccache", "0.19"),
+        ("github:vadimcn/codelldb", "1.12"),
+    ]);
+    let wild = |enable: bool| OptionsChange {
+        enable: if enable { vec!["wild".to_owned()] } else { Vec::new() },
+        disable: if enable { Vec::new() } else { vec!["wild".to_owned()] },
+        ..OptionsChange::default()
+    };
+
+    let added = h.suites.add(rust, &OptionsChange::default()).unwrap();
+    let with_wild = h.suites.configure(rust, &wild(true)).unwrap();
+    let fragment = fs::read_to_string(h.paths.mise_fragment("rust")).unwrap();
+    let without_wild = h.suites.configure(rust, &wild(false)).unwrap();
+
+    assert_eq!(added.tools, base);
+    assert_eq!(with_wild.tools[..base.len()], base[..]);
+    assert_eq!(
+        with_wild.tools[base.len()..],
+        requests(&[("github:davidlattimore/wild", "0.11")])[..]
+    );
+    assert!(
+        fragment.contains("\"github:davidlattimore/wild\" = \"0.11\""),
+        "{fragment}"
+    );
+    assert_eq!(without_wild.tools, base);
+    assert!(
+        !fs::read_to_string(h.paths.mise_fragment("rust"))
+            .unwrap()
+            .contains("wild"),
+        "turning the extra off takes wild out of the fragment"
+    );
+}
+
+#[test]
+fn a_rust_record_from_before_mise_gets_its_fragment_on_configure_and_keeps_its_extras() {
+    let h = home();
+    let rust = catalog::find("rust").unwrap();
+    write(&h.paths.state_dir().suite_file("rust"), "extras = [\"wild\"]\n");
+
+    let configured = h.suites.configure(rust, &OptionsChange::default()).unwrap();
+    let again = h.suites.configure(rust, &OptionsChange::default()).unwrap();
+
+    assert!(!configured.changed, "the record stays as it was");
+    assert_eq!(configured.config.extras.iter().collect::<Vec<_>>(), ["wild"]);
+    assert_eq!(configured.config.version, None);
+    assert_eq!(configured.tools.len(), rust.mise.len());
+    assert!(configured.tools.iter().any(|t| t.tool == "github:davidlattimore/wild"));
+    assert!(h.paths.mise_fragment("rust").is_file());
+    assert_eq!(again.tools, configured.tools);
+    assert_eq!(
+        h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
+        1,
+        "a second run installs nothing"
+    );
+}
+
+#[test]
 fn go_installs_the_newest_go_line_by_default() {
     let go = catalog::find("go").unwrap();
 
