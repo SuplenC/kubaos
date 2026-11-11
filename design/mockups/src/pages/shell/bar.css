@@ -16,8 +16,8 @@
   align-items: center;
   gap: var(--space-s8);
   min-width: 0;
-  /* Clear of the clock by `--clear`: space.s40, less at the narrowest. */
-  padding-right: var(--clear, var(--space-s40));
+  /* space.s40 clear of the clock, at every width. */
+  padding-right: var(--space-s40);
 }
 
 .shell-bar-left > .shell-title {
@@ -33,7 +33,7 @@
   justify-content: flex-end;
   gap: var(--space-s8);
   min-width: 0;
-  padding-left: var(--clear, var(--space-s40));
+  padding-left: var(--space-s40);
 }
 
 /* A bar alone, without its screen: the frame's surface under it, at the frame's glass. It is a

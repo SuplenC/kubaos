@@ -12,8 +12,8 @@ import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { WINDOWS } from "../../site/settings.ts";
 import { barStrip, type BarContent, EVERYDAY, EVERYTHING, fitBar, logicalWidth, RUNGS, TITLE } from "./bar-parts.ts";
 
-/** The widths the bar is designed at, logical pixels: a 4K screen down to a phone's. */
-export const STEPS = [3840, 2560, 1920, 1440, 1280, 1024, 640, 540, 360] as const;
+/** The widths the bar is designed at, logical pixels: a 4K screen down to a portrait one at 2. */
+export const STEPS = [3840, 2560, 1920, 1440, 1280, 1024, 640, 540] as const;
 
 const LAPTOP = WINDOWS[2]!;
 const WIDE = 1600;
@@ -30,7 +30,7 @@ function gaveWay(width: number, above: number | null): string {
   return fresh.length === 0 ? (above === null ? "Everything shows" : "Nothing changes") : fresh.join(" · ");
 }
 
-/** The stage: the bar with every pill, at the width the slider picks, from a phone's to a 4K screen's. */
+/** The stage: the bar with every pill, at the width the slider picks, 540 to a 4K screen's. */
 function live(): HTMLElement {
   const ascending = [...STEPS].reverse();
   const start = ascending.indexOf(1440);
@@ -82,12 +82,12 @@ export default page<"rest" | "lit" | "pressed">({
   title: "Bar",
   lede: "The frame's top edge: what you're doing on the left, the clock centred, what opens a panel on the right.",
   code: { qml: "Bar", unbuilt: "QML: steps not built yet" },
-  stage: { live, hint: "drag the slider: 360 to 3840", daylight: true },
+  stage: { live, hint: "drag the slider: 540 to 3840", daylight: true },
   variants: [
     { name: "Everyday", for: "tray, system monitor, bell, status", sample: () => strip(WIDE) },
     { name: "Everything on", for: "every pill at once, on its own side", sample: () => strip(WIDE, EVERYTHING) },
     { name: "No window", for: "an empty workspace: no title", sample: () => strip(WIDE, { ...EVERYDAY, title: "" }) },
-    { name: "A phone's width", for: "360: the narrowest step, everything on", sample: () => strip(360, EVERYTHING) },
+    { name: "The narrowest", for: "540: the last step, everything on", sample: () => strip(540, EVERYTHING) },
   ],
   sizes: doesntApply("one height, `size.bar`; its width is the screen's, and its steps the Reflow's."),
   states: {
@@ -142,20 +142,19 @@ export default page<"rest" | "lit" | "pressed">({
   measures: {
     samples: nonEmpty([
       { name: "Everything on", for: "both sides' gaps, the title, the clear space", sample: () => strip(WIDE, EVERYTHING) },
-      { name: "A phone's width", for: "the narrowest step's clear space", sample: () => strip(360, EVERYTHING) },
+      { name: "The narrowest", for: "540, everything on", sample: () => strip(540, EVERYTHING) },
     ]),
     measures: [
       { part: "Bar's height", token: "size-bar" },
       { part: "Pills' height", token: "size-control_sm" },
-      { part: "Ends, between pills; clear at 360", token: "space-s8" },
+      { part: "Ends, between pills", token: "space-s8" },
       { part: "Pills to the title", token: "space-s12" },
       { part: "Clear of the clock", token: "space-s40" },
-      { part: "Clear of the clock, under 640", token: "space-s16" },
       { part: "Title, at least", token: "space-s48" },
       { part: "Title's line", token: "type-body_strong-line" },
     ],
     reflow: {
-      note: "Every step from 3840 to 360, everything on: what gave way since the step above, the clock always centred.",
+      note: "Every step from 3840 to 540, everything on: what gave way since the step above, the clock always centred.",
       sample: steps,
     },
   },
