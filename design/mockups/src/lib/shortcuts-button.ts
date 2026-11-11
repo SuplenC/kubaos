@@ -50,11 +50,11 @@ export function takeShortcutKeys(root: HTMLElement, made: ShortcutsButton): void
     (event) => {
       if (event.key === "?") {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         made.set(!made.open());
       } else if (event.key === "Escape" && made.open()) {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         made.set(false);
       }
     },
