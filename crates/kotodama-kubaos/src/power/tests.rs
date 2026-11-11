@@ -68,6 +68,7 @@ fn the_scheduler_item_is_found_by_its_names() {
     assert_eq!(item.title, "CPU scheduler: status");
     assert!(item.keywords.contains(&"lavd".to_owned()));
     assert!(item.keywords.contains(&"eevdf".to_owned()));
+    assert!(item.keywords.contains(&"background work".to_owned()));
     assert_eq!(ids(), [ID, SCHEDULER_ID, DRAIN_ID]);
 }
 

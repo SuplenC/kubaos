@@ -1510,7 +1510,8 @@ arguments = [{ name = "setting", placeholder = "cpu-temp, ram, disk or battery-d
 # of them still works. "Power: what this stop does" is the Extension's own
 # Item (`power-status`): every layer of the stop, as the machine has it now;
 # so is "CPU scheduler: status" (`cpu-scheduler-status`): which scheduler
-# runs, Linux's own or LAVD, and why; and "What's draining the battery"
+# runs, Linux's own or LAVD, and why, and what background work yields now;
+# and "What's draining the battery"
 # (`battery-drain`): the draw now, the stop and what wakes the machine most.
 # The settings Items write ~/.config/kubaos/desktop/power/power.toml through
 # `kubaos-power`, which puts them to work at once and says so in a toast.
@@ -1709,3 +1710,19 @@ icon = "cpu"
 keywords = ["cpu scheduler", "lavd", "scx", "sched_ext", "eevdf", "default scheduler", "off"]
 run = ["kubaos-power", "scheduler", "off"]
 shown_when = { state = "power.scheduler", is = "lavd" }
+
+[extensions.kubaos.actions.background-yields-on]
+title = "Background work yields: on"
+subtitle = "Build tools you start and Nix's builds run at nice 19, so the desktop, audio and your app stay smooth while they use every core"
+icon = "cpu"
+keywords = ["background work", "yield", "nice", "priority", "build", "compile", "cargo", "nix", "responsiveness", "on"]
+run = ["kubaos-power", "background-yields", "on"]
+shown_when = { state = "power.background-yields", is = false }
+
+[extensions.kubaos.actions.background-yields-off]
+title = "Background work yields: off"
+subtitle = "For a build you're waiting on: compilers and Nix's builds get the CPU back at once, the running ones too"
+icon = "cpu"
+keywords = ["background work", "yield", "nice", "priority", "build", "compile", "cargo", "nix", "faster build", "off"]
+run = ["kubaos-power", "background-yields", "off"]
+shown_when = { state = "power.background-yields", is = true }

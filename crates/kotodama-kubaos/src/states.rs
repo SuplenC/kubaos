@@ -16,6 +16,7 @@
 //! | `power.panel-power-saving` | on: panel power saving | `U/desktop/power/power.toml` |
 //! | `power.battery-notes` | on: the toasts when a sleep or a night went wrong | the same |
 //! | `power.scheduler` | `kernel` or `lavd` | the same |
+//! | `power.background-yields` | on: build tools and Nix's builds run at a lower priority | the same |
 //! | `power.low-battery` | `power-saver`, `super-saver` or `off` | the same |
 //! | `power.critical-warning` | on: the critical-battery warning | the same |
 //! | `nix.unfree` | on: the user's nixpkgs takes unfree packages | `U/home/kubaos.d/nixpkgs.toml` |
@@ -95,6 +96,8 @@ pub const PANEL_POWER_SAVING: &str = "power.panel-power-saving";
 pub const BATTERY_NOTES: &str = "power.battery-notes";
 /// The CPU scheduler's name in the power settings.
 pub const SCHEDULER: &str = "power.scheduler";
+/// Whether build tools and Nix's builds yield to the desktop.
+pub const BACKGROUND_YIELDS: &str = "power.background-yields";
 /// Where the low-battery drop goes, or `off`.
 pub const LOW_BATTERY: &str = "power.low-battery";
 /// Whether the critical-battery warning is on.
@@ -297,6 +300,7 @@ impl States {
             self.set(PANEL_POWER_SAVING, Reading::Bool(power.panel_power_saving));
             self.set(BATTERY_NOTES, Reading::Bool(power.battery_notes));
             self.set(SCHEDULER, Reading::Word(power.scheduler.name().to_owned()));
+            self.set(BACKGROUND_YIELDS, Reading::Bool(power.background_yields));
             let low_battery = power.low_battery_stop.map_or("off", |stop| stop.id());
             self.set(LOW_BATTERY, Reading::Word(low_battery.to_owned()));
             self.set(CRITICAL_WARNING, Reading::Bool(power.critical_warning.is_some()));
@@ -317,8 +321,8 @@ pub fn values(name: &str) -> Option<Values> {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK
-        | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES | UNFREE | PREVIEW | BLUETOOTH_UNNAMED
-        | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => Some(Values::Bool),
+        | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES | BACKGROUND_YIELDS | UNFREE | PREVIEW
+        | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,

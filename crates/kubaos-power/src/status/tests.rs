@@ -35,7 +35,7 @@ fn find<'a>(rows: &'a [Row], name: &str) -> &'a Row {
 #[test]
 fn power_saver_on_the_laptop_today_shows_what_ppd_did_and_what_is_missing() {
     let root = FakeRoot::laptop();
-    let settings = Settings::default();
+    let settings = Settings::parse("scheduler = \"kernel\"\n").expect("parses");
     let plan = Plan::for_stop(Stop::PowerSaver, &settings);
 
     let rows = rows(&plan, &settings, &root.machine(), &live());

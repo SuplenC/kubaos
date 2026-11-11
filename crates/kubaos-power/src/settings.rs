@@ -6,7 +6,8 @@
 //! low_battery = 20              # the drop's level, in percent
 //! low_battery_stop = "power-saver"   # "super-saver", or "off" for no drop
 //! critical_warning = 5          # the warning's level, in percent, or "off"
-//! scheduler = "kernel"          # "lavd": scx_lavd through sched_ext, its mode the stop's
+//! scheduler = "lavd"            # scx_lavd through sched_ext, its mode the stop's; "kernel": EEVDF
+//! background_yields = true      # compilers and Nix builds at a lower priority
 //! battery_notes = true          # the toasts when a sleep or a night went wrong
 //!
 //! [usb]
@@ -146,9 +147,14 @@ impl CpuScheduler {
 /// a drained battery is what they exist to explain.
 pub const DEFAULT_BATTERY_NOTES: bool = true;
 
-/// The kernel's own scheduler, until LAVD's numbers against it on the reference laptop (frame
-/// times under a full build, input latency, build time, battery draw) say otherwise.
-pub const DEFAULT_CPU_SCHEDULER: CpuScheduler = CpuScheduler::Kernel;
+/// LAVD: it puts what a person waits on first, and its modes follow the stops. On the reference
+/// laptop it builds as fast as EEVDF, and with background work yielding the desktop stays smooth
+/// while every core builds.
+pub const DEFAULT_CPU_SCHEDULER: CpuScheduler = CpuScheduler::Lavd;
+
+/// Background work yields by default: a build takes every core it can, and nobody waiting on the
+/// desktop should wait on it.
+pub const DEFAULT_BACKGROUND_YIELDS: bool = true;
 
 /// What the laptop panel does in a stop.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -206,6 +212,8 @@ pub struct Settings {
     pub usb_skip: Vec<UsbId>,
     /// The CPU scheduler every stop runs, LAVD in the stop's mode or the kernel's own.
     pub scheduler: CpuScheduler,
+    /// Compilers and Nix builds run at a lower priority ([`crate::yields`]).
+    pub background_yields: bool,
     /// The toasts when a sleep or a night went wrong; the history is written either way.
     pub battery_notes: bool,
     stops: [StopSettings; 5],
@@ -221,6 +229,7 @@ impl Default for Settings {
             critical_warning: Some(DEFAULT_CRITICAL_WARNING),
             usb_skip: Vec::new(),
             scheduler: DEFAULT_CPU_SCHEDULER,
+            background_yields: DEFAULT_BACKGROUND_YIELDS,
             battery_notes: DEFAULT_BATTERY_NOTES,
             stops: Stop::ALL.map(default_stop),
         }
@@ -314,6 +323,7 @@ struct SettingsToml {
     low_battery_stop: Option<String>,
     critical_warning: Option<toml::Value>,
     scheduler: Option<String>,
+    background_yields: Option<bool>,
     battery_notes: Option<bool>,
     #[serde(default)]
     usb: UsbToml,
@@ -395,6 +405,9 @@ impl Settings {
         }
         if let Some(on) = read.battery_notes {
             settings.battery_notes = on;
+        }
+        if let Some(on) = read.background_yields {
+            settings.background_yields = on;
         }
         if let Some(limit) = read.charge_limit {
             settings.charge_limit = u8::try_from(limit)
@@ -595,18 +608,36 @@ pub fn set_critical_warning(path: &Path, warning: Option<u8>) -> Result<Settings
     })
 }
 
-/// Sets which CPU scheduler runs. The kernel's, the default, removes the key: a release from
-/// before the key refuses a file that has it, so a rollback would lose every power setting.
+/// Sets which CPU scheduler runs. LAVD, the default, removes the key, so the file follows
+/// KubaOS's default; `"kernel"` is a value every release with the key reads.
 ///
 /// # Errors
 ///
 /// As reading and writing the file.
 pub fn set_scheduler(path: &Path, scheduler: CpuScheduler) -> Result<Settings, SettingsError> {
-    edit(path, |doc| match scheduler {
-        CpuScheduler::Kernel => {
+    edit(path, |doc| {
+        if scheduler == DEFAULT_CPU_SCHEDULER {
             doc.remove("scheduler");
+        } else {
+            doc["scheduler"] = value(scheduler.name());
         }
-        CpuScheduler::Lavd => doc["scheduler"] = value(scheduler.name()),
+    })
+}
+
+/// Turns background work yielding on or off. On is the default, written by removing the key: a
+/// release from before the key refuses a file that has it, so a rollback would lose every power
+/// setting.
+///
+/// # Errors
+///
+/// As reading and writing the file.
+pub fn set_background_yields(path: &Path, on: bool) -> Result<Settings, SettingsError> {
+    edit(path, |doc| {
+        if on == DEFAULT_BACKGROUND_YIELDS {
+            doc.remove("background_yields");
+        } else {
+            doc["background_yields"] = value(on);
+        }
     })
 }
 
