@@ -46,7 +46,7 @@ export default page<Shown>({
   title: "Quick toggles",
   lede: "The control center's tiles, two to a row, and the Proxy tile's detail under them.",
   code: { qml: "QuickToggles" },
-  stage: { live: () => inRoom(toggles()), hint: "click a tile; Tab, then Space or →", daylight: true },
+  stage: { live: () => inRoom(toggles({ live: true })), hint: "click a tile; Proxy's arrow opens its detail", daylight: true },
   variants: [
     { name: "With Proxy", for: "a profile set up: six tiles", sample: () => inRoom(toggles()) },
     { name: "No Proxy", for: "the keyboard tile across its own row", sample: () => inRoom(toggles({ proxy: false })) },
@@ -100,6 +100,14 @@ export default page<Shown>({
     leaves: doesntApply("they go with the panel."),
     between: [
       TURNS,
+      {
+        name: "The detail opens",
+        what: "Proxy's arrow, or →: the detail fades in under the tiles over `short`.",
+        tracks: [{ part: "the detail", on: "the Proxy detail", target: ".cc-detail", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+        reduced: "same",
+        back: "plays",
+        sample: () => inRoom(toggles({ detail: {} })),
+      },
       { name: "A tile lights up", what: "Pointer or keyboard: the tube and glow fade in.", tracks: lights(".k-tile", "Do not disturb", 0, 1), reduced: "same", back: "plays", sample: () => half(TILES.dnd) },
       { name: "A tile pressed", what: "A lit tile pressed: its tube runs hot.", tracks: press(".k-tile", "Do not disturb"), reduced: "same", back: "plays", sample: () => half({ ...TILES.dnd, pinned: "lit" }) },
       ...powerMoves(() => inRoom(toggles())),

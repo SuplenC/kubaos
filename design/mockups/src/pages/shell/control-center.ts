@@ -69,12 +69,13 @@ function picking(reduced: boolean): NonEmpty<Track<Easing>> {
     { part: "flash", on: "the lit stretch", target: ".k-tabs-lit", property: "--flash", from: 1, to: 0, duration: reduced ? "short" : "long", cue: "micro", curve: "standard" },
     { part: "words", on: "the tab picked", target: '.k-tab[aria-selected="true"]', property: "--picked", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "words", on: "the tab it leaves", target: ".k-tab[data-was]", property: "--picked", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the well", on: "the tab picked", target: ".cc-tab", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
   ];
 }
 
 const PICK: Move = {
   name: "Another tab",
-  what: "A tab, `1`–`4`, or h/l on the tabs: the stretch glides there; the well swaps at once.",
+  what: "A tab, `1`–`4`, or h/l on the tabs: the stretch glides there; the new well fades in over `short`.",
   tracks: picking(false),
   reduced: picking(true),
   back: "cuts",
@@ -88,7 +89,7 @@ function cell(state: Shown): HTMLElement {
     case "rest":
       return shot();
     case "lit":
-      return shot({ headerLit: "lit" });
+      return shot({ powerLit: "lit" });
     case "selected":
       return shot({ tab: 3 });
     case "loading":
@@ -112,6 +113,7 @@ export default page<Shown>({
     { name: "Bluetooth", for: "devices, and the unnamed drawer", sample: () => shot({ tab: 1 }) },
     { name: "Output", for: "the default audio output", sample: () => shot({ tab: 2 }) },
     { name: "Keyboard", for: "layouts, their order and accents", sample: () => shot({ tab: 3 }) },
+    { name: "Power, lit", for: "the power menu's way in, the bar having none", sample: () => shot({ powerLit: "lit" }) },
   ],
   sizes: [
     { name: "A 1000-high screen", for: "the shots' screen: the well takes the rest", sample: () => shot() },
@@ -126,7 +128,7 @@ export default page<Shown>({
     rows: nonEmpty(ROWS.map(({ name }) => ({ name, cell }))),
     looks: {
       rest: "`surface` at the frame's glass; nothing lit",
-      lit: "a header button lit with the keyboard",
+      lit: "Power lit: the way to the power menu",
       selected: "another tab picked: its well in place",
       loading: "a scan's skeletons under Nearby",
       empty: "the radio off: an `EmptyState` in the well",
@@ -146,7 +148,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING],
     leaves: [CLOSING],
-    between: [PICK, ...powerMoves(() => shot({ headerLit: "lit" }))],
+    between: [PICK, ...powerMoves(() => shot({ powerLit: "lit" }))],
   },
   keyboard: {
     keys: [

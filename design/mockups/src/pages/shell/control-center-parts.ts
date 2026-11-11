@@ -17,15 +17,17 @@ import { iconButton } from "../../lib/icon-button.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { keyHints } from "../../lib/keycap.ts";
 import { container, fill, filling, gap, grid, header, row, stack } from "../../lib/layout.ts";
-import { type ListRowSpec, listRow, type RowPinned, scrolled } from "../../lib/list.ts";
+import { dropLine, type ListItem, listDisclosure, listLabel, listNote, type ListRowSpec, listRow, type RowPinned, scrolled, scrollingList } from "../../lib/list.ts";
 import { hang, screen, sheet } from "../../lib/sheet.ts";
 import { slider } from "../../lib/slider.ts";
 import { switchControl } from "../../lib/switch.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { tile, type TileOptions } from "../../lib/tile.ts";
+import { cubic, raw } from "../../lib/tokens.ts";
 import { tooltip } from "../../lib/tooltip.ts";
-import { barButtons } from "../templates/panels.ts";
+import { settings } from "../../site/settings.ts";
+import { bellPill, statusPill, sysmonPill } from "./bar-parts.ts";
 
 // The header: the shots' frozen clock, Tuesday 27 October 2026, 21:47, and the battery.
 export const ACCENT = "火曜日";
@@ -35,12 +37,25 @@ export const DATE = "Tuesday, 27 October · 64% 3h 12m left";
 export const TAB_NAMES = ["Wi-Fi", "Bluetooth", "Output", "Keyboard"] as const;
 export type TabName = (typeof TAB_NAMES)[number];
 
-/** The header's row: the weekday's kanji over the time and the date, the two Tonal buttons at its end. */
+/**
+ * The header's row: the weekday's kanji over the time and the date, Wallpaper and Power at its end,
+ * Tonal. Power is the way to the power menu now the bar has no button of its own; `lit` pins it.
+ */
 export function ccHeader(options: { date?: string; lit?: Pinned } = {}): HTMLElement {
   const words = header({ accent: ACCENT, title: TIME, subtitle: options.date ?? DATE });
-  const wall = iconButton({ icon: "wallpaper", label: "Wallpaper", kind: "Tonal", ...(options.lit ? { pinned: options.lit } : {}) });
-  const power = iconButton({ icon: "power_settings_new", label: "Power", kind: "Tonal" });
+  const wall = iconButton({ icon: "wallpaper", label: "Wallpaper", kind: "Tonal" });
+  const power = iconButton({ icon: "power_settings_new", label: "Power", kind: "Tonal", ...(options.lit ? { pinned: options.lit } : {}) });
   return row("s8", "centre", filling(words), wall, power);
+}
+
+/**
+ * `element` fading in over `short` on `standard`, at the speed setting's pace: the standard short
+ * fade the Proxy detail and a tab's well arrive with. It is a fade already, so reduce motion plays
+ * it as it is.
+ */
+export function fadeIn(element: HTMLElement): void {
+  const duration = Number.parseFloat(raw("duration-short")) / settings().speed;
+  element.animate([{ opacity: 0 }, { opacity: 1 }], { duration, easing: `cubic-bezier(${cubic("easing-standard").join(", ")})` });
 }
 
 // The quick toggles.
@@ -54,6 +69,8 @@ export interface Toggles {
   readonly proxy?: Partial<TileOptions> | false;
   /** The Proxy tile's detail open under the tiles. */
   readonly detail?: ProxyDetail | false;
+  /** The Proxy tile's arrow opens and closes its detail, which fades in. */
+  readonly live?: boolean;
 }
 
 export const TILES: Record<"wifi" | "bluetooth" | "dnd" | "motion" | "keyboard" | "proxy", TileOptions> = {
@@ -68,14 +85,30 @@ export const TILES: Record<"wifi" | "bluetooth" | "dnd" | "motion" | "keyboard" 
 /** The tiles, two to a row `space.s8` apart; the keyboard tile across a row of its own with no Proxy tile. */
 export function toggles(options: Toggles = {}): HTMLElement {
   const make = (name: keyof typeof TILES, patch?: Partial<TileOptions>) => tile({ ...TILES[name], ...patch });
-  const proxy = options.proxy === false ? null : make("proxy", options.proxy);
+  const opened: { detail: HTMLElement | null } = { detail: null };
+  const holder = stack("s8", "start");
+  const flip = () => {
+    if (opened.detail) {
+      opened.detail.remove();
+      opened.detail = null;
+      return;
+    }
+    opened.detail = filling(proxyDetail(options.detail || {}));
+    holder.append(opened.detail);
+    fadeIn(opened.detail);
+  };
+  const proxy = options.proxy === false ? null : make("proxy", { ...(options.live ? { detail: flip } : {}), ...options.proxy });
   const paired = [make("wifi", options.wifi), make("bluetooth", options.bluetooth), make("dnd", options.dnd), make("motion", options.motion)];
   const keyboard = make("keyboard", options.keyboard);
   const cells = proxy ? [...paired, keyboard, proxy] : paired;
   const parts: HTMLElement[] = [filling(grid(2, "s8", cells))];
   if (!proxy) parts.push(filling(keyboard));
-  if (proxy && options.detail) parts.push(filling(proxyDetail(options.detail)));
-  return stack("s8", "start", ...parts);
+  holder.append(...parts);
+  if (proxy && options.detail) {
+    opened.detail = filling(proxyDetail(options.detail));
+    holder.append(opened.detail);
+  }
+  return holder;
 }
 
 // The Proxy tile's detail.
@@ -106,7 +139,9 @@ export function proxyDetail(options: ProxyDetail = {}): HTMLElement {
   const live = options.steady
     ? []
     : [valueRow("Last received", "12 s ago"), ...(options.openvpn ? [] : [valueRow("Last handshake", "32 s ago")]), valueRow("Moved", "48.2 MB in · 3.1 MB out")];
-  return card({ body: [stack("s4", "start", ...[...steady, local, ...live].map(filling))] });
+  const made = card({ body: [stack("s4", "start", ...[...steady, local, ...live].map(filling))] });
+  made.classList.add("cc-detail");
+  return made;
 }
 
 // The capture card.
@@ -116,7 +151,8 @@ export type Capture = "idle" | "recording" | "replay";
 /** Capture: its two lines, then the screenshot, annotate, record and replay buttons, Tonal and sm. */
 export function capture(state: Capture = "idle", elapsed = "0:42", pinned?: Pinned): HTMLElement {
   const recording = state === "recording";
-  const status = recording ? clamped(`Recording · ${elapsed}`, "mono", "error") : clamped(state === "replay" ? "Replay buffer on" : "Screenshot or record", "small", state === "replay" ? "error" : "on_surface_variant");
+  // Red only while recording: the replay buffer keeps a quiet line.
+  const status = recording ? clamped(`Recording · ${elapsed}`, "mono", "error") : clamped(state === "replay" ? "Replay buffer on" : "Screenshot or record", "small", "on_surface_variant");
   const lines = stack(0, "start", clamped("Capture", "body_strong"), status);
   let first = true;
   const sm = (glyph: string, label: string, kind: "Tonal" | "Danger" | "Filled" = "Tonal") => {
@@ -159,20 +195,15 @@ export function sliders(options: Sliders = {}): HTMLElement {
   const parts = [
     slider({ icon: volumeIcon(volume), size: "Compact", value: volume, toggle: { icon: "volume_off", words: "Muted", label: "Mute", toggledLabel: "Unmute", on: options.muted ?? false }, ...pinned }),
     ...(options.brightness === false ? [] : [slider({ icon: "brightness_medium", size: "Compact", value: options.brightness ?? 0.7 })]),
-    slider({ icon: POWER_ICONS[power]!, size: "Compact", stops: POWER_STOPS.length, index: power, names: POWER_STOPS }),
+    slider({ icon: POWER_ICONS[power]!, icons: POWER_ICONS, size: "Compact", stops: POWER_STOPS.length, index: power, names: POWER_STOPS }),
   ];
   return stack("s8", "start", ...parts.map(filling));
 }
 
 // The radio wells.
 
-/** A row of a radio tab's well, as `RadioTab.qml` lists them. */
-export type WellRow =
-  | ({ readonly kind: "row" } & ListRowSpec)
-  | { readonly kind: "label"; readonly title: string }
-  | { readonly kind: "skeleton"; readonly share: number }
-  | { readonly kind: "note"; readonly title: string; readonly failed?: boolean }
-  | { readonly kind: "disclosure"; readonly title: string; readonly open: boolean };
+/** What a radio tab's well lists, as `RadioTab.qml` does: rows, labels, notes, a drawer's line. */
+export type WellRow = ListItem;
 
 export interface WellOptions {
   /** The well's height, a length's CSS. */
@@ -183,45 +214,17 @@ export interface WellOptions {
   readonly focused?: boolean;
 }
 
-function wellRow(each: WellRow, index: number, options: WellOptions): HTMLElement {
-  switch (each.kind) {
-    case "row": {
-      const { kind: _kind, ...spec } = each;
-      const current = index === options.current;
-      return listRow(spec as ListRowSpec, current, current ? options.pinned : undefined);
-    }
-    case "label": {
-      const label = text(each.title, "label", "on_surface_variant");
-      label.classList.add("cc-label");
-      label.toggleAttribute("data-after", index > 0);
-      return label;
-    }
-    case "skeleton":
-      return listRow({ title: "", icon: "bluetooth", tile: true, loading: true, share: each.share });
-    case "note": {
-      const line = document.createElement("span");
-      line.className = "cc-line";
-      line.append(clamped(each.title, "body", each.failed ? "error" : "on_surface_variant"));
-      return line;
-    }
-    case "disclosure": {
-      const line = document.createElement("span");
-      line.className = "cc-line";
-      const current = index === options.current;
-      const toggle = button({ label: each.open ? "Hide" : "Show", kind: "Text", size: "Sm", icon: "expand_more", trailing: true, ...(current && options.pinned ? { pinned: "lit" as const } : {}) });
-      line.append(clamped(each.title, "body", "on_surface_variant"), toggle);
-      return line;
-    }
-  }
-}
+/** A row still being found, a scan's: a tiled two-line row's place. */
+const skeletonRow = (share: number): ListRowSpec => ({ title: "", icon: "bluetooth", tile: true, loading: true, share });
 
-/** The rows `space.s4` apart in a scrolling well, as the radio tabs' `LiveList` holds them. */
+/** The rows `space.s4` apart in a scrolling well, `space.s12` in, as the radio tabs' `LiveList` holds them. */
 export function radioWell(rows: readonly WellRow[], options: WellOptions = {}): HTMLElement {
-  const column = stack("s4", "start", ...rows.map((each, index) => filling(wellRow(each, index, options))));
-  column.classList.add("k-list-rows");
-  const { box } = scrolled("ScrollingList", column, { height: options.height ?? "100%" });
-  if (options.focused) box.querySelector<HTMLElement>(":scope > .k-ring")?.setAttribute("data-pinned", "lit");
-  return box;
+  return scrollingList(rows, {
+    height: options.height ?? "100%",
+    ...(options.current !== undefined ? { current: options.current } : {}),
+    ...(options.pinned ? { pinned: options.pinned } : {}),
+    ...(options.focused ? { focused: true } : {}),
+  });
 }
 
 /** The well holding something else in its place: the connection form, or an empty state. */
@@ -235,7 +238,7 @@ const lock = "lock";
 
 export const WIFI_KNOWN: readonly ListRowSpec[] = [
   { title: "Shinjuku-5G", subtitle: "Connected · 5 GHz", subtitleIcon: lock, icon: "signal_wifi_4_bar", tile: true, accent: true, checked: true },
-  { title: "Golden Gai", subtitle: "Saved", subtitleIcon: lock, icon: "network_wifi_3_bar", tile: true, checked: false },
+  { title: "Golden Gai", subtitle: "Saved", subtitleIcon: lock, icon: "network_wifi_3_bar", tile: true, checked: false, forget: () => undefined },
 ];
 
 export const WIFI_NEARBY: readonly ListRowSpec[] = [
@@ -246,17 +249,15 @@ export const WIFI_NEARBY: readonly ListRowSpec[] = [
 
 export type WifiState = "rest" | "scanning" | "none" | "off" | "no-adapter";
 
-const asRow = (spec: ListRowSpec): WellRow => ({ kind: "row", ...spec });
-
 /** The Wi-Fi tab's rows: Known, then Nearby, or a scan's skeletons, or a note. */
 export function wifiRows(state: WifiState = "rest", nearby: readonly ListRowSpec[] = WIFI_NEARBY, known: readonly ListRowSpec[] = WIFI_KNOWN): WellRow[] {
   const out: WellRow[] = [];
   const shownKnown = state === "scanning" ? [] : known;
-  if (shownKnown.length > 0) out.push({ kind: "label", title: "Known" }, ...shownKnown.map(asRow));
-  out.push({ kind: "label", title: "Nearby" });
-  if (state === "scanning") out.push(...[0.7, 0.45, 0.7].map((share) => ({ kind: "skeleton" as const, share })));
-  else if (state === "none" || nearby.length === 0) out.push({ kind: "note", title: shownKnown.length === 0 ? "No networks in range" : "No other networks in range" });
-  else out.push(...nearby.map(asRow));
+  if (shownKnown.length > 0) out.push(listLabel("Known", false), ...shownKnown);
+  out.push(listLabel("Nearby", out.length > 0));
+  if (state === "scanning") out.push(...[0.7, 0.45, 0.7].map(skeletonRow));
+  else if (state === "none" || nearby.length === 0) out.push(listNote(shownKnown.length === 0 ? "No networks in range" : "No other networks in range"));
+  else out.push(...nearby);
   return out;
 }
 
@@ -265,8 +266,8 @@ export function wifiRows(state: WifiState = "rest", nearby: readonly ListRowSpec
 export const BT_KNOWN: readonly ListRowSpec[] = [
   { title: "MX Master 3S", subtitle: "Connected · 45%", subtitleIcon: "battery_1_bar", icon: "mouse", tile: true, accent: true, checked: true },
   { title: "WH-1000XM4", subtitle: "Connected · 80%", subtitleIcon: "battery_3_bar", icon: "headphones", tile: true, accent: true, checked: true },
-  { title: "Keychron K3", subtitle: "Not connected", icon: "keyboard", tile: true, checked: false },
-  { title: "Pixel 9", subtitle: "Not connected", icon: "smartphone", tile: true, checked: false },
+  { title: "Keychron K3", subtitle: "Not connected", icon: "keyboard", tile: true, checked: false, forget: () => undefined },
+  { title: "Pixel 9", subtitle: "Not connected", icon: "smartphone", tile: true, checked: false, forget: () => undefined },
 ];
 
 export const BT_NEARBY: readonly ListRowSpec[] = [
@@ -284,16 +285,16 @@ export function btRows(state: BtState = "rest", options: { unnamed?: "closed" | 
   const known = options.known ?? BT_KNOWN;
   const nearby = options.nearby ?? BT_NEARBY;
   const out: WellRow[] = [];
-  if (known.length > 0) out.push({ kind: "label", title: "Known" }, ...known.map(asRow));
-  out.push({ kind: "label", title: "Nearby" });
-  if (state === "scanning") out.push(...[0.7, 0.45].map((share) => ({ kind: "skeleton" as const, share })));
-  else if (state === "failed") out.push({ kind: "note", title: "Discovery failed: the adapter is busy", failed: true });
-  else if (state === "none" || nearby.length === 0) out.push({ kind: "note", title: "Nothing in pairing mode nearby" });
-  else out.push(...nearby.map(asRow));
+  if (known.length > 0) out.push(listLabel("Known", false), ...known);
+  out.push(listLabel("Nearby", out.length > 0));
+  if (state === "scanning") out.push(...[0.7, 0.45].map(skeletonRow));
+  else if (state === "failed") out.push(listNote("Discovery failed: the adapter is busy", true));
+  else if (state === "none" || nearby.length === 0) out.push(listNote("Nothing in pairing mode nearby"));
+  else out.push(...nearby);
   const unnamed = options.unnamed ?? "closed";
   if (unnamed !== "none") {
-    out.push({ kind: "disclosure", title: `${BT_UNNAMED.length} unnamed devices`, open: unnamed === "open" });
-    if (unnamed === "open") out.push(...BT_UNNAMED.map(asRow));
+    out.push(listDisclosure(`${BT_UNNAMED.length} unnamed devices`, { open: unnamed === "open" }));
+    if (unnamed === "open") out.push(...BT_UNNAMED);
   }
   return out;
 }
@@ -332,8 +333,10 @@ export function connectForm(form: Form): HTMLElement {
     const pinned = form.focus === "field" ? { pinned: "lit" as const } : {};
     asks.push(gap("s16"), filling(field({ icon: form.secret ? "key" : "passkey", secret: form.secret ?? false, placeholder: form.placeholder ?? "", value: form.value ?? "", state: form.failed ? "Invalid" : "Normal", ...pinned })));
   } else if (form.ask === "code") asks.push(gap("s16"), text(form.code ?? "", "headline", "primary"));
-  const status = clamped(form.status ?? "", "small", form.failed ? "error" : "on_surface_variant");
-  status.classList.add("cc-status");
+  // The status line keeps its room while empty, so a status arriving moves nothing.
+  const status = document.createElement("span");
+  status.className = "cc-status";
+  status.append(clamped(form.status ?? "", "small", form.failed ? "error" : "on_surface_variant"));
   const cancel = button({ label: "Cancel", kind: "Text", ...(form.focus === "cancel" ? { pinned: "lit" as const } : {}) });
   const act = button({ label: form.action, kind: "Filled", disabled: form.ready === false, ...(form.focus === "action" && form.ready !== false ? { pinned: "lit" as const } : {}) });
   const actions = row("s8", "centre", cancel, fill(), act);
@@ -365,10 +368,7 @@ export const OUTPUTS: readonly ListRowSpec[] = [
 
 /** The outputs in their well, the default checked, `space.s12` above the first and below the last. */
 export function outputs(rows: readonly ListRowSpec[] = OUTPUTS, options: WellOptions = {}): HTMLElement {
-  const column = stack("s4", "start", ...rows.map((spec, index) => filling(listRow(spec, index === options.current, index === options.current ? options.pinned : undefined))));
-  column.classList.add("k-list-rows");
-  const { box } = scrolled("ScrollingList", column, { height: options.height ?? "100%" });
-  return box;
+  return radioWell(rows, options);
 }
 
 // Keyboard.
@@ -408,13 +408,9 @@ export function keyboardTab(options: KeyboardOptions = {}): HTMLElement {
   const selected = options.selected ?? -1;
   const rows: HTMLElement[] = [];
   layouts.forEach((layout, index) => {
-    const made = listRow({ title: layout.name, subtitle: layout.spelling, icon: index === 0 ? "star_filled" : "keyboard", tile: true, accent: index === 0, checked: index === active }, index === selected || options.drag?.from === index);
-    if (options.drag?.from === index) made.classList.add("cc-lifted");
-    if (options.drag && options.drag.to === index && options.drag.to < options.drag.from) {
-      const line = document.createElement("span");
-      line.className = "cc-drop";
-      rows.push(line);
-    }
+    const lifted = options.drag?.from === index;
+    const made = listRow({ title: layout.name, subtitle: layout.spelling, icon: index === 0 ? "star_filled" : "keyboard", tile: true, accent: index === 0, checked: index === active, lifted }, index === selected || lifted);
+    if (options.drag && options.drag.to === index && options.drag.to < options.drag.from) rows.push(dropLine());
     rows.push(filling(made));
   });
   const toolbar = row(
@@ -438,9 +434,9 @@ export function keyboardTab(options: KeyboardOptions = {}): HTMLElement {
 }
 
 export const MATCHES: readonly ListRowSpec[] = [
-  { title: "Polish", subtitle: "pl", icon: "keyboard", tile: true, checked: false },
-  { title: "Polish (legacy, with dead keys)", subtitle: "pl(legacy)", icon: "keyboard", tile: true, checked: false },
-  { title: "Polish (programmer Dvorak)", subtitle: "pl(dvp)", icon: "keyboard", tile: true, checked: false },
+  { title: "Polish", subtitle: "pl", icon: "keyboard", tile: true },
+  { title: "Polish (legacy, with dead keys)", subtitle: "pl(legacy)", icon: "keyboard", tile: true },
+  { title: "Polish (programmer Dvorak)", subtitle: "pl(dvp)", icon: "keyboard", tile: true },
 ];
 
 /** "Add a language" in the well: Back and its title, the search, and its matches. */
@@ -457,7 +453,7 @@ export function addView(options: { query?: string; matches?: readonly ListRowSpe
     below = emptyState(said);
   } else {
     const matches = options.matches ?? MATCHES;
-    below = stack("s4", "start", ...matches.map((spec, index) => filling(listRow(spec, index === 0))));
+    below = stack("s4", "start", ...matches.map((spec, index) => filling(listRow({ ...spec, adds: true }, index === 0))));
   }
   const column = document.createElement("span");
   column.className = "cc-keys";
@@ -475,7 +471,7 @@ export interface PanelOptions {
   readonly capture?: Capture;
   readonly sliders?: Sliders;
   readonly date?: string;
-  readonly headerLit?: Pinned;
+  readonly powerLit?: Pinned;
   readonly tabsPinned?: Pinned;
   /** The tab a pick comes from, for a move's sample. */
   readonly tabsFrom?: number;
@@ -499,7 +495,7 @@ export function tabContent(index: number): HTMLElement {
 /** The whole panel: the sections in a container, then the tabs and the tab's well in what is left. */
 export function controlCenter(options: PanelOptions = {}): HTMLElement {
   const picked = options.tab ?? 0;
-  const top = stack("s16", "start", ...[ccHeader({ ...(options.date ? { date: options.date } : {}), ...(options.headerLit ? { lit: options.headerLit } : {}) }), toggles(options.toggles), capture(options.capture), sliders(options.sliders)].map(filling));
+  const top = stack("s16", "start", ...[ccHeader({ ...(options.date ? { date: options.date } : {}), ...(options.powerLit ? { lit: options.powerLit } : {}) }), toggles(options.toggles), capture(options.capture), sliders(options.sliders)].map(filling));
   const topBox = container(top);
   topBox.classList.add("cc-top");
   const room = document.createElement("span");
@@ -512,6 +508,7 @@ export function controlCenter(options: PanelOptions = {}): HTMLElement {
     ...(options.tabsFrom !== undefined ? { from: options.tabsFrom } : {}),
     onPick: (index) => {
       room.replaceChildren(tabContent(index));
+      fadeIn(room);
       options.onPick?.(index, room);
     },
   });
@@ -540,9 +537,9 @@ export const CORNER = "calc(var(--size-panel) + var(--space-s64) + var(--space-s
 /** The shots' screen height, 1000 logical pixels: `size.app_height` and the rest. */
 export const TALL = "calc(var(--size-app_min_height) * 2 + var(--space-s40))";
 
-/** The panel open on the right edge of a screen corner, drawn still. */
+/** The panel open on the right edge of a screen corner, under the bar's panel pills, drawn still. */
 export function onScreen(panel: HTMLElement, height = TALL, reveal?: number): HTMLElement {
-  const room = screen({ width: CORNER, height, wallpaper, bar: barButtons() });
+  const room = screen({ width: CORNER, height, wallpaper, bar: [sysmonPill(), bellPill(), statusPill()] });
   room.element.dataset.open = "";
   hang(room, sheet({ content: panel, edge: "right", ...(reveal !== undefined ? { reveal } : {}) }));
   return room.element;
@@ -550,7 +547,7 @@ export function onScreen(panel: HTMLElement, height = TALL, reveal?: number): HT
 
 /** The well as the form takes the list's place: both in it, the two cross-fading. */
 export function swapping(rows: readonly WellRow[], form: Form, formShown: boolean, height = "100%"): HTMLElement {
-  const column = stack("s4", "start", ...rows.map((each, index) => filling(wellRow(each, index, {}))));
+  const column = stack("s4", "start", ...rows.map((each) => filling(each instanceof HTMLElement ? each : listRow(each))));
   column.classList.add("k-list-rows", "cc-list");
   const over = connectForm(form);
   over.classList.add("cc-overlay");

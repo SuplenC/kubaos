@@ -4,7 +4,9 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 ## `PanelPage`
 
-QML `PanelPage`, a template: the shell's alone, as only the shell has panels. Its mockup page is the source of truth, with `Sheet`: Templates, Sheet and PanelPage, in `design/mockups/`. *Not built yet: the system monitor, the notifications, the control center, the clock and the wallpaper picker each lay out their own header, scroll and fade inside their `Sheet`.*
+QML `PanelPage`, a template: the shell's alone, as only the shell has panels. Its mockup page is the source of truth, with `Sheet`: Templates, Sheet and PanelPage, in `design/mockups/`. *Not built yet: the system monitor, the notifications, the clock and the wallpaper picker each lay out their own header, scroll and fade inside their `Sheet`.*
+
+**The control center keeps a header of its own**, by intent, not PanelPage's: a `Header` with the weekday's kanji as its accent, the time as its title and the date and the battery as its line, and at its end two Tonal md icon buttons, Wallpaper and Power. Power opens the power menu; the bar has no power button, so this is the way to it. Under the header it holds sections of its own (the quick toggles, capture, the sliders) before its tabs, and its tab's well takes the room left, so it has no scrolling body. Its pages are Shell surfaces, Control center, in `design/mockups/`.
 
 The inside of a `Sheet`: what every shell panel is laid out on. From the top:
 

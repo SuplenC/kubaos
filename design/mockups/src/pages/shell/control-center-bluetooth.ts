@@ -23,7 +23,7 @@ function live(): HTMLElement {
   let open = false;
   const draw = () => {
     const made = radioWell(btRows("rest", { unnamed: open ? "open" : "closed" }));
-    made.querySelector<HTMLElement>(".cc-line .k-button")?.addEventListener("click", () => {
+    made.querySelector<HTMLElement>(".k-list-disclosure")?.addEventListener("click", () => {
       open = !open;
       draw();
     });
