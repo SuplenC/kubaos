@@ -319,6 +319,16 @@
   );
 }
 
+/* The preview's catcher, under every card: room for the pointer, never drawn. */
+.k-notif-catcher {
+  z-index: 0;
+  --h0: var(--rest-h);
+}
+
+.k-notif-group[data-open] > .k-notif-catcher {
+  display: none;
+}
+
 .k-notif-slot > .k-notif-card {
   position: absolute;
   top: 0;
