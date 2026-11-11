@@ -502,6 +502,7 @@ Each component has a page of its own under `design/components/`: its constructor
 
 - [Sheet](design/components/sheet.md)
 - [PopupStack](design/components/popup-stack.md)
+- [Wallpaper picker](design/components/wallpaper-picker.md)
 - [Pill](design/components/pill.md)
 - [Bar](design/components/bar.md)
 

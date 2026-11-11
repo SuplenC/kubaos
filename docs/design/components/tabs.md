@@ -6,7 +6,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `tabs::tabs`; QML `Tabs`. Its mockup page is the source of truth: Molecules, Tabs, in `design/mockups/`.
 
-One of a few views or values, picked along a rail of neon. It is the segmented control too: a setting's few choices side by side (the wallpaper's motion, Always, On AC, Never). The control center's sections, the clock's tools, the wallpaper picker's folders, the system monitor's order. Choices that don't fit their room are a `Select` instead: tabs never wrap or scroll.
+One of a few views or values, picked along a rail of neon. It is the segmented control too: a setting's few choices side by side (the wallpaper's motion, Always, On AC, Never). The control center's sections, the clock's tools, the wallpaper picker's views (Picture, Desktop, Lock), the system monitor's order. Choices that don't fit their room are a `Select` instead: tabs never wrap or scroll.
 
 **The well.** The choices sit side by side in one well: a pill (`radius.full`) in `surface_container_highest` at `opacity.track`, as a slider's track is, `size.control_sm` (32) tall, with `space.s4` round the choices. Each choice is the well's height less that padding (24), `space.s12` inside its sides, its words `button_small` with an optional symbol `space.s4` before them in the words' colour. Nothing fills the picked choice, and the well is as wide as its choices.
 
