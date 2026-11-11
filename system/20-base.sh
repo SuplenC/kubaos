@@ -36,7 +36,7 @@ require_sudo
 # The base system's groups of system/packages.toml.
 BASE_GROUPS=(
   tools network proxy audio session graphics microcode laptop dock fingerprint
-  build snapshots files fonts fallback shell
+  build snapshots files media fonts fallback shell
 )
 
 step "apt update"

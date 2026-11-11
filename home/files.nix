@@ -62,6 +62,13 @@ let
     "video/x-msvideo"
     "video/mpeg"
     "video/ogg"
+    "video/mp2t"
+    "video/x-m4v"
+    "video/x-ms-wmv"
+    "video/x-ms-asf"
+    "video/x-flv"
+    "video/3gpp"
+    "video/3gpp2"
   ];
   defaults = {
     "inode/directory" = "${nautilus};kubaos-files.desktop";
