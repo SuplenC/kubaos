@@ -13,7 +13,7 @@ The bar is `size.bar` (40) tall along the frame's top. Its pills are `control_sm
 - **The live preview is its `code` symbol alone**, on its `cold` tint, a lone-symbol pill at every width; the branch is in its hint.
 - **⋯ (`more`)** is a new KubaOS Symbol, three dots on the set's grid: a lone-symbol pill holding the tray's apps once they fold, and whatever folds in with them.
 
-Each side keeps `space.s40` clear of the clock; `space.s16` below 640 logical pixels, `space.s8` at 360. A symbol and its own value sit `space.s4` apart (see Pill).
+Each side keeps `space.s40` clear of the clock at every width. A symbol and its own value sit `space.s4` apart (see Pill).
 
 ## How it narrows
 
@@ -26,11 +26,10 @@ As the bar narrows, its parts give way in one order, the same at every width, a 
 5. Recording keeps its dot; its time is in its hint.
 6. The tray's apps fold into ⋯; the update and the preview join them.
 7. A borrowed group's name goes, then each group's ghost.
-8. The system monitor turns compact: one `control_sm` circle of rings edge to edge, the rim CPU in `primary`, RAM in `cold`, temperature in `on_surface_variant`, each ring `space.s4` less a device hairline thick and `space.s4` from the next, over its track at `opacity.spinner_track`; a ring near its limit turns `warning`, past it `error`. The numbers are in its hint.
+8. The system monitor turns compact: one `control_sm` circle of rings edge to edge, CPU the rim, RAM inside it, temperature innermost, each ring `space.s4` less a device hairline thick and `space.s4` from the next, over its track at `opacity.spinner_track`. Every ring has one palette, its place saying which reading it is: `primary` at ease, `warning` near its limit, `error` past it. Its hint names each with its number.
 9. Status sheds: the battery's share, then its symbols one by one from the left; the battery's symbol stays.
-10. Below 640: the workspaces show the shown one alone (a click and the wheel still move between them); the bell joins the status pill as its own leading half; recording moves onto the clock, which takes the recording pill's look (`error_container`, `on_error_container`, its `error` dot leading), where there is room for it; the clock keeps `space.s16` clear and drops its kanji.
-11. At 360: ⋯ folds into the status pill as its own half before the bell, and the clock keeps `space.s8` clear.
+Never gone: the clock's time, the system monitor, status's battery symbol, the bell, ⋯ once there is anything behind it, and the recording's dot. The steps are 3840, 2560, 1920, 1440, 1280, 1024, 640 and 540, a portrait screen at scale 2: with every pill showing, the bar fits all of them with the clock centred. A phone's width is a topic of its own.
 
-Never gone: the clock's time, the system monitor, status's battery symbol, the bell, ⋯ once there is anything behind it, and the recording's dot. With every pill showing, the bar fits from 3840 down to 360 with the clock centred. At 360 the left has room for recording's own dot, so the clock stays its own colour; moving recording onto it there would leave the right side 16 px short.
+When recording merges into the clock, the clock takes the recording pill's look: `error_container`, `on_error_container`, its `error` dot leading.
 
 *Not built yet: `modules/bar/Bar.qml` keeps the old arrangement (recording, Keep awake, the Proxy, the layout and the update on the right, a power `IconButton` at its end), shows the preview's branch in its pill, and hides nothing for width: only the title elides, at the room up to the clock less 40, and the right group runs under the clock on a narrow screen. The ⋯ symbol, the compact system monitor and the status pill's shedding don't exist in QML.*
