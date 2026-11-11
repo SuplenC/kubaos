@@ -28,6 +28,11 @@ export interface ScreenOptions {
   readonly wallpaper: string;
   /** What the bar shows, laid along it. */
   readonly bar?: readonly Element[];
+  /**
+   * How far the desktop dims while something is open over it: a panel's `opacity.panel_scrim`, or
+   * a dialog's darker `opacity.scrim`, as the power menu asks what to do with the session.
+   */
+  readonly dim?: "panel" | "dialog";
 }
 
 /** A screen: its wallpaper, the frame's glass layer and the layer above it for what sits on the glass. */
@@ -52,6 +57,7 @@ export function screen(options: ScreenOptions): Screen {
   picture.alt = "";
   const dim = document.createElement("span");
   dim.className = "k-screen-dim";
+  if (options.dim === "dialog") element.dataset.dim = "dialog";
   const glass = document.createElement("span");
   glass.className = "k-screen-glass";
   const frame = document.createElement("span");
