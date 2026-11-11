@@ -138,3 +138,7 @@ mockups/menu-actions design/mockups/src/pages/shell/menu-actions.ts design/mocku
 mockups/menu-views design/mockups/src/pages/shell/menu-views.ts design/mockups/src/pages/shell/menu-parts.ts design/mockups/src/pages/shell/menu.css design/mockups/src/lib/list-detail.ts design/mockups/src/lib/list-detail.css
 mockups/menu-form design/mockups/src/pages/shell/menu-form.ts design/mockups/src/pages/shell/menu-parts.ts design/mockups/src/pages/shell/menu.css design/mockups/src/lib/list-detail.ts design/mockups/src/lib/list-detail.css
 mockups/menu-footer design/mockups/src/pages/shell/menu-footer.ts design/mockups/src/pages/shell/menu-parts.ts design/mockups/src/pages/shell/menu.css design/mockups/src/lib/list-detail.ts design/mockups/src/lib/list-detail.css
+mockups/sysmon      design/mockups/src/pages/shell/sysmon.ts design/mockups/src/pages/shell/sysmon-parts.ts design/mockups/src/pages/shell/sysmon.css
+mockups/sysmon-processes design/mockups/src/pages/shell/sysmon-processes.ts design/mockups/src/pages/shell/sysmon-parts.ts design/mockups/src/pages/shell/sysmon.css
+mockups/clock       design/mockups/src/pages/shell/clock.ts design/mockups/src/pages/shell/clock-parts.ts design/mockups/src/pages/shell/clock.css
+mockups/clock-settings design/mockups/src/pages/shell/clock-settings.ts design/mockups/src/pages/shell/clock-parts.ts design/mockups/src/pages/shell/clock.css

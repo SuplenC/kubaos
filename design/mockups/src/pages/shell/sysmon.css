@@ -1,0 +1,110 @@
+/* The system monitor's own boxes (`sysmon-parts.ts`): the panel from the bar to the frame's foot
+   with its info button in the corner, a line's placeholder under its words, the cores' bars, a
+   process row's placeholder and its details. The cards, meters and table are the library's. */
+
+@property --sm-open {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+.sm-panel {
+  position: relative;
+  min-height: var(--sheet-room);
+}
+
+.sm-panel > .k-panel-body {
+  flex: 1 1 auto;
+}
+
+/* Room to scroll the last row clear of the info button. */
+.sm-body {
+  padding-block-end: calc(var(--size-control_sm) + var(--space-s16));
+}
+
+.k-tip-anchor.sm-about {
+  position: absolute;
+  z-index: 2;
+  right: var(--space-s16);
+  bottom: var(--space-s16);
+}
+
+/* A line that ticks over its placeholder, one box: the words fade in over the bone over `slow`. */
+.sm-wait {
+  display: grid;
+  min-width: 0;
+}
+
+.sm-wait > * {
+  grid-area: 1 / 1;
+  transition: opacity var(--motion-slow) var(--easing-standard);
+}
+
+[data-reduced] .sm-wait > * {
+  transition-duration: var(--motion-short);
+}
+
+.sm-wait > .sm-bone {
+  width: calc(var(--share) * 100%);
+}
+
+.sm-wait[data-end] > * {
+  justify-self: end;
+}
+
+.sm-wait[data-waiting] > .sm-words,
+.sm-wait:not([data-waiting]) > .sm-bone {
+  opacity: 0;
+}
+
+/* In a card's head the placeholder takes its share of the head's width. */
+.k-row > .sm-wait[data-waiting] {
+  flex: 0 0 calc(var(--share) * 100%);
+}
+
+.k-row > .sm-wait > .sm-bone {
+  width: 100%;
+}
+
+/* A core's bar: the track at `opacity.track`, filled from the bottom in `primary`. */
+.sm-core {
+  position: relative;
+  height: var(--space-s24);
+  border-radius: var(--radius-small);
+  background: rgb(from var(--color-surface_container_highest) r g b / var(--opacity-track));
+}
+
+.sm-core-busy {
+  position: absolute;
+  inset: auto 0 0;
+  height: calc(var(--busy) * 100%);
+  border-radius: inherit;
+  background: var(--color-primary);
+  transition: height var(--motion-short) var(--easing-linear);
+}
+
+/* With quotas off the snapshots' line is as tall as its info button from the first frame. */
+.sm-snapshots[data-explained] {
+  min-height: var(--size-control_sm);
+}
+
+/* A process row's placeholder: a row's box, a bar in each column. */
+.sm-placeholder {
+  box-sizing: border-box;
+  height: var(--size-row_compact);
+  padding: var(--space-s4) var(--space-s12);
+  align-items: center;
+}
+
+/* A process's details under its row, opening to their height. */
+.sm-details {
+  height: calc(var(--sm-open) * var(--natural, 0px));
+  overflow: clip;
+}
+
+.sm-details-body {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-s8) var(--space-s12) var(--space-s12);
+}

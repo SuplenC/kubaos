@@ -1,0 +1,135 @@
+/* The clock popup's own boxes (`clock-parts.ts`): the body's padding, the seconds on the time's
+   baseline, the analog face, an extra clock's box, the answer opening, and the columns. The month,
+   the fields, chips, tabs and cards are the library's. */
+
+@property --ck-open {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* `space.s20` above and below; the container's padding at the sides. */
+.ck-popup {
+  padding-block: var(--space-s20);
+}
+
+.ck-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+}
+
+/* The seconds sit on the time's baseline, `space.s12` after it: each line's baseline is where its
+   box sets it (`.k-text` in `lib.css`), so the seconds come down by the difference. */
+.ck-time {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-s12);
+}
+
+.ck-time > .k-figure {
+  margin-top: calc(
+    round(nearest, calc(var(--type-hero_number-line) / 2 + var(--time-mass) * var(--type-hero_number-size)), 1px) -
+      round(nearest, calc(var(--type-headline-line) / 2 + var(--mass-seconds, 0.35) * var(--type-headline-size)), 1px)
+  );
+}
+
+/* The analog face: `icon.s48` twice across, `surface_container_high` with a hairline. */
+.ck-face {
+  position: relative;
+  flex: none;
+  width: calc(var(--icon-s48) * 2);
+  height: calc(var(--icon-s48) * 2);
+  border-radius: var(--radius-full);
+  background: var(--color-surface_container_high);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+}
+
+.ck-tick,
+.ck-hand {
+  position: absolute;
+  left: 50%;
+  border-radius: var(--radius-full);
+  transform-origin: 50% calc(var(--icon-s48) - var(--from));
+  translate: -50% 0;
+  rotate: var(--turn);
+}
+
+.ck-tick {
+  --from: var(--space-s4);
+  top: var(--space-s4);
+  width: var(--stroke-hairline_device_px);
+  height: var(--space-s4);
+  background: var(--color-outline);
+}
+
+.ck-tick[data-quarter] {
+  width: var(--stroke-thin);
+  height: var(--space-s8);
+  background: var(--color-on_surface_variant);
+}
+
+/* A hand reaches `space.s4` past the centre behind it. */
+.ck-hand {
+  --from: calc(var(--icon-s48) - var(--length));
+  top: var(--from);
+  height: calc(var(--length) + var(--space-s4));
+}
+
+.ck-hand-hour {
+  --length: calc(var(--icon-s48) * 2 * 0.27);
+  width: var(--space-s4);
+  background: var(--color-primary);
+}
+
+.ck-hand-minute {
+  --length: calc(var(--icon-s48) * 2 * 0.38);
+  width: var(--stroke-thin);
+  background: var(--color-on_surface);
+}
+
+.ck-hand-second {
+  --length: calc(var(--icon-s48) * 2 * 0.42);
+  width: var(--stroke-hairline_device_px);
+  background: var(--color-tertiary);
+}
+
+.ck-pin {
+  position: absolute;
+  inset: calc(var(--icon-s48) - var(--space-s4));
+  border-radius: var(--radius-full);
+  background: var(--color-tertiary);
+}
+
+/* An extra clock: `size.control_md` tall, `space.s12` in, `surface_container` at the control radius. */
+.ck-zone {
+  box-sizing: border-box;
+  height: var(--size-control_md);
+  padding-inline: var(--space-s12);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container);
+}
+
+/* The answer opens to its card's height. */
+.ck-answer {
+  display: block;
+  height: calc(var(--ck-open) * var(--natural, 0px));
+  overflow: clip;
+}
+
+/* The countdowns and the tools: the rail's width. */
+.ck-side {
+  flex: none;
+  width: var(--size-rail);
+}
+
+/* Every tool's page one height: the alarms' field over three alarms. */
+.ck-tool-room {
+  display: flex;
+  flex-direction: column;
+  height: calc(var(--size-control_md) + (var(--size-control_sm) + var(--space-s8)) * 3);
+}
+
+.ck-month {
+  flex: none;
+}
