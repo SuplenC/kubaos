@@ -329,13 +329,14 @@ export interface Load {
   readonly level?: 0 | 1 | 2;
 }
 
-const RIM_TONES = ["primary", "cold", "on_surface_variant"] as const;
 export const LOADS: readonly Load[] = READINGS.map((reading) => ({ share: reading.fill }));
 
 /**
- * CPU, RAM and temperature as rings edge to edge in the pill's circle, CPU its rim: each ring
- * `space.s4` less a device hairline thick, their middles `space.s4` apart, so a hairline parts them;
- * each over its track at `opacity.spinner_track`, `warning` near its limit and `error` past it.
+ * CPU, RAM and temperature as rings edge to edge in the pill's circle, CPU the rim, RAM inside it,
+ * temperature innermost: each ring `space.s4` less a device hairline thick, their middles
+ * `space.s4` apart, so a hairline parts them. One palette for every ring, its order saying which is
+ * which: `primary` at ease, `warning` near its limit, `error` past it, over its track at
+ * `opacity.spinner_track`.
  */
 export function rimPill(loads: readonly Load[] = LOADS, state: Shown = "rest"): HTMLElement {
   const scale = settings().scale;
@@ -348,14 +349,14 @@ export function rimPill(loads: readonly Load[] = LOADS, state: Shown = "rest"): 
   svg.classList.add("shell-rim");
   svg.innerHTML = loads
     .map((load, index) => {
-      const tone = load.level === 2 ? "error" : load.level === 1 ? "warning" : RIM_TONES[index]!;
+      const tone = load.level === 2 ? "error" : load.level === 1 ? "warning" : "primary";
       const radius = middle - stroke / 2 - step * index;
       const ring = `cx="${middle}" cy="${middle}" r="${radius}" fill="none" stroke-width="${stroke}"`;
       return `<circle ${ring} class="shell-rim-track" style="--tone: var(--color-${tone})"/>` +
         (load.share > 0 ? `<circle ${ring} class="shell-rim-arc" style="--tone: var(--color-${tone})" pathLength="100" stroke-dasharray="${(load.share * 100).toFixed(2)} 100" transform="rotate(-90 ${middle} ${middle})"/>` : "");
     })
     .join("");
-  const made = control([svg], `CPU ${Math.round(loads[0]!.share * 100)}%  ·  RAM ${Math.round((loads[1]?.share ?? 0) * 100)}%  ·  61 °C`, state, { lone: true });
+  const made = control([svg], `CPU ${Math.round(loads[0]!.share * 100)}%  ·  RAM ${Math.round((loads[1]?.share ?? 0) * 100)}%  ·  Temperature 61 °C`, state, { lone: true });
   made.classList.add("shell-rim-pill");
   return made;
 }
@@ -365,18 +366,12 @@ export function rimPill(loads: readonly Load[] = LOADS, state: Shown = "rest"): 
 export interface ShedOptions {
   /** How far it has shed: 0 all, 1 the battery's share gone, then a symbol from the left each, 5 the battery alone. */
   readonly shed?: number;
-  /** The bell, its own half, leading. */
-  readonly bell?: boolean;
-  /** The ⋯, its own half, before the bell. */
-  readonly more?: boolean;
   readonly state?: Shown;
 }
 
 export function shedStatus(options: ShedOptions = {}): HTMLElement {
   const shed = options.shed ?? 0;
   const parts: Element[] = [];
-  if (options.more) parts.push(glyph("more"));
-  if (options.bell) parts.push(glyph("notifications"));
   parts.push(...["balance", "signal_wifi_4_bar", "bluetooth", "volume_up"].slice(Math.max(0, shed - 1)).map((name) => glyph(name)));
   parts.push(shed === 0 ? paired(glyph("battery_2_bar"), text("64%", "mono", "on_surface")) : glyph("battery_2_bar"));
   return control(parts, "Home 5G  ·  Volume 60%  ·  Battery 64%", options.state ?? "rest", { lone: parts.length === 1 });
@@ -439,7 +434,7 @@ interface BarState {
   countdown: boolean;
   idle: boolean;
   date: "full" | "day" | "none";
-  recording: "time" | "dot" | "clock";
+  recording: "time" | "dot";
   tray: "open" | "folded";
   update: boolean;
   preview: boolean;
@@ -447,14 +442,9 @@ interface BarState {
   ghosts: boolean;
   sysmon: "numbers" | "rings";
   shed: number;
-  current: boolean;
-  bell: boolean;
-  tight: boolean;
-  more: boolean;
-  tighter: boolean;
 }
 
-const FULL: BarState = { title: true, layout: true, countdown: true, idle: true, date: "full", recording: "time", tray: "open", update: true, preview: true, name: true, ghosts: true, sysmon: "numbers", shed: 0, current: false, bell: false, tight: false, more: false, tighter: false };
+const FULL: BarState = { title: true, layout: true, countdown: true, idle: true, date: "full", recording: "time", tray: "open", update: true, preview: true, name: true, ghosts: true, sysmon: "numbers", shed: 0 };
 
 /** Where a rung's part sits: the left, the right, or the clock in the middle. */
 type Side = "left" | "right" | "clock";
@@ -469,7 +459,8 @@ export interface Rung {
 /**
  * The order the bar gives way in, Kuba's and its proposals: the title first, then the layout; what
  * only shows state before what opens something; the clock, the system monitor, status and the bell
- * always there, and the recording's dot never gone. A rung is taken only while its side runs short
+ * always there, and the recording's dot never gone. It reaches down to 540; a phone's width is a
+ * topic of its own. A rung is taken only while its side runs short
  * of the clock's clear space (a clock rung, while either side does), and nothing else goes while
  * the title still shows.
  */
@@ -492,12 +483,6 @@ export const RUNGS: readonly Rung[] = [
   { side: "right", says: "Network goes", apply: (s) => void (s.shed = 3) },
   { side: "right", says: "Bluetooth goes", apply: (s) => void (s.shed = 4) },
   { side: "right", says: "Sound goes", apply: (s) => void (s.shed = 5) },
-  { side: "left", says: "Workspaces: the current one alone", apply: (s) => void (s.current = true) },
-  { side: "right", says: "Bell joins the status pill", apply: (s) => void (s.bell = true) },
-  { side: "left", says: "Recording moves onto the clock", apply: (s) => void (s.recording = "clock") },
-  { side: "clock", says: "Clock: space.s16 clear, kanji goes", apply: (s) => void (s.tight = true) },
-  { side: "right", says: "⋯ folds into the status pill", apply: (s) => void (s.more = true) },
-  { side: "clock", says: "Clock: space.s8 clear", apply: (s) => void (s.tighter = true) },
 ];
 
 function stateOf(taken: ReadonlySet<number>): BarState {
@@ -506,9 +491,8 @@ function stateOf(taken: ReadonlySet<number>): BarState {
   return state;
 }
 
-/** The workspaces as the state shows them: every group, or the shown one alone. */
+/** The workspaces as the state shows them: a borrowed group's name and the ghosts while they last. */
 function workspacesFor(content: BarContent, state: BarState, options: WorkspacesOptions = {}): HTMLElement {
-  if (state.current) return workspaces({ groups: [{ block: 0, spaces: [{ id: 2, occupied: true }] }], active: 2 });
   const own = state.ghosts ? SHOTS_GROUPS[0]! : { ...SHOTS_GROUPS[0]!, spaces: SHOTS_GROUPS[0]!.spaces.slice(0, 2) };
   const desk = SHOTS_GROUPS[1]!;
   const borrowed = { ...desk, ...(state.name ? {} : { name: "" }), spaces: state.ghosts ? desk.spaces : desk.spaces.slice(0, 1) };
@@ -529,24 +513,22 @@ function draw(content: BarContent, state: BarState, shown: Shown, options: Works
   left.className = "shell-bar-left";
   left.append(workspacesFor(content, state, options));
   if (content.preview && state.preview) left.append(previewPill(BRANCH, shown));
-  if (content.recording && state.recording !== "clock") left.append(state.recording === "dot" ? recordingDot(shown) : recordingPill({ state: shown }));
+  if (content.recording) left.append(state.recording === "dot" ? recordingDot(shown) : recordingPill({ state: shown }));
   if (content.keepAwake && state.idle) left.append(idlePill({ state: shown }));
   if (content.proxy && state.idle) left.append(proxyPill(false, shown));
   if (content.layout && state.layout) left.append(keyboardPill("US", shown));
   if (content.update && state.update) left.append(updatePill(undefined, shown));
   const titled = content.title !== "" && state.title ? title(content.title) : null;
   if (titled) left.append(titled);
-  const clock = compactClock({ kanji: !state.tight, date: state.date, countdown: content.countdown && state.countdown, recording: content.recording && state.recording === "clock", state: shown });
+  const clock = compactClock({ date: state.date, countdown: content.countdown && state.countdown, state: shown });
   const right = document.createElement("span");
   right.className = "shell-bar-right";
   const folded = state.tray === "folded" || (content.update && !state.update) || (content.preview && !state.preview);
-  if (!state.more) right.append(content.tray && !folded ? trayPill() : morePill(shown));
+  right.append(content.tray && !folded ? trayPill() : morePill(shown));
   right.append(state.sysmon === "rings" ? rimPill(LOADS.slice(0, 3), shown) : sysmonPill({ readings: READINGS.slice(0, content.readings), state: shown }));
-  if (!state.bell) right.append(bellPill(false, shown));
-  right.append(shedStatus({ shed: state.shed, bell: state.bell, more: state.more, state: shown }));
+  right.append(bellPill(false, shown), shedStatus({ shed: state.shed, state: shown }));
   const row = document.createElement("span");
   row.className = "shell-bar-row";
-  row.style.setProperty("--clear", `var(--space-${state.tighter ? "s8" : state.tight ? "s16" : "s40"})`);
   row.append(left, clock, right);
   return { row, left, clock, right, title: titled };
 }
@@ -588,7 +570,7 @@ function measure(width: number, content: BarContent, state: BarState): Measured 
   const rightNeed = need(drawn.right);
   const clockWidth = of(drawn.clock);
   host.remove();
-  const clear = length(state.tighter ? "space-s8" : state.tight ? "space-s16" : "space-s40");
+  const clear = length("space-s40");
   const half = (width - 2 * gap - clockWidth) / 2;
   return { leftFits: leftNeed + clear <= half, rightFits: rightNeed + clear <= half, titleRoom: half - clear - leftNeed - length("space-s12") };
 }

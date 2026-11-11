@@ -77,7 +77,6 @@ export default page<State>({
     { name: "One group", for: "the screen's own, its ghost last", sample: () => workspaces({ groups: SHOTS_GROUPS.slice(0, 1) }) },
     { name: "Borrowed, unnamed", for: "the tint alone", sample: () => workspaces({ groups: UNNAMED }) },
     { name: "Borrowed, named", for: "its name first, `secondary`", sample: () => workspaces() },
-    { name: "The shown one alone", for: "under 640: its cell only; click and wheel still move", sample: () => workspaces({ groups: [{ block: 0, spaces: [{ id: 2, occupied: true }] }], active: 2 }) },
   ],
   sizes: doesntApply("one height, `size.control_sm`; as wide as its entries."),
   states: {
