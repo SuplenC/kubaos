@@ -148,7 +148,7 @@ export default page<State>({
       { part: "Height", token: "size-control_sm" },
       { part: "Recording's ends, scheduled's ends", token: "space-s12" },
       { part: "Keep awake's ends", token: "space-s8" },
-      { part: "A symbol to its value; Keep awake's gaps", token: "space-s4" },
+      { part: "Symbol to value; Keep awake's gaps", token: "space-s4" },
       { part: "Dot", token: "size-radio_dot" },
       { part: "Hollow dot's ring", token: "stroke-thin" },
       { part: "Time's line", token: "type-mono-line" },

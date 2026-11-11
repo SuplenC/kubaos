@@ -7,10 +7,11 @@ The shell's top edge, an organism of the shell built from `Pill`s: not a library
 The bar is `size.bar` (40) tall along the frame's top. Its pills are `control_sm` (32), `space.s8` apart and `space.s8` in from its ends.
 
 - **The left holds what you're doing**, in this order: the workspaces, the live preview, recording, Keep awake, the Proxy, the keyboard layout, the update, then the focused window's title, `space.s12` after the last pill.
-- **The clock is always centred** on the bar, whatever either side holds.
+- **The clock is always centred** on the bar, whatever either side holds. Its time is `body`, Geist's own proportional figures, centred in a slot as wide as the widest time a 24-hour clock shows, as the lock's bar clock is: the pill keeps its width as the minutes turn. A pinned countdown after it reads to the minute ("52 d 2 h", "12 min"), and under a minute its seconds ("0:45"), never its name alone.
 - **The right holds what opens a panel**: the tray (or its ⋯), the system monitor, then the bell and status, which end the bar, opening their panels from that corner.
 - **No power button.** Power is in the control center.
 - **The live preview is its `code` symbol alone**, on its `cold` tint, a lone-symbol pill at every width; the branch is in its hint.
+- **The tray's menu** is our `Menu` on a popover `space.s12` under the app's icon, padded 4 round the menu as every menu is; an entry that opens a submenu ends in a chevron (see Menu).
 - **⋯ (`more`)** is a new KubaOS Symbol, three dots on the set's grid: a lone-symbol pill holding the tray's apps once they fold, and whatever folds in with them.
 
 Each side keeps `space.s40` clear of the clock at every width. A symbol and its own value sit `space.s4` apart (see Pill).
@@ -32,4 +33,4 @@ Never gone: the clock's time, the system monitor, status's battery symbol, the b
 
 When recording merges into the clock, the clock takes the recording pill's look: `error_container`, `on_error_container`, its `error` dot leading.
 
-*Not built yet: `modules/bar/Bar.qml` keeps the old arrangement (recording, Keep awake, the Proxy, the layout and the update on the right, a power `IconButton` at its end), shows the preview's branch in its pill, and hides nothing for width: only the title elides, at the room up to the clock less 40, and the right group runs under the clock on a narrow screen. The ⋯ symbol, the compact system monitor and the status pill's shedding don't exist in QML.*
+*Not built yet: `modules/bar/Bar.qml` keeps the old arrangement (recording, Keep awake, the Proxy, the layout and the update on the right, a power `IconButton` at its end), shows the preview's branch in its pill, and hides nothing for width: only the title elides, at the room up to the clock less 40, and the right group runs under the clock on a narrow screen. The ⋯ symbol, the compact system monitor and the status pill's shedding don't exist in QML. `Clock.qml` draws the time in `mono_large`, and under a minute its countdown shows only its name. `Tray.qml` pads its menu's popover 12, and its submenu entries have no chevron. The power menu's dialog dim (`opacity.scrim`) is the library's screen's; the power menu itself is drawn elsewhere.*
