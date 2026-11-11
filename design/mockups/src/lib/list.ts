@@ -68,7 +68,7 @@ export type ListRowSpec = RowTaking & {
   readonly picture?: string;
   /** A photo covering the tile: a contact, an album. */
   readonly photo?: string;
-  /** The tile's symbol in the accent: the row of the list that comes first, the default. */
+  /** The tile's symbol in the accent: a row in use, the network or the devices connected. */
   readonly accent?: boolean;
   /** Always two lines tall, a title alone included, so every row's words start in one column. */
   readonly tall?: boolean;

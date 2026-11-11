@@ -37,7 +37,7 @@ function senders(): HTMLElement {
   const rows: [Partial<TileOptions>, string, string][] = [
     [{ glyph: "terminal", picture: appIcon }, "KubaOS", "Updates are ready"],
     [{ glyph: "notifications", photo }, "Aiko", "Sent a photo"],
-    [{ glyph: "star_filled", accent: true }, "Polish", "The default layout"],
+    [{ glyph: "wifi", accent: true }, "Shinjuku-5G", "Connected · 5 GHz"],
     [{ glyph: "keyboard" }, "English (US)", "A layout"],
     [{ glyph: "warning", danger: true }, "Battery", "5% left: plug in now"],
   ];
@@ -86,7 +86,7 @@ export default page({
   },
   variants: [
     { name: "A symbol", for: "something KubaOS draws", sample: () => iconTile({ glyph: "keyboard", size: "Md" }) },
-    { name: "Accent", for: "the one of a list that comes first", sample: () => iconTile({ glyph: "star_filled", size: "Md", accent: true }) },
+    { name: "Accent", for: "a row in use: the network connected", sample: () => iconTile({ glyph: "wifi", size: "Md", accent: true }) },
     { name: "Danger", for: "a critical notification", sample: () => iconTile({ glyph: "warning", size: "Md", danger: true }) },
     ...APP_ICONS.map((app) => ({ name: app.name, for: app.for, sample: () => measured(app.picture) })),
     { name: "A photo", for: "covers the tile", sample: () => iconTile({ glyph: "notifications", size: "Md", photo }) },
