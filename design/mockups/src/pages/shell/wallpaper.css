@@ -94,10 +94,9 @@
   --light-strength: 0;
 }
 
-/* What belongs to the room alone fades as you step out: the lamps, the words, the floors. */
-.gl-room-only {
-  opacity: calc(1 - var(--out));
-}
+/* What belongs to the room alone (the lamps, the placard, the floors) never fades: it lies outside
+   the picture in front of you, so as the room grows round that picture it leaves the screen past
+   its edges, and comes back as the room shrinks, as if it had been there all along. */
 
 /* A floor per folder, one above the other; the floor you are on fills the room. */
 .gl-floors {
@@ -244,10 +243,41 @@
   width: calc(var(--size-panel) / 2);
 }
 
+/* What lies over the room: the bar and the shortcuts' button, at rest in their places. While the
+   picture in front of you grows to the screen as the gallery shuts, or shrinks from it as it opens,
+   they are behind it: covered wherever its frame stands, uncovered as its edge passes over them. */
+.gl-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.gl-screen[data-open] .gl-controls > * {
+  pointer-events: auto;
+}
+
+.gl-screen[data-covering] .gl-controls {
+  /* The front frame where the room's growth puts it: its middle moves to the screen's as it grows
+     by `--zoom`, the room's own numbers. */
+  --frame-mid: calc(var(--pic-top) + var(--pic-height) / 2);
+  --frame-y: calc(var(--frame-mid) + (var(--screen-height) / 2 - var(--frame-mid)) * var(--out));
+  --frame-half-w: calc(var(--pic-width) * var(--zoom) / 2);
+  --frame-half-h: calc(var(--pic-height) * var(--zoom) / 2);
+  clip-path: polygon(
+    evenodd,
+    0 0, 100% 0, 100% 100%, 0 100%, 0 0,
+    calc(50% - var(--frame-half-w)) calc(var(--frame-y) - var(--frame-half-h)),
+    calc(50% + var(--frame-half-w)) calc(var(--frame-y) - var(--frame-half-h)),
+    calc(50% + var(--frame-half-w)) calc(var(--frame-y) + var(--frame-half-h)),
+    calc(50% - var(--frame-half-w)) calc(var(--frame-y) + var(--frame-half-h)),
+    calc(50% - var(--frame-half-w)) calc(var(--frame-y) - var(--frame-half-h))
+  );
+}
+
 /* The bar along the foot: glass, a pill, `space.s8` round its small controls. */
 .gl-bar {
   position: absolute;
-  z-index: 3;
   left: 50%;
   bottom: var(--space-s24);
   translate: -50% 0;
@@ -259,9 +289,62 @@
   background: rgb(from var(--color-surface) r g b / var(--opacity-glass));
   backdrop-filter: blur(var(--size-lock_blur));
   white-space: nowrap;
+  transition: translate var(--motion-long) var(--easing-emphasized_decel);
+}
+
+/* The full screen's own parts of the bar, the picture's name and its neighbours, and the step's two
+   words: each in a cell whose width eases from nothing to its own as the picture grows to the
+   screen, and back, over the same time on the same curve (`--step-time`), its words fading with
+   it, so the bar widens and its other controls slide along, never a jump. */
+.gl-bar-lead,
+.gl-step-pair {
+  display: grid;
   transition:
-    opacity var(--motion-long) var(--easing-emphasized_decel),
-    translate var(--motion-long) var(--easing-emphasized_decel);
+    grid-template-columns var(--step-time, 0ms) var(--step-curve, var(--easing-emphasized_decel)),
+    margin var(--step-time, 0ms) var(--step-curve, var(--easing-emphasized_decel));
+}
+
+.gl-bar-lead {
+  grid-template-columns: 0fr;
+  /* Shut, it takes the bar's gap back, so the bar is as it was with no lead at all. */
+  margin-right: calc(-1 * var(--space-s16));
+}
+
+.gl-bar-lead > *,
+.gl-step-pair > * {
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--step-time, 0ms) var(--step-curve, var(--easing-emphasized_decel));
+}
+
+.gl-bar-lead > * {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s16);
+  padding-right: var(--space-s16);
+}
+
+.gl-step-pair {
+  grid-template-columns: 1fr 0fr;
+}
+
+.gl-step-pair > :first-child,
+.gl-screen[data-full] .gl-bar-lead > *,
+.gl-screen[data-full] .gl-step-pair > :last-child {
+  opacity: 1;
+}
+
+.gl-screen[data-full] .gl-step-pair > :first-child {
+  opacity: 0;
+}
+
+.gl-screen[data-full] .gl-bar-lead {
+  grid-template-columns: 1fr;
+}
+
+.gl-screen[data-full] .gl-step-pair {
+  grid-template-columns: 0fr 1fr;
 }
 
 /* The password's sheet rises under it while the lock is awake on the full screen. */
@@ -275,10 +358,6 @@
   gap: var(--space-s12);
 }
 
-.gl-bar-now[hidden] {
-  display: none;
-}
-
 .gl-bar-rule {
   align-self: stretch;
   width: var(--stroke-hairline_device_px);
@@ -289,18 +368,8 @@
 /* The shortcuts' button at the foot's start. */
 .gl-info {
   position: absolute;
-  z-index: 3;
   left: var(--space-s24);
   bottom: var(--space-s24);
-  transition: opacity var(--motion-long) var(--easing-emphasized_decel);
-}
-
-/* Shut, the bar and the shortcuts' button are gone. */
-.gl-screen:not([data-open]) :is(.gl-bar, .gl-info) {
-  opacity: 0;
-  pointer-events: none;
-  transition-duration: var(--motion-medium);
-  transition-timing-function: var(--easing-emphasized_accel);
 }
 
 /* A control's name and key, floating `space.s8` over it while the pointer or the keyboard is on it. */
