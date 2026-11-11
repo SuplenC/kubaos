@@ -33,7 +33,7 @@ export interface TileOptions {
   readonly picture?: string;
   /** A photo covering the whole tile. */
   readonly photo?: string;
-  /** The symbol in the accent: the one tile of a list that comes first. */
+  /** The symbol in the accent: a row in use, the network or the devices connected. */
   readonly accent?: boolean;
   /** On the error colour: a critical notification's. */
   readonly danger?: boolean;

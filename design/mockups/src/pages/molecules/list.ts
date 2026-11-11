@@ -15,9 +15,9 @@ export const WELL_ROOM = "calc(var(--size-panel) - 2 * var(--container-0-padding
 const TITLE: Words = { short: "Polish", long: "English (United States, international with dead keys)" };
 const SUBTITLE: Words = { short: "WPA2", long: "Secured · WPA2 Enterprise · connected automatically" };
 
-/** The control center's keyboard layouts: the default first, on the accent's star. */
+/** The control center's keyboard layouts: the default first by its place, the one in use ticked. */
 const LAYOUTS: readonly ListRowSpec[] = [
-  { title: "English (US)", subtitle: "Default", icon: "star", tile: true, accent: true, checked: true },
+  { title: "English (US)", subtitle: "us", icon: "keyboard", tile: true, accent: true, checked: true },
   { title: "Polish", subtitle: "Programmer", icon: "keyboard", tile: true, checked: false },
   { title: "Japanese", subtitle: "Kana", icon: "keyboard", tile: true, checked: false },
   { title: "German", subtitle: "No dead keys", icon: "keyboard", tile: true, checked: false, disabled: true },
