@@ -100,3 +100,85 @@
 [data-reduced] .k-notif-stack > .k-notif-leaving {
   animation: k-notif-fade-out var(--motion-short) var(--easing-standard_accel) both;
 }
+
+/* The popup stack: its popups `space.s4` apart, `space.s8` in from the sheet's edges. Each sits in a
+   slot whose room opens as it arrives and closes as it leaves, so those below make and close the gap. */
+@property --room {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --rise {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.k-popup-stack {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: var(--size-panel);
+  padding: var(--space-s8) var(--space-s8) var(--space-s4);
+}
+
+.k-popup-slot {
+  display: block;
+  height: round(nearest, calc(var(--slot-h, 0px) * var(--room)), 1px);
+  overflow-y: clip;
+  overflow-x: visible;
+  transition: --room var(--motion-medium) var(--easing-standard_decel);
+}
+
+.k-popup-slot[data-shut] {
+  --room: 0;
+}
+
+.k-popup-inner {
+  display: block;
+  padding-bottom: var(--space-s4);
+  translate: calc(var(--space-s64) * var(--slide-by)) calc(-1 * var(--space-s24) * var(--rise));
+}
+
+/* Leaving, it isn't cut by its slot: it rises or slides over the room it gives back. */
+.k-popup-slot:has(> :is(.k-popup-out-side, .k-popup-out-up)) {
+  overflow: visible;
+}
+
+.k-popup-in {
+  animation:
+    k-notif-slide-in var(--motion-long) var(--easing-emphasized_decel) both,
+    k-notif-fade-in var(--motion-short) var(--easing-standard) both;
+}
+
+.k-popup-out-side {
+  animation:
+    k-notif-slide-out var(--motion-medium) var(--easing-emphasized_accel) both,
+    k-notif-fade-out var(--motion-medium) var(--easing-standard_accel) both;
+}
+
+.k-popup-out-up {
+  animation:
+    k-popup-rise var(--motion-medium) var(--easing-emphasized_accel) both,
+    k-notif-fade-out var(--motion-medium) var(--easing-standard_accel) both;
+}
+
+@keyframes k-popup-rise {
+  to {
+    --rise: 1;
+  }
+}
+
+/* With reduce motion each only fades, over `short`, and the gap closes at once. */
+[data-reduced] .k-popup-in {
+  animation: k-notif-fade-in var(--motion-short) var(--easing-standard) both;
+}
+
+[data-reduced] :is(.k-popup-out-side, .k-popup-out-up) {
+  animation: k-notif-fade-out var(--motion-short) var(--easing-standard_accel) both;
+}
+
+[data-reduced] .k-popup-slot {
+  transition: none;
+}

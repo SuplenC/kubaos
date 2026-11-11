@@ -14,6 +14,7 @@
 
 import { icon } from "./icon.ts";
 import { probe, variant } from "./probe.ts";
+import { text } from "./text.ts";
 import { number } from "./tokens.ts";
 
 export const TILE_SIZES = ["Sm", "Md", "Lg"] as const;
@@ -39,6 +40,11 @@ export interface TileOptions {
   readonly danger?: boolean;
   /** The picture held on its way, whatever its address does: the symbol shows meanwhile. */
   readonly pending?: boolean;
+  /**
+   * A count in the symbol's place, in `body_strong` (its line the body's symbol's box) in the
+   * symbol's colour, 99+ past 99: a popup standing for several from one app.
+   */
+  readonly count?: number;
 }
 
 /** What an app's icon draws, as its measurement found it. */
@@ -197,9 +203,14 @@ export function iconTile(options: TileOptions): HTMLElement {
   const tint = options.danger ? "error" : "surface_container_highest";
   const ink = options.danger ? "on_error" : options.accent ? "primary" : "on_surface_variant";
   tile.style.setProperty("--tint", `var(--color-${tint})`);
-  tile.append(icon(options.glyph, "var(--icon)", `var(--color-${ink})`));
+  if (options.count !== undefined) {
+    const words = options.count > 99 ? "99+" : String(options.count);
+    const shown = text(words, "body_strong", ink);
+    shown.classList.add("k-icon-tile-count");
+    tile.append(shown);
+  } else tile.append(icon(options.glyph, "var(--icon)", `var(--color-${ink})`));
   const pending = options.pending ?? false;
   if (options.photo) tile.append(photo(options.photo, pending));
   else if (options.picture) tile.append(appIcon(options.picture, pending));
-  return probe(tile, { role: "component", name: "IconTile", variant: variant(options.size), fixed: { width: true, height: true } });
+  return probe(tile, { role: "component", name: "IconTile", variant: variant(options.size, options.count !== undefined && "count"), fixed: { width: true, height: true } });
 }
