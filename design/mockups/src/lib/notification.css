@@ -307,8 +307,19 @@
   mask-repeat: no-repeat;
 }
 
-/* Each previewed card's own shadow, straight under it on the list: the ladder's step 1 at rest
-   rising to step 2 as it spreads, both layers of it, gone as the group opens. */
+/* A spread card stands on the ladder's step 2 whole, as it spreads and until the group opens: its
+   fill one container role up at night, its rim, and its shadow below. */
+.k-notif-slot > .k-notif-card {
+  --lift: calc(var(--fan) * var(--k-spread) * (1 - var(--opening)));
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--fg) r g b / calc(var(--elevation-rim) * var(--lift)));
+}
+
+.k-notif-slot > .k-notif-card:not([data-critical]) {
+  background-color: color-mix(in srgb, var(--color-surface_container), var(--color-surface_container_high) calc(var(--elevation-lighter) * var(--lift) * 100%));
+}
+
+/* Each spread card's own shadow, straight under it on the list: the ladder's step 1 at rest rising
+   to step 2 as it spreads, both layers of it, gone as the group opens. */
 .k-notif-lift {
   position: absolute;
   inset: 0;
