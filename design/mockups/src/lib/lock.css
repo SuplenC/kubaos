@@ -228,8 +228,8 @@
 
 /* The clock: the digits' box, their cap height down to their baseline, with the kicker
    `scale.lock_date_gap` of the clock over its cap top, to its baseline. Its size is the screen's
-   share (`--rest-size`), and `type.clock_rest` the 1080 tall screen's. It flies one path, from the rest clock where the
-   wallpaper puts it to the bar's time in `type.body` where the pill puts it, its size, its place
+   share (`--rest-size`), and `type.clock_rest` the 1080 tall screen's. It flies one path, from the rest clock, the
+   same place on every wallpaper, to the bar's time in `type.body` where the pill puts it, its size, its place
    and its colour moving together: `--flown` is how far along it stands. Waking takes it
    `scale.clock_awake` of the way (`--clock-lift`) and docking the rest from there (`--dock`), so an
    unlock from awake goes on from where waking stopped.
@@ -261,11 +261,10 @@
   --date-width: round(up, calc(var(--date-natural, 0) * var(--kicker-k) * var(--px) - 0.001px), 1px);
   --kicker-width: calc(var(--place-width) + var(--date-width));
   --bar-top: calc(var(--bar-shift) + (var(--size-bar) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-body-size));
-  /* The rest place moves with the picture as it pushes in: where the wallpaper puts the clock on
-     the desktop's picture (0) and on the pushed one (1), each worked out from the picture. */
-  --rest-cx: calc(var(--rest-cx-flat, var(--middle)) + (var(--rest-cx-pushed, var(--middle)) - var(--rest-cx-flat, var(--middle))) * var(--push));
-  --rest-top: calc(var(--rest-top-flat, 0px) + (var(--rest-top-pushed, 0px) - var(--rest-top-flat, 0px)) * var(--push));
-  --cx: calc(var(--rest-cx) + (var(--bar-cx, var(--middle)) - var(--rest-cx)) * var(--flown));
+  /* The rest place is the screen's, not the picture's: the middle, the digits' cap top where
+     `lib/lock.ts` puts it from `scale.lock_clock_base`; it holds still as the picture pushes in. */
+  --rest-top: var(--rest-top-at, 0px);
+  --cx: calc(var(--middle) + (var(--bar-cx, var(--middle)) - var(--middle)) * var(--flown));
   /* `--clock-above` for the digits, which don't inherit it. */
   --city-cut: var(--clock-above);
   --clock-left: round(down, calc(var(--cx) - var(--digits-width) / 2), 1px);
