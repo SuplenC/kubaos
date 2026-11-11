@@ -586,6 +586,19 @@ install_inotify_limits() {
   fi
 }
 
+# install_zswap: compressed swap in RAM in front of the swap file
+# (system/files/tmpfiles.d/kubaos-zswap.conf), which systemd-tmpfiles applies
+# at every boot, and applied at once on a booted machine. The update goes on
+# when the kernel refuses it: the machine swaps as it did, and says so.
+# 20-base.sh runs it, and a migration on machines installed before it.
+install_zswap() {
+  install_root_file "$FILES_DIR/tmpfiles.d/kubaos-zswap.conf" /etc/tmpfiles.d/kubaos-zswap.conf 0644
+  if ((!IMAGE_BUILD)) && has_systemd && ! in_container; then
+    sudo_run systemd-tmpfiles --create /etc/tmpfiles.d/kubaos-zswap.conf ||
+      warn "zswap stays off until the next boot: the kernel refused /etc/tmpfiles.d/kubaos-zswap.conf"
+  fi
+}
+
 # install_arp_per_interface: each interface answers ARP only for its own
 # addresses (system/files/sysctl.d/60-kubaos-arp.conf), so a cable and Wi-Fi on
 # one network don't take each other's address as a conflict. Applied at once on

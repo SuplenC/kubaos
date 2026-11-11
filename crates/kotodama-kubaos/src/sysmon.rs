@@ -297,20 +297,27 @@ fn ram(sample: &Sample) -> (String, String, &'static str) {
     let Some(memory) = &sample.memory else {
         return ("RAM".to_owned(), "Memory can't be read".to_owned(), "memory");
     };
-    let mut subtitle = format!(
-        "{} of {} used · {} cache · {} available",
-        format::bytes(memory.used),
-        format::bytes(memory.total),
-        format::bytes(memory.cache),
-        format::bytes(memory.available)
-    );
+    let mut parts = vec![
+        format!("{} of {} used", format::bytes(memory.used), format::bytes(memory.total)),
+        format!("{} cache", format::bytes(memory.cache)),
+        format!("{} available", format::bytes(memory.available)),
+    ];
     if memory.swap_total > 0 {
-        subtitle.push_str(" · swap ");
-        subtitle.push_str(&format::bytes(memory.swap_used));
-        subtitle.push_str(" of ");
-        subtitle.push_str(&format::bytes(memory.swap_total));
+        parts.push(format!(
+            "swap {} of {}",
+            format::bytes(memory.swap_used),
+            format::bytes(memory.swap_total)
+        ));
     }
-    (format!("RAM {:.0} %", memory.percent), subtitle, "memory")
+    // The pages zswap holds are part of the swap used, kept compressed in RAM.
+    if memory.zswapped > 0 {
+        parts.push(format!(
+            "zswap {} in {}",
+            format::bytes(memory.zswapped),
+            format::bytes(memory.zswap)
+        ));
+    }
+    (format!("RAM {:.0} %", memory.percent), parts.join(" · "), "memory")
 }
 
 fn battery(sample: &Sample) -> (String, String, &'static str) {

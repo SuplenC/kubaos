@@ -83,6 +83,7 @@ systemd/snapper-boot.service.d/kubaos-not-in-snapshot.conf system/25-boot.sh
 systemd/system.conf.d/kubaos-timeouts.conf              install_fast_shutdown_boot
 systemd/user.conf.d/kubaos-timeouts.conf                install_fast_shutdown_boot
 
+tmpfiles.d/kubaos-zswap.conf                            install_zswap
 tmpfiles.d/qs-lock-unix-chkpwd.conf                     system/50-hyprland.sh
 udev/90-kubaos-backlight.rules                          system/50-hyprland.sh
 

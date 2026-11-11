@@ -4,6 +4,9 @@
 //! asked) and the rest of what is available. Used is `MemTotal - MemAvailable`, the kernel's own
 //! estimate, so the split adds up to what `free` shows.
 //!
+//! Swap used includes the pages zswap holds compressed in RAM: each keeps its slot in the swap
+//! file, and its compressed copy counts as used RAM.
+//!
 //! # Owns
 //!
 //! - Parsing `/proc/meminfo`.
@@ -28,6 +31,10 @@ pub struct Memory {
     pub percent: f32,
     pub swap_total: u64,
     pub swap_used: u64,
+    /// RAM zswap's pool takes, compressed.
+    pub zswap: u64,
+    /// The pages zswap holds, as large as they were before compression.
+    pub zswapped: u64,
 }
 
 /// Parses `/proc/meminfo`; `None` when it has no `MemTotal`.
@@ -53,6 +60,8 @@ pub fn parse_meminfo(text: &str) -> Option<Memory> {
             "Shmem" => fields.shared = bytes,
             "SwapTotal" => fields.swap_total = bytes,
             "SwapFree" => fields.swap_free = bytes,
+            "Zswap" => fields.zswap = bytes,
+            "Zswapped" => fields.zswapped = bytes,
             _ => {}
         }
     }
@@ -73,6 +82,8 @@ pub fn parse_meminfo(text: &str) -> Option<Memory> {
         },
         swap_total: fields.swap_total,
         swap_used: fields.swap_total.saturating_sub(fields.swap_free),
+        zswap: fields.zswap,
+        zswapped: fields.zswapped,
     })
 }
 
@@ -87,6 +98,8 @@ struct Fields {
     shared: u64,
     swap_total: u64,
     swap_free: u64,
+    zswap: u64,
+    zswapped: u64,
 }
 
 #[cfg(test)]

@@ -154,6 +154,10 @@ step "inotify: room for every program that watches files"
 install_inotify_limits
 
 # --------------------------------------------------------------------------
+step "zswap: swap compressed in RAM before it reaches the disk"
+install_zswap
+
+# --------------------------------------------------------------------------
 step "Short shutdown and boot: 10 s stop timeouts, no wait for the network, no console palette"
 install_fast_shutdown_boot
 
