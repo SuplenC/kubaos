@@ -7,7 +7,7 @@ import { shown, type Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { keyHints } from "../../lib/keycap.ts";
 import { row, stack } from "../../lib/layout.ts";
-import { type TipOptions, tooltip, withTooltip } from "../../lib/tooltip.ts";
+import { keyTooltip, type TipOptions, tooltip, withTooltip } from "../../lib/tooltip.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
@@ -55,6 +55,8 @@ export default page({
     { name: "Held inside the window", for: "moved back until its end is the window's", sample: () => explained({ held: true, shown: true }) },
     { name: "Without keys", for: "a control with no keys of its own", sample: () => tooltip(shown(TITLE), shown(BODY)) },
     { name: "A title alone", for: "when the title says it all", sample: () => tooltip(shown(TITLE), "") },
+    { name: "A name and its key", for: "a button whose key isn't shown: one line", sample: () => keyTooltip("Desktop", "2") },
+    { name: "A name and a combination", for: "each key a cap, `space.s4` apart", sample: () => keyTooltip("Full screen", "F") },
   ],
   sizes: doesntApply("one width, `size.menu`; as tall as what it holds."),
   states: {
@@ -72,6 +74,7 @@ export default page({
       { name: "With keys", cell: () => card() },
       { name: "Without keys", cell: () => card(false) },
       { name: "A title alone", cell: () => tooltip(shown(TITLE), "") },
+      { name: "A name and its key", cell: () => keyTooltip("Desktop", "2") },
     ],
     looks: {
       rest: "step 4 on `surface_container`, `radius.control`; no line, no glow",
@@ -82,6 +85,7 @@ export default page({
     text: [
       { name: "Its title", words: TITLE, sample: (words: string) => tooltip(words, shown(BODY)) },
       { name: "Its body", words: BODY, sample: (words: string) => tooltip(shown(TITLE), words) },
+      { name: "A name beside its key", words: { short: "Apply", long: "Apply and keep this wallpaper" }, sample: (words: string) => keyTooltip(words, "↵") },
     ],
     missingPicture: doesntApply("words and keys only."),
     counts: [
@@ -135,6 +139,8 @@ export default page({
       { part: "Body line", token: "type-small-line" },
       { part: "Title → body", token: "space-s4" },
       { part: "Words → keys, card → control", token: "space-s8" },
+      { part: "Name → its key", token: "space-s12" },
+      { part: "Between keycaps", token: "space-s4" },
       { part: "Contact blur", token: "elevation-4-contact-blur" },
       { part: "Ambient drop", token: "elevation-4-ambient-y" },
       { part: "Ambient blur", token: "elevation-4-ambient-blur" },
