@@ -236,6 +236,7 @@ export default page({
       { part: "Kicker, portrait", token: "scale-lock_date_portrait" },
       { part: "Kicker, at least", token: "size-lock_date_least" },
       { part: "Kicker at 1080, its line", token: "type-clock_date-line" },
+      { part: "Shade, no cut-out", token: "opacity-clock_shade" },
       { part: "Halo, edge", token: "size-halo_edge" },
       { part: "Halo, round the word", token: "size-halo" },
       { part: "Kicker's baseline → cap top, now", token: "scale-lock_date_gap" },
