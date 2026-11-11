@@ -180,6 +180,8 @@ The Suite checks (`suites`, `pins`, `suite_*`, `update_*`, `rollback`) install r
 
 `test/run` passes `GITHUB_TOKEN` and `MISE_GITHUB_TOKEN` into the container when they are set in its own environment, by name (`-e NAME`), so the value is in no argument list, file or image layer, and `as_user` keeps them in the environment of every command it runs as kuba: `GITHUB_TOKEN=$(gh auth token) test/run e2e --only suite_go`. It never reads a token from `gh` itself and never prints one; a token with no scopes is enough.
 
+Each Suite check also fails when an interactive zsh, as a terminal opens one, starts with a `mise WARN` or `mise ERROR` line after the Suite is installed or migrated (`quiet_shell`).
+
 ## Adding a check
 
 1. Write `c_<name>` in `test/lib/e2e.sh` (or `bitwarden.sh`). Print `ok   ...` lines for what passed and `FAIL ...` for what didn't, return non-zero on failure. It runs in a subshell as root; `as_user`, `zrun` (login zsh) and `zlogin` (login + interactive zsh) run things as kuba, `session_start`/`qs_start`/`in_session` give you a Wayland session.

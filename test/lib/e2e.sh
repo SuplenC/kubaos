@@ -2576,6 +2576,15 @@ link_test_tool() {
 # /usr/local/bin goes first, so `kubaos` is /out/kubaos, built with the test
 # Suite, and not the home's.
 kz() { zrun ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; PATH=/usr/local/bin:\$PATH; $1"; }
+# quiet_shell WHAT: an interactive zsh, as a terminal opens one, starts with no
+# `mise WARN` or `mise ERROR` line, which a person would see before every
+# prompt. WHAT names the state the Suite is in.
+quiet_shell() {
+  local out
+  out="$(zlogin 'true' 2>&1 | grep -E 'mise (WARN|ERROR)')" || true
+  [[ -z $out ]] || { echo "FAIL $1: an interactive zsh starts with mise's complaints:"; printf '%s
+' "$out"; return 1; }
+}
 
 # The state directory and switch jobs, through the kubaos binary
 # test/run built (/out/kubaos) and a user flake like the installer's, with the
@@ -2825,6 +2834,7 @@ c_suites() {
   grep -qx 'kubaos-test-tool = "1.0"' "$frag" && [[ $(zlogin 'kubaos-test-tool') == 1.0.1 ]] ||
     { echo "FAIL its mise tool: no request 1.0 in $frag, or kubaos-test-tool isn't 1.0.1"; cat "$frag"; return 1; }
   [[ -s $USER_HOME/.config/mise/mise.lock ]] || { echo "FAIL mise lock --global wrote no lockfile"; return 1; }
+  quiet_shell "kubaos suite add test" || return 1
   echo "ok   its mise tool: requested in ~/.config/mise/conf.d/kubaos-test.toml, locked, 1.0.1 on PATH"
   [[ -f $mine ]] && grep -q 'created ~/.config/kubaos/editor/nvim/plugins/test-suite.lua' <<<"$out" ||
     { echo "FAIL the missing user-layer file was not seeded"; printf '%s\n' "$out"; return 1; }
@@ -3067,6 +3077,7 @@ c_suite_rust() {
     out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
       { echo "FAIL the rust-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
   done
+  quiet_shell "the rust-on-mise migration" || return 1
   grep -qx '"aqua:rust-lang/rustup" = "1.29"' "$frag" && grep -qx '"github:wild-linker/wild" = "0.11"' "$frag" &&
     grep -qF 'already extras: wild' <<<"$out" && [[ $(cat "$u/kubaos.d/suites/rust.toml") == 'extras = ["wild"]' ]] ||
     { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
@@ -3233,6 +3244,7 @@ c_suite_go() {
     out="$(kz "GOTOOLCHAIN=local KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
       { echo "FAIL the go-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
   done
+  quiet_shell "the go-on-mise migration" || return 1
   grep -qx 'go = "1.26"' "$frag" && grep -qx '"go:golang.org/x/tools/gopls" = "0.24"' "$frag" &&
     grep -q 'already version 1.26' <<<"$out" && grep -qx 'version = "1.26"' "$u/kubaos.d/suites/go.toml" ||
     { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
@@ -3367,6 +3379,7 @@ c_suite_node() {
     out="$(kz "NPM_CONFIG_PREFIX='$USER_HOME/.local/share/npm' BUN_INSTALL_CACHE_DIR='$USER_HOME/.cache/bun' KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
       { echo "FAIL the node-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
   done
+  quiet_shell "the node-on-mise migration" || return 1
   grep -qxE 'node = "24\.[0-9]+"' "$frag" && grep -qx '"npm:@vtsls/language-server" = "0.3"' "$frag" && grep -qx 'bun = "1.4"' "$frag" &&
     grep -q 'already version 24' <<<"$out" && grep -qx 'version = "24"' "$u/kubaos.d/suites/node.toml" ||
     { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
@@ -3380,6 +3393,7 @@ c_suite_node() {
     { echo "FAIL configure: not Node 26, or 24 wasn't pruned"; ls "$installs/node"; return 1; }
   [[ -f $mine ]] || { echo "FAIL plugins/node-suite.lua was not seeded"; return 1; }
   grep -qxE 'node = "26\.[0-9]+"' "$frag" || { echo "FAIL configure: the fragment doesn't ask for Node 26:"; cat "$frag"; return 1; }
+  quiet_shell "kubaos suite configure node --version 26" || return 1
   echo "ok   kubaos suite configure node --version 26: Node 26, 24 pruned, the seeded node-suite.lua"
 
   path="$(zrun 'print -r -- $PATH' | tr ':' '\n')"
@@ -3502,6 +3516,7 @@ c_suite_python() {
   before="$(mise_state)"
   out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
     { echo "FAIL the python-on-mise migration, run again"; printf '%s\n' "$out" | tail -20; return 1; }
+  quiet_shell "the python-on-mise migration" || return 1
   grep -qx '"aqua:astral-sh/uv" = "0.13"' "$frag" && grep -qx '"pypi:debugpy" = "1.8"' "$frag" &&
     [[ $(mise_state) == "$before" && $(cat "$u/kubaos.d/suites/python.toml") == 'extras = []' ]] ||
     { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
@@ -3623,6 +3638,7 @@ c_suite_proto() {
   before="$(mise_state)"
   out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
     { echo "FAIL the proto-on-mise migration, run again"; printf '%s\n' "$out" | tail -20; return 1; }
+  quiet_shell "the proto-on-mise migration" || return 1
   grep -qx '"aqua:moonrepo/proto" = "0.63"' "$frag" && [[ $(mise_state) == "$before" && ! -e $proto_home/bin/proto ]] &&
     [[ $(cat "$u/kubaos.d/suites/proto.toml") == 'extras = []' ]] ||
     { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }

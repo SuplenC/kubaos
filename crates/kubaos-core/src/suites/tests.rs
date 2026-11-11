@@ -746,7 +746,7 @@ fn the_python_suite_installs_uv_and_each_tool_at_its_own_request() {
     assert!(super::same_tools(&configured.tools, &added.tools));
     assert_eq!(
         h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
-        1,
+        2,
         "a configure that changes nothing installs nothing"
     );
     assert!(
@@ -776,7 +776,7 @@ fn a_python_record_from_before_mise_gets_its_fragment_on_configure_and_stays_wit
     assert!(super::same_tools(&again.tools, &configured.tools));
     assert_eq!(
         h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
-        1,
+        2,
         "a second run installs nothing"
     );
 }
@@ -912,7 +912,7 @@ fn a_rust_record_from_before_mise_gets_its_fragment_on_configure_and_keeps_its_e
     assert_eq!(again.tools, configured.tools);
     assert_eq!(
         h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
-        1,
+        2,
         "a second run installs nothing"
     );
 }
@@ -981,7 +981,7 @@ fn a_go_record_from_before_mise_gets_its_fragment_on_configure_and_keeps_its_ver
     assert_eq!(again.tools, configured.tools);
     assert_eq!(
         h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
-        1,
+        2,
         "a second run installs nothing"
     );
 }
@@ -1047,7 +1047,7 @@ fn a_node_record_from_before_mise_gets_its_fragment_on_configure_and_keeps_its_v
     assert!(super::same_tools(&again.tools, &configured.tools));
     assert_eq!(
         h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
-        1,
+        2,
         "a second run installs nothing"
     );
 }
@@ -1094,7 +1094,7 @@ fn a_proto_record_from_before_mise_gets_its_fragment_on_configure_and_keeps_its_
     assert!(super::same_tools(&again.tools, &configured.tools));
     assert_eq!(
         h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
-        1,
+        2,
         "a second run installs nothing"
     );
 }
@@ -1160,7 +1160,9 @@ fn adding_installs_the_tools_first_then_writes_the_fragment_and_the_record() {
             "mise latest demo-lang@1",
             "mise ls --json",
             "mise install demo-lang@1.0 demo-ls@0.5",
-            "mise lock --global demo-lang demo-ls"
+            "mise lock --global demo-lang demo-ls",
+            "mise install demo-lang@1.0 demo-ls@0.5",
+            "mise prune --tools"
         ]
     );
     assert_eq!(h.mise.installed(), ["demo-lang@1.0.3", "demo-ls@0.5.2"]);
@@ -1392,6 +1394,18 @@ fn a_configure_whose_lock_fails_leaves_the_suite_and_the_lockfile_as_they_were()
     assert_eq!(fs::read_to_string(fragment(&h)).unwrap(), before);
     assert_eq!(lockfile(&h), locked);
     assert_eq!(h.mise.installed(), ["demo-lang@1.0.3", "demo-ls@0.5.2"]);
+}
+
+#[test]
+fn an_add_installs_again_once_locked_and_prunes_the_unlocked_install() {
+    let h = home();
+
+    h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+
+    let calls = h.mise.calls();
+    let lock = calls.iter().position(|c| c.starts_with("mise lock")).unwrap();
+    assert!(calls[lock + 1].starts_with("mise install"), "{calls:?}");
+    assert_eq!(calls.last().map(String::as_str), Some("mise prune --tools"));
 }
 
 #[test]

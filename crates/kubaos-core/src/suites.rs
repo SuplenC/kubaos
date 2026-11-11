@@ -341,7 +341,8 @@ pub enum SuiteError {
     /// selects any more.
     #[error("pruning mise's unused versions")]
     Prune(#[source] MiseError),
-    /// mise could not lock the Suite's tools. The Suite is put back as it was.
+    /// mise could not lock the Suite's tools, or install what the lockfile then names. The Suite
+    /// is put back as it was.
     #[error("locking the {suite} Suite's tools with mise; the Suite is back as it was")]
     MiseLock {
         suite: String,
@@ -501,6 +502,9 @@ impl Suites {
         let tools = wanted_tools(suite, &config, &[], |tool, line| self.narrow(suite, tool, line))?;
         self.install(suite, &tools)?;
         self.commit(suite, Some(&config), &tools, &before)?;
+        if !tools.is_empty() {
+            self.mise.prune().map_err(SuiteError::Prune)?;
+        }
         let seeds = self.seed(suite)?;
         Ok(Added {
             config,
@@ -852,7 +856,7 @@ impl Suites {
     }
 
     /// Writes `suite`'s fragment with `tools`, and its record with `config` when one is given,
-    /// then locks the tools. When a step fails, the Suite
+    /// then locks the tools and installs what the lockfile names. When a step fails, the Suite
     /// goes back as `before` found it, lockfile and all, so it ends either fully changed or not
     /// at all.
     fn commit(
@@ -879,8 +883,8 @@ impl Suites {
         Ok(())
     }
 
-    /// Locks `tools`, which `suite`'s fragment now asks for, and forgets the `dropped` ones
-    /// nothing asks for any more.
+    /// Locks `tools`, which `suite`'s fragment now asks for, forgets the `dropped` ones nothing
+    /// asks for any more, and installs the tools again under the lockfile.
     fn settle(&self, suite: &Suite, tools: &[ToolRequest], dropped: &[String]) -> Result<(), SuiteError> {
         let lock_err = |source| SuiteError::MiseLock {
             suite: suite.name.to_owned(),
@@ -891,7 +895,11 @@ impl Suites {
             return Ok(());
         }
         let names: Vec<String> = tools.iter().map(|t| t.tool.clone()).collect();
-        self.mise.lock(&names).map_err(lock_err)
+        self.mise.lock(&names).map_err(lock_err)?;
+        // HAZARD: install again once locked. An npm tool's lock entry holds its dependency
+        // graph, which mise installs to a folder of its own, so the install made before the lock
+        // isn't the one the lockfile selects, and every shell warns that the tool is missing.
+        self.mise.install(tools).map_err(lock_err)
     }
 
     /// Puts `suite` back as `before` found it, after a failed add or configure: its fragment,
