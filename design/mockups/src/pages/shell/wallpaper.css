@@ -1,0 +1,337 @@
+/* The wallpaper picker, the gallery (`pages/shell/wallpaper-parts.ts`): a wall of pictures, each
+   the desktop drawn at the screen's size and scaled into its frame; a floor per folder, a lamp over
+   each picture; the bar along the foot. */
+
+/* How far the gallery has stepped out to the picture in front of you: 0 the wall, 1 that picture
+   filling the screen, which the live desktop is when the gallery is shut. */
+@property --out {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* Which picture of a floor is in front of you, and which floor: the wall and the floors glide to it. */
+@property --at {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --floor {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far a picture is from the one in front of you along the wall, -1 to 1: its city stands that
+   far ahead of its sky. */
+@property --aside {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.gl-screen {
+  position: relative;
+  display: block;
+  flex: none;
+  overflow: hidden;
+  width: var(--screen-width);
+  height: var(--screen-height);
+  background: var(--color-surface_container_lowest);
+  color: var(--color-on_surface);
+  outline: none;
+  user-select: none;
+  /* The wall's shares of the screen (`[scale]`), in its pixels. */
+  --share: var(--scale-gallery_picture);
+  --pic-width: calc(var(--screen-width) * var(--share));
+  --pic-height: calc(var(--screen-height) * var(--share));
+  --pic-top: calc(var(--screen-height) * var(--scale-gallery_top));
+  --pitch: calc(var(--pic-width) + var(--screen-width) * var(--scale-gallery_gap));
+  /* Stepping out grows the room round the picture in front of you until it is the screen. */
+  --zoom: calc(1 + (1 / var(--share) - 1) * var(--out));
+}
+
+/* The room: the wall down to the floor's line, the floor under it. */
+.gl-room {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% calc(var(--pic-top) + var(--pic-height) / 2);
+  transform: translateY(calc((var(--screen-height) / 2 - var(--pic-top) - var(--pic-height) / 2) * var(--out))) scale(var(--zoom));
+  background: linear-gradient(
+    var(--color-surface_container_lowest),
+    var(--color-surface) calc(var(--scale-gallery_floor) * 100%),
+    var(--color-surface_container_low) calc(var(--scale-gallery_floor) * 100%),
+    var(--color-surface_container_lowest)
+  );
+}
+
+/* What belongs to the room alone fades as you step out: the lamps, the words, the floors. */
+.gl-room-only {
+  opacity: calc(1 - var(--out));
+}
+
+/* The lamp's light on the wall, at night: its tone, faint, falling off from above the picture. */
+.gl-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(calc(var(--pic-width) * 0.8) calc(var(--screen-height) * 0.6) at 50% calc(var(--pic-top) - var(--space-s24)), rgb(from var(--color-primary) r g b / var(--opacity-tint)), transparent);
+}
+
+.gl-screen[data-mode="light"] .gl-wash {
+  display: none;
+}
+
+/* A floor per folder, one above the other; the floor you are on fills the room. */
+.gl-floors {
+  position: absolute;
+  inset: 0;
+  translate: 0 calc(var(--floor) * var(--screen-height));
+  transition: translate var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.gl-floor {
+  position: absolute;
+  inset: 0;
+  translate: 0 calc(var(--level) * -1 * var(--screen-height));
+}
+
+/* The wall slides one picture and its gap a step, gliding into place with a small overshoot. */
+.gl-track {
+  position: absolute;
+  inset: 0;
+  translate: calc(var(--at) * -1 * var(--pitch)) 0;
+  transition: translate var(--motion-long) var(--easing-spring);
+}
+
+.gl-art {
+  position: absolute;
+  left: calc((var(--screen-width) - var(--pic-width)) / 2 + var(--index) * var(--pitch));
+  top: var(--pic-top);
+  width: var(--pic-width);
+  opacity: var(--opacity-subdued);
+  transition: opacity var(--motion-long) var(--easing-standard);
+  cursor: pointer;
+}
+
+.gl-art[data-on] {
+  opacity: 1;
+}
+
+/* The lamp: a neon tube `space.s4` thick, `space.s32` over its picture, unlit but over the picture
+   in front of you, which it lights. By day nothing glows: an outline, and the tone over the one in
+   front of you. */
+.gl-lamp {
+  position: absolute;
+  left: 50%;
+  top: calc(-1 * var(--space-s32));
+  width: calc(var(--pic-width) * var(--scale-gallery_lamp));
+  height: var(--space-s4);
+  translate: -50% 0;
+  border-radius: var(--radius-full);
+  background: var(--color-primary_unlit);
+  transition:
+    background-color var(--motion-short) var(--easing-standard),
+    box-shadow var(--motion-short) var(--easing-standard);
+}
+
+.gl-art[data-on] .gl-lamp {
+  background: var(--color-primary_core);
+  box-shadow:
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / var(--focus-near_opacity)),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / var(--focus-far_opacity));
+}
+
+.gl-screen[data-mode="light"] .gl-lamp {
+  background: var(--color-outline_variant);
+  box-shadow: none;
+}
+
+.gl-screen[data-mode="light"] .gl-art[data-on] .gl-lamp {
+  background: var(--color-primary);
+}
+
+/* Lit with the signs off: the tube as unlit glass, no glow. */
+.gl-screen[data-signs-off] .gl-art[data-on] .gl-lamp {
+  background: var(--color-primary_glass);
+  box-shadow: none;
+}
+
+/* The frame: the picture's box, its corner the surface's, a step back unless it is in front of
+   you, and the ladder's top shadow on the wall while it is. Stepping out takes its corner and its
+   shadow away as it becomes the screen. */
+.gl-frame {
+  position: relative;
+  display: block;
+  width: var(--pic-width);
+  height: var(--pic-height);
+  overflow: hidden;
+  border-radius: calc(var(--radius-surface) * (1 - var(--out)) / var(--zoom));
+  scale: var(--scale-behind);
+  background: var(--color-surface_container);
+  box-shadow: 0 var(--elevation-1-ambient-y) var(--elevation-1-ambient-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-ambient-opacity) * (1 - var(--out))));
+  transition: scale var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.gl-art[data-on] .gl-frame {
+  scale: 1;
+  box-shadow: 0 var(--elevation-4-ambient-y) var(--elevation-4-ambient-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-ambient-opacity) * (1 - var(--out))));
+}
+
+/* The desktop or the lock in it: drawn at the screen's size, scaled to the frame. */
+.gl-frame > .k-lock {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  scale: var(--share);
+  /* Its city a step ahead of its sky the farther it is along the wall, in its own pixels. */
+  --city-lead: calc(var(--aside) * var(--depth) * var(--space-s24) / var(--share));
+  transition: --aside var(--motion-long) var(--easing-spring);
+}
+
+/* An empty folder's frame: the sunken edge round an EmptyState. */
+.gl-frame[data-empty] {
+  display: grid;
+  place-items: center;
+  background: none;
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
+}
+
+/* The placard under the picture in front of you: what it is on the left, its depth on the right. */
+.gl-placard {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-s24);
+  margin-top: var(--space-s24);
+  transition: opacity var(--motion-long) var(--easing-standard);
+}
+
+.gl-art:not([data-on]) .gl-placard {
+  opacity: 0;
+}
+
+/* The floors, a list at the wall's start, the middle of the screen. */
+.gl-floors-panel {
+  position: absolute;
+  left: var(--space-s32);
+  top: 50%;
+  translate: 0 -50%;
+  width: calc(var(--size-panel) / 2);
+}
+
+/* The bar along the foot: glass, a pill, `space.s8` round its small controls. */
+.gl-bar {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: var(--space-s24);
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-s16);
+  padding: var(--space-s8);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-surface) r g b / var(--opacity-glass));
+  backdrop-filter: blur(var(--size-lock_blur));
+  white-space: nowrap;
+  transition:
+    opacity var(--motion-long) var(--easing-emphasized_decel),
+    translate var(--motion-long) var(--easing-emphasized_decel);
+}
+
+/* The password's sheet rises under it while the lock is awake on the full screen. */
+.gl-bar[data-lifted] {
+  translate: -50% calc(-1 * (var(--size-control_md) + 3 * var(--space-s16)));
+}
+
+.gl-bar-now {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s12);
+}
+
+.gl-bar-now[hidden] {
+  display: none;
+}
+
+.gl-bar-rule {
+  align-self: stretch;
+  width: var(--stroke-hairline_device_px);
+  margin: var(--space-s4) 0;
+  background: var(--color-outline_variant);
+}
+
+/* The shortcuts' button at the foot's start. */
+.gl-info {
+  position: absolute;
+  z-index: 3;
+  left: var(--space-s24);
+  bottom: var(--space-s24);
+  transition: opacity var(--motion-long) var(--easing-emphasized_decel);
+}
+
+/* Shut, the bar and the shortcuts' button are gone. */
+.gl-screen:not([data-open]) :is(.gl-bar, .gl-info) {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: var(--motion-medium);
+  transition-timing-function: var(--easing-emphasized_accel);
+}
+
+/* A control's name and key, floating `space.s8` over it while the pointer or the keyboard is on it. */
+.gl-tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.gl-tip[data-shown] {
+  opacity: 1;
+}
+
+/* The desktop's windows, stills of the user's: drawn as they land, the desktop you opened from
+   having its own at once. */
+.gl-stills {
+  position: relative;
+  flex: 1 1 0;
+  transition: opacity var(--motion-slow) var(--easing-standard);
+}
+
+.gl-screen:not([data-stills]) .k-lock:not([data-live]) .gl-stills {
+  opacity: 0;
+}
+
+.gl-window {
+  position: absolute;
+}
+
+/* A video wallpaper breathes: its loop drawn over its poster in screen, coming and going. */
+.gl-loop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: gl-breathe var(--motion-hum) var(--easing-standard) infinite alternate;
+}
+
+[data-reduced] .gl-loop {
+  animation: none;
+}
+
+@keyframes gl-breathe {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: var(--opacity-hum);
+  }
+}

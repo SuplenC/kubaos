@@ -3,7 +3,7 @@
 // password's sheet up; always in the wallpaper's own night scheme.
 
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
-import { BLUR, BLURRED, CLOCK, DIM, DIMMED, FRAME, fromAwake, fromAwakeReduced, locking, lockingReduced, ON, reducedRest, SHEET, touching, touchingReduced, waking, wakingReduced } from "./lock-moves.ts";
+import { fromAwake, fromAwakeReduced, locking, lockingReduced, ON, reducedRest, resting, touching, touchingReduced, waking, wakingReduced } from "./lock-moves.ts";
 import type { Moment } from "../../lib/lock.ts";
 import { windowSize } from "../../site/settings.ts";
 import { DATES, FINGER_ERROR, kickerFor, LOCK_ERROR, liveLock, PURPLE_HOUR, SHIBUYA, still, TIMES, TOWER, twelveHour, twoScreens } from "./locks.ts";
@@ -38,13 +38,7 @@ const WAKES: Move = {
 const RESTS: Move = {
   name: "Going back to rest",
   what: "Esc, or 20 s idle: the sheet sinks, the frame slides out, the clock flies home.",
-  tracks: [
-    { part: SHEET, on: ON, target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: FRAME, on: ON, target: ".k-lock", property: "--framed", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: DIM, on: ON, target: DIMMED, property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
-    { part: BLUR, on: ON, target: BLURRED, property: "--wake", from: 1, to: 0, duration: "long", curve: "standard" },
-    { part: CLOCK, on: ON, target: ".k-lock-clock", property: "--clock-lift", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
-  ],
+  tracks: resting(ON),
   reduced: reducedRest(),
   back: "cuts",
   sample: held("awake"),

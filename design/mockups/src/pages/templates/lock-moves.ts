@@ -177,3 +177,14 @@ export function touchingReduced(on: string, scope = ""): [Eased, ...Eased[]] {
   ];
 }
 
+
+/** Going back to rest from awake: the sheet sinks, the frame slides out, the clock flies home. */
+export function resting(on: string, scope = ""): [Eased, ...Eased[]] {
+  return [
+    { part: SHEET, on, target: within(scope, ".k-sheet-part"), property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
+    { part: FRAME, on, target: within(scope, ".k-lock"), property: "--framed", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
+    { part: DIM, on, target: within(scope, DIMMED), property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
+    { part: BLUR, on, target: within(scope, BLURRED), property: "--wake", from: 1, to: 0, duration: "long", curve: "standard" },
+    { part: CLOCK, on, target: within(scope, ".k-lock-clock"), property: "--clock-lift", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+  ];
+}

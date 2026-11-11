@@ -1,187 +1,315 @@
-// The wallpaper picker (`config/quickshell/modules/wallpaper/WallpaperPicker.qml` and
-// `WallpaperSettings.qml`): a sheet rising out of the frame's bottom edge, a tab per folder over
-// its thumbnails, the settings as the last tab. The keyboard's thumbnail previews on the desktop.
+// The wallpaper picker (`docs/design/components/wallpaper-picker.md`, `modules/wallpaper/`, not
+// built yet): a gallery. Every picture of a folder hangs on a wall, a floor per folder, a neon lamp
+// over each; each is drawn as the picture, your desktop on it, or your lock, in its own colours;
+// the one in front of you steps out to the full screen, and the live desktop is that one stepped
+// out, so opening steps back into the wall and applying or cancelling steps out again.
 
-import { lights, powerMoves, press } from "../../site/moves.ts";
-import { type Move, nonEmpty, page } from "../../site/page.ts";
-import { ALL } from "../../site/settings.ts";
-import { hung, live as liven, NARROW_WIDTH } from "./screen-parts.ts";
-import { FOLDERS, landIn, type PickerOptions, picker } from "./wallpaper-parts.ts";
+import { doesntApply, type Duration, type Easing, type Move, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
+import { windowSize } from "../../site/settings.ts";
+import { locking, lockingReduced, touching, touchingReduced, waking, wakingReduced } from "../templates/lock-moves.ts";
+import { FOLDERS, gallery, type GalleryOptions, KABUKICHO, pictureToLock, sideToDesktop, sideToLock, toDesktop, toDesktopReduced, toPicture, toPictureReduced, type View } from "./wallpaper-parts.ts";
 
-type Shown = "rest" | "lit" | "pressed" | "selected" | "loading" | "empty" | "error";
+type Shown = "rest" | "lit" | "open" | "disabled" | "loading" | "empty";
 
-/** The picker open on the shots' screen, drawn still. */
-function shot(options: PickerOptions = {}, width?: number, reveal?: number): HTMLElement {
-  return hung(picker(options), { edge: "bottom", ...(width !== undefined ? { width } : {}), ...(reveal !== undefined ? { reveal } : {}) }).screen.element;
+/** The gallery drawn still. */
+const still = (options: GalleryOptions = {}) => () => gallery(options);
+
+/** The gallery drawn still in a box, so a move can reach its root. */
+const held = (options: GalleryOptions = {}) => () => {
+  const box = document.createElement("span");
+  box.style.display = "block";
+  box.append(gallery(options));
+  return box;
+};
+
+/** The front picture's frame, and every other picture's, as the moves' targets name them. */
+const FRONT = ".gl-art[data-on]";
+const SIDES = ".gl-art:not([data-on])";
+const MAIN = "the picture in front of you";
+const OTHERS = "the pictures either side";
+const ROOM = "the gallery";
+
+/** Every track of `tracks` a phase later: after `phase`, then its own cue. */
+function after(phase: Duration, tracks: readonly Track<Easing>[]): Track<Easing>[] {
+  return tracks.map((track) => {
+    const own: readonly Duration[] = track.cue === undefined ? [] : typeof track.cue === "string" ? [track.cue] : track.cue;
+    return { ...track, cue: [phase, ...own] as unknown as NonEmpty<Duration> };
+  });
 }
 
-/** The stage: the picker live, previewing on the desktop; Esc shuts it and a click opens it again. */
-function live(): HTMLElement {
-  let set: (open: boolean) => void = () => {};
-  let picture: HTMLImageElement | null = null;
-  const content = picker({
-    live: {
-      preview: (source) => {
-        if (picture) picture.src = source;
-      },
-      close: () => set(false),
-    },
-  });
-  const made = hung(content, { edge: "bottom" });
-  picture = made.screen.element.querySelector<HTMLImageElement>(".k-screen-wallpaper");
-  const applied = picture?.src ?? "";
-  set = liven(made.sheet, true);
-  made.screen.element.addEventListener("click", (event) => {
-    if (made.sheet.parts[0]!.hasAttribute("data-shown") || content.contains(event.target as Node)) return;
-    if (picture) picture.src = applied;
-    set(true);
-    landIn(content);
-  });
-  if (!ALL) landIn(content);
-  return made.screen.element;
-}
-
-const SHEET = "the sheet";
+const stepOut = (from: number, to: number, duration: Duration): Track<Easing> => ({ part: "stepping out", on: ROOM, target: ".gl-screen", property: "--out", from, to, duration, curve: "emphasized_decel" });
+const barFades = (from: number, to: number, duration: Duration, curve: Easing): Track<Easing> => ({ part: "the bar", on: ROOM, target: ".gl-bar, .gl-info", property: "opacity", from, to, duration, curve });
 
 const OPENING: Move = {
   name: "Opening",
-  what: "Super+Ctrl+Space, the control center's Wallpaper or the Command menu: the sheet rises.",
-  tracks: [{ part: SHEET, on: "the picker", target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" }],
-  reduced: [{ part: SHEET, on: "the picker", target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
+  what: "Super+Ctrl+Space: the desktop steps back into its frame as the wall builds round it.",
+  tracks: [stepOut(1, 0, "slow"), ...toPicture(MAIN, FRONT), ...toPicture(OTHERS, SIDES, false), barFades(0, 1, "long", "emphasized_decel")],
+  reduced: [
+    { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "stepping out", on: ROOM, target: ".gl-screen", property: "--out", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
+    ...after("short", toPictureReduced(MAIN, FRONT)),
+    { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
+    barFades(0, 1, "short", "standard"),
+  ],
   back: "cuts",
-  sample: () => shot(),
+  sample: held({ open: false }),
 };
 
-const CLOSING: Move = {
-  name: "Closing",
-  what: "Esc, Enter's apply, or a press outside: the sheet sinks back into the edge.",
-  tracks: [{ part: SHEET, on: "the picker", target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }],
-  reduced: [{ part: SHEET, on: "the picker", target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" }],
+const APPLYING: Move = {
+  name: "Applying",
+  what: "Enter: the picture in front of you grows into the desktop as the wall goes.",
+  tracks: [stepOut(0, 1, "slow"), ...toDesktop(MAIN, FRONT), ...toDesktop(OTHERS, SIDES, false), barFades(1, 0, "medium", "emphasized_accel")],
+  reduced: [
+    { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "stepping out", on: ROOM, target: ".gl-screen", property: "--out", from: 0, to: 1, duration: "instant", cue: "short", curve: "standard" },
+    ...after("short", toDesktopReduced(MAIN, FRONT)),
+    { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
+    barFades(1, 0, "short", "standard"),
+  ],
   back: "cuts",
-  sample: () => shot(),
+  sample: held({ at: 1 }),
 };
 
-const RESIZING: Move = {
-  name: "Another folder",
-  what: "Tab to a folder of two: the sheet narrows to its thumbnails over `medium`.",
-  tracks: [{ part: "the span", on: "the picker", target: ".k-sheet-part", property: "--sheet-span", from: { length: "size-panel" }, to: { length: "size-dialog" }, duration: "medium", curve: "standard_decel" }],
-  reduced: [{ part: "the span", on: "the picker", target: ".k-sheet-part", property: "--sheet-span", from: { length: "size-panel" }, to: { length: "size-dialog" }, duration: "instant", curve: "standard_decel" }],
+const CANCELLING: Move = {
+  name: "Cancelling",
+  what: "Esc: the wall walks back to the picture you had, then it grows into the desktop.",
+  tracks: [
+    { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 2, to: 0, duration: "long", curve: "spring" },
+    ...after("long", [stepOut(0, 1, "slow"), ...toDesktop(MAIN, ".gl-floor:first-child .gl-art:first-child"), barFades(1, 0, "medium", "emphasized_accel")]),
+  ],
+  reduced: [
+    { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 2, to: 0, duration: "instant", cue: "short", curve: "standard" },
+    { part: "stepping out", on: ROOM, target: ".gl-screen", property: "--out", from: 0, to: 1, duration: "instant", cue: "short", curve: "standard" },
+    ...after("short", toDesktopReduced(MAIN, ".gl-floor:first-child .gl-art:first-child")),
+    { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
+    barFades(1, 0, "short", "standard"),
+  ],
+  back: "cuts",
+  sample: held({ at: 2 }),
+};
+
+const TO_DESKTOP: Move = {
+  name: "Picture to desktop",
+  what: "2: every picture becomes its desktop; the one in front eases back to 1:1.",
+  tracks: nonEmpty([...toDesktop(MAIN, FRONT), ...toDesktop(OTHERS, SIDES, false)]),
+  reduced: nonEmpty([...toDesktopReduced(MAIN, FRONT), ...toDesktopReduced(OTHERS, SIDES)]),
+  back: "cuts",
+  sample: held({ at: 2, view: "picture" }),
+};
+
+const LOCKS: Move = {
+  name: "Desktop to lock",
+  what: "3: the Lock's own locking in front, the bar's time growing into the clock behind the city.",
+  tracks: [...locking(MAIN, FRONT), ...sideToLock(OTHERS, SIDES)],
+  reduced: [...lockingReduced(MAIN, FRONT), ...sideToLock(OTHERS, SIDES, true)],
+  back: "cuts",
+  sample: held({ at: 2, view: "desktop" }),
+};
+
+const UNLOCKS: Move = {
+  name: "Lock to desktop",
+  what: "2: the Lock's own unlocking in front, the clock flying into the bar's time.",
+  tracks: [...touching(MAIN, FRONT), ...sideToDesktop(OTHERS, SIDES)],
+  reduced: [...touchingReduced(MAIN, FRONT), ...sideToDesktop(OTHERS, SIDES, true)],
+  back: "cuts",
+  sample: held({ at: 2, view: "lock" }),
+};
+
+const TO_LOCK: Move = {
+  name: "Picture to lock",
+  what: "3 from the picture: every clock fades in behind its city.",
+  tracks: nonEmpty([...pictureToLock(MAIN, FRONT), ...pictureToLock(OTHERS, SIDES, false)]),
+  reduced: nonEmpty([...pictureToLock(MAIN, FRONT, true, true), ...pictureToLock(OTHERS, SIDES, false, true)]),
+  back: "cuts",
+  sample: held({ at: 2, view: "picture" }),
+};
+
+const WAKES: Move = {
+  name: "Waking the lock",
+  what: "W: the Lock's own waking, in the frame or on the full screen.",
+  tracks: waking(MAIN, FRONT),
+  reduced: wakingReduced(MAIN, FRONT),
+  back: "cuts",
+  sample: held({ at: 2, view: "lock" }),
+};
+
+const FULL: Move = {
+  name: "Full screen",
+  what: "F: the room grows round the picture in front of you until it is the screen.",
+  tracks: [stepOut(0, 1, "slow")],
+  reduced: [
+    { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "stepping out", on: ROOM, target: ".gl-screen", property: "--out", from: 0, to: 1, duration: "instant", cue: "short", curve: "standard" },
+    { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
+  ],
+  back: "cuts",
+  sample: held({ at: 2, view: "desktop" }),
+};
+
+const WALL = "the wall";
+const OLD = ".gl-floor:first-child .gl-art:nth-child(2)";
+const NEW = ".gl-floor:first-child .gl-art:nth-child(3)";
+
+const BROWSES: Move = {
+  name: "Browsing",
+  what: "→: the wall glides a step, each city ahead of its sky; the one reached lifts.",
+  tracks: [
+    { part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 2, duration: "long", curve: "spring" },
+    { part: "its city's lead", on: "the picture reached", target: `${NEW} .k-lock`, property: "--aside", from: 1, to: 0, duration: "long", curve: "spring" },
+    { part: "its city's lead", on: "the picture left", target: `${OLD} .k-lock`, property: "--aside", from: 0, to: -1, duration: "long", curve: "spring" },
+    { part: "the push", on: "the picture reached", target: `${NEW} .k-lock`, property: "--push", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: "the push", on: "the picture left", target: `${OLD} .k-lock`, property: "--push", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: "its frame", on: "the picture reached", target: `${NEW} .gl-frame`, property: "scale", from: { scale: "behind" }, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: "its frame", on: "the picture left", target: `${OLD} .gl-frame`, property: "scale", from: 1, to: { scale: "behind" }, duration: "long", curve: "emphasized_decel" },
+    { part: "its lamp", on: "the picture reached", target: `${NEW} .gl-lamp`, property: "background-color", from: { color: "primary_unlit" }, to: { color: "primary_core" }, duration: "short", curve: "standard" },
+    { part: "its lamp", on: "the picture left", target: `${OLD} .gl-lamp`, property: "background-color", from: { color: "primary_core" }, to: { color: "primary_unlit" }, duration: "short", curve: "standard" },
+  ],
+  reduced: [{ part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 2, duration: "instant", curve: "standard" }],
+  back: "cuts",
+  sample: held({ at: 1 }),
+};
+
+const FLATTENS: Move = {
+  name: "Depth off",
+  what: "D: the city settles onto the sky and its plate goes; on a lock the clock fades round it.",
+  tracks: [{ part: "the depth", on: MAIN, target: `${FRONT} .k-lock`, property: "--depth", from: 1, to: 0, duration: "long", curve: "emphasized_decel" }],
+  reduced: [{ part: "the depth", on: MAIN, target: `${FRONT} .k-lock`, property: "--depth", from: 1, to: 0, duration: "instant", curve: "standard" }],
   back: "plays",
-  sample: () => shot({ tab: 2 }),
+  sample: held({ at: 2 }),
 };
 
-const ROWS = [{ name: "Picker" }] as const;
-
-function cell(state: Shown): HTMLElement {
-  switch (state) {
-    case "rest":
-      return shot();
-    case "lit":
-      return shot({ at: 2, pinned: "lit" });
-    case "pressed":
-      return shot({ at: 2, pinned: "pressed" });
-    case "selected":
-      return shot({ tab: FOLDERS.length });
-    case "loading":
-      return shot({ folders: [{ name: "Shinjuku", pictures: FOLDERS[0]!.pictures.map((each, index) => (index > 2 ? { ...each, arrival: "loading" as const } : each)) }, ...FOLDERS.slice(1)] });
-    case "empty":
-      return shot({ folders: [{ name: "Mine", pictures: [] }, ...FOLDERS] });
-    case "error":
-      return shot({ folders: [{ name: "Shinjuku", pictures: FOLDERS[0]!.pictures.map((each, index) => (index === 4 ? { ...each, arrival: "broken" as const } : each)) }, ...FOLDERS.slice(1)] });
-  }
+/** A view's gallery in `state`. */
+function cell(view: View) {
+  return (state: Shown): HTMLElement => {
+    switch (state) {
+      case "rest":
+        return gallery({ at: 2, view });
+      case "lit":
+        return gallery({ at: 2, view, tip: view === "picture" ? "Desktop" : view === "desktop" ? "Lock" : "Wake" });
+      case "open":
+        return gallery({ at: 2, view, shortcuts: true });
+      case "disabled":
+        return gallery({ at: 4, view });
+      case "loading":
+        return gallery({ at: 2, view, stills: false });
+      case "empty":
+        return gallery({ folder: 2, view: "picture" });
+    }
+  };
 }
 
-const MANY = [...FOLDERS[0]!.pictures, ...FOLDERS[1]!.pictures];
+/** The live gallery, shut: the desktop, which a click or Space opens. */
+function live(): HTMLElement {
+  return gallery({ open: false, live: true });
+}
+
+/** The front picture with a name at the toolbar's length. */
+const named = (words: string) => gallery({ at: 0, name: words });
 
 export default page<Shown>({
   level: "shell",
   slug: "wallpaper",
   title: "Wallpaper picker",
-  lede: "A bottom-edge sheet: a tab per folder over its thumbnails, the settings last; the keyboard's one previews.",
-  code: { qml: "WallpaperPicker, WallpaperSettings" },
-  from: ["panel-page", "tabs", "picture-choice", "keycap", "empty-state"],
-  stage: { live, hint: "arrows preview, Enter applies, Tab folders, S settings", daylight: true },
+  lede: "A gallery: every picture on a wall, each drawn as itself, your desktop or your lock, the one in front lit.",
+  code: { unbuilt: "QML WallpaperPicker: not built yet" },
+  from: ["lock", "depth-picture", "tabs", "button", "button-bar", "icon-button", "chip", "switch", "list", "empty-state", "shortcuts", "tooltip"],
+  stage: { live, hint: "click it, then the keys: ? lists them", daylight: true },
   variants: [
-    { name: "A folder of five", for: "four a row, the rest under", sample: () => shot() },
-    { name: "A folder of two", for: "two a row: a narrower sheet", sample: () => shot({ tab: 2 }) },
-    { name: "Settings", for: "motion's three choices; ← → change", sample: () => shot({ tab: FOLDERS.length }) },
+    { name: "Picture", for: "the wall: each picture alone, the front one lifted", sample: still({ at: 1 }) },
+    { name: "Desktop", for: "each its desktop, in its own colours", sample: still({ at: 1, view: "desktop" }) },
+    { name: "Lock", for: "each its lock, the clock behind the city", sample: still({ at: 2, view: "lock" }) },
+    { name: "Full screen, desktop", for: "the front one fills the screen", sample: still({ at: 2, view: "desktop", full: true }) },
+    { name: "Full screen, lock awake", for: "the password's sheet up, the bar lifted", sample: still({ at: 2, view: "lock", full: true, awake: true }) },
+    { name: "A video", for: "its loop breathes over its poster", sample: still({ at: 3 }) },
+    { name: "Depth off", for: "the tower flat on its sky", sample: still({ at: 2, view: "lock", flat: [FOLDERS[0]!.pictures[2]!.name] }) },
+    { name: "Shut", for: "the live desktop", sample: still({ open: false }) },
   ],
-  sizes: [
-    { name: "The shots' screen", for: "1600 by 1000", sample: () => shot() },
-    { name: "A narrow screen", for: "never wider than between the frame's corners", sample: () => shot({}, NARROW_WIDTH) },
-  ],
+  sizes: doesntApply("as large as its screen; the wall is shares of it (`[scale]`)."),
   states: {
-    shown: ["rest", "lit", "pressed", "selected", "loading", "empty", "error"],
-    absent: { disabled: "open or gone; nothing in it disables" },
-    rows: nonEmpty(ROWS.map(({ name }) => ({ name, cell }))),
+    shown: ["rest", "lit", "open", "disabled", "loading", "empty"],
+    absent: {
+      pressed: "its buttons press as their own pages say",
+      selected: "the applied picture is marked Current at rest",
+      error: "a picture it can't read isn't hung",
+    },
+    rows: nonEmpty((["picture", "desktop", "lock"] as const).map((view) => ({ name: view === "picture" ? "Picture" : view === "desktop" ? "Desktop" : "Lock", cell: cell(view) }))),
     looks: {
-      rest: "the applied one ringed and marked Current",
-      lit: "the keyboard's one: the cold tube",
-      pressed: "the cold tube white-hot",
-      selected: "the settings tab: one row, motion's choices",
-      loading: "a placeholder until the picture fades in",
-      empty: "an `EmptyState` saying where to drop them",
-      error: "a picture it can't read: the placeholder stays",
+      rest: "the front one lit, its lamp burning",
+      lit: "a control's name and key over it",
+      open: "the shortcuts over their button",
+      disabled: "no cut-out: depth's switch off, with why",
+      loading: "the windows' stills not landed yet",
+      empty: "an `EmptyState` in the frame, where to drop them",
     },
   },
   focus: {
     tubes: [
-      { name: "The keyboard's thumbnail", tone: "cold", filled: false, content: false },
-      { name: "The applied one", tone: "accent", filled: false, content: false },
+      { name: "The lamp over the front picture", tone: "accent", filled: true, content: false },
+      { name: "Its controls", tone: "accent", filled: false, content: false },
     ],
-    looks: { lit: "the cold tube inside the edge, its glow outside", signsOff: "the tube as glass, no glow" },
-    signsOff: () => shot({ at: 2, pinned: "signs-off" }),
+    looks: { lit: "the lamp's core burns, its glow on the wall", signsOff: "the lamp as glass: no glow" },
+    signsOff: () => gallery({ at: 2, signsOff: true }),
   },
   content: {
-    text: [
-      { name: "A folder's name", words: { short: "Shinjuku", long: "Shinjuku after the last train" }, sample: (words: string) => shot({ folderName: words }) },
+    text: [{ name: "A picture's name", words: { short: "Kabukicho rain", long: "Kabukicho rain after the last train home" }, sample: named }],
+    missingPicture: [
+      {
+        name: "Not arrived",
+        for: "`surface_container_lowest`, then the picture",
+        sample: still({ folders: [{ name: "Mine", icon: "person", pictures: [{ ...KABUKICHO, name: "Not arrived", wallpaper: { ...KABUKICHO.wallpaper, picture: "" } }, KABUKICHO] }], folder: 0, at: 0 }),
+      },
     ],
-    missingPicture: [{ name: "Unreadable", for: "the placeholder holds the box", sample: () => cell("error") }],
     counts: [
-      { name: "None", for: "an `EmptyState`, two thumbnails wide", sample: () => cell("empty") },
-      { name: "One", for: "two columns still", sample: () => shot({ folders: [{ name: "Japanese", pictures: FOLDERS[2]!.pictures.slice(0, 1) }] }) },
-      { name: "Many", for: "two rows show; a row scrolls at a time", sample: () => shot({ folders: [{ name: "Everything", pictures: MANY }] }) },
+      { name: "None", for: "Downloads: an `EmptyState` in the frame", sample: still({ folder: 2 }) },
+      { name: "One", for: "Mine: no neighbours", sample: still({ folder: 1, at: 0 }) },
+      { name: "Many", for: "KubaOS: five, two either side in view", sample: still({ at: 2 }) },
     ],
   },
   motion: {
     arrives: [OPENING],
-    leaves: [CLOSING],
-    between: [
-      RESIZING,
-      { name: "Lit", what: "The keyboard moves on: the cold tube lights over `short`.", tracks: lights(".k-picture-tile", "a thumbnail", 0, 1), reduced: "same", back: "cuts", sample: () => shot({ at: 2 }) },
-      { name: "Pressed", what: "Over `micro` the tube runs white-hot.", tracks: press(".k-picture-tile", "a thumbnail"), reduced: "same", back: "plays", sample: () => shot({ at: 2, pinned: "lit" }) },
-      ...powerMoves(() => shot({ at: 2, pinned: "lit" })),
-    ],
+    leaves: [APPLYING, CANCELLING],
+    between: [BROWSES, TO_DESKTOP, LOCKS, UNLOCKS, TO_LOCK, WAKES, FULL, FLATTENS],
   },
   keyboard: {
     keys: [
-      { keys: ["Super+Ctrl+Space"], does: "opens or closes it" },
-      { keys: ["h", "j", "k", "l", "←", "↓", "↑", "→"], does: "the next thumbnail; it previews on the desktop" },
-      { keys: ["Enter"], does: "applies it and recolours everything" },
-      { keys: ["Tab", "Shift+Tab"], does: "the next or the last folder, round to Settings" },
-      { keys: ["S"], does: "the settings" },
-      { keys: ["←", "→", "Space"], does: "in the settings: motion's choice" },
-      { keys: ["Esc"], does: "from the settings, back; else closes" },
+      { keys: ["Super+Ctrl+Space"], does: "opens or shuts it" },
+      { keys: ["←", "→"], does: "the picture before or after, in every view" },
+      { keys: ["↑", "↓"], does: "the floor above or below" },
+      { keys: ["1", "2", "3"], does: "Picture, Desktop, Lock" },
+      { keys: ["F", "Space"], does: "full screen, and back to the wall" },
+      { keys: ["D"], does: "depth on or off, on a picture with it" },
+      { keys: ["W"], does: "in Lock: wakes it, or lets it rest" },
+      { keys: ["Enter"], does: "applies the one in front" },
+      { keys: ["Esc"], does: "the shortcuts first; else cancels, the old one back" },
+      { keys: ["?"], does: "the shortcuts" },
     ],
-    order: "Tab switches folders; the thumbnails are one stop.",
-    lands: "Opening, on the applied thumbnail; a folder, on its applied one or its first.",
+    order: "Tab: the shortcuts' button, the views, Full screen, Cancel, Wake, Apply.",
+    lands: "Opening, on the gallery itself; shutting, back where it was.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "A folder of five", for: "the padding, the header, the grid", sample: () => shot() },
-      { name: "Settings", for: "the row and its choices", sample: () => shot({ tab: FOLDERS.length }) },
+      { name: "The wall", for: "pictures, gaps, lamps, placard, floors", sample: still({ at: 2 }) },
+      { name: "The bar, full screen", for: "the bar's parts and the name", sample: still({ at: 2, view: "desktop", full: true }) },
     ]),
     measures: [
-      { part: "Top and foot", token: "space-s24" },
-      { part: "Sides, the container's padding", token: "container-2-padding" },
-      { part: "Header to the thumbnails", token: "space-s16" },
-      { part: "Tabs to the key hints", token: "space-s16" },
-      { part: "Thumbnail", token: "size-thumbnail_width" },
-      { part: "Thumbnail's height", token: "size-thumbnail_height" },
-      { part: "Between thumbnails", token: "space-s16" },
-      { part: "Settings row's padding", token: "space-s12" },
-      { part: "Corners, fillets", token: "radius-surface" },
+      { part: "Picture's height", token: "scale-gallery_picture" },
+      { part: "Pictures' top edge", token: "scale-gallery_top" },
+      { part: "Between pictures", token: "scale-gallery_gap" },
+      { part: "Lamp's width", token: "scale-gallery_lamp" },
+      { part: "Lamp's height", token: "space-s4" },
+      { part: "Lamp over its picture", token: "space-s32" },
+      { part: "Wall's foot", token: "scale-gallery_floor" },
+      { part: "Picture → placard", token: "space-s24" },
+      { part: "Frame's corner", token: "radius-surface" },
+      { part: "A picture stepped back", token: "scale-behind" },
+      { part: "City ahead, browsing", token: "space-s24" },
+      { part: "Floors' inset", token: "space-s32" },
+      { part: "Bar's padding", token: "space-s8" },
+      { part: "Bar's gaps", token: "space-s16" },
+      { part: "Bar, shortcuts → foot", token: "space-s24" },
+      { part: "Tooltip over its control", token: "space-s8" },
     ],
-    reflow: { note: "Never wider than between the frame's corners; the padding steps down.", sample: () => shot({}, NARROW_WIDTH) },
+    reflow: { note: "The wall is shares of the screen: the same shape on every screen.", sample: () => gallery({ at: 2, size: windowSize() }) },
   },
 });
