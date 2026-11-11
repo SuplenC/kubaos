@@ -19,6 +19,7 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt;
+use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
@@ -159,13 +160,14 @@ pub trait Mise: fmt::Debug + Send + Sync {
     /// [`MiseError`] when mise can't start or fails.
     fn prune(&self) -> Result<(), MiseError>;
 
-    /// Locks the tools of the global configs, KubaOS's fragments included, in mise's global
-    /// lockfile ([`crate::state::Paths::mise_lock`]).
+    /// Locks `tools`, which the global configs ask for, in mise's global lockfile
+    /// ([`crate::state::Paths::mise_lock`]), for this machine's platform only, and leaves every
+    /// other entry as it is.
     ///
     /// # Errors
     ///
-    /// [`MiseError`] when mise can't start or fails.
-    fn lock(&self) -> Result<(), MiseError>;
+    /// [`MiseError`] when mise can't start or fails; the lockfile is then as it was.
+    fn lock(&self, tools: &[String]) -> Result<(), MiseError>;
 }
 
 /// A call to mise failed.
@@ -187,6 +189,15 @@ pub enum MiseError {
         status: String,
         message: String,
     },
+    /// mise needed GitHub's API, and the calls GitHub allows without a token (60 an hour, for
+    /// everything on the machine's address) were used up. `resets` is when they come back, as mise
+    /// printed it, when it did.
+    #[error(
+        "`mise {command}` hit GitHub's limit of 60 API calls an hour without a token, which {}: run it again then, \
+         or now with a token, as `GITHUB_TOKEN=$(gh auth token) kubaos …`",
+        resets.as_deref().map_or_else(|| "resets within the hour".to_owned(), |at| format!("resets at {at}"))
+    )]
+    RateLimited { command: String, resets: Option<String> },
     /// mise printed something other than the JSON asked for.
     #[error("reading what `mise {command}` printed")]
     Output {
@@ -262,22 +273,9 @@ impl Cli {
         if !self.shown {
             return self.run_captured(args).map(drop);
         }
-        let status = self
-            .command(args)
-            .stdout(Stdio::from(io::stderr()))
-            .status()
-            .map_err(|source| MiseError::Spawn {
-                program: self.program_name(),
-                source,
-            })?;
-        if status.success() {
-            return Ok(());
-        }
-        Err(MiseError::Failed {
-            command: args.join(" "),
-            status: status.to_string(),
-            message: String::new(),
-        })
+        let mut command = self.command(args);
+        command.stdout(Stdio::from(io::stderr()));
+        self.run(command, args, Shown::Yes).map(drop)
     }
 
     /// Runs mise and keeps what it prints.
@@ -286,20 +284,59 @@ impl Cli {
     }
 
     /// Runs `command`, mise with `args`, and keeps what it prints.
-    fn capture(&self, mut command: Command, args: &[&str]) -> Result<Output, MiseError> {
-        let out = command.output().map_err(|source| MiseError::Spawn {
+    fn capture(&self, command: Command, args: &[&str]) -> Result<Output, MiseError> {
+        self.run(command, args, Shown::No)
+    }
+
+    /// Runs `command`, mise with `args`, with its warnings also written to a log file of its own,
+    /// so that a failure can say why even when a person saw the output and this process didn't.
+    fn run(&self, mut command: Command, args: &[&str], shown: Shown) -> Result<Output, MiseError> {
+        let log = tempfile::NamedTempFile::new().ok();
+        if let Some(log) = &log {
+            command
+                .env("MISE_LOG_FILE", log.path())
+                .env("MISE_LOG_FILE_LEVEL", "warn");
+        }
+        let spawned = match shown {
+            Shown::Yes => command.status().map(|status| Output {
+                status,
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            }),
+            Shown::No => command.output(),
+        };
+        let out = spawned.map_err(|source| MiseError::Spawn {
             program: self.program_name(),
             source,
         })?;
         if out.status.success() {
             return Ok(out);
         }
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        let logged = log
+            .as_ref()
+            .and_then(|log| fs::read_to_string(log.path()).ok())
+            .unwrap_or_default();
+        let command = args.join(" ");
+        if is_rate_limited(&logged) || is_rate_limited(&stderr) {
+            return Err(MiseError::RateLimited {
+                command,
+                resets: resets_at(&logged).or_else(|| resets_at(&stderr)),
+            });
+        }
         Err(MiseError::Failed {
-            command: args.join(" "),
+            command,
             status: out.status.to_string(),
-            message: last_line(&String::from_utf8_lossy(&out.stderr)),
+            message: last_line(&stderr),
         })
     }
+}
+
+/// Whether a run shows mise's output to a person or keeps it.
+#[derive(Clone, Copy)]
+enum Shown {
+    Yes,
+    No,
 }
 
 impl Mise for Cli {
@@ -398,8 +435,18 @@ impl Mise for Cli {
         self.run_shown(&["prune", "--tools"])
     }
 
-    fn lock(&self) -> Result<(), MiseError> {
-        self.run_captured(&["lock", "--global"]).map(drop)
+    fn lock(&self, tools: &[String]) -> Result<(), MiseError> {
+        if tools.is_empty() {
+            return Ok(());
+        }
+        // Every platform a new lockfile would hold costs a lock-time provenance check, some of
+        // them a GitHub API call each; this machine only installs its own.
+        let mut args = vec!["lock", "--global"];
+        if let Some(platform) = PLATFORM {
+            args.extend(["--platform", platform]);
+        }
+        args.extend(tools.iter().map(String::as_str));
+        self.run_captured(&args).map(drop)
     }
 }
 
@@ -472,6 +519,30 @@ pub fn parse_outdated(json: &[u8]) -> Result<Vec<OutdatedTool>, serde_json::Erro
             source: entry.source.map(|s| s.path),
         })
         .collect())
+}
+
+/// This machine's platform, as mise names it in a lockfile, or `None` on one KubaOS doesn't run
+/// on, where mise picks the platforms itself.
+const PLATFORM: Option<&str> = if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+    Some("linux-x64")
+} else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+    Some("linux-arm64")
+} else {
+    None
+};
+
+/// Whether mise's output says GitHub refused a call for its rate limit.
+fn is_rate_limited(text: &str) -> bool {
+    text.lines()
+        .any(|line| line.to_ascii_lowercase().contains("rate limit exceeded"))
+}
+
+/// When GitHub's rate limit resets, from mise's `GitHub rate limit exceeded. Resets at <time>`.
+fn resets_at(text: &str) -> Option<String> {
+    text.lines()
+        .rev()
+        .find_map(|line| line.split_once("Resets at ").map(|(_, at)| at.trim().to_owned()))
+        .filter(|at| !at.is_empty())
 }
 
 /// The last line `stderr` holds, which is where mise says what failed, before the two lines its

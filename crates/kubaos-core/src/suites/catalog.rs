@@ -373,8 +373,11 @@ const RUST: Suite = Suite {
             request: Request::Fixed("1.12"),
             extra: None,
         },
+        // wild's repository moved here from davidlattimore/wild. Under the old name, mise asks
+        // GitHub's API where it went on every install, to match the release's attestations, and
+        // fails once the calls GitHub allows without a token are used up.
         Tool {
-            name: "github:davidlattimore/wild",
+            name: "github:wild-linker/wild",
             request: Request::Fixed("0.11"),
             extra: Some("wild"),
         },

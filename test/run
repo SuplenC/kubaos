@@ -22,6 +22,8 @@
 #   test/run nuke [--yes]               clean, then delete the harness's volumes
 #
 # DOTFILES_SRC=<checkout> tests another copy of the repo (default: this one).
+# GITHUB_TOKEN / MISE_GITHUB_TOKEN, when set, reach mise in the container
+# (docs/TESTING.md, "GitHub's rate limit").
 # Runs of different checkouts run side by side; runs of one checkout take turns,
 # and say they are waiting (docs/TESTING.md, "Concurrent runs").
 # DOTFILES_TEST_MEM / DOTFILES_TEST_CPUS: container limits (12g / 8).
@@ -67,10 +69,18 @@ compose() { docker compose -f "$HERE/compose.yaml" "$@"; }
 # the container (harness.sh, trust_local_inputs).
 # shellcheck source=test/lib/local-inputs.sh
 . "$HERE/lib/local-inputs.sh"
-# run_dotfiles ARGS...: `compose run` of the dotfiles service with them.
+# run_dotfiles ARGS...: `compose run` of the dotfiles service with them. A GitHub
+# token already in the caller's environment (GITHUB_TOKEN, MISE_GITHUB_TOKEN) goes
+# in by name, `-e NAME`, so its value is in no argument list, file or image layer;
+# mise's calls to GitHub's API in the container then use it.
 run_dotfiles() {
+  local tokens=() name
+  for name in GITHUB_TOKEN MISE_GITHUB_TOKEN; do
+    [[ -n ${!name:-} ]] && tokens+=(-e "$name")
+  done
   local_input_mounts "$DOTFILES_SRC"
-  compose run ${LOCAL_INPUT_MOUNTS[@]+"${LOCAL_INPUT_MOUNTS[@]}"} -e DOTFILES_LOCAL_INPUTS="$LOCAL_INPUTS" "$@"
+  compose run ${LOCAL_INPUT_MOUNTS[@]+"${LOCAL_INPUT_MOUNTS[@]}"} ${tokens[@]+"${tokens[@]}"} \
+    -e DOTFILES_LOCAL_INPUTS="$LOCAL_INPUTS" "$@"
 }
 elapsed() { printf '%dm%02ds' $((SECONDS / 60)) $((SECONDS % 60)); }
 

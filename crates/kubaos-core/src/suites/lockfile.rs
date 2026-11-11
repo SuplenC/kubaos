@@ -9,6 +9,8 @@
 //! # Owns
 //!
 //! - [`Suites::save_locked`] and [`Suites::restore_locked`], and the saved entries' file.
+//! - Reading and writing the lockfile whole, for a Suite change that is undone, and dropping the
+//!   entries of tools nothing asks for any more, with their dependency graphs.
 //!
 //! # Not here
 //!
@@ -121,6 +123,62 @@ impl Suites {
         Ok(restored)
     }
 
+    /// The global lockfile's text, or `None` when there is none.
+    pub(super) fn read_lockfile(&self) -> Result<Option<String>, SuiteError> {
+        let path = self.paths.mise_lock();
+        match fs::read_to_string(&path) {
+            Ok(text) => Ok(Some(text)),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(SuiteError::Read(crate::state::ReadError::read(&path)(e))),
+        }
+    }
+
+    /// Writes the global lockfile as `text`, or deletes it when `text` is `None`.
+    pub(super) fn write_lockfile(&self, text: Option<&str>) -> Result<(), SuiteError> {
+        let path = self.paths.mise_lock();
+        let written = match text {
+            Some(text) => write_atomic(&path, text),
+            None => match fs::remove_file(&path) {
+                Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
+                _ => Ok(()),
+            },
+        };
+        written.map_err(|source| SuiteError::Write { path, source })
+    }
+
+    /// Deletes the lockfile entries of those of `tools` that no config asks for any more, with
+    /// the dependency graphs beside the lockfile that they name. It needs no network, unlike
+    /// `mise lock`, which locks every platform's artifacts again to drop an entry.
+    pub(super) fn unlock(&self, tools: &[String]) -> Result<(), SuiteError> {
+        if tools.is_empty() {
+            return Ok(());
+        }
+        let path = self.paths.mise_lock();
+        let Some(mut lockfile) = read_doc(&path)? else {
+            return Ok(());
+        };
+        let listed = self.mise.list().map_err(SuiteError::Tools)?;
+        let unasked = tools
+            .iter()
+            .filter(|tool| !listed.iter().any(|v| v.tool == **tool && v.source.is_some()));
+        let Some(locked) = lockfile.get_mut("tools").and_then(Item::as_table_like_mut) else {
+            return Ok(());
+        };
+        let removed: Vec<Item> = unasked.filter_map(|tool| locked.remove(tool)).collect();
+        if removed.is_empty() {
+            return Ok(());
+        }
+        write_atomic(&path, &lockfile.to_string()).map_err(|source| SuiteError::Write {
+            path: path.clone(),
+            source,
+        })?;
+        let dir = path.parent().unwrap_or(&path);
+        for graph in removed.iter().flat_map(graphs_of) {
+            let _ = fs::remove_dir_all(dir.join(graph));
+        }
+        Ok(())
+    }
+
     /// Every tool a Suite's fragment asks for, with the Suite's name and the request.
     fn asked(&self) -> Result<BTreeMap<String, (&'static str, String)>, SuiteError> {
         let mut asked = BTreeMap::new();
@@ -144,6 +202,32 @@ fn read_doc(path: &Path) -> Result<Option<DocumentMut>, SuiteError> {
         path: path.to_path_buf(),
         source,
     })
+}
+
+/// The dependency graphs a tool's lockfile entry names (`aube = { path = "locks/…" }`), as
+/// paths below the lockfile's folder; a path that would leave it is left out.
+fn graphs_of(entry: &Item) -> Vec<std::path::PathBuf> {
+    let mut found = Vec::new();
+    let mut take = |table: &dyn toml_edit::TableLike| {
+        for (_, value) in table.iter() {
+            let path = value
+                .as_table_like()
+                .and_then(|graph| graph.get("path"))
+                .and_then(Item::as_str)
+                .map(Path::new);
+            if let Some(path) = path
+                && path.components().all(|c| matches!(c, std::path::Component::Normal(_)))
+            {
+                found.push(path.to_path_buf());
+            }
+        }
+    };
+    match entry {
+        Item::ArrayOfTables(tables) => tables.iter().for_each(|t| take(t)),
+        Item::Table(table) => take(table),
+        _ => {}
+    }
+    found
 }
 
 /// The versions a tool's lockfile entry names: one table per version (`[[tools.node]]`), or

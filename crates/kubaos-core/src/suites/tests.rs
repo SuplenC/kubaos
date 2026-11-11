@@ -141,6 +141,10 @@ fn extras(names: &[&str]) -> BTreeSet<String> {
     names.iter().map(|n| (*n).to_owned()).collect()
 }
 
+pub(super) fn lockfile(h: &Home) -> String {
+    fs::read_to_string(h.paths.mise_lock()).unwrap_or_default()
+}
+
 pub(super) fn suite_file(h: &Home) -> PathBuf {
     h.paths.state_dir().suite_file("demo")
 }
@@ -875,10 +879,10 @@ fn the_rust_suite_installs_rustup_and_each_tool_at_its_own_request_and_wild_with
     assert_eq!(with_wild.tools[..base.len()], base[..]);
     assert_eq!(
         with_wild.tools[base.len()..],
-        requests(&[("github:davidlattimore/wild", "0.11")])[..]
+        requests(&[("github:wild-linker/wild", "0.11")])[..]
     );
     assert!(
-        fragment.contains("\"github:davidlattimore/wild\" = \"0.11\""),
+        fragment.contains("\"github:wild-linker/wild\" = \"0.11\""),
         "{fragment}"
     );
     assert_eq!(without_wild.tools, base);
@@ -903,7 +907,7 @@ fn a_rust_record_from_before_mise_gets_its_fragment_on_configure_and_keeps_its_e
     assert_eq!(configured.config.extras.iter().collect::<Vec<_>>(), ["wild"]);
     assert_eq!(configured.config.version, None);
     assert_eq!(configured.tools.len(), rust.mise.len());
-    assert!(configured.tools.iter().any(|t| t.tool == "github:davidlattimore/wild"));
+    assert!(configured.tools.iter().any(|t| t.tool == "github:wild-linker/wild"));
     assert!(h.paths.mise_fragment("rust").is_file());
     assert_eq!(again.tools, configured.tools);
     assert_eq!(
@@ -1156,7 +1160,7 @@ fn adding_installs_the_tools_first_then_writes_the_fragment_and_the_record() {
             "mise latest demo-lang@1",
             "mise ls --json",
             "mise install demo-lang@1.0 demo-ls@0.5",
-            "mise lock --global"
+            "mise lock --global demo-lang demo-ls"
         ]
     );
     assert_eq!(h.mise.installed(), ["demo-lang@1.0.3", "demo-ls@0.5.2"]);
@@ -1218,15 +1222,17 @@ fn a_failed_install_leaves_no_fragment_no_record_and_no_leftover_versions() {
 fn removing_deletes_the_fragment_and_prunes_at_once() {
     let h = home();
     h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+    let added = h.mise.calls().len();
 
     h.suites.remove(&DEMO_MISE, CachePolicy::Keep).unwrap();
 
     assert!(!fragment(&h).exists());
     assert!(!suite_file(&h).exists());
     assert!(h.mise.installed().is_empty(), "{:?}", h.mise.installed());
+    assert!(!lockfile(&h).contains("demo-lang"), "{}", lockfile(&h));
     assert_eq!(
-        h.mise.calls()[4..],
-        ["mise lock --global", "mise prune --tools"],
+        h.mise.calls()[added..],
+        ["mise ls --json", "mise prune --tools"],
         "{:?}",
         h.mise.calls()
     );
@@ -1336,6 +1342,82 @@ fn a_failed_configure_changes_nothing() {
     assert_eq!(fs::read_to_string(suite_file(&h)).unwrap(), record);
     assert_eq!(fs::read_to_string(fragment(&h)).unwrap(), before);
     assert_eq!(h.mise.installed(), ["demo-lang@1.0.3", "demo-ls@0.5.2"]);
+}
+
+#[test]
+fn an_add_whose_lock_fails_is_taken_back_out_whole() {
+    let h = home();
+    h.mise.fail_lock();
+
+    let err = h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap_err();
+
+    assert!(
+        matches!(
+            &err,
+            SuiteError::MiseLock {
+                source: crate::mise::MiseError::RateLimited { .. },
+                ..
+            }
+        ),
+        "{err:?}"
+    );
+    assert!(!suite_file(&h).exists());
+    assert!(!fragment(&h).exists());
+    assert!(!h.paths.mise_lock().exists());
+    assert!(h.mise.installed().is_empty(), "{:?}", h.mise.installed());
+}
+
+#[test]
+fn a_configure_whose_lock_fails_leaves_the_suite_and_the_lockfile_as_they_were() {
+    let h = home();
+    h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+    let record = fs::read_to_string(suite_file(&h)).unwrap();
+    let before = fs::read_to_string(fragment(&h)).unwrap();
+    let locked = lockfile(&h);
+    h.mise.fail_lock();
+
+    let err = h
+        .suites
+        .configure(
+            &DEMO_MISE,
+            &OptionsChange {
+                version: Some("2".into()),
+                ..OptionsChange::default()
+            },
+        )
+        .unwrap_err();
+
+    assert!(matches!(err, SuiteError::MiseLock { .. }), "{err:?}");
+    assert_eq!(fs::read_to_string(suite_file(&h)).unwrap(), record);
+    assert_eq!(fs::read_to_string(fragment(&h)).unwrap(), before);
+    assert_eq!(lockfile(&h), locked);
+    assert_eq!(h.mise.installed(), ["demo-lang@1.0.3", "demo-ls@0.5.2"]);
+}
+
+#[test]
+fn removing_unlocks_only_the_tools_no_other_config_asks_for_with_their_graphs() {
+    let h = home();
+    h.suites.add(&DEMO_MISE, &OptionsChange::default()).unwrap();
+    let conf_d = h.paths.mise_config().join("conf.d");
+    fs::write(conf_d.join("mine.toml"), "[tools]\ndemo-ls = \"0.5\"\n").unwrap();
+    let graph = h.paths.mise_config().join("locks/demo-lang/1.0.3");
+    fs::create_dir_all(&graph).unwrap();
+    let mut doc: toml_edit::DocumentMut = lockfile(&h).parse().unwrap();
+    doc["tools"]["demo-lang"][0]["aube"] =
+        toml_edit::Item::Value(toml_edit::InlineTable::from_iter([("path", "locks/demo-lang/1.0.3")]).into());
+    fs::write(h.paths.mise_lock(), doc.to_string()).unwrap();
+    let added = h.mise.calls().len();
+
+    h.suites.remove(&DEMO_MISE, CachePolicy::Keep).unwrap();
+
+    let locked = lockfile(&h);
+    assert!(!locked.contains("demo-lang"), "{locked}");
+    assert!(locked.contains("demo-ls"), "{locked}");
+    assert!(!graph.exists());
+    assert!(
+        !h.mise.calls()[added..].iter().any(|c| c.starts_with("mise lock")),
+        "removal needs no network"
+    );
 }
 
 #[test]

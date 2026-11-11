@@ -138,7 +138,7 @@ Ranked by benefit over effort. None of these is urgent; the current set already 
 
 Expected gain: about 20 to 25% faster incremental debug rebuilds on large binaries in this test (0.4 s per rebuild on helix); upstream reports 2.3 to 2.5x faster linking than mold on linker-only benchmarks. Effort: small. Risk: pre-1.0 linker bugs; fall back to mold.
 
-- `kubaos suite configure rust --extra wild`: mise installs wild's release (`github:davidlattimore/wild`), and the Rust Suite's cargo defaults, `~/.cargo/kubaos.toml` (`home/suites/rust.nix`), pass `link-arg=--ld-path=wild` instead of `-fuse-ld=mold`; clang finds wild on PATH. `linker = "clang"` (clang from apt) stays.
+- `kubaos suite configure rust --extra wild`: mise installs wild's release (`github:wild-linker/wild`), and the Rust Suite's cargo defaults, `~/.cargo/kubaos.toml` (`home/suites/rust.nix`), pass `link-arg=--ld-path=wild` instead of `-fuse-ld=mold`; clang finds wild on PATH. `linker = "clang"` (clang from apt) stays.
 - Keep `mold` in `system/20-base.sh` as the fallback. For a one-off build with mold: `CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=mold" cargo build`.
 - Verify on the laptop: `readelf --string-dump .comment target/debug/<bin> | grep -i wild`, then `cargo build --timings` on a large Rust workspace with both linkers.
 

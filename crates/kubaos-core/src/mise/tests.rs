@@ -1,11 +1,14 @@
 use std::path::PathBuf;
 
 use super::ListedVersion;
+use super::MiseError;
 use super::OutdatedTool;
 use super::ToolRequest;
+use super::is_rate_limited;
 use super::last_line;
 use super::parse_list;
 use super::parse_outdated;
+use super::resets_at;
 
 #[test]
 fn a_tool_request_is_tool_at_request() {
@@ -107,4 +110,28 @@ fn a_failure_is_the_line_before_the_version_and_the_hint_mise_ends_with() {
         last_line("mise ERROR no version of x\n\n"),
         "mise ERROR no version of x"
     );
+}
+
+#[test]
+fn a_rate_limited_run_reads_when_the_limit_resets_from_mise_s_warning() {
+    let log = "mise WARN  GitHub rate limit exceeded. Resets at 2026-11-11 13:36:35 +01:00\n\
+               mise WARN  HTTP GET https://api.github.com/repos/o/r attempt 1 failed\n\
+               github rate limit: 0/60 (core), resets at 1794400595\n";
+
+    assert!(is_rate_limited(log));
+    assert_eq!(resets_at(log).as_deref(), Some("2026-11-11 13:36:35 +01:00"));
+    assert!(!is_rate_limited("mise ERROR no version of demo-lang\n"));
+}
+
+#[test]
+fn a_rate_limit_says_when_it_resets_and_how_a_token_lifts_it() {
+    let err = MiseError::RateLimited {
+        command: "lock --global".into(),
+        resets: Some("2026-11-11 13:36:35 +01:00".into()),
+    };
+
+    let text = err.to_string();
+
+    assert!(text.contains("resets at 2026-11-11 13:36:35 +01:00"), "{text}");
+    assert!(text.contains("GITHUB_TOKEN=$(gh auth token)"), "{text}");
 }

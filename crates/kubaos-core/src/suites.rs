@@ -244,13 +244,16 @@ pub struct Configured {
     pub before: Before,
 }
 
-/// A Suite's record and fragment as an add or configure found them.
+/// A Suite's record and fragment, and mise's global lockfile, as an add, configure or upgrade
+/// found them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Before {
     /// Its options, or `None` when it was not installed.
     pub config: Option<SuiteConfig>,
     /// Its fragment's tools, empty when it had no fragment.
     pub tools: Vec<ToolRequest>,
+    /// The global lockfile's text, or `None` when there was none.
+    pub lockfile: Option<String>,
 }
 
 /// One tool of an installed Suite, as its fragment asks for it and mise lists it.
@@ -338,9 +341,13 @@ pub enum SuiteError {
     /// selects any more.
     #[error("pruning mise's unused versions")]
     Prune(#[source] MiseError),
-    /// The Suite's files are written or deleted, but mise could not write its lockfile.
-    #[error("locking mise's tools")]
-    MiseLock(#[source] MiseError),
+    /// mise could not lock the Suite's tools. The Suite is put back as it was.
+    #[error("locking the {suite} Suite's tools with mise; the Suite is back as it was")]
+    MiseLock {
+        suite: String,
+        #[source]
+        source: MiseError,
+    },
     /// mise could not read which of the Suites' tools have newer releases.
     #[error("asking mise for newer releases")]
     Outdated(#[source] MiseError),
@@ -490,22 +497,10 @@ impl Suites {
             });
         }
         let config = apply(suite, default_config(suite), change)?;
-        let before = Before {
-            config: None,
-            tools: self.fragment(suite)?,
-        };
+        let before = self.before(suite, None)?;
         let tools = wanted_tools(suite, &config, &[], |tool, line| self.narrow(suite, tool, line))?;
         self.install(suite, &tools)?;
-        if let Err(e) = self
-            .write_fragment(suite, &tools)
-            .and_then(|()| self.write(suite, &config))
-        {
-            self.take_out(suite);
-            return Err(e);
-        }
-        if !tools.is_empty() {
-            self.mise.lock().map_err(SuiteError::MiseLock)?;
-        }
+        self.commit(suite, Some(&config), &tools, &before)?;
         let seeds = self.seed(suite)?;
         Ok(Added {
             config,
@@ -533,24 +528,17 @@ impl Suites {
         };
         let config = apply(suite, current.clone(), change)?;
         let changed = config != current;
-        let before = Before {
-            config: Some(current),
-            tools: self.fragment(suite)?,
-        };
+        let before = self.before(suite, Some(current))?;
         let tools = wanted_tools(suite, &config, &before.tools, |tool, line| {
             self.narrow(suite, tool, line)
         })?;
         let moved = !same_tools(&tools, &before.tools);
         if moved {
             self.install(suite, &tools)?;
-            self.write_fragment(suite, &tools)?;
-        }
-        if changed {
-            self.write(suite, &config)?;
-        }
-        if moved {
-            self.mise.lock().map_err(SuiteError::MiseLock)?;
+            self.commit(suite, changed.then_some(&config), &tools, &before)?;
             self.mise.prune().map_err(SuiteError::Prune)?;
+        } else if changed {
+            self.write(suite, &config)?;
         }
         let seeds = self.seed(suite)?;
         Ok(Configured {
@@ -571,16 +559,14 @@ impl Suites {
     /// A failed lock, write, git sync or mise call.
     pub fn restore(&self, suite: &Suite, before: &Before) -> Result<(), SuiteError> {
         let _lock = self.lock()?;
-        if let Some(config) = &before.config {
-            self.install(suite, &before.tools)?;
-            self.write_fragment(suite, &before.tools)?;
-            self.write(suite, config)?;
-        } else {
-            self.write_fragment(suite, &[])?;
-            self.delete_record(suite)?;
+        self.write_fragment(suite, &before.tools)?;
+        match &before.config {
+            Some(config) => self.write(suite, config)?,
+            None => self.delete_record(suite)?,
         }
+        self.write_lockfile(before.lockfile.as_deref())?;
         if !suite.mise.is_empty() {
-            self.mise.lock().map_err(SuiteError::MiseLock)?;
+            self.install(suite, &before.tools)?;
             self.mise.prune().map_err(SuiteError::Prune)?;
         }
         Ok(())
@@ -601,14 +587,14 @@ impl Suites {
                 suite: suite.name.to_owned(),
             });
         }
+        let dropped: Vec<String> = self.fragment(suite)?.into_iter().map(|t| t.tool).collect();
         self.delete_record(suite)?;
-        let had_fragment = self.paths.mise_fragment(suite.name).exists();
         self.write_fragment(suite, &[])?;
-        // HAZARD: lock before pruning. While any global config is left (the user's
+        // HAZARD: unlock before pruning. While any global config is left (the user's
         // config.toml, a Suite's defaults in conf.d), mise reads the global lockfile with it,
         // and prune keeps every version the lockfile still lists.
-        if had_fragment {
-            self.mise.lock().map_err(SuiteError::MiseLock)?;
+        if !dropped.is_empty() {
+            self.unlock(&dropped)?;
             self.mise.prune().map_err(SuiteError::Prune)?;
         }
 
@@ -856,12 +842,69 @@ impl Suites {
         self.state.sync_git().map(drop).map_err(SuiteError::Git)
     }
 
-    /// Takes a half-written add back out: the fragment and the record, then prunes the versions
-    /// the install added. Each step is tried whatever the last did, and their errors are dropped:
-    /// the error that led here is the one to report.
-    fn take_out(&self, suite: &Suite) {
-        let _ = self.write_fragment(suite, &[]);
-        let _ = self.delete_record(suite);
+    /// `suite` as it is now, with its record's options `config`, for [`Suites::restore`].
+    fn before(&self, suite: &Suite, config: Option<SuiteConfig>) -> Result<Before, SuiteError> {
+        Ok(Before {
+            config,
+            tools: self.fragment(suite)?,
+            lockfile: self.read_lockfile()?,
+        })
+    }
+
+    /// Writes `suite`'s fragment with `tools`, and its record with `config` when one is given,
+    /// then locks the tools. When a step fails, the Suite
+    /// goes back as `before` found it, lockfile and all, so it ends either fully changed or not
+    /// at all.
+    fn commit(
+        &self,
+        suite: &Suite,
+        config: Option<&SuiteConfig>,
+        tools: &[ToolRequest],
+        before: &Before,
+    ) -> Result<(), SuiteError> {
+        let dropped: Vec<String> = before
+            .tools
+            .iter()
+            .filter(|old| !tools.iter().any(|t| t.tool == old.tool))
+            .map(|t| t.tool.clone())
+            .collect();
+        let done = self
+            .write_fragment(suite, tools)
+            .and_then(|()| config.map_or(Ok(()), |config| self.write(suite, config)))
+            .and_then(|()| self.settle(suite, tools, &dropped));
+        if let Err(e) = done {
+            self.put_back(suite, before);
+            return Err(e);
+        }
+        Ok(())
+    }
+
+    /// Locks `tools`, which `suite`'s fragment now asks for, and forgets the `dropped` ones
+    /// nothing asks for any more.
+    fn settle(&self, suite: &Suite, tools: &[ToolRequest], dropped: &[String]) -> Result<(), SuiteError> {
+        let lock_err = |source| SuiteError::MiseLock {
+            suite: suite.name.to_owned(),
+            source,
+        };
+        self.unlock(dropped)?;
+        if tools.is_empty() {
+            return Ok(());
+        }
+        let names: Vec<String> = tools.iter().map(|t| t.tool.clone()).collect();
+        self.mise.lock(&names).map_err(lock_err)
+    }
+
+    /// Puts `suite` back as `before` found it, after a failed add or configure: its fragment,
+    /// its record and the lockfile, then prunes the versions the failed run added. Each step is
+    /// tried whatever the last did, and their errors are dropped: the error that led here is
+    /// the one to report.
+    fn put_back(&self, suite: &Suite, before: &Before) {
+        let _ = self.write_fragment(suite, &before.tools);
+        let _ = match &before.config {
+            Some(config) => self.write(suite, config),
+            None => self.delete_record(suite),
+        };
+        let _ = self.write_lockfile(before.lockfile.as_deref());
         if !suite.mise.is_empty() {
             let _ = self.mise.prune();
         }

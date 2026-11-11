@@ -191,10 +191,7 @@ impl Suites {
         }
         let mut before = Vec::new();
         for s in &moved {
-            let state = Before {
-                config: self.config(s.suite)?,
-                tools: self.fragment(s.suite)?,
-            };
+            let state = self.before(s.suite, self.config(s.suite)?)?;
             before.push((s.suite, state));
         }
         let targets: Vec<ToolRequest> = moved

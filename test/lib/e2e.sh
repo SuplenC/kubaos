@@ -3039,7 +3039,7 @@ c_suite_rust() {
   local installs="$USER_HOME/.local/share/mise/installs" shims="$USER_HOME/.local/share/mise/shims"
   local migration=("$REPO"/migrations/user/*-rust-on-mise.sh)
   local proxies=(rustup cargo rustc rustfmt cargo-clippy rust-analyzer codelldb)
-  local folders=(aqua-rust-lang-rustup aqua-nextest-rs-nextest-cargo-nextest aqua-mozilla-sccache github-vadimcn-codelldb github-davidlattimore-wild)
+  local folders=(aqua-rust-lang-rustup aqua-nextest-rs-nextest-cargo-nextest aqua-mozilla-sccache github-vadimcn-codelldb github-wild-linker-wild)
   install_kubaos || return 1
   user_flake "$u" || return 1
   as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
@@ -3067,7 +3067,7 @@ c_suite_rust() {
     out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
       { echo "FAIL the rust-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
   done
-  grep -qx '"aqua:rust-lang/rustup" = "1.29"' "$frag" && grep -qx '"github:davidlattimore/wild" = "0.11"' "$frag" &&
+  grep -qx '"aqua:rust-lang/rustup" = "1.29"' "$frag" && grep -qx '"github:wild-linker/wild" = "0.11"' "$frag" &&
     grep -qF 'already extras: wild' <<<"$out" && [[ $(cat "$u/kubaos.d/suites/rust.toml") == 'extras = ["wild"]' ]] ||
     { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
   grep -qx 'auto_self_update = "disable"' "$settings" && grep -qx 'profile = "minimal"' "$settings" ||
@@ -3105,7 +3105,7 @@ c_suite_rust() {
 
   out="$(kz 'kubaos suite configure rust --no-extra wild --foreground' 2>&1)" ||
     { echo "FAIL kubaos suite configure rust --no-extra wild"; printf '%s\n' "$out" | tail -20; return 1; }
-  ! grep -q wild "$frag" && [[ -z $(find "$installs/github-davidlattimore-wild" -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
+  ! grep -q wild "$frag" && [[ -z $(find "$installs/github-wild-linker-wild" -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
     { echo "FAIL configure: wild is left in the fragment or installed"; cat "$frag"; return 1; }
   grep -qx 'rustc-wrapper = "sccache"' "$defaults" && grep -qF 'link-arg=-fuse-ld=mold' "$defaults" ||
     { echo "FAIL ~/.cargo/kubaos.toml without wild:"; cat "$defaults"; return 1; }

@@ -174,6 +174,12 @@ A cold `test/run warm` on an empty `dotfiles-nix` volume wasn't measured here. M
 | `bw_mise_env` | `kubaos bitwarden env list`: the keyring holds `demo` and its variables, not the invalid one; a `mise.toml` with `KUBAOS_BWENV = "demo"` and its `_.source`, trusted: `cd` in an interactive zsh exports all four intact, leaving unloads them; the time per `mise env` |
 | `bw_alias` | the old names, once: `dot-bw-setup --check` and `dot-bwenv list` print their new names and do the same |
 
+## mise and GitHub's rate limit
+
+The Suite checks (`suites`, `pins`, `suite_*`, `update_*`, `rollback`) install real tools with mise, which asks GitHub's API for what its mirror doesn't have. Without a token GitHub allows 60 calls an hour for every program on the machine's address, the harness and the machine's own mise together; `curl -s https://api.github.com/rate_limit` shows what is left (that call itself is free). A step that runs out fails with mise's `GitHub rate limit exceeded. Resets at <time>`. While the mirror answers, adding every Suite and updating them makes no API call at all (measured with mise's `MISE_LOG_HTTP=1`); when it fails, each `aqua:` or `github:` tool costs about three calls an install or lock, and one `mise outdated` twenty, so a full run of the Suite checks no longer fits in 60.
+
+`test/run` passes `GITHUB_TOKEN` and `MISE_GITHUB_TOKEN` into the container when they are set in its own environment, by name (`-e NAME`), so the value is in no argument list, file or image layer, and `as_user` keeps them in the environment of every command it runs as kuba: `GITHUB_TOKEN=$(gh auth token) test/run e2e --only suite_go`. It never reads a token from `gh` itself and never prints one; a token with no scopes is enough.
+
 ## Adding a check
 
 1. Write `c_<name>` in `test/lib/e2e.sh` (or `bitwarden.sh`). Print `ok   ...` lines for what passed and `FAIL ...` for what didn't, return non-zero on failure. It runs in a subshell as root; `as_user`, `zrun` (login zsh) and `zlogin` (login + interactive zsh) run things as kuba, `session_start`/`qs_start`/`in_session` give you a Wayland session.

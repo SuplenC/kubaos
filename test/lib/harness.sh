@@ -42,8 +42,20 @@ JENV=(
   PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games
   XDG_RUNTIME_DIR="$RUNTIME_DIR" DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
 )
-# as_user CMD...: run as kuba with a clean login-like environment.
-as_user() { runuser -u "$USER_NAME" -- env -i "${JENV[@]}" "$@"; }
+# as_user CMD...: run as kuba with a clean login-like environment. A GitHub token
+# test/run passed in stays in it, for mise: everything else is cleared by name, as
+# `env -i` would drop the token and an argument would show it in `ps`.
+as_user() {
+  if [[ -z ${GITHUB_TOKEN:-}${MISE_GITHUB_TOKEN:-} ]]; then
+    runuser -u "$USER_NAME" -- env -i "${JENV[@]}" "$@"
+    return
+  fi
+  local clear=() name
+  for name in $(compgen -e); do
+    [[ $name == GITHUB_TOKEN || $name == MISE_GITHUB_TOKEN ]] || clear+=(-u "$name")
+  done
+  runuser -u "$USER_NAME" -- env "${clear[@]}" "${JENV[@]}" "$@"
+}
 # zlogin CMD: CMD in kuba's login + interactive zsh (what a terminal gets).
 zlogin() { as_user zsh -l -i -c "$1"; }
 # zrun CMD: CMD in a login zsh (PATH and session vars, no interactive init).
