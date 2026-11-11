@@ -64,6 +64,10 @@ impl FakeMise {
                 ("node", vec!["22.23.4", "24.22.2", "26.13.0"]),
                 ("npm:@vtsls/language-server", vec!["0.3.0"]),
                 ("bun", vec!["1.4.4"]),
+                ("aqua:astral-sh/uv", vec!["0.12.24", "0.13.7"]),
+                ("pypi:basedpyright", vec!["1.40.2"]),
+                ("aqua:astral-sh/ruff", vec!["0.17.4"]),
+                ("pypi:debugpy", vec!["1.8.22"]),
             ]),
             state: Mutex::default(),
         }

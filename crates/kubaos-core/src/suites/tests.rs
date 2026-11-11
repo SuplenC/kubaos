@@ -549,6 +549,28 @@ fn a_scaffolder_that_fails_is_an_error() {
 }
 
 #[test]
+fn a_scaffolder_whose_command_is_not_on_path_names_the_suite_to_configure() {
+    const MISSING: Suite = Suite {
+        scaffolders: &[Scaffolder {
+            id: "app",
+            label: "New Demo project",
+            argv: &["kubaos-no-such-scaffolder", "{path}"],
+        }],
+        ..DEMO
+    };
+    let h = home();
+    h.suites.add(&MISSING, &OptionsChange::default()).unwrap();
+
+    let err = h.suites.scaffold(&MISSING, &MISSING.scaffolders[0], "x").unwrap_err();
+
+    assert!(matches!(err, ScaffoldError::NotOnPath { .. }), "{err:?}");
+    assert_eq!(
+        err.to_string(),
+        "kubaos-no-such-scaffolder isn't on PATH; `kubaos suite configure demo` installs the Suite's tools again"
+    );
+}
+
+#[test]
 fn every_suite_in_the_catalog_is_well_formed() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let suites: Vec<&Suite> = catalog::all().collect();
@@ -696,6 +718,62 @@ fn the_proto_suite_leaves_versions_to_proto() {
     assert_eq!(
         proto.caches.iter().map(|c| c.path).collect::<Vec<_>>(),
         [".local/share/proto"]
+    );
+}
+
+#[test]
+fn the_python_suite_installs_uv_and_each_tool_at_its_own_request() {
+    let h = home();
+    let python = catalog::find("python").unwrap();
+
+    let added = h.suites.add(python, &OptionsChange::default()).unwrap();
+    let configured = h.suites.configure(python, &OptionsChange::default()).unwrap();
+
+    assert_eq!(
+        added.tools,
+        requests(&[
+            ("aqua:astral-sh/uv", "0.13"),
+            ("pypi:basedpyright", "1.40"),
+            ("aqua:astral-sh/ruff", "0.17"),
+            ("pypi:debugpy", "1.8"),
+        ])
+    );
+    assert_eq!(added.config.version, None);
+    assert!(super::same_tools(&configured.tools, &added.tools));
+    assert_eq!(
+        h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
+        1,
+        "a configure that changes nothing installs nothing"
+    );
+    assert!(
+        fs::read_to_string(h.paths.mise_fragment("python"))
+            .unwrap()
+            .contains("\"pypi:debugpy\" = \"1.8\"")
+    );
+    assert!(matches!(
+        crate::pins::main_tool(python),
+        Err(crate::pins::PinError::Unversioned { .. })
+    ));
+}
+
+#[test]
+fn a_python_record_from_before_mise_gets_its_fragment_on_configure_and_stays_without_a_version() {
+    let h = home();
+    let python = catalog::find("python").unwrap();
+    write(&h.paths.state_dir().suite_file("python"), "extras = []\n");
+
+    let configured = h.suites.configure(python, &OptionsChange::default()).unwrap();
+    let again = h.suites.configure(python, &OptionsChange::default()).unwrap();
+
+    assert!(!configured.changed, "the record stays as it was");
+    assert_eq!(configured.config.version, None);
+    assert_eq!(configured.tools.len(), python.mise.len());
+    assert!(h.paths.mise_fragment("python").is_file());
+    assert!(super::same_tools(&again.tools, &configured.tools));
+    assert_eq!(
+        h.mise.calls().iter().filter(|c| c.starts_with("mise install")).count(),
+        1,
+        "a second run installs nothing"
     );
 }
 

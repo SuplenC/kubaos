@@ -101,14 +101,43 @@ const NODE: Suite = Suite {
     ],
 };
 
-/// Python through uv. Its Nix module is `home/suites/python.nix`.
+/// Python through uv, with basedpyright, ruff and debugpy, each its own mise tool. Its Nix module
+/// is `home/suites/python.nix`.
+///
+/// The Suite has no versions: uv installs each project's Python, from its `.python-version` and
+/// `requires-python`. uv and ruff are release binaries from aqua. basedpyright and debugpy publish
+/// none, so mise's `pypi:` backend installs each into a venv of its own with the Suite's uv, on the
+/// Python uv finds (the system's, or a Python uv installed); basedpyright's wheel brings its own
+/// Node. mise finds that uv only in the same install or in the fragment, so uv stays in the
+/// Suite's tools and a `pypi:` tool is never installed without it.
 const PYTHON: Suite = Suite {
     name: "python",
     title: "Python",
     description: "uv for Pythons and venvs, basedpyright, ruff and debugpy, set up in Neovim.",
     versions: &[],
     extras: &[],
-    mise: &[],
+    mise: &[
+        Tool {
+            name: "aqua:astral-sh/uv",
+            request: Request::Fixed("0.13"),
+            extra: None,
+        },
+        Tool {
+            name: "pypi:basedpyright",
+            request: Request::Fixed("1.40"),
+            extra: None,
+        },
+        Tool {
+            name: "aqua:astral-sh/ruff",
+            request: Request::Fixed("0.17"),
+            extra: None,
+        },
+        Tool {
+            name: "pypi:debugpy",
+            request: Request::Fixed("1.8"),
+            extra: None,
+        },
+    ],
     toolchain: Toolchain::Upstream { manager: "uv" },
     caches: &[
         Cache {

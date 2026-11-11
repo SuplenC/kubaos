@@ -3310,6 +3310,126 @@ c_suite_node() {
   rm -rf "$project" "$bunproject" "$pinned" "$mine" "$globalpkg" "$USER_HOME/.cache/my-npmrc"
 }
 
+# The Python Suite (crates/kubaos-core/src/suites/catalog.rs,
+# home/suites/python.nix): uv, ruff, basedpyright and debugpy from mise, which
+# downloads uv and ruff and installs basedpyright and debugpy into venvs with
+# that uv (network). A home from before mise moves onto it through the
+# migration; a project is scaffolded and checked, and uv installs a Python of
+# its own that runs; a login shell and Neovim without mise's hook find the
+# tools through the shims, and debugpy's adapter answers DAP; removal leaves
+# nothing of it in mise or the generation, and a fresh add installs it again.
+c_suite_python() {
+  local u="$USER_HOME/.config/kubaos/home" project="$USER_HOME/Projects/py-demo" out gen t before
+  local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/python-suite.lua"
+  local frag="$USER_HOME/.config/mise/conf.d/kubaos-python.toml" uvbin="$USER_HOME/.local/share/uv/bin"
+  local installs="$USER_HOME/.local/share/mise/installs" shims="$USER_HOME/.local/share/mise/shims"
+  local migration=("$REPO"/migrations/user/*-python-on-mise.sh)
+  local tools=(uv uvx ruff basedpyright basedpyright-langserver debugpy debugpy-adapter)
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$project" "$mine" "$USER_HOME/.local/share/uv" "$USER_HOME/.cache/uv"
+  on_shims() {
+    local t
+    for t in "${tools[@]}"; do
+      [[ $(zrun "whence -p $t") == "$shims/$t" ]] || { echo "FAIL $t is not mise's shim in a login shell: $(zrun "whence -p $t")"; return 1; }
+    done
+  }
+  # The fragment and the installed versions, to tell whether a run changed
+  # anything.
+  mise_state() { cat "$frag" 2>/dev/null; find "$installs" -mindepth 2 -maxdepth 2 -type d | sort; }
+
+  # A home as the Suite on Nix left it: the record and no fragment.
+  as_user install -d "$u/kubaos.d/suites"
+  printf 'extras = []\n' | as_user tee "$u/kubaos.d/suites/python.toml" >/dev/null
+  out="$(kz 'kubaos switch --foreground' 2>&1)" ||
+    { echo "FAIL the switch with the old Python record"; printf '%s\n' "$out" | tail -20; return 1; }
+  gone_from_generation "the Python Suite's Nix tools" '-(uv|ruff|basedpyright|debugpy|debugpy-adapter)-[0-9]' || return 1
+  ! has_bin uv && ! has_bin debugpy-adapter || { echo "FAIL uv or debugpy-adapter is still in the Nix profile"; return 1; }
+  out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+    { echo "FAIL the python-on-mise migration"; printf '%s\n' "$out" | tail -20; return 1; }
+  before="$(mise_state)"
+  out="$(kz "KUBAOS_DIR='$REPO' KUBAOS_USER_FLAKE='$u' bash -euo pipefail '${migration[0]}'" 2>&1)" ||
+    { echo "FAIL the python-on-mise migration, run again"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx '"aqua:astral-sh/uv" = "0.13"' "$frag" && grep -qx '"pypi:debugpy" = "1.8"' "$frag" &&
+    [[ $(mise_state) == "$before" && $(cat "$u/kubaos.d/suites/python.toml") == 'extras = []' ]] ||
+    { echo "FAIL the migration: the fragment, the record, or a second run that changed something:"; cat "$frag"; printf '%s\n' "$out"; return 1; }
+  on_shims || return 1
+  [[ $(zrun 'uv --version') == "uv 0.13."* && $(zrun 'ruff --version') == "ruff 0.17."* && $(zrun 'basedpyright --version') == *"basedpyright 1.40."* ]] ||
+    { echo "FAIL the tools' versions: $(zrun 'uv --version; ruff --version; basedpyright --version' 2>&1 | tr '\n' ' ')"; return 1; }
+  echo "ok   the python-on-mise migration: the record gets its fragment, uv, ruff, basedpyright and debugpy through the shims, the record kept, a rerun changes nothing"
+
+  local path
+  path="$(zrun 'print -r -- $PATH' | tr ':' '\n')"
+  grep -qx "$uvbin" <<<"$path" && [[ $(zrun 'print -r -- "$UV_TOOL_BIN_DIR $UV_PYTHON_BIN_DIR"') == "$uvbin $uvbin" ]] ||
+    { echo "FAIL uv's command folder is not on PATH or not its default: $(zrun 'print -r -- "$UV_TOOL_BIN_DIR $UV_PYTHON_BIN_DIR"')"; return 1; }
+  out="$(zrun 'uv python install 3.13 && python3.13 -c "import ssl, sqlite3, ctypes, readline; print(\"PY\", ssl.OPENSSL_VERSION)"' 2>&1)"
+  grep -q '^PY OpenSSL' <<<"$out" && [[ -L $uvbin/python3.13 ]] ||
+    { echo "FAIL a Python uv installed doesn't run from ~/.local/share/uv/bin:"; printf '%s\n' "$out" | tail -10; return 1; }
+  echo "ok   uv's commands in ~/.local/share/uv/bin on PATH; the Python uv installed runs on the system's loader with ssl, sqlite3, ctypes and readline"
+
+  out="$(kz 'kubaos suite new python py-demo' 2>&1)" ||
+    { echo "FAIL kubaos suite new python py-demo"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ -d $project/.git && -f $project/pyproject.toml && $(zrun "cd $project && uv run --quiet py-demo") == "Hello from py-demo!" ]] ||
+    { echo "FAIL the scaffolded project doesn't run"; ls -la "$project"; zrun "cd $project && uv run py-demo" 2>&1 | tail -5; return 1; }
+  out="$(zrun "cd $project && ruff check . && ruff format --check . && basedpyright src" 2>&1)" ||
+    { echo "FAIL ruff or basedpyright in the project"; printf '%s\n' "$out" | tail -10; return 1; }
+  [[ $(zrun "cd $project && whence -p ruff") == "$shims/ruff" ]] || { echo "FAIL the project's venv put a ruff ahead of the Suite's"; return 1; }
+  echo "ok   kubaos suite new python py-demo: a uv project under git whose command runs, lints, is formatted and type-checks clean"
+
+  out="$(kz "kubaos pin python 3.13 '$project'" 2>&1)" && { echo "FAIL kubaos pin python succeeded"; return 1; }
+  grep -q 'has no versions to pin' <<<"$out" && [[ ! -e $project/mise.toml ]] ||
+    { echo "FAIL kubaos pin python: want a refusal and no mise.toml"; printf '%s\n' "$out"; return 1; }
+  echo "ok   kubaos pin python refuses: a project's Python is uv's"
+
+  cache_lock nvim
+  out="$(zrun "nvim --headless +'lua io.write(\"\\nMASON \", table.concat(LazyVim.opts(\"mason.nvim\").ensure_installed, \",\"), \"\\nLSP \", tostring(LazyVim.opts(\"nvim-lspconfig\").servers.basedpyright.mason), \" \", tostring(LazyVim.opts(\"nvim-lspconfig\").servers.ruff.mason), \"\\nPATHS \", vim.fn.exepath(\"basedpyright-langserver\"), \" \", vim.fn.exepath(\"ruff\"), \" \", vim.fn.exepath(\"debugpy-adapter\"))' +qa" 2>&1 | tr -d '\r')"
+  grep -qx 'LSP false false' <<<"$out" && grep -q '^MASON ' <<<"$out" &&
+    ! grep '^MASON ' <<<"$out" | grep -qwE 'basedpyright|ruff|debugpy' &&
+    grep -qx "PATHS $shims/basedpyright-langserver $shims/ruff $shims/debugpy-adapter" <<<"$out" ||
+    { echo "FAIL Neovim without mise's hook doesn't take the Python tools from the shims, or Mason would install them:"; printf '%s\n' "$out" | grep -E '^(MASON|LSP|PATHS)'; return 1; }
+  # The adapter nvim-dap-python starts: a DAP initialize request on its stdin
+  # gets a successful response. The adapter drops a reply it hasn't sent when
+  # its stdin closes, so stdin stays open a while after the request.
+  local request='{"seq":1,"type":"request","command":"initialize","arguments":{"adapterID":"debugpy","clientID":"kubaos"}}'
+  printf 'Content-Length: %d\r\n\r\n%s' "${#request}" "$request" | as_user tee "$USER_HOME/.cache/dap-initialize" >/dev/null
+  out="$(zrun "{ cat '$USER_HOME/.cache/dap-initialize'; sleep 5; } | timeout 20 debugpy-adapter" 2>&1 | tr -d '\r')"
+  rm -f "$USER_HOME/.cache/dap-initialize"
+  grep -qE '"command": ?"initialize"' <<<"$out" && grep -qE '"success": ?true' <<<"$out" ||
+    { echo "FAIL debugpy-adapter didn't answer DAP's initialize:"; printf '%s\n' "$out" | tail -10; return 1; }
+  echo "ok   Neovim started without mise's hook finds basedpyright, ruff and debugpy-adapter through the shims; Mason installs none; the adapter answers DAP"
+
+  out="$(kz 'kubaos suite remove python --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove python"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^cache ~/.local/share/uv \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" &&
+    grep -qx '  ~/.config/kubaos/editor/nvim/plugins/python-suite.lua' <<<"$out" && [[ -f $project/pyproject.toml ]] ||
+    { echo "FAIL remove: uv's folder's size, the user's python-suite.lua, or the project"; printf '%s\n' "$out"; return 1; }
+  # A pruned tool keeps its folder and mise's .mise.backend.toml in it; its
+  # versions are the folders inside.
+  [[ ! -e $frag && -z $(find "$installs"/aqua-astral-sh-* "$installs"/pypi-* -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
+    { echo "FAIL remove: the fragment or a version is left"; find "$installs" -mindepth 2 -maxdepth 2 -type d; return 1; }
+  for t in "${tools[@]}"; do
+    [[ ! -e $shims/$t ]] && ! zrun "whence -p $t" >/dev/null || { echo "FAIL $t is still on PATH"; return 1; }
+  done
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  ! grep -qF lang.python "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" &&
+    [[ -z $(zrun 'print -r -- "$UV_TOOL_BIN_DIR$UV_PYTHON_BIN_DIR"') ]] && ! zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$uvbin" ||
+    { echo "FAIL the Suite's uv variables, PATH entry or Neovim extra are left"; return 1; }
+  echo "ok   kubaos suite remove python: fragment, versions and shims gone, uv's folder kept, python-suite.lua listed, the project untouched, nothing of it left in the generation"
+
+  out="$(kz 'kubaos suite add python --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add python"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qx '"pypi:basedpyright" = "1.40"' "$frag" && on_shims ||
+    { echo "FAIL kubaos suite add python: not every tool"; cat "$frag"; return 1; }
+  echo "ok   kubaos suite add python: every tool again"
+  out="$(kz 'kubaos suite remove python --purge-caches --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove python --purge-caches"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ ! -e $USER_HOME/.local/share/uv && ! -e $USER_HOME/.cache/uv ]] ||
+    { echo "FAIL remove --purge-caches left uv's folders"; printf '%s\n' "$out"; return 1; }
+  echo "ok   kubaos suite remove python --purge-caches: uv's Pythons, tools and cache gone"
+  rm -rf "$project" "$mine"
+}
+
 # The user layer: test/user-layer-check, which the VM bench also
 # runs on an installed system. Commits to the checkout, so it runs after the
 # other checks but the update ones, which start from a clone of it.
@@ -4248,7 +4368,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node suite_python dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

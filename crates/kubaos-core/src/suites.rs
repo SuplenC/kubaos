@@ -145,8 +145,8 @@ pub enum Toolchain {
     Nix,
     /// mise, from the Suite's tools.
     Mise,
-    /// The language's own manager, which the Nix module installs and the Suite drives, where
-    /// that is the norm (rustup for Rust).
+    /// The language's own manager, which the Suite installs (through its Nix module, or as one of
+    /// its mise tools) and drives, where that is the norm (rustup for Rust, uv for Python).
     Upstream { manager: &'static str },
 }
 
@@ -396,6 +396,9 @@ pub enum ScaffoldError {
         #[source]
         source: io::Error,
     },
+    /// The scaffolder's command isn't on `PATH`: the Suite's tools aren't installed.
+    #[error("{program} isn't on PATH; `kubaos suite configure {suite}` installs the Suite's tools again")]
+    NotOnPath { program: String, suite: String },
     /// The scaffolder could not be started.
     #[error("starting {program}")]
     Spawn {
@@ -723,9 +726,18 @@ impl Suites {
             .current_dir(&self.projects)
             .stdin(Stdio::null())
             .status()
-            .map_err(|source| ScaffoldError::Spawn {
-                program: program_name.clone(),
-                source,
+            .map_err(|source| {
+                if source.kind() == io::ErrorKind::NotFound {
+                    ScaffoldError::NotOnPath {
+                        program: program_name.clone(),
+                        suite: suite.name.to_owned(),
+                    }
+                } else {
+                    ScaffoldError::Spawn {
+                        program: program_name.clone(),
+                        source,
+                    }
+                }
             })?;
         if !status.success() {
             return Err(ScaffoldError::Failed {
