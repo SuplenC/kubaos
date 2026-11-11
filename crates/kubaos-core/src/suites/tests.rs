@@ -972,7 +972,7 @@ fn removing_deletes_the_fragment_and_prunes_at_once() {
     assert!(h.mise.installed().is_empty(), "{:?}", h.mise.installed());
     assert_eq!(
         h.mise.calls()[4..],
-        ["mise prune --tools", "mise lock --global"],
+        ["mise lock --global", "mise prune --tools"],
         "{:?}",
         h.mise.calls()
     );

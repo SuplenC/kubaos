@@ -600,9 +600,12 @@ impl Suites {
         self.delete_record(suite)?;
         let had_fragment = self.paths.mise_fragment(suite.name).exists();
         self.write_fragment(suite, &[])?;
+        // HAZARD: lock before pruning. While any global config is left (the user's
+        // config.toml, a Suite's defaults in conf.d), mise reads the global lockfile with it,
+        // and prune keeps every version the lockfile still lists.
         if had_fragment {
-            self.mise.prune().map_err(SuiteError::Prune)?;
             self.mise.lock().map_err(SuiteError::MiseLock)?;
+            self.mise.prune().map_err(SuiteError::Prune)?;
         }
 
         let sized = self.caches(suite);

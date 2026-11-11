@@ -3095,6 +3095,7 @@ c_suite_go() {
   [[ $(zrun 'go env GOVERSION') == go1.27.* && -z $(compgen -G "$installs/go/1.26*") ]] ||
     { echo "FAIL configure: not Go 1.27, or 1.26 wasn't pruned"; ls "$installs/go"; return 1; }
   [[ -f $mine ]] || { echo "FAIL plugins/go.lua was not seeded"; return 1; }
+  grep -qx 'go = "1.27"' "$frag" || { echo "FAIL configure: the fragment doesn't ask for go 1.27:"; cat "$frag"; return 1; }
   echo "ok   kubaos suite configure go --version 1.27: Go 1.27, 1.26 pruned, the seeded go.lua"
 
   local path
@@ -3120,12 +3121,17 @@ c_suite_go() {
     { echo "FAIL golangci-lint or dlv in the project"; zrun "cd $project && golangci-lint run ./...; dlv version" 2>&1 | tail -5; return 1; }
   echo "ok   kubaos suite new go go-demo: a module under git whose main package runs, is formatted, lints clean, and dlv runs"
 
-  out="$(kz "kubaos pin go 1.26 '$project'" 2>&1)" ||
+  # A folder of its own: in go-demo, whose go.mod asks for the Go that made
+  # it, Go 1.26 would switch to that toolchain itself.
+  local pinned="$USER_HOME/Projects/go-pinned"
+  as_user install -d "$pinned"
+  out="$(kz "kubaos pin go 1.26 '$pinned'" 2>&1)" ||
     { echo "FAIL kubaos pin go 1.26"; printf '%s\n' "$out" | tail -20; return 1; }
-  [[ $(zrun "cd $project && go env GOVERSION") == go1.26.* && $(zrun 'go env GOVERSION') == go1.27.* ]] ||
-    { echo "FAIL the pin: Go $(zrun "cd $project && go env GOVERSION") in the project, $(zrun 'go env GOVERSION') outside"; return 1; }
-  expect_ok "kubaos unpin go" kz "kubaos unpin go '$project'" || return 1
-  echo "ok   kubaos pin go 1.26: the project runs Go 1.26 through the shims, the home 1.27"
+  [[ $(zrun "cd $pinned && go env GOVERSION") == go1.26.* && $(zrun 'go env GOVERSION') == go1.27.* ]] ||
+    { echo "FAIL the pin: Go $(zrun "cd $pinned && go env GOVERSION") in the folder, $(zrun 'go env GOVERSION') outside"; return 1; }
+  expect_ok "kubaos unpin go" kz "kubaos unpin go '$pinned'" || return 1
+  [[ -f $frag ]] || { echo "FAIL unpin took the Suite's fragment"; return 1; }
+  echo "ok   kubaos pin go 1.26: the folder runs Go 1.26 through the shims, the home 1.27"
 
   cache_lock nvim
   out="$(zrun "nvim --headless +'lua io.write(\"\\nMASON \", table.concat(LazyVim.opts(\"mason.nvim\").ensure_installed, \",\"), \"\\nGOPLS \", tostring(LazyVim.opts(\"nvim-lspconfig\").servers.gopls.mason), \"\\nPATHS \", vim.fn.exepath(\"gopls\"), \" \", vim.fn.exepath(\"dlv\"))' +qa" 2>&1 | tr -d '\r')"
@@ -3136,6 +3142,7 @@ c_suite_go() {
   [[ $(zrun "cd $project && gopls version") == golang.org/x/tools/gopls* ]] || { echo "FAIL gopls through its shim"; return 1; }
   echo "ok   Neovim started without mise's hook finds gopls and dlv through the shims; LazyVim's Go extra asks Mason for none"
 
+  grep -qx 'go = "1.27"' "$frag" || { echo "FAIL before remove, the fragment is gone or moved:"; ls -la "$(dirname "$frag")"; cat "$frag"; return 1; }
   out="$(kz 'kubaos suite remove go --foreground' 2>&1)" ||
     { echo "FAIL kubaos suite remove go"; printf '%s\n' "$out" | tail -20; return 1; }
   grep -qE '^cache ~/.cache/go-build \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" &&
@@ -3144,7 +3151,7 @@ c_suite_go() {
   # A pruned tool keeps its folder and mise's .mise.backend.toml in it; its
   # versions are the folders inside.
   [[ ! -e $frag && -z $(find "$installs"/go* "$installs"/aqua-* -mindepth 1 -maxdepth 1 -type d 2>/dev/null) ]] ||
-    { echo "FAIL remove: the fragment or a version is left"; ls -R "$installs" | head -40; return 1; }
+    { echo "FAIL remove: the fragment or a version is left"; find "$installs" -mindepth 2 -maxdepth 2 -type d; return 1; }
   for t in "${tools[@]}" kubaos-go-new; do
     [[ ! -e $shims/$t ]] && ! zrun "whence -p $t" >/dev/null || { echo "FAIL $t is still on PATH"; return 1; }
   done
@@ -3160,7 +3167,7 @@ c_suite_go() {
     { echo "FAIL kubaos suite add go: not Go 1.27 with every tool"; cat "$frag"; return 1; }
   echo "ok   kubaos suite add go: the default line, 1.27, and every tool"
   expect_ok "kubaos suite remove go again" kz 'kubaos suite remove go --foreground' || return 1
-  rm -rf "$project" "$mine"
+  rm -rf "$project" "$mine" "$pinned"
 }
 
 # The user layer: test/user-layer-check, which the VM bench also
