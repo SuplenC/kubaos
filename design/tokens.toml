@@ -820,10 +820,6 @@ clock_date = 0.85
 # street, faint enough that no shape shows round them.
 halo_edge = 0.50
 halo = 0.35
-# The lock's soft shade under a clock that stands in front of its picture (a wallpaper with no
-# cut-out, or depth turned off): `surface` this strong at the clock's middle, fading to nothing past
-# its edges, so the digits and the date read over busy signs.
-clock_shade = 0.75
 # An inactive window's border, the highest container over what is behind it,
 # and its neutral shadow, of the `shadow` role. The active window's tube and
 # glow strike on over these (config/hypr/focus.lua).

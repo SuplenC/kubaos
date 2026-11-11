@@ -232,8 +232,6 @@ export function lock(options: LockOptions): Lock {
   element.dataset.phase = options.phase;
   element.toggleAttribute("data-open", options.phase === "awake");
   element.toggleAttribute("data-live", options.live ?? false);
-  // No cut-out: the clock stands in front of the picture, over its shade.
-  element.toggleAttribute("data-bare", !wallpaper.depth);
 
   const picture = element.querySelector<HTMLImageElement>(".k-screen-wallpaper")!;
   const blur = document.createElement("span");
