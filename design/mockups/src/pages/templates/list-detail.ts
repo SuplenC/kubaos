@@ -60,10 +60,10 @@ const OPENS: Move = {
   name: "The Command menu opens",
   what: "Super+Space: the panel fades in and drops into place, its Results there from the first frame.",
   tracks: [
-    { part: "fade", on: "the panel", target: ".k-menu", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
-    { part: "drop", on: "the panel", target: ".k-menu", property: "--menu-drop", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
+    { part: "fade", on: "the panel", target: ".k-command", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
+    { part: "drop", on: "the panel", target: ".k-command", property: "--menu-drop", from: 1, to: 0, duration: "short", curve: "emphasized_decel" },
   ],
-  reduced: [{ part: "fade", on: "the panel", target: ".k-menu", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
+  reduced: [{ part: "fade", on: "the panel", target: ".k-command", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
   back: "cuts",
   sample: () => stack(0, "start", menu(1280, 800, { rows: 3 })),
 };
@@ -72,10 +72,10 @@ const CLOSES: Move = {
   name: "The Command menu closes",
   what: "Esc, or an Item run: the panel fades and lifts; what it runs waits until it is gone.",
   tracks: [
-    { part: "fade", on: "the panel", target: ".k-menu", property: "opacity", from: 1, to: 0, duration: "micro", curve: "emphasized_accel" },
-    { part: "drop", on: "the panel", target: ".k-menu", property: "--menu-drop", from: 0, to: 1, duration: "micro", curve: "emphasized_accel" },
+    { part: "fade", on: "the panel", target: ".k-command", property: "opacity", from: 1, to: 0, duration: "micro", curve: "emphasized_accel" },
+    { part: "drop", on: "the panel", target: ".k-command", property: "--menu-drop", from: 0, to: 1, duration: "micro", curve: "emphasized_accel" },
   ],
-  reduced: [{ part: "fade", on: "the panel", target: ".k-menu", property: "opacity", from: 1, to: 0, duration: "micro", curve: "emphasized_accel" }],
+  reduced: [{ part: "fade", on: "the panel", target: ".k-command", property: "opacity", from: 1, to: 0, duration: "micro", curve: "emphasized_accel" }],
   back: "cuts",
   sample: () => stack(0, "start", menu(1280, 800, { rows: 3 })),
 };
