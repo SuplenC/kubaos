@@ -269,10 +269,42 @@
   --raised: calc((1 - var(--fan)) * (1 - var(--opening)));
 }
 
-/* Only the lowest edge casts its step's shadow, onto the panel: one cast onto another would sink the
-   peek under it into the dark. The others keep their rim. */
-.k-notif-slot:not([data-lowest]) > .k-notif-edge {
+/* An edge keeps its step's rim; the stack casts its one shadow from `.k-notif-under`, so one tucked
+   card never sinks the peek under it into the dark. */
+.k-notif-edge.k-raised {
   box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--rim-tone, var(--color-on_surface)) r g b / calc(var(--elevation-rim) * var(--raised)));
+}
+
+.k-notif-under {
+  position: absolute;
+  z-index: 0;
+  left: var(--k-inset);
+  right: var(--k-inset);
+  top: var(--k-inset);
+  height: var(--h0);
+  border-radius: var(--notif-corner);
+  --raised: calc((1 - var(--fan)) * (1 - var(--opening)));
+  box-shadow:
+    0 var(--elevation-1-contact-y) var(--elevation-1-contact-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-contact-opacity) * var(--raised))),
+    0 var(--elevation-1-ambient-y) var(--elevation-1-ambient-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-ambient-opacity) * var(--raised)));
+}
+
+/* At rest the tucked cards draw over the newest card, its glow included, each over the one under it,
+   and each is masked to what the card above leaves showing: the band under that card's straight
+   foot and the two slivers under its rounded corners. So a lit card's glow runs round the stack
+   instead of washing over the cards behind it, with no edge of its own cut across them. The card
+   above is `space.s8` wider each side and `space.s8` higher, its corner the card's. */
+.k-notif-group[data-stacked]:not([data-raised], [data-open]) > .k-notif-slot:not([data-newest], .k-notif-catcher, .k-notif-more) {
+  --cw: calc(var(--notif-corner) - var(--space-s8));
+  --cy: calc(var(--h0) - var(--space-s8) - var(--notif-corner));
+  z-index: var(--rest-z);
+  mask-image:
+    linear-gradient(to bottom, transparent calc(var(--h0) - var(--space-s8)), #000 calc(var(--h0) - var(--space-s8))),
+    radial-gradient(circle var(--notif-corner) at var(--cw) 0, transparent calc(var(--notif-corner) - 0.5px), #000 calc(var(--notif-corner) + 0.5px)),
+    radial-gradient(circle var(--notif-corner) at 0 0, transparent calc(var(--notif-corner) - 0.5px), #000 calc(var(--notif-corner) + 0.5px));
+  mask-size: 100% 100%, var(--cw) var(--notif-corner), var(--cw) var(--notif-corner);
+  mask-position: 0 0, 0 var(--cy), 100% var(--cy);
+  mask-repeat: no-repeat;
 }
 
 /* Each previewed card's own shadow, straight under it on the list: the ladder's step 1 at rest
@@ -304,20 +336,6 @@
   box-shadow: 0 var(--elevation-1-contact-y) var(--elevation-1-contact-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-contact-opacity) * var(--raised) * var(--day)));
 }
 
-/* The newest card's glow, lit on a stack at rest, leaves the edges below it alone: it is cut out
-   over them, a notch `space.s8` in from each side under the card, so the stack still reads. */
-.k-notif-group[data-stacked]:not([data-raised], [data-open]) > .k-notif-slot[data-newest] > .k-notif-card > .k-ring > .k-glow {
-  clip-path: polygon(
-    0 0,
-    100% 0,
-    100% 100%,
-    calc(100% - var(--glow-reach) - var(--space-s8)) 100%,
-    calc(100% - var(--glow-reach) - var(--space-s8)) calc(100% - var(--glow-reach)),
-    calc(var(--glow-reach) + var(--space-s8)) calc(100% - var(--glow-reach)),
-    calc(var(--glow-reach) + var(--space-s8)) 100%,
-    0 100%
-  );
-}
 
 /* The preview's catcher, under every card: room for the pointer, never drawn. */
 .k-notif-catcher {
