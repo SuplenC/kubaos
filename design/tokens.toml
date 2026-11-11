@@ -814,7 +814,9 @@ window_shadow = 0.33
 
 # Scale factors a surface is drawn at, round its middle, while it comes or
 # goes: a share of its size, more than 0. And how far along its flight a
-# moving surface stands: a share of the path.
+# moving surface stands: a share of the path. And where the wallpaper picker's
+# wall hangs its pictures: shares of the screen, so the wall keeps its shape on
+# every screen.
 [scale]
 # A surface stepping back behind what comes over it: the desktop's windows as
 # the lock comes up, shrinking to it as they fade, and growing from it as the
@@ -833,6 +835,20 @@ near = 1.05
 # share of the path: its size, its place and its colour all that far from the rest clock's toward
 # the bar's time, so it stays big, keeps most of the picture's tint, and unlocking flies the rest.
 clock_awake = 0.2
+# A picture on the wallpaper picker's wall: its height, a share of the screen's,
+# 16:10 as the screen is, so the desktop drawn in it is the screen scaled by
+# this much. Large enough to judge the picture, small enough that its
+# neighbours show either side.
+gallery_picture = 0.62
+# The pictures' top edge on the wall, a share of the screen's height: room for
+# the lamp above them.
+gallery_top = 0.12
+# The wall between two pictures, a share of the screen's width.
+gallery_gap = 0.14
+# The lamp over a picture, a neon tube a share of its picture's width.
+gallery_lamp = 0.5
+# Where the wall meets the floor, a share of the screen's height down.
+gallery_floor = 0.86
 
 # Shadows: offset down and blur in logical pixels, and the shadow's opacity
 # of the `shadow` role.
