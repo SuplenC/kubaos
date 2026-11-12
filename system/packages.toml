@@ -83,13 +83,16 @@ packages = [
   "libspa-0.2-bluetooth", "bluez", "rtkit",
 ]
 
+# zenity is how apps ask a question when they can't draw a window of their
+# own: Chrome's profile-in-use prompt, Steam, Wine, scripts. Without it they
+# exit with only a log line.
 [group.session]
-summary = "Session plumbing: D-Bus, polkit, XWayland, portals, the keyring"
+summary = "Session plumbing: D-Bus, polkit, XWayland, portals, the keyring, app dialogs"
 packages = [
   "dbus-user-session", "xdg-user-dirs", "xdg-utils", "polkitd", "pkexec",
   "xwayland", "qt6-wayland", "qtwayland5",
   "xdg-desktop-portal", "xdg-desktop-portal-gtk",
-  "gnome-keyring", "libsecret-1-0",
+  "gnome-keyring", "libsecret-1-0", "zenity",
 ]
 
 # mesa-libgallium carries the VA-API drivers in 26.04; the old
