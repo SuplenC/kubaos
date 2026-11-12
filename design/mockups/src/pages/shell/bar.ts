@@ -1,7 +1,7 @@
 // The Bar page: the frame's top edge as it is designed now. What you're doing on the left (the
 // workspaces, the preview, recording, Keep awake, Proxy, the layout, the update, the title), the
 // clock always centred, and on the right what opens a panel (the tray or its ⋯, the system monitor,
-// the bell and status, which end it). As the bar narrows its parts give way in one order (`RUNGS`).
+// now playing and the mute pill, the bell and status, which end it). As the bar narrows its parts give way in one order (`RUNGS`).
 
 import type { Shown } from "../../lib/control.ts";
 import { row, stack } from "../../lib/layout.ts";
@@ -84,7 +84,7 @@ export default page<"rest" | "lit" | "pressed">({
   code: { qml: "Bar", unbuilt: "QML: steps not built yet" },
   stage: { live, hint: "drag the slider: 540 to 3840", daylight: true },
   variants: [
-    { name: "Everyday", for: "tray, system monitor, bell, status", sample: () => strip(WIDE) },
+    { name: "Everyday", for: "tray, system monitor, mute, bell, status", sample: () => strip(WIDE) },
     { name: "Everything on", for: "every pill at once, on its own side", sample: () => strip(WIDE, EVERYTHING) },
     { name: "No window", for: "an empty workspace: no title", sample: () => strip(WIDE, { ...EVERYDAY, title: "" }) },
     { name: "The narrowest", for: "540: the last step, everything on", sample: () => strip(540, EVERYTHING) },
@@ -122,7 +122,7 @@ export default page<"rest" | "lit" | "pressed">({
     text: [{ name: "The window title", words: { short: "Firefox", long: TITLE }, sample: (words: string) => strip(logicalWidth(LAPTOP.width), { ...EVERYDAY, title: words }) }],
     missingPicture: doesntApply("its symbols are always there; a tray app's missing picture is the Tray page's."),
     counts: [
-      { name: "The fewest", for: "workspaces, clock, system monitor, bell, status", sample: () => strip(WIDE, QUIET) },
+      { name: "The fewest", for: "workspaces, clock, system monitor, mute, bell, status", sample: () => strip(WIDE, QUIET) },
       { name: "Everyday", for: "and the tray", sample: () => strip(WIDE) },
       { name: "Every one", for: "every pill, each on its side", sample: () => strip(WIDE, EVERYTHING) },
     ],

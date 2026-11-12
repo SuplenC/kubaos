@@ -16,6 +16,7 @@ import { advance, clamped, text } from "../../lib/text.ts";
 import { length } from "../../lib/tokens.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
 import { settings } from "../../site/settings.ts";
+import { mutePill, nowPlaying } from "./bar-audio-parts.ts";
 import { workspaces, type WorkspacesOptions, SHOTS_GROUPS } from "./workspaces.ts";
 
 export { wallpaper };
@@ -86,7 +87,6 @@ export interface StatusOptions {
   readonly power?: string;
   readonly net?: string;
   readonly bluetooth?: string | null;
-  readonly audio?: string;
   /** The battery, or none on a desktop: its share, low or charging. */
   readonly battery?: { readonly percent: number; readonly low?: boolean; readonly charging?: boolean } | null;
   readonly state?: Shown;
@@ -96,7 +96,6 @@ export function statusContent(options: StatusOptions = {}): Element[] {
   const parts: Element[] = [glyph(options.power ?? "balance"), glyph(options.net ?? "signal_wifi_4_bar")];
   const bluetooth = options.bluetooth === undefined ? "bluetooth" : options.bluetooth;
   if (bluetooth) parts.push(glyph(bluetooth));
-  parts.push(glyph(options.audio ?? "volume_up"));
   const battery = options.battery === undefined ? { percent: 64 } : options.battery;
   if (battery) {
     const tone = battery.low ? "error" : battery.charging ? "primary" : "on_surface_variant";
@@ -107,7 +106,7 @@ export function statusContent(options: StatusOptions = {}): Element[] {
 }
 
 export function statusPill(options: StatusOptions = {}): HTMLElement {
-  return control(statusContent(options), "Home 5G  ·  Volume 60%  ·  Battery 64%", options.state ?? "rest");
+  return control(statusContent(options), "Home 5G  ·  Battery 64%", options.state ?? "rest");
 }
 
 // The bell.
@@ -396,7 +395,7 @@ export function rimPill(loads: readonly Load[] = LOADS, state: Shown = "rest"): 
 // The status pill as it sheds.
 
 export interface ShedOptions {
-  /** How far it has shed: 0 all, 1 the battery's share gone, then a symbol from the left each, 5 the battery alone. */
+  /** How far it has shed: 0 all, 1 the battery's share gone, then a symbol from the left each, 4 the battery alone. */
   readonly shed?: number;
   readonly state?: Shown;
 }
@@ -404,9 +403,9 @@ export interface ShedOptions {
 export function shedStatus(options: ShedOptions = {}): HTMLElement {
   const shed = options.shed ?? 0;
   const parts: Element[] = [];
-  parts.push(...["balance", "signal_wifi_4_bar", "bluetooth", "volume_up"].slice(Math.max(0, shed - 1)).map((name) => glyph(name)));
+  parts.push(...["balance", "signal_wifi_4_bar", "bluetooth"].slice(Math.max(0, shed - 1)).map((name) => glyph(name)));
   parts.push(shed === 0 ? paired(glyph("battery_2_bar"), text("64%", "mono", "on_surface")) : glyph("battery_2_bar"));
-  return control(parts, "Home 5G  ·  Volume 60%  ·  Battery 64%", options.state ?? "rest", { lone: parts.length === 1 });
+  return control(parts, "Home 5G  ·  Battery 64%", options.state ?? "rest", { lone: parts.length === 1 });
 }
 
 // The clock as it compacts.
@@ -452,12 +451,14 @@ export interface BarContent {
   readonly title: string;
   readonly readings: 2 | 3;
   readonly borrowed: boolean;
+  /** An app has a player: now playing shows. */
+  readonly playing: boolean;
 }
 
 /** Every pill at once, as the shots' stand-ins hold them. */
-export const EVERYTHING: BarContent = { recording: true, keepAwake: true, proxy: true, layout: true, update: true, preview: true, tray: true, countdown: true, title: TITLE, readings: 3, borrowed: true };
+export const EVERYTHING: BarContent = { recording: true, keepAwake: true, proxy: true, layout: true, update: true, preview: true, tray: true, countdown: true, title: TITLE, readings: 3, borrowed: true, playing: true };
 /** An ordinary day: the tray, the system monitor's two default readings, the bell, status. */
-export const EVERYDAY: BarContent = { recording: false, keepAwake: false, proxy: false, layout: false, update: false, preview: false, tray: true, countdown: false, title: TITLE, readings: 2, borrowed: false };
+export const EVERYDAY: BarContent = { recording: false, keepAwake: false, proxy: false, layout: false, update: false, preview: false, tray: true, countdown: false, title: TITLE, readings: 2, borrowed: false, playing: false };
 
 /** How far each part has given way. */
 interface BarState {
@@ -473,10 +474,12 @@ interface BarState {
   name: boolean;
   ghosts: boolean;
   sysmon: "numbers" | "rings";
+  playing: "full" | "play" | "none";
+  mute: "both" | "mic";
   shed: number;
 }
 
-const FULL: BarState = { title: true, layout: true, countdown: true, idle: true, date: "full", recording: "time", tray: "open", update: true, preview: true, name: true, ghosts: true, sysmon: "numbers", shed: 0 };
+const FULL: BarState = { title: true, layout: true, countdown: true, idle: true, date: "full", recording: "time", tray: "open", update: true, preview: true, name: true, ghosts: true, sysmon: "numbers", playing: "full", mute: "both", shed: 0 };
 
 /** Where a rung's part sits: the left, the right, or the clock in the middle. */
 type Side = "left" | "right" | "clock";
@@ -490,10 +493,10 @@ export interface Rung {
 
 /**
  * The order the bar gives way in, Kuba's and its proposals: the title first, then the layout; what
- * only shows state before what opens something; the clock, the system monitor, status and the bell
- * always there, and the recording's dot never gone. It reaches down to 540; a phone's width is a
- * topic of its own. A rung is taken only while its side runs short
- * of the clock's clear space (a clock rung, while either side does), and nothing else goes while
+ * only shows state before what opens something; the clock, the system monitor, the mute pill, status
+ * and the bell always there, and the recording's dot never gone. It reaches down to 540; a phone's
+ * width is a topic of its own. A rung is taken only while its side runs short of the clock's clear
+ * space (a clock rung, while either side does), and nothing else goes while
  * the title still shows.
  */
 export const RUNGS: readonly Rung[] = [
@@ -509,12 +512,14 @@ export const RUNGS: readonly Rung[] = [
   { side: "left", says: "Preview joins ⋯", apply: (s) => void (s.preview = false) },
   { side: "left", says: "Group name goes", apply: (s) => void (s.name = false) },
   { side: "left", says: "Ghosts go", apply: (s) => void (s.ghosts = false) },
+  { side: "right", says: "Now playing drops ⏮ ⏭", apply: (s) => void (s.playing = "play") },
   { side: "right", says: "System monitor turns to rings", apply: (s) => void (s.sysmon = "rings") },
   { side: "right", says: "Battery % goes", apply: (s) => void (s.shed = 1) },
+  { side: "right", says: "Now playing goes", apply: (s) => void (s.playing = "none") },
   { side: "right", says: "Power mode goes", apply: (s) => void (s.shed = 2) },
   { side: "right", says: "Network goes", apply: (s) => void (s.shed = 3) },
   { side: "right", says: "Bluetooth goes", apply: (s) => void (s.shed = 4) },
-  { side: "right", says: "Sound goes", apply: (s) => void (s.shed = 5) },
+  { side: "right", says: "Mute pill keeps the mic", apply: (s) => void (s.mute = "mic") },
 ];
 
 function stateOf(taken: ReadonlySet<number>): BarState {
@@ -558,7 +563,10 @@ function draw(content: BarContent, state: BarState, shown: Shown, options: Works
   const folded = state.tray === "folded" || (content.update && !state.update) || (content.preview && !state.preview);
   right.append(content.tray && !folded ? trayPill() : morePill(shown));
   right.append(state.sysmon === "rings" ? rimPill(LOADS.slice(0, 3), shown) : sysmonPill({ readings: READINGS.slice(0, content.readings), state: shown }));
-  right.append(bellPill(false, shown), shedStatus({ shed: state.shed, state: shown }));
+  // The audio pills' circles take the state layer in a pill's place: lit or pressed, the first's.
+  const circle = shown === "lit" || shown === "pressed" ? shown : undefined;
+  if (content.playing && state.playing !== "none") right.append(nowPlaying({ compact: state.playing === "play", ...(circle ? { pinned: { part: "play", state: circle } } : {}) }));
+  right.append(mutePill({ ...(state.mute === "mic" ? { micOnly: true } : {}), ...(circle ? { pinned: { side: state.mute === "mic" ? "input" : "output", state: circle } } : {}) }), bellPill(false, shown), shedStatus({ shed: state.shed, state: shown }));
   const row = document.createElement("span");
   row.className = "shell-bar-row";
   row.append(left, clock, right);

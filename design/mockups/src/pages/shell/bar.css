@@ -101,8 +101,10 @@
   min-width: round(up, calc(var(--widest) * var(--px) - 0.001px), 1px);
 }
 
-/* The tray: each app's picture in a circle a chip tall, which takes the state layer. */
-.shell-tray-item {
+/* The tray, and the audio pills: each press target in a circle a chip tall, which takes the state
+   layer. */
+.shell-tray-item,
+.shell-pill-item {
   position: relative;
   display: grid;
   place-items: center;
@@ -129,13 +131,30 @@
 
 .shell-tray-item:hover,
 .shell-tray-item[data-pinned="lit"],
-.shell-tray-item[data-pinned="pressed"] {
+.shell-tray-item[data-pinned="pressed"],
+.shell-pill-item:hover,
+.shell-pill-item[data-pinned="lit"],
+.shell-pill-item[data-pinned="pressed"] {
   --hovered: 1;
 }
 
 .shell-tray-item:active,
-.shell-tray-item[data-pinned="pressed"] {
+.shell-tray-item[data-pinned="pressed"],
+.shell-pill-item:active,
+.shell-pill-item[data-pinned="pressed"] {
   --held: 1;
+}
+
+/* Play or pause, on the accent's fill: its state layer is its content's colour over the fill. */
+.shell-pill-item[data-filled] {
+  background:
+    linear-gradient(rgb(from var(--color-on_primary) r g b / calc(var(--opacity-hover) * var(--hovered, 0) + (var(--opacity-press) - var(--opacity-hover)) * var(--held, 0))), rgb(from var(--color-on_primary) r g b / calc(var(--opacity-hover) * var(--hovered, 0) + (var(--opacity-press) - var(--opacity-hover)) * var(--held, 0)))),
+    var(--color-primary);
+}
+
+/* A symbol with the microphone's dot takes the dot's overhang on both sides: inside its circle. */
+.shell-pill-item > .k-badged {
+  margin-inline: calc(-1 * var(--overhang));
 }
 
 .shell-tray-picture {
