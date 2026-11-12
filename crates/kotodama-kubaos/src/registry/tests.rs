@@ -635,6 +635,20 @@ fn the_wallpaper_depth_items_of_kubaos_toml_run_kubaos_depth() {
     }
 }
 
+#[test]
+fn run_command_hands_the_whole_typed_command_to_an_interactive_zsh_in_the_terminal() {
+    let (registry, _) = Registry::from_config(&shipped(), &crate::toggles::ids());
+    let typed = "ls -la ~ | grep 'my file' && echo \"$HOME\"";
+
+    let argv = registry
+        .command("run-command", &arguments(&[("command", typed)]))
+        .expect("run-command")
+        .argv;
+
+    assert_eq!(&argv[..registry.terminal().len()], registry.terminal());
+    assert_eq!(tail(&argv, 5), ["env", "KUBAOS_GREETING=0", "zsh", "-ic", typed]);
+}
+
 /// The states an action's `shown_when` names, each a table of `state` and `is` or `is_not`.
 fn conditions(actions: &Table, id: &str) -> Vec<Table> {
     let Some(Value::Table(action)) = actions.get(id) else {

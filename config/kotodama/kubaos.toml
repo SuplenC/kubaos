@@ -269,6 +269,22 @@ keywords = ["fastfetch", "terminal", "welcome", "logo", "motd", "quiet"]
 run = ["dot-greeting", "off"]
 shown_when = { state = "terminal.greeting", is = true }
 
+# "> " then a command runs it in the floating terminal, which stays open on
+# its output. An interactive zsh runs it, so your aliases and functions work;
+# KUBAOS_GREETING=0 keeps the greeting out of a window that is there for the
+# command. The whole command is one word of the argv, so no shell of ours
+# splits or expands it before zsh does.
+
+[extensions.kubaos.actions.run-command]
+title = "Run in terminal…"
+subtitle = "A shell command, in a floating terminal that stays open on its output"
+icon = "utilities-terminal"
+keywords = ["command", "shell", "execute", "run command", "zsh"]
+keyword = ">"
+run = ["env", "KUBAOS_GREETING=0", "zsh", "-ic", "{command}"]
+arguments = [{ name = "command", placeholder = "journalctl --user -b -p err" }]
+terminal = true
+
 # Wallpaper and theme (scripts/dot-theme, the shell's picker).
 
 [extensions.kubaos.actions.theme-next]
