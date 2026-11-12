@@ -84,6 +84,10 @@
   --frame-side: round(nearest, calc(var(--space-s8) - (var(--space-s8) + var(--radius-surface)) * (1 - var(--framed))), 1px);
   --bar-shift: round(nearest, calc(-1 * (var(--size-bar) + var(--radius-surface)) * (1 - var(--barred))), 1px);
   --frame-top: max(var(--frame-side), var(--bar-shift) + var(--size-bar));
+  /* The screen's middle across, which the picture and its city are pushed in round. */
+  --screen-middle: calc(var(--screen-width) / 2);
+  /* How much of each layer set in front of the clock cuts it: all, or none with depth off. */
+  --layer-cut: 1;
 }
 
 .k-lock[data-phase="awake"] {
@@ -112,6 +116,7 @@
 
 .k-lock[data-flat] .k-lock-clock {
   --city-cut: 0;
+  --layer-cut: 0;
 }
 
 /* With reduce motion nothing pushes: the lock holds the desktop's 1:1 picture, and only fades. */
@@ -283,10 +288,15 @@
 /* The kicker stands its gap (`--kicker-gap`, `scale.lock_date_gap` of the clock, scaling with it) over the digits, measured as the eye does: from the digits' cap
    top, which is their box's, to the kicker's baseline (`--kicker-base`, its depth in its line, read
    off the font), so its descenders and its line's leading don't count. */
+.k-lock-clock {
+  --kicker-top: round(nearest, calc(-1 * (var(--kicker-gap, var(--space-s40)) * var(--k) + var(--kicker-base-share, 1.2) * var(--kicker-rest) * var(--kicker-k))), 1px);
+  --kicker-left: calc(round(down, calc(var(--cx) - var(--kicker-width) / 2), 1px) - round(down, calc(var(--cx) - var(--digits-width) / 2), 1px));
+}
+
 .k-lock-clock > .k-lock-kicker {
   position: absolute;
-  top: round(nearest, calc(-1 * (var(--kicker-gap, var(--space-s40)) * var(--k) + var(--kicker-base-share, 1.2) * var(--kicker-rest) * var(--kicker-k))), 1px);
-  left: calc(round(down, calc(var(--cx) - var(--kicker-width) / 2), 1px) - round(down, calc(var(--cx) - var(--digits-width) / 2), 1px));
+  top: var(--kicker-top);
+  left: var(--kicker-left);
   width: max-content;
 }
 
@@ -358,7 +368,7 @@
     calc(var(--city-flat-width) * var(--neared) * var(--city-cut)) calc(var(--city-flat-height) * var(--neared) * var(--city-cut));
   mask-position:
     0 0,
-    calc(var(--middle) + (var(--city-flat-left) - var(--middle)) * var(--neared) + var(--city-lead) - var(--clock-left)) calc(var(--screen-height) + (var(--city-flat-top) - var(--screen-height)) * var(--neared) - var(--clock-top));
+    calc(var(--screen-middle) + (var(--city-flat-left) - var(--screen-middle)) * var(--neared) + var(--city-lead) - var(--clock-left)) calc(var(--screen-height) + (var(--city-flat-top) - var(--screen-height)) * var(--neared) - var(--clock-top));
 }
 
 /* The city: the picture through the cut-out's alpha, in front of the clock, pushed in to
@@ -511,3 +521,73 @@
 [data-reduced] .k-lock[data-live][data-phase="awake"] .k-screen-glass {
   opacity: var(--opacity-frame);
 }
+
+/* A clock set for its picture (`LockClock`): its kicker stands on the digits' ink, its left edge on
+   their first figure's, its middle on theirs or its right edge on their last figure's
+   (`--kicker-align`), so it lines up with what the eye sees rather than the box. */
+.k-lock[data-clocked] .k-lock-clock {
+  --ink-l: calc(var(--ink-left, 0) * var(--rest) * var(--k));
+  --ink-r: calc(var(--ink-right, 0) * var(--rest) * var(--k));
+  --kicker-left: round(nearest, calc(var(--ink-l) + var(--kicker-align, 0.5) * (var(--digits-width) - var(--ink-l) - var(--ink-r) - var(--kicker-width))), 1px);
+  /* Where the screen crops the picture, worked out here from the picture's size so a screen
+     changing shape crops the layers as it crops the picture, every frame. */
+  --cover: max(calc(var(--screen-width) / (var(--picture-width, 1) * 1px)), calc(var(--screen-height) / (var(--picture-height, 1) * 1px)));
+  --city-flat-width: calc(var(--picture-width, 1) * 1px * var(--cover));
+  --city-flat-height: calc(var(--picture-height, 1) * 1px * var(--cover));
+  --city-flat-left: calc((var(--screen-width) - var(--city-flat-width)) / 2);
+  --city-flat-top: calc((var(--screen-height) - var(--city-flat-height)) / 2);
+}
+
+/* With layers set in front of it, the clock stands over the city as well and takes every layer in
+   front of it out of its digits and its kicker (their masks, `lib/lock.ts`), so a step changes the
+   clock alone and the picture is never redrawn. The kicker gets the digits' room for its mask:
+   Chromium clips a mask to the border box. */
+.k-lock[data-layered] .k-lock-clock {
+  z-index: 1;
+}
+
+.k-lock[data-layered] .k-lock-kicker {
+  padding: var(--kicker-height);
+  margin: calc(-1 * var(--kicker-height));
+  mask-origin: content-box;
+  mask-clip: no-clip;
+}
+
+/* A set clock's glow, under the digits and the kicker in its colour, as strong as set: a tight
+   ring that edges the strokes and a wide one that quiets the picture round them, each a share of
+   the type size. It fades as the clock flies to the bar, and it takes the kicker's halo's place.
+   The digits get room beside them for it, as they have above and below. */
+.k-lock[data-clocked] .k-lock-digits {
+  box-sizing: content-box;
+  padding-inline: 1lh;
+  margin-inline: -1lh;
+}
+
+.k-lock[data-glow] :is(.k-lock-digits, .k-lock-place, .k-lock-date) {
+  --glow-fade: calc(1 - var(--flown));
+  filter:
+    drop-shadow(0 0 calc(var(--scale-clock_glow_edge) * 1em) rgb(from var(--glow-colour) r g b / calc(min(1, var(--scale-clock_glow_edge_gain) * var(--glow-strength)) * var(--glow-fade))))
+    drop-shadow(0 0 calc(var(--scale-clock_glow) * 1em) rgb(from var(--glow-colour) r g b / calc(min(1, var(--scale-clock_glow_gain) * var(--glow-strength)) * var(--glow-fade))));
+}
+
+.k-lock[data-glow] .k-lock-kicker {
+  text-shadow: none;
+}
+
+/* A picture set to show no clock: the lock at rest is the picture alone, and nothing flies to the
+   bar or from it. The bar's time is then the bar's like its other words, there whenever the bar
+   is, sliding in and out with it: it takes the place of the flight's own fades of it, which a
+   rule marked important wins over. */
+.k-lock[data-clockless] .k-lock-clock {
+  visibility: hidden;
+}
+
+.k-lock[data-clockless] .k-lock-bar-time {
+  opacity: 1 !important;
+}
+
+/* A picture set to show no date: the digits alone, flying as they do with it. */
+.k-lock[data-undated] .k-lock-kicker {
+  visibility: hidden;
+}
+
