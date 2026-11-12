@@ -19,7 +19,7 @@ import { emptyState } from "../../lib/empty-state.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { list } from "../../lib/list.ts";
-import { lock, type Wallpaper } from "../../lib/lock.ts";
+import { type Lock, lock, type Wallpaper } from "../../lib/lock.ts";
 import { nested, role } from "../../lib/radius.ts";
 import { type ShortcutGroup } from "../../lib/shortcuts.ts";
 import { shortcutsButton, takeShortcutKeys } from "../../lib/shortcuts-button.ts";
@@ -37,6 +37,7 @@ import { PURPLE_HOUR, SCREEN, SHIBUYA, TOWER } from "../templates/locks.ts";
 import { wallpaper as kabukicho } from "./bar-parts.ts";
 import sign from "../../../../../branding/photo/neon-sign-banner.jpg?url";
 import hero from "../../../../../branding/png/kubaos-hero.jpg?url";
+import { type ClockLook, clockEditor, defaultLook, type Editor, type EditorPose, lockClock } from "./wallpaper-clock.ts";
 import { HERO_DAY, HERO_NIGHT, KABUKICHO_DAY, KABUKICHO_NIGHT, PURPLE_DAY, SHIBUYA_DAY, SIGN_DAY, SIGN_NIGHT, TOWER_DAY } from "./wallpaper-schemes.ts";
 
 /** A picture on the wall: the Lock's wallpaper, its day scheme, and whether it moves. */
@@ -75,6 +76,7 @@ export const APPLIED = KABUKICHO;
 export const PICKER_KEYS: readonly ShortcutGroup[] = [
   { name: "Browse", keys: [["← →", "The picture before or after"], ["↑ ↓", "The floor above or below"]] },
   { name: "Views", keys: [["1", "Picture"], ["2", "Desktop"], ["3", "Lock"], ["F", "Full screen and back"], ["W", "Wake the lock, or let it rest"]] },
+  { name: "Clock", keys: [["E", "The clock's panel"], ["j k", "The setting below or above"], ["h l", "Less or more; Shift for a fine step"], ["R", "Standard place"], ["D", "In front, or back to its last step"]] },
   { name: "Depth", keys: [["D", "Depth on or off"]] },
   { name: "Apply and leave", keys: [["↵", "Apply"], ["Esc", "Cancel: the old wallpaper back"], ["?", "These shortcuts"]] },
 ];
@@ -114,6 +116,10 @@ export interface GalleryOptions {
   readonly signsOff?: boolean;
   /** The wall alone, for a move that plays on the pictures: no bar, placard or floors' list. */
   readonly bare?: boolean;
+  /** The clock's editor open on the lock in front of you, drawn in this pose; or a move's two. */
+  readonly edit?: EditorPose | { readonly from: EditorPose | "wall"; readonly to: EditorPose | "wall" };
+  /** Clocks set for pictures, by name, over their own. */
+  readonly looks?: Readonly<Record<string, Partial<ClockLook>>>;
 }
 
 /** The mode the gallery is drawn in: its pane's. */
@@ -287,6 +293,7 @@ const PHASES: Record<View, "picture" | "desktop" | "rest"> = { picture: "picture
 /** One picture's desktop: the Lock template at the screen's size. */
 interface Desk {
   readonly hung: Hung;
+  readonly lock: Lock;
   readonly element: HTMLElement;
   view: View;
   palette: Palette | undefined;
@@ -313,10 +320,10 @@ function stills(): HTMLElement {
   return room;
 }
 
-function makeDesk(hung: Hung, view: View, mode: Mode, size: { readonly width: string; readonly height: string }, wakes: boolean): Desk {
+function makeDesk(hung: Hung, view: View, mode: Mode, size: { readonly width: string; readonly height: string }, wakes: boolean, look: ClockLook): Desk {
   // A picture of a desktop: its bar's pills still; only the lock in front can wake, so only it holds
-  // the password's sheet until another comes to the front.
-  const made = lock({ width: size.width, height: size.height, wallpaper: hung.wallpaper, phase: PHASES[view], bar: barButtons(false), windows: [stills()], sheet: wakes });
+  // the password's sheet until another comes to the front. Its clock is as set for the picture.
+  const made = lock({ width: size.width, height: size.height, wallpaper: hung.wallpaper, phase: PHASES[view], bar: barButtons(false), windows: [stills()], sheet: wakes, clock: lockClock(look, hung.wallpaper, "wide") });
   const element = made.element;
   if (hung.video) {
     const loop = document.createElement("img");
@@ -325,7 +332,7 @@ function makeDesk(hung: Hung, view: View, mode: Mode, size: { readonly width: st
     loop.alt = "";
     element.querySelector(".k-screen-wallpaper")!.after(loop);
   }
-  const desk: Desk = { hung, element, view, palette: undefined };
+  const desk: Desk = { hung, lock: made, element, view, palette: undefined };
   paintDesk(desk, mode, false);
   return desk;
 }
@@ -422,6 +429,16 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
   };
   let mode: Mode = settings().mode;
   const front = () => folders[S.folder]!.pictures[S.at[S.folder]!];
+  // Each picture's clock as set, by its name: its own until the clock's editor changes it.
+  const looks = new Map<string, ClockLook>();
+  const lookOf = (hung: Hung): ClockLook => {
+    const known = looks.get(hung.name);
+    if (known) return known;
+    const made = { ...defaultLook(hung.wallpaper), ...structuredClone(options.looks?.[hung.name] ?? {}) };
+    looks.set(hung.name, made);
+    return made;
+  };
+  let editor: Editor | undefined;
 
   const room = document.createElement("span");
   room.className = "gl-room";
@@ -468,7 +485,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
       // A picture's desktop is built when it first shows: the one in front and those either side
       // at once, the rest while the gallery is idle, so the first frame waits on three, not all.
       makers.set(art, (wakes: boolean) => {
-        const desk = makeDesk(index === 0 && options.name ? { ...hung, name: options.name } : hung, S.view, mode, size, wakes);
+        const desk = makeDesk(index === 0 && options.name ? { ...hung, name: options.name } : hung, S.view, mode, size, wakes, lookOf(hung));
         if (S.flat.has(hung.name)) flatten(desk, true);
         frame.append(desk.element);
         return desk;
@@ -477,7 +494,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
       placard.className = "gl-placard gl-room-only";
       art.append(lamp, frame, placard);
       art.addEventListener("click", (event) => {
-        if (!S.open || S.busy) return;
+        if (!S.open || S.busy || editor?.editing()) return;
         // The password's sheet, up on an awake lock, keeps its own clicks.
         if (event.target instanceof Element && event.target.closest(".k-sheet-part")) return;
         // The picture in front of you steps out to the full screen, and a click on it there steps
@@ -507,6 +524,8 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
   /** The picture in front of you and those either side, built. */
   const ensureNear = (): void => {
     const here = arts[S.folder]!;
+    // With the clock's editor drawn open only the picture in front of you shows.
+    if (options.edit) return ensure(here[S.at[S.folder]!]);
     for (let index = S.at[S.folder]! - 1; index <= S.at[S.folder]! + 1; index += 1) ensure(here[index]);
   };
 
@@ -685,6 +704,12 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
 
   const drawBar = () => {
     if (bare) return;
+    if (editor?.editing()) {
+      bar.replaceChildren(...editor.bar());
+      bar.toggleAttribute("data-lifted", false);
+      if (tipFor && !tipFor.isConnected) hideTip(tipFor);
+      return;
+    }
     const hung = front();
     const folder = folders[S.folder]!;
     const now = document.createElement("span");
@@ -719,7 +744,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     }
     const actions = buttonBar({
       dismiss: "Cancel",
-      actions: [...(S.view === "lock" ? [{ label: S.awake ? "Rest" : "Wake", kind: "Text" as const }] : []), { label: "Apply", kind: "Filled" }],
+      actions: [...(S.view === "lock" ? [{ label: S.awake ? "Rest" : "Wake", kind: "Text" as const }, { label: "Clock", kind: "Text" as const, icon: "schedule" }] : []), { label: "Apply", kind: "Filled" }],
       size: "Sm",
     });
     tipOn(actions.dismiss!, "Cancel", "Esc");
@@ -731,6 +756,9 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
       const waker = actions.actions[0]!;
       tipOn(waker, S.awake ? "Rest" : "Wake", "W");
       waker.addEventListener("click", (event) => (event.stopPropagation(), void wake(!S.awake)));
+      const clock = actions.actions[1]!;
+      tipOn(clock, "Clock", "E");
+      clock.addEventListener("click", (event) => (event.stopPropagation(), void editor?.enter()));
     }
     const rule = () => {
       const made = document.createElement("span");
@@ -873,6 +901,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     ensureNear();
     lightsOff();
     landOn(was);
+    editor?.swap();
     strikeAfter(reducedFor(screen) ? ms("short") : ms("long"));
   }
 
@@ -1033,8 +1062,20 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
           }
           return;
         }
+        if (editor?.editing()) {
+          const owner = editor.key(event);
+          if (owner === "control") return;
+          if (owner === "taken") {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+        }
         const act = (): boolean => {
-          if (key === "ArrowLeft" || key === "h") move(-1);
+          if (key === "e" || key === "E") {
+            if (S.view !== "lock" || S.busy || !front()) return false;
+            void editor?.enter();
+          } else if (key === "ArrowLeft" || key === "h") move(-1);
           else if (key === "ArrowRight" || key === "l") move(1);
           else if (key === "ArrowUp" || key === "k") pickFolder(S.folder + 1);
           else if (key === "ArrowDown" || key === "j") pickFolder(S.folder - 1);
@@ -1056,7 +1097,36 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     );
     screen.addEventListener("click", (event) => {
       if (!S.open && event.target instanceof Node && !bar.contains(event.target)) void open();
+      // A click in the clock's panel leaves the keyboard on the control it pressed.
+      if (event.target instanceof Element && event.target.closest(".ce-panel")) return;
       screen.focus({ preventScroll: true });
+    });
+  }
+
+  // The clock's editor, on a live gallery or one drawn with it open.
+  if (live || options.edit) {
+    editor = clockEditor({
+      screen,
+      front: () => {
+        const art = arts[S.folder]?.[S.at[S.folder]!];
+        const desk = art ? desks.get(art) : undefined;
+        if (!art || !desk) return undefined;
+        return { lock: desk.lock, wallpaper: desk.hung.wallpaper, name: desk.hung.name, frame: art.querySelector<HTMLElement>(".gl-frame")! };
+      },
+      look: (shown) => lookOf(folders.flatMap((folder) => folder.pictures).find((hung) => hung.name === shown.name) ?? front()!),
+      setLook: (shown, set) => looks.set(shown.name, set),
+      wallFull: () => S.full,
+      leaveWallFull: (time) => {
+        S.full = false;
+        barFull(false, time);
+        void ease(screen, "--out", 0, time, reducedFor(screen) ? "standard" : "emphasized_decel");
+      },
+      awake: () => S.awake,
+      wake,
+      drawBar,
+      tipOn,
+      reduced: () => reducedFor(screen),
+      live,
     });
   }
 
@@ -1086,6 +1156,11 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     idle(next);
   }
   if (options.shortcuts) shortcutsMade.set(true);
+  if (editor && options.edit) {
+    const edit = options.edit;
+    if ("from" in edit) editor.pose(edit.to, edit.from);
+    else editor.pose(edit);
+  }
   return screen;
 }
 

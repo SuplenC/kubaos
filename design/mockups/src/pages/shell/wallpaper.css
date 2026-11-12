@@ -40,6 +40,27 @@
   initial-value: 0;
 }
 
+/* The room's light, worked out on the room alone: none of it inherits, so a frame of the lamp
+   striking or of the clock's editor taking the wall away restyles the room and not the pictures
+   hung in it. */
+@property --gl-light-strength {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --gl-light {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
+
+@property --gl-light-quarter {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
+
 .gl-screen {
   position: relative;
   display: block;
@@ -74,16 +95,16 @@
   /* Its light: the lit lamp's colour, its chroma and its strength rising with `--room-lit` at its
      own hue, so it goes from the dark room's grey to the lamp's colour and never through another
      hue; grey at `opacity.lamp_dark` with every lamp off, the colour at `opacity.lamp_light` lit. */
-  --light-strength: calc(var(--opacity-lamp_dark) + (var(--opacity-lamp_light) - var(--opacity-lamp_dark)) * var(--room-lit));
+  --gl-light-strength: calc((var(--opacity-lamp_dark) + (var(--opacity-lamp_light) - var(--opacity-lamp_dark)) * var(--room-lit)) * (1 - var(--ce-dim)));
   --light-grey: oklch(from var(--color-on_surface) l 0 none);
-  --light: oklch(from color-mix(in oklch, var(--glow, var(--color-primary)) calc(var(--room-lit) * 100%), var(--light-grey)) l c h / var(--light-strength));
-  --light-quarter: oklch(from var(--light) l c h / calc(alpha / 4));
+  --gl-light: oklch(from color-mix(in oklch, var(--glow, var(--color-primary)) calc(var(--room-lit) * 100%), var(--light-grey)) l c h / var(--gl-light-strength));
+  --gl-light-quarter: oklch(from var(--gl-light) l c h / calc(alpha / 4));
   /* One field over the whole room, wall and floor alike, from the lamp, so nothing has a seam. */
   background:
     radial-gradient(
       calc(var(--screen-width) * var(--scale-gallery_light_width)) calc(var(--screen-height) * var(--scale-gallery_light_height)) at var(--lamp-x) var(--lamp-y),
-      var(--light),
-      var(--light-quarter) calc(var(--scale-gallery_light_falloff) * 100%),
+      var(--gl-light),
+      var(--gl-light-quarter) calc(var(--scale-gallery_light_falloff) * 100%),
       transparent
     ),
     var(--color-surface_container_lowest);
@@ -91,7 +112,7 @@
 
 /* By day nothing glows: the room is its surface, and only the lamp shows its tone. */
 .gl-screen[data-mode="light"] .gl-room {
-  --light-strength: 0;
+  --gl-light-strength: 0;
 }
 
 /* What belongs to the room alone (the lamps, the placard, the floors) never fades: it lies outside
@@ -125,7 +146,8 @@
   left: calc((var(--screen-width) - var(--pic-width)) / 2 + var(--index) * var(--pitch));
   top: var(--pic-top);
   width: var(--pic-width);
-  opacity: var(--opacity-subdued);
+  /* The pictures either side go while the clock's editor is open (`--ce-dim`). */
+  opacity: calc(var(--opacity-subdued) * (1 - var(--ce-dim)));
   transition: opacity var(--motion-long) var(--easing-standard);
   cursor: pointer;
 }
@@ -153,6 +175,7 @@
   height: var(--space-s4);
   translate: -50% 0;
   border-radius: var(--radius-full);
+  opacity: calc(1 - var(--ce-dim));
   --tone: var(--lamp-tone, var(--color-primary));
   --off: oklch(from var(--tone) calc(l * 0.6) calc(c * 1.2) h);
   --on: color-mix(in srgb, var(--tone), white 50%);
@@ -227,6 +250,7 @@
   justify-content: space-between;
   gap: var(--space-s24);
   margin-top: var(--space-s24);
+  opacity: calc(1 - var(--ce-dim));
   transition: opacity var(--motion-long) var(--easing-standard);
 }
 
@@ -241,6 +265,7 @@
   top: 50%;
   translate: 0 -50%;
   width: calc(var(--size-panel) / 2);
+  opacity: calc(1 - var(--ce-dim));
 }
 
 /* What lies over the room: the bar and the shortcuts' button, at rest in their places. While the
