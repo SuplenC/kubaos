@@ -42,6 +42,7 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use self::firmware::Staging;
+use super::changelog::Changelog;
 use super::closure;
 use super::event::Command;
 use super::event::PackageChange;
@@ -98,7 +99,8 @@ use crate::state::write_atomic;
 /// apt's downloads.
 pub const MIN_FREE_BYTES: u64 = 3 * 1024 * 1024 * 1024;
 
-/// How many commits of a release the summary lists.
+/// How many of a release's changes the preview lists, besides the breaking ones, which it always
+/// lists: enough for a week of edge, short enough to read before the question.
 const LOG_LINES: usize = 20;
 
 /// How often, and how far apart, the update lock is tried before another update counts as running.
@@ -503,7 +505,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             from: release_of(&installed),
             to: release_of(&rolled_back),
             channel: rolled_back.channel,
-            changes: Vec::new(),
+            changelog: Changelog::default(),
             packages: 0,
             upgraded: Vec::new(),
             apt: Vec::new(),
@@ -967,7 +969,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         })?;
         let packages = preview.packages;
         let upgraded = preview.upgrades.clone();
-        let changes = preview.changes.clone();
+        let changelog = preview.changelog.clone();
         self.j.emit(&UpdateEvent::Preview(preview));
         // An upgrade always asks: it moves to a new Ubuntu-and-nixpkgs pairing.
         let ask = opts.confirm == Confirm::Ask || kind == Kind::Upgrade;
@@ -1042,7 +1044,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             from: release_of(installed),
             to: release_of(&now),
             channel: now.channel,
-            changes,
+            changelog,
             packages,
             upgraded,
             apt,
@@ -1079,7 +1081,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         }
     }
 
-    /// What the update brings: the release's commits, the apt packages, whether the Hyprland pin
+    /// What the update brings: the release's changes, the apt packages, whether the Hyprland pin
     /// changes, and the system migrations it will run.
     fn review(&mut self, installed: &Installed, target: Option<&Target>) -> Result<Preview, UpdateError> {
         self.j.step("Refreshing apt's package lists");
@@ -1089,7 +1091,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             from: release_of(installed),
             to: None,
             channel: self.channel(installed),
-            changes: Vec::new(),
+            changelog: Changelog::default(),
             packages: 0,
             apt: Vec::new(),
             hyprland_pin: false,
@@ -1109,7 +1111,7 @@ impl<'a, M: Machine> Updater<'a, M> {
                 codename: target.codename.clone(),
                 commit: target.commit.clone(),
             });
-            preview.changes = refs.log(&installed.commit, &target.commit, LOG_LINES);
+            preview.changelog = refs.changelog(&installed.commit, &target.commit, LOG_LINES);
             let pin = refs.file_at(&target.commit, record::RELEASE_PIN);
             preview.hyprland_pin = pin.is_some() && pin != fs::read_to_string(self.sys.apt_pin()).ok();
             let markers = self.sys.markers();
@@ -1142,7 +1144,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         preview.packages = preview.upgrades.len();
         let mut detail = vec![count(preview.packages, "apt package")];
         if preview.to.is_some() {
-            detail.push(count(preview.changes.len(), "commit"));
+            detail.push(count(preview.changelog.count(), "change"));
         }
         self.j.detail(detail.join(", "));
         Ok(preview)

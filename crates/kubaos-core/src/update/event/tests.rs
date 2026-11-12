@@ -8,6 +8,7 @@ use super::Prompt;
 use super::Restart;
 use super::UpdateEvent;
 use super::chain;
+use crate::update::changelog::ChangeKind;
 use crate::update::firmware::FirmwareOutcome;
 
 /// A summary with every field set, as a front end reads it.
@@ -105,6 +106,14 @@ fn the_summary_fixture_reads_with_every_list_a_front_end_shows() {
     assert_eq!(summary.programs[0].waiting.as_deref(), Some("2027.1.0"));
     assert_eq!(summary.firmware.with(FirmwareOutcome::Staged).count(), 1);
     assert_eq!(summary.restart, Restart::Reboot);
+    let log = &summary.changelog;
+    assert_eq!((log.changes[0].kind, log.changes[0].breaking), (ChangeKind::Feat, true));
+    assert_eq!(log.changes[1].scope.as_deref(), Some("hypr"));
+    assert_eq!((log.count(), log.internal_changes), (5, 2));
+    assert_eq!(
+        log.pr_url(397).as_deref(),
+        Some("https://github.com/SuplenC/kubaos/pull/397")
+    );
 }
 
 #[test]

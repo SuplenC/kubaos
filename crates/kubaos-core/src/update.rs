@@ -12,8 +12,9 @@
 //! # Owns
 //!
 //! - [`Updater`], the steps; the release-policy seam (`policy.rs`) and the git reading it uses.
-//! - What an update reports as it runs (`event.rs`), what its summary condenses to (`summary.rs`),
-//!   the home's Nix packages a switch changed (`closure.rs`), and its log (`journal.rs`).
+//! - What an update reports as it runs (`event.rs`), the changes a release brings (`changelog.rs`),
+//!   what its summary condenses to (`summary.rs`), the home's Nix packages a switch changed
+//!   (`closure.rs`), and its log (`journal.rs`).
 //! - The files under `/etc/kubaos` and `/var/lib/kubaos`, and the user's update state.
 //!
 //! # Not here
@@ -22,6 +23,7 @@
 //! - Rendering the events on a terminal: `kubaos-cli`'s `update/render.rs`.
 
 pub mod bitwarden;
+pub mod changelog;
 pub mod closure;
 pub mod event;
 pub mod firmware;

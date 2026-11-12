@@ -1,5 +1,5 @@
 //! Reading KubaOS's checkout and `origin` with git, as the user: the refs a [`Refs`] offers, the
-//! commits between two releases, and a file at a commit. Nothing here writes: moving `release`
+//! changes between two releases, and a file at a commit. Nothing here writes: moving `release`
 //! and fetching are root's, through `machine.rs`.
 //!
 //! The checkout is root-owned, and `/etc/gitconfig` lists it in `safe.directory`, so git reads it
@@ -7,12 +7,13 @@
 //!
 //! # Owns
 //!
-//! - [`GitRefs`], the refs of the checkout after a fetch, signatures checked.
+//! - [`GitRefs`], the refs of the checkout after a fetch, signatures checked, and the changelog
+//!   between two of its commits.
 //! - [`RemoteRefs`], the refs `git ls-remote` lists, for the daily check.
 //!
 //! # Not here
 //!
-//! - Which ref an update takes: `policy.rs`.
+//! - Which ref an update takes: `policy.rs`. Reading changes from commits: `changelog.rs`.
 
 use std::ffi::OsStr;
 use std::io;
@@ -22,6 +23,9 @@ use std::process::Command;
 use std::process::Output;
 use std::process::Stdio;
 
+use super::changelog;
+use super::changelog::Changelog;
+use super::changelog::LogEntry;
 use super::policy::Refs;
 use super::policy::RefsError;
 use super::policy::Tag;
@@ -56,17 +60,38 @@ impl GitRefs {
             .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
     }
 
-    /// `git log --oneline from..to`, at most `limit` lines, newest first.
-    pub fn log(&self, from: &str, to: &str, limit: usize) -> Vec<String> {
+    /// The changes `to` brings over `from`, newest first, listing at most `limit` that aren't
+    /// breaking; none when git can't read the range. The pull requests link to `origin` when it is
+    /// on GitHub.
+    pub fn changelog(&self, from: &str, to: &str, limit: usize) -> Changelog {
+        let repository = self.origin_url().as_deref().and_then(changelog::github_repository);
+        Changelog::new(changelog::collapse(&self.log(from, to)), limit, repository)
+    }
+
+    /// Every commit in `from..to`, children before their parents.
+    fn log(&self, from: &str, to: &str) -> Vec<LogEntry> {
         let range = format!("{from}..{to}");
-        let max = format!("--max-count={limit}");
-        match git(&self.dir, ["log", "--oneline", "--no-decorate", &max, &range]) {
-            Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
-                .lines()
-                .map(str::to_owned)
-                .collect(),
-            _ => Vec::new(),
-        }
+        let out = match git(
+            &self.dir,
+            ["log", "--topo-order", "--format=%H%x1f%P%x1f%B%x1e", &range],
+        ) {
+            Ok(out) if out.status.success() => out,
+            _ => return Vec::new(),
+        };
+        String::from_utf8_lossy(&out.stdout)
+            .split('\x1e')
+            .filter_map(|record| {
+                let mut fields = record.trim_start_matches('\n').splitn(3, '\x1f');
+                let commit = fields.next().filter(|c| !c.is_empty())?.to_owned();
+                let parents = fields.next()?.split_whitespace().map(str::to_owned).collect();
+                let message = fields.next()?.trim().to_owned();
+                Some(LogEntry {
+                    commit,
+                    parents,
+                    message,
+                })
+            })
+            .collect()
     }
 
     /// The names of the files in the folder `dir` at `commit`; none when it has no such folder.

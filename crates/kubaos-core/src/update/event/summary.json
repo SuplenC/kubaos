@@ -4,7 +4,13 @@
   "from": { "version": "0.1.0", "codename": "shinjuku", "commit": "1a2b3c4d5e" },
   "to": { "version": "0.1.1", "codename": "shinjuku", "commit": "9f8e7d6c5b" },
   "channel": "edge",
-  "changes": ["9f8e7d6 fix(hypr): keep each screen's workspaces as a group"],
+  "changes": [
+    { "kind": "feat", "scope": "menu", "subject": "drop the old search syntax", "breaking": true, "pr": 395, "commit": "4c7365961e0a4b3d9a2f8c1e5b6d7a8f9c0e1d2b" },
+    { "kind": "fix", "scope": "hypr", "subject": "keep each screen's workspaces as a group", "pr": 397, "commit": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432" }
+  ],
+  "more_changes": 3,
+  "internal_changes": 2,
+  "repository": "https://github.com/SuplenC/kubaos",
   "packages": 2,
   "upgraded": [
     { "name": "firefox", "from": "130.0", "to": "131.0" },

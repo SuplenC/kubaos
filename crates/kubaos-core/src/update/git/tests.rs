@@ -36,7 +36,7 @@ fn a_signed_commit_and_tag_verify_and_unsigned_ones_do_not() {
         [("v0.1.0", unsigned.as_str()), ("v0.1.1", signed.as_str())]
     );
     assert_eq!(refs.file_at(&unsigned, "VERSION").as_deref(), Some("0.1.0\n"));
-    assert_eq!(refs.log(&unsigned, &signed, 10).len(), 1);
+    assert_eq!(refs.changelog(&unsigned, &signed, 10).count(), 1);
 }
 
 #[test]

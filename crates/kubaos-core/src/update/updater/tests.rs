@@ -632,7 +632,7 @@ fn an_update_reports_each_phase_that_runs_in_order_and_ends_with_its_summary() {
         summary.migrations,
         ["1790000000-fix-apt.sh", "1790000001-move-config.sh"]
     );
-    assert_eq!(summary.changes.len(), 1);
+    assert_eq!(summary.changelog.changes.len(), 1);
     assert_eq!(summary.restart, Restart::None);
     assert_eq!(summary.undo.as_deref(), Some("kubaos rollback"));
     let log = fs::read_to_string(summary.log.as_ref().unwrap()).unwrap();

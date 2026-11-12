@@ -30,6 +30,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 
+use super::changelog::Changelog;
 use super::firmware::Firmware;
 use super::record::Channel;
 use super::record::capitalise;
@@ -188,8 +189,9 @@ pub struct Preview {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<Release>,
     pub channel: Channel,
-    /// The release's commits, `<short hash> <subject>`, newest first.
-    pub changes: Vec<String>,
+    /// The release's changes, as `changes`, `more_changes`, `internal_changes` and `repository`.
+    #[serde(flatten)]
+    pub changelog: Changelog,
     /// The apt packages to upgrade.
     pub packages: usize,
     /// What the package manifest's phase will install, by group; nothing is removed here, since
@@ -343,8 +345,10 @@ pub struct Summary {
     pub from: Release,
     pub to: Release,
     pub channel: Channel,
-    /// The release's commits, `<short hash> <subject>`, newest first.
-    pub changes: Vec<String>,
+    /// The release's changes, as `changes`, `more_changes`, `internal_changes` and `repository`;
+    /// a rollback lists none.
+    #[serde(flatten)]
+    pub changelog: Changelog,
     /// How many apt packages `apt-get upgrade` upgraded or newly installed.
     pub packages: usize,
     /// Those apt packages by name, with their versions.
