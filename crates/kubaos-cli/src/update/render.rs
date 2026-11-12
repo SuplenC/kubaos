@@ -29,6 +29,9 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
+use kubaos_core::update::changelog::Change;
+use kubaos_core::update::changelog::Changelog;
+use kubaos_core::update::changelog::Section;
 use kubaos_core::update::event::Command;
 use kubaos_core::update::event::GroupChange;
 use kubaos_core::update::event::Outcome;
@@ -63,11 +66,19 @@ const TIME_WIDTH: usize = 6;
 /// The width of the summary's labels: the longest, "Nix packages", and two spaces.
 const LABEL_WIDTH: usize = 14;
 
-/// How many of the release's commits the summary names.
+/// How many of the release's changes the summary names.
 const CHANGES_SHOWN: usize = 5;
 
-/// How many upgraded apt packages the summary names on its line; the log has them all.
+/// How many upgraded apt packages the summary names on its line, and the preview one a line; the
+/// log has them all.
 const APT_SHOWN: usize = 8;
+
+/// The width of the preview's section labels: the longest, "Breaking", and two spaces.
+const SECTION_WIDTH: usize = 10;
+
+/// The widest a change's subject is padded to, so the pull requests after it line up; a longer
+/// subject pushes its own number out rather than every line's.
+const SUBJECT_WIDTH: usize = 60;
 
 /// How many of the home's changed Nix packages the summary names, one a line.
 const NIX_SHOWN: usize = 6;
@@ -178,6 +189,20 @@ impl Style {
     fn cyan(self, text: &str) -> String {
         self.paint("36", text)
     }
+
+    fn bold_yellow(self, text: &str) -> String {
+        self.paint("1;33", text)
+    }
+
+    /// `text` as an OSC 8 hyperlink to `url`, which terminals that know it open on a click and
+    /// others print as `text`; only with colour, since a pipe or a log would keep the escape.
+    fn link(self, url: &str, text: &str) -> String {
+        if self.color {
+            format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
+        } else {
+            text.to_owned()
+        }
+    }
 }
 
 /// The lines every text view prints the same way.
@@ -246,17 +271,25 @@ impl Text {
 
     fn preview(&self, preview: &Preview) -> String {
         let s = self.style;
+        let log = &preview.changelog;
         let mut out = String::from("\n");
         match &preview.to {
             Some(to) => {
-                let _ = writeln!(
-                    out,
-                    "  {} {} → {}, {}",
+                let release = format!(
+                    "{} {} → {}, {}",
                     s.bold("KubaOS"),
                     preview.from.describe(),
                     s.bold(&to.describe()),
                     preview.channel
                 );
+                match log.count() {
+                    0 => {
+                        let _ = writeln!(out, "  {release}");
+                    }
+                    n => {
+                        let _ = writeln!(out, "  {release} · {}", count(n, "change"));
+                    }
+                }
             }
             None => {
                 let _ = writeln!(
@@ -268,11 +301,8 @@ impl Text {
                 );
             }
         }
-        for change in &preview.changes {
-            let (hash, subject) = change.split_once(' ').unwrap_or(("", change));
-            let _ = writeln!(out, "    {} {subject}", s.dim(hash));
-        }
-        let _ = writeln!(out, "  {} to upgrade", count(preview.packages, "apt package"));
+        out.push_str(&self.changelog(log));
+        out.push_str(&self.apt_upgrades(preview.packages, &preview.upgrades));
         if !preview.apt.is_empty() {
             out.push_str("  New apt packages to install:\n");
             for change in &preview.apt {
@@ -286,6 +316,87 @@ impl Text {
             let _ = writeln!(out, "  System migrations to run: {}", preview.migrations.join(", "));
         }
         out.push('\n');
+        out
+    }
+
+    /// The preview's changes, under the section labels: the breaking ones first, highlighted,
+    /// then each listed section in order, then how many more and how many internal ones.
+    fn changelog(&self, log: &Changelog) -> String {
+        let s = self.style;
+        let rows = listed(log);
+        let scope_width = rows
+            .iter()
+            .filter_map(|(_, change)| change.scope.as_ref())
+            .map(|scope| scope.chars().count() + 2)
+            .max()
+            .unwrap_or(0);
+        let subject_width = rows
+            .iter()
+            .map(|(_, change)| change.subject.chars().count())
+            .max()
+            .unwrap_or(0)
+            .min(SUBJECT_WIDTH);
+        let mut out = String::new();
+        let mut last = None;
+        for (section, change) in &rows {
+            let label = if last == Some(*section) {
+                String::new()
+            } else {
+                section.map_or("Breaking", Section::title).to_owned()
+            };
+            last = Some(*section);
+            let label = format!("{label:<SECTION_WIDTH$}");
+            let scope = format!("{:<scope_width$}", change.scope.as_deref().unwrap_or(""));
+            let pr = change.pr.map(|pr| self.pr(log, pr));
+            let subject = match pr {
+                Some(_) => format!("{:<subject_width$}", change.subject),
+                None => change.subject.clone(),
+            };
+            let (label, scope, subject) = match section {
+                None => (s.bold_yellow(&label), scope, s.bold(&subject)),
+                Some(Section::New | Section::Fixed | Section::Faster) => (s.bold(&label), scope, subject),
+                Some(_) => (s.dim(&label), s.dim(&scope), s.dim(&subject)),
+            };
+            let pr = pr.map(|pr| format!("  {pr}")).unwrap_or_default();
+            let _ = writeln!(out, "    {label}{scope}{subject}{pr}");
+        }
+        let indent = " ".repeat(4 + SECTION_WIDTH);
+        if log.more_changes > 0 {
+            let _ = writeln!(out, "{indent}{}", s.dim(&format!("+{} more", log.more_changes)));
+        }
+        if log.internal_changes > 0 {
+            let _ = writeln!(out, "{indent}{}", s.dim(&format!("+{} internal", log.internal_changes)));
+        }
+        out
+    }
+
+    /// `#12`, dim, linked to the pull request when the repository is known.
+    fn pr(&self, log: &Changelog, pr: u32) -> String {
+        let s = self.style;
+        let text = s.dim(&format!("#{pr}"));
+        match log.pr_url(pr) {
+            Some(url) => s.link(&url, &text),
+            None => text,
+        }
+    }
+
+    /// The apt packages the preview's update will upgrade: their count, then one a line with
+    /// their versions, [`APT_SHOWN`] at most and how many more.
+    fn apt_upgrades(&self, packages: usize, upgrades: &[PackageChange]) -> String {
+        let s = self.style;
+        let mut out = String::new();
+        if upgrades.is_empty() {
+            let _ = writeln!(out, "  {} to upgrade", count(packages, "apt package"));
+            return out;
+        }
+        let _ = writeln!(out, "  {} to upgrade:", count(packages, "apt package"));
+        for package in upgrades.iter().take(APT_SHOWN) {
+            let _ = writeln!(out, "    {}", package.describe());
+        }
+        let more = upgrades.len().saturating_sub(APT_SHOWN);
+        if more > 0 {
+            let _ = writeln!(out, "    {}", s.dim(&format!("and {more} more")));
+        }
         out
     }
 
@@ -325,13 +436,7 @@ impl Text {
             (Command::Update | Command::Check | Command::Packages, true) => "Updated",
         };
         out.push_str(&row(label, &release));
-        if !summary.changes.is_empty() {
-            let subjects = summary
-                .changes
-                .iter()
-                .map(|change| change.split_once(' ').map_or(change.as_str(), |(_, subject)| subject));
-            out.push_str(&self.rows("Changes", subjects, summary.changes.len(), CHANGES_SHOWN));
-        }
+        out.push_str(&self.change_rows(&summary.changelog));
         if summary.command != Command::Rollback {
             out.push_str(&row("Apt", &upgraded(summary.packages, &summary.upgraded)));
             if !summary.apt.is_empty() {
@@ -382,6 +487,44 @@ impl Text {
             out.push_str(&row("Log", &self.path(log)));
         }
         out
+    }
+
+    /// The summary's `Changes` rows: the first [`CHANGES_SHOWN`] changes in the preview's order,
+    /// each `scope: subject` and its pull request, and how many more; none without a change.
+    fn change_rows(&self, log: &Changelog) -> String {
+        let s = self.style;
+        if log.count() == 0 {
+            return String::new();
+        }
+        let rows: Vec<_> = listed(log)
+            .into_iter()
+            .take(CHANGES_SHOWN)
+            .map(|(section, change)| {
+                let text = match &change.scope {
+                    Some(scope) => format!("{scope}: {}", change.subject),
+                    None => change.subject.clone(),
+                };
+                (section, change.pr, text)
+            })
+            .collect();
+        let width = rows
+            .iter()
+            .map(|(_, _, text)| text.chars().count())
+            .max()
+            .unwrap_or(0)
+            .min(SUBJECT_WIDTH);
+        let lines = rows.into_iter().map(|(section, pr, text)| {
+            let text = match pr {
+                Some(_) => format!("{text:<width$}"),
+                None => text,
+            };
+            let text = if section.is_none() { s.bold(&text) } else { text };
+            match pr {
+                Some(pr) => format!("{text}  {}", self.pr(log, pr)),
+                None => text,
+            }
+        });
+        self.rows("Changes", lines, log.count(), CHANGES_SHOWN)
     }
 
     /// The summary's `Apt` rows: one line a group the package manifest's phase changed, or
@@ -529,6 +672,19 @@ fn available(update: Option<&str>, upgrade: Option<&str>, apt_security: usize) -
         out.push_str("  Nothing new: KubaOS is up to date.\n");
     }
     out
+}
+
+/// The changes `log` lists, in the order people read them: the breaking ones first (no section),
+/// then each listed section's, newest first within each.
+fn listed(log: &Changelog) -> Vec<(Option<Section>, &Change)> {
+    let breaking = log.changes.iter().filter(|c| c.section().is_none()).map(|c| (None, c));
+    let sections = Section::LISTED.into_iter().flat_map(|section| {
+        log.changes
+            .iter()
+            .filter(move |c| c.section() == Some(section))
+            .map(move |c| (Some(section), c))
+    });
+    breaking.chain(sections).collect()
 }
 
 /// "1 package", "12 packages".

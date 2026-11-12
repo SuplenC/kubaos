@@ -33,6 +33,7 @@ use crate::apt::dpkg;
 use crate::apt::plan;
 use crate::apt::plan::Facts;
 use crate::apt::plan::Want;
+use crate::update::changelog::Changelog;
 use crate::update::event::Command;
 use crate::update::event::GroupChange;
 use crate::update::event::Phase;
@@ -168,7 +169,7 @@ impl<M: Machine> Updater<'_, M> {
             from: release_of(&installed),
             to: release_of(&installed),
             channel: self.channel(&installed),
-            changes: Vec::new(),
+            changelog: Changelog::default(),
             packages: 0,
             upgraded: Vec::new(),
             apt,

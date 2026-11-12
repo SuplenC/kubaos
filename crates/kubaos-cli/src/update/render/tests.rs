@@ -6,6 +6,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 use std::time::Instant;
 
+use kubaos_core::update::changelog::Change;
+use kubaos_core::update::changelog::Changelog;
 use kubaos_core::update::event::Command;
 use kubaos_core::update::event::GroupChange;
 use kubaos_core::update::event::Outcome;
@@ -59,7 +61,7 @@ impl Shared {
 }
 
 /// What a terminal shows after `bytes`: it moves on `\n` and `\r`, erases a line on `ESC[2K`, goes
-/// up on `ESC[1A`, and draws no colours.
+/// up on `ESC[1A`, and draws no colours or links.
 fn terminal(bytes: &[u8]) -> String {
     let text = String::from_utf8_lossy(bytes);
     let mut rows: Vec<Vec<char>> = vec![Vec::new()];
@@ -75,8 +77,13 @@ fn terminal(bytes: &[u8]) -> String {
                 }
             }
             '\r' => col = 0,
+            '\x1b' if chars.clone().next() == Some(']') => {
+                let rest = chars.as_str();
+                let end = rest.find("\x1b\\").expect("an unfinished OSC");
+                chars = rest[end + 2..].chars();
+            }
             '\x1b' => {
-                assert_eq!(chars.next(), Some('['), "an escape that is not CSI");
+                assert_eq!(chars.next(), Some('['), "an escape that is neither CSI nor OSC");
                 let mut params = String::new();
                 let end = loop {
                     let c = chars.next().expect("an unfinished escape");
@@ -146,6 +153,29 @@ fn package(name: &str, from: Option<&str>, to: Option<&str>) -> PackageChange {
     }
 }
 
+const REPOSITORY: &str = "https://github.com/SuplenC/kubaos";
+
+/// The edge update's changes, newest first: one a section, a breaking one, a commit made on main
+/// and an internal one.
+fn changelog() -> Changelog {
+    let changes = [
+        ("fix(hypr): keep each screen's workspaces as a group", Some(397)),
+        ("feat(menu): run a shell command in a floating terminal", Some(396)),
+        (
+            "fix(session)!: restart a dead shell, locked again if it was locked",
+            Some(395),
+        ),
+        ("docs: describe workspace groups", Some(394)),
+        ("build(nix): move nixpkgs to nixos-26.05's newest", None),
+    ];
+    let changes = changes
+        .into_iter()
+        .enumerate()
+        .map(|(i, (message, pr))| Change::parse(format!("{i}0c0ffee"), message, pr))
+        .collect();
+    Changelog::new(changes, 20, Some(REPOSITORY.into()))
+}
+
 /// The 12 apt packages the edge update upgrades.
 fn upgraded() -> Vec<PackageChange> {
     let mut packages = vec![package("firefox", Some("130.0"), Some("131.0"))];
@@ -176,10 +206,7 @@ const LOG: &str = "/home/kuba/.local/state/kubaos/update/2026-10-23T09-14-03-upd
 fn edge_update() -> Vec<UpdateEvent> {
     let from = release("0.1.0", Some("shinjuku"), "1a2b3c4d5e");
     let to = release("0.1.1", Some("shinjuku"), "9f8e7d6c5b");
-    let changes = vec![
-        "9f8e7d6 fix(hypr): keep each screen's workspaces as a group".to_owned(),
-        "d8c8ecf docs: describe workspace groups".to_owned(),
-    ];
+    let changes = changelog();
     vec![
         UpdateEvent::Started {
             command: Command::Update,
@@ -201,12 +228,12 @@ fn edge_update() -> Vec<UpdateEvent> {
             phase: Phase::Reviewing,
         },
         step("Refreshing apt's package lists"),
-        finished(Phase::Reviewing, 3410, Some("12 apt packages, 2 commits")),
+        finished(Phase::Reviewing, 3410, Some("12 apt packages, 4 changes")),
         UpdateEvent::Preview(Preview {
             from: from.clone(),
             to: Some(to.clone()),
             channel: Channel::Edge,
-            changes: changes.clone(),
+            changelog: changes.clone(),
             packages: 12,
             apt: vec![
                 GroupChange {
@@ -267,7 +294,7 @@ fn edge_update() -> Vec<UpdateEvent> {
             from,
             to,
             channel: Channel::Edge,
-            changes,
+            changelog: changes,
             packages: 12,
             upgraded: upgraded(),
             apt: vec![
@@ -351,12 +378,24 @@ KubaOS update
   ✓ Fetching            1.2s
     ! no allowed_signers on this machine: main's head is taken unchecked
   ✓ Verifying           0.0s  found main at 9f8e7d6 (0.1.1)
-  ✓ Reviewing changes   3.4s  12 apt packages, 2 commits
+  ✓ Reviewing changes   3.4s  12 apt packages, 4 changes
 
-  KubaOS Shinjuku 0.1.0 (1a2b3c4) → Shinjuku 0.1.1 (9f8e7d6), edge
-    9f8e7d6 fix(hypr): keep each screen's workspaces as a group
-    d8c8ecf docs: describe workspace groups
-  12 apt packages to upgrade
+  KubaOS Shinjuku 0.1.0 (1a2b3c4) → Shinjuku 0.1.1 (9f8e7d6), edge · 4 changes
+    Breaking  session  restart a dead shell, locked again if it was locked  #395
+    New       menu     run a shell command in a floating terminal           #396
+    Fixed     hypr     keep each screen's workspaces as a group             #397
+    Build     nix      move nixpkgs to nixos-26.05's newest
+              +1 internal
+  12 apt packages to upgrade:
+    firefox 130.0 → 131.0
+    lib1 1 → 2
+    lib2 1 → 2
+    lib3 1 → 2
+    lib4 1 → 2
+    lib5 1 → 2
+    lib6 1 → 2
+    lib7 1 → 2
+    and 4 more
   New apt packages to install:
     files: loupe, showtime
     tools: jq
@@ -372,8 +411,10 @@ KubaOS update
   ✓ Home               1m05s  reloaded Hyprland, restarting Quickshell
 
   Updated       Shinjuku 0.1.0 (1a2b3c4) → Shinjuku 0.1.1 (9f8e7d6), edge
-  Changes       fix(hypr): keep each screen's workspaces as a group
-                docs: describe workspace groups
+  Changes       session: restart a dead shell, locked again if it was locked  #395
+                menu: run a shell command in a floating terminal              #396
+                hypr: keep each screen's workspaces as a group                #397
+                nix: move nixpkgs to nixos-26.05's newest
   Apt           12 upgraded: firefox, lib1, lib2, lib3, lib4, lib5, lib6, lib7, and 4 more
                 files: installed loupe, showtime
                 tools: removed old-tool
@@ -476,6 +517,56 @@ fn colours_come_from_the_terminal_palette_and_no_color_has_none() {
     assert!(colour_out.text().contains("\x1b[32m✓\x1b[0m"));
     assert!(colour_out.text().contains("\x1b[2mreloaded Hyprland\x1b[0m"));
     assert!(!plain_out.text().contains('\x1b'));
+}
+
+/// The edge update's preview, as `change` leaves it, in `style`.
+fn preview_text(style: Style, change: impl FnOnce(&mut Preview)) -> String {
+    let Some(UpdateEvent::Preview(mut preview)) =
+        edge_update().into_iter().find(|e| matches!(e, UpdateEvent::Preview(_)))
+    else {
+        panic!("the update shows a preview");
+    };
+    change(&mut preview);
+    text(style)
+        .lines(&UpdateEvent::Preview(preview))
+        .expect("a preview has lines")
+}
+
+#[test]
+fn pull_requests_link_to_github_only_with_colour_and_a_known_repository() {
+    let link = format!("\x1b]8;;{REPOSITORY}/pull/396\x1b\\\x1b[2m#396\x1b[0m\x1b]8;;\x1b\\");
+
+    let coloured = preview_text(Style::COLOR, |_| {});
+    let plain = preview_text(Style::PLAIN, |_| {});
+    let unknown = preview_text(Style::COLOR, |p| p.changelog.repository = None);
+
+    assert!(coloured.contains(&link), "no link to #396:\n{coloured:?}");
+    assert!(coloured.contains("\x1b[1;33mBreaking  \x1b[0m"));
+    assert!(plain.contains("  #396\n") && !plain.contains('\x1b'));
+    assert!(unknown.contains("\x1b[2m#396\x1b[0m") && !unknown.contains("\x1b]8"));
+}
+
+#[test]
+fn changes_past_the_limit_are_counted_in_the_header_and_under_the_list() {
+    let shown = preview_text(Style::PLAIN, |p| {
+        p.changelog.more_changes = 3;
+        p.changelog.internal_changes = 0;
+    });
+
+    assert!(shown.contains("edge · 7 changes\n"), "{shown}");
+    assert!(shown.contains("    Build     nix      move nixpkgs to nixos-26.05's newest\n              +3 more\n  12"));
+}
+
+#[test]
+fn a_release_with_only_internal_changes_counts_none_and_says_how_many_internal() {
+    let shown = preview_text(Style::PLAIN, |p| {
+        p.changelog = Changelog::new(vec![Change::parse("c", "ci: cache the store", None)], 20, None);
+    });
+
+    assert!(
+        shown.contains("(9f8e7d6), edge\n              +1 internal\n  12 apt packages"),
+        "{shown}"
+    );
 }
 
 #[test]
@@ -616,7 +707,7 @@ fn summary_text(change: impl FnOnce(&mut Summary)) -> String {
 /// `summary` with nothing in it moved: the release, the packages, the programs and firmware stay.
 fn unchanged(summary: &mut Summary) {
     summary.to = summary.from.clone();
-    summary.changes.clear();
+    summary.changelog = Changelog::default();
     summary.packages = 0;
     summary.upgraded.clear();
     summary.apt.clear();

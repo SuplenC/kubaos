@@ -1,3 +1,4 @@
+use crate::update::changelog::Changelog;
 use crate::update::event::Command;
 use crate::update::event::PackageChange;
 use crate::update::event::Program;
@@ -28,7 +29,7 @@ fn quiet() -> Summary {
         from: release("0.1.0", "1a2b3c4"),
         to: release("0.1.0", "1a2b3c4"),
         channel: Channel::Stable,
-        changes: Vec::new(),
+        changelog: Changelog::default(),
         packages: 0,
         upgraded: Vec::new(),
         apt: Vec::new(),
