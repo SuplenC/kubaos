@@ -2131,11 +2131,13 @@
    as the spinner's arc, the tone by day with none, and solid glass (`primary_glass`) while the
    signs are off. The rail is `tabs.rail` thick at night and `tabs.rail_day` by day, in whole device
    pixels. The focus tube is the whole well's edge, drawn under the rail. Disabled, every part is at
-   `opacity.disabled_content`, with no glow. */
+   `opacity.disabled_content`, with no glow. A choice can be disabled alone; when that choice is
+   the pick, the well itself takes the keyboard, so it draws no outline of its own. */
 .k-tabs {
   position: relative;
   display: inline-flex;
   flex: none;
+  outline: none;
   box-sizing: border-box;
   height: var(--size-control_sm);
   padding: var(--space-s4);
@@ -2154,8 +2156,14 @@
   --dim: var(--opacity-disabled_content);
 }
 
-.k-tabs:has(> .k-tab:focus-visible) > .k-ring {
+.k-tabs:is(:has(> .k-tab:focus-visible), [data-stranded]:focus-visible) > .k-ring {
   --lit: 1;
+}
+
+/* A pick that is disabled: its stretch dims with its words and burns no glow. */
+.k-tabs[data-stranded] > .k-tabs-lit {
+  --dim: var(--opacity-disabled_content);
+  --rail-signs: 0;
 }
 
 .k-tabs[aria-disabled="true"] > .k-ring {
@@ -2238,8 +2246,14 @@
   --picked: 1;
 }
 
+/* A choice disabled alone dims its words, picked or not, and burns no glow round them. */
 .k-tab:disabled {
   cursor: default;
+}
+
+.k-tabs:not([aria-disabled="true"]) > .k-tab:disabled {
+  --dim: var(--opacity-disabled_content);
+  --rail-signs: 0;
 }
 
 .k-tab.k-control {
