@@ -28,7 +28,7 @@ export interface Cover {
 }
 
 /** The OKLCH lightness the rest digits' tint is set to: light, as a sky's highlight is. */
-const TINT_LIGHTNESS = 0.84;
+export const TINT_LIGHTNESS = 0.84;
 
 /** How much the tint raises the picture's chroma, so a hazy sky still gives a colour. */
 const TINT_CHROMA = 1.2;
