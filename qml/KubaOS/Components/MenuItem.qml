@@ -6,6 +6,14 @@ import KubaOS.Components as K
 // words on one line, the keys that do the same as keycaps, and a check whose room is kept when
 // unchecked. Its corners are concentric inside the popover. The item the keyboard is on takes
 // the secondary container; one that destroys something (Kill) is in the error colour.
+//
+// A held item destroys something that can't be taken back (Hold to remove), so it is taken only
+// by holding it for `duration.hold`: the pointer pressed on it, or Enter while the keyboard is on
+// it (`keyHolding`, which its menu sets). While it is held, the error colour sweeps across it from
+// its start on `linear`, its words `on_error` under the sweep, and it is taken when the sweep
+// reaches its end; let go or left early, the sweep runs back over `short`. It is in the error
+// colour lit or not, and lit it lies on the error at `opacity.tint`, so the sweep has room to
+// show. The sweep is a timer, not a move: reduce motion keeps it.
 K.Pressable {
     id: root
 
@@ -20,13 +28,32 @@ K.Pressable {
     property bool highlighted: false
     // A hairline between two groups, in place of an item.
     property bool separator: false
+    // Taken only once held for `duration.hold`; a held item is a danger item.
+    property bool held: false
+    // How far the sweep reaches across it, 0 to 1. The hold moves it; a sample pins it.
+    property real hold: 0
+    // Enter is down while the keyboard is on it: its menu holds it from the keyboard.
+    property bool keyHolding: false
 
+    readonly property bool dangerous: root.danger || root.held
+    // Held by the pointer only while the pointer stays on it: leaving it lets go.
+    readonly property bool holding: root.held && root.enabled && (root.keyHolding || (root.pointerDown && root.pointerOver))
     readonly property bool fillWidth: true
-    readonly property color ink: !root.enabled ? K.Look.alpha(Tokens.color.on_surface, Tokens.opacity.disabled_content) : root.highlighted ? Tokens.color.on_secondary_container : root.danger ? Tokens.color.error : Tokens.color.on_surface
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
+    readonly property color ink: {
+        if (!root.enabled)
+            return K.Look.alpha(Tokens.color.on_surface, Tokens.opacity.disabled_content);
+        if (root.held)
+            return Tokens.color.error;
+        if (root.highlighted)
+            return Tokens.color.on_secondary_container;
+        return root.danger ? Tokens.color.error : Tokens.color.on_surface;
+    }
+    readonly property color litFill: root.held ? K.Look.alpha(Tokens.color.error, Tokens.opacity.tint) : Tokens.color.secondary_container
     readonly property var probe: root.separator ? null : {
         role: "component",
         name: "MenuItem",
-        variant: [root.icon === "" ? "" : "icon", root.checkable ? "check" : "", root.danger ? "danger" : ""].filter(word => word !== "").join(" "),
+        variant: [root.icon === "" ? "" : "icon", root.checkable ? "check" : "", root.dangerous ? "danger" : ""].filter(word => word !== "").join(" "),
         fixed: {
             width: false,
             height: true
@@ -42,12 +69,43 @@ K.Pressable {
 
     implicitHeight: root.separator ? rule.implicitHeight : Tokens.size.control_sm
     activeFocusOnTab: false
+    instant: !root.held
+
+    // Pressed on, the sweep goes on to the end over what is left of `duration.hold`; let go, it
+    // runs back.
+    onHoldingChanged: {
+        sweeping.stop();
+        if (root.holding) {
+            sweeping.to = 1;
+            sweeping.duration = Tokens.duration.hold * (1 - root.hold);
+            sweeping.easing.bezierCurve = Tokens.easing.linear;
+        } else if (root.hold > 0) {
+            sweeping.to = 0;
+            sweeping.duration = Tokens.duration.short;
+            sweeping.easing.bezierCurve = Tokens.easing.standard;
+        } else {
+            return;
+        }
+        sweeping.start();
+    }
+
+    NumberAnimation {
+        id: sweeping
+
+        target: root
+        property: "hold"
+        easing.type: Easing.BezierSpline
+        onFinished: {
+            if (root.holding && root.hold >= 1)
+                root.activated();
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
         visible: !root.separator
         radius: K.Look.nested(Tokens.radius.surface, Tokens.space.s12)
-        color: root.highlighted && root.enabled ? Tokens.color.secondary_container : "transparent"
+        color: root.highlighted && root.enabled ? root.litFill : "transparent"
 
         K.StateLayer {
             radius: parent.radius
@@ -71,41 +129,92 @@ K.Pressable {
         }
     }
 
-    K.Row {
+    Content {
         id: line
 
         visible: !root.separator
         x: Tokens.space.s12
         width: root.width - Tokens.space.s12 * 2
         fixedHeight: root.height
+        ink: root.ink
+        text: root.text
+        icon: root.icon
+        shortcut: root.shortcut
+        checkable: root.checkable
+        checked: root.checked
+    }
+
+    // The sweep, from the item's start to `hold` of its width: the error colour with the item's
+    // content again in `on_error`, cut at its edge, so the words read on either side of it.
+    Item {
+        // Paint over the item, not a part of the page: the geometry check reads the item's own
+        // content.
+        readonly property bool overlay: true
+
+        visible: root.held && root.hold > 0
+        width: K.Look.snap(root.width * root.hold, root.dpr)
+        height: root.height
+        clip: true
+
+        Rectangle {
+            width: root.width
+            height: root.height
+            radius: K.Look.nested(Tokens.radius.surface, Tokens.space.s12)
+            color: Tokens.color.error
+
+            Content {
+                x: Tokens.space.s12
+                width: root.width - Tokens.space.s12 * 2
+                fixedHeight: root.height
+                ink: Tokens.color.on_error
+                text: root.text
+                icon: root.icon
+                shortcut: root.shortcut
+                checkable: root.checkable
+                checked: root.checked
+            }
+        }
+    }
+
+    // An item's symbol, words, keys and check in `ink`, across `width`.
+    component Content: K.Row {
+        id: content
+
+        property color ink
+        property string text
+        property string icon
+        property list<string> shortcut
+        property bool checkable
+        property bool checked
+
         gap: Tokens.space.s12
         align: "centre"
 
         K.Icon {
-            visible: root.icon !== ""
-            name: root.icon
+            visible: content.icon !== ""
+            name: content.icon
             size: Tokens.type.body.icon
-            color: root.ink
+            color: content.ink
         }
 
         K.Stack {
             fill: true
 
             K.Text {
-                text: root.text
+                text: content.text
                 style: Tokens.type.body
-                color: root.ink
+                color: content.ink
                 maximumLines: 1
             }
         }
 
         K.Row {
-            visible: root.shortcut.length > 0
+            visible: content.shortcut.length > 0
             gap: Tokens.space.s4
             align: "centre"
 
             Repeater {
-                model: root.shortcut
+                model: content.shortcut
 
                 K.Keycap {
                     required property string modelData
@@ -116,15 +225,15 @@ K.Pressable {
         }
 
         Item {
-            visible: root.checkable
+            visible: content.checkable
             implicitWidth: Tokens.type.body.icon
             implicitHeight: Tokens.type.body.icon
 
             K.Icon {
-                visible: root.checked
+                visible: content.checked
                 name: "check"
                 size: Tokens.type.body.icon
-                color: root.ink
+                color: content.ink
             }
         }
     }

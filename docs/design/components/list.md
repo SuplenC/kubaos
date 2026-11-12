@@ -8,6 +8,8 @@ Rust `list::list`; QML `List`.
 
 Rows in a well: the surface radius (24), padding 12, rows 4 apart, so the rows take 24 − 12 = 12, the control radius (concentric). The focus tube lights the well's edge; the row shows where the keyboard is.
 
+**Flush** (Rust `list::flush_list`; QML `List { flush: true }`): the rows 4 apart straight on the surface under them, with no fill, edge or padding of the well's, for a surface that holds the list alone (a sheet of counters), where a well would be a box round the whole surface. The rows keep their 12 corners, and the focus tube still lights the list's edge.
+
 ## `ListRow`
 
 Rust `list::list_row(title)`; QML `ListRow`.

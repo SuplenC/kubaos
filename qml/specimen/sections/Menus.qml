@@ -5,7 +5,7 @@ import KubaOS.Components as K
 // `crates/kubaos-specimen/src/pages/components/menus.rs` draws with `kubaos-ui`, box for box.
 K.Section {
     title: "Selects and menus"
-    description: "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control."
+    description: "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control. A held item is taken only once held: the error sweeps across it."
 
     K.Grid {
         columns: 3
@@ -95,6 +95,34 @@ K.Section {
                 options: ["Unavailable"]
                 currentIndex: 0
                 enabled: false
+            }
+        }
+
+        // A counter's menu, its held item lit and held part of the way.
+        K.Popover {
+            fixedWidth: K.Tokens.size.menu
+
+            K.Menu {
+                currentIndex: 4
+                entries: [
+                    {
+                        text: "Rename"
+                    },
+                    {
+                        text: "Reset now"
+                    },
+                    {
+                        text: "History"
+                    },
+                    {
+                        separator: true
+                    },
+                    {
+                        text: "Hold to remove",
+                        held: true,
+                        reach: 0.4
+                    }
+                ]
             }
         }
     }

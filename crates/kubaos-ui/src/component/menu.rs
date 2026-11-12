@@ -4,12 +4,19 @@
 //! shadow, 12 inside, so the items in it take 24 − 12 = 12, the control radius. A menu is its
 //! items one under the other, each a small control tall, with separators between groups.
 //!
+//! A held item ([`MenuItem::held`]) destroys something that can't be taken back, so it is taken
+//! only by holding it for [`Duration::Hold`](crate::tokens::Duration::Hold): while it is held, the
+//! error colour sweeps across it from its start, its words `on_error` under the sweep, and it is
+//! taken when the sweep reaches its end; let go or left early, the sweep runs back over `short`.
+//!
 //! # Owns
 //!
 //! - [`popover`], [`menu`], [`menu_item`] (built up with [`MenuItem`]) and [`menu_separator`].
 //!
 //! # Not here
 //!
+//! - Timing a held item's hold, by the pointer or by Enter while the keyboard is on it: the app's,
+//!   which says how far along it is. The sweep is a timer, not a move: reduce motion keeps it.
 //! - Floating the popover over the view at its anchor: the app's. The shell's popovers float over
 //!   the window (`Popover` in `KubaOS.Components`); here one is drawn where it is put.
 //! - The control a select's menu drops from: [`crate::component::select`].
@@ -48,6 +55,8 @@ use crate::tokens::Shadow as ShadowToken;
 use crate::tokens::Size;
 use crate::tokens::Space;
 use crate::tokens::Type;
+
+mod sweep;
 
 /// The popover's corners: it holds content.
 const SURFACE: Radius = Radius::Surface;
@@ -110,6 +119,8 @@ pub struct MenuItem<'a, M> {
     danger: bool,
     highlighted: bool,
     on_press: Option<M>,
+    /// How far the sweep has gone, and what pressing it and letting go send.
+    hold: Option<(f32, M, M)>,
 }
 
 /// An item reading `label` on one line, ending in an ellipsis where it doesn't fit.
@@ -122,6 +133,7 @@ pub fn menu_item<'a, M>(label: impl Into<String>) -> MenuItem<'a, M> {
         danger: false,
         highlighted: false,
         on_press: None,
+        hold: None,
     }
 }
 
@@ -172,11 +184,30 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
         }
     }
 
+    /// An item taken only by holding it, a danger item: `start` when the pointer presses it, `end`
+    /// when the press comes up or the pointer leaves it, the sweep `reach` (0 to 1) across it. The
+    /// app times the hold over [`Duration::Hold`](crate::tokens::Duration::Hold), holds it from
+    /// Enter too while the keyboard is on it, takes it once `reach` gets to 1, and runs it back
+    /// over [`Duration::Short`](crate::tokens::Duration::Short) when let go early.
+    #[must_use]
+    pub fn held(self, reach: f32, start: M, end: M) -> Self {
+        MenuItem {
+            hold: Some((reach, start, end)),
+            danger: true,
+            ..self
+        }
+    }
+
     pub fn view(self, look: &Look) -> Element<'a, M> {
         let c = look.colors;
-        let enabled = self.on_press.is_some();
+        let enabled = self.on_press.is_some() || self.hold.is_some();
+        let held = self.hold.is_some();
         let (fill, ink) = if !enabled {
             (None, color::alpha(c.on_surface, Opacity::DisabledContent.value()))
+        } else if held {
+            // Lit, a held item lies on the error at `tint`, so the sweep has room to show.
+            let lit = self.highlighted.then(|| color::alpha(c.error, Opacity::Tint.value()));
+            (lit, c.error)
         } else if self.highlighted {
             (Some(c.secondary_container), c.on_secondary_container)
         } else if self.danger {
@@ -184,6 +215,66 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
         } else {
             (None, c.on_surface)
         };
+        let words = [
+            if self.icon.is_some() { "icon" } else { "" },
+            if self.checked.is_some() { "check" } else { "" },
+            if self.danger { "danger" } else { "" },
+        ];
+        let parts = self.content(look, ink);
+        let swept = self.hold.is_some().then(|| self.content(look, c.on_error));
+        let face = move |_theme: &Theme| widget::container::Style {
+            background: fill.map(Background::Color),
+            text_color: Some(ink),
+            border: Border::default().rounded(radius(ITEM_RADIUS)),
+            ..widget::container::Style::default()
+        };
+        let height = f32::from(Size::ControlSm.px());
+        let view = if let (Some((reach, start, end)), Some(swept)) = (self.hold, swept) {
+            let item = widget::container(parts)
+                .width(Length::Fill)
+                .height(height)
+                .padding(Inset::x(Space::S12).padding())
+                .style(face);
+            let item = widget::mouse_area(item)
+                .on_press(start)
+                .on_release(end.clone())
+                .on_exit(end)
+                .interaction(iced::mouse::Interaction::Pointer);
+            let copy = widget::container(swept)
+                .width(Length::Fill)
+                .height(height)
+                .padding(Inset::x(Space::S12).padding());
+            sweep::swept(
+                layered(item, ITEM_RADIUS, ink, enabled, None),
+                copy.into(),
+                reach,
+                c.error,
+                ITEM_RADIUS,
+                look.scale,
+            )
+        } else {
+            let pressable = widget::button(parts)
+                .width(Length::Fill)
+                .height(height)
+                .padding(Inset::x(Space::S12).padding())
+                .on_press_maybe(self.on_press)
+                .style(move |theme: &Theme, _status| {
+                    let face = face(theme);
+                    widget::button::Style {
+                        background: face.background,
+                        text_color: ink,
+                        border: face.border,
+                        shadow: Shadow::default(),
+                        snap: true,
+                    }
+                });
+            layered(pressable, ITEM_RADIUS, ink, enabled, None)
+        };
+        probe::component("MenuItem", words, Fixed::HEIGHT, view)
+    }
+
+    /// The item's symbol, words, keys and check in `ink`, across its width.
+    fn content(&self, look: &Look, ink: iced::Color) -> Element<'a, M> {
         let glyph_size = Type::Body.icon();
         let mut parts = row(look, Space::S12).center().width(Extent::Fill).height(Extent::Fill);
         if let Some(glyph) = self.icon {
@@ -192,7 +283,7 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
         parts = parts.push(
             stack(look, Gap::NONE)
                 .width(Extent::Fill)
-                .push(line(self.label, Type::Body, ink)),
+                .push(line(self.label.clone(), Type::Body, ink)),
         );
         if !self.shortcut.is_empty() {
             parts = parts.push(
@@ -211,24 +302,6 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
                     .into()
             });
         }
-        let pressable = widget::button(parts)
-            .width(Length::Fill)
-            .height(f32::from(Size::ControlSm.px()))
-            .padding(Inset::x(Space::S12).padding())
-            .on_press_maybe(self.on_press)
-            .style(move |_theme: &Theme, _status| widget::button::Style {
-                background: fill.map(Background::Color),
-                text_color: ink,
-                border: Border::default().rounded(radius(ITEM_RADIUS)),
-                shadow: Shadow::default(),
-                snap: true,
-            });
-        let view = layered(pressable, ITEM_RADIUS, ink, enabled, None);
-        let words = [
-            if self.icon.is_some() { "icon" } else { "" },
-            if self.checked.is_some() { "check" } else { "" },
-            if self.danger { "danger" } else { "" },
-        ];
-        probe::component("MenuItem", words, Fixed::HEIGHT, view)
+        parts.into()
     }
 }

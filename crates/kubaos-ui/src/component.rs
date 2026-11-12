@@ -13,9 +13,10 @@
 //!   and key hints ([`keycap`]), pictures in a box of a fixed aspect ([`media`]) and pictures to
 //!   pick ([`picture`]), tabs ([`tabs`]), quick toggle tiles ([`tile`]), meters and sparklines
 //!   ([`meter`]), sheets ([`sheet`]), calendars ([`calendar`]), icon tiles and badges ([`avatar`]),
-//!   skeletons ([`skeleton`]), popovers and menus ([`menu`]), selects ([`select`]), tables
-//!   ([`table`]), collapsibles ([`collapsible`]), banners ([`banner`]), steps ([`step`]) and
-//!   description lists ([`description`]).
+//!   skeletons ([`skeleton`]), popovers and menus ([`menu`]), a value asked for in a popover
+//!   ([`prompt`]), counts that roll ([`rolling`]), selects ([`select`]), tables ([`table`]),
+//!   collapsibles ([`collapsible`]), banners ([`banner`]), steps ([`step`]) and description lists
+//!   ([`description`]).
 //!
 //! # Not here
 //!
@@ -43,6 +44,8 @@ pub mod menu;
 pub mod meter;
 pub mod picture;
 pub mod progress;
+pub mod prompt;
+pub mod rolling;
 pub mod select;
 pub mod sheet;
 pub mod skeleton;

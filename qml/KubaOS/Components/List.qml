@@ -4,6 +4,10 @@ import KubaOS.Components as K
 // Rows in a well: `kubaos-ui`'s `list::list`. A surface (24) with 12 inside and rows 4 apart, so
 // the rows take 24 - 12 = 12, the control radius: concentric with the well. The focus tube lights
 // the well's edge while the list has the keyboard; the rows show where it is themselves.
+//
+// A flush list (`flush`) has no well: its rows lie straight on the surface under it, with no
+// fill, edge or padding of its own, where the surface is the list's only content (a Sheet of
+// counters). The focus tube still lights its edge.
 Item {
     id: root
 
@@ -13,13 +17,15 @@ Item {
     property alias room: well.room
     // The name the geometry check reads it by: `EmptyList` reads its own well as one.
     property string probeName: "List"
+    // Its rows straight on the surface: no fill, edge or padding.
+    property bool flush: false
 
     readonly property bool fillWidth: true
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property var probe: ({
             role: "component",
             name: root.probeName,
-            variant: "",
+            variant: root.flush ? "Flush" : "",
             fixed: {
                 width: false,
                 height: false
@@ -34,6 +40,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
+        visible: !root.flush
         radius: Tokens.radius.surface
         color: K.Look.alpha(Tokens.color.surface_container_low, Tokens.opacity.well)
         border.width: K.Look.hairline(root.dpr)
@@ -45,10 +52,10 @@ Item {
 
         width: root.width
         fill: true
-        leftPadding: Tokens.space.s12
-        rightPadding: Tokens.space.s12
-        topPadding: Tokens.space.s12
-        bottomPadding: Tokens.space.s12
+        leftPadding: root.flush ? 0 : Tokens.space.s12
+        rightPadding: root.flush ? 0 : Tokens.space.s12
+        topPadding: root.flush ? 0 : Tokens.space.s12
+        bottomPadding: root.flush ? 0 : Tokens.space.s12
 
         K.Stack {
             id: stack

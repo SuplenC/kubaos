@@ -28,7 +28,7 @@ use crate::specimen::Message;
 pub const SECTION: Section = Section {
     title: "Selects and menus",
     lede: Some(
-        "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control.",
+        "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control. A held item is taken only once held: the error sweeps across it.",
     ),
     view,
 };
@@ -37,6 +37,9 @@ pub const SECTION: Section = Section {
 const OPEN_KEYS: [&str; 1] = ["Enter"];
 
 const COPY_KEYS: [&str; 2] = ["Ctrl", "C"];
+
+/// How far the held sample's sweep has gone.
+const HELD_REACH: f32 = 0.4;
 
 fn view<'a>(look: &Look) -> Element<'a, Message> {
     let countries = ["None", "Germany", "Italy", "Poland"];
@@ -102,5 +105,28 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
                 .view(look),
         )
         .push(select::<Message>("Unavailable").view(look));
-    grid(look, 3, Space::S24).push(open).push(context).push(closed).into()
+    // A counter's menu, its held item lit and held part of the way.
+    let counter = popover(
+        look,
+        Extent::Fixed(Size::Menu),
+        menu(
+            look,
+            [
+                menu_item("Rename").on_press(Message::Sample).view(look),
+                menu_item("Reset now").on_press(Message::Sample).view(look),
+                menu_item("History").on_press(Message::Sample).view(look),
+                menu_separator(look),
+                menu_item("Hold to remove")
+                    .held(HELD_REACH, Message::Sample, Message::Sample)
+                    .highlighted(true)
+                    .view(look),
+            ],
+        ),
+    );
+    grid(look, 3, Space::S24)
+        .push(open)
+        .push(context)
+        .push(closed)
+        .push(counter)
+        .into()
 }
