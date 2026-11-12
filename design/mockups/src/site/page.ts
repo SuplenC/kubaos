@@ -166,7 +166,7 @@ export interface Content {
 }
 
 /** A duration token's name. */
-export type Duration = "instant" | "micro" | "short" | "medium" | "long" | "slow" | "scene" | "recolour" | "settle" | "strike" | "caret_glow" | "caret_hold" | "caret_fade" | "hum" | "swap_lag" | "swap_fade";
+export type Duration = "instant" | "micro" | "short" | "medium" | "long" | "slow" | "scene" | "recolour" | "settle" | "strike" | "caret_glow" | "caret_hold" | "caret_fade" | "hum" | "swap_lag" | "swap_fade" | "hold";
 /** An easing token's name. */
 export type Easing =
   | "standard"

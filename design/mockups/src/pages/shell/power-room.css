@@ -1,0 +1,200 @@
+/* The power menu's room (`power-room.ts`): the Lock's desktop with the frame closing in, the lights
+   going down over everything but the sheet, the sheet's tiles, the windows that won't quit, and the
+   boot splash's sign over the black. Numbers move it, each 0 at rest. */
+
+/* The frame, from where the shell draws it (0) to closed in to `space.s32` all round (1). */
+@property --power-closein {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How dark the room is: black over the desktop, from none (0) to all of it (1). */
+@property --power-dark {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A window leaving as Log out plays: from its place (0) to `space.s64` lower (1). */
+@property --power-gone {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* A window that won't quit: its warning tube and why, from out (0) to lit (1). */
+@property --power-refuse {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far a hold on a tile is, its tint filling it from the start: 0 to 1. */
+@property --power-held {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* The blocker coming in: from `space.s24` low (1) to its place (0). */
+@property --power-rise {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* The frame closes in from `space.s8` to `space.s32` as the menu opens, on top of the Lock's own
+   slide in from past the screen's edges. */
+.k-screen.k-lock.power-room {
+  --frame-side: round(nearest, calc(var(--space-s8) + (var(--space-s32) - var(--space-s8)) * var(--power-closein) - (var(--space-s8) + var(--radius-surface)) * (1 - var(--framed))), 1px);
+  --power-lights: calc(1 - var(--power-dark));
+}
+
+/* The lights: everything the room shows dims as one, the picture, its city, the windows, the
+   clock, the frame and the bar; the sheet's tubes are the last left burning. */
+.power-room :is(.k-screen-wallpaper, .k-lock-plate, .k-lock-windows, .k-lock-clock, .k-frame, .k-bar) {
+  filter: brightness(var(--power-lights));
+}
+
+.power-room .k-lock-cutout {
+  filter: blur(calc(var(--size-lock_blur) * var(--wake) / var(--neared))) brightness(calc((1 - var(--opacity-panel_scrim) * var(--panel-dim)) * var(--power-lights)));
+}
+
+/* A window of the desktop: the Lock's, with a symbol before its name. One that won't quit lights
+   its tube in `warning` and says why on a chip in its corner. */
+.power-window {
+  position: relative;
+  translate: 0 calc(var(--power-gone) * var(--space-s64));
+}
+
+.power-window > .k-ring {
+  --lit: var(--power-refuse);
+}
+
+.power-why {
+  position: absolute;
+  top: var(--space-s12);
+  right: var(--space-s12);
+  opacity: var(--power-refuse);
+}
+
+/* The sheet's content: `space.s16` inside, the blocker's slot, the line and its facts, the tiles. */
+.power-content {
+  box-sizing: border-box;
+  padding: var(--space-s16);
+}
+
+.power-slot:empty {
+  display: none;
+}
+
+/* The blocker takes the tiles' width, its two banners across it. */
+.power-slot,
+.power-blocker,
+.power-blocker > * {
+  align-self: stretch;
+}
+
+.power-say {
+  padding: 0 var(--space-s4);
+}
+
+/* Once open, the sheet follows its content's size as the blocker comes and goes, as a live
+   sheet does: over `medium` on `standard_decel`. */
+.power-sheet[data-power-settled] {
+  transition:
+    --sheet-span var(--motion-medium) var(--easing-standard_decel),
+    --sheet-depth var(--motion-medium) var(--easing-standard_decel);
+}
+
+/* Open and settled, it no longer cuts what it holds: a tile's tooltip floats over its top edge. */
+.power-sheet.k-sheet[data-power-settled] {
+  overflow: visible;
+}
+
+.power-blocker {
+  translate: 0 calc(var(--power-rise) * var(--space-s24));
+}
+
+/* A tile: its symbol over its name, `space.s4` apart, `space.s16` above and below, `size.power_tile`
+   wide on `surface_container_high` at the control radius. It lights as a control does, its tube
+   in the accent and its symbol turning to it; the one the keyboard is on is lit. Held, it runs
+   white-hot, and the accent's tint fills it from the start as the hold goes on. */
+.power-tile {
+  appearance: none;
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-s4);
+  width: var(--size-power_tile);
+  margin: 0;
+  padding: var(--space-s16) 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+  color: var(--color-on_surface);
+  font: inherit;
+  cursor: pointer;
+  outline: none;
+  --power-glyph: color-mix(in srgb, var(--color-on_surface_variant), var(--color-primary) calc(var(--lit) * 100%));
+}
+
+.power-tile.k-control[data-on] {
+  --lit: 1;
+}
+
+.power-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(from var(--color-primary) r g b / var(--opacity-tint));
+  clip-path: inset(0 calc((1 - var(--power-held)) * 100%) 0 0);
+}
+
+.power-tile > :not(.k-ring) {
+  position: relative;
+}
+
+/* After: the black, and the boot splash's sign on it where the splash draws it, centred with the
+   room its passphrase field keeps under it, at its device size (`--power-splash-scale`). The sign's
+   layers have no background: the room shows through them as it darkens. */
+.power-splash {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.power-black {
+  position: absolute;
+  inset: 0;
+  background: var(--color-scrim);
+}
+
+.power-sign {
+  position: relative;
+  flex: none;
+  width: calc(var(--sign-device, 0) * var(--px) / var(--power-splash-scale));
+  aspect-ratio: var(--sign-ratio, auto);
+}
+
+.power-sign > img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.power-sign-room {
+  flex: none;
+  height: calc((var(--size-control_md) + var(--space-s8) + var(--size-keycap)) / var(--power-splash-scale));
+}
