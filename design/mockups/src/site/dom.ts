@@ -88,10 +88,16 @@ export function holdScaled(outer: HTMLElement, inner: HTMLElement, by: number, h
   growing.observe(inner);
 }
 
-// Every sample's box is `data-away` while none of it is in the viewport, which holds its endless
-// loops (`site.css`): a page scrolled past its samples asks for no frames.
+/** The endless loops `site.css` holds in a sample's box that is `data-away`. */
+const LOOPS = ".gl-loop, .k-skeleton, .k-spinner, .k-step-bead, .f-race";
+
+// Every sample's box holding an endless loop is `data-away` while none of it is in the viewport,
+// which holds its loops (`site.css`): a page scrolled past its samples asks for no frames. A box
+// with none is left alone, so scrolling past it changes nothing on the page.
 const seen = new IntersectionObserver((entries) => {
-  for (const entry of entries) (entry.target as HTMLElement).toggleAttribute("data-away", !entry.isIntersecting);
+  for (const { target, isIntersecting } of entries) {
+    if (isIntersecting || target.hasAttribute("data-away") || target.querySelector(LOOPS)) target.toggleAttribute("data-away", !isIntersecting);
+  }
 });
 
 /**
