@@ -15,7 +15,7 @@ group.
 
 ```
 ~/.config/kubaos/
-  desktop/    hypr/ quickshell/ cursor/ clock/ keyboard/ sysmon/ idle/ files/ wallpapers/ workspaces/ update/
+  desktop/    hypr/ quickshell/ cursor/ clock/ keyboard/ sysmon/ idle/ files/ wallpapers/ workspaces/ update/ audio/
   terminal/   ghostty/ foot/ tmux/ zsh/ fastfetch/
   editor/     nvim/
   tools/      git/ lazygit/ yazi/ bat/ bacon/ fuzzel/

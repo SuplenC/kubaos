@@ -1910,6 +1910,23 @@ test("SUPER + hjkl focus the windows and the arrows the screens", function()
   end
 end)
 
+test("push to talk unmutes while held and mutes on its own release only", function()
+  local found = binds()
+  local ran = {}
+  hl.dispatch = function(action) ran[#ran + 1] = action.args end
+  local press, release = found[key("SUPER + SHIFT + M")].action, found[key("M")].action
+
+  release()
+  press()
+  release()
+  release()
+
+  same(ran, {
+    "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 0",
+    "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 1",
+  }, "what ran")
+end)
+
 test("the workspace cycling binds walk the focused screen's groups", function()
   local found = binds()
   local want = {

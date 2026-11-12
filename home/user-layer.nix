@@ -26,6 +26,7 @@ let
       "network"
       "workspaces"
       "update"
+      "audio"
     ];
     terminal = [
       "ghostty"

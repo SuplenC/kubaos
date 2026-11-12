@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+# test/dot-audio-test: `scripts/dot-audio` with `pw-dump`, `pw-record`,
+# `wpctl` and `systemctl` stubbed and a config home of the test's own, so
+# nothing reaches the session's audio. Needs bash, coreutils, jq and awk.
+#
+#   test/dot-audio-test REPO
+#
+# Prints an ok or FAIL line per test and exits 1 when any fails.
+# shellcheck disable=SC2329 # The tests are called by name from the list at the end.
+set -euo pipefail
+# A test function stops at its first failed check, inside the command substitution too.
+shopt -s inherit_errexit
+
+REPO="${1:?usage: test/dot-audio-test REPO}"
+AUDIO="$REPO/scripts/dot-audio"
+SCRATCH="$(mktemp -d)"
+trap 'rm -rf "$SCRATCH"' EXIT
+failed=0
+
+# The graph `pw-dump` prints: the default output, the device behind it and
+# its node. $1 is the device's API, $2 its current profile, $3 a microphone
+# node too (1) or not (0).
+graph() {
+  jq -n --arg api "$1" --arg profile "$2" --argjson mic "$3" '[
+    {id: 0, type: "PipeWire:Interface:Metadata", props: {"metadata.name": "default"},
+     metadata: [{subject: 0, key: "default.audio.sink", type: "Spa:String:JSON", value: {name: "out.headset"}}]},
+    {id: 40, type: "PipeWire:Interface:Device",
+     info: {props: {"device.api": $api, "device.description": "WH-1000XM4"},
+            params: {Profile: [{index: 9, name: $profile}],
+                     EnumProfile: [
+                       {index: 0, name: "off", priority: 0, available: "yes"},
+                       {index: 1, name: "a2dp-sink", priority: 18, available: "yes"},
+                       {index: 2, name: "a2dp-sink-aac", priority: 19, available: "yes"},
+                       {index: 3, name: "headset-head-unit-cvsd", priority: 1, available: "yes"},
+                       {index: 4, name: "headset-head-unit", priority: 2, available: "yes"},
+                       {index: 5, name: "headset-head-unit-msbc", priority: 3, available: "no"}]}}},
+    {id: 50, type: "PipeWire:Interface:Node",
+     info: {props: {"node.name": "out.headset", "device.id": 40, "media.class": "Audio/Sink"}}}
+  ] + if $mic == 1 then [{id: 51, type: "PipeWire:Interface:Node",
+     info: {props: {"node.name": "in.headset", "device.id": 40, "media.class": "Audio/Source"}}}] else [] end'
+}
+
+# A config home, and stubs that log their arguments to $T/log. `wpctl
+# set-profile` brings up the Calls graph, with the headset's microphone, as a
+# headset does; `wpctl settings` answers as $T/settings says.
+setup() {
+  T="$(mktemp -d "$SCRATCH/XXXXXX")"
+  mkdir -p "$T/stubs" "$T/config"
+  graph bluez5 a2dp-sink-aac 0 >"$T/dump.json"
+  graph bluez5 headset-head-unit 1 >"$T/calls.json"
+  echo "Value: false" >"$T/settings"
+  cat >"$T/stubs/pw-dump" <<STUB
+#!/usr/bin/env bash
+cat "$T/dump.json"
+STUB
+  cat >"$T/stubs/wpctl" <<STUB
+#!/usr/bin/env bash
+if [[ \$1 == settings && \$# == 2 ]]; then cat "$T/settings"; exit 0; fi
+printf 'wpctl %s\n' "\$*" >>"$T/log"
+if [[ \$1 == set-profile ]]; then cp "$T/calls.json" "$T/dump.json"; fi
+STUB
+  cat >"$T/stubs/systemctl" <<STUB
+#!/usr/bin/env bash
+printf 'systemctl %s\n' "\$*" >>"$T/log"
+STUB
+  # Two 50 ms blocks: one at half of full scale, one silent.
+  cat >"$T/stubs/pw-record" <<'STUB'
+#!/usr/bin/env bash
+for _ in $(seq 400); do printf '\x00\x40'; done
+for _ in $(seq 400); do printf '\x00\x00'; done
+STUB
+  chmod +x "$T/stubs/"*
+  : >"$T/log"
+}
+
+run_audio() {
+  PATH="$T/stubs:$PATH" XDG_CONFIG_HOME="$T/config" DOT_AUDIO_WP_TRIES=1 bash "$AUDIO" "$@"
+}
+
+flag() { printf '%s\n' "$T/config/kubaos/desktop/audio/$1"; }
+
+# What the stubs were asked since the last time, a call a line.
+asked() {
+  cat "$T/log"
+  : >"$T/log"
+}
+
+expect() {
+  local what=$1 got=$2 want=$3
+  [[ $got == "$want" ]] || {
+    printf 'expected %s:\n%s\ngot:\n%s\n' "$what" "$want" "$got"
+    return 1
+  }
+}
+
+t_a_headset_in_music_reports_its_name_and_mode() {
+  setup
+
+  expect "the JSON" "$(run_audio headset status --json)" '{"device":"WH-1000XM4","mode":"music"}'
+  expect "the plain status" "$(run_audio headset status)" music
+}
+
+t_without_a_bluetooth_headset_the_status_is_null() {
+  setup
+  graph alsa analog-stereo 0 >"$T/dump.json"
+
+  expect "the JSON" "$(run_audio headset status --json)" '{"device":null,"mode":null}'
+}
+
+t_calls_takes_the_best_available_headset_profile_and_its_microphone() {
+  setup
+
+  run_audio headset calls
+
+  expect "the profile, then the default input" "$(asked)" "wpctl set-profile 40 4
+wpctl set-default 51"
+}
+
+t_music_in_music_changes_nothing() {
+  setup
+
+  run_audio headset music
+
+  expect "nothing asked" "$(asked)" ""
+}
+
+t_toggle_from_calls_goes_to_the_best_music_profile() {
+  setup
+  cp "$T/calls.json" "$T/dump.json"
+
+  run_audio headset toggle
+
+  expect "the profile" "$(asked)" "wpctl set-profile 40 2"
+}
+
+t_switching_without_a_headset_fails_and_says_so() {
+  setup
+  graph alsa analog-stereo 0 >"$T/dump.json"
+
+  local code=0 err
+  err="$(run_audio headset calls 2>&1)" || code=$?
+
+  expect "the exit code" "$code" 1
+  expect "the message" "$err" "dot-audio: the default output isn't a Bluetooth headset"
+  expect "nothing asked" "$(asked)" ""
+}
+
+t_a_filter_on_writes_its_flag_and_starts_its_unit_and_off_undoes_both() {
+  setup
+
+  run_audio noise on
+  [[ -e $(flag noise-suppression) ]]
+  expect "the status on" "$(run_audio noise status)" on
+  run_audio noise off
+  [[ ! -e $(flag noise-suppression) ]]
+  run_audio echo on
+
+  expect "the units" "$(asked)" "systemctl --user start kubaos-noise-suppression.service
+systemctl --user stop kubaos-noise-suppression.service
+systemctl --user start kubaos-echo-cancellation.service"
+  expect "the status off" "$(run_audio noise status)" off
+  expect "echo's status" "$(run_audio echo status)" on
+}
+
+t_takeover_sets_its_flag_and_wireplumbers_setting() {
+  setup
+
+  run_audio takeover on
+  [[ -e $(flag takeover) ]]
+  run_audio takeover off
+  [[ ! -e $(flag takeover) ]]
+
+  expect "the setting" "$(asked)" "wpctl settings kubaos.takeover true
+wpctl settings kubaos.takeover false"
+}
+
+t_takeover_sync_copies_the_flag_in() {
+  setup
+  mkdir -p "$(dirname "$(flag takeover)")"
+  : >"$(flag takeover)"
+
+  run_audio takeover sync
+
+  expect "the setting" "$(asked)" "wpctl settings kubaos.takeover true"
+}
+
+t_takeover_before_wireplumber_knows_the_setting_keeps_the_flag_for_the_next_login() {
+  setup
+  echo "Setting 'kubaos.takeover' not found" >"$T/settings"
+
+  local err
+  err="$(run_audio takeover on 2>&1)"
+
+  [[ -e $(flag takeover) ]]
+  expect "the message" "$err" "dot-audio: WirePlumber has no kubaos.takeover setting yet; it applies from the next login"
+  expect "nothing set" "$(asked)" ""
+}
+
+t_level_prints_each_blocks_peak() {
+  setup
+
+  expect "the peaks" "$(run_audio level)" "0.500
+0.000"
+}
+
+t_anything_else_is_a_usage_error() {
+  setup
+
+  local code=0
+  run_audio noise loud 2>/dev/null || code=$?
+
+  expect "the exit code" "$code" 2
+  expect "nothing asked" "$(asked)" ""
+}
+
+mapfile -t tests < <(declare -F | awk '$3 ~ /^t_/ { print $3 }')
+for t in "${tests[@]}"; do
+  # Not in an `if` or before `||`, where errexit wouldn't stop the test at its first failed check.
+  set +e
+  out="$(set -e; "$t" 2>&1)"
+  code=$?
+  set -e
+  if ((code == 0)); then
+    echo "ok   $t"
+  else
+    echo "FAIL $t"
+    printf '%s\n' "$out"
+    failed=1
+  fi
+done
+exit "$failed"

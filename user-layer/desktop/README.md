@@ -1,7 +1,7 @@
 # desktop/
 
 The desktop: Hyprland, the shell (bar, popups, Command menu look), keyboard, pointer,
-clock, system monitor, idle, the power stops, files, wallpapers, the phone link, the work network (Proxy), the workspace groups and what `kubaos update` updates.
+clock, system monitor, idle, the power stops, files, wallpapers, the phone link, the work network (Proxy), the workspace groups, what `kubaos update` updates and the audio switches.
 
 | Folder | Files | What they change | Applies |
 |---|---|---|---|
@@ -24,5 +24,6 @@ clock, system monitor, idle, the power stops, files, wallpapers, the phone link,
 | `workspaces/` | `groups.toml` | Which screens are pinned to which workspace group, by description, and the groups' names: a pinned screen shows its group wherever it is plugged in. Two of a group's screens plugged in: the first listed wins. Screens without a pin take the groups left over, left to right, never one a group pins. The laptop panel can be pinned too (with the lid closed it holds no group). The Command menu's "Pin <screen> to group N", "Unpin <screen>" and "Name group N…" write it; a mistake is a notification, and no screen is pinned until it is fixed | at once, as it is saved |
 | `update/` | `no-firmware` | A flag file, no contents: `kubaos update` leaves firmware alone (fwupd and the LVFS). "Firmware updates off" in the Command menu writes it, "Firmware updates on" removes it, as `kubaos update --turn-off firmware` and `--turn-on firmware` do | the next `kubaos update` |
 | | `no-bitwarden`, `no-nix` | Flag files, no contents: one stops `kubaos update` from moving Bitwarden desktop to the newest release of its series, the other from moving Nix to the newest patch release of its minor. "Bitwarden updates off" and "Nix updates off" in the Command menu write them, the "on" Items remove them, as `kubaos update --turn-off` and `--turn-on` do | the next `kubaos update` |
+| `audio/` | `noise-suppression`, `echo-cancellation`, `takeover` | Flag files, no contents: each one turns its switch on, and its absence off. `noise-suppression` cleans the background out of your microphone, `echo-cancellation` keeps the speakers out of it on a call, and `takeover` makes a headset you connect (Bluetooth or USB) the default output and input. The Command menu's Items and `dot-audio noise\|echo\|takeover on\|off` write them | at once from those; the next login after a hand edit |
 
 The Command menu's "Settings: Desktop" opens this folder in Files.
