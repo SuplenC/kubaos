@@ -2223,6 +2223,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "kubaos-counters"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "kubaos-clock",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "toml 0.9.12+spec-1.1.0",
+]
+
+[[package]]
 name = "kubaos-cursor"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,25 @@
+[package]
+name = "kubaos-counters"
+description = "KubaOS's counters: named counts with auto resets and a history of every change"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "kubaos-counters"
+path = "src/main.rs"
+
+[dependencies]
+# Reads the auto resets' rules and the clock's time format.
+kubaos-clock.workspace = true
+jiff.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

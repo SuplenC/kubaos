@@ -84,6 +84,7 @@ let
       "kubaos-clock"
       "kubaos-sysmon"
       "kubaos-idle"
+      "kubaos-counters"
       "kubaos-power"
       "kubaos-proxy"
     ];

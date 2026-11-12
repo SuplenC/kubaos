@@ -52,6 +52,8 @@ rec {
   kubaos-sysmon = callCrate ../crates/kubaos-sysmon/package.nix;
   # The idle settings, Keep awake and the scheduled power actions (home/idle.nix).
   kubaos-idle = callCrate ../crates/kubaos-idle/package.nix;
+  # The counters' command, their timed resets and the state the bar reads (home/counters.nix).
+  kubaos-counters = callCrate ../crates/kubaos-counters/package.nix;
   # The power stops' service and command (home/power.nix).
   kubaos-power = callCrate ../crates/kubaos-power/package.nix;
   # The Proxy's command and service, the work network's switch (home/proxy.nix).
