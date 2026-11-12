@@ -2,7 +2,7 @@
 // "States"). A value or one of a few stops as a pill whose fill is the value, regular and compact:
 // dragged, stepped, snapping onto its stops, held at a sticky point, toggled by its icon (muted, on
 // Auto), the fill brightening lit and more while held, and its icon's button lit and pressed, by
-// night and by day.
+// night and by day. The knob variant, balance, moves a knob either side of a sticky centre.
 
 import { shown, type Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
@@ -15,6 +15,7 @@ import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 const PROFILES: Words = { short: "Saver", long: "Max Performance" };
 const NAMES = ["Super Saver", "Power Saver", "Balanced", "Performance", "Max Performance"];
 const AUTO: Words = { short: "Auto · 55%", long: "Automatic brightness · 55%" };
+const BALANCE: Words = { short: "Centre", long: "Right 100%" };
 
 // The locale's percentage, for the sticky volume's own reading of its value.
 const PERCENT = new Intl.NumberFormat("en-GB", { style: "percent", maximumFractionDigits: 0 });
@@ -55,6 +56,22 @@ function boosted(size: SliderSize = "Regular", extra: Partial<SliderOptions> = {
   return { icon: "volume_up", size, value: 2 / 3, sticky: 2 / 3, number: (at) => PERCENT.format(at * 1.5), widest: "150%", ...extra };
 }
 
+/** Balance as its words: the side and how far toward it, or Centre in the middle. */
+function sideOf(at: number): string {
+  const far = Math.round(Math.abs(at - 0.5) * 200);
+  return far === 0 ? "Centre" : `${at < 0.5 ? "Left" : "Right"} ${PERCENT.format(far / 100)}`;
+}
+
+/** Balance: a knob either side of the centre, held there within `size.slider_hold`. */
+function balance(size: SliderSize = "Regular", extra: Partial<SliderOptions> = {}): SliderOptions {
+  return { icon: "balance", size, knob: true, value: 0.5, sticky: 0.5, number: sideOf, ...extra };
+}
+
+/** Balance 30% to the left. */
+function leftward(size: SliderSize = "Regular", extra: Partial<SliderOptions> = {}): SliderOptions {
+  return balance(size, { value: 0.35, ...extra });
+}
+
 /** Brightness on Auto at 55%: the sensor's level in the softer accent, named; its icon goes manual. */
 function auto(size: SliderSize = "Regular", extra: Partial<SliderOptions> = {}): SliderOptions {
   return { icon: "brightness_medium", size, value: 0.55, toggle: autoToggle(), ...extra };
@@ -69,6 +86,8 @@ const ROWS: readonly { readonly name: string; readonly options: Options; readonl
   { name: "Brightness toggled (Auto)", options: auto },
   { name: "Five stops", options: profiles },
   { name: "Sticky at 100% of 150%", options: boosted },
+  { name: "Knob at the centre", options: balance },
+  { name: "Knob, left 30%", options: leftward },
   { name: "Volume, its icon", options: volume, icon: true },
   { name: "Muted, its icon", options: muted, icon: true },
   { name: "Five stops, its icon", options: profiles, icon: true },
@@ -99,7 +118,10 @@ function iconCell(options: Options, state: Shown): HTMLElement {
 
 /** The specimens' samples: a regular and a compact volume, the profiles and Auto. */
 function specimen(): HTMLElement {
-  return within("var(--size-column)", stack("s16", "start", slider(volume()), slider(profiles()), slider(boosted()), slider(auto()), slider(volume("Compact")), slider(profiles("Compact"))));
+  return within(
+    "var(--size-column)",
+    stack("s16", "start", slider(volume()), slider(profiles()), slider(boosted()), slider(auto()), slider(balance()), slider(volume("Compact")), slider(profiles("Compact")), slider(balance("Compact", { value: 0.575 }))),
+  );
 }
 
 /** A regular and a compact slider side by side in `state`, still: what a move plays on. */
@@ -151,6 +173,37 @@ const ICON: Move = {
   sample: pair(),
 };
 
+/** A regular and a compact knob, still, at `value`. */
+function knobs(value: number, state: Shown = "rest"): () => HTMLElement {
+  return () => within(ROOM, stack("s8", "start", slider(balance("Regular", { value, ...stateOptions(state), still: true })), slider(balance("Compact", { value, ...stateOptions(state), still: true }))));
+}
+
+const KNOBS = "a regular and a compact knob";
+
+const CAUGHT: Move = {
+  name: "The knob caught at the centre",
+  what: "Dragged within `size.slider_hold`, the knob jumps to the centre at once; the anchor pops in on `pop`.",
+  tracks: [
+    { part: "knob", on: KNOBS, target: ".k-slider", property: "--slider-shown", from: 0.47, to: 0.5, duration: "instant", curve: "linear" },
+    { part: "anchor", on: KNOBS, target: ".k-slider-anchor", property: "scale", from: 0, to: 1, duration: "short", curve: "pop" },
+  ],
+  reduced: [
+    { part: "knob", on: KNOBS, target: ".k-slider", property: "--slider-shown", from: 0.47, to: 0.5, duration: "instant", curve: "linear" },
+    { part: "anchor", on: KNOBS, target: ".k-slider-anchor", property: "scale", from: 0, to: 1, duration: "instant", curve: "linear" },
+  ],
+  back: "cuts",
+  sample: knobs(0.5),
+};
+
+const KNOB_SET: Move = {
+  name: "The knob set from elsewhere",
+  what: "From outside, the knob eases to the new value over `short` on `standard`; the words change at once.",
+  tracks: [{ part: "knob", on: KNOBS, target: ".k-slider", property: "--slider-shown", from: 0.35, to: 0.575, duration: "short", curve: "standard" }],
+  reduced: [{ part: "knob", on: KNOBS, target: ".k-slider", property: "--slider-shown", from: 0.35, to: 0.575, duration: "instant", curve: "linear" }],
+  back: "cuts",
+  sample: knobs(0.575),
+};
+
 const NUMBER: Move = {
   name: "A compact slider's number shows",
   what: "A compact slider's percentage fades in over `micro` as it lights; a name always shows.",
@@ -177,10 +230,16 @@ export default page({
       for: "a second state its icon turns: Muted, Auto; softer fill",
       sample: () => within(ROOM, stack("s16", "start", slider(volume()), slider(auto()))),
     },
+    {
+      name: "Knob",
+      for: "either side of a sticky centre: balance; no fill",
+      sample: () => within(ROOM, stack("s16", "start", ...[0.5, 0.35, 0.575].map((value) => slider(balance("Regular", { value }))))),
+    },
   ],
   sizes: [
     { name: "Regular", for: "`size.slider`: a panel's or a page's", sample: () => boxed(volume()) },
     { name: "Compact", for: "`size.slider_compact`: a dense panel; number only lit or held", sample: () => boxed(volume("Compact")) },
+    { name: "Knob, regular and compact", for: "the knob `space.s4` inside either height", sample: () => within(ROOM, stack("s8", "start", slider(leftward()), slider(leftward("Compact")))) },
   ],
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],
@@ -192,9 +251,9 @@ export default page({
     },
     rows: nonEmpty(ROWS.map(({ name, options, icon }) => ({ name, cell: (state: MatrixState) => (icon ? iconCell(options, state) : cell(options, state)) }))),
     looks: {
-      rest: "`primary` fill, `on_primary`; toggled, `secondary`; compact hides its number",
-      lit: "fill + `opacity.press`, tube and glow; in icon rows, the button",
-      pressed: "fill + `opacity.held`, glow × `focus.pressed_glow`",
+      rest: "`primary` fill or knob; toggled, `secondary`; compact hides its number",
+      lit: "fill or knob + `opacity.press`, tube and glow; in icon rows, the button",
+      pressed: "fill or knob + `opacity.held`, glow × `focus.pressed_glow`",
       disabled: "every part at `opacity.disabled_content`; no pointer, keys or Tab",
     },
   },
@@ -217,6 +276,7 @@ export default page({
       { name: "A stop's name", words: PROFILES, sample: (words: string) => boxed({ icon: "balance", stops: 5, index: 4, names: NAMES.map((name, i) => (i === 4 ? words : name)) }) },
       { name: "A toggled value's name", words: AUTO, sample: (words: string) => boxed(auto("Regular", { toggle: autoToggle(words) })) },
       { name: "In a compact slider", words: AUTO, sample: (words: string) => boxed(auto("Compact", { toggle: autoToggle(words) })) },
+      { name: "A knob's words", words: BALANCE, sample: (words: string) => boxed(balance("Regular", { value: 0.15, number: () => words })) },
     ],
     missingPicture: doesntApply("its icon is a symbol its owner names."),
     counts: [
@@ -224,6 +284,7 @@ export default page({
       { name: "Two stops", for: "the fewest: each end", sample: () => boxed({ icon: "bedtime", stops: 2, index: 0, names: ["Off", "On"] }) },
       { name: "Five stops", for: "the power profiles", sample: () => boxed(profiles()) },
       { name: "Many stops", for: "dots too close to icon, label or fill aren't drawn", sample: () => boxed({ icon: "brightness_medium", stops: 11, index: 6 }) },
+      { name: "Knob at either end", for: "it covers the icon, or the words", sample: () => within(ROOM, stack("s16", "start", slider(balance("Regular", { value: 0 })), slider(balance("Regular", { value: 1 })))) },
     ],
   },
   motion: {
@@ -238,15 +299,19 @@ export default page({
       NUMBER,
       EASES,
       SETTLES,
+      { name: "The knob lights", what: "Pointer or keyboard: over `short` on `standard`, the knob brightens, tube and glow fade in.", tracks: lights(".k-slider", KNOBS, 0, 1), reduced: "same", back: "plays", sample: knobs(0.35) },
+      { name: "The knob held", what: "Pressed or dragged: the knob to `opacity.held`, the glow to `focus.pressed_glow`, over `micro`.", tracks: press(".k-slider", KNOBS), reduced: "same", back: "plays", sample: knobs(0.35, "lit") },
+      CAUGHT,
+      KNOB_SET,
       ...powerMoves(pair("lit")),
     ],
   },
   keyboard: {
     keys: [
-      { keys: ["←", "h"], does: "5% or one stop lower; leaves Toggled" },
-      { keys: ["→", "l"], does: "5% or one stop higher; leaves Toggled" },
-      { keys: ["Home"], does: "to 0, or the first stop" },
-      { keys: ["End"], does: "to 1 or the last stop; a boosted volume's 150%" },
+      { keys: ["←", "h"], does: "5% or one stop lower; leaves Toggled; a knob 10% left" },
+      { keys: ["→", "l"], does: "5% or one stop higher; leaves Toggled; a knob 10% right" },
+      { keys: ["Home"], does: "to 0, or the first stop; a knob fully left" },
+      { keys: ["End"], does: "to 1 or the last stop; a boosted volume's 150%; a knob fully right" },
       {
         keys: ["Space"],
         does: "presses the icon, where it is a button, as the key lifts",
@@ -261,6 +326,8 @@ export default page({
       { name: "Regular, five stops", for: "height, icon's circle, dots, anchor, label inset", sample: () => boxed(profiles("Regular", { still: true })) },
       { name: "Compact, five stops", for: "compact height and anchor", sample: () => boxed(profiles("Compact", { still: true })) },
       { name: "Sticky", for: "sticky anchor, number's widest box", sample: () => boxed(boosted("Regular", { still: true })) },
+      { name: "Knob, left 30%", for: "knob and its inset, centre dot, words", sample: () => boxed(leftward("Regular", { still: true })) },
+      { name: "Knob at the centre", for: "the anchor on the knob", sample: () => boxed(balance("Compact", { still: true })) },
     ]),
     measures: [
       { part: "Height, icon's circle", token: "size-slider" },
@@ -269,6 +336,7 @@ export default page({
       { part: "Anchor", token: "size-slider_anchor" },
       { part: "Anchor, compact", token: "size-slider_anchor_compact" },
       { part: "Sticky hold", token: "size-slider_hold" },
+      { part: "Knob inset, all round", token: "space-s4" },
       { part: "Icon", token: "type-label-icon" },
       { part: "Value's line", token: "type-label_number-line" },
       { part: "Value's inset", token: "space-s12" },
