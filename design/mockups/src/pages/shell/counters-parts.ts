@@ -153,7 +153,7 @@ export function counterRow(counter: Counter, options: RowOptions): CounterRow {
 
   if (options.index !== undefined) element.dataset.index = String(options.index);
 
-  // The name: its whole in a hint when it is cut; a double-click asks for a new one.
+  // The name: a hint says a double-click renames it, after the whole name when it is cut.
   let name = counter.name;
   const nameBox = document.createElement("span");
   nameBox.className = "ct-name";
@@ -162,7 +162,8 @@ export function counterRow(counter: Counter, options: RowOptions): CounterRow {
     made.classList.add("k-list-title");
     made.style.color = "var(--title)";
     requestAnimationFrame(() => {
-      if (made.scrollWidth > made.clientWidth + 0.5) withHint(nameBox, words, { held: "start" });
+      const cut = made.scrollWidth > made.clientWidth + 0.5;
+      withHint(nameBox, cut ? `${words}. Double-click to rename` : "Double-click to rename", { held: "start" });
     });
     return made;
   };
@@ -172,6 +173,7 @@ export function counterRow(counter: Counter, options: RowOptions): CounterRow {
   // The value, rolling; a double-click asks for a new one.
   const rolling = rollingNumber({ value, widest: options.widest });
   rolling.element.classList.add("ct-value");
+  withHint(rolling.element, "Double-click to set");
   const pinnedOf = (which: "minus" | "plus") => (options.button?.which === which ? { pinned: options.button.state } : {});
   const minus = iconButton({ icon: "remove", label: "−1", kind: "Tonal", size: "Sm", disabled: value === 0, ...pinnedOf("minus") });
   const full = () => counter.cap !== undefined && value >= counter.cap;
