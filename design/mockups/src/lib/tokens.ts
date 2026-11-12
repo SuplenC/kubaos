@@ -27,6 +27,7 @@ export function forgetLengths(): void {
   lengths.clear();
   numbers.clear();
   curves.clear();
+  raws.clear();
 }
 
 /** The token `--name`'s cubic Bézier, its four numbers, read once: a ball is eased along it each
@@ -51,9 +52,20 @@ export function number(name: string): number {
   return value;
 }
 
-/** The token `--name` as written: a duration's `100ms`, a curve's `cubic-bezier(…)`. */
+const raws = new Map<string, string>();
+
+/**
+ * The token `--name` as written: a duration's `100ms`, a curve's `cubic-bezier(…)`. Read once in
+ * each mode, the only thing the root's tokens change with: reading the root's style brings the
+ * whole page's style up to date first, which a page being drawn would otherwise pay per read.
+ */
 export function raw(name: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim();
+  const key = `${document.documentElement.dataset.mode ?? ""}|${name}`;
+  const known = raws.get(key);
+  if (known !== undefined) return known;
+  const read = getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim();
+  raws.set(key, read);
+  return read;
 }
 
 /**

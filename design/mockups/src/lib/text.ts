@@ -56,6 +56,7 @@ export function forgetWidths(): void {
   widths.clear();
   masses.clear();
   fonts.clear();
+  tabulars.clear();
 }
 
 /** Whether iced shapes `words`: anything but plain ASCII. */
@@ -74,9 +75,18 @@ export function advance(style: TypeStyle, words: string): number {
   return width;
 }
 
-/** Whether `style` draws its figures tabular (OpenType `tnum`). */
+const tabulars = new Map<TypeStyle, boolean>();
+
+/**
+ * Whether `style` draws its figures tabular (OpenType `tnum`), read once: reading the root's style
+ * brings the whole page's style up to date, and every new label is measured while a page is drawn.
+ */
 function tabular(style: TypeStyle): boolean {
-  return getComputedStyle(document.documentElement).getPropertyValue(`--type-${style}-features`).trim() !== "normal";
+  const known = tabulars.get(style);
+  if (known !== undefined) return known;
+  const read = getComputedStyle(document.documentElement).getPropertyValue(`--type-${style}-features`).trim() !== "normal";
+  tabulars.set(style, read);
+  return read;
 }
 
 /** `words`' advance at `font(style).times` its size, measured on the canvas. */
