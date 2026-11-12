@@ -8,8 +8,9 @@
 //!                "detail": "Resets every day at 9:00"}]}
 //! ```
 //!
-//! `last` is the counter the key adds to, empty when there is none. `stop` is 0 without one, `rule` empty and `next` 0 without a rule, and `detail` the line under
-//! the name, empty without either. `next` is in seconds since the epoch.
+//! `last` is the counter the key adds to, empty when there is none. `stop` is 0 without one, `rule`
+//! empty and `next` 0 without a rule, and `detail` the line under the name, empty without either.
+//! `next` is in seconds since the epoch.
 //!
 //! # Owns
 //!

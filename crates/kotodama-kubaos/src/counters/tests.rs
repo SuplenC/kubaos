@@ -98,7 +98,10 @@ fn a_counter_offers_every_change_with_plus_one_first() {
         ]
     );
     assert!(item.actions[7].confirm);
-    assert_eq!(item.actions[2].arguments[0].kind, kotodama_protocol::ArgumentKind::Number);
+    assert_eq!(
+        item.actions[2].arguments[0].kind,
+        kotodama_protocol::ArgumentKind::Number
+    );
 }
 
 #[test]
@@ -136,7 +139,8 @@ fn each_change_launches_the_command_by_the_counters_name() {
     list.run("counter:1", SUB, &none(), &runner).unwrap();
     list.run("counter:1", SET, &typed(VALUE, "12"), &runner).unwrap();
     list.run("counter:1", RESET, &none(), &runner).unwrap();
-    list.run("counter:1", RENAME, &typed(NAME, "Push-ups"), &runner).unwrap();
+    list.run("counter:1", RENAME, &typed(NAME, "Push-ups"), &runner)
+        .unwrap();
     list.run("counter:1", REMOVE, &none(), &runner).unwrap();
 
     assert_eq!(
@@ -179,7 +183,11 @@ fn refusals_read_in_the_menu_and_launch_nothing() {
 
 #[test]
 fn auto_reset_opens_with_the_current_rule_the_examples_never_and_a_stop() {
-    let view = view_of(list().run("counter:1", AUTO_RESET, &none(), &FakeRunner::default()).unwrap());
+    let view = view_of(
+        list()
+            .run("counter:1", AUTO_RESET, &none(), &FakeRunner::default())
+            .unwrap(),
+    );
 
     let rows = rows(&view);
     assert_eq!(view.id, "counter-reset:1");
@@ -216,7 +224,14 @@ fn a_number_typed_is_a_stop() {
     let view = list().filter("counter-reset:1", "100").unwrap();
 
     let rows = rows(&view);
-    assert_eq!(rows[0], ("counter-reset:1:stop:100".to_owned(), "When it reaches 100".to_owned(), None));
+    assert_eq!(
+        rows[0],
+        (
+            "counter-reset:1:stop:100".to_owned(),
+            "When it reaches 100".to_owned(),
+            None
+        )
+    );
     assert_eq!(rows.len(), 2);
 }
 
@@ -224,7 +239,10 @@ fn a_number_typed_is_a_stop() {
 fn what_does_not_read_says_so_and_offers_the_examples() {
     let view = list().filter("counter-reset:1", "sometimes").unwrap();
 
-    assert_eq!(view.title, "Auto reset for Pushups: “sometimes” doesn't read; try one of these");
+    assert_eq!(
+        view.title,
+        "Auto reset for Pushups: “sometimes” doesn't read; try one of these"
+    );
     assert_eq!(rows(&view)[0].1, "Every day at 9:00");
     assert!(list().filter("idle-lock", "x").is_none());
 }
@@ -238,8 +256,10 @@ fn a_choice_sets_the_auto_reset_and_closes_its_list() {
         .choose("counter-reset:1:rule:every 30 minutes", CHOOSE, &none(), &runner)
         .unwrap();
     list.choose("counter-reset:1:never", CHOOSE, &none(), &runner).unwrap();
-    list.choose("counter-reset:1:stop:100", CHOOSE, &none(), &runner).unwrap();
-    list.choose("counter-reset:1:stop", CHOOSE, &typed(VALUE, "5"), &runner).unwrap();
+    list.choose("counter-reset:1:stop:100", CHOOSE, &none(), &runner)
+        .unwrap();
+    list.choose("counter-reset:1:stop", CHOOSE, &typed(VALUE, "5"), &runner)
+        .unwrap();
 
     assert!(matches!(ran, Ran::Pop(view) if view == "counter-reset:1"));
     assert_eq!(
@@ -251,7 +271,10 @@ fn a_choice_sets_the_auto_reset_and_closes_its_list() {
             "kubaos-counters stop Pushups 5 --notify",
         ]
     );
-    assert!(list.choose("counter-reset:1:stop", CHOOSE, &typed(VALUE, "0"), &runner).is_err());
+    assert!(
+        list.choose("counter-reset:1:stop", CHOOSE, &typed(VALUE, "0"), &runner)
+            .is_err()
+    );
 }
 
 #[test]

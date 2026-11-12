@@ -3,9 +3,9 @@
 //! each change the update check writes, each change to the keyboard layouts, to the wallpaper sets
 //! file, to Hyprland's screens file, to the drives file and to a file a state of the actions is
 //! read from, and to the counters' file; each config also reads the user folders and the states
-//! again; each run is answered with its outcome, after the View it pushes or pops. Each keystroke in
-//! a View that filters itself is answered with the View again, and each Live query at once, with a
-//! monitor answer, processes to stop, a date answer, or nothing.
+//! again; each run is answered with its outcome, after the View it pushes or pops. Each keystroke
+//! in a View that filters itself is answered with the View again, and each Live query at once, with
+//! a monitor answer, processes to stop, a date answer, or nothing.
 //!
 //! # Owns
 //!
@@ -26,10 +26,10 @@ use std::time::Duration;
 
 use jiff::Zoned;
 use kotodama_extension::Connection;
-use kotodama_extension::Writer;
 use kotodama_extension::Event;
 use kotodama_extension::SentItems;
 use kotodama_extension::SentStatus;
+use kotodama_extension::Writer;
 use kotodama_extension::config;
 use kotodama_extension::watch::RecursiveMode;
 use kotodama_extension::watch::Watcher;
@@ -323,7 +323,12 @@ fn watch(dir: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
             let _ = events.send(Event::Own(Own::Counters(CounterList::read())));
         },
     )
-    .map_err(|err| kotodama_extension::log!("not watching for KubaOS updates or the counters: {}", watched::why(&err)))
+    .map_err(|err| {
+        kotodama_extension::log!(
+            "not watching for KubaOS updates or the counters: {}",
+            watched::why(&err)
+        )
+    })
     .ok()?;
     watcher.watch(vec![dir]);
     Some(watcher)

@@ -281,8 +281,8 @@ impl CounterList {
         Some(self.reset_view(counter, text, &Zoned::now()))
     }
 
-    /// The Auto reset list of `counter` for `typed`: what it reads as (a rule, or a number for "When
-    /// it reaches N"), or the examples; then Never and "When it reaches N…".
+    /// The Auto reset list of `counter` for `typed`: what it reads as (a rule, or a number for
+    /// "When it reaches N"), or the examples; then Never and "When it reaches N…".
     fn reset_view(&self, counter: &Counter, typed: &str, now: &Zoned) -> View {
         let typed = typed.trim();
         let view = format!("{RESET_VIEW}{}", counter.id);
@@ -290,7 +290,12 @@ impl CounterList {
         let mut title = format!("Auto reset for {}", counter.name);
         let stop = typed.parse::<u64>().ok().filter(|&stop| stop > 0);
         if let Some(stop) = stop {
-            items.push(Self::choice(&view, &format!("stop:{stop}"), format!("When it reaches {stop}"), None));
+            items.push(Self::choice(
+                &view,
+                &format!("stop:{stop}"),
+                format!("When it reaches {stop}"),
+                None,
+            ));
         } else if typed.is_empty() {
             if let Some(now_item) = self.current(&view, counter, now) {
                 items.push(now_item);
@@ -299,10 +304,18 @@ impl CounterList {
         } else if let Ok(rule) = Recurrence::parse(typed) {
             items.push(self.rule_choice(&view, rule, now, None));
         } else {
-            title = format!("Auto reset for {}: “{typed}” doesn't read; try one of these", counter.name);
+            title = format!(
+                "Auto reset for {}: “{typed}” doesn't read; try one of these",
+                counter.name
+            );
             items.extend(self.examples(&view, now));
         }
-        items.push(Self::choice(&view, "never", "Never".to_owned(), Some("No auto reset".to_owned())));
+        items.push(Self::choice(
+            &view,
+            "never",
+            "Never".to_owned(),
+            Some("No auto reset".to_owned()),
+        ));
         if stop.is_none() {
             let mut reaches = Self::choice(
                 &view,
@@ -452,9 +465,9 @@ fn new_item() -> Item {
         app_only: false,
         weak_keywords: Vec::new(),
         yields: false,
-        actions: vec![Action::new(CREATE, "Create").arguments(vec![
-            Argument::new(NAME).placeholder(DEFAULT_NAME).optional(),
-        ])],
+        actions: vec![
+            Action::new(CREATE, "Create").arguments(vec![Argument::new(NAME).placeholder(DEFAULT_NAME).optional()]),
+        ],
     }
 }
 

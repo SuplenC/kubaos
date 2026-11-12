@@ -31,8 +31,8 @@
 //!
 //! # Not here
 //!
-//! - The log's lines, groups and sorts: [`crate::history`]. Reading rules: `kubaos_clock::recurrence`.
-//!   Locking, the live file and the reset timer: `main.rs`.
+//! - The log's lines, groups and sorts: [`crate::history`]. Reading rules:
+//!   `kubaos_clock::recurrence`. Locking, the live file and the reset timer: `main.rs`.
 
 use std::fs;
 use std::io;

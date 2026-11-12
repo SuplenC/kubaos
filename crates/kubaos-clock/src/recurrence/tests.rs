@@ -13,7 +13,11 @@ fn read(text: &str) -> Recurrence {
 }
 
 fn next(rule: &str, after: &str) -> String {
-    read(rule).next_after(&at(after)).expect("a next time").strftime("%Y-%m-%dT%H:%M%:z").to_string()
+    read(rule)
+        .next_after(&at(after))
+        .expect("a next time")
+        .strftime("%Y-%m-%dT%H:%M%:z")
+        .to_string()
 }
 
 fn nine() -> Time {
@@ -36,15 +40,27 @@ fn weekdays_read_singular_plural_and_short() {
     assert_eq!(read("mondays 8am"), monday_eight);
     assert_eq!(read("every Monday at 8"), monday_eight);
     assert_eq!(read("on mon at 8:00"), monday_eight);
-    assert_eq!(read("every monday"), Recurrence::Weekly(Weekday::Monday, Time::midnight()));
-    assert_eq!(read("every week"), Recurrence::Weekly(Weekday::Monday, Time::midnight()));
-    assert_eq!(read("weekly on fridays at 17:00"), Recurrence::Weekly(Weekday::Friday, Time::constant(17, 0, 0, 0)));
+    assert_eq!(
+        read("every monday"),
+        Recurrence::Weekly(Weekday::Monday, Time::midnight())
+    );
+    assert_eq!(
+        read("every week"),
+        Recurrence::Weekly(Weekday::Monday, Time::midnight())
+    );
+    assert_eq!(
+        read("weekly on fridays at 17:00"),
+        Recurrence::Weekly(Weekday::Friday, Time::constant(17, 0, 0, 0))
+    );
 }
 
 #[test]
 fn days_of_the_month_read_as_ordinals_or_after_the() {
     assert_eq!(read("1st of the month"), Recurrence::Monthly(1, Time::midnight()));
-    assert_eq!(read("every month on the 15th"), Recurrence::Monthly(15, Time::midnight()));
+    assert_eq!(
+        read("every month on the 15th"),
+        Recurrence::Monthly(15, Time::midnight())
+    );
     assert_eq!(read("on the 15 of each month at 9"), Recurrence::Monthly(15, nine()));
     assert_eq!(read("monthly"), Recurrence::Monthly(1, Time::midnight()));
     assert_eq!(read("the 31st"), Recurrence::Monthly(31, Time::midnight()));
@@ -78,7 +94,10 @@ fn what_it_cannot_read_names_examples() {
     ] {
         let err = Recurrence::parse(text).expect_err(text);
         let message = err.to_string();
-        assert!(message.contains("every day at 9") && message.contains("1st of the month"), "{message}");
+        assert!(
+            message.contains("every day at 9") && message.contains("1st of the month"),
+            "{message}"
+        );
     }
 }
 
@@ -87,7 +106,10 @@ fn it_says_itself_back_in_words() {
     assert_eq!(read("every day at 9").words(None), "Every day at 9:00");
     assert_eq!(read("mondays 8am").words(None), "Every Monday at 8:00");
     assert_eq!(read("1st of the month").words(None), "Every month on the 1st at 0:00");
-    assert_eq!(read("every month on the 22nd").words(None), "Every month on the 22nd at 0:00");
+    assert_eq!(
+        read("every month on the 22nd").words(None),
+        "Every month on the 22nd at 0:00"
+    );
     assert_eq!(read("the 13th").words(None), "Every month on the 13th at 0:00");
     assert_eq!(read("every 2 hours").words(None), "Every 2 hours");
     assert_eq!(read("hourly").words(None), "Every hour");
@@ -139,13 +161,19 @@ fn a_day_of_the_month_past_its_end_is_the_last_day() {
     assert_eq!(next("the 31st", "2028-01-31T12:00:00"), "2028-02-29T00:00+01:00");
     assert_eq!(next("the 31st", "2026-04-01T00:00:00"), "2026-04-30T00:00+02:00");
     assert_eq!(next("the 31st", "2026-04-30T00:00:00"), "2026-05-31T00:00+02:00");
-    assert_eq!(next("1st of the month", "2026-12-15T00:00:00"), "2027-01-01T00:00+01:00");
+    assert_eq!(
+        next("1st of the month", "2026-12-15T00:00:00"),
+        "2027-01-01T00:00+01:00"
+    );
 }
 
 #[test]
 fn intervals_fall_on_the_clock_from_midnight() {
     assert_eq!(next("every 2 hours", "2026-11-12T09:15:00"), "2026-11-12T10:00+01:00");
-    assert_eq!(next("every 30 minutes", "2026-11-12T09:30:00"), "2026-11-12T10:00+01:00");
+    assert_eq!(
+        next("every 30 minutes", "2026-11-12T09:30:00"),
+        "2026-11-12T10:00+01:00"
+    );
     assert_eq!(next("every 5 hours", "2026-11-12T20:00:00"), "2026-11-13T00:00+01:00");
     assert_eq!(next("every 24 hours", "2026-11-12T00:00:00"), "2026-11-13T00:00+01:00");
 }
@@ -153,8 +181,14 @@ fn intervals_fall_on_the_clock_from_midnight() {
 #[test]
 fn a_time_skipped_by_summer_time_comes_an_hour_later() {
     // Warsaw goes from 2:00 to 3:00 on 29 March 2026.
-    assert_eq!(next("every day at 2:30", "2026-03-29T00:00:00"), "2026-03-29T03:30+02:00");
-    assert_eq!(next("every day at 2:30", "2026-03-29T03:30:00"), "2026-03-30T02:30+02:00");
+    assert_eq!(
+        next("every day at 2:30", "2026-03-29T00:00:00"),
+        "2026-03-29T03:30+02:00"
+    );
+    assert_eq!(
+        next("every day at 2:30", "2026-03-29T03:30:00"),
+        "2026-03-30T02:30+02:00"
+    );
     assert_eq!(next("hourly", "2026-03-29T01:30:00"), "2026-03-29T03:00+02:00");
 }
 

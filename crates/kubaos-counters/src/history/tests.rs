@@ -62,11 +62,18 @@ fn a_line_reads_back_to_the_same_entry() {
 fn lines_that_do_not_read_are_skipped() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("counters.log");
-    std::fs::write(&path, "garbage\n2026-11-12T07:05:00Z\t1\tadd\t1\n2026-11-12T07:05:00Z\t1\tjump\t1\n").unwrap();
+    std::fs::write(
+        &path,
+        "garbage\n2026-11-12T07:05:00Z\t1\tadd\t1\n2026-11-12T07:05:00Z\t1\tjump\t1\n",
+    )
+    .unwrap();
 
     let entries = read(&path).unwrap();
 
-    assert_eq!(entries, [Entry::new("2026-11-12T07:05:00Z".parse().unwrap(), 1, Kind::Add, 1)]);
+    assert_eq!(
+        entries,
+        [Entry::new("2026-11-12T07:05:00Z".parse().unwrap(), 1, Kind::Add, 1)]
+    );
 }
 
 #[test]
@@ -144,7 +151,10 @@ fn weeks_start_on_monday_and_months_on_the_first() {
     let weeks = history(&week(), 1, Group::Week, Sort::Newest, &warsaw());
     assert_eq!(
         summary(&weeks),
-        [("11-16 00:00".to_owned(), 12, 1, 1), ("11-09 00:00".to_owned(), 11, 2, 6)]
+        [
+            ("11-16 00:00".to_owned(), 12, 1, 1),
+            ("11-09 00:00".to_owned(), 11, 2, 6)
+        ]
     );
 
     let months = history(&week(), 1, Group::Month, Sort::Newest, &warsaw());
