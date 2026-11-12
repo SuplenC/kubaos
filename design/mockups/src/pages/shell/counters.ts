@@ -9,6 +9,8 @@ import { PROMPT_CLOSES, PROMPT_INVALID, PROMPT_OPENS } from "../molecules/prompt
 import {
   anchorOf,
   askFor,
+  askNew,
+  listPage,
   askStop,
   autoMenu,
   type Counter,
@@ -35,7 +37,7 @@ const STOPPED: readonly Counter[] = COUNTERS.map((each) => (each.cap !== undefin
 const AT = { x: "calc(var(--space-s64) * 2)", y: "calc(var(--size-bar) + var(--size-row_two_line) + var(--space-s64))" };
 
 /** The sheet holding the list, `options` on it. */
-const listed = (counters: readonly Counter[] = COUNTERS, options: Parameters<typeof countersList>[1] = {}) => sheetBox(countersList(counters, options).element);
+const listed = (counters: readonly Counter[] = COUNTERS, options: Parameters<typeof countersList>[1] = {}) => sheetBox(listPage(countersList(counters, options).element));
 
 const onList = screen((counters: readonly Counter[] = COUNTERS, options: Parameters<typeof countersList>[1] = {}) => countersOnScreen({ content: listed(counters, options) }));
 
@@ -64,6 +66,16 @@ const withStop = screen((options: { typed?: string; invalid?: boolean } = {}) =>
       card: askStop(COUNTERS[1]!, { pinned: "lit", ...(options.typed !== undefined ? { typed: options.typed } : {}), ...(options.invalid ? { invalid: true } : {}) }),
       anchor: ".ct-cap",
       held: "end",
+    },
+  }),
+);
+
+/** The list with the prompt for a new counter's name under New counter. */
+const withNew = screen((options: { typed?: string; invalid?: boolean } = {}) =>
+  countersOnScreen({
+    prompt: {
+      card: askNew({ pinned: "lit", ...(options.typed !== undefined ? { typed: options.typed } : {}), ...(options.invalid ? { invalid: true } : {}) }),
+      anchor: ".ct-create",
     },
   }),
 );
@@ -171,6 +183,8 @@ export default page<Shown>({
     { name: "Renaming", for: "double-click or F2: a Prompt under the name", sample: () => withAsk("name") },
     { name: "Renaming, empty", for: "Enter on it: `Invalid`, the reason", sample: () => withAsk("name", { typed: "", invalid: true }) },
     { name: "Setting the value", for: "double-click it or Shift+F2: under the value", sample: () => withAsk("value") },
+    { name: "New counter", for: "under the list: a Prompt for its name", sample: () => withNew() },
+    { name: "New counter, empty", for: "Enter on it: `Invalid`, the reason", sample: () => withNew({ typed: "", invalid: true }) },
     { name: "Setting the value, not a count", for: "Enter on it: `Invalid`, the reason", sample: () => withAsk("value", { typed: "3.5", invalid: true }) },
     { name: "History", for: "every change, newest first", sample: () => withHistory(COUNTERS[0]!) },
     { name: "History by day", for: "each day's changes and how much it added", sample: () => withHistory(COUNTERS[0]!, { group: "day" }) },

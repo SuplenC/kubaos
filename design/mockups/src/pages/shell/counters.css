@@ -60,3 +60,9 @@
 .ct-what {
   flex: none;
 }
+
+/* The list page: the rows, then the foot `space.s8` under them: a divider, then New counter. */
+.ct-page,
+.ct-foot {
+  align-self: stretch;
+}
