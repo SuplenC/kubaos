@@ -4,7 +4,6 @@
 // Thursday 12 November 2026, 14:32.
 
 import "./counters.css";
-import { button } from "../../lib/button.ts";
 import { type Pinned, type Shown, stateOptions } from "../../lib/control.ts";
 import { emptyState } from "../../lib/empty-state.ts";
 import { withHint } from "../../lib/hint.ts";
@@ -749,21 +748,28 @@ function rollingStill(words: string, widest: string): HTMLElement {
   return row(0, "centre", text("+", "mono_large"), shown.element);
 }
 
-/** The list page's foot: a divider, then New counter, which asks for a name and adds it. */
-export function createFoot(onCreate?: (button: HTMLButtonElement) => void): HTMLElement {
-  const create = button({ label: "New counter", icon: "add", kind: "Text", size: "Sm" });
+/** The list page's foot: a divider, then New counter, a row of its own, flush as the counters' are,
+ *  which asks for a name and adds it. */
+export function createFoot(onCreate?: (row: HTMLElement) => void): HTMLElement {
+  const create = listRow({ title: "New counter", icon: "add" });
   create.classList.add("ct-create");
-  if (onCreate) create.addEventListener("click", (event) => {
-    event.stopPropagation();
-    onCreate(create);
-  });
-  const foot = stack("s8", "start", divider(), create);
+  const column = stack("s4", "start", create);
+  column.classList.add("k-list-rows");
+  const box = flush(well("List", column));
+  if (onCreate) {
+    listRows(box, null, () => [create], { onTake: () => onCreate(create) });
+    create.addEventListener("click", (event) => {
+      event.stopPropagation();
+      onCreate(create);
+    });
+  }
+  const foot = stack("s8", "start", divider(), box);
   foot.classList.add("ct-foot");
   return foot;
 }
 
 /** The list page: the counters' rows, then the foot. */
-export function listPage(list: HTMLElement, onCreate?: (button: HTMLButtonElement) => void): HTMLElement {
+export function listPage(list: HTMLElement, onCreate?: (row: HTMLElement) => void): HTMLElement {
   const page = stack("s8", "start", list, createFoot(onCreate));
   page.classList.add("ct-page");
   return page;
