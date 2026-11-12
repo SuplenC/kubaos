@@ -24,6 +24,7 @@ controlcenter-bt-drawer  controlcenter  FrameShot   1176,0,424,1000   controlcen
 controlcenter-bt-scan    controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-scan
 controlcenter-bt-form    controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-form
 controlcenter-passkey    controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-code
+controlcenter-audio      controlcenter  FrameShot   1176,0,424,1000   controlcenter audio
 controlcenter-keyboard   controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard
 controlcenter-kb-tooltip controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard-tooltip
 controlcenter-kb-drag    controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard-drag

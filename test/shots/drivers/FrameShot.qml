@@ -193,6 +193,8 @@ QtObject {
             cc.tab = 1;
         if (driver.state.startsWith("wifi-") || driver.state.startsWith("bluetooth-"))
             radioPose.start();
+        if (driver.state === "audio")
+            cc.tab = 2;
         if (driver.state.startsWith("keyboard")) {
             cc.tab = cc.keyboardTab;
             keyboardPose.start();
