@@ -4,7 +4,7 @@
 // the one in front of you steps out to the full screen, and the live desktop is that one stepped
 // out, so opening steps back into the wall and applying or cancelling steps out again.
 
-import { doesntApply, type Duration, type Easing, type Move, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
+import { doesntApply, type Duration, type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Track } from "../../site/page.ts";
 import { windowSize } from "../../site/settings.ts";
 import { locking, lockingReduced, touching, touchingReduced, waking, wakingReduced } from "../templates/lock-moves.ts";
 import { type ClockLook, DIMMED, type EditorPose } from "./wallpaper-clock.ts";
@@ -13,7 +13,7 @@ import { BLUE, FOLDERS, gallery, type GalleryOptions, KABUKICHO, pictureToLock, 
 type Shown = "rest" | "lit" | "open" | "disabled" | "loading" | "empty";
 
 /** The clock's editor on the tower, drawn in `pose`. */
-const editing = (pose: EditorPose = {}, options: GalleryOptions = {}) => () => gallery({ at: 2, view: "lock", edit: pose, ...options });
+const editing = (pose: EditorPose = {}, options: GalleryOptions = {}) => screen(() => gallery({ at: 2, view: "lock", edit: pose, ...options }));
 /** The clock's editor ready to move from `from` to `to`, for a move's player. */
 const editMove = (from: EditorPose | "wall", to: EditorPose | "wall") => held({ at: 2, view: "lock", edit: { from, to } });
 /** The tower's clock set by `look`, on the wall. */
@@ -23,7 +23,7 @@ const DATE_OFF: Partial<ClockLook> = { dated: { wide: false } };
 const MOVED: Partial<ClockLook> = { place: { wide: { x: 0.3, y: 0.82, s: 0.2 } }, date: { wide: { size: 0.08, gap: 0.12, align: "left" } }, colour: { mode: "custom", h: 40, l: 0.8 }, glow: { mode: "dark", strength: 0.6 } };
 
 /** The gallery drawn still. */
-const still = (options: GalleryOptions = {}) => () => gallery(options);
+const still = (options: GalleryOptions = {}) => screen(() => gallery(options));
 
 /** The gallery drawn still in a box, so a move can reach its root. */
 const held = (options: GalleryOptions = {}) => () => {
@@ -308,7 +308,7 @@ const FLATTENS: Move = {
 
 /** A view's gallery in `state`. */
 function cell(view: View) {
-  return (state: Shown): HTMLElement => {
+  return screen((state: Shown): HTMLElement => {
     switch (state) {
       case "rest":
         return gallery({ at: 2, view });
@@ -323,11 +323,11 @@ function cell(view: View) {
       case "empty":
         return gallery({ folder: 2, view: "picture" });
     }
-  };
+  });
 }
 
 /** The clock's editor in `state`. */
-function editorCell(state: Shown): HTMLElement {
+const editorCell = screen((state: Shown): HTMLElement => {
   switch (state) {
     case "rest":
       return gallery({ at: 2, view: "lock", edit: {} });
@@ -342,7 +342,7 @@ function editorCell(state: Shown): HTMLElement {
     case "empty":
       return gallery({ at: 2, view: "lock", edit: { look: CLOCK_OFF } });
   }
-}
+});
 
 /** The live gallery, shut: the desktop, which a click or Space opens. */
 function live(): HTMLElement {
@@ -350,7 +350,7 @@ function live(): HTMLElement {
 }
 
 /** The front picture with a name at the toolbar's length. */
-const named = (words: string) => gallery({ at: 0, name: words });
+const named = screen((words: string) => gallery({ at: 0, name: words }));
 
 export default page<Shown>({
   level: "shell",
@@ -377,7 +377,7 @@ export default page<Shown>({
     { name: "Editor, a look set", for: "a custom colour, a dark glow, the date left", sample: editing({ look: MOVED }) },
     { name: "Editor, clock off", for: "its rows disabled, no box on the picture", sample: editing({ look: CLOCK_OFF }) },
     { name: "Editor, date off", for: "its sub-rows disabled, the box round the digits", sample: editing({ look: DATE_OFF }) },
-    { name: "No depth layers", for: "Depth disabled, with why", sample: () => gallery({ at: 4, view: "lock", edit: {} }) },
+    { name: "No depth layers", for: "Depth disabled, with why", sample: screen(() => gallery({ at: 4, view: "lock", edit: {} })) },
     { name: "Full screen, drawer closed", for: "a strip of the panel at the edge", sample: editing({ full: true, drawer: "closed" }) },
     { name: "Full screen, drawer open", for: "cut flush by the edge, over the bar", sample: editing({ full: true, drawer: "open" }) },
     { name: "Full screen, floating", for: "ripped off the edge, anywhere", sample: editing({ full: true, drawer: "float" }) },
@@ -409,7 +409,7 @@ export default page<Shown>({
       { name: "Its controls", tone: "accent", filled: false, content: false },
     ],
     looks: { lit: "the lamp's core burns, its glow on the wall", signsOff: "the lamp as glass: no glow" },
-    signsOff: () => gallery({ at: 2, signsOff: true }),
+    signsOff: screen(() => gallery({ at: 2, signsOff: true })),
   },
   content: {
     text: [{ name: "A picture's name", words: { short: "Kabukicho rain", long: "Kabukicho rain after the last train home" }, sample: named }],

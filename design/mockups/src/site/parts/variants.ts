@@ -1,12 +1,12 @@
 // Variants and sizes: each one live, its name, and what it is for, as a shelf's group.
 
 import type { DoesntApply, Variant } from "../page.ts";
-import { applies } from "../page.ts";
+import { applies, drawsScreen } from "../page.ts";
 import type { Group, Item } from "./shelf.ts";
 
-/** `rows` as the items of a shelf, each drawn now. */
+/** `rows` as the items of a shelf, each drawn now, or a whole screen when it is first shown. */
 export function variantItems(rows: readonly Variant[]): Item[] {
-  return rows.map((row) => ({ name: row.name, words: row.for, sample: row.sample(), make: row.sample }));
+  return rows.map((row) => ({ name: row.name, words: row.for, sample: drawsScreen(row.sample) ? () => row.sample() : row.sample(), make: row.sample }));
 }
 
 /**
