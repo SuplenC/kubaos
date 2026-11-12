@@ -79,6 +79,8 @@ export interface BadgedOptions {
   readonly color?: string;
   /** The badge in the accent: something unread rather than wrong. */
   readonly accent?: boolean;
+  /** A dot in a fixed meaning's colour: the mic an app records from. */
+  readonly meaning?: Meaning;
   /** Whether the badge shows. */
   readonly badged?: boolean;
   /** How many, or none for a dot. */
@@ -100,7 +102,7 @@ export function badgedIcon(options: BadgedOptions): HTMLElement {
     box.dataset.badged = "";
     box.style.setProperty("--badge-width", badgeWidth(options.count));
     const accent = options.accent ?? false;
-    box.append(badge(options.count === undefined ? { accent } : { count: options.count, accent }));
+    box.append(badge(options.meaning ? { meaning: options.meaning } : options.count === undefined ? { accent } : { count: options.count, accent }));
   }
   return probe(box, { role: "component", name: "BadgedIcon", variant: variant(options.badged && (options.count === undefined ? "dot" : "count")), fixed: { width: false, height: true } });
 }

@@ -2200,6 +2200,15 @@
   display: block;
 }
 
+/* An app's icon in the symbol's box, kept whole. */
+.k-menu-picture {
+  display: block;
+  flex: none;
+  width: var(--icon-s16);
+  height: var(--icon-s16);
+  object-fit: contain;
+}
+
 .k-menu-keys {
   margin-inline-start: auto;
 }
