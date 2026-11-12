@@ -17,7 +17,7 @@
 
 .ct-value {
   flex: none;
-  width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+  width: calc(var(--slots) * round(up, calc(var(--figure) * var(--px) - 0.001px), 1px));
 }
 
 /* A row whose menu is open stays lit under it. */

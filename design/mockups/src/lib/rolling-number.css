@@ -12,15 +12,17 @@
   display: flex;
   flex: none;
   justify-content: flex-end;
-  width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+  --slot: round(up, calc(var(--figure) * var(--px) - 0.001px), 1px);
+  width: calc(var(--slots) * var(--slot));
   height: var(--t-line);
 }
 
+/* A slot is a figure's advance rounded up to a whole device pixel, so every figure starts on one. */
 .k-roll-slot {
   position: relative;
   display: block;
   flex: none;
-  width: calc(var(--figure) * var(--px));
+  width: var(--slot);
   height: var(--t-line);
   overflow: clip;
 }
