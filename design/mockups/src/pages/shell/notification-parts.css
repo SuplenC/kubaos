@@ -103,7 +103,7 @@
 
 /* The popup stack: its popups `space.s4` apart, `space.s8` in from the sheet's edges. Each sits in a
    slot whose room opens as it arrives and closes as it leaves, so those below make and close the gap. */
-@property --room {
+@property --slot-open {
   syntax: "<number>";
   inherits: false;
   initial-value: 1;
@@ -125,14 +125,14 @@
 
 .k-popup-slot {
   display: block;
-  height: round(nearest, calc(var(--slot-h, 0px) * var(--room)), 1px);
+  height: round(nearest, calc(var(--slot-h, 0px) * var(--slot-open)), 1px);
   overflow-y: clip;
   overflow-x: visible;
-  transition: --room var(--motion-medium) var(--easing-standard_decel);
+  transition: --slot-open var(--motion-medium) var(--easing-standard_decel);
 }
 
 .k-popup-slot[data-shut] {
-  --room: 0;
+  --slot-open: 0;
 }
 
 .k-popup-inner {
