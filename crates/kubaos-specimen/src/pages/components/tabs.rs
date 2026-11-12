@@ -31,7 +31,7 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
     let views = [
         Tab::new("Wi-Fi"),
         Tab::new("Bluetooth"),
-        Tab::new("Output"),
+        Tab::new("Audio"),
         Tab::new("Keyboard"),
     ];
     let tools = [Tab::new("Timer").icon(Icon::Timer), Tab::new("Alarm").icon(Icon::Alarm)];

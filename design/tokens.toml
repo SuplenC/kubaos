@@ -1004,6 +1004,9 @@ mail = { tabler = "mail" }
 manage_search = { tabler = "list-search" }
 memory = { tabler = "cpu" }
 memory_alt = { tabler = "device-sd-card" }
+mic = { tabler = "microphone" }
+mic_external_on = { tabler = "microphone-2" }
+mic_off = { tabler = "microphone-off" }
 mode_fan = { tabler = "propeller" }
 mouse = { tabler = "mouse" }
 mood = { tabler = "mood-smile" }

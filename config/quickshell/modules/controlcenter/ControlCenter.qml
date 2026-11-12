@@ -6,7 +6,7 @@ import qs.services
 
 // Side sheet on the right edge, from the bar down to the bottom border:
 // header, quick toggles, capture (screenshot, annotate, record, replay),
-// sliders, and tabs for Wi-Fi, Bluetooth, audio output and keyboard
+// sliders, and tabs for Wi-Fi, Bluetooth, audio and keyboard
 // layouts, whose list takes the room left at the bottom. The notifications
 // have a panel of their own (modules/notifications/NotificationPanel.qml).
 // Keys: Tab/Shift+Tab move between controls, h/l switch tabs on the tab bar,
@@ -174,7 +174,7 @@ K.Sheet {
             id: tabBar
 
             room: parent.width
-            labels: ["Wi-Fi", "Bluetooth", "Output", "Keyboard"]
+            labels: ["Wi-Fi", "Bluetooth", "Audio", "Keyboard"]
             currentIndex: root.tab
             onPicked: index => root.tab = index
         }
@@ -201,7 +201,7 @@ K.Sheet {
                 visible: root.tab === 1
             }
 
-            OutputList {
+            AudioList {
                 anchors.fill: parent
                 visible: root.tab === 2
             }

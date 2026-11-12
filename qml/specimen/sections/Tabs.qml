@@ -12,7 +12,7 @@ K.Section {
         align: "centre"
 
         K.Tabs {
-            labels: ["Wi-Fi", "Bluetooth", "Output", "Keyboard"]
+            labels: ["Wi-Fi", "Bluetooth", "Audio", "Keyboard"]
             currentIndex: 0
         }
 
