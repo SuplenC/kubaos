@@ -11,6 +11,7 @@
 //!   each of their Actions runs.
 //! - The states the registry's actions are shown in, read from their files: `states`.
 //! - The idle settings' Items and their choice lists, and the typed Keep awakes.
+//! - The counters' Items, their Auto reset lists and their History.
 //! - The shell's settings the menu changes: the focus stutter, always showing the bell.
 //! - "Power: what this stop does", the power stop's layers read live.
 //! - "Proxy status", the work network's parts and its tunnel read live.
@@ -27,6 +28,7 @@
 pub mod audio;
 pub mod bus;
 pub mod clock;
+pub mod counters;
 pub mod desk;
 pub mod drives;
 pub mod extension;

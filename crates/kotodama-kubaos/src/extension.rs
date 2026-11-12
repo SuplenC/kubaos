@@ -8,7 +8,7 @@
 //!   update check changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
 //!   user folder, a desk position, a drive, a Suite, an idle setting or Keep awake, a shell
-//!   setting, the power stop's status, the CPU scheduler's or the Proxy's.
+//!   setting, a counter, the power stop's status, the CPU scheduler's or the Proxy's.
 //!
 //! # Not here
 //!
@@ -16,8 +16,8 @@
 //!   [`crate::toggles`]. The keyboard layouts: [`crate::keyboard`]. The wallpaper sets:
 //!   [`crate::wallpapers`]. The user folders: [`crate::files`]. The desk positions:
 //!   [`crate::desk`]. The drives: [`crate::drives`]. The Suites: [`crate::suites`]. The idle
-//!   settings: [`crate::idle`]. The shell's settings: [`crate::shell`]. The power stop's status and
-//!   the CPU scheduler's: [`crate::power`]. The Proxy's status: [`crate::proxy`].
+//!   settings: [`crate::idle`]. The counters: [`crate::counters`]. The shell's settings:
+//!   [`crate::shell`]. The power stop's status and the CPU scheduler's: [`crate::power`]. The Proxy's status: [`crate::proxy`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -26,12 +26,15 @@ use kotodama_extension::Chain;
 use kotodama_protocol::Item;
 use kotodama_protocol::ItemRef;
 use kotodama_protocol::Table;
+use kotodama_protocol::View;
 use kubaos_power::live::Now;
 use kubaos_power::machine::Machine;
 use kubaos_power::report::Drain;
 use kubaos_power::settings::Settings as PowerSettings;
 
 use crate::bus::Bus;
+use crate::counters;
+use crate::counters::CounterList;
 use crate::desk;
 use crate::desk::Desk;
 use crate::drives;
@@ -67,6 +70,7 @@ pub struct Extension<B, R> {
     folders: UserFolders,
     desk: Desk,
     drives: Drives,
+    counters: CounterList,
     states: States,
     bus: B,
     runner: R,
@@ -83,6 +87,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             folders: UserFolders::default(),
             desk: Desk::default(),
             drives: Drives::default(),
+            counters: CounterList::default(),
             states: States::default(),
             bus,
             runner,
@@ -96,6 +101,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .into_iter()
             .chain(keyboard::ids())
             .chain(idle::ids())
+            .chain(counters::ids())
             .chain(shell::ids())
             .chain(power::ids())
             .chain(proxy::ids())
@@ -133,6 +139,16 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.drives = drives;
     }
 
+    /// Takes the counters, as their file now has them.
+    pub fn set_counters(&mut self, counters: CounterList) {
+        self.counters = counters;
+    }
+
+    /// The self-filtering View `view` as `text` reads, when it is one of the Extension's.
+    pub fn filter_view(&self, view: &str, text: &str) -> Option<View> {
+        self.counters.filter(view, text)
+    }
+
     /// Takes the desk positions, as Hyprland's screens file now lists them.
     pub fn set_desk(&mut self, desk: Desk) {
         self.desk = desk;
@@ -144,7 +160,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
     }
 
     /// The Items to index: the actions the states show, the toggles, the idle settings, the
-    /// shell's, the power stop's, the CPU scheduler's and the Proxy's status, the Suites, the
+    /// counters, the shell's, the power stop's, the CPU scheduler's and the Proxy's status, the Suites, the
     /// keyboard Items, the wallpaper sets, the user folders, the desk positions and the drives
     /// `hide` leaves in, the update actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
@@ -184,6 +200,11 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
         let idle = idle::items().into_iter().filter(|item| !self.registry.hides(&item.id));
+        let counters = self
+            .counters
+            .items()
+            .into_iter()
+            .filter(|item| !self.registry.hides(&item.id));
         let shell = shell::items().into_iter().filter(|item| !self.registry.hides(&item.id));
         let power = [
             power::item(),
@@ -198,6 +219,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .filter_map(|item| self.pending.apply(item))
             .chain(toggles)
             .chain(idle)
+            .chain(counters)
             .chain(shell)
             .chain(power)
             .chain(suites)
@@ -249,6 +271,13 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             idle::KEEP_AWAKE_KIND if action == idle::KEEP && !self.registry.hides(&item.id) => {
                 idle::keep_awake(&item.id, arguments, &self.runner)
             }
+            counters::NEW_KIND if action == counters::CREATE && !self.registry.hides(&item.id) => {
+                self.counters.create(arguments, &self.runner)
+            }
+            counters::KIND if !self.registry.hides(&item.id) => {
+                self.counters.run(&item.id, action, arguments, &self.runner)
+            }
+            counters::RESET_KIND => self.counters.choose(&item.id, action, arguments, &self.runner),
             shell::KIND if !self.registry.hides(&item.id) => {
                 let file = shell::path().ok_or("There's no home folder to keep the setting in")?;
                 shell::run(&item.id, action, &file)

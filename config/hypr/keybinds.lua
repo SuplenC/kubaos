@@ -206,6 +206,10 @@ bind("SUPER + CTRL + ALT + Space", "Switch wallpaper folder", "dot-theme toggle-
 -- lock before a suspend still work.
 bind("SUPER + CTRL + I", "Keep awake on/off", "kubaos-idle awake toggle")
 
+-- +1 to the counter used last, or the only one, with a toast saying where it
+-- is now (crates/kubaos-counters). The key is the "+" one, right of "-".
+bind("SUPER + CTRL + code:21", "Add 1 to the counter used last", "kubaos-counters add --last --notify")
+
 ---------------------------------------------------------------------------
 -- Look
 ---------------------------------------------------------------------------

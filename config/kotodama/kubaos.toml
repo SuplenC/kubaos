@@ -732,6 +732,18 @@ keywords = ["idle settings", "reset", "lock", "suspend", "lid", "hypridle"]
 run = ["kubaos-idle", "reset"]
 confirm = true
 
+# Counters (crates/kubaos-counters). "New counter" and an Item a counter are
+# the Extension's own Items (crates/kotodama-kubaos/src/counters.rs), so they
+# follow ~/.local/state/kubaos/counters.toml as it changes: `new-counter
+# Pushups` makes one (nothing typed is "Counter"), and a counter's Enter adds
+# 1; Ctrl+K has −1, Set to…, Reset, Rename…, Auto reset…, History and Remove.
+# Auto reset… reads what you type as the clock does ("every day at 9",
+# "mondays 8am", "1st of the month", "every 2 hours") and shows the next
+# reset; a number there stops the counter at it. Each runs `kubaos-counters …
+# --notify`, which says what it came to in a toast. SUPER + CTRL + "+" adds 1
+# to the counter used last (config/hypr/keybinds.lua). `hide = ["counter-new"]`
+# leaves "New counter" out.
+
 # A lock, suspend, shut down or reboot once, at a time, whether you're idle or
 # not (systemd user timers, `systemctl --user list-timers 'kubaos-scheduled*'`).
 # One at a time, whichever it is: a new one replaces it and says what it
