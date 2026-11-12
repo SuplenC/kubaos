@@ -99,9 +99,9 @@ pub enum ChangeError {
     Stopped { name: String, stop: u64 },
     #[error("A counter can only stop at 1 or more")]
     StopAtZero,
-    #[error("There are no counters yet; make one with `kubaos-counters new`")]
+    #[error("There are no counters yet; make one with New counter in the Command menu")]
     NoCounters,
-    #[error("No counter has been used yet; name the one to change")]
+    #[error("No counter has been changed yet; change one, and the key adds to it after")]
     NoLast,
 }
 
