@@ -54,7 +54,16 @@ const encoded = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2
 
 /** `#rrggbb` in OKLCH. */
 export function toLch(hex: string): Lch {
-  const [r, g, b] = [1, 3, 5].map((at) => linear(Number.parseInt(hex.slice(at, at + 2), 16) / 255)) as [number, number, number];
+  const [r, g, b] = [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16)) as [number, number, number];
+  return bytesToLch(r, g, b);
+}
+
+/** Each 8 bit channel's value, linear: a picture's pixels are read by the hundred thousand. */
+const LINEAR = Array.from({ length: 256 }, (_, v) => linear(v / 255));
+
+/** The colour of 8 bit channels `red`, `green` and `blue` in OKLCH: `toLch` of its `#rrggbb`. */
+export function bytesToLch(red: number, green: number, blue: number): Lch {
+  const [r, g, b] = [LINEAR[red]!, LINEAR[green]!, LINEAR[blue]!];
   const long = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
   const medium = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
   const short = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
