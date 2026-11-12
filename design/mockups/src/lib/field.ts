@@ -381,6 +381,13 @@ export function field(options: FieldOptions = {}): HTMLElement {
     caret = { pos: length(), anchor: length() };
     draw();
   });
+  // Turned invalid or back from outside, as an app does once it has checked the value: the tone
+  // fades between the accent and the error's.
+  element.addEventListener("validity", (event) => {
+    const invalid = (event as CustomEvent<boolean>).detail;
+    element.dataset.state = invalid ? "Invalid" : "Normal";
+    element.style.setProperty("--invalid", invalid ? "1" : "0");
+  });
   element.addEventListener("secret", (event) => {
     secret = (event as CustomEvent<boolean>).detail;
     draw();
@@ -392,6 +399,11 @@ export function field(options: FieldOptions = {}): HTMLElement {
 /** Shows `field`'s value as bullets, or as itself. */
 export function setSecret(field: HTMLElement, secret: boolean): void {
   field.dispatchEvent(new CustomEvent("secret", { detail: secret }));
+}
+
+/** Turns `field` invalid, or back to normal, as an app does once it has checked its value. */
+export function setInvalid(field: HTMLElement, invalid: boolean): void {
+  field.dispatchEvent(new CustomEvent("validity", { detail: invalid }));
 }
 
 /** Sets `field`'s value, the caret at its end, as an app sets it: it says nothing back. */
