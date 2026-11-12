@@ -21,7 +21,10 @@ impl Session {
         fs::create_dir_all(dir.path().join("run")).expect("make run");
         for program in ["systemctl", "systemd-run", "notify-send"] {
             let path = bin.join(program);
-            let script = format!("#!/bin/sh\necho \"{program} $*\" >> \"{}\"\n", dir.path().join("calls").display());
+            let script = format!(
+                "#!/bin/sh\necho \"{program} $*\" >> \"{}\"\n",
+                dir.path().join("calls").display()
+            );
             fs::write(&path, script).expect("write a stand-in");
             fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).expect("make it runnable");
         }
@@ -47,7 +50,11 @@ impl Session {
 
     fn ok(&self, args: &[&str]) -> String {
         let output = self.run(args);
-        assert!(output.status.success(), "{args:?}: {}", String::from_utf8_lossy(&output.stderr));
+        assert!(
+            output.status.success(),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         String::from_utf8(output.stdout).unwrap().trim_end().to_owned()
     }
 
@@ -94,7 +101,12 @@ fn a_refusal_exits_one_and_says_why_in_a_toast_when_asked() {
 
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("Coffee is at 0"));
-    assert!(session.calls().iter().any(|call| call.starts_with("notify-send") && call.contains("Coffee is at 0")));
+    assert!(
+        session
+            .calls()
+            .iter()
+            .any(|call| call.starts_with("notify-send") && call.contains("Coffee is at 0"))
+    );
 }
 
 #[test]
@@ -125,7 +137,11 @@ fn a_rule_arms_the_timer_and_never_stops_it() {
     );
 
     session.ok(&["add", "Pushups"]);
-    assert_eq!(session.calls().len(), 2, "a change that keeps the next reset leaves the timer");
+    assert_eq!(
+        session.calls().len(),
+        2,
+        "a change that keeps the next reset leaves the timer"
+    );
 
     session.ok(&["rule", "Pushups", "never"]);
     assert_eq!(session.calls().len(), 3);
@@ -168,7 +184,10 @@ fn the_log_groups_and_sorts_as_asked() {
     assert_eq!(days.as_array().unwrap().len(), 1);
     assert_eq!(days[0]["added"], 2);
     assert_eq!(days[0]["changes"], 3);
-    assert_eq!(session.run(&["log", "Pushups", "--group", "year"]).status.code(), Some(1));
+    assert_eq!(
+        session.run(&["log", "Pushups", "--group", "year"]).status.code(),
+        Some(1)
+    );
 }
 
 #[test]
@@ -177,6 +196,9 @@ fn tick_writes_the_shell_state_even_with_no_counters() {
 
     session.ok(&["tick"]);
 
-    assert_eq!(session.read("run/kubaos-counters.json"), "{\"counters\":[],\"last\":\"\"}\n");
+    assert_eq!(
+        session.read("run/kubaos-counters.json"),
+        "{\"counters\":[],\"last\":\"\"}\n"
+    );
     assert!(!Path::new(&session.dir.path().join("state/kubaos/counters.toml")).exists());
 }

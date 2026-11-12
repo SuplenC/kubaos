@@ -59,7 +59,10 @@ fn names_are_unique_whatever_the_case_and_hold_no_tabs() {
 
     assert!(matches!(counters.create("pushups", &now()), Err(ChangeError::Taken(_))));
     assert!(matches!(counters.create("a\tb", &now()), Err(ChangeError::BadName)));
-    assert!(matches!(counters.rename("Pushups", "", &now()), Err(ChangeError::BadName)));
+    assert!(matches!(
+        counters.rename("Pushups", "", &now()),
+        Err(ChangeError::BadName)
+    ));
 }
 
 #[test]
@@ -201,20 +204,14 @@ fn a_rule_resets_on_time_and_logs_it_at_the_time_it_came_due() {
         .set_reset("Pushups", rule("every day at 9"), &at("2026-11-12T10:00:00"))
         .unwrap();
     counters.set("Pushups", 5, &now()).unwrap();
-    assert_eq!(
-        counters.next_reset().unwrap(),
-        at("2026-11-13T09:00:00").timestamp()
-    );
+    assert_eq!(counters.next_reset().unwrap(), at("2026-11-13T09:00:00").timestamp());
 
     assert!(counters.catch_up(&at("2026-11-13T08:59:59")).is_empty());
     let entries = counters.catch_up(&at("2026-11-13T09:00:00"));
 
     assert_eq!(kinds(&entries), [(Kind::AutoReset, 0)]);
     assert_eq!(entries[0].at, at("2026-11-13T09:00:00").timestamp());
-    assert_eq!(
-        counters.next_reset().unwrap(),
-        at("2026-11-14T09:00:00").timestamp()
-    );
+    assert_eq!(counters.next_reset().unwrap(), at("2026-11-14T09:00:00").timestamp());
 }
 
 #[test]
@@ -230,10 +227,7 @@ fn resets_missed_while_asleep_or_off_happen_once_at_the_next_command() {
     assert_eq!(kinds(&entries), [(Kind::AutoReset, 0)]);
     assert_eq!(entries[0].at, at("2026-11-12T12:00:00").timestamp());
     assert_eq!(value(&counters, "Pushups"), 0);
-    assert_eq!(
-        counters.next_reset().unwrap(),
-        at("2026-11-15T08:00:00").timestamp()
-    );
+    assert_eq!(counters.next_reset().unwrap(), at("2026-11-15T08:00:00").timestamp());
 }
 
 #[test]
@@ -244,10 +238,7 @@ fn a_counter_at_zero_resets_without_a_log_line() {
         .unwrap();
 
     assert!(counters.catch_up(&at("2026-11-12T10:05:00")).is_empty());
-    assert_eq!(
-        counters.next_reset().unwrap(),
-        at("2026-11-12T10:06:00").timestamp()
-    );
+    assert_eq!(counters.next_reset().unwrap(), at("2026-11-12T10:06:00").timestamp());
 }
 
 #[test]
@@ -291,7 +282,11 @@ fn no_file_is_no_counters() {
 fn a_file_with_a_rule_it_cannot_read_says_which_counter() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("counters.toml");
-    std::fs::write(&path, "[[counters]]\nid = 1\nname = \"Pushups\"\nrule = \"sometimes\"\n").unwrap();
+    std::fs::write(
+        &path,
+        "[[counters]]\nid = 1\nname = \"Pushups\"\nrule = \"sometimes\"\n",
+    )
+    .unwrap();
 
     let err = Counters::load(&path).unwrap_err();
 
@@ -302,16 +297,17 @@ fn a_file_with_a_rule_it_cannot_read_says_which_counter() {
 fn a_hand_added_rule_gets_its_next_reset_at_the_next_command() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("counters.toml");
-    std::fs::write(&path, "[[counters]]\nid = 4\nname = \"Pushups\"\nvalue = 3\nrule = \"daily\"\n").unwrap();
+    std::fs::write(
+        &path,
+        "[[counters]]\nid = 4\nname = \"Pushups\"\nvalue = 3\nrule = \"daily\"\n",
+    )
+    .unwrap();
     let mut counters = Counters::load(&path).unwrap();
 
     assert!(counters.catch_up(&now()).is_empty());
 
     assert_eq!(value(&counters, "Pushups"), 3);
-    assert_eq!(
-        counters.next_reset().unwrap(),
-        at("2026-11-13T00:00:00").timestamp()
-    );
+    assert_eq!(counters.next_reset().unwrap(), at("2026-11-13T00:00:00").timestamp());
     counters.create("Coffee", &now()).unwrap();
     assert_eq!(counters.find("Coffee").unwrap().id, 5);
 }

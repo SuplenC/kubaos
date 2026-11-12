@@ -52,7 +52,11 @@ impl Paths {
     /// The files in KubaOS's state folder, `$XDG_STATE_HOME/kubaos` or `~/.local/state/kubaos`;
     /// `None` with neither variable set.
     pub fn from_env() -> Option<Self> {
-        let var = |name| std::env::var_os(name).filter(|value| !value.is_empty()).map(PathBuf::from);
+        let var = |name| {
+            std::env::var_os(name)
+                .filter(|value| !value.is_empty())
+                .map(PathBuf::from)
+        };
         let state = var("XDG_STATE_HOME").or_else(|| Some(var("HOME")?.join(".local/state")))?;
         Some(Paths::in_dir(&state.join("kubaos")))
     }

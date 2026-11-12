@@ -152,7 +152,10 @@ fn main() -> ExitCode {
             let to = to.join(" ");
             change(|counters, now| {
                 let entries = counters.rename(name, &to, now)?;
-                Ok(Outcome::said(entries, format!("Renamed to {}", counters.find(&to)?.name)))
+                Ok(Outcome::said(
+                    entries,
+                    format!("Renamed to {}", counters.find(&to)?.name),
+                ))
             })
         }
         ["rule", name, rule @ ..] if !rule.is_empty() => set_rule(name, &rule.join(" ")),
@@ -282,9 +285,7 @@ fn set_rule(name: &str, typed: &str) -> Result<String, String> {
 /// Reads the counters under the lock, does the resets that came due, makes the change `apply`
 /// asks for, and writes the log, the counters and the shell's state file, then arms the timer if
 /// the next reset moved. What `apply` says is the answer.
-fn change(
-    apply: impl FnOnce(&mut Counters, &Zoned) -> Result<Outcome, ChangeError>,
-) -> Result<String, String> {
+fn change(apply: impl FnOnce(&mut Counters, &Zoned) -> Result<Outcome, ChangeError>) -> Result<String, String> {
     let paths = paths()?;
     let _lock = lock(&paths)?;
     let mut counters = Counters::load(&paths.counters).map_err(|err| chain(&err))?;
@@ -428,7 +429,11 @@ fn list_text(counters: &Counters, format: Option<TimeFormat>) -> String {
         .map(|counter| {
             let line = format!("{:width$}  {}", counter.name, counter.value);
             let detail = live::detail(counter.reset, format);
-            if detail.is_empty() { line } else { format!("{line}  {detail}") }
+            if detail.is_empty() {
+                line
+            } else {
+                format!("{line}  {detail}")
+            }
         })
         .collect::<Vec<_>>()
         .join("\n")

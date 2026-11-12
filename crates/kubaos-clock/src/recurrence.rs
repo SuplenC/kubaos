@@ -22,8 +22,8 @@
 //!
 //! # Not here
 //!
-//! - Times of day, spans and names of days: `crate::parse` and `crate::words`. What repeats
-//!   (a counter's auto reset): `kubaos-counters`.
+//! - Times of day, spans and names of days: `crate::parse` and `crate::words`. What repeats (a
+//!   counter's auto reset): `kubaos-counters`.
 
 use std::fmt;
 use std::str::FromStr;
@@ -60,7 +60,9 @@ pub enum Recurrence {
 
 /// What was typed isn't a time [`Recurrence`] reads.
 #[derive(Debug, thiserror::Error)]
-#[error("`{0}` isn't a time it can repeat at; try \"every day at 9\", \"mondays 8am\", \"every 2 hours\" or \"1st of the month\"")]
+#[error(
+    "`{0}` isn't a time it can repeat at; try \"every day at 9\", \"mondays 8am\", \"every 2 hours\" or \"1st of the month\""
+)]
 pub struct RecurrenceError(String);
 
 impl RecurrenceError {
@@ -93,7 +95,9 @@ impl Recurrence {
     pub fn parse(text: &str) -> Result<Recurrence, RecurrenceError> {
         let split = words::split(text);
         let w: Vec<&str> = split.iter().map(String::as_str).collect();
-        read(&w).and_then(Parts::into_recurrence).ok_or_else(|| RecurrenceError::unread(text))
+        read(&w)
+            .and_then(Parts::into_recurrence)
+            .ok_or_else(|| RecurrenceError::unread(text))
     }
 
     /// The first time it comes strictly after `after`, in `after`'s zone; `None` only past the
@@ -236,9 +240,7 @@ impl Parts {
         match (self.weekday, self.day) {
             (Some(weekday), None) if !self.day_word && !self.month_word => Some(Recurrence::Weekly(weekday, time)),
             (None, Some(day)) if !self.day_word && !self.week_word => Some(Recurrence::Monthly(day, time)),
-            (None, None) if self.month_word && !self.day_word && !self.week_word => {
-                Some(Recurrence::Monthly(1, time))
-            }
+            (None, None) if self.month_word && !self.day_word && !self.week_word => Some(Recurrence::Monthly(1, time)),
             (None, None) if self.week_word && !self.day_word => Some(Recurrence::Weekly(Weekday::Monday, time)),
             (None, None) if self.day_word || self.time.is_some() => Some(Recurrence::Daily(time)),
             _ => None,

@@ -55,7 +55,10 @@ fn no_counters_is_an_empty_list() {
 fn the_details_follow_the_clock_format() {
     let rule = AutoReset::Rule(Recurrence::parse("every day at 21:00").unwrap());
 
-    assert_eq!(detail(rule, Some(TimeFormat::TwelveHour)), "Resets every day at 9:00 PM");
+    assert_eq!(
+        detail(rule, Some(TimeFormat::TwelveHour)),
+        "Resets every day at 9:00 PM"
+    );
 }
 
 #[test]
@@ -65,7 +68,10 @@ fn the_state_file_is_written_whole() {
 
     write(&path, &json!({"last": "", "counters": []})).unwrap();
 
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "{\"counters\":[],\"last\":\"\"}\n");
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "{\"counters\":[],\"last\":\"\"}\n"
+    );
     assert!(!dir.path().join("kubaos-counters.json.new").exists());
 }
 
@@ -82,7 +88,10 @@ fn a_rule_that_reads_says_its_words_and_next_time() {
     );
     assert_eq!(check("every day at 11", &now(), None)["when"], "Next today at 11:00");
     assert_eq!(check("every day at 9", &now(), None)["when"], "Next tomorrow at 9:00");
-    assert_eq!(check("1st of the month", &now(), None)["when"], "Next 1 December at 0:00");
+    assert_eq!(
+        check("1st of the month", &now(), None)["when"],
+        "Next 1 December at 0:00"
+    );
 }
 
 #[test]
