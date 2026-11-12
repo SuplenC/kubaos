@@ -156,6 +156,12 @@ PanelWindow {
             closing.stop();
             if (!visible)
                 openness = 0;
+            // The search opens on its top row; a pushed View keeps its place, as it was left.
+            if (menu.kind === "") {
+                list.currentIndex = 0;
+                follow.stop();
+                list.positionViewAtBeginning();
+            }
             visible = true;
             opening.restart();
         }
@@ -745,13 +751,17 @@ PanelWindow {
                     // off the top row stops Late Results reranking the rows.
                     onCurrentIndexChanged: {
                         search.select(currentIndex);
-                        reveal(currentIndex);
+                        reveal(currentIndex, false);
                     }
+                    // A row revealed while the list was shorter, as when the intro card showed
+                    // above it or the screen's size wasn't known yet, left the list scrolled; it
+                    // settles again on the room it has now.
+                    onHeightChanged: reveal(currentIndex, true)
 
                     // The view scrolls to keep the selection on screen. With the highlight not
                     // following the current row, ListView doesn't do that itself, so it is
                     // done here, on the selection's glide. Rows are all one height.
-                    function reveal(index: int): void {
+                    function reveal(index: int, snap: bool): void {
                         if (index < 0)
                             return;
                         const top = originY + index * menu.pitch;
@@ -765,7 +775,7 @@ PanelWindow {
                         follow.stop();
                         if (to === contentY)
                             return;
-                        if (menu.moves && !menu.typing && menu.visible) {
+                        if (menu.moves && !menu.typing && menu.visible && !snap) {
                             follow.to = to;
                             follow.start();
                         } else {
