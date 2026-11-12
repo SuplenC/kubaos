@@ -104,7 +104,7 @@ export default page<State>({
     { name: "Clock", for: "kanji `tertiary`, date and time `body`, the time held widest", sample: () => clockPill() },
     { name: "Clock with a countdown", for: "the pinned countdown after the time, `tertiary`", sample: () => clockPill({ countdown: CLOCK.countdown }) },
     { name: "A countdown under a minute", for: "m:ss, never its name alone", sample: () => clockPill({ countdown: countdownWords("Vacation", 45) }) },
-    { name: "Status", for: "power, network, Bluetooth, sound, battery", sample: () => statusPill() },
+    { name: "Status", for: "power, network, Bluetooth, battery", sample: () => statusPill() },
     { name: "Status, wired desktop", for: "no Bluetooth, no battery", sample: () => statusPill({ net: "lan", bluetooth: null, battery: null }) },
     { name: "Status, battery low", for: "the battery in `error`", sample: () => statusPill({ battery: { percent: 8, low: true } }) },
     { name: "Status, charging", for: "the battery in `primary`", sample: () => statusPill({ battery: { percent: 64, charging: true } }) },
@@ -173,7 +173,7 @@ export default page<State>({
     counts: [
       { name: "One reading", for: "the system monitor at its least", sample: () => sysmonPill({ readings: READINGS.slice(0, 1) }) },
       { name: "Three readings", for: "CPU, RAM, temperature", sample: () => sysmonPill() },
-      { name: "Status at its least", for: "power, network, sound", sample: () => statusPill({ bluetooth: null, battery: null }) },
+      { name: "Status at its least", for: "power, network", sample: () => statusPill({ bluetooth: null, battery: null }) },
     ],
   },
   motion: {
