@@ -265,6 +265,10 @@ log = 232
 # A panel of the shell, and a notification beside one: the control center's
 # side sheet, the cards of the notification stack.
 panel = 384
+# The power menu's action, its symbol over its name: two and a half large
+# controls, so the longest name, "Shut down", sits with the same air either
+# side as the shortest, and five side by side stay a short row at the bottom edge.
+power_tile = 120
 # The shell's bar along the top of every screen: a small control (32) with 4
 # above and below, so its pills and buttons centre on whole device pixels.
 bar = 40
@@ -799,6 +803,19 @@ miss = 0.45
 # What darkens the desktop behind an open panel, lighter than a dialog's scrim:
 # a panel sits beside the windows rather than over a question.
 panel_scrim = 0.20
+# The power menu plays the action you're on over the desktop before you commit,
+# each as black over it, the lights going down: Suspend dims as a dialog's
+# `scrim` does. Shut down, looked at, takes three quarters of `backdrop`, dark
+# enough to read as the lights going, light enough to still see what you'd
+# leave; held to the end it is `scrim` and `panel_scrim` together, the last of
+# the dark coming with the sign. Restart's lights cycle down to `power_cycle`
+# and its frame and bar to `power_cycle_glass`; held, it goes to
+# `power_restart_held`, short of Shut down's, since the room comes back.
+power_dusk = 0.675
+power_held = 0.80
+power_cycle = 0.45
+power_cycle_glass = 0.15
+power_restart_held = 0.65
 # Where Hyprland starts blurring behind the frame's layer (its `ignore_alpha`): only the glass.
 # The layer also draws a scrim and, over it, the panels' shadow, which cover up to 0.81 together
 # (`scrim` under `shadow.panel` at `frame`); a cut-off under that blurs a ragged band of the
