@@ -4,11 +4,12 @@
 // Thursday 12 November 2026, 14:32.
 
 import "./counters.css";
+import { button } from "../../lib/button.ts";
 import { type Pinned, type Shown, stateOptions } from "../../lib/control.ts";
 import { emptyState } from "../../lib/empty-state.ts";
 import { withHint } from "../../lib/hint.ts";
 import { iconButton } from "../../lib/icon-button.ts";
-import { filling, row, stack } from "../../lib/layout.ts";
+import { divider, filling, row, stack } from "../../lib/layout.ts";
 import { flush, listRow, listRows, scrolled, well } from "../../lib/list.ts";
 import { type MenuEntry, menu, menuSeparator } from "../../lib/menu.ts";
 import { pill } from "../../lib/pill.ts";
@@ -271,6 +272,19 @@ export function askFor(what: Editing, counter: Counter, options: AskOptions = {}
     label: what === "name" ? "Rename" : "Set value",
     value: typed,
     check: what === "name" ? checkName : checkCount,
+    ...(options.pinned ? { pinned: options.pinned } : {}),
+    ...(options.invalid ? { invalid: true } : {}),
+    ...(options.onSave ? { onSave: options.onSave } : {}),
+    ...(options.onCancel ? { onCancel: options.onCancel } : {}),
+  }).element;
+}
+
+/** The prompt for a new counter's name: "Counter" typed in it, all of it selected. */
+export function askNew(options: AskOptions = {}): HTMLElement {
+  return prompt({
+    label: "New counter",
+    value: options.typed ?? "Counter",
+    check: checkName,
     ...(options.pinned ? { pinned: options.pinned } : {}),
     ...(options.invalid ? { invalid: true } : {}),
     ...(options.onSave ? { onSave: options.onSave } : {}),
@@ -735,6 +749,26 @@ function rollingStill(words: string, widest: string): HTMLElement {
   return row(0, "centre", text("+", "mono_large"), shown.element);
 }
 
+/** The list page's foot: a divider, then New counter, which asks for a name and adds it. */
+export function createFoot(onCreate?: (button: HTMLButtonElement) => void): HTMLElement {
+  const create = button({ label: "New counter", icon: "add", kind: "Text", size: "Sm" });
+  create.classList.add("ct-create");
+  if (onCreate) create.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onCreate(create);
+  });
+  const foot = stack("s8", "start", divider(), create);
+  foot.classList.add("ct-foot");
+  return foot;
+}
+
+/** The list page: the counters' rows, then the foot. */
+export function listPage(list: HTMLElement, onCreate?: (button: HTMLButtonElement) => void): HTMLElement {
+  const page = stack("s8", "start", list, createFoot(onCreate));
+  page.classList.add("ct-page");
+  return page;
+}
+
 // ---------------------------------------------------------------- the sheet --
 
 /** The sheet's content box: `size.panel` wide, `space.s8` inside, as the peek's. */
@@ -773,7 +807,7 @@ export function countersOnScreen(options: ScreenOptions = {}): HTMLElement {
   const room = screen({ width: CORNER, height: options.height ?? TALL, wallpaper, bar });
   if (options.content !== null) {
     room.element.dataset.open = "";
-    hang(room, sheet({ content: options.content ?? sheetBox(countersList(COUNTERS).element), edge: "top", corner: true, ...(options.reveal !== undefined ? { reveal: options.reveal } : {}) }));
+    hang(room, sheet({ content: options.content ?? sheetBox(listPage(countersList(COUNTERS).element)), edge: "top", corner: true, ...(options.reveal !== undefined ? { reveal: options.reveal } : {}) }));
   }
   if (options.over) {
     const card = options.over.card;
@@ -879,7 +913,24 @@ export function liveCounters(start: readonly Counter[] = COUNTERS): HTMLElement 
       },
     });
     rows = drawn.rows;
-    box.replaceChildren(drawn.element);
+    box.replaceChildren(listPage(drawn.element, (create) => {
+      closeMenu();
+      ask(
+        askNew({
+          onCancel: () => {
+            closeAsk();
+            create.focus({ preventScroll: true });
+          },
+          onSave: (typed) => {
+            closeAsk();
+            counters = [...counters, { name: typed.trim(), value: 0, log: [] }];
+            list();
+          },
+        }),
+        create,
+        "start",
+      );
+    }));
   }
   /** The menu's card at `at` in the page, inside the screen. */
   function place(index: number, at: { x: number; y: number }, drawnRows: readonly CounterRow[]): void {
