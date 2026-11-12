@@ -390,9 +390,12 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
   }
 
   box.addEventListener("pointermove", (event) => {
+    const back = !pointer;
     pointer = true;
     const item = rowAt(event);
+    // Back over the row it left, it lights again: `move` runs only for another row.
     if (item && item !== at) move(rowsOf().indexOf(item));
+    else if (back) show();
   });
   box.addEventListener("click", (event) => {
     const item = rowAt(event);
