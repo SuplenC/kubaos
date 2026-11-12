@@ -1,0 +1,41 @@
+/* A rolling number (`lib/rolling-number.ts`): its figures at its end in a box as wide as its widest
+   value, each in a slot one figure wide and a line tall that cuts what rolls out of it. */
+
+/* How far a figure has rolled, 0 to 1, and which way: 1 up, -1 down. */
+@property --roll {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.k-rolling {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+  height: var(--t-line);
+}
+
+.k-roll-slot {
+  position: relative;
+  display: block;
+  flex: none;
+  width: calc(var(--figure) * var(--px));
+  height: var(--t-line);
+  overflow: clip;
+}
+
+.k-roll-figure {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Going up, the old figure leaves upward and the new one comes in from below; down, the reverse. */
+.k-roll-figure[data-out] {
+  translate: 0 calc(var(--roll) * var(--way, 1) * -100%);
+}
+
+.k-roll-figure[data-in] {
+  translate: 0 calc((1 - var(--roll)) * var(--way, 1) * 100%);
+}
