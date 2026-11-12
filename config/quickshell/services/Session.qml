@@ -1,6 +1,8 @@
 pragma Singleton
 
+import QtQuick
 import Quickshell
+import Quickshell.Io
 
 // Lock state and power actions.
 Singleton {
@@ -8,6 +10,8 @@ Singleton {
 
     // Survives config hot-reloads so editing the shell never drops the lock.
     readonly property bool locked: persisted.locked
+
+    onLockedChanged: lockFile.setText(locked ? "locked\n" : "")
 
     function lock(): void {
         Panels.close();
@@ -48,5 +52,29 @@ Singleton {
         reloadableId: "session"
 
         property bool locked: false
+    }
+
+    // The lock outlives the shell. A shell that died with the screen locked
+    // leaves Hyprland locked with no lock screen; the next one finds this file
+    // saying so and locks again as it starts, taking the session lock over
+    // (`allow_session_lock_restore`, `config/hypr/looks.lua`). In
+    // $XDG_RUNTIME_DIR, so a new login starts unlocked.
+    FileView {
+        id: lockFile
+
+        path: `${Quickshell.env("XDG_RUNTIME_DIR")}/kubaos-session-lock`
+        // Read and written at once: the shell locks before its first frame,
+        // and a crash right after locking still finds the file saying so.
+        blockLoading: true
+        blockWrites: true
+        printErrors: false
+    }
+
+    // HAZARD: read `text()` here, not in the FileView's `onLoaded`. A blocking
+    // load finishes while the FileView is built, before its handlers are
+    // connected, so `loaded` reaches nobody.
+    Component.onCompleted: {
+        if (lockFile.text().trim() === "locked")
+            persisted.locked = true;
     }
 }

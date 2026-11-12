@@ -1791,6 +1791,70 @@ c_session_reload() {
   return "$bad"
 }
 
+# shell_back OLD N: until one Quickshell other than OLD runs and $QS_LOG has
+# loaded a config N times, for up to 20 s; that Quickshell's pid in the
+# caller's $now.
+shell_back() {
+  for _ in $(seq 100); do
+    now="$(qs_pids)"
+    [[ -n $now && $now != "$1" && $now != *' '* && $(grep -c 'Configuration Loaded' "$QS_LOG") -ge $2 ]] && return 0
+    sleep 0.2
+  done
+  return 1
+}
+
+# A shell that dies comes back under `dot-session shell`, locked again if it
+# was locked; `qs kill` stops it for good.
+c_shell_supervisor() {
+  local pid now rc bad=0
+  session_start sway 1280x720 1
+  : >"$QS_LOG"
+  chown "$USER_NAME:" "$QS_LOG"
+  as_user rm -f "$RUNTIME_DIR/kubaos-session-lock"
+  in_session "exec bash '$REPO/scripts/dot-session' shell >$QS_LOG 2>&1" &
+  for _ in $(seq 600); do
+    grep -q -E 'Configuration Loaded|Failed to load configuration' "$QS_LOG" && break
+    sleep 0.1
+  done
+  if ! grep -q 'Configuration Loaded' "$QS_LOG"; then
+    echo "FAIL Quickshell didn't load under dot-session shell"; tail -20 "$QS_LOG"; session_stop; return 1
+  fi
+  pid="$(qs_pids)"
+
+  rc=0
+  in_session "bash '$REPO/scripts/dot-session' shell" >/dev/null 2>&1 || rc=$?
+  ((rc == 1)) && echo "ok   a second dot-session shell exits 1" ||
+    { echo "FAIL a second dot-session shell exited $rc"; bad=1; }
+
+  pkill -KILL -u "$USER_NAME" -x .quickshell-wra
+  shell_back "$pid" 2 && echo "ok   a killed Quickshell comes back ($pid -> $now)" ||
+    { echo "FAIL Quickshell is '$now' after a kill, was '$pid'"; tail -20 "$QS_LOG"; bad=1; }
+  pid="$now"
+
+  in_session "bash '$REPO/scripts/dot-session' restart-shell" >/dev/null 2>&1
+  shell_back "$pid" 3 && echo "ok   restart-shell leaves the supervisor one new shell ($pid -> $now)" ||
+    { echo "FAIL Quickshell is '$now' after restart-shell, was '$pid'"; tail -20 "$QS_LOG"; bad=1; }
+  pid="$now"
+
+  in_session 'qs ipc call session lock' >/dev/null 2>&1
+  pkill -KILL -u "$USER_NAME" -x .quickshell-wra
+  shell_back "$pid" 4 || { echo "FAIL Quickshell is '$now' after a kill while locked"; bad=1; }
+  now="$(in_session 'qs ipc call session locked' 2>/dev/null || true)"
+  [[ $now == true ]] && echo "ok   a shell killed while locked comes back locked" ||
+    { echo "FAIL the shell back from a kill while locked says locked '$now'"; bad=1; }
+
+  in_session 'qs kill' >/dev/null 2>&1
+  sleep 3
+  now="$(qs_pids)"
+  [[ -z $now ]] && echo "ok   qs kill stops the shell for good" ||
+    { echo "FAIL Quickshell '$now' runs after qs kill"; bad=1; }
+
+  [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
+  session_stop
+  as_user rm -f "$RUNTIME_DIR/kubaos-session-lock"
+  return "$bad"
+}
+
 # menu_stop PID: the Daemon (PID is its in_session job), its Extensions, the
 # keyboard and pointer, and the session. Waiting on the job keeps the shell's
 # "Terminated" out of the log.
@@ -4777,7 +4841,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files codecs automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node suite_python suite_proto dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files codecs automount bluetooth phone recorder session_reload shell_supervisor wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node suite_python suite_proto dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

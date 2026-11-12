@@ -61,8 +61,10 @@ hl.on("hyprland.start", function()
   -- colors.json and repaints when it lands.
   start("dot-theme apply")
 
-  -- Desktop shell (bar, Command menu, notifications, OSD, lock, wallpaper).
-  start("qs")
+  -- Desktop shell (bar, Command menu, notifications, OSD, lock, wallpaper),
+  -- under `dot-session shell`, which starts it again when it dies. Without
+  -- Nix's scripts, a plain `qs`.
+  start("command -v dot-session >/dev/null && exec dot-session shell || exec qs")
 
   -- Idle: lock 5 min, screens off 10 min, suspend 30 min on battery, or the
   -- user's idle settings. `kubaos-idle session` writes hypridle's listeners

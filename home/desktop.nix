@@ -17,7 +17,10 @@
     packages = kubaosPkgs.nixpkgs;
   };
 
-  # No systemd service: Hyprland's autostart runs `qs`.
+  # No systemd service: Hyprland's autostart runs `dot-session shell`, which
+  # starts `qs` again when it dies. A unit stopping its whole cgroup would take
+  # what the shell started with it, `dot-session leave` halfway through a
+  # logout among them.
   home.packages = [
     kubaosPkgs.quickshell
 

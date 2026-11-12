@@ -9,6 +9,11 @@
 #                               for each part that changed, reload Hyprland,
 #                               restart Quickshell or hypridle inside it, and
 #                               reload Ghostty or tmux. Home activation runs it.
+#   dot-session shell           in the session: run Quickshell, its log in the
+#                               journal (`journalctl --user -t quickshell`),
+#                               and start it again whenever it dies, until a
+#                               `qs kill` or the end of the session. Hyprland's
+#                               autostart runs it.
 #   dot-session restart-shell   in the session: restart the default Quickshell
 #                               once the screen is unlocked
 #   dot-session restart-idle    in the session: restart hypridle, if it runs
@@ -26,6 +31,7 @@ set -euo pipefail
 
 SELF="$(readlink -f "${BASH_SOURCE[0]}")"
 RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+SUPERVISOR_LOCK="$RUNTIME/dot-session-shell-supervisor.lock"
 # The order `apply` takes them in: Hyprland's reload first, so a shell
 # restarted in it starts under the new rules.
 PARTS=(hyprland quickshell hypridle ghostty tmux)
@@ -116,6 +122,44 @@ wait_gone() {
   done
 }
 
+# shell: Quickshell under a supervisor. Quickshell's own crash handler
+# restarts a shell that crashes on a signal, in the same process tree, so this
+# loop only sees the deaths it misses: an exit on a lost Wayland connection
+# (Qt's `_exit`, no crash report), a crash in the first 10 s, a kill. A shell
+# that dies with the screen locked locks again as it starts
+# (`config/quickshell/services/Session.qml`).
+run_shell() {
+  exec 8>"$SUPERVISOR_LOCK"
+  flock -n 8 || { say "a shell supervisor already runs" >&2; exit 1; }
+  # Into the journal when journald runs; where it doesn't (the test
+  # harness), the output stays wherever this script's went.
+  if [[ -S /run/systemd/journal/stdout ]] && command -v systemd-cat >/dev/null; then
+    exec > >(systemd-cat -t quickshell 8>&-) 2>&1
+  fi
+  local delay=0 started rc
+  while :; do
+    started=$SECONDS
+    rc=0
+    qs --no-color 8>&- || rc=$?
+    ((rc == 0)) && return 0
+    # The compositor is gone: the session ended, so has the shell.
+    [[ -n ${WAYLAND_DISPLAY:-} && -S $RUNTIME/$WAYLAND_DISPLAY ]] || return 0
+    # Back off while it keeps dying as it starts, up to 30 s between tries.
+    if ((SECONDS - started < 10)); then
+      delay=$((delay == 0 ? 1 : delay * 2 > 30 ? 30 : delay * 2))
+    else
+      delay=0
+    fi
+    say "Quickshell exited with status $rc, starting it again in ${delay}s"
+    sleep "$delay"
+  done
+}
+
+# supervised: whether `dot-session shell` runs, by the lock it holds.
+supervised() {
+  ! flock -n "$SUPERVISOR_LOCK" true
+}
+
 restart_shell() {
   exec 9>"$RUNTIME/dot-session-shell.lock"
   # A restart already waiting starts the newest config anyway.
@@ -126,9 +170,11 @@ restart_shell() {
     sleep 2
   done
   # Every Quickshell, by process: `qs kill` reaches one instance, and the
-  # supervisor it runs under relaunches the shell it sees die, so a kill by
+  # crash handler it runs under relaunches the shell it sees die, so a kill by
   # instance leaves one shell running beside the new one.
   pkill -u "$(id -u)" -x .quickshell-wra || return 0
+  # `dot-session shell` starts the new one.
+  supervised && return 0
   wait_gone pgrep -u "$(id -u)" -x .quickshell-wra
   # HAZARD: close the lock before exec. Quickshell would hold it for as long
   # as it runs, and every later restart would skip.
@@ -167,6 +213,7 @@ case "${1:-}" in
     (($# == 3)) || { usage >&2; exit 2; }
     apply "$2" "$3" || true
     ;;
+  shell) run_shell ;;
   restart-shell) restart_shell ;;
   restart-idle) restart_idle ;;
   start-idle) start_idle ;;

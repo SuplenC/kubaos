@@ -434,7 +434,8 @@ system/60-nix.sh                 # = --user kuba --host tuxedo
 7. Snapshot "home-manager base".
 
 Reboot. You get: LUKS passphrase -> autologin on tty1 -> Hyprland. Quickshell
-starts from Hyprland's autostart (`qs`, no systemd unit).
+starts from Hyprland's autostart (`dot-session shell`, which starts it again
+when it dies; no systemd unit).
 
 **Verify:** `home-manager generations` has one entry; `ls -l
 /run/opengl-driver`; Ghostty (`SUPER+Return`) and the bar render;
