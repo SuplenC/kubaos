@@ -30,6 +30,8 @@ import { settings } from "../site/settings.ts";
 export interface MenuItemSpec {
   readonly label: string;
   readonly icon?: string;
+  /** An app's own icon in the symbol's place, at the symbol's size: a player's app. */
+  readonly picture?: string;
   /** The keys that do the same, as `Ctrl+C`: one keycap each. */
   readonly keys?: string;
   /** Whether it shows a check, and whether it is ticked; none for an item that never does. */
@@ -75,7 +77,7 @@ export function menuItem(spec: MenuItemSpec, current = false, pinned?: ItemPinne
     item.prepend(sweep);
     if (spec.holding !== undefined) item.style.setProperty("--hold", String(spec.holding));
   }
-  const words_ = variant(spec.icon && "icon", spec.checked !== undefined && "check", (spec.danger || spec.held) && "danger", spec.submenu && "submenu");
+  const words_ = variant((spec.icon || spec.picture) && "icon", spec.checked !== undefined && "check", (spec.danger || spec.held) && "danger", spec.submenu && "submenu");
   return probe(item, { role: "component", name: "MenuItem", variant: words_, fixed: FIXED_HEIGHT });
 }
 
@@ -84,7 +86,8 @@ function content(spec: MenuItemSpec, ink: string): HTMLElement {
   const words = clamped(spec.label, "body");
   words.style.color = ink;
   const parts: Element[] = [];
-  if (spec.icon) parts.push(icon(spec.icon, "var(--icon-s16)", ink));
+  if (spec.picture) parts.push(picture(spec.picture));
+  else if (spec.icon) parts.push(icon(spec.icon, "var(--icon-s16)", ink));
   const room = document.createElement("span");
   room.className = "k-menu-words";
   room.append(words);
@@ -102,6 +105,15 @@ function content(spec: MenuItemSpec, ink: string): HTMLElement {
   }
   if (spec.submenu) parts.push(icon("chevron_right", "var(--icon-s16)", ink));
   return row("s8", "centre", ...parts);
+}
+
+/** An app's icon in a symbol's box, kept whole. */
+function picture(source: string): HTMLElement {
+  const image = document.createElement("img");
+  image.className = "k-menu-picture";
+  image.src = source;
+  image.alt = "";
+  return image;
 }
 
 /** A duration token in milliseconds under the speed setting. */
