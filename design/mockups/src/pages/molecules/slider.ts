@@ -252,7 +252,7 @@ export default page({
     rows: nonEmpty(ROWS.map(({ name, options, icon }) => ({ name, cell: (state: MatrixState) => (icon ? iconCell(options, state) : cell(options, state)) }))),
     looks: {
       rest: "`primary` fill or knob; toggled, `secondary`; compact hides its number",
-      lit: "fill or knob + `opacity.press`, tube and glow; in icon rows, the button",
+      lit: "fill or knob + `opacity.press`, tube, glow; icon rows: the button",
       pressed: "fill or knob + `opacity.held`, glow × `focus.pressed_glow`",
       disabled: "every part at `opacity.disabled_content`; no pointer, keys or Tab",
     },
@@ -311,7 +311,7 @@ export default page({
       { keys: ["←", "h"], does: "5% or one stop lower; leaves Toggled; a knob 10% left" },
       { keys: ["→", "l"], does: "5% or one stop higher; leaves Toggled; a knob 10% right" },
       { keys: ["Home"], does: "to 0, or the first stop; a knob fully left" },
-      { keys: ["End"], does: "to 1 or the last stop; a boosted volume's 150%; a knob fully right" },
+      { keys: ["End"], does: "to 1, the last stop, a boost's 150%; a knob fully right" },
       {
         keys: ["Space"],
         does: "presses the icon, where it is a button, as the key lifts",

@@ -260,8 +260,38 @@
   transition: --reach var(--motion-short) var(--easing-linear);
 }
 
-[data-sequence] .k-meter-part {
+[data-sequence] .k-meter-part,
+.k-meter[data-live] > .k-meter-part {
   transition: none;
+}
+
+/* Where a live meter's peak tick stands, 0 to 1 along the bar. */
+@property --meter-peak {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A live meter clips its peak tick to the pill, so the tick at either end takes its round end. */
+.k-meter[data-live] {
+  overflow: hidden;
+}
+
+/* The peak tick: `stroke.thin` wide in whole device pixels, `primary`, the bar's height, its right
+   edge at the peak. Shown only once there is one. */
+.k-meter-peak {
+  --tick: max(1px, round(nearest, var(--stroke-thin), 1px));
+  position: absolute;
+  top: 0;
+  left: max(0px, calc(round(nearest, calc(var(--meter-peak) * 100%), 1px) - var(--tick)));
+  width: var(--tick);
+  height: 100%;
+  background: var(--color-primary);
+  visibility: hidden;
+}
+
+.k-meter[data-peaked] > .k-meter-peak {
+  visibility: visible;
 }
 
 /* A sparkline: as wide as its room and `size.sparkline` tall, or inline a line of small text tall
