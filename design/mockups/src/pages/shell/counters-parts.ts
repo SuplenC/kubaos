@@ -185,7 +185,8 @@ export function counterRow(counter: Counter, options: RowOptions): CounterRow {
   });
   shown.element.classList.add("ct-value");
   // Editing, the box keeps the widest value's width, so nothing beside it moves.
-  shown.element.style.setProperty("--natural", String(advance("mono_large", options.widest)));
+  shown.element.style.setProperty("--slots", String(options.widest.length));
+  shown.element.style.setProperty("--figure", String(advance("mono_large", "0")));
 
   const pinnedOf = (which: "minus" | "plus") => (options.button?.which === which ? { pinned: options.button.state } : {});
   const minus = iconButton({ icon: "remove", label: "−1", kind: "Tonal", size: "Sm", disabled: value === 0, ...pinnedOf("minus") });
