@@ -80,6 +80,7 @@ mockups/tabs        design/mockups/src/pages/molecules/tabs.ts
 mockups/select      design/mockups/src/pages/molecules/select.ts
 mockups/popover     design/mockups/src/pages/molecules/popover.ts
 mockups/menu        design/mockups/src/pages/molecules/menu.ts
+mockups/inline-edit design/mockups/src/pages/molecules/inline-edit.ts design/mockups/src/lib/inline-edit.ts design/mockups/src/lib/inline-edit.css design/mockups/src/pages/shell/counters-parts.ts design/mockups/src/pages/shell/counters.css
 mockups/calendar    design/mockups/src/pages/molecules/calendar.ts
 mockups/tile        design/mockups/src/pages/molecules/tile.ts
 mockups/collapsible design/mockups/src/pages/molecules/collapsible.ts
@@ -134,6 +135,7 @@ mockups/notification-popup design/mockups/src/pages/molecules/notification-popup
 mockups/notification-group design/mockups/src/pages/molecules/notification-group.ts design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css
 mockups/notifications-panel design/mockups/src/pages/shell/notifications-panel.ts design/mockups/src/pages/shell/notification-parts.ts design/mockups/src/pages/shell/notification-parts.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css
 mockups/popup-stack design/mockups/src/pages/shell/popup-stack.ts design/mockups/src/pages/shell/notification-parts.ts design/mockups/src/pages/shell/notification-parts.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css
+mockups/counters design/mockups/src/pages/shell/counters.ts design/mockups/src/pages/shell/counters-parts.ts design/mockups/src/pages/shell/counters.css
 mockups/notification-peek design/mockups/src/pages/shell/notification-peek.ts design/mockups/src/pages/shell/notification-parts.ts design/mockups/src/pages/shell/notification-parts.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css
 mockups/menu design/mockups/src/pages/shell/menu.ts design/mockups/src/pages/shell/menu-parts.ts design/mockups/src/pages/shell/menu.css design/mockups/src/lib/list-detail.ts design/mockups/src/lib/list-detail.css
 mockups/menu-actions design/mockups/src/pages/shell/menu-actions.ts design/mockups/src/pages/shell/menu-parts.ts design/mockups/src/pages/shell/menu.css design/mockups/src/lib/list-detail.ts design/mockups/src/lib/list-detail.css
