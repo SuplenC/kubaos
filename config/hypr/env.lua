@@ -70,6 +70,12 @@ hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
 hl.env("NIXOS_OZONE_WL", "1")
 
+-- Bitwarden desktop's launcher (/opt/Bitwarden/bitwarden) passes Electron
+-- `--ozone-platform=x11` whenever both X11 and Wayland are up, a workaround for
+-- an Electron 39 crash with GPU acceleration on Wayland, and ignores the hint
+-- above. Its own override puts it back on Wayland, where it runs with the GPU.
+hl.env("DISPLAY_MODE", "WAYLAND")
+
 -- Java (IntelliJ and friends) on tiling WMs.
 hl.env("_JAVA_AWT_WM_NONREPARENTING", "1")
 
