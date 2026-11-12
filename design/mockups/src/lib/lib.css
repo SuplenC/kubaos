@@ -1897,6 +1897,26 @@
   visibility: visible;
 }
 
+/* A knob slider (balance): no fill, its icon and words on the track. The knob is the fill's circle
+   less `space.s4` round it, centred on the value as the fill's round end is, its left edge on a
+   whole device pixel, over the icon and the words; it is the fill's tone and lifts as the fill
+   does, lit and held. */
+.k-slider[data-knob] > .k-slider-fill {
+  display: none;
+}
+
+.k-slider-knob {
+  --knob: calc(var(--side) - 2 * var(--space-s4));
+  position: absolute;
+  top: var(--space-s4);
+  left: round(nearest, calc(var(--side) / 2 + (100% - var(--side)) * var(--slider-shown) - var(--knob) / 2), 1px);
+  width: var(--knob);
+  height: var(--knob);
+  border-radius: var(--radius-full);
+  background: rgb(from color-mix(in srgb, var(--tone), var(--bright) calc(var(--lift) * 100%)) r g b / var(--dim));
+  pointer-events: none;
+}
+
 /* The icon's button, where the icon steps or toggles: the circle at the fill's start, holding the
    icon. At rest nothing shows it is a button. Lit, it is a Filled icon button in the fill's tone:
    its circle lifts toward the bright end as the fill does, by `opacity.press` lit and

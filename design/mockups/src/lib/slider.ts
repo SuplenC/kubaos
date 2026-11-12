@@ -14,6 +14,12 @@
 // is. On a slider with stops the icon steps through them instead, its name the stop it goes to;
 // each stop may have a symbol of its own, which the circle shows while the slider is on it.
 //
+// The knob variant (balance) has no fill: a knob, the fill's circle less `space.s4` round it, moves
+// left and right along the track over the icon at the start and the words at the end, which it
+// covers at either end. Its centre is a sticky point with its dot, and the words name the side and
+// how far ("Centre", "Left 30%"), in tabular figures. Resting on the centre, the anchor shows on the
+// knob. The knob lifts as the fill does, lit and held.
+//
 // Steps show as dots on both sides of the fill, each in its side's colour; the mark the value rests
 // on, a stop or a sticky point it holds at, turns solid and pops in. No dot is drawn under the icon
 // or the label, `space.s4` clear of each.
@@ -65,6 +71,11 @@ export interface SliderOptions {
   readonly widest?: string;
   /** A sticky point, a fraction along the track, the value holds at within `size.slider_hold`. */
   readonly sticky?: number;
+  /**
+   * A knob in place of the fill, for a value either side of a middle: balance. Continuous, no
+   * toggle, the words always shown as `number` reads them.
+   */
+  readonly knob?: boolean;
   /** The toggle its icon turns on and off, on a continuous slider; with none, its icon is no button. */
   readonly toggle?: SliderToggle;
   readonly disabled?: boolean;
@@ -134,10 +145,11 @@ export function slider(options: SliderOptions): HTMLElement {
   const stops = options.stops !== undefined && options.stops > 1 ? options.stops : 0;
   const last = stops - 1;
   const stepping = stops > 0;
+  const knobbed = !stepping && (options.knob ?? false);
   const sticky = options.sticky;
   let index = Math.max(0, Math.min(last, options.index ?? 0));
   let value = Math.max(0, Math.min(1, options.value ?? 0));
-  const toggle = stepping ? undefined : options.toggle;
+  const toggle = stepping || knobbed ? undefined : options.toggle;
   let toggled = toggle?.on ?? false;
   let direction: -1 | 1 = -1;
   let dragging = false;
@@ -150,6 +162,7 @@ export function slider(options: SliderOptions): HTMLElement {
   root.setAttribute("aria-valuemin", "0");
   root.setAttribute("aria-valuemax", stepping ? String(last) : "100");
   root.toggleAttribute("data-compact", compact);
+  root.toggleAttribute("data-knob", knobbed);
   root.toggleAttribute("data-held", options.held ?? false);
   root.toggleAttribute("data-still", options.still ?? false);
   if (options.disabled) root.setAttribute("aria-disabled", "true");
@@ -162,7 +175,7 @@ export function slider(options: SliderOptions): HTMLElement {
   const onFill = document.createElement("span");
   onFill.className = "k-slider-on-fill";
   fill.append(onFill);
-  const style = (): TypeStyle => (numeric() ? "label_number" : "label");
+  const style = (): TypeStyle => (numeric() || knobbed ? "label_number" : "label");
   const underTrack = text("", "label", "on_surface");
   underTrack.classList.add("k-slider-label");
   underTrack.style.color = "var(--on-track)";
@@ -184,11 +197,15 @@ export function slider(options: SliderOptions): HTMLElement {
   });
   const anchor = document.createElement("span");
   anchor.className = "k-slider-anchor";
-  root.append(track, underTrack, fill, dots, anchor);
+  const knob = document.createElement("span");
+  knob.className = "k-slider-knob";
+  root.append(track, underTrack, fill, dots, ...(knobbed ? [knob] : []), anchor);
 
   const button = !options.disabled && (stepping || toggle) ? iconButton() : undefined;
-  // The icon is drawn in its button where it has one, so the button's circle lies under it.
-  (button ?? onFill).prepend(glyph);
+  // The icon is drawn in its button where it has one, so the button's circle lies under it; a
+  // knob's lies on the track under the knob, which passes over it.
+  if (knobbed) track.after(glyph);
+  else (button ?? onFill).prepend(glyph);
   focusRing(root, "full", "accent", false).dataset.pressable = "";
 
   /**
@@ -212,7 +229,7 @@ export function slider(options: SliderOptions): HTMLElement {
   function drawToggle(): void {
     root.style.setProperty("--toggled", toggled ? "1" : "0");
     const symbol = toggled && toggle ? toggle.icon : stepping && options.icons?.[index] ? options.icons[index]! : options.icon;
-    glyph.replaceChildren(icon(symbol, "var(--type-label-icon)", "var(--on-fill)"));
+    glyph.replaceChildren(icon(symbol, "var(--type-label-icon)", knobbed ? "var(--on-track)" : "var(--on-fill)"));
     if (toggle && button) button.setAttribute("aria-pressed", String(toggled));
     nameIcon();
   }
@@ -255,7 +272,7 @@ export function slider(options: SliderOptions): HTMLElement {
   }
 
   function numeric(): boolean {
-    return !toggled && !(stepping && options.names !== undefined && options.names.length > 0);
+    return !knobbed && !toggled && !(stepping && options.names !== undefined && options.names.length > 0);
   }
 
   function label(): string {
@@ -306,15 +323,16 @@ export function slider(options: SliderOptions): HTMLElement {
     const rest = resting();
     const stop = px("size-slider_stop");
     const anchorSide = px(compact ? "size-slider_anchor_compact" : "size-slider_anchor");
+    const knobSide = side - 2 * px("space-s4");
     points.forEach((point, i) => {
       const dot = dotOf[i]!;
       const x = centre(point);
       const anchored = rest !== undefined && Math.abs(rest - point) < 1e-4;
-      const shows = clear(x, stop) && !anchored && Math.abs(x - valueX) >= anchorSide / 2 && Math.abs(x - fillEnd) >= stop / 2;
-      dot.toggleAttribute("data-hidden", !shows);
-      dot.toggleAttribute("data-passed", x < fillEnd);
+      const free = knobbed ? Math.abs(x - valueX) >= (knobSide + stop) / 2 : Math.abs(x - valueX) >= anchorSide / 2 && Math.abs(x - fillEnd) >= stop / 2;
+      dot.toggleAttribute("data-hidden", !(clear(x, stop) && !anchored && free));
+      dot.toggleAttribute("data-passed", !knobbed && x < fillEnd);
     });
-    const showsAnchor = rest !== undefined && clear(centre(rest), anchorSide);
+    const showsAnchor = rest !== undefined && (knobbed || clear(centre(rest), anchorSide));
     if (showsAnchor) anchor.style.setProperty("--at", String(rest));
     const was = anchor.hasAttribute("data-shown");
     anchor.toggleAttribute("data-shown", showsAnchor);
@@ -506,5 +524,10 @@ export function slider(options: SliderOptions): HTMLElement {
   new ResizeObserver(() => draw()).observe(root);
   drawToggle();
   draw();
-  return probe(root, { role: "component", name: "Slider", variant: variant(compact ? "compact" : "regular", stepping && "stepped"), fixed: { width: false, height: true } });
+  return probe(root, {
+    role: "component",
+    name: "Slider",
+    variant: variant(compact ? "compact" : "regular", stepping && "stepped", knobbed && "knob"),
+    fixed: { width: false, height: true },
+  });
 }
