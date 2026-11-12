@@ -12,6 +12,7 @@
 
 /* The name's room takes what the value and the buttons leave; its hint floats from it, uncut. */
 .ct-name {
+  position: relative;
   display: flex;
   align-self: stretch;
   min-width: 0;
@@ -22,6 +23,7 @@
 }
 
 .ct-value {
+  position: relative;
   flex: none;
 }
 
