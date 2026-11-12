@@ -1959,15 +1959,24 @@
    `opacity.track`, as the slider's track is, `space.s4` round its choices. An unlit rail runs along
    its bottom edge across the flat part between the round ends, half the well's height in from each
    side: the tone at the spinner's ring's `opacity.spinner_track`. The picked choice's stretch of it
-   is lit, under its words, square at both ends: the core at night with the content glow round it,
-   as the spinner's arc, the tone by day with none, and solid glass (`primary_glass`) while the
-   signs are off. The rail is `tabs.rail` thick at night and `tabs.rail_day` by day, in whole device
+   is lit, under the choice `space.s12` in from its sides, square at both ends: the core at night
+   with the content glow round it, as the spinner's arc, the tone by day with none, and solid glass
+   (`primary_glass`) while the signs are off. The rail is `tabs.rail` thick at night and `tabs.rail_day` by day, in whole device
    pixels. The focus tube is the whole well's edge, drawn under the rail. Disabled, every part is at
-   `opacity.disabled_content`, with no glow. */
+   `opacity.disabled_content`, with no glow.
+
+   The well is as wide as its room and its choices share it in equal columns; laid out at its
+   content's width (beside others in a row, or in a room too narrow) every column is the widest
+   choice's, so the choices are always equal and none is cut. */
 .k-tabs {
   position: relative;
-  display: inline-flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   flex: none;
+  align-self: stretch;
+  min-width: max-content;
+  outline: none;
   box-sizing: border-box;
   height: var(--size-control_sm);
   padding: var(--space-s4);
@@ -1986,8 +1995,14 @@
   --dim: var(--opacity-disabled_content);
 }
 
-.k-tabs:has(> .k-tab:focus-visible) > .k-ring {
+.k-tabs:is(:has(> .k-tab:focus-visible), [data-stranded]:focus-visible) > .k-ring {
   --lit: 1;
+}
+
+/* A pick that is disabled: its stretch dims with its words and burns no glow. */
+.k-tabs[data-stranded] > .k-tabs-lit {
+  --dim: var(--opacity-disabled_content);
+  --rail-signs: 0;
 }
 
 .k-tabs[aria-disabled="true"] > .k-ring {
@@ -2030,8 +2045,8 @@
   --right-at: var(--trail);
 }
 
-/* A choice: as tall as the well less its padding, `space.s12` inside its sides, its words
-   `button_small` with an optional symbol `space.s4` before them. Not picked, the words are
+/* A choice: as tall as the well less its padding and as wide as its column, `space.s12` inside
+   its sides, its words `button_small` centred, with an optional symbol `space.s4` before them. Not picked, the words are
    `on_surface_variant`, brightening to `on_surface` under the pointer (`--lit`); picked, they are
    `primary_lit` (the core at night, fitted to the well; the tone by day), at night with the label
    glow round them while the signs are on. Pressed, a choice's words go to the picked colour over
@@ -2040,9 +2055,10 @@
   all: unset;
   box-sizing: border-box;
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  flex: none;
+  justify-content: center;
+  min-width: max-content;
   height: calc(var(--size-control_sm) - 2 * var(--space-s4));
   padding: 0 var(--space-s12);
   cursor: pointer;
@@ -2055,8 +2071,14 @@
   --picked: 1;
 }
 
+/* A choice disabled alone dims its words, picked or not, and burns no glow round them. */
 .k-tab:disabled {
   cursor: default;
+}
+
+.k-tabs:not([aria-disabled="true"]) > .k-tab:disabled {
+  --dim: var(--opacity-disabled_content);
+  --rail-signs: 0;
 }
 
 .k-tab.k-control {

@@ -1,28 +1,39 @@
 // The Tabs page: `docs/design/components/tabs.md`. One of a few views or values, picked along a
-// rail of neon in one well; the same well is the segmented control. The pick's lit stretch travels
-// to the new choice and flashes as it lands.
+// rail of neon in one well as wide as its room, the choices sharing it equally; the same well is
+// the segmented control. The pick's lit stretch travels to the new choice and flashes as it lands.
+// A choice may be disabled alone: the audio panel's Input while a headset is in Music mode.
 
 import type { Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
-import { stack } from "../../lib/layout.ts";
-import { type Tab, tabs } from "../../lib/tabs.ts";
+import { stack, within } from "../../lib/layout.ts";
+import { setTabDisabled, type Tab, tabs } from "../../lib/tabs.ts";
 import { wrapped } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
 
-const SECTIONS: readonly Tab[] = [{ label: "Wi-Fi" }, { label: "Bluetooth" }, { label: "Output" }, { label: "Keyboard" }];
+const SECTIONS: readonly Tab[] = [{ label: "Wi-Fi" }, { label: "Bluetooth" }, { label: "Audio" }, { label: "Keyboard" }];
 const TOOLS: readonly Tab[] = [
   { label: "Timer", icon: "timer" },
   { label: "Alarm", icon: "alarm" },
 ];
+const MODES: readonly Tab[] = [
+  { label: "Calls", icon: "call" },
+  { label: "Music", icon: "music_note" },
+];
 const MOTION: readonly Tab[] = [{ label: "Always" }, { label: "On AC" }, { label: "Never" }];
+const SIDES: readonly Tab[] = [{ label: "Output" }, { label: "Input" }, { label: "Options" }];
+/** The audio panel's sides in Music mode: the headset has no microphone, so Input is disabled. */
+const MUSIC_SIDES: readonly Tab[] = [{ label: "Output" }, { label: "Input", disabled: true }, { label: "Options" }];
+
+/** A shell panel's room for its rows: the panel less its padding either side. */
+const PANEL = "calc(var(--size-panel) - 2 * var(--space-s16))";
 
 const LONG: Words = { short: "On AC", long: "Only while plugged in" };
 
-/** A row of `choices`, `picked` lit as `state` would light it. */
+/** A row of `choices` in a panel's room, `picked` lit as `state` would light it. */
 function row(choices: readonly Tab[], picked: number, state: Shown = "rest"): HTMLElement {
   const { disabled, pinned } = stateOptions(state);
-  return tabs({ choices, picked, ...(disabled ? { disabled } : {}), ...(pinned ? { pinned } : {}) });
+  return within(PANEL, tabs({ choices, picked, ...(disabled ? { disabled } : {}), ...(pinned ? { pinned } : {}) }));
 }
 
 /** The control center's sections with the view each shows under them, which follows the pick. */
@@ -31,17 +42,31 @@ function sections(): HTMLElement {
   const view = wrapped(views[0]!, "body", "on_surface_variant");
   const row = tabs({
     choices: SECTIONS,
+    picked: 2,
     onPick: (index) => {
       view.textContent = views[index] ?? "";
     },
   });
-  return stack("s16", "start", row, view);
+  view.textContent = views[2]!;
+  return within(PANEL, stack("s16", "start", row, view));
+}
+
+/**
+ * The audio panel's two rows: Music disables Input under it. Input picked when Music is picked
+ * stays picked and dimmed, until Output or Options is picked.
+ */
+function audio(): HTMLElement {
+  const sides = tabs({ choices: SIDES, picked: 1 });
+  const modes = tabs({ choices: MODES, onPick: (index) => setTabDisabled(sides, 1, index === 1) });
+  return within(PANEL, stack("s16", "start", modes, sides));
 }
 
 const ROWS = [
-  { name: "Views", choices: SECTIONS, picked: 0 },
-  { name: "With symbols", choices: TOOLS, picked: 1 },
+  { name: "Views", choices: SECTIONS, picked: 2 },
+  { name: "With symbols", choices: MODES, picked: 1 },
   { name: "Segmented control", choices: MOTION, picked: 1 },
+  { name: "A choice disabled", choices: MUSIC_SIDES, picked: 0 },
+  { name: "The pick disabled", choices: MUSIC_SIDES, picked: 1 },
 ] as const;
 
 type MatrixState = "rest" | "lit" | "pressed" | "disabled";
@@ -75,7 +100,7 @@ function pickMove(name: string, what: string, from: number, to: number): Move {
     reduced: picking(true),
     back: "cuts",
     // The player moves parts inside its sample, so the well sits in a box of its own.
-    sample: () => stack(0, "start", tabs({ choices: SECTIONS, picked: to, from })),
+    sample: () => within(PANEL, tabs({ choices: SECTIONS, picked: to, from })),
   };
 }
 
@@ -83,13 +108,14 @@ export default page({
   level: "molecules",
   slug: "tabs",
   title: "Tabs",
-  lede: "One of a few views or values, picked along a rail of neon in one well.",
+  lede: "One of a few views or values, picked along a rail of neon in one well, its choices sharing the width.",
   code: { rust: "tabs::tabs", qml: "Tabs", unbuilt: "the neon rail: not built yet" },
-  stage: { live: () => stack("s24", "start", sections(), row(TOOLS, 1), row(MOTION, 1)), hint: "click a choice, or Tab and ← →", daylight: true },
+  stage: { live: () => stack("s24", "start", sections(), audio(), row(MOTION, 1)), hint: "pick Music, then ← → on Input", daylight: true },
   variants: [
-    { name: "Views", for: "a few views of one thing: the control center", sample: () => row(SECTIONS, 0) },
-    { name: "With symbols", for: "a symbol helps tell them apart: Timer, Alarm", sample: () => row(TOOLS, 1) },
+    { name: "Views", for: "a few views of one thing: the control center", sample: () => row(SECTIONS, 2) },
+    { name: "With symbols", for: "a symbol helps tell them apart: Calls, Music", sample: () => row(MODES, 0) },
     { name: "Segmented control", for: "a setting's few values side by side", sample: () => row(MOTION, 1) },
+    { name: "A choice disabled", for: "a view that can't open now: Input in Music mode", sample: () => row(MUSIC_SIDES, 0) },
   ],
   sizes: doesntApply("always a small control tall: no louder than the view."),
   states: {
@@ -104,7 +130,7 @@ export default page({
     looks: {
       rest: "unlit rail, the pick's stretch lit; words `primary_lit`",
       lit: "focus tube round the well; a pointed choice brightens its words",
-      pressed: "the choice's words go to the picked colour",
+      pressed: "the next open choice's words go to the picked colour",
       disabled: "every part at `opacity.disabled_content`, the pick still shown",
     },
   },
@@ -120,11 +146,12 @@ export default page({
     text: [{ name: "A choice's words", words: LONG, sample: (words: string) => row([{ label: "Always" }, { label: words }, { label: "Never" }], 1) }],
     missingPicture: doesntApply("a symbol is optional: a row's choices all have one or none."),
     counts: [
-      { name: "Two", for: "the fewest", sample: () => row(TOOLS, 0) },
+      { name: "Two", for: "the fewest: the clock's tools", sample: () => row(TOOLS, 0) },
+      { name: "Three, one disabled", for: "the audio panel's sides in Music mode", sample: () => row(MUSIC_SIDES, 2) },
       { name: "Four", for: "the control center's sections", sample: () => row(SECTIONS, 2) },
       {
         name: "Too many for the row",
-        for: "past its room, choices become a `Select`",
+        for: "past its room, at the widest choice each: becomes a `Select`",
         sample: () => row([...SECTIONS, { label: "Display" }, { label: "Power" }], 0),
       },
     ],
@@ -164,18 +191,18 @@ export default page({
   },
   keyboard: {
     keys: [
-      { keys: ["←", "h"], does: "picks the one before, wrapping round" },
-      { keys: ["→", "l"], does: "picks the one after, wrapping round" },
+      { keys: ["←", "h"], does: "picks the one before, wrapping round, passing a disabled one" },
+      { keys: ["→", "l"], does: "picks the one after, wrapping round, passing a disabled one" },
       { keys: ["Tab", "Shift+Tab"], does: "into the row, on its pick, or out: one stop" },
       { keys: ["Space", "Enter"], does: "nothing more: the keyboard's choice is already picked" },
     ],
-    order: "One stop in reading order, on the pick; a disabled row is skipped.",
+    order: "One stop in reading order, on the pick, or the well while the pick is disabled; a disabled row is skipped.",
     lands: "On the pick when a surface opens on its tabs; a pick keeps it on the row.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "With symbols", for: "well, padding, choice, symbol and gap, rail", sample: () => row(TOOLS, 1) },
-      { name: "Views", for: "the well as wide as its choices; the lit stretch", sample: () => row(SECTIONS, 0) },
+      { name: "With symbols", for: "well, padding, choice, symbol and gap, rail", sample: () => row(MODES, 1) },
+      { name: "Views", for: "equal choices across the room; the lit stretch", sample: () => row(SECTIONS, 2) },
     ]),
     measures: [
       { part: "Well height", token: "size-control_sm" },
@@ -187,6 +214,9 @@ export default page({
       { part: "Rail at night", token: "tabs-rail" },
       { part: "Rail by day", token: "tabs-rail_day" },
     ],
-    reflow: doesntApply("as wide as its choices: it never stretches, wraps or scrolls."),
+    reflow: {
+      note: "As wide as its room, choices in equal shares; never under the widest choice each, never wrapping.",
+      sample: () => within("100%", stack("s16", "start", tabs({ choices: SECTIONS, picked: 2 }), tabs({ choices: MUSIC_SIDES, picked: 0 }), tabs({ choices: MOTION, picked: 1 }))),
+    },
   },
 });
