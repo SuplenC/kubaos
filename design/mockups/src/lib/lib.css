@@ -2182,6 +2182,40 @@
   top: 0;
 }
 
+/* How far a held item's sweep has gone across it, 0 to 1. */
+@property --hold {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A held item (`holdable` in `lib/menu.ts`): lit, `error` at `opacity.tint` under its `error` words,
+   so the sweep has room to show. The sweep is `error` from its start to `--hold` of its width, over
+   the item's content, its own copy of it `on_error`, so the words read on either side of its edge;
+   the item's corners round its start, and its edge is straight. */
+.k-menu-item[data-held]:not([aria-disabled="true"]) {
+  --ink: var(--color-error);
+  background: color-mix(in srgb, transparent, rgb(from var(--color-error) r g b / var(--opacity-tint)) calc(var(--lit) * 100%));
+}
+
+.k-menu-hold {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 0 var(--space-s8);
+  border-radius: inherit;
+  background: var(--color-error);
+  clip-path: inset(0 calc((1 - var(--hold)) * 100%) 0 0);
+  pointer-events: none;
+}
+
+.k-menu-hold > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 /* The hairline between two groups, `space.s4` clear of each, inset as the items' words are, so it
    starts and ends `space.s12` from the popover's edge, as a select's rule does. */
 .k-menu-separator {

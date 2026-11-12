@@ -5,7 +5,7 @@
 
 import { shown, type Words } from "../../lib/content.ts";
 import { row, within } from "../../lib/layout.ts";
-import { type ItemPinned, type MenuEntry, type MenuItemSpec, menu, menuItem } from "../../lib/menu.ts";
+import { holdable, type ItemPinned, type MenuEntry, type MenuItemSpec, menu, menuItem } from "../../lib/menu.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
@@ -22,6 +22,39 @@ const ACTIONS: readonly MenuEntry[] = [
   "separator",
   { label: "Quit", icon: "logout", danger: true },
 ];
+
+/** A counter's menu: four steps, then the held one that removes it with its history. */
+const COUNTER: readonly MenuEntry[] = [
+  { label: "Rename", icon: "draw" },
+  { label: "Reset now", icon: "restart_alt" },
+  { label: "Auto reset", icon: "repeat", submenu: true },
+  { label: "History", icon: "history" },
+  "separator",
+  { label: "Hold to remove", icon: "delete", held: true },
+];
+
+const HOLD: MenuItemSpec = { label: "Hold to remove", icon: "delete", held: true };
+
+/** A held item alone, live: hold it with the pointer or Enter; taken, it says so and comes back. */
+function liveHold(): HTMLElement {
+  const item = alone(HOLD, true);
+  const inner = item.querySelector<HTMLElement>(".k-menu-item")!;
+  inner.tabIndex = 0;
+  const { press, release } = holdable(inner, () => {
+    inner.dataset.taken = "";
+    setTimeout(() => {
+      delete inner.dataset.taken;
+      inner.style.setProperty("--hold", "0");
+    }, 900);
+  });
+  inner.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.repeat) press();
+  });
+  inner.addEventListener("keyup", (event) => {
+    if (event.key === "Enter") release();
+  });
+  return item;
+}
 
 /** A few choices: the holidays' countries, one checked. */
 const COUNTRIES = ["None", "Germany", "Italy", "Poland"];
@@ -58,6 +91,7 @@ const ITEMS: readonly { readonly name: string; readonly spec: MenuItemSpec }[] =
   { name: "A choice, checked", spec: { label: "Poland", checked: true } },
   { name: "A choice, unchecked", spec: { label: "Italy", checked: false } },
   { name: "Danger", spec: { label: "Quit", icon: "logout", danger: true } },
+  { name: "Held", spec: HOLD },
 ];
 
 type MatrixState = "rest" | "lit" | "pressed" | "disabled";
@@ -65,6 +99,7 @@ type MatrixState = "rest" | "lit" | "pressed" | "disabled";
 /** An item in `state`: lit is the keyboard on it. */
 function cell(spec: MenuItemSpec, state: MatrixState): HTMLElement {
   if (state === "disabled") return alone({ ...spec, disabled: true });
+  if (spec.held && state === "pressed") return alone({ ...spec, holding: 0.4 }, true, "lit");
   return alone(spec, state !== "rest", state === "rest" ? undefined : state === "lit" ? "lit" : "pressed");
 }
 
@@ -74,13 +109,15 @@ export default page({
   title: "Menu and MenuItem",
   lede: "A few actions or choices one under the other on a popover: the item the keyboard is on is lit.",
   code: { rust: "menu::menu, menu::menu_item, menu::menu_separator", qml: "Menu, MenuItem" },
-  stage: { live: () => row("s32", "start", onPopover(ACTIONS), onPopover(choices(3), 3)), hint: "Tab in and ↑ ↓, or point at it", daylight: true },
+  stage: { live: () => row("s32", "start", onPopover(ACTIONS), onPopover(choices(3), 3), onPopover(COUNTER)), hint: "Tab in and ↑ ↓; hold the last, or Enter on it", daylight: true },
   variants: [
     { name: "Actions", for: "what can be done to one thing: symbols, keys, groups", sample: () => onPopover(ACTIONS) },
     { name: "Choices", for: "one of a few, checked; each item keeps the check's room", sample: () => onPopover(choices(3), 3) },
     { name: "MenuItem, with keys", for: "a shortcut's keys as keycaps at its end", sample: () => alone({ label: "Copy path", icon: "content_paste", keys: "Ctrl+C" }) },
     { name: "MenuItem, danger", for: "destroys something: in `error`", sample: () => alone({ label: "Quit", icon: "logout", danger: true }) },
     { name: "MenuItem, opening a submenu", for: "a chevron at its end: the tray's VPN Connections", sample: () => alone({ label: "VPN Connections", submenu: true }) },
+    { name: "MenuItem, held", for: "can't be taken back: held `duration.hold`, `error` sweeping across", sample: liveHold },
+    { name: "Held, part-way", for: "the sweep at 40%: words `on_error` under it", sample: () => alone({ ...HOLD, holding: 0.4 }, true, "lit") },
   ],
   sizes: doesntApply("an item is a small control tall; a menu as tall as its items, as wide as its popover."),
   states: {
@@ -94,8 +131,8 @@ export default page({
     rows: nonEmpty(ITEMS.map(({ name, spec }) => ({ name, cell: (state: MatrixState) => cell(spec, state) }))),
     looks: {
       rest: "no fill, `on_surface`; a danger item's `error`",
-      lit: "`secondary_container`, keycaps `primary`; danger fills `error`; no line or glow",
-      pressed: "lifts to `secondary_container_pressed`, or `error_pressed`",
+      lit: "`secondary_container`, keycaps `primary`; danger `error`; held `error` at `opacity.tint`",
+      pressed: "`secondary_container_pressed`, `error_pressed`; held: the sweep starts",
       disabled: "`on_surface` at `opacity.disabled_content`, passed over by the keys",
     },
   },
@@ -106,6 +143,7 @@ export default page({
     counts: [
       { name: "One", for: "still a menu: a tray app with only Quit", sample: () => onPopover([{ label: "Quit", icon: "logout", danger: true }]) },
       { name: "A few, in groups", for: "groups apart by hairlines", sample: () => onPopover(ACTIONS) },
+      { name: "A held one last", for: "a counter's menu: the held item alone after a hairline", sample: () => onPopover(COUNTER) },
       { name: "Past eight", for: "twelve held to eight: the rest scroll", sample: long },
     ],
   },
@@ -132,6 +170,22 @@ export default page({
         back: "plays",
         sample: () => alone({ label: "Copy path", icon: "content_paste", keys: "Ctrl+C" }, true, "lit"),
       },
+      {
+        name: "Held",
+        what: "Pressed or Enter down: `error` sweeps from its start over `hold` on `linear`; at its end it is taken.",
+        tracks: [{ part: "the sweep", on: "the held item", target: ".k-menu-item", property: "--hold", from: 0, to: 1, duration: "hold", curve: "linear" }],
+        reduced: "same",
+        back: "cuts",
+        sample: () => alone(HOLD, true, "lit"),
+      },
+      {
+        name: "Let go early",
+        what: "Let go or left before its end: the sweep runs back over `short` on `standard`.",
+        tracks: [{ part: "the sweep", on: "the held item", target: ".k-menu-item", property: "--hold", from: 0.6, to: 0, duration: "short", curve: "standard" }],
+        reduced: "same",
+        back: "cuts",
+        sample: () => alone({ ...HOLD, holding: 0.6 }, true, "lit"),
+      },
       ...powerMoves(() => onPopover(ACTIONS, 0, "lit")),
     ],
   },
@@ -141,6 +195,7 @@ export default page({
       { keys: ["↑", "k", "Ctrl+K", "Ctrl+P"], does: "previous item that can be taken, wrapping round" },
       { keys: ["Home", "End"], does: "first or last item that can be taken" },
       { keys: ["Enter"], does: "takes it, never on key repeat; the menu closes" },
+      { keys: ["Enter held"], does: "on a held item: holds it; let go early, it runs back" },
       { keys: ["Esc"], does: "leaves, or steps out of a submenu first" },
     ],
     order: "One stop: the keys move inside it, past disabled items and hairlines.",
@@ -150,6 +205,7 @@ export default page({
     samples: nonEmpty([
       { name: "A tray menu", for: "item height, padding, gaps, keys, hairlines", sample: () => onPopover(ACTIONS) },
       { name: "A choice", for: "the check's room, kept when unchecked", sample: () => alone({ label: "Italy", checked: false }, true) },
+      { name: "Held, part-way", for: "the sweep inside the item's box, its corners", sample: () => alone({ ...HOLD, holding: 0.4 }, true, "lit") },
     ]),
     measures: [
       { part: "Item height", token: "size-control_sm" },
@@ -162,6 +218,7 @@ export default page({
       { part: "Popover corners", token: "radius-control" },
       { part: "Item corners", token: "radius-row" },
       { part: "Menu width", token: "size-menu" },
+      { part: "Held item lit", token: "opacity-tint" },
     ],
     reflow: {
       note: "As wide as its popover, as tall as its items up to its room, then it scrolls; words end in an ellipsis.",
