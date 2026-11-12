@@ -733,6 +733,8 @@ export function clockEditor(host: EditorHost): Editor {
             stops: n + 1,
             index: n - Math.min(set.depth, n),
             names,
+            // The clock passes behind one layer after another under the pointer.
+            live: true,
             changed: (f) => {
               set.depth = n - f;
               if (set.depth > 0) set.last = set.depth;

@@ -82,6 +82,11 @@ export interface SliderOptions {
   readonly fine?: number;
   /** Told each time the value moves: a continuous slider's 0 to 1 as it moves, or the stop it settles on. */
   readonly changed?: (value: number) => void;
+  /**
+   * A slider with stops tells `changed` of each stop a drag passes as it passes it, for a value
+   * whose effect is judged while dragging; the fill still moves freely and settles on release.
+   */
+  readonly live?: boolean;
 }
 
 /** Each slider's own way of being set from outside, by its root. */
@@ -394,6 +399,21 @@ export function slider(options: SliderOptions): HTMLElement {
     stepTo(index + direction);
   }
 
+  // The stop the owner was last told of, during a drag.
+  let told = index;
+  /** Tells the owner where a drag has the value: as it moves, or for a live slider with stops, each stop it passes. */
+  function tell(): void {
+    if (!stepping) {
+      options.changed?.(value);
+      return;
+    }
+    if (!options.live) return;
+    const at = Math.round(shown * last);
+    if (at === told) return;
+    told = at;
+    options.changed?.(at);
+  }
+
   if (!options.disabled) {
     root.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
@@ -401,29 +421,29 @@ export function slider(options: SliderOptions): HTMLElement {
       for (const running of root.getAnimations()) running.cancel();
       delete root.dataset.settling;
       dragging = true;
+      told = index;
       root.dataset.dragging = "";
       shown = fractionAt(along(event));
       if (!stepping) value = shown;
       setToggled(false);
       draw();
-      if (!stepping) options.changed?.(value);
+      tell();
     });
     root.addEventListener("pointermove", (event) => {
       if (!dragging) return;
       shown = fractionAt(along(event));
       if (!stepping) value = shown;
       draw();
-      if (!stepping) options.changed?.(value);
+      tell();
     });
     const release = () => {
       if (!dragging) return;
       dragging = false;
       delete root.dataset.dragging;
       if (stepping) {
-        const was = index;
         index = Math.round(shown * last);
         drawToggle();
-        if (index !== was) options.changed?.(index);
+        if (index !== told) options.changed?.(index);
       }
       nameIcon();
       settle();

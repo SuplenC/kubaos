@@ -363,8 +363,10 @@
   min-height: var(--size-row_compact);
 }
 
+/* A margin, not a padding: a label's box is its words' width, and the column is sized from the
+   margin box, so the longest label at its indent sets the column. */
 .ce-row[data-sub] > :first-child {
-  padding-left: var(--space-s12);
+  margin-inline-start: var(--space-s12);
 }
 
 /* A setting with sub-settings is one well round the parent row and its sub-rows, drawn out past
@@ -395,6 +397,14 @@
   cursor: default;
 }
 
+/* Disabled, the hues are dimmed as a disabled control is, and their chroma lowered by the same
+   share: at the same opacity a wheel of every hue still reads brighter than a one-colour fill
+   beside it, so the share is taken off its colour too, not only its strength. */
+.ce-swatches[aria-disabled="true"] .ce-swatch[data-custom],
+.ce-hue[aria-disabled="true"] {
+  --ce-hue-shown: calc(var(--ce-hue-chroma) * var(--opacity-disabled_content));
+}
+
 .ce-swatch {
   all: unset;
   position: relative;
@@ -414,7 +424,7 @@
 
 /* Custom: the hues round the wheel, the colour picked in its middle once it is one. */
 .ce-swatch[data-custom] {
-  background: conic-gradient(in oklch longer hue, oklch(var(--ce-hue-tone) var(--ce-hue-chroma) 0), oklch(var(--ce-hue-tone) var(--ce-hue-chroma) 359.9));
+  background: conic-gradient(in oklch longer hue, oklch(var(--ce-hue-tone) var(--ce-hue-shown, var(--ce-hue-chroma)) 0), oklch(var(--ce-hue-tone) var(--ce-hue-shown, var(--ce-hue-chroma)) 359.9));
 }
 
 .ce-swatch[data-custom]::after {
@@ -433,7 +443,7 @@
   position: relative;
   height: var(--size-slider_compact);
   border-radius: var(--radius-full);
-  background: linear-gradient(90deg in oklch longer hue, oklch(var(--ce-hue-tone) var(--ce-hue-chroma) 0), oklch(var(--ce-hue-tone) var(--ce-hue-chroma) 359.9));
+  background: linear-gradient(90deg in oklch longer hue, oklch(var(--ce-hue-tone) var(--ce-hue-shown, var(--ce-hue-chroma)) 0), oklch(var(--ce-hue-tone) var(--ce-hue-shown, var(--ce-hue-chroma)) 359.9));
   cursor: pointer;
   outline: none;
   touch-action: none;
