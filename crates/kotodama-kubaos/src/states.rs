@@ -6,6 +6,7 @@
 //! | `packages.<group>` | on: the optional group is on | `/etc/kubaos/apt-groups`, else the manifest's default |
 //! | `files.tidy-daily` | on: the daily Downloads tidy | `U/desktop/files/tidy-downloads` exists |
 //! | `files.automount` | on: drives mount when plugged in | `U/desktop/files/no-automount` doesn't exist |
+//! | `workspaces.open-where-launched` | on: apps open on the workspace they were launched from | `U/desktop/workspaces/no-open-where-launched` doesn't exist |
 //! | `terminal.greeting` | on: the terminal greeting | `U/terminal/zsh/no-greeting` doesn't exist |
 //! | `keyboard.mac-accents` | on: the accents on Left Alt | `U/desktop/keyboard/keyboard.toml` |
 //! | `idle.keep-awake` | on: kept awake | `$XDG_RUNTIME_DIR/kubaos-keep-awake.json` |
@@ -76,6 +77,8 @@ use crate::suites::Installed;
 pub const TIDY_DAILY: &str = "files.tidy-daily";
 /// Whether drives mount when plugged in.
 pub const AUTOMOUNT: &str = "files.automount";
+/// Whether apps open on the workspace they were launched from.
+pub const OPEN_WHERE_LAUNCHED: &str = "workspaces.open-where-launched";
 /// Whether a new Ghostty window greets with fastfetch.
 pub const GREETING: &str = "terminal.greeting";
 /// Whether the Mac-style accents are on Left Alt.
@@ -288,6 +291,7 @@ impl States {
         let files = Files::new(config);
         self.set(TIDY_DAILY, Reading::Bool(files.tidy.daily()));
         self.set(AUTOMOUNT, Reading::Bool(files.automount.automount()));
+        self.set(OPEN_WHERE_LAUNCHED, Reading::Bool(files.launches.open_where_launched()));
         self.set(GREETING, Reading::Bool(!files.no_greeting.exists()));
         self.set(PHONE_LINK, Reading::Bool(files.phone.is_on()));
         self.set(FIRMWARE, Reading::Bool(files.updates.is_on(Part::Firmware)));
@@ -320,9 +324,11 @@ pub fn values(name: &str) -> Option<Values> {
     match name {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
-        TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK
-        | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES | BACKGROUND_YIELDS | UNFREE | PREVIEW
-        | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => Some(Values::Bool),
+        TIDY_DAILY | AUTOMOUNT | OPEN_WHERE_LAUNCHED | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY
+        | PROXY_LOCAL_NETWORK | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES | BACKGROUND_YIELDS
+        | UNFREE | PREVIEW | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => {
+            Some(Values::Bool)
+        }
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,
@@ -379,6 +385,7 @@ impl Places {
             files.extend([
                 user_layer.tidy.path().to_path_buf(),
                 user_layer.automount.path().to_path_buf(),
+                user_layer.launches.path().to_path_buf(),
                 user_layer.no_greeting,
                 user_layer.phone.path().to_path_buf(),
                 user_layer.updates.path(Part::Firmware),
@@ -411,6 +418,7 @@ impl Places {
 struct Files {
     tidy: kubaos_files::tidy::Setting,
     automount: kubaos_automount::settings::Settings,
+    launches: kubaos_launches::settings::Settings,
     no_greeting: PathBuf,
     phone: kubaos_phone::setting::Setting,
     /// The switches of the update's parts: Bitwarden, Nix and firmware, `U/desktop/update`.
@@ -428,6 +436,7 @@ impl Files {
         Files {
             tidy: kubaos_files::tidy::Setting::new(config),
             automount: kubaos_automount::settings::Settings::new(config),
+            launches: kubaos_launches::settings::Settings::new(config),
             no_greeting: kubaos_user_layer::dir(config, App::Zsh).join(NO_GREETING),
             phone: kubaos_phone::setting::Setting::new(config),
             updates: Switches::new(config),

@@ -139,6 +139,18 @@ fn the_files_settings_are_their_flag_files() {
 }
 
 #[test]
+fn apps_open_where_launched_until_its_off_file_exists() {
+    let machine = Machine::new();
+
+    let before = machine.read();
+    machine.write("config/kubaos/desktop/workspaces/no-open-where-launched", "");
+    let after = machine.read();
+
+    assert_eq!(before.get(OPEN_WHERE_LAUNCHED), Some(&on(true)));
+    assert_eq!(after.get(OPEN_WHERE_LAUNCHED), Some(&on(false)));
+}
+
+#[test]
 fn the_greeting_is_on_until_its_off_file_exists() {
     let machine = Machine::new();
 
@@ -478,6 +490,7 @@ fn every_file_a_state_is_read_from_is_watched() {
         "usr/share/kubaos/system/packages.toml",
         "config/kubaos/desktop/files/tidy-downloads",
         "config/kubaos/desktop/files/no-automount",
+        "config/kubaos/desktop/workspaces/no-open-where-launched",
         "config/kubaos/terminal/zsh/no-greeting",
         "config/kubaos/desktop/keyboard/keyboard.toml",
         "config/kubaos/desktop/phone/phone-link",

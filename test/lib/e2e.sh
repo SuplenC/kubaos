@@ -760,6 +760,10 @@ c_lua() {
   # short by a new focus, off with the setting, and always ending lit.
   as_user lua5.5 "$REPO/test/lua/focus_test.lua" "$REPO" "$USER_HOME/.config/hypr" ||
     { echo "FAIL test/lua/focus_test.lua"; bad=1; }
+  # Apps open where they were launched (config/hypr/launches.lua): each
+  # launch's rule, when it is on, and the windows it places.
+  as_user lua5.5 "$REPO/test/lua/launches_test.lua" "$REPO" ||
+    { echo "FAIL test/lua/launches_test.lua"; bad=1; }
   return "$bad"
 }
 

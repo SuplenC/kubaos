@@ -36,6 +36,9 @@ rec {
   # The automount for removable drives, and their Eject and photo import
   # (home/automount.nix).
   kubaos-automount = callCrate ../crates/kubaos-automount/package.nix;
+  # The launch watcher, so apps open where they were launched
+  # (home/launches.nix).
+  kubaos-launches = callCrate ../crates/kubaos-launches/package.nix;
   # The phone link's command (home/phone.nix).
   kubaos-phone = callCrate ../crates/kubaos-phone/package.nix;
   # The phone link's daemon. Pinned with the release: kubaos-phone speaks
