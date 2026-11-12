@@ -11,8 +11,9 @@
 //!
 //! # Owns
 //!
-//! - Reading queries ([`query`]), the calendar's months and days ([`calendar`]), holidays
-//!   ([`holidays`]), zone names ([`zones`]), and the settings in the user layer ([`settings`]).
+//! - Reading queries ([`query`]) and what repeats ([`recurrence`]), the calendar's months and days
+//!   ([`calendar`]), holidays ([`holidays`]), zone names ([`zones`]), and the settings in the user
+//!   layer ([`settings`]).
 //! - The popup's protocol ([`serve`]).
 //!
 //! # Not here
@@ -24,6 +25,7 @@ pub mod calendar;
 pub mod holidays;
 mod parse;
 pub mod query;
+pub mod recurrence;
 pub mod serve;
 pub mod settings;
 mod words;
