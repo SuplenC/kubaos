@@ -25,7 +25,7 @@ hl.on("hyprland.start", function()
   -- that needs WAYLAND_DISPLAY) is started in the same command, after this.
   local session_env = "systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP "
     .. "HYPRLAND_INSTANCE_SIGNATURE PATH QT_QPA_PLATFORM QT_QPA_PLATFORMTHEME GDK_BACKEND "
-    .. "ELECTRON_OZONE_PLATFORM_HINT XCURSOR_SIZE XCURSOR_THEME HYPRCURSOR_SIZE HYPRCURSOR_THEME; "
+    .. "ELECTRON_OZONE_PLATFORM_HINT DISPLAY_MODE XCURSOR_SIZE XCURSOR_THEME HYPRCURSOR_SIZE HYPRCURSOR_THEME; "
     .. "dbus-update-activation-environment --systemd --all; "
     -- Then graphical-session.target (through hyprland-session.target,
     -- home/desktop.nix): xdg-desktop-portal won't start without it.
