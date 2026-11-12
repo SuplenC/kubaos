@@ -323,12 +323,7 @@ fn watch(dir: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
             let _ = events.send(Event::Own(Own::Counters(CounterList::read())));
         },
     )
-    .map_err(|err| {
-        kotodama_extension::log!(
-            "not watching for KubaOS updates or the counters: {}",
-            watched::why(&err)
-        )
-    })
+    .map_err(|err| kotodama_extension::log!("not watching the state folder: {}", watched::why(&err)))
     .ok()?;
     watcher.watch(vec![dir]);
     Some(watcher)
