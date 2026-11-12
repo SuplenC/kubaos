@@ -442,6 +442,12 @@
   animation: none;
 }
 
+/* Shut, the gallery is the front picture's desktop over the whole screen: the pictures either side
+   are out of it, and their loops hold until it opens rather than ask for frames nobody sees. */
+.gl-screen:not([data-open]) .gl-art:not([data-on]) .gl-loop {
+  animation-play-state: paused;
+}
+
 @keyframes gl-breathe {
   from {
     opacity: 0;
