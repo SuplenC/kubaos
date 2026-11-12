@@ -81,7 +81,7 @@ mockups/tabs        design/mockups/src/pages/molecules/tabs.ts
 mockups/select      design/mockups/src/pages/molecules/select.ts
 mockups/popover     design/mockups/src/pages/molecules/popover.ts
 mockups/menu        design/mockups/src/pages/molecules/menu.ts
-mockups/inline-edit design/mockups/src/pages/molecules/inline-edit.ts design/mockups/src/lib/inline-edit.ts design/mockups/src/lib/inline-edit.css design/mockups/src/pages/shell/counters-parts.ts design/mockups/src/pages/shell/counters.css
+mockups/prompt design/mockups/src/pages/molecules/prompt.ts design/mockups/src/lib/prompt.ts design/mockups/src/lib/prompt.css design/mockups/src/pages/shell/counters-parts.ts design/mockups/src/pages/shell/counters.css
 mockups/calendar    design/mockups/src/pages/molecules/calendar.ts
 mockups/tile        design/mockups/src/pages/molecules/tile.ts
 mockups/collapsible design/mockups/src/pages/molecules/collapsible.ts

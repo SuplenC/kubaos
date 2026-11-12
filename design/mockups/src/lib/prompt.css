@@ -1,0 +1,22 @@
+/* A prompt (`lib/prompt.ts`): the library's Labelled Field on a popover, or inside a menu's. */
+
+/* Floating, it is placed under the text it changes in the layer it floats in, over what is there. */
+.k-prompt-float {
+  position: absolute;
+  z-index: 3;
+}
+
+/* Inside a menu's popover, whose padding is `space.s4`, it is `space.s8` in, so its label and Field
+   start `space.s12` from the popover's edge, as on a popover of its own and as the items' words. */
+.k-prompt-in {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-s8);
+}
+
+/* The Enter keycap at the label row's end, centred down the row on a whole device pixel. */
+:is(.k-prompt, .k-prompt-in) .k-labelled-head > .k-keycap {
+  align-self: flex-start;
+  margin-top: round(nearest, calc((var(--size-control_sm) - var(--size-keycap)) / 2), 1px);
+}
