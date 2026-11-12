@@ -9,7 +9,7 @@ import { emptyState } from "../../lib/empty-state.ts";
 import { withHint } from "../../lib/hint.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { filling, row, stack } from "../../lib/layout.ts";
-import { listRow, listRows, scrolled, well } from "../../lib/list.ts";
+import { flush, listRow, listRows, scrolled, well } from "../../lib/list.ts";
 import { type MenuEntry, menu, menuSeparator } from "../../lib/menu.ts";
 import { pill } from "../../lib/pill.ts";
 import { floatUnder, type PromptHeld, prompt } from "../../lib/prompt.ts";
@@ -299,7 +299,7 @@ export interface LiveHooks {
   readonly onEdit: (index: number, what: Editing, anchor: HTMLElement, row: CounterRow) => void;
 }
 
-/** The counters' rows in a well; past `MOST_ROWS` the well scrolls. */
+/** The counters' rows, flush on the sheet; past `MOST_ROWS` they scroll. */
 export function countersList(counters: readonly Counter[], options: ListOptions = {}): { element: HTMLElement; rows: CounterRow[] } {
   const widest = widestOf(counters);
   const rows = counters.map((counter, index) =>
@@ -335,6 +335,7 @@ export function countersList(counters: readonly Counter[], options: ListOptions 
       });
     }
   } else box = well("List", column);
+  flush(box);
   const keys = listRows(box, pane, () => rows.map((each) => each.element), {
     ...(options.current !== undefined ? { current: options.current } : {}),
     ...(options.pinned ? { pinned: options.pinned } : {}),
@@ -994,5 +995,5 @@ export function rowAlone(counter: Counter, options: Partial<RowOptions> = {}): H
   const made = counterRow(counter, { widest: widestOf([counter]), ...options });
   const column = stack("s4", "start", made.element);
   column.classList.add("k-list-rows");
-  return sheetBox(well("List", column));
+  return sheetBox(flush(well("List", column)));
 }
