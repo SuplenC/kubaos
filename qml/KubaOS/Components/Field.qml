@@ -46,6 +46,11 @@ FocusScope {
             }
         })
 
+    // Selects the whole value, the caret at its end: a prompt opening on a value to replace.
+    function selectAll(): void {
+        input.selectAll();
+    }
+
     implicitHeight: Tokens.size.control_md
     activeFocusOnTab: !root.locked
 

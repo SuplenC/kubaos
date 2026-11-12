@@ -35,6 +35,8 @@ mod menus;
 mod meters;
 mod page_scroll;
 mod progress;
+mod prompts;
+mod rolling_numbers;
 mod samples;
 mod sheets;
 mod skeletons;
@@ -77,6 +79,7 @@ const SECTIONS: &[Section] = &[
     page_scroll::SECTION,
     chips::SECTION,
     keycaps::SECTION,
+    rolling_numbers::SECTION,
     tooltips::SECTION,
     cards::SECTION,
     sheets::SECTION,
@@ -90,6 +93,7 @@ const SECTIONS: &[Section] = &[
     meters::SECTION,
     empty_states::SECTION,
     menus::SECTION,
+    prompts::SECTION,
     tables::SECTION,
     collapsibles::SECTION,
     errors::SECTION,

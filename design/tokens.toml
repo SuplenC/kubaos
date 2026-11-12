@@ -442,6 +442,13 @@ use = "A panel or dialog arriving, a page sliding in."
 ms = 800
 use = "A wallpaper fading in, the light/dark crossfade, a live list's new row fading in."
 
+# A hold, not a move: how long a step that can't be taken back is held before
+# it is taken. Reduce motion keeps it, since it is a timer, and the sweep that
+# shows it with it.
+[duration.hold]
+ms = 1100
+use = "A held control until it acts: Install, erasing a disk, a held menu item."
+
 [duration.scene]
 ms = 1200
 use = "A whole scene changing once: the lock screen lifting, Kōbō's welcome settling."
@@ -813,6 +820,7 @@ pairs = [
   { fg = "on_error", bg = "error", need = "text", use = "A Danger button's label" },
   { fg = "on_error", bg = "error", need = "text", opacity = "subdued_text", use = "A selected danger row's subtitle" },
   { fg = "error", bg = "surface", need = "text", use = "An invalid field's note, a failure" },
+  { fg = "error", bg = "surface_container", need = "text", use = "A danger or held menu item's words on its popover" },
   { fg = "on_error_container", bg = "error_container", need = "text", use = "A critical notification" },
   { fg = "on_error_container", bg = "error_container", need = "text", opacity = "subdued_text", use = "A critical notification's body" },
   { fg = "cold", bg = "surface", need = "text", use = "A holiday in the calendar, a cold chip's label" },

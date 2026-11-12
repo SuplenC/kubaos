@@ -206,6 +206,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `medium` | 300 | A panel or popup leaving, a log opening, a list reordering, a toast fading out, a neon tube striking on (the focus tube too). |
 | `long` | 500 | A panel or dialog arriving, a page sliding in. |
 | `slow` | 800 | A wallpaper fading in, the light/dark crossfade, a live list's new row fading in. |
+| `hold` | 1100 | Not a move but a timer: a held control until it acts (Kōbō's Install, a held menu item). Reduce motion keeps it. |
 | `scene` | 1200 | A whole scene changing once: the lock lifting, Kōbō's welcome settling. |
 
 | Curve (`[easing.*]`) | Bézier | For |
@@ -310,6 +311,7 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Tooltip` | none | width | surface, its popover's |
 | `Menu` | none | none | none |
 | `MenuItem` | `icon`, `check`, `danger` | height | control, nested 12 in a popover |
+| `Prompt` | `menu` | width | surface, its popover's; none in a menu |
 | `Table` | none | none | none |
 | `TableRow` | none | height | control |
 | `Collapsible` | `open` | none, holds content | control, its header |
@@ -320,6 +322,7 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Radio` | none | height | full |
 | `ProgressBar` | `danger` | height | full |
 | `Keycap` | none | height | small |
+| `RollingNumber` | none | height | none |
 | `Tabs` | none | height | control |
 | `Tile` | `detail` | height | control |
 | `Calendar` | `year` | both | full, its days and title; control, its months |
@@ -331,7 +334,8 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Step` | `todo`, `current`, `done` or `action`; `icon`; `mark` | none | control, nested 12 in a surface |
 | `DescriptionList` | none | none | none |
 | `ErrorBlock` | `long` | none | surface |
-| `List`, `EmptyList`, `Toast`, `Log` | none | none | surface |
+| `List` | `Flush` | none | surface; none when flush |
+| `EmptyList`, `Toast`, `Log` | none | none | surface |
 | `Media` | none | none | the caller's: control in a picker, nested in a card |
 | `PictureChoice` | `name-over` or `name-under` | none, holds content | control |
 | `Card`, `ChoiceCard` | none | none, holds content | surface |
@@ -361,6 +365,7 @@ Each component has a page of its own under `design/components/`: its constructor
 **Keys**
 
 - [Keycap and KeyHints](design/components/keycap.md)
+- [RollingNumber](design/components/rolling-number.md)
 
 **Inputs**
 
@@ -377,6 +382,7 @@ Each component has a page of its own under `design/components/`: its constructor
 **Menus, tables and collapsibles**
 
 - [Popover, Menu and MenuItem](design/components/menu.md)
+- [Prompt](design/components/prompt.md)
 - [Table and TableRow](design/components/table.md)
 - [Collapsible](design/components/collapsible.md)
 
