@@ -200,9 +200,9 @@ body {
   background: var(--color-surface);
 }
 
-/* Its padding for the width it takes (`--page-padding`), picked by `site/settle.ts`. */
+/* Its padding for the width it takes, picked by `site/settle.ts`. */
 .page-container {
-  padding-inline: var(--page-padding, var(--container-0-padding));
+  padding-inline: var(--container-0-padding);
   display: flex;
   flex-direction: column;
   gap: var(--space-s64);
@@ -460,6 +460,13 @@ body {
 [data-sample][data-engaged] {
   outline: var(--stroke-hairline_device_px) solid var(--color-outline);
   outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+/* A sample out of view (`sampleBox` in `site/dom.ts`) holds its endless loops where they are, so a
+   page asks for no frames for what nobody sees; they go on from there when it comes back. Only the
+   loops: a move that ends is left to end, so a sample scrolled to later has landed as it would. */
+[data-sample][data-away] :is(.gl-loop, .k-skeleton, .k-spinner, .k-step[data-running] > .k-row > .k-step-bead, .f-race) {
+  animation-play-state: paused;
 }
 
 /* A sample's own box on a stage or beside a description: as wide as the sample, the container's

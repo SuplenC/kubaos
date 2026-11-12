@@ -88,11 +88,18 @@ export function holdScaled(outer: HTMLElement, inner: HTMLElement, by: number, h
   growing.observe(inner);
 }
 
+// Every sample's box is `data-away` while none of it is in the viewport, which holds its endless
+// loops (`site.css`): a page scrolled past its samples asks for no frames.
+const seen = new IntersectionObserver((entries) => {
+  for (const entry of entries) (entry.target as HTMLElement).toggleAttribute("data-away", !entry.isIntersecting);
+});
+
 /**
  * Marks `box` as holding a live sample: a wheel over it scrolls the page until the reader clicks
- * into it (`site/scroll.ts`).
+ * into it (`site/scroll.ts`), and its endless loops hold while it is out of view.
  */
 export function sampleBox<E extends HTMLElement>(box: E): E {
   box.dataset.sample = "";
+  seen.observe(box);
   return box;
 }
