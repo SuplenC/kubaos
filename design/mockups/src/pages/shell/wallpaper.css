@@ -3,10 +3,12 @@
    each picture; the bar along the foot. */
 
 /* How far the gallery has stepped out to the picture in front of you: 0 the wall, 1 that picture
-   filling the screen, which the live desktop is when the gallery is shut. */
+   filling the screen, which the live desktop is when the gallery is shut. It and `--room-lit` are
+   handed down only to the boxes that read them (`inherit` below): a frame of a move restyles the
+   room, the wall and the frames, not every box of the pictures hung in it. */
 @property --out {
   syntax: "<number>";
-  inherits: true;
+  inherits: false;
   initial-value: 0;
 }
 
@@ -15,20 +17,21 @@
    the light and the room's colours together, so they never part. */
 @property --room-lit {
   syntax: "<number>";
-  inherits: true;
+  inherits: false;
   initial-value: 0;
 }
 
-/* Which picture of a floor is in front of you, and which floor: the wall and the floors glide to it. */
+/* Which picture of a floor is in front of you, and which floor: the wall and the floors glide to it.
+   Each is read where it is set alone. */
 @property --at {
   syntax: "<number>";
-  inherits: true;
+  inherits: false;
   initial-value: 0;
 }
 
 @property --floor {
   syntax: "<number>";
-  inherits: true;
+  inherits: false;
   initial-value: 0;
 }
 
@@ -78,7 +81,50 @@
   --pic-height: calc(var(--screen-height) * var(--share));
   --pic-top: calc(var(--screen-height) * var(--scale-gallery_top));
   --pitch: calc(var(--pic-width) + var(--screen-width) * var(--scale-gallery_gap));
-  /* Stepping out grows the room round the picture in front of you until it is the screen. */
+}
+
+/* The boxes that read how far the gallery has stepped out and how lit the room is, and those
+   between them and the screen, which hand them down. */
+.gl-room,
+.gl-floors,
+.gl-floor,
+.gl-track,
+.gl-art,
+.gl-frame,
+.gl-lamp,
+.gl-controls {
+  --out: inherit;
+  --room-lit: inherit;
+}
+
+/* Stepping out grows the room round the picture in front of you until it is the screen: worked out
+   on each box that reads it, from the number handed down, and like the front frame's place on
+   the covering controls never inherited, so a frame of the step restyles only those boxes. */
+@property --zoom {
+  syntax: "*";
+  inherits: false;
+}
+
+@property --frame-y {
+  syntax: "*";
+  inherits: false;
+}
+
+@property --frame-half-w {
+  syntax: "*";
+  inherits: false;
+}
+
+@property --frame-half-h {
+  syntax: "*";
+  inherits: false;
+}
+
+/* Stepping out grows the room round the picture in front of you until it is the screen: worked out
+   on each box that reads it, from the number handed down. */
+.gl-room,
+.gl-frame,
+.gl-controls {
   --zoom: calc(1 + (1 / var(--share) - 1) * var(--out));
 }
 
