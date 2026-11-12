@@ -33,6 +33,7 @@ export function matrix<S extends State>(states: States<S>, focus: Focus | Doesnt
         name: `${row.name} · ${name(column)} · ${MODE_NAMES[mode]}`,
         words: words(column),
         sample: column === "signsOff" ? off!.signsOff(index) : row.cell(column),
+        make: () => (column === "signsOff" ? off!.signsOff(index) : row.cell(column)),
         at: [MODE_NAMES[mode], row.name, name(column)],
         frame: (sample: Element) => painted(theme, mode, sample),
       })),

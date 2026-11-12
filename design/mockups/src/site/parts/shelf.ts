@@ -8,7 +8,8 @@
 
 import { applies, type DoesntApply } from "../page.ts";
 import { el, label, prose, relayout, sampleBox } from "../dom.ts";
-import { ALL } from "../settings.ts";
+import { fullScreenControl, isScreen } from "../full-screen.ts";
+import { ALL, type Mode, settings } from "../settings.ts";
 import { picker } from "./picker.ts";
 import { notApplying, subheading } from "./section.ts";
 
@@ -17,6 +18,8 @@ export interface Item {
   readonly name: string;
   readonly words?: string;
   readonly sample: Element;
+  /** It drawn afresh, as `sample` was: what the full-screen tool shows of a sample that is a screen. */
+  readonly make?: () => Element;
   /**
    * Its place on a stage's switcher, a choice per row of chips, broadest first (a mode, a row, a
    * state); its name alone when it has none.
@@ -159,11 +162,22 @@ export function inspected(items: readonly Item[]): HTMLElement {
  * it; one that fills its room, across the stage, under its words.
  */
 function shown(item: Item): HTMLElement {
+  const { make } = item;
+  // Its mode is the box it is drawn in's: a state's cell is painted in its own.
+  const mode = () => (item.sample.parentElement?.closest<HTMLElement>("[data-mode]")?.dataset.mode as Mode | undefined) ?? settings().mode;
+  const full = make && isScreen([item.sample]) ? fullScreenControl(() => ({ make, mode: mode() })) : null;
   const body = el(
     "div",
     "page-stage-item",
     sampleBox(el("div", "page-view", item.frame ? item.frame(item.sample) : item.sample)),
-    el("div", "page-stage-words", label(item.name, "body_strong", "on_surface"), ...(item.words ? [prose(item.words)] : []), ...(item.aside ? [item.aside] : [])),
+    el(
+      "div",
+      "page-stage-words",
+      label(item.name, "body_strong", "on_surface"),
+      ...(item.words ? [prose(item.words)] : []),
+      ...(item.aside ? [item.aside] : []),
+      ...(full ? [full] : []),
+    ),
   );
   body.toggleAttribute("data-fluid", item.fluid ?? false);
   return body;
