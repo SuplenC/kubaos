@@ -5,12 +5,17 @@
 import type { Words } from "../../lib/content.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page, screen } from "../../site/page.ts";
+import { PROMPT_CLOSES, PROMPT_INVALID, PROMPT_OPENS } from "../molecules/prompt.ts";
 import {
+  anchorOf,
+  askFor,
+  askStop,
   autoMenu,
   type Counter,
   COUNTERS,
   counterMenu,
   countersList,
+  type Editing,
   countersOnScreen,
   countersPill,
   historyPage,
@@ -21,7 +26,7 @@ import {
   sheetBox,
 } from "./counters-parts.ts";
 
-type Shown = "rest" | "lit" | "pressed" | "open" | "disabled" | "empty";
+type Shown = "rest" | "lit" | "pressed" | "open" | "disabled" | "empty" | "error";
 
 /** The water glass at its stop: + is a reset. */
 const STOPPED: readonly Counter[] = COUNTERS.map((each) => (each.cap !== undefined ? { ...each, value: each.cap } : each));
@@ -37,6 +42,31 @@ const onList = screen((counters: readonly Counter[] = COUNTERS, options: Paramet
 const withMenu = screen((card: HTMLElement, row = 1) => countersOnScreen({ content: listed(COUNTERS, { menuOpen: row }), over: { card, ...AT } }));
 
 const withHistory = screen((counter: Counter, options: Parameters<typeof historyPage>[1] = {}) => countersOnScreen({ content: sheetBox(historyPage(counter, options)), height: "calc(var(--size-app_min_height) + var(--space-s64) * 3)" }));
+
+/** The list with a prompt for Coffee's name or value under it, `typed` in it, the keyboard in it. */
+const withAsk = screen((what: Editing, options: { typed?: string; invalid?: boolean; counters?: readonly Counter[] } = {}) =>
+  countersOnScreen({
+    content: listed(options.counters ?? COUNTERS),
+    prompt: {
+      card: askFor(what, (options.counters ?? COUNTERS)[0]!, { pinned: "lit", ...(options.typed !== undefined ? { typed: options.typed } : {}), ...(options.invalid ? { invalid: true } : {}) }),
+      anchor: anchorOf(0, what),
+      held: what === "value" ? "end" : "start",
+    },
+  }),
+);
+
+/** Auto reset over the water glass's row, with the prompt for its stop under N. */
+const withStop = screen((options: { typed?: string; invalid?: boolean } = {}) =>
+  countersOnScreen({
+    content: listed(COUNTERS, { menuOpen: 1 }),
+    over: { card: autoMenu(COUNTERS[1]!, { current: 2 }), ...AT },
+    prompt: {
+      card: askStop(COUNTERS[1]!, { pinned: "lit", ...(options.typed !== undefined ? { typed: options.typed } : {}), ...(options.invalid ? { invalid: true } : {}) }),
+      anchor: ".ct-cap",
+      held: "end",
+    },
+  }),
+);
 
 const live = screen(() => liveCounters());
 
@@ -112,6 +142,8 @@ function cell(state: Shown): HTMLElement {
       return onList(COUNTERS, { current: 3 });
     case "empty":
       return countersOnScreen({ content: null, none: true });
+    case "error":
+      return withAsk("name", { typed: "", invalid: true });
   }
 }
 
@@ -123,7 +155,7 @@ export default page<Shown>({
   title: "Counters",
   lede: "Named counters in the bar: a pill opens a sheet of rows, each counted with − and +.",
   code: { unbuilt: "QML: not built yet" },
-  from: nonEmpty(["pill", "list", "icon-button", "rolling-number", "inline-edit", "popover", "menu", "field", "tabs", "empty-state"]),
+  from: nonEmpty(["pill", "list", "icon-button", "rolling-number", "prompt", "popover", "menu", "field", "tabs", "empty-state"]),
   stage: { live, hint: "pill opens it; right-click a row; + − F2 Shift+F2 Menu", daylight: true },
   variants: [
     { name: "Open", for: "a row per counter, its rule under its name", sample: () => onList() },
@@ -131,11 +163,15 @@ export default page<Shown>({
     { name: "Its menu", for: "right-click: the row stays lit under it", sample: () => withMenu(counterMenu(COUNTERS[1]!, { current: 0 })) },
     { name: "Holding Remove", for: "the sweep part-way; letting go runs it back", sample: () => withMenu(counterMenu(COUNTERS[1]!, { current: 5, holding: 0.45 })) },
     { name: "Auto reset, read", for: "what it read and the next reset", sample: () => withMenu(autoMenu(COUNTERS[0]!, { typed: "every day at 9", fieldLit: true })) },
-    { name: "Auto reset, unread", for: "the phrases it reads, in `error`", sample: () => withMenu(autoMenu(COUNTERS[0]!, { typed: "whenever I feel like it", fieldLit: true })) },
+    { name: "Auto reset, unread", for: "typing: the phrases it reads", sample: () => withMenu(autoMenu(COUNTERS[0]!, { typed: "whenever I feel like it", fieldLit: true })) },
+    { name: "Auto reset, can't read", for: "Enter on it: `Invalid`, the reason", sample: () => withMenu(autoMenu(COUNTERS[0]!, { typed: "whenever I feel like it", fieldLit: true, invalid: true })) },
     { name: "Auto reset, empty", for: "the phrases it reads", sample: () => withMenu(autoMenu(COUNTERS[3]!, { typed: "", fieldLit: true })) },
-    { name: "When it reaches, typed", for: "N edited in the item", sample: () => withMenu(autoMenu(COUNTERS[1]!, { current: 2, editingCap: true })) },
-    { name: "Renaming", for: "double-click or F2: the name in its box", sample: () => onList(COUNTERS, { current: 0, editing: { index: 0, what: "name" } }) },
-    { name: "Setting the value", for: "double-click it or Shift+F2", sample: () => onList(COUNTERS, { current: 0, editing: { index: 0, what: "value" } }) },
+    { name: "When it reaches, asked", for: "the item taken: a Prompt under N", sample: () => withStop() },
+    { name: "When it reaches, can't take", for: "0 or not a number: `Invalid`", sample: () => withStop({ typed: "0", invalid: true }) },
+    { name: "Renaming", for: "double-click or F2: a Prompt under the name", sample: () => withAsk("name") },
+    { name: "Renaming, empty", for: "Enter on it: `Invalid`, the reason", sample: () => withAsk("name", { typed: "", invalid: true }) },
+    { name: "Setting the value", for: "double-click it or Shift+F2: under the value", sample: () => withAsk("value") },
+    { name: "Setting the value, not a count", for: "Enter on it: `Invalid`, the reason", sample: () => withAsk("value", { typed: "3.5", invalid: true }) },
     { name: "History", for: "every change, newest first", sample: () => withHistory(COUNTERS[0]!) },
     { name: "History by day", for: "each day's changes and how much it added", sample: () => withHistory(COUNTERS[0]!, { group: "day" }) },
     { name: "History by week, most added", for: "the busiest week first", sample: () => withHistory(COUNTERS[2]!, { group: "week", sort: "most" }) },
@@ -144,11 +180,10 @@ export default page<Shown>({
   ],
   sizes: doesntApply("one size: the sheet `size.panel` wide, rows `size.row_two_line`."),
   states: {
-    shown: ["rest", "lit", "pressed", "open", "disabled", "empty"],
+    shown: ["rest", "lit", "pressed", "open", "disabled", "empty", "error"],
     absent: {
       selected: "no counter is picked; the keyboard's row is lit",
       loading: "the counters are read before the pill shows",
-      error: "nothing it shows can fail; a typed value shakes",
     },
     rows: [{ name: "The sheet", cell }],
     looks: {
@@ -158,11 +193,15 @@ export default page<Shown>({
       open: "a row's menu at the pointer",
       disabled: "at 0: − dimmed, Reset now dimmed",
       empty: "no counters: no pill, no sheet",
+      error: "a Prompt's value it can't take: `Invalid`, the reason",
     },
   },
   focus: doesntApply("no line of its own: the List's well, the Menu, the Field and the Tabs light theirs."),
   content: {
-    text: [{ name: "A counter's name", words: NAME, sample: (words: string) => onList([{ ...COUNTERS[0]!, name: words }, ...COUNTERS.slice(1)]) }],
+    text: [
+      { name: "A counter's name", words: NAME, sample: (words: string) => onList([{ ...COUNTERS[0]!, name: words }, ...COUNTERS.slice(1)]) },
+      { name: "A name, renaming", words: NAME, sample: (words: string) => withAsk("name", { counters: [{ ...COUNTERS[0]!, name: words }, ...COUNTERS.slice(1)] }) },
+    ],
     missingPicture: doesntApply("its symbols are fixed; it shows no picture."),
     counts: [
       { name: "None", for: "the pill is gone", sample: () => countersOnScreen({ content: null, none: true }) },
@@ -173,29 +212,37 @@ export default page<Shown>({
   motion: {
     arrives: [OPENS],
     leaves: [CLOSES],
-    between: [COUNTS, HELD, ...powerMoves(() => onList(COUNTERS, { current: 0 }))],
+    between: [
+      { ...PROMPT_OPENS, name: "A prompt opens", sample: () => withAsk("name") },
+      { ...PROMPT_CLOSES, name: "A prompt closes", sample: () => withAsk("name") },
+      { ...PROMPT_INVALID, name: "A prompt can't take it", sample: () => withAsk("name", { typed: "" }) },
+      COUNTS,
+      HELD,
+      ...powerMoves(() => onList(COUNTERS, { current: 0 })),
+    ],
   },
   keyboard: {
     keys: [
       { keys: ["↑", "↓", "j", "k"], does: "the rows, round" },
       { keys: ["+", "="], does: "+1, or reset at its stop" },
       { keys: ["-"], does: "−1; nothing at 0" },
-      { keys: ["F2"], does: "renames the row's counter in place" },
-      { keys: ["Shift+F2"], does: "sets its value in place" },
-      { keys: ["Enter"], does: "while editing: saves" },
-      { keys: ["Esc"], does: "cancels an edit, closes the menu, leaves history, closes" },
+      { keys: ["F2"], does: "asks for the row's name, under it" },
+      { keys: ["Shift+F2"], does: "asks for its value, under it" },
+      { keys: ["Enter"], does: "in a Prompt: saves, or shows why it can't" },
+      { keys: ["Esc"], does: "cancels a Prompt, closes the menu, leaves history, closes" },
       { keys: ["Menu", "Shift+F10"], does: "the row's menu, under it" },
       { keys: ["Enter held"], does: "on Hold to remove: holds it" },
     ],
-    order: "The list, one stop; its menu, Auto reset's Back, type box and choices; history's Back, Group, Sort, list.",
-    lands: "Opening, on the list with no row lit; history, on Back; leaving history, on the list.",
+    order: "The list, one stop; a Prompt, its Field alone; its menu, Auto reset's Back, type box and choices; history's Back, Group, Sort, list.",
+    lands: "Opening, on the list; a Prompt, in its Field, all selected, then back on the list; history, on Back.",
   },
   measures: {
     samples: nonEmpty([
       { name: "A row", for: "name, rule, value, − and +", sample: () => rowAlone(COUNTERS[0]!, { widest: "000" }) },
       { name: "The bar's pill", for: "a lone symbol", sample: () => countersPill() },
       { name: "The menu", for: "the library's popover and items", sample: () => counterMenu(COUNTERS[1]!) },
-      { name: "Auto reset", for: "the type box and its answer", sample: () => autoMenu(COUNTERS[0]!, { typed: "every day at 9" }) },
+      { name: "Auto reset", for: "the type box, a Prompt in the menu", sample: () => autoMenu(COUNTERS[0]!, { typed: "every day at 9" }) },
+      { name: "A Prompt", for: "the library's popover, label, Field, Note", sample: () => askFor("name", COUNTERS[0]!, { typed: "", invalid: true, pinned: "lit" }) },
       { name: "History", for: "its head, tabs and rows", sample: () => sheetBox(historyPage(COUNTERS[0]!)) },
     ]),
     measures: [
@@ -209,7 +256,8 @@ export default page<Shown>({
       { part: "Between − and +", token: "space-s8" },
       { part: "Value line", token: "type-mono_large-line" },
       { part: "History row", token: "size-row" },
-      { part: "Menu width", token: "size-menu" },
+      { part: "Menu and Prompt width", token: "size-menu" },
+      { part: "Prompt under its text", token: "space-s8" },
     ],
     reflow: doesntApply("it keeps the corner and `size.panel` on every screen; past eight rows the list scrolls."),
   },

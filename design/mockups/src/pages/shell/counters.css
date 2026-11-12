@@ -10,14 +10,19 @@
   padding: var(--space-s8);
 }
 
-/* The name's room takes what the value and the buttons leave. */
+/* The name's room takes what the value and the buttons leave; its hint floats from it, uncut. */
 .ct-name {
+  display: flex;
   align-self: stretch;
+  min-width: 0;
+}
+
+.ct-name > .k-list-title {
+  min-width: 0;
 }
 
 .ct-value {
   flex: none;
-  width: calc(var(--slots) * round(up, calc(var(--figure) * var(--px) - 0.001px), 1px));
 }
 
 /* A row whose menu is open stays lit under it. */
@@ -31,20 +36,6 @@
   left: var(--ct-x);
   top: var(--ct-y);
   z-index: 2;
-}
-
-/* Auto reset: the type box and what it read, `space.s4` inside the popover as an item's sides
-   are, `space.s8` between them. */
-.ct-read {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-s8);
-  padding: var(--space-s4);
-}
-
-.ct-answer {
-  display: block;
-  padding: 0 var(--space-s8);
 }
 
 /* N in When it reaches, held to the item's end before its check. */
