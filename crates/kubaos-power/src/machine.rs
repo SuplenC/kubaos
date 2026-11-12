@@ -195,7 +195,7 @@ pub struct Cpu {
 pub struct SchedExt {
     /// `disabled`, `enabling`, `enabled` or `disabling`.
     pub state: String,
-    /// The BPF scheduler's name while one runs: `lavd_1.1.2_…`.
+    /// The BPF scheduler's name while one runs: `lavd_1.1.4_…`.
     pub ops: Option<String>,
 }
 
