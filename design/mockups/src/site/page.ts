@@ -52,6 +52,23 @@ export function nonEmpty<T>(list: readonly T[]): NonEmpty<T> {
 /** Something live on the page: drawn again whenever the words or the page change. */
 export type Sample = () => Element;
 
+const screens = new WeakSet<(...args: never[]) => Element>();
+
+/**
+ * Marks `draw`, which draws a whole screen, as one: it goes on its section's stage whatever its
+ * width, so the site needn't draw it to place it, and draws it only when the stage first shows it.
+ * A page of many screens is drawn in the time of the few in view, not of all of them.
+ */
+export function screen<F extends (...args: never[]) => Element>(draw: F): F {
+  screens.add(draw);
+  return draw;
+}
+
+/** Whether `draw` was marked as drawing a whole screen (`screen`). */
+export function drawsScreen(draw: (...args: never[]) => Element): boolean {
+  return screens.has(draw);
+}
+
 /**
  * The levels (`docs/DESIGN.md`, "Levels and where they live"), and the layout primitives beside
  * them, in the navigation's order.

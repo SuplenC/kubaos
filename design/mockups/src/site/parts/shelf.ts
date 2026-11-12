@@ -17,7 +17,11 @@ import { notApplying, subheading } from "./section.ts";
 export interface Item {
   readonly name: string;
   readonly words?: string;
-  readonly sample: Element;
+  /**
+   * It, drawn; or how to draw it, for a whole screen (`screen` in `site/page.ts`), which goes on a
+   * stage and is drawn when the stage first shows it (`sampleOf`).
+   */
+  readonly sample: Element | (() => Element);
   /** It drawn afresh, as `sample` was: what the full-screen tool shows of a sample that is a screen. */
   readonly make?: () => Element;
   /**
@@ -46,6 +50,18 @@ export interface Group {
   readonly small?: (items: readonly Item[]) => Element;
 }
 
+const drawnLater = new WeakMap<() => Element, Element>();
+
+/** `item`'s sample, drawn now if it is drawn when first shown and hasn't been. */
+export function sampleOf(item: Item): Element {
+  if (item.sample instanceof Element) return item.sample;
+  const known = drawnLater.get(item.sample);
+  if (known) return known;
+  const made = item.sample();
+  drawnLater.set(item.sample, made);
+  return made;
+}
+
 /**
  * Whether `item`, `width` wide in the page's CSS pixels, is as big as a window: wider than a text
  * column, it would leave no room beside it, and a grid of such could hold only one a row. A whole
@@ -53,6 +69,7 @@ export interface Group {
  * width, and one that fills whatever room it has is drawn as wide as the page, so it is one too.
  */
 function windowSized(item: Item, width: number, column: number): boolean {
+  if (!(item.sample instanceof Element)) return true;
   const whole = item.sample.matches("[data-whole]") || item.sample.querySelector("[data-whole]") !== null;
   return width > column || whole || (item.fluid ?? false);
 }
@@ -60,12 +77,13 @@ function windowSized(item: Item, width: number, column: number): boolean {
 /**
  * Each group's samples' widths as drawn at their own, in the page's CSS pixels, and a column's
  * width: the samples are laid out once, together, in a box of no width of its own on the page.
+ * A whole screen drawn when first shown is a stage's whatever its width, so it isn't drawn here.
  */
 function measure(groups: readonly (readonly Item[])[]): { widths: number[][]; column: number } {
   const page = document.getElementById("page") ?? document.body;
   const host = el("div", "page-measure");
   const column = el("div", "page-measure-column");
-  const boxes = groups.map((items) => items.map((item) => el("div", "page-measure-item", item.sample)));
+  const boxes = groups.map((items) => items.map((item) => el("div", "page-measure-item", ...(item.sample instanceof Element ? [item.sample] : []))));
   host.append(column, ...boxes.flat());
   page.append(host);
   // The page is zoomed so its CSS pixels are device pixels: a box is read back in them.
@@ -138,7 +156,7 @@ export function cards(items: readonly Item[], widest: number): HTMLElement {
       el(
         "div",
         "page-card",
-        sampleBox(el("div", "page-card-sample", item.sample)),
+        sampleBox(el("div", "page-card-sample", sampleOf(item))),
         el("div", "page-card-words", label(item.name, "label", "on_surface"), ...(item.words ? [prose(item.words, "body", "on_surface_variant")] : []), ...(item.aside ? [item.aside] : [])),
       ),
     ),
@@ -157,19 +175,27 @@ export function inspected(items: readonly Item[]): HTMLElement {
   return grid;
 }
 
+/** An item on a stage, and how to draw its sample in it, which the stage does when it shows it. */
+interface Shown {
+  readonly body: HTMLElement;
+  readonly draw: () => void;
+}
+
 /**
  * An item on a stage: it at its real size in a box of its own, its name and words beside or under
  * it; one that fills its room, across the stage, under its words.
  */
-function shown(item: Item): HTMLElement {
+function shown(item: Item): Shown {
   const { make } = item;
+  const view = sampleBox(el("div", "page-view"));
   // Its mode is the box it is drawn in's: a state's cell is painted in its own.
-  const mode = () => (item.sample.parentElement?.closest<HTMLElement>("[data-mode]")?.dataset.mode as Mode | undefined) ?? settings().mode;
-  const full = make && isScreen([item.sample]) ? fullScreenControl(() => ({ make, mode: mode() })) : null;
+  const mode = () => (sampleOf(item).parentElement?.closest<HTMLElement>("[data-mode]")?.dataset.mode as Mode | undefined) ?? settings().mode;
+  // A sample drawn when first shown is a screen by its page's word; the tool reads it once drawn.
+  const full = make && (!(item.sample instanceof Element) || isScreen([item.sample])) ? fullScreenControl(() => ({ make, mode: mode() })) : null;
   const body = el(
     "div",
     "page-stage-item",
-    sampleBox(el("div", "page-view", item.frame ? item.frame(item.sample) : item.sample)),
+    view,
     el(
       "div",
       "page-stage-words",
@@ -180,17 +206,27 @@ function shown(item: Item): HTMLElement {
     ),
   );
   body.toggleAttribute("data-fluid", item.fluid ?? false);
-  return body;
+  const draw = () => {
+    if (view.firstChild) return;
+    const sample = sampleOf(item);
+    view.append(item.frame ? item.frame(sample) : sample);
+    if (full) full.hidden = !isScreen([sample]);
+  };
+  if (item.sample instanceof Element) draw();
+  return { body, draw };
 }
 
 /**
  * Samples as big as a window on one stage, a row of chips per level of their places picking the
- * one shown; with `?all`, every one of them, one under another.
+ * one shown, a whole screen drawn when it is first picked; with `?all`, every one of them, one
+ * under another.
  */
 export function stage(items: readonly Item[]): HTMLElement {
-  const bodies = items.map(shown);
+  const made = items.map(shown);
+  const bodies = made.map((each) => each.body);
   const box = el("div", "page-stage");
   if (ALL) {
+    for (const each of made) each.draw();
     box.append(...bodies);
     return box;
   }
@@ -232,6 +268,7 @@ export function stage(items: readonly Item[]): HTMLElement {
   /** Shows the item the picks name, and lays the page out again for it. */
   const show = (): void => {
     const at = places.findIndex((place) => place.every((value, i) => picked[i] === value));
+    made[at]?.draw();
     bodies.forEach((body, i) => {
       body.hidden = i !== at;
     });
