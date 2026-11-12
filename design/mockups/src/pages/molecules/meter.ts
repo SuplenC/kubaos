@@ -91,7 +91,7 @@ function live(): HTMLElement {
  * rising and falling, short gaps between syllables and longer pauses between words, over a little
  * room noise. Seeded, so it says the same each time the page is drawn.
  */
-function voice(): (now: number) => number {
+export function voice(): (now: number) => number {
   let seed = 0x5eed;
   const random = () => {
     seed = (seed + 0x6d2b79f5) | 0;

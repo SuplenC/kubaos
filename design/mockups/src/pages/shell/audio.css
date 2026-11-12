@@ -1,0 +1,27 @@
+/* The Audio panel's own boxes (`audio-parts.ts`): the line under Calls and Music, the picked tab's
+   room, and each app's device menu. */
+
+/* Calls and Music's line, its words `space.s12` in, as a slider's are from its ends. */
+.audio-line {
+  padding-inline: var(--space-s12);
+}
+
+.audio-tab {
+  display: block;
+}
+
+/* An app's device: a Text sm button whose words line up with the app's name over it, its padding
+   reaching back into the gap after the tile. */
+.audio-device {
+  position: relative;
+  display: block;
+  margin-inline-start: calc(-1 * var(--space-s12));
+}
+
+/* The device's Menu, `space.s4` under its button, starting where the button does. */
+.audio-device-menu {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + var(--space-s4));
+  left: 0;
+}
