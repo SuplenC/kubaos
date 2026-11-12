@@ -27,20 +27,50 @@ function foot(): number {
   return bar + length("space-s24");
 }
 
+// Where each section's top stands against the foot's line, from an observer of the room above the
+// line, which hears every top that crosses it and the boxes as laid out for the frame: scrolling
+// reads no layout of its own.
+const above = new Map<Element, boolean>();
+let lineObserver: IntersectionObserver | null = null;
+/** The document's height, as laid out last: read when it changes, not as the page scrolls. */
+let documentHeight = 0;
+new ResizeObserver(() => {
+  documentHeight = document.scrollingElement!.scrollHeight;
+  if (!jumping) light(reading());
+}).observe(document.documentElement);
+
+/** Watches the sections drawn against the foot's line where it stands now: the bar's height moved it. */
+export function watchLine(): void {
+  lineObserver?.disconnect();
+  above.clear();
+  if (!drawn) return;
+  const line = foot() + 1;
+  lineObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) above.set(entry.target, entry.boundingClientRect.top <= line);
+      if (!jumping) light(reading());
+    },
+    { rootMargin: `0px 0px ${-Math.max(0, innerHeight - line)}px 0px` },
+  );
+  for (const section of drawn.sections) lineObserver.observe(section);
+}
+addEventListener("resize", watchLine);
+
 /** The section read now: the last whose top is at or above the top bar's foot, or the last one. */
 function reading(): number {
   if (!drawn) return 0;
-  const scroller = document.scrollingElement!;
-  if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1) return drawn.sections.length - 1;
+  if (scrollY + innerHeight >= documentHeight - 1) return drawn.sections.length - 1;
   let at = 0;
-  const line = foot() + 1;
   drawn.sections.forEach((section, i) => {
-    if (section.getBoundingClientRect().top <= line) at = i;
+    if (above.get(section)) at = i;
   });
   return at;
 }
 
+let lit = -1;
 function light(index: number): void {
+  if (index === lit) return;
+  lit = index;
   drawn?.links.forEach((link, i) => {
     if (i === index) link.setAttribute("aria-current", "location");
     else link.removeAttribute("aria-current");
@@ -83,6 +113,8 @@ export function rail(sections: readonly Section[]): HTMLElement {
     return link;
   });
   drawn = { sections: elements, links };
+  lit = -1;
+  watchLine();
   light(reading());
   return el("nav", "site-rail", label("On this page", "label", "on_surface_variant"), ...links);
 }
@@ -90,4 +122,5 @@ export function rail(sections: readonly Section[]): HTMLElement {
 /** Forgets the rail of the page drawn before, when a page is drawn without one. */
 export function forgetRail(): void {
   drawn = null;
+  watchLine();
 }

@@ -20,7 +20,7 @@ import { type Frame, frame } from "./site/frame.ts";
 import { type Nav, nav } from "./site/nav.ts";
 import { type AnyPage, applies, isFoundation } from "./site/page.ts";
 import { recipes, stopPlayers } from "./site/parts/motion.ts";
-import { forgetRail, rail } from "./site/rail.ts";
+import { forgetRail, rail, watchLine } from "./site/rail.ts";
 import { render } from "./site/render.ts";
 import { apply, CHROME, onChange, settings } from "./site/settings.ts";
 import { holdWheel, releaseWheel } from "./site/scroll.ts";
@@ -83,8 +83,12 @@ function drawChrome(): NonNullable<typeof chrome> {
  * `--site-toolbar-height` so the navigation sticks just under it, as tall as the window below it.
  */
 const toolbarHeight = new ResizeObserver(([entry]) => {
-  const height = entry?.borderBoxSize[0]?.blockSize ?? 0;
-  document.documentElement.style.setProperty("--site-toolbar-height", `${height}px`);
+  const height = `${entry?.borderBoxSize[0]?.blockSize ?? 0}px`;
+  // A custom property on the root restyles the whole page: set only when the height moved.
+  if (document.documentElement.style.getPropertyValue("--site-toolbar-height") !== height) {
+    document.documentElement.style.setProperty("--site-toolbar-height", height);
+    watchLine();
+  }
   // The navigation is the window's height under the bar: its current row is brought into the room
   // it has now.
   chrome?.navigation.select(picked());
@@ -125,14 +129,27 @@ let painted: Painted = { theme: settings().theme, mode: settings().mode };
 
 /**
  * Lines side by side share a baseline (`shareRows`): set once a frame after anything is drawn, so a
- * sample a player or a live part draws later shares it too.
+ * sample a player or a live part draws later shares it too. Only where something changed: under
+ * the outermost row round each change, or under the change itself; a player's readout turning
+ * every frame would otherwise have every row on the page looked at every frame.
  */
 let sharing = 0;
-const rowsDrawn = new MutationObserver(() => {
+const changed = new Set<ParentNode>();
+const rowsDrawn = new MutationObserver((records) => {
+  for (const { target } of records) {
+    const at = target instanceof Element ? target : target.parentElement;
+    if (!at) continue;
+    let outer: Element | null = null;
+    for (let row = at.closest(".k-row"); row; row = row.parentElement?.closest(".k-row") ?? null) outer = row;
+    changed.add(outer?.parentElement ?? at);
+  }
   if (sharing) return;
   sharing = requestAnimationFrame(() => {
     sharing = 0;
-    shareRows(document);
+    const roots = [...changed].filter((root) => (root as Node).isConnected);
+    changed.clear();
+    // A root inside another is shared with it.
+    for (const root of roots) if (!roots.some((other) => other !== root && other.contains(root as Node))) shareRows(root);
   });
 });
 
