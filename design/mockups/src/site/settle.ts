@@ -43,7 +43,9 @@ function fitContainer(page: HTMLElement): void {
   for (let i = 0; raw(`container-${i}-from`) !== ""; i++) {
     if (width >= Number(raw(`container-${i}-from`))) step = i;
   }
-  container.style.setProperty("--page-padding", `var(--container-${step}-padding)`);
+  // Its own padding, not a custom property every box under it inherits: one changed there would
+  // style the whole page again.
+  container.style.setProperty("padding-inline", `var(--container-${step}-padding)`);
 }
 
 /**

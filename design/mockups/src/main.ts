@@ -9,6 +9,7 @@ import "./fonts.css";
 import "./motion.css";
 import "./lib/lib.css";
 import "./site/site.css";
+import { forgetMasks } from "./lib/focus.ts";
 import { forgetWidths, shareRows } from "./lib/text.ts";
 import { forgetLengths } from "./lib/tokens.ts";
 import { type Painted, paintPage, playChange } from "./site/change.ts";
@@ -94,8 +95,13 @@ function draw(): void {
   apply(pageBox);
   stopPlayers();
   releaseWheel();
-  // The page measures its samples as it draws them, so its box is on the document first.
-  if (!pageBox.isConnected) site.append(pageBox);
+  // The page measures its samples as it draws them, so its box is in its place on the document
+  // first: moved there after, the whole page would be styled and laid out again.
+  if (CHROME) {
+    const { bar, body } = drawChrome();
+    if (pageBox.parentElement !== body) body.insertBefore(pageBox, shownRail);
+    if (bar.element.parentElement !== site || body.parentElement !== site) site.replaceChildren(bar.element, body);
+  } else if (pageBox.parentElement !== site || site.childElementCount !== 1) site.replaceChildren(pageBox);
   const drawn = page ? render(page) : null;
   pageBox.replaceChildren(drawn?.container ?? el("p", "page-prose", "No pages yet."));
   if (CHROME) {
@@ -105,15 +111,10 @@ function draw(): void {
     if (shownRail) shownRail.replaceWith(nextRail);
     else body.append(nextRail);
     shownRail = nextRail;
-    if (pageBox.parentElement !== body) body.insertBefore(pageBox, nextRail);
-    if (bar.element.parentElement !== site || body.parentElement !== site) site.replaceChildren(bar.element, body);
     navigation.select(page);
     toolbarHeight.disconnect();
     toolbarHeight.observe(bar.element);
-  } else {
-    forgetRail();
-    site.replaceChildren(pageBox);
-  }
+  } else forgetRail();
   document.title = page ? `${page.title} · KubaOS mockups` : "KubaOS mockups";
   settle(pageBox);
   pageBox.dataset.page = page?.slug ?? "";
@@ -152,6 +153,7 @@ async function start(): Promise<void> {
   import.meta.hot?.on("vite:afterUpdate", () => {
     forgetWidths();
     forgetLengths();
+    forgetMasks();
     forgetPalettes();
     draw();
     paintPage([document.documentElement, pageBox], painted);

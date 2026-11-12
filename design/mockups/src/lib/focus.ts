@@ -103,8 +103,23 @@ export function glowMask(width: number, height: number, corner: number, reach: n
  * glow shows it at `1 / boost`.
  */
 function mask(width: number, height: number, corner: number, scale: number, boost: number): string {
+  const key = `${width}x${height}r${corner}@${scale}x${boost}`;
+  const known = masks.get(key);
+  if (known !== undefined) return known;
   const reach = Math.max(0, Math.ceil(length("focus-far") * scale - 1e-3));
-  return glowMask(width, height, corner, reach, (d) => glow(d / scale) * boost);
+  const made = glowMask(width, height, corner, reach, (d) => glow(d / scale) * boost);
+  masks.set(key, made);
+  return made;
+}
+
+// The masks drawn, by the box, the scale and the boost they are for: the same control on many
+// samples, and every control of a size, take one mask, worked out per pixel once rather than per
+// ring. Kept while the tokens stand (`forgetMasks`).
+const masks = new Map<string, string>();
+
+/** Forgets every mask drawn: the tokens they were worked out from changed. */
+export function forgetMasks(): void {
+  masks.clear();
 }
 
 /**
