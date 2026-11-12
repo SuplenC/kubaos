@@ -192,6 +192,23 @@ fn each_part_of_the_update_is_on_until_its_off_file_exists() {
 }
 
 #[test]
+fn the_audio_switches_are_on_while_their_flag_files_exist() {
+    let machine = Machine::new();
+
+    let before = machine.read();
+    machine.write("config/kubaos/desktop/audio/noise-suppression", "");
+    machine.write("config/kubaos/desktop/audio/takeover", "");
+    let after = machine.read();
+
+    for state in [NOISE_SUPPRESSION, ECHO_CANCELLATION, TAKEOVER] {
+        assert_eq!(before.get(state), Some(&on(false)), "{state}");
+    }
+    assert_eq!(after.get(NOISE_SUPPRESSION), Some(&on(true)));
+    assert_eq!(after.get(ECHO_CANCELLATION), Some(&on(false)));
+    assert_eq!(after.get(TAKEOVER), Some(&on(true)));
+}
+
+#[test]
 fn the_mac_accents_are_the_keyboard_settings_and_unknown_when_they_do_not_read() {
     let machine = Machine::new();
 
@@ -471,6 +488,9 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         FIRMWARE,
         UPDATE_BITWARDEN,
         UPDATE_NIX,
+        NOISE_SUPPRESSION,
+        ECHO_CANCELLATION,
+        TAKEOVER,
         "kubaos.suites.test",
     ] {
         assert_eq!(states.get(name), None, "{name}");
@@ -497,6 +517,9 @@ fn every_file_a_state_is_read_from_is_watched() {
         "config/kubaos/desktop/update/no-firmware",
         "config/kubaos/desktop/update/no-bitwarden",
         "config/kubaos/desktop/update/no-nix",
+        "config/kubaos/desktop/audio/noise-suppression",
+        "config/kubaos/desktop/audio/echo-cancellation",
+        "config/kubaos/desktop/audio/takeover",
         "config/kubaos/desktop/power/power.toml",
         "config/kubaos/home/kubaos.d/nixpkgs.toml",
         "config/kubaos/home/kubaos.d/suites/test.toml",
@@ -523,6 +546,7 @@ fn a_state_name_is_one_of_the_probes_or_a_package_group() {
     assert_eq!(values(PREVIEW), Some(Values::Bool));
     assert_eq!(values(BLUETOOTH_UNNAMED), Some(Values::Bool));
     assert_eq!(values(FIRMWARE), Some(Values::Bool));
+    assert_eq!(values(TAKEOVER), Some(Values::Bool));
     assert_eq!(values(SCHEDULER), Some(Values::Words(&["kernel", "lavd"])));
     assert_eq!(values("kubaos.suites.test"), Some(Values::Bool));
     assert_eq!(values("kubaos.suites.nope"), None);

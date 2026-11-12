@@ -1,0 +1,272 @@
+#!/usr/bin/env bash
+# dot-audio: the audio switches and the live input level, for the shell's
+# Audio panel and the Command menu.
+#
+#   dot-audio headset calls|music|toggle   put the Bluetooth headset that is
+#                                          the default output (else input) in
+#                                          Calls (HFP, its mic works; Calls
+#                                          also makes its mic the default
+#                                          input) or Music (A2DP, no mic)
+#   dot-audio headset status [--json]      print its mode, calls or music, or
+#                                          as JSON {"device": NAME, "mode":
+#                                          "calls"|"music"}; both null when
+#                                          the default isn't a Bluetooth
+#                                          headset
+#   dot-audio noise on|off|status          noise suppression (RNNoise)
+#   dot-audio echo on|off|status           echo cancellation
+#   dot-audio takeover on|off|status       a headset you connect becomes the
+#                                          default output and input
+#   dot-audio takeover sync                copy the setting into WirePlumber
+#                                          (the kubaos-audio-takeover unit,
+#                                          at each WirePlumber start)
+#   dot-audio level                        print the default input's peak,
+#                                          0 to 1, about 20 lines a second,
+#                                          until killed
+#
+# The three switches are flag files in the user layer's audio folder
+# (~/.config/kubaos/desktop/audio): on while the file exists. `status` prints
+# on or off. Noise suppression and echo cancellation are PipeWire filters in
+# units of their own (home/audio.nix), placed in front of the default devices
+# by WirePlumber, so the default devices stay the real ones and turning a
+# filter on or off never restarts PipeWire. The takeover is a WirePlumber
+# script (home/files/kubaos-takeover.lua) behind the `kubaos.takeover`
+# setting.
+#
+# The level's recording is a monitor stream named `kubaos.audio-level`: the
+# shell leaves it out of the apps recording, and WirePlumber never switches a
+# Bluetooth headset to Calls for it.
+set -euo pipefail
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
+# home/user-layer.nix puts the audio app in desktop/.
+AUDIO_DIR="$CONFIG/kubaos/desktop/audio"
+
+die() { printf 'dot-audio: %s\n' "$*" >&2; exit 1; }
+
+usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p;}' "${BASH_SOURCE[0]}"; }
+
+usage_error() {
+  usage >&2
+  exit 2
+}
+
+# ---------------------------------------------------------------------------
+# The switches
+# ---------------------------------------------------------------------------
+
+flag() { printf '%s/%s\n' "$AUDIO_DIR" "$1"; }
+
+is_on() { [[ -e $(flag "$1") ]]; }
+
+print_status() { if is_on "$1"; then echo on; else echo off; fi; }
+
+set_flag() {
+  local file
+  file=$(flag "$1")
+  if [[ $2 == on ]]; then
+    mkdir -p -- "$AUDIO_DIR"
+    : >"$file"
+  else
+    rm -f -- "$file"
+  fi
+}
+
+# filter FLAG UNIT on|off|status: a filter's flag file and its unit, which
+# starts only while the flag exists.
+filter() {
+  local name=$1 unit=$2
+  case "${3:-}" in
+    on)
+      set_flag "$name" on
+      systemctl --user start "$unit" || die "couldn't start $unit (journalctl --user -u $unit)"
+      ;;
+    off)
+      set_flag "$name" off
+      systemctl --user stop "$unit"
+      ;;
+    status) print_status "$name" ;;
+    *) usage_error ;;
+  esac
+}
+
+# The setting in WirePlumber: `wpctl settings KEY` prints `Value: true` once
+# its schema (config/wireplumber/wireplumber.conf.d/50-kubaos.conf) is loaded.
+# DOT_AUDIO_WP_TRIES is how many times to ask, half a second apart, while it
+# starts (20; test/dot-audio-test asks once).
+TAKEOVER_KEY=kubaos.takeover
+
+# takeover_apply true|false: sets WirePlumber's setting, retrying while
+# WirePlumber starts. Without the setting, after a home switch and before the
+# next login, the flag file alone waits for the next start.
+takeover_apply() {
+  local tries=${DOT_AUDIO_WP_TRIES:-20}
+  while ((tries--)); do
+    if [[ $(wpctl settings "$TAKEOVER_KEY" 2>/dev/null) == "Value: "* ]]; then
+      wpctl settings "$TAKEOVER_KEY" "$1" >/dev/null
+      return
+    fi
+    ((tries)) && sleep 0.5
+  done
+  printf 'dot-audio: WirePlumber has no %s setting yet; it applies from the next login\n' "$TAKEOVER_KEY" >&2
+}
+
+takeover() {
+  case "${1:-}" in
+    on | off)
+      set_flag takeover "$1"
+      if [[ $1 == on ]]; then takeover_apply true; else takeover_apply false; fi
+      ;;
+    sync) if is_on takeover; then takeover_apply true; else takeover_apply false; fi ;;
+    status) print_status takeover ;;
+    *) usage_error ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# The headset
+# ---------------------------------------------------------------------------
+
+# The Bluetooth headset behind the default output, else the default input, as
+# one JSON object: its device id, name, current profile and the best profile
+# of each mode, by WirePlumber's priority, among those it has now. Nothing
+# when neither default is a Bluetooth device with both modes.
+headset_json() {
+  pw-dump | jq -c '
+    . as $all
+    | def default($key):
+        $all[]
+        | select(.type == "PipeWire:Interface:Metadata" and .props["metadata.name"] == "default")
+        | .metadata[]? | select(.key == $key) | .value.name;
+      def node_device($name):
+        $all[]
+        | select(.type == "PipeWire:Interface:Node" and .info.props["node.name"] == $name)
+        | .info.props["device.id"] | tostring;
+      def best($pattern):
+        [.info.params.EnumProfile[]? | select(.name | test($pattern)) | select(.available != "no")]
+        | max_by(.priority) // null;
+      first(
+        (default("default.audio.sink"), default("default.audio.source"))
+        | node_device(.) as $id
+        | $all[]
+        | select(.type == "PipeWire:Interface:Device" and (.id | tostring) == $id)
+        | select(.info.props["device.api"] == "bluez5")
+      )
+      | {
+          id: .id,
+          name: (.info.props["device.description"] // .info.props["device.alias"] // .info.props["device.name"]),
+          current: (.info.params.Profile[0].name // null),
+          calls: best("^(headset-head-unit|bap-duplex)"),
+          music: best("^(a2dp-sink|bap-sink)")
+        }
+      | select(.calls != null and .music != null)
+  '
+}
+
+# mode_of PROFILE: calls, music, or nothing for a profile of neither (off).
+mode_of() {
+  case "$1" in
+    headset-head-unit* | bap-duplex*) echo calls ;;
+    a2dp-sink* | bap-sink*) echo music ;;
+  esac
+}
+
+headset_status() {
+  local json mode=""
+  json=$(headset_json)
+  [[ -n $json ]] && mode=$(mode_of "$(jq -r '.current // ""' <<<"$json")")
+  if [[ ${1:-} == --json ]]; then
+    jq -cn --argjson headset "${json:-null}" --arg mode "$mode" \
+      '{device: ($headset.name // null), mode: (if $headset == null or $mode == "" then null else $mode end)}'
+  elif [[ -n $mode ]]; then
+    echo "$mode"
+  elif [[ -z $json ]]; then
+    die "the default output isn't a Bluetooth headset"
+  else
+    echo off
+  fi
+}
+
+# headset_mic DEVICE_ID: makes the headset's microphone the default input,
+# once its profile has brought it up (a second or so after the switch).
+headset_mic() {
+  local id tries=30
+  while ((tries--)); do
+    id=$(pw-dump | jq -r --argjson device "$1" '
+      first(.[] | select(.type == "PipeWire:Interface:Node")
+        | select((.info.props["device.id"] | tostring) == ($device | tostring))
+        | select(.info.props["media.class"] == "Audio/Source")
+        | .id) // empty')
+    if [[ -n $id ]]; then
+      wpctl set-default "$id"
+      return
+    fi
+    sleep 0.1
+  done
+  die "the headset's microphone didn't come up"
+}
+
+headset() {
+  local json want profile index id current
+  [[ ${1:-} == status ]] && { headset_status "${2:-}"; return; }
+  case "${1:-}" in
+    calls | music | toggle) ;;
+    *) usage_error ;;
+  esac
+  json=$(headset_json)
+  [[ -n $json ]] || die "the default output isn't a Bluetooth headset"
+  want=$1
+  if [[ $want == toggle ]]; then
+    current=$(mode_of "$(jq -r '.current // ""' <<<"$json")")
+    if [[ $current == calls ]]; then want=music; else want=calls; fi
+  fi
+  read -r id index profile < <(jq -r --arg mode "$want" '"\(.id) \(.[$mode].index) \(.[$mode].name)"' <<<"$json")
+  if [[ $(jq -r '.current // ""' <<<"$json") != "$profile" ]]; then
+    wpctl set-profile "$id" "$index"
+  fi
+  if [[ $want == calls ]]; then
+    headset_mic "$id"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# The level
+# ---------------------------------------------------------------------------
+
+# 8 kHz mono, 16-bit: a meter needs no more, and PipeWire resamples in the
+# graph. od turns each 50 ms block (400 samples, 800 bytes) into a line, and
+# awk prints its peak. The three together take 0.33% of one core, about a
+# third each (measured over a minute on a Ryzen AI 9 HX 370).
+LEVEL_RATE=8000
+LEVEL_BLOCK_BYTES=800
+
+level() {
+  # HAZARD: mawk, Ubuntu's awk, waits to fill a large input buffer before it
+  # reads a line from a pipe, which holds the lines back for seconds; its
+  # interactive mode reads each line as it comes.
+  local awk=(awk)
+  command -v mawk >/dev/null && awk=(mawk -W interactive)
+  # shellcheck disable=SC2016 # The last argument is an awk program, whose $ are awk's.
+  pw-record --raw --rate "$LEVEL_RATE" --channels 1 --format s16 --latency 50ms \
+    -P '{ node.name = "kubaos.audio-level", node.description = "Level meter", stream.monitor = true }' - |
+    stdbuf -oL od -An -v -td2 -w"$LEVEL_BLOCK_BYTES" |
+    "${awk[@]}" '{
+      peak = 0
+      for (i = 1; i <= NF; i++) { v = $i < 0 ? -$i : $i; if (v > peak) peak = v }
+      printf "%.3f\n", peak / 32768
+      fflush()
+    }' &
+  # HAZARD: a killed shell must take the pipeline with it, or pw-record keeps
+  # the microphone open with no one reading.
+  trap 'pkill -P $$ 2>/dev/null; exit 0' TERM INT HUP
+  wait
+}
+
+case "${1:-}" in
+  headset) headset "${@:2}" ;;
+  noise) filter noise-suppression kubaos-noise-suppression.service "${2:-}" ;;
+  echo) filter echo-cancellation kubaos-echo-cancellation.service "${2:-}" ;;
+  takeover) takeover "${2:-}" ;;
+  level) level ;;
+  -h | --help) usage ;;
+  *) usage_error ;;
+esac

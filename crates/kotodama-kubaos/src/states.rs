@@ -29,6 +29,9 @@
 //! | `update.firmware` | on: `kubaos update` updates firmware | `U/desktop/update/no-firmware` doesn't exist |
 //! | `update.bitwarden` | on: `kubaos update` moves Bitwarden desktop on within its series | `U/desktop/update/no-bitwarden` doesn't exist |
 //! | `update.nix` | on: `kubaos update` moves Nix on within its minor | `U/desktop/update/no-nix` doesn't exist |
+//! | `audio.noise-suppression` | on: noise suppression on the microphone | `U/desktop/audio/noise-suppression` exists |
+//! | `audio.echo-cancellation` | on: echo cancellation | `U/desktop/audio/echo-cancellation` exists |
+//! | `audio.takeover` | on: a headset you connect becomes the default | `U/desktop/audio/takeover` exists |
 //!
 //! `U` is the user layer, `~/.config/kubaos`; `S` is `XDG_STATE_HOME`, `~/.local/state`. A state
 //! whose file can't be read has no reading, and an action that names it shows whatever it declares.
@@ -122,6 +125,13 @@ pub const UPDATE_BITWARDEN: &str = "update.bitwarden";
 /// Whether `kubaos update` moves Nix to the newest patch release of its minor.
 pub const UPDATE_NIX: &str = "update.nix";
 
+/// Whether noise suppression cleans the microphone.
+pub const NOISE_SUPPRESSION: &str = "audio.noise-suppression";
+/// Whether echo cancellation keeps the speakers out of the microphone.
+pub const ECHO_CANCELLATION: &str = "audio.echo-cancellation";
+/// Whether a headset you connect becomes the default output and input.
+pub const TAKEOVER: &str = "audio.takeover";
+
 /// What starts the state of an optional package group, `packages.chrome`.
 const PACKAGES: &str = "packages.";
 /// What starts the state of a Suite of the catalog, `kubaos.suites.go`.
@@ -159,6 +169,14 @@ const DND_FILE: &str = "kubaos-dnd.json";
 
 /// The key of [`BLUETOOTH_UNNAMED`] in the shell's remembered settings.
 const BLUETOOTH_UNNAMED_KEY: &str = "bluetoothUnnamed";
+
+/// The audio switches' flag files, in the audio folder of the user layer, each on while it exists.
+/// `scripts/dot-audio` owns them.
+const AUDIO_FLAGS: [(&str, &str); 3] = [
+    (NOISE_SUPPRESSION, "noise-suppression"),
+    (ECHO_CANCELLATION, "echo-cancellation"),
+    (TAKEOVER, "takeover"),
+];
 
 /// The file that turns the greeting off, in the zsh folder of the user layer.
 /// `scripts/dot-greeting` owns it.
@@ -297,6 +315,9 @@ impl States {
         self.set(FIRMWARE, Reading::Bool(files.updates.is_on(Part::Firmware)));
         self.set(UPDATE_BITWARDEN, Reading::Bool(files.updates.is_on(Part::Bitwarden)));
         self.set(UPDATE_NIX, Reading::Bool(files.updates.is_on(Part::Nix)));
+        for (state, flag) in AUDIO_FLAGS {
+            self.set(state, Reading::Bool(files.audio.join(flag).exists()));
+        }
         if let Ok(keyboard) = keyboard_settings::Settings::load(&files.keyboard) {
             self.set(MAC_ACCENTS, Reading::Bool(keyboard.mac_accents));
         }
@@ -326,9 +347,8 @@ pub fn values(name: &str) -> Option<Values> {
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | OPEN_WHERE_LAUNCHED | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY
         | PROXY_LOCAL_NETWORK | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES | BACKGROUND_YIELDS
-        | UNFREE | PREVIEW | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => {
-            Some(Values::Bool)
-        }
+        | UNFREE | PREVIEW | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX
+        | NOISE_SUPPRESSION | ECHO_CANCELLATION | TAKEOVER => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,
@@ -397,6 +417,7 @@ impl Places {
                 user_layer.network.join(kubaos_proxy::paths::PROFILE),
                 wallpaper_depth::path(config),
             ]);
+            files.extend(AUDIO_FLAGS.map(|(_, flag)| user_layer.audio.join(flag)));
             let state_dir = StateDir::new(&user_layer.state_dir);
             files.extend(catalog::all().map(|suite| state_dir.suite_file(suite.name)));
         }
@@ -429,6 +450,8 @@ struct Files {
     state_dir: PathBuf,
     /// The network folder, `U/desktop/network`, with the Proxy's profile.
     network: PathBuf,
+    /// The audio folder, `U/desktop/audio`, with the audio switches' flag files.
+    audio: PathBuf,
 }
 
 impl Files {
@@ -444,6 +467,7 @@ impl Files {
             power: kubaos_user_layer::dir(config, App::Power).join(kubaos_power::settings::FILE),
             state_dir: user_flake(config).join(STATE_DIR),
             network: kubaos_user_layer::dir(config, App::Network),
+            audio: kubaos_user_layer::dir(config, App::Audio),
         }
     }
 }

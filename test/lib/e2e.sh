@@ -4185,6 +4185,12 @@ c_hypr_lid() {
   as_user bash "$REPO/test/hypr-lid-test" "$REPO" || { echo "FAIL test/hypr-lid-test"; return 1; }
 }
 
+# scripts/dot-audio on its own, with PipeWire's tools and systemctl stubbed:
+# the headset's modes, the switches' flags and units, and the level's peaks.
+c_dot_audio() {
+  as_user bash "$REPO/test/dot-audio-test" "$REPO" || { echo "FAIL test/dot-audio-test"; return 1; }
+}
+
 # scripts/dot-config on its own, in a scratch home: seeding, the README
 # links, and moving a flat user layer into its groups without losing a file.
 # The Lua side of the same table (config/hypr/user_layer.lua) beside it, and
@@ -4841,7 +4847,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files codecs automount bluetooth phone recorder session_reload shell_supervisor wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node suite_python suite_proto dot_config hypr_lid wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files codecs automount bluetooth phone recorder session_reload shell_supervisor wallpaper_sets wallpaper_video packages preview suites pins suite_rust suite_go suite_node suite_python suite_proto dot_config hypr_lid dot_audio wallpaper_depth warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

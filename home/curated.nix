@@ -44,6 +44,11 @@ rec {
   # The phone link's daemon. Pinned with the release: kubaos-phone speaks
   # kdeconnectd's D-Bus interface, which can change between KDE Gear releases.
   inherit (pkgs.kdePackages) kdeconnect-kde;
+  # The audio filters' runtime (home/audio.nix): noise suppression and echo
+  # cancellation run in a PipeWire process of their own, against the session's
+  # PipeWire, from configs written for this PipeWire's modules; and RNNoise's
+  # LADSPA plugin, loaded into it.
+  inherit (pkgs) pipewire rnnoise-plugin;
   # The Bluetooth pairing agent the shell pairs through (home/bluetooth.nix).
   kubaos-bluetooth = callCrate ../crates/kubaos-bluetooth/package.nix;
   # The date engine behind the clock popup (home/clock.nix).

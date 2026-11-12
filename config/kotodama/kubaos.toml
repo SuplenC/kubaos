@@ -75,6 +75,7 @@ kind = "scripts"
 # `power.critical-warning`, `power.battery-notes`,
 # `nix.unfree`, `kubaos.preview`, `kubaos.suites.<name>` (the Suite is
 # installed), `bluetooth.unnamed`, `update.firmware`, `update.bitwarden`,
+# `audio.noise-suppression`, `audio.echo-cancellation`, `audio.takeover`,
 # `update.nix`, `wallpapers.depth` (the wallpaper-depth Suite cuts out your own
 # pictures) and `wallpapers.depth-skipped` (the current wallpaper is in its skip
 # list), true or false;
@@ -571,6 +572,58 @@ icon = "bluetooth"
 keywords = ["bluetooth", "bt", "unnamed", "nameless", "address", "nearby", "pair"]
 run = ["qs", "ipc", "call", "bluetooth", "unnamed", "hide"]
 shown_when = { state = "bluetooth.unnamed", is = true }
+
+# The audio switches (scripts/dot-audio, home/audio.nix), flag files in
+# ~/.config/kubaos/desktop/audio; the Audio panel's Options change the same
+# ones. Headset mode, Calls or Music, is a toggle of the Extension itself.
+
+[extensions.kubaos.actions.noise-suppression-on]
+title = "Noise suppression on"
+subtitle = "Your mic, without the background"
+icon = "audio-input-microphone"
+keywords = ["noise", "rnnoise", "denoise", "microphone", "mic", "background", "calls"]
+run = ["dot-audio", "noise", "on"]
+shown_when = { state = "audio.noise-suppression", is = false }
+
+[extensions.kubaos.actions.noise-suppression-off]
+title = "Noise suppression off"
+subtitle = "Your mic as it is, background and all"
+icon = "audio-input-microphone"
+keywords = ["noise", "rnnoise", "denoise", "microphone", "mic", "background", "calls"]
+run = ["dot-audio", "noise", "off"]
+shown_when = { state = "audio.noise-suppression", is = true }
+
+[extensions.kubaos.actions.echo-cancellation-on]
+title = "Echo cancellation on"
+subtitle = "For calls on the speakers"
+icon = "audio-input-microphone"
+keywords = ["echo", "aec", "speakers", "microphone", "mic", "calls"]
+run = ["dot-audio", "echo", "on"]
+shown_when = { state = "audio.echo-cancellation", is = false }
+
+[extensions.kubaos.actions.echo-cancellation-off]
+title = "Echo cancellation off"
+subtitle = "Your mic hears the speakers again"
+icon = "audio-input-microphone"
+keywords = ["echo", "aec", "speakers", "microphone", "mic", "calls"]
+run = ["dot-audio", "echo", "off"]
+shown_when = { state = "audio.echo-cancellation", is = true }
+
+[extensions.kubaos.actions.takeover-on]
+title = "New devices take over on"
+subtitle = "A headset you connect becomes the default"
+icon = "audio-headset"
+keywords = ["headset", "headphones", "bluetooth", "usb", "default", "switch", "connect", "audio"]
+run = ["dot-audio", "takeover", "on"]
+shown_when = { state = "audio.takeover", is = false }
+
+[extensions.kubaos.actions.takeover-off]
+title = "New devices take over off"
+subtitle = "A headset you connect waits until you pick it"
+icon = "audio-headset"
+keywords = ["headset", "headphones", "bluetooth", "usb", "default", "switch", "connect", "audio"]
+run = ["dot-audio", "takeover", "off"]
+shown_when = { state = "audio.takeover", is = true }
 
 [extensions.kubaos.actions.keyboard-tab]
 title = "Keyboard layouts"

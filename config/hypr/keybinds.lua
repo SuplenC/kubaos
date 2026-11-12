@@ -303,6 +303,23 @@ bind("ALT + XF86AudioRaiseVolume", "Volume up 1%", "wpctl set-volume -l 1 @DEFAU
 bind("ALT + XF86AudioLowerVolume", "Volume down 1%", "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%-", locked_repeat)
 bind("XF86AudioMute", "Mute", "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle", locked)
 bind("XF86AudioMicMute", "Mute microphone", "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle", locked)
+bind("SUPER + M", "Mute microphone", "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle", locked)
+
+-- Push to talk: the microphone is on only while SUPER + SHIFT + M is held.
+-- The release bind ignores the modifiers, so letting go of SUPER or SHIFT
+-- first still mutes, and lets the release through to the window. It acts
+-- only after a press of its own, so an M typed anywhere else costs nothing
+-- and never mutes a microphone turned on by hand.
+local talking = false
+bind("SUPER + SHIFT + M", "Push to talk (hold)", function()
+  talking = true
+  hl.dispatch(hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 0"))
+end)
+hl.bind("M", function()
+  if not talking then return end
+  talking = false
+  hl.dispatch(hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 1"))
+end, { release = true, ignore_mods = true, non_consuming = true })
 
 bind("XF86MonBrightnessUp", "Brightness up", "brightnessctl -e4 -n2 set 5%+", locked_repeat)
 bind("XF86MonBrightnessDown", "Brightness down", "brightnessctl -e4 -n2 set 5%-", locked_repeat)

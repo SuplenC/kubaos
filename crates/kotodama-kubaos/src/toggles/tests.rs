@@ -262,3 +262,48 @@ fn a_device_id_that_is_no_device_runs_nothing() {
     assert!(use_device("54", &runner).is_err());
     assert_eq!(runner.ran(), [] as [std::string::String; 0]);
 }
+
+#[test]
+fn headset_mode_puts_the_headset_in_the_mode_picked() {
+    let runner = FakeRunner::default();
+
+    for action in [CALLS, MUSIC, TOGGLE] {
+        let ran = Toggle::HeadsetMode.run(action, &none(), &mut FakeBus::default(), &runner);
+        assert_eq!(ran, Ok(Ran::Close), "{action}");
+    }
+
+    assert_eq!(
+        runner.ran(),
+        [
+            "dot-audio headset calls",
+            "dot-audio headset music",
+            "dot-audio headset toggle"
+        ]
+    );
+}
+
+#[test]
+fn headset_mode_without_a_headset_says_what_dot_audio_said() {
+    let runner = FakeRunner {
+        failing: Some("dot-audio: the default output isn't a Bluetooth headset".to_owned()),
+        ..FakeRunner::default()
+    };
+
+    let err = Toggle::HeadsetMode
+        .run(CALLS, &none(), &mut FakeBus::default(), &runner)
+        .unwrap_err();
+
+    assert!(err.contains("isn't a Bluetooth headset"), "{err}");
+}
+
+#[test]
+fn headset_mode_has_no_other_action() {
+    let runner = FakeRunner::default();
+
+    let err = Toggle::HeadsetMode
+        .run(RUN, &none(), &mut FakeBus::default(), &runner)
+        .unwrap_err();
+
+    assert_eq!(err, "Headset mode has no Action `run`");
+    assert_eq!(runner.ran(), [] as [String; 0]);
+}

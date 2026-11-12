@@ -24,6 +24,7 @@ M.apps = {
   network = "desktop/network",
   workspaces = "desktop/workspaces",
   update = "desktop/update",
+  audio = "desktop/audio",
   ghostty = "terminal/ghostty",
   foot = "terminal/foot",
   tmux = "terminal/tmux",

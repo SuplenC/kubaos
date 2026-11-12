@@ -22,6 +22,8 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 | `SUPER + CTRL + ALT + →/←` | First workspace of the next / previous group on the focused screen |
 | `SUPER + ALT + Tab` | Next window in a group (`+ SHIFT` for previous) |
 | `SUPER + CTRL + A` / `B` / `W` | Control center: audio, Bluetooth, Wi-Fi |
+| `SUPER + M` | Mute or unmute the microphone (the laptop's mic-mute key too) |
+| `SUPER + SHIFT + M` | Push to talk: the microphone is on only while you hold it |
 | `SUPER + N` | Notifications |
 | `SUPER + CTRL + Space` | Wallpaper picker (the colors follow) |
 | `SUPER + SHIFT + Space` | Next keyboard layout, with two or more |
@@ -126,6 +128,20 @@ Cancel or Esc stops a pairing. A pairing gives up after a minute and a half, and
 The codes come from KubaOS's pairing agent, the `kubaos-bluetooth` user service: `systemctl --user status kubaos-bluetooth`, logs in `journalctl --user -u kubaos-bluetooth`. Without it the tab says so and can't pair. `bluetoothctl` works beside it; its own `agent on` takes over the prompts until it quits.
 
 When the adapter is off, the tab has a Turn on button. When it is blocked (airplane mode), it says to run `rfkill unblock bluetooth`. When bluetoothd stops answering (it can after a pairing that hung), the tab says "Bluetooth isn't responding": run `sudo systemctl restart bluetooth`.
+
+## Audio
+
+Muting the microphone: `SUPER + M`, or the laptop's mic-mute key. Push to talk: hold `SUPER + SHIFT + M` and the microphone is on until you let go (of any of the three keys), then muted again; between presses it stays muted. On a laptop with a mic-mute light, the kernel lights it while the built-in microphone is muted; a USB or Bluetooth microphone doesn't light it.
+
+Three switches live in the Command menu (type "noise", "echo" or "headset") and in the Audio panel's Options, and stay as you leave them, login after login:
+
+- **Noise suppression** cleans the background out of your microphone (RNNoise): typing, fans, the street. Apps recording from the default microphone get the clean one; the microphone you pick stays the one listed as in use, and the cleaning follows it when you pick another.
+- **Echo cancellation**, for calls on the speakers: what the speakers play is taken out of what the microphone hears, so the other side doesn't hear itself. It works on what apps play to the default output and record from the default microphone. With noise suppression on too, the echo goes first.
+- **New devices take over**: a headset you connect, over Bluetooth or USB, becomes the default output, and the default microphone once it has one, as if you had picked it; unplug it and the one before comes back. A screen's HDMI sound never takes over. Off by default. Turned on, it works from the next login after the update that brought it.
+
+A Bluetooth headset has two modes. **Calls** (HFP) makes its microphone work, and the default microphone, but music sounds flatter; **Music** (A2DP) sounds full and has no microphone. "Headset mode" in the Command menu switches (Calls, Music, or the other one), as the Audio panel does.
+
+`dot-audio` does the same from a terminal: `dot-audio headset calls|music|toggle|status`, `dot-audio noise|echo|takeover on|off|status`. The switches are flag files in `~/.config/kubaos/desktop/audio`. When one misbehaves: `systemctl --user status kubaos-noise-suppression kubaos-echo-cancellation`, and `journalctl --user -u wireplumber` for the takeover.
 
 ## Your phone
 

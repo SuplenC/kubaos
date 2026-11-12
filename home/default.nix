@@ -6,6 +6,7 @@
 {
   imports = [
     ./links.nix
+    ./audio.nix
     ./automount.nix
     ./bluetooth.nix
     ./cli.nix

@@ -1,5 +1,5 @@
 //! The system toggles: Wi-Fi and Bluetooth over D-Bus (NetworkManager and
-//! BlueZ), audio through `wpctl` and brightness through `brightnessctl`. Each
+//! BlueZ), audio through `wpctl` and `dot-audio` and brightness through `brightnessctl`. Each
 //! talks to the service or program itself, never to the shell, so it works
 //! with Quickshell down; the shell sees the change as it would any other.
 //!
@@ -41,6 +41,9 @@ pub const DEVICE_KIND: &str = "kubaos.audio-device";
 pub const TOGGLE: &str = "toggle";
 pub const ON: &str = "on";
 pub const OFF: &str = "off";
+/// The Actions of Headset mode: Calls (HFP, the mic works) and Music (A2DP, no mic).
+pub const CALLS: &str = "calls";
+pub const MUSIC: &str = "music";
 /// The one Action of the other toggles.
 pub const RUN: &str = "run";
 /// The one Action of an audio device: make it the default.
@@ -75,6 +78,7 @@ pub enum Toggle {
     Volume,
     AudioOutput,
     AudioInput,
+    HeadsetMode,
     BrightnessUp,
     BrightnessDown,
     Brightness,
@@ -95,7 +99,7 @@ pub enum Ran {
 
 impl Toggle {
     /// Every one, in the order the Items are sent.
-    pub const ALL: [Toggle; 12] = [
+    pub const ALL: [Toggle; 13] = [
         Toggle::Wifi,
         Toggle::Bluetooth,
         Toggle::Mute,
@@ -105,6 +109,7 @@ impl Toggle {
         Toggle::Volume,
         Toggle::AudioOutput,
         Toggle::AudioInput,
+        Toggle::HeadsetMode,
         Toggle::BrightnessUp,
         Toggle::BrightnessDown,
         Toggle::Brightness,
@@ -122,6 +127,7 @@ impl Toggle {
             Toggle::Volume => "volume",
             Toggle::AudioOutput => "audio-output",
             Toggle::AudioInput => "audio-input",
+            Toggle::HeadsetMode => "headset-mode",
             Toggle::BrightnessUp => "brightness-up",
             Toggle::BrightnessDown => "brightness-down",
             Toggle::Brightness => "brightness",
@@ -144,6 +150,7 @@ impl Toggle {
             Toggle::Volume => "Set volume",
             Toggle::AudioOutput => "Audio output",
             Toggle::AudioInput => "Audio input",
+            Toggle::HeadsetMode => "Headset mode",
             Toggle::BrightnessUp => "Brightness up",
             Toggle::BrightnessDown => "Brightness down",
             Toggle::Brightness => "Set brightness",
@@ -161,6 +168,7 @@ impl Toggle {
             Toggle::Volume => "Set the volume, from 0 to 100%",
             Toggle::AudioOutput => "Choose the speakers or headphones",
             Toggle::AudioInput => "Choose the microphone",
+            Toggle::HeadsetMode => "Calls: the Bluetooth headset's mic works. Music: fuller sound, no mic",
             Toggle::BrightnessUp => "Raise the screen's brightness by 5%",
             Toggle::BrightnessDown => "Lower the screen's brightness by 5%",
             Toggle::Brightness => "Set the screen's brightness, from 1 to 100%",
@@ -175,6 +183,7 @@ impl Toggle {
             Toggle::Mute | Toggle::VolumeUp | Toggle::VolumeDown | Toggle::Volume => "audio-volume-high",
             Toggle::MuteMicrophone | Toggle::AudioInput => "audio-input-microphone",
             Toggle::AudioOutput => "audio-speakers",
+            Toggle::HeadsetMode => "audio-headset",
             Toggle::BrightnessUp | Toggle::BrightnessDown | Toggle::Brightness => "display-brightness",
         }
     }
@@ -191,6 +200,17 @@ impl Toggle {
             Toggle::Volume => &["sound", "audio"],
             Toggle::AudioOutput => &["speakers", "headphones", "sink", "sound output", "hdmi"],
             Toggle::AudioInput => &["microphone", "mic", "source"],
+            Toggle::HeadsetMode => &[
+                "bluetooth",
+                "headphones",
+                "calls",
+                "music",
+                "microphone",
+                "mic",
+                "hfp",
+                "a2dp",
+                "profile",
+            ],
             Toggle::BrightnessUp => &["brighter", "screen", "backlight"],
             Toggle::BrightnessDown => &["darker", "dim", "screen", "backlight"],
             Toggle::Brightness => &["screen", "backlight", "dim"],
@@ -213,6 +233,11 @@ impl Toggle {
                 Action::new(TOGGLE, format!("Turn {} on or off", self.title())),
                 Action::new(ON, "Turn on"),
                 Action::new(OFF, "Turn off"),
+            ],
+            Toggle::HeadsetMode => vec![
+                Action::new(TOGGLE, "Switch between Calls and Music"),
+                Action::new(CALLS, "Calls"),
+                Action::new(MUSIC, "Music"),
             ],
             Toggle::Volume | Toggle::Brightness => {
                 vec![Action::new(RUN, self.title()).arguments(vec![Argument::new(PERCENT).placeholder("50")])]
@@ -271,6 +296,7 @@ impl Toggle {
             Toggle::Volume => set_volume(runner, &format!("{}%", percent(arguments, 0)?), Ran::Close),
             Toggle::AudioOutput => device_list(runner, Direction::Output),
             Toggle::AudioInput => device_list(runner, Direction::Input),
+            Toggle::HeadsetMode => headset(runner, action),
             Toggle::BrightnessUp => brightnessctl(runner, &format!("{STEP}+"), Ran::KeepOpen),
             Toggle::BrightnessDown => brightnessctl(runner, &format!("{STEP}-"), Ran::KeepOpen),
             Toggle::Brightness => brightnessctl(runner, &format!("{}%", percent(arguments, 1)?), Ran::Close),
@@ -364,6 +390,15 @@ fn wpctl(runner: &impl Runner, words: &[&str], done: Ran) -> Result<Ran, String>
 /// `5%+`), at most 100%.
 fn set_volume(runner: &impl Runner, volume: &str, done: Ran) -> Result<Ran, String> {
     wpctl(runner, &["set-volume", "-l", "1", "@DEFAULT_AUDIO_SINK@", volume], done)
+}
+
+/// Puts the Bluetooth headset in the mode `action` names, or the other one for `toggle`, through
+/// `dot-audio`, which finds the headset and says when there is none.
+fn headset(runner: &impl Runner, action: &str) -> Result<Ran, String> {
+    match action {
+        TOGGLE | CALLS | MUSIC => run_program(runner, &["dot-audio", "headset", action], Ran::Close),
+        _ => Err(format!("Headset mode has no Action `{action}`")),
+    }
 }
 
 /// Sets the backlight to `value`, as `brightnessctl` writes it. `-n2` keeps
