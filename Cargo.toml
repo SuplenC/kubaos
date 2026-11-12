@@ -3,7 +3,8 @@
 # (`kubaos-kobo`), its graphical front end, the Command menu's KubaOS
 # Extension (`kotodama-kubaos`), yazi's launcher and the Downloads tidy
 # (`kubaos-files`), the Bluetooth pairing agent (`kubaos-bluetooth`), the
-# automount for removable drives (`kubaos-automount`), the phone link
+# automount for removable drives (`kubaos-automount`), the launch watcher
+# that opens apps where they were launched (`kubaos-launches`), the phone link
 # through KDE Connect (`kubaos-phone`), the date engine
 # behind the clock popup and the menu's date answers (`kubaos-clock`), and the
 # system monitor behind the bar's pill, its popup and the menu's `cpu`, `ram`
@@ -27,6 +28,7 @@ members = [
     "crates/kubaos-files",
     "crates/kubaos-bluetooth",
     "crates/kubaos-automount",
+    "crates/kubaos-launches",
     "crates/kubaos-phone",
     "crates/kubaos-clock",
     "crates/kubaos-sysmon",
@@ -53,6 +55,7 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 kubaos-core = { path = "crates/kubaos-core" }
 kubaos-automount = { path = "crates/kubaos-automount" }
+kubaos-launches = { path = "crates/kubaos-launches" }
 kubaos-cursor = { path = "crates/kubaos-cursor" }
 kubaos-files = { path = "crates/kubaos-files" }
 kubaos-clock = { path = "crates/kubaos-clock" }

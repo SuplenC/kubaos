@@ -69,9 +69,9 @@ kind = "scripts"
 # `shown_when = [{ ... }, { ... }]`, lists it only while each holds. The Extension reads the
 # states from their files and reads them again when one changes
 # (crates/kotodama-kubaos/src/states.rs, docs/CONTRACTS.md): `packages.<group>`,
-# `files.tidy-daily`, `files.automount`, `terminal.greeting`,
-# `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
-# `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
+# `files.tidy-daily`, `files.automount`, `workspaces.open-where-launched`,
+# `terminal.greeting`, `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`,
+# `proxy`, `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
 # `power.critical-warning`, `power.battery-notes`,
 # `nix.unfree`, `kubaos.preview`, `kubaos.suites.<name>` (the Suite is
 # installed), `bluetooth.unnamed`, `update.firmware`, `update.bitwarden`,
@@ -229,6 +229,26 @@ subtitle = "Which screens are pinned to which workspace group, and the groups' n
 icon = "video-display"
 keywords = ["settings", "config", "workspace group", "pin screen", "monitor", "display", "desk", "groups.toml"]
 run = ["sh", "-c", 'dir="$(dot-config path workspaces)" && mkdir -p "$dir" && exec ghostty -e nvim "$dir/groups.toml"']
+
+# Where a launched app's window opens (kubaos-launches, config/hypr/launches.lua):
+# on the workspace it was launched from, by default, or on the one focused when
+# it shows.
+
+[extensions.kubaos.actions.open-where-launched-on]
+title = "Open apps where you launched them"
+subtitle = "A slow app's window opens on the workspace you started it from, even once you've moved on"
+icon = "video-display"
+keywords = ["workspace", "launch", "app opens on wrong screen", "window placement", "monitor", "screen", "focus"]
+run = ["kubaos-launches", "on"]
+shown_when = { state = "workspaces.open-where-launched", is = false }
+
+[extensions.kubaos.actions.open-where-launched-off]
+title = "Open apps where you are"
+subtitle = "An app's window opens on the workspace focused when it shows"
+icon = "video-display"
+keywords = ["workspace", "launch", "app opens on wrong screen", "window placement", "monitor", "screen", "focus"]
+run = ["kubaos-launches", "off"]
+shown_when = { state = "workspaces.open-where-launched", is = true }
 
 # The terminal greeting: fastfetch with the クバ mark in a new Ghostty window
 # (scripts/dot-greeting, home/shell.nix). On by default.

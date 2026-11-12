@@ -14,6 +14,7 @@
     ./desktop.nix
     ./files.nix
     ./idle.nix
+    ./launches.nix
     ./power.nix
     ./proxy.nix
     ./menu.nix

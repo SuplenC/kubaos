@@ -1,0 +1,23 @@
+[package]
+name = "kubaos-launches"
+description = "KubaOS's launch watcher: tells Hyprland which app was launched from which workspace, so its window opens there"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "kubaos-launches"
+path = "src/main.rs"
+
+[dependencies]
+kubaos-user-layer.workspace = true
+thiserror.workspace = true
+# Follows the systemd user manager on the session bus. The blocking API keeps the service a plain
+# loop, as kubaos-power's is.
+zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

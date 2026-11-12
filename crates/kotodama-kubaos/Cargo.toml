@@ -14,6 +14,7 @@ kubaos-clock.workspace = true
 kubaos-core.workspace = true
 kubaos-files.workspace = true
 kubaos-idle.workspace = true
+kubaos-launches.workspace = true
 kubaos-phone.workspace = true
 kubaos-power.workspace = true
 kubaos-proxy.workspace = true

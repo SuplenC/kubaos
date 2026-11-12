@@ -78,6 +78,7 @@ let
       "kotodama-kubaos"
       "kubaos-files"
       "kubaos-automount"
+      "kubaos-launches"
       "kubaos-phone"
       "kubaos-bluetooth"
       "kubaos-clock"
