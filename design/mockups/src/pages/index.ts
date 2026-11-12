@@ -47,6 +47,7 @@ import liveList from "./molecules/live-list.ts";
 import media from "./molecules/media.ts";
 import scrollingList from "./molecules/scrolling-list.ts";
 import menu from "./molecules/menu.ts";
+import inlineEdit from "./molecules/inline-edit.ts";
 import pictureChoice from "./molecules/picture-choice.ts";
 import pill from "./molecules/pill.ts";
 import shortcutsPage from "./molecules/shortcuts.ts";
@@ -84,6 +85,7 @@ import notificationCard from "./molecules/notification-card.ts";
 import notificationGroup from "./molecules/notification-group.ts";
 import notificationPopup from "./molecules/notification-popup.ts";
 import notificationPeek from "./shell/notification-peek.ts";
+import shellCounters from "./shell/counters.ts";
 import popupStack from "./shell/popup-stack.ts";
 import notificationsPanel from "./shell/notifications-panel.ts";
 import stepRailPage from "./templates/step-rail-page.ts";
@@ -107,7 +109,7 @@ import shellPowerMenu from "./shell/power-menu.ts";
 import shellOsd from "./shell/osd.ts";
 import shellPolkit from "./shell/polkit.ts";
 
-export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, rollingNumber, slider, tabs, select, popover, shortcutsPage, menu, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, notificationCard, notificationPopup, notificationGroup, media, pictureChoice, depthPicture, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll, progressBar, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, shellBar, shellContents, shellWorkspaces, shellTray, shellRecording, shellFrame, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard, notificationsPanel, popupStack, notificationPeek, shellMenu, shellMenuActions, shellMenuViews, shellMenuForm, shellMenuFooter, shellSysmon, shellSysmonProcesses, shellClock, shellClockSettings, shellWallpaper, shellPowerMenu, shellOsd, shellPolkit];
+export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, rollingNumber, slider, tabs, select, popover, shortcutsPage, menu, inlineEdit, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, notificationCard, notificationPopup, notificationGroup, media, pictureChoice, depthPicture, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll, progressBar, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, shellBar, shellContents, shellWorkspaces, shellTray, shellRecording, shellFrame, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard, notificationsPanel, popupStack, notificationPeek, shellCounters, shellMenu, shellMenuActions, shellMenuViews, shellMenuForm, shellMenuFooter, shellSysmon, shellSysmonProcesses, shellClock, shellClockSettings, shellWallpaper, shellPowerMenu, shellOsd, shellPolkit];
 
 export function pagesOf(level: Level): AnyPage[] {
   return PAGES.filter((page) => page.level === level);
