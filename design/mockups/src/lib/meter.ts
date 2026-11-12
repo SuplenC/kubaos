@@ -6,6 +6,10 @@
 // a share and its colour, left to right, every part from the left edge to where it ends so each
 // keeps the bar's rounded ends. A new reading eases each part over `short` on `linear`.
 //
+// A live meter is a mic's level as it comes, one `primary` part with no easing, and a peak tick: a
+// `stroke.thin` line across the bar at the highest level lately, which holds for `slow` and then
+// falls back at the whole bar per `scene`, never under the level. Muted, it is the track alone.
+//
 // A sparkline is the last minute of a reading as a line in the thin stroke, in whole device pixels,
 // filled under it with the line's colour at `opacity.tint`, each sample placed by its time with the
 // newest at the right edge; a second reading over it, unfilled, in `tertiary`. It draws when a
@@ -13,7 +17,8 @@
 
 import "./feedback.css";
 import { probe } from "./probe.ts";
-import { length } from "./tokens.ts";
+import { length, raw } from "./tokens.ts";
+import { settings } from "../site/settings.ts";
 
 /** A reading's colour step against its threshold: fine, close to it, over it. */
 export type Level = 0 | 1 | 2;
@@ -63,6 +68,64 @@ export function meter(parts: readonly MeterPart[]): HTMLElement {
   }
   setMeter(bar, parts);
   return probe(bar, { role: "component", name: "Meter", variant: "", fixed: { width: false, height: true } });
+}
+
+export interface LiveMeter {
+  readonly bar: HTMLElement;
+  /** A level, 0 to 1, read at `now` in milliseconds: the part jumps to it, the peak holds or falls. */
+  readonly feed: (level: number, now: number) => void;
+  /** Muted, it is empty and takes no level; unmuted, it starts again from nothing. */
+  readonly mute: (muted: boolean) => void;
+}
+
+/** The duration token `name` in milliseconds under the speed setting. */
+function duration(name: string): number {
+  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+}
+
+export function liveMeter(level = 0, peak = level): LiveMeter {
+  const bar = meter([{ share: level, color: "primary" }]);
+  bar.dataset.live = "";
+  const part = bar.querySelector<HTMLElement>(".k-meter-part")!;
+  const tick = document.createElement("span");
+  tick.className = "k-meter-peak";
+  bar.append(tick);
+  let muted = false;
+  // The peak last caught and when: it holds there, then falls from it.
+  let top = Math.max(level, peak);
+  let since = Number.NEGATIVE_INFINITY;
+
+  /** Where the tick is at `now`: the peak held, or falling from it, never under `under`. */
+  function peakAt(now: number, under: number): number {
+    const fallen = Math.max(0, now - since - duration("slow")) / duration("scene");
+    return Math.max(under, top - fallen);
+  }
+
+  function draw(reach: number, at: number): void {
+    part.style.setProperty("--reach", String(reach));
+    bar.style.setProperty("--meter-peak", String(at));
+    bar.toggleAttribute("data-peaked", at > 0);
+  }
+
+  draw(level, top);
+  return {
+    bar,
+    feed(next, now) {
+      if (muted) return;
+      const reach = Math.max(0, Math.min(1, next));
+      if (reach >= peakAt(now, 0)) {
+        top = reach;
+        since = now;
+      }
+      draw(reach, peakAt(now, reach));
+    },
+    mute(on) {
+      muted = on;
+      top = 0;
+      since = Number.NEGATIVE_INFINITY;
+      draw(0, 0);
+    },
+  };
 }
 
 /** A sample: its time in milliseconds and its value. */
