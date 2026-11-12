@@ -1,0 +1,496 @@
+/* The lock clock's editor in the wallpaper picker (`pages/shell/wallpaper-clock.ts`): the stage the
+   picture in front of you moves onto, its clock's box and guides, and the panel beside it, or at
+   full screen a drawer on an edge or floating. */
+
+/* How far the stage has moved from where it stood (0) to where it goes (1): the frame, the screen
+   shape inside it, the push and the clock, each mixed between its two places by this one number. */
+@property --ce-morph {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+/* How far the panel has moved from where it stood (0) to where it goes (1). It doesn't inherit:
+   only the panel's own box moves, so a frame of a move restyles the panel and not its rows. */
+@property --ce-slide {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* The panel's place and the drawer's overhang and corners, worked out on the panel alone: none of
+   them inherits, so its rows aren't restyled as it moves. */
+@property --ce-px {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --ce-py {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --ce-pd {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --ce-ov {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --ce-rt {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --ce-rb {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* How far the wall round the picture has gone while editing: 0 all there, 1 gone. Each part of
+   the wall eases its own (`DIMMED`), so it doesn't inherit into the pictures' locks. */
+@property --ce-dim {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* The stage, over the wall and under the bar: the picture's frame at `--ce-x`, `--ce-y`, the screen
+   shape it shows (`--ce-dw` by `--ce-dh`) scaled by `--ce-k` into it, its corner the surface's as
+   far as `--ce-round` (none filling the screen), with the front picture's shadow. */
+.ce-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.ce-stage[data-shown] {
+  visibility: visible;
+}
+
+.ce-frame {
+  position: absolute;
+  left: 0;
+  top: 0;
+  translate: var(--ce-x, 0) var(--ce-y, 0);
+  width: calc(var(--ce-dw, 0px) * var(--ce-k, 1));
+  height: calc(var(--ce-dh, 0px) * var(--ce-k, 1));
+  overflow: hidden;
+  border-radius: calc(var(--radius-surface) * var(--ce-round, 1));
+  background: var(--color-surface_container);
+  box-shadow: 0 var(--elevation-4-ambient-y) var(--elevation-4-ambient-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-ambient-opacity) * var(--ce-round, 1)));
+}
+
+.ce-frame > .k-lock {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  scale: var(--ce-k, 1);
+}
+
+/* Only the clock's box takes the pointer on the picture. */
+.ce-frame .k-lock,
+.ce-frame .k-lock * {
+  pointer-events: none;
+}
+
+/* The clock's box: round the digits and the date over them, `space.s16` out, its middle on the
+   digits'. Lengths that must hold on the screen are divided by the frame's scale. At rest a
+   hairline; under the pointer, while dragged, the tube in `primary`; gone while the lock is awake
+   or flies. */
+.ce-box {
+  --pad: var(--space-s16);
+  --box-width: max(var(--digits-width), var(--kicker-width));
+  position: absolute;
+  left: calc(var(--cx) - var(--clock-left) - var(--box-width) / 2 - var(--pad));
+  width: calc(var(--box-width) + 2 * var(--pad));
+  top: calc(-1 * (var(--kicker-gap) * var(--k) + var(--cap-height) * var(--kicker-rest) * var(--kicker-k)) - var(--pad));
+  bottom: calc(-1 * var(--pad));
+  border-radius: calc(var(--radius-control) / var(--ce-k, 1));
+  box-shadow: inset 0 0 0 calc(var(--stroke-hairline_device_px) / var(--ce-k, 1)) rgb(from var(--color-on_surface) r g b / var(--opacity-subdued));
+  cursor: grab;
+  opacity: 0;
+  transition: opacity var(--motion-medium) var(--easing-standard);
+}
+
+/* With no date the box encloses the digits alone. */
+.k-lock[data-undated] .ce-box {
+  --box-width: var(--digits-width);
+  top: calc(-1 * var(--pad));
+}
+
+.gl-screen[data-editing] .ce-frame .k-lock[data-phase="rest"] .ce-box {
+  opacity: 1;
+}
+
+.gl-screen[data-editing] .ce-frame .k-lock[data-phase="rest"] :is(.ce-box, .ce-handle) {
+  pointer-events: auto;
+}
+
+.ce-box:hover,
+.ce-box[data-lit],
+.gl-screen[data-ce-dragging] .ce-box {
+  box-shadow:
+    inset 0 0 0 calc(var(--stroke-thin) / var(--ce-k, 1)) var(--color-primary),
+    0 0 calc(var(--focus-near) / var(--ce-k, 1)) rgb(from var(--color-primary) r g b / var(--focus-near_opacity));
+}
+
+.gl-screen[data-ce-dragging] .ce-box {
+  cursor: grabbing;
+}
+
+/* A corner: a point in `primary`, ringed in `surface`, that sizes the clock about the one across. */
+.ce-handle {
+  position: absolute;
+  width: calc(var(--size-check) / var(--ce-k, 1));
+  height: calc(var(--size-check) / var(--ce-k, 1));
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 calc(var(--stroke-thin) / var(--ce-k, 1)) var(--color-surface);
+  translate: -50% -50%;
+}
+
+.ce-handle[data-corner="nw"] {
+  left: 0;
+  top: 0;
+  cursor: nwse-resize;
+}
+
+.ce-handle[data-corner="ne"] {
+  left: 100%;
+  top: 0;
+  cursor: nesw-resize;
+}
+
+.ce-handle[data-corner="sw"] {
+  left: 0;
+  top: 100%;
+  cursor: nesw-resize;
+}
+
+.ce-handle[data-corner="se"] {
+  left: 100%;
+  top: 100%;
+  cursor: nwse-resize;
+}
+
+/* The guides, only while the clock is dragged: the middle and the thirds each way, the standard
+   baseline in `primary`, and the room it may move in; the one it sticks to lit. */
+.ce-guides {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.ce-guide {
+  position: absolute;
+  opacity: 0;
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-subdued));
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.ce-guide:is(.ce-v50, .ce-v33, .ce-v67) {
+  top: 0;
+  bottom: 0;
+  width: calc(var(--stroke-hairline_device_px) / var(--ce-k, 1));
+}
+
+.ce-guide:is(.ce-h50, .ce-h33, .ce-h67, .ce-hstd) {
+  left: 0;
+  right: 0;
+  height: calc(var(--stroke-hairline_device_px) / var(--ce-k, 1));
+}
+
+.ce-v50 {
+  left: 50%;
+}
+
+.ce-v33 {
+  left: calc(100% / 3);
+}
+
+.ce-v67 {
+  left: calc(200% / 3);
+}
+
+.ce-h50 {
+  top: 50%;
+}
+
+.ce-h33 {
+  top: calc(100% / 3);
+}
+
+.ce-h67 {
+  top: calc(200% / 3);
+}
+
+.ce-hstd {
+  top: calc(var(--ce-std, 0.5) * 100%);
+  background: rgb(from var(--color-primary) r g b / var(--opacity-subdued));
+}
+
+.gl-screen[data-ce-dragging] .ce-guide {
+  opacity: var(--opacity-recede);
+}
+
+.ce-guide[data-lit] {
+  opacity: 1;
+  background: var(--color-primary);
+  box-shadow: 0 0 calc(var(--focus-near) / var(--ce-k, 1)) rgb(from var(--color-primary) r g b / var(--focus-near_opacity));
+}
+
+.gl-screen[data-ce-dragging] .ce-guide[data-lit] {
+  opacity: 1;
+}
+
+.ce-safe {
+  position: absolute;
+  left: var(--space-s32);
+  top: var(--space-s32);
+  right: var(--space-s32);
+  bottom: var(--ce-floor, var(--space-s32));
+  opacity: 0;
+  border-radius: calc(var(--radius-content) / var(--ce-k, 1));
+  box-shadow: inset 0 0 0 calc(var(--stroke-hairline_device_px) / var(--ce-k, 1)) rgb(from var(--color-on_surface) r g b / var(--opacity-recede));
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.gl-screen[data-ce-dragging] .ce-safe {
+  opacity: 1;
+}
+
+/* The panel: `size.panel` wide at `--ce-px`, `--ce-py` from the screen's top left, over the bar,
+   with `--ce-pd` of the overhang (`space.s24`, its corner's radius) padded inside on its docked
+   side (`--ce-left`), so its rows stay where they are as the overhang comes and goes and a drawer
+   is cut flush by the screen's edge. Docked, an inner corner within its radius of the screen's top
+   or bottom closes with it. */
+.ce-panel {
+  --ce-ov: calc(var(--space-s24) * var(--ce-pd, 0));
+  --ce-rt: calc(var(--radius-surface) + (clamp(0px, var(--ce-py, 0px), var(--radius-surface)) - var(--radius-surface)) * var(--ce-pd, 0));
+  --ce-rb: calc(var(--radius-surface) + (clamp(0px, var(--screen-height) - var(--ce-py, 0px) - var(--ce-ph, 0px), var(--radius-surface)) - var(--radius-surface)) * var(--ce-pd, 0));
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  width: calc(var(--size-panel) + var(--ce-ov));
+  max-height: calc(100% - 2 * var(--space-s24));
+  translate: calc(var(--ce-px, 0px) - var(--ce-ov) * var(--ce-left, 0)) var(--ce-py, 0px);
+  box-sizing: border-box;
+  padding-left: calc(var(--ce-ov) * var(--ce-left, 0));
+  padding-right: calc(var(--ce-ov) * (1 - var(--ce-left, 0)));
+  border-radius:
+    calc(var(--ce-rt) + (var(--radius-surface) - var(--ce-rt)) * var(--ce-left, 0))
+    calc(var(--radius-surface) + (var(--ce-rt) - var(--radius-surface)) * var(--ce-left, 0))
+    calc(var(--radius-surface) + (var(--ce-rb) - var(--radius-surface)) * var(--ce-left, 0))
+    calc(var(--ce-rb) + (var(--radius-surface) - var(--ce-rb)) * var(--ce-left, 0));
+  background: var(--color-surface_container);
+  box-shadow: 0 var(--elevation-4-ambient-y) calc(var(--elevation-4-ambient-blur) / 2) rgb(from var(--color-shadow) r g b / var(--elevation-ambient-opacity));
+  visibility: hidden;
+  user-select: none;
+}
+
+.ce-panel[data-shown] {
+  visibility: visible;
+}
+
+.ce-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ce-body > .k-panel-page {
+  --sheet-room: calc(var(--screen-height) - 2 * var(--space-s24));
+}
+
+/* At full screen the whole panel carries it, but for its controls. */
+.ce-panel[data-edge] {
+  cursor: grab;
+}
+
+.ce-panel[data-dragging],
+.ce-panel[data-dragging] * {
+  cursor: grabbing;
+}
+
+/* The rows: one column of labels and one of controls, every group, well and sub-row on the same
+   two, the sub-rows' labels set in under their parent's. */
+.ce-rows {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--space-s12);
+  row-gap: var(--space-s16);
+}
+
+.ce-group,
+.ce-row,
+.ce-well {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+}
+
+.ce-group {
+  row-gap: var(--space-s4);
+}
+
+.ce-group > :not(.ce-row, .ce-well) {
+  grid-column: 1 / -1;
+}
+
+.ce-heading {
+  padding-bottom: var(--space-s4);
+}
+
+.ce-row {
+  align-items: center;
+  min-height: var(--size-row_compact);
+}
+
+.ce-row[data-sub] > :first-child {
+  padding-left: var(--space-s12);
+}
+
+/* A setting with sub-settings is one well round the parent row and its sub-rows, drawn out past
+   the rows by its own padding, so its controls keep the panel's one column. */
+.ce-well {
+  row-gap: var(--space-s4);
+  margin: var(--space-s4) calc(-1 * var(--space-s8));
+  padding: var(--space-s4) var(--space-s8);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+}
+
+/* The colour's choice: Auto and the swatches in a row, one stop for Tab. */
+.ce-swatches {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s8);
+  justify-self: start;
+  padding: var(--space-s4);
+  border-radius: var(--radius-full);
+  outline: none;
+}
+
+.ce-swatches[aria-disabled="true"] .ce-swatch {
+  opacity: var(--opacity-disabled_content);
+  cursor: default;
+}
+
+.ce-swatch {
+  all: unset;
+  position: relative;
+  width: var(--size-chip);
+  height: var(--size-chip);
+  border-radius: var(--radius-full);
+  background: var(--swatch);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-on_surface) r g b / var(--elevation-rim));
+}
+
+.ce-swatch[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 var(--stroke-thin) var(--color-surface_container_high),
+    0 0 0 calc(2 * var(--stroke-thin)) var(--color-primary);
+}
+
+/* Custom: the hues round the wheel, the colour picked in its middle once it is one. */
+.ce-swatch[data-custom] {
+  background: conic-gradient(in oklch longer hue, oklch(var(--ce-hue-tone) var(--ce-hue-chroma) 0), oklch(var(--ce-hue-tone) var(--ce-hue-chroma) 359.9));
+}
+
+.ce-swatch[data-custom]::after {
+  content: "";
+  position: absolute;
+  inset: calc(var(--size-chip) / 4);
+  border-radius: var(--radius-full);
+  background: var(--swatch, var(--color-surface_container_high));
+  box-shadow: 0 0 0 var(--stroke-thin) var(--color-surface_container_high);
+}
+
+/* The hue track: the hues at one light tone round the wheel, `size.slider_compact` tall, a ring at
+   the hue picked, its value at the far end. The tone and chroma it draws the hues at are the
+   picker's own (`--ce-hue-tone`, `--ce-hue-chroma`). */
+.ce-hue {
+  position: relative;
+  height: var(--size-slider_compact);
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg in oklch longer hue, oklch(var(--ce-hue-tone) var(--ce-hue-chroma) 0), oklch(var(--ce-hue-tone) var(--ce-hue-chroma) 359.9));
+  cursor: pointer;
+  outline: none;
+  touch-action: none;
+}
+
+.ce-hue[aria-disabled="true"] {
+  opacity: var(--opacity-disabled_content);
+  cursor: default;
+}
+
+.ce-hue-knob {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--size-slider_compact) / 2 + (100% - var(--size-slider_compact)) * var(--hue-at, 0));
+  width: calc(var(--size-slider_stop) + 2 * var(--stroke-thin));
+  height: calc(var(--size-slider_stop) + 2 * var(--stroke-thin));
+  translate: -50% -50%;
+  border-radius: var(--radius-full);
+  background: var(--color-on_surface);
+  box-shadow: 0 0 0 var(--stroke-thin) var(--color-surface);
+}
+
+/* The hues are light in both modes, so their value is the dark end of the palette in both. */
+.ce-hue-value {
+  color: var(--color-surface);
+  position: absolute;
+  right: var(--space-s12);
+  top: round(nearest, calc((var(--size-slider_compact) - var(--t-line)) / 2), 1px);
+}
+
+.gl-screen[data-mode="light"] .ce-hue-value {
+  color: var(--color-on_surface);
+}
+
+/* The bar while editing: what it edits, in `label` with its symbol. */
+.ce-bar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s8);
+  padding-left: var(--space-s8);
+}
+
+/* Full screen and Back to the wall swap as the gallery's own pair does, over the frame's move. */
+.gl-screen[data-ce-full] .ce-step {
+  grid-template-columns: 0fr 1fr;
+}
+
+.gl-screen[data-ce-full] .ce-step > :first-child {
+  opacity: 0;
+}
+
+.gl-screen[data-ce-full] .ce-step > :last-child {
+  opacity: 1;
+}
+
+/* The wall while editing: the picture in front of you is on the stage, its frame on the wall
+   empty and hidden; the rest of the wall goes as `--ce-dim` comes in. */
+.gl-art[data-staged] > .gl-frame {
+  visibility: hidden;
+}

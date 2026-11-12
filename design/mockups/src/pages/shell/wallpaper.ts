@@ -7,9 +7,20 @@
 import { doesntApply, type Duration, type Easing, type Move, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
 import { windowSize } from "../../site/settings.ts";
 import { locking, lockingReduced, touching, touchingReduced, waking, wakingReduced } from "../templates/lock-moves.ts";
-import { FOLDERS, gallery, type GalleryOptions, KABUKICHO, pictureToLock, sideToDesktop, sideToLock, toDesktop, toDesktopReduced, toPicture, toPictureReduced, type View } from "./wallpaper-parts.ts";
+import { type ClockLook, DIMMED, type EditorPose } from "./wallpaper-clock.ts";
+import { BLUE, FOLDERS, gallery, type GalleryOptions, KABUKICHO, pictureToLock, sideToDesktop, sideToLock, toDesktop, toDesktopReduced, toPicture, toPictureReduced, type View } from "./wallpaper-parts.ts";
 
 type Shown = "rest" | "lit" | "open" | "disabled" | "loading" | "empty";
+
+/** The clock's editor on the tower, drawn in `pose`. */
+const editing = (pose: EditorPose = {}, options: GalleryOptions = {}) => () => gallery({ at: 2, view: "lock", edit: pose, ...options });
+/** The clock's editor ready to move from `from` to `to`, for a move's player. */
+const editMove = (from: EditorPose | "wall", to: EditorPose | "wall") => held({ at: 2, view: "lock", edit: { from, to } });
+/** The tower's clock set by `look`, on the wall. */
+const setOnTower = (look: Partial<ClockLook>) => ({ [BLUE.name]: look });
+const CLOCK_OFF: Partial<ClockLook> = { shown: { wide: false } };
+const DATE_OFF: Partial<ClockLook> = { dated: { wide: false } };
+const MOVED: Partial<ClockLook> = { place: { wide: { x: 0.3, y: 0.82, s: 0.2 } }, date: { wide: { size: 0.08, gap: 0.12, align: "left" } }, colour: { mode: "custom", h: 40, l: 0.8 }, glow: { mode: "dark", strength: 0.6 } };
 
 /** The gallery drawn still. */
 const still = (options: GalleryOptions = {}) => () => gallery(options);
@@ -160,6 +171,85 @@ const FULL: Move = {
   sample: held({ bare: true, at: 2, view: "desktop" }),
 };
 
+// The clock's editor: one number moves the picture's frame, its shape and its clock, another the
+// panel, another takes the wall away; with reduce motion each fades out and in round the change.
+const STAGE = "the picture and its clock";
+const PANEL = "the clock's panel";
+const EDITOR = "the clock's editor";
+const morphs = (duration: Duration = "long"): Track<Easing> => ({ part: STAGE, on: EDITOR, target: ".ce-stage", property: "--ce-morph", from: 0, to: 1, duration, curve: "emphasized_decel" });
+const slides: Track<Easing> = { part: PANEL, on: EDITOR, target: ".ce-panel", property: "--ce-slide", from: 0, to: 1, duration: "long", curve: "emphasized_decel" };
+const dims = (from: number, to: number): Track<Easing> => ({ part: "the wall round it", on: ROOM, target: DIMMED, property: "--ce-dim", from, to, duration: "long", curve: "standard" });
+/** What reduce motion makes of a move of `part` on `target`: out over `short`, the change, back in. */
+const faded = (part: string, target: string, property: string): Track<Easing>[] => [
+  { part, on: EDITOR, target, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+  { part, on: EDITOR, target, property, from: 0, to: 1, duration: "instant", cue: "short", curve: "standard" },
+  { part, on: EDITOR, target, property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
+];
+const BOX: Track<Easing> = { part: "the clock's box", on: EDITOR, target: ".ce-box", property: "opacity", from: 0, to: 1, duration: "medium", curve: "standard" };
+
+const EDIT_OPENS: Move = {
+  name: "Clock editor opening",
+  what: "E: the frame moves over beside the panel, unpushed; the panel slides in; the wall goes.",
+  tracks: [morphs(), slides, dims(0, 1), BOX],
+  reduced: nonEmpty([...faded(STAGE, ".ce-stage", "--ce-morph"), ...faded(PANEL, ".ce-panel", "--ce-slide"), { ...dims(0, 1), duration: "short" }]),
+  back: "cuts",
+  sample: editMove("wall", {}),
+};
+
+const EDIT_CLOSES: Move = {
+  name: "Done or Cancel",
+  what: "↵ or Esc: the same move back, the panel sliding out, the push and the wall returning.",
+  tracks: [morphs(), slides, dims(1, 0), { ...BOX, from: 1, to: 0 }],
+  reduced: nonEmpty([...faded(STAGE, ".ce-stage", "--ce-morph"), ...faded(PANEL, ".ce-panel", "--ce-slide"), { ...dims(1, 0), duration: "short" }]),
+  back: "cuts",
+  sample: editMove({}, "wall"),
+};
+
+const SHAPE: Move = {
+  name: "Wide to portrait",
+  what: "One morph of the frame, the picture's crop and the clock; each shape keeps its own values.",
+  tracks: [morphs()],
+  reduced: nonEmpty(faded(STAGE, ".ce-stage", "--ce-morph")),
+  back: "plays",
+  sample: editMove({}, { tab: "portrait" }),
+};
+
+const EDIT_FULL: Move = {
+  name: "Editor full screen",
+  what: "F: the frame fills the screen; the panel goes to its edge as a closed drawer.",
+  tracks: [morphs(), slides],
+  reduced: nonEmpty([...faded(STAGE, ".ce-stage", "--ce-morph"), ...faded(PANEL, ".ce-panel", "--ce-slide")]),
+  back: "plays",
+  sample: editMove({}, { full: true, drawer: "closed" }),
+};
+
+const DRAWER: Move = {
+  name: "Drawer opening",
+  what: "The edge under the pointer, or the panel's keys: it slides out, cut flush by the edge.",
+  tracks: [slides],
+  reduced: nonEmpty(faded(PANEL, ".ce-panel", "--ce-slide")),
+  back: "plays",
+  sample: editMove({ full: true, drawer: "closed" }, { full: true, drawer: "open" }),
+};
+
+const DOCKS: Move = {
+  name: "Rip off and dock",
+  what: "Past the pull it rips free, catching the pointer over medium; let go, it settles.",
+  tracks: [{ ...slides, duration: "medium", curve: "standard" }],
+  reduced: [{ ...slides, duration: "instant", curve: "standard" }],
+  back: "plays",
+  sample: editMove({ full: true, drawer: "open" }, { full: true, drawer: "float" }),
+};
+
+const RESETS: Move = {
+  name: "Standard place",
+  what: "R: the clock goes back to the lock's own place, size, look and date in one move.",
+  tracks: [morphs()],
+  reduced: nonEmpty(faded(STAGE, ".ce-stage", "--ce-morph")),
+  back: "plays",
+  sample: held({ at: 2, view: "lock", looks: setOnTower(MOVED), edit: { from: { look: MOVED }, to: { look: { place: {}, date: {}, colour: { mode: "auto" }, glow: { mode: "off", strength: 0.5 } } } } }),
+};
+
 const WALL = "the wall";
 const OLD = ".gl-floor:first-child .gl-art:nth-child(2)";
 const NEW = ".gl-floor:first-child .gl-art:nth-child(3)";
@@ -236,6 +326,24 @@ function cell(view: View) {
   };
 }
 
+/** The clock's editor in `state`. */
+function editorCell(state: Shown): HTMLElement {
+  switch (state) {
+    case "rest":
+      return gallery({ at: 2, view: "lock", edit: {} });
+    case "lit":
+      return gallery({ at: 2, view: "lock", edit: { lit: true }, tip: "Done" });
+    case "open":
+      return gallery({ at: 2, view: "lock", edit: {}, shortcuts: true });
+    case "disabled":
+      return gallery({ at: 4, view: "lock", edit: { look: DATE_OFF } });
+    case "loading":
+      return gallery({ at: 2, view: "lock", edit: {}, stills: false });
+    case "empty":
+      return gallery({ at: 2, view: "lock", edit: { look: CLOCK_OFF } });
+  }
+}
+
 /** The live gallery, shut: the desktop, which a click or Space opens. */
 function live(): HTMLElement {
   return gallery({ open: false, live: true });
@@ -250,7 +358,7 @@ export default page<Shown>({
   title: "Wallpaper picker",
   lede: "A gallery: every picture on a wall, each drawn as itself, your desktop or your lock, the one in front lit.",
   code: { unbuilt: "QML WallpaperPicker: not built yet" },
-  from: ["lock", "depth-picture", "tabs", "button", "button-bar", "icon-button", "chip", "switch", "list", "empty-state", "shortcuts", "tooltip"],
+  from: ["lock", "depth-picture", "tabs", "button", "button-bar", "icon-button", "chip", "switch", "slider", "panel-page", "list", "empty-state", "shortcuts", "tooltip"],
   stage: { live, hint: "click it, then the keys: ? lists them", daylight: true },
   variants: [
     { name: "Picture", for: "the wall: each picture alone, the front one lifted", sample: still({ at: 1 }) },
@@ -261,6 +369,18 @@ export default page<Shown>({
     { name: "A video", for: "its loop breathes over its poster", sample: still({ at: 3 }) },
     { name: "Depth off", for: "the tower flat on its sky", sample: still({ at: 2, view: "lock", flat: [FOLDERS[0]!.pictures[2]!.name] }) },
     { name: "Shut", for: "the live desktop", sample: still({ open: false }) },
+    { name: "Lock, clock off", for: "the picture alone: no clock, no date", sample: still({ at: 2, view: "lock", looks: setOnTower(CLOCK_OFF) }) },
+    { name: "Lock, date off", for: "the digits alone", sample: still({ at: 2, view: "lock", looks: setOnTower(DATE_OFF) }) },
+    { name: "Clock editor", for: "E: the panel beside the lock at rest, unpushed", sample: editing() },
+    { name: "Editor, dragging", for: "the guides and the room it may move in", sample: editing({ dragging: true }) },
+    { name: "Editor, portrait screen", for: "the portrait shape's own values", sample: editing({ tab: "portrait" }) },
+    { name: "Editor, a look set", for: "a custom colour, a dark glow, the date left", sample: editing({ look: MOVED }) },
+    { name: "Editor, clock off", for: "its rows disabled, no box on the picture", sample: editing({ look: CLOCK_OFF }) },
+    { name: "Editor, date off", for: "its sub-rows disabled, the box round the digits", sample: editing({ look: DATE_OFF }) },
+    { name: "No depth layers", for: "Depth disabled, with why", sample: () => gallery({ at: 4, view: "lock", edit: {} }) },
+    { name: "Full screen, drawer closed", for: "a strip of the panel at the edge", sample: editing({ full: true, drawer: "closed" }) },
+    { name: "Full screen, drawer open", for: "cut flush by the edge, over the bar", sample: editing({ full: true, drawer: "open" }) },
+    { name: "Full screen, floating", for: "ripped off the edge, anywhere", sample: editing({ full: true, drawer: "float" }) },
   ],
   sizes: doesntApply("as large as its screen; the wall is shares of it (`[scale]`)."),
   states: {
@@ -270,14 +390,17 @@ export default page<Shown>({
       selected: "the applied picture is marked Current at rest",
       error: "a picture it can't read isn't hung",
     },
-    rows: nonEmpty((["picture", "desktop", "lock"] as const).map((view) => ({ name: view === "picture" ? "Picture" : view === "desktop" ? "Desktop" : "Lock", cell: cell(view) }))),
+    rows: nonEmpty([
+      ...(["picture", "desktop", "lock"] as const).map((view) => ({ name: view === "picture" ? "Picture" : view === "desktop" ? "Desktop" : "Lock", cell: cell(view) })),
+      { name: "Clock editor", cell: editorCell },
+    ]),
     looks: {
       rest: "the front one lit, its lamp burning",
       lit: "a control's name and key over it",
       open: "the shortcuts over their button",
-      disabled: "no cut-out: depth's switch off, with why",
+      disabled: "no cut-out: depth off, with why; editing, date off",
       loading: "the windows' stills not landed yet",
-      empty: "an `EmptyState` in the frame, where to drop them",
+      empty: "an `EmptyState` in the frame; editing, clock off",
     },
   },
   focus: {
@@ -306,7 +429,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING],
     leaves: [APPLYING, CANCELLING],
-    between: [BROWSES, TO_DESKTOP, LOCKS, UNLOCKS, TO_LOCK, WAKES, FULL, FLATTENS],
+    between: [BROWSES, TO_DESKTOP, LOCKS, UNLOCKS, TO_LOCK, WAKES, FULL, FLATTENS, EDIT_OPENS, EDIT_CLOSES, SHAPE, EDIT_FULL, DRAWER, DOCKS, RESETS],
   },
   keyboard: {
     keys: [
@@ -321,14 +444,24 @@ export default page<Shown>({
       { keys: ["Enter"], does: "applies the one in front" },
       { keys: ["Esc"], does: "the shortcuts first; else cancels, the old one back" },
       { keys: ["?"], does: "the shortcuts" },
+      { keys: ["E"], does: "in Lock: the clock's editor" },
+      { keys: ["j", "k"], does: "editing: the setting below or above, switches included" },
+      { keys: ["h", "l"], does: "editing: less or more; Shift a fine step" },
+      { keys: ["Space"], does: "editing, on a switch: Clock or Date on or off" },
+      { keys: ["R"], does: "editing: the standard place, both switches on" },
+      { keys: ["D"], does: "editing: in front, or back to its last step" },
+      { keys: ["Alt"], does: "dragging the clock: no sticking to the guides" },
+      { keys: ["Wheel"], does: "on the clock's box: its size; Shift a fine step" },
     ],
-    order: "Tab: the shortcuts' button, the views, Full screen, Cancel, Wake, Apply.",
-    lands: "Opening, on the gallery itself; shutting, back where it was.",
+    order: "Tab: shortcuts, views, Full screen, Cancel, Wake, Clock, Apply; editing, the panel's rows.",
+    lands: "Opening, on the gallery; the editor, on Across; leaving it, the gallery.",
   },
   measures: {
     samples: nonEmpty([
       { name: "The wall", for: "pictures, gaps, lamps, placard, floors", sample: still({ at: 2 }) },
       { name: "The bar, full screen", for: "the bar's parts and the name", sample: still({ at: 2, view: "desktop", full: true }) },
+      { name: "The clock's editor", for: "the frame, the panel, the box", sample: editing() },
+      { name: "The drawer", for: "docked open at the edge", sample: editing({ full: true, drawer: "open" }) },
     ]),
     measures: [
       { part: "Picture's height", token: "scale-gallery_picture" },
@@ -351,6 +484,26 @@ export default page<Shown>({
       { part: "Bar's gaps", token: "space-s16" },
       { part: "Bar, shortcuts → foot", token: "space-s24" },
       { part: "Tooltip over its control", token: "space-s8" },
+      { part: "Editor's frame inset", token: "space-s32" },
+      { part: "Panel's width", token: "size-panel" },
+      { part: "Panel from the screen's edge", token: "space-s24" },
+      { part: "Clock's box round it", token: "space-s16" },
+      { part: "Box's corner points", token: "size-check" },
+      { part: "Clock's allowed area inset", token: "space-s32" },
+      { part: "Awake clock over the sheet", token: "space-s16" },
+      { part: "Clock's least size", token: "scale-clock_least" },
+      { part: "Clock's largest size", token: "scale-clock_most" },
+      { part: "Guides' pull", token: "scale-clock_snap" },
+      { part: "Date's largest size", token: "scale-clock_date_most" },
+      { part: "Date's least gap", token: "scale-clock_gap_least" },
+      { part: "Date's largest gap", token: "scale-clock_gap_most" },
+      { part: "Glow's tight ring", token: "scale-clock_glow_edge" },
+      { part: "Glow's wide ring", token: "scale-clock_glow" },
+      { part: "Closed drawer's strip", token: "space-s12" },
+      { part: "Drawer's overhang", token: "space-s24" },
+      { part: "Sticky step from the edge", token: "scale-dock_sticky" },
+      { part: "Pull to rip or dock", token: "scale-dock_pull" },
+      { part: "Drawer's give", token: "scale-dock_rubber" },
     ],
     reflow: { note: "The wall is shares of the screen: the same shape on every screen.", sample: () => gallery({ at: 2, size: windowSize() }) },
   },
