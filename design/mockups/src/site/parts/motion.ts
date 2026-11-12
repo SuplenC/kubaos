@@ -40,6 +40,7 @@ import {
 } from "../recipe.ts";
 import { fullScreenMove } from "../full-screen.ts";
 import { ALL, CHROME, onChange, settings } from "../settings.ts";
+import { whenStill } from "../still.ts";
 import { key as keyOf, legend, type Mark, named, Plot } from "./plot.ts";
 import { picker } from "./picker.ts";
 import { partOr, subheading } from "./section.ts";
@@ -50,8 +51,6 @@ const SLOW = 10;
 /** How many frames Shift with an arrow moves. */
 const BIG_STEP = 10;
 
-/** How long a part waiting to be drawn waits for an idle moment, in milliseconds, at most. */
-const LATER_WAIT = 100;
 
 /** How to stop each player on the page drawn: its settings listener, its observer, its frames. */
 const players = new Set<() => void>();
@@ -462,6 +461,12 @@ function player(move: Move): Player {
     time = t;
     const start = now() - t / rate();
     for (const animation of animations) {
+      // A part out of view holds where the loop is, and takes the clock again as it comes back.
+      if (away.has(animation)) {
+        animation.pause();
+        animation.currentTime = t;
+        continue;
+      }
       animation.playbackRate = rate();
       animation.startTime = start;
     }
@@ -538,7 +543,11 @@ function player(move: Move): Player {
           return alone;
         };
         // Drawn now, its animations start with the player's; drawn later, they join its clock.
-        partIn(box, draw, (alone) => (drawing ? added : animations).push(...animate(alone, timed)));
+        partIn(box, draw, (alone) => {
+          const made = animate(alone, timed);
+          (drawing ? added : animations).push(...made);
+          return made;
+        });
         // A picture of the part, not more controls: no focus, no hover, nothing read out twice.
         box.inert = true;
         box.setAttribute("aria-hidden", "true");
@@ -554,39 +563,62 @@ function player(move: Move): Player {
   }
 
   // A part's sample is a whole copy of the player's, and a move of many parts on a page of screens
-  // is a page of screens more: a copy as big as the player's own is drawn as its box comes within a
-  // viewport of the screen, one an idle moment, its stand-in holding the box meanwhile. Its box
+  // is a page of screens more: a copy as big as the player's own is drawn as its box comes within
+  // two screens' height of the view, one at a time while the reader is still (`whenStill`), never
+  // mid-scroll, its stand-in holding the box meanwhile. Its box
   // keeps its size, so the page isn't laid out again for it: its rings draw as they are laid out.
   let nearing: IntersectionObserver | null = null;
   const waiting = new Map<Element, () => void>();
   const queued: (() => void)[] = [];
-  let pumping = 0;
+  let pumping: (() => void) | null = null;
+
+  // Each part plays only while its stage is in view: a part is a whole sample restyled every
+  // frame it plays, and a move's parts run down past the screen. One out of view holds; the clock
+  // it takes again on coming back is the player's, so no part is ever seen out of step.
+  const partAnimations = new Map<Element, Animation[]>();
+  const away = new Set<Animation>();
+  const partsSeen = new IntersectionObserver((entries) => {
+    for (const { target, isIntersecting } of entries) {
+      for (const animation of partAnimations.get(target) ?? []) {
+        if (isIntersecting) away.delete(animation);
+        else away.add(animation);
+      }
+    }
+    go(current());
+  });
 
   function pump(): void {
-    pumping = 0;
+    pumping = null;
     queued.shift()?.();
-    if (queued.length > 0) pumping = requestIdleCallback(pump, { timeout: LATER_WAIT });
+    if (queued.length > 0) pumping = whenStill(pump);
   }
 
   /** Lets go of the parts still to be drawn: the parts are drawn again, or the player stopped. */
   function forgetLater(): void {
+    partsSeen.disconnect();
+    partAnimations.clear();
+    away.clear();
     nearing?.disconnect();
     nearing = null;
     waiting.clear();
     queued.length = 0;
-    cancelIdleCallback(pumping);
-    pumping = 0;
+    pumping?.();
+    pumping = null;
   }
 
   /**
    * Fits the sample `draw` draws in `box` and hands it to `then`: now, or once `box` nears the
    * screen for a copy as big as the player's own sample, one that leaves its layout whole.
    */
-  function partIn(box: HTMLElement, draw: () => Element, then: (alone: Element) => void): void {
+  function partIn(box: HTMLElement, draw: () => Element, then: (alone: Element) => Animation[]): void {
+    const playing = (alone: Element): void => {
+      partAnimations.set(box, then(alone));
+      partsSeen.observe(box);
+    };
     if (ALL || sample.hasAttribute("data-layout")) {
       const alone = draw();
       fits.push(fitIn(box, alone));
-      then(alone);
+      playing(alone);
       return;
     }
     const standIn = el("div", "page-fit-later");
@@ -601,15 +633,15 @@ function player(move: Move): Player {
           nearing?.unobserve(entry.target);
           queued.push(job);
         }
-        if (queued.length > 0 && !pumping) pumping = requestIdleCallback(pump, { timeout: LATER_WAIT });
+        if (queued.length > 0 && !pumping) pumping = whenStill(pump);
       },
-      { rootMargin: "100% 0px" },
+      { rootMargin: "200% 0px" },
     );
     waiting.set(box, () => {
       const alone = draw();
       standIn.replaceWith(alone);
       delete later.twin;
-      then(alone);
+      playing(alone);
       go(current());
       fit();
     });
@@ -650,7 +682,7 @@ function player(move: Move): Player {
         spread(alone);
         return alone;
       },
-      () => undefined,
+      () => [],
     );
     box.inert = true;
     box.setAttribute("aria-hidden", "true");
