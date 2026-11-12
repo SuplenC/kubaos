@@ -286,6 +286,14 @@ export function well(name: string, ...content: Element[]): HTMLElement {
   return probe(box, { role: "component", name, variant: "", fixed: { width: false, height: false } });
 }
 
+/** A well drawn flush: the rows straight on the surface under it, with no fill, edge or room of its
+ *  own. The keyboard's focus tube and a scrolling well's thumb stay. */
+export function flush(box: HTMLElement): HTMLElement {
+  box.dataset.flush = "";
+  const role = JSON.parse(box.dataset.probe ?? "{}");
+  return probe(box, { ...role, variant: "Flush" });
+}
+
 /** The rows `space.s4` apart, as the well holds them. */
 function rowStack(rows: readonly HTMLElement[]): HTMLElement {
   const column = stack("s4", "start", ...rows);

@@ -81,6 +81,20 @@
   z-index: 2;
 }
 
+/* A flush well (`flush` in `lib/list.ts`): its rows straight on the surface under it. */
+.k-list[data-flush] {
+  padding: 0;
+  background: none;
+}
+
+.k-list[data-flush] > .k-list-edge {
+  display: none;
+}
+
+.k-list[data-flush] > .k-list-pane > .k-list-rows {
+  padding: 0;
+}
+
 .k-list-rows {
   position: relative;
   align-self: stretch;
@@ -177,6 +191,11 @@
   transition:
     --lit var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard);
+}
+
+/* A row whose hint shows lies over the rows after it, so the hint is never under them. */
+.k-list-row:has(.k-hinted:is(:hover, :focus-visible, [data-pinned], [data-keyed])) {
+  z-index: 2;
 }
 
 .k-list-row[data-lines="two"] {
