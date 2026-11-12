@@ -1,0 +1,69 @@
+/* Counters' own boxes (`counters-parts.ts`): the sheet's content, a row's end, the menus placed at
+   the pointer and the history page. The rows, buttons, menus and tabs are the library's. */
+
+/* The sheet's content: `size.panel` wide, `space.s8` inside, as the bell's peek's. */
+.ct-sheet {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: var(--size-panel);
+  padding: var(--space-s8);
+}
+
+/* The name's room takes what the value and the buttons leave. */
+.ct-name {
+  align-self: stretch;
+}
+
+.ct-value {
+  flex: none;
+  width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+}
+
+/* A row whose menu is open stays lit under it. */
+.ct-row[data-menu] {
+  --lit: 1;
+}
+
+/* A menu at the pointer, over the sheet. */
+.ct-placed {
+  position: absolute;
+  left: var(--ct-x);
+  top: var(--ct-y);
+  z-index: 2;
+}
+
+/* Auto reset: the type box and what it read, `space.s4` inside the popover as an item's sides
+   are, `space.s8` between them. */
+.ct-read {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  padding: var(--space-s4);
+}
+
+.ct-answer {
+  display: block;
+  padding: 0 var(--space-s8);
+}
+
+/* N in When it reaches, held to the item's end before its check. */
+.ct-cap {
+  flex: none;
+}
+
+/* The history page: its head, Group and Sort, then the changes, `space.s8` apart. */
+.ct-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+.ct-head {
+  height: var(--size-control_md);
+  padding: 0 var(--space-s4);
+}
+
+.ct-what {
+  flex: none;
+}
