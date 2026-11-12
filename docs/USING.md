@@ -10,7 +10,7 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 |---|---|
 | `SUPER + Return` | Terminal (Ghostty). It opens with the クバ logo and a few lines of system facts; "Terminal greeting off" in the Command menu, `dot-greeting off` or `KUBAOS_GREETING=0` turns that off |
 | `SUPER + CTRL + Return` | Terminal in tmux session `main` |
-| `SUPER + Space` | Command menu (Kotodama): apps, projects, scripts, windows, binds, KubaOS's actions and the system toggles ("wifi", "volume 40", "next wallpaper"). Type a sum to calculate. It opens on the focused screen |
+| `SUPER + Space` | Command menu (Kotodama): apps, projects, scripts, windows, binds, KubaOS's actions and the system toggles ("wifi", "volume 40", "next wallpaper"). Type a sum to calculate, or `>` and a command to run it in a floating terminal that stays open on its output ("> journalctl --user -b -p err"; your aliases work). It opens on the focused screen |
 | `SUPER + SHIFT + F` | Files (Nautilus) in your home folder |
 | `SUPER + CTRL + F` | yazi in your home folder, in Ghostty |
 | `SUPER + Q` | Close window |
