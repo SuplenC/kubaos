@@ -1,7 +1,7 @@
 // A count that rolls as it changes, as an odometer does: `RollingNumber`, new, in neither library
 // yet. Its figures are tabular, each in a slot one figure wide and the style's line tall that cuts
-// what leaves it, and the box is as wide as the widest value it is given, its figures held to its
-// end, so nothing beside it moves as the count grows a figure.
+// what leaves it (a figure's advance rounded up to a whole device pixel, so each starts on one),
+// and the box is as many slots wide as the widest value it is given, its figures held to its end, so nothing beside it moves as the count grows a figure.
 //
 // Only the figures that change roll. Going up, the new one comes in from below as the old one leaves
 // upward; going down, from above as the old leaves downward: `--roll` 0 to 1 over `short` on
@@ -9,7 +9,7 @@
 // sheds leaves into nothing. With reduce motion the figures change in place.
 
 import "./rolling-number.css";
-import { probe } from "./probe.ts";
+import { FIXED_HEIGHT, probe } from "./probe.ts";
 import { advance, centreFor, text, type TypeStyle } from "./text.ts";
 import { raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
@@ -62,7 +62,7 @@ export function rollingNumber(options: RollingOptions): Rolling {
   const element = document.createElement("span");
   element.className = "k-rolling";
   element.setAttribute("role", "status");
-  element.style.setProperty("--natural", String(advance(style, options.widest)));
+  element.style.setProperty("--slots", String(options.widest.length));
   element.style.setProperty("--figure", String(advance(style, "0")));
   element.style.setProperty("--t-line", `var(--type-${style}-line)`);
   let value = options.value;
@@ -111,7 +111,7 @@ export function rollingNumber(options: RollingOptions): Rolling {
     element.setAttribute("aria-label", shown);
   }
 
-  probe(element, { role: "component", name: "RollingNumber", variant: style, fixed: { width: true, height: true } });
+  probe(element, { role: "component", name: "RollingNumber", variant: style, fixed: FIXED_HEIGHT });
   return { element, set, value: () => value };
 }
 
