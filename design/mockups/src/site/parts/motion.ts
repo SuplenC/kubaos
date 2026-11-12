@@ -50,6 +50,9 @@ const SLOW = 10;
 /** How many frames Shift with an arrow moves. */
 const BIG_STEP = 10;
 
+/** How long a part waiting to be drawn waits for an idle moment, in milliseconds, at most. */
+const LATER_WAIT = 100;
+
 /** How to stop each player on the page drawn: its settings listener, its observer, its frames. */
 const players = new Set<() => void>();
 
@@ -279,6 +282,11 @@ interface Fit {
   readonly outer: HTMLElement;
   /** The sample at its own size, scaled by a transform, which lays nothing out. */
   readonly inner: HTMLElement;
+  /**
+   * Of a copy of the player's sample not drawn yet: the player's own, whose box its stand-in takes
+   * meanwhile, so the page is laid out as it will be when it is drawn.
+   */
+  twin?: Fit;
 }
 
 /** `sample` in the boxes that scale it to fit `stage`, which holds them. */
@@ -300,14 +308,20 @@ function refit(fits: readonly Fit[], oneToOne: boolean): boolean {
     inner.style.transform = "";
   }
   // Every box is read, then every one sized: one layout, not one a box.
-  const read = fits.map(({ stage, inner }) => {
+  const read = fits.map(({ stage, inner, twin }) => {
     const style = getComputedStyle(stage);
     const room = stage.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight);
-    return { width: inner.offsetWidth, height: inner.offsetHeight, room };
+    const drawn = (twin ?? { inner }).inner;
+    return { width: drawn.offsetWidth, height: drawn.offsetHeight, room };
   });
   let wider = false;
-  fits.forEach(({ outer, inner }, i) => {
+  fits.forEach(({ outer, inner, twin }, i) => {
     const { width, height, room } = read[i]!;
+    if (twin) {
+      const standIn = inner.firstElementChild as HTMLElement;
+      standIn.style.width = `${width}px`;
+      standIn.style.height = `${height}px`;
+    }
     const by = width > room && room > 0 ? room / width : 1;
     wider ||= by < 1;
     if (oneToOne || by === 1) {
@@ -493,6 +507,7 @@ function player(move: Move): Player {
    */
   function drawParts(): Animation[] {
     fits.length = 1;
+    forgetLater();
     const resting = restingIn(playing);
     if (playing.timed.length + resting.length < 2) {
       parts.replaceChildren();
@@ -502,24 +517,28 @@ function player(move: Move): Player {
     // as tall in either mode.
     const other = partWords(loop(move, settings().mode === "light" ? "dark" : "light"));
     const added: Animation[] = [];
+    let drawing = true;
     parts.replaceChildren(
       ...playing.timed.map((timed, i) => {
-        const alone = move.sample();
         const target = timed.track.target;
-        for (const each of playing.timed) {
-          for (const layer of alone.querySelectorAll<HTMLElement>(each.track.target)) {
-            if (!layer.matches(target)) layer.style.visibility = "hidden";
-          }
-        }
-        if (alone.hasAttribute("data-layout")) {
-          for (const child of [...alone.children]) {
-            if (!child.matches(target) && !child.querySelector(target)) child.remove();
-          }
-        }
-        spread(alone);
-        added.push(...animate(alone, timed));
         const box = el("div", "page-part-stage mock");
-        fits.push(fitIn(box, alone));
+        const draw = (): Element => {
+          const alone = move.sample();
+          for (const each of playing.timed) {
+            for (const layer of alone.querySelectorAll<HTMLElement>(each.track.target)) {
+              if (!layer.matches(target)) layer.style.visibility = "hidden";
+            }
+          }
+          if (alone.hasAttribute("data-layout")) {
+            for (const child of [...alone.children]) {
+              if (!child.matches(target) && !child.querySelector(target)) child.remove();
+            }
+          }
+          spread(alone);
+          return alone;
+        };
+        // Drawn now, its animations start with the player's; drawn later, they join its clock.
+        partIn(box, draw, (alone) => (drawing ? added : animations).push(...animate(alone, timed)));
         // A picture of the part, not more controls: no focus, no hover, nothing read out twice.
         box.inert = true;
         box.setAttribute("aria-hidden", "true");
@@ -529,8 +548,72 @@ function player(move: Move): Player {
       }),
       ...resting.map((track, i) => restingPart(track, other[playing.timed.length + i])),
     );
+    drawing = false;
     // Their rings' glows are drawn by the page's settle, which follows every build.
     return added;
+  }
+
+  // A part's sample is a whole copy of the player's, and a move of many parts on a page of screens
+  // is a page of screens more: a copy as big as the player's own is drawn as its box comes within a
+  // viewport of the screen, one an idle moment, its stand-in holding the box meanwhile. Its box
+  // keeps its size, so the page isn't laid out again for it: its rings draw as they are laid out.
+  let nearing: IntersectionObserver | null = null;
+  const waiting = new Map<Element, () => void>();
+  const queued: (() => void)[] = [];
+  let pumping = 0;
+
+  function pump(): void {
+    pumping = 0;
+    queued.shift()?.();
+    if (queued.length > 0) pumping = requestIdleCallback(pump, { timeout: LATER_WAIT });
+  }
+
+  /** Lets go of the parts still to be drawn: the parts are drawn again, or the player stopped. */
+  function forgetLater(): void {
+    nearing?.disconnect();
+    nearing = null;
+    waiting.clear();
+    queued.length = 0;
+    cancelIdleCallback(pumping);
+    pumping = 0;
+  }
+
+  /**
+   * Fits the sample `draw` draws in `box` and hands it to `then`: now, or once `box` nears the
+   * screen for a copy as big as the player's own sample, one that leaves its layout whole.
+   */
+  function partIn(box: HTMLElement, draw: () => Element, then: (alone: Element) => void): void {
+    if (ALL || sample.hasAttribute("data-layout")) {
+      const alone = draw();
+      fits.push(fitIn(box, alone));
+      then(alone);
+      return;
+    }
+    const standIn = el("div", "page-fit-later");
+    const later: Fit = { ...fitIn(box, standIn), twin: fits[0]! };
+    fits.push(later);
+    nearing ??= new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const job = waiting.get(entry.target);
+          if (!entry.isIntersecting || !job) continue;
+          waiting.delete(entry.target);
+          nearing?.unobserve(entry.target);
+          queued.push(job);
+        }
+        if (queued.length > 0 && !pumping) pumping = requestIdleCallback(pump, { timeout: LATER_WAIT });
+      },
+      { rootMargin: "100% 0px" },
+    );
+    waiting.set(box, () => {
+      const alone = draw();
+      standIn.replaceWith(alone);
+      delete later.twin;
+      then(alone);
+      go(current());
+      fit();
+    });
+    nearing.observe(box);
   }
 
   /**
@@ -559,10 +642,16 @@ function player(move: Move): Player {
 
   /** A part that doesn't play in light mode: its sample still, under a line saying why. */
   function restingPart(track: Track, room: string | undefined): HTMLElement {
-    const alone = move.sample();
-    spread(alone);
     const box = el("div", "page-part-stage mock");
-    fits.push(fitIn(box, alone));
+    partIn(
+      box,
+      () => {
+        const alone = move.sample();
+        spread(alone);
+        return alone;
+      },
+      () => undefined,
+    );
     box.inert = true;
     box.setAttribute("aria-hidden", "true");
     return el("div", "page-part-resting", keyOf(null, restingWords(track), "on_surface_variant", room), box);
@@ -726,6 +815,7 @@ function player(move: Move): Player {
     forget();
     watch.disconnect();
     resize.disconnect();
+    forgetLater();
     cancelAnimationFrame(frame);
     for (const animation of animations) animation.cancel();
   };
