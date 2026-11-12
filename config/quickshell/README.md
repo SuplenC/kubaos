@@ -90,7 +90,8 @@ services/               singletons, no UI
   Hypr                  focused screen, each screen's block of workspaces, workspace switching
   Panels                which panel is open, and on which screen
   MenuRequests          `kotodama toggle` / `open` an embedded KotodamaSearch got, handed on to the Command menu
-  Session               lock state, suspend/logout/reboot/poweroff
+  Session               lock state (kept across a shell restart in $XDG_RUNTIME_DIR/kubaos-session-lock),
+                        suspend/logout/reboot/poweroff
   Recorder              screen recording state ($XDG_RUNTIME_DIR/dot-record.json, watched), dot-hypr-record calls
   Idle                  Keep awake and the scheduled action ($XDG_RUNTIME_DIR/kubaos-keep-awake.json,
                         kubaos-scheduled.json, watched), kubaos-idle calls
