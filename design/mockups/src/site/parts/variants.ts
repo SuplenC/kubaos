@@ -6,7 +6,7 @@ import type { Group, Item } from "./shelf.ts";
 
 /** `rows` as the items of a shelf, each drawn now. */
 export function variantItems(rows: readonly Variant[]): Item[] {
-  return rows.map((row) => ({ name: row.name, words: row.for, sample: row.sample() }));
+  return rows.map((row) => ({ name: row.name, words: row.for, sample: row.sample(), make: row.sample }));
 }
 
 /**

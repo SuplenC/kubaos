@@ -5,6 +5,7 @@
 // to fit it, and its pane says by how much; with `?all`, the panes stack and nothing is scaled.
 
 import { el, holdScaled, label, relayout, sampleBox } from "../dom.ts";
+import { fullScreenControl, isScreen } from "../full-screen.ts";
 import { applies, type DoesntApply, type Focus, LOOK_NAMES, STATE_NAMES, type Stage, type State, type States } from "../page.ts";
 import { ALL, type Mode, settings } from "../settings.ts";
 import { picker } from "./picker.ts";
@@ -28,6 +29,8 @@ interface Pane {
   readonly outer: HTMLElement;
   readonly inner: HTMLElement;
   readonly scale: HTMLElement;
+  /** Shows the pick drawn on the whole screen, where it is a screen. */
+  readonly full: HTMLButtonElement | null;
 }
 
 /**
@@ -78,21 +81,28 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
   const now = settings();
   const day = applies(spec.daylight);
   const modes: Mode[] = !day ? ["dark"] : ALL || now.both ? ["dark", "light"] : [now.mode];
+  let shown = 0;
   const panes = modes.map((mode): Pane => {
     const inner = el("div", "page-stage-flow");
     const outer = el("div", "page-pane-fit", inner);
     const scale = el("span", "page-pane-scale");
-    const head = el("div", "page-pane-head", label(day ? MODE_NAMES[mode] : `${MODE_NAMES[mode]}, in either mode`, "label", "on_surface_variant"), scale);
+    const full = fullScreenControl(() => ({ make: () => picks[shown]!.draw(mode)[0]!, mode }));
+    const head = el("div", "page-pane-head", label(day ? MODE_NAMES[mode] : `${MODE_NAMES[mode]}, in either mode`, "label", "on_surface_variant"), scale, ...(full ? [full] : []));
     const box = sampleBox(painted(now.theme, mode, head, outer));
     box.classList.add("page-pane");
     box.dataset.paneMode = mode;
-    return { box, outer, inner, scale };
+    return { box, outer, inner, scale, full };
   });
   const hint = el("div", "page-stage-hint");
 
   const show = (index: number): void => {
     const pick = picks[index]!;
-    panes.forEach((pane, i) => pane.inner.replaceChildren(...pick.draw(modes[i]!)));
+    shown = index;
+    panes.forEach((pane, i) => {
+      const drawn = pick.draw(modes[i]!);
+      pane.inner.replaceChildren(...drawn);
+      if (pane.full) pane.full.hidden = !isScreen(drawn);
+    });
     // A label is measured for its words, so each pick's hint is a label of its own.
     hint.replaceChildren(label(pick.hint, "mono", "on_surface_variant"));
     if (box.isConnected) relayout(box);

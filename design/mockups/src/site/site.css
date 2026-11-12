@@ -2166,3 +2166,38 @@ body {
   left: round(down, calc((var(--side) - var(--icon-size)) / 2), 1px);
   top: round(down, calc((var(--side) - var(--icon-size)) / 2), 1px);
 }
+
+/* The full-screen control (`site/full-screen.ts`) on a pane's head line, after the scale it is
+   shown at, without making the line taller; under a stage sample's words, at its own width. */
+.page-full-screen[hidden] {
+  display: none;
+}
+
+.page-pane-head:has(> .page-full-screen:not([hidden])) {
+  align-items: center;
+  gap: var(--space-s8);
+}
+
+.page-pane-head:has(> .page-full-screen:not([hidden])) > .page-pane-scale {
+  margin-inline-start: auto;
+}
+
+.page-pane-head > .page-full-screen {
+  margin-block: calc(-1 * var(--space-s4));
+}
+
+.page-stage-words > .page-full-screen {
+  align-self: flex-start;
+}
+
+/* The room a screen is shown in on the whole screen: over the whole page until the browser's full
+   screen takes it, the screen from its top left. */
+.site-full-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  overflow: hidden;
+  background: var(--color-surface_container_lowest);
+  outline: none;
+}
