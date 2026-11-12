@@ -14,9 +14,14 @@ Singleton {
         persisted.locked = true;
     }
 
-    // Only the lock screen calls this, after PAM succeeded.
+    // Only the lock screen calls this, after PAM succeeded. A security key's
+    // touch is no keyboard or mouse input, so neither hypridle's resume nor
+    // Hyprland lights screens its idle timer turned off: light them here,
+    // the way hypridle's resume does, lid sync after so a failing script
+    // leaves them on.
     function unlock(): void {
         persisted.locked = false;
+        Quickshell.execDetached(["sh", "-c", `hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })'; exec dot-hypr-lid sync`]);
     }
 
     function suspend(): void {
