@@ -19,6 +19,7 @@ export function content(spec: Content): Group[] {
           [row.words.short, row.words.long, translated(row.words.long)].map((words, i): Item => ({
             name: `${row.name} · ${LENGTHS[i]!}`,
             sample: row.sample(words),
+            make: () => row.sample(words),
             at: [row.name, LENGTHS[i]!],
           })),
         )

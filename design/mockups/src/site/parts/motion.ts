@@ -38,6 +38,7 @@ import {
   tokenOf,
   tracksOf,
 } from "../recipe.ts";
+import { fullScreenMove } from "../full-screen.ts";
 import { ALL, CHROME, onChange, settings } from "../settings.ts";
 import { key as keyOf, legend, type Mark, named, Plot } from "./plot.ts";
 import { picker } from "./picker.ts";
@@ -644,6 +645,7 @@ function player(move: Move): Player {
     pick(null);
   });
   sizeControl.hidden = true;
+  const fullControl = fullScreenMove(move, sample, current, rate);
 
   const seekTo = (event: PointerEvent) => pause(plot.timeAt(event.clientX));
   bar.addEventListener("pointerdown", (event) => {
@@ -696,7 +698,7 @@ function player(move: Move): Player {
   whole.append(
     el("div", "page-player-words", label(move.name, "body_strong", "on_surface"), prose(move.what)),
     stage,
-    el("div", "page-player-controls", playControl, restart, slowControl, copy, sizeControl),
+    el("div", "page-player-controls", playControl, restart, slowControl, copy, sizeControl, ...(fullControl ? [fullControl] : [])),
     bar,
     readout,
     key,
