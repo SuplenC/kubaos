@@ -457,7 +457,7 @@ export function popupStackOnScreen(options: PopupStackOptions = {}): HTMLElement
         each.run.finished.then(() => leave(each, "up"), () => {});
       }
     }
-    // The slot's room is its popup's height, which only layout knows, closing as `--room` goes to 0.
+    // The slot's room is its popup's height, which only layout knows, closing as `--slot-open` goes to 0.
     new ResizeObserver(() => slot.style.setProperty("--slot-h", `${inner.offsetHeight}px`)).observe(inner);
     return each;
   }

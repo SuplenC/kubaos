@@ -30,10 +30,10 @@ const ARRIVES: Move = {
   tracks: [
     { part: "the slide", on: ON, target: INNER, property: "--slide-by", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
     { part: "the fade", on: ON, target: INNER, property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: "its room", on: ON, target: STACK, property: "--room", from: 0, to: 1, duration: "medium", curve: "standard_decel" },
+    { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 0, to: 1, duration: "medium", curve: "standard_decel" },
   ],
   reduced: [
-    { part: "its room", on: ON, target: STACK, property: "--room", from: 0, to: 1, duration: "instant", curve: "linear" },
+    { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 0, to: 1, duration: "instant", curve: "linear" },
     { part: "the fade", on: ON, target: INNER, property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   back: "cuts",
@@ -46,11 +46,11 @@ const DISMISSED: Move = {
   tracks: [
     { part: "the slide", on: ON, target: INNER, property: "--slide-by", from: 0, to: 2, duration: "medium", curve: "emphasized_accel" },
     { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_accel" },
-    { part: "its room", on: ON, target: STACK, property: "--room", from: 1, to: 0, duration: "medium", cue: "medium", curve: "standard_decel" },
+    { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 1, to: 0, duration: "medium", cue: "medium", curve: "standard_decel" },
   ],
   reduced: [
     { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" },
-    { part: "its room", on: ON, target: STACK, property: "--room", from: 1, to: 0, duration: "instant", cue: "short", curve: "linear" },
+    { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 1, to: 0, duration: "instant", cue: "short", curve: "linear" },
   ],
   back: "cuts",
   sample: () => still(SETTLED),
@@ -62,11 +62,11 @@ const TIME_UP: Move = {
   tracks: [
     { part: "the rise", on: ON, target: INNER, property: "--rise", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
     { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_accel" },
-    { part: "its room", on: ON, target: STACK, property: "--room", from: 1, to: 0, duration: "medium", curve: "standard_decel" },
+    { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 1, to: 0, duration: "medium", curve: "standard_decel" },
   ],
   reduced: [
     { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" },
-    { part: "its room", on: ON, target: STACK, property: "--room", from: 1, to: 0, duration: "instant", cue: "short", curve: "linear" },
+    { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 1, to: 0, duration: "instant", cue: "short", curve: "linear" },
   ],
   back: "cuts",
   sample: () => still(SETTLED),
