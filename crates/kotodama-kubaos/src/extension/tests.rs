@@ -29,12 +29,13 @@ fn ids(extension: &Extension<FakeBus, FakeRunner>) -> Vec<String> {
     extension.items().map(|item| item.id).collect()
 }
 
-/// The Items the Extension always sends, in order: the toggles, the idle settings, the shell's,
-/// the power stop's status and the Proxy's, then the Suites', none of them installed.
+/// The Items the Extension always sends, in order: the toggles, the idle settings, "New counter",
+/// the shell's, the power stop's status and the Proxy's, then the Suites', none of them installed.
 fn always() -> Vec<String> {
     toggles::ids()
         .into_iter()
         .chain(crate::idle::ids())
+        .chain(crate::counters::ids())
         .chain(crate::shell::ids())
         .chain(crate::power::ids())
         .chain(crate::proxy::ids())

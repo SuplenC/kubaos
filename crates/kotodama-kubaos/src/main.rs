@@ -2,15 +2,17 @@
 //! config the Daemon sends makes the Items over, sending only the ones that changed, and so does
 //! each change the update check writes, each change to the keyboard layouts, to the wallpaper sets
 //! file, to Hyprland's screens file, to the drives file and to a file a state of the actions is
-//! read from; each config also reads the user folders and the states again; each run is answered
-//! with its outcome, after the View it pushes or pops. Each Live query is answered at once, with a
+//! read from, and to the counters' file; each config also reads the user folders and the states
+//! again; each run is answered with its outcome, after the View it pushes or pops. Each keystroke in
+//! a View that filters itself is answered with the View again, and each Live query at once, with a
 //! monitor answer, processes to stop, a date answer, or nothing.
 //!
 //! # Owns
 //!
 //! - The loop, logging the config's problems, and turning what a run came to into messages.
-//! - Watching the update check's file, the keyboard settings and `/etc/default/keyboard`, the
-//!   wallpaper sets file, Hyprland's screens file, the drives file and the states' files.
+//! - Watching the update check's file, the counters' file, the keyboard settings and
+//!   `/etc/default/keyboard`, the wallpaper sets file, Hyprland's screens file, the drives file and
+//!   the states' files.
 //!
 //! # Not here
 //!
@@ -24,6 +26,7 @@ use std::time::Duration;
 
 use jiff::Zoned;
 use kotodama_extension::Connection;
+use kotodama_extension::Writer;
 use kotodama_extension::Event;
 use kotodama_extension::SentItems;
 use kotodama_extension::SentStatus;
@@ -33,6 +36,8 @@ use kotodama_extension::watch::Watcher;
 use kotodama_kubaos::bus::SystemBus;
 use kotodama_kubaos::clock;
 use kotodama_kubaos::clock::Dates;
+use kotodama_kubaos::counters;
+use kotodama_kubaos::counters::CounterList;
 use kotodama_kubaos::desk;
 use kotodama_kubaos::desk::Desk;
 use kotodama_kubaos::drives;
@@ -82,6 +87,8 @@ enum Own {
     Desk(Desk),
     /// A file a state is read from changed.
     States(States),
+    /// The counters' file changed.
+    Counters(CounterList),
 }
 
 /// What answers Live queries: the system monitor, then the dates.
@@ -211,6 +218,7 @@ fn run() -> Result<(), Error> {
     let _drives_watcher = drives_file.and_then(|file| watch_drives(file, events.clone()));
     let _desk_watcher = read_desk(&mut extension, events.clone());
     let (places, _states_watcher) = read_states(&mut extension, events.clone());
+    extension.set_counters(CounterList::read());
     let _watcher = state.and_then(|dir| watch(dir, events));
     let mut configured = false;
 
@@ -232,9 +240,15 @@ fn run() -> Result<(), Error> {
                     Own::Drives(drives) => extension.set_drives(drives),
                     Own::Desk(desk) => extension.set_desk(desk),
                     Own::States(states) => extension.set_states(states),
+                    Own::Counters(counters) => extension.set_counters(counters),
                 }
                 if configured {
                     sent.publish(&mut writer, extension.items())?;
+                }
+            }
+            Event::Message(ToExtension::FilterView { view, text }) => {
+                if let Some(view) = extension.filter_view(&view, &text) {
+                    writer.send(&FromExtension::UpdateView(view))?;
                 }
             }
             Event::Message(ToExtension::LiveQuery { id, query, .. }) => {
@@ -260,16 +274,7 @@ fn run() -> Result<(), Error> {
                 arguments,
             }) => {
                 let outcome = match extension.run(&action, &item, &arguments) {
-                    Ok(Ran::Close) => Outcome::Close,
-                    Ok(Ran::KeepOpen) => Outcome::KeepOpen,
-                    Ok(Ran::Push(view)) => {
-                        writer.send(&FromExtension::PushView(view))?;
-                        Outcome::KeepOpen
-                    }
-                    Ok(Ran::Pop(view)) => {
-                        writer.send(&FromExtension::PopView { view })?;
-                        Outcome::Close
-                    }
+                    Ok(ran) => outcome_of(ran, &mut writer)?,
                     Err(message) => Outcome::Failed { message },
                 };
                 writer.send(&FromExtension::ActionDone { invocation, outcome })?;
@@ -281,24 +286,44 @@ fn run() -> Result<(), Error> {
     Ok(())
 }
 
-/// Watches `dir` for the update check's file, sending what it says on each change. Without a
-/// watch the update actions keep what the file said at start.
+/// What a run came to, sending the View it pushes or pops first.
+fn outcome_of(ran: Ran, writer: &mut Writer) -> Result<Outcome, Error> {
+    Ok(match ran {
+        Ran::Close => Outcome::Close,
+        Ran::KeepOpen => Outcome::KeepOpen,
+        Ran::Push(view) => {
+            writer.send(&FromExtension::PushView(view))?;
+            Outcome::KeepOpen
+        }
+        Ran::Pop(view) => {
+            writer.send(&FromExtension::PopView { view })?;
+            Outcome::Close
+        }
+    })
+}
+
+/// Watches KubaOS's state folder `dir` for the update check's file and the counters' file, sending
+/// what both say on each change to either. Without a watch the update actions keep what the file
+/// said at start, and the counters' Items the counters of the start.
 fn watch(dir: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
+    // `kubaos-counters` makes the folder with its first counter; made here, it waits for that.
+    let _ = std::fs::create_dir_all(&dir);
     // The events name the real path, behind any symlink on the way.
     let dir = dir.canonicalize().unwrap_or(dir);
     let file = dir.join(updates::FILE);
-    let changed = file.clone();
+    let changed = [file.clone(), dir.join(counters::FILE_NAME)];
     let watcher = Watcher::start(
         "watch",
         RecursiveMode::NonRecursive,
         SETTLE,
-        // The check writes through a temporary file and a rename onto `file`.
-        move |event, _| watched::changes(event, &changed),
+        // The check and `kubaos-counters` write through a temporary file and a rename onto theirs.
+        move |event, _| changed.iter().any(|file| watched::changes(event, file)),
         move |_| {
             let _ = events.send(Event::Own(Own::Pending(Pending::read(&file))));
+            let _ = events.send(Event::Own(Own::Counters(CounterList::read())));
         },
     )
-    .map_err(|err| kotodama_extension::log!("not watching for KubaOS updates: {}", watched::why(&err)))
+    .map_err(|err| kotodama_extension::log!("not watching for KubaOS updates or the counters: {}", watched::why(&err)))
     .ok()?;
     watcher.watch(vec![dir]);
     Some(watcher)
