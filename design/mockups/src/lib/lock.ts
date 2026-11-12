@@ -68,6 +68,79 @@ export interface Wallpaper {
 }
 
 /**
+ * A part of the picture that can stand in front of the clock, as an alpha picture the picture's
+ * size: the city's cut-out, which pushes in to `scale.near` with the city, or a band of the
+ * picture's own depth, which stays with the picture at `scale.push`.
+ */
+export interface Layer {
+  readonly mask: string;
+  /** Drawn by the city layer, ahead of the picture, rather than by the picture itself. */
+  readonly near: boolean;
+}
+
+/** Where the rest clock stands, in shares of the screen it is drawn on. */
+export interface ClockPlace {
+  /** The digits' middle across the screen's width. */
+  readonly x: number;
+  /** The digits' baseline down the screen's height. */
+  readonly y: number;
+  /** The clock's type size, a share of the screen's shorter side. */
+  readonly s: number;
+}
+
+export type DateAlign = "left" | "centre" | "right";
+
+/** The kicker over the digits, in shares of the clock's size, and its edge on the digits' ink. */
+export interface ClockDate {
+  readonly size: number;
+  readonly gap: number;
+  readonly align: DateAlign;
+}
+
+/** A soft glow under the digits and the kicker: its colour and how strong it is, 0 to 1. */
+export interface ClockGlow {
+  readonly colour: string;
+  readonly strength: number;
+}
+
+/**
+ * The rest clock as the wallpaper picker sets it, each part the lock's own when left out: the
+ * standard place, the tokens' kicker, the picture's tint, no glow, and the city's cut-out in front.
+ */
+export interface LockClock {
+  readonly place?: ClockPlace;
+  readonly date?: ClockDate;
+  /** A CSS colour for the digits and the kicker, in place of the picture's tint. */
+  readonly colour?: string;
+  readonly glow?: ClockGlow;
+  /** What stands in front of the clock, nearest first; none, and it stands in front of it all. */
+  readonly layers?: readonly Layer[];
+  /** False: no clock and no date at rest, the picture alone; the bar's time comes and goes with the bar. */
+  readonly showClock?: boolean;
+  /** False: the digits with no date over them. */
+  readonly showDate?: boolean;
+}
+
+/**
+ * The rest clock drawn on a screen, in that screen's CSS pixels (the natural widths in logical
+ * pixels, as the CSS reads them): what a move of the clock eases between.
+ */
+export interface ClockAt {
+  readonly cx: number;
+  /** The digits' cap top. */
+  readonly top: number;
+  readonly size: number;
+  readonly kickerSize: number;
+  readonly kickerLine: number;
+  readonly kickerGap: number;
+  /** The kicker's edge on the digits' ink: 0 its left on their left, 0.5 its middle, 1 its right. */
+  readonly align: number;
+  readonly digits: number;
+  readonly place: number;
+  readonly date: number;
+}
+
+/**
  * At rest, awake with the password's sheet up, or the desktop: the still of it the lock plays its
  * locking and unlocking on, the frame and the bar as the shell draws them and the clock in the bar.
  * Or the picture alone, pushed in with its city off the sky: the wallpaper picker's wall.
@@ -114,6 +187,11 @@ export interface LockOptions {
   readonly windows?: readonly Element[];
   /** The password's sheet; false for a lock that is only ever at rest: a picture of one. */
   readonly sheet?: boolean;
+  /**
+   * The rest clock as set for this picture: with one, the kicker stands on the digits' ink and
+   * the clock in front of the city, cut by each layer in front of it.
+   */
+  readonly clock?: LockClock;
 }
 
 export interface Lock {
@@ -122,6 +200,17 @@ export interface Lock {
   readonly sheet: Sheet;
   /** The sheet's content, whose field a live lock swaps. */
   readonly content: HTMLElement;
+  /** Sets the rest clock, and places it again. */
+  setClock(clock: LockClock): void;
+  /**
+   * Held, the lock leaves its clock where its owner draws it (`drawClock`) rather than placing it
+   * itself; it still reads the bar's time and the kicker's baseline as it is resized.
+   */
+  hold(held: boolean): void;
+  /** Where the rest clock stands with `clock` on this lock drawn `width` by `height` CSS pixels. */
+  clockAt(clock: LockClock, width: number, height: number): ClockAt;
+  /** The picture's tint under the digits of `at`, on a screen `width` by `height`: null until it has arrived. */
+  tintAt(at: ClockAt, width: number, height: number): string | null;
 }
 
 export const TIME = "21:47";
@@ -277,68 +366,108 @@ export function lock(options: LockOptions): Lock {
 
   // The rest clock stands in the screen's place, the same on every wallpaper, in front of the sky
   // and behind the city; the city's cut-out clips the digits wherever it happens to cross them.
-  // The clock's tint is the picture's colour under the digits at rest, read off the picture
-  // itself. The bar's clock is where the pill's layout puts its time, which only layout knows.
-  // Placing reads the layout and writes styles; done for every lock at once in phases (`placeAll`),
-  // reads then writes, so a page of many locks is laid out a few times, not once a lock.
-  function* place(): Generator<void, void, void> {
-    const width = element.clientWidth;
-    const height = element.clientHeight;
-    const pillWidth = bar.pill.offsetWidth;
-    if (width === 0) return;
+  // A picture's own clock (`options.clock`) stands where it was set instead, and in front of the
+  // city, cut by every layer set in front of it. The clock's tint is the picture's colour under
+  // the digits at rest, read off the picture itself. The bar's clock is where the pill's layout
+  // puts its time, which only layout knows. Placing reads the layout and writes styles; done for
+  // every lock at once in phases (`placeAll`), reads then writes, so a page of many locks is laid
+  // out a few times, not once a lock.
+  let own: LockClock | undefined = options.clock;
+  let held = false;
+  if (own) clockOn(element, clock, own);
+
+  /** How the screen crops the picture, flat and pushed in, on a screen `width` by `height`. */
+  const covers = (width: number, height: number) => {
     // Until the picture has arrived the clock is placed on the screen as if it were the picture.
     const seen = picture.naturalWidth > 0 ? { width: picture.naturalWidth, height: picture.naturalHeight } : { width, height };
-    const px = pxOf(element);
-    const token = (name: string) => length(name) * px;
     const scale = Math.max(width / seen.width, height / seen.height);
     const flat = { scale, left: (width - seen.width * scale) / 2, top: (height - seen.height * scale) / 2 };
-    const pushed = pushedCover(flat, width, height, element.closest("[data-reduced]") ? 1 : number("scale-push"));
-    const cap = capHeight();
-    // The clock is the screen's share (`scale.lock_clock`, `scale.lock_clock_width`; on a portrait
-    // screen sized from the width, below), its kicker the clock's (`scale.lock_date`,
-    // `scale.lock_date_gap`, the portrait pair), never under `size.lock_date_least`:
-    // `type.clock_rest` and `type.clock_date` are the 1080 tall screen's.
+    return { seen, flat, pushed: pushedCover(flat, width, height, element.closest("[data-reduced]") ? 1 : number("scale-push")) };
+  };
+
+  /** Where the clock stands with `set` on a screen `width` by `height`, in its CSS pixels. */
+  const at = (set: LockClock | undefined, width: number, height: number): ClockAt => {
+    const px = pxOf(element);
+    const token = (name: string) => length(name) * px;
     const portrait = height > width;
     const reference = token("type-clock_rest-size");
     const margin = token("space-s32");
     // Each on whole pixels of the screen it is drawn on.
     const whole = (v: number) => Math.floor(v / px + 0.5) * px;
-    // On a portrait screen the clock's size is set once from the width: the widest time it can show
-    // fills the width less `space.s32` either side, so no time ever leaves the screen and the size
-    // never changes as the minutes turn; a narrower time is simply drawn narrower, as on a wide one.
-    const restSize = portrait
+    const cap = capHeight();
+    // The clock is the screen's share (`scale.lock_clock`, `scale.lock_clock_width`; on a portrait
+    // screen sized from the width, below), its kicker the clock's (`scale.lock_date`,
+    // `scale.lock_date_gap`, the portrait pair), never under `size.lock_date_least`:
+    // `type.clock_rest` and `type.clock_date` are the 1080 tall screen's. On a portrait screen the
+    // clock's size is set once from the width: the widest time it can show fills the width less
+    // `space.s32` either side, so no time ever leaves the screen and the size never changes as the
+    // minutes turn; a narrower time is simply drawn narrower, as on a wide one.
+    const standard = portrait
       ? Math.floor(((width - 2 * margin) * length("type-clock_rest-size")) / widestRest(twelve) / px) * px
       : whole(Math.min(number("scale-lock_clock") * height, number("scale-lock_clock_width") * width));
-    const grown = restSize / reference;
-    // The kicker, the clock's share, shrunk to fit the width less `space.s32` either side should a
-    // long date need it, and never under `size.lock_date_least`.
-    const wanted = Math.max(token("size-lock_date_least"), number(portrait ? "scale-lock_date_portrait" : "scale-lock_date") * restSize);
-    const wantedWidth = ((placeNatural + dateNatural) * wanted * px) / token("type-clock_date-size");
-    const kickerSize = whole(Math.max(token("size-lock_date_least"), wantedWidth > width - 2 * margin ? (wanted * (width - 2 * margin)) / wantedWidth : wanted));
+    // A clock set by hand keeps its exact share, so a drag or a move between screens is smooth.
+    const size = set?.place ? set.place.s * Math.min(width, height) : standard;
+    const grown = size / reference;
+    const least = token("size-lock_date_least");
+    let kickerSize: number;
+    let kickerGap: number;
+    if (set?.date) {
+      kickerSize = Math.max(least, set.date.size * size);
+      kickerGap = set.date.gap * size;
+    } else {
+      // The kicker, the clock's share, shrunk to fit the width less `space.s32` either side should
+      // a long date need it, and never under `size.lock_date_least`.
+      const wanted = Math.max(least, number(portrait ? "scale-lock_date_portrait" : "scale-lock_date") * size);
+      const wantedWidth = ((placeNatural + dateNatural) * wanted * px) / token("type-clock_date-size");
+      kickerSize = whole(Math.max(least, wantedWidth > width - 2 * margin ? (wanted * (width - 2 * margin)) / wantedWidth : wanted));
+      kickerGap = whole(number(portrait ? "scale-lock_date_gap_portrait" : "scale-lock_date_gap") * size);
+    }
     const kickerGrown = kickerSize / token("type-clock_date-size");
-    const kickerGap = whole(number(portrait ? "scale-lock_date_gap_portrait" : "scale-lock_date_gap") * restSize);
-    const natural = digitsWidth(time) * grown;
-    const restDigits = Math.ceil(natural * px - 0.001);
     // One place on every wallpaper, the screen's, not the picture's: centred, its digits' baseline
     // `scale.lock_clock_base` of the screen's height down (`scale.lock_clock_base_portrait` on a
-    // portrait screen). A city with depth clips the digits wherever it happens to stand over them.
-    const base = number(portrait ? "scale-lock_clock_base_portrait" : "scale-lock_clock_base") * height;
-    const rest = { cx: width / 2, top: Math.round(base - cap * restSize) };
-    clock.style.setProperty("--digits-natural", String(natural));
-    clock.style.setProperty("--rest-size", `${restSize}px`);
-    clock.style.setProperty("--kicker-size", `${kickerSize}px`);
-    clock.style.setProperty("--kicker-line", `${(token("type-clock_date-line") * kickerGrown).toFixed(3)}px`);
-    clock.style.setProperty("--kicker-gap", `${kickerGap}px`);
-    clock.style.setProperty("--place-natural", String(placeNatural * kickerGrown));
-    clock.style.setProperty("--date-natural", String(dateNatural * kickerGrown));
-    clock.style.setProperty("--cap-height", String(cap));
+    // portrait screen); or the place set for this picture.
+    const base = set?.place ? set.place.y * height : number(portrait ? "scale-lock_clock_base_portrait" : "scale-lock_clock_base") * height;
+    const cx = set?.place ? set.place.x * width : width / 2;
+    return {
+      cx,
+      top: set?.place ? base - cap * size : Math.round(base - cap * size),
+      size,
+      kickerSize,
+      kickerLine: token("type-clock_date-line") * kickerGrown,
+      kickerGap,
+      align: ALIGN[set?.date?.align ?? "centre"],
+      digits: digitsWidth(time) * grown,
+      place: placeNatural * kickerGrown,
+      date: dateNatural * kickerGrown,
+    };
+  };
+
+  /** The picture's tint under the digits of `where`, as they stand at rest: pushed in. */
+  const tintAt = (where: ClockAt, width: number, height: number): string | null => {
+    const digitsBox = Math.ceil(where.digits * pxOf(element) - 0.001);
+    return tintFor(picture, { x: where.cx - digitsBox / 2, y: where.top, width: digitsBox, height: capHeight() * where.size }, covers(width, height).pushed);
+  };
+
+  function* place(): Generator<void, void, void> {
+    const width = element.clientWidth;
+    const height = element.clientHeight;
+    const pillWidth = bar.pill.offsetWidth;
+    if (width === 0) return;
+    const { seen, flat } = covers(width, height);
+    clock.style.setProperty("--cap-height", String(capHeight()));
     clock.style.setProperty("--bar-natural", String(advance("body", time)));
-    clock.style.setProperty("--middle", `${width / 2}px`);
-    clock.style.setProperty("--rest-top-at", `${rest.top}px`);
-    clock.style.setProperty("--city-flat-left", `${flat.left}px`);
-    clock.style.setProperty("--city-flat-top", `${flat.top}px`);
-    clock.style.setProperty("--city-flat-width", `${seen.width * flat.scale}px`);
-    clock.style.setProperty("--city-flat-height", `${seen.height * flat.scale}px`);
+    if (own) {
+      element.style.setProperty("--picture-width", String(seen.width));
+      element.style.setProperty("--picture-height", String(seen.height));
+    } else {
+      clock.style.setProperty("--city-flat-left", `${flat.left}px`);
+      clock.style.setProperty("--city-flat-top", `${flat.top}px`);
+      clock.style.setProperty("--city-flat-width", `${seen.width * flat.scale}px`);
+      clock.style.setProperty("--city-flat-height", `${seen.height * flat.scale}px`);
+    }
+    const where = at(own, width, height);
+    if (!held) drawClock(clock, where);
+    if (own) inkOn(clock, time);
     bar.time.style.setProperty("--slot", String(widestTime("body", twelve)));
     bar.pill.style.setProperty("--pill-width", `${pillWidth}px`);
     const mark = document.createElement("span");
@@ -355,7 +484,9 @@ export function lock(options: LockOptions): Lock {
     // Its baseline's depth below its top as a share of its size, so it holds at whatever size the
     // kicker is drawn (the size in the screen's pixels, the box as the viewport draws it).
     const kickerFont = Number.parseFloat(getComputedStyle(date).fontSize) * (kickerBox.width / ((kicker as HTMLElement).offsetWidth || kickerBox.width || 1));
-    const kickerBase = kickerFont > 0 ? (kickerMark.getBoundingClientRect().bottom - kickerBox.top) / kickerFont : 0;
+    // From inside its padding: a clock with layers pads its kicker to give its mask room.
+    const kickerPad = Number.parseFloat(getComputedStyle(kicker).paddingTop) * (kickerBox.height / ((kicker as HTMLElement).offsetHeight || kickerBox.height || 1));
+    const kickerBase = kickerFont > 0 ? (kickerMark.getBoundingClientRect().bottom - kickerBox.top - kickerPad) / kickerFont : 0;
     yield;
     mark.remove();
     kickerMark.remove();
@@ -364,9 +495,8 @@ export function lock(options: LockOptions): Lock {
       clock.style.setProperty("--bar-base", measured.base);
     }
     if (kickerBase > 0) clock.style.setProperty("--kicker-base-share", kickerBase.toFixed(5));
-
-    const restDigitsBox = { x: rest.cx - restDigits / 2, y: rest.top, width: restDigits, height: cap * restSize };
-    const tint = tintFor(picture, restDigitsBox, pushed);
+    if (held) return;
+    const tint = own?.colour ?? tintAt(where, width, height);
     if (tint) clock.style.setProperty("--digits-tint", tint);
     else clock.style.removeProperty("--digits-tint");
   }
@@ -378,7 +508,126 @@ export function lock(options: LockOptions): Lock {
   void document.fonts.ready.then(() => later(place));
 
   probe(element, { role: "component", name: "Lock", variant: variant(options.phase, wallpaper.depth && "cutout"), fixed: { width: false, height: false, holds: true } });
-  return { element, screen: shown, sheet: rising, content };
+  return {
+    element,
+    screen: shown,
+    sheet: rising,
+    content,
+    setClock(set: LockClock): void {
+      own = set;
+      clockOn(element, clock, set);
+      // Held, its owner draws the clock: nothing is measured, so a move it starts has no slow frame.
+      if (!held) later(place);
+    },
+    hold(on: boolean): void {
+      held = on;
+      if (!on) later(place);
+    },
+    clockAt: (set, width, height) => at(set, width, height),
+    tintAt,
+  };
+}
+
+const ALIGN: Record<DateAlign, number> = { left: 0, centre: 0.5, right: 1 };
+
+/**
+ * Draws the rest clock at `to`, or on the way there from `from` as far as the number property `by`
+ * stands (0 at `from`, 1 at `to`), so a move eases one number and the CSS draws every frame.
+ */
+export function drawClock(clock: HTMLElement, to: ClockAt, from?: ClockAt, by?: string): void {
+  const mix = (a: number, b: number, unit: string) => (from === undefined || by === undefined || Math.abs(a - b) < 1e-4 ? `${b}${unit}` : `calc(${a}${unit} + ${b - a}${unit} * var(${by}))`);
+  const was = from ?? to;
+  clock.style.setProperty("--middle", mix(was.cx, to.cx, "px"));
+  clock.style.setProperty("--rest-top-at", mix(was.top, to.top, "px"));
+  clock.style.setProperty("--rest-size", mix(was.size, to.size, "px"));
+  clock.style.setProperty("--kicker-size", mix(was.kickerSize, to.kickerSize, "px"));
+  clock.style.setProperty("--kicker-line", mix(was.kickerLine, to.kickerLine, "px"));
+  clock.style.setProperty("--kicker-gap", mix(was.kickerGap, to.kickerGap, "px"));
+  clock.style.setProperty("--kicker-align", mix(was.align, to.align, ""));
+  clock.style.setProperty("--digits-natural", mix(was.digits, to.digits, ""));
+  clock.style.setProperty("--place-natural", mix(was.place, to.place, ""));
+  clock.style.setProperty("--date-natural", mix(was.date, to.date, ""));
+}
+
+/**
+ * Marks `element` as drawing a set clock and lays its layers, colour and glow on `clock`: the
+ * digits and the kicker each take every layer in front of the clock out of themselves, laid where
+ * its pixels are drawn, the city's ahead with the city, the picture's own with the picture.
+ */
+function clockOn(element: HTMLElement, clock: HTMLElement, set: LockClock): void {
+  element.toggleAttribute("data-clocked", true);
+  element.toggleAttribute("data-clockless", set.showClock === false);
+  element.toggleAttribute("data-undated", set.showDate === false);
+  const layers = set.layers ?? [];
+  element.toggleAttribute("data-layered", layers.length > 0);
+  for (const [part, x, y] of [
+    [".k-lock-digits", "var(--clock-left)", "var(--clock-top)"],
+    [".k-lock-kicker", "var(--clock-left) - var(--kicker-left)", "var(--clock-top) - var(--kicker-top)"],
+  ] as const) {
+    const each = clock.querySelector<HTMLElement>(part)!;
+    if (layers.length === 0) {
+      for (const property of ["mask-image", "mask-size", "mask-position", "mask-composite", "mask-repeat"]) each.style.removeProperty(property);
+      continue;
+    }
+    const scale = (layer: Layer) => (layer.near ? "var(--neared)" : "var(--pushed)");
+    const lead = (layer: Layer) => (layer.near ? " + var(--city-lead)" : "");
+    // Each layer is taken out of the solid one under it in turn (`exclude`): the layers of a step
+    // don't overlap, the cut-out being taken out of the bands round it, so each only removes.
+    // Chromium doesn't take a union of several layers out of a solid one listed first.
+    each.style.setProperty("mask-image", [...layers.map((layer) => `url("${layer.mask}")`), "linear-gradient(var(--color-surface), var(--color-surface))"].join(", "));
+    each.style.setProperty("mask-composite", [...layers.map(() => "exclude"), "add"].join(", "));
+    each.style.setProperty("mask-repeat", [...layers.map(() => "no-repeat"), "repeat"].join(", "));
+    each.style.setProperty(
+      "mask-size",
+      [...layers.map((layer) => `calc(var(--city-flat-width) * ${scale(layer)} * var(--layer-cut)) calc(var(--city-flat-height) * ${scale(layer)} * var(--layer-cut))`), "100% 100%"].join(", "),
+    );
+    each.style.setProperty(
+      "mask-position",
+      [
+        ...layers.map(
+          (layer) =>
+            `calc(var(--screen-middle) + (var(--city-flat-left) - var(--screen-middle)) * ${scale(layer)}${lead(layer)} - ${x}) calc(var(--screen-height) + (var(--city-flat-top) - var(--screen-height)) * ${scale(layer)} - ${y})`,
+        ),
+        "0 0",
+      ].join(", "),
+    );
+  }
+  element.toggleAttribute("data-glow", set.glow !== undefined);
+  if (set.glow) {
+    clock.style.setProperty("--glow-colour", set.glow.colour);
+    clock.style.setProperty("--glow-strength", String(set.glow.strength));
+  }
+}
+
+/** The digits' ink edges on `clock`, as shares of the type size, for the kicker to stand on. */
+function inkOn(clock: HTMLElement, time: string): void {
+  const ink = inkEdges(time);
+  clock.style.setProperty("--ink-left", String(ink.left));
+  clock.style.setProperty("--ink-right", String(ink.right));
+}
+
+/**
+ * Where the ink of `time` in `type.clock_rest` starts and ends inside its box, as shares of the
+ * type size: the figures' side bearings, which only the font knows, read off a canvas laid out as
+ * the digits are (no kerning).
+ */
+export function inkEdges(time: string): { left: number; right: number } {
+  const meter = document.createElement("span");
+  meter.className = "k-lock-meter";
+  document.documentElement.append(meter);
+  // Read while it is laid out: a computed style is live, and empty once the meter is gone.
+  const style = getComputedStyle(meter);
+  const size = Number.parseFloat(style.fontSize);
+  const font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  meter.remove();
+  const context = document.createElement("canvas").getContext("2d");
+  if (!context || !size) return { left: 0, right: 0 };
+  context.font = font;
+  context.fontKerning = "none";
+  const measured = context.measureText(time);
+  // Not kept: until the canvas draws the clock's own face it measures a stand-in's, and nothing
+  // says when it does. One string is measured each time the lock is placed.
+  return { left: -measured.actualBoundingBoxLeft / size, right: (measured.width - measured.actualBoundingBoxRight) / size };
 }
 
 /**
@@ -516,4 +765,12 @@ function capHeight(): number {
   meter.remove();
   if (measured > 0 && document.fonts.status === "loaded") cap = measured;
   return measured;
+}
+
+/**
+ * The rest clock's figures as shares of its type size, for an owner that limits where it may
+ * stand: Geist Light's cap height, and the widest time it can show.
+ */
+export function clockFigures(twelve = false): { readonly cap: number; readonly widest: number } {
+  return { cap: capHeight(), widest: widestRest(twelve) / length("type-clock_rest-size") };
 }

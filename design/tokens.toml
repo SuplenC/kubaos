@@ -884,6 +884,34 @@ lock_date = 0.0521
 lock_date_gap = 0.1042
 lock_date_portrait = 0.115
 lock_date_gap_portrait = 0.25
+# The lock's clock as the wallpaper picker sets it for a picture: its size between these shares of
+# the screen's shorter side, small enough to sit in a corner, never so large it leaves the screen.
+clock_least = 0.12
+clock_most = 0.6
+# How near a guide (the middle, a third, the standard baseline) the clock's place comes, a share of
+# the screen, before it sticks to it while dragged.
+clock_snap = 0.008
+# The kicker as set for a picture, shares of the clock's size: its size at most this (and never
+# wider than the digits), and its gap from the digits between these.
+clock_date_most = 0.3
+clock_gap_least = 0.03
+clock_gap_most = 0.5
+# A set clock's glow, two rings round its digits and its kicker, each a share of the type size: a
+# tight one that edges the strokes and a wide one that quiets the picture round them. Each ring's
+# opacity is the glow's strength times its gain, at most 1, so the tight ring is full sooner.
+clock_glow_edge = 0.04
+clock_glow = 0.16
+clock_glow_edge_gain = 1.6
+clock_glow_gain = 1.1
+# A panel docked on a screen edge as a drawer, the clock's editor at full screen, as shares of the
+# screen's shorter side, so it feels the same on a wide screen and a portrait one: carried back
+# toward an edge it meets a sticky step this far out, and the travel that pushes it through the
+# step onto the edge, or pulls a docked one off it, is `dock_pull` (never under `space.s16`).
+dock_sticky = 0.03
+dock_pull = 0.0225
+# How much of a pull a docked drawer follows before it rips free, and of a push into the sticky
+# step: it gives, but less than the pointer moves.
+dock_rubber = 0.35
 # A picture on the wallpaper picker's wall: its height, a share of the screen's,
 # 16:10 as the screen is, so the desktop drawn in it is the screen scaled by
 # this much. Large enough to judge the picture, small enough that its

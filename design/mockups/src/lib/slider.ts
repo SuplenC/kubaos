@@ -75,6 +75,24 @@ export interface SliderOptions {
   readonly held?: boolean;
   /** Drawn still, as a player's sample is: no pop, nothing eased. */
   readonly still?: boolean;
+  /**
+   * A continuous slider's step for an arrow key with Shift held, a fraction: a fine step, for a
+   * value set by hand to the pixel. Without it Shift changes nothing.
+   */
+  readonly fine?: number;
+  /** Told each time the value moves: a continuous slider's 0 to 1 as it moves, or the stop it settles on. */
+  readonly changed?: (value: number) => void;
+}
+
+/** Each slider's own way of being set from outside, by its root. */
+const setters = new WeakMap<Element, (value: number) => void>();
+
+/**
+ * Sets `element`'s value from outside, as its owner moves what it stands for some other way: a
+ * continuous slider's 0 to 1, or a stop. It draws itself there at once, telling no one.
+ */
+export function setSlider(element: Element, value: number): void {
+  setters.get(element)?.(value);
 }
 
 /**
@@ -354,12 +372,15 @@ export function slider(options: SliderOptions): HTMLElement {
     value = Math.max(0, Math.min(1, fraction));
     setToggled(false);
     settle();
+    options.changed?.(value);
   }
 
   function stepTo(to: number): void {
+    const was = index;
     index = Math.max(0, Math.min(last, to));
     drawToggle();
     settle();
+    if (index !== was) options.changed?.(index);
   }
 
   // The icon's press: on a slider with stops it steps from high to low and back, turning at either
@@ -385,20 +406,24 @@ export function slider(options: SliderOptions): HTMLElement {
       if (!stepping) value = shown;
       setToggled(false);
       draw();
+      if (!stepping) options.changed?.(value);
     });
     root.addEventListener("pointermove", (event) => {
       if (!dragging) return;
       shown = fractionAt(along(event));
       if (!stepping) value = shown;
       draw();
+      if (!stepping) options.changed?.(value);
     });
     const release = () => {
       if (!dragging) return;
       dragging = false;
       delete root.dataset.dragging;
       if (stepping) {
+        const was = index;
         index = Math.round(shown * last);
         drawToggle();
+        if (index !== was) options.changed?.(index);
       }
       nameIcon();
       settle();
@@ -429,8 +454,9 @@ export function slider(options: SliderOptions): HTMLElement {
         if (stepping) stepTo(end ? last : 0);
         else moveTo(end ? 1 : 0);
       } else if (back || forward) {
+        const step = event.shiftKey && options.fine !== undefined ? options.fine : NUDGE;
         if (stepping) stepTo(index + (forward ? 1 : -1));
-        else moveTo(value + (forward ? NUDGE : -NUDGE));
+        else moveTo(value + (forward ? step : -step));
       } else {
         return;
       }
@@ -443,6 +469,18 @@ export function slider(options: SliderOptions): HTMLElement {
       else moveTo(value + notches * NUDGE);
     });
   }
+
+  setters.set(root, (to) => {
+    if (dragging) return;
+    for (const running of root.getAnimations()) running.cancel();
+    delete root.dataset.settling;
+    if (stepping) {
+      index = Math.max(0, Math.min(last, Math.round(to)));
+      shown = index / last;
+      drawToggle();
+    } else shown = value = Math.max(0, Math.min(1, to));
+    draw();
+  });
 
   // Drawn once it is laid out, and again whenever its width or the scale changes it.
   new ResizeObserver(() => draw()).observe(root);
