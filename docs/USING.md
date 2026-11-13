@@ -151,6 +151,14 @@ On a company or hotel network the phone may not see the laptop: some networks bl
 
 The daemon is the `kubaos-phone` user unit: `systemctl --user status kubaos-phone`, logs in `journalctl --user -u kubaos-phone`. The switch is the file `~/.config/kubaos/desktop/phone/phone-link`.
 
+## Startup apps
+
+Apps can start with the session: in the Command menu, find the app and pick **Start on login** from its Actions (Ctrl+K), or type `autostart solaar`. An app that starts has **Don't start on login** in the same place. Its own setting works too: Bitwarden's "Start automatically on login", for one, is the same switch. The change is for the next login; nothing starts or stops now.
+
+Bitwarden desktop starts out of the box, since its SSH agent is what `ssh` and `git` sign with; turn it off like any other. Packages can ship their own: Solaar starts hidden in the tray, and Ubuntu's `xdg-user-dirs` checks your user folders. An entry for another desktop (`OnlyShowIn=GNOME`) stays off.
+
+`kubaos autostart list` prints what starts, `kubaos autostart on|off <app>` changes it. Each is an XDG autostart entry, yours in `~/.config/autostart` and the system's in `/etc/xdg/autostart`; your entry of the same name wins, and one with `Hidden=true` keeps a system entry from starting. Each startup app runs as a unit of its own: `systemctl --user status 'app-solaar@autostart'`, its log in `journalctl --user -u 'app-solaar@autostart'`.
+
 ## Idle, Keep awake and the lid
 
 Out of the box the screen locks after 5 minutes idle, the screens go off after 10, and the laptop suspends after 30 on battery and never plugged in. Closing the lid suspends on battery and does nothing plugged in or docked (a dock, or a second screen connected).
@@ -463,6 +471,7 @@ A preview only changes what your home builds: the shell, Hyprland's config, the 
 | `dot-theme apply [--force]` | Regenerate from the current wallpaper; without `--force` it does nothing when no input changed (login runs it) |
 | `kubaos cursor style dark\|accent\|classic`, `kubaos cursor size <16-96>` | The pointer: dark with a light outline, the wallpaper's accent, or plain Bibata black and white, and its size, in steps of 4. Applies at once and is kept in `~/.config/kubaos/desktop/cursor/cursor.toml`; the Command menu has both ("cursor") |
 | `kubaos depth on\|off`, `kubaos depth redo\|skip\|unskip [<picture>]`, `kubaos depth push <0-0.05>`, `kubaos depth show` | Wallpaper depth, with the wallpaper-depth Suite: on or off for your own pictures, a picture's cut-out again, none on it, or back (the current wallpaper without one), and how far the wallpaper comes toward you as the lock comes up. Applies at once and is kept in `~/.config/kubaos/desktop/wallpapers/depth.toml`; the Command menu has them all ("wallpaper depth") |
+| `kubaos autostart list`, `kubaos autostart on\|off <app>` | The startup apps: print the ones that start on login, or turn one on or off by its desktop id (`solaar` or `solaar.desktop`), for the next login. The Command menu has the same on every app ("Start on login") |
 | `kubaos keyboard show`, `kubaos keyboard set us,it(intl)`, `kubaos keyboard add\|remove\|default <layout>`, `kubaos keyboard move <layout> <place>`, `kubaos keyboard list`, `kubaos keyboard accents [on\|off\|apply]` | Your keyboard layouts (`~/.config/kubaos/desktop/keyboard/keyboard.toml`), the first the default; Hyprland reloads after a change. A new default also goes to `/etc/default/keyboard` for the console and the disk prompt, through a root helper and pkexec, which may ask for your password. At most 4, and the last one stays; the Command menu has them all ("keyboard"). `list` prints every layout and variant by name; `accents` turns the Mac-style accents on Left Alt on or off |
 | `dot-config apply` | Create missing files in `~/.config/kubaos` and rewrite the merged configs (bat, git ignore, fastfetch) from the defaults plus yours. Every `home-manager switch` runs it |
 | `qs ipc show` | List the Quickshell IPC targets Hyprland binds call |
