@@ -1,6 +1,6 @@
--- How Hyprland's config leaves the session, under plain Lua: the fallback
--- exit bind (`config/hypr/fallback.lua`) and the shutdown hook
--- (`config/hypr/autostart.lua`).
+-- How Hyprland's config starts and leaves the session, under plain Lua: the
+-- startup apps and the shutdown hook (`config/hypr/autostart.lua`), and the
+-- fallback exit bind (`config/hypr/fallback.lua`).
 --
 --   lua5.5 test/lua/session_test.lua REPO
 --
@@ -28,9 +28,10 @@ end
 
 -- Loads FILE against a stand-in `hl` that keeps the binds by their keys
 -- (an `exec_cmd` dispatcher is its command, any other is its name), the
--- event handlers by event, and what `os.execute` was handed.
+-- event handlers by event, what `os.execute` was handed, and the commands
+-- `hl.exec_cmd` starts once Hyprland has started.
 local function load(file)
-  local seen = { binds = {}, on = {}, executed = {} }
+  local seen = { binds = {}, on = {}, executed = {}, started = {} }
   local function dispatcher(path)
     return setmetatable({}, {
       __index = function(_, key) return dispatcher(path == "" and key or path .. "." .. key) end,
@@ -41,12 +42,15 @@ local function load(file)
     dsp = dispatcher(""),
     bind = function(keys, action) seen.binds[keys] = action end,
     on = function(event, fn) seen.on[event] = fn end,
-    exec_cmd = function() end,
+    exec_cmd = function(cmd) seen.started[#seen.started + 1] = cmd end,
   }
   local real_execute = os.execute
   os.execute = function(cmd) seen.executed[#seen.executed + 1] = cmd end
   local ok, err = pcall(function()
     dofile(repo .. "/config/hypr/" .. file)
+    if seen.on["hyprland.start"] then
+      seen.on["hyprland.start"]()
+    end
     if seen.on["hyprland.shutdown"] then
       seen.on["hyprland.shutdown"]()
     end
@@ -72,6 +76,24 @@ test("Hyprland's shutdown hook stops the session without waiting on it", functio
   local executed = load("autostart.lua").executed
   same(#executed, 1, "commands run on shutdown")
   same(executed[1], "systemctl --user --no-block stop graphical-session.target", "the shutdown hook")
+end)
+
+test("the startup apps start once the session is up, unless first-boot setup is pending", function()
+  local started = load("autostart.lua").started
+  local with_target
+  for _, cmd in ipairs(started) do
+    assert(not cmd:find("bitwarden", 1, true), "a command starts Bitwarden itself: " .. cmd)
+    if cmd:find("start xdg-desktop-autostart.target", 1, true) then
+      same(with_target, nil, "a second command starting the startup apps")
+      with_target = cmd
+    end
+  end
+  assert(with_target, "nothing starts xdg-desktop-autostart.target")
+  local session = with_target:find("start hyprland-session.target", 1, true)
+  local gate = with_target:find("kubaos/setup-done", 1, true)
+  local target = with_target:find("start xdg-desktop-autostart.target", 1, true)
+  assert(session and session < target, "the startup apps start before the session: " .. with_target)
+  assert(gate and gate < target, "the startup apps don't wait for first-boot setup: " .. with_target)
 end)
 
 os.exit(failed == 0 and 0 or 1)
