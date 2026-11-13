@@ -428,22 +428,23 @@ export function audioPanel(options: AudioOptions = {}): Panel {
     if (live) fadeIn(room);
   }
 
-  /** The headset's mode changes: the mic, its meter, the line, the codecs, Input, and Input's content if it shows. */
+  /** The headset's mode changes: the mic, its meter, the line, the codecs, Input, and Input's content if it shows.
+      Each new part fills the width as the one it replaces did, or it shrinks to its content. */
   function switchMode(mode: Mode): void {
     // The codec picked was the other mode's: the new mode starts on its best.
     const { codec: _left, ...rest } = state;
     state = { ...rest, mode };
     devices = devicesOf(state);
-    const named = defaultPicker(devices, devices.default.codecs?.[mode][0], false);
+    const named = filling(defaultPicker(devices, devices.default.codecs?.[mode][0], false));
     device.replaceWith(named);
     device = named;
-    const said = modeLine(mode);
+    const said = filling(modeLine(mode));
     line?.replaceWith(said);
     line = said;
-    const codecs = codecPicker(devices.default, mode, undefined);
+    const codecs = filling(codecPicker(devices.default, mode, undefined));
     codec?.replaceWith(codecs);
     codec = codecs;
-    const fresh = micSlider(state.input ?? 0.8, inputMuted(), (on) => meterOf.mute(on));
+    const fresh = filling(micSlider(state.input ?? 0.8, inputMuted(), (on) => meterOf.mute(on)));
     mic.replaceWith(fresh);
     mic = fresh;
     meterOf.mute(inputMuted());
