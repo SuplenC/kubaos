@@ -63,6 +63,8 @@ export interface SelectOptions {
   readonly up?: boolean;
   readonly disabled?: boolean;
   readonly pinned?: Pinned;
+  /** Told the option picked, by its index, each time a pick changes it. */
+  readonly changed?: (index: number) => void;
 }
 
 /** How a select looks shut: a field's box, or inline in a line of text. */
@@ -286,9 +288,11 @@ export function select(options: SelectOptions): HTMLElement {
     if (!open || !items[index]) return;
     items[index]!.setAttribute("data-taken", "");
     room.dataset.taken = "";
+    const was = picked;
     picked = index;
     showPick();
     close();
+    if (index !== was) options.changed?.(index);
   }
 
   /** The next option after the highlight whose words start with `letter`, round from the end. */

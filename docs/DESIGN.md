@@ -188,7 +188,7 @@ Dense, never cramped (principle 8): room that holds nothing is a bug, as an edge
 
 - **Bands are their content and a step of space.** A footer, a toolbar or a header band is as tall as what is in it and one spacing step above and below, and no taller: the specimen's bar is a 32 control with 16 above and below.
 - **No side gutter past the container padding.** Content runs to the container padding at either side; it may stop short (a column of text at `column`, 560), but nothing pads it in further.
-- **Rows are their type's natural height**: a `ListRow` is 44 (`row`) or 56 (`row_two_line`), a line of text its style's line. A row taller than that holds air.
+- **Rows are their type's natural height**: a `ListRow` is 44 (`row`) or 56 (`row_two_line`), a menu item or a select option whose description wraps to its second line 72 (`row_three_line`), a line of text its style's line. A row taller than that holds air.
 - **A page's or a panel's content runs out where it ends.** A panel that scrolls shows no "more content" strip besides its scroll; a panel shows all of its content or scrolls, never both.
 - The `container-padding` rule fails a page or a container whose content sits further in than its padding at the left, or runs into it at the right. An empty band is measured by eye in the shots: a band's height can't be told from a deliberate gap by the boxes alone, so no rule judges it.
 

@@ -206,9 +206,12 @@ two_line = 24
 control_sm = 32
 control_md = 40
 control_lg = 48
-# A list row with one line, and with a title over a subtitle.
+# A list row with one line, with a title over a subtitle, and with a title over a
+# subtitle that wraps to its second line (a menu item's or a select option's
+# description): each a `small` line taller, with the same inset at its top and foot.
 row = 44
 row_two_line = 56
+row_three_line = 72
 # A table's row: a line of body text with 4 above and below, so a list of readings (the
 # system monitor's processes) stays dense and each row is still easy to hit.
 row_compact = 28

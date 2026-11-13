@@ -22,6 +22,7 @@ import {
   NO_BUILT_IN_MIC,
   onScreen,
   PLAYING,
+  RECORDING,
   SCREEN,
   shot,
   SHORT,
@@ -44,31 +45,31 @@ const USB: AudioOptions = { device: USB_HEADSET };
 /** A default with no mic and none picked for Input: the screen. */
 const NO_MIC: AudioOptions = { device: SCREEN, inputDevice: null };
 
-/** Nothing recording, the state the subtitle's later cases need: a recording app comes before them. */
-const QUIET: AudioOptions = { recording: [] };
+/** The Input tab with an app recording, as its Apps card shows one. */
+const INPUT: AudioOptions = { tab: 1, recording: RECORDING };
 
 /**
  * A panel in a state for each of the subtitle's cases, in their order; balance has a sample for each
  * side. Each state is the case's own: the first case that holds for it.
  */
 const SAID: readonly AudioOptions[] = [
-  { machine: [BUILT_IN_MIC] },
+  { machine: [BUILT_IN_MIC], playing: [] },
   { outputMuted: true, inputMuted: true },
   { outputMuted: true },
+  { inputMuted: true, recording: RECORDING },
+  { recording: RECORDING },
   { inputMuted: true },
+  NO_MIC,
+  MUSIC,
+  CALLS,
+  { output: 1.25 },
+  { output: 0 },
+  { outputDevice: HEADSET },
+  { balance: 0.35 },
+  { balance: 0.65 },
   {},
-  { ...QUIET, inputMuted: true },
-  { ...QUIET, ...NO_MIC },
-  { ...QUIET, ...MUSIC },
-  { ...QUIET, ...CALLS },
-  { ...QUIET, output: 1.25 },
-  { ...QUIET, output: 0 },
-  { ...QUIET, outputDevice: HEADSET },
-  { ...QUIET, balance: 0.35 },
-  { ...QUIET, balance: 0.65 },
-  QUIET,
-  { ...QUIET, noise: false },
-  { ...QUIET, noise: false, playing: [] },
+  { playing: [] },
+  { playing: [], noise: false },
 ];
 
 /** The subtitle's samples, one per state in the cases' order, each named by the case it picks. */
@@ -81,7 +82,7 @@ function subtitles(): NonEmpty<Variant> {
  * so its subtitle answers Calls and Music as well as the mutes.
  */
 function live(): HTMLElement {
-  const panel = audioPanel({ ...CALLS, ...QUIET, live: true });
+  const panel = audioPanel({ ...CALLS, live: true });
   const room = onScreen(panel.element);
   if (!ALL) requestAnimationFrame(panel.land);
   return room;
@@ -146,7 +147,7 @@ const TO_INPUT: Move = {
   tracks: picking(".audio-body > :last-child", false, [{ part: CARDS, on: "Input", target: ".audio-tab", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }]),
   reduced: picking(".audio-body > :last-child", true, [{ part: CARDS, on: "Input", target: ".audio-tab", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }]),
   back: "cuts",
-  sample: () => shot({ ...CALLS, tab: 1, tabFrom: 0 }),
+  sample: () => shot({ ...CALLS, ...INPUT, tabFrom: 0 }),
 };
 
 const TO_MUSIC: Move = {
@@ -171,7 +172,7 @@ function cell(base: AudioOptions): (state: Shown) => HTMLElement {
       case "lit":
         return shot({ ...base, landed: true });
       case "selected":
-        return shot({ ...base, tab: 1 });
+        return shot({ ...base, ...INPUT });
       case "disabled":
         return shot({ ...base, ...MUSIC });
       case "empty":
@@ -190,7 +191,7 @@ export default page<Shown>({
   stage: { live, hint: "drag, Space mutes; Calls/Music; tabs; Esc", daylight: true },
   variants: [
     { name: "Laptop, Output", for: `${BUILT_IN_SET}: Calls and Music disabled`, sample: draw() },
-    { name: "Laptop, Input", for: "Default · the built-in mic, from the set", sample: draw({ tab: 1 }) },
+    { name: "Laptop, Input", for: "Default · the built-in mic, from the set", sample: draw(INPUT) },
     { name: "Laptop, Options", for: "three switch rows", sample: draw({ tab: 2 }) },
     { name: "The default, open", for: "the built-in set as one; no mic, crossed out", sample: draw({ deviceOpen: true }) },
     { name: "No built-in mic, open", for: "the speakers alone, crossed out", sample: draw({ machine: NO_BUILT_IN_MIC, deviceOpen: true }) },
@@ -202,10 +203,10 @@ export default page<Shown>({
     { name: "Calls' tooltip", for: TIPS.calls, sample: draw({ ...CALLS, modeTip: "calls" }) },
     { name: "Music's tooltip", for: TIPS.music, sample: draw({ ...MUSIC, modeTip: "music" }) },
     { name: "The codecs, open", for: "each with what it is good for", sample: draw({ ...MUSIC, codecOpen: true }) },
-    { name: "Bluetooth in Calls, Input", for: "the headset's mic as the default", sample: draw({ ...CALLS, tab: 1 }) },
+    { name: "Bluetooth in Calls, Input", for: "the headset's mic as the default", sample: draw({ ...CALLS, ...INPUT }) },
     { name: "Music mode, Input", for: "the headset's mic: EmptyState, Switch to Calls", sample: draw({ ...MUSIC, tab: 1 }) },
-    { name: "Music mode, another mic", for: "Input enabled, the built-in mic picked", sample: draw({ ...MUSIC, inputDevice: BUILT_IN_MIC, tab: 1 }) },
-    { name: "USB headset, Input", for: "Calls and Music disabled, no codec", sample: draw({ ...USB, tab: 1 }) },
+    { name: "Music mode, another mic", for: "Input enabled, the built-in mic picked", sample: draw({ ...MUSIC, inputDevice: BUILT_IN_MIC, ...INPUT }) },
+    { name: "USB headset, Input", for: "Calls and Music disabled, no codec", sample: draw({ ...USB, ...INPUT }) },
     { name: "A default with no mic", for: `Input: No mic on ${SCREEN.name}`, sample: draw({ ...NO_MIC, tab: 1 }) },
     { name: "Output on another device", for: "the speakers over the headset", sample: draw({ ...CALLS, outputDevice: SPEAKERS }) },
     { name: "An app's device, lit", for: "its words and chevron in the accent", sample: draw({ appPicker: "lit" }) },

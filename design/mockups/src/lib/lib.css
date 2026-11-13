@@ -2208,13 +2208,14 @@
     --press var(--motion-micro) var(--easing-standard);
 }
 
-/* An item with a description under its words: a two-line row's height, as a list's, and taller by
-   a line where the description wraps to its second, the words kept the two-line row's inset from
-   its top and its foot. */
+/* An item with a description under its words: a two-line row's height, as a list's, or a
+   three-line row's where the description wraps to its second line. */
 .k-menu-item[data-lines="two"] {
-  height: auto;
-  min-height: var(--size-row_two_line);
-  padding-block: calc((var(--size-row_two_line) - var(--type-body-line) - var(--type-small-line)) / 2);
+  height: var(--size-row_two_line);
+}
+
+.k-menu-item[data-lines="three"] {
+  height: var(--size-row_three_line);
 }
 
 /* A danger item lights in the error itself, not the accent's container, so under the pointer and
