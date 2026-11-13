@@ -735,8 +735,9 @@ confirm = true
 # Counters (crates/kubaos-counters). "New counter" and an Item a counter are
 # the Extension's own Items (crates/kotodama-kubaos/src/counters.rs), so they
 # follow ~/.local/state/kubaos/counters.toml as it changes: `new-counter
-# Pushups` makes one (nothing typed is "Counter"), and a counter's Enter adds
-# 1; Ctrl+K has −1, Set to…, Reset, Rename…, Auto reset…, History and Remove.
+# Pushups` makes one (with nothing typed, it asks for the name), and a
+# counter's Enter adds 1; Ctrl+K has −1, Set to…, Reset, Rename…, Auto reset…,
+# History and Remove.
 # Auto reset… reads what you type as the clock does ("every day at 9",
 # "mondays 8am", "1st of the month", "every 2 hours") and shows the next
 # reset; a number there stops the counter at it. Each runs `kubaos-counters …

@@ -67,7 +67,8 @@ fn new_counter_comes_first_then_a_counter_an_item_in_order() {
     let titles: Vec<&str> = items.iter().map(|item| item.title.as_str()).collect();
     assert_eq!(titles, ["New counter", "Pushups", "Coffee", "Steps"]);
     assert_eq!(items[0].keyword.as_deref(), Some("new-counter"));
-    assert!(items[0].actions[0].arguments[0].optional);
+    assert!(!items[0].actions[0].arguments[0].optional);
+    assert_eq!(items[0].actions[0].arguments[0].placeholder.as_deref(), Some("Counter"));
     assert_eq!(items[1].id, "counter:1");
     assert_eq!(items[1].subtitle.as_deref(), Some("3 · Resets every day at 9:00"));
     assert_eq!(items[2].subtitle.as_deref(), Some("2 · Stops at 2"));
@@ -105,19 +106,23 @@ fn a_counter_offers_every_change_with_plus_one_first() {
 }
 
 #[test]
-fn new_counter_takes_the_query_as_its_name_or_counter() {
+fn new_counter_takes_the_query_as_its_name() {
     let runner = FakeRunner::default();
 
     list().create(&typed(NAME, " Squats "), &runner).unwrap();
-    list().create(&none(), &runner).unwrap();
 
-    assert_eq!(
-        launched(&runner),
-        [
-            "kubaos-counters new Squats --notify",
-            "kubaos-counters new Counter --notify"
-        ]
-    );
+    assert_eq!(launched(&runner), ["kubaos-counters new Squats --notify"]);
+}
+
+#[test]
+fn new_counter_refuses_no_name() {
+    let runner = FakeRunner::default();
+
+    let err = list().create(&none(), &runner).unwrap_err();
+    list().create(&typed(NAME, "  "), &runner).unwrap_err();
+
+    assert_eq!(err, "A counter's name can't be empty or hold tabs or line breaks");
+    assert!(launched(&runner).is_empty());
 }
 
 #[test]

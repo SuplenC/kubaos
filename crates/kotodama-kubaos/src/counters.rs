@@ -1,7 +1,7 @@
-//! The counters in the menu: "New counter", whose query after `new-counter` is the name (empty is
-//! "Counter"), and an Item a counter, titled by its name, whose Enter adds 1 and whose other
-//! Actions take 1, set it to a number, reset it, rename it, set its auto reset, show its history or
-//! remove it.
+//! The counters in the menu: "New counter", whose query after `new-counter` is the name, asked for
+//! in a form when nothing is typed after it, and an Item a counter, titled by its name, whose Enter
+//! adds 1 and whose other Actions take 1, set it to a number, reset it, rename it, set its auto
+//! reset, show its history or remove it.
 //!
 //! "Auto reset…" opens a list that reads what is typed as the clock does, through
 //! `kubaos_clock::recurrence`: the rule it read and its next reset, or examples when it reads
@@ -46,6 +46,7 @@ use kubaos_counters::history::Group;
 use kubaos_counters::history::Sort;
 use kubaos_counters::live;
 use kubaos_counters::store::AutoReset;
+use kubaos_counters::store::ChangeError;
 use kubaos_counters::store::Counter;
 use kubaos_counters::store::Counters;
 use kubaos_counters::store::DEFAULT_NAME;
@@ -176,18 +177,20 @@ impl CounterList {
         }
     }
 
-    /// Runs "New counter": a counter named as typed after `new-counter`, or "Counter".
+    /// Runs "New counter": a counter named as typed after `new-counter`, or in its form.
     ///
     /// # Errors
     ///
-    /// When the name is taken or isn't one, or `kubaos-counters` can't start.
+    /// When the name is empty, taken or isn't one, or `kubaos-counters` can't start.
     pub fn create(&self, arguments: &BTreeMap<String, String>, runner: &impl Runner) -> Result<Ran, String> {
         let name = arguments.get(NAME).map_or("", |name| name.trim());
+        if name.is_empty() {
+            return Err(ChangeError::BadName.to_string());
+        }
         self.counters
             .clone()
             .create(name, &Zoned::now())
             .map_err(|err| err.to_string())?;
-        let name = if name.is_empty() { DEFAULT_NAME } else { name };
         launch(runner, &["new", name])?;
         Ok(Ran::Close)
     }
@@ -465,9 +468,7 @@ fn new_item() -> Item {
         app_only: false,
         weak_keywords: Vec::new(),
         yields: false,
-        actions: vec![
-            Action::new(CREATE, "Create").arguments(vec![Argument::new(NAME).placeholder(DEFAULT_NAME).optional()]),
-        ],
+        actions: vec![Action::new(CREATE, "Create").arguments(vec![Argument::new(NAME).placeholder(DEFAULT_NAME)])],
     }
 }
 
