@@ -23,13 +23,13 @@
 
 /* Which picture of a floor is in front of you, and which floor: the wall and the floors glide to it.
    Each is read where it is set alone. */
-@property --at {
+@property --gl-at {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
 }
 
-@property --floor {
+@property --gl-floor {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
@@ -169,7 +169,7 @@
 .gl-floors {
   position: absolute;
   inset: 0;
-  translate: 0 calc(var(--floor) * var(--screen-height));
+  translate: 0 calc(var(--gl-floor) * var(--screen-height));
   transition: translate var(--motion-long) var(--easing-emphasized_decel);
 }
 
@@ -183,7 +183,7 @@
 .gl-track {
   position: absolute;
   inset: 0;
-  translate: calc(var(--at) * -1 * var(--pitch)) 0;
+  translate: calc(var(--gl-at) * -1 * var(--pitch)) 0;
   transition: translate var(--motion-long) var(--easing-spring);
 }
 
