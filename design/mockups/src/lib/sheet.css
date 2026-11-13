@@ -286,15 +286,15 @@
    from under the frame, and fades in a beat after the surface moves: from a fifth of the way open
    to three quarters. */
 .k-sheet {
-  overflow: clip;
   /* Once it is fully open its clip reaches a glow's distance past its edge, so a lit control in the
      container's padding keeps its whole glow; while it opens, and while twins swap their content,
-     it cuts at its edge, so nothing sliding shows past it. */
-  overflow-clip-margin: calc(var(--focus-far) * clamp(0, (var(--reveal) - 0.999) * 1000, 1));
+     it cuts at its edge, so nothing sliding shows past it. A clip path, not `overflow: clip` with
+     an `overflow-clip-margin`: Chromium drops that margin to 0 for any `calc()`. */
+  clip-path: inset(calc(-1 * var(--focus-far) * clamp(0, (var(--reveal) - 0.999) * 1000, 1)));
 }
 
 .k-sheet:has(> .k-sheet-rider > [data-leaving]) {
-  overflow-clip-margin: 0px;
+  clip-path: inset(0);
 }
 
 .k-sheet-rider {

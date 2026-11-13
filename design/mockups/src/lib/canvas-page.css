@@ -67,8 +67,10 @@
   border-radius: var(--radius-content);
   background-color: var(--color-surface_container_lowest);
   outline: none;
-  overflow: clip;
-  overflow-clip-margin: var(--focus-far);
+  /* What it holds is cut a glow's distance past its rounded edge, so its own lit tube keeps its
+     whole glow. A clip path, not `overflow: clip` with an `overflow-clip-margin`: Chromium drops
+     that margin to 0 for any `calc()`. */
+  clip-path: inset(calc(-1 * var(--focus-far)) round calc(var(--radius-content) + var(--focus-far)));
 }
 
 .k-cv::before {
