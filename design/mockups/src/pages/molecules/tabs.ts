@@ -26,8 +26,8 @@ const MODES: readonly Tab[] = [
 ];
 /** Calls and Music, each with what it means in its tip. */
 const TIPPED: readonly Tab[] = [
-  { label: "Calls", icon: "call", tip: "Your mic works; music sounds flatter while it's on." },
-  { label: "Music", icon: "music_note", tip: "Music mode has no microphone: switch to Calls to talk." },
+  { label: "Calls", icon: "call", tip: "Your mic works; music sounds flatter." },
+  { label: "Music", icon: "music_note", tip: "The best sound; the mic is off." },
 ];
 const MOTION: readonly Tab[] = [{ label: "Always" }, { label: "On AC" }, { label: "Never" }];
 const SIDES: readonly Tab[] = [{ label: "Output" }, { label: "Input" }, { label: "Options" }];
@@ -50,7 +50,7 @@ function row(choices: readonly Tab[], picked: number, state: Shown = "rest"): HT
  * the card floating over the row stays inside the sample. The room is a copy of the card, unseen.
  */
 function tipped(shown: number): HTMLElement {
-  const room = tooltip(TIPPED[shown]!.tip!, "");
+  const room = tooltip(TIPPED[shown]!.label, TIPPED[shown]!.tip!);
   room.style.visibility = "hidden";
   room.setAttribute("aria-hidden", "true");
   for (const each of [room, ...room.querySelectorAll<HTMLElement | SVGElement>("[data-probe]")]) delete each.dataset.probe;

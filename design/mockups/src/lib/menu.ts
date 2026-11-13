@@ -29,7 +29,10 @@ import { settings } from "../site/settings.ts";
 
 export interface MenuItemSpec {
   readonly label: string;
-  /** A short line under the words, in `small` and the muted colour: the item is two lines tall. */
+  /**
+   * A short line under the words, in `small` and the muted colour, wrapped to at most two lines and
+   * cut there with an ellipsis: the item is a two-line row, taller where the description wraps.
+   */
   readonly description?: string;
   readonly icon?: string;
   /** A symbol at the item's end, in the muted colour: what the item lacks, as a device's crossed-out mic. */
@@ -96,7 +99,7 @@ function content(spec: MenuItemSpec, ink: string, muted: string): HTMLElement {
   const room = document.createElement("span");
   room.className = "k-menu-words";
   if (spec.description) {
-    const line = clamped(spec.description, "small");
+    const line = clamped(spec.description, "small", "on_surface_variant", 2);
     line.style.color = muted;
     room.append(stack(0, "start", filling(words), filling(line)));
   } else room.append(words);

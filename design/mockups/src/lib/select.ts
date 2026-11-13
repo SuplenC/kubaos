@@ -11,10 +11,11 @@
 // and Tab goes on from the select as from any control.
 //
 // Each option may carry a symbol of its own (a device's, by how it connects): the list's rows show
-// theirs, and the value row leads with the pick's. An option may also carry a short description,
-// a second line under its words in `small` and the muted colour, which makes every row of the list
-// a two-line row's height, and a symbol at its row's end in the muted colour (a device's crossed-out
-// mic). Both show only in the list: the value row shows the pick's words alone.
+// theirs, and the value row leads with the pick's. An option may also carry a short description
+// under its words in `small` and the muted colour, wrapped to at most two lines and cut there with
+// an ellipsis, which makes every row of the list a two-line row's height, a line taller where its
+// description wraps; and a symbol at its row's end in the muted colour (a device's crossed-out mic).
+// Both show only in the list: the value row shows the pick's words alone.
 //
 // The inline look is a choice inside a line of text, an app's device under its name: no border and
 // no box, the pick in `small` and `on_surface_variant` with a `small` chevron `space.s4` after it.
@@ -48,7 +49,7 @@ export interface SelectOptions {
   readonly icon?: string;
   /** Each option's own symbol, in its row; the value row leads with the pick's, over `icon`. */
   readonly icons?: readonly string[];
-  /** Each option's short line under its words, in the list only: every row is two lines tall. */
+  /** Each option's short line under its words, in the list only, at most two lines: every row is two lines tall or more. */
   readonly descriptions?: readonly string[];
   /** Each option's symbol at its row's end in the muted colour, in the list only; none where undefined. */
   readonly trailing?: readonly (string | undefined)[];
@@ -123,6 +124,17 @@ export function select(options: SelectOptions): HTMLElement {
     return item;
   });
   list.append(...items);
+  // A description that wraps makes its row taller than the rest, so the list's view is measured:
+  // the first eight rows as laid out, and the list's padding round them.
+  if (described && !inline) {
+    const fit = () => {
+      const last = items[Math.min(MOST, items.length) - 1];
+      if (!last || !last.offsetHeight) return;
+      room.style.setProperty("--drop", `${last.offsetTop + last.offsetHeight + items[0]!.offsetTop}px`);
+    };
+    const watch = new ResizeObserver(fit);
+    for (const item of items.slice(0, MOST)) watch.observe(item);
+  }
 
   if (inline) {
     room.dataset.look = "inline";

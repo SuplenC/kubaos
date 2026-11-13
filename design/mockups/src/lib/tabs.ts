@@ -22,8 +22,8 @@
 // for a row that doesn't apply, disabled, as Calls and Music are for a device that isn't Bluetooth;
 // a pick on one that isn't disabled lays the stretch under it at once.
 //
-// A choice may carry a tip, what picking it means: the library's Tooltip, its words as the title,
-// floating `space.s8` above the well while the pointer is on the choice or the keyboard is, lined up
+// A choice may carry a tip, what picking it means: the library's Tooltip, the choice's name as its
+// title and the tip as its muted body under it, floating `space.s8` above the well while the pointer is on the choice or the keyboard is, lined up
 // with the well's start, or its end for a choice in the row's second half, so the card stays over
 // the row. It takes no room, so nothing round the row moves as it comes and goes.
 
@@ -42,7 +42,10 @@ export interface Tab {
   readonly icon?: string;
   /** Dimmed, no press, passed over by the arrows: Input while a headset is in Music mode. */
   readonly disabled?: boolean;
-  /** What picking it means, in a Tooltip over the row while the pointer or the keyboard is on it. */
+  /**
+   * What picking it means, the body of a Tooltip over the row, under the choice's name as its title,
+   * while the pointer or the keyboard is on it.
+   */
   readonly tip?: string;
 }
 
@@ -118,7 +121,7 @@ export function tabs(options: TabsOptions): HTMLElement {
     content.classList.add("k-tab-words");
     each.append(content);
     if (choice.tip) {
-      const tip = tooltip(choice.tip, "");
+      const tip = tooltip(choice.label, choice.tip);
       tip.id = `${id}-tip-${index}`;
       tip.setAttribute("role", "tooltip");
       // Read out as the choice's description, never as part of its name.

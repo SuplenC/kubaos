@@ -40,11 +40,14 @@ function devices(extra: Partial<SelectOptions> = {}): SelectOptions {
   return { options: DEVICES, icons: DEVICE_ICONS, picked: 1, ...extra };
 }
 
-/** A Bluetooth headset's codecs, each with what it is good for under its name. */
+/**
+ * A Bluetooth headset's codecs, each with what it is good for under its name: one line, two, and one
+ * too long for two, cut with an ellipsis.
+ */
 function codecs(extra: Partial<SelectOptions> = {}): SelectOptions {
   return {
     options: ["LDAC", "AAC", "SBC"],
-    descriptions: ["The best sound; drops out sooner far from the PC", "Very good sound, steady", "Plain sound; every headset has it"],
+    descriptions: ["The best sound; drops out sooner far from the PC", "Very good sound, steady", "Plain sound; every headset has it, so it is the one left when the headset and the computer share no better codec"],
     picked: 0,
     ...extra,
   };
@@ -151,7 +154,7 @@ export default page({
     { name: "A symbol each", for: "devices, by how they connect", sample: () => boxed(devices()) },
     { name: "A symbol each, open", for: "every row with its own", sample: () => boxed(devices({ open: true })) },
     { name: "Descriptions", for: "a short line under each option: codecs", sample: () => boxed(codecs()) },
-    { name: "Descriptions, open", for: "two lines each; shut, the name alone", sample: () => boxed(codecs({ open: true })) },
+    { name: "Descriptions, open", for: "at most two lines, then cut; shut, the name alone", sample: () => boxed(codecs({ open: true })) },
     { name: "A trailing symbol, open", for: "at a row's end, muted: no mic", sample: () => boxed(playing({ open: true })) },
     { name: "Inline", for: "a choice in a line of text: an app's device", sample: () => named(inline()) },
     { name: "Inline, open", for: "its Menu under the words", sample: () => named(inline({ open: true })) },
