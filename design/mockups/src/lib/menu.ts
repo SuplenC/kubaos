@@ -29,7 +29,11 @@ import { settings } from "../site/settings.ts";
 
 export interface MenuItemSpec {
   readonly label: string;
+  /** A short line under the words, in `small` and the muted colour: the item is two lines tall. */
+  readonly description?: string;
   readonly icon?: string;
+  /** A symbol at the item's end, in the muted colour: what the item lacks, as a device's crossed-out mic. */
+  readonly trailing?: string;
   /** An app's own icon in the symbol's place, at the symbol's size: a player's app. */
   readonly picture?: string;
   /** The keys that do the same, as `Ctrl+C`: one keycap each. */
@@ -64,25 +68,26 @@ export function menuItem(spec: MenuItemSpec, current = false, pinned?: ItemPinne
   if (pinned && !spec.disabled) item.dataset.pinned = pinned;
   if (spec.disabled) item.setAttribute("aria-disabled", "true");
   if (spec.submenu) item.setAttribute("aria-haspopup", "menu");
-  item.append(filling(content(spec, "var(--ink)")));
+  if (spec.description) item.dataset.lines = "two";
+  item.append(filling(content(spec, "var(--ink)", "var(--muted)")));
   if (spec.held) {
     // The sweep holds the same content in `on_error`, cut to how far it has gone, so the words
     // read on either side of its edge.
     const sweep = document.createElement("span");
     sweep.className = "k-menu-hold";
     sweep.setAttribute("aria-hidden", "true");
-    sweep.append(filling(content(spec, "var(--color-on_error)")));
+    sweep.append(filling(content(spec, "var(--color-on_error)", "var(--color-on_error)")));
     // The item's own content is what the geometry check reads; the sweep's copy is paint.
     for (const each of sweep.querySelectorAll<HTMLElement | SVGElement>("[data-probe]")) delete each.dataset.probe;
     item.prepend(sweep);
     if (spec.holding !== undefined) item.style.setProperty("--hold", String(spec.holding));
   }
-  const words_ = variant((spec.icon || spec.picture) && "icon", spec.checked !== undefined && "check", (spec.danger || spec.held) && "danger", spec.submenu && "submenu");
+  const words_ = variant((spec.icon || spec.picture) && "icon", spec.checked !== undefined && "check", (spec.danger || spec.held) && "danger", spec.submenu && "submenu", spec.description && "two-line");
   return probe(item, { role: "component", name: "MenuItem", variant: words_, fixed: FIXED_HEIGHT });
 }
 
-/** An item's symbol, words, keys, check and chevron, in `ink`. */
-function content(spec: MenuItemSpec, ink: string): HTMLElement {
+/** An item's symbol, words, keys, check and chevron, in `ink`; its description and trailing symbol in `muted`. */
+function content(spec: MenuItemSpec, ink: string, muted: string): HTMLElement {
   const words = clamped(spec.label, "body");
   words.style.color = ink;
   const parts: Element[] = [];
@@ -90,8 +95,13 @@ function content(spec: MenuItemSpec, ink: string): HTMLElement {
   else if (spec.icon) parts.push(icon(spec.icon, "var(--icon-s16)", ink));
   const room = document.createElement("span");
   room.className = "k-menu-words";
-  room.append(words);
+  if (spec.description) {
+    const line = clamped(spec.description, "small");
+    line.style.color = muted;
+    room.append(stack(0, "start", filling(words), filling(line)));
+  } else room.append(words);
   parts.push(filling(room));
+  if (spec.trailing) parts.push(icon(spec.trailing, "var(--icon-s16)", muted));
   if (spec.keys) {
     const caps = row("s4", "centre", ...keys(spec.keys).map(keycap));
     caps.classList.add("k-menu-keys");

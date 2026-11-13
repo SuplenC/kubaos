@@ -372,11 +372,11 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Skeleton` | `line`, `circle` or `block` | none | small, full, or the caller's |
 | `ListRow` | `one-line` or `two-line`; `icon` or `tile` | height | row, nested 8 in a content box |
 | `Field` | `icon` | height | control |
-| `Select` | `icon` | height | control |
+| `Select` | `icon`, `two-line` | height | control |
 | `Popover` | none | none, holds content | control |
 | `Tooltip` | none | width | control, its popover's |
 | `Menu` | none | none | none |
-| `MenuItem` | `icon`, `check`, `danger` | height | row, nested 4 in a popover |
+| `MenuItem` | `icon`, `check`, `danger`, `two-line` | height | row, nested 4 in a popover |
 | `Table` | none | none | none |
 | `TableRow` | none | height | row |
 | `Collapsible` | `open` | none, holds content | control, its header |

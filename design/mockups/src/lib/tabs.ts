@@ -21,6 +21,11 @@
 // A row may have no pick (`picked: null`): no stretch is lit and every choice's words rest. It is
 // for a row that doesn't apply, disabled, as Calls and Music are for a device that isn't Bluetooth;
 // a pick on one that isn't disabled lays the stretch under it at once.
+//
+// A choice may carry a tip, what picking it means: the library's Tooltip, its words as the title,
+// floating `space.s8` above the well while the pointer is on the choice or the keyboard is, lined up
+// with the well's start, or its end for a choice in the row's second half, so the card stays over
+// the row. It takes no room, so nothing round the row moves as it comes and goes.
 
 import { iconInLine } from "./button.ts";
 import { type Pinned, pin } from "./control.ts";
@@ -28,6 +33,7 @@ import { focusRing } from "./focus.ts";
 import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
 import { text } from "./text.ts";
+import { tooltip } from "./tooltip.ts";
 import { raw } from "./tokens.ts";
 import { CHROME, settings } from "../site/settings.ts";
 
@@ -36,6 +42,8 @@ export interface Tab {
   readonly icon?: string;
   /** Dimmed, no press, passed over by the arrows: Input while a headset is in Music mode. */
   readonly disabled?: boolean;
+  /** What picking it means, in a Tooltip over the row while the pointer or the keyboard is on it. */
+  readonly tip?: string;
 }
 
 export interface TabsOptions {
@@ -53,6 +61,8 @@ export interface TabsOptions {
    * and the move's player takes them to the picked one.
    */
   readonly from?: number;
+  /** The choice whose tip is drawn shown, as under the pointer: a sample of it. */
+  readonly tipShown?: number;
   /** What a pick does besides picking: the view it shows. */
   readonly onPick?: (index: number) => void;
 }
@@ -74,6 +84,8 @@ export function setTabDisabled(well: Element, index: number, disabled: boolean):
   disablers.get(well)?.(index, disabled);
 }
 
+let made = 0;
+
 /** The duration token `name` in milliseconds under the speed setting. */
 function duration(name: string): number {
   return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
@@ -85,6 +97,7 @@ export function tabs(options: TabsOptions): HTMLElement {
   let picked = options.picked === null ? -1 : clamp(options.picked ?? 0);
   const from = options.from === undefined ? null : clamp(options.from);
 
+  const id = `k-tabs-${made++}`;
   const well = document.createElement("span");
   well.className = "k-tabs";
   well.setAttribute("role", "tablist");
@@ -104,6 +117,17 @@ export function tabs(options: TabsOptions): HTMLElement {
     const content = row("s4", "start", ...(glyph ? [glyph, words] : [words]));
     content.classList.add("k-tab-words");
     each.append(content);
+    if (choice.tip) {
+      const tip = tooltip(choice.tip, "");
+      tip.id = `${id}-tip-${index}`;
+      tip.setAttribute("role", "tooltip");
+      // Read out as the choice's description, never as part of its name.
+      tip.setAttribute("aria-hidden", "true");
+      tip.dataset.held = index >= count / 2 ? "end" : "start";
+      tip.toggleAttribute("data-shown", options.tipShown === index);
+      each.setAttribute("aria-describedby", tip.id);
+      each.append(tip);
+    }
     each.addEventListener("click", () => pick(index, false));
     return each;
   });

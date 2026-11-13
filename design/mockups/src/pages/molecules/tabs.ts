@@ -3,13 +3,15 @@
 // the segmented control. The pick's lit stretch travels to the new choice and flashes as it lands.
 // A choice may be disabled alone: the audio panel's Input while a headset is in Music mode. A row
 // that doesn't apply is disabled with nothing picked: Calls and Music for a device that isn't
-// Bluetooth.
+// Bluetooth. A choice may carry a tip, a Tooltip over the row while the pointer or the keyboard is
+// on it: what Calls and Music each mean.
 
 import type { Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { stack, within } from "../../lib/layout.ts";
 import { setTabDisabled, type Tab, tabs } from "../../lib/tabs.ts";
 import { wrapped } from "../../lib/text.ts";
+import { tooltip } from "../../lib/tooltip.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
 
@@ -21,6 +23,11 @@ const TOOLS: readonly Tab[] = [
 const MODES: readonly Tab[] = [
   { label: "Calls", icon: "call" },
   { label: "Music", icon: "music_note" },
+];
+/** Calls and Music, each with what it means in its tip. */
+const TIPPED: readonly Tab[] = [
+  { label: "Calls", icon: "call", tip: "Your mic works; music sounds flatter while it's on." },
+  { label: "Music", icon: "music_note", tip: "Music mode has no microphone: switch to Calls to talk." },
 ];
 const MOTION: readonly Tab[] = [{ label: "Always" }, { label: "On AC" }, { label: "Never" }];
 const SIDES: readonly Tab[] = [{ label: "Output" }, { label: "Input" }, { label: "Options" }];
@@ -36,6 +43,18 @@ const LONG: Words = { short: "On AC", long: "Only while plugged in" };
 function row(choices: readonly Tab[], picked: number, state: Shown = "rest"): HTMLElement {
   const { disabled, pinned } = stateOptions(state);
   return within(PANEL, tabs({ choices, picked, ...(disabled ? { disabled } : {}), ...(pinned ? { pinned } : {}) }));
+}
+
+/**
+ * Calls and Music with `shown`'s tip drawn over it, under a room as tall as the card and its gap, so
+ * the card floating over the row stays inside the sample. The room is a copy of the card, unseen.
+ */
+function tipped(shown: number): HTMLElement {
+  const room = tooltip(TIPPED[shown]!.tip!, "");
+  room.style.visibility = "hidden";
+  room.setAttribute("aria-hidden", "true");
+  for (const each of [room, ...room.querySelectorAll<HTMLElement | SVGElement>("[data-probe]")]) delete each.dataset.probe;
+  return within(PANEL, stack("s8", "start", room, tabs({ choices: TIPPED, tipShown: shown })));
 }
 
 /** The control center's sections with the view each shows under them, which follows the pick. */
@@ -117,6 +136,8 @@ export default page({
     { name: "Views", for: "a few views of one thing: the control center", sample: () => row(SECTIONS, 2) },
     { name: "With symbols", for: "a symbol helps tell them apart: Calls, Music", sample: () => row(MODES, 0) },
     { name: "Segmented control", for: "a setting's few values side by side", sample: () => row(MOTION, 1) },
+    { name: "A tip, first choice", for: "what Calls means, from the row's start", sample: () => tipped(0) },
+    { name: "A tip, last choice", for: "what Music means, from the row's end", sample: () => tipped(1) },
     { name: "A choice disabled", for: "a view that can't open now: Input in Music mode", sample: () => row(MUSIC_SIDES, 0) },
     {
       name: "Nothing picked",

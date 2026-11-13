@@ -2133,6 +2133,34 @@
   transition: none;
 }
 
+/* A choice's tip: its Tooltip `space.s8` above the well, lined up with the well's edge on the
+   choice's side (the well's padding past the choice's box), fading in and out over `short` as the
+   choice is lit. */
+.k-tab > .k-tooltip {
+  position: absolute;
+  z-index: 3;
+  bottom: calc(100% + var(--space-s4) + var(--space-s8));
+  left: calc(-1 * var(--space-s4));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.k-tab > .k-tooltip[data-held="end"] {
+  left: auto;
+  right: calc(-1 * var(--space-s4));
+}
+
+.k-tab:is(:hover, :focus-visible, [data-pinned]) > .k-tooltip,
+.k-tab > .k-tooltip[data-shown] {
+  opacity: 1;
+}
+
+.k-tab[data-pinned] > .k-tooltip,
+.k-tab > .k-tooltip[data-shown] {
+  transition: none;
+}
+
 .k-tab-words {
   filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--picked) * var(--rail-signs))));
 }
@@ -2156,7 +2184,8 @@
    pressed, the container lifts to
    `secondary_container_pressed` over `micro`. At rest its content is `on_surface`, or `error` on a
    danger item, whose keycaps keep their own colours; disabled, `on_surface` at
-   `opacity.disabled_content`. */
+   `opacity.disabled_content`. Its description and trailing symbol are `on_surface_variant`, and
+   lit `on_secondary_container` at `opacity.subdued_text`, a list row's subtitle's. */
 .k-menu-item {
   position: relative;
   display: flex;
@@ -2171,6 +2200,7 @@
   --press: 0;
   --rest-ink: var(--color-on_surface);
   --ink: color-mix(in srgb, var(--rest-ink), var(--color-on_secondary_container) calc(var(--lit) * 100%));
+  --muted: color-mix(in srgb, var(--color-on_surface_variant), rgb(from var(--color-on_secondary_container) r g b / var(--opacity-subdued_text)) calc(var(--lit) * 100%));
   --container: color-mix(in srgb, var(--color-secondary_container), var(--color-secondary_container_pressed) calc(var(--press) * 100%));
   background: color-mix(in srgb, transparent, var(--container) calc(var(--lit) * 100%));
   transition:
@@ -2178,9 +2208,15 @@
     --press var(--motion-micro) var(--easing-standard);
 }
 
+/* An item with a description under its words: a two-line row's height, as a list's. */
+.k-menu-item[data-lines="two"] {
+  height: var(--size-row_two_line);
+}
+
 /* A danger item lights in the error itself, not the accent's container, so under the pointer and
    the keyboard it reads as what it is: a step that destroys something. */
 .k-menu-item[data-danger] {
+  --muted: var(--ink);
   --rest-ink: var(--color-error);
   --ink: color-mix(in srgb, var(--rest-ink), var(--color-on_error) calc(var(--lit) * 100%));
   --container: color-mix(in srgb, var(--color-error), var(--color-error_pressed) calc(var(--press) * 100%));
@@ -2203,6 +2239,7 @@
   cursor: default;
   --lit: 0;
   --ink: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --muted: var(--ink);
 }
 
 /* A disabled item's keys dim with its words, so the shortcut doesn't read as working. */
@@ -2304,7 +2341,8 @@
 }
 
 /* A select's room (`lib/select.ts`): a shut select's height in the flow, whatever the select does.
-   Its list's visible part, `--drop`, is `--rows` small controls and the list's padding. It opens
+   Its list's visible part, `--drop`, is `--rows` options (small controls, or two-line rows where
+   the options carry descriptions) and the list's padding. It opens
    over `medium` on `emphasized_decel` and folds over `short` on `emphasized_accel`; a pick folds it
    a `micro` later, once the option has shown pressed. With reduced motion it opens and folds at
    once. A sample of the open state takes the open surface's height in the flow. */
@@ -2314,7 +2352,7 @@
   flex: none;
   align-self: stretch;
   height: var(--size-control_md);
-  --drop: calc(var(--rows) * var(--size-control_sm) + 2 * var(--space-s4));
+  --drop: calc(var(--rows) * var(--select-option, var(--size-control_sm)) + 2 * var(--space-s4));
   transition: --select-open var(--motion-short) var(--easing-emphasized_accel);
 }
 
@@ -2585,6 +2623,7 @@
 
 .k-select-menu {
   --most: 8;
+  max-height: calc(var(--select-option, var(--size-control_sm)) * var(--most));
 }
 
 .k-select-menu > .k-menu-item[data-taken] {

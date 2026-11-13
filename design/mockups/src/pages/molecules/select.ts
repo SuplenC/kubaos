@@ -40,6 +40,21 @@ function devices(extra: Partial<SelectOptions> = {}): SelectOptions {
   return { options: DEVICES, icons: DEVICE_ICONS, picked: 1, ...extra };
 }
 
+/** A Bluetooth headset's codecs, each with what it is good for under its name. */
+function codecs(extra: Partial<SelectOptions> = {}): SelectOptions {
+  return {
+    options: ["LDAC", "AAC", "SBC"],
+    descriptions: ["The best sound; drops out sooner far from the PC", "Very good sound, steady", "Plain sound; every headset has it"],
+    picked: 0,
+    ...extra,
+  };
+}
+
+/** The devices that play, a crossed-out mic at the end of each that has none. */
+function playing(extra: Partial<SelectOptions> = {}): SelectOptions {
+  return { ...devices(), trailing: ["mic_off", undefined, undefined, "mic_off", "mic_off"], ...extra };
+}
+
 /** An app's device, inline under its name: Default first, then every device. */
 function inline(extra: Partial<SelectOptions> = {}): SelectOptions {
   return { look: "inline", options: ["Default", ...DEVICES], icons: ["bluetooth", ...DEVICE_ICONS], picked: 0, ...extra };
@@ -125,7 +140,7 @@ export default page({
     live: () =>
       within(
         "var(--size-column)",
-        stack("s16", "start", select(holidays()), select(many()), select(devices()), select(often()), stack(0, "start", text("Spotify", "body_strong"), select(inline()))),
+        stack("s16", "start", select(holidays()), select(many()), select(playing()), select(codecs()), select(often()), stack(0, "start", text("Spotify", "body_strong"), select(inline()))),
       ),
     hint: "click it, or Tab and ↓",
     daylight: true,
@@ -135,6 +150,9 @@ export default page({
     { name: "Without", for: "plain options", sample: () => boxed(often()) },
     { name: "A symbol each", for: "devices, by how they connect", sample: () => boxed(devices()) },
     { name: "A symbol each, open", for: "every row with its own", sample: () => boxed(devices({ open: true })) },
+    { name: "Descriptions", for: "a short line under each option: codecs", sample: () => boxed(codecs()) },
+    { name: "Descriptions, open", for: "two lines each; shut, the name alone", sample: () => boxed(codecs({ open: true })) },
+    { name: "A trailing symbol, open", for: "at a row's end, muted: no mic", sample: () => boxed(playing({ open: true })) },
     { name: "Inline", for: "a choice in a line of text: an app's device", sample: () => named(inline()) },
     { name: "Inline, open", for: "its Menu under the words", sample: () => named(inline({ open: true })) },
     { name: "With a placeholder", for: "nothing picked yet", sample: () => boxed(holidays({ picked: -1 })) },

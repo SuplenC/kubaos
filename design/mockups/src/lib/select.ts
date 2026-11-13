@@ -11,7 +11,10 @@
 // and Tab goes on from the select as from any control.
 //
 // Each option may carry a symbol of its own (a device's, by how it connects): the list's rows show
-// theirs, and the value row leads with the pick's.
+// theirs, and the value row leads with the pick's. An option may also carry a short description,
+// a second line under its words in `small` and the muted colour, which makes every row of the list
+// a two-line row's height, and a symbol at its row's end in the muted colour (a device's crossed-out
+// mic). Both show only in the list: the value row shows the pick's words alone.
 //
 // The inline look is a choice inside a line of text, an app's device under its name: no border and
 // no box, the pick in `small` and `on_surface_variant` with a `small` chevron `space.s4` after it.
@@ -45,6 +48,10 @@ export interface SelectOptions {
   readonly icon?: string;
   /** Each option's own symbol, in its row; the value row leads with the pick's, over `icon`. */
   readonly icons?: readonly string[];
+  /** Each option's short line under its words, in the list only: every row is two lines tall. */
+  readonly descriptions?: readonly string[];
+  /** Each option's symbol at its row's end in the muted colour, in the list only; none where undefined. */
+  readonly trailing?: readonly (string | undefined)[];
   /** A field's box, or the inline look: the words and chevron alone, in a line of text. */
   readonly look?: SelectLook;
   /** Drawn open in the sample's flow, the room taking the open surface's height. */
@@ -74,6 +81,8 @@ export function select(options: SelectOptions): HTMLElement {
   const room = document.createElement("span");
   room.className = "k-select-room";
   room.style.setProperty("--rows", String(Math.max(1, Math.min(MOST, options.options.length))));
+  const described = Boolean(options.descriptions);
+  if (described) room.style.setProperty("--select-option", "var(--size-row_two_line)");
 
   const inline = options.look === "inline";
   const iconOf = (index: number): string | undefined => options.icons?.[index] ?? options.icon;
@@ -106,7 +115,9 @@ export function select(options: SelectOptions): HTMLElement {
   list.tabIndex = -1;
   const items = options.options.map((label, index) => {
     const symbol = options.icons?.[index];
-    const item = menuItem({ label, ...(symbol ? { icon: symbol } : {}) });
+    const description = options.descriptions?.[index];
+    const trailing = options.trailing?.[index];
+    const item = menuItem({ label, ...(symbol ? { icon: symbol } : {}), ...(description ? { description } : {}), ...(trailing ? { trailing } : {}) });
     item.id = `${id}-${index}`;
     item.setAttribute("role", "option");
     return item;
@@ -182,7 +193,7 @@ export function select(options: SelectOptions): HTMLElement {
   probe(surface, {
     role: "component",
     name: "Select",
-    variant: variant(inline && "inline", hasIcon && "icon", options.open && "open"),
+    variant: variant(inline && "inline", hasIcon && "icon", described && "two-line", options.open && "open"),
     fixed: { width: false, height: inline || !options.open },
   });
 
