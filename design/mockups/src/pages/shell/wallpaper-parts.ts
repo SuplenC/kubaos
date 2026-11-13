@@ -592,7 +592,6 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
         l0 === undefined || !/^#[0-9a-f]{6}$/i.test(value) ? value : `oklch(from ${value} calc(l * var(--room-lit) + ${l0.toFixed(4)} * (1 - var(--room-lit))) calc(c * var(--room-lit)) h)`,
       );
     }
-    screen.style.setProperty("--glow", to.primary ?? "");
   };
   /** Every lamp in its own picture's primary, lit or not: a lamp never changes colour. */
   const paintLamps = () => {
@@ -605,8 +604,8 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
   };
 
   // The light: lights off, walk, lights on. One number, `--room-lit`, on the screen: the lamp over
-  // the picture in front of you burns with it, its light lies on the room with it, and the room's
-  // colours come in with it.
+  // the picture in front of you burns with it, the light round that lamp comes and goes with it,
+  // and the room's colours come in with it.
   let litArt: HTMLElement | undefined;
   let lightRun: Animation | undefined;
   let strikeTimer = 0;
