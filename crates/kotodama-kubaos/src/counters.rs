@@ -158,7 +158,7 @@ impl CounterList {
             title: counter.name.clone(),
             subtitle: Some(subtitle),
             icon: Some(ICON.to_owned()),
-            keyword: None,
+            names: Vec::new(),
             keywords: KEYWORDS.map(str::to_owned).to_vec(),
             hidden: false,
             app_only: false,
@@ -387,7 +387,7 @@ impl CounterList {
             title,
             subtitle,
             icon: Some(ICON.to_owned()),
-            keyword: None,
+            names: Vec::new(),
             keywords: Vec::new(),
             hidden: false,
             app_only: false,
@@ -460,7 +460,7 @@ fn new_item() -> Item {
         title: "New counter".to_owned(),
         subtitle: Some("A counter at 0 in the bar; type its name after new-counter".to_owned()),
         icon: Some(ICON.to_owned()),
-        keyword: Some("new-counter".to_owned()),
+        names: vec!["new-counter".to_owned()],
         keywords: ["add counter", "create counter", "tally", "count", "tracker"]
             .map(str::to_owned)
             .to_vec(),

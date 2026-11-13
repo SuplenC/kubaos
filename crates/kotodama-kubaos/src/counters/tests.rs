@@ -66,7 +66,7 @@ fn new_counter_comes_first_then_a_counter_an_item_in_order() {
 
     let titles: Vec<&str> = items.iter().map(|item| item.title.as_str()).collect();
     assert_eq!(titles, ["New counter", "Pushups", "Coffee", "Steps"]);
-    assert_eq!(items[0].keyword.as_deref(), Some("new-counter"));
+    assert_eq!(items[0].names, ["new-counter"]);
     assert!(!items[0].actions[0].arguments[0].optional);
     assert_eq!(items[0].actions[0].arguments[0].placeholder.as_deref(), Some("Counter"));
     assert_eq!(items[1].id, "counter:1");
