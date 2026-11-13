@@ -44,6 +44,14 @@ const ROWS = [
   { name: "Segmented control", choices: MOTION, picked: 1 },
 ] as const;
 
+/** The well filling a row a menu wide, as a setting's row gives it. */
+function filling(choices: readonly Tab[], picked: number): HTMLElement {
+  const room = document.createElement("span");
+  room.className = "f-tabs-room";
+  room.append(tabs({ choices, picked, fill: true }));
+  return room;
+}
+
 type MatrixState = "rest" | "lit" | "pressed" | "disabled";
 
 const STRETCH = "the lit stretch";
@@ -90,6 +98,7 @@ export default page({
     { name: "Views", for: "a few views of one thing: the control center", sample: () => row(SECTIONS, 0) },
     { name: "With symbols", for: "a symbol helps tell them apart: Timer, Alarm", sample: () => row(TOOLS, 1) },
     { name: "Segmented control", for: "a setting's few values side by side", sample: () => row(MOTION, 1) },
+    { name: "Filling its row", for: "a setting's row: the choices share the well, ending at its end", sample: () => filling(MOTION, 1) },
   ],
   sizes: doesntApply("always a small control tall: no louder than the view."),
   states: {

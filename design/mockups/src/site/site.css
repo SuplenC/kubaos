@@ -1595,6 +1595,12 @@ body {
   background: var(--color-cold);
 }
 
+/* The room a filling Tabs is shown in: a menu wide. */
+.f-tabs-room {
+  display: flex;
+  width: var(--size-menu);
+}
+
 /* A list well: a content box with its rows 8 in, at the row radius. */
 .f-well {
   display: flex;
