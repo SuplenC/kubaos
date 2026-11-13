@@ -538,12 +538,17 @@
   --city-flat-top: calc((var(--screen-height) - var(--city-flat-height)) / 2);
 }
 
-/* With layers set in front of it, the clock stands over the city as well and takes every layer in
-   front of it out of its digits and its kicker (their masks, `lib/lock.ts`), so a step changes the
-   clock alone and the picture is never redrawn. The kicker gets the digits' room for its mask:
+/* A set clock stands over the city at every step and takes each layer set in front of it out of
+   its digits and its kicker alike (their masks, `lib/lock.ts`), so the date stands at the clock's
+   depth, a step changes the clock alone and the picture is never redrawn. With no layers in front
+   nothing cuts it: not the city's own mask either. The kicker gets the digits' room for its mask:
    Chromium clips a mask to the border box. */
-.k-lock[data-layered] .k-lock-clock {
+.k-lock[data-clocked] .k-lock-clock {
   z-index: 1;
+}
+
+.k-lock[data-clocked]:not([data-layered]) .k-lock-digits {
+  mask-image: none;
 }
 
 .k-lock[data-layered] .k-lock-kicker {
