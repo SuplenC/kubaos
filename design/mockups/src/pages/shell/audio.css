@@ -1,10 +1,5 @@
-/* The Audio panel's own boxes (`audio-parts.ts`): the line under Calls and Music, the picked tab's
-   room, and an app's device drawn open. */
-
-/* Calls and Music's line, its words `space.s12` in, as a slider's are from its ends. */
-.audio-line {
-  padding-inline: var(--space-s12);
-}
+/* The Audio panel's own boxes (`audio-parts.ts`): the picked tab's room, and an app's device drawn
+   open. */
 
 .audio-tab {
   display: block;
