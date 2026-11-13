@@ -300,7 +300,7 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
                     let face = face(theme);
                     let pressed = pin == Some(Pin::Pressed) || status == widget::button::Status::Pressed;
                     let background = if danger_lit && pressed {
-                        Some(Background::Color(c.error_pressed))
+                        Some(Background::Color(c.error_pressed_fixed))
                     } else {
                         face.background
                     };

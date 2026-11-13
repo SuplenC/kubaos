@@ -44,7 +44,7 @@ TestCase {
         item.highlighted = true;
         item.preview = "pressed";
 
-        compare(item.litFill, K.Tokens.color.error_pressed);
+        compare(item.litFill, K.Tokens.color.error_pressed_fixed);
         compare(item.ink, K.Tokens.color.on_error);
     }
 

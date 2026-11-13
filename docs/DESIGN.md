@@ -251,7 +251,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `swap_lag` | 50 | How long after a twin panel's content starts leaving the arriving one starts moving in: half a `micro`. |
 | `swap_fade` | 150 | The arriving twin panel's content fading in, from when the leaving one is gone until it lands: `short` less `swap_lag`. |
 | `toast` | 3600 | A toast staying once it has arrived, long enough to read its line twice. Not a move: reduce motion doesn't cap it. |
-| `hold` | 1100 | A held button held until it acts, its timed bar filling meanwhile: Kōbō's Install, the hold that erases a disk. Not a move: reduce motion doesn't cap it. *Not built yet: Kōbō times its hold with a constant of its own.* |
+| `hold` | 1100 | A held button held until it acts, its timed bar filling meanwhile: Kōbō's Install, the hold that erases a disk, a held menu item. Not a move: reduce motion doesn't cap it. *Not built yet: Kōbō times its hold with a constant of its own.* |
 | `lock_idle` | 20000 | The awake lock left alone until it goes back to rest: time to find a key or a finger, short enough that an empty field doesn't sit lit. Not a move: reduce motion doesn't cap it. |
 
 | Curve (`[easing.*]`) | Bézier | For |
@@ -377,6 +377,7 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Tooltip` | none | width | control, its popover's |
 | `Menu` | none | none | none |
 | `MenuItem` | `icon`, `check`, `danger` | height | row, nested 4 in a popover |
+| `Prompt` | `menu` | width | surface, its popover's; none in a menu |
 | `Table` | none | none | none |
 | `TableRow` | none | height | row |
 | `Collapsible` | `open` | none, holds content | control, its header |
@@ -399,7 +400,8 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Step` | `todo`, `current`, `done` or `action`; `icon`; `mark` | none | control, nested 12 in a surface |
 | `DescriptionList` | none | none | none |
 | `ErrorBlock` | `long` | none | surface |
-| `List`, `EmptyList` | none | none | content |
+| `List` | `Flush` | none | content; none when flush |
+| `EmptyList` | none | none | content |
 | `Toast` | none | none | control |
 | `Log` | none | none | surface |
 | `Media` | none | none | the caller's: control in a picker, row in a card |
@@ -439,6 +441,7 @@ Each component has a page of its own under `design/components/`: its constructor
 
 - [Keycap and KeyHints](design/components/keycap.md)
 - [Shortcuts](design/components/shortcuts.md)
+- [RollingNumber](design/components/rolling-number.md)
 
 **Inputs**
 
@@ -519,7 +522,7 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 - **The panel's own controls** (its header, the quick toggles, the sliders) sit on the panel, with nothing around them: wrapping them would put a box round the whole panel.
 - A card or a well is never inside another; the container padding is the only padding around them.
 - **A form takes its list's place.** Connecting to an item of a list (a Wi-Fi network's password, a Bluetooth pairing) turns the list's well into the form, the two cross-fading over `short` (`standard`), so nothing floats over the list. The form is centred in the well: the item's lg icon tile, its name in `headline` 12 under it, a `small` line under that (Secured · WPA2, what to do on the device), then 16 under it what it asks for (a `Field`, or a pairing code in `headline`), a `small` status line under that (Connecting…, or the error, which keeps the form open), and the buttons 16 under it: Cancel (`Text`) on the left, the action (`Filled`) on the right. Enter does the action and Esc cancels, with no key hints; Tab goes field, Cancel, action. Success goes back to the list. Wi-Fi and Bluetooth share it (`modules/controlcenter/ConnectForm.qml`).
-- **What scrolls in a well or a card is cut by its own shape**, not by a rectangle inside its padding: the rows scroll right up to the well's rounded edge, and the padding is the scroll's padding, the room above the first row and below the last. In the shell the well clips to its rounded shape (`ScrollingList`). iced 0.14 clips only to rectangles, so `kubaos-ui`'s scrolling list cuts at the well's own rectangle, with the padding inside the scroll; at its rounded corners a row passing the curve, and the thumb at either end of its rail, show past it until iced clips to shapes. In both, the well's hairline and focus tube are drawn over the rows, so a row scrolled to the edge never covers them. A grid of pictures scrolls a whole row at a time, so no picture is ever cut.
+- **What scrolls in a well or a card is cut by its own shape**, not by a rectangle inside its padding: the rows scroll right up to the well's rounded edge, and the padding is the scroll's padding, the room above the first row and below the last. In the shell the well clips to its rounded shape (`ScrollingList`; `components/Well.qml` round a list of its own). iced 0.14 clips only to rectangles, so `kubaos-ui`'s scrolling list cuts at the well's own rectangle, with the padding inside the scroll; at its rounded corners a row passing the curve, and the thumb at either end of its rail, show past it until iced clips to shapes. In both, the well's hairline and focus tube are drawn over the rows, so a row scrolled to the edge never covers them. A grid of pictures scrolls a whole row at a time, so no picture is ever cut.
 
 Rules the feedback components carry:
 

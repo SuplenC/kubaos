@@ -105,6 +105,7 @@ services/               singletons, no UI
 components/             blocks composed from KubaOS.Components
   PowerSlider           the power stops on a K.Slider
   WallpaperView         a still, or a video looping over its poster (desktop, lock screen, picker)
+  Well                  a list's well round a scrolling NavList, cut by its own rounded shape
 modules/
   frame/                Frame (one layer per screen: bar, border, every panel, input mask),
                         Exclusions (exclusive zones as four empty windows)
@@ -115,10 +116,13 @@ modules/
                         ActionPanel, FormView, DetailView, IntroCard, Label (the rows' text
                         that changes with every key), words.js (glyphs, kinds, shortcuts),
                         Probe (test-only timing and state lines)
-  controlcenter/        ControlCenter, QuickToggles (K.Tile), CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists in a K.ScrollingList,
+  controlcenter/        ControlCenter, QuickToggles (K.Tile), CaptureRow, Sliders, Wi-Fi/Bluetooth lists in a K.ScrollingList, Audio lists in a Well,
                         KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app),
                         ScanPulse (when a radio's tab scans for what is in range)
   notifications/        NotificationPanel, Popups (corner, and the bell's Peek), PopupsBelow (critical, under a panel), ToastList, PopupHold (what a stack of popups keeps while the pointer is on it), CardGroup (one app's notifications: a stack at rest, a preview fanned over the list on hover, opened in place on a click), NotificationCard (a notification on its CardFace, which draws it and folds its text), feed.js (groups, New and Earlier, the peek, a card's buttons), Countdown (a popup's time left, stopped while the pointer is on it), ToastProbe (tests)
+  counters/             CountersSheet (the counters' pill's sheet, from the bar's corner): CounterRow,
+                        CounterMenu (a row's menu, Auto reset in its place), HistoryPage,
+                        counters.js (checks, the menu's entries, the history's rows)
   osd/                  volume / brightness OSD
   lock/                 Lock (WlSessionLock), LockSurface, Auth (PAM)
   powermenu/            PowerMenu
