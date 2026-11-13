@@ -127,7 +127,7 @@ pub fn items() -> Vec<Item> {
             title: setting.title.to_owned(),
             subtitle: Some(setting.subtitle.to_owned()),
             icon: Some(setting.icon.to_owned()),
-            keyword: None,
+            names: Vec::new(),
             keywords: setting.keywords.iter().map(|word| (*word).to_owned()).collect(),
             hidden: false,
             app_only: false,

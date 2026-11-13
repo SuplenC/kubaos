@@ -58,7 +58,7 @@ kind = "scripts"
 # leave any out, toggles too, with `hide = ["<id>", ...]` there
 # (docs/USING.md). An action takes `title` and `run` (the program, then its
 # arguments, `{name}` filled in from its `arguments`), and may take
-# `subtitle`, `icon`, `keywords`, `keyword`, `terminal = true` (runs it in
+# `subtitle`, `icon`, `keywords`, `names`, `terminal = true` (runs it in
 # `terminal` below), `confirm = true` (asks first), `delay_ms` (waits that
 # long, so the menu is off the screen first) and `shown_when` (listed only in
 # that state, below).
@@ -116,7 +116,7 @@ title = "Open folder in yazi…"
 subtitle = "A folder or a file by its path, in yazi"
 icon = "folder-open"
 keywords = ["file manager", "yazi", "go to folder", "path"]
-keyword = "open-folder"
+names = ["open-folder"]
 run = ["kubaos-files", "open", "{path}"]
 arguments = [{ name = "path", placeholder = "~/Projects/kubaos" }]
 
@@ -280,7 +280,7 @@ title = "Run in terminal…"
 subtitle = "A shell command, in a floating terminal that stays open on its output"
 icon = "utilities-terminal"
 keywords = ["command", "shell", "execute", "run command", "zsh"]
-keyword = ">"
+names = [">"]
 run = ["env", "KUBAOS_GREETING=0", "zsh", "-ic", "{command}"]
 arguments = [{ name = "command", placeholder = "journalctl --user -b -p err" }]
 terminal = true
@@ -306,7 +306,7 @@ title = "Set wallpaper"
 subtitle = "An image or video by its path, and its colors"
 icon = "preferences-desktop-wallpaper"
 keywords = ["theme", "background"]
-keyword = "wallpaper"
+names = ["wallpaper"]
 run = ["dot-theme", "set", "{file}"]
 arguments = [{ name = "file", placeholder = "~/Pictures/wallpapers/city.jpg" }]
 
@@ -420,7 +420,7 @@ title = "Set the lock's push"
 subtitle = "How far the wallpaper comes toward you as the lock comes up: 0 to 0.05, 0.025 by default"
 icon = "system-lock-screen"
 keywords = ["wallpaper depth", "lock screen", "zoom", "motion"]
-keyword = "lock-push"
+names = ["lock-push"]
 run = ["kubaos", "depth", "push", "{share}"]
 arguments = [{ name = "share", placeholder = "0.025" }]
 shown_when = { state = "kubaos.suites.wallpaper-depth", is = true }
@@ -475,7 +475,7 @@ title = "Set cursor size"
 subtitle = "The pointer's size in pixels, 16 to 96 in steps of 4"
 icon = "input-mouse"
 keywords = ["pointer size", "mouse"]
-keyword = "cursor-size"
+names = ["cursor-size"]
 run = ["kubaos", "cursor", "size", "{size}"]
 arguments = [{ name = "size", placeholder = "32" }]
 
@@ -491,7 +491,7 @@ title = "Keyboard: set layouts"
 subtitle = "Every layout, comma-separated, the default first: us,de(nodeadkeys)"
 icon = "input-keyboard"
 keywords = ["keyboard layout", "keymap", "language", "input"]
-keyword = "keyboard-layouts"
+names = ["keyboard-layouts"]
 run = ["kubaos", "keyboard", "set", "{layouts}"]
 arguments = [{ name = "layouts", placeholder = "us,de" }]
 
@@ -744,7 +744,7 @@ title = "Lock in…"
 subtitle = "Lock the screen once after a while, even if you're working: 10m, 1h30m"
 icon = "system-lock-screen"
 keywords = ["lock later", "lock timer", "scheduled lock", "parental"]
-keyword = "lock-in"
+names = ["lock-in"]
 run = ["kubaos-idle", "schedule", "lock", "in", "{duration}"]
 arguments = [{ name = "duration", placeholder = "10m" }]
 
@@ -753,7 +753,7 @@ title = "Lock at…"
 subtitle = "Lock the screen once at a time, even if you're working: 20:00, 9pm, friday 17:00"
 icon = "system-lock-screen"
 keywords = ["lock later", "lock timer", "scheduled lock", "bedtime"]
-keyword = "lock-at"
+names = ["lock-at"]
 run = ["kubaos-idle", "schedule", "lock", "at", "{time}"]
 arguments = [{ name = "time", placeholder = "20:00" }]
 
@@ -762,7 +762,7 @@ title = "Suspend in…"
 subtitle = "Suspend once after a while, locked first: 30m, 1h30m"
 icon = "system-suspend"
 keywords = ["sleep timer", "suspend later", "scheduled suspend"]
-keyword = "suspend-in"
+names = ["suspend-in"]
 run = ["kubaos-idle", "schedule", "suspend", "in", "{duration}"]
 arguments = [{ name = "duration", placeholder = "30m" }]
 
@@ -771,7 +771,7 @@ title = "Suspend at…"
 subtitle = "Suspend once at a time, locked first: 23:00, friday 18:00"
 icon = "system-suspend"
 keywords = ["sleep timer", "suspend later", "scheduled suspend", "bedtime"]
-keyword = "suspend-at"
+names = ["suspend-at"]
 run = ["kubaos-idle", "schedule", "suspend", "at", "{time}"]
 arguments = [{ name = "time", placeholder = "23:00" }]
 
@@ -780,7 +780,7 @@ title = "Shut down in…"
 subtitle = "Power off once after a while, the session closed cleanly first: 30m, 2h"
 icon = "system-shutdown"
 keywords = ["power off later", "shutdown timer", "sleep timer", "scheduled shutdown"]
-keyword = "shutdown-in"
+names = ["shutdown-in"]
 run = ["kubaos-idle", "schedule", "shutdown", "in", "{duration}"]
 arguments = [{ name = "duration", placeholder = "30m" }]
 confirm = true
@@ -790,7 +790,7 @@ title = "Shut down at…"
 subtitle = "Power off once at a time, the session closed cleanly first: 23:00, friday 18:00"
 icon = "system-shutdown"
 keywords = ["power off later", "shutdown timer", "scheduled shutdown"]
-keyword = "shutdown-at"
+names = ["shutdown-at"]
 run = ["kubaos-idle", "schedule", "shutdown", "at", "{time}"]
 arguments = [{ name = "time", placeholder = "23:00" }]
 confirm = true
@@ -800,7 +800,7 @@ title = "Reboot in…"
 subtitle = "Restart once after a while, the session closed cleanly first: 10m, 1h"
 icon = "system-reboot"
 keywords = ["restart later", "reboot timer", "scheduled reboot"]
-keyword = "reboot-in"
+names = ["reboot-in"]
 run = ["kubaos-idle", "schedule", "reboot", "in", "{duration}"]
 arguments = [{ name = "duration", placeholder = "10m" }]
 confirm = true
@@ -810,7 +810,7 @@ title = "Reboot at…"
 subtitle = "Restart once at a time, the session closed cleanly first: 03:00, sunday 4am"
 icon = "system-reboot"
 keywords = ["restart later", "reboot timer", "scheduled reboot"]
-keyword = "reboot-at"
+names = ["reboot-at"]
 run = ["kubaos-idle", "schedule", "reboot", "at", "{time}"]
 arguments = [{ name = "time", placeholder = "03:00" }]
 confirm = true
@@ -941,7 +941,7 @@ title = "New SSH key on the security key"
 subtitle = "An ed25519-sk key that needs your finger on the YubiKey"
 icon = "dialog-password"
 keywords = ["yubikey", "ssh", "ed25519-sk"]
-keyword = "ssh-key"
+names = ["ssh-key"]
 run = ["dot-ssh-sk-new", "{name}"]
 arguments = [{ name = "name", placeholder = "server" }]
 terminal = true
@@ -994,7 +994,7 @@ title = "Send a file to the phone…"
 subtitle = "A file by its path, to the paired phone"
 icon = "document-send"
 keywords = ["kde connect", "iphone", "android", "share", "photo", "transfer", "airdrop"]
-keyword = "send-file"
+names = ["send-file"]
 run = ["kubaos-phone", "send-file", "{path}"]
 arguments = [{ name = "path", placeholder = "~/Downloads/photo.jpg" }]
 
@@ -1072,7 +1072,7 @@ title = "Import VPN config…"
 subtitle = "IT's WireGuard .conf or OpenVPN .ovpn: its secrets go to your Bitwarden vault, the rest beside proxy.toml"
 icon = "document-import"
 keywords = ["vpn", "wireguard", "openvpn", "conf", "ovpn", "work network", "tunnel", "import", "proxy"]
-keyword = "import-vpn"
+names = ["import-vpn"]
 run = ["kubaos-proxy", "import", "{path}"]
 arguments = [{ name = "path", placeholder = "~/Downloads/work.conf" }]
 terminal = true
@@ -1150,7 +1150,7 @@ title = "Switch channel (stable/edge)"
 subtitle = "Stable: signed releases. Edge: origin/main as it lands, bugs included"
 icon = "preferences-system"
 keywords = ["release channel", "stable", "edge", "updates"]
-keyword = "channel"
+names = ["channel"]
 run = ["kubaos", "channel", "{channel}"]
 arguments = [{ name = "channel", placeholder = "stable or edge" }]
 terminal = true
@@ -1202,7 +1202,7 @@ title = "Pin a Suite version…"
 subtitle = "This folder uses Node 22: a version for a folder and everything in it"
 icon = "view-pin"
 keywords = ["project pin", "suite", "version", "mise.toml", "mise", "legacy", "nvm", "toolchain"]
-keyword = "pin"
+names = ["pin"]
 run = ["kubaos", "pin", "{suite}", "{version}", "{folder}"]
 arguments = [
   { name = "suite", placeholder = "node" },
@@ -1216,7 +1216,7 @@ title = "Unpin a Suite version…"
 subtitle = "The folder goes back to the installed version"
 icon = "list-remove"
 keywords = ["project pin", "suite", "version", "mise.toml", "mise", "remove"]
-keyword = "unpin"
+names = ["unpin"]
 run = ["kubaos", "unpin", "{suite}", "{folder}"]
 arguments = [{ name = "suite", placeholder = "node" }, { name = "folder", placeholder = "~/Projects/acme" }]
 terminal = true
@@ -1385,7 +1385,7 @@ title = "Add countdown"
 subtitle = "Count down to a date or time in the clock popup: 19 dec, friday 17:00"
 icon = "alarm-symbolic"
 keywords = ["countdown", "clock", "calendar", "vacation", "deadline"]
-keyword = "add-countdown"
+names = ["add-countdown"]
 run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1); notify-send -a Clock Clock "$out"', "sh", "countdown", "add", "{name}", "{when}"]
 arguments = [{ name = "name", placeholder = "Vacation" }, { name = "when", placeholder = "19 dec" }]
 
@@ -1410,7 +1410,7 @@ title = "Add time zone"
 subtitle = "An extra clock in the popup, up to four: Tokyo, New York, America/Chicago"
 icon = "preferences-system-time"
 keywords = ["time zone", "world clock", "clock", "city"]
-keyword = "add-zone"
+names = ["add-zone"]
 run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1); notify-send -a Clock Clock "$out"', "sh", "zone", "add", "{zone}"]
 arguments = [{ name = "zone", placeholder = "Tokyo" }]
 
@@ -1466,7 +1466,7 @@ title = "Start timer"
 subtitle = "Rings with a notification and a sound: 25m, 1h30m, 90 seconds"
 icon = "alarm-symbolic"
 keywords = ["timer", "countdown", "pomodoro", "kitchen timer"]
-keyword = "clock-timer"
+names = ["clock-timer"]
 run = ["qs", "ipc", "call", "clock", "timer", "{duration}"]
 arguments = [{ name = "duration", placeholder = "25m" }]
 
@@ -1475,7 +1475,7 @@ title = "Set alarm"
 subtitle = "Rings at a time with a notification and a sound: 7:30, 6pm, friday 17:00"
 icon = "alarm-symbolic"
 keywords = ["alarm", "wake up", "reminder", "clock"]
-keyword = "clock-alarm"
+names = ["clock-alarm"]
 run = ["qs", "ipc", "call", "clock", "alarm", "{time}"]
 arguments = [{ name = "time", placeholder = "7:30" }]
 
@@ -1623,7 +1623,7 @@ title = "Low battery drop at…"
 subtitle = "The battery level the stop drops at, from 5 to 50 %"
 icon = "battery-caution"
 keywords = ["power stop", "low battery", "threshold", "percent"]
-keyword = "low-battery"
+names = ["low-battery"]
 run = ["kubaos-power", "low-battery", "{percent}"]
 arguments = [{ name = "percent", placeholder = "20" }]
 
@@ -1648,7 +1648,7 @@ title = "Critical battery warning at…"
 subtitle = "The battery level of the toast and sound before the power-off at 2 %, from 3 to 20 %"
 icon = "battery-caution"
 keywords = ["power off", "shutdown", "empty battery", "threshold", "percent"]
-keyword = "critical-warning"
+names = ["critical-warning"]
 run = ["kubaos-power", "critical-warning", "{percent}"]
 arguments = [{ name = "percent", placeholder = "5" }]
 
@@ -1702,7 +1702,7 @@ title = "Measure power draw for…"
 subtitle = "As long as you say, in seconds: 60, 300"
 icon = "utilities-system-monitor"
 keywords = ["power draw", "battery drain", "watts", "wakeups", "measure"]
-keyword = "measure-power"
+names = ["measure-power"]
 terminal = true
 run = ["kubaos", "power", "measure", "--seconds", "{seconds}"]
 arguments = [{ name = "seconds", placeholder = "300" }]

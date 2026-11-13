@@ -400,7 +400,7 @@ In the Command menu, "Settings folder" opens it in Files, and "Settings: Desktop
 
   [extensions.kubaos.actions.timer]
   title = "Timer"
-  keyword = "timer"   # type "timer 5m"
+  names = ["timer"]   # type "timer 5m"
   arguments = [{ name = "duration", placeholder = "5m" }]   # fills {duration}
   run = ["sh", "-c", "sleep \"$1\" && notify-send Done", "sh", "{duration}"]
   ```

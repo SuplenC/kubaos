@@ -228,7 +228,7 @@ fn item(id: &str, title: String, subtitle: String, actions: Vec<Action>) -> Item
         title,
         subtitle: Some(subtitle),
         icon: Some(ICON.to_owned()),
-        keyword: None,
+        names: Vec::new(),
         keywords: ["keyboard layout", "keymap", "language", "input"]
             .map(str::to_owned)
             .to_vec(),

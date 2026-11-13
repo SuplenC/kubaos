@@ -38,7 +38,7 @@ pub fn item() -> Item {
         title: "Proxy status".to_owned(),
         subtitle: Some("The work network: each part, whether it is up, and the VPN's last handshake".to_owned()),
         icon: Some(ICON.to_owned()),
-        keyword: None,
+        names: Vec::new(),
         keywords: [
             "proxy",
             "vpn",
@@ -78,7 +78,7 @@ pub fn view(rows: &[Row]) -> View {
             title: row.label.to_owned(),
             subtitle: Some(row.value.clone()),
             icon: Some(ICON.to_owned()),
-            keyword: None,
+            names: Vec::new(),
             keywords: Vec::new(),
             hidden: false,
             app_only: false,

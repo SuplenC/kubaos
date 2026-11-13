@@ -225,7 +225,7 @@ fn arguments_fill_their_placeholders() {
         r#"
         [actions.ssh-key]
         title = "New SSH key on the security key"
-        keyword = "ssh-key"
+        names = ["ssh-key"]
         run = ["dot-ssh-sk-new", "{name}", "--comment={name}@kubaos"]
         arguments = [{ name = "name", placeholder = "github" }]
         "#,
@@ -236,7 +236,7 @@ fn arguments_fill_their_placeholders() {
         .command("ssh-key", &arguments(&[("name", "server")]))
         .expect("a command");
 
-    assert_eq!(item.keyword.as_deref(), Some("ssh-key"));
+    assert_eq!(item.names, ["ssh-key"]);
     assert_eq!(item.actions[0].arguments[0].name, "name");
     assert_eq!(item.actions[0].arguments[0].placeholder.as_deref(), Some("github"));
     assert!(!item.actions[0].arguments[0].optional);

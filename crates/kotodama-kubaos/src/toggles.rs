@@ -199,7 +199,7 @@ impl Toggle {
 
     /// The word typed before its Argument, for the two that take one:
     /// `volume 40`, `brightness 70`.
-    fn keyword(self) -> Option<&'static str> {
+    fn name(self) -> Option<&'static str> {
         match self {
             Toggle::Volume => Some("volume"),
             Toggle::Brightness => Some("brightness"),
@@ -230,7 +230,7 @@ impl Toggle {
             title: self.title().to_owned(),
             subtitle: Some(self.subtitle().to_owned()),
             icon: Some(self.icon().to_owned()),
-            keyword: self.keyword().map(str::to_owned),
+            names: self.name().into_iter().map(str::to_owned).collect(),
             keywords: self.keywords().iter().map(|&keyword| keyword.to_owned()).collect(),
             hidden: false,
             app_only: false,
@@ -396,7 +396,7 @@ fn device_list(runner: &impl Runner, direction: Direction) -> Result<Ran, String
             title: device.name,
             subtitle: device.default.then(|| "In use".to_owned()),
             icon: Some(list.icon().to_owned()),
-            keyword: None,
+            names: Vec::new(),
             keywords: Vec::new(),
             hidden: false,
             app_only: false,

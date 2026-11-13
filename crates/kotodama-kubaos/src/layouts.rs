@@ -114,7 +114,7 @@ fn item(layout: &Layout, name: &str) -> Item {
         title: name.to_owned(),
         subtitle: Some(spelled.clone()),
         icon: Some(ICON.to_owned()),
-        keyword: None,
+        names: Vec::new(),
         keywords: vec![spelled, layout.layout.clone()],
         hidden: false,
         app_only: true,

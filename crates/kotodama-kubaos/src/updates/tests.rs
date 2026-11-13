@@ -14,7 +14,7 @@ fn item(id: &str, title: &str) -> Item {
         title: title.to_owned(),
         subtitle: Some("Default".to_owned()),
         icon: None,
-        keyword: None,
+        names: Vec::new(),
         keywords: Vec::new(),
         hidden: false,
         app_only: false,

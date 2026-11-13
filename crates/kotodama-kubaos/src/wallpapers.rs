@@ -183,7 +183,7 @@ fn item(id: &str, shown: Shown) -> Item {
         title: format!("Wallpaper set: {}", name(id)),
         subtitle: Some(subtitle),
         icon: Some(ICON.to_owned()),
-        keyword: None,
+        names: Vec::new(),
         keywords: ["wallpaper sets", "choose wallpapers", "picker", "theme", "background"]
             .map(str::to_owned)
             .to_vec(),

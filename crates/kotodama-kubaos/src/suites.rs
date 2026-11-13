@@ -365,7 +365,7 @@ fn item(id: String, title: String, subtitle: String, icon: &str, keywords: Vec<S
         title,
         subtitle: Some(subtitle),
         icon: Some(icon.to_owned()),
-        keyword: None,
+        names: Vec::new(),
         keywords,
         hidden: false,
         app_only: false,
