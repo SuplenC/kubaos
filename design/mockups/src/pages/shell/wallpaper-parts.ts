@@ -719,22 +719,15 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     tipOn(after, "The picture after", "→");
     before.addEventListener("click", (event) => (event.stopPropagation(), move(-1)));
     after.addEventListener("click", (event) => (event.stopPropagation(), move(1)));
-    const words: HTMLElement[] = hung ? [text(hung.name, "body_strong"), kicker(folder, S.at[S.folder]!)] : [text(folder.name, "body_strong")];
-    if (hung?.wallpaper.depth) {
-      const flat = S.flat.has(hung.name);
-      const depth = chip({ label: flat ? "Depth off" : "Depth", kind: flat ? "Neutral" : "Cold", icon: "deployed_code", press: "press" });
-      tipOn(depth, "Depth", "D");
-      depth.addEventListener("click", (event) => (event.stopPropagation(), void toggleDepth(true)));
-      words.push(depth);
-    }
-    now.append(before, ...words, after);
+    now.append(before, text(hung ? hung.name : folder.name, "body_strong"), after);
     const views = tabs({ choices: VIEWS.map((view) => ({ label: VIEW_NAMES[view] })), picked: VIEWS.indexOf(S.view), onPick: (index) => void setView(VIEWS[index]!) });
     views.querySelectorAll<HTMLElement>(".k-tab").forEach((tab, index) => tipOn(tab, VIEW_NAMES[VIEWS[index]!], String(index + 1)));
-    // Both of the step's words, the one the bar isn't in shut to nothing.
+    // Both of the step's buttons, the one the bar isn't in shut to nothing: the wall's in words,
+    // the full screen's its icon alone.
     const stepper = document.createElement("span");
     stepper.className = "gl-step-pair";
     for (const [label, full] of [["Full screen", true], ["Back to the wall", false]] as const) {
-      const made = button({ label, kind: "Text", size: "Sm", icon: "desktop_windows" });
+      const made = full ? button({ label, kind: "Text", size: "Sm", icon: "desktop_windows" }) : iconButton({ icon: "desktop_windows", label, kind: "Text", size: "Sm", hint: false });
       tipOn(made, label, "F");
       made.addEventListener("click", (event) => (event.stopPropagation(), void step(full)));
       const cell = document.createElement("span");
