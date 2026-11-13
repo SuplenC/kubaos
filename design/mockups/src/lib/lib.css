@@ -2051,6 +2051,18 @@
   --words: rgb(from var(--picked-words) r g b / var(--dim));
 }
 
+/* Filling its room: the choices share the well equally, their words centred, so the last one ends
+   at the well's own end. */
+.k-tabs[data-fill] {
+  display: flex;
+  flex: 1 1 auto;
+}
+
+.k-tabs[data-fill] > .k-tab {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
 .k-tab[aria-selected="true"] {
   --picked: 1;
 }
