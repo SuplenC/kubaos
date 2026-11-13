@@ -100,7 +100,7 @@ export interface DefaultChoice {
 }
 
 /** The built-in set's name: a machine's built-in speakers and built-in mic as one default. */
-export const BUILT_IN_SET = "Built-in speakers + microphone";
+export const BUILT_IN_SET = "Built-in";
 
 /** `device` as a default on its own: its own mic if it records, none if it doesn't. */
 function alone(device: Device): DefaultChoice {
@@ -280,10 +280,10 @@ function micSlider(level: number, muted: boolean, told?: (on: boolean) => void):
   });
 }
 
-/** What a headset's mode means, in Calls' and Music's tooltips. */
+/** What a headset's mode means, each tooltip's body under the mode's name. */
 export const TIPS: Record<Mode, string> = {
-  calls: "Your mic works; music sounds flatter while it's on.",
-  music: "Music mode has no microphone: switch to Calls to talk.",
+  calls: "Your mic works; music sounds flatter.",
+  music: "The best sound; the mic is off.",
 };
 
 /** A card's label over what it holds, as a list's section label reads. */
@@ -307,21 +307,18 @@ export const CODEC_WORDS: Readonly<Record<string, string>> = {
   CVSD: "Basic voice; every headset has it",
 };
 
-/** The symbol at the end of a playing device's row that has no mic. */
+/**
+ * The symbol at the end of a default's row that brings no mic. Only the top Device card's Select
+ * shows it, where a pick sets the mic too; a side's and an app's choose where sound goes alone.
+ */
 const NO_MIC = "mic_off";
 
-/** A device's name and symbol in a Select's list, and the crossed-out mic of one with none that plays. */
-function names(devices: readonly Device[]): { readonly options: string[]; readonly icons: string[]; readonly trailing: (string | undefined)[] } {
+/** A device's name and symbol in a Select's list. */
+function names(devices: readonly Device[]): { readonly options: string[]; readonly icons: string[] } {
   return {
     options: devices.map((each) => each.name),
     icons: devices.map((each) => LINK_ICONS[each.link]),
-    trailing: devices.map(micMark),
   };
-}
-
-/** The crossed-out mic for a device that plays and has no mic; nothing for any other. */
-function micMark(device: Device): string | undefined {
-  return device.plays && !device.records ? NO_MIC : undefined;
 }
 
 /** What a device's tooltip names: its link, and a headset's codec. */
@@ -378,7 +375,6 @@ function sidePicker(devices: Devices, input: boolean): HTMLElement {
   return select({
     options: [`${FOLLOWS} · ${following.name}`, ...listed.options],
     icons: [LINK_ICONS[following.link], ...listed.icons],
-    trailing: [micMark(following), ...listed.trailing],
     picked: chosen && chosen !== following ? 1 + all.indexOf(chosen) : 0,
   });
 }
@@ -394,7 +390,6 @@ function appPicker(app: App, side: readonly Device[], following: Device, state?:
     look: "inline",
     options: [FOLLOWS, ...listed.options],
     icons: [LINK_ICONS[following.link], ...listed.icons],
-    trailing: [micMark(following), ...listed.trailing],
     picked: app.device ? 1 + all.indexOf(app.device) : 0,
     ...(state === "lit" ? { pinned: "lit" as const } : state === "open" ? { open: true, up: true } : {}),
   });
