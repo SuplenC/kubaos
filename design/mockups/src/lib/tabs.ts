@@ -45,6 +45,11 @@ export interface TabsOptions {
   readonly from?: number;
   /** What a pick does besides picking: the view it shows. */
   readonly onPick?: (index: number) => void;
+  /**
+   * The well as wide as the room it is given, its choices sharing it equally with their words
+   * centred: a setting's row, where the well ends in line with the controls under it.
+   */
+  readonly fill?: boolean;
 }
 
 /** A lit stretch's two edges along the well, in CSS pixels from its left edge. */
@@ -68,6 +73,7 @@ export function tabs(options: TabsOptions): HTMLElement {
   well.className = "k-tabs";
   well.setAttribute("role", "tablist");
   if (options.disabled) well.setAttribute("aria-disabled", "true");
+  if (options.fill) well.dataset.fill = "";
   if (options.pinned !== "pressed") pin(well, options.pinned);
   focusRing(well, "full", "accent", false);
 
