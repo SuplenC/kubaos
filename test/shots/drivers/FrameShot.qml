@@ -53,6 +53,14 @@ import qs.modules.frame
 //                  not disturb on while the screen is shared, its tooltip showing),
 //                  panel-menu-closed (a card's menu open, then the panel closed as a keybind
 //                  closes it)
+//   counters: "" (four counters, one stopped short of its stop), stop (that one at its stop),
+//             menu (its menu open under it), hold (Hold to remove held part-way), auto (Auto reset
+//             in its place, "every day at 9" read), auto-unread (a rule it can't read typed),
+//             auto-invalid (Enter on that), reach (When it reaches taken: a prompt for N), rename
+//             (Coffee's name asked for), rename-invalid (emptied, Enter on it), value (Coffee's
+//             value asked for), value-invalid ("3.5", Enter on it), new (New counter's name asked
+//             for), history (Coffee's changes), history-week (Push-ups' by week, most added
+//             first), history-empty (a counter never changed)
 //   bar: traymenu (the network item's menu open), dnd (the bell crossed out), nobell (no
 //        notification, so no bell), dnd-empty (no notification, the bell crossed out all the same),
 //        preview (the home a live preview of a branch)
@@ -162,6 +170,13 @@ QtObject {
             driver.controlCenter(root);
         if (driver.panel === "sysmon" && ["scrolled", "process", "kill", "quotas"].includes(driver.state))
             sysmonPose.start();
+        if (driver.panel === "counters" && driver.state !== "") {
+            countersPose.start();
+            countersCaret.start();
+            // When it reaches is taken a beat after Auto reset opens: the shot waits for it.
+            if (driver.state === "reach")
+                driver.capture.interval = 2000;
+        }
         if (driver.panel === "clock" && (driver.state === "settings" || driver.state === "select-closed")) {
             const clock = driver.find(root, it => it.page !== undefined && typeof it.land === "function");
             if (clock)
@@ -249,6 +264,109 @@ QtObject {
         Sysmon.sample = s;
         if (driver.state === "process" || driver.state === "kill")
             Sysmon.pendingPid = 4211;
+    }
+
+    // The counters' sheet posed once it has opened, through what CountersSheet.qml, CounterMenu.qml
+    // and HistoryPage.qml expose.
+    property Timer countersPose: Timer {
+        interval: 700
+        onTriggered: {
+            const root = driver.window.contentItem;
+            const sheet = driver.find(root, it => typeof it.askNew === "function" && typeof it.showHistory === "function");
+            if (!sheet) {
+                console.warn("shot: no counters' sheet found");
+                return;
+            }
+            const state = driver.state;
+            const list = driver.find(sheet, it => typeof it.itemAtIndex === "function" && it.model !== undefined);
+            if (state === "rename" || state === "rename-invalid" || state === "value" || state === "value-invalid") {
+                const row = list.itemAtIndex(0);
+                const what = state.startsWith("rename") ? "name" : "value";
+                sheet.ask(what, row.counter, what === "name" ? row.nameAnchor : row.valueAnchor);
+                if (state.endsWith("-invalid"))
+                    driver.countersInvalid(state === "rename-invalid" ? "" : "3.5");
+                return;
+            }
+            if (state === "new") {
+                sheet.askNew();
+                return;
+            }
+            if (state.startsWith("history")) {
+                const at = state === "history-week" ? 2 : state === "history-empty" ? 3 : 0;
+                sheet.showHistory(Counters.list[at]);
+                if (state === "history-week")
+                    countersWeek.start();
+                return;
+            }
+            sheet.menuUnder(1);
+            const menu = driver.find(root, it => typeof it.showAuto === "function");
+            if (state === "hold") {
+                const items = driver.find(menu, it => it.entries !== undefined && it.visible);
+                items.currentIndex = 5;
+                const held = driver.find(menu, it => it.held === true && it.hold !== undefined);
+                held.hold = 0.45;
+                return;
+            }
+            if (state.startsWith("auto") || state === "reach") {
+                menu.showAuto();
+                const rule = driver.find(menu, it => it.inMenu === true && typeof it.take === "function");
+                if (state === "auto")
+                    rule.text = "every day at 9";
+                if (state === "auto-unread" || state === "auto-invalid")
+                    rule.text = "whenever I feel like it";
+                if (state === "auto-invalid")
+                    rule.take();
+                if (state === "reach") {
+                    rule.text = "";
+                    countersReach.start();
+                }
+            }
+        }
+    }
+
+    // The caret of the prompt's field held still once it has opened, as `typing` does: at 1.5×
+    // llvmpipe draws a frame slowly enough that a blinking caret leaves the window no quiet time.
+    property Timer countersCaret: Timer {
+        interval: 500
+        repeat: true
+        onTriggered: {
+            const input = driver.find(driver.window.contentItem, it => it.cursorVisible !== undefined && it.activeFocus);
+            if (input)
+                input.cursorVisible = false;
+        }
+    }
+
+    // By week, most added first, picked once the history's first rows have been made, as tabs
+    // clicked are.
+    property Timer countersWeek: Timer {
+        interval: 300
+        onTriggered: {
+            const page = driver.find(driver.window.contentItem, it => typeof it.showFor === "function");
+            page.group = 2;
+            page.sort = 2;
+            page.read();
+        }
+    }
+
+    // When it reaches taken, once Auto reset has been laid out in the menu's place.
+    property Timer countersReach: Timer {
+        interval: 300
+        onTriggered: {
+            const menu = driver.find(driver.window.contentItem, it => typeof it.showAuto === "function");
+            const choices = driver.find(menu, it => it.entries !== undefined && it.entries.length === 2);
+            choices.activated(1);
+        }
+    }
+
+    // A floating prompt's value set to `typed`, then Enter on it.
+    function countersInvalid(typed: string): void {
+        const prompt = driver.find(driver.window.contentItem, it => it.floating === true && it.open === true && typeof it.take === "function");
+        if (!prompt) {
+            console.warn("shot: no open prompt found");
+            return;
+        }
+        prompt.text = typed;
+        prompt.take();
     }
 
     // The system monitor scrolled to its end once it has opened, through its `K.Scroll`, and for
@@ -594,6 +712,11 @@ QtObject {
             Time.pendingSearch = "days until vacation";
         if (driver.panel === "sysmon")
             driver.sysmonSample();
+        // Glasses of water at its stop, before the frame exists, so no row is drawn twice.
+        if (driver.panel === "counters" && driver.state === "stop")
+            Counters.list = Counters.list.map(c => c.stop > 0 ? Object.assign({}, c, {
+                    value: c.stop
+                }) : c);
         if (driver.panel === "wallpaper" && driver.state === "settings")
             Wallpapers.openSettings = true;
         // A scan that has found nothing yet, its skeleton rows with the room to show: emptied

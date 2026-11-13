@@ -10,7 +10,8 @@
 # system monitor behind the bar's pill, its popup and the menu's `cpu`, `ram`
 # and `battery` answers (`kubaos-sysmon`), a wallpaper's cut-out and the lock
 # clock's place and tint on it (`kubaos-depth`), the idle settings, Keep awake and the
-# scheduled power actions (`kubaos-idle`), the power stops (`kubaos-power`),
+# scheduled power actions (`kubaos-idle`), the counters (`kubaos-counters`), the power
+# stops (`kubaos-power`),
 # where each app's settings live in the user layer (`kubaos-user-layer`), and
 # the design language: the tokens' generator (`kubaos-tokens`), the iced
 # components every Rust front end draws with (`kubaos-ui`), the specimen that
@@ -35,6 +36,7 @@ members = [
     "crates/kubaos-depth",
     "crates/kubaos-user-layer",
     "crates/kubaos-idle",
+    "crates/kubaos-counters",
     "crates/kubaos-power",
     "crates/kubaos-proxy",
     "crates/kubaos-tokens",
@@ -60,6 +62,7 @@ kubaos-cursor = { path = "crates/kubaos-cursor" }
 kubaos-files = { path = "crates/kubaos-files" }
 kubaos-clock = { path = "crates/kubaos-clock" }
 kubaos-idle = { path = "crates/kubaos-idle" }
+kubaos-counters = { path = "crates/kubaos-counters" }
 kubaos-power = { path = "crates/kubaos-power" }
 kubaos-proxy = { path = "crates/kubaos-proxy" }
 kubaos-phone = { path = "crates/kubaos-phone" }

@@ -12,6 +12,7 @@ use iced::Element;
 use kubaos_ui::Look;
 use kubaos_ui::component::chip::ChipKind;
 use kubaos_ui::component::list::empty_list;
+use kubaos_ui::component::list::flush_list;
 use kubaos_ui::component::list::list;
 use kubaos_ui::component::list::list_row;
 use kubaos_ui::icon::Icon;
@@ -24,7 +25,7 @@ use crate::specimen::Message;
 pub const SECTION: Section = Section {
     title: "Lists",
     lede: Some(
-        "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The focus tube lights the well's edge; the row shows where the keyboard is.",
+        "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The focus tube lights the well's edge; the row shows where the keyboard is. A flush list lays its rows straight on the surface, its tube at their corner.",
     ),
     view,
 };
@@ -126,5 +127,21 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(list(look, power, false))
         .push(list(look, tiled, false))
         .push(list(look, radios, false))
+        .push(flush_list(look, flush(look), true))
         .into()
+}
+
+/// A flush list's rows: counters straight on their sheet.
+fn flush<'a>(look: &Look) -> Vec<Element<'a, Message>> {
+    vec![
+        list_row("Coffee")
+            .detail("3")
+            .selected(true)
+            .on_press(Message::Sample)
+            .view(look),
+        list_row("Glasses of water")
+            .detail("128")
+            .on_press(Message::Sample)
+            .view(look),
+    ]
 }

@@ -10,6 +10,7 @@
     ./bluetooth.nix
     ./cli.nix
     ./clock.nix
+    ./counters.nix
     ./dev.nix
     ./desktop.nix
     ./files.nix

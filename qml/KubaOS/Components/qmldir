@@ -37,6 +37,8 @@ Select 1.0 Select.qml
 Popover 1.0 Popover.qml
 Menu 1.0 Menu.qml
 MenuItem 1.0 MenuItem.qml
+Prompt 1.0 Prompt.qml
+RollingNumber 1.0 RollingNumber.qml
 Table 1.0 Table.qml
 TableRow 1.0 TableRow.qml
 TableCell 1.0 TableCell.qml

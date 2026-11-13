@@ -43,6 +43,7 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 - **Roles, never hex.** Code names a role (`primary`, `on_surface`, `surface_container_high`, `error`, `cold`, `warning`), never a colour. The roles are Material 3's, plus `cold` and `warning`. The palette changes with the wallpaper, so a hex value in a component is wrong the moment the wallpaper changes.
 - **Matugen derives them from the wallpaper** (`scripts/dot-theme`, `scheme-fidelity`). `[color.source]` in the tokens names the matugen colour each role comes from. `[color.dark]` and `[color.light]` are the fallback: matugen's output for the default wallpaper, used until a theme exists and in the specimen.
 - **Cold accent** (`cold`, from matugen's tertiary): the blue of the sign's dakuten. With `scheme-fidelity` tertiary is the wallpaper's complement, so cold follows the wallpaper. Use it rarely: the focus tube on picked cards, where the accent already means picked, and a demo or preview badge. It is never a second primary. It is configurable: the complement is the default, and the user may pick another. *Not enforced yet: lands in #154.*
+- **Error pressed** (`error_pressed`) is ours: `error` with its OKLCH lightness up 0.035 in dark and down 0.04 in light, under a lit danger menu item that is pressed. Material 3's error palette is the same whatever the wallpaper, so a value made from the fallback `error` stays matugen's `error` pressed.
 - **Warning** is ours (Material 3 has none): amber between fine and the error colour, for a reading close to its limit. It keeps its value whatever the wallpaper; the light one is dark enough for text on light surfaces.
 - **Contrast minimums** (WCAG 2.1 AA, `kubaos_ui::color::Contrast`): 4.5:1 for body text and labels; 3:1 for large text (24 px and up, or 19 px semibold and up) and for icons, outlines and other shapes that carry meaning. Decoration (a divider, a well's edge, a disabled control) carries no meaning and has no minimum, as WCAG exempts it.
 - **Every pair is listed and checked.** `[contrast]` in the tokens lists every foreground role the front ends draw on a background role, at the opacity it is drawn at, with what it needs and where it is drawn. `kubaos-tokens` refuses a pair under its minimum in either fallback palette, `kubaos-ui`'s tests hold it, and `kubaos-design contrast` lists every pair with its ratio (see "Checks"). A new pairing adds its line there in the PR that draws it. The fixes that held: a field's placeholder is text, so it takes `placeholder_text`, 0.85 (0.80 left it 4.4:1 on a focused field's fill in light), not the 0.55 of `placeholder`, which a ghost shape keeps (2.8:1 in light); a selected row's subtitle takes `subdued_text`, 0.85, not the 0.75 of `subdued`, which a thumbnail sitting back keeps (4.0:1 in light); `outline` is a graphic's colour, never text's (4.3:1 on light `surface`), so a key hint's words are `on_surface_variant`.
@@ -206,6 +207,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `medium` | 300 | A panel or popup leaving, a log opening, a list reordering, a toast fading out, a neon tube striking on (the focus tube too). |
 | `long` | 500 | A panel or dialog arriving, a page sliding in. |
 | `slow` | 800 | A wallpaper fading in, the light/dark crossfade, a live list's new row fading in. |
+| `hold` | 1100 | Not a move but a timer: a held control until it acts (Kōbō's Install, a held menu item). Reduce motion keeps it. |
 | `scene` | 1200 | A whole scene changing once: the lock lifting, Kōbō's welcome settling. |
 
 | Curve (`[easing.*]`) | Bézier | For |
@@ -310,6 +312,7 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Tooltip` | none | width | surface, its popover's |
 | `Menu` | none | none | none |
 | `MenuItem` | `icon`, `check`, `danger` | height | control, nested 12 in a popover |
+| `Prompt` | `menu` | width | surface, its popover's; none in a menu |
 | `Table` | none | none | none |
 | `TableRow` | none | height | control |
 | `Collapsible` | `open` | none, holds content | control, its header |
@@ -320,6 +323,7 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Radio` | none | height | full |
 | `ProgressBar` | `danger` | height | full |
 | `Keycap` | none | height | small |
+| `RollingNumber` | none | height | none |
 | `Tabs` | none | height | control |
 | `Tile` | `detail` | height | control |
 | `Calendar` | `year` | both | full, its days and title; control, its months |
@@ -331,7 +335,8 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Step` | `todo`, `current`, `done` or `action`; `icon`; `mark` | none | control, nested 12 in a surface |
 | `DescriptionList` | none | none | none |
 | `ErrorBlock` | `long` | none | surface |
-| `List`, `EmptyList`, `Toast`, `Log` | none | none | surface |
+| `List` | `Flush` | none | surface; none when flush |
+| `EmptyList`, `Toast`, `Log` | none | none | surface |
 | `Media` | none | none | the caller's: control in a picker, nested in a card |
 | `PictureChoice` | `name-over` or `name-under` | none, holds content | control |
 | `Card`, `ChoiceCard` | none | none, holds content | surface |
@@ -361,6 +366,7 @@ Each component has a page of its own under `design/components/`: its constructor
 **Keys**
 
 - [Keycap and KeyHints](design/components/keycap.md)
+- [RollingNumber](design/components/rolling-number.md)
 
 **Inputs**
 
@@ -377,6 +383,7 @@ Each component has a page of its own under `design/components/`: its constructor
 **Menus, tables and collapsibles**
 
 - [Popover, Menu and MenuItem](design/components/menu.md)
+- [Prompt](design/components/prompt.md)
 - [Table and TableRow](design/components/table.md)
 - [Collapsible](design/components/collapsible.md)
 
@@ -422,7 +429,7 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 - **The panel's own controls** (its header, the quick toggles, the sliders) sit on the panel, with nothing around them: wrapping them would put a box round the whole panel.
 - A card or a well is never inside another; the container padding is the only padding around them.
 - **A form takes its list's place.** Connecting to an item of a list (a Wi-Fi network's password, a Bluetooth pairing) turns the list's well into the form, the two cross-fading over `short` (`standard`), so nothing floats over the list. The form is centred in the well: the item's `Lg` icon tile, its name in `headline` 12 under it, a `small` line under that (Secured · WPA2, what to do on the device), then 16 under it what it asks for (a `Field`, or a pairing code in `headline`), a `small` status line under that (Connecting…, or the error, which keeps the form open), and the buttons 16 under it: Cancel (`Text`) on the left, the action (`Filled`) on the right. Enter does the action and Esc cancels, with no key hints; Tab goes field, Cancel, action. Success goes back to the list. Wi-Fi and Bluetooth share it (`modules/controlcenter/ConnectForm.qml`).
-- **What scrolls in a well or a card is cut by its own shape**, not by a rectangle inside its padding: the rows scroll right up to the well's rounded edge, and the padding is the scroll's padding, the room above the first row and below the last. In the shell the well clips to its rounded shape (`modules/controlcenter/Well.qml`). iced 0.14 clips only to rectangles, so `kubaos-ui`'s scrolling list cuts at the well's own rectangle, with the padding inside the scroll; at its rounded corners a row passing the curve, and the thumb at either end of its rail, show past it until iced clips to shapes. In both, the well's hairline and focus tube are drawn over the rows, so a row scrolled to the edge never covers them. A grid of pictures scrolls a whole row at a time, so no picture is ever cut.
+- **What scrolls in a well or a card is cut by its own shape**, not by a rectangle inside its padding: the rows scroll right up to the well's rounded edge, and the padding is the scroll's padding, the room above the first row and below the last. In the shell the well clips to its rounded shape (`components/Well.qml`). iced 0.14 clips only to rectangles, so `kubaos-ui`'s scrolling list cuts at the well's own rectangle, with the padding inside the scroll; at its rounded corners a row passing the curve, and the thumb at either end of its rail, show past it until iced clips to shapes. In both, the well's hairline and focus tube are drawn over the rows, so a row scrolled to the edge never covers them. A grid of pictures scrolls a whole row at a time, so no picture is ever cut.
 
 Rules the feedback components carry:
 

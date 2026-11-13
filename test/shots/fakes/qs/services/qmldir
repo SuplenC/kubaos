@@ -2,6 +2,7 @@ module qs.services
 singleton Audio 1.0 Audio.qml
 singleton Battery 1.0 Battery.qml
 singleton Brightness 1.0 Brightness.qml
+singleton Counters 1.0 Counters.qml
 singleton Bt 1.0 Bt.qml
 singleton Hypr 1.0 Hypr.qml
 singleton Idle 1.0 Idle.qml

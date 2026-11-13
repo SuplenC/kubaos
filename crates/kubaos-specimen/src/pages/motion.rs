@@ -42,13 +42,14 @@ use kubaos_ui::tokens::Type;
 
 use crate::specimen::Message;
 
-const DURATIONS: [Duration; 7] = [
+const DURATIONS: [Duration; 8] = [
     Duration::Instant,
     Duration::Micro,
     Duration::Short,
     Duration::Medium,
     Duration::Long,
     Duration::Slow,
+    Duration::Hold,
     Duration::Scene,
 ];
 
@@ -73,6 +74,7 @@ fn use_of(duration: Duration) -> &'static str {
         Duration::Medium => "A panel or popup leaving, the log opening, a toast leaving.",
         Duration::Long => "A panel or dialog arriving, a page sliding in.",
         Duration::Slow => "A wallpaper fading in, the light/dark crossfade.",
+        Duration::Hold => "A held control until it acts: Install, a held menu item.",
         Duration::Scene => "A whole scene once: the lock lifting, Kōbō's welcome settling.",
     }
 }

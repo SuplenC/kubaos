@@ -15,9 +15,14 @@ Item {
     property bool focused: root.activeFocus
     // Whether Space presses it; a field's text takes Space instead.
     property bool spacePresses: true
+    // Whether a click, Enter or Space acts at once. A held control acts only once it has been held
+    // long enough, and times the hold itself from `pointerDown`.
+    property bool instant: true
 
     // The pointer itself over it, whatever the preview.
     readonly property bool pointerOver: pointer.containsMouse
+    // The pointer pressed on it, wherever it has gone since.
+    readonly property bool pointerDown: pointer.pressed
     readonly property bool hovered: root.enabled && (root.preview === "hovered" || root.pointerOver)
     readonly property bool down: root.enabled && (root.preview === "pressed" || pointer.pressed || root.keyDown)
     property bool keyDown: false
@@ -35,7 +40,8 @@ Item {
         if (event.isAutoRepeat)
             return;
         root.keyDown = true;
-        root.activated();
+        if (root.instant)
+            root.activated();
     }
     Keys.onReleased: event => {
         if (!root.presses(event) || event.isAutoRepeat)
@@ -51,6 +57,9 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: root.activated()
+        onClicked: {
+            if (root.instant)
+                root.activated();
+        }
     }
 }

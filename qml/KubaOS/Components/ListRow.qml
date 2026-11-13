@@ -5,7 +5,8 @@ import KubaOS.Components as K
 // 12 inside, a 20 icon (24 beside two lines) or the icon on an icon tile (`tile`), the title in
 // `body_strong`, the subtitle in `small`, chips and a detail in `mono` at the end, and an optional
 // check whose room is kept when unchecked, so the rows' ends line up. Each part is centred on the
-// row's whole height, so a chip moves nothing else.
+// row's whole height, so a chip moves nothing else. Controls a composed row holds (a counter's
+// value and its − and +) go at its end (`end`), after the detail, and the title gives them room.
 // Its corners are concentric inside the list's well. The selected row takes the secondary
 // container, or the error colour on a row whose action can't be taken back (`danger`).
 K.Pressable {
@@ -33,6 +34,10 @@ K.Pressable {
     // Whether the row shows a check at its end, and whether it is ticked.
     property bool checkable: false
     property bool checked: false
+    // Controls at the row's end, side by side, `space.s12` from the title.
+    default property alias end: endSlot.data
+    // The title's text, for what a composed row lays over it: its hint, a double-click on it.
+    readonly property alias titleItem: titleText
 
     readonly property bool fillWidth: true
     readonly property color onFill: root.danger ? Tokens.color.on_error : Tokens.color.on_secondary_container
@@ -101,6 +106,8 @@ K.Pressable {
             gap: Tokens.space.s4
 
             K.Text {
+                id: titleText
+
                 text: root.title
                 style: Tokens.type.body_strong
                 maximumLines: 1
@@ -153,6 +160,14 @@ K.Pressable {
             text: root.detail
             style: Tokens.type.mono
             color: root.muted
+        }
+
+        K.Row {
+            id: endSlot
+
+            visible: endSlot.children.length > 0
+            gap: Tokens.space.s12
+            align: "centre"
         }
 
         Item {

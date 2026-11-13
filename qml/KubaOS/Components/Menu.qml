@@ -2,16 +2,20 @@ import QtQuick
 import KubaOS.Components as K
 
 // A few actions or choices, one under the other: `kubaos-ui`'s `menu::menu`, on a `Popover`.
-// `entries` are `{ text, icon, shortcut, checkable, checked, danger, enabled, separator }`, every
-// key but `text` optional. The keyboard moves with ↑ ↓ (and j k, Ctrl+J/K/N/P), Home and End over
-// the items that can be taken, Enter takes one (`activated`, once per press), and Esc leaves it
-// (`dismissed`).
+// `entries` are `{ text, icon, shortcut, checkable, checked, danger, held, enabled, separator }`,
+// every key but `text` optional; a sample may pin one `preview`: "hovered" or "pressed". The keyboard moves with ↑ ↓ (and j k, Ctrl+J/K/N/P), Home and End
+// over the items that can be taken, Enter takes one (`activated`, once per press) or, kept down,
+// holds a held one until it is taken, and Esc leaves it (`dismissed`). A held entry's `reach` pins
+// its sweep part of the way: a sample.
 Item {
     id: root
 
     property var entries: []
     // The item the keyboard is on, or -1.
     property int currentIndex: -1
+    // Enter is down on a held item: it holds the item the keyboard is on, and lets go when the
+    // keyboard moves off it.
+    property bool keyHeld: false
 
     signal activated(int index)
     signal dismissed
@@ -57,14 +61,23 @@ Item {
         else if (k === Qt.Key_End)
             root.jump(root.entries.length - 1, -1);
         else if (k === Qt.Key_Return || k === Qt.Key_Enter) {
-            if (!event.isAutoRepeat && root.takes(root.currentIndex))
-                root.activated(root.currentIndex);
+            if (!event.isAutoRepeat && root.takes(root.currentIndex)) {
+                if (root.entries[root.currentIndex].held)
+                    root.keyHeld = true;
+                else
+                    root.activated(root.currentIndex);
+            }
         } else if (k === Qt.Key_Escape)
             root.dismissed();
         else
             return;
         event.accepted = true;
     }
+    Keys.onReleased: event => {
+        if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat)
+            root.keyHeld = false;
+    }
+    onActiveFocusChanged: root.keyHeld = false
 
     readonly property bool fillWidth: true
     readonly property var probe: ({
@@ -98,7 +111,10 @@ Item {
             scroller.contentY = item.y + item.height - scroller.height;
     }
 
-    onCurrentIndexChanged: root.reveal()
+    onCurrentIndexChanged: {
+        root.keyHeld = false;
+        root.reveal();
+    }
     onEntriesChanged: scroller.contentY = 0
     // Each time it shows, and once its items have their places, the keyboard's item is in view.
     onVisibleChanged: {
@@ -140,6 +156,10 @@ Item {
                     checkable: modelData.checkable ?? false
                     checked: modelData.checked ?? false
                     danger: modelData.danger ?? false
+                    held: modelData.held ?? false
+                    hold: modelData.reach ?? 0
+                    preview: modelData.preview ?? ""
+                    keyHolding: root.keyHeld && index === root.currentIndex
                     separator: modelData.separator ?? false
                     enabled: !(modelData.separator ?? false) && modelData.enabled !== false
                     highlighted: index === root.currentIndex

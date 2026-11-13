@@ -34,6 +34,7 @@ wallpaper           config/quickshell/modules/wallpaper config/quickshell/module
 powermenu           config/quickshell/modules/powermenu config/quickshell/modules/frame config/quickshell/modules/bar
 osd                 config/quickshell/modules/osd config/quickshell/modules/frame
 notifications       config/quickshell/modules/notifications config/quickshell/modules/frame config/quickshell/modules/bar
+counters            config/quickshell/modules/counters config/quickshell/modules/frame config/quickshell/modules/bar
 lock                config/quickshell/modules/lock
 polkit              config/quickshell/modules/polkit
 menu                config/quickshell/modules/menu

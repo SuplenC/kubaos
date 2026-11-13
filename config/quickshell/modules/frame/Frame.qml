@@ -9,6 +9,7 @@ import qs.services
 import qs.modules.bar
 import qs.modules.clock
 import qs.modules.controlcenter
+import qs.modules.counters
 import qs.modules.notifications
 import qs.modules.osd
 import qs.modules.powermenu
@@ -46,7 +47,7 @@ Scope {
         readonly property bool modal: panel !== ""
         // 1 = frame shown, 0 = retracted (a fullscreen window, no panel open).
         property real reveal: fullscreen && !modal ? 0 : 1
-        readonly property var panels: [controlCenter, notificationPanel, clockPopup, sysmonPanel, powerMenu, wallpaperPicker]
+        readonly property var panels: [controlCenter, notificationPanel, clockPopup, sysmonPanel, powerMenu, wallpaperPicker, countersSheet]
         // The panel on screen (opening, open or closing) that reaches into
         // the popups' corner column, or null. Popups never draw over it.
         readonly property K.Sheet toastCover: panels.find(d => root.reachesToasts(d)) ?? null
@@ -202,6 +203,10 @@ Scope {
                 }
 
                 PanelPath {
+                    drawer: countersSheet
+                }
+
+                PanelPath {
                     drawer: popups
                 }
 
@@ -325,6 +330,13 @@ Scope {
 
                 frame: geo
                 shown: root.panel === "wallpaper"
+            }
+
+            CountersSheet {
+                id: countersSheet
+
+                frame: geo
+                shown: root.panel === "counters"
             }
 
             // `c_notifications`'s probe (test/lib/e2e.sh), with KUBAOS_TOAST_PROBE=1 only.

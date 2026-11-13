@@ -63,6 +63,26 @@ pub(crate) fn layered<'a, M: 'a>(
         colour,
         enabled,
         pin,
+        presses: true,
+    })
+}
+
+/// [`layered`] showing the pointer resting on it only: for a pressable whose press is a fill of
+/// its own (a lit danger menu item's `error_pressed`), so the press isn't drawn twice.
+pub(crate) fn hover_layered<'a, M: 'a>(
+    content: impl Into<Element<'a, M>>,
+    corner: impl Into<Corner>,
+    colour: Color,
+    enabled: bool,
+    pin: Option<Pin>,
+) -> Element<'a, M> {
+    Element::new(Layer {
+        content: content.into(),
+        corner: corner.into(),
+        colour,
+        enabled,
+        pin,
+        presses: false,
     })
 }
 
@@ -72,6 +92,8 @@ struct Layer<'a, M> {
     colour: Color,
     enabled: bool,
     pin: Option<Pin>,
+    /// Whether a press shows: off where the press is the pressable's own fill.
+    presses: bool,
 }
 
 /// Where the pointer is, and how much of the layer shows.
@@ -92,7 +114,7 @@ impl<M> Layer<'_, M> {
             Some(Pin::Pressed) => (true, true),
             None => (state.hovered, state.pressed),
         };
-        if pressed {
+        if pressed && self.presses {
             Opacity::Press.value()
         } else if hovered {
             Opacity::Hover.value()

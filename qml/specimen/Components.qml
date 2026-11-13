@@ -125,6 +125,9 @@ K.Stack {
                 S.Keycaps {
                 }
 
+                S.RollingNumbers {
+                }
+
                 S.Tooltips {
                 }
 
@@ -162,6 +165,9 @@ K.Stack {
                 }
 
                 S.Menus {
+                }
+
+                S.Prompts {
                 }
 
                 S.Tables {

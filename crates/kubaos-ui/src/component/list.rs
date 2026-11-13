@@ -3,6 +3,10 @@
 //! The well is a surface (24) with 12 inside, so the rows inside take 24 - 12 = 12, the control
 //! radius: concentric with the well, and the radius of everything clicked. A list taller than its
 //! room scrolls inside the well, its thumb in the well's padding at the right.
+//!
+//! A flush list ([`flush_list`]) has no well: its rows lie straight on the surface under it, with
+//! no fill, edge or padding of its own, where the surface holds the list alone (a sheet of
+//! counters). The focus tube still lights its edge.
 
 use std::fmt;
 
@@ -325,8 +329,37 @@ pub fn list<'a, M: 'a>(look: &Look, rows: impl IntoIterator<Item = Element<'a, M
         Inset::all(WELL_INSET),
         Extent::Shrink,
         focused,
-        false,
+        Well::Drawn,
     )
+}
+
+/// `rows` 4 apart straight on the surface, with no well: no fill, edge or padding. The focus tube
+/// lights their edge while the list has the keyboard, at the rows' own corner, so the tube and a
+/// lit or hovered row at its edge are one shape.
+pub fn flush_list<'a, M: 'a>(
+    look: &Look,
+    rows: impl IntoIterator<Item = Element<'a, M>>,
+    focused: bool,
+) -> Element<'a, M> {
+    well(
+        look,
+        stack(look, ROW_GAP).extend(rows),
+        Inset::NONE,
+        Extent::Shrink,
+        focused,
+        Well::Flush,
+    )
+}
+
+/// How a list's well is drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Well {
+    /// Its fill and edge, its rows inside them.
+    Drawn,
+    /// Its fill, its edge over rows that scroll under it.
+    Scrolled,
+    /// Neither: the rows on the surface under it.
+    Flush,
 }
 
 /// A list whose rows scroll inside its well, built up then drawn with [`ScrollingList::view`].
@@ -396,20 +429,21 @@ impl<'a, M: 'a> ScrollingList<'a, M> {
         if let Some(on_scroll) = self.on_scroll {
             scrolled = scrolled.on_scroll(on_scroll);
         }
-        well(look, scrolled, Inset::NONE, self.height, self.focused, true)
+        well(look, scrolled, Inset::NONE, self.height, self.focused, Well::Scrolled)
     }
 }
 
-/// `content` in the list's well, `inset` inside it and `height` tall, its edge lit as the focus
-/// tube while `focused`. `scrolls` when the content is a scroll, whose rows pass under the edge.
+/// `content` in the list's well, `inset` inside it and `height` tall, drawn as `drawn` says, its
+/// edge lit as the focus tube while `focused`.
 fn well<'a, M: 'a>(
     look: &Look,
     content: impl Into<Element<'a, M>>,
     inset: Inset,
     height: Extent,
     focused: bool,
-    scrolls: bool,
+    drawn: Well,
 ) -> Element<'a, M> {
+    let scrolls = drawn == Well::Scrolled;
     let c = look.colors;
     let surface = color::alpha(c.surface_container_low, Opacity::Well.value());
     let edge = look.outline_soft();
@@ -423,14 +457,18 @@ fn well<'a, M: 'a>(
         .padding(inset.padding())
         .width(Length::Fill)
         .height(height.length())
-        .style(move |_theme| container::Style {
-            background: Some(Background::Color(surface)),
-            border: if scrolls {
-                Border::default().rounded(radius(WELL_RADIUS))
-            } else {
-                border
+        .style(move |_theme| match drawn {
+            Well::Drawn => container::Style {
+                background: Some(Background::Color(surface)),
+                border,
+                ..container::Style::default()
             },
-            ..container::Style::default()
+            Well::Scrolled => container::Style {
+                background: Some(Background::Color(surface)),
+                border: Border::default().rounded(radius(WELL_RADIUS)),
+                ..container::Style::default()
+            },
+            Well::Flush => container::Style::default(),
         });
     let well: Element<'a, M> = if scrolls {
         // The edge is the well's, over the rows that scroll under it: drawn as the container's
@@ -450,8 +488,15 @@ fn well<'a, M: 'a>(
     } else {
         rows.into()
     };
-    let view: Element<'a, M> = focus_ring(look, well, WELL_RADIUS, focused, RingColor::Accent);
-    probe::component("List", ["", "", ""], Fixed::NONE, view)
+    // A flush list's edge is its rows' edge: the tube takes their corner.
+    let corner = if drawn == Well::Flush {
+        ROW_RADIUS
+    } else {
+        WELL_RADIUS.corner()
+    };
+    let view: Element<'a, M> = focus_ring(look, well, corner, focused, RingColor::Accent);
+    let variant = if drawn == Well::Flush { "Flush" } else { "" };
+    probe::component("List", [variant, "", ""], Fixed::NONE, view)
 }
 
 /// The well with nothing in it: `message`, centred.
