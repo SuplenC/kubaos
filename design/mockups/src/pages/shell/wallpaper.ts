@@ -97,13 +97,13 @@ const CANCELLING: Move = {
   what: "Esc: the lamp goes off, the wall walks back in the dark, the old picture grows into the desktop.",
   tracks: [
     lightOff(),
-    { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 0, duration: "long", curve: "spring" },
+    { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--gl-at", from: 1, to: 0, duration: "long", curve: "spring" },
     ...after("long", [stepOut(0, 1, "slow"), ...toDesktop(MAIN, ".gl-floor:first-child .gl-art:first-child"), barFades(1, 0, "medium", "emphasized_accel")]),
   ],
   reduced: [
     lightOffCalm(),
     { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
+    { part: "the wall", on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--gl-at", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
     { part: "stepping out", on: ROOM, target: ".gl-screen", property: "--out", from: 0, to: 1, duration: "instant", cue: "short", curve: "standard" },
     ...after("short", toDesktopReduced(MAIN, ".gl-floor:first-child .gl-art:first-child")),
     { part: "the room", on: ROOM, target: ".gl-room", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
@@ -263,7 +263,7 @@ const BROWSES: Move = {
   tracks: [
     lightOff(),
     OLD_LAMP,
-    { part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 2, duration: "long", curve: "spring" },
+    { part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--gl-at", from: 1, to: 2, duration: "long", curve: "spring" },
     { part: "its city's lead", on: "the picture reached", target: `${NEW} .k-lock`, property: "--aside", from: 1, to: 0, duration: "long", curve: "spring" },
     { part: "its city's lead", on: "the picture left", target: `${OLD} .k-lock`, property: "--aside", from: 0, to: -1, duration: "long", curve: "spring" },
     { part: "the push", on: "the picture reached", target: `${NEW} .k-lock`, property: "--push", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
@@ -276,7 +276,7 @@ const BROWSES: Move = {
   unflickered: [
     lightOff(),
     OLD_LAMP,
-    { part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 2, duration: "long", curve: "spring" },
+    { part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--gl-at", from: 1, to: 2, duration: "long", curve: "spring" },
     { part: "its city's lead", on: "the picture reached", target: `${NEW} .k-lock`, property: "--aside", from: 1, to: 0, duration: "long", curve: "spring" },
     { part: "its city's lead", on: "the picture left", target: `${OLD} .k-lock`, property: "--aside", from: 0, to: -1, duration: "long", curve: "spring" },
     { part: "the push", on: "the picture reached", target: `${NEW} .k-lock`, property: "--push", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
@@ -289,7 +289,7 @@ const BROWSES: Move = {
   reduced: [
     lightOffCalm(),
     { ...OLD_LAMP, curve: "standard" },
-    { part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--at", from: 1, to: 2, duration: "instant", cue: "short", curve: "standard" },
+    { part: WALL, on: ROOM, target: ".gl-floor:first-child .gl-track", property: "--gl-at", from: 1, to: 2, duration: "instant", cue: "short", curve: "standard" },
     lightOnCalm("short"),
     { part: "its lamp", on: "the picture reached", target: `${NEW} .gl-lamp`, property: "--lamp", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],

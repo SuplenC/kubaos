@@ -661,10 +661,10 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
 
   const bare = options.bare ?? false;
   const drawWall = () => {
-    floors.style.setProperty("--floor", String(S.folder));
+    floors.style.setProperty("--gl-floor", String(S.folder));
     arts.forEach((here, level) => {
       const track = here[0]?.parentElement;
-      track?.style.setProperty("--at", String(S.at[level]));
+      track?.style.setProperty("--gl-at", String(S.at[level]));
       here.forEach((art, index) => {
         const on = level === S.folder && index === S.at[level];
         art.toggleAttribute("data-on", on);
