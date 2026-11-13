@@ -112,9 +112,10 @@ Item {
         }
     }
 
-    MouseArea {
-        anchors.fill: parent
+    // A handler, not a MouseArea over the row: a MouseArea always sets a cursor of its own, an
+    // arrow, which would win over the hand of the − and + under it.
+    TapHandler {
         acceptedButtons: Qt.RightButton
-        onClicked: mouse => root.menuAsked(mapToItem(null, mouse.x, mouse.y))
+        onTapped: (point, button) => root.menuAsked(root.mapToItem(null, point.position.x, point.position.y))
     }
 }

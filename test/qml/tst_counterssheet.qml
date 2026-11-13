@@ -69,6 +69,26 @@ TestCase {
             compare(rows.itemAtIndex(i).height, K.Tokens.size.row_two_line);
     }
 
+    // A MouseArea always sets a cursor of its own: one over a row but a pressable's would take the
+    // hand from the − and + under it.
+    function test_every_mouse_area_in_a_row_shows_the_hand() {
+        const rows = list();
+        tryCompare(rows, "count", Counters.list.length);
+        const areas = [];
+        const collect = item => {
+            if (item.cursorShape !== undefined && item.acceptedButtons !== undefined)
+                areas.push(item);
+            for (const kid of item.children)
+                collect(kid);
+        };
+
+        collect(rows.itemAtIndex(0));
+
+        verify(areas.length > 0);
+        for (const area of areas)
+            compare(area.cursorShape, Qt.PointingHandCursor);
+    }
+
     function test_the_rows_take_the_sheet_s_width_less_its_padding() {
         tryCompare(list(), "width", K.Tokens.size.panel - K.Tokens.space.s8 * 2);
     }
