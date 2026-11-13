@@ -1,12 +1,12 @@
 // The stage, which leads a page: the thing itself, live and large, in a night pane and a day pane
-// side by side (or the one mode the top bar picks; one under the other for a whole screen, so it is
+// side by side (or the one mode the top bar picks; one under the other for whole screens, so they are
 // drawn about twice as large), under one bar of chips that drives both: Live,
 // then each state the page shows, pinned on every row. A mono hint at the bar's end says how to try
 // the live sample, or what the pinned state looks like. A sample wider than its pane is scaled down
 // to fit it, and its pane says by how much; with `?all`, the panes stack and nothing is scaled.
 
 import { el, holdScaled, label, relayout, sampleBox } from "../dom.ts";
-import { fullScreenControl, isScreen } from "../full-screen.ts";
+import { allScreens, fullScreenControl, isScreen } from "../full-screen.ts";
 import { applies, type DoesntApply, type Focus, LOOK_NAMES, STATE_NAMES, type Stage, type State, type States } from "../page.ts";
 import { ALL, type Mode, settings } from "../settings.ts";
 import { picker } from "./picker.ts";
@@ -103,8 +103,8 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
     panes.forEach((pane, i) => {
       const drawn = pick.draw(modes[i]!);
       pane.inner.replaceChildren(...drawn);
-      screen = isScreen(drawn);
-      if (pane.full) pane.full.hidden = !screen;
+      screen = allScreens(drawn);
+      if (pane.full) pane.full.hidden = !isScreen(drawn);
     });
     // `?all` stacks every stage's panes already, and the shots keep its corners.
     box.toggleAttribute("data-screen", screen && !ALL);
