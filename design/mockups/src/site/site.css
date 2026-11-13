@@ -320,6 +320,20 @@ body {
   --panes: 2;
 }
 
+/* A whole screen's panes stand one under the other, each across the stage, so the screen is drawn
+   about twice as large as side by side; the night pane above takes both top corners. */
+.page-hero[data-screen] .page-panes {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.page-hero[data-screen] .page-panes > .page-pane:first-child {
+  border-top-right-radius: var(--radius-surface);
+}
+
+.page-hero[data-screen] .page-panes > .page-pane:last-child:not(:first-child) {
+  border-top-right-radius: 0;
+}
+
 .f-painted.page-pane {
   min-width: 0;
   gap: var(--space-s24);

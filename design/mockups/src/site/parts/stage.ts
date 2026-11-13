@@ -1,5 +1,6 @@
 // The stage, which leads a page: the thing itself, live and large, in a night pane and a day pane
-// side by side (or the one mode the top bar picks), under one bar of chips that drives both: Live,
+// side by side (or the one mode the top bar picks; one under the other for a whole screen, so it is
+// drawn about twice as large), under one bar of chips that drives both: Live,
 // then each state the page shows, pinned on every row. A mono hint at the bar's end says how to try
 // the live sample, or what the pinned state looks like. A sample wider than its pane is scaled down
 // to fit it, and its pane says by how much; with `?all`, the panes stack and nothing is scaled.
@@ -98,11 +99,15 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
   const show = (index: number): void => {
     const pick = picks[index]!;
     shown = index;
+    let screen = false;
     panes.forEach((pane, i) => {
       const drawn = pick.draw(modes[i]!);
       pane.inner.replaceChildren(...drawn);
-      if (pane.full) pane.full.hidden = !isScreen(drawn);
+      screen = isScreen(drawn);
+      if (pane.full) pane.full.hidden = !screen;
     });
+    // `?all` stacks every stage's panes already, and the shots keep its corners.
+    box.toggleAttribute("data-screen", screen && !ALL);
     // A label is measured for its words, so each pick's hint is a label of its own.
     hint.replaceChildren(label(pick.hint, "mono", "on_surface_variant"));
     if (box.isConnected) relayout(box);
