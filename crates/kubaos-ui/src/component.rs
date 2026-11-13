@@ -59,4 +59,5 @@ pub mod toast;
 pub mod tooltip;
 
 pub(crate) use self::layer::Pin;
+pub(crate) use self::layer::hover_layered;
 pub(crate) use self::layer::layered;

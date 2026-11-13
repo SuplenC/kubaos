@@ -3,7 +3,7 @@ import KubaOS.Components as K
 
 // A few actions or choices, one under the other: `kubaos-ui`'s `menu::menu`, on a `Popover`.
 // `entries` are `{ text, icon, shortcut, checkable, checked, danger, held, enabled, separator }`,
-// every key but `text` optional. The keyboard moves with ↑ ↓ (and j k, Ctrl+J/K/N/P), Home and End
+// every key but `text` optional; a sample may pin one `preview`: "hovered" or "pressed". The keyboard moves with ↑ ↓ (and j k, Ctrl+J/K/N/P), Home and End
 // over the items that can be taken, Enter takes one (`activated`, once per press) or, kept down,
 // holds a held one until it is taken, and Esc leaves it (`dismissed`). A held entry's `reach` pins
 // its sweep part of the way: a sample.
@@ -158,6 +158,7 @@ Item {
                     danger: modelData.danger ?? false
                     held: modelData.held ?? false
                     hold: modelData.reach ?? 0
+                    preview: modelData.preview ?? ""
                     keyHolding: root.keyHeld && index === root.currentIndex
                     separator: modelData.separator ?? false
                     enabled: !(modelData.separator ?? false) && modelData.enabled !== false

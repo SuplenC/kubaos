@@ -5,7 +5,9 @@ import KubaOS.Components as K
 // `menu::menu_separator`. An item is a small control tall, 12 inside: an optional symbol, its
 // words on one line, the keys that do the same as keycaps, and a check whose room is kept when
 // unchecked. Its corners are concentric inside the popover. The item the keyboard is on takes
-// the secondary container; one that destroys something (Kill) is in the error colour.
+// the secondary container. One that destroys something (Kill) is in the error colour, and lights
+// in the error itself with its words `on_error`, pressed to `error_pressed`, so lit it reads as what
+// it is.
 //
 // A held item destroys something that can't be taken back (Hold to remove), so it is taken only
 // by holding it for `duration.hold`: the pointer pressed on it, or Enter while the keyboard is on
@@ -36,6 +38,9 @@ K.Pressable {
     property bool keyHolding: false
 
     readonly property bool dangerous: root.danger || root.held
+    // A danger item lit by the keyboard: it lies on the error, and its press is a fill of its own,
+    // not the state layer.
+    readonly property bool dangerLit: root.danger && !root.held && root.highlighted && root.enabled
     // Held by the pointer only while the pointer stays on it: leaving it lets go.
     readonly property bool holding: root.held && root.enabled && (root.keyHolding || (root.pointerDown && root.pointerOver))
     readonly property bool fillWidth: true
@@ -45,11 +50,19 @@ K.Pressable {
             return K.Look.alpha(Tokens.color.on_surface, Tokens.opacity.disabled_content);
         if (root.held)
             return Tokens.color.error;
+        if (root.dangerLit)
+            return Tokens.color.on_error;
         if (root.highlighted)
             return Tokens.color.on_secondary_container;
         return root.danger ? Tokens.color.error : Tokens.color.on_surface;
     }
-    readonly property color litFill: root.held ? K.Look.alpha(Tokens.color.error, Tokens.opacity.tint) : Tokens.color.secondary_container
+    readonly property color litFill: {
+        if (root.held)
+            return K.Look.alpha(Tokens.color.error, Tokens.opacity.tint);
+        if (root.danger)
+            return root.down ? Tokens.color.error_pressed : Tokens.color.error;
+        return Tokens.color.secondary_container;
+    }
     readonly property var probe: root.separator ? null : {
         role: "component",
         name: "MenuItem",
@@ -112,7 +125,7 @@ K.Pressable {
             content: root.ink
             active: root.enabled
             hovered: root.hovered
-            pressed: root.down
+            pressed: root.down && !root.dangerLit
         }
     }
 

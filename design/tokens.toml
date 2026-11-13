@@ -675,6 +675,11 @@ error = "error"
 on_error = "on_error"
 error_container = "error_container"
 on_error_container = "on_error_container"
+# A lit danger menu item pressed: `error` moved in OKLCH, its lightness up 0.035
+# by night and down 0.04 by day, its chroma lowered only where sRGB can't hold
+# it. Ours, as a value: Material 3's error palette is the same whatever the
+# wallpaper, so matugen's `error` never moves away from the one it is made from.
+error_pressed = ""
 surface = "surface"
 on_surface = "on_surface"
 surface_variant = "surface_variant"
@@ -722,6 +727,7 @@ error = "#ffb4ab"
 on_error = "#690005"
 error_container = "#93000a"
 on_error_container = "#ffdad6"
+error_pressed = "#ffc5be"
 surface = "#18120d"
 on_surface = "#ede0d6"
 surface_variant = "#524437"
@@ -765,6 +771,7 @@ error = "#ba1a1a"
 on_error = "#ffffff"
 error_container = "#ffdad6"
 on_error_container = "#410002"
+error_pressed = "#ab000b"
 surface = "#fff8f4"
 on_surface = "#211a14"
 surface_variant = "#f4dfcd"
@@ -819,6 +826,7 @@ pairs = [
   { fg = "on_secondary_container", bg = "secondary_container", need = "text", opacity = "subdued_text", use = "A selected row's subtitle" },
   { fg = "on_error", bg = "error", need = "text", use = "A Danger button's label" },
   { fg = "on_error", bg = "error", need = "text", opacity = "subdued_text", use = "A selected danger row's subtitle" },
+  { fg = "on_error", bg = "error_pressed", need = "text", use = "A lit danger menu item's words, pressed" },
   { fg = "error", bg = "surface", need = "text", use = "An invalid field's note, a failure" },
   { fg = "error", bg = "surface_container", need = "text", use = "A danger or held menu item's words on its popover" },
   { fg = "on_error_container", bg = "error_container", need = "text", use = "A critical notification" },

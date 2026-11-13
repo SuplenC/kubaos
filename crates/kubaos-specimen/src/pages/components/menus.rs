@@ -10,6 +10,7 @@
 
 use iced::Element;
 use kubaos_ui::Look;
+use kubaos_ui::component::button::Preview;
 use kubaos_ui::component::menu::menu;
 use kubaos_ui::component::menu::menu_item;
 use kubaos_ui::component::menu::menu_separator;
@@ -28,7 +29,7 @@ use crate::specimen::Message;
 pub const SECTION: Section = Section {
     title: "Selects and menus",
     lede: Some(
-        "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control. A held item is taken only once held: the error sweeps across it.",
+        "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control. A danger item lights in the error, and presses deeper. A held item is taken only once held: the error sweeps across it.",
     ),
     view,
 };
@@ -128,5 +129,35 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(context)
         .push(closed)
         .push(counter)
+        .push(danger(look, None))
+        .push(danger(look, Some(Preview::Pressed)))
         .into()
+}
+
+/// A danger item lit, pinned pressed when `preview` says so.
+fn danger<'a>(look: &Look, preview: Option<Preview>) -> Element<'a, Message> {
+    let kill = menu_item("Kill")
+        .icon(Icon::Close)
+        .danger()
+        .highlighted(true)
+        .on_press(Message::Sample);
+    let kill = match preview {
+        Some(preview) => kill.preview(preview),
+        None => kill,
+    };
+    popover(
+        look,
+        Extent::Fixed(Size::Menu),
+        menu(
+            look,
+            [
+                menu_item("Copy command")
+                    .icon(Icon::ContentPaste)
+                    .on_press(Message::Sample)
+                    .view(look),
+                menu_separator(look),
+                kill.view(look),
+            ],
+        ),
+    )
 }

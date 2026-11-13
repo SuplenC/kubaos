@@ -4,6 +4,9 @@
 //! shadow, 12 inside, so the items in it take 24 − 12 = 12, the control radius. A menu is its
 //! items one under the other, each a small control tall, with separators between groups.
 //!
+//! An item that destroys something ([`MenuItem::danger`]) is in the error colour, and lit it lies
+//! on the error itself with its words `on_error`, pressed to `error_pressed`.
+//!
 //! A held item ([`MenuItem::held`]) destroys something that can't be taken back, so it is taken
 //! only by holding it for [`Duration::Hold`](crate::tokens::Duration::Hold): while it is held, the
 //! error colour sweeps across it from its start, its words `on_error` under the sweep, and it is
@@ -32,6 +35,9 @@ use iced::widget;
 use iced::widget::container;
 
 use crate::color;
+use crate::component::Pin;
+use crate::component::button::Preview;
+use crate::component::hover_layered;
 use crate::component::keycap::keycap;
 use crate::component::layered;
 use crate::icon::Icon;
@@ -121,6 +127,7 @@ pub struct MenuItem<'a, M> {
     on_press: Option<M>,
     /// How far the sweep has gone, and what pressing it and letting go send.
     hold: Option<(f32, M, M)>,
+    preview: Option<Preview>,
 }
 
 /// An item reading `label` on one line, ending in an ellipsis where it doesn't fit.
@@ -134,6 +141,7 @@ pub fn menu_item<'a, M>(label: impl Into<String>) -> MenuItem<'a, M> {
         highlighted: false,
         on_press: None,
         hold: None,
+        preview: None,
     }
 }
 
@@ -163,7 +171,8 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
         }
     }
 
-    /// An item that destroys something (Kill, Delete): its words and symbol in the error colour.
+    /// An item that destroys something (Kill, Delete): its words and symbol in the error colour;
+    /// lit, it lies on the error with its words `on_error`.
     #[must_use]
     pub fn danger(self) -> Self {
         MenuItem { danger: true, ..self }
@@ -173,6 +182,16 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
     #[must_use]
     pub fn highlighted(self, highlighted: bool) -> Self {
         MenuItem { highlighted, ..self }
+    }
+
+    /// Shown as if the pointer were on it, whatever the pointer does: the specimen's view of hover
+    /// and press.
+    #[must_use]
+    pub fn preview(self, preview: Preview) -> Self {
+        MenuItem {
+            preview: Some(preview),
+            ..self
+        }
     }
 
     /// What a press sends; an item without one is disabled.
@@ -202,12 +221,18 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
         let c = look.colors;
         let enabled = self.on_press.is_some() || self.hold.is_some();
         let held = self.hold.is_some();
+        // A danger item lit by the keyboard lies on the error, and its press is a fill of its own,
+        // not the state layer.
+        let danger_lit = enabled && self.danger && !held && self.highlighted;
+        let pin = self.preview.map(Preview::pin);
         let (fill, ink) = if !enabled {
             (None, color::alpha(c.on_surface, Opacity::DisabledContent.value()))
         } else if held {
             // Lit, a held item lies on the error at `tint`, so the sweep has room to show.
             let lit = self.highlighted.then(|| color::alpha(c.error, Opacity::Tint.value()));
             (lit, c.error)
+        } else if danger_lit {
+            (Some(c.error), c.on_error)
         } else if self.highlighted {
             (Some(c.secondary_container), c.on_secondary_container)
         } else if self.danger {
@@ -245,7 +270,7 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
                 .height(height)
                 .padding(Inset::x(Space::S12).padding());
             sweep::swept(
-                layered(item, ITEM_RADIUS, ink, enabled, None),
+                layered(item, ITEM_RADIUS, ink, enabled, pin),
                 copy.into(),
                 reach,
                 c.error,
@@ -258,17 +283,27 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
                 .height(height)
                 .padding(Inset::x(Space::S12).padding())
                 .on_press_maybe(self.on_press)
-                .style(move |theme: &Theme, _status| {
+                .style(move |theme: &Theme, status| {
                     let face = face(theme);
+                    let pressed = pin == Some(Pin::Pressed) || status == widget::button::Status::Pressed;
+                    let background = if danger_lit && pressed {
+                        Some(Background::Color(c.error_pressed))
+                    } else {
+                        face.background
+                    };
                     widget::button::Style {
-                        background: face.background,
+                        background,
                         text_color: ink,
                         border: face.border,
                         shadow: Shadow::default(),
                         snap: true,
                     }
                 });
-            layered(pressable, ITEM_RADIUS, ink, enabled, None)
+            if danger_lit {
+                hover_layered(pressable, ITEM_RADIUS, ink, enabled, pin)
+            } else {
+                layered(pressable, ITEM_RADIUS, ink, enabled, pin)
+            }
         };
         probe::component("MenuItem", words, Fixed::HEIGHT, view)
     }
