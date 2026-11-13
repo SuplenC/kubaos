@@ -2,10 +2,11 @@
 // edge, opened by the mute pill's right-click, the Command menu or its hotkey. Its sliders, the
 // mic's live Meter, the Device card (the default device, the built-in speakers and mic as one, a
 // headset's Calls and Music, each with its tooltip, and its codec),
-// then Output, Input and Options over their cards, each side's device and each app's.
+// then Output, Input and Options over their cards, each side's device and each app's. Its subtitle
+// follows its state: a sample of each case, in the order that picks one.
 
 import { powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Track } from "../../site/page.ts";
+import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Track, type Variant } from "../../site/page.ts";
 import { ALL } from "../../site/settings.ts";
 import {
   type AudioOptions,
@@ -25,6 +26,8 @@ import {
   shot,
   SHORT,
   SPEAKERS,
+  subtitleCase,
+  subtitleOf,
   TIPS,
   USB_HEADSET,
 } from "./audio-parts.ts";
@@ -41,9 +44,44 @@ const USB: AudioOptions = { device: USB_HEADSET };
 /** A default with no mic and none picked for Input: the screen. */
 const NO_MIC: AudioOptions = { device: SCREEN, inputDevice: null };
 
-/** The stage's panel: live, a headset in Calls, the keyboard on the output's slider. */
+/** Nothing recording, the state the subtitle's later cases need: a recording app comes before them. */
+const QUIET: AudioOptions = { recording: [] };
+
+/**
+ * A panel in a state for each of the subtitle's cases, in their order; balance has a sample for each
+ * side. Each state is the case's own: the first case that holds for it.
+ */
+const SAID: readonly AudioOptions[] = [
+  { machine: [BUILT_IN_MIC] },
+  { outputMuted: true, inputMuted: true },
+  { outputMuted: true },
+  { inputMuted: true },
+  {},
+  { ...QUIET, inputMuted: true },
+  { ...QUIET, ...NO_MIC },
+  { ...QUIET, ...MUSIC },
+  { ...QUIET, ...CALLS },
+  { ...QUIET, output: 1.25 },
+  { ...QUIET, output: 0 },
+  { ...QUIET, outputDevice: HEADSET },
+  { ...QUIET, balance: 0.35 },
+  { ...QUIET, balance: 0.65 },
+  QUIET,
+  { ...QUIET, noise: false },
+  { ...QUIET, noise: false, playing: [] },
+];
+
+/** The subtitle's samples, one per state in the cases' order, each named by the case it picks. */
+function subtitles(): NonEmpty<Variant> {
+  return nonEmpty(SAID.map((options) => ({ name: subtitleCase(options).when, for: subtitleOf(options), sample: draw(options) })));
+}
+
+/**
+ * The stage's panel: live, a headset in Calls, the keyboard on the output's slider. Nothing records,
+ * so its subtitle answers Calls and Music as well as the mutes.
+ */
 function live(): HTMLElement {
-  const panel = audioPanel({ ...CALLS, live: true });
+  const panel = audioPanel({ ...CALLS, ...QUIET, live: true });
   const room = onScreen(panel.element);
   if (!ALL) requestAnimationFrame(panel.land);
   return room;
@@ -180,6 +218,7 @@ export default page<Shown>({
     { name: "A 1000-high screen", for: "as tall as its content", sample: draw(CALLS) },
     { name: "A short screen", for: "the body scrolls under the header", sample: draw({ ...CALLS, playing: MANY }, SHORT) },
   ],
+  groups: [{ title: "Subtitle", rows: subtitles() }],
   states: {
     shown: ["rest", "lit", "selected", "disabled", "empty"],
     absent: {

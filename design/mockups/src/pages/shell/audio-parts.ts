@@ -3,7 +3,8 @@
 // 150% holding at 100%, and the mic's, each one's icon muting it; the mic's live Meter; the Device
 // card, the default device for both sides, with a Bluetooth headset's Calls and Music, each saying
 // in its tooltip what it means, and its codec; then Output, Input and Options, stretched Tabs, over the
-// picked tab's cards, where each side, then each app, may take another device. Every part is the
+// picked tab's cards, where each side, then each app, may take another device. The header's pun
+// follows the panel's state, the first of `SUBTITLES`' cases that holds. Every part is the
 // library's; the data is the shots' stand-ins'.
 
 import "./audio.css";
@@ -35,9 +36,8 @@ const PERCENT = new Intl.NumberFormat("en-GB", { style: "percent", maximumFracti
 /** The most the output's slider reaches: 150%, its value's 1. */
 export const BOOST = 1.5;
 
-/** The panel's header: its title, and its pun, which never moves. */
+/** The panel's header's title; its pun, the subtitle, follows the panel's state (`SUBTITLES`). */
 export const TITLE = "Audio";
-export const PUN = "Loud and clear";
 
 /** How a device connects, which its symbol says. */
 export type Link = "bluetooth" | "usb" | "jack" | "hdmi" | "builtin";
@@ -244,6 +244,93 @@ function devicesOf(options: AudioOptions): Devices {
   };
 }
 
+/** What the subtitle reads of the panel's state. */
+export interface Heard {
+  /** Whether any device on the machine plays. */
+  readonly outputs: boolean;
+  readonly outputMuted: boolean;
+  /** The mic muted by hand; a headset in Music mode is its own case. */
+  readonly micMuted: boolean;
+  /** The first app listed as recording, and as playing. */
+  readonly recording: App | undefined;
+  readonly playing: App | undefined;
+  /** The default's name, as its Select names it, and whether it brings a mic. */
+  readonly device: string;
+  readonly deviceMic: boolean;
+  readonly mode: Mode | null;
+  /** The output's level, 0 to `BOOST`. */
+  readonly level: number;
+  /** Whether the output or the mic is on a device of its own, off the default. */
+  readonly moved: boolean;
+  /** Balance, 0 left to 1 right; centred as `sideOf` rounds it. */
+  readonly balance: number;
+  readonly noise: boolean;
+}
+
+/** One case of the subtitle: what it says of the state, when it holds, and the line. */
+export interface Subtitle {
+  readonly when: string;
+  readonly holds: (heard: Heard) => boolean;
+  readonly line: (heard: Heard) => string;
+}
+
+/** Whether `at` is off centre, as its words would say: Left or Right, not Centre. */
+function offCentre(at: number): boolean {
+  return Math.round(Math.abs(at - 0.5) * 200) !== 0;
+}
+
+/**
+ * The panel's subtitle, by its state: the first case that holds wins, so the order is the rule. The
+ * last always holds, so the line is never empty and nothing under it moves.
+ */
+export const SUBTITLES: readonly Subtitle[] = [
+  { when: "No output device at all", holds: (h) => !h.outputs, line: () => "Nowhere to send the noise" },
+  { when: "Output and mic both muted", holds: (h) => h.outputMuted && h.micMuted, line: () => "Full monk mode" },
+  { when: "Output muted", holds: (h) => h.outputMuted, line: () => "Shh, the speakers are napping" },
+  { when: "Mic muted while an app records", holds: (h) => h.micMuted && h.recording !== undefined, line: (h) => `${h.recording!.name} sees lips, hears nothing` },
+  { when: "An app is recording", holds: (h) => h.recording !== undefined, line: (h) => `${h.recording!.name} is all ears` },
+  { when: "Mic muted", holds: (h) => h.micMuted, line: () => "Your secrets are safe" },
+  { when: "The default device has no mic", holds: (h) => !h.deviceMic, line: (h) => `${h.device} can't hear a thing` },
+  { when: "Headset in Music mode", holds: (h) => h.mode === "music", line: () => "All ears, no mouth" },
+  { when: "Headset in Calls mode", holds: (h) => h.mode === "calls", line: () => "Ring ring, ready to talk" },
+  { when: "Boosted past 100%", holds: (h) => h.level > 1, line: () => "Neighbours have been notified" },
+  { when: "Volume at 0", holds: (h) => h.level === 0, line: () => "Technically on" },
+  { when: "Output or mic off the default", holds: (h) => h.moved, line: () => "One ear here, one mouth there" },
+  { when: "Balance off centre", holds: (h) => offCentre(h.balance), line: (h) => `Leaning ${h.balance < 0.5 ? "left" : "right"} a little` },
+  { when: "Noise suppression on", holds: (h) => h.noise, line: () => "The dog is now on mute" },
+  { when: "Something is playing", holds: (h) => h.playing !== undefined, line: (h) => `${h.playing!.name} has the floor` },
+  { when: "Nothing playing, all fine", holds: () => true, line: () => "Loud and clear" },
+];
+
+/** What the subtitle reads of `options`. */
+function heard(options: AudioOptions, devices: Devices): Heard {
+  return {
+    outputs: devices.machine.some((each) => each.plays),
+    outputMuted: options.outputMuted ?? false,
+    micMuted: options.inputMuted ?? false,
+    recording: (options.recording ?? RECORDING)[0],
+    playing: (options.playing ?? PLAYING)[0],
+    device: devices.choice.name,
+    deviceMic: devices.defaultInput !== null,
+    mode: devices.mode,
+    level: options.output ?? LEVEL,
+    moved: (devices.output !== null && devices.output !== devices.default) || (devices.input !== null && devices.input !== devices.defaultInput),
+    balance: options.balance ?? 0.5,
+    noise: options.noise ?? true,
+  };
+}
+
+/** The case of `SUBTITLES` that picks the subtitle for `options`: the first that holds. */
+export function subtitleCase(options: AudioOptions): Subtitle {
+  const state = heard(options, devicesOf(options));
+  return SUBTITLES.find((each) => each.holds(state))!;
+}
+
+/** The panel's subtitle for `options`. */
+export function subtitleOf(options: AudioOptions): string {
+  return subtitleCase(options).line(heard(options, devicesOf(options)));
+}
+
 /** Whether the mic is a headset's own in Music mode, which has none: Input is then off. */
 function micInMusic(devices: Devices): boolean {
   return devices.mode === "music" && (devices.input === null || devices.input === devices.default);
@@ -255,9 +342,12 @@ export function sideOf(at: number): string {
   return far === 0 ? "Centre" : `${at < 0.5 ? "Left" : "Right"} ${PERCENT.format(far / 100)}`;
 }
 
+/** The output's level when none is given. */
+const LEVEL = 0.62;
+
 /** The output's slider: compact, boosting to 150% and holding at 100%, its icon muting it. */
-function outputSlider(options: AudioOptions): HTMLElement {
-  const level = options.output ?? 0.62;
+function outputSlider(options: AudioOptions, told?: (change: AudioOptions) => void): HTMLElement {
+  const level = options.output ?? LEVEL;
   return slider({
     icon: volumeIcon(Math.min(1, level)),
     size: "Compact",
@@ -265,7 +355,8 @@ function outputSlider(options: AudioOptions): HTMLElement {
     sticky: 1 / BOOST,
     number: (at) => PERCENT.format(at * BOOST),
     widest: "150%",
-    toggle: { icon: "volume_off", words: "Muted", label: "Mute", toggledLabel: "Unmute", on: options.outputMuted ?? false },
+    toggle: { icon: "volume_off", words: "Muted", label: "Mute", toggledLabel: "Unmute", on: options.outputMuted ?? false, ...(told ? { changed: (on: boolean) => told({ outputMuted: on }) } : {}) },
+    ...(told ? { changed: (value: number) => told({ output: value * BOOST }) } : {}),
     ...(options.landed ? { pinned: "lit" as const } : {}),
   });
 }
@@ -429,8 +520,8 @@ function appsCard(apps: readonly App[], devices: Devices, input: boolean, state?
 }
 
 /** The Output tab: its Device card (the output's own device, balance) and the Apps card. */
-function outputTab(options: AudioOptions, devices: Devices): HTMLElement {
-  const knob = slider({ icon: "balance", size: "Compact", knob: true, value: options.balance ?? 0.5, sticky: 0.5, number: sideOf });
+function outputTab(options: AudioOptions, devices: Devices, told?: (change: AudioOptions) => void): HTMLElement {
+  const knob = slider({ icon: "balance", size: "Compact", knob: true, value: options.balance ?? 0.5, sticky: 0.5, number: sideOf, ...(told ? { changed: (balance: number) => told({ balance }) } : {}) });
   return stack("s12", "start", cardOf("Device", sidePicker(devices, false), knob), filling(appsCard(options.playing ?? PLAYING, devices, false, options.appPicker)));
 }
 
@@ -449,18 +540,26 @@ function musicEmpty(toCalls?: () => void): HTMLElement {
 }
 
 /** The Options tab: a switch row each. */
-function optionsTab(options: AudioOptions): HTMLElement {
-  return list([
+function optionsTab(options: AudioOptions, told?: (change: AudioOptions) => void): HTMLElement {
+  const made = list([
     { title: "Noise suppression", subtitle: "Your mic, without the background", toggle: options.noise ?? true },
     { title: "Echo cancellation", subtitle: "For calls on the speakers", toggle: options.echo ?? false },
     { title: "New devices take over", subtitle: "A headset you connect becomes the default", toggle: options.takeover ?? true },
   ]);
+  if (told) {
+    const keys = ["noise", "echo", "takeover"] as const;
+    // A row's own click turns its switch first, so it reads as turned here.
+    made.querySelectorAll<HTMLElement>(".k-list-row").forEach((row, index) =>
+      row.addEventListener("click", () => told({ [keys[index]!]: row.getAttribute("aria-checked") === "true" })),
+    );
+  }
+  return made;
 }
 
 /** The picked tab's content: Input, while the mic is a headset's own in Music mode, is its empty state. */
-function tabContent(tab: number, options: AudioOptions, devices: Devices, toCalls?: () => void): HTMLElement {
+function tabContent(tab: number, options: AudioOptions, devices: Devices, toCalls?: () => void, told?: (change: AudioOptions) => void): HTMLElement {
   if (tab === 1 && micInMusic(devices)) return musicEmpty(toCalls);
-  return tab === 0 ? outputTab(options, devices) : tab === 1 ? inputTab(options, devices) : optionsTab(options);
+  return tab === 0 ? outputTab(options, devices, told) : tab === 1 ? inputTab(options, devices) : optionsTab(options, told);
 }
 
 /**
@@ -494,11 +593,21 @@ export function audioPanel(options: AudioOptions = {}): Panel {
   let devices = devicesOf(state);
   let tab: number = options.tab ?? 0;
   const live = options.live ?? false;
-  const output = outputSlider(state);
+  /** The panel's state changes by hand, live: the subtitle follows it. */
+  const told = live ? (change: AudioOptions) => {
+    state = { ...state, ...change };
+    page.subtitle(subtitleOf(state));
+  } : undefined;
+  const output = outputSlider(state, told);
   const inputMuted = () => (state.inputMuted ?? false) || micInMusic(devices);
   const meterOf = liveMeter(state.meter?.level ?? 0.46, state.meter?.peak ?? 0.68);
   if (inputMuted()) meterOf.mute(true);
-  let mic = micSlider(state.input ?? 0.8, inputMuted(), live ? (on) => meterOf.mute(on) : undefined);
+  /** The mic's slider turned: its meter, and the subtitle, which a headset in Music mode leaves be. */
+  const micTurned = (on: boolean) => {
+    meterOf.mute(on);
+    if (!micInMusic(devices)) told?.({ inputMuted: on });
+  };
+  let mic = micSlider(state.input ?? 0.8, inputMuted(), live ? micTurned : undefined);
   const room = document.createElement("span");
   room.className = "audio-tab";
   const picker = tabs({
@@ -516,7 +625,7 @@ export function audioPanel(options: AudioOptions = {}): Panel {
   let device = defaultPicker(devices, devices.mode ? (state.codec ?? devices.default.codecs?.[devices.mode][0]) : undefined, state.tooltip ?? false, options.deviceOpen);
 
   function show(): void {
-    room.replaceChildren(tabContent(tab, state, devices, live ? () => modes.querySelector<HTMLElement>(".k-tab")?.click() : undefined));
+    room.replaceChildren(tabContent(tab, state, devices, live ? () => modes.querySelector<HTMLElement>(".k-tab")?.click() : undefined, told));
     if (live) fadeIn(room);
   }
 
@@ -533,12 +642,13 @@ export function audioPanel(options: AudioOptions = {}): Panel {
     const codecs = filling(codecPicker(devices.default, mode, undefined));
     codec?.replaceWith(codecs);
     codec = codecs;
-    const fresh = filling(micSlider(state.input ?? 0.8, inputMuted(), (on) => meterOf.mute(on)));
+    const fresh = filling(micSlider(state.input ?? 0.8, inputMuted(), micTurned));
     mic.replaceWith(fresh);
     mic = fresh;
     meterOf.mute(inputMuted());
     setTabDisabled(picker, 1, micInMusic(devices));
     if (tab === 1) show();
+    page.subtitle(subtitleOf(state));
   }
 
   show();
@@ -552,7 +662,7 @@ export function audioPanel(options: AudioOptions = {}): Panel {
     filling(stack("s12", "start", filling(picker), filling(room))),
   );
   body.classList.add("audio-body");
-  const page = panelPage({ title: TITLE, subtitle: PUN, body, ...(options.down !== undefined ? { down: options.down } : {}) });
+  const page = panelPage({ title: TITLE, subtitle: subtitleOf(state), body, ...(options.down !== undefined ? { down: options.down } : {}) });
   page.element.classList.add("audio-panel");
 
   if (live && CHROME && !ALL) {

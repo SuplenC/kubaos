@@ -86,7 +86,8 @@ export function menuItem(spec: MenuItemSpec, current = false, pinned?: ItemPinne
     if (spec.holding !== undefined) item.style.setProperty("--hold", String(spec.holding));
   }
   const words_ = variant((spec.icon || spec.picture) && "icon", spec.checked !== undefined && "check", (spec.danger || spec.held) && "danger", spec.submenu && "submenu", spec.description && "two-line");
-  return probe(item, { role: "component", name: "MenuItem", variant: words_, fixed: FIXED_HEIGHT });
+  // A described item grows a line where its description wraps, so its height is its content's.
+  return probe(item, { role: "component", name: "MenuItem", variant: words_, fixed: spec.description ? { width: false, height: false } : FIXED_HEIGHT });
 }
 
 /** An item's symbol, words, keys, check and chevron, in `ink`; its description and trailing symbol in `muted`. */

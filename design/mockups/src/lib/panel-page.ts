@@ -47,11 +47,20 @@ export interface PanelPage {
   readonly view: HTMLElement;
   /** The tabs' well, when it has them. */
   readonly tabs: HTMLElement | null;
+  /** Puts `words` in the subtitle line, for a pun that follows the panel's state. */
+  readonly subtitle: (words: string) => void;
+}
+
+/** The subtitle line: one line, cut with an ellipsis where its words run past the band. */
+function subtitleLine(words: string): HTMLElement {
+  const line = clamped(words, "small", "on_surface_variant");
+  line.classList.add("k-panel-subtitle");
+  return line;
 }
 
 /** The header band: the title over its pun, and the panel's buttons at its end, centred on the two. */
 function headerBand(options: PanelPageOptions): HTMLElement {
-  const lines = stack(0, "start", clamped(options.title, "heading"), clamped(options.subtitle, "small", "on_surface_variant"));
+  const lines = stack(0, "start", clamped(options.title, "heading"), subtitleLine(options.subtitle));
   const band = row("s8", "centre", filling(lines), ...(options.actions?.length ? options.actions : []));
   const box = container(band);
   box.classList.add("k-panel-band", "k-panel-header");
@@ -89,5 +98,6 @@ export function panelPage(options: PanelPageOptions): PanelPage {
 
   element.append(header, ...(tabsBand ? [tabsBand] : []), body, ...(options.footer?.length ? [footerBand(options.footer)] : []));
   probe(element, { role: "component", name: "PanelPage", variant: [options.tabs ? "tabs" : "", options.footer ? "footer" : "", options.sized ? "sized" : ""].filter(Boolean).join(" "), fixed: { width: !(options.sized ?? false), height: false, holds: true } });
-  return { element, view, tabs: well };
+  const subtitle = (words: string) => header.querySelector(".k-panel-subtitle")?.replaceWith(subtitleLine(words));
+  return { element, view, tabs: well, subtitle };
 }
