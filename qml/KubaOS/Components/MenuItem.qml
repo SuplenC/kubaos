@@ -60,7 +60,7 @@ K.Pressable {
         if (root.held)
             return K.Look.alpha(Tokens.color.error, Tokens.opacity.tint);
         if (root.danger)
-            return root.down ? Tokens.color.error_pressed : Tokens.color.error;
+            return root.down ? Tokens.color.error_pressed_fixed : Tokens.color.error;
         return Tokens.color.secondary_container;
     }
     readonly property var probe: root.separator ? null : {

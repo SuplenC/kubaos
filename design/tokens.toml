@@ -612,13 +612,6 @@ use = "A panel or dialog arriving, a page sliding in."
 ms = 800
 use = "A wallpaper fading in, a live list's new row fading in."
 
-# A hold, not a move: how long a step that can't be taken back is held before
-# it is taken. Reduce motion keeps it, since it is a timer, and the sweep that
-# shows it with it.
-[duration.hold]
-ms = 1100
-use = "A held control until it acts: Install, erasing a disk, a held menu item."
-
 [duration.scene]
 ms = 1200
 use = "A whole scene changing once: the lock screen lifting, Kōbō's welcome settling."
@@ -679,7 +672,7 @@ use = "A toast staying: long enough to read twice."
 # a press can't erase a disk by accident. Not a move: reduce motion doesn't cap it.
 [duration.hold]
 ms = 1100
-use = "A held button until it acts: Install, erasing a disk."
+use = "A held control until it acts: Install, erasing a disk, a held menu item."
 
 # How long the awake lock waits for a key, a press or a touch of the reader
 # before it goes back to rest. Not a move: reduce motion doesn't cap it.
@@ -1087,6 +1080,10 @@ cold = "tertiary"
 on_cold = "on_tertiary"
 cold_container = "tertiary_container"
 on_cold_container = "on_tertiary_container"
+# A lit danger menu item pressed, as a value: the Rust and QML libraries don't
+# build the OKLCH recipes, so they can't read `error_pressed` of `[color.derived]`,
+# which is the rule.
+error_pressed_fixed = ""
 surface = "surface"
 on_surface = "on_surface"
 surface_variant = "surface_variant"
@@ -1159,24 +1156,25 @@ cold = "#79d1fe"
 on_cold = "#003548"
 cold_container = "#3c9ac5"
 on_cold_container = "#000000"
-surface = "#19120b"
-on_surface = "#f0dfd4"
-surface_variant = "#544436"
-on_surface_variant = "#dac2b1"
-surface_dim = "#19120b"
-surface_bright = "#413730"
-surface_container_lowest = "#140d07"
-surface_container_low = "#221a13"
-surface_container = "#261e17"
-surface_container_high = "#312821"
-surface_container_highest = "#3d332b"
-outline = "#a28d7d"
-outline_variant = "#544436"
+error_pressed_fixed = "#ffc5be"
+surface = "#18120d"
+on_surface = "#ede0d6"
+surface_variant = "#524437"
+on_surface_variant = "#d7c3b2"
+surface_dim = "#18120d"
+surface_bright = "#403831"
+surface_container_lowest = "#130d08"
+surface_container_low = "#211a14"
+surface_container = "#251e18"
+surface_container_high = "#302922"
+surface_container_highest = "#3b332d"
+outline = "#9f8e7e"
+outline_variant = "#524437"
 shadow = "#000000"
 scrim = "#000000"
-inverse_surface = "#f0dfd4"
-inverse_on_surface = "#382f27"
-inverse_primary = "#8e4e00"
+inverse_surface = "#ede0d6"
+inverse_on_surface = "#362f28"
+inverse_primary = "#895100"
 logo_core_warm = "#ffe6cf"
 logo_core_cold = "#dcf1ff"
 # The fixed palette's tones at night: neon-bright. Success's chroma is a step
@@ -1205,12 +1203,13 @@ cold = "#006385"
 on_cold = "#ffffff"
 cold_container = "#067da7"
 on_cold_container = "#ffffff"
-surface = "#fff8f5"
-on_surface = "#221a13"
-surface_variant = "#f7decc"
-on_surface_variant = "#544436"
-surface_dim = "#e7d7cc"
-surface_bright = "#fff8f5"
+error_pressed_fixed = "#ab000b"
+surface = "#fff8f4"
+on_surface = "#211a14"
+surface_variant = "#f4dfcd"
+on_surface_variant = "#524437"
+surface_dim = "#e5d8ce"
+surface_bright = "#fff8f4"
 surface_container_lowest = "#ffffff"
 surface_container_low = "#fff1e7"
 surface_container = "#f9ebe1"
@@ -1220,9 +1219,9 @@ outline = "#847465"
 outline_variant = "#d7c3b2"
 shadow = "#000000"
 scrim = "#000000"
-inverse_surface = "#382f27"
-inverse_on_surface = "#ffeee2"
-inverse_primary = "#ffb779"
+inverse_surface = "#362f28"
+inverse_on_surface = "#fceee4"
+inverse_primary = "#ffb86c"
 logo_core_warm = "#ffe6cf"
 logo_core_cold = "#dcf1ff"
 # The fixed palette's tones by day: deeper, so a fill reads on the light
@@ -1430,7 +1429,6 @@ pairs = [
   { fg = "on_burn_warning", bg = "burn_warning_lit", need = "text", use = "A Warning button's label, lit" },
   { fg = "on_burn_warning", bg = "burn_warning_pressed", need = "text", use = "A Warning button's label, pressed" },
   { fg = "on_error", bg = "error", need = "text", opacity = "subdued_text", use = "A selected danger row's subtitle" },
-  { fg = "on_error", bg = "error_pressed", need = "text", use = "A lit danger menu item's words, pressed" },
   { fg = "error", bg = "surface", need = "text", use = "An invalid field's note, a failure" },
   { fg = "error", bg = "surface_container", need = "text", use = "A danger or held menu item's words on its popover" },
   { fg = "on_error_container", bg = "error_container", need = "text", use = "A critical notification" },

@@ -41,6 +41,10 @@ K.Pressable {
     // How much of the row a loading row's lines take, so rows one under another don't read as one
     // block.
     property real share: 0.6
+    // Controls at the row's end, side by side, `space.s12` from the title.
+    default property alias end: endSlot.data
+    // The title's text, for what a composed row lays over it: its hint, a double-click on it.
+    readonly property alias titleItem: titleText
 
     readonly property bool fillWidth: true
     readonly property color onFill: root.danger ? Tokens.color.on_error : Tokens.color.on_secondary_container
