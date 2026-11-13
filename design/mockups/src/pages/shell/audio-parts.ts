@@ -1,8 +1,8 @@
 // The Audio panel as `config/quickshell/modules/audio/` is to draw it: a PanelPage on a Sheet at the
 // frame's right edge, under the bar. Its body, from the top: the output's slider, which boosts to
 // 150% holding at 100%, and the mic's, each one's icon muting it; the mic's live Meter; the Device
-// card, the default device for both sides, with a Bluetooth headset's Calls and Music, the line
-// under the one picked and its codec; then Output, Input and Options, stretched Tabs, over the
+// card, the default device for both sides, with a Bluetooth headset's Calls and Music, each saying
+// in its tooltip what it means, and its codec; then Output, Input and Options, stretched Tabs, over the
 // picked tab's cards, where each side, then each app, may take another device. Every part is the
 // library's; the data is the shots' stand-ins'.
 
@@ -20,7 +20,7 @@ import { select } from "../../lib/select.ts";
 import { hang, screen, sheet } from "../../lib/sheet.ts";
 import { slider } from "../../lib/slider.ts";
 import { setTabDisabled, tabs } from "../../lib/tabs.ts";
-import { clamped, text, wrapped } from "../../lib/text.ts";
+import { clamped, text } from "../../lib/text.ts";
 import { floatingTooltip, tooltip } from "../../lib/tooltip.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
 import { ALL, CHROME } from "../../site/settings.ts";
@@ -85,6 +85,43 @@ export const LONG_DEVICE: Device = { name: "Focusrite Scarlett 2i2 4th Gen USB A
 /** Every device the shots' laptop has, in the order the Selects list them. */
 export const DEVICES: readonly Device[] = [SPEAKERS, BUILT_IN_MIC, HEADSET, USB_HEADSET, JACK, SCREEN];
 
+/** A machine with no built-in mic: its speakers stand alone as a default. */
+export const NO_BUILT_IN_MIC: readonly Device[] = DEVICES.filter((each) => each !== BUILT_IN_MIC);
+
+/**
+ * One choice of the default device, the top Device card's: what plays, and the mic that comes with
+ * it, which is the device itself when it records, the built-in mic for the built-in set, or none.
+ */
+export interface DefaultChoice {
+  readonly name: string;
+  readonly link: Link;
+  readonly output: Device;
+  readonly input: Device | null;
+}
+
+/** The built-in set's name: a machine's built-in speakers and built-in mic as one default. */
+export const BUILT_IN_SET = "Built-in speakers + microphone";
+
+/** `device` as a default on its own: its own mic if it records, none if it doesn't. */
+function alone(device: Device): DefaultChoice {
+  return { name: device.name, link: device.link, output: device, input: device.records ? device : null };
+}
+
+/**
+ * The default's choices on `machine`: every device that plays, in order. Built-in speakers with no
+ * mic of their own pair with the machine's built-in mic, when it has one, as one choice, the built-in
+ * set: it makes the speakers the default output and the mic the default input. Each side's own
+ * Select and each app's keep the two apart.
+ */
+export function defaultChoices(machine: readonly Device[]): DefaultChoice[] {
+  const builtInMic = machine.find((each) => each.link === "builtin" && each.records && !each.plays);
+  return machine
+    .filter((each) => each.plays)
+    .map((each) =>
+      each.link === "builtin" && !each.records && builtInMic ? { name: BUILT_IN_SET, link: each.link, output: each, input: builtInMic } : alone(each),
+    );
+}
+
 /** What an app's device picker says while the app follows its side's device. */
 export const FOLLOWS = "Default";
 
@@ -122,20 +159,24 @@ export const LONG_APP: App = { name: "Visual Studio Code — Insiders (Electron)
 export const TABS = ["Output", "Input", "Options"] as const;
 
 export interface AudioOptions {
-  /** The default device, both sides': the laptop's speakers when none is given. */
+  /** Every device the machine has: the shots' laptop's when none is given. */
+  readonly machine?: readonly Device[];
+  /**
+   * The default device's output: the laptop's speakers when none is given, which with the built-in
+   * mic is the built-in set.
+   */
   readonly device?: Device;
   /** A Bluetooth default device's mode: Calls when none is given. */
   readonly mode?: Mode;
+  /** The mode whose tooltip is drawn shown over its choice, as under the pointer. */
+  readonly modeTip?: Mode;
   /** The codec picked for the mode: the best when none is given. */
   readonly codec?: string;
   /** The device's tooltip shown, as under the pointer. */
   readonly tooltip?: boolean;
   /** The output's own device over the default, or none while it follows it. */
   readonly outputDevice?: Device;
-  /**
-   * The mic's own device over the default, or none while it follows it. With no device given at
-   * all, the laptop's speakers are the default and the built-in mic its override.
-   */
+  /** The mic's own device over the default, or none while it follows it. */
   readonly inputDevice?: Device | null;
   /** The tab picked: Output, Input or Options. */
   readonly tab?: 0 | 1 | 2;
@@ -162,6 +203,10 @@ export interface AudioOptions {
   readonly appPicker?: "lit" | "open";
   /** Scrolled this share of the way down, as a sample of it scrolled. */
   readonly down?: number;
+  /** The top Device card's Select drawn open, its choices listed. */
+  readonly deviceOpen?: boolean;
+  /** The Codec Select drawn open, its descriptions under the codecs. */
+  readonly codecOpen?: boolean;
   /** For a move's sample: the tab, and the headset's mode, a pick comes from. */
   readonly tabFrom?: number;
   readonly modeFrom?: Mode;
@@ -169,7 +214,13 @@ export interface AudioOptions {
 
 /** The default device and each side's, worked out from `options`. */
 interface Devices {
+  readonly machine: readonly Device[];
+  /** The default's choice, as the top Device card's Select names it. */
+  readonly choice: DefaultChoice;
+  /** The default output. */
   readonly default: Device;
+  /** The default input: the choice's mic, or none when the default has no mic. */
+  readonly defaultInput: Device | null;
   /** The output's override, if any. */
   readonly output: Device | null;
   /** The mic's override, if any. */
@@ -179,10 +230,18 @@ interface Devices {
 }
 
 function devicesOf(options: AudioOptions): Devices {
-  const fallback = options.device === undefined;
+  const machine = options.machine ?? DEVICES;
   const chosen = options.device ?? SPEAKERS;
-  const input = options.inputDevice === undefined ? (fallback ? BUILT_IN_MIC : null) : options.inputDevice;
-  return { default: chosen, output: options.outputDevice ?? null, input, mode: chosen.link === "bluetooth" ? (options.mode ?? "calls") : null };
+  const choice = defaultChoices(machine).find((each) => each.output === chosen) ?? alone(chosen);
+  return {
+    machine,
+    choice,
+    default: chosen,
+    defaultInput: choice.input,
+    output: options.outputDevice ?? null,
+    input: options.inputDevice ?? null,
+    mode: chosen.link === "bluetooth" ? (options.mode ?? "calls") : null,
+  };
 }
 
 /** Whether the mic is a headset's own in Music mode, which has none: Input is then off. */
@@ -221,8 +280,8 @@ function micSlider(level: number, muted: boolean, told?: (on: boolean) => void):
   });
 }
 
-/** What a headset's mode says under Calls and Music. */
-export const LINES: Record<Mode, string> = {
+/** What a headset's mode means, in Calls' and Music's tooltips. */
+export const TIPS: Record<Mode, string> = {
   calls: "Your mic works; music sounds flatter while it's on.",
   music: "Music mode has no microphone: switch to Calls to talk.",
 };
@@ -239,9 +298,30 @@ function cardOf(name: string, ...parts: HTMLElement[]): HTMLElement {
   return made;
 }
 
-/** A device's name and symbol in a Select's list. */
-function names(devices: readonly Device[]): { readonly options: string[]; readonly icons: string[] } {
-  return { options: devices.map((each) => each.name), icons: devices.map((each) => LINK_ICONS[each.link]) };
+/** What each codec is good for, under its name in the Codec Select's list. */
+export const CODEC_WORDS: Readonly<Record<string, string>> = {
+  LDAC: "The best sound; drops out sooner far from the PC",
+  AAC: "Very good sound, steady",
+  SBC: "Plain sound; every headset has it",
+  mSBC: "Clearer voice on calls",
+  CVSD: "Basic voice; every headset has it",
+};
+
+/** The symbol at the end of a playing device's row that has no mic. */
+const NO_MIC = "mic_off";
+
+/** A device's name and symbol in a Select's list, and the crossed-out mic of one with none that plays. */
+function names(devices: readonly Device[]): { readonly options: string[]; readonly icons: string[]; readonly trailing: (string | undefined)[] } {
+  return {
+    options: devices.map((each) => each.name),
+    icons: devices.map((each) => LINK_ICONS[each.link]),
+    trailing: devices.map(micMark),
+  };
+}
+
+/** The crossed-out mic for a device that plays and has no mic; nothing for any other. */
+function micMark(device: Device): string | undefined {
+  return device.plays && !device.records ? NO_MIC : undefined;
 }
 
 /** What a device's tooltip names: its link, and a headset's codec. */
@@ -249,38 +329,57 @@ export function linkOf(device: Device, codec?: string): string {
   return codec ? `${LINK_WORDS[device.link]} · ${codec}` : LINK_WORDS[device.link];
 }
 
-/** The top Device card's Select: every device that plays, the default picked, its tooltip over it. */
-function defaultPicker(devices: Devices, codec: string | undefined, shown: boolean): HTMLElement {
-  const playing = DEVICES.filter((each) => each.plays);
-  const listed = playing.includes(devices.default) ? playing : [devices.default, ...playing];
-  const pick = select({ ...names(listed), picked: listed.indexOf(devices.default), ...(shown ? { pinned: "lit" as const } : {}) });
+/**
+ * The top Device card's Select: the default's choices, the built-in set as one, the default
+ * picked, its tooltip over it. A choice with no mic ends in the crossed-out mic.
+ */
+function defaultPicker(devices: Devices, codec: string | undefined, shown: boolean, open = false): HTMLElement {
+  const choices = defaultChoices(devices.machine);
+  const listed = choices.some((each) => each.output === devices.default) ? choices : [devices.choice, ...choices];
+  const pick = select({
+    options: listed.map((each) => each.name),
+    icons: listed.map((each) => LINK_ICONS[each.link]),
+    trailing: listed.map((each) => (each.input ? undefined : NO_MIC)),
+    picked: listed.findIndex((each) => each.output === devices.default),
+    ...(shown ? { pinned: "lit" as const } : {}),
+    ...(open ? { open: true } : {}),
+  });
   const anchor = floatingTooltip(pick, tooltip(linkOf(devices.default, codec), ""), { side: "above", shown });
   return anchor;
 }
 
-/** A Bluetooth headset's codecs in its mode, `codec` picked. */
-function codecPicker(device: Device, mode: Mode, codec: string | undefined): HTMLElement {
+/** A Bluetooth headset's codecs in its mode, each with what it is good for, `codec` picked. */
+function codecPicker(device: Device, mode: Mode, codec: string | undefined, open = false): HTMLElement {
   const codecs = device.codecs?.[mode] ?? [];
-  return stack("s8", "start", filling(label("Codec")), filling(select({ options: codecs, picked: Math.max(0, codecs.indexOf(codec ?? codecs[0] ?? "")) })));
+  const pick = select({
+    options: codecs,
+    descriptions: codecs.map((each) => CODEC_WORDS[each] ?? ""),
+    picked: Math.max(0, codecs.indexOf(codec ?? codecs[0] ?? "")),
+    ...(open ? { open: true } : {}),
+  });
+  return stack("s8", "start", filling(label("Codec")), filling(pick));
 }
 
 /**
  * A side's Device card's Select: "Default · <device>" first, with the default's symbol, then every
- * other device of that side. A default that has nothing for the side leaves it unpicked, saying so.
+ * other device of that side, the built-in speakers and mic apart. A default that has nothing for the
+ * side leaves it unpicked, saying so.
  */
 function sidePicker(devices: Devices, input: boolean): HTMLElement {
   const fits = (each: Device) => (input ? each.records : each.plays);
   const chosen = input ? devices.input : devices.output;
-  const others = DEVICES.filter((each) => fits(each) && each !== devices.default);
-  const all = chosen && !others.includes(chosen) && chosen !== devices.default ? [chosen, ...others] : others;
-  if (!fits(devices.default)) {
-    return select({ ...names(all), picked: chosen ? all.indexOf(chosen) : -1, placeholder: `No mic on ${devices.default.name}` });
+  const following = input ? devices.defaultInput : devices.default;
+  const others = devices.machine.filter((each) => fits(each) && each !== following);
+  const all = chosen && !others.includes(chosen) && chosen !== following ? [chosen, ...others] : others;
+  if (!following) {
+    return select({ ...names(all), picked: chosen ? all.indexOf(chosen) : -1, placeholder: `No mic on ${devices.choice.name}` });
   }
   const listed = names(all);
   return select({
-    options: [`${FOLLOWS} · ${devices.default.name}`, ...listed.options],
-    icons: [LINK_ICONS[devices.default.link], ...listed.icons],
-    picked: chosen && chosen !== devices.default ? 1 + all.indexOf(chosen) : 0,
+    options: [`${FOLLOWS} · ${following.name}`, ...listed.options],
+    icons: [LINK_ICONS[following.link], ...listed.icons],
+    trailing: [micMark(following), ...listed.trailing],
+    picked: chosen && chosen !== following ? 1 + all.indexOf(chosen) : 0,
   });
 }
 
@@ -295,6 +394,7 @@ function appPicker(app: App, side: readonly Device[], following: Device, state?:
     look: "inline",
     options: [FOLLOWS, ...listed.options],
     icons: [LINK_ICONS[following.link], ...listed.icons],
+    trailing: [micMark(following), ...listed.trailing],
     picked: app.device ? 1 + all.indexOf(app.device) : 0,
     ...(state === "lit" ? { pinned: "lit" as const } : state === "open" ? { open: true, up: true } : {}),
   });
@@ -323,8 +423,8 @@ export const NO_APPS = { output: "Nothing is playing", input: "No app is recordi
 
 /** The Apps card: a row per app, `space.s16` apart, or its empty line. */
 function appsCard(apps: readonly App[], devices: Devices, input: boolean, state?: "lit" | "open"): HTMLElement {
-  const side = DEVICES.filter((each) => (input ? each.records : each.plays));
-  const following = (input ? devices.input : devices.output) ?? devices.default;
+  const side = devices.machine.filter((each) => (input ? each.records : each.plays));
+  const following = (input ? (devices.input ?? devices.defaultInput) : devices.output) ?? devices.default;
   const rows =
     apps.length === 0
       ? [text(input ? NO_APPS.input : NO_APPS.output, "body", "on_surface_variant")]
@@ -368,25 +468,23 @@ function tabContent(tab: number, options: AudioOptions, devices: Devices, toCall
   return tab === 0 ? outputTab(options, devices) : tab === 1 ? inputTab(options, devices) : optionsTab(options);
 }
 
-/** Calls and Music, stretched with their symbols; disabled, with nothing picked, for a device that isn't Bluetooth. */
-function modeTabs(mode: Mode | null, onPick?: (mode: Mode) => void, from?: Mode): HTMLElement {
+/**
+ * Calls and Music, stretched with their symbols, each saying what it means in its tooltip; disabled,
+ * with nothing picked and no tooltips, for a device that isn't Bluetooth.
+ */
+function modeTabs(mode: Mode | null, onPick?: (mode: Mode) => void, from?: Mode, tip?: Mode): HTMLElement {
+  const tips = mode !== null;
   return tabs({
     choices: [
-      { label: "Calls", icon: "call" },
-      { label: "Music", icon: "music_note" },
+      { label: "Calls", icon: "call", ...(tips ? { tip: TIPS.calls } : {}) },
+      { label: "Music", icon: "music_note", ...(tips ? { tip: TIPS.music } : {}) },
     ],
     picked: mode === null ? null : mode === "music" ? 1 : 0,
     ...(mode === null ? { disabled: true } : {}),
+    ...(tips && tip ? { tipShown: tip === "calls" ? 0 : 1 } : {}),
     ...(from ? { from: from === "calls" ? 0 : 1 } : {}),
     ...(onPick ? { onPick: (index: number) => onPick(index === 0 ? "calls" : "music") } : {}),
   });
-}
-
-/** The line under Calls and Music, for `mode`. */
-function modeLine(mode: Mode): HTMLElement {
-  const line = filling(wrapped(LINES[mode], "small", "on_surface_variant"));
-  line.classList.add("audio-line");
-  return line;
 }
 
 export interface Panel {
@@ -418,17 +516,16 @@ export function audioPanel(options: AudioOptions = {}): Panel {
     },
   });
 
-  const modes = modeTabs(devices.mode, live ? switchMode : undefined, options.modeFrom);
-  let line = devices.mode ? modeLine(devices.mode) : null;
-  let codec = devices.mode ? codecPicker(devices.default, devices.mode, state.codec) : null;
-  let device = defaultPicker(devices, devices.mode ? (state.codec ?? devices.default.codecs?.[devices.mode][0]) : undefined, state.tooltip ?? false);
+  const modes = modeTabs(devices.mode, live ? switchMode : undefined, options.modeFrom, options.modeTip);
+  let codec = devices.mode ? codecPicker(devices.default, devices.mode, state.codec, options.codecOpen) : null;
+  let device = defaultPicker(devices, devices.mode ? (state.codec ?? devices.default.codecs?.[devices.mode][0]) : undefined, state.tooltip ?? false, options.deviceOpen);
 
   function show(): void {
     room.replaceChildren(tabContent(tab, state, devices, live ? () => modes.querySelector<HTMLElement>(".k-tab")?.click() : undefined));
     if (live) fadeIn(room);
   }
 
-  /** The headset's mode changes: the mic, its meter, the line, the codecs, Input, and Input's content if it shows.
+  /** The headset's mode changes: the mic, its meter, the codecs, Input, and Input's content if it shows.
       Each new part fills the width as the one it replaces did, or it shrinks to its content. */
   function switchMode(mode: Mode): void {
     // The codec picked was the other mode's: the new mode starts on its best.
@@ -438,9 +535,6 @@ export function audioPanel(options: AudioOptions = {}): Panel {
     const named = filling(defaultPicker(devices, devices.default.codecs?.[mode][0], false));
     device.replaceWith(named);
     device = named;
-    const said = filling(modeLine(mode));
-    line?.replaceWith(said);
-    line = said;
     const codecs = filling(codecPicker(devices.default, mode, undefined));
     codec?.replaceWith(codecs);
     codec = codecs;
@@ -454,12 +548,7 @@ export function audioPanel(options: AudioOptions = {}): Panel {
 
   show();
 
-  const top = cardOf(
-    "Device",
-    device,
-    line ? stack("s4", "start", filling(modes), filling(line)) : modes,
-    ...(codec ? [codec] : []),
-  );
+  const top = cardOf("Device", device, modes, ...(codec ? [codec] : []));
   const body = stack(
     "s16",
     "start",

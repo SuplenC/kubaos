@@ -1,6 +1,7 @@
 // The Audio panel (`config/quickshell/modules/audio/`): a PanelPage on a Sheet at the frame's right
 // edge, opened by the mute pill's right-click, the Command menu or its hotkey. Its sliders, the
-// mic's live Meter, the Device card (the default device, a headset's Calls and Music and codec),
+// mic's live Meter, the Device card (the default device, the built-in speakers and mic as one, a
+// headset's Calls and Music, each with its tooltip, and its codec),
 // then Output, Input and Options over their cards, each side's device and each app's.
 
 import { powerMoves } from "../../site/moves.ts";
@@ -10,18 +11,21 @@ import {
   type AudioOptions,
   audioPanel,
   BUILT_IN_MIC,
+  BUILT_IN_SET,
   HEADSET,
   LONG_APP,
   LONG_DEVICE,
   linkOf,
   MANY,
   NO_APPS,
+  NO_BUILT_IN_MIC,
   onScreen,
   PLAYING,
   SCREEN,
   shot,
   SHORT,
   SPEAKERS,
+  TIPS,
   USB_HEADSET,
 } from "./audio-parts.ts";
 
@@ -107,16 +111,11 @@ const TO_INPUT: Move = {
   sample: () => shot({ ...CALLS, tab: 1, tabFrom: 0 }),
 };
 
-const LINE = "the line under the mode";
 const TO_MUSIC: Move = {
   name: "Calls to Music",
-  what: "Music picked: its stretch glides, its line fades in over `short`; the codecs, the mic and Input change at once.",
-  tracks: picking(".audio-body > :nth-child(2)", false, [
-    { part: LINE, on: "Music", target: ".audio-line", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-  ]),
-  reduced: picking(".audio-body > :nth-child(2)", true, [
-    { part: LINE, on: "Music", target: ".audio-line", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-  ]),
+  what: "Music picked: its stretch glides; the codecs, the mic and Input change at once.",
+  tracks: picking(".audio-body > :nth-child(2)", false, []),
+  reduced: picking(".audio-body > :nth-child(2)", true, []),
   back: "cuts",
   sample: () => shot({ ...MUSIC, modeFrom: "calls" }),
 };
@@ -152,12 +151,19 @@ export default page<Shown>({
   from: ["panel-page", "slider", "meter", "tabs", "card", "select", "list", "empty-state"],
   stage: { live, hint: "drag, Space mutes; Calls/Music; tabs; Esc", daylight: true },
   variants: [
-    { name: "Laptop, Output", for: "the speakers: Calls and Music disabled", sample: draw() },
-    { name: "Laptop, Input", for: "the built-in mic picked over the speakers", sample: draw({ tab: 1 }) },
+    { name: "Laptop, Output", for: `${BUILT_IN_SET}: Calls and Music disabled`, sample: draw() },
+    { name: "Laptop, Input", for: "Default · the built-in mic, from the set", sample: draw({ tab: 1 }) },
     { name: "Laptop, Options", for: "three switch rows", sample: draw({ tab: 2 }) },
+    { name: "The default, open", for: "the built-in set as one; no mic, crossed out", sample: draw({ deviceOpen: true }) },
+    { name: "No built-in mic, open", for: "the speakers alone, crossed out", sample: draw({ machine: NO_BUILT_IN_MIC, deviceOpen: true }) },
+    { name: "No built-in mic", for: "the speakers alone, the crossed-out mic", sample: draw({ machine: NO_BUILT_IN_MIC }) },
+    { name: "No built-in mic, Input", for: `No mic on ${SPEAKERS.name}`, sample: draw({ machine: NO_BUILT_IN_MIC, tab: 1 }) },
     { name: "Bluetooth in Music, Output", for: "its codec; the mic Muted, Input dimmed", sample: draw(MUSIC) },
     { name: "Bluetooth, its tooltip", for: `the link and codec: ${linkOf(HEADSET, "LDAC")}`, sample: draw({ ...MUSIC, tooltip: true }) },
-    { name: "Bluetooth in Calls, Output", for: "Calls picked, its line, its codecs", sample: draw(CALLS) },
+    { name: "Bluetooth in Calls, Output", for: "Calls picked, its codecs", sample: draw(CALLS) },
+    { name: "Calls' tooltip", for: TIPS.calls, sample: draw({ ...CALLS, modeTip: "calls" }) },
+    { name: "Music's tooltip", for: TIPS.music, sample: draw({ ...MUSIC, modeTip: "music" }) },
+    { name: "The codecs, open", for: "each with what it is good for", sample: draw({ ...MUSIC, codecOpen: true }) },
     { name: "Bluetooth in Calls, Input", for: "the headset's mic as the default", sample: draw({ ...CALLS, tab: 1 }) },
     { name: "Music mode, Input", for: "the headset's mic: EmptyState, Switch to Calls", sample: draw({ ...MUSIC, tab: 1 }) },
     { name: "Music mode, another mic", for: "Input enabled, the built-in mic picked", sample: draw({ ...MUSIC, inputDevice: BUILT_IN_MIC, tab: 1 }) },
@@ -241,9 +247,7 @@ export default page<Shown>({
       { part: "Sliders and meter apart", token: "space-s8" },
       { part: "Meter's height", token: "size-progress" },
       { part: "Device card's parts apart", token: "space-s8" },
-      { part: "Calls/Music to its line", token: "space-s4" },
       { part: "Codec's label to its Select", token: "space-s8" },
-      { part: "Line's inset", token: "space-s12" },
       { part: "Tabs' height", token: "size-control_sm" },
       { part: "Tabs to cards, cards apart", token: "space-s12" },
       { part: "Card's padding", token: "space-s16" },
