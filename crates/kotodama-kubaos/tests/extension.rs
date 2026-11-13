@@ -12,6 +12,7 @@ use std::time::Duration;
 use kotodama_extension::testing::Spawned;
 use kotodama_protocol::Clipboard;
 use kotodama_protocol::FromExtension;
+use kotodama_protocol::Item;
 use kotodama_protocol::ItemKind;
 use kotodama_protocol::ItemRef;
 use kotodama_protocol::NamespacedKind;
@@ -46,6 +47,39 @@ impl Deref for Running {
 
     fn deref(&self) -> &Spawned {
         &self.0
+    }
+}
+
+/// The Spawned's readers, past the startup apps' sets: the Extension sends both at its start, at
+/// each config and at each change to an autostart entry or an app, whatever else a test waits for.
+impl Running {
+    fn recv(&self) -> FromExtension {
+        loop {
+            match self.0.recv() {
+                FromExtension::TargetAction { .. } => {}
+                other => return other,
+            }
+        }
+    }
+
+    fn added(&self) -> Vec<Item> {
+        match self.recv() {
+            FromExtension::AddItems { items } => items,
+            other => panic!("expected add_items, got {other:?}"),
+        }
+    }
+
+    fn removed(&self) -> Vec<String> {
+        match self.recv() {
+            FromExtension::RemoveItems { ids } => ids,
+            other => panic!("expected remove_items, got {other:?}"),
+        }
+    }
+
+    fn outcome(&self, invocation: u64, skip: impl Fn(&FromExtension) -> bool) -> Outcome {
+        self.0.outcome(invocation, |message| {
+            matches!(message, FromExtension::TargetAction { .. }) || skip(message)
+        })
     }
 }
 
@@ -334,4 +368,42 @@ fn ram_is_answered_by_the_monitor() {
     assert!(results[0].answer);
     assert_eq!(results[0].item.kind.name(), "kubaos.sysmon");
     assert!(results[0].item.title.starts_with("RAM"), "{}", results[0].item.title);
+}
+
+#[test]
+fn start_on_login_is_offered_on_the_apps_that_do_not_start_and_its_opposite_on_those_that_do() {
+    let home = tempfile::tempdir().expect("a home");
+    let write = |path: &str, text: &str| {
+        let file = home.path().join(path);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(file, text).unwrap();
+    };
+    let app = "[Desktop Entry]\nType=Application\nName=App\nExec=app\n";
+    write("share/applications/chrome.desktop", app);
+    write("share/applications/solaar.desktop", app);
+    write("config/autostart/solaar.desktop", app);
+    let extension = spawn(
+        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos"))
+            .env("XDG_CONFIG_HOME", home.path().join("config"))
+            .env("XDG_CONFIG_DIRS", home.path().join("etc"))
+            .env("XDG_DATA_HOME", home.path().join("share"))
+            .env("XDG_DATA_DIRS", home.path().join("none")),
+        WAIT,
+    );
+
+    let sets: Vec<FromExtension> = (0..2).map(|_| extension.0.recv()).collect();
+
+    assert_eq!(
+        sets,
+        [
+            FromExtension::TargetAction {
+                action: "start-on-login".to_owned(),
+                identities: vec!["app:chrome.desktop".to_owned()],
+            },
+            FromExtension::TargetAction {
+                action: "dont-start-on-login".to_owned(),
+                identities: vec!["app:solaar.desktop".to_owned()],
+            },
+        ]
+    );
 }

@@ -5,14 +5,16 @@
 //! read from, and to the counters' file; each config also reads the user folders and the states
 //! again; each run is answered with its outcome, after the View it pushes or pops. Each keystroke
 //! in a View that filters itself is answered with the View again, and each Live query at once, with
-//! a monitor answer, processes to stop, a date answer, or nothing.
+//! a monitor answer, processes to stop, a date answer, or nothing. The apps the startup Actions are
+//! offered on are sent at the start, at each config and at each change to an autostart entry or an
+//! app's desktop file.
 //!
 //! # Owns
 //!
 //! - The loop, logging the config's problems, and turning what a run came to into messages.
 //! - Watching the update check's file, the counters' file, the keyboard settings and
 //!   `/etc/default/keyboard`, the wallpaper sets file, Hyprland's screens file, the drives file and
-//!   the states' files.
+//!   the states' files, the autostart folders and the apps' folders.
 //!
 //! # Not here
 //!
@@ -47,6 +49,7 @@ use kotodama_kubaos::files::UserFolders;
 use kotodama_kubaos::keyboard::Keyboards;
 use kotodama_kubaos::layouts::LayoutsApp;
 use kotodama_kubaos::run::Programs;
+use kotodama_kubaos::startup::StartupApps;
 use kotodama_kubaos::states::Places;
 use kotodama_kubaos::states::States;
 use kotodama_kubaos::sysmon;
@@ -64,6 +67,7 @@ use kotodama_protocol::LiveResult;
 use kotodama_protocol::Outcome;
 use kotodama_protocol::ToExtension;
 use kubaos_clock::settings as clock_settings;
+use kubaos_core::autostart::Dirs as AutostartDirs;
 use kubaos_core::keyboard;
 use kubaos_core::keyboard::settings as keyboard_settings;
 use kubaos_sysmon::processes;
@@ -89,6 +93,8 @@ enum Own {
     States(States),
     /// The counters' file changed.
     Counters(CounterList),
+    /// An autostart entry or an app's desktop file changed.
+    Startup(StartupApps),
 }
 
 /// What answers Live queries: the system monitor, then the dates.
@@ -197,29 +203,12 @@ fn run() -> Result<(), Error> {
     let mut sent = SentItems::default();
     // The toggles work on any machine, and the actions need only their programs.
     SentStatus::default().usable(&mut writer)?;
-    let state = updates::state_dir();
-    if let Some(dir) = &state {
-        extension.set_pending(Pending::read(&dir.join(updates::FILE)));
-    }
-    let keyboard_files = KeyboardFiles::new();
-    if let Some(files) = &keyboard_files {
-        extension.set_keyboards(files.read());
-    }
-    let _keyboard_watcher = keyboard_files.and_then(|files| watch_keyboards(files, events.clone()));
-    let sets_file = wallpapers::sets_file();
-    if let Some(file) = &sets_file {
-        extension.set_wallpaper_sets(WallpaperSets::read(&wallpapers::sets_dir(), file));
-    }
-    let _sets_watcher = sets_file.and_then(|file| watch_wallpaper_sets(file, events.clone()));
-    let drives_file = drives::file();
-    if let Some(file) = &drives_file {
-        extension.set_drives(Drives::read(file));
-    }
-    let _drives_watcher = drives_file.and_then(|file| watch_drives(file, events.clone()));
-    let _desk_watcher = read_desk(&mut extension, events.clone());
-    let (places, _states_watcher) = read_states(&mut extension, events.clone());
-    extension.set_counters(CounterList::read());
-    let _watcher = state.and_then(|dir| watch(dir, events));
+    let Sources {
+        places,
+        autostart,
+        mut startup,
+        _watchers,
+    } = read_sources(&mut extension, &mut writer, events)?;
     let mut configured = false;
 
     for event in received {
@@ -229,9 +218,11 @@ fn run() -> Result<(), Error> {
                     config::warn(problem);
                 }
                 read_again(&mut extension, &places);
+                startup.read(&mut writer, autostart.as_ref())?;
                 configured = true;
                 sent.publish(&mut writer, extension.items())?;
             }
+            Event::Own(Own::Startup(apps)) => startup.send(&mut writer, apps)?,
             Event::Own(own) => {
                 match own {
                     Own::Pending(pending) => extension.set_pending(pending),
@@ -241,6 +232,7 @@ fn run() -> Result<(), Error> {
                     Own::Desk(desk) => extension.set_desk(desk),
                     Own::States(states) => extension.set_states(states),
                     Own::Counters(counters) => extension.set_counters(counters),
+                    Own::Startup(_) => {}
                 }
                 if configured {
                     sent.publish(&mut writer, extension.items())?;
@@ -286,6 +278,65 @@ fn run() -> Result<(), Error> {
     Ok(())
 }
 
+/// What the Extension reads its Items and the startup apps from, and the watches that read them
+/// again; each watch lasts as long as this.
+struct Sources {
+    places: Places,
+    autostart: Option<AutostartDirs>,
+    startup: SentStartup,
+    _watchers: Vec<Watcher>,
+}
+
+/// Gives `extension` what each of its files says, sends the startup apps, and watches them all.
+fn read_sources(
+    extension: &mut Extension<SystemBus, Programs>,
+    writer: &mut Writer,
+    events: Sender<Event<Own>>,
+) -> Result<Sources, Error> {
+    let state = updates::state_dir();
+    if let Some(dir) = &state {
+        extension.set_pending(Pending::read(&dir.join(updates::FILE)));
+    }
+    let keyboard_files = KeyboardFiles::new();
+    if let Some(files) = &keyboard_files {
+        extension.set_keyboards(files.read());
+    }
+    let keyboard_watcher = keyboard_files.and_then(|files| watch_keyboards(files, events.clone()));
+    let sets_file = wallpapers::sets_file();
+    if let Some(file) = &sets_file {
+        extension.set_wallpaper_sets(WallpaperSets::read(&wallpapers::sets_dir(), file));
+    }
+    let sets_watcher = sets_file.and_then(|file| watch_wallpaper_sets(file, events.clone()));
+    let drives_file = drives::file();
+    if let Some(file) = &drives_file {
+        extension.set_drives(Drives::read(file));
+    }
+    let drives_watcher = drives_file.and_then(|file| watch_drives(file, events.clone()));
+    let desk_watcher = read_desk(extension, events.clone());
+    let (places, states_watcher) = read_states(extension, events.clone());
+    extension.set_counters(CounterList::read());
+    let autostart = AutostartDirs::from_env();
+    let mut startup = SentStartup::default();
+    startup.read(writer, autostart.as_ref())?;
+    let startup_watcher = autostart.clone().and_then(|dirs| watch_startup(dirs, events.clone()));
+    let update_watcher = state.and_then(|dir| watch(dir, events));
+    let watchers = [
+        keyboard_watcher,
+        sets_watcher,
+        drives_watcher,
+        desk_watcher,
+        states_watcher,
+        startup_watcher,
+        update_watcher,
+    ];
+    Ok(Sources {
+        places,
+        autostart,
+        startup,
+        _watchers: watchers.into_iter().flatten().collect(),
+    })
+}
+
 /// What a run came to, sending the View it pushes or pops first.
 fn outcome_of(ran: Ran, writer: &mut Writer) -> Result<Outcome, Error> {
     Ok(match ran {
@@ -300,6 +351,67 @@ fn outcome_of(ran: Ran, writer: &mut Writer) -> Result<Outcome, Error> {
             Outcome::Close
         }
     })
+}
+
+/// The startup apps last sent, so a change to an app's folder that changes neither set sends
+/// nothing.
+#[derive(Default)]
+struct SentStartup(Option<StartupApps>);
+
+impl SentStartup {
+    /// Reads the startup apps in `dirs` and sends them; nothing without a home.
+    fn read(&mut self, writer: &mut Writer, dirs: Option<&AutostartDirs>) -> Result<(), Error> {
+        dirs.map_or(Ok(()), |dirs| self.send(writer, StartupApps::read(dirs)))
+    }
+
+    /// Sends the apps each startup Action is offered on, each set whole, unless they are the ones
+    /// sent last.
+    fn send(&mut self, writer: &mut Writer, apps: StartupApps) -> Result<(), Error> {
+        if self.0.as_ref() == Some(&apps) {
+            return Ok(());
+        }
+        for (action, identities) in apps.targets() {
+            writer.send(&FromExtension::TargetAction {
+                action: action.to_owned(),
+                identities,
+            })?;
+        }
+        self.0 = Some(apps);
+        Ok(())
+    }
+}
+
+/// Watches the autostart folders and the apps' folders, sending the startup apps on each change
+/// to a desktop file in one. The user's autostart folder is made, so its first entry is seen.
+/// Without a watch the Actions keep the apps of the start, until the next config.
+fn watch_startup(dirs: AutostartDirs, events: Sender<Event<Own>>) -> Option<Watcher> {
+    let _ = std::fs::create_dir_all(&dirs.user);
+    let folders: Vec<PathBuf> = std::iter::once(&dirs.user)
+        .chain(&dirs.system)
+        .chain(&dirs.applications)
+        // The events name the real path, behind any symlink on the way, as the Nix profile's.
+        .filter_map(|dir| dir.canonicalize().ok())
+        .collect();
+    let watcher = Watcher::start(
+        "startup",
+        RecursiveMode::NonRecursive,
+        SETTLE,
+        // `kubaos autostart` writes an entry through a temporary file and a rename onto its name.
+        |event, _| {
+            !event.kind.is_access()
+                && event
+                    .paths
+                    .iter()
+                    .any(|path| path.extension().is_some_and(|ext| ext == "desktop"))
+        },
+        move |_| {
+            let _ = events.send(Event::Own(Own::Startup(StartupApps::read(&dirs))));
+        },
+    )
+    .map_err(|err| kotodama_extension::log!("not watching the startup apps: {}", watched::why(&err)))
+    .ok()?;
+    watcher.watch(folders);
+    Some(watcher)
 }
 
 /// Watches KubaOS's state folder `dir` for the update check's file and the counters' file, sending

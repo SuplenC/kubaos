@@ -7,7 +7,7 @@ command = ["./kotodama-kubaos"]
 word = "kubaos"
 title = "KubaOS"
 icon = "preferences-system"
-about = "KubaOS's own actions, the keyboard layouts, and Wi-Fi, Bluetooth, audio, brightness and power profiles, which work with the shell down. Date queries such as `days until christmas` are answered with the clock popup's holidays and zones. `cpu`, `ram` and `battery` are answered from the system monitor, and `kill chrome` or `end slack` finds the processes to stop, each stop confirmed first. Add your own actions and hide these in ~/.config/kubaos/menu/kotodama/user.toml."
+about = "KubaOS's own actions, the keyboard layouts, and Wi-Fi, Bluetooth, audio, brightness and power profiles, which work with the shell down. Date queries such as `days until christmas` are answered with the clock popup's holidays and zones. `cpu`, `ram` and `battery` are answered from the system monitor, and `kill chrome` or `end slack` finds the processes to stop, each stop confirmed first. Every app offers Start on login, or Don't start on login when it starts with the session. Add your own actions and hide these in ~/.config/kubaos/menu/kotodama/user.toml."
 examples = [
     { query = "wifi", result = "Turn Wi-Fi on or off" },
     { query = "volume 40", result = "Set the volume to 40%" },
@@ -41,3 +41,17 @@ triggers = [
     '(?i)\s(time|now)\s*$',
 ]
 debounce_ms = 0
+
+# On the apps' Results, from the Apps Extension, by the Identities the Extension sends: Start on
+# login on each app that doesn't start, Don't start on login on each that does (src/startup.rs).
+[[contributed_actions]]
+targeted = true
+id = "start-on-login"
+title = "Start on login"
+keywords = ["autostart"]
+
+[[contributed_actions]]
+targeted = true
+id = "dont-start-on-login"
+title = "Don't start on login"
+keywords = ["autostart"]
