@@ -771,9 +771,11 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     leadInner.append(now, rule());
     lead.append(leadInner);
     bar.replaceChildren(lead, views, stepper, rule(), actions.element);
-    bar.toggleAttribute("data-lifted", S.full && S.view === "lock" && S.awake);
+    liftBar();
     if (tipFor && !tipFor.isConnected) hideTip(tipFor);
   };
+  /** The bar lifted over the password's sheet, up on an awake lock on the full screen. */
+  const liftBar = () => bar.toggleAttribute("data-lifted", S.full && S.view === "lock" && S.awake);
 
   /** The bar's full-screen look, at once or over the picture's step (`time`). */
   const barFull = (full: boolean, time = 0) => {
@@ -866,7 +868,9 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     if (!S.open || S.busy || full === S.full || !front()) return;
     S.busy = true;
     S.full = full;
-    drawBar();
+    // HAZARD: the bar keeps its elements over the step. Drawn afresh, its cells would have no style
+    // to ease from and would jump to the full screen's widths at once.
+    liftBar();
     const time = full ? ms("slow") : ms("long");
     // The bar changes with the picture's step, over its time and curve; with reduce motion a short fade.
     barFull(full, reducedFor(screen) ? ms("short") : time);
