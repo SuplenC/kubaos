@@ -216,11 +216,56 @@ fn a_crash_into_a_restart_is_a_fallback_once() {
     assert_eq!(
         fallback(Some(&running), &restarting),
         Some(Fallback::Restarting {
-            result: "exit-code".to_owned()
+            result: "exit-code".to_owned(),
+            delay: 5,
         })
     );
     assert_eq!(fallback(Some(&restarting), &restarting), None);
     assert_eq!(fallback(Some(&restarting), &running), None);
+}
+
+#[test]
+fn each_restart_waits_longer_up_to_a_minute() {
+    let mut third = unit("activating", "auto-restart", "signal");
+    third.restarts = 2;
+
+    assert_eq!(third.next_restart_delay(), 17);
+    assert_eq!(restart_delay(1), 5);
+    assert_eq!(restart_delay(40), 60);
+}
+
+#[test]
+fn the_restart_delays_are_what_systemd_works_out_from_the_unit() {
+    let unit = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../system/files/systemd/kubaos-scx.service"
+    ))
+    .expect("read the unit");
+    let setting = |key: &str| -> f64 {
+        unit.lines()
+            .find_map(|line| line.strip_prefix(key)?.strip_prefix('='))
+            .and_then(|value| value.parse().ok())
+            .expect(key)
+    };
+    let (first, steps, max) = (
+        setting("RestartSec"),
+        setting("RestartSteps"),
+        setting("RestartMaxDelaySec"),
+    );
+
+    // systemd's service_restart_usec_next: RestartSec, growing geometrically to
+    // RestartMaxDelaySec over RestartSteps restarts.
+    for (restart, delay) in (1..).zip(RESTART_DELAYS) {
+        let exact = if f64::from(restart) > steps {
+            max
+        } else {
+            first * (max / first).powf((f64::from(restart) - 1.0) / steps)
+        };
+        assert!(
+            (exact - f64::from(delay)).abs() < 0.5,
+            "restart {restart}: {exact} s, not {delay} s"
+        );
+    }
 }
 
 #[test]

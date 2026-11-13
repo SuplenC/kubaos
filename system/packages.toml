@@ -122,6 +122,13 @@ packages = ["bolt"]
 summary = "The fingerprint reader (fprintd)"
 packages = ["fprintd", "libpam-fprintd"]
 
+# systemd-oomd kills what has stalled the user's services and apps on memory
+# before the kernel's OOM killer would, with Ubuntu's defaults. The
+# compositor and the shell run in the login session, which it doesn't watch.
+[group.memory]
+summary = "systemd-oomd, which ends what stalls the machine on memory"
+packages = ["systemd-oomd"]
+
 # rustup and proto toolchains need these.
 [group.build]
 summary = "Build tools"

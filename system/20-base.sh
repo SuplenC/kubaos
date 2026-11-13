@@ -36,7 +36,7 @@ require_sudo
 # The base system's groups of system/packages.toml.
 BASE_GROUPS=(
   tools network proxy audio session graphics microcode laptop dock fingerprint
-  build snapshots files media fonts fallback shell
+  memory build snapshots files media fonts fallback shell
 )
 
 step "apt update"
@@ -156,6 +156,10 @@ install_inotify_limits
 # --------------------------------------------------------------------------
 step "zswap: swap compressed in RAM before it reaches the disk"
 install_zswap
+
+# --------------------------------------------------------------------------
+step "Memory: a reserve for the desktop, and systemd-oomd"
+install_desktop_memory
 
 # --------------------------------------------------------------------------
 step "Short shutdown and boot: 10 s stop timeouts, no wait for the network, no console palette"

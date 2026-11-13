@@ -9,9 +9,14 @@
 # restart, and the kernel runs its own scheduler (EEVDF) for that moment. When
 # the BPF scheduler errors or stalls the kernel ejects it and goes back to
 # EEVDF by itself; scx_lavd then exits with an error and this unit starts it
-# again after 2 s, twice at most in 5 minutes. A third crash leaves the unit
-# failed and the machine on EEVDF until LAVD is turned on again
-# (`scheduler=reset`) or the next boot. The power service toasts both.
+# again, five times at most in 10 minutes, waiting 5 s before the first
+# restart and longer before each next one, up to a minute. A crash under
+# memory pressure (scx_lavd failing to allocate a new task's state) comes
+# back at once while the pressure lasts, and the growing waits let it pass.
+# A sixth crash leaves the unit failed and the machine on EEVDF until LAVD is
+# turned on again (`scheduler=reset`) or the next boot. The power service
+# toasts both, and its RESTART_DELAYS (crates/kubaos-power/src/scheduler.rs)
+# are the waits these settings come to.
 #
 # SysRq-S (Alt+SysRq+S) also hands the machine back to EEVDF; scx_lavd exits
 # cleanly then, and the unit stays stopped until the next stop.
@@ -23,8 +28,8 @@ Description=KubaOS CPU scheduler: scx_lavd through sched_ext
 Documentation=https://github.com/sched-ext/scx/tree/main/scheds/rust/scx_lavd
 ConditionPathIsDirectory=/sys/kernel/sched_ext
 ConditionPathExists=/var/lib/kubaos/scx-lavd.env
-StartLimitIntervalSec=5min
-StartLimitBurst=3
+StartLimitIntervalSec=10min
+StartLimitBurst=6
 
 [Service]
 Type=simple
@@ -33,7 +38,9 @@ EnvironmentFile=/var/lib/kubaos/scx-lavd.env
 # ${LAVD_ARGS} would pass the whole line as one argument, which scx_lavd refuses.
 ExecStart=/usr/local/libexec/kubaos-scx-lavd $LAVD_ARGS
 Restart=on-failure
-RestartSec=2
+RestartSec=5
+RestartSteps=4
+RestartMaxDelaySec=60
 ProtectHome=yes
 PrivateTmp=yes
 NoNewPrivileges=yes

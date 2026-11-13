@@ -9,7 +9,8 @@
 //! as it runs, follows power-profiles-daemon's three profiles, which have no autopilot and no
 //! fewest cores), so a new mode restarts it, and the kernel runs EEVDF for the moment between.
 //! The kernel also falls back to EEVDF by itself when the BPF scheduler errors or stalls; the
-//! unit restarts it twice, then stays failed until LAVD is turned on again.
+//! unit restarts it five times, each after a longer wait, then stays failed until LAVD is turned
+//! on again.
 //!
 //! # Owns
 //!
@@ -38,11 +39,21 @@ use crate::writes::Write;
 pub const UNIT: &str = "kubaos-scx.service";
 /// Its object on systemd's bus: the unit's name with `-` and `.` escaped.
 pub const UNIT_PATH: &str = "/org/freedesktop/systemd1/unit/kubaos_2dscx_2eservice";
-/// How long the unit waits before it starts LAVD again after a crash (`RestartSec`).
-pub const RESTART_SECONDS: u32 = 2;
+/// How long the unit waits before each restart after a crash, in seconds: what systemd works out
+/// from its `RestartSec=5`, `RestartSteps=4` and `RestartMaxDelaySec=60`, the last for every
+/// restart after. A crash under memory pressure (scx_lavd failing to allocate a new task's state)
+/// comes back at once while the pressure lasts, so the waits grow until it has passed.
+pub const RESTART_DELAYS: [u32; 5] = [5, 9, 17, 32, 60];
 /// When the unit gives up instead (`StartLimitBurst` in `StartLimitIntervalSec`). The crash that
 /// reaches it still enters `auto-restart` first, so a restart's toast can't promise the restart.
-pub const START_LIMIT: &str = "3 times in 5 minutes";
+pub const START_LIMIT: &str = "6 times in 10 minutes";
+
+/// How long the unit waits before its restart number `restart`, counted from 1.
+pub fn restart_delay(restart: u32) -> u32 {
+    let last = RESTART_DELAYS.len() - 1;
+    let index = usize::try_from(restart.saturating_sub(1)).map_or(last, |index| index.min(last));
+    RESTART_DELAYS[index]
+}
 
 /// What the kernel's own scheduler is called everywhere it shows.
 const KERNEL: &str = "Linux's own (EEVDF)";
@@ -198,6 +209,11 @@ impl UnitState {
         self.active == "failed"
     }
 
+    /// How long the unit waits before its next restart: `NRestarts` counts the ones done.
+    pub fn next_restart_delay(&self) -> u32 {
+        restart_delay(self.restarts.saturating_add(1))
+    }
+
     /// The unit's state in a few words: `active (running), 1 restart`.
     pub fn words(&self) -> String {
         if self.load == "not-found" {
@@ -220,8 +236,8 @@ impl UnitState {
 /// LAVD's end, as the kernel fell back to EEVDF.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Fallback {
-    /// It crashed, or the kernel ejected it, and the unit starts it again shortly.
-    Restarting { result: String },
+    /// It crashed, or the kernel ejected it, and the unit starts it again after `delay` seconds.
+    Restarting { result: String, delay: u32 },
     /// It crashed again and again, and the unit gave up on it.
     GaveUp,
 }
@@ -236,6 +252,7 @@ pub fn fallback(before: Option<&UnitState>, now: &UnitState) -> Option<Fallback>
     if now.restarting() && !before.is_some_and(UnitState::restarting) {
         return Some(Fallback::Restarting {
             result: now.result.clone(),
+            delay: now.next_restart_delay(),
         });
     }
     None
@@ -245,11 +262,11 @@ impl Fallback {
     /// The toast's title, body and urgency.
     pub fn toast(&self) -> (&'static str, String, &'static str) {
         match self {
-            Fallback::Restarting { result } => (
+            Fallback::Restarting { result, delay } => (
                 "CPU scheduler",
                 format!(
                     "LAVD stopped ({}) and the kernel took over with its own scheduler. systemd \
-                     starts LAVD again in {RESTART_SECONDS} s, unless it crashed {START_LIMIT}.",
+                     starts LAVD again in {delay} s, unless it crashed {START_LIMIT}.",
                     result_words(result)
                 ),
                 "normal",
@@ -394,7 +411,8 @@ fn why(
         ),
         Some(unit) if unit.restarting() => format!(
             "LAVD crashed{because} and the kernel fell back to its own scheduler; systemd starts it again \
-             in {RESTART_SECONDS} s, unless it crashed {START_LIMIT}."
+             in {} s, unless it crashed {START_LIMIT}.",
+            unit.next_restart_delay()
         ),
         Some(unit) if unit.active == "activating" || unit.active == "active" => "LAVD is starting.".to_owned(),
         _ => "LAVD isn't running: it was stopped, or unloaded with SysRq-S. The next stop starts it.".to_owned(),
