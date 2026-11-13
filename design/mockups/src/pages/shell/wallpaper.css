@@ -434,11 +434,28 @@
 .gl-bar-lead > *,
 .gl-step-pair > * {
   min-width: 0;
-  /* Cut as far out as a lit control's glow reaches, so a focused button keeps its whole glow. */
-  overflow: clip;
-  overflow-clip-margin: var(--focus-far);
+  /* Shut or moving, a cell cuts its words at its sides, so they never spill over the next cell;
+     above and below, and at its sides once it is open, it cuts as far out as a lit control's glow
+     reaches, so a focused button keeps its whole glow. Opening, its sides give way only as the step
+     ends (`--cut-time`); shutting, they close at once. A clip path, not `overflow-clip-margin`:
+     Chromium drops that margin to 0 for any `calc()`, which every length token is. */
+  clip-path: inset(calc(-1 * var(--focus-far)) 0);
   opacity: 0;
-  transition: opacity var(--step-time, 0ms) var(--step-curve, var(--easing-emphasized_decel));
+  transition:
+    opacity var(--step-time, 0ms) var(--step-curve, var(--easing-emphasized_decel)),
+    clip-path var(--cut-time, 0ms) step-end;
+}
+
+.gl-step-pair > :first-child,
+.gl-screen[data-full] .gl-bar-lead > *,
+.gl-screen[data-full] .gl-step-pair > :last-child {
+  clip-path: inset(calc(-1 * var(--focus-far)));
+  --cut-time: var(--step-time, 0ms);
+}
+
+.gl-screen[data-full] .gl-step-pair > :first-child {
+  clip-path: inset(calc(-1 * var(--focus-far)) 0);
+  --cut-time: 0ms;
 }
 
 .gl-bar-lead > * {
@@ -461,7 +478,8 @@
   width: 0;
   transition:
     width var(--step-time, 0ms) var(--step-curve, var(--easing-emphasized_decel)),
-    opacity var(--step-time, 0ms) var(--step-curve, var(--easing-emphasized_decel));
+    opacity var(--step-time, 0ms) var(--step-curve, var(--easing-emphasized_decel)),
+    clip-path var(--cut-time, 0ms) step-end;
 }
 
 .gl-step-pair > :first-child,
