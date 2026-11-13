@@ -92,6 +92,12 @@ export interface Variant {
   readonly sample: Sample;
 }
 
+/** A group of variants under its own heading. */
+export interface VariantGroup {
+  readonly title: Label;
+  readonly rows: NonEmpty<Variant>;
+}
+
 /** Every state the mockup skill names, and open, which only a part that opens has. */
 export const STATES = [
   "rest",
@@ -368,6 +374,11 @@ export interface Page<S extends State = State> {
   readonly stage: Stage;
   readonly variants: readonly Variant[] | DoesntApply;
   readonly sizes: readonly Variant[] | DoesntApply;
+  /**
+   * More groups of variants, each under its own heading after the sizes: a surface's part that
+   * changes with its state, one sample per case, as the Audio panel's subtitle.
+   */
+  readonly groups?: readonly VariantGroup[];
   readonly states: States<S>;
   /**
    * Its focus line: every tube it lights, each in its tone, and both looks of it; a part with no
@@ -495,6 +506,10 @@ export function wordy(page: AnyPage): Wordy[] {
   if (page.code.unbuilt) hold("code", "label", page.code.unbuilt);
   variants(page.variants, "variant");
   variants(page.sizes, "size");
+  for (const group of page.groups ?? []) {
+    hold(`group ${group.title}`, "label", group.title);
+    variants(group.rows, group.title);
+  }
   for (const [state, words] of Object.entries(page.states.looks)) hold(`state ${state}`, "cell", words as string);
   for (const [state, words] of Object.entries(page.states.absent)) hold(`absent ${state}`, "cell", words as string);
   page.states.rows.forEach((row) => hold(`row ${row.name}`, "label", row.name));
