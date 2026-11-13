@@ -2,6 +2,7 @@
 //! engine, the CLI and Kōbō is docs/INSTALL-INTERNALS.md.
 
 pub mod apt;
+pub mod autostart;
 pub mod bitwarden;
 pub mod config;
 pub mod demo;
