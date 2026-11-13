@@ -1466,6 +1466,21 @@
   transition: none;
 }
 
+/* A select with a tooltip fills the anchor, and lights it as any control does; open, its list
+   is what it shows, so the card goes. */
+.k-tip-anchor > .k-select-room {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-tip-anchor:has(> .k-select-room:not([data-open]) > .k-control:is(:hover, :focus-visible, [data-pinned])) > .k-tooltip {
+  opacity: 1;
+}
+
+.k-tip-anchor:has(> .k-select-room > .k-control[data-pinned]) > .k-tooltip {
+  transition: none;
+}
+
 /* One line, or `--lines`, in the room the text is given, the last ending in an ellipsis where the
    words don't fit; never wider than its words. */
 .k-text[data-clamped] {
@@ -2019,6 +2034,11 @@
   --lit: 1;
 }
 
+/* No pick: no stretch lit, the rail alone. */
+.k-tabs[data-none] > .k-tabs-lit {
+  visibility: hidden;
+}
+
 /* A pick that is disabled: its stretch dims with its words and burns no glow. */
 .k-tabs[data-stranded] > .k-tabs-lit {
   --dim: var(--opacity-disabled_content);
@@ -2457,11 +2477,11 @@
 
 /* The picked option's words are `primary_lit`, as a picked tab's, with the label glow round them at
    night while the signs are on; highlighted, they take the highlight's colours. */
-.k-select-list > .k-menu-item[data-picked] {
+:is(.k-select-list, .k-select-menu) > .k-menu-item[data-picked] {
   --rest-ink: var(--color-primary_lit);
 }
 
-.k-select-list > .k-menu-item[data-picked] .k-menu-words {
+:is(.k-select-list, .k-select-menu) > .k-menu-item[data-picked] .k-menu-words {
   filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--signs) * (1 - var(--lit)))));
 }
 
@@ -2479,6 +2499,96 @@
 .k-select-room[data-up] .k-select-rule {
   top: auto;
   bottom: var(--size-control_md);
+}
+
+/* The value row's symbol, the pick's: as wide as the symbol. */
+.k-select-lead {
+  display: flex;
+  flex: none;
+}
+
+.k-select-lead[hidden] {
+  display: none;
+}
+
+/* An inline select's room (`look: "inline"`): as wide as its words, a line of `small` tall, its
+   Menu hanging from it. It opens over `short` on `emphasized_decel` and folds over `micro` on
+   `emphasized_accel`, a popover's; a pick folds it a `micro` later, once the option has shown
+   pressed. A sample of the open state keeps the Menu in the flow under it. */
+.k-select-room[data-look="inline"] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: auto;
+  height: auto;
+  transition: --select-open var(--motion-micro) var(--easing-emphasized_accel);
+}
+
+.k-select-room[data-look="inline"][data-open] {
+  transition: --select-open var(--motion-short) var(--easing-emphasized_decel);
+}
+
+.k-select-room[data-look="inline"][data-taken] {
+  transition: --select-open var(--motion-micro) var(--easing-emphasized_accel) var(--motion-micro);
+}
+
+/* The words and the chevron, `on_surface_variant`; lit, both `primary_lit`, a lit Text button's
+   words. No box, no line and no glow: the colour alone says it is lit. */
+.k-select-inline {
+  display: flex;
+  max-width: 100%;
+  outline: none;
+  cursor: pointer;
+  --value: color-mix(in srgb, var(--color-on_surface_variant), var(--color-primary_lit) calc(var(--lit) * 100%));
+  --mark: var(--value);
+}
+
+.k-select-room[data-look="inline"]:is([data-open], [data-folding]) > .k-select-inline {
+  --lit: 1;
+}
+
+.k-select-inline[aria-disabled="true"] {
+  cursor: default;
+  --value: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+/* Its Menu, `space.s4` under the words (over them, growing up), moved back by the popover's padding
+   and an option's, and its symbol and gap where options have one, so its options' words start
+   where the pick's do. */
+.k-select-popover {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + var(--space-s4));
+  left: calc(-1 * (var(--space-s4) + var(--space-s8) + var(--select-symbol, 0px)));
+  opacity: var(--select-open);
+}
+
+.k-select-room[data-icons] > .k-select-popover {
+  --select-symbol: calc(var(--icon-s16) + var(--space-s8));
+}
+
+/* Shut, the Menu takes no box at all: a hidden one would still stretch what scrolls round it. */
+.k-select-room:not([data-open], [data-folding]) > .k-select-popover {
+  display: none;
+}
+
+.k-select-room[data-look="inline"][data-up] > .k-select-popover {
+  top: auto;
+  bottom: calc(100% + var(--space-s4));
+}
+
+.k-select-room[data-look="inline"][data-shown] > .k-select-popover {
+  position: relative;
+  top: auto;
+  margin-top: var(--space-s4);
+}
+
+.k-select-menu {
+  --most: 8;
+}
+
+.k-select-menu > .k-menu-item[data-taken] {
+  --press: 1;
 }
 
 /* How far a collapsible is open, 0 to 1. */

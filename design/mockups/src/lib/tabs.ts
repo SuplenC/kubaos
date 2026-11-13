@@ -17,6 +17,10 @@
 // for Tab. A single choice disabled dims alone and takes no press, and the arrows pass over it. A
 // pick that is disabled stays picked, dimmed with its stretch, until the owner moves it; the stop
 // for Tab is then the well itself, and an arrow picks the nearest choice that isn't disabled.
+//
+// A row may have no pick (`picked: null`): no stretch is lit and every choice's words rest. It is
+// for a row that doesn't apply, disabled, as Calls and Music are for a device that isn't Bluetooth;
+// a pick on one that isn't disabled lays the stretch under it at once.
 
 import { iconInLine } from "./button.ts";
 import { type Pinned, pin } from "./control.ts";
@@ -36,7 +40,8 @@ export interface Tab {
 
 export interface TabsOptions {
   readonly choices: readonly Tab[];
-  readonly picked?: number;
+  /** The picked choice, the first by default; null for none, on a row that doesn't apply. */
+  readonly picked?: number | null;
   readonly disabled?: boolean;
   /**
    * The row pinned in a state: lit or lit with the signs off, as the keyboard on the row lights
@@ -77,7 +82,7 @@ function duration(name: string): number {
 export function tabs(options: TabsOptions): HTMLElement {
   const count = options.choices.length;
   const clamp = (index: number) => Math.max(0, Math.min(count - 1, index));
-  let picked = clamp(options.picked ?? 0);
+  let picked = options.picked === null ? -1 : clamp(options.picked ?? 0);
   const from = options.from === undefined ? null : clamp(options.from);
 
   const well = document.createElement("span");
@@ -141,7 +146,8 @@ export function tabs(options: TabsOptions): HTMLElement {
       each.setAttribute("aria-selected", String(current));
       each.tabIndex = current && open(index) ? 0 : -1;
     }
-    const stranded = !options.disabled && !open(picked);
+    well.toggleAttribute("data-none", picked < 0);
+    const stranded = !options.disabled && picked >= 0 && !open(picked);
     well.toggleAttribute("data-stranded", stranded);
     if (stranded) well.tabIndex = 0;
     else well.removeAttribute("tabindex");
@@ -219,7 +225,8 @@ export function tabs(options: TabsOptions): HTMLElement {
 
   function pick(index: number, focus: boolean): void {
     if (index === picked || !open(index)) return;
-    const start = where();
+    // From no pick the stretch has nowhere to travel from: it starts where it lands.
+    const start = picked < 0 ? under(index) : where();
     picked = index;
     mark();
     if (focus) buttons[index]?.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
@@ -230,7 +237,7 @@ export function tabs(options: TabsOptions): HTMLElement {
 
   /** Lays the stretch on the pick, or for a move's sample its travel from `from`, whenever the well's size changes. */
   function lay(): void {
-    if (!well.isConnected || flying.some((each) => each.playState === "running")) return;
+    if (!well.isConnected || picked < 0 || flying.some((each) => each.playState === "running")) return;
     const end = under(picked);
     travel(from !== null && from !== picked ? under(from) : end, end);
   }
@@ -243,7 +250,7 @@ export function tabs(options: TabsOptions): HTMLElement {
     button.disabled = (options.disabled ?? false) || disabled;
     mark();
     // The row keeps the keyboard it had: on the well while its pick is disabled, back on the pick after.
-    const holder = open(picked) ? buttons[picked] : well;
+    const holder = picked >= 0 && open(picked) ? buttons[picked] : well;
     if (had) holder?.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
   });
 

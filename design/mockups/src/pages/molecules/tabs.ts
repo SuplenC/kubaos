@@ -1,7 +1,9 @@
 // The Tabs page: `docs/design/components/tabs.md`. One of a few views or values, picked along a
 // rail of neon in one well as wide as its room, the choices sharing it equally; the same well is
 // the segmented control. The pick's lit stretch travels to the new choice and flashes as it lands.
-// A choice may be disabled alone: the audio panel's Input while a headset is in Music mode.
+// A choice may be disabled alone: the audio panel's Input while a headset is in Music mode. A row
+// that doesn't apply is disabled with nothing picked: Calls and Music for a device that isn't
+// Bluetooth.
 
 import type { Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
@@ -116,6 +118,11 @@ export default page({
     { name: "With symbols", for: "a symbol helps tell them apart: Calls, Music", sample: () => row(MODES, 0) },
     { name: "Segmented control", for: "a setting's few values side by side", sample: () => row(MOTION, 1) },
     { name: "A choice disabled", for: "a view that can't open now: Input in Music mode", sample: () => row(MUSIC_SIDES, 0) },
+    {
+      name: "Nothing picked",
+      for: "a row that doesn't apply: Calls, Music for USB",
+      sample: () => within(PANEL, tabs({ choices: MODES, picked: null, disabled: true })),
+    },
   ],
   sizes: doesntApply("always a small control tall: no louder than the view."),
   states: {

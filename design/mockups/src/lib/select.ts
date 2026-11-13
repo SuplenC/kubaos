@@ -9,6 +9,17 @@
 // below is too short. Its options are menu items (`lib/menu.ts`), at most eight in view before the
 // list scrolls. The keyboard stays on the select throughout: it moves the highlight in the list,
 // and Tab goes on from the select as from any control.
+//
+// Each option may carry a symbol of its own (a device's, by how it connects): the list's rows show
+// theirs, and the value row leads with the pick's.
+//
+// The inline look is a choice inside a line of text, an app's device under its name: no border and
+// no box, the pick in `small` and `on_surface_variant` with a `small` chevron `space.s4` after it.
+// Under the pointer or the keyboard only the words and the chevron turn `primary_lit`, a lit Text
+// button's words, with no tube and no fill. Open, the chevron turns up and its list is a Menu built
+// in, on a popover raised to step 2 `space.s4` under the words (over them where the room below is
+// too short), its options' words in line with the pick's; it fades in over `short` and out over
+// `micro`, as a popover does.
 
 import { pin, type Pinned } from "./control.ts";
 import { raise } from "./elevation.ts";
@@ -18,6 +29,7 @@ import { filling, row } from "./layout.ts";
 import { menuItem } from "./menu.ts";
 import { probe, variant } from "./probe.ts";
 import { clamped } from "./text.ts";
+import { popover } from "./tooltip.ts";
 
 /** The most options in view before the list scrolls. */
 const MOST = 8;
@@ -31,6 +43,10 @@ export interface SelectOptions {
   readonly picked?: number;
   readonly placeholder?: string;
   readonly icon?: string;
+  /** Each option's own symbol, in its row; the value row leads with the pick's, over `icon`. */
+  readonly icons?: readonly string[];
+  /** A field's box, or the inline look: the words and chevron alone, in a line of text. */
+  readonly look?: SelectLook;
   /** Drawn open in the sample's flow, the room taking the open surface's height. */
   readonly open?: boolean;
   /** The highlighted option of a select drawn open; the pick by default. */
@@ -40,6 +56,9 @@ export interface SelectOptions {
   readonly disabled?: boolean;
   readonly pinned?: Pinned;
 }
+
+/** How a select looks shut: a field's box, or inline in a line of text. */
+export type SelectLook = "field" | "inline";
 
 let made = 0;
 
@@ -56,8 +75,12 @@ export function select(options: SelectOptions): HTMLElement {
   room.className = "k-select-room";
   room.style.setProperty("--rows", String(Math.max(1, Math.min(MOST, options.options.length))));
 
-  const surface = raise(document.createElement("span"), 2);
-  surface.classList.add("k-select", "k-sunken", "k-control");
+  const inline = options.look === "inline";
+  const iconOf = (index: number): string | undefined => options.icons?.[index] ?? options.icon;
+  const hasIcon = Boolean(options.icons ?? options.icon);
+
+  const surface = inline ? document.createElement("span") : raise(document.createElement("span"), 2);
+  surface.classList.add(...(inline ? ["k-select-inline"] : ["k-select", "k-sunken"]), "k-control");
   surface.setAttribute("role", "combobox");
   surface.setAttribute("aria-haspopup", "listbox");
   surface.setAttribute("aria-controls", `${id}-list`);
@@ -68,43 +91,61 @@ export function select(options: SelectOptions): HTMLElement {
 
   const value = document.createElement("span");
   value.className = "k-select-value";
-  const chevron = icon("expand_more", "var(--type-body_large-icon)", "var(--mark)");
+  const markSize = inline ? "var(--type-small-icon)" : "var(--type-body_large-icon)";
+  const chevron = icon("expand_more", markSize, "var(--mark)");
   chevron.classList.add("k-select-chevron");
-  const head = document.createElement("span");
-  head.className = "k-select-head";
-  const parts: Element[] = [];
-  if (options.icon) parts.push(icon(options.icon, "var(--type-body_large-icon)", "var(--mark)"));
-  parts.push(filling(value), chevron);
-  head.append(row("s8", "centre", ...parts));
-  focusRing(head, "control", "accent", false).dataset.pressable = "";
+  // The value row's symbol, swapped as the pick changes.
+  const lead = document.createElement("span");
+  lead.className = "k-select-lead";
 
   const list = document.createElement("span");
-  list.className = "k-select-list";
+  list.className = inline ? "k-menu k-select-menu" : "k-select-list";
   list.id = `${id}-list`;
   list.setAttribute("role", "listbox");
   // A scrolling box takes Tab of its own in Chromium; the keyboard stays on the select instead.
   list.tabIndex = -1;
   const items = options.options.map((label, index) => {
-    const item = menuItem({ label });
+    const symbol = options.icons?.[index];
+    const item = menuItem({ label, ...(symbol ? { icon: symbol } : {}) });
     item.id = `${id}-${index}`;
     item.setAttribute("role", "option");
     return item;
   });
   list.append(...items);
-  const rule = document.createElement("span");
-  rule.className = "k-select-rule";
-  const pane = document.createElement("span");
-  pane.className = "k-select-pane";
-  pane.append(list, rule);
-  surface.append(pane, head);
-  room.append(surface);
+
+  if (inline) {
+    room.dataset.look = "inline";
+    room.toggleAttribute("data-icons", Boolean(options.icons));
+    surface.append(row("s4", "centre", filling(value), chevron));
+    const card = popover(2, list);
+    card.classList.add("k-select-popover");
+    room.append(surface, card);
+  } else {
+    const parts: Element[] = [];
+    if (hasIcon) parts.push(lead);
+    parts.push(filling(value), chevron);
+    const head = document.createElement("span");
+    head.className = "k-select-head";
+    head.append(row("s8", "centre", ...parts));
+    focusRing(head, "control", "accent", false).dataset.pressable = "";
+    const rule = document.createElement("span");
+    rule.className = "k-select-rule";
+    const pane = document.createElement("span");
+    pane.className = "k-select-pane";
+    pane.append(list, rule);
+    surface.append(pane, head);
+    room.append(surface);
+  }
 
   /** Shows the pick: its words in the value row and its option marked picked. */
   function showPick(): void {
     const words = options.options[picked] ?? options.placeholder ?? "";
-    const text = clamped(words, "body_large");
+    const text = clamped(words, inline ? "small" : "body_large");
     text.style.color = "var(--value)";
     value.replaceChildren(text);
+    const symbol = iconOf(picked);
+    lead.replaceChildren(...(symbol ? [icon(symbol, "var(--type-body_large-icon)", "var(--mark)")] : []));
+    lead.hidden = !symbol;
     surface.toggleAttribute("data-placeholder", picked < 0);
     items.forEach((item, index) => {
       item.toggleAttribute("data-picked", index === picked);
@@ -138,7 +179,12 @@ export function select(options: SelectOptions): HTMLElement {
   }
 
   room.toggleAttribute("data-up", options.up ?? false);
-  probe(surface, { role: "component", name: "Select", variant: variant(options.icon && "icon", options.open && "open"), fixed: { width: false, height: !options.open } });
+  probe(surface, {
+    role: "component",
+    name: "Select",
+    variant: variant(inline && "inline", hasIcon && "icon", options.open && "open"),
+    fixed: { width: false, height: inline || !options.open },
+  });
 
   if (options.open) {
     room.dataset.open = "";
@@ -161,9 +207,9 @@ export function select(options: SelectOptions): HTMLElement {
   /** Whether the list fits under the select in the room that clips it, or the window. */
   function growsUp(): boolean {
     const here = room.getBoundingClientRect();
-    // The list's box is laid out while shut, so its height is the open surface's growth, in the
-    // same viewport pixels as the rooms'.
-    const drop = list.getBoundingClientRect().height;
+    // A field's list is laid out while shut, so its height is the open surface's growth; an inline
+    // select's Menu is measured once open. Both in the same viewport pixels as the rooms'.
+    const drop = (inline ? list.parentElement! : list).getBoundingClientRect().height;
     let top = 0;
     let bottom = window.innerHeight;
     for (let up = room.parentElement; up; up = up.parentElement) {
@@ -183,6 +229,8 @@ export function select(options: SelectOptions): HTMLElement {
     delete room.dataset.folding;
     delete room.dataset.taken;
     for (const item of items) item.removeAttribute("data-taken");
+    // An inline select's Menu is laid out only while open, so it opens before it is measured.
+    if (inline) room.dataset.open = "";
     room.toggleAttribute("data-up", growsUp());
     scrollTo(Math.max(0, picked));
     light(Math.max(0, picked));
@@ -237,7 +285,7 @@ export function select(options: SelectOptions): HTMLElement {
   room.addEventListener("transitionend", (event) => {
     if (event.target === room && event.propertyName === "--select-open" && !open) folded();
   });
-  head.addEventListener("click", () => (open ? close() : show()));
+  (inline ? surface : surface.querySelector<HTMLElement>(".k-select-head")!).addEventListener("click", () => (open ? close() : show()));
   items.forEach((item, index) => {
     // Only a pointer that moves takes the highlight: a list opening under a resting pointer keeps
     // it on the pick.
