@@ -56,17 +56,21 @@ crop() {
 # overlay hyprpicker repaints from its own copy of the frame. The capture taken first has neither
 # slurp's box nor the cursor and is the compositor's own pixels; hyprpicker only shows the frozen
 # frame to select on. The trap ends the freeze however the script ends.
+#
+# That capture spans every monitor at the highest scale, tens of megapixels, so it is a raw PPM:
+# a PNG would take about a second to compress before the freeze shows, and as long again to
+# decode for the crop. Only the cropped selection is compressed, into the saved PNG.
 capture_region() {
   local geometry
   scratch=$(mktemp -d)
   trap '[[ -z $picker ]] || kill "$picker" 2>/dev/null || true; rm -rf "$scratch"' EXIT
-  grim "$scratch/full.png"
+  grim -t ppm "$scratch/full.ppm"
   hyprpicker --render-inactive --no-zoom --quiet >/dev/null 2>&1 &
   picker=$!
   wait_for_freeze
   geometry=$(slurp -d) || exit 0
   kill "$picker" 2>/dev/null || true
-  crop "$scratch/full.png" "$1" "$geometry"
+  crop "$scratch/full.ppm" "$1" "$geometry"
 }
 
 picker=
