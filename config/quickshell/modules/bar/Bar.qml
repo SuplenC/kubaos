@@ -8,8 +8,8 @@ import qs.services
 // KubaOS checkout) and the window title.
 // Center: clock (opens the clock popup). Right: recording indicator (while recording), Keep
 // awake and a scheduled action (while on), the Proxy (while on), the keyboard layout (with two
-// or more), the update marker (while a KubaOS release waits), tray, the system monitor (opens its
-// popup), the bell (while there is a notification; opens the notifications panel), status (opens
+// or more), the update marker (while a KubaOS release waits), tray, the counters (while there is
+// one; opens their sheet), the system monitor (opens its popup), the bell (while there is a notification; opens the notifications panel), status (opens
 // the control center), power menu.
 //
 // Every group is a pill as tall as a small control, 4 inside the bar's 40, so each lands on whole
@@ -78,6 +78,8 @@ Item {
         Tray {
             window: root.window
         }
+
+        CountersPill {}
 
         SysmonPill {}
 

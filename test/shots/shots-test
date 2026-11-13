@@ -92,7 +92,7 @@ a_shell_modules_file_renders_its_surface_alone() {
 
 the_frame_renders_every_surface_that_opens_in_it() {
   expect "the frame" "$(touched config/quickshell/modules/frame/Frame.qml)" \
-    "bar clock controlcenter notifications osd powermenu sysmon wallpaper "
+    "bar clock controlcenter counters notifications osd powermenu sysmon wallpaper "
 }
 
 a_specimen_pages_own_file_renders_that_page_alone() {

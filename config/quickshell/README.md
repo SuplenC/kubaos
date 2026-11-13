@@ -95,6 +95,8 @@ services/               singletons, no UI
   Recorder              screen recording state ($XDG_RUNTIME_DIR/dot-record.json, watched), dot-hypr-record calls
   Idle                  Keep awake and the scheduled action ($XDG_RUNTIME_DIR/kubaos-keep-awake.json,
                         kubaos-scheduled.json, watched), kubaos-idle calls
+  Counters              the counters ($XDG_RUNTIME_DIR/kubaos-counters.json, watched), kubaos-counters
+                        calls: every change, what a rule reads as, a counter's history
   Time                  the clock engine (`kubaos-clock serve`, line JSON), clock.toml (watched),
                         the timer, stopwatch and alarms
   Sysmon                the system monitor's stream (`kubaos-sysmon serve`, line JSON, paced by
@@ -108,11 +110,12 @@ components/             blocks composed from KubaOS.Components
   SkeletonRow           a two-line list row still being found, as K.Skeletons
   WallpaperView         a still, or a video looping over its poster (desktop, lock screen, picker)
   Countdown             a popup's time left, stopped while the pointer is on it
+  Well                  a list's well round a scrolling NavList, cut by its own rounded shape
 modules/
   frame/                Frame (one layer per screen: bar, border, every panel, input mask),
                         Exclusions (exclusive zones as four empty windows)
-  bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, SysmonPill, Bell, Status, RecordingIndicator,
-                        IdleIndicator
+  bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, SysmonPill, Bell, CountersPill, Status,
+                        RecordingIndicator, IdleIndicator
   menu/                 Menu: the Command menu on KotodamaSearch, built from KubaOS.Components (its
                         sizes for the screen, its motion). ResultRow, DetailPane + PaneContent,
                         ActionPanel, FormView, ProgressView, DetailView, IntroCard, Label (text that
@@ -121,6 +124,9 @@ modules/
   controlcenter/        ControlCenter, QuickToggles (K.Tile), CaptureRow, Sliders, Wi-Fi/Bluetooth/Audio lists in a Well,
                         KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app)
   notifications/        NotificationPanel, Popups (corner, and the bell's Peek), PopupsBelow (critical, under a panel), ToastList, PopupHold (what a stack of popups keeps while the pointer is on it), CardGroup (one app's notifications: a stack at rest, a preview fanned over the list on hover, opened in place on a click), NotificationCard (a notification on its CardFace, which draws it and folds its text), feed.js (groups, New and Earlier, the peek, a card's buttons), ToastProbe (tests)
+  counters/             CountersSheet (the counters' pill's sheet, from the bar's corner): CounterRow,
+                        CounterMenu (a row's menu, Auto reset in its place), HistoryPage,
+                        counters.js (checks, the menu's entries, the history's rows)
   osd/                  volume / brightness OSD
   lock/                 Lock (WlSessionLock), LockSurface, Auth (PAM)
   powermenu/            PowerMenu

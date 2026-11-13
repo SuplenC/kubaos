@@ -37,6 +37,22 @@ controlcenter-proxy-ovpn controlcenter  FrameShot   1176,0,424,1000   controlcen
 clock                    clock          FrameShot   400,0,800,800     clock answer
 clock-settings           clock          FrameShot   400,0,800,800     clock settings
 clock-select-closed      clock          FrameShot   400,0,800,800     clock select-closed
+counters                 counters       FrameShot   1000,0,600,720    counters
+counters-stop            counters       FrameShot   1000,0,600,720    counters stop
+counters-menu            counters       FrameShot   1000,0,600,720    counters menu
+counters-hold            counters       FrameShot   1000,0,600,720    counters hold
+counters-auto            counters       FrameShot   1000,0,600,720    counters auto
+counters-auto-unread     counters       FrameShot   1000,0,600,720    counters auto-unread
+counters-auto-invalid    counters       FrameShot   1000,0,600,720    counters auto-invalid
+counters-reach           counters       FrameShot   1000,0,600,720    counters reach
+counters-rename          counters       FrameShot   1000,0,600,720    counters rename
+counters-rename-invalid  counters       FrameShot   1000,0,600,720    counters rename-invalid
+counters-value           counters       FrameShot   1000,0,600,720    counters value
+counters-value-invalid   counters       FrameShot   1000,0,600,720    counters value-invalid
+counters-new             counters       FrameShot   1000,0,600,720    counters new
+counters-history         counters       FrameShot   1000,0,600,720    counters history
+counters-history-week    counters       FrameShot   1000,0,600,720    counters history-week
+counters-history-empty   counters       FrameShot   1000,0,600,720    counters history-empty
 sysmon                   sysmon         FrameShot   1176,0,424,1000   sysmon
 sysmon-fine              sysmon         FrameShot   1176,0,424,1000   sysmon fine
 sysmon-critical          sysmon         FrameShot   1176,0,424,1000   sysmon critical
