@@ -986,6 +986,7 @@ coffee = { tabler = "coffee" }
 computer = { tabler = "device-laptop" }
 content_paste = { tabler = "clipboard" }
 dark_mode = { tabler = "moon" }
+delete = { tabler = "trash" }
 deployed_code = { tabler = "package" }
 desktop_windows = { tabler = "device-desktop" }
 developer_board = { tabler = "cpu-2" }
@@ -1003,6 +1004,7 @@ folder = { tabler = "folder" }
 folder_open = { tabler = "folder-open" }
 hard_drive = { drawn = "A drive's case in server-2's proportions, its board below a line, server-2's light and slot" }
 headphones = { tabler = "headphones" }
+history = { tabler = "history" }
 hourglass_top = { tabler = "hourglass-high" }
 info = { tabler = "info-circle" }
 key = { tabler = "key" }
@@ -1047,6 +1049,8 @@ push_pin = { tabler = "pin" }
 radar = { tabler = "radar" }
 radio_button_checked = { tabler = "circle-dot" }
 radio_button_unchecked = { tabler = "circle" }
+remove = { tabler = "minus" }
+repeat = { tabler = "repeat" }
 replay_30 = { tabler = "rewind-backward-30" }
 restart_alt = { tabler = "rotate" }
 rocket_launch = { tabler = "rocket" }
@@ -1069,6 +1073,7 @@ stop = { tabler = "player-stop" }
 storage = { tabler = "database" }
 swap_vert = { tabler = "arrows-sort" }
 system_update_alt = { tabler = "download" }
+tallymarks = { tabler = "tallymarks" }
 terminal = { tabler = "terminal-2" }
 thermostat = { tabler = "temperature" }
 timer = { tabler = "stopwatch" }
