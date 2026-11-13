@@ -599,6 +599,40 @@ install_zswap() {
   fi
 }
 
+# install_desktop_memory: the desktop's memory reserve, MemoryLow on each
+# level from user.slice down to Hyprland's session, the session's services
+# and the Command menu (laid out in files/systemd/user.slice.d/kubaos-desktop.conf),
+# so a build that fills RAM gives up its own pages before the desktop's. The
+# system manager and each logged-in user's reread their units at once.
+# systemd-oomd comes with the `memory` group, with its own defaults.
+# 20-base.sh runs it, and a migration on machines installed before it.
+install_desktop_memory() {
+  local file dest user reload=0
+  local files=(
+    systemd/user.slice.d/kubaos-desktop.conf
+    systemd/user-.slice.d/kubaos-desktop.conf
+    systemd/session-.scope.d/kubaos-desktop.conf
+    systemd/user@.service.d/kubaos-desktop.conf
+    systemd/user/session.slice.d/kubaos-desktop.conf
+    systemd/user/app.slice.d/kubaos-desktop.conf
+    systemd/user/kotodamad.service.d/kubaos-desktop.conf
+  )
+  for file in "${files[@]}"; do
+    case $file in
+      systemd/user/*) dest="/etc/systemd/user/${file#systemd/user/}" ;;
+      *) dest="/etc/systemd/system/${file#systemd/}" ;;
+    esac
+    same_content "$FILES_DIR/$file" "$dest" || reload=1
+    install_root_file "$FILES_DIR/$file" "$dest" 0644
+  done
+  ((reload && !IMAGE_BUILD)) && has_systemd && ! in_container || return 0
+  sudo_run systemctl daemon-reload
+  for user in $(loginctl list-users --no-legend 2>/dev/null | awk '{print $2}'); do
+    sudo_run systemctl --user --machine="$user@" daemon-reload ||
+      warn "$user's session keeps its memory settings until the next login"
+  done
+}
+
 # install_arp_per_interface: each interface answers ARP only for its own
 # addresses (system/files/sysctl.d/60-kubaos-arp.conf), so a cable and Wi-Fi on
 # one network don't take each other's address as a conflict. Applied at once on

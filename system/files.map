@@ -79,9 +79,14 @@ systemd/kubaos-scx.service                              update
 systemd/kubaos-shutdown-splash.service                  install_shutdown_splash
 systemd/plymouth-shutdown.d/kubaos-after-session.conf   install_shutdown_splash
 systemd/polkit-agent-helper@.service.d/u2f.conf         system/70-bitwarden.sh
+systemd/session-.scope.d/kubaos-desktop.conf           install_desktop_memory
 systemd/snapper-boot.service.d/kubaos-not-in-snapshot.conf system/25-boot.sh
 systemd/system.conf.d/kubaos-timeouts.conf              install_fast_shutdown_boot
 systemd/user.conf.d/kubaos-timeouts.conf                install_fast_shutdown_boot
+systemd/user.slice.d/kubaos-desktop.conf               install_desktop_memory
+systemd/user-.slice.d/kubaos-desktop.conf              install_desktop_memory
+systemd/user@.service.d/kubaos-desktop.conf            install_desktop_memory
+systemd/user/*                                          install_desktop_memory
 
 tmpfiles.d/kubaos-zswap.conf                            install_zswap
 tmpfiles.d/qs-lock-unix-chkpwd.conf                     system/50-hyprland.sh
