@@ -1146,7 +1146,7 @@ terminal = true
 shown_when = { state = "kubaos.preview", is = true }
 
 [extensions.kubaos.actions.channel]
-title = "Switch channel (stable/edge)"
+title = "Switch channel"
 subtitle = "Stable: signed releases. Edge: origin/main as it lands, bugs included"
 icon = "preferences-system"
 keywords = ["release channel", "stable", "edge", "updates"]
@@ -1402,6 +1402,7 @@ title = "Countdown in the bar"
 subtitle = "Show a countdown next to the bar's clock, by name, or none"
 icon = "alarm-symbolic"
 keywords = ["countdown", "bar", "clock"]
+names = ["bar-countdown"]
 run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1) || notify-send -a Clock -u critical Clock "$out"', "sh", "set", "bar-countdown", "{name}"]
 arguments = [{ name = "name", placeholder = "Vacation, or none" }]
 
@@ -1419,6 +1420,7 @@ title = "Remove time zone"
 subtitle = "Take an extra clock out of the popup"
 icon = "preferences-system-time"
 keywords = ["time zone", "world clock", "clock", "delete"]
+names = ["remove-zone"]
 run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1) || notify-send -a Clock -u critical Clock "$out"', "sh", "zone", "remove", "{zone}"]
 arguments = [{ name = "zone", placeholder = "Tokyo" }]
 
@@ -1427,6 +1429,7 @@ title = "Holidays country"
 subtitle = "Whose public holidays the calendar marks and working days leave out: pl, de, gb, us, none"
 icon = "x-office-calendar"
 keywords = ["holidays", "calendar", "country", "public holidays", "bank holidays"]
+names = ["holidays"]
 run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1) || notify-send -a Clock -u critical Clock "$out"', "sh", "set", "holidays", "{country}"]
 arguments = [{ name = "country", placeholder = "pl" }]
 
@@ -1435,6 +1438,7 @@ title = "First day of the week"
 subtitle = "The calendar's first column: monday, sunday or any other day"
 icon = "x-office-calendar"
 keywords = ["calendar", "week start", "monday", "sunday"]
+names = ["week-start"]
 run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1) || notify-send -a Clock -u critical Clock "$out"', "sh", "set", "first-weekday", "{day}"]
 arguments = [{ name = "day", placeholder = "monday" }]
 
@@ -1466,7 +1470,7 @@ title = "Start timer"
 subtitle = "Rings with a notification and a sound: 25m, 1h30m, 90 seconds"
 icon = "alarm-symbolic"
 keywords = ["timer", "countdown", "pomodoro", "kitchen timer"]
-names = ["clock-timer"]
+names = ["timer"]
 run = ["qs", "ipc", "call", "clock", "timer", "{duration}"]
 arguments = [{ name = "duration", placeholder = "25m" }]
 
@@ -1475,7 +1479,7 @@ title = "Set alarm"
 subtitle = "Rings at a time with a notification and a sound: 7:30, 6pm, friday 17:00"
 icon = "alarm-symbolic"
 keywords = ["alarm", "wake up", "reminder", "clock"]
-names = ["clock-alarm"]
+names = ["alarm"]
 run = ["qs", "ipc", "call", "clock", "alarm", "{time}"]
 arguments = [{ name = "time", placeholder = "7:30" }]
 
@@ -1512,6 +1516,7 @@ title = "Pick bar metrics"
 subtitle = "What the bar's monitor pill shows, in order: cpu, ram, temp, gpu, net, power"
 icon = "utilities-system-monitor"
 keywords = ["system monitor", "bar", "pill", "metrics", "temperature", "network", "battery draw"]
+names = ["bar-metrics"]
 run = ["sh", "-c", 'out=$(kubaos-sysmon "$@" 2>&1) || notify-send -a "System monitor" -u critical "System monitor" "$out"', "sh", "set", "metrics", "{metrics}"]
 arguments = [{ name = "metrics", placeholder = "cpu ram temp" }]
 
@@ -1535,6 +1540,7 @@ title = "System monitor threshold"
 subtitle = "Where the pill turns red and alerts fire: cpu-temp 85, ram 90, disk 95, battery-draw 30"
 icon = "utilities-system-monitor"
 keywords = ["system monitor", "threshold", "temperature", "alert", "limit"]
+names = ["threshold"]
 run = ["sh", "-c", 'out=$(kubaos-sysmon "$@" 2>&1) || notify-send -a "System monitor" -u critical "System monitor" "$out"', "sh", "set", "{setting}", "{value}"]
 arguments = [{ name = "setting", placeholder = "cpu-temp, ram, disk or battery-draw" }, { name = "value", placeholder = "85" }]
 
