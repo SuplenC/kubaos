@@ -207,11 +207,13 @@ function deviceMenu(device: string, devices: readonly string[]): HTMLElement {
   return room;
 }
 
-/** One app's row: its tile, its name over its device, then its slider across, its icon muting it. */
+/** One app's row: its tile, its name over its device, then its slider across, its icon muting it.
+    The name lines up with the tile's top and the device button's taller box hangs below it, so
+    the name never rides above the tile. */
 function appRow(app: App, devices: readonly string[], input: boolean): HTMLElement {
   const tile = iconTile({ glyph: input ? "mic" : "volume_up", size: "Md", picture: app.picture });
   const words = stack(0, "start", filling(clamped(app.name, "body_strong")), deviceMenu(app.device, devices));
-  const head = row("s12", "centre", tile, filling(words));
+  const head = row("s12", "start", tile, filling(words));
   const level = slider({
     icon: input ? "mic" : volumeIcon(app.level),
     size: "Compact",
