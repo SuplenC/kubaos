@@ -1,19 +1,45 @@
 // The Audio panel (`config/quickshell/modules/audio/`): a PanelPage on a Sheet at the frame's right
 // edge, opened by the mute pill's right-click, the Command menu or its hotkey. Its sliders, the
-// mic's live Meter, a headset's Calls and Music, then Output, Input and Options over their cards.
+// mic's live Meter, the Device card (the default device, a headset's Calls and Music and codec),
+// then Output, Input and Options over their cards, each side's device and each app's.
 
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Track } from "../../site/page.ts";
 import { ALL } from "../../site/settings.ts";
-import { type AudioOptions, audioPanel, LONG_APP, LONG_DEVICE, MANY, NO_APPS, onScreen, PLAYING, shot, SHORT } from "./audio-parts.ts";
+import {
+  type AudioOptions,
+  audioPanel,
+  BUILT_IN_MIC,
+  HEADSET,
+  LONG_APP,
+  LONG_DEVICE,
+  linkOf,
+  MANY,
+  NO_APPS,
+  onScreen,
+  PLAYING,
+  SCREEN,
+  shot,
+  SHORT,
+  SPEAKERS,
+  USB_HEADSET,
+} from "./audio-parts.ts";
 
 type Shown = "rest" | "lit" | "selected" | "disabled" | "empty";
 
 const draw = (options: AudioOptions = {}, height?: string) => screen(() => shot(options, height));
 
+/** A Bluetooth headset as the default, in Calls and in Music. */
+const CALLS: AudioOptions = { device: HEADSET, mode: "calls" };
+const MUSIC: AudioOptions = { device: HEADSET, mode: "music" };
+/** A USB headset as the default: it plays and records at once, so no Calls or Music, no codec. */
+const USB: AudioOptions = { device: USB_HEADSET };
+/** A default with no mic and none picked for Input: the screen. */
+const NO_MIC: AudioOptions = { device: SCREEN, inputDevice: null };
+
 /** The stage's panel: live, a headset in Calls, the keyboard on the output's slider. */
 function live(): HTMLElement {
-  const panel = audioPanel({ headset: "calls", live: true });
+  const panel = audioPanel({ ...CALLS, live: true });
   const room = onScreen(panel.element);
   if (!ALL) requestAnimationFrame(panel.land);
   return room;
@@ -35,7 +61,7 @@ const OPENING: Move = {
     { part: SCRIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   back: "cuts",
-  sample: () => shot({ headset: "calls" }),
+  sample: () => shot(CALLS),
 };
 
 const CLOSING: Move = {
@@ -50,7 +76,7 @@ const CLOSING: Move = {
     { part: SCRIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
   ],
   back: "cuts",
-  sample: () => shot({ headset: "calls" }),
+  sample: () => shot(CALLS),
 };
 
 /** A pick along a row of Tabs, `well` the row's place among the panel's: Tabs' own move, then what changes. */
@@ -78,13 +104,13 @@ const TO_INPUT: Move = {
   tracks: picking(".audio-body > :last-child", false, [{ part: CARDS, on: "Input", target: ".audio-tab", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }]),
   reduced: picking(".audio-body > :last-child", true, [{ part: CARDS, on: "Input", target: ".audio-tab", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }]),
   back: "cuts",
-  sample: () => shot({ headset: "calls", tab: 1, tabFrom: 0 }),
+  sample: () => shot({ ...CALLS, tab: 1, tabFrom: 0 }),
 };
 
 const LINE = "the line under the mode";
 const TO_MUSIC: Move = {
   name: "Calls to Music",
-  what: "Music picked: its stretch glides, its line fades in over `short`; the mic and Input change at once.",
+  what: "Music picked: its stretch glides, its line fades in over `short`; the codecs, the mic and Input change at once.",
   tracks: picking(".audio-body > :nth-child(2)", false, [
     { part: LINE, on: "Music", target: ".audio-line", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
   ]),
@@ -92,12 +118,12 @@ const TO_MUSIC: Move = {
     { part: LINE, on: "Music", target: ".audio-line", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
   ]),
   back: "cuts",
-  sample: () => shot({ headset: "music", modeFrom: "calls" }),
+  sample: () => shot({ ...MUSIC, modeFrom: "calls" }),
 };
 
 const ROWS = [
   { name: "Laptop", options: {} },
-  { name: "Headset", options: { headset: "calls" } },
+  { name: "Bluetooth", options: CALLS },
 ] as const satisfies readonly { name: string; options: AudioOptions }[];
 
 function cell(base: AudioOptions): (state: Shown) => HTMLElement {
@@ -110,7 +136,7 @@ function cell(base: AudioOptions): (state: Shown) => HTMLElement {
       case "selected":
         return shot({ ...base, tab: 1 });
       case "disabled":
-        return shot({ ...base, headset: "music" });
+        return shot({ ...base, ...MUSIC });
       case "empty":
         return shot({ ...base, playing: [] });
     }
@@ -121,25 +147,32 @@ export default page<Shown>({
   level: "shell",
   slug: "audio-panel",
   title: "Audio panel",
-  lede: "Output and mic in one sheet: levels, the mic's meter, a headset's mode, then devices, apps and options.",
+  lede: "Output and mic in one sheet: levels, the mic's meter, the default device, then each side's, each app's, and options.",
   code: { qml: "AudioPanel", unbuilt: "QML: not built yet" },
   from: ["panel-page", "slider", "meter", "tabs", "card", "select", "list", "empty-state"],
   stage: { live, hint: "drag, Space mutes; Calls/Music; tabs; Esc", daylight: true },
   variants: [
-    { name: "Laptop, Output", for: "no headset: no Calls or Music", sample: draw() },
-    { name: "Laptop, Input", for: "the mic's Device and the apps recording", sample: draw({ tab: 1 }) },
+    { name: "Laptop, Output", for: "the speakers: Calls and Music disabled", sample: draw() },
+    { name: "Laptop, Input", for: "the built-in mic picked over the speakers", sample: draw({ tab: 1 }) },
     { name: "Laptop, Options", for: "three switch rows", sample: draw({ tab: 2 }) },
-    { name: "Headset in Calls, Output", for: "Calls picked, its line", sample: draw({ headset: "calls" }) },
-    { name: "Headset in Calls, Input", for: "the headset's mic picked", sample: draw({ headset: "calls", tab: 1 }) },
-    { name: "Headset in Music, Output", for: "the mic Muted, its meter empty, Input dimmed", sample: draw({ headset: "music" }) },
-    { name: "Headset in Music, Input", for: "Input was open: its EmptyState, Switch to Calls", sample: draw({ headset: "music", tab: 1 }) },
+    { name: "Bluetooth in Music, Output", for: "its codec; the mic Muted, Input dimmed", sample: draw(MUSIC) },
+    { name: "Bluetooth, its tooltip", for: `the link and codec: ${linkOf(HEADSET, "LDAC")}`, sample: draw({ ...MUSIC, tooltip: true }) },
+    { name: "Bluetooth in Calls, Output", for: "Calls picked, its line, its codecs", sample: draw(CALLS) },
+    { name: "Bluetooth in Calls, Input", for: "the headset's mic as the default", sample: draw({ ...CALLS, tab: 1 }) },
+    { name: "Music mode, Input", for: "the headset's mic: EmptyState, Switch to Calls", sample: draw({ ...MUSIC, tab: 1 }) },
+    { name: "Music mode, another mic", for: "Input enabled, the built-in mic picked", sample: draw({ ...MUSIC, inputDevice: BUILT_IN_MIC, tab: 1 }) },
+    { name: "USB headset, Input", for: "Calls and Music disabled, no codec", sample: draw({ ...USB, tab: 1 }) },
+    { name: "A default with no mic", for: `Input: No mic on ${SCREEN.name}`, sample: draw({ ...NO_MIC, tab: 1 }) },
+    { name: "Output on another device", for: "the speakers over the headset", sample: draw({ ...CALLS, outputDevice: SPEAKERS }) },
+    { name: "An app's device, lit", for: "its words and chevron in the accent", sample: draw({ appPicker: "lit" }) },
+    { name: "An app's device, open", for: "its Menu under the words", sample: draw({ appPicker: "open" }) },
     { name: "Both muted", for: "each slider's Toggled; the meter empty", sample: draw({ outputMuted: true, inputMuted: true }) },
     { name: "Boosted past 100%", for: "125%, past the dot at 100%", sample: draw({ output: 1.25 }) },
     { name: "Balance off centre", for: "the knob at Left 30%", sample: draw({ balance: 0.35 }) },
   ],
   sizes: [
-    { name: "A 1000-high screen", for: "as tall as its content", sample: draw({ headset: "calls" }) },
-    { name: "A short screen", for: "the body scrolls under the header", sample: draw({ headset: "calls", playing: MANY }, SHORT) },
+    { name: "A 1000-high screen", for: "as tall as its content", sample: draw(CALLS) },
+    { name: "A short screen", for: "the body scrolls under the header", sample: draw({ ...CALLS, playing: MANY }, SHORT) },
   ],
   states: {
     shown: ["rest", "lit", "selected", "disabled", "empty"],
@@ -161,7 +194,14 @@ export default page<Shown>({
   content: {
     text: [
       { name: "An app's name", words: { short: "mpv", long: LONG_APP.name }, sample: (words: string) => shot({ playing: [{ ...PLAYING[0]!, name: words }] }) },
-      { name: "A device's name", words: { short: "WH-1000XM4", long: LONG_DEVICE }, sample: (words: string) => shot({ outputDevice: words, playing: [{ ...PLAYING[0]!, device: words }] }) },
+      {
+        name: "A device's name",
+        words: { short: "WH-1000XM4", long: LONG_DEVICE.name },
+        sample: (words: string) => {
+          const device = { ...LONG_DEVICE, name: words };
+          return shot({ device, playing: [{ ...PLAYING[0]!, device }] });
+        },
+      },
     ],
     missingPicture: [{ name: "An app with no icon", for: "its tile keeps the symbol", sample: draw({ playing: [{ ...PLAYING[0]!, picture: "" }, PLAYING[1]!] }) }],
     counts: [
@@ -174,7 +214,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING],
     leaves: [CLOSING],
-    between: [TO_INPUT, TO_MUSIC, ...powerMoves(() => shot({ headset: "calls", landed: true }))],
+    between: [TO_INPUT, TO_MUSIC, ...powerMoves(() => shot({ ...CALLS, landed: true }))],
   },
   keyboard: {
     keys: [
@@ -182,16 +222,16 @@ export default page<Shown>({
       { keys: ["←", "→", "h", "l"], does: "a slider's level; on Tabs, the choice beside" },
       { keys: ["Home", "End"], does: "a slider to 0 or its most" },
       { keys: ["Space"], does: "on a slider: its icon, muting" },
-      { keys: ["Enter", "↑", "↓"], does: "a Select or a device menu: open, then pick" },
+      { keys: ["Enter", "↑", "↓"], does: "a Select, an app's too: open, then pick" },
       { keys: ["Esc"], does: "an open menu shuts; else the panel closes" },
     ],
-    order: "Output's slider, the mic's, Calls/Music, the tabs, then the picked tab's controls in reading order.",
+    order: "Output's slider, the mic's, the device, Calls/Music, the codec, the tabs, then the picked tab's controls in reading order.",
     lands: "Opening, on the output's slider; closing, back where the keyboard was.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "Headset, Output", for: "width, sections, cards", sample: draw({ headset: "calls" }) },
-      { name: "A short screen", for: "the body scrolls", sample: draw({ headset: "calls", playing: MANY }, SHORT) },
+      { name: "Bluetooth, Output", for: "width, sections, cards", sample: draw(CALLS) },
+      { name: "A short screen", for: "the body scrolls", sample: draw({ ...CALLS, playing: MANY }, SHORT) },
     ]),
     measures: [
       { part: "Panel's width", token: "size-panel" },
@@ -200,7 +240,9 @@ export default page<Shown>({
       { part: "Sliders' height", token: "size-slider_compact" },
       { part: "Sliders and meter apart", token: "space-s8" },
       { part: "Meter's height", token: "size-progress" },
+      { part: "Device card's parts apart", token: "space-s8" },
       { part: "Calls/Music to its line", token: "space-s4" },
+      { part: "Codec's label to its Select", token: "space-s8" },
       { part: "Line's inset", token: "space-s12" },
       { part: "Tabs' height", token: "size-control_sm" },
       { part: "Tabs to cards, cards apart", token: "space-s12" },
@@ -208,10 +250,11 @@ export default page<Shown>({
       { part: "Card's label to its parts", token: "space-s8" },
       { part: "Between app rows", token: "space-s16" },
       { part: "App's tile", token: "size-control_md" },
+      { part: "Tile to name and device", token: "space-s12" },
     ],
     reflow: {
       note: "It keeps `size.panel`; past the screen's room the body scrolls under the header.",
-      sample: draw({ headset: "calls", playing: MANY }, SHORT),
+      sample: draw({ ...CALLS, playing: MANY }, SHORT),
     },
   },
 });

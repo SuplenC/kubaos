@@ -5,7 +5,7 @@
 import { row } from "../../lib/layout.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
-import { shot as panelShot } from "./audio-parts.ts";
+import { HEADSET, shot as panelShot } from "./audio-parts.ts";
 import {
   type CirclePinned,
   LONG_PLAYER,
@@ -123,7 +123,7 @@ const FIVE: readonly Player[] = [...PLAYERS, LONG_PLAYER, { app: "mpv", picture:
 
 /** A row's cell: the mute pill or now playing, pinned on its first circle, or open. */
 function muteCell(state: State): HTMLElement {
-  if (state === "open") return panelShot({ headset: "calls" });
+  if (state === "open") return panelShot({ device: HEADSET });
   return state === "rest" ? mutePill({ input: { recording: true } }) : mutePill({ input: { recording: true }, pinned: { side: "output", state } });
 }
 

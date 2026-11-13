@@ -1,5 +1,6 @@
 // The Select page: `docs/design/components/select.md` is its full reference. One of a list too
-// long for radio rows or tabs: a field's look that grows into its list.
+// long for radio rows or tabs: a field's look that grows into its list, or the inline look, its
+// words and chevron in a line of text with its Menu built in.
 
 import { shown, type Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
@@ -30,6 +31,25 @@ function many(extra: Partial<SelectOptions> = {}): SelectOptions {
   return { options: MANY, picked: 11, icon: "flag", placeholder: "Pick a country", ...extra };
 }
 
+/** The Audio panel's devices, each with the symbol of how it connects. */
+const DEVICES = ["Built-in speakers", "WH-1000XM4", "Arctis Nova Pro Wireless", "Headphones", "LG ULTRAGEAR"];
+const DEVICE_ICONS = ["device_laptop", "bluetooth", "usb", "headphones", "device_tv"];
+
+/** The default device, each option with its own symbol. */
+function devices(extra: Partial<SelectOptions> = {}): SelectOptions {
+  return { options: DEVICES, icons: DEVICE_ICONS, picked: 1, ...extra };
+}
+
+/** An app's device, inline under its name: Default first, then every device. */
+function inline(extra: Partial<SelectOptions> = {}): SelectOptions {
+  return { look: "inline", options: ["Default", ...DEVICES], icons: ["bluetooth", ...DEVICE_ICONS], picked: 0, ...extra };
+}
+
+/** An inline select under the name it belongs to, as an app's row has it. */
+function named(options: SelectOptions): HTMLElement {
+  return within(ROOM, stack(0, "start", text("Spotify", "body_strong"), select(options)));
+}
+
 /** A select with no symbol: how often something runs. */
 function often(extra: Partial<SelectOptions> = {}): SelectOptions {
   return { options: ["Every 5 minutes", "Hourly", "Daily"], picked: 0, placeholder: "How often", ...extra };
@@ -38,13 +58,15 @@ function often(extra: Partial<SelectOptions> = {}): SelectOptions {
 const ROWS = [
   { name: "With a symbol", options: holidays },
   { name: "Without", options: often },
+  { name: "Inline", options: inline },
 ] as const;
 
 type MatrixState = "rest" | "lit" | "pressed" | "open" | "disabled";
 
 function cell(options: (extra?: Partial<SelectOptions>) => SelectOptions, state: MatrixState): HTMLElement {
-  if (state === "open") return boxed(options({ open: true }));
-  return boxed(options(stateOptions(state as Shown)));
+  const draw = options === inline ? named : boxed;
+  if (state === "open") return draw(options({ open: true }));
+  return draw(options(stateOptions(state as Shown)));
 }
 
 /** A select shut and lit, and the same with no symbol: what the lighting moves play on. */
@@ -100,13 +122,21 @@ export default page({
   lede: "One of a list too long for radio rows or tabs: a field's look that grows into its list.",
   code: { rust: "select::select", qml: "Select" },
   stage: {
-    live: () => within("var(--size-column)", stack("s16", "start", select(holidays()), select(many()), select(often()))),
+    live: () =>
+      within(
+        "var(--size-column)",
+        stack("s16", "start", select(holidays()), select(many()), select(devices()), select(often()), stack(0, "start", text("Spotify", "body_strong"), select(inline()))),
+      ),
     hint: "click it, or Tab and ↓",
     daylight: true,
   },
   variants: [
     { name: "With a symbol", for: "options a symbol helps place", sample: () => boxed(holidays()) },
     { name: "Without", for: "plain options", sample: () => boxed(often()) },
+    { name: "A symbol each", for: "devices, by how they connect", sample: () => boxed(devices()) },
+    { name: "A symbol each, open", for: "every row with its own", sample: () => boxed(devices({ open: true })) },
+    { name: "Inline", for: "a choice in a line of text: an app's device", sample: () => named(inline()) },
+    { name: "Inline, open", for: "its Menu under the words", sample: () => named(inline({ open: true })) },
     { name: "With a placeholder", for: "nothing picked yet", sample: () => boxed(holidays({ picked: -1 })) },
     { name: "A long list", for: "eight in view, the pick three rows down", sample: () => boxed(many({ open: true })) },
     { name: "Growing upward", for: "too near its room's foot", sample: () => boxed(holidays({ open: true, up: true })) },
@@ -130,9 +160,9 @@ export default page({
     },
   },
   focus: {
-    tubes: [{ name: "Every select, shut", tone: "accent", filled: false, content: false }],
+    tubes: [{ name: "Every select, shut, but inline", tone: "accent", filled: false, content: false }],
     looks: {
-      lit: "the tube over the hairline, the glow outside",
+      lit: "the tube over the hairline, glow outside; inline: words `primary_lit`",
       signsOff: "the tube as `primary_glass`, no glow",
     },
     signsOff: (index: number) => cell((extra) => ROWS[index]!.options({ ...extra, pinned: "signs-off" }), "rest"),
@@ -142,6 +172,7 @@ export default page({
     missingPicture: [{ name: "No symbol", for: "words start `space.s12` in", sample: () => boxed(often()) }],
     counts: [
       { name: "Nothing picked", for: "the placeholder", sample: () => boxed(holidays({ picked: -1 })) },
+      { name: "Inline, a long pick", for: "it ends in an ellipsis", sample: () => named(inline({ options: [OPTION.long], icons: [], picked: 0 })) },
       { name: "A few options", for: "as tall as they are", sample: () => boxed(holidays({ open: true, highlight: 1 })) },
       { name: "Many", for: "eight in view, the rest scroll", sample: () => boxed(many({ open: true })) },
     ],
@@ -176,6 +207,7 @@ export default page({
     samples: nonEmpty([
       { name: "With a symbol", for: "height, inset, symbol, chevron", sample: () => boxed(holidays()) },
       { name: "Open", for: "value row, rule, list padding, rows", sample: () => boxed(holidays({ open: true })) },
+      { name: "Inline, open", for: "words, chevron, the Menu's place", sample: () => named(inline({ open: true })) },
     ]),
     measures: [
       { part: "Height", token: "size-control_md" },
@@ -190,6 +222,11 @@ export default page({
       { part: "Option row", token: "size-control_sm" },
       { part: "Shadow drop", token: "elevation-2-ambient-y" },
       { part: "Shadow blur", token: "elevation-2-ambient-blur" },
+      { part: "Inline: words", token: "type-small-line" },
+      { part: "Inline: words → chevron", token: "space-s4" },
+      { part: "Inline: chevron", token: "type-small-icon" },
+      { part: "Inline: words → Menu", token: "space-s4" },
+      { part: "Inline: Menu's width", token: "size-menu" },
     ],
     reflow: {
       note: "It fills the room it is given; the pick ends in an ellipsis where it doesn't fit.",

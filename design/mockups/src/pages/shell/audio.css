@@ -1,5 +1,5 @@
 /* The Audio panel's own boxes (`audio-parts.ts`): the line under Calls and Music, the picked tab's
-   room, and each app's device menu. */
+   room, and an app's device drawn open. */
 
 /* Calls and Music's line, its words `space.s12` in, as a slider's are from its ends. */
 .audio-line {
@@ -10,18 +10,15 @@
   display: block;
 }
 
-/* An app's device: a Text sm button whose words line up with the app's name over it, its padding
-   reaching back into the gap after the tile. */
-.audio-device {
-  position: relative;
-  display: block;
-  margin-inline-start: calc(-1 * var(--space-s12));
+/* An app's device drawn open hangs its Menu over the rows under it, as a live one does, rather
+   than in the flow, so the row's tile stays centred on the name and the pick. */
+.audio-app .k-select-room[data-look="inline"][data-shown] > .k-select-popover {
+  position: absolute;
+  top: calc(100% + var(--space-s4));
+  margin-top: 0;
 }
 
-/* The device's Menu, `space.s4` under its button, starting where the button does. */
-.audio-device-menu {
-  position: absolute;
-  z-index: 2;
-  top: calc(100% + var(--space-s4));
-  left: 0;
+.audio-app .k-select-room[data-look="inline"][data-shown][data-up] > .k-select-popover {
+  top: auto;
+  bottom: calc(100% + var(--space-s4));
 }
