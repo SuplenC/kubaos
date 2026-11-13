@@ -56,6 +56,14 @@ function slot(char: string, style: TypeStyle, color: string): HTMLElement {
   return box;
 }
 
+/**
+ * The figures' slots of a rolling number, in order: its own children of that class alone, since an
+ * owner may hang a hint or anything else inside its box.
+ */
+function slotsOf(element: HTMLElement): HTMLElement[] {
+  return [...element.querySelectorAll<HTMLElement>(":scope > .k-roll-slot")];
+}
+
 export function rollingNumber(options: RollingOptions): Rolling {
   const style = options.style ?? "mono_large";
   const color = options.color ?? "on_surface";
@@ -76,8 +84,8 @@ export function rollingNumber(options: RollingOptions): Rolling {
     const words = COUNT.format(next);
     const width = Math.max(words.length, shown.length);
     const [was, now] = [shown.padStart(width, " "), words.padStart(width, " ")];
-    while (element.children.length < width) element.prepend(slot("", style, color));
-    const slots = [...element.children] as HTMLElement[];
+    while (slotsOf(element).length < width) element.prepend(slot("", style, color));
+    const slots = slotsOf(element);
     const reduced = settings().reduced;
     slots.forEach((box, index) => {
       if (was[index] === now[index]) return;
@@ -125,8 +133,8 @@ export function rollingMidway(from: number, to: number, widest: string, style: T
   const [a, b] = [COUNT.format(from), COUNT.format(to)];
   const width = Math.max(a.length, b.length);
   const [was, now] = [a.padStart(width, " "), b.padStart(width, " ")];
-  while (made.element.children.length < width) made.element.prepend(slot("", style, "on_surface"));
-  ([...made.element.children] as HTMLElement[]).forEach((box, index) => {
+  while (slotsOf(made.element).length < width) made.element.prepend(slot("", style, "on_surface"));
+  slotsOf(made.element).forEach((box, index) => {
     if (was[index] === now[index]) return;
     box.style.setProperty("--way", String(way));
     box.querySelector<HTMLElement>(".k-roll-figure")?.setAttribute("data-out", "");

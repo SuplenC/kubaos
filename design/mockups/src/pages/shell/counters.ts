@@ -117,7 +117,8 @@ const COUNTS: Move = {
   sample: () => {
     const sample = rowAlone(COUNTERS[0]!, { widest: "000" });
     // The value caught as it starts to roll from 3 to 4.
-    const slot = sample.querySelector<HTMLElement>(".k-roll-slot:last-child");
+    // The ones figure's slot: the value's box holds its hint too, so it is the last slot, not the last child.
+    const slot = [...sample.querySelectorAll<HTMLElement>(".k-rolling > .k-roll-slot")].at(-1);
     const old = slot?.querySelector<HTMLElement>(".k-roll-figure");
     if (slot && old) {
       slot.style.setProperty("--way", "1");
