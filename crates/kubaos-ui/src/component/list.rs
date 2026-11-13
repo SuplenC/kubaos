@@ -334,7 +334,8 @@ pub fn list<'a, M: 'a>(look: &Look, rows: impl IntoIterator<Item = Element<'a, M
 }
 
 /// `rows` 4 apart straight on the surface, with no well: no fill, edge or padding. The focus tube
-/// lights their edge while the list has the keyboard.
+/// lights their edge while the list has the keyboard, at the rows' own corner, so the tube and a
+/// lit or hovered row at its edge are one shape.
 pub fn flush_list<'a, M: 'a>(
     look: &Look,
     rows: impl IntoIterator<Item = Element<'a, M>>,
@@ -487,7 +488,13 @@ fn well<'a, M: 'a>(
     } else {
         rows.into()
     };
-    let view: Element<'a, M> = focus_ring(look, well, WELL_RADIUS, focused, RingColor::Accent);
+    // A flush list's edge is its rows' edge: the tube takes their corner.
+    let corner = if drawn == Well::Flush {
+        ROW_RADIUS
+    } else {
+        WELL_RADIUS.corner()
+    };
+    let view: Element<'a, M> = focus_ring(look, well, corner, focused, RingColor::Accent);
     let variant = if drawn == Well::Flush { "Flush" } else { "" };
     probe::component("List", [variant, "", ""], Fixed::NONE, view)
 }

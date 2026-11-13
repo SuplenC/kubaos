@@ -7,7 +7,8 @@ import KubaOS.Components as K
 //
 // A flush list (`flush`) has no well: its rows lie straight on the surface under it, with no
 // fill, edge or padding of its own, where the surface is the list's only content (a Sheet of
-// counters). The focus tube still lights its edge.
+// counters). The focus tube still lights its edge, at its rows' corner, as its edge is theirs: the
+// tube and a lit or hovered row at it are one shape.
 Item {
     id: root
 
@@ -67,6 +68,6 @@ Item {
 
     K.FocusRing {
         shown: root.focused
-        controlRadius: Tokens.radius.surface
+        controlRadius: root.flush ? K.Look.nested(Tokens.radius.surface, Tokens.space.s12) : Tokens.radius.surface
     }
 }

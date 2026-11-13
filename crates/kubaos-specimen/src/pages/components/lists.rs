@@ -25,7 +25,7 @@ use crate::specimen::Message;
 pub const SECTION: Section = Section {
     title: "Lists",
     lede: Some(
-        "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The focus tube lights the well's edge; the row shows where the keyboard is. A flush list lays its rows straight on the surface.",
+        "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The focus tube lights the well's edge; the row shows where the keyboard is. A flush list lays its rows straight on the surface, its tube at their corner.",
     ),
     view,
 };
@@ -127,7 +127,7 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(list(look, power, false))
         .push(list(look, tiled, false))
         .push(list(look, radios, false))
-        .push(flush_list(look, flush(look), false))
+        .push(flush_list(look, flush(look), true))
         .into()
 }
 

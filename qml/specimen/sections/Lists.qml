@@ -5,7 +5,7 @@ import KubaOS.Components as K
 // `crates/kubaos-specimen/src/pages/components/lists.rs` draws with `kubaos-ui`, box for box.
 K.Section {
     title: "Lists"
-    description: "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The focus tube lights the well's edge; the row shows where the keyboard is. A flush list lays its rows straight on the surface."
+    description: "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The focus tube lights the well's edge; the row shows where the keyboard is. A flush list lays its rows straight on the surface, its tube at their corner."
 
     K.Grid {
         columns: 3
@@ -121,6 +121,7 @@ K.Section {
 
         K.List {
             flush: true
+            focused: true
 
             K.ListRow {
                 title: "Coffee"
