@@ -1,7 +1,7 @@
 //! The idle settings in the menu: "Lock after…", "Screens off after…", "Suspend after…" and "When
 //! the lid closes…". Enter lists the usual choices, the ones in use marked, each for both power
-//! sources or, from its Actions, one; or a time typed after the word, `lock-after 2m`,
-//! `suspend-after 1h30m ac`, sets it at once.
+//! sources or, from its Actions, one; or a time typed after the word, `lock after 2m`,
+//! `suspend after 1h30m ac`, sets it at once.
 //!
 //! A choice is checked here, so a refusal reads in the menu, then launched as `kubaos-idle set`,
 //! which writes the file, restarts hypridle and says what it came to in a toast.
@@ -119,12 +119,12 @@ impl Setting {
 
     fn subtitle(self) -> &'static str {
         match self {
-            Setting::Timer(Timer::Lock) => "How long idle before the screen locks: pick, or type lock-after 2m",
+            Setting::Timer(Timer::Lock) => "How long idle before the screen locks: pick, or type lock after 2m",
             Setting::Timer(Timer::ScreensOff) => {
-                "How long idle before the screens go dark: pick, or type screens-off-after 10m"
+                "How long idle before the screens go dark: pick, or type screens off after 10m"
             }
             Setting::Timer(Timer::Suspend) => {
-                "How long idle before it suspends: pick, or type suspend-after 1h30m battery"
+                "How long idle before it suspends: pick, or type suspend after 1h30m battery"
             }
             Setting::Lid => "Suspend, lock or nothing, on battery and plugged in; docked, always nothing",
         }

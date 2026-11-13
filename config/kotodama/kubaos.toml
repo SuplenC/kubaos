@@ -640,8 +640,8 @@ run = ["dot-session", "restart-shell"]
 # Idle (crates/kubaos-idle). "Lock after…", "Screens off after…", "Suspend
 # after…" and "When the lid closes…" are the Extension's own Items: Enter
 # lists the usual choices, each for both power sources or one (Ctrl+K), or
-# type a time after the word, `lock-after 2m`, `suspend-after 1h30m ac`,
-# `screens-off-after never battery`. They write
+# type a time after the word, `lock after 2m`, `suspend after 1h30m ac`,
+# `screens off after never battery`. They write
 # ~/.config/kubaos/desktop/idle/idle.toml through `kubaos-idle set`, which
 # restarts hypridle and says what changed in a toast.
 #
@@ -656,7 +656,7 @@ run = ["dot-session", "restart-shell"]
 # stays on. "Keep awake for…" and "Keep awake with the lid closed for…" are the
 # Extension's own Items (`keep-awake-for`, `keep-awake-lid-for`,
 # crates/kotodama-kubaos/src/idle.rs), which check what is typed after their
-# word: a while, `keep-awake 1h30m`, or a level from 1 % to 99 %,
+# word: a while, `keep awake 1h30m`, or a level from 1 % to 99 %,
 # `keep-awake-lid 25%`. The `idle` id is the old "Toggle idle", so a `hide` of
 # it still works.
 
