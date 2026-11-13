@@ -12,6 +12,7 @@
 //!
 //! - The install commands (`probe`, `validate`, `plan`, `run`, `demo`): `install.rs`.
 //! - First-boot setup (`setup`): `setup.rs`.
+//! - The startup apps (`autostart`): `autostart.rs`.
 //! - The Bitwarden vault (`bitwarden`): `bitwarden.rs`.
 //! - The recoloured pointer (`cursor`): `cursor.rs`.
 //! - The wallpaper-depth settings (`depth`): `depth.rs`.
@@ -36,6 +37,7 @@ use clap::ValueEnum;
 use crate::out::err;
 
 mod apt;
+mod autostart;
 mod bitwarden;
 mod cursor;
 mod depth;
@@ -115,6 +117,11 @@ enum Cmd {
     Rollback(update::RollbackArgs),
     /// Print the channel updates follow, or set it: stable or edge.
     Channel(update::ChannelArgs),
+    /// The startup apps, which the session starts at login: list them, or turn one on or off.
+    Autostart {
+        #[command(subcommand)]
+        cmd: autostart::AutostartCmd,
+    },
     /// The pointer in the wallpaper's colours: its style and size.
     Cursor {
         #[command(subcommand)]
@@ -182,6 +189,7 @@ fn main() -> ExitCode {
         Cmd::Upgrade(args) => update::upgrade(&args),
         Cmd::Rollback(args) => update::rollback(&args),
         Cmd::Channel(args) => update::channel(&args),
+        Cmd::Autostart { cmd } => autostart::main(cmd),
         Cmd::Cursor { cmd } => cursor::main(cmd),
         Cmd::Depth { cmd } => depth::main(cmd),
         Cmd::Keyboard { cmd } => keyboard::main(cmd),
