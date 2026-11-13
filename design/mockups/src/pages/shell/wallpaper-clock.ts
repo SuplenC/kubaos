@@ -94,7 +94,7 @@ const GLOW_TURN = 0.6;
  * What goes from the wall while editing, each easing its own `--ce-dim`: the number doesn't
  * inherit, so a frame of the fade restyles these alone, not every picture's lock inside them.
  */
-export const DIMMED = ".gl-room, .gl-art, .gl-lamp, .gl-placard, .gl-floors-panel";
+export const DIMMED = ".gl-frame, .gl-lamp, .gl-placard, .gl-floors-panel";
 
 /** The keyboard's and the wheel's steps for the clock's place and size, as shares: coarse and fine. */
 const STEP = 0.01;
