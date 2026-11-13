@@ -1,0 +1,14 @@
+# KubaOS starts Bitwarden desktop on login: its SSH agent
+# (~/.bitwarden-ssh-agent.sock, what SSH_AUTH_SOCK points at) only answers
+# while the app runs. The name is the one Bitwarden's own "Start automatically
+# on login" writes in ~/.config/autostart, which replaces this entry, and
+# "Don't start on login" in the Command menu writes one there with Hidden=true.
+# Turn on "Start to tray icon" in its settings to start hidden.
+[Desktop Entry]
+Type=Application
+Name=Bitwarden
+Icon=bitwarden
+TryExec=bitwarden
+Exec=bitwarden --autostart
+StartupNotify=false
+Terminal=false

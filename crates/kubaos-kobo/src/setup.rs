@@ -1145,7 +1145,7 @@ impl Setup {
         if !pending && let Err(e) = self.backend.finish() {
             log::warn!("can't write the marker: {e}");
         }
-        self.backend.start_bitwarden();
+        self.backend.start_startup_apps();
         iced::exit()
     }
 

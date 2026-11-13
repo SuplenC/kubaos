@@ -8,7 +8,8 @@
 //!   update check changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
 //!   user folder, a desk position, a drive, a Suite, an idle setting or Keep awake, a shell
-//!   setting, a counter, the power stop's status, the CPU scheduler's or the Proxy's.
+//!   setting, a counter, the power stop's status, the CPU scheduler's or the Proxy's, or an app's
+//!   start on login.
 //!
 //! # Not here
 //!
@@ -18,7 +19,7 @@
 //!   [`crate::desk`]. The drives: [`crate::drives`]. The Suites: [`crate::suites`]. The idle
 //!   settings: [`crate::idle`]. The counters: [`crate::counters`]. The shell's settings:
 //!   [`crate::shell`]. The power stop's status and the CPU scheduler's: [`crate::power`]. The
-//!   Proxy's status: [`crate::proxy`].
+//!   Proxy's status: [`crate::proxy`]. The startup apps: [`crate::startup`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -51,6 +52,7 @@ use crate::registry;
 use crate::registry::Registry;
 use crate::run::Runner;
 use crate::shell;
+use crate::startup;
 use crate::states::States;
 use crate::suites;
 use crate::toggles;
@@ -305,6 +307,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             proxy::KIND if action == proxy::SHOW && !self.registry.hides(&item.id) => {
                 Ok(Ran::Push(proxy::view(&proxy::now())))
             }
+            _ if startup::is_action(action) => startup::run(action, &item.kind, &self.runner),
             _ => Err(unknown()),
         }
     }

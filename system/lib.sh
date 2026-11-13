@@ -515,6 +515,15 @@ install_mac_accents() {
   fi
 }
 
+# install_bitwarden_autostart: Bitwarden desktop starts on login, as a
+# system-wide XDG autostart entry the session's xdg-desktop-autostart.target
+# starts (config/hypr/autostart.lua) and the user can turn off. Without the
+# app (arm64), TryExec skips the entry. 70-bitwarden.sh runs it, and a
+# migration on machines installed before it.
+install_bitwarden_autostart() {
+  install_root_file "$FILES_DIR/xdg/autostart/bitwarden.desktop" /etc/xdg/autostart/bitwarden.desktop 0644
+}
+
 # boot_unit UNIT enable|disable|mask: whether UNIT starts at boot, when it
 # exists. Nothing starts or stops now, so it works offline too (image
 # builds, the test container); the change shows at the next boot.

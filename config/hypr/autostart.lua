@@ -30,10 +30,21 @@ hl.on("hyprland.start", function()
     -- Then graphical-session.target (through hyprland-session.target,
     -- home/desktop.nix): xdg-desktop-portal won't start without it.
     .. "systemctl --user start hyprland-session.target"
+  -- The startup apps: every XDG autostart entry, in ~/.config/autostart and
+  -- /etc/xdg/autostart, is a unit systemd-xdg-autostart-generator writes
+  -- (`app-<id>@autostart.service`, PartOf graphical-session.target), wanted by
+  -- xdg-desktop-autostart.target. Hyprland reads no autostart entries itself,
+  -- so this target is what starts them, once the session's environment is in
+  -- systemd. While KubaOS first-boot setup is pending (its user unit is
+  -- installed and its marker isn't there yet), setup has the screen to itself
+  -- and starts the target when it closes (crates/kubaos-kobo/src/setup).
+  local startup_apps = '[ -e /usr/lib/systemd/user/kubaos-setup.service ] && '
+    .. '[ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/kubaos/setup-done" ] || '
+    .. "systemctl --user --no-block start xdg-desktop-autostart.target"
   if POLKIT_AGENT == "hyprpolkitagent" then
-    start(session_env .. "; systemctl --user start hyprpolkitagent")
+    start(session_env .. "; systemctl --user start hyprpolkitagent; " .. startup_apps)
   else
-    start(session_env)
+    start(session_env .. "; " .. startup_apps)
   end
 
   -- keyd starts with the machine for the Mac-style accents on Left Alt;
@@ -43,17 +54,6 @@ hl.on("hyprland.start", function()
 
   -- Secrets (Chrome passwords, git credentials via libsecret).
   start("gnome-keyring-daemon --start --components=secrets")
-
-  -- Bitwarden desktop: its SSH agent (~/.bitwarden-ssh-agent.sock, what
-  -- SSH_AUTH_SOCK points at; home/secrets.nix) only answers while the app
-  -- runs. Hyprland ignores XDG autostart, so the app's own "start on login"
-  -- does nothing here. Turn on "Start to tray icon" in its settings to start
-  -- hidden. Not installed (aarch64 has no build): the exec fails quietly.
-  -- While KubaOS first-boot setup is pending (its user unit is installed and
-  -- its marker isn't there yet), setup has the screen to itself and starts
-  -- Bitwarden when it closes (crates/kubaos-kobo/src/setup).
-  start('[ -e /usr/lib/systemd/user/kubaos-setup.service ] && '
-    .. '[ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/kubaos/setup-done" ] || exec bitwarden')
 
   -- Regenerate colors from the current wallpaper (or copy the default
   -- palette on first boot); a few ms no-op when nothing changed since the

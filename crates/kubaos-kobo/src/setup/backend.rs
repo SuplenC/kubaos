@@ -29,10 +29,10 @@ pub trait SetupBackend: Send + Sync {
     /// need one (the YubiKey's own PIN and fingerprints).
     fn terminal(&self, script: &str) -> Result<(), String>;
     fn is_demo(&self) -> bool;
-    /// Bitwarden desktop, once setup closes: Hyprland's autostart skips it
+    /// The startup apps, once setup closes: the session holds them back
     /// while setup is pending (config/hypr/autostart.lua), so the first
     /// login shows setup alone.
-    fn start_bitwarden(&self) {}
+    fn start_startup_apps(&self) {}
 }
 
 pub struct Real {
@@ -97,35 +97,27 @@ impl SetupBackend for Real {
         false
     }
 
-    fn start_bitwarden(&self) {
-        const BITWARDEN: &str = "/opt/Bitwarden/bitwarden";
-        // amd64 only; already running when setup was opened by hand.
-        let installed = std::path::Path::new(BITWARDEN).exists();
-        let running = Command::new("pgrep")
-            .args(["-f", BITWARDEN])
-            .stdout(Stdio::null())
-            .status()
-            .is_ok_and(|s| s.success());
-        if !installed || running {
+    fn start_startup_apps(&self) {
+        const TARGET: &str = "xdg-desktop-autostart.target";
+        let systemctl = |args: &[&str]| {
+            Command::new("systemctl")
+                .arg("--user")
+                .args(args)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+        };
+        // HAZARD: starting the target while it is active starts again every startup app the
+        // user has quit since login, as it pulls each one in afresh. Setup opened by hand,
+        // after the first login, finds it active.
+        if systemctl(&["is-active", "--quiet", TARGET]).is_ok_and(|s| s.success()) {
             return;
         }
-        // Its own user unit, which has the session's environment
-        // (config/hypr/autostart.lua imports it before setup starts): a
-        // child of ours would die with setup's unit. Not hyprctl: the Lua
-        // config rejects `dispatch exec` and hyprctl still exits 0.
-        let started = Command::new("systemd-run")
-            .args([
-                "--user",
-                "--collect",
-                "--property=PartOf=graphical-session.target",
-                BITWARDEN,
-            ])
-            .stdout(Stdio::null())
-            .status()
+        let started = systemctl(&["--no-block", "start", TARGET])
             .map_err(|e| e.to_string())
             .and_then(|s| if s.success() { Ok(()) } else { Err(s.to_string()) });
         if let Err(e) = started {
-            log::warn!("can't start Bitwarden: systemd-run: {e}");
+            log::warn!("can't start the startup apps: systemctl start {TARGET}: {e}");
         }
     }
 }
