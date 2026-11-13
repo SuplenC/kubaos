@@ -31,7 +31,7 @@ export interface MenuItemSpec {
   readonly label: string;
   /**
    * A short line under the words, in `small` and the muted colour, wrapped to at most two lines and
-   * cut there with an ellipsis: the item is a two-line row, taller where the description wraps.
+   * cut there with an ellipsis: the item is a two-line row, a three-line row where it wraps.
    */
   readonly description?: string;
   readonly icon?: string;
@@ -72,7 +72,15 @@ export function menuItem(spec: MenuItemSpec, current = false, pinned?: ItemPinne
   if (spec.disabled) item.setAttribute("aria-disabled", "true");
   if (spec.submenu) item.setAttribute("aria-haspopup", "menu");
   if (spec.description) item.dataset.lines = "two";
-  item.append(filling(content(spec, "var(--ink)", "var(--muted)")));
+  const own = filling(content(spec, "var(--ink)", "var(--muted)"));
+  item.append(own);
+  if (spec.description) {
+    // The description wraps or not by the width it is given, so the row's height follows it.
+    const line = own.querySelector<HTMLElement>(".k-menu-words [data-clamped]")!;
+    new ResizeObserver(() => {
+      item.dataset.lines = line.offsetHeight > Number.parseFloat(getComputedStyle(line).lineHeight) ? "three" : "two";
+    }).observe(line);
+  }
   if (spec.held) {
     // The sweep holds the same content in `on_error`, cut to how far it has gone, so the words
     // read on either side of its edge.

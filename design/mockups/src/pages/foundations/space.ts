@@ -23,6 +23,7 @@ const SIZE_FOR: Record<string, { axis: Axis; for: string }> = {
   control_lg: { axis: "height", for: "A big page's one main action" },
   row: { axis: "height", for: "A list row of one line" },
   row_two_line: { axis: "height", for: "A list row, title over subtitle" },
+  row_three_line: { axis: "height", for: "A menu row whose description wraps" },
   row_compact: { axis: "height", for: "A table's row" },
   menu: { axis: "width", for: "A menu" },
   chip: { axis: "height", for: "A chip" },
@@ -203,7 +204,7 @@ function rows(): HTMLElement {
     "div",
     "f-swatch-cell",
     el("div", "f-rows", one("Wi-Fi"), two("Home network", "Connected · secured"), one("Bluetooth")),
-    token(`size.row ${length("size-row")}, size.row_two_line ${length("size-row_two_line")}: no row taller`),
+    token(`size.row ${length("size-row")}, size.row_two_line ${length("size-row_two_line")}, size.row_three_line ${length("size-row_three_line")}: no row taller`),
   );
 }
 
@@ -262,7 +263,7 @@ export default foundation({
   ],
   rules: [
     { name: "A band: content and a step", note: "As tall as what is in it and one step above and below, and no taller.", sample: band },
-    { name: "Rows are their type's height", note: "`row` with one line, `row_two_line` with two; a taller row holds air.", sample: rows },
+    { name: "Rows are their type's height", note: "`row` with one line, `row_two_line` with two, `row_three_line` where a description wraps; a taller row holds air.", sample: rows },
     { name: "Padding is applied once", note: "A card keeps its padding inside; the page's is the only one round it.", sample: nestedContainer },
   ],
   modes: doesntApply("geometry never changes with the mode."),
