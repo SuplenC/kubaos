@@ -384,7 +384,9 @@
 .gl-bar-lead > *,
 .gl-step-pair > * {
   min-width: 0;
-  overflow: hidden;
+  /* Cut as far out as a lit control's glow reaches, so a focused button keeps its whole glow. */
+  overflow: clip;
+  overflow-clip-margin: var(--focus-far);
   opacity: 0;
   transition: opacity var(--step-time, 0ms) var(--step-curve, var(--easing-emphasized_decel));
 }
