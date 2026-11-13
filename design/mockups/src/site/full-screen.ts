@@ -8,10 +8,10 @@
 // screen's size lays the screen out for it, not a picture of the small one scaled up.
 //
 // Shown, the sample is built afresh from its own description, in the mode it showed in and at the
-// toolbar's settings, in a room over the whole page that the browser's full screen then takes. A
-// tap of Esc goes to the mockup (Keyboard Lock, where the browser has it), and holding Esc leaves,
-// as the browser's own full screen does; Ctrl+Esc always leaves. Leaving releases all of it and
-// puts focus and the scroll back where they were.
+// toolbar's settings, in a room over the whole page that the browser's full screen then takes. Esc
+// goes to the mockup (Keyboard Lock, where the browser has it), which closes its menus and editors
+// with it; Ctrl+Esc leaves. Chromium still leaves its full screen on a held Esc, which no page can
+// stop. Leaving releases all of it and puts focus and the scroll back where they were.
 
 import { el } from "./dom.ts";
 import type { Move } from "./page.ts";
@@ -79,7 +79,7 @@ export function fullScreenControl(opening: () => Opening): HTMLButtonElement | n
   if (!CHROME || ALL) return null;
   const control = el("button", "site-control page-full-screen", "Full screen");
   control.type = "button";
-  control.title = "Full screen: Esc goes to the mockup; hold Esc or press Ctrl+Esc to leave";
+  control.title = "Full screen: Esc goes to the mockup; Ctrl+Esc leaves";
   control.addEventListener("click", () => show(opening(), control));
   return control;
 }
