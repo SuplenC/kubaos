@@ -418,8 +418,8 @@
 }
 
 /* The full screen's own parts of the bar, the picture's name and its neighbours, and the step's two
-   words: each in a cell whose width eases from nothing to its own as the picture grows to the
-   screen, and back, over the same time on the same curve (`--step-time`), its words fading with
+   buttons: each in a cell whose width eases from nothing to its own as the picture grows to the
+   screen, and back, over the same time on the same curve (`--step-time`), its content fading with
    it, so the bar widens and its other controls slide along, never a jump. */
 .gl-bar-lead {
   display: grid;
@@ -434,7 +434,7 @@
 .gl-bar-lead > *,
 .gl-step-pair > * {
   min-width: 0;
-  /* Shut or moving, a cell cuts its words at its sides, so they never spill over the next cell;
+  /* Shut or moving, a cell cuts its content at its sides, so it never spills over the next cell;
      above and below, and at its sides once it is open, it cuts as far out as a lit control's glow
      reaches, so a focused button keeps its whole glow. Opening, its sides give way only as the step
      ends (`--cut-time`); shutting, they close at once. A clip path, not `overflow-clip-margin`:
@@ -465,9 +465,9 @@
   padding-right: var(--space-s16);
 }
 
-/* The step's two words each ease their own width, from nothing to their own. As two tracks of one
+/* The step's two buttons each ease their own width, from nothing to their own. As two tracks of one
    grid they would share an fr, and while both are open at all the pair would be as wide as the
-   wider word: a jump of the difference as the step starts and as it ends. */
+   wider button: a jump of the difference as the step starts and as it ends. */
 .gl-step-pair {
   display: flex;
   interpolate-size: allow-keywords;

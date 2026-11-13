@@ -47,7 +47,7 @@ The one in front steps out to fill the screen (F, Space, the bar's Full screen, 
 
 ## The bar
 
-Along the foot, glass, a pill, `space.s8` round small controls `space.s16` apart, in the `ButtonBar`'s order: the views as `Tabs` (Picture, Desktop, Lock), Full screen (a Text button), then Cancel (Text), Wake or Rest on the Lock view only (Text), and Apply (Filled) last. On the full screen the picture's name, its folder and place, its depth chip and the previous and next buttons lead it. No key is shown: each control's `Tooltip` gives its name and its key on one line. The `Shortcuts` button sits at the foot's start, its popover listing every key, grouped; `?` opens it, and Esc closes it before Esc cancels.
+Along the foot, glass, a pill, `space.s8` round small controls `space.s16` apart, in the `ButtonBar`'s order: the views as `Tabs` (Picture, Desktop, Lock), Full screen (a Text button; on the full screen Back to the wall, an `IconButton` with the same icon), then Cancel (Text), Wake or Rest on the Lock view only (Text), and Apply (Filled) last. On the full screen the picture's name between the previous and next buttons leads it. No key is shown: each control's `Tooltip` gives its name and its key on one line. The `Shortcuts` button sits at the foot's start, its popover listing every key, grouped; `?` opens it, and Esc closes it before Esc cancels.
 
 ## Reduce motion
 
