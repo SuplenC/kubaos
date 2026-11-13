@@ -186,6 +186,7 @@ if ((DO_DESKTOP && !REMOVE_U2F)); then
     sudo_run apt-get install -y --no-install-recommends "$tmp/bitwarden.deb"
     rm -rf "$tmp"
   fi
+  install_bitwarden_autostart
 fi
 
 # --------------------------------------------------------------------------

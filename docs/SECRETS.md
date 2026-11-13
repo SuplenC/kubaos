@@ -24,7 +24,7 @@ Installed from the KubaOS stick? Steps 1 and 2 and `system/75-yubikey.sh` are al
 
 1. `system/70-bitwarden.sh` (after `60-nix.sh`). It installs the Bitwarden desktop `.deb` and the `bw` CLI, both pinned and sha256-checked, plus `secret-tool`, `pam_u2f` and `pamu2fcfg`. It puts the security key in front of the password for sudo and polkit and installs the lock screen's `qs-lock-u2f` service.
 2. `home-manager switch --flake ~/.config/kubaos/home` (`~/Projects/dotfiles` on a machine set up by hand, docs/INSTALL.md), then log out and in, so `SSH_AUTH_SOCK` points at Bitwarden everywhere.
-3. Open Bitwarden (Hyprland starts it at login), log in, then in Settings:
+3. Open Bitwarden (it starts at login, one of the startup apps), log in, then in Settings:
    - turn on **Enable SSH agent**. It's off by default. The app keeps the switch in its own `data.json` with no documented config-file way to set it, so this stays a click.
    - optional: **Unlock with system authentication**. That's a polkit prompt, and the security key answers it like it answers sudo.
    - optional: **Start to tray icon**, so the login start stays out of the way.

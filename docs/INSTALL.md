@@ -74,7 +74,7 @@ kubaos suite add go
 
 The MOK screen, the fingerprint enrollment and what to verify are in the hard way's sections 1, 7 and 8 below: same scripts, same steps.
 
-Then the secrets. Bitwarden desktop, `bw` and the security-key PAM lines are already installed. Open Bitwarden (Hyprland starts it), log in, Settings -> enable "SSH agent", then run `kubaos bitwarden setup`. Set the YubiKey's PIN and fingerprints with `ykman` and run `dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md` has the order, and section 11 below says how to check it all works.
+Then the secrets. Bitwarden desktop, `bw` and the security-key PAM lines are already installed. Open Bitwarden (it starts at login), log in, Settings -> enable "SSH agent", then run `kubaos bitwarden setup`. Set the YubiKey's PIN and fingerprints with `ykman` and run `dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md` has the order, and section 11 below says how to check it all works.
 
 Kōbō will do this part itself one day (the first-boot setup screen, `docs/screenshots/setup/`). Today it's a stub.
 

@@ -94,3 +94,5 @@ udev/90-kubaos-backlight.rules                          system/50-hyprland.sh
 
 xkb/rules/evdev                                         install_mac_accents
 xkb/symbols/kubaos                                      install_mac_accents
+
+xdg/autostart/bitwarden.desktop                         install_bitwarden_autostart
