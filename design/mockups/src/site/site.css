@@ -320,8 +320,8 @@ body {
   --panes: 2;
 }
 
-/* A whole screen's panes stand one under the other, each across the stage, so the screen is drawn
-   about twice as large as side by side; the night pane above takes both top corners. */
+/* A stage of whole screens stands its panes one under the other, each across the stage, so they
+   are drawn about twice as large as side by side; the night pane above takes both top corners. */
 .page-hero[data-screen] .page-panes {
   grid-template-columns: minmax(0, 1fr);
 }

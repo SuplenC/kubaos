@@ -44,6 +44,11 @@ export function isScreen(drawn: readonly Element[]): boolean {
   return drawn.length === 1 && screenIn(drawn[0]!) !== null;
 }
 
+/** Whether every one of `drawn` is a whole screen: a state pinned on each row of screens. */
+export function allScreens(drawn: readonly Element[]): boolean {
+  return drawn.length > 0 && drawn.every((each) => screenIn(each) !== null);
+}
+
 /** A move playing on the sample shown: how to stop it, and the keys that drive it. */
 interface Playing {
   readonly stop: () => void;
