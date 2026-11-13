@@ -1967,8 +1967,9 @@ body {
   flex-direction: column;
   gap: var(--space-s8);
   height: var(--size-thumbnail_height);
-  overflow: clip;
-  overflow-clip-margin: var(--focus-far);
+  /* A clip path, not `overflow: clip` with an `overflow-clip-margin`: Chromium drops that margin to
+     0 for any `calc()`. */
+  clip-path: inset(calc(-1 * var(--focus-far)));
   outline: var(--stroke-hairline_device_px) dashed var(--color-on_surface_variant);
 }
 
