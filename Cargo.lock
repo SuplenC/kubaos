@@ -2080,7 +2080,7 @@ checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 [[package]]
 name = "kotodama-extension"
 version = "1.0.0"
-source = "git+https://github.com/SuplenC/kotodama?rev=1a4754b7c213bf6b4bc5cc57cbe6eabc9cfc9fb0#1a4754b7c213bf6b4bc5cc57cbe6eabc9cfc9fb0"
+source = "git+https://github.com/SuplenC/kotodama?rev=1644c20bf20d7aa844b62308f72fabb75c983417#1644c20bf20d7aa844b62308f72fabb75c983417"
 dependencies = [
  "kotodama-protocol",
  "libc",
@@ -2117,7 +2117,7 @@ dependencies = [
 [[package]]
 name = "kotodama-protocol"
 version = "1.0.0"
-source = "git+https://github.com/SuplenC/kotodama?rev=1a4754b7c213bf6b4bc5cc57cbe6eabc9cfc9fb0#1a4754b7c213bf6b4bc5cc57cbe6eabc9cfc9fb0"
+source = "git+https://github.com/SuplenC/kotodama?rev=1644c20bf20d7aa844b62308f72fabb75c983417#1644c20bf20d7aa844b62308f72fabb75c983417"
 dependencies = [
  "base64 0.23.1",
  "itoa",

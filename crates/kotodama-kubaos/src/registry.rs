@@ -11,7 +11,7 @@
 //!
 //! [extensions.kubaos.actions.ssh-key]
 //! title = "New SSH key on the security key"
-//! keyword = "ssh-key"
+//! names = ["ssh-key"]
 //! run = ["dot-ssh-sk-new", "{name}"]
 //! arguments = [{ name = "name", placeholder = "github" }]
 //! terminal = true
@@ -70,7 +70,7 @@ const ACTION_KEYS: &[&str] = &[
     "subtitle",
     "icon",
     "keywords",
-    "keyword",
+    "names",
     "run",
     "arguments",
     "terminal",
@@ -99,7 +99,7 @@ struct Entry {
     subtitle: Option<String>,
     icon: Option<String>,
     keywords: Vec<String>,
-    keyword: Option<String>,
+    names: Vec<String>,
     run: Vec<String>,
     arguments: Vec<Argument>,
     terminal: bool,
@@ -243,11 +243,6 @@ impl Entry {
             Some(Some(run)) if !run.is_empty() => run,
             _ => return Err("needs `run`, a list of strings, the program first".to_owned()),
         };
-        let keywords = match table.get("keywords").map(config::strings) {
-            None => Vec::new(),
-            Some(Some(keywords)) => keywords,
-            Some(None) => return Err("`keywords` should be a list of strings".to_owned()),
-        };
         let delay = match table.get("delay_ms") {
             None => Duration::ZERO,
             Some(Value::Integer(ms)) if *ms >= 0 => Duration::from_millis(ms.unsigned_abs()),
@@ -258,8 +253,8 @@ impl Entry {
             title,
             subtitle: string(table, "subtitle")?,
             icon: string(table, "icon")?,
-            keywords,
-            keyword: string(table, "keyword")?,
+            keywords: strings(table, "keywords")?,
+            names: strings(table, "names")?,
             run,
             arguments: arguments(table)?,
             terminal: boolean(table, "terminal")?,
@@ -281,7 +276,7 @@ impl Entry {
             title: self.title.clone(),
             subtitle: self.subtitle.clone(),
             icon: self.icon.clone(),
-            keyword: self.keyword.clone(),
+            names: self.names.clone(),
             keywords: self.keywords.clone(),
             hidden: false,
             app_only: false,
@@ -362,6 +357,14 @@ fn string(table: &Table, key: &str) -> Result<Option<String>, String> {
         None => Ok(None),
         Some(Value::String(value)) => Ok(Some(value.clone())),
         Some(_) => Err(format!("`{key}` should be a string")),
+    }
+}
+
+fn strings(table: &Table, key: &str) -> Result<Vec<String>, String> {
+    match table.get(key).map(config::strings) {
+        None => Ok(Vec::new()),
+        Some(Some(strings)) => Ok(strings),
+        Some(None) => Err(format!("`{key}` should be a list of strings")),
     }
 }
 

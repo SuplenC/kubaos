@@ -125,7 +125,7 @@ fn item(drive: &Drive) -> Item {
         title: format!("Eject {}", drive.name),
         subtitle: Some(format!("Unmount {} and power it off", drive.mounts.join(", "))),
         icon: Some(ICON.to_owned()),
-        keyword: None,
+        names: Vec::new(),
         keywords: ["eject drive", "unmount", "safely remove", "usb", "disk", "card"]
             .map(str::to_owned)
             .to_vec(),

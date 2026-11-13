@@ -122,7 +122,7 @@ fn live_result(query: &str, answer: &Answer) -> LiveResult {
             title: answer.title.clone(),
             subtitle: Some(answer.detail.clone()),
             icon: Some("x-office-calendar".into()),
-            keyword: None,
+            names: Vec::new(),
             keywords: vec![],
             hidden: false,
             app_only: false,

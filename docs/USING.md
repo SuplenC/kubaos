@@ -155,7 +155,7 @@ The daemon is the `kubaos-phone` user unit: `systemctl --user status kubaos-phon
 
 Out of the box the screen locks after 5 minutes idle, the screens go off after 10, and the laptop suspends after 30 on battery and never plugged in. Closing the lid suspends on battery and does nothing plugged in or docked (a dock, or a second screen connected).
 
-Change any of it from the Command menu: "Lock after…", "Screens off after…", "Suspend after…" and "When the lid closes…". Enter lists the usual choices with the ones in use marked; Enter on a choice sets it on battery and plugged in, and its other Actions (Ctrl+K) set one of them. Or type a time after the word: `lock-after 2m`, `screens-off-after 1h30m`, `suspend-after never ac`, `lid lock battery`. A time is what the clock's timer takes (`90s`, `2m`, `1h30m`, `5h`, a number alone in minutes) or `never`; a trailing `battery` or `ac` sets that power source alone, both otherwise. The lock and screens off take 30 s at the least, suspend a minute, and a day at most; a toast says what changed ("Lock after 15 min idle on battery, 30 min plugged in") or why it was refused. The file is `~/.config/kubaos/desktop/idle/idle.toml`; after a hand edit run `kubaos-idle apply`. "Idle: KubaOS defaults" puts it all back. `kubaos-idle status` prints what is set.
+Change any of it from the Command menu: "Lock after…", "Screens off after…", "Suspend after…" and "When the lid closes…". Enter lists the usual choices with the ones in use marked; Enter on a choice sets it on battery and plugged in, and its other Actions (Ctrl+K) set one of them. Or type a time after the word: `lock after 2m`, `screens off after 1h30m`, `suspend after never ac`, `lid lock battery`. A time is what the clock's timer takes (`90s`, `2m`, `1h30m`, `5h`, a number alone in minutes) or `never`; a trailing `battery` or `ac` sets that power source alone, both otherwise. The lock and screens off take 30 s at the least, suspend a minute, and a day at most; a toast says what changed ("Lock after 15 min idle on battery, 30 min plugged in") or why it was refused. The file is `~/.config/kubaos/desktop/idle/idle.toml`; after a hand edit run `kubaos-idle apply`. "Idle: KubaOS defaults" puts it all back. `kubaos-idle status` prints what is set.
 
 If you change the power source while idle, the other source's time takes over within a minute: unplugging a laptop that has been idle longer than its battery time locks or suspends it then.
 
@@ -165,7 +165,7 @@ The lid setting works without root: while it differs from what logind does, or a
 
 **Keep awake with the lid closed** ("Keep awake with the lid closed", or "…until the battery is at 20 %", or `keep-awake-lid 2h`, `keep-awake-lid 25%` in the Command menu; `kubaos-idle awake lid on|2h|25%` in a terminal) does all that and holds the lid too: closing it does nothing, on battery and plugged in. Ask for a battery level if it may run on battery, since it never ends for the battery otherwise. The cup looks the same, and its tooltip says the lid is held. Once it ends with the lid still closed, the lid does what its setting says 30 s later.
 
-"Keep awake until the battery is at 40 %", "at 20 %" and "at 10 %", or any level from 1 % to 99 % typed after the word (`keep-awake 25%`), keep awake the same way until the battery falls to that level, then end and say so; the laptop then locks and suspends when idle as usual. Plugged in it stays on, until you unplug and the battery drains to the level. On battery at or below the level already, it refuses. The cup's tooltip shows the level.
+"Keep awake until the battery is at 40 %", "at 20 %" and "at 10 %", or any level from 1 % to 99 % typed after the word (`keep awake 25%`), keep awake the same way until the battery falls to that level, then end and say so; the laptop then locks and suspends when idle as usual. Plugged in it stays on, until you unplug and the battery drains to the level. On battery at or below the level already, it refuses. The cup's tooltip shows the level.
 
 **Lock, suspend, shut down or reboot in… / at…** do it once, whether you're working or not: `lock-in 10m`, `lock-at 20:00`, `suspend-at 23:00`, `shutdown-at friday 17:00`, `reboot-in 5m` (an "at" is the next time it comes round). Shut down and reboot ask you to confirm first, and close the session the way the power menu does; a suspend locks first. Toasts warn a minute and 10 s before, each with a Cancel button, the bar counts down with the action's icon, and Keep awake doesn't stop any of them: you asked for it. One at a time, whichever it is; a new one replaces the old, and the toast says what it replaced. "Cancel scheduled action", Cancel on a warning, or a click on the countdown cancels it. They are systemd user timers: `systemctl --user list-timers 'kubaos-scheduled*'`.
 
@@ -400,7 +400,7 @@ In the Command menu, "Settings folder" opens it in Files, and "Settings: Desktop
 
   [extensions.kubaos.actions.timer]
   title = "Timer"
-  keyword = "timer"   # type "timer 5m"
+  names = ["timer"]   # type "timer 5m"
   arguments = [{ name = "duration", placeholder = "5m" }]   # fills {duration}
   run = ["sh", "-c", "sleep \"$1\" && notify-send Done", "sh", "{duration}"]
   ```

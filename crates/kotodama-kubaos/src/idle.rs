@@ -1,7 +1,7 @@
 //! The idle settings in the menu: "Lock after…", "Screens off after…", "Suspend after…" and "When
 //! the lid closes…". Enter lists the usual choices, the ones in use marked, each for both power
-//! sources or, from its Actions, one; or a time typed after the word, `lock-after 2m`,
-//! `suspend-after 1h30m ac`, sets it at once.
+//! sources or, from its Actions, one; or a time typed after the word, `lock after 2m`,
+//! `suspend after 1h30m ac`, sets it at once.
 //!
 //! A choice is checked here, so a refusal reads in the menu, then launched as `kubaos-idle set`,
 //! which writes the file, restarts hypridle and says what it came to in a toast.
@@ -119,18 +119,18 @@ impl Setting {
 
     fn subtitle(self) -> &'static str {
         match self {
-            Setting::Timer(Timer::Lock) => "How long idle before the screen locks: pick, or type lock-after 2m",
+            Setting::Timer(Timer::Lock) => "How long idle before the screen locks: pick, or type lock after 2m",
             Setting::Timer(Timer::ScreensOff) => {
-                "How long idle before the screens go dark: pick, or type screens-off-after 10m"
+                "How long idle before the screens go dark: pick, or type screens off after 10m"
             }
             Setting::Timer(Timer::Suspend) => {
-                "How long idle before it suspends: pick, or type suspend-after 1h30m battery"
+                "How long idle before it suspends: pick, or type suspend after 1h30m battery"
             }
             Setting::Lid => "Suspend, lock or nothing, on battery and plugged in; docked, always nothing",
         }
     }
 
-    fn keyword(self) -> &'static str {
+    fn menu_name(self) -> &'static str {
         match self {
             Setting::Timer(Timer::Lock) => "lock-after",
             Setting::Timer(Timer::ScreensOff) => "screens-off-after",
@@ -165,7 +165,7 @@ impl Setting {
             title: self.title().to_owned(),
             subtitle: Some(self.subtitle().to_owned()),
             icon: Some(ICON.to_owned()),
-            keyword: Some(self.keyword().to_owned()),
+            names: vec![self.menu_name().to_owned()],
             keywords: self.keywords().iter().map(|&word| word.to_owned()).collect(),
             hidden: false,
             app_only: false,
@@ -265,14 +265,7 @@ fn keep_awake_lid_item() -> Item {
     )
 }
 
-fn typed_keep_awake(
-    id: &str,
-    title: &str,
-    subtitle: &str,
-    keyword: &str,
-    placeholder: &str,
-    keywords: &[&str],
-) -> Item {
+fn typed_keep_awake(id: &str, title: &str, subtitle: &str, name: &str, placeholder: &str, keywords: &[&str]) -> Item {
     let keep = Action::new(KEEP, "Keep awake").arguments(vec![Argument::new(VALUE).placeholder(placeholder)]);
     Item {
         id: id.to_owned(),
@@ -281,7 +274,7 @@ fn typed_keep_awake(
         title: title.to_owned(),
         subtitle: Some(subtitle.to_owned()),
         icon: Some(ICON.to_owned()),
-        keyword: Some(keyword.to_owned()),
+        names: vec![name.to_owned()],
         keywords: keywords.iter().map(|&word| word.to_owned()).collect(),
         hidden: false,
         app_only: false,
@@ -399,7 +392,7 @@ fn list(setting: Setting, settings: &Settings) -> View {
             title,
             subtitle: now.map(str::to_owned),
             icon: Some(ICON.to_owned()),
-            keyword: None,
+            names: Vec::new(),
             keywords: Vec::new(),
             hidden: false,
             app_only: false,

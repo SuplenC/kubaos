@@ -66,7 +66,7 @@ def ask(daemon, text):
 def enter(daemon, word):
     """Runs the entry Item of the app of `word`, as a click on it does."""
     results = ask(daemon, word + " ")
-    entry = next((r for r in results["results"] if r["item"].get("keyword") == word), None)
+    entry = next((r for r in results["results"] if word in r["item"].get("names", [])), None)
     if entry is None:
         sys.exit(f"no entry Item for the app of {word!r}")
     item = entry["item"]

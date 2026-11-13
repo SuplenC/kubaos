@@ -164,7 +164,7 @@ impl UserFolders {
             title: format!("Files: {name}"),
             subtitle: Some(shown),
             icon: Some(ICON.to_owned()),
-            keyword: None,
+            names: Vec::new(),
             keywords: [folder.english, "folder", "file manager", "nautilus", "yazi"]
                 .map(str::to_owned)
                 .to_vec(),

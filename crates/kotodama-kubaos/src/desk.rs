@@ -430,7 +430,7 @@ fn item(id: String, title: String, subtitle: String, keywords: &[&str], action: 
         title,
         subtitle: Some(subtitle),
         icon: Some(ICON.to_owned()),
-        keyword: None,
+        names: Vec::new(),
         keywords: ["workspace group", "desk", "screen", "monitor", "display"]
             .iter()
             .chain(keywords)

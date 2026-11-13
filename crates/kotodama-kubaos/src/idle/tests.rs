@@ -49,7 +49,7 @@ fn there_are_four_settings_each_with_its_word_and_an_optional_value() {
             "Keep awake with the lid closed for…"
         ]
     );
-    assert_eq!(items[0].keyword.as_deref(), Some("lock-after"));
+    assert_eq!(items[0].names, ["lock-after"]);
     assert!(
         items[..4]
             .iter()
@@ -73,7 +73,7 @@ fn keep_awake_takes_a_typed_value_after_its_word() {
     let item = &items()[4];
 
     assert_eq!(item.id, KEEP_AWAKE_ID);
-    assert_eq!(item.keyword.as_deref(), Some("keep-awake"));
+    assert_eq!(item.names, ["keep-awake"]);
     assert_eq!(item.actions.len(), 1);
     assert_eq!(item.actions[0].id, KEEP);
     assert!(!item.actions[0].arguments[0].optional);
@@ -102,7 +102,7 @@ fn keep_awake_with_the_lid_closed_takes_a_typed_value_after_its_own_word() {
     let item = &items()[5];
 
     assert_eq!(item.id, KEEP_AWAKE_LID_ID);
-    assert_eq!(item.keyword.as_deref(), Some("keep-awake-lid"));
+    assert_eq!(item.names, ["keep-awake-lid"]);
     assert_eq!(item.actions[0].id, KEEP);
     assert!(!item.actions[0].arguments[0].optional);
 }
