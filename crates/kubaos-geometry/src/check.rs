@@ -84,6 +84,15 @@ struct Ancestor {
     bounds: Rect,
     /// Whether its content scrolls in it.
     scrolls: bool,
+    /// Whether it starts a space of its own ([`starts_space`]): what is inside is held to it and
+    /// the boxes inside it, never to the boxes around it.
+    space: bool,
+}
+
+/// Whether `node` starts a space of its own: a picture, laid out at its own size and drawn
+/// scaled, whose layout the room it is drawn in doesn't hold.
+fn starts_space(node: &Node) -> bool {
+    node.marks.picture.is_some()
 }
 
 impl Walk<'_> {
@@ -165,6 +174,7 @@ impl Walk<'_> {
             label: label.clone(),
             bounds: node.bounds,
             scrolls: matches!(node.role, Role::Scroll { .. }),
+            space: starts_space(node),
         });
         for (index, child) in node.children.iter().enumerate() {
             let segment = !matches!(node.role, Role::Box);
@@ -275,13 +285,18 @@ impl Walk<'_> {
             self.report(Rule::ClippedText, path, &node.role, message);
             return;
         }
-        if !matches!(node.role, Role::Text { .. } | Role::Icon { .. }) {
+        if !matches!(node.role, Role::Text { .. } | Role::Icon { .. }) || starts_space(node) {
             return;
         }
+        // A space of its own holds what is in it; the boxes around it don't.
+        let held = ancestors
+            .iter()
+            .rposition(|ancestor| ancestor.space)
+            .map_or(ancestors, |start| &ancestors[start..]);
         // From the nearest scroll out, the content may run above or below the boxes around it:
         // that is scrolling, not clipping. Scrolls only scroll down, so across it still clips.
         let mut scrolled = false;
-        let outside = ancestors.iter().rev().find_map(|ancestor| {
+        let outside = held.iter().rev().find_map(|ancestor| {
             let a = ancestor.bounds;
             let across = self.device(a.x - b.x) >= EPSILON || self.device(b.right() - a.right()) >= EPSILON;
             let down = self.device(a.y - b.y) >= EPSILON || self.device(b.bottom() - a.bottom()) >= EPSILON;

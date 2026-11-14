@@ -56,6 +56,7 @@ The Anatomy section's samples draw nothing over them at rest. Pointing at a part
 | `src/pages/LEVEL/PAGE.ts` | One page each; `src/pages/index.ts` lists them. |
 | `scripts/render.ts` | Draws the built site in headless Chromium, as shots and geometry frames, or as each page's motion recipes (`--motion`). |
 | `scripts/player-test.ts` | Seeks every motion player on the built site and holds its plot and its parts to what plays. |
+| `scripts/frame-test.ts` | Walks small pages of probed boxes into geometry frames and holds the walk (`src/site/frame.ts`) to what is drawn. |
 | `scripts/perf.ts`, `scripts/perf-trace.ts`, `scripts/perf-budgets.ts` | The speed check: it drives the pages named, reads their traces, and holds them to the budgets. |
 
 ## Adding a page

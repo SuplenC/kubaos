@@ -324,6 +324,7 @@ fn moved(node: &Node, x: f32, y: f32) -> Node {
             y: node.bounds.y - y,
             ..node.bounds
         },
+        marks: node.marks.clone(),
         children: node.children.iter().map(|child| moved(child, x, y)).collect(),
     }
 }

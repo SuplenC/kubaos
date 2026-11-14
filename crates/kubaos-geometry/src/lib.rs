@@ -58,20 +58,39 @@ pub struct Node {
     #[serde(flatten)]
     pub role: Role,
     pub bounds: Rect,
+    /// What the box is beyond its role: how it is drawn, and what its probe declares.
+    #[serde(flatten)]
+    pub marks: Marks,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<Node>,
 }
 
 impl Node {
-    /// A node with no children yet.
+    /// A node with no children yet and no marks.
     #[must_use]
     pub fn new(role: Role, bounds: Rect) -> Node {
         Node {
             role,
             bounds,
+            marks: Marks::default(),
             children: Vec::new(),
         }
     }
+}
+
+/// What a box is beyond its role, each left out of a frame when it doesn't apply. The toolkits'
+/// own layouts report none; a mockup's frame reports how each box is drawn (`picture`), and its
+/// probes declare the rest by name, each a rule's exception for that box alone
+/// (`docs/DESIGN.md`, "The geometry check").
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct Marks {
+    /// A picture of UI: the box and everything in it drawn scaled by this ratio, as a gallery's
+    /// small copy of a screen or windows stepped back behind a lock. Its boxes are reported at the
+    /// size they are laid out at, from its own top left on a whole device pixel, and its texts and
+    /// icons are held to the boxes from it inward: the room it is drawn in holds the picture, not
+    /// its layout.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub picture: Option<f32>,
 }
 
 /// What a box is, as much as the toolkit knows.

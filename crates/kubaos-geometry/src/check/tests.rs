@@ -394,3 +394,71 @@ fn a_frame_reads_back_from_its_json() {
     assert_eq!(read, written);
     assert!(json.contains(r#""role":"layout""#), "{json}");
 }
+
+#[test]
+fn a_frame_reads_its_marks_back_and_leaves_them_out_when_unset() {
+    let mut picture = Node::new(Role::Box, rect(0.0, 0.0, 400.0, 200.0));
+    picture.marks.picture = Some(0.25);
+    let written = frame(
+        "dark",
+        1.0,
+        with(Node::new(Role::Box, rect(0.0, 0.0, 100.0, 50.0)), vec![picture]),
+    );
+
+    let json = serde_json::to_string(&written).unwrap();
+    let read: Frame = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(read, written);
+    assert_eq!(json.matches("picture").count(), 1, "{json}");
+}
+
+/// A room 100×50 holding a picture of a 400×200 layout drawn at a quarter, with `inside` in it.
+fn room_with_picture(picture: Option<f32>, inside: Vec<Node>) -> Frame {
+    let mut drawn = with(Node::new(Role::Box, rect(0.0, 0.0, 400.0, 200.0)), inside);
+    drawn.marks.picture = picture;
+    frame(
+        "dark",
+        1.0,
+        with(Node::new(Role::Box, rect(0.0, 0.0, 100.0, 50.0)), vec![drawn]),
+    )
+}
+
+#[test]
+fn a_pictures_text_is_held_to_the_picture_not_the_room_it_is_drawn_in() {
+    let natural = Size {
+        width: 60.0,
+        height: 20.0,
+    };
+    let words = || text("Unlock", natural, rect(300.0, 160.0, 60.0, 20.0));
+
+    let as_picture = rules_broken(&[room_with_picture(Some(0.25), vec![words()])]);
+    let as_layout = rules_broken(&[room_with_picture(None, vec![words()])]);
+
+    assert_eq!(as_picture, [] as [Rule; 0]);
+    assert_eq!(as_layout, [Rule::ClippedText]);
+}
+
+#[test]
+fn a_pictures_own_layout_is_still_held_to_every_rule() {
+    let natural = Size {
+        width: 60.0,
+        height: 20.0,
+    };
+    let cut = with(
+        Node::new(Role::Box, rect(300.0, 160.0, 40.0, 20.0)),
+        vec![text("Unlock", natural, rect(300.0, 160.0, 60.0, 20.0))],
+    );
+    let off_grid = with(
+        Node::new(Role::Box, rect(8.0, 8.0, 40.0, 20.0)),
+        vec![icon(rect(10.5, 10.0, 16.0, 16.0)), icon(rect(30.0, 10.0, 16.0, 16.0))],
+    );
+
+    assert_eq!(
+        rules_broken(&[room_with_picture(Some(0.25), vec![cut])]),
+        [Rule::ClippedText]
+    );
+    assert_eq!(
+        rules_broken(&[room_with_picture(Some(0.25), vec![off_grid])]),
+        [Rule::DeviceGrid]
+    );
+}

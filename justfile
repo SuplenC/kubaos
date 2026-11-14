@@ -145,12 +145,13 @@ mockups *args: _mockups-deps
 mockups-build: _mockups-deps
     cd design/mockups && npm run -s build
 
-# The mockups' pages laid out in headless Chromium at every scale, light and dark, each held to the geometry rules, and each mocked component to its twin on the specimen's pages (`kubaos-specimen mockup`): the same boxes as the build, wherever each page puts it. Then every motion player seeked and held to its recipe (`scripts/player-test.ts`). Run by hand, and not part of `design-check`: the site's pages are drawn ahead of the libraries, so not every page passes it.
+# The walk that reads a page's boxes held to small pages first (`scripts/frame-test.ts`), then the mockups' pages laid out in headless Chromium at every scale, light and dark, each held to the geometry rules, and each mocked component to its twin on the specimen's pages (`kubaos-specimen mockup`): the same boxes as the build, wherever each page puts it. Then every motion player seeked and held to its recipe (`scripts/player-test.ts`). Run by hand, and not part of `design-check`: the site's pages are drawn ahead of the libraries, so not every page passes it.
 mockups-check: mockups-build
     #!/usr/bin/env bash
     set -euo pipefail
     frames="$(mktemp -d)"
     trap 'rm -rf "$frames"' EXIT
+    (cd design/mockups && node --disable-warning=ExperimentalWarning scripts/frame-test.ts)
     (cd design/mockups && node scripts/render.ts "$frames" --frames)
     cargo run -q -p kubaos-specimen -- mockup "$frames"
     (cd design/mockups && node scripts/player-test.ts)

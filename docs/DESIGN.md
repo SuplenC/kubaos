@@ -813,6 +813,10 @@ The QML shots come from the same runner, `nix run .#checks.x86_64-linux.qml-spec
 
 **The mockups.** Every mocked element in `design/mockups/` carries the same probe, and the site reports a page's boxes as a frame (`scripts/render.ts --frames`, in headless Chromium at every scale, light and dark). `just mockups-check` holds each frame to the rules above, and each mocked component to its twin on the specimen's pages, of the same name, variant and words at the same mode and scale, wherever each page puts it (`kubaos-specimen mockup DIR`): its boxes to a hundredth of a device pixel and its texts' natural sizes to a hundredth of a logical pixel, as parity does. A component whose words the specimen doesn't show (a translation's) is held to the rules alone.
 
+**What a mockup's frame says.** The site's frame (`src/site/frame.ts`) reports what a person sees, which the page's boxes alone don't say. Each is a mark on a node of the frame, beside its role:
+
+- `picture`: a box the site draws scaled (CSS `scale`, or a `transform` that scales), such as the Gallery's small screens or the windows stepped back behind a lock, is a picture of UI, not UI on the device grid. It and everything in it are reported at the size they are laid out at, measured from its own top left, which stands on the whole device pixel nearest where it is laid out (its own grid starts at its corner, as the screen it pictures does), and marked with the ratio it is drawn at; the room it is drawn in holds the picture, not its layout, so its texts and icons are held to the boxes from the picture inward. Inside, every rule holds as anywhere else: a picture of a layout off the grid is still off it. One turned or mirrored as well is reported as one box, as drawn.
+
 ```text
 $ just mockups-check
 kubaos-specimen mockup: 8 frame(s), 640 component(s) compared, 0 difference(s), 0 finding(s)
