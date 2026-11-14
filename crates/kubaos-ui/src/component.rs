@@ -14,9 +14,9 @@
 //!   pick ([`picture`]), tabs ([`tabs`]), quick toggle tiles ([`tile`]), meters and sparklines
 //!   ([`meter`]), sheets ([`sheet`]), calendars ([`calendar`]), icon tiles ([`icon_tile`]), badges
 //!   ([`badge`]), skeletons ([`skeleton`]), popovers and menus ([`menu`]), a value asked for in a
-//!   popover ([`prompt`]), counts that roll ([`rolling`]), selects ([`select`]), tables ([`table`]),
-//!   collapsibles ([`collapsible`]), banners ([`banner`]), steps ([`step`]) and description lists
-//!   ([`description`]).
+//!   popover ([`prompt`]), counts that roll ([`rolling`]), selects ([`select`]), tables
+//!   ([`table`]), collapsibles ([`collapsible`]), banners ([`banner`]), steps ([`step`]) and
+//!   description lists ([`description`]).
 //!
 //! # Not here
 //!

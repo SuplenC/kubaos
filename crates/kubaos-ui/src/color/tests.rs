@@ -147,5 +147,8 @@ fn a_core_follows_the_primary_it_is_drawn_with() {
         derived(&fallback, tokens::PRIMARY_CORE).into_rgba8(),
         [0xff, 0xdb, 0xbc, 0xff]
     );
-    assert_eq!(derived(&live, tokens::PRIMARY_CORE).into_rgba8(), [0x9d, 0xbd, 0xea, 0xff]);
+    assert_eq!(
+        derived(&live, tokens::PRIMARY_CORE).into_rgba8(),
+        [0x9d, 0xbd, 0xea, 0xff]
+    );
 }
