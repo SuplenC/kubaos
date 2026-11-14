@@ -108,6 +108,18 @@ const CASES: Case[] = [
     },
   },
   {
+    name: "a box between two grid tracks alike on both sides lands on a whole pixel, the odd one after it",
+    html: `<div style="display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); width: 400px">
+      <span id="left" style="height: 20px"></span>
+      <span id="a" ${PROBE} style="width: 55px; height: 20px"></span>
+      <span id="right" style="height: 20px"></span>
+    </div>`,
+    check: async (page) => {
+      await centre(page);
+      return (await boxIs(page, "a", 172, 0, 55, 20)) ?? (await boxIs(page, "right", 228, 0, 172, 20));
+    },
+  },
+  {
     name: "a box centred inside a box that is centred lands on whole pixels too",
     html: `<div style="display: flex; align-items: center; height: 50px">
       <span id="outer" ${PROBE} style="display: flex; align-items: center; width: 60px; height: 35px">

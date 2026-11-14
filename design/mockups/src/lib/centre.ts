@@ -51,7 +51,7 @@ function isCentre(value: string): boolean {
 }
 
 /** Whether `parent` centres `child` along `axis`, and along its flex line's main axis if so. */
-function centring(parentStyle: CSSStyleDeclaration, child: HTMLElement, axis: Axis): { readonly main: boolean } | null {
+function centring(parentStyle: CSSStyleDeclaration, child: HTMLElement, axis: Axis, offset: number): { readonly main: boolean } | null {
   const display = parentStyle.display;
   if (display.endsWith("flex")) {
     const main = parentStyle.flexDirection.startsWith("row") === (axis === "x");
@@ -63,12 +63,30 @@ function centring(parentStyle: CSSStyleDeclaration, child: HTMLElement, axis: Ax
     const style = getComputedStyle(child);
     const self = axis === "x" ? style.justifySelf : style.alignSelf;
     const items = axis === "x" ? parentStyle.justifyItems : parentStyle.alignItems;
-    return isCentre(self === "auto" ? items : self) ? { main: false } : null;
+    if (isCentre(self === "auto" ? items : self)) return { main: false };
+    const tracks = axis === "x" ? parentStyle.gridTemplateColumns : parentStyle.gridTemplateRows;
+    const gap = Number.parseFloat(axis === "x" ? parentStyle.columnGap : parentStyle.rowGap) || 0;
+    return symmetric(tracks, gap, offset) ? { main: false } : null;
   }
   if (axis === "x" && parentStyle.textAlign === "center" && getComputedStyle(child).display.startsWith("inline")) {
     return { main: true };
   }
   return null;
+}
+
+/**
+ * Whether a grid's `tracks` (its resolved sizes, `1fr auto 1fr` as `612.5px 55px 612.5px`) are laid
+ * out alike on both sides of the middle one, and the box `offset` into its content starts it: a bar's clock between its
+ * two groups. The box is centred by the tracks, and a margin after it grows its track by that
+ * much, which the tracks round it give up half each.
+ */
+function symmetric(tracks: string, gap: number, offset: number): boolean {
+  const sizes = tracks.split(" ").map((each) => Number.parseFloat(each));
+  if (sizes.length < 3 || sizes.length % 2 === 0 || sizes.some((each) => Number.isNaN(each))) return false;
+  const middle = (sizes.length - 1) / 2;
+  const before = sizes.slice(0, middle).reduce((sum, each) => sum + each + gap, 0);
+  if (Math.abs(offset - before) >= EPSILON) return false;
+  return sizes.every((each, index) => Math.abs(each - sizes[sizes.length - 1 - index]!) < EPSILON);
 }
 
 /** The boxes `parent` lays out in its flow, first to last: those a centred line is made of. */
@@ -155,7 +173,9 @@ export function centreOnPixels(root: ParentNode): void {
       parentStyle = parent ? getComputedStyle(parent) : null;
     }
     if (!parent || !parentStyle) return;
-    const how = centring(parentStyle, box, axis);
+    const edge = axis === "x" ? "Left" : "Top";
+    const contentStart = startOf(parent, axis) + Number.parseFloat(parentStyle[`border${edge}Width`]) + Number.parseFloat(parentStyle[`padding${edge}`]);
+    const how = centring(parentStyle, box, axis, startOf(box, axis) - contentStart);
     if (!how) return;
     const key = keyOf(how.main ? parent : box, `${axis}${how.main ? "main" : "cross"}`);
     if (looked.has(key)) return;
@@ -167,8 +187,6 @@ export function centreOnPixels(root: ParentNode): void {
     const carrier = line.at(-1);
     if (!lead || !carrier) return;
     const side = SIDE[axis];
-    const edge = axis === "x" ? "Left" : "Top";
-    const contentStart = startOf(parent, axis) + Number.parseFloat(parentStyle[`border${edge}Width`]) + Number.parseFloat(parentStyle[`padding${edge}`]);
     // Where the CSS centres the line, before a correction moved it half its margin toward the start.
     const offset = startOf(lead, axis) - contentStart + (corrections.get(carrier)?.[side]?.shift ?? 0) / 2;
     const shift = 2 * (offset - centredOffset(offset));
