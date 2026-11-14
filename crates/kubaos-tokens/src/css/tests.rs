@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use super::CssTokens;
 use crate::Target;
+use crate::contrast::Mode;
 use crate::target::Kept;
 
 const TOKENS: &str = include_str!("../../../../design/tokens.toml");
@@ -116,14 +117,17 @@ fn the_neon_strike_is_one_property_per_step() {
 
 #[test]
 fn colours_follow_the_mode_of_the_box_they_are_read_in() {
+    let tokens = crate::parse(TOKENS).expect("the repo's tokens hold");
+    let palette = &tokens.color.light;
+    let derived = tokens.color.with_derived(palette, Mode::Light);
     let css = render();
     let dark = block(&css, ":root,\n[data-mode=\"dark\"]");
     let light = block(&css, "[data-mode=\"light\"]");
 
-    assert!(dark.contains("--color-primary: #ffb779;"));
-    assert!(light.contains("--color-primary: #8b4c00;"));
+    assert!(dark.contains(&format!("--color-primary: {:?};", tokens.color.dark["primary"])));
+    assert!(light.contains(&format!("--color-primary: {:?};", palette["primary"])));
     assert!(dark.contains("--color-on_secondary_container: "));
-    assert!(light.contains("--color-sharing: #6b3fc4;"));
+    assert!(light.contains(&format!("--color-sharing: {:?};", derived["sharing"])));
 }
 
 #[test]

@@ -592,16 +592,23 @@ fn a_darker_scrim_moves_the_frame_blur_cut_off_up_with_it() {
 fn every_core_is_its_tone_half_way_to_white() {
     let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
     let dark = tokens.color.with_derived(&tokens.color.dark, Mode::Dark);
+    // Each channel half way from the tone's to 255, a half rounded up, worked out apart from the
+    // generator's own mix.
+    let half_way = |tone: &str| {
+        let rgb = dark[tone];
+        let channel = |c: u8| (u16::from(c) + 255).div_ceil(2);
+        format!("#{:02x}{:02x}{:02x}", channel(rgb.r), channel(rgb.g), channel(rgb.b))
+    };
 
-    for (role, core) in [
-        ("primary_core", "#ffdbbc"),
-        ("cold_core", "#c2e7ff"),
-        ("error_core", "#ffdad5"),
-        ("success_core", "#afe9bd"),
-        ("warning_core", "#f9e0a7"),
-        ("sharing_core", "#e4d3ff"),
+    for (role, tone) in [
+        ("primary_core", "primary"),
+        ("cold_core", "cold"),
+        ("error_core", "burn_error"),
+        ("success_core", "burn_success"),
+        ("warning_core", "burn_warning"),
+        ("sharing_core", "burn_sharing"),
     ] {
-        assert_eq!(format!("{:?}", dark[role]), core, "{role}");
+        assert_eq!(format!("{:?}", dark[role]), half_way(tone), "{role}");
     }
 }
 
