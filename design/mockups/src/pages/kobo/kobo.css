@@ -36,6 +36,13 @@
   initial-value: 1;
 }
 
+/* How far a part of the disk's now bar has gone to the erased look: 0 kept, 1 gone. */
+@property --kobo-gone {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 /* A partition's share of its bar, in thousandths of the disk, and how far it shows. */
 @property --kobo-share {
   syntax: "<number>";
@@ -273,14 +280,14 @@
 }
 
 .kobo-part-fill[data-kind="system"] {
-  background: var(--color-cold_container);
-  color: var(--color-on_cold_container);
+  --kobo-fill: var(--color-cold_container);
+  --kobo-ink: var(--color-on_cold_container);
 }
 
 .kobo-part-fill[data-kind="plumbing"],
 .kobo-part-fill[data-kind="data"] {
-  background: var(--color-surface_container_highest);
-  color: var(--color-on_surface_variant);
+  --kobo-fill: var(--color-surface_container_highest);
+  --kobo-ink: var(--color-on_surface_variant);
 }
 
 .kobo-part-fill[data-kind="free"] {
@@ -295,11 +302,20 @@
   box-shadow: 0 var(--shadow-glow-y) var(--shadow-glow-blur) rgb(from var(--color-primary) r g b / calc(var(--shadow-glow-opacity) * (1 - var(--day))));
 }
 
-/* Erasing: what goes is struck through in `error`, so the bar says what the danger is. */
+/* Erasing: what goes turns to an outline in `error`, so the bar says what the danger is; how far
+   it has gone is a number a move takes from 0 to 1. */
+.kobo-part-fill {
+  --kobo-gone: 0;
+}
+
 .kobo-part-fill[data-gone] {
-  background: transparent;
-  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-error);
-  color: var(--color-error);
+  --kobo-gone: 1;
+}
+
+.kobo-part-fill:is([data-kind="system"], [data-kind="plumbing"], [data-kind="data"]) {
+  background: color-mix(in srgb, var(--kobo-fill), transparent calc(var(--kobo-gone) * 100%));
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-error) r g b / var(--kobo-gone));
+  color: color-mix(in srgb, var(--kobo-ink), var(--color-error) calc(var(--kobo-gone) * 100%));
 }
 
 /* The hold to install: a Danger or Filled lg button whose held share fills the banner's foot. */

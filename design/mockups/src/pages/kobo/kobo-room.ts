@@ -821,11 +821,10 @@ const WELCOME = "the welcome";
 /** Kōbō starts: the street lights up and settles back, the sign strikes, the words rise in order. */
 export const OPENING: Move = {
   name: "Kōbō starts",
-  what: "Black, then the street lights up and settles back; the sign strikes; the words rise in, one after another.",
+  what: "Black, then the street lights up round its band and settles back; the sign strikes; the words rise in, one after another.",
   tracks: [
     { part: "the street's light", on: WELCOME, target: ".kobo-scene .k-backdrop-dark", property: "opacity", from: 1, to: 0, duration: "slow", curve: "emphasized_decel" },
     { part: "the street settling", on: WELCOME, target: ".kobo-scene .k-backdrop-picture", property: "scale", from: { scale: "push" }, to: 1, duration: "scene", curve: "emphasized_decel" },
-    { part: "the band", on: WELCOME, target: ".kobo-scene .k-backdrop-scrim", property: "opacity", from: 0, to: 1, duration: "long", cue: "short", curve: "emphasized_decel" },
     { part: "the accent", on: WELCOME, target: ".kobo-accent", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
     { part: "the sign", on: WELCOME, target: ".kobo-sign", property: "--kobo-sign", from: 0, to: 1, duration: "medium", cue: "short", curve: "neon.strike" },
     ...rising(".kobo-hero", "the hero", WELCOME, ["short", "medium"]),
@@ -836,7 +835,6 @@ export const OPENING: Move = {
   unflickered: [
     { part: "the street's light", on: WELCOME, target: ".kobo-scene .k-backdrop-dark", property: "opacity", from: 1, to: 0, duration: "slow", curve: "emphasized_decel" },
     { part: "the street settling", on: WELCOME, target: ".kobo-scene .k-backdrop-picture", property: "scale", from: { scale: "push" }, to: 1, duration: "scene", curve: "emphasized_decel" },
-    { part: "the band", on: WELCOME, target: ".kobo-scene .k-backdrop-scrim", property: "opacity", from: 0, to: 1, duration: "long", cue: "short", curve: "emphasized_decel" },
     { part: "the accent", on: WELCOME, target: ".kobo-accent", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
     { part: "the sign", on: WELCOME, target: ".kobo-sign", property: "--kobo-sign", from: 0, to: 1, duration: "medium", cue: "short", curve: "standard" },
     ...rising(".kobo-hero", "the hero", WELCOME, ["short", "medium"]),
@@ -878,6 +876,7 @@ export const ENTERING: Move = {
   reduced: [
     { part: "the welcome", on: WELCOME, target: ".kobo-scene", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => room({ at: { panel: "language" }, leaving: { scene: "welcome" } }),
@@ -891,13 +890,14 @@ export const LEAVING: Move = {
     { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the panel's sink", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
     { part: "the band", on: WELCOME, target: ".kobo-scene > .k-backdrop-layers", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "the welcome's words", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
-    { part: "the words' fall", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "--backdrop-rise", from: -1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
+    { part: "the welcome's words", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "medium", curve: "emphasized_decel" },
+    { part: "the words' fall", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "--backdrop-rise", from: -1, to: 0, duration: "long", cue: "medium", curve: "emphasized_decel" },
     { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
   ],
   reduced: [
-    { part: "the welcome", on: WELCOME, target: ".kobo-scene", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the welcome", on: WELCOME, target: ".kobo-scene", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
+    { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => room({ at: { scene: "welcome" }, leaving: { panel: "language" } }),
@@ -920,8 +920,9 @@ export const STARTING: Move = {
     { part: "the foot", on: INSTALL, target: ".kobo-foot", property: "opacity", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
   ],
   reduced: [
-    { part: "the scene", on: INSTALL, target: ".kobo-scene", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: "the foot", on: INSTALL, target: ".kobo-foot", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the scene", on: INSTALL, target: ".kobo-scene", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
+    { part: "the foot", on: INSTALL, target: ".kobo-foot", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => room({ at: { scene: "installing", share: 0 }, leaving: { panel: "review" } }),
@@ -944,14 +945,14 @@ export const ADVANCING: Move = {
 function tipMove(count = 2): Move {
   return {
     name: "The next tip",
-    what: "Every three `scene`s: the tip fades off as the next rises in over it.",
+    what: "Every three `scene`s: the tip fades off, then the next rises in where it was.",
     tracks: [
       { part: "the old tip", on: "the tips", target: `.kobo-tip > :nth-child(${count - 1})`, property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-      ...rising(`.kobo-tip > :nth-child(${count})`, "the next tip", "the tips", "micro"),
+      ...rising(`.kobo-tip > :nth-child(${count})`, "the next tip", "the tips", "medium"),
     ],
     reduced: [
       { part: "the old tip", on: "the tips", target: `.kobo-tip > :nth-child(${count - 1})`, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-      fading(`.kobo-tip > :nth-child(${count})`, "the next tip", "the tips"),
+      { ...fading(`.kobo-tip > :nth-child(${count})`, "the next tip", "the tips"), cue: "short" },
     ],
     back: "cuts",
     sample: () => {
@@ -979,6 +980,7 @@ export const DETAILS: Move = {
   reduced: [
     { part: "the scene", on: INSTALL, target: ".kobo-scene", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the scene's foot", on: INSTALL, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => room({ at: { panel: "details" }, leaving: { scene: "installing", share: 0.41 } }),
@@ -998,6 +1000,7 @@ export const FAILING: Move = {
   reduced: [
     { part: "the scene", on: INSTALL, target: ".kobo-scene", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the scene's foot", on: INSTALL, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => room({ at: { panel: "failed" }, leaving: { scene: "installing", share: 0.38 } }),
@@ -1093,7 +1096,7 @@ export const FINISHING: Move = {
   unflickered: ENDING(DONE_TRACKS("standard")) as unknown as NonEmpty<Track<Easing>>,
   reduced: [
     { part: "the install's words", on: INSTALL, target: ".kobo-scene[data-scene='installing'] > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "the done screen", on: DONE, target: ".kobo-scene[data-scene='done']", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the done screen", on: DONE, target: ".kobo-scene[data-scene='done']", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => room({ at: { scene: "done" }, leaving: { scene: "installing", share: 1 } }),

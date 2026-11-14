@@ -19,15 +19,25 @@ const CELLS: Record<Shown, () => HTMLElement> = {
   error: at("disk", () => ({ disk: 0 }), machine(SMALL_DISK, STICK)),
 };
 
+/** A part of the disk's bar by its name: the now bar's first, the after bar's last. */
+const NOW = (piece: string) => `.kobo-map > .kobo-bar:nth-child(2) > [data-piece='${piece}'] > .kobo-part-fill`;
+const AFTER = (piece: string) => `.kobo-map > .kobo-bar:last-child > [data-piece='${piece}']`;
+
 const ERASING: Move = {
   name: "Erase picked",
-  what: "Windows' parts give their room back over `medium`; KubaOS grows across the disk; the now bar's parts turn `error`.",
+  what: "What goes turns to an `error` outline; Windows gives its room back over `medium` and KubaOS grows across the disk.",
   tracks: [
-    { part: "Windows' share", on: "the after bar", target: ".kobo-map > .kobo-bar:last-child > [data-piece='Windows 11']", property: "--kobo-share", from: 590, to: 0, duration: "medium", curve: "standard_decel" },
-    { part: "Windows showing", on: "the after bar", target: ".kobo-map > .kobo-bar:last-child > [data-piece='Windows 11']", property: "--kobo-shown", from: 1, to: 0, duration: "medium", curve: "standard_decel" },
-    { part: "KubaOS's share", on: "the after bar", target: ".kobo-map > .kobo-bar:last-child > [data-piece='kubaos']", property: "--kobo-share", from: 409, to: 1000, duration: "medium", curve: "standard_decel" },
+    { part: "Windows, now", on: "the now bar", target: NOW("Windows 11"), property: "--kobo-gone", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "Windows' share", on: "the after bar", target: AFTER("Windows 11"), property: "--kobo-share", from: 590, to: 0, duration: "medium", curve: "standard_decel" },
+    { part: "Windows showing", on: "the after bar", target: AFTER("Windows 11"), property: "--kobo-shown", from: 1, to: 0, duration: "medium", curve: "standard_decel" },
+    { part: "KubaOS's share", on: "the after bar", target: AFTER("kubaos"), property: "--kobo-share", from: 409, to: 1000, duration: "medium", curve: "standard_decel" },
   ],
-  reduced: [{ part: "Windows showing", on: "the after bar", target: ".kobo-map > .kobo-bar:last-child > [data-piece='Windows 11']", property: "--kobo-shown", from: 1, to: 0, duration: "short", curve: "standard" }],
+  reduced: [
+    { part: "Windows, now", on: "the now bar", target: NOW("Windows 11"), property: "--kobo-gone", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "Windows' share", on: "the after bar", target: AFTER("Windows 11"), property: "--kobo-share", from: 590, to: 0, duration: "instant", curve: "standard" },
+    { part: "Windows showing", on: "the after bar", target: AFTER("Windows 11"), property: "--kobo-shown", from: 1, to: 0, duration: "instant", curve: "standard" },
+    { part: "KubaOS's share", on: "the after bar", target: AFTER("kubaos"), property: "--kobo-share", from: 409, to: 1000, duration: "instant", curve: "standard" },
+  ],
   back: "plays",
   sample: at("disk"),
 };

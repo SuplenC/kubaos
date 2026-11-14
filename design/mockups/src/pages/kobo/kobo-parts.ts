@@ -735,12 +735,17 @@ function morph(map: HTMLElement, disk: Disk, mode: Answers["mode"], encrypt: boo
     const into = next[index];
     if (!into) return;
     const read = (from: HTMLElement) => ({ "--kobo-share": from.style.getPropertyValue("--kobo-share"), "--kobo-shown": from.style.getPropertyValue("--kobo-shown") });
-    const before = read(box);
+    const from = read(box);
     const after = read(into);
     box.style.setProperty("--kobo-share", after["--kobo-share"]);
     box.style.setProperty("--kobo-shown", after["--kobo-shown"]);
-    if (moving) box.animate([before, after], { duration: milliseconds("medium") / settings().speed, easing: `cubic-bezier(${bezier("standard_decel").join(", ")})` });
-    box.firstElementChild?.replaceWith(into.firstElementChild!);
+    if (moving) box.animate([from, after], { duration: milliseconds("medium") / settings().speed, easing: `cubic-bezier(${bezier("standard_decel").join(", ")})` });
+    const was = box.firstElementChild;
+    const fill = into.firstElementChild as HTMLElement;
+    const gone = (each: Element | null) => (each?.hasAttribute("data-gone") ? 1 : 0);
+    const before = gone(was);
+    was?.replaceWith(fill);
+    if (moving && before !== gone(fill)) fill.animate([{ "--kobo-gone": before }, { "--kobo-gone": gone(fill) }], { duration: milliseconds("short") / settings().speed, easing: `cubic-bezier(${bezier("standard").join(", ")})` });
   });
 }
 
