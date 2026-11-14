@@ -358,7 +358,7 @@ export default page<Shown>({
   title: "Wallpaper picker",
   lede: "A gallery: every picture on a wall, each drawn as itself, your desktop or your lock, the one in front lit.",
   code: { unbuilt: "QML WallpaperPicker: not built yet" },
-  from: ["lock", "depth-picture", "tabs", "button", "button-bar", "icon-button", "chip", "switch", "slider", "panel-page", "list", "empty-state", "shortcuts", "tooltip"],
+  from: ["lock", "depth-picture", "tabs", "button", "button-bar", "icon-button", "chip", "switch", "slider", "colour-picker", "panel-page", "list", "empty-state", "shortcuts", "tooltip"],
   stage: { live, hint: "click it, then the keys: ? lists them", daylight: true },
   variants: [
     { name: "Picture", for: "the wall: each picture alone, the front one lifted", sample: still({ at: 1 }) },

@@ -454,6 +454,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Tile](design/components/tile.md)
 - [Calendar](design/components/calendar.md)
 - [Select](design/components/select.md)
+- [ColourPicker](design/components/colour-picker.md)
 
 **Menus, tables and collapsibles**
 
