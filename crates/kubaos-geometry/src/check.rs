@@ -92,10 +92,10 @@ struct Ancestor {
 }
 
 /// Whether `node` starts a space of its own: a picture, laid out at its own size and drawn
-/// scaled, whose layout the room it is drawn in doesn't hold; or a layer floating over the page,
-/// which its control's box doesn't hold.
+/// scaled, whose layout the room it is drawn in doesn't hold; a layer floating over the page,
+/// which its control's box doesn't hold; or a part that hangs past the part it is placed over.
 fn starts_space(node: &Node) -> bool {
-    node.marks.picture.is_some() || node.marks.floats
+    node.marks.picture.is_some() || node.marks.floats || node.marks.overhangs
 }
 
 /// The children a layout places one after another: those in its flow, not those placed over it.
@@ -284,8 +284,10 @@ impl Walk<'_> {
     /// Text that fits its box, and text and icons inside every box around them.
     fn fits(&mut self, node: &Node, path: &[String], ancestors: &[Ancestor]) {
         let b = node.bounds;
+        // Words that vary are cut with an ellipsis where they don't fit: their width isn't a clip.
         if let Role::Text { natural, .. } = &node.role
-            && (self.device(natural.width - b.width) >= EPSILON || self.device(natural.height - b.height) >= EPSILON)
+            && ((!node.marks.variable && self.device(natural.width - b.width) >= EPSILON)
+                || self.device(natural.height - b.height) >= EPSILON)
         {
             let message = format!(
                 "the text needs {}×{} and its box is {}×{}",
@@ -595,8 +597,12 @@ fn same_parts(a: &[Part], b: &[Part]) -> bool {
 
 /// A frame's boxes in order, each with its role's label. A text's words and an icon's symbol are
 /// content, which a mode may change (a contrast ratio, a switch naming the other mode), so they
-/// are left out, and with them the width the words take; where the text sits still counts.
+/// are left out, and with them the width the words take; where the text sits still counts. A box
+/// drawn in one mode only is left out, with what it holds.
 fn flatten(node: &Node, into: &mut Vec<(String, Rect)>) {
+    if node.marks.only.is_some() {
+        return;
+    }
     let (label, bounds) = match node.role {
         Role::Text { .. } => (
             "Text".to_owned(),
@@ -617,6 +623,9 @@ fn flatten(node: &Node, into: &mut Vec<(String, Rect)>) {
 /// Each page's light frame with the same boxes as its dark one at the same scale: changing modes
 /// changes colours, never geometry.
 fn mode_invariant(frames: &[Frame], findings: &mut Vec<Finding>) {
+    for frame in frames {
+        drawn_in_its_mode(frame, &frame.root, &mut Vec::new(), findings);
+    }
     for (index, frame) in frames.iter().enumerate() {
         let Some(other) = frames[..index]
             .iter()
@@ -648,6 +657,35 @@ fn mode_invariant(frames: &[Frame], findings: &mut Vec<Finding>) {
             path: frame.page.clone(),
             message,
         });
+    }
+}
+
+/// Every box of `node` that says it is drawn in one mode only, held to being drawn in that mode: a
+/// declaration a mode outgrew is stale, and fails.
+fn drawn_in_its_mode(frame: &Frame, node: &Node, path: &mut Vec<String>, findings: &mut Vec<Finding>) {
+    if let Some(only) = &node.marks.only
+        && *only != frame.mode
+    {
+        findings.push(Finding {
+            frame: frame.name(),
+            rule: Rule::ModeInvariant,
+            path: path_text(path, &node.role),
+            message: format!(
+                "{} says it is drawn in {only} only, and is drawn in {}",
+                node.role.label(),
+                frame.mode
+            ),
+        });
+    }
+    let segment = !matches!(node.role, Role::Box);
+    for (index, child) in node.children.iter().enumerate() {
+        if segment {
+            path.push(format!("{}[{index}]", node.role.label()));
+        }
+        drawn_in_its_mode(frame, child, path, findings);
+        if segment {
+            path.pop();
+        }
     }
 }
 

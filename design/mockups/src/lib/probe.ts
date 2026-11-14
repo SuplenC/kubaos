@@ -31,6 +31,25 @@ export interface Declared {
    * but drawn in a layer of its own, held to its own boxes rather than its control's.
    */
   readonly floats?: true;
+  /**
+   * On a text: its words are content that varies (a window's title, a notification's body, a
+   * network's name), cut with an ellipsis where they don't fit, so needing more room across than
+   * its box is how it is drawn, not a clip. Fixed words that get cut still fail.
+   */
+  readonly variable?: true;
+  /** It hangs past the part it is placed over by design: a count badge over its icon's corner. */
+  readonly overhangs?: true;
+  /**
+   * It is drawn in this mode only: a sample of a look one mode has, left out when the page's modes
+   * are compared, and a finding where it is drawn in the other mode.
+   */
+  readonly only?: "dark" | "light";
+}
+
+/** Adds what `element`'s probe `declares` to it: words of a text that vary, say. */
+export function declare<E extends HTMLElement | SVGElement>(element: E, declares: Declared): E {
+  element.dataset.probe = JSON.stringify({ ...(JSON.parse(element.dataset.probe ?? "{}") as object), ...declares });
+  return element;
 }
 
 /** Marks `element` as `role`, with what it `declares`. */

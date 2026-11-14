@@ -12,6 +12,7 @@ import { sparkline, minute } from "../../lib/meter.ts";
 import { makePill, type Pill, type PillOptions, paired, pill } from "../../lib/pill.ts";
 import { type Screen, screen } from "../../lib/sheet.ts";
 import { widestTime } from "../../lib/lock.ts";
+import { declare } from "../../lib/probe.ts";
 import { advance, clamped, text } from "../../lib/text.ts";
 import { length } from "../../lib/tokens.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
@@ -343,7 +344,7 @@ export const TITLE = "kubaos — nvim config/quickshell/modules/bar/Workspaces.q
 export function title(words = TITLE): HTMLElement {
   const box = document.createElement("span");
   box.className = "shell-title";
-  box.append(clamped(words, "body_strong", "on_surface_variant"));
+  box.append(declare(clamped(words, "body_strong", "on_surface_variant"), { variable: true }));
   return box;
 }
 

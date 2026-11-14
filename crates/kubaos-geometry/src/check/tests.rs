@@ -550,3 +550,108 @@ fn a_frame_with_words_the_checker_doesnt_read_still_reads() {
 
     assert_eq!(read.root.children.len(), 1);
 }
+
+/// A 100 px row holding a text that needs `need` across, marked variable or not.
+fn cut_words(variable: bool, need: Size) -> Frame {
+    let mut words = text("Kuba's Sony WH-1000XM4", need, rect(0.0, 0.0, 100.0, 20.0));
+    words.marks.variable = variable;
+    frame(
+        "dark",
+        1.0,
+        with(Node::new(Role::Box, rect(0.0, 0.0, 100.0, 20.0)), vec![words]),
+    )
+}
+
+#[test]
+fn words_that_vary_may_be_cut_with_an_ellipsis_and_fixed_words_may_not() {
+    let wide = Size {
+        width: 180.0,
+        height: 20.0,
+    };
+    let tall = Size {
+        width: 80.0,
+        height: 40.0,
+    };
+
+    assert_eq!(rules_broken(&[cut_words(true, wide)]), [] as [Rule; 0]);
+    assert_eq!(rules_broken(&[cut_words(false, wide)]), [Rule::ClippedText]);
+    assert_eq!(rules_broken(&[cut_words(true, tall)]), [Rule::ClippedText]);
+}
+
+/// A 32×16 icon with a count badge 8 above it, the badge declaring its overhang or not.
+fn badged(overhangs: bool) -> Frame {
+    let natural = Size {
+        width: 8.0,
+        height: 16.0,
+    };
+    let mut badge = with(
+        Node::new(
+            Role::Component {
+                name: "Badge".to_owned(),
+                variant: "count".to_owned(),
+                fixed: Fixed::HEIGHT,
+            },
+            rect(20.0, 0.0, 16.0, 16.0),
+        ),
+        vec![text("3", natural, rect(24.0, 0.0, 8.0, 16.0))],
+    );
+    badge.marks.overhangs = overhangs;
+    badge.marks.over = true;
+    let badged = with(
+        Node::new(
+            Role::Component {
+                name: "BadgedIcon".to_owned(),
+                variant: "count".to_owned(),
+                fixed: Fixed::NONE,
+            },
+            rect(0.0, 8.0, 32.0, 16.0),
+        ),
+        vec![badge],
+    );
+    frame(
+        "dark",
+        1.0,
+        with(Node::new(Role::Box, rect(0.0, 0.0, 64.0, 32.0)), vec![badged]),
+    )
+}
+
+#[test]
+fn a_badge_that_declares_its_overhang_may_hang_past_its_icon() {
+    assert_eq!(rules_broken(&[badged(true)]), [] as [Rule; 0]);
+    assert_eq!(rules_broken(&[badged(false)]), [Rule::ClippedText]);
+}
+
+/// A page's frame in `mode`, with an extra column declared drawn in `only` or undeclared.
+fn with_night_column(mode: &str, column: bool, only: Option<&str>) -> Frame {
+    let mut children = vec![button("Filled Md", rect(0.0, 0.0, 120.0, 40.0))];
+    if column {
+        let mut extra = button("Filled Md", rect(0.0, 48.0, 120.0, 40.0));
+        extra.marks.only = only.map(str::to_owned);
+        children.push(extra);
+    }
+    frame(
+        mode,
+        1.0,
+        with(Node::new(Role::Box, rect(0.0, 0.0, 200.0, 100.0)), children),
+    )
+}
+
+#[test]
+fn a_sample_declared_for_one_mode_may_be_missing_from_the_other() {
+    let declared = [
+        with_night_column("dark", true, Some("dark")),
+        with_night_column("light", false, None),
+    ];
+    let undeclared = [
+        with_night_column("dark", true, None),
+        with_night_column("light", false, None),
+    ];
+    let stale = [
+        with_night_column("dark", true, Some("dark")),
+        with_night_column("light", true, Some("dark")),
+    ];
+
+    assert_eq!(rules_broken(&declared), [] as [Rule; 0]);
+    assert_eq!(rules_broken(&undeclared), [Rule::ModeInvariant]);
+    assert_eq!(rules_broken(&stale), [Rule::ModeInvariant]);
+}

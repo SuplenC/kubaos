@@ -12,7 +12,7 @@ import { type CardElement, card, CORNER, type Note } from "./notification-card.t
 import { raise } from "./elevation.ts";
 import { raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
-import { probe } from "./probe.ts";
+import { declare, probe } from "./probe.ts";
 import { clamped, text } from "./text.ts";
 
 export interface GroupOptions {
@@ -131,7 +131,7 @@ export function group(notes: readonly Note[], options: GroupOptions = {}): Group
     event.stopPropagation();
     setOpen(false);
   });
-  const heading = row("s8", "centre", clamped(notes[0]?.app || "Notification", "label"), chip({ label: String(count) }), fill(), less);
+  const heading = row("s8", "centre", declare(clamped(notes[0]?.app || "Notification", "label"), { variable: true }), chip({ label: String(count) }), fill(), less);
   heading.classList.add("k-notif-heading");
   heading.style.zIndex = String((count + 2) * 3);
   heading.toggleAttribute("data-shown", open);

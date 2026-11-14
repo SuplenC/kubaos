@@ -823,6 +823,12 @@ The QML shots come from the same runner, `nix run .#checks.x86_64-linux.qml-spec
 - A text's `natural`: a line of words in its type style needs its words' advance, measured as iced measures it (`--natural`, `src/lib/text.ts`), and its line. Words that break onto lines (`wrapped`, a clamp to more than one line) need their widest line and every line they break onto, as laid out in the room they have, so a word wider than its box or lines cut off by it still fail. Words the CSS draws at another size than their style's (the lock's clock and its kicker, sized from the screen) need their advance grown to that size, in the line the CSS gives them.
 - `across`: a box the site lets scroll sideways, a screen wider than the page under `?all`, is a `scroll` marked `across`: content past its sides is scrolled out of view, not clipped, while content past the screen it is on still is.
 
+Three exceptions are a probe's to declare, by name, for its own box alone (`declare` in `src/lib/probe.ts`); none is a blanket one:
+
+- `variable`: a text whose words are content that varies, a window's title, a notification's body or its app's name, a network's or a device's name, is cut with an ellipsis where it doesn't fit, so needing more room across than its box is how it is drawn, not a clip. Its height and where it sits are held as any text's, and a fixed label that gets cut (a tile's "Wallpaper motion") still fails: only the words declared vary.
+- `overhangs`: a count badge hangs past the icon it is placed over by design; its probe says so, and it is held to its own boxes from there. A dot, or any other part past its box, still fails.
+- `only`: a sample drawn in one mode only (`dark` or `light`), as a motion player's parts for a move that plays other tracks by day, is left out when the page's modes are compared. A box drawn in the mode it doesn't name fails, so the declaration can't outlive the sample; any other box that differs between the modes still fails.
+
 ```text
 $ just mockups-check
 kubaos-specimen mockup: 8 frame(s), 640 component(s) compared, 0 difference(s), 0 finding(s)

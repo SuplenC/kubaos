@@ -10,7 +10,7 @@
 // Motion is reviewed for its timing, not its pixels: a sample wider than its stage is drawn scaled
 // down to fit it, unless the player is at 1:1.
 
-import { type Align, probe } from "../../lib/probe.ts";
+import { type Align, declare, probe } from "../../lib/probe.ts";
 import { length, number } from "../../lib/tokens.ts";
 import { el, holdScaled, label, prose, relayout, sampleBox } from "../dom.ts";
 import type { DoesntApply, Motion, Move, Track, Value } from "../page.ts";
@@ -546,6 +546,9 @@ function player(move: Move): Player {
             }
           }
           spread(alone);
+          // A move with tracks of its own in light mode draws its parts from the tracks that play
+          // in the mode shown, so each mode's part is a sample of that mode alone.
+          if (move.daylight && alone instanceof HTMLElement && alone.dataset.probe !== undefined) declare(alone, { only: settings().mode });
           return alone;
         };
         // Drawn now, its animations start with the player's; drawn later, they join its clock.
@@ -686,6 +689,8 @@ function player(move: Move): Player {
       () => {
         const alone = move.sample();
         spread(alone);
+        // Only light mode's tracks leave a part resting: its sample is drawn by day alone.
+        if (alone instanceof HTMLElement && alone.dataset.probe !== undefined) declare(alone, { only: settings().mode });
         return alone;
       },
       () => [],

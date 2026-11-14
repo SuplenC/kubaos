@@ -83,6 +83,10 @@ impl Node {
 /// probes declare the rest by name, each a rule's exception for that box alone
 /// (`docs/DESIGN.md`, "The geometry check").
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Each is a mark of its own that a frame's JSON spells as a flag, any of them on together."
+)]
 pub struct Marks {
     /// A picture of UI: the box and everything in it drawn scaled by this ratio, as a gallery's
     /// small copy of a screen or windows stepped back behind a lock. Its boxes are reported at the
@@ -105,6 +109,19 @@ pub struct Marks {
     /// lets scroll.
     #[serde(default, skip_serializing_if = "is_false")]
     pub across: bool,
+    /// On a text: its words are content that varies (a window's title, a notification's body, a
+    /// network's name), cut with an ellipsis where they don't fit, so needing more width than its
+    /// box is how it is drawn, not a clip. Its height and its place are held as any text's.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub variable: bool,
+    /// Hangs past the part it is placed over by design, as a count badge over its icon's corner:
+    /// it and what it holds are held to the boxes from it inward.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub overhangs: bool,
+    /// Drawn in this mode only (`dark` or `light`), as a sample of a look only night has: left out
+    /// when a page's modes are compared, and a finding where it is drawn in the other mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub only: Option<String>,
 }
 
 /// What a box is, as much as the toolkit knows.

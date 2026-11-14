@@ -31,7 +31,7 @@ import { icon, missingIcon } from "./icon.ts";
 import { iconTile } from "./icon-tile.ts";
 import { keycap, keys } from "./keycap.ts";
 import { filling, row, stack } from "./layout.ts";
-import { FIXED_HEIGHT, probe, scrolls, variant } from "./probe.ts";
+import { declare, FIXED_HEIGHT, probe, scrolls, variant } from "./probe.ts";
 import { skeleton } from "./skeleton.ts";
 import { switchControl } from "./switch.ts";
 import { focusRing } from "./focus.ts";
@@ -99,6 +99,8 @@ export type ListRowSpec = RowTaking & {
   readonly lifted?: boolean;
   /** Taking it adds it: a + in its tick's room while it is the current row. */
   readonly adds?: boolean;
+  /** Its title is a name that varies, a network's or a device's: cut with an ellipsis where it doesn't fit. */
+  readonly named?: boolean;
 };
 
 /** A state a row is pinned in, as the specimens pin them: the keyboard on it, or pressed. */
@@ -134,6 +136,7 @@ function lead(spec: ListRowSpec): Element | null {
 function words(spec: ListRowSpec): HTMLElement {
   const title = spec.matched ? marked(spec.title, "body_strong", "on_surface", spec.matched) : clamped(spec.title, "body_strong");
   if (spec.matched) title.dataset.clamped = "line";
+  if (spec.named) declare(title, { variable: true });
   title.classList.add("k-list-title");
   title.style.color = "var(--title)";
   const lines: Element[] = [title];
