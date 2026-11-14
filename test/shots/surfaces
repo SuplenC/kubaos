@@ -78,6 +78,7 @@ mockups/figure      design/mockups/src/pages/atoms/figure.ts
 mockups/rolling-number design/mockups/src/pages/atoms/rolling-number.ts design/mockups/src/lib/rolling-number.ts design/mockups/src/lib/rolling-number.css
 mockups/slider      design/mockups/src/pages/molecules/slider.ts
 mockups/tabs        design/mockups/src/pages/molecules/tabs.ts
+mockups/colour-picker design/mockups/src/pages/molecules/colour-picker.ts
 mockups/select      design/mockups/src/pages/molecules/select.ts
 mockups/popover     design/mockups/src/pages/molecules/popover.ts
 mockups/menu        design/mockups/src/pages/molecules/menu.ts

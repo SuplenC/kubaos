@@ -37,6 +37,7 @@ import calendar from "./molecules/calendar.ts";
 import card from "./molecules/card.ts";
 import choiceCard from "./molecules/choice-card.ts";
 import collapsible from "./molecules/collapsible.ts";
+import colourPicker from "./molecules/colour-picker.ts";
 import depthPicture from "./molecules/depth-picture.ts";
 import descriptionList from "./molecules/description-list.ts";
 import dialog from "./molecules/dialog.ts";
@@ -109,7 +110,7 @@ import shellPowerMenu from "./shell/power-menu.ts";
 import shellOsd from "./shell/osd.ts";
 import shellPolkit from "./shell/polkit.ts";
 
-export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, rollingNumber, slider, tabs, select, popover, shortcutsPage, menu, prompt, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, notificationCard, notificationPopup, notificationGroup, media, pictureChoice, depthPicture, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll, progressBar, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, shellBar, shellContents, shellWorkspaces, shellTray, shellRecording, shellFrame, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard, notificationsPanel, popupStack, notificationPeek, shellCounters, shellMenu, shellMenuActions, shellMenuViews, shellMenuForm, shellMenuFooter, shellSysmon, shellSysmonProcesses, shellClock, shellClockSettings, shellWallpaper, shellPowerMenu, shellOsd, shellPolkit];
+export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, rollingNumber, slider, tabs, colourPicker, select, popover, shortcutsPage, menu, prompt, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, notificationCard, notificationPopup, notificationGroup, media, pictureChoice, depthPicture, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll, progressBar, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, shellBar, shellContents, shellWorkspaces, shellTray, shellRecording, shellFrame, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard, notificationsPanel, popupStack, notificationPeek, shellCounters, shellMenu, shellMenuActions, shellMenuViews, shellMenuForm, shellMenuFooter, shellSysmon, shellSysmonProcesses, shellClock, shellClockSettings, shellWallpaper, shellPowerMenu, shellOsd, shellPolkit];
 
 export function pagesOf(level: Level): AnyPage[] {
   return PAGES.filter((page) => page.level === level);

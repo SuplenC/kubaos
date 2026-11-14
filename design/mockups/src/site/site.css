@@ -2229,3 +2229,22 @@ body {
   background: var(--color-surface_container_lowest);
   outline: none;
 }
+
+/* The ColourPicker page's samples: the picker's three controls in a setting's well, a label column
+   beside them, as a settings panel lays out a setting with sub-settings. */
+.f-colour-well {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-auto-rows: minmax(var(--size-row_compact), auto);
+  align-items: center;
+  column-gap: var(--space-s12);
+  row-gap: var(--space-s4);
+  padding: var(--space-s4) var(--space-s8);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+}
+
+/* A sub-setting's label, in by `space.s12` under its setting's. */
+.f-colour-well > [data-sub] {
+  margin-inline-start: var(--space-s12);
+}
