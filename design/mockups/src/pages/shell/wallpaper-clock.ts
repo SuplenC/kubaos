@@ -1086,7 +1086,9 @@ export function clockEditor(host: EditorHost): Editor {
     const c = { x: box.left + pt.x * k, y: box.top + pt.y * k };
     const p = panel.getBoundingClientRect();
     if (c.x >= p.left && c.x <= p.right && c.y >= p.top && c.y <= p.bottom) return false;
-    return [...screen.querySelectorAll(".gl-bar, .gl-info")].some((each) => {
+    // The shortcuts' button is hidden on the full screen, so where it stood is the picture's.
+    return [...screen.querySelectorAll(".gl-bar, .gl-info > .k-button")].some((each) => {
+      if (!each.checkVisibility({ visibilityProperty: true })) return false;
       const b = each.getBoundingClientRect();
       return c.x >= b.left && c.x <= b.right && c.y >= b.top && c.y <= b.bottom;
     });

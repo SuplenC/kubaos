@@ -378,7 +378,7 @@ export default page<Shown>({
     { name: "Editor, clock off", for: "its rows disabled, no box on the picture", sample: editing({ look: CLOCK_OFF }) },
     { name: "Editor, date off", for: "its sub-rows disabled, the box round the digits", sample: editing({ look: DATE_OFF }) },
     { name: "No depth layers", for: "Depth disabled, with why", sample: screen(() => gallery({ at: 4, view: "lock", edit: {} })) },
-    { name: "Full screen, drawer closed", for: "a strip of the panel at the edge", sample: editing({ full: true, drawer: "closed" }) },
+    { name: "Full screen, drawer closed", for: "a strip of the panel at the edge; no shortcuts' button", sample: editing({ full: true, drawer: "closed" }) },
     { name: "Full screen, drawer open", for: "cut flush by the edge, over the bar", sample: editing({ full: true, drawer: "open" }) },
     { name: "Full screen, floating", for: "ripped off the edge, anywhere", sample: editing({ full: true, drawer: "float" }) },
   ],
@@ -453,7 +453,7 @@ export default page<Shown>({
       { keys: ["Alt"], does: "dragging the clock: no sticking to the guides" },
       { keys: ["Wheel"], does: "on the clock's box: its size; Shift a fine step" },
     ],
-    order: "Tab: shortcuts (not on the full screen), views, Full screen, Cancel, Wake, Clock, Apply; editing, the panel's rows.",
+    order: "Tab: shortcuts (not on a full screen), views, Full screen, Cancel, Wake, Clock, Apply; editing, the panel's rows.",
     lands: "Opening, on the gallery; the editor, on Across; leaving it, the gallery.",
   },
   measures: {
