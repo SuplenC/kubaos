@@ -143,12 +143,20 @@ fn a_core_follows_the_primary_it_is_drawn_with() {
         ..fallback
     };
 
+    // The core is its primary half way to white, a half rounded up, worked out apart from the
+    // library's own mix.
+    let half_way = |primary: Color| {
+        let [r, g, b, a] = primary.into_rgba8();
+        let channel = |c: u8| u8::try_from((u16::from(c) + 255).div_ceil(2)).expect("at most 255");
+        [channel(r), channel(g), channel(b), a]
+    };
+
     assert_eq!(
         derived(&fallback, tokens::PRIMARY_CORE).into_rgba8(),
-        [0xff, 0xdb, 0xbc, 0xff]
+        half_way(fallback.primary)
     );
     assert_eq!(
         derived(&live, tokens::PRIMARY_CORE).into_rgba8(),
-        [0x9d, 0xbd, 0xea, 0xff]
+        half_way(live.primary)
     );
 }
