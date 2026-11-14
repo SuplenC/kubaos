@@ -20,6 +20,7 @@ import { type Frame, frame } from "./site/frame.ts";
 import { type Nav, nav } from "./site/nav.ts";
 import { type AnyPage, applies, isFoundation } from "./site/page.ts";
 import { recipes, stopPlayers } from "./site/parts/motion.ts";
+import { forgetRules } from "./site/parts/uses.ts";
 import { forgetRail, rail, watchLine } from "./site/rail.ts";
 import { render } from "./site/render.ts";
 import { apply, CHROME, onChange, settings } from "./site/settings.ts";
@@ -172,6 +173,7 @@ async function start(): Promise<void> {
     forgetLengths();
     forgetMasks();
     forgetPalettes();
+    forgetRules();
     draw();
     paintPage([document.documentElement, pageBox], painted);
   });
