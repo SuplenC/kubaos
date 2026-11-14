@@ -136,9 +136,7 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
   }
   if (role.role === "text") {
     role.content = element.textContent ?? "";
-    const natural = Number(element.style.getPropertyValue("--natural"));
-    const lines = Math.max(1, Math.round(bounds.height / lineOf(element)));
-    role.natural = { width: natural, height: lines * lineOf(element) };
+    role.natural = naturalOf(element, style, drawn, bounds, at.perCss);
   }
   let kept = children;
   while (kept.length === 1 && kept[0]!.role === "box" && !marked(kept[0]!) && same(kept[0]!.bounds, bounds)) kept = kept[0]!.children;
@@ -305,6 +303,50 @@ function unscaled(bounds: Bounds, m: DOMMatrix, at: Walk): { bounds: Bounds; spa
     return { x: laid.x + (b.x - bounds.x) / m.a, y: laid.y + (b.y - bounds.y) / m.d, width: b.width / m.a, height: b.height / m.d };
   };
   return { bounds: laid, space };
+}
+
+/**
+ * The room a text needs, in logical pixels. A line of words in its type style needs its words'
+ * advance (`--natural`, measured as iced measures it) and its line. Words that break onto lines
+ * need their widest line and every line they break onto, as they are laid out in the room they
+ * have. Words whose size the CSS sets (a lock's clock, sized from its screen) need their advance
+ * grown to that size, and the line the CSS gives them.
+ */
+function naturalOf(element: HTMLElement | SVGElement, style: CSSStyleDeclaration, drawn: DOMRectReadOnly, bounds: Bounds, perCss: number): { width: number; height: number } {
+  const line = lineOf(element);
+  const advance = Number(element.style.getPropertyValue("--natural"));
+  const breaks = element.matches("[data-wrapped], [data-clamped='lines']");
+  const grown = grownByCss(element, style, perCss);
+  if (!breaks) return { width: advance * grown, height: grown === 1 ? Math.max(1, Math.round(bounds.height / line)) * line : bounds.height };
+  const perViewport = drawn.width > 0 ? bounds.width / drawn.width : 0;
+  const rows = linesOf(element);
+  const widest = rows.reduce((most, row) => Math.max(most, (row.right - drawn.left) * perViewport), 0);
+  return { width: widest, height: Math.max(1, rows.length) * line };
+}
+
+/**
+ * How many times its type style's size the CSS draws `element`'s words at: 1, or the size the CSS
+ * gives them over the style's, which `text()` notes on it (`data-size`, in logical pixels).
+ */
+function grownByCss(element: HTMLElement | SVGElement, style: CSSStyleDeclaration, perCss: number): number {
+  const own = Number(element.dataset.size);
+  if (!own) return 1;
+  const drawnAt = Number.parseFloat(style.fontSize) / perCss;
+  return Math.abs(drawnAt - own) > own * 1e-3 ? drawnAt / own : 1;
+}
+
+/** The lines `element`'s words are laid out on, as drawn: each line's extent, left to right. */
+function linesOf(element: Element): { left: number; right: number }[] {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  const rows = new Map<number, { left: number; right: number }>();
+  for (const rect of range.getClientRects()) {
+    if (rect.width === 0) continue;
+    const key = Math.round(rect.top + rect.height / 2);
+    const known = rows.get(key);
+    rows.set(key, known ? { left: Math.min(known.left, rect.left), right: Math.max(known.right, rect.right) } : { left: rect.left, right: rect.right });
+  }
+  return [...rows.values()];
 }
 
 /** A text's line height in logical pixels. */

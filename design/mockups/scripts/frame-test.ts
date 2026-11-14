@@ -261,6 +261,35 @@ const CASES: Case[] = [
       return boxIs(scroll, 0, 0, 200, 40) ?? boxIs(scroll.children[0]!, 0, 0, 200, 88);
     },
   },
+  {
+    name: "wrapped words need their widest line and every line they break onto, not one long line",
+    html: `<span ${TEXT} data-wrapped style="display: block; width: 120px; font: 16px/20px sans-serif; --natural: 400">one two three four five six seven eight nine ten</span>`,
+    check: (root) => {
+      const words = one(root, "text");
+      const need = words.natural as { width: number; height: number };
+      if (need.width > 120 || need.width < 60) return `the words need ${need.width} across`;
+      return need.height === words.bounds.height && need.height >= 60 ? null : `the words need ${need.height} down in a box ${words.bounds.height} tall`;
+    },
+  },
+  {
+    name: "wrapped words cut short by their box, or with a word wider than it, still need more room",
+    html: `<span ${TEXT} data-wrapped style="display: block; overflow: hidden; width: 120px; height: 20px; font: 16px/20px sans-serif">one two three four five six</span>
+    <span ${TEXT} data-wrapped style="display: block; width: 60px; font: 16px/20px sans-serif">unbreakablewordhere</span>`,
+    check: (root) => {
+      const [cut, wide] = all(root, "text");
+      const needs = (node: Node) => node.natural as { width: number; height: number };
+      if (needs(cut!).height <= cut!.bounds.height) return `the cut words need only ${needs(cut!).height} down`;
+      return needs(wide!).width > wide!.bounds.width ? null : `the long word needs only ${needs(wide!).width} across`;
+    },
+  },
+  {
+    name: "words the CSS draws larger than their type style need their advance at that size",
+    html: `<span ${TEXT} data-size="14" style="display: block; white-space: pre; width: 400px; font: 28px/34px sans-serif; --natural: 30">Clock</span>`,
+    check: (root) => {
+      const need = one(root, "text").natural as { width: number; height: number };
+      return need.width > 40 && need.width < 400 ? null : `the words need ${need.width} across, not their style's 30`;
+    },
+  },
 ];
 
 async function main(): Promise<void> {
