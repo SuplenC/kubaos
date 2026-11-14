@@ -84,7 +84,7 @@ fn a_text_that_needs_more_room_is_a_difference_inside_the_same_box() {
 }
 
 #[test]
-fn a_missing_node_is_counted() {
+fn a_missing_node_is_one_difference_where_it_is() {
     let iced = frame(button(rect(0.0, 0.0, 101.6, 40.0), 52.956));
     let mut short = button(rect(0.0, 0.0, 101.6, 40.0), 52.956);
     short.children.clear();
@@ -92,9 +92,63 @@ fn a_missing_node_is_counted() {
 
     let found = compare(&iced, &qml, ("iced", "QML"));
 
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].message, "Text \"Continue\" is in iced and not in QML");
+    assert_eq!(found[0].path, "Button(Filled Md) > Text \"Continue\"");
+}
+
+/// A row of `count` buttons, the first wrapped in an extra row when `nested`.
+fn buttons(count: usize, nested: bool) -> Node {
+    let mut row = Node::new(
+        Role::Layout {
+            axis: crate::Axis::X,
+            gap: 8.0,
+            align: crate::Align::Start,
+        },
+        rect(0.0, 0.0, 1000.0, 40.0),
+    );
+    row.children = (0..count)
+        .map(|i| button(rect(i as f32 * 110.0, 0.0, 101.6, 40.0), 52.956))
+        .collect();
+    if nested {
+        let mut extra = Node::new(
+            Role::Layout {
+                axis: crate::Axis::X,
+                gap: 0.0,
+                align: crate::Align::Start,
+            },
+            rect(0.0, 0.0, 101.6, 40.0),
+        );
+        extra.children = vec![row.children.remove(0)];
+        row.children.insert(0, extra);
+    }
+    row
+}
+
+#[test]
+fn a_level_one_side_lacks_is_one_difference_not_one_for_every_node_after_it() {
+    let iced = frame(buttons(20, true));
+    let qml = frame(buttons(20, false));
+
+    let found = compare(&iced, &qml, ("iced", "QML"));
+
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].message, "Row is in iced and not in QML");
+}
+
+#[test]
+fn a_node_moved_into_another_part_is_a_difference() {
+    let iced = frame(buttons(2, false));
+    let mut qml = buttons(2, false);
+    let label = qml.children[1].children.remove(0);
+    qml.children.push(label);
+
+    let found = compare(&iced, &frame(qml), ("iced", "QML"));
+
+    assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(
-        found.last().map(|d| d.message.as_str()),
-        Some("iced has 2 nodes and QML has 1")
+        found[0].message,
+        "Text \"Continue\" sits in another part in QML than in iced"
     );
 }
 
@@ -203,4 +257,119 @@ fn only_a_twin_of_the_same_scale_and_mode_counts() {
 
     assert_eq!(report.compared, 0);
     assert_eq!(report.unmatched.len(), 1);
+}
+
+/// A bar `width` wide, its fill 40 from its start and its value at its end, as a `ProgressBar` the
+/// parent sets the width of.
+fn bar(x: f32, width: f32, value_from_end: f32) -> Node {
+    let mut node = Node::new(
+        Role::Component {
+            name: "ProgressBar".to_owned(),
+            variant: String::new(),
+            fixed: Fixed::HEIGHT,
+        },
+        rect(x, 0.0, width, 24.0),
+    );
+    let text = |content: &str, bounds: Rect| {
+        Node::new(
+            Role::Text {
+                content: content.to_owned(),
+                natural: Size {
+                    width: bounds.width,
+                    height: 16.0,
+                },
+            },
+            bounds,
+        )
+    };
+    node.children = vec![
+        text("Copying", rect(x, 0.0, 52.0, 16.0)),
+        text("40%", rect(x + width - value_from_end - 24.0, 0.0, 24.0, 16.0)),
+        Node::new(Role::Box, rect(x, 20.0, width, 4.0)),
+    ];
+    node
+}
+
+#[test]
+fn a_component_its_parent_sizes_is_held_to_what_it_fixes_at_another_width() {
+    let iced = page_of("components", vec![bar(0.0, 584.0, 0.0)]);
+    let narrower = page_of("progress-bar", vec![bar(100.0, 560.0, 0.0)]);
+    let value_moved = page_of("progress-bar", vec![bar(100.0, 560.0, 4.0)]);
+
+    let at_width = components(std::slice::from_ref(&iced), &narrower, ("iced", "mockup"));
+    let moved = components(&[iced], &value_moved, ("iced", "mockup"));
+
+    assert_eq!(at_width.differences, []);
+    assert_eq!(moved.differences.len(), 1, "{:?}", moved.differences);
+}
+
+#[test]
+fn a_twin_drawn_at_the_same_size_is_preferred() {
+    let iced = page_of("components", vec![bar(0.0, 584.0, 4.0), bar(0.0, 560.0, 0.0)]);
+    let mockup = page_of("progress-bar", vec![bar(100.0, 560.0, 0.0)]);
+
+    let report = components(&[iced], &mockup, ("iced", "mockup"));
+
+    assert_eq!(report.compared, 1);
+    assert_eq!(report.differences, []);
+}
+
+#[test]
+fn a_layout_level_one_side_lacks_pairs_the_level_alike_in_every_detail() {
+    let mut iced = buttons(1, true);
+    iced.children[0] = {
+        let mut inner = buttons(1, false);
+        inner.bounds = rect(0.0, 0.0, 101.6, 40.0);
+        let mut outer = Node::new(
+            Role::Layout {
+                axis: crate::Axis::X,
+                gap: 0.0,
+                align: crate::Align::Start,
+            },
+            rect(0.0, 0.0, 101.6, 40.0),
+        );
+        outer.children = vec![inner];
+        outer
+    };
+    let mut qml = buttons(1, false);
+    qml.children[0] = {
+        let mut inner = buttons(1, false);
+        inner.bounds = rect(0.0, 0.0, 101.6, 40.0);
+        inner
+    };
+
+    let found = compare(&frame(iced), &frame(qml), ("iced", "QML"));
+
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].message, "Row is in iced and not in QML");
+}
+
+#[test]
+fn a_part_moved_is_one_difference_not_one_for_every_box_it_holds() {
+    let iced = frame(buttons(5, false));
+    let mut qml = buttons(5, false);
+    qml.bounds.x += 8.0;
+    for button in &mut qml.children {
+        button.bounds.x += 8.0;
+        for part in &mut button.children {
+            part.bounds.x += 8.0;
+        }
+    }
+
+    let found = compare(&iced, &frame(qml), ("iced", "QML"));
+
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].path, "Row");
+}
+
+#[test]
+fn a_box_moved_inside_a_part_that_stayed_is_still_a_difference() {
+    let iced = frame(buttons(5, false));
+    let mut qml = buttons(5, false);
+    qml.children[2].children[0].bounds.x += 0.8;
+
+    let found = compare(&iced, &frame(qml), ("iced", "QML"));
+
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].path.ends_with("Text \"Continue\""), "{found:?}");
 }

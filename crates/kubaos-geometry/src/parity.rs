@@ -55,17 +55,18 @@ impl fmt::Display for Difference {
 /// A node as parity compares it, with where it sits.
 struct Flat<'a> {
     node: &'a Node,
-    depth: usize,
+    /// The nearest kept node around it, by its index in the flattened list.
+    parent: Option<usize>,
     path: String,
 }
 
 /// Every node of `node` but the plain boxes and the scrolls held to their box (each toolkit scrolls
-/// a list in its own), in order, each with its depth among the kept ones. A page's scroll is kept,
-/// with how far it reaches.
-fn flatten<'a>(node: &'a Node, depth: usize, path: &str, into: &mut Vec<Flat<'a>>) {
+/// a list in its own), in order, each with the nearest kept node around it. A page's scroll is
+/// kept, with how far it reaches.
+fn flatten<'a>(node: &'a Node, parent: Option<usize>, path: &str, into: &mut Vec<Flat<'a>>) {
     if matches!(node.role, Role::Box | Role::Scroll { reach: None }) {
         for child in &node.children {
-            flatten(child, depth, path, into);
+            flatten(child, parent, path, into);
         }
         return;
     }
@@ -76,24 +77,55 @@ fn flatten<'a>(node: &'a Node, depth: usize, path: &str, into: &mut Vec<Flat<'a>
     };
     into.push(Flat {
         node,
-        depth,
+        parent,
         path: here.clone(),
     });
+    let index = into.len() - 1;
     for child in &node.children {
-        flatten(child, depth + 1, &here, into);
+        flatten(child, Some(index), &here, into);
+    }
+}
+
+/// How two nodes line up when their boxes are compared: the same box; or, inside parts of their
+/// own or a component whose size its parent sets, the same place in the part around them, by what
+/// that part fixes.
+#[derive(Debug, Clone, Copy, Default)]
+struct Stretch {
+    /// The components' boxes across, the reference's then the other's, when the component doesn't
+    /// fix its width and the two differ.
+    across: Option<(Span, Span)>,
+    /// The same down, for its height.
+    down: Option<(Span, Span)>,
+}
+
+impl Stretch {
+    /// Boxes held to the parts around them, `ours` and `theirs`: their place from those parts'
+    /// edges, along both axes.
+    fn inside(ours: Rect, theirs: Rect) -> Stretch {
+        Stretch {
+            across: Some((Span::across(ours), Span::across(theirs))),
+            down: Some((Span::down(ours), Span::down(theirs))),
+        }
     }
 }
 
 /// Every place `other` differs from `reference`, the same page from another toolkit: a node of
 /// another role, name, variant, words or symbol, a box moved or resized, a text whose natural size
-/// differs, or nodes one has and the other hasn't. `names` labels the two toolkits in messages:
+/// differs, or a node one has and the other hasn't. The two are lined up node by node first, so a
+/// node one of them lacks is one difference, where it is, and every node after it is still held
+/// to its own counterpart. Each box is held to its place in the part around it, so a part moved is
+/// one difference, not one for each box it holds. `names` labels the two toolkits in messages:
 /// `("iced", "QML")`.
 pub fn compare(reference: &Frame, other: &Frame, names: (&str, &str)) -> Vec<Difference> {
+    compare_stretched(reference, other, names, Stretch::default())
+}
+
+fn compare_stretched(reference: &Frame, other: &Frame, names: (&str, &str), stretch: Stretch) -> Vec<Difference> {
     let frame = reference.name();
     let scale = reference.scale;
     let (mut ours, mut theirs) = (Vec::new(), Vec::new());
-    flatten(&reference.root, 0, "", &mut ours);
-    flatten(&other.root, 0, "", &mut theirs);
+    flatten(&reference.root, None, "", &mut ours);
+    flatten(&other.root, None, "", &mut theirs);
     let mut found = Vec::new();
     if (reference.scale - other.scale).abs() > f32::EPSILON || reference.mode != other.mode {
         found.push(Difference {
@@ -103,60 +135,155 @@ pub fn compare(reference: &Frame, other: &Frame, names: (&str, &str)) -> Vec<Dif
         });
         return found;
     }
-    for (a, b) in ours.iter().zip(&theirs) {
-        let mut parts = Vec::new();
-        if a.depth != b.depth || a.node.role.label() != b.node.role.label() || !same_role(&a.node.role, &b.node.role) {
-            parts.push(format!(
-                "{} is {} in {} and {} in {}",
-                a.node.role.label(),
+    let pairs = align(&ours, &theirs);
+    let mut ours_to = vec![None; ours.len()];
+    let mut theirs_to = vec![None; theirs.len()];
+    for &(a, b) in &pairs {
+        ours_to[a] = Some(b);
+        theirs_to[b] = Some(a);
+    }
+    let difference = |path: &str, message: String| Difference {
+        frame: frame.clone(),
+        path: path.to_owned(),
+        message,
+    };
+    for (index, flat) in ours.iter().enumerate() {
+        if ours_to[index].is_none() && flat.parent.is_none_or(|p| ours_to[p].is_some()) {
+            let message = format!("{} is in {} and not in {}", flat.node.role.label(), names.0, names.1);
+            found.push(difference(&flat.path, message));
+        }
+    }
+    for (index, flat) in theirs.iter().enumerate() {
+        if theirs_to[index].is_none() && flat.parent.is_none_or(|p| theirs_to[p].is_some()) {
+            let message = format!("{} is in {} and not in {}", flat.node.role.label(), names.1, names.0);
+            found.push(difference(&flat.path, message));
+        }
+    }
+    for &(i, j) in &pairs {
+        let (a, b) = (&ours[i], &theirs[j]);
+        let label = a.node.role.label();
+        let around = matched_around(&ours, &ours_to, i);
+        // A box is held to the part around it, so a part moved or resized is one difference, where
+        // it is, and what it holds is held to it wherever it went.
+        let within = around
+            .and_then(|p| ours_to[p].map(|q| Stretch::inside(ours[p].node.bounds, theirs[q].node.bounds)))
+            .unwrap_or(stretch);
+        let message = if around != matched_around(&theirs, &theirs_to, j).and_then(|p| theirs_to[p]) {
+            Some(format!(
+                "{label} sits in another part in {} than in {}",
+                names.1, names.0
+            ))
+        } else if !same_role(&a.node.role, &b.node.role) {
+            Some(format!(
+                "{label} is {} in {} and {} in {}",
                 describe(&b.node.role),
                 names.1,
                 describe(&a.node.role),
                 names.0
-            ));
-        } else if !same_box(a.node.bounds, b.node.bounds, scale) {
-            parts.push(format!(
-                "{} is {} in {} and {} in {}",
-                a.node.role.label(),
-                b.node.bounds,
-                names.1,
-                a.node.bounds,
-                names.0
-            ));
+            ))
+        } else if !same_box(a.node.bounds, b.node.bounds, scale, within) {
+            Some(format!(
+                "{label} is {} in {} and {} in {}",
+                b.node.bounds, names.1, a.node.bounds, names.0
+            ))
         } else if let (Role::Text { natural: x, .. }, Role::Text { natural: y, .. }) = (&a.node.role, &b.node.role)
             && ((x.width - y.width).abs() > NATURAL_EPSILON || (x.height - y.height).abs() > NATURAL_EPSILON)
         {
-            parts.push(format!(
-                "{} needs {}×{} in {} and {}×{} in {}",
-                a.node.role.label(),
-                y.width,
-                y.height,
-                names.1,
-                x.width,
-                x.height,
-                names.0
-            ));
-        }
-        found.extend(parts.into_iter().map(|message| Difference {
-            frame: frame.clone(),
-            path: a.path.clone(),
-            message,
-        }));
-    }
-    if ours.len() != theirs.len() {
-        found.push(Difference {
-            frame: frame.clone(),
-            path: reference.page.clone(),
-            message: format!(
-                "{} has {} nodes and {} has {}",
-                names.0,
-                ours.len(),
-                names.1,
-                theirs.len()
-            ),
-        });
+            Some(format!(
+                "{label} needs {}×{} in {} and {}×{} in {}",
+                y.width, y.height, names.1, x.width, x.height, names.0
+            ))
+        } else {
+            None
+        };
+        found.extend(message.map(|message| difference(&a.path, message)));
     }
     found
+}
+
+/// The nearest node around `index` that has a counterpart on the other side.
+fn matched_around(flat: &[Flat<'_>], to: &[Option<usize>], index: usize) -> Option<usize> {
+    let mut at = flat[index].parent;
+    while let Some(parent) = at {
+        if to[parent].is_some() {
+            return Some(parent);
+        }
+        at = flat[parent].parent;
+    }
+    None
+}
+
+/// The most cells the alignment's table may have; past it, the middle where two frames differ is
+/// lined up in order, as two pages too unlike to align node by node.
+const ALIGNED_CELLS: usize = 16_000_000;
+
+/// The pairs of nodes, one from each side, that are the same node: the run in order whose labels
+/// agree (role, name, variant, words, symbol) that pairs the most, a pair of the same role in
+/// every detail (a layout's gap, say) counting over one whose label alone agrees. The runs both
+/// frames start and end with alike are taken as they are.
+fn align(ours: &[Flat<'_>], theirs: &[Flat<'_>]) -> Vec<(usize, usize)> {
+    let a: Vec<String> = ours.iter().map(|f| f.node.role.label()).collect();
+    let b: Vec<String> = theirs.iter().map(|f| f.node.role.label()).collect();
+    let alike = |i: usize, j: usize| a[i] == b[j] && same_role(&ours[i].node.role, &theirs[j].node.role);
+    let head = (0..a.len().min(b.len())).take_while(|&i| alike(i, i)).count();
+    let tail = (0..(a.len() - head).min(b.len() - head))
+        .take_while(|&k| alike(a.len() - 1 - k, b.len() - 1 - k))
+        .count();
+    let (rows, columns) = (a.len() - head - tail, b.len() - head - tail);
+    let mut pairs: Vec<(usize, usize)> = (0..head).map(|i| (i, i)).collect();
+    let weight = |i: usize, j: usize| match (a[head + i] == b[head + j], alike(head + i, head + j)) {
+        (_, true) => 2,
+        (true, false) => 1,
+        (false, _) => 0,
+    };
+    if (rows + 1) * (columns + 1) <= ALIGNED_CELLS {
+        pairs.extend(
+            heaviest_common(rows, columns, weight)
+                .into_iter()
+                .map(|(i, j)| (head + i, head + j)),
+        );
+    } else {
+        pairs.extend(
+            (0..rows.min(columns))
+                .filter(|&i| weight(i, i) > 0)
+                .map(|i| (head + i, head + i)),
+        );
+    }
+    pairs.extend((0..tail).map(|k| (a.len() - tail + k, b.len() - tail + k)));
+    pairs
+}
+
+/// The pairs, in order, of a common subsequence of two sequences `rows` and `columns` long whose
+/// pairs weigh the most, `weight` saying what pairing two items weighs (0 where they can't pair).
+fn heaviest_common(rows: usize, columns: usize, weight: impl Fn(usize, usize) -> u32) -> Vec<(usize, usize)> {
+    let width = columns + 1;
+    let mut table = vec![0_u32; (rows + 1) * width];
+    for i in (0..rows).rev() {
+        for j in (0..columns).rev() {
+            let skip = table[(i + 1) * width + j].max(table[i * width + j + 1]);
+            let w = weight(i, j);
+            table[i * width + j] = if w > 0 {
+                skip.max(table[(i + 1) * width + j + 1] + w)
+            } else {
+                skip
+            };
+        }
+    }
+    let (mut i, mut j) = (0, 0);
+    let mut pairs = Vec::new();
+    while i < rows && j < columns {
+        let w = weight(i, j);
+        if w > 0 && table[i * width + j] == table[(i + 1) * width + j + 1] + w {
+            pairs.push((i, j));
+            i += 1;
+            j += 1;
+        } else if table[(i + 1) * width + j] >= table[i * width + j + 1] {
+            i += 1;
+        } else {
+            j += 1;
+        }
+    }
+    pairs
 }
 
 /// A role as a difference names it: its label, a layout's or grid's gap and alignment, and how far
@@ -240,13 +367,26 @@ pub fn components(references: &[Frame], other: &Frame, names: (&str, &str)) -> C
     let mut report = Components::default();
     for component in ours {
         let key = parts(component);
-        let Some(twin) = theirs
+        let mut twins = theirs
             .iter()
-            .find(|twin| twin.role == component.role && parts(twin) == key)
-        else {
+            .filter(|twin| twin.role == component.role && parts(twin) == key)
+            .peekable();
+        let Some(&first) = twins.peek() else {
             report.unmatched.push(reading(component));
             continue;
         };
+        // Where the specimen draws it at the same size, that twin; else the first, held only to
+        // what the component fixes along the measures its parent sets.
+        let twin = twins
+            .find(|twin| {
+                same_box(
+                    moved_rect(twin.bounds),
+                    moved_rect(component.bounds),
+                    other.scale,
+                    Stretch::default(),
+                )
+            })
+            .unwrap_or(first);
         report.compared += 1;
         let alone = |node: &Node| Frame {
             page: format!("{} {}", other.page, reading(component)),
@@ -254,11 +394,37 @@ pub fn components(references: &[Frame], other: &Frame, names: (&str, &str)) -> C
             scale: other.scale,
             root: moved(node, node.bounds.x, node.bounds.y),
         };
+        let stretch = stretch_of(component, twin);
         report
             .differences
-            .extend(compare(&alone(twin), &alone(component), names));
+            .extend(compare_stretched(&alone(twin), &alone(component), names, stretch));
     }
     report
+}
+
+/// A box moved to the origin, for comparing sizes alone.
+fn moved_rect(bounds: Rect) -> Rect {
+    Rect {
+        x: 0.0,
+        y: 0.0,
+        ..bounds
+    }
+}
+
+/// The axes along which `component` and its `twin` are drawn at different sizes that the
+/// component doesn't fix, as both are compared, from their own top left.
+fn stretch_of(component: &Node, twin: &Node) -> Stretch {
+    let Role::Component { fixed, .. } = component.role else {
+        return Stretch::default();
+    };
+    let (a, b) = (twin.bounds, component.bounds);
+    let from_origin = |length: f32| Span { start: 0.0, length };
+    Stretch {
+        across: (!fixed.width && (a.width - b.width).abs() > f32::EPSILON)
+            .then_some((from_origin(a.width), from_origin(b.width))),
+        down: (!fixed.height && (a.height - b.height).abs() > f32::EPSILON)
+            .then_some((from_origin(a.height), from_origin(b.height))),
+    }
 }
 
 /// The outermost components under `node`.
@@ -286,7 +452,7 @@ fn every_component<'a>(node: &'a Node, into: &mut Vec<&'a Node>) {
 /// words, its icons with their symbols, its nested components.
 fn parts(node: &Node) -> Vec<String> {
     let mut flat = Vec::new();
-    flatten(node, 0, "", &mut flat);
+    flatten(node, None, "", &mut flat);
     flat.iter()
         .skip(1)
         .filter(|f| {
@@ -329,11 +495,53 @@ fn moved(node: &Node, x: f32, y: f32) -> Node {
     }
 }
 
-/// Whether two boxes are the same to a hundredth of a device pixel.
-fn same_box(a: Rect, b: Rect, scale: f32) -> bool {
-    [(a.x, b.x), (a.y, b.y), (a.width, b.width), (a.height, b.height)]
-        .iter()
-        .all(|(x, y)| ((x - y) * scale).abs() < EPSILON)
+/// Whether two boxes are the same to a hundredth of a device pixel. Along an axis `stretch` names,
+/// the two sit in components of different sizes, so a box is the same when it keeps the same
+/// place from either edge, both edges, or the middle: what the component itself fixes.
+fn same_box(a: Rect, b: Rect, scale: f32, stretch: Stretch) -> bool {
+    let same = |x: f32, y: f32| ((x - y) * scale).abs() < EPSILON;
+    let along = |ours: Span, theirs: Span, within: Option<(Span, Span)>| {
+        let Some((ours_in, theirs_in)) = within else {
+            return same(ours.start, theirs.start) && same(ours.length, theirs.length);
+        };
+        let from_start = same(ours.start - ours_in.start, theirs.start - theirs_in.start);
+        let from_end = same(ours_in.end() - ours.end(), theirs_in.end() - theirs.end());
+        let length = same(ours.length, theirs.length);
+        let middle = same(ours.middle() - ours_in.middle(), theirs.middle() - theirs_in.middle());
+        (from_start && (length || from_end)) || (from_end && length) || (middle && length)
+    };
+    along(Span::across(a), Span::across(b), stretch.across) && along(Span::down(a), Span::down(b), stretch.down)
+}
+
+/// A box along one axis.
+#[derive(Debug, Clone, Copy)]
+struct Span {
+    start: f32,
+    length: f32,
+}
+
+impl Span {
+    fn across(r: Rect) -> Span {
+        Span {
+            start: r.x,
+            length: r.width,
+        }
+    }
+
+    fn down(r: Rect) -> Span {
+        Span {
+            start: r.y,
+            length: r.height,
+        }
+    }
+
+    fn end(self) -> f32 {
+        self.start + self.length
+    }
+
+    fn middle(self) -> f32 {
+        self.start + self.length / 2.0
+    }
 }
 
 #[cfg(test)]
