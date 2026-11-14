@@ -114,7 +114,7 @@ const ROWS: Move = {
 
 export default page<Shown>({
   level: "shell",
-  slug: "menu",
+  slug: "command-menu",
   title: "Command menu",
   lede: "Super+Space: a search over every Item, its Results beside the selected one's pane, and the keys it takes.",
   code: { qml: "Menu" },
