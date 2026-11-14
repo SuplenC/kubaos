@@ -61,6 +61,8 @@ pub enum Error {
     },
     #[error("loading the tokens")]
     Tokens(#[source] kubaos_tokens::Error),
+    #[error("the tokens have no `duration.scene`, the longest a move runs")]
+    NoScene,
     #[error("reading the baseline's git history")]
     History(#[source] Option<io::Error>),
 }
