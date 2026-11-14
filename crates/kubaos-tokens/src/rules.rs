@@ -368,7 +368,18 @@ fn check_rules(tokens: &Tokens, found: &mut Vec<Violation>) {
     }
 }
 
+/// The lengths: each on the grid and each scale in order, then the opacities the same tables give,
+/// and the pairs whose first must stay under its second.
 fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
+    check_on_grid(tokens, found);
+    check_ascending(tokens, found);
+    check_opacities(tokens, found);
+    check_ordered_pairs(tokens, found);
+}
+
+/// Every length a multiple of `rules.grid`, but the sizes `rules.off_grid` names, which must be
+/// sizes.
+fn check_on_grid(tokens: &Tokens, found: &mut Vec<Violation>) {
     let grid = tokens.rules.grid;
     let mut on_grid = |token: String, value: u16| {
         if !value.is_multiple_of(grid) {
@@ -432,7 +443,11 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
             });
         }
     }
+}
 
+/// Each scale smallest first.
+fn check_ascending(tokens: &Tokens, found: &mut Vec<Violation>) {
+    let radius = &tokens.radius;
     let roles = [radius.small, radius.row, radius.control, radius.content, radius.surface];
     for (table, values) in [
         ("space.values", &tokens.space.values),
@@ -444,6 +459,10 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
             found.push(Violation::NotAscending { token: table.into() });
         }
     }
+}
+
+/// Every opacity, and every share held to the same 0 to 1.
+fn check_opacities(tokens: &Tokens, found: &mut Vec<Violation>) {
     for (name, shadow) in &tokens.shadow {
         check_opacity(format!("shadow.{name}.opacity"), shadow.opacity, found);
         if let Some(light) = shadow.light_opacity {
@@ -473,6 +492,11 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
         edge * tokens.focus.pressed_glow,
         found,
     );
+}
+
+/// The pairs whose first must stay under its second: the rails by day and night, the focus glow's
+/// near and far edges.
+fn check_ordered_pairs(tokens: &Tokens, found: &mut Vec<Violation>) {
     if tokens.tabs.rail > tokens.tabs.rail_day {
         found.push(Violation::NotAscending {
             token: "tabs.rail, tabs.rail_day".into(),
