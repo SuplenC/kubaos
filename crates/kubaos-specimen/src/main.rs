@@ -62,8 +62,9 @@ parity the components page as `KubaOS.Components` draws it (qml/specimen/), read
 mockup the mockup site's frames in DIR (PAGE-MODE-SCALEx.json, from design/mockups'
        scripts/render.ts), each held to the geometry rules, and each of its components to its twin
        on the specimen's pages, of the same name, variant and words at the same mode and scale,
-       wherever each page puts it; exit 1 on any difference or finding, or when no component had a
-       twin";
+       wherever each page puts it; a component its probe says is ahead of its twin is listed, not
+       counted. Exit 1 on any difference or finding, when DIR holds no frame, or when the pages
+       hold components and not one has a twin";
 
 /// How many of a screenshot's off-grid boxes are listed; the count says how many there are.
 const AUDIT_SHOWN: usize = 5;
@@ -263,7 +264,13 @@ fn mockup(dir: &Path) -> ExitCode {
                 report.differences,
                 report.findings
             );
-            if report.compared > 0 && report.differences == 0 && report.findings == 0 {
+            // Components on these pages and not one with a twin: the specimen's names or its
+            // layout no longer reach the mockups, and nothing is held to the libraries.
+            let twinless = report.compared == 0 && report.ahead.is_empty() && !report.unmatched.is_empty();
+            if twinless {
+                eprintln!("kubaos-specimen mockup: not one component on these pages has a twin in the specimen");
+            }
+            if report.frames > 0 && !twinless && report.differences == 0 && report.findings == 0 {
                 ExitCode::SUCCESS
             } else {
                 ExitCode::FAILURE

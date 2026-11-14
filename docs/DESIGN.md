@@ -665,7 +665,7 @@ The words are `docs/BRAND.md`'s: read its "Voice" before writing anything a pers
 
 ## Checks
 
-Five checks keep every front end on this file: the lint, the contrast check, the geometry check, parity and the mockups' check. The first three run in `cargo test --workspace` (`just test`), in `nix flake check` (`crates/checks.nix`) and in `just design-check`, parity in `just design-check` and `nix flake check`; a PR that fails any of those four isn't done. The mockups' check is `just mockups-check`, run by hand: the site's pages are drawn ahead of the libraries, so not every page passes it, and no pull request check runs it.
+Five checks keep every front end on this file: the lint, the contrast check, the geometry check, parity and the mockups' check. The first three run in `cargo test --workspace` (`just test`), in `nix flake check` (`crates/checks.nix`) and in `just design-check`, parity in `just design-check` and `nix flake check`; a PR that fails any of those four isn't done. The mockups' check is `just mockups-check`: the site's pages are drawn ahead of the libraries, so not every page passes it yet, and `just design-check` holds every pull request to it on the pages listed in `design/mockups/checked-pages` ("The mockups", below).
 
 ### The contrast check
 
@@ -812,6 +812,8 @@ That run is Qt drawing `mono` text in a proportional font from the desktop's own
 The QML shots come from the same runner, `nix run .#checks.x86_64-linux.qml-specimen -- shots DIR`. Headless, Qt draws with its software renderer, which leaves `RectangularShadow` out: the dialogs' shadow and the progress bar's glow are missing from these shots.
 
 **The mockups.** Every mocked element in `design/mockups/` carries the same probe, and the site reports a page's boxes as a frame (`scripts/render.ts --frames`, in headless Chromium at every scale, light and dark). `just mockups-check` holds each frame to the rules above, and each mocked component to its twin on the specimen's pages, of the same name, variant and words at the same mode and scale, wherever each page puts it (`kubaos-specimen mockup DIR`): its boxes to a hundredth of a device pixel and its texts' natural sizes to a hundredth of a logical pixel, as parity does. A component whose width or height its parent sets (a tile, a progress bar, a meter, a divider) is held to a twin drawn at the same size where the specimen has one; at another size, each box inside it is held to what the component fixes: the same place from its start, its end, both or its middle, along the measure its parent sets. A component whose words the specimen doesn't show (a translation's) is held to the rules alone.
+
+`just mockups-check PAGE…` checks the pages named, and with none, the whole site. Pages named are checked together, so the `identical` rule holds their instances to each other's only, and a component on another page is no part of it. The run fails when its pages hold components and not one has a twin, which means the specimen's names or layout no longer reach the mockups. Every pull request runs the check on the pages that pass it, listed one slug a line in `design/mockups/checked-pages`, together (`just mockups-checked`, by `just design-check`): a page joins the list once `just mockups-check PAGE` passes it with no finding and no difference, and a change that breaks a listed page fails until it is fixed.
 
 **What a mockup's frame says.** The site's frame (`src/site/frame.ts`) reports what a person sees, which the page's boxes alone don't say. Each is a mark on a node of the frame, beside its role:
 

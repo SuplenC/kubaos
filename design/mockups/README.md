@@ -10,7 +10,7 @@ In `nix develop`, which provides Node, the tokens' generator and Chromium:
 |---|---|
 | `just mockups` | Serves the site with hot reload at the address Vite prints. A change to `design/tokens.toml` regenerates `src/tokens.css` and the page follows it. |
 | `just mockups-build` | Type-checks, holds each registered custom property to one registration (`scripts/property-check.ts`) and builds it static into `dist/`, then draws each page in headless Chromium to write its moves' recipes into `dist/motion/PAGE.json`. |
-| `just mockups-check` | Draws every page at every scale, light and dark, and holds its boxes to the geometry rules and each mocked component to its twin on the specimen's pages (`docs/DESIGN.md`, "The mockups"), then holds every motion player to its recipe (`scripts/player-test.ts`). Run by hand: `just design-check` doesn't run it, and not every page passes it. |
+| `just mockups-check [PAGE…]` | Draws the pages named, or every page, at every scale, light and dark, and holds its boxes to the geometry rules and each mocked component to its twin on the specimen's pages (`docs/DESIGN.md`, "The mockups"), then holds every motion player to its recipe (`scripts/player-test.ts`). `just design-check` runs it on the pages listed in `checked-pages`, which every pull request must keep passing; a page joins that list once it passes with no finding and no difference. |
 | `just shots mockups` | Renders the pages' shots, before and after (`docs/agents/design-pr-loop.md`). |
 | `npm run perf -- PAGE…` | Measures the pages named for speed and holds them to their budgets ("Speed", below). |
 
@@ -56,6 +56,7 @@ The Anatomy section's samples draw nothing over them at rest. Pointing at a part
 | `src/pages/LEVEL/PAGE.ts` | One page each; `src/pages/index.ts` lists them. |
 | `scripts/render.ts` | Draws the built site in headless Chromium, as shots and geometry frames, or as each page's motion recipes (`--motion`). |
 | `scripts/player-test.ts` | Seeks every motion player on the built site and holds its plot and its parts to what plays. |
+| `checked-pages` | The pages every pull request holds to the mockups' check, one slug a line (`just mockups-checked`). |
 | `scripts/frame-test.ts` | Walks small pages of probed boxes into geometry frames and holds the walk (`src/site/frame.ts`) to what is drawn. |
 | `scripts/perf.ts`, `scripts/perf-trace.ts`, `scripts/perf-budgets.ts` | The speed check: it drives the pages named, reads their traces, and holds them to the budgets. |
 
