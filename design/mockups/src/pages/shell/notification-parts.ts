@@ -16,7 +16,7 @@ import { hang, sheet } from "../../lib/sheet.ts";
 import { advance, centreFor, text } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { BUILD, clearButton, dndButton, KUBAOS, keysButton, SIGNAL, SLACK, status } from "../notifications.ts";
-import { ALL } from "../../site/settings.ts";
+import { ALL, CHROME } from "../../site/settings.ts";
 import { CORNER_WIDTH, desk, onScreen, system } from "../templates/panels.ts";
 
 /** `shown` in a room as wide as the popups hold a card. */
@@ -347,7 +347,10 @@ export interface PopupStackOptions {
   /** The popup at this place opened, or pinned under the pointer or the keyboard. */
   readonly open?: number;
   readonly pinned?: { readonly at: number; readonly as: PopupPinned };
-  /** Live: these arrive one by one, `space`-paced, each running its own time down; again once all have gone. */
+  /**
+   * Live: these arrive one by one, `space`-paced, each running its own time down; again once all
+   * have gone. A shot (`?chrome=off`) draws them all arrived and holds their time.
+   */
   readonly schedule?: readonly PopupNote[];
   /** The bell's dot shown, as while anything is unread. */
   readonly unread?: boolean;
@@ -462,7 +465,8 @@ export function popupStackOnScreen(options: PopupStackOptions = {}): HTMLElement
     return each;
   }
 
-  function arrive(note: PopupNote): void {
+  /** `note` arriving: sliding in and running its time down, or, `held`, in place and still. */
+  function arrive(note: PopupNote, held = false): void {
     mark(1);
     const same = note.critical ? undefined : [...live].find((each) => !each.note.critical && each.note.app === note.app);
     if (same) {
@@ -473,10 +477,11 @@ export function popupStackOnScreen(options: PopupStackOptions = {}): HTMLElement
       sync();
       return;
     }
-    const each = place(note, -1, true);
-    each.slot.setAttribute("data-shut", "");
+    const each = place(note, -1, !held);
+    if (!held) each.slot.setAttribute("data-shut", "");
     stack.prepend(each.slot);
     live.add(each);
+    if (held) return;
     requestAnimationFrame(() => {
       each.slot.removeAttribute("data-shut");
       each.shown.classList.add("k-popup-in");
@@ -487,6 +492,11 @@ export function popupStackOnScreen(options: PopupStackOptions = {}): HTMLElement
   let timers: number[] = [];
   function play(list: readonly PopupNote[]): void {
     for (const id of timers) window.clearTimeout(id);
+    // A shot holds every moving thing: the burst stands arrived, nothing sliding, no time running.
+    if (!CHROME) {
+      for (const note of list) arrive(note, true);
+      return;
+    }
     timers = list.map((note, at) => window.setTimeout(() => arrive(note), ALL ? 0 : at * ARRIVALS));
   }
 
