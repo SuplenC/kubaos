@@ -13,6 +13,9 @@
 // night and humming while it runs, and the current row is a quiet fill. A pressable step is a
 // control: lit, the accent's tube inside its edge with the glow outside at night; pressed, the
 // tube runs white-hot by night and the tone tints its fill by day.
+//
+// Where the row is too narrow for the chip beside the title's first word, the chip goes under the
+// words, at their start, on a line of its own; in a list, every step's chip goes with it.
 
 import "./feedback.css";
 import { chip } from "./chip.ts";
@@ -21,7 +24,9 @@ import { focusRing } from "./focus.ts";
 import { icon } from "./icon.ts";
 import { filling, row, stack } from "./layout.ts";
 import { probe, variant } from "./probe.ts";
-import { clamped, wrapped } from "./text.ts";
+import { advance, clamped, wrapped } from "./text.ts";
+import { length } from "./tokens.ts";
+import { settings } from "../site/settings.ts";
 
 export type StepState =
   | { readonly is: "todo" }
@@ -92,6 +97,27 @@ function bead(symbol: Element): HTMLElement {
   return box;
 }
 
+/**
+ * Puts `end` under the words while the room beside it would leave the title less than its first
+ * word. The room is the row's less the symbol, the chip and the gaps, read from layout, which the
+ * chip's going under changes in height only, so the reading holds either way.
+ */
+function chipGivesWay(element: HTMLElement, line: HTMLElement, end: HTMLElement, title: string): void {
+  const first = title.split(/\s+/)[0] ?? title;
+  new ResizeObserver(() => {
+    const scale = Number.parseFloat(getComputedStyle(element).getPropertyValue("--scale")) || settings().scale;
+    const between = length("space-s12") * scale;
+    // The symbol may be an SVG, which has no offset width.
+    const lead = line.firstElementChild!;
+    const symbol = lead !== end && !lead.matches(".k-stack") ? Number.parseFloat(getComputedStyle(lead).width) + between : 0;
+    const room = line.clientWidth - symbol - between - end.offsetWidth;
+    element.toggleAttribute("data-chip-under", room < Math.ceil(advance("body_strong", first) * scale));
+    // Steps side by side in a list keep their chips in one column: one under puts them all under.
+    const list = element.parentElement;
+    list?.toggleAttribute("data-chips-under", [...list.children].some((each) => each.hasAttribute("data-chip-under")));
+  }).observe(line);
+}
+
 export function step(options: StepOptions): HTMLElement {
   const state = options.state ?? { is: "todo" };
   const selected = (options.selected ?? false) || state.is === "current";
@@ -121,7 +147,9 @@ export function step(options: StepOptions): HTMLElement {
   parts.push(filling(stack("s4", "start", ...lines)));
   const end = options.mark ? stateMark(state) : stateChip(state, selected, options.words);
   if (end) parts.push(end);
-  element.append(filling(row("s12", "centre", ...parts)));
+  const line = filling(row("s12", "centre", ...parts));
+  element.append(line);
+  if (end && !options.mark) chipGivesWay(element, line, end as HTMLElement, options.title);
   if (options.pressable) {
     element.classList.add("k-control");
     element.dataset.hot = "";

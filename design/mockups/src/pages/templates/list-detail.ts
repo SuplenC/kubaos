@@ -127,6 +127,7 @@ export default page<"rest" | "selected" | "empty" | "error" | "loading">({
   variants: [
     { name: "The Command menu", for: "a key summons it; drawn for a 1536 × 864 screen", sample: () => menu(1536, 864) },
     { name: "Kōbō's setup", for: "an app's window: what's left to do, and how", sample: () => framed(setup(), "var(--size-app_width)", "var(--size-app_height)") },
+    { name: "Kōbō's setup, the least window", for: "keys out, three cards, the rest scrolls", sample: () => framed(setup(), "var(--size-app_min_width)", "var(--size-app_min_height)") },
   ],
   sizes: [
     { name: "The menu without its pane", for: "a 1280 × 800 screen: the footer shows the row's keys", sample: () => menu(1280, 800) },

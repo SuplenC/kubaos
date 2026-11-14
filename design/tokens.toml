@@ -263,8 +263,10 @@ app_min_height = 480
 # A log opened under an error or a progress bar.
 log = 232
 # A panel of the shell, and a notification beside one: the control center's
-# side sheet, the cards of the notification stack.
-panel = 384
+# side sheet, the cards of the notification stack. Wide enough that two tiles
+# side by side each hold their longest title ("Wallpaper motion", 118 in
+# `body_strong`) whole beside their symbol, with a few pixels to spare.
+panel = 392
 # The power menu's action, its symbol over its name: two and a half large
 # controls, so the longest name, "Shut down", sits with the same air either
 # side as the shortest, and five side by side stay a short row at the bottom edge.
@@ -326,7 +328,7 @@ motion_plot = 160
 # A page's or a panel's body: its padding on every side, by its own width.
 # Tailwind's container, `px-4 sm:px-6 lg:px-8`, on Tailwind's default
 # breakpoints: 16 under 640 (`sm`), 24 from 640, 32 from 1024 (`lg`). A
-# panel of the shell (384) takes 16; Kōbō's content pane, 32 on a 1080p
+# panel of the shell (392) takes 16; Kōbō's content pane, 32 on a 1080p
 # screen and 24 on a 1280 px one.
 # https://tailwindcss.com/docs/responsive-design
 [container]

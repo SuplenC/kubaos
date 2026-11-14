@@ -336,6 +336,31 @@
   min-width: 0;
 }
 
+/* Too narrow for the chip beside the title's first word: the chip goes under the words, at their
+   start, a line of the words' own pitch below them; the symbol stays centred down the whole. In a
+   list, one step's chip going under takes every step's, so the chips keep one column. */
+:is(.k-step[data-chip-under], [data-chips-under] > .k-step) > .k-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-s4) var(--space-s12);
+}
+
+:is(.k-step[data-chip-under], [data-chips-under] > .k-step) > .k-row:has(> .k-stack:first-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:is(.k-step[data-chip-under], [data-chips-under] > .k-step) > .k-row > :is(.k-stack, .k-chip) {
+  grid-column: -2 / -1;
+}
+
+:is(.k-step[data-chip-under], [data-chips-under] > .k-step) > .k-row > .k-chip {
+  justify-self: start;
+}
+
+:is(.k-step[data-chip-under], [data-chips-under] > .k-step) > .k-row > :first-child:not(.k-stack) {
+  grid-row: 1 / span 2;
+}
+
 .k-step[data-box="rail"] {
   --step-corner: calc(var(--radius-surface) - var(--space-s12));
 }

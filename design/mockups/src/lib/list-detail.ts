@@ -13,8 +13,8 @@ import { type KeyHint, keycap, keyHints, keys } from "./keycap.ts";
 import { emptyState } from "./empty-state.ts";
 import { field } from "./field.ts";
 import { icon } from "./icon.ts";
-import { divider, fill, filling, fillingHeight, flow, gap, header, page, row, stack } from "./layout.ts";
-import { type ListRowSpec, scrolled, scrollingList } from "./list.ts";
+import { container, divider, fill, filling, fillingHeight, flow, gap, header, page, row, stack } from "./layout.ts";
+import { type ListRowSpec, scaleOf, scrolled, scrollingList } from "./list.ts";
 import { probe, workedOut } from "./probe.ts";
 import { scroll } from "./scroll.ts";
 import { step, type StepOptions } from "./step.ts";
@@ -353,9 +353,58 @@ function sideWidth(side: HTMLElement, window: HTMLElement): void {
 }
 
 /**
+ * How the side gives way as the window gets shorter. The cards' list takes the room left and
+ * scrolls in it, down to its first three cards' height; the keys go next, whole, rather than take
+ * the list below that; past that what is under the header scrolls as one, under the header's fade.
+ * The list's three cards and the keys' lines follow the side's width, which only layout knows, so
+ * script reads them; the keys are measured once, as they don't change, and laid out by
+ * arithmetic, so they are known while they are out.
+ */
+function giveWay(view: HTMLElement, below: HTMLElement, list: HTMLElement, keys: HTMLElement): void {
+  const rows = list.querySelector<HTMLElement>(".k-list-rows")!;
+  const flowed = keys.firstElementChild as HTMLElement;
+  let hints: { widths: number[]; tall: number } | null = null;
+  const lay = () => {
+    // A sample not drawn yet has no layout to read.
+    if (view.clientHeight === 0 || (!hints && flowed.offsetWidth === 0)) return;
+    const scale = scaleOf(list);
+    const between = length("space-s16") * scale;
+    hints ??= { widths: [...flowed.children].map((each) => (each as HTMLElement).offsetWidth), tall: (flowed.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0 };
+    // The list: its well's edges and inset, and its rows down to the third one's foot.
+    const third = rows.children[Math.min(2, rows.children.length - 1)] as HTMLElement | undefined;
+    const pane = list.firstElementChild as HTMLElement;
+    const least = third ? third.offsetTop + third.offsetHeight + Number.parseFloat(getComputedStyle(rows).paddingBottom) + list.offsetHeight - pane.clientHeight : 0;
+    list.style.minHeight = `${least}px`;
+    // The keys' lines at this width, each line the keys that fit `space.s16` apart.
+    const room = below.clientWidth - Number.parseFloat(getComputedStyle(below).paddingLeft) - Number.parseFloat(getComputedStyle(below).paddingRight);
+    let lines = hints.widths.length > 0 ? 1 : 0;
+    let used = 0;
+    for (const width of hints.widths) {
+      if (used > 0 && used + between + width > room) {
+        lines += 1;
+        used = width;
+      } else used += (used > 0 ? between : 0) + width;
+    }
+    const keysTall = lines > 0 ? between + lines * hints.tall + (lines - 1) * between : 0;
+    const body = view.firstElementChild as HTMLElement;
+    const shown = view.clientHeight - Number.parseFloat(getComputedStyle(body).paddingTop) - Number.parseFloat(getComputedStyle(body).paddingBottom);
+    const column = below.firstElementChild as HTMLElement;
+    let rest = Number.parseFloat(getComputedStyle(below).paddingBottom);
+    for (const each of column.children) if (each !== list && each !== keys) rest += (each as HTMLElement).offsetHeight;
+    keys.toggleAttribute("data-out", shown < least + rest + keysTall);
+    // The first layout places the keys at once; a change after it fades.
+    requestAnimationFrame(() => keys.toggleAttribute("data-settled", true));
+  };
+  const watched = new ResizeObserver(lay);
+  watched.observe(view);
+  watched.observe(rows);
+}
+
+/**
  * Kōbō's setup window: the side, a third of the window on the well's fill, holding the header, the
  * cards in a scrolling list, whether the machine is online, the way out and the keys; beside it the
- * selected card's page. ↑ ↓ (j k) in the list pick a card, and the page rises in.
+ * selected card's page. ↑ ↓ (j k) in the list pick a card, and the page rises in. A short window
+ * gives way as `giveWay` says.
  */
 export function setupWindow(options: SetupOptions): HTMLElement {
   let selected = options.selected ?? 0;
@@ -378,23 +427,25 @@ export function setupWindow(options: SetupOptions): HTMLElement {
     ["Enter", "open, press"],
     ["Esc", "back to the cards"],
   ];
-  const sideContent = stack(
-    0,
-    "start",
-    filling(header({ accent: "初期設定", title: "First boot", subtitle: "The things the install couldn't do without you or the hardware. Each one checks itself, so done stays done." })),
-    gap("s20"),
-    fillingHeight(filling(list)),
-    gap("s12"),
-    gap("s12"),
-    status,
-    gap("s16"),
-    button({ label: "Done for now", kind: "Tonal", icon: "check_circle" }),
-    gap("s16"),
-    filling(flow("s16", ...hints.map((hint) => keyHints([hint])))),
+  const head = container(header({ accent: "初期設定", title: "First boot", subtitle: "The things the install couldn't do without you or the hardware. Each one checks itself, so done stays done." }));
+  head.classList.add("k-setup-head");
+  const keys = document.createElement("span");
+  keys.className = "k-setup-keys";
+  keys.append(flow("s16", ...hints.map((hint) => keyHints([hint]))));
+  const below = container(
+    stack(0, "start", fillingHeight(filling(list)), gap("s12"), gap("s12"), status, gap("s16"), button({ label: "Done for now", kind: "Tonal", icon: "check_circle" }), filling(keys)),
   );
+  below.classList.add("k-setup-below");
+  // The thumb floats in the side's own padding at its end, so the cards keep their width whether
+  // or not it scrolls.
+  const { box: scroller, view } = scroll(below, { height: "100%", above: "s20", below: 0, noGutter: true, fade: "s20" });
+  const scrolls = document.createElement("span");
+  scrolls.className = "k-setup-scroll";
+  scrolls.append(scroller);
   const side = document.createElement("span");
   side.className = "k-setup-side";
-  side.append(page(fillingHeight(sideContent), { clear: true }));
+  side.append(head, scrolls);
+  giveWay(view, below, list, keys);
   const detail = document.createElement("span");
   detail.className = "k-setup-detail";
   const show = (animate: boolean) => {
