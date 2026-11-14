@@ -74,6 +74,7 @@ export function tabs(options: TabsOptions): HTMLElement {
   well.setAttribute("role", "tablist");
   if (options.disabled) well.setAttribute("aria-disabled", "true");
   if (options.fill) well.dataset.fill = "";
+  well.style.setProperty("--count", String(count));
   if (options.pinned !== "pressed") pin(well, options.pinned);
   focusRing(well, "full", "accent", false);
 
@@ -82,6 +83,7 @@ export function tabs(options: TabsOptions): HTMLElement {
     each.className = "k-tab k-control";
     each.type = "button";
     each.setAttribute("role", "tab");
+    each.style.setProperty("--index", String(index));
     each.disabled = options.disabled ?? false;
     const words = text(choice.label, "button_small");
     words.style.color = "var(--words)";

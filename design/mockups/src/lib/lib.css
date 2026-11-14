@@ -2061,14 +2061,17 @@
 }
 
 /* Filling its room: the choices share the well equally, their words centred, so the last one ends
-   at the well's own end. */
+   at the well's own end. Each share is whole device pixels, the spare ones one each to the first
+   choices, as `kubaos-ui`'s grid splits a width (`grid::weighted`). */
 .k-tabs[data-fill] {
   display: flex;
   flex: 1 1 auto;
 }
 
 .k-tabs[data-fill] > .k-tab {
-  flex: 1 1 0;
+  --share: round(down, calc(100% / var(--count)), 1px);
+  flex: none;
+  width: calc(var(--share) + clamp(0px, 100% - var(--share) * var(--count) - var(--index) * 1px, 1px));
   justify-content: center;
 }
 
