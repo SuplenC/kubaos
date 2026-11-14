@@ -302,6 +302,11 @@ async function main(): Promise<void> {
     const cdp = await context.newCDPSession(page);
 
     await page.goto(`http://localhost:${port}/index.html?mode=dark&scale=${scale}&text=short&reduced=off&speed=1&flicker=on#/shell/wallpaper`);
+    // Software drawing reads a backdrop filter under a scaled ancestor from the wrong place and
+    // fills the rest with the blur's mirrored edge, so the awake lock on the wall shows its city
+    // mirrored. The wall's screens are drawn at the same size and place by `zoom` instead of
+    // `scale`: no transform for the backdrop to be read through, and the picture the page means.
+    await page.addStyleTag({ content: ".gl-frame > .k-lock { scale: none; zoom: var(--share); }" });
     // The site's modules load on real time, then draw the page on the page's.
     await pump(page, () => page.evaluate(() => "kubaos" in window), 600);
     let ready = false;
