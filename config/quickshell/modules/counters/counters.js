@@ -116,7 +116,8 @@ function stopOf(counter) {
     return counter.stop > 0 ? counter.stop : 10;
 }
 
-// Auto reset's choices after its type box: Never, and When it reaches N, the counter's ticked.
+// Auto reset's choices after its type box: Never, and When it reaches with N as its value, the
+// counter's ticked.
 function autoEntries(counter) {
     return [
         {
@@ -125,7 +126,8 @@ function autoEntries(counter) {
             checked: counter.rule === "" && !(counter.stop > 0)
         },
         {
-            text: `When it reaches ${stopOf(counter)}`,
+            text: "When it reaches",
+            value: String(stopOf(counter)),
             checkable: true,
             checked: counter.stop > 0
         }

@@ -55,6 +55,7 @@ use crate::look::radius;
 use crate::probe;
 use crate::probe::Fixed;
 use crate::text::line;
+use crate::text::text;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Shadow as ShadowToken;
@@ -120,6 +121,7 @@ pub fn menu_separator<'a, M: 'a>(look: &Look) -> Element<'a, M> {
 pub struct MenuItem<'a, M> {
     label: String,
     icon: Option<Icon>,
+    value: Option<String>,
     shortcut: &'a [&'a str],
     checked: Option<bool>,
     danger: bool,
@@ -135,6 +137,7 @@ pub fn menu_item<'a, M>(label: impl Into<String>) -> MenuItem<'a, M> {
     MenuItem {
         label: label.into(),
         icon: None,
+        value: None,
         shortcut: &[],
         checked: None,
         danger: false,
@@ -151,6 +154,16 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
     pub fn icon(self, icon: Icon) -> Self {
         MenuItem {
             icon: Some(icon),
+            ..self
+        }
+    }
+
+    /// A figure the item is about, set apart at the end of its words in `mono_large`: When it
+    /// reaches 10. A prompt that changes it opens under it.
+    #[must_use]
+    pub fn value(self, value: impl Into<String>) -> Self {
+        MenuItem {
+            value: Some(value.into()),
             ..self
         }
     }
@@ -308,7 +321,7 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
         probe::component("MenuItem", words, Fixed::HEIGHT, view)
     }
 
-    /// The item's symbol, words, keys and check in `ink`, across its width.
+    /// The item's symbol, words, value, keys and check in `ink`, across its width.
     fn content(&self, look: &Look, ink: iced::Color) -> Element<'a, M> {
         let glyph_size = Type::Body.icon();
         let mut parts = row(look, Space::S12).center().width(Extent::Fill).height(Extent::Fill);
@@ -320,6 +333,9 @@ impl<'a, M: Clone + 'a> MenuItem<'a, M> {
                 .width(Extent::Fill)
                 .push(line(self.label.clone(), Type::Body, ink)),
         );
+        if let Some(value) = &self.value {
+            parts = parts.push(text(value.clone(), Type::MonoLarge, ink));
+        }
         if !self.shortcut.is_empty() {
             parts = parts.push(
                 row(look, Space::S4)

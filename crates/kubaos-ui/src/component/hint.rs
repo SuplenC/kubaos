@@ -3,7 +3,7 @@
 //!
 //! # Owns
 //!
-//! - [`hint`], and the floating that a tooltip's card shares ([`floating`]).
+//! - [`hint`] and [`hint_at_start`], and the floating that a tooltip's card shares ([`floating`]).
 //!
 //! # Not here
 //!
@@ -44,17 +44,33 @@ use crate::tokens::Space;
 use crate::tokens::Type;
 
 /// `content` with `label` in a bubble under it while hovered, or while `shown` (the keyboard is on
-/// it). The bubble is the toast's inverse colours, 8 below the control.
+/// it). The bubble is the toast's inverse colours, 8 below the control and centred on it.
 pub fn hint<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>, label: &'a str, shown: bool) -> Element<'a, M> {
+    floating(look, content, bubble(look, label), shown, Side::Below)
+}
+
+/// [`hint`], its bubble held to the control's start rather than centred: for a control that starts
+/// something wider than itself, a row's name, whose hint reads from where the name does.
+pub fn hint_at_start<'a, M: 'a>(
+    look: &Look,
+    content: impl Into<Element<'a, M>>,
+    label: &'a str,
+    shown: bool,
+) -> Element<'a, M> {
+    floating(look, content, bubble(look, label), shown, Side::BelowStart)
+}
+
+/// A hint's bubble saying `label`.
+fn bubble<'a, M: 'a>(look: &Look, label: &'a str) -> Element<'a, M> {
     let c = look.colors;
-    let bubble = widget::container(text(label, Type::Label, c.surface))
+    widget::container(text(label, Type::Label, c.surface))
         .padding(Inset::xy(Space::S8, Space::S4).padding())
         .style(move |_theme| container::Style {
             background: Some(Background::Color(c.on_surface)),
             border: Border::default().rounded(radius(Radius::Small)),
             ..container::Style::default()
-        });
-    floating(look, content, bubble, shown, Side::Below)
+        })
+        .into()
 }
 
 /// Which side of its control a floating bubble takes.
@@ -62,6 +78,8 @@ pub fn hint<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>, label: &
 pub(crate) enum Side {
     /// Under it and centred on it: a hint, which names the control.
     Below,
+    /// Under it, starting where it starts: a hint for a control at the start of something wider.
+    BelowStart,
     /// Over it, starting where it starts: a tooltip, whose card is taller than the room a
     /// control's foot usually leaves, and wider than a chip at a toolbar's start, so centred it
     /// would hang past the panel. With no room above it, under it instead, still starting where
@@ -240,6 +258,7 @@ impl<M> overlay::Overlay<M, Theme, Renderer> for Bubble<'_, '_, M> {
         let below = self.anchor.y + self.anchor.height + apart;
         let (x, y) = match self.side {
             Side::Below => (self.anchor.center_x() - size.width / 2.0, below),
+            Side::BelowStart => (self.anchor.x, below),
             Side::Above => {
                 let above = self.anchor.y - apart - size.height;
                 (self.anchor.x, if above < 0.0 { below } else { above })

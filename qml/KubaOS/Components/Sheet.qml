@@ -2,15 +2,17 @@ import QtQuick
 import KubaOS.Components as K
 
 // A panel that grows out of an inner edge of the screen frame: `kubaos-ui`'s `sheet::sheet`, and
-// every shell panel. The owner draws the sheet's surface from `path` in the same layer as the
-// frame, so sheet and frame read as one surface (the shell's `modules/frame/Frame.qml`); this item
-// only places and clips the content.
+// every shell panel. The owner draws the sheet's surface from `path` at `fade` in the same layer
+// as the frame, so sheet and frame read as one surface (the shell's `modules/frame/Frame.qml`); this
+// item only places and clips the content.
 //
 // Opening animates `progress` 0 -> 1 over `long` on emphasized decelerate, as every panel
 // arrives; closing goes back over `medium` on emphasized accelerate, as it leaves. The body grows
 // to progress * depth and the content rides on its far edge, so it slides out from under the frame
 // instead of fading in place. The sheet meets the frame through concave fillets of the surface
-// radius, the frame's own inner corner.
+// radius, the frame's own inner corner. With reduce motion nothing moves: the sheet stands open
+// where it goes and fades in, surface and content together, over `short` on emphasized
+// decelerate, and out over `short` on emphasized accelerate.
 //
 // Sheets in the same place are twins, as the system monitor, the notifications panel and the
 // control center are. One asked for while a twin is open takes the surface over where it is, and
@@ -54,6 +56,9 @@ FocusScope {
     // How far the content is moved sideways, and how much of it shows, while it is swapped.
     property real shift: 0
     property real presence: 1
+    // How much of the whole sheet shows, surface and content: 1, but with reduce motion it fades
+    // in and out in place of growing.
+    property real fade: 1
     readonly property int travel: Tokens.space.s24
     default property alias content: body.data
 
@@ -168,6 +173,25 @@ FocusScope {
         root.progress = 0;
         root.shift = 0;
         root.presence = 1;
+        fading.stop();
+        root.fade = 1;
+    }
+
+    // With reduce motion: open where it goes and fade in, or fade out and then close. A twin's
+    // surface taken over is already there, so it shows at once.
+    function fadeTo(shown: bool, takenOver: bool): void {
+        motion.stop();
+        fading.stop();
+        if (shown) {
+            if (takenOver)
+                root.fade = 1;
+            else if (root.progress < 1)
+                root.fade = 0;
+            root.progress = 1;
+        }
+        fading.to = shown ? 1 : 0;
+        fading.easing.bezierCurve = shown ? Tokens.easing.emphasized_decel : Tokens.easing.emphasized_accel;
+        fading.start();
     }
 
     onShownChanged: {
@@ -177,11 +201,17 @@ FocusScope {
         const twin = shown ? holder() : null;
         if (twin)
             takeOver(twin);
-        motion.stop();
-        motion.to = shown ? 1 : 0;
-        motion.duration = shown ? Tokens.duration.long : Tokens.duration.medium;
-        motion.easing.bezierCurve = shown ? Tokens.easing.emphasized_decel : Tokens.easing.emphasized_accel;
-        motion.start();
+        if (K.Motion.reduced) {
+            fadeTo(shown, twin !== null);
+        } else {
+            fading.stop();
+            root.fade = 1;
+            motion.stop();
+            motion.to = shown ? 1 : 0;
+            motion.duration = shown ? Tokens.duration.long : Tokens.duration.medium;
+            motion.easing.bezierCurve = shown ? Tokens.easing.emphasized_decel : Tokens.easing.emphasized_accel;
+            motion.start();
+        }
         if (shown) {
             if (takesFocus)
                 body.forceActiveFocus();
@@ -224,6 +254,22 @@ FocusScope {
         target: root
         property: "progress"
         easing.type: Easing.BezierSpline
+    }
+
+    // Reduce motion's fade, in or out; faded out, the sheet closes.
+    NumberAnimation {
+        id: fading
+
+        target: root
+        property: "fade"
+        duration: Tokens.duration.short
+        easing.type: Easing.BezierSpline
+        onFinished: {
+            if (!root.shown && root.fade === 0) {
+                root.progress = 0;
+                root.fade = 1;
+            }
+        }
     }
 
     // The content swap, run by the sheet taking over: the twin's content leaves away from this
@@ -324,7 +370,7 @@ FocusScope {
         y: root.edge === "top" ? root.reveal - root.depth : 0
         width: root.horizontal ? root.u1 - root.u0 : root.depth
         height: root.horizontal ? root.depth : root.u1 - root.u0
-        opacity: root.contentOpacity * root.presence
+        opacity: root.contentOpacity * root.presence * root.fade
         enabled: !root.leaving
     }
 }

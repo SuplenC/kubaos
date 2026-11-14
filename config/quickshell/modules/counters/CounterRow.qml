@@ -109,6 +109,8 @@ Item {
         K.Hint {
             text: row.titleItem.cut ? `${root.counter.name}. Double-click to rename` : "Double-click to rename"
             shown: nameHover.hovered
+            // It reads from where the name starts, which may run half the row.
+            held: "start"
         }
     }
 

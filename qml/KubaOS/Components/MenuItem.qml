@@ -3,8 +3,8 @@ import KubaOS.Components as K
 
 // One item of a menu, or the hairline between two groups: `kubaos-ui`'s `menu::menu_item` and
 // `menu::menu_separator`. An item is a small control tall, 12 inside: an optional symbol, its
-// words on one line, the keys that do the same as keycaps, and a check whose room is kept when
-// unchecked. Its corners are concentric inside the popover. The item the keyboard is on takes
+// words on one line, an optional value of its own at their end (When it reaches 10), the keys that
+// do the same as keycaps, and a check whose room is kept when unchecked. Its corners are concentric inside the popover. The item the keyboard is on takes
 // the secondary container. One that destroys something (Kill) is in the error colour, and lights
 // in the error itself with its words `on_error`, pressed to `error_pressed`, so lit it reads as what
 // it is.
@@ -23,6 +23,9 @@ K.Pressable {
     property string icon: ""
     // The keys that do the same, one keycap each.
     property list<string> shortcut
+    // A figure the item is about, set apart at the end of its words; a prompt that changes it opens
+    // under it (`valueItem`).
+    property string value: ""
     // Whether it shows a check at its end, and whether it is ticked.
     property bool checkable: false
     property bool checked: false
@@ -38,6 +41,8 @@ K.Pressable {
     property bool keyHolding: false
 
     readonly property bool dangerous: root.danger || root.held
+    // The value's box, for a prompt to open under; null without a value.
+    readonly property Item valueItem: root.value === "" ? null : line.valueItem
     // A danger item lit by the keyboard: it lies on the error, and its press is a fill of its own,
     // not the state layer.
     readonly property bool dangerLit: root.danger && !root.held && root.highlighted && root.enabled
@@ -152,6 +157,7 @@ K.Pressable {
         ink: root.ink
         text: root.text
         icon: root.icon
+        value: root.value
         shortcut: root.shortcut
         checkable: root.checkable
         checked: root.checked
@@ -182,6 +188,7 @@ K.Pressable {
                 ink: Tokens.color.on_error
                 text: root.text
                 icon: root.icon
+                value: root.value
                 shortcut: root.shortcut
                 checkable: root.checkable
                 checked: root.checked
@@ -189,13 +196,15 @@ K.Pressable {
         }
     }
 
-    // An item's symbol, words, keys and check in `ink`, across `width`.
+    // An item's symbol, words, value, keys and check in `ink`, across `width`.
     component Content: K.Row {
         id: content
 
         property color ink
         property string text
         property string icon
+        property string value
+        readonly property Item valueItem: figure
         property list<string> shortcut
         property bool checkable
         property bool checked
@@ -219,6 +228,15 @@ K.Pressable {
                 color: content.ink
                 maximumLines: 1
             }
+        }
+
+        K.Text {
+            id: figure
+
+            visible: content.value !== ""
+            text: content.value
+            style: Tokens.type.mono_large
+            color: content.ink
         }
 
         K.Row {
