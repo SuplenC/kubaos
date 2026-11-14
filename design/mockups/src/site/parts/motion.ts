@@ -250,9 +250,11 @@ function marks(playing: Loop): Mark[] {
 const SPREAD = "s48";
 
 /**
- * Spreads each layout in `sample` (itself included) whose children carry a focus ring `SPREAD`
+ * Spreads each layout in `sample` (itself included) whose children all carry a focus ring `SPREAD`
  * apart: a row as one row of columns, a stack as one column, probed as that grid. A layout inside
- * a control keeps its own gap.
+ * a control keeps its own gap, and so does one that also holds words, a spacer or a part: its gaps
+ * are the design's, and spread in a box of fixed width they squeeze its words to nothing and push
+ * its controls out of it.
  *
  * A whole surface (`[data-whole]`: a screen, a template) is drawn as it is laid out, never spread,
  * and so is a button bar, whose gap is its own and whose buttons stack when they don't fit.
@@ -263,7 +265,11 @@ const SPREAD = "s48";
  */
 function spread(sample: Element): void {
   const layouts = [sample, ...sample.querySelectorAll("[data-layout]")].filter(
-    (layout): layout is HTMLElement => layout instanceof HTMLElement && layout.matches("[data-layout]:has(> * > .k-ring)") && !layout.closest("[data-whole], .k-button-bar"),
+    (layout): layout is HTMLElement =>
+      layout instanceof HTMLElement &&
+      layout.matches("[data-layout]:has(> * > .k-ring)") &&
+      [...layout.children].every((child) => child.querySelector(":scope > .k-ring") !== null) &&
+      !layout.closest("[data-whole], .k-button-bar"),
   );
   for (const layout of layouts) {
     const columns = layout.classList.contains("k-row") ? layout.children.length : 1;
