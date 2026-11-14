@@ -365,3 +365,24 @@
 .kobo-room > .k-backdrop > :is(.k-backdrop-thing, .k-backdrop-layers) {
   will-change: translate, opacity;
 }
+
+/* A line of key hints keeps a keycap's height with none in it, so what is under it never moves. */
+.kobo-keys {
+  min-height: var(--size-keycap);
+}
+
+/* The hanko's foot on the foot of the mark's lowest stroke, on a whole device pixel. */
+.kobo-sealed > .kobo-stamp {
+  margin-top: round(nearest, calc(var(--kobo-ink-foot, var(--size-hanko)) - var(--size-hanko)), 1px);
+}
+
+/* The foot over the street: the Backdrop's band behind words, in the scene's own layers under its
+   words, from the screen's bottom edge up past the foot and fading to nothing over `space.s64`
+   above it, so Power, the release and the battery read as the words over the picture do. */
+.kobo-foot-band {
+  position: absolute;
+  inset: auto 0 0;
+  display: block;
+  height: calc(var(--kobo-margin) + var(--space-s16) + var(--size-control_sm) + var(--space-s64));
+  background: linear-gradient(rgb(from var(--color-surface) r g b / 0), rgb(from var(--color-surface) r g b / var(--opacity-backdrop)) var(--space-s64));
+}

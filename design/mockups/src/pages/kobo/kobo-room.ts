@@ -200,19 +200,19 @@ export function welcomeColumn(moment: Moment = "rest", hero = HERO.short, lede =
       : button({ label: "Let's go", size: "Lg", icon: "arrow_forward", trailing: true, ...(moment === "rest" ? {} : { disabled: true }) });
   action.classList.add("kobo-start");
   const hints: readonly KeyHint[] = moment === "noimage" || moment === "loading" ? [] : [["Enter", moment === "error" ? "try again" : "start"]];
-  const keys = keyHints(hints);
-  keys.classList.add("kobo-keys");
+  const keyLine = keys(hints);
   return column(
     "welcome",
     part(text("ようこそ", "accent", "primary"), "accent"),
     gap("s8"),
     neonSign(),
-    gap("s20"),
+    gap("s24"),
     part(wrapped(hero, "hero"), "hero"),
     gap("s16"),
     part(wrapped(lede, "body_large", "on_surface_variant"), "lede"),
     gap("s40"),
-    part(stack("s16", "centre", action, welcomeStatus(moment), keys), "act"),
+    // The action and its key are one thing, close; the promise under them is a statement of its own.
+    part(stack(0, "centre", action, gap("s12"), keyLine, gap("s24"), welcomeStatus(moment)), "act"),
   );
 }
 
@@ -331,8 +331,10 @@ export function doneColumn(going = false, headline = DONE_HEADLINE.short): HTMLE
   const stay = button({ label: "Stay in the live system", kind: "Text", size: "Lg" });
   const actions = going ? row("s8", "centre", spinner("s20"), text("Restarting…", "body", "on_surface_variant")) : row("s8", "centre", reboot, stay);
   actions.classList.add("kobo-status");
-  const mark = row("s16", "end", neonMark(), part(hanko(), "stamp"));
+  const drawn = neonMark();
+  const mark = row("s8", "start", drawn, part(hanko(), "stamp"));
   mark.classList.add("kobo-sealed");
+  sealed(mark, drawn);
   return column(
     "done",
     mark,
@@ -341,8 +343,35 @@ export function doneColumn(going = false, headline = DONE_HEADLINE.short): HTMLE
     gap("s16"),
     part(wrapped(doneLine(), "body_large", "on_surface_variant"), "lede"),
     gap("s40"),
-    part(stack("s16", "centre", actions, keyHints(going ? [] : [["Enter", "reboot"], ["Tab", "move"]])), "act"),
+    part(stack("s12", "centre", actions, keys(going ? [] : [["Enter", "reboot"], ["Tab", "move"]])), "act"),
   );
+}
+
+/** Key hints that keep a keycap's line of room with none to show, so nothing under them moves. */
+function keys(hints: readonly KeyHint[]): HTMLElement {
+  const line = keyHints(hints);
+  line.classList.add("kobo-keys");
+  return line;
+}
+
+/**
+ * The 完了 hanko stands on the mark's baseline: its foot on the foot of the mark's lowest stroke,
+ * as a seal is pressed beside a signature. Where that foot is, in the mark's box, is the drawing's
+ * own (its strokes and their width), which only the drawing knows, so it is read from it.
+ */
+function sealed(row: HTMLElement, drawn: SVGSVGElement): void {
+  const place = () => {
+    const tubes = drawn.querySelector<SVGGElement>('[data-layer="tube"]');
+    const view = drawn.viewBox.baseVal;
+    if (!tubes || !view || view.height === 0 || drawn.clientHeight === 0) return;
+    const ink = tubes.getBBox();
+    const half = Number.parseFloat(tubes.querySelector("path")?.getAttribute("stroke-width") ?? "0") / 2;
+    const frame = drawn.querySelector("g[transform]")?.getAttribute("transform")?.match(/translate\(([\d.]+) ([\d.]+)\)/);
+    const shift = frame ? Number.parseFloat(frame[2]!) : 0;
+    const foot = ((shift + ink.y + ink.height + half) / view.height) * drawn.clientHeight;
+    row.style.setProperty("--kobo-ink-foot", `${foot}px`);
+  };
+  new ResizeObserver(place).observe(drawn);
 }
 
 /** The foot of a scene: Power and the battery where the rail holds them, the release between. */
@@ -520,6 +549,9 @@ function sceneLayer(at: Extract<At, { scene: string }>, options: RoomOptions, wi
   const layer = backdrop({ width, height, picture: wallpaper, scrim: "band", content, dark, ...(at.scene === "done" ? { push: 1 } : {}) });
   layer.classList.add("kobo-scene");
   layer.dataset.scene = at.scene;
+  const band = document.createElement("span");
+  band.className = "kobo-foot-band";
+  layer.querySelector(".k-backdrop-layers")?.append(band);
   return layer;
 }
 

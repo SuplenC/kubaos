@@ -262,7 +262,7 @@ function scrolled(content: HTMLElement): HTMLElement {
 function body(accent: string, title: string, subtitle: string, content: HTMLElement, scrolls = true): HTMLElement {
   const top = header({ accent, title, subtitle });
   if (!scrolls) return stack("s24", "start", filling(top), fillingHeight(filling(content)));
-  const { box } = scroll(scrolled(content), { height: "100%", above: "s24", below: "s16", noGutter: true });
+  const { box } = scroll(scrolled(content), { height: "100%", above: "s24", below: "s16", noGutter: true, fade: "s24", footFade: true });
   box.classList.add("kobo-scrolls");
   return stack("s24", "start", filling(top), fillingHeight(filling(box)));
 }
@@ -672,7 +672,7 @@ export function diskBody(answers: Answers, machine: Machine, view: DiskView = {}
       if (alongsideOk) alongside.addEventListener("click", () => pick("alongside"));
       erase.addEventListener("click", () => pick("erase"));
       const map = diskMap(disk, answers.mode, answers.encrypt);
-      const under = text(plumbing(disk, answers.mode), "small", "on_surface_variant");
+      const under = wrapped(plumbing(disk, answers.mode), "small", "on_surface_variant");
       parts.push(filling(stack("s12", "start", filling(grid(2, "s16", [alongside, erase])), filling(map), under)));
 
       const encryption = stack("s16", "start");
@@ -872,7 +872,7 @@ export function reviewBody(answers: Answers, machine: Machine, go: (page: string
   const confirm = banner({ tone: words.danger ? "Danger" : "Info", icon: words.danger ? "warning" : "storage", title: words.title, body: words.body, actions, foot });
   const top: Element[] = [];
   if (view.lowBattery !== undefined) top.push(filling(banner({ tone: "Warning", icon: "battery_1_bar", title: `${view.lowBattery}% left. Plug the damn thing in.`, body: "" })));
-  const { box } = scroll(scrolled(cards), { height: "100%", above: "s20", below: "s20", noGutter: true });
+  const { box } = scroll(scrolled(cards), { height: "100%", above: "s20", below: "s20", noGutter: true, fade: "s20", footFade: true });
   box.classList.add("kobo-scrolls");
   return stack(
     "s20",

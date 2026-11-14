@@ -14,7 +14,8 @@
 // top, the view's content is masked out over the gap above its box and fades back in over the next
 // `space.s16`, rather than being cut flat under the header's words. A mask, never a fill: a lit
 // control's tube and glow go with the rest, and the panel's glass shows through unchanged. It spans
-// the view's whole reach, and fades in and out over `micro`.
+// the view's whole reach, and fades in and out over `micro`. A foot fade is its mirror at the
+// bottom, over the room below where a page's footer band stands, while more is below.
 
 import "./lists.css";
 import { probe, scrolls } from "./probe.ts";
@@ -41,6 +42,11 @@ export interface ScrollOptions {
   readonly fade?: string;
   /** The header fade pinned shown, as while scrolled. */
   readonly fadePinned?: boolean;
+  /**
+   * A foot fade: the header fade's mirror over the room below, where a page's footer band stands.
+   * What scrolls toward the band fades out over `space.s16` above it while more is below.
+   */
+  readonly footFade?: boolean;
 }
 
 /** What each scroll reads to place its thumb, by its content and its view. */
@@ -100,6 +106,7 @@ export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTM
   thumb.className = "k-scroll-thumb";
   thumb.toggleAttribute("data-pinned", options.thumbPinned ?? false);
   box.append(view, thumb);
+  box.toggleAttribute("data-foot-fade", options.footFade ?? false);
   if (options.fade) {
     const fade = headerFade(options.fade);
     box.toggleAttribute("data-fade-pinned", options.fadePinned ?? false);
@@ -115,6 +122,7 @@ export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTM
       const overflow = height - shown;
       thumb.toggleAttribute("data-shown", overflow > 1);
       box.toggleAttribute("data-scrolled", top >= 1);
+      box.toggleAttribute("data-more", overflow - top >= 1);
       if (overflow <= 1) return;
       const tall = Math.round((shown * shown) / height);
       thumb.style.setProperty("--top", `${Math.round(((shown - tall) * top) / overflow)}px`);
