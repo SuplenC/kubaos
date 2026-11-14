@@ -57,6 +57,8 @@ export interface RailPage {
   readonly note?: Live<string | undefined>;
   /** A page with no footer: the review, whose action is in its body, and the running steps. */
   readonly footless?: boolean;
+  /** Its body reads the whole flow (the review), so it is drawn again each time it shows. */
+  readonly fresh?: boolean;
   /** Going back past it is refused: it can't be undone (the install started). */
   readonly fixed?: boolean;
 }
@@ -396,25 +398,84 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   // The blocker of the page showing, which Enter refused flashes.
   const shown: { nudge: () => HTMLElement | null } = { nudge: () => null };
 
-  const draw = (from: number | null) => {
-    const spec = options.pages[current];
-    if (!spec) return;
+  // Every page drawn so far, kept in the page's side, hidden, laid out: going back to one only
+  // shows it again, and the page before and the first done step are drawn in idle time, so a press
+  // on either builds nothing. A page whose body reads the whole flow (`fresh`) is drawn each time.
+  const side = document.createElement("span");
+  side.className = "k-step-side";
+  const rooms = new Map<number, ReturnType<typeof pageRoom>>();
+  const roomOf = (index: number): ReturnType<typeof pageRoom> | null => {
+    const spec = options.pages[index];
+    if (!spec) return null;
+    const kept = rooms.get(index);
+    if (kept && !spec.fresh) {
+      kept.room.dispatchEvent(new Event(RECHECK));
+      return kept;
+    }
+    kept?.room.remove();
     const made = pageRoom(spec, () => go(current - 1), next);
-    shown.nudge = made.nudge;
-    const side = document.createElement("span");
-    side.className = "k-step-side";
+    rooms.set(index, made);
     side.append(made.room);
+    return made;
+  };
+  // The rail as it stands on each page a done step goes back to, drawn ahead with the page; any
+  // drawn for a rail that has since changed is dropped as the rail is drawn again.
+  const rails = new Map<number, HTMLElement>();
+  const railOf = (index: number): HTMLElement => rails.get(index) ?? rail(options, index, Math.max(reached, index), go);
+  const showOnly = (index: number) => {
+    for (const [at, made] of rooms) {
+      const hidden = at !== index;
+      made.room.toggleAttribute("data-kept", hidden);
+      made.room.inert = hidden;
+    }
+  };
+
+  const draw = (from: number | null) => {
+    const made = roomOf(current);
+    if (!made) return;
+    showOnly(current);
+    shown.nudge = made.nudge;
     const scrolled = box.querySelector(".k-rail .k-scroll-view")?.scrollTop ?? 0;
-    // Drawing replaces what has the keyboard, which would drop it out of the template.
+    // Drawing the rail again replaces what has the keyboard, which would drop it out of the template.
     const keyboardIn = box.contains(document.activeElement);
-    box.replaceChildren(rail(options, current, reached, go), side);
+    box.replaceChildren(railOf(current), side);
+    rails.clear();
     const steps = box.querySelector<HTMLElement>(".k-rail-steps");
-    if (steps) keepInView(steps, current, scrolled);
-    if (from === null) return;
+    // Kept in view once the frame lays it out, not read back inside the press that drew it.
+    if (steps) requestAnimationFrame(() => keepInView(steps, current, scrolled));
+    if (from === null) {
+      ahead();
+      return;
+    }
     arrive(made.room, current > from);
     if (steps) travel(steps, from, current, options.failed ?? false);
-    // The template holds the keys on a page with nothing to do yet: Enter and Esc still work.
-    if (keyboardIn) (made.first ?? box).focus({ preventScroll: true });
+    // The template holds the keys on a page with nothing to do yet: Enter and Esc still work. The
+    // keyboard moves with the next frame, which lays the page out anyway, not inside the press.
+    if (keyboardIn) {
+      box.focus({ preventScroll: true });
+      requestAnimationFrame(() => {
+        if (box.contains(document.activeElement) && document.activeElement === box) (made.first ?? box).focus({ preventScroll: true });
+      });
+    }
+    ahead();
+  };
+
+  /** Draws, one an idle moment, the pages a press most likely goes back to, and their rails. */
+  const ahead = () => {
+    const first = backTo(options.pages, current, options.locked ?? false);
+    // The two a press most often takes: the page before (Back, Esc) and the first done step.
+    const waiting = [...new Set([current - 1, first])].filter((index) => index >= first && index <= reached && index !== current && !options.pages[index]?.fresh);
+    const one = () => {
+      const index = waiting.shift();
+      if (index === undefined || !box.isConnected) return;
+      if (!rooms.has(index)) {
+        roomOf(index);
+        showOnly(current);
+      }
+      if (!rails.has(index)) rails.set(index, rail(options, index, reached, go));
+      requestIdleCallback(one);
+    };
+    requestIdleCallback(one);
   };
 
   function go(to: number): void {
@@ -450,7 +511,7 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   draw(null);
   if (options.nudged !== undefined) shown.nudge()?.style.setProperty("--nudge", String(options.nudged));
   if (options.arriving) {
-    const room = box.querySelector<HTMLElement>(".k-step-room");
+    const room = box.querySelector<HTMLElement>(".k-step-room:not([data-kept])");
     if (room) {
       room.dataset.from = options.arriving.forward ? "end" : "start";
       room.style.opacity = String(options.arriving.shown);

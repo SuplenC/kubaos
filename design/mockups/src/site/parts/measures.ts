@@ -15,6 +15,7 @@ import type { Measures } from "../page.ts";
 import { el } from "../dom.ts";
 import { applies } from "../page.ts";
 import { releaseWheel } from "../scroll.ts";
+import { forgetWheelWork, whenWheelStops } from "../still.ts";
 import { inspector, type Inspector, type Lit, litWords, tokenName } from "./inspector.ts";
 import { type Group, inspected } from "./shelf.ts";
 import { specTable } from "./table.ts";
@@ -136,8 +137,11 @@ export function measures(spec: Measures): Drawn {
   drawn.rows.forEach((row, i) => {
     const token = tokens[i]!;
     rows.set(token, row);
-    row.addEventListener("pointerenter", () => point({ token }));
-    row.addEventListener("pointerleave", () => point(null));
+    row.addEventListener("pointerenter", () => whenWheelStops(() => point({ token })));
+    row.addEventListener("pointerleave", () => {
+      forgetWheelWork();
+      point(null);
+    });
     row.addEventListener("click", () => click({ token }));
   });
 

@@ -318,6 +318,13 @@ export function doneLine(): string {
   return `That's it. Done in ${duration(TOTAL)}. Not bad: Windows would still be on “Getting ready”. Pull the stick, reboot, type your password at boot and you're on the desktop as mika.`;
 }
 
+/** What Done says once Reboot is taken, in the actions' place. */
+function restarting(): HTMLElement {
+  const line = row("s8", "centre", spinner("s20"), text("Restarting…", "body", "on_surface_variant"));
+  line.classList.add("kobo-status");
+  return line;
+}
+
 export function doneColumn(going = false, headline = DONE_HEADLINE.short): HTMLElement {
   const words = headline.split(" ").map((word, index) => {
     const shown = part(text(index === 0 ? word : ` ${word}`, "hero"), `word-${index}`);
@@ -329,7 +336,7 @@ export function doneColumn(going = false, headline = DONE_HEADLINE.short): HTMLE
   const reboot = button({ label: "Reboot", size: "Lg", icon: "power_settings_new" });
   reboot.classList.add("kobo-reboot");
   const stay = button({ label: "Stay in the live system", kind: "Text", size: "Lg" });
-  const actions = going ? row("s8", "centre", spinner("s20"), text("Restarting…", "body", "on_surface_variant")) : row("s8", "centre", reboot, stay);
+  const actions = going ? restarting() : row("s8", "centre", reboot, stay);
   actions.classList.add("kobo-status");
   const drawn = neonMark();
   const mark = row("s8", "start", drawn, part(hanko(), "stamp"));
@@ -432,13 +439,14 @@ function panelTemplate(flow: Flow, at: Panel): HTMLElement {
       case "yours":
         return { step: { title: "Make it yours", icon: "wallpaper" }, body: () => yoursBody(answers, { ...(options.gitOpen ? { gitOpen: true } : {}), ...(options.setName ? { first: options.setName } : {}) }), blocker: () => yoursProblem(answers), note: () => wallpaperNote(answers) };
       case "review":
-        return { step: { title: "Last look", icon: "list_alt" }, body: () => reviewBody(answers, machine, goTo, held, options.review), footless: true };
+        return { step: { title: "Last look", icon: "list_alt" }, body: () => reviewBody(answers, machine, goTo, held, options.review), footless: true, fresh: true };
       default:
         return {
           step: { title: "Install", icon: "download" },
           body: () => (failed ? failedBody(answers, machine, { retry: () => flow.go({ scene: "installing", share: 0 }), review: () => flow.go({ panel: "review" }) }) : detailsBody(0.41, () => flow.go({ scene: "installing", share: 0.41 }))),
           footless: true,
           fixed: true,
+          fresh: true,
         };
     }
   });
@@ -620,6 +628,18 @@ export function room(options: RoomOptions): HTMLElement {
     return arriving;
   };
 
+  /**
+   * Reboot taken: the done screen shown stays, its actions giving way to what it is doing, so the
+   * press builds no screen; the lights going out is the move that follows.
+   */
+  const goingDown = (): HTMLElement => {
+    const layer = element.querySelector<HTMLElement>('.kobo-scene[data-scene="done"]');
+    if (!layer) return draw({ scene: "done", going: true });
+    layer.querySelector(".kobo-done .kobo-status")?.replaceWith(restarting());
+    layer.querySelector(".kobo-done .kobo-keys")?.replaceChildren();
+    return layer;
+  };
+
   /** The panel under any scene, a scene over the panel. */
   const orderLayers = (layers: Element[]) => [...layers].sort((a, b) => Number(a.classList.contains("kobo-scene")) - Number(b.classList.contains("kobo-scene")));
 
@@ -632,9 +652,25 @@ export function room(options: RoomOptions): HTMLElement {
     else element.focus({ preventScroll: true });
   };
 
-  // The live welcome builds the panel Let's go reveals once it is idle, under itself, where its
-  // picture hides it: Let's go then only plays the move, with no page to build in the press.
-  let prebuilt: HTMLElement | null = null;
+  // The live room builds the next place a press reveals once it is idle, under what shows, where
+  // the picture hides it: the panel under the welcome, the install's scene under the panel. The
+  // press then only plays the move, with nothing to build in it.
+  const prebuilt = new Map<string, HTMLElement>();
+  const keyOf = (at: At): string => ("panel" in at ? "panel" : at.scene);
+  const prebuild = (at: At) => {
+    requestIdleCallback(() => {
+      if (!element.isConnected || prebuilt.has(keyOf(at)) || keyOf(where) === keyOf(at)) return;
+      const layer = layerOf(at);
+      layer.dataset.under = "";
+      layer.inert = true;
+      element.append(layer);
+      prebuilt.set(keyOf(at), layer);
+    });
+  };
+  const ahead = () => {
+    if ("scene" in where && where.scene === "welcome") prebuild({ panel: "language" });
+    if ("panel" in where) prebuild({ scene: "installing", share: 0 });
+  };
 
   const go = (to: At): void => {
     const from = where;
@@ -644,18 +680,33 @@ export function room(options: RoomOptions): HTMLElement {
     if (!options.live) return;
     const move = between(from, to);
     const same = "scene" in from && "scene" in to && from.scene === to.scene;
-    const reuse = prebuilt !== null && "scene" in from && from.scene === "welcome" && "panel" in to && to.panel === "language";
-    const kept = reuse && prebuilt ? prebuilt : move && !same ? arrive(to) : draw(to);
-    if (reuse) kept.inert = false;
-    prebuilt = null;
+    const ready = prebuilt.get(keyOf(to));
+    const reuse = ready !== undefined && move !== null && !same && !("panel" in to && to.panel !== "language");
+    for (const [key, layer] of prebuilt) if (!reuse || layer !== ready) (layer.remove(), prebuilt.delete(key));
+    let kept: HTMLElement;
+    if (reuse && ready) {
+      kept = ready;
+      prebuilt.delete(keyOf(to));
+      kept.inert = false;
+      // A scene arriving over the panel goes over it, its foot with it; a panel revealed under a
+      // scene stays under it until the scene is gone.
+      if ("scene" in to) {
+        delete kept.dataset.under;
+        element.append(kept);
+        if (!element.querySelector(".kobo-foot")) kept.after(foot(machine));
+      }
+    } else if (same && "scene" in to && to.scene === "done" && to.going) kept = goingDown();
+    else kept = move && !same ? arrive(to) : draw(to);
     const keyboard = () => (element.querySelector<HTMLElement>(".kobo-start, .kobo-reboot, .kobo-details") ?? element.querySelector<HTMLElement>(".k-step-room [tabindex='0'], .k-step-room button:not(:disabled)") ?? element).focus({ preventScroll: true });
     // The move's end is the new place drawn: only the layer it left, and a scene's foot under the
     // panel, are taken away.
     const settle = () => {
       for (const child of [...element.children]) if (child !== kept && child.classList.contains("k-backdrop")) child.remove();
+      delete kept.dataset.under;
       if ("panel" in to) element.querySelector(".kobo-foot")?.remove();
       keyboard();
       if ("scene" in to && to.scene === "installing") running = simulate(element, to.share, () => go({ scene: "done" }));
+      ahead();
     };
     if (!move) {
       settle();
@@ -691,16 +742,7 @@ export function room(options: RoomOptions): HTMLElement {
       }
     });
     if ("scene" in where && where.scene === "installing") running = simulate(element, where.share, () => go({ scene: "done" }));
-    if ("scene" in where && where.scene === "welcome" && !options.leaving) {
-      requestIdleCallback(() => {
-        if (!("scene" in where) || where.scene !== "welcome" || !element.isConnected) return;
-        prebuilt = layerOf({ panel: "language" });
-        // Under the welcome, and out of reach of the keyboard, until Let's go.
-        prebuilt.dataset.under = "";
-        prebuilt.inert = true;
-        element.append(prebuilt);
-      });
-    }
+    if (!options.leaving) ahead();
   }
   if (options.opening) requestAnimationFrame(() => void play(element, tracksNow(OPENING)));
   return element;

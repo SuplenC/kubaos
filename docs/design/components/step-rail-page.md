@@ -14,6 +14,8 @@ A step rail beside a page with a footer band, and how it moves between its pages
 
 **Between pages** the new page slides 32 in from the direction of travel and fades in over `long` on `emphasized_decel`, on whole device pixels; the page left goes at once. The rail's rows change at once; the wire's lit length grows to the new current symbol (or retracts to it) over `long` on `emphasized_decel`, its end on whole device pixels, and each symbol it reaches lights over `short` as the light gets there (the new current one from `medium` in), one it leaves going out as the light leaves it. Reduce motion makes the page a fade and the wire and symbols change at once.
 
+**Pages kept.** A page shown once stays drawn, hidden and out of the keyboard's reach, so going back to it only shows it again, with its footer worked out anew; the page before the current one and the first done step are drawn in idle time with the rail as it will stand there, so a press on either draws nothing in the press. A page whose body reads the whole flow (Kōbō's Last look, the install) is drawn each time it shows.
+
 **Its host's ends.** Back or Esc on the first page and Continue or Enter on the last are its host's to take: in Kōbō the first goes back to the welcome, and the last page's own action (the held install) hands over to the install's scene.
 
 **Answers that change.** A page's blocker, its note and Continue's words follow its answers as they are typed: the band is drawn again in place, with no motion, the keyboard staying on Continue if it was there.

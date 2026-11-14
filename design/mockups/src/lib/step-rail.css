@@ -120,6 +120,20 @@
   overflow: hidden;
 }
 
+/* The page shown slides on a layer of its own, so its arrival moves it rather than drawing it again
+   each frame. */
+.k-step-side > .k-step-room:not([data-kept]) {
+  will-change: translate, opacity;
+}
+
+/* A page drawn before, kept laid out under the one shown, unseen and out of the keyboard's reach. */
+.k-step-side > .k-step-room[data-kept] {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .k-step-room {
   display: flex;
   flex: 1 1 0;

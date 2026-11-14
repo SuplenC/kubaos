@@ -86,13 +86,25 @@ export function select(options: SelectOptions): HTMLElement {
   list.setAttribute("role", "listbox");
   // A scrolling box takes Tab of its own in Chromium; the keyboard stays on the select instead.
   list.tabIndex = -1;
-  const items = options.options.map((label, index) => {
-    const item = menuItem({ label });
-    item.id = `${id}-${index}`;
-    item.setAttribute("role", "option");
-    return item;
-  });
-  list.append(...items);
+  // The options are made the first time the list opens: a page of selects shut builds none of
+  // them. The list's height is its rows' (`--drop`), so nothing it lays out waits on them.
+  const items: HTMLElement[] = [];
+  const built = { ready: false };
+  const ensureItems = () => {
+    if (built.ready) return;
+    built.ready = true;
+    for (const [index, label] of options.options.entries()) {
+      const item = menuItem({ label });
+      item.id = `${id}-${index}`;
+      item.setAttribute("role", "option");
+      item.toggleAttribute("data-picked", index === picked);
+      item.setAttribute("aria-selected", String(index === picked));
+      items.push(item);
+    }
+    list.append(...items);
+    wire(items);
+  };
+  let wire: (each: readonly HTMLElement[]) => void = () => {};
   const rule = document.createElement("span");
   rule.className = "k-select-rule";
   const pane = document.createElement("span");
@@ -143,6 +155,7 @@ export function select(options: SelectOptions): HTMLElement {
   probe(surface, { role: "component", name: "Select", variant: variant(options.icon && "icon", options.open && "open"), fixed: { width: false, height: !options.open } });
 
   if (options.open) {
+    ensureItems();
     room.dataset.open = "";
     room.dataset.shown = "";
     surface.setAttribute("aria-expanded", "true");
@@ -181,6 +194,7 @@ export function select(options: SelectOptions): HTMLElement {
 
   function show(): void {
     if (open) return;
+    ensureItems();
     open = true;
     delete room.dataset.folding;
     delete room.dataset.taken;
@@ -241,14 +255,15 @@ export function select(options: SelectOptions): HTMLElement {
     if (event.target === room && event.propertyName === "--select-open" && !open) folded();
   });
   head.addEventListener("click", () => (open ? close() : show()));
-  items.forEach((item, index) => {
-    // Only a pointer that moves takes the highlight: a list opening under a resting pointer keeps
-    // it on the pick.
-    item.addEventListener("pointermove", () => {
-      if (open && highlight !== index) light(index);
+  wire = (each) =>
+    each.forEach((item, index) => {
+      // Only a pointer that moves takes the highlight: a list opening under a resting pointer keeps
+      // it on the pick.
+      item.addEventListener("pointermove", () => {
+        if (open && highlight !== index) light(index);
+      });
+      item.addEventListener("click", () => take(index));
     });
-    item.addEventListener("click", () => take(index));
-  });
 
   surface.addEventListener("keydown", (event) => {
     const key = event.key;

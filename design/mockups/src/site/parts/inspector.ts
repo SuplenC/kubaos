@@ -6,6 +6,7 @@
 import { length } from "../../lib/tokens.ts";
 import { el } from "../dom.ts";
 import { settings } from "../settings.ts";
+import { forgetWheelWork, whenWheelStops } from "../still.ts";
 import { type Kind, reader, type Side, type Use, tokensFor } from "./uses.ts";
 
 /** What the layer draws: a part of one sample, or a token across a section's samples. */
@@ -259,11 +260,18 @@ export function inspector(name: string, sample: Element, hands: Hands): Inspecto
     return probeOf(part).role === "text" ? [el("span", "page-tree-detail", part.textContent ?? "")] : [];
   }
 
+  // What the pointer is over is read once it is still: while the wheel moves the page, a sample
+  // passing under a resting pointer would be cloned and measured at every part it crosses (a
+  // whole screen's sample took 80 ms each), and the reader points at none of them.
   holder.addEventListener("pointermove", (event) => {
     const part = event.target instanceof Element ? event.target.closest("[data-probe]") : null;
-    hands.point(part && sample.contains(part) ? part : null, self);
+    const over = part && sample.contains(part) ? part : null;
+    whenWheelStops(() => hands.point(over, self));
   });
-  holder.addEventListener("pointerleave", () => hands.point(null, self));
+  holder.addEventListener("pointerleave", () => {
+    forgetWheelWork();
+    hands.point(null, self);
+  });
   // A click in a measured sample is the inspector's, never the sample's, so measuring it doesn't
   // change it: no row is selected, nothing takes focus. `site/scroll.ts` has already heard it, on
   // the window, and given the sample the wheel.
