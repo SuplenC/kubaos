@@ -276,17 +276,14 @@ function cloneOf(sample: Element): Clone {
  */
 export function tokensFor(element: Element, sample: Element): string[] {
   const found = new Set<string>();
-  const scan = (text: string) => {
-    for (const match of text.matchAll(/var\(--([a-z0-9_-]+)/g)) found.add(match[1]!);
-  };
   const chain: Element[] = [];
   for (let at: Element | null = element; at; at = at === sample ? null : at.parentElement) chain.push(at);
-  for (const each of chain) scan(each.getAttribute("style") ?? "");
-  for (const rule of styleRules()) {
-    // A pseudo-element's rule is its element's: `::before` is drawn from the box it is on.
-    const selector = rule.selectorText.replace(/::?(before|after|placeholder|marker|selection)\b/g, "");
+  for (const each of chain) for (const token of named(each.getAttribute("style") ?? "")) found.add(token);
+  for (const rule of namingRules()) {
+    // A rule naming only tokens found already adds none: matching it is the costly part.
+    if (rule.tokens.every((token) => found.has(token))) continue;
     try {
-      if (chain.some((each) => each.matches(selector))) scan(rule.style.cssText);
+      if (chain.some((each) => each.matches(rule.selector))) for (const token of rule.tokens) found.add(token);
     } catch {
       // A selector the engine can't match on an element (a vendor one) names none of its tokens.
     }
@@ -296,15 +293,43 @@ export function tokensFor(element: Element, sample: Element): string[] {
   return [...found].filter((token) => sentinel(token) !== null);
 }
 
-/** Every style rule of the page's sheets that names a custom property, inside media and layers too. */
-function styleRules(): CSSStyleRule[] {
-  const list: CSSStyleRule[] = [];
+/** The custom properties `text` reads, in order. */
+function named(text: string): string[] {
+  return [...text.matchAll(/var\(--([a-z0-9_-]+)/g)].map((match) => match[1]!);
+}
+
+/** A style rule that names custom properties: its selector, as its element's, and those names. */
+interface NamingRule {
+  readonly selector: string;
+  readonly tokens: readonly string[];
+}
+
+let rules: NamingRule[] | null = null;
+
+/**
+ * Every style rule of the page's sheets that names a custom property, inside media and layers too.
+ * Read once and kept until `forgetRules`: the sheets change only as Vite swaps one, and reading
+ * every rule's text again took some 20 ms each time a part was pointed at.
+ */
+function namingRules(): NamingRule[] {
+  if (rules) return rules;
+  const list: NamingRule[] = [];
   const walk = (group: CSSRuleList) => {
     for (const rule of group) {
-      if (rule instanceof CSSStyleRule && rule.style.cssText.includes("var(--")) list.push(rule);
+      if (rule instanceof CSSStyleRule && rule.style.cssText.includes("var(--")) {
+        // A pseudo-element's rule is its element's: `::before` is drawn from the box it is on.
+        const selector = rule.selectorText.replace(/::?(before|after|placeholder|marker|selection)\b/g, "");
+        list.push({ selector, tokens: named(rule.style.cssText) });
+      }
       if ("cssRules" in rule) walk((rule as CSSGroupingRule).cssRules);
     }
   };
   for (const each of document.styleSheets) walk(each.cssRules);
+  rules = list;
   return list;
+}
+
+/** Forgets the rules read: a sheet changed. */
+export function forgetRules(): void {
+  rules = null;
 }
