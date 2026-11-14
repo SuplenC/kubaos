@@ -1434,6 +1434,7 @@ pairs = [
   { fg = "on_error_container", bg = "error_container", need = "text", use = "A critical notification" },
   { fg = "on_error", bg = "error", need = "text", use = "A danger menu item's label, lit" },
   { fg = "on_error", bg = "error_pressed", need = "text", use = "A danger menu item's label, pressed" },
+  { fg = "on_error", bg = "error_pressed_fixed", need = "text", use = "A danger menu item's label, pressed, in iced" },
   { fg = "on_error_container", bg = "error_container", need = "text", opacity = "subdued_text", use = "A critical notification's body" },
   { fg = "cold", bg = "surface", need = "text", use = "A holiday in the calendar, a cold chip's label" },
   { fg = "on_cold", bg = "cold", need = "text", use = "Text on the cold accent" },
