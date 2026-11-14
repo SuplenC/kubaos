@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && node scripts/property-check.ts && vite build && node scripts/render.ts dist/motion --motion",
     "typecheck": "tsc --noEmit",
     "property-check": "node scripts/property-check.ts",
-    "render": "node scripts/render.ts"
+    "render": "node scripts/render.ts",
+    "perf": "node scripts/perf.ts"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

@@ -12,6 +12,7 @@ In `nix develop`, which provides Node, the tokens' generator and Chromium:
 | `just mockups-build` | Type-checks, holds each registered custom property to one registration (`scripts/property-check.ts`) and builds it static into `dist/`, then draws each page in headless Chromium to write its moves' recipes into `dist/motion/PAGE.json`. |
 | `just mockups-check` | Draws every page at every scale, light and dark, and holds its boxes to the geometry rules and each mocked component to its twin on the specimen's pages (`docs/DESIGN.md`, "The mockups"), then holds every motion player to its recipe (`scripts/player-test.ts`). Part of `just design-check`. |
 | `just shots mockups` | Renders the pages' shots, before and after (`docs/agents/design-pr-loop.md`). |
+| `npm run perf -- PAGE…` | Measures the pages named for speed and holds them to their budgets ("Speed", below). |
 
 Plain HTML, CSS and TypeScript, built by Vite; no UI framework. The npm dependencies are locked in `package-lock.json`, and `playwright-core` is the version of nixpkgs' Playwright, whose Chromium draws the shots and frames. Use a Chromium-based browser: the icons' stroke uses CSS typed arithmetic.
 
@@ -55,12 +56,14 @@ The Anatomy section's samples draw nothing over them at rest. Pointing at a part
 | `src/pages/LEVEL/PAGE.ts` | One page each; `src/pages/index.ts` lists them. |
 | `scripts/render.ts` | Draws the built site in headless Chromium, as shots and geometry frames, or as each page's motion recipes (`--motion`). |
 | `scripts/player-test.ts` | Seeks every motion player on the built site and holds its plot and its parts to what plays. |
+| `scripts/perf.ts`, `scripts/perf-trace.ts`, `scripts/perf-budgets.ts` | The speed check: it drives the pages named, reads their traces, and holds them to the budgets. |
 
 ## Adding a page
 
 1. Write `src/pages/LEVEL/PAGE.ts` with `page({ … })` from `src/site/page.ts`, LEVEL one of `layout`, `atoms`, `molecules`, `templates`, `shell`, `kobo` or `apps`; or with `foundation({ … })` under `foundations`. `src/pages/atoms/button.ts` and `src/pages/foundations/colour.ts` are the examples.
 2. Add it to `PAGES` in `src/pages/index.ts`.
 3. Add its line to `test/shots/surfaces`: `mockups/PAGE  design/mockups/src/pages/LEVEL/PAGE.ts`.
+4. Run `npm run perf -- PAGE` and keep the page within its budgets ("Speed", below).
 
 Every part is required, and the types refuse a page without one, or with an empty list where one is needed: `lede`, `code` (its names in code, from its component page), `stage` (the thing itself, live, how to try it, and its day pane or why not), `variants`, `sizes`, `states`, `content` (text, a missing picture, none/one/many), `focus` (each line the part lights and its tone, and what lit makes of it in each look, `docs/DESIGN.md`, "States"), `motion` (arriving, leaving, between states, each move as data, below), `keyboard`, `measures` (the samples to inspect, every part by its token, and the reflow across window sizes). A part that doesn't apply is `doesntApply("why")`, a note the page shows as one muted line in its place. The states name those shown, each with a few words of its look; each of the others (rest, lit, pressed, disabled, selected, loading, empty, error) gets its reason in `absent`.
 
@@ -83,6 +86,63 @@ A move of more than one track renders its parts: under the legend, each part alo
 The recipe follows as tables, the row of whatever is changing at the playhead lit, and the player's loop phase by phase. A shot (`?chrome=off`) holds every player on its first state; with `?all`, as the shots draw, every move has a player of its own. `node scripts/player-test.ts [PAGE…]`, run by `just mockups-check`, seeks every player on the built site with its own tracks, light mode's, reduced motion's, the flicker off's and at speed 2, and holds each ball to the progress the browser is playing (on a property two tracks share, the whole plays the later's), each part alone to the whole or to its own ball where a later track has the property, a tick to its moment and the arrow keys to a frame.
 
 `just mockups-build` writes every page's recipes to `dist/motion/PAGE.json`, the moves as the libraries and a check read them.
+
+## Speed
+
+`npm run perf -- PAGE [PAGE…]`, in `nix develop` from `design/mockups/`, measures the pages named (by slug, as in `#/atoms/button`) and nothing else: with no page it prints its usage and fails. It builds the site unminified into `~/.cache/kubaos-mockups-perf/site`, so a culprit is named by its function and its module, serves it with `vite preview` on port 5184, and loads each page as a reader sees it, top bar and navigation included (`?chrome=off` holds every player, spinner and live sample still). One headless Chromium, drawing in software, loads one page at a time, three times, each in a fresh context and under a Chrome trace with the V8 sampler on. A page takes 30 to 60 seconds.
+
+Each load goes through four phases:
+
+| Phase | What happens | Measures |
+|---|---|---|
+| Load | From navigation until `window.kubaos.ready` | the time to ready; script, style recalculation, layout and paint time on the main thread; the long tasks (over 50 ms), their count and time; the page's elements |
+| Rest | One second still, then two seconds watched | the main thread's busy time a second; style recalculations, layouts, and timers and frame callbacks a second; the animations running |
+| Scroll | The wheel turned 120 px a step through the page's height (at most 150 steps), a frame's wait after each, the pointer over the middle of the page's box, so hover answers as it would for a reader | the median and worst frame's main-thread time; style and layout a frame; the style and layout script forced, their count and their time a frame; long tasks |
+| Press | Space on the first control in the stage's live sample (a button or a control's role, then a field, then anything focusable; never a link), and the second after it | the longest task, frames over 16.7 ms, the main thread's busy time. A sample with no control skips it, and the output says so |
+
+It prints a table a page: each measure's median over the three loads, the three values, its budget and `ok` or `OVER`; then what it pressed and how far it scrolled; then, under each measure over budget, what it points at. The machine's load average is printed before and after. It exits 1 when any budget is broken.
+
+### Which numbers mean something here
+
+Chromium draws in software here, with no GPU: paint is shown but held to no budget, and nothing is said about the GPU, raster or compositing, which Kuba's machine does in hardware. A frame is the main thread's work for it, not a frame rate. What holds across runs and machines is the main thread's own work: script, style recalculation and layout time, the forced style and layout, long tasks, the element count and what runs at rest. Counts (elements, forced layouts, long tasks, what runs at rest) repeat exactly from run to run; times move with the machine's load, as the three values in each row show. Compare a page's times with the reference pages measured at a similar load average, and measure again when the load average is far above the core count.
+
+### The budgets
+
+`scripts/perf-budgets.ts` holds one budget a measure in `BUDGETS`. They are set so the Button page, a light page, passes each with room for this machine's swings, from the Button, Tabs and Control Center pages measured at a load average of 10 to 30 on 24 cores:
+
+| Measure | Budget | Button | Tabs | Control Center |
+|---|---|---|---|---|
+| Load: navigation to ready | 2000 ms | 1023 ms | 671 ms | 1350 ms |
+| Load: script | 1000 ms | 529 ms | 329 ms | 672 ms |
+| Load: style recalculation | 600 ms | 329 ms | 191 ms | 344 ms |
+| Load: layout | 200 ms | 52 ms | 36 ms | 129 ms |
+| Load: long tasks | 5 | 3 | 3 | 3 |
+| Load: long tasks' time | 1800 ms | 926 ms | 569 ms | 1228 ms |
+| Load: elements | 12000 | 5492 | 3197 | 18298 |
+| Rest: animations running | 0 | 0 | 0 | 0 |
+| Rest: main thread busy | 5 ms/s | 0.4 | 0.4 | 0.4 |
+| Rest: style recalculations, layouts | 2 /s | 0 | 0 | 0 |
+| Rest: timers and frame callbacks | 5 /s | 0 | 0 | 0 |
+| Scroll: median frame | 8 ms | 2.1 ms | 2.6 ms | 3.3 ms |
+| Scroll: worst frame | 80 ms | 34 ms | 21 ms | 162 ms |
+| Scroll: style + layout a frame | 3 ms | 0.6 ms | 0.8 ms | 1.5 ms |
+| Scroll: forced style and layout a frame | 1 ms | 0.2 ms | 0.2 ms | 0.3 ms |
+| Scroll: long tasks | 0 | 0 | 0 | 3 |
+| Press: longest task | 50 ms | 6 ms | 6 ms | 46 ms |
+| Press: frames over 16.7 ms | 2 | 0 | 0 | 1 |
+| Press: main thread busy in 1 s | 200 ms | 59 ms | 40 ms | 159 ms |
+
+At rest a page does nothing: no animation, no timer, no restyle, on all three; a live clock ticking once a second still passes. A long task is one a reader notices, so a scroll has none and a press stays within one. The Control Center is over on its elements and on its scroll, where pointing at the Anatomy table's rows reads every element of its samples. A page that needs more than a budget gets an entry in `PAGE_BUDGETS` for that measure, with its reason; the table marks it `*` and prints the reason under it.
+
+### Reading a failure
+
+Under each measure over budget are the lines that point at its cause, from the run in the middle:
+
+- `function · module 12.3 ms`: the V8 sampler's time in that function over the phase, or in the task or frame named, most first. `module` is the source file, so `measure · src/site/parts/shelf.ts` is where to look.
+- `forced by inner · module ← caller · module ×n, t ms`: script read a size or a style after a write, and the browser styled or laid the page out then and there, n times for t ms. The fix is to read every box before writing any, or to read before the first write of the frame.
+- `restyled by inner ← caller ×n`: the script whose writes made the page's style or layout stale.
+- `250 ms task (style 180 ms, script 60 ms, …)`: a long task, by what it did, then the code that ran longest in it.
+- `animation div.k-spinner spin`: an animation still running at rest, by its element and its name.
 
 ## The Gallery's tour
 
