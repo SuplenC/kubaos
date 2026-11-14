@@ -116,12 +116,30 @@ function isSpacer(element: Element): boolean {
 
 let probeSheet: CSSStyleSheet | null = null;
 
-/** The sheet that sets one token on the clone, added to the document once. */
-function sheet(): CSSStyleSheet {
-  if (probeSheet) return probeSheet;
-  probeSheet = new CSSStyleSheet();
-  document.adoptedStyleSheets = [...document.adoptedStyleSheets, probeSheet];
-  return probeSheet;
+/** The value the sheet sets each token it knows to. */
+const sentinels = new Map<string, string>();
+
+/** The attribute on the clone's box naming the one token the sheet sets on it. */
+const PROBED = "data-probed-token";
+
+/**
+ * Makes the sheet, added to the document once, hold a rule for each of `tokens` setting it on the
+ * clone while the clone's box names it. A sheet's text changing costs Chromium a rebuild of its
+ * style rules, 5 ms each on the Control Center's page, where a part pointed at asks some fifty
+ * tokens: the text changes only for a token new to it, and a probe names its token on the box.
+ */
+function holdSentinels(tokens: readonly { token: string; value: string }[]): void {
+  if (!probeSheet) {
+    probeSheet = new CSSStyleSheet();
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, probeSheet];
+  }
+  if (tokens.every(({ token, value }) => sentinels.get(token) === value)) return;
+  for (const { token, value } of tokens) sentinels.set(token, value);
+  const rules = [...sentinels].map(([token, value]) => {
+    const box = `.page-uses[${PROBED}="${token}"]`;
+    return `${box}, ${box} * { --${token}: ${value} !important; }`;
+  });
+  probeSheet.replaceSync(rules.join("\n"));
 }
 
 /** Where one sample uses its tokens, read a token or an element at a time, as it is asked. */
@@ -155,7 +173,7 @@ export function reader(sample: Element): Reader {
     for (const element of clone.originals) {
       if (workedOut(element).includes(name)) add(element, { token: name, kind: "box", sides: [], properties: [] });
     }
-    clone.probe(name, null, (i, changed) => {
+    clone.probe([name], null, (_, i, changed) => {
       for (const use of usesOf(name, changed, isSpacer(clone.originals[i]!))) add(clone.originals[i]!, use);
     });
     byToken.set(name, uses);
@@ -171,11 +189,7 @@ export function reader(sample: Element): Reader {
     const uses: Use[] = workedOut(part)
       .filter((name) => tokens.includes(name))
       .map((name) => ({ token: name, kind: "box", sides: [], properties: [] }));
-    if (i >= 0) {
-      for (const name of tokens) {
-        clone.probe(name, [i], (_, changed) => uses.push(...usesOf(name, changed, isSpacer(part))));
-      }
-    }
+    if (i >= 0) clone.probe(tokens, [i], (name, _, changed) => uses.push(...usesOf(name, changed, isSpacer(part))));
     byElement.set(part, uses);
     return uses;
   };
@@ -199,10 +213,11 @@ function workedOut(element: Element): string[] {
 interface Clone {
   readonly originals: readonly Element[];
   /**
-   * Sets `token` to a value it never has on the clone and tells `found` each element, of `only` or
-   * of all, whose properties then changed, with those properties.
+   * Sets each of `tokens` in turn to a value it never has on the clone and tells `found` each
+   * element, of `only` or of all, whose properties then changed, with the token and those
+   * properties.
    */
-  probe(token: string, only: readonly number[] | null, found: (index: number, changed: string[]) => void): void;
+  probe(tokens: readonly string[], only: readonly number[] | null, found: (token: string, index: number, changed: string[]) => void): void;
 }
 
 function cloneOf(sample: Element): Clone {
@@ -217,30 +232,36 @@ function cloneOf(sample: Element): Clone {
   const styles = copies.map((each) => getComputedStyle(each));
   const before = new Map<number, string[]>();
   const read = (i: number) => READ.map((property) => styles[i]!.getPropertyValue(property));
-  const probe = (token: string, only: readonly number[] | null, found: (index: number, changed: string[]) => void) => {
-    const value = sentinel(token);
-    if (!value) return;
+  const probe = (tokens: readonly string[], only: readonly number[] | null, found: (token: string, index: number, changed: string[]) => void) => {
+    const probed = tokens.flatMap((token) => {
+      const value = sentinel(token);
+      return value ? [{ token, value }] : [];
+    });
+    if (probed.length === 0) return;
+    holdSentinels(probed);
     const asked = only ?? copies.map((_, i) => i);
     // Each element's parent too: an inherited value is the element's own use only where its parent's differs.
     const wanted = [...new Set(asked.flatMap((i) => (parents[i]! >= 0 ? [i, parents[i]!] : [i])))];
     sample.after(box);
     try {
       for (const i of wanted) if (!before.has(i)) before.set(i, read(i));
-      sheet().replaceSync(`.page-uses, .page-uses * { --${token}: ${value} !important; }`);
-      const after = new Map(wanted.map((i) => [i, read(i)]));
-      for (const i of asked) {
-        const values = after.get(i)!;
-        const was = before.get(i)!;
-        const parent = parents[i]!;
-        const changed = READ.filter((_, p) => {
-          if (values[p] === was[p]) return false;
-          if (p >= PROPERTIES.length && parent >= 0) return values[p] !== after.get(parent)![p];
-          return true;
-        });
-        if (changed.length > 0) found(i, changed);
+      for (const { token } of probed) {
+        box.setAttribute(PROBED, token);
+        const after = new Map(wanted.map((i) => [i, read(i)]));
+        for (const i of asked) {
+          const values = after.get(i)!;
+          const was = before.get(i)!;
+          const parent = parents[i]!;
+          const changed = READ.filter((_, p) => {
+            if (values[p] === was[p]) return false;
+            if (p >= PROPERTIES.length && parent >= 0) return values[p] !== after.get(parent)![p];
+            return true;
+          });
+          if (changed.length > 0) found(token, i, changed);
+        }
       }
     } finally {
-      sheet().replaceSync("");
+      box.removeAttribute(PROBED);
       box.remove();
     }
   };
