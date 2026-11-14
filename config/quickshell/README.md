@@ -105,7 +105,6 @@ services/               singletons, no UI
 components/             blocks composed from KubaOS.Components
   PowerSlider           the power stops on a K.Slider
   WallpaperView         a still, or a video looping over its poster (desktop, lock screen, picker)
-  Well                  a list's well round a scrolling NavList, cut by its own rounded shape
 modules/
   frame/                Frame (one layer per screen: bar, border, every panel, input mask),
                         Exclusions (exclusive zones as four empty windows)

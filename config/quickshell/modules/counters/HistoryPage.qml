@@ -1,6 +1,5 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 import "counters.js" as Logic
 
@@ -160,12 +159,12 @@ FocusScope {
             body: "Every +1, −1, set and reset shows here, with its time."
         }
 
-        Well {
+        K.ScrollingList {
             visible: root.rows.length > 0
             implicitHeight: Math.min(root.lines.length, root.mostRows) * (K.Tokens.size.row + K.Tokens.space.s4) - K.Tokens.space.s4 + inset * 2
             focused: list.activeFocus
 
-            NavList {
+            K.ListRows {
                 id: list
 
                 width: parent.width
