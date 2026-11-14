@@ -39,6 +39,8 @@ export interface SelectOptions {
   readonly up?: boolean;
   readonly disabled?: boolean;
   readonly pinned?: Pinned;
+  /** What a pick does besides: what follows from it on the page. */
+  readonly onPick?: (index: number) => void;
 }
 
 let made = 0;
@@ -218,6 +220,7 @@ export function select(options: SelectOptions): HTMLElement {
     picked = index;
     showPick();
     close();
+    options.onPick?.(index);
   }
 
   /** The next option after the highlight whose words start with `letter`, round from the end. */

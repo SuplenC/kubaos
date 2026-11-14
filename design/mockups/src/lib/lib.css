@@ -3061,6 +3061,13 @@
   margin-inline-end: calc(-1 * var(--hang, 1) * var(--padding));
 }
 
+/* A Collapsible on a page or in a card (`hangs` on it) hangs its header's `space.s12` the same
+   way, so its chevron is on the content's edge, in line with the fields round it, and its
+   summary ends on the other edge; its lit tube reaches into the padding. */
+.k-collapsible[data-hangs] {
+  margin-inline: calc(-1 * var(--hang, 1) * var(--space-s12));
+}
+
 /* A card's `space.s16` would leave a hung button 4 from its edge, and a banner's padding is its
    rail's lane, which the button would meet. */
 :is(.k-card, .k-status) {

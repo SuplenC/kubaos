@@ -14,6 +14,12 @@ A step rail beside a page with a footer band, and how it moves between its pages
 
 **Between pages** the new page slides 32 in from the direction of travel and fades in over `long` on `emphasized_decel`, on whole device pixels; the page left goes at once. The rail's rows change at once; the wire's lit length grows to the new current symbol (or retracts to it) over `long` on `emphasized_decel`, its end on whole device pixels, and each symbol it reaches lights over `short` as the light gets there (the new current one from `medium` in), one it leaves going out as the light leaves it. Reduce motion makes the page a fade and the wire and symbols change at once.
 
+**Its host's ends.** Back or Esc on the first page and Continue or Enter on the last are its host's to take: in Kōbō the first goes back to the welcome, and the last page's own action (the held install) hands over to the install's scene.
+
+**Answers that change.** A page's blocker, its note and Continue's words follow its answers as they are typed: the band is drawn again in place, with no motion, the keyboard staying on Continue if it was there.
+
+**The battery** at the rail's foot shows how full it is (`battery_full`, then three, two and one bar, or `battery_charging_full` on the charger) beside its percent in `label`, both `on_surface_variant`; at 20% or under on battery, both `warning`.
+
 **Keys:** Enter is the page's `Filled` action; Esc goes back a page; ↑ ↓ (k j) move between the rail's pressable steps; Tab goes rail, page, Back, Continue. A page arriving puts the keyboard on its first thing to do.
 
 *Not built yet: neither library has the template; Kōbō draws its rail, panel and footer by hand (`crates/kubaos-kobo/src/view.rs`), and the updater doesn't exist.*

@@ -30,18 +30,31 @@ import { THEMES } from "../site/themes.ts";
 /** Where the template is drawn: an app's window, or Kōbō's glass panel over its backdrop. */
 export type RailHost = "window" | "kobo";
 
+/** A value given as it is, or worked out each time it is read: a page's answers change it. */
+export type Live<T> = T | (() => T);
+
+function now<T>(value: Live<T>): T {
+  return typeof value === "function" ? (value as () => T)() : value;
+}
+
+/**
+ * The event a page's body sends when its answers change what its footer says: the band is drawn
+ * again in place, its blocker, note and Continue's words worked out anew.
+ */
+export const RECHECK = "k-step-recheck";
+
 /** One page of the flow: its step in the rail and what the page holds. */
 export interface RailPage {
   /** Its step: a title and a symbol; where it stands comes from the flow. */
   readonly step: Pick<StepOptions, "title" | "icon">;
   /** The page's body, drawn each time the page shows. */
   readonly body: () => HTMLElement;
-  /** Continue's words: Continue, Skip, Install. */
-  readonly next?: string;
+  /** Continue's words: Continue, Skip, Install; worked out again as the page changes. */
+  readonly next?: Live<string>;
   /** Why Continue does nothing yet: Enter flashes it in the error colour. */
-  readonly blocker?: string;
+  readonly blocker?: Live<string | undefined>;
   /** What the footer says before Continue when nothing blocks it: 12 of 40 picked. */
-  readonly note?: string;
+  readonly note?: Live<string | undefined>;
   /** A page with no footer: the review, whose action is in its body, and the running steps. */
   readonly footless?: boolean;
   /** Going back past it is refused: it can't be undone (the install started). */
@@ -53,6 +66,7 @@ export interface RailFoot {
   readonly power: boolean;
   /** The battery's percent, or none on a desktop. */
   readonly battery?: number;
+  readonly charging?: boolean;
 }
 
 /** The pictures behind Kōbō's panel: the wallpaper, and the same blurred for its glass. */
@@ -83,6 +97,11 @@ export interface StepRailOptions {
   readonly nudged?: number;
   /** The current page arriving from this side, held this far in, as a still sample of the slide. */
   readonly arriving?: { readonly forward: boolean; readonly shown: number };
+  /**
+   * What its host does past either end: Back or Esc on the first page (`forward` false), Continue
+   * or Enter on the last (`forward` true). Kōbō's welcome before it, its install after it.
+   */
+  readonly onExit?: (forward: boolean) => void;
 }
 
 /** A rail step's state: done before the current one, the current one, to do after it. */
@@ -108,10 +127,21 @@ export function hintColumn(hints: readonly KeyHint[]): HTMLElement {
   return stack("s4", "start", ...hints.map((hint) => keyHints([hint])));
 }
 
-/** The battery: its symbol and the percent, muted, in `label`. */
-function battery(percent: number): HTMLElement {
+/** At or under this percent, running on it, a battery is low: an install outlasts it. */
+const LOW_BATTERY = 20;
+
+/**
+ * The battery: its symbol by how full it is (charging, its own), and the percent in `label`, muted;
+ * low and not charging, both in `warning`.
+ */
+export function battery(percent: number, charging = false): HTMLElement {
   const words = new Intl.NumberFormat(undefined, { style: "percent" }).format(percent / 100);
-  return row("s4", "centre", icon("battery_full", "var(--icon-s16)", "var(--color-on_surface_variant)"), text(words, "label", "on_surface_variant"));
+  const low = !charging && percent <= LOW_BATTERY;
+  const glyph = charging ? "battery_charging_full" : percent >= 80 ? "battery_full" : percent >= 50 ? "battery_3_bar" : percent >= 25 ? "battery_2_bar" : "battery_1_bar";
+  const tone = low ? "warning" : "on_surface_variant";
+  const line = row("s4", "centre", icon(glyph, "var(--icon-s16)", `var(--color-${tone})`), text(words, "label", tone));
+  line.classList.add("k-battery");
+  return line;
 }
 
 /** The rail: the brand, `space.s20`, the steps on their wire, then the hints and the foot at its bottom. */
@@ -153,10 +183,11 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
     const foot: Element[] = [];
     if (options.foot.power) {
       const power = button({ label: "Power", kind: "Text", size: "Sm", icon: "power_settings_new" });
+      power.dataset.power = "";
       foot.push(power);
     }
     foot.push(fill());
-    if (options.foot.battery !== undefined) foot.push(battery(options.foot.battery));
+    if (options.foot.battery !== undefined) foot.push(battery(options.foot.battery, options.foot.charging));
     parts.push(gap("s16"), inset(hangs(row("s8", "centre", ...foot)), 0, "s12"));
   }
   const box = document.createElement("span");
@@ -253,18 +284,20 @@ export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: ()
   back.addEventListener("click", onBack);
   const parts: Element[] = [back, fill()];
   let nudge: HTMLElement | null = null;
-  if (spec.blocker) {
-    const reason = wrapped(spec.blocker, "small");
+  const blocker = spec.blocker === undefined ? undefined : now(spec.blocker);
+  const note = spec.note === undefined ? undefined : now(spec.note);
+  if (blocker) {
+    const reason = wrapped(blocker, "small");
     reason.style.color = "var(--nudge-ink)";
     nudge = row("s8", "centre", icon("error", "var(--type-small-icon)", "var(--nudge-ink)"), reason);
     nudge.classList.add("k-step-blocker");
     parts.push(nudge);
-  } else if (spec.note) {
-    const note = wrapped(spec.note, "small", "on_surface_variant");
-    note.classList.add("k-step-note");
-    parts.push(note);
+  } else if (note) {
+    const shown = wrapped(note, "small", "on_surface_variant");
+    shown.classList.add("k-step-note");
+    parts.push(shown);
   }
-  const next = button({ label: spec.next ?? "Continue", kind: "Filled", icon: "arrow_forward", trailing: true, ...(spec.blocker ? { disabled: true } : {}), ...(pinned.next ? { pinned: pinned.next } : {}) });
+  const next = button({ label: spec.next === undefined ? "Continue" : now(spec.next), kind: "Filled", icon: "arrow_forward", trailing: true, ...(blocker ? { disabled: true } : {}), ...(pinned.next ? { pinned: pinned.next } : {}) });
   next.addEventListener("click", onNext);
   parts.push(next);
   const band = hangs(row("s16", "centre", ...parts));
@@ -311,21 +344,39 @@ const TAKES_KEYS = "[tabindex='0'], button:not(:disabled)";
  * is its first thing to do, where the keyboard lands: the body's first control, or Continue while
  * nothing blocks it.
  */
-function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void): { room: HTMLElement; nudge: HTMLElement | null; first: HTMLElement | null } {
+/** Whether something blocks Continue on `spec` now. */
+function blocked(spec: RailPage): boolean {
+  return spec.blocker !== undefined && Boolean(now(spec.blocker));
+}
+
+function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void): { room: HTMLElement; nudge: () => HTMLElement | null; first: HTMLElement | null } {
   const body = spec.body();
   const parts: Element[] = [fillingHeight(filling(body))];
   let nudge: HTMLElement | null = null;
   let first = body.querySelector<HTMLElement>(TAKES_KEYS);
-  if (!spec.footless) {
-    const made = footer(spec, onBack, onNext);
-    nudge = made.nudge;
-    first ??= spec.blocker ? null : made.next;
-    parts.push(gap("s16"), filling(made.band));
-  }
   const room = document.createElement("span");
+  const made = { nudge: null as HTMLElement | null };
+  if (!spec.footless) {
+    const drawn = footer(spec, onBack, onNext);
+    nudge = drawn.nudge;
+    made.nudge = nudge;
+    first ??= blocked(spec) ? null : drawn.next;
+    let band = filling(drawn.band);
+    parts.push(gap("s16"), band);
+    // The answers changed: the band is drawn again where it was, the keyboard kept on Continue.
+    room.addEventListener(RECHECK, () => {
+      const had = band.contains(document.activeElement);
+      const again = footer(spec, onBack, onNext);
+      const fresh = filling(again.band);
+      band.replaceWith(fresh);
+      band = fresh;
+      made.nudge = again.nudge;
+      if (had) again.next.focus({ preventScroll: true });
+    });
+  }
   room.className = "k-step-room";
   room.append(page(fillingHeight(stack(0, "start", ...parts)), { clear: true }));
-  return { room, nudge, first };
+  return { room, nudge: () => made.nudge, first };
 }
 
 /**
@@ -343,7 +394,7 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   box.dataset.whole = "";
   box.tabIndex = -1;
   // The blocker of the page showing, which Enter refused flashes.
-  const shown: { nudge: HTMLElement | null } = { nudge: null };
+  const shown: { nudge: () => HTMLElement | null } = { nudge: () => null };
 
   const draw = (from: number | null) => {
     const spec = options.pages[current];
@@ -367,6 +418,10 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   };
 
   function go(to: number): void {
+    if (options.onExit && !options.locked && (to === -1 || to === options.pages.length)) {
+      options.onExit(to === options.pages.length);
+      return;
+    }
     if (to < backTo(options.pages, current, options.locked ?? false) || to < 0 || to >= options.pages.length || to === current) return;
     const from = current;
     current = to;
@@ -376,8 +431,9 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
 
   function next(): void {
     const spec = options.pages[current];
-    if (spec?.blocker) {
-      if (shown.nudge) flash(shown.nudge);
+    if (spec && blocked(spec)) {
+      const nudge = shown.nudge();
+      if (nudge) flash(nudge);
       return;
     }
     go(current + 1);
@@ -392,7 +448,7 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   });
 
   draw(null);
-  if (options.nudged !== undefined) shown.nudge?.style.setProperty("--nudge", String(options.nudged));
+  if (options.nudged !== undefined) shown.nudge()?.style.setProperty("--nudge", String(options.nudged));
   if (options.arriving) {
     const room = box.querySelector<HTMLElement>(".k-step-room");
     if (room) {
