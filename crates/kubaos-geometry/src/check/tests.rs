@@ -462,3 +462,91 @@ fn a_pictures_own_layout_is_still_held_to_every_rule() {
         [Rule::DeviceGrid]
     );
 }
+
+/// A row of two 40 px buttons 8 apart, and a third box placed `over` it or not, at -56.
+fn row_with_highlight(over: bool) -> Frame {
+    let mut highlight = Node::new(Role::Box, rect(0.0, 0.0, 88.0, 40.0));
+    highlight.marks.over = over;
+    let row = with(
+        Node::new(
+            Role::Layout {
+                axis: Axis::X,
+                gap: 8.0,
+                align: Align::Start,
+            },
+            rect(0.0, 0.0, 88.0, 40.0),
+        ),
+        vec![
+            highlight,
+            button("Filled Md", rect(0.0, 0.0, 40.0, 40.0)),
+            button("Filled Md", rect(48.0, 0.0, 40.0, 40.0)),
+        ],
+    );
+    frame("dark", 1.0, row)
+}
+
+#[test]
+fn a_box_placed_over_a_layout_is_not_one_of_its_children() {
+    assert_eq!(rules_broken(&[row_with_highlight(true)]), [] as [Rule; 0]);
+    assert_eq!(rules_broken(&[row_with_highlight(false)]), [Rule::SiblingGap]);
+}
+
+/// A 40 px control holding a bubble 8 under it, the bubble `floats` or not, its words `width` wide
+/// in a 60 px box.
+fn control_with_bubble(floats: bool, width: f32) -> Frame {
+    let natural = Size { width, height: 16.0 };
+    let mut bubble = with(
+        Node::new(Role::Box, rect(-10.0, 48.0, 60.0, 24.0)),
+        vec![text("Search", natural, rect(-6.0, 52.0, width, 16.0))],
+    );
+    bubble.marks.over = true;
+    bubble.marks.floats = floats;
+    let control = with(Node::new(Role::Box, rect(100.0, 0.0, 40.0, 40.0)), vec![bubble]);
+    frame(
+        "dark",
+        1.0,
+        with(Node::new(Role::Box, rect(0.0, 0.0, 400.0, 200.0)), vec![control]),
+    )
+}
+
+#[test]
+fn a_floating_bubble_is_held_to_its_own_box_not_its_controls() {
+    assert_eq!(rules_broken(&[control_with_bubble(true, 52.0)]), [] as [Rule; 0]);
+    assert_eq!(rules_broken(&[control_with_bubble(false, 52.0)]), [Rule::ClippedText]);
+    assert_eq!(rules_broken(&[control_with_bubble(true, 72.0)]), [Rule::ClippedText]);
+}
+
+/// A 200 px scroll holding a 400 px screen with words at `x`, the scroll sideways or not.
+fn wide_screen(across: bool, x: f32) -> Frame {
+    let natural = Size {
+        width: 40.0,
+        height: 16.0,
+    };
+    let screen = with(
+        Node::new(Role::Box, rect(0.0, 0.0, 400.0, 40.0)),
+        vec![text("61°", natural, rect(x, 0.0, 40.0, 16.0))],
+    );
+    let mut pane = with(
+        Node::new(Role::Scroll { reach: None }, rect(0.0, 0.0, 200.0, 40.0)),
+        vec![screen],
+    );
+    pane.marks.across = across;
+    frame("dark", 1.0, pane)
+}
+
+#[test]
+fn content_past_a_sideways_scroll_is_scrolled_but_past_the_screen_it_is_on_is_clipped() {
+    assert_eq!(rules_broken(&[wide_screen(true, 300.0)]), [] as [Rule; 0]);
+    assert_eq!(rules_broken(&[wide_screen(false, 300.0)]), [Rule::ClippedText]);
+    assert_eq!(rules_broken(&[wide_screen(true, 380.0)]), [Rule::ClippedText]);
+}
+
+#[test]
+fn a_frame_with_words_the_checker_doesnt_read_still_reads() {
+    let json = r#"{"page":"p","mode":"dark","scale":1,"root":{"role":"box","bounds":{"x":0,"y":0,"width":10,"height":10},
+        "children":[{"role":"box","unseen":"opacity","bounds":{"x":0,"y":0,"width":4,"height":4}}]}}"#;
+
+    let read: Frame = serde_json::from_str(json).unwrap();
+
+    assert_eq!(read.root.children.len(), 1);
+}

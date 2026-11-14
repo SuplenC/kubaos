@@ -4,10 +4,21 @@
 // plain box, since the layout's rules hold its edges, and a plain box around one child with its
 // bounds is that child, as iced reports them.
 //
-// A box drawn scaled (CSS `scale`, or a `transform` that scales) is a picture of UI, such as the
-// Gallery's small screens or windows stepped back behind a lock: it and everything in it are
-// reported at the size they are laid out at, from its own top left on a whole pixel, marked
-// `picture` with the ratio it is drawn at.
+// The frame is what a person sees, so the walk reports three things the DOM alone doesn't say:
+//
+// - A box drawn scaled (CSS `scale`, or a `transform` that scales) is a picture of UI, such as
+//   the Gallery's small screens or windows stepped back behind a lock: it and everything in it
+//   are reported at the size they are laid out at, from its own top left on a whole pixel, marked
+//   `picture` with the ratio it is drawn at.
+// - What isn't drawn is left out: a box at no opacity or hidden, and one parked wholly outside a
+//   box that cuts it off (`overflow`, `clip-path`) when the cut is on purpose: the box it is cut by
+//   is a part shut to nothing, or it was moved or placed out of the flow to be there. A layout's child
+//   left out keeps its place as a plain box, so its siblings' gaps still add up. Content a layout
+//   pushed past its box is still reported, and sticks out of it.
+// - A box out of the flow (`position: absolute`) is marked `over`, so its parent's layout leaves
+//   it out; one its probe says floats (a hint's bubble) is marked `floats` too, so it is held to
+//   its own boxes, not its control's. A box the site lets scroll sideways (a screen wider than the
+//   page under `?all`) is a `scroll` that scrolls `across`.
 //
 // The root is the page's own box, which claims nothing, so every mock on the page is one frame.
 
@@ -35,11 +46,34 @@ export interface Frame {
 /** A box as drawn in the viewport, mapped to logical pixels in the space being walked. */
 type Space = (drawn: DOMRectReadOnly) => Bounds;
 
+/** A box that cuts off what it holds, as drawn in the viewport. */
+interface Clip {
+  readonly element: Element;
+  readonly rect: DOMRectReadOnly;
+  /** Shut to nothing on an axis: a closed sheet, a shut section. */
+  readonly shut: boolean;
+  /**
+   * It is a part's own box, or inside one: shut, it is a part closed on purpose. A box of the page
+   * shut to nothing hides what it holds by fault, and its content is still reported.
+   */
+  readonly part: boolean;
+  /** What is under it here was moved or placed out of the flow on its way: parked on purpose. */
+  readonly moved: boolean;
+}
+
 interface Walk {
   readonly space: Space;
+  /** Inside a probed component. */
+  readonly part: boolean;
+  readonly clips: readonly Clip[];
+  /** Inside an element that says nothing and is out of the flow: what it holds is over its parent too. */
+  readonly over: boolean;
   /** The CSS pixels a logical pixel takes, outside any picture. */
   readonly perCss: number;
 }
+
+/** How near two lengths are, in CSS pixels, to count as one: Chromium lays out in 1/64 px. */
+const NEAR = 1 / 64;
 
 function same(a: Bounds, b: Bounds): boolean {
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
@@ -51,18 +85,36 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
   const style = getComputedStyle(element);
   if (style.display === "none") return;
   const parent = element.parentElement;
-  const laidOut = parent?.dataset.layout !== undefined && parent?.dataset.probe !== undefined;
+  const out = style.position === "absolute" || style.position === "fixed";
+  const laidOut = !out && parent?.dataset.layout !== undefined && parent?.dataset.probe !== undefined;
   const drawn = element.getBoundingClientRect();
-  const probe = element.dataset.probe;
-  const declared = probe ? (JSON.parse(probe) as Record<string, unknown>) : null;
   const matrix = element instanceof HTMLElement ? transformOf(style) : null;
-  const picture = matrix ? pictureOf(matrix) : null;
-  const found: Record<string, unknown> | null = declared ?? (laidOut || picture ? { role: "box" } : null);
-  if (!found) {
-    for (const child of element.children) walk(child, at, into);
+  const moved = out || (matrix !== null && displaced(style, matrix));
+  // Scaled to nothing, as a mark before it pops in, it is drawn nowhere.
+  const shrunk = matrix !== null && (pictureOf(matrix)?.ratio ?? 1) < 1e-4;
+  const hidden = unseen(element, style, drawn, at.clips, moved, shrunk);
+  if (hidden) {
+    // A layout's child that isn't drawn still takes its place in the layout.
+    if (laidOut) into.push({ role: "box", unseen: hidden, bounds: at.space(drawn), children: [] });
     return;
   }
-  const role = { ...found };
+  const probe = element.dataset.probe;
+  const declared = probe ? (JSON.parse(probe) as Record<string, unknown>) : null;
+  const picture = matrix ? pictureOf(matrix) : null;
+  const scroller = sideways(element, style);
+  let role: Record<string, unknown> | null = declared ?? (laidOut || picture ? { role: "box" } : scroller ? { role: "scroll" } : null);
+  const part = at.part || declared?.role === "component";
+  const clips = holding(element, style, drawn, at.clips, moved, part);
+  if (!role) {
+    for (const child of element.children) walk(child, { ...at, clips, over: at.over || out }, into);
+    return;
+  }
+  role = { ...role };
+  const { floats, ...said } = role;
+  role = said;
+  if (out || at.over) role.over = true;
+  if (out && floats === true) role.floats = true;
+  if (scroller && role.role === "scroll") role.across = true;
   let bounds = at.space(drawn);
   let space = at.space;
   if (picture && matrix) {
@@ -76,7 +128,7 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
   }
   const children: FrameNode[] = [];
   if (role.role !== "icon") {
-    for (const child of element.children) walk(child, { ...at, space }, children);
+    for (const child of element.children) walk(child, { ...at, space, clips, part, over: false }, children);
   }
   if (role.role === "text") {
     role.content = element.textContent ?? "";
@@ -98,9 +150,55 @@ function marked(node: Record<string, unknown>): boolean {
   return Object.keys(node).some((key) => key !== "role" && key !== "bounds" && key !== "children");
 }
 
+/**
+ * Why `element` isn't drawn, or null: no opacity, scaled to nothing, hidden, or parked wholly outside a box that cuts
+ * it off. A box past a cut is only parked when the cut is a part shut, or it was moved there or placed
+ * out of the flow (`moved`): content a layout pushed out of its box is a fault, and stays.
+ */
+function unseen(element: Element, style: CSSStyleDeclaration, drawn: DOMRectReadOnly, clips: readonly Clip[], moved: boolean, shrunk: boolean): string | null {
+  if (Number(style.opacity) === 0) return "opacity";
+  if (shrunk) return "shrunk";
+  if (style.visibility !== "visible") return "hidden";
+  for (const clip of cutting(element, style, clips)) {
+    if (clip.shut && clip.part) return "shut";
+    const c = clip.rect;
+    const outside = drawn.right <= c.left + NEAR || drawn.left >= c.right - NEAR || drawn.bottom <= c.top + NEAR || drawn.top >= c.bottom - NEAR;
+    if (outside && (clip.moved || moved)) return "parked";
+  }
+  return null;
+}
 
+/**
+ * The clips that cut `element`: all of them for a box in the flow; for one placed absolutely, those
+ * around the box it is placed in; none for a fixed one.
+ */
+function cutting(element: Element, style: CSSStyleDeclaration, clips: readonly Clip[]): readonly Clip[] {
+  if (style.position === "fixed") return [];
+  if (style.position !== "absolute" || !(element instanceof HTMLElement)) return clips;
+  const placedIn = element.offsetParent;
+  return placedIn ? clips.filter((clip) => clip.element.contains(placedIn)) : [];
+}
 
+/**
+ * The clips what `element` holds is under: those around it, marked moved where it was moved or
+ * placed out of the flow, then its own when it cuts off what it holds.
+ */
+function holding(element: Element, style: CSSStyleDeclaration, drawn: DOMRectReadOnly, clips: readonly Clip[], moved: boolean, part: boolean): readonly Clip[] {
+  const cuts = cutting(element, style, clips);
+  const under = moved ? clips.map((clip) => (cuts.includes(clip) ? { ...clip, moved: true } : clip)) : clips;
+  const cutsOff =
+    style.overflowX !== "visible" || style.overflowY !== "visible" || style.clipPath !== "none" || /paint|strict|content/.test(style.contain);
+  if (!cutsOff) return under;
+  return [...under, { element, rect: drawn, shut: drawn.width < NEAR || drawn.height < NEAR, part, moved: false }];
+}
 
+/**
+ * Whether `element`, saying nothing, is a box the site lets scroll sideways and whose content runs
+ * past it: a screen wider than the page, under `?all`.
+ */
+function sideways(element: Element, style: CSSStyleDeclaration): boolean {
+  return element.getAttribute("data-probe") === null && /auto|scroll/.test(style.overflowX) && element.scrollWidth > element.clientWidth + 1;
+}
 
 /**
  * A box's own transform, in its CSS pixels from its laid-out top left: `translate`, `rotate`,
@@ -152,6 +250,14 @@ function pictureOf(m: DOMMatrix): { ratio: number; turned: boolean } | null {
   return { ratio: Math.min(across, down), turned };
 }
 
+/** Whether `m` draws its box somewhere other than where it is laid out. */
+function displaced(style: CSSStyleDeclaration, m: DOMMatrix): boolean {
+  const [width, height] = laidOutSize(style);
+  const corners = [new DOMPoint(0, 0), new DOMPoint(width, 0), new DOMPoint(0, height), new DOMPoint(width, height)].map((p) => m.transformPoint(p));
+  const xs = corners.map((p) => p.x);
+  const ys = corners.map((p) => p.y);
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs) - width, Math.max(...ys) - height].some((v) => Math.abs(v) > NEAR);
+}
 
 /**
  * A picture's box and the space of what it holds: the box where it is laid out, at the size it is
@@ -196,7 +302,7 @@ export function frame(page: HTMLElement, slug: string, mode: string, scale: numb
     height: drawn.height / perLogical,
   });
   const children: FrameNode[] = [];
-  const at: Walk = { space, perCss: scale };
+  const at: Walk = { space, part: false, clips: [], over: false, perCss: scale };
   for (const child of page.children) walk(child, at, children);
   return {
     page: slug,

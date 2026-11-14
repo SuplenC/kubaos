@@ -32,7 +32,7 @@ export function tooltip(title: string, body: string, extra?: Element): HTMLEleme
   const card = document.createElement("span");
   card.className = "k-tooltip";
   card.append(popover(4, stack("s8", "start", words, ...(extra ? [extra] : []))));
-  return probe(card, { role: "component", name: "Tooltip", variant: "", fixed: { width: true, height: false } });
+  return probe(card, { role: "component", name: "Tooltip", variant: "", fixed: { width: true, height: false } }, { floats: true });
 }
 
 /**
@@ -46,7 +46,7 @@ export function keyTooltip(title: string, combination: string): HTMLElement {
   card.className = "k-tooltip";
   card.dataset.line = "";
   card.append(popover(4, row("s12", "centre", text(title, "body_strong"), caps)));
-  return probe(card, { role: "component", name: "Tooltip", variant: "key", fixed: { width: false, height: true } });
+  return probe(card, { role: "component", name: "Tooltip", variant: "key", fixed: { width: false, height: true } }, { floats: true });
 }
 
 /** Where a card floats from its control: above it, or below where there is no room above. */

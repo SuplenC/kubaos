@@ -21,9 +21,21 @@ export type Role =
 
 export const FIXED_HEIGHT: Fixed = { width: false, height: true };
 
-/** Marks `element` as `role`. */
-export function probe<E extends HTMLElement | SVGElement>(element: E, role: Role): E {
-  element.dataset.probe = JSON.stringify(role);
+/**
+ * What a probe declares of its box beyond its role, by name, for `site/frame.ts` and the check
+ * (`docs/DESIGN.md`, "What a mockup's frame says"). Each is a rule's exception for that box alone.
+ */
+export interface Declared {
+  /**
+   * It floats over the page when placed out of the flow: a bubble or a card anchored to a control
+   * but drawn in a layer of its own, held to its own boxes rather than its control's.
+   */
+  readonly floats?: true;
+}
+
+/** Marks `element` as `role`, with what it `declares`. */
+export function probe<E extends HTMLElement | SVGElement>(element: E, role: Role, declares: Declared = {}): E {
+  element.dataset.probe = JSON.stringify({ ...role, ...declares });
   return element;
 }
 

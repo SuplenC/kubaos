@@ -40,6 +40,7 @@ function probe(role: Record<string, unknown>): string {
 
 const BOX = probe({ role: "component", name: "Box", variant: "", fixed: { width: false, height: false } });
 const TEXT = probe({ role: "text" });
+const ROW = `${probe({ role: "layout", axis: "x", gap: 8, align: "start" })} data-layout`;
 
 /** Every node under `node` whose probe names it `name`, or whose role is `name`, depth first. */
 function all(node: Node, name: string): Node[] {
@@ -119,6 +120,111 @@ const CASES: Case[] = [
     check: (root) => {
       const moved = one(root, "Box");
       return moved.picture !== undefined ? "a moved box is marked as a picture" : boxIs(moved, 12, 4, 40, 40);
+    },
+  },
+  {
+    name: "a box at no opacity or hidden is left out, keeping its place in a layout as a plain box",
+    html: `<span ${ROW} style="display: flex; gap: 8px">
+      <span ${BOX} style="width: 40px; height: 40px; opacity: 0"></span>
+      <span ${TEXT} style="width: 40px; height: 20px; visibility: hidden">Gone</span>
+      <span ${BOX} style="width: 40px; height: 40px"></span>
+    </span>`,
+    check: (root) => {
+      const row = one(root, "layout");
+      const kinds = row.children.map((c) => `${c.role}${c.unseen ? `(${String(c.unseen)})` : ""}`).join(" ");
+      return kinds === "box(opacity) box(hidden) component" ? null : `the row holds ${kinds}`;
+    },
+  },
+  {
+    name: "a box scaled to nothing is left out, and one scaled to a little is still a picture",
+    html: `<span ${BOX} style="display: block; scale: 0; width: 40px; height: 40px"></span>
+    <span ${BOX} style="display: block; scale: 0.5; width: 40px; height: 40px"></span>`,
+    check: (root) => {
+      const boxes = all(root, "Box");
+      return boxes.length === 1 && boxes[0]!.picture === 0.5 ? null : `${boxes.length} boxes are reported`;
+    },
+  },
+  {
+    name: "content placed or moved wholly outside the box that cuts it off is left out",
+    html: `<div style="position: relative; overflow: hidden; width: 200px; height: 40px">
+      <span ${BOX} style="position: absolute; top: 60px; width: 40px; height: 40px"></span>
+      <span ${TEXT} style="display: block; translate: 0 -80px; width: 40px; height: 20px">Slid</span>
+    </div>`,
+    check: (root) => (root.children.length === 0 ? null : `${root.children.length} nodes are reported`),
+  },
+  {
+    name: "content a layout pushes wholly out of the box that cuts it off is still reported",
+    html: `<div style="overflow: hidden; width: 200px; height: 40px">
+      <span ${BOX} style="display: block; width: 40px; height: 60px"></span>
+      <span ${TEXT} style="display: block; width: 40px; height: 20px">Pushed</span>
+    </div>`,
+    check: (root) => (all(root, "text").length === 1 ? null : "the pushed text is left out"),
+  },
+  {
+    name: "content in a part shut to nothing is left out",
+    html: `<span ${BOX} style="display: block; overflow: hidden; width: 200px; height: 0">
+      <span ${TEXT} style="display: block; width: 40px; height: 20px">Shut</span>
+    </span>`,
+    check: (root) => (all(root, "text").length === 0 ? null : "the shut text is reported"),
+  },
+  {
+    name: "content in a box of the page shut to nothing is still reported",
+    html: `<div style="overflow: hidden; width: 200px; height: 0">
+      <span ${TEXT} style="display: block; width: 40px; height: 20px">Lost</span>
+    </div>`,
+    check: (root) => (all(root, "text").length === 1 ? null : "the hidden text is left out"),
+  },
+  {
+    name: "content scrolled out of view is still reported",
+    html: `<div style="overflow-y: auto; width: 200px; height: 40px">
+      <span ${BOX} style="display: block; width: 40px; height: 60px"></span>
+      <span ${TEXT} style="display: block; position: relative; top: 10px; width: 40px; height: 20px">Below</span>
+    </div>`,
+    check: (root) => (all(root, "text").length === 1 ? null : "the scrolled text is left out"),
+  },
+  {
+    name: "a box placed outside a cut whose box it is placed in is outside the cut is still reported",
+    html: `<div style="position: relative">
+      <div style="overflow: hidden; width: 200px; height: 40px">
+        <span ${BOX} style="position: absolute; top: 60px; width: 40px; height: 40px"></span>
+      </div>
+    </div>`,
+    check: (root) => (all(root, "Box").length === 1 ? null : "the escaping box is left out"),
+  },
+  {
+    name: "a box out of the flow is marked over, through a wrapper that says nothing",
+    html: `<span ${ROW} style="display: flex; position: relative; gap: 8px">
+      <span style="position: absolute; inset: 0"><span ${BOX} style="display: block; height: 40px"></span></span>
+      <span ${TEXT} style="position: absolute; left: 0">Over</span>
+      <span ${BOX} style="width: 40px; height: 40px"></span>
+    </span>`,
+    check: (root) => {
+      const marks = one(root, "layout").children.map((c) => (c.over === true ? "over" : "flow")).join(" ");
+      return marks === "over over flow" ? null : `the row's children are ${marks}`;
+    },
+  },
+  {
+    name: "a probe that floats floats only when placed out of the flow",
+    html: `<span style="position: relative; display: block; width: 40px; height: 40px">
+      <span ${probe({ role: "component", name: "Hint", variant: "", fixed: { width: false, height: true }, floats: true })} style="position: absolute; top: 48px; width: 60px; height: 24px"></span>
+    </span>
+    <span ${probe({ role: "component", name: "Hint", variant: "", fixed: { width: false, height: true }, floats: true })} style="display: block; width: 60px; height: 24px"></span>`,
+    check: (root) => {
+      const said = all(root, "Hint").map((hint) => String(hint.floats === true)).join(" ");
+      return said === "true false" ? null : `the hints float: ${said}`;
+    },
+  },
+  {
+    name: "a box the site lets scroll sideways is a scroll across when its content runs past it",
+    html: `<div style="overflow-x: auto; width: 200px">
+      <span ${BOX} style="display: block; width: 400px; height: 40px"></span>
+    </div>
+    <div style="overflow-x: auto; width: 200px">
+      <span ${BOX} style="display: block; width: 100px; height: 40px"></span>
+    </div>`,
+    check: (root) => {
+      const scrolls = all(root, "scroll");
+      return scrolls.length === 1 && scrolls[0]!.across === true ? null : `${scrolls.length} scrolls across`;
     },
   },
 ];

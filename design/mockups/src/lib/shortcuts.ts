@@ -47,5 +47,5 @@ export function shortcuts(groups: readonly ShortcutGroup[]): HTMLElement {
   const body = made.firstElementChild as HTMLElement;
   body.classList.add("k-shortcut-groups");
   for (const group of body.children) group.classList.add("k-shortcut-group");
-  return probe(made, { role: "component", name: "Shortcuts", variant: "", fixed: { width: true, height: false } });
+  return probe(made, { role: "component", name: "Shortcuts", variant: "", fixed: { width: true, height: false } }, { floats: true });
 }

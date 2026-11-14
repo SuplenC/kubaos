@@ -67,7 +67,7 @@ export function hint(words: string, options: HintOptions = {}): HTMLElement {
   if (options.held !== undefined && options.held !== "centred") bubble.dataset.held = options.held;
   if (options.side === "above") bubble.dataset.side = "above";
   bubble.append(text(words, "label", "surface"));
-  return probe(bubble, { role: "component", name: "Hint", variant: "", fixed: { width: false, height: true } });
+  return probe(bubble, { role: "component", name: "Hint", variant: "", fixed: { width: false, height: true } }, { floats: true });
 }
 
 /**

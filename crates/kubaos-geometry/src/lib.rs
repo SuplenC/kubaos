@@ -87,10 +87,24 @@ pub struct Marks {
     /// A picture of UI: the box and everything in it drawn scaled by this ratio, as a gallery's
     /// small copy of a screen or windows stepped back behind a lock. Its boxes are reported at the
     /// size they are laid out at, from its own top left on a whole device pixel, and its texts and
-    /// icons are held to the boxes from it inward: the room it is drawn in holds the picture, not
-    /// its layout.
+    /// icons are held to the boxes from it inward: the room it is drawn in holds the picture,
+    /// not its layout.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub picture: Option<f32>,
+    /// Placed over its parent, out of its flow (CSS `position: absolute`): not one of its layout's
+    /// children, so the layout's gaps and lines leave it out.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub over: bool,
+    /// A layer of its own over the page, anchored to a control but not inside it: a hint's bubble,
+    /// a tooltip, an open list. Its texts and icons are held to the boxes from it inward, not to
+    /// its control's.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub floats: bool,
+    /// On a scroll: its content scrolls sideways as well as down, so content past its left or
+    /// right is scrolled out of view, not clipped: a screen wider than the page, in a pane the site
+    /// lets scroll.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub across: bool,
 }
 
 /// What a box is, as much as the toolkit knows.
