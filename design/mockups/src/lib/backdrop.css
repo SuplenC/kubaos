@@ -7,6 +7,20 @@
   initial-value: 0;
 }
 
+/* How far the picture has come toward you: 0 at 1:1, 1 grown to `scale.push`. */
+@property --backdrop-push {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How dark the picture has gone: 0 as it is, 1 all `surface_container_lowest`. */
+@property --backdrop-dark {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 .k-backdrop {
   position: relative;
   display: block;
@@ -30,6 +44,16 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  scale: calc(1 + (var(--scale-push) - 1) * var(--backdrop-push));
+  transform-origin: 50% 100%;
+}
+
+.k-backdrop-dark {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: var(--color-surface_container_lowest);
+  opacity: var(--backdrop-dark);
 }
 
 .k-backdrop-scrim {
@@ -70,8 +94,9 @@
   display: none;
 }
 
-/* The words of a thing in the middle are centred under one another; a dialog keeps its own. */
-.k-backdrop-thing > :not(.k-dialog) .k-text[data-wrapped] {
+/* The words of a thing in the middle are centred under one another; a dialog and a glass panel
+   keep their own. */
+.k-backdrop-thing > :not(.k-dialog, .k-glass-panel) .k-text[data-wrapped] {
   text-align: center;
 }
 

@@ -7,6 +7,10 @@
 // the words keep 4.5:1 over any picture and the picture shows round them; behind a dialog or a
 // panel, `scrim` at `opacity.scrim` over all of it.
 //
+// The picture can come toward you, growing to `scale.push` round the middle of its bottom edge
+// (`--backdrop-push`), and it can go dark toward `surface_container_lowest` (`--backdrop-dark`):
+// Kōbō's room lighting up as it opens and as the install runs.
+//
 // It arrives over `scene` on `emphasized_decel`, the picture and the scrim fading in and the thing
 // fading in as it rises `space.s24` into place, and lifts over `scene` on `emphasized_accel`, the
 // whole of it fading off what is under it while the thing rises `space.s24` on. With reduce motion
@@ -29,6 +33,10 @@ export interface BackdropOptions {
   readonly content: HTMLElement;
   /** What it lies over and lifts off: the desktop. */
   readonly under?: HTMLElement;
+  /** How far the picture has come toward you, 0 at 1:1 and 1 at `scale.push`. */
+  readonly push?: number;
+  /** How dark the picture has gone, 0 as it is and 1 `surface_container_lowest`. */
+  readonly dark?: number;
 }
 
 export function backdrop(options: BackdropOptions): HTMLElement {
@@ -38,6 +46,8 @@ export function backdrop(options: BackdropOptions): HTMLElement {
   element.dataset.whole = "";
   element.style.setProperty("--backdrop-width", options.width);
   element.style.setProperty("--backdrop-height", options.height);
+  if (options.push !== undefined) element.style.setProperty("--backdrop-push", String(options.push));
+  if (options.dark !== undefined) element.style.setProperty("--backdrop-dark", String(options.dark));
   const layers = document.createElement("span");
   layers.className = "k-backdrop-layers";
   if (options.picture) {
@@ -45,7 +55,9 @@ export function backdrop(options: BackdropOptions): HTMLElement {
     picture.className = "k-backdrop-picture";
     picture.src = options.picture;
     picture.alt = "";
-    layers.append(picture);
+    const dark = document.createElement("span");
+    dark.className = "k-backdrop-dark";
+    layers.append(picture, dark);
   }
   const scrim = document.createElement("span");
   scrim.className = "k-backdrop-scrim";
@@ -83,13 +95,28 @@ export function backdrop(options: BackdropOptions): HTMLElement {
   return probe(element, { role: "component", name: "Backdrop", variant: options.scrim, fixed: { width: false, height: false, holds: true } });
 }
 
-/** The length token `name` in the CSS pixels `element` is laid out in. */
+/** Each backdrop's lengths measured so far, at the scale they were measured at. */
+const measured = new WeakMap<HTMLElement, { readonly scale: string; readonly lengths: Map<string, number> }>();
+
+/**
+ * The length token `name` in the CSS pixels `element` is laid out in. Measuring adds a box and
+ * lays it out, so each length is measured once a backdrop and scale: placing runs on every resize.
+ */
 function lengthIn(element: HTMLElement, name: string): number {
+  const scale = getComputedStyle(element).getPropertyValue("--px");
+  let known = measured.get(element);
+  if (known?.scale !== scale) {
+    known = { scale, lengths: new Map() };
+    measured.set(element, known);
+  }
+  const had = known.lengths.get(name);
+  if (had !== undefined) return had;
   const meter = document.createElement("span");
   meter.style.cssText = `position:absolute;visibility:hidden;width:var(--${name})`;
   element.append(meter);
   const width = meter.offsetWidth;
   meter.remove();
+  known.lengths.set(name, width);
   return width;
 }
 
