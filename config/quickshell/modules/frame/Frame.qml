@@ -354,7 +354,8 @@ Scope {
     component PanelPath: ShapePath {
         required property K.Sheet drawer
 
-        fillColor: K.Tokens.color.surface
+        // At the sheet's fade: with reduce motion a sheet fades in and out, surface and all.
+        fillColor: K.Look.alpha(K.Tokens.color.surface, drawer.fade)
         // design-allow(size): -1 is ShapePath's "no stroke", not a width.
         strokeWidth: -1
 

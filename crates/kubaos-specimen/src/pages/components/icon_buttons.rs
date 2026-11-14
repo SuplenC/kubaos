@@ -14,6 +14,7 @@ use kubaos_ui::component::button::ButtonSize;
 use kubaos_ui::component::button::Kind;
 use kubaos_ui::component::button::Preview;
 use kubaos_ui::component::button::icon_button;
+use kubaos_ui::component::hint::hint_at_start;
 use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
@@ -30,7 +31,7 @@ use crate::specimen::Message;
 pub const SECTION: Section = Section {
     title: "Icon buttons",
     lede: Some(
-        "Circles as tall as the label buttons of each size. The label is required: it shows in a hint on hover and while focused.",
+        "Circles as tall as the label buttons of each size. The label is required: it shows in a hint on hover and while focused. A hint is centred under its control, or held to the start of one that starts something wider.",
     ),
     view,
 };
@@ -82,5 +83,17 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
                 .push(rows),
         );
     }
-    sizes.into()
+    // A row's name, its hint held to where the name starts.
+    sizes
+        .push(
+            stack(look, Space::S12)
+                .push(text("Held to its start", Type::Subheading, c.on_surface))
+                .push(hint_at_start(
+                    look,
+                    text("Glasses of water", Type::BodyStrong, c.on_surface),
+                    "Double-click to rename",
+                    true,
+                )),
+        )
+        .into()
 }

@@ -3,7 +3,8 @@ import KubaOS.Components as K
 
 // A control's name in a small bubble under it, while the pointer is over it or the keyboard is on
 // it: `kubaos-ui`'s `hint::hint`. The inverse colours, `label` type, 8 by 4 inside, the small
-// radius, centred under the control 8 below it, on whole device pixels.
+// radius, 8 below the control on whole device pixels: centred under it, or held to its start for a
+// control that starts something wider than itself (a row's name), as `hint::hint_at_start`.
 //
 // The bubble floats over the whole window, as iced's overlay does: it is drawn on the window's
 // own content item, so neither a clipping panel nor what is laid out after the control covers it.
@@ -15,6 +16,9 @@ Item {
 
     property string text
     property bool shown: false
+    // Where the bubble sits across its control: "centre", or "start", its left edge on the
+    // control's.
+    property string held: "centre"
     // Whether the control shows whole where it is: one scrolled out of its view, even part way,
     // shows no bubble, which would float over whatever is there instead. Read as it is placed.
     property bool inView: true
@@ -35,9 +39,9 @@ Item {
         const at = root.mapToItem(root.host, 0, 0);
         floating.x = K.Look.snap(at.x, root.dpr);
         floating.y = K.Look.snap(at.y, root.dpr);
-        // Centred under the control, but held inside the window, so a control at a screen's edge
-        // keeps its bubble whole.
-        const left = floating.x + bubble.centred;
+        // Centred under the control or at its start, but held inside the window, so a control at
+        // a screen's edge keeps its bubble whole.
+        const left = floating.x + bubble.across;
         const inside = Math.max(0, Math.min(left, root.host.width - bubble.width));
         floating.shift = K.Look.snap(inside - left, root.dpr);
     }
@@ -74,9 +78,9 @@ Item {
         Rectangle {
             id: bubble
 
-            readonly property real centred: K.Look.snap((floating.width - width) / 2, root.dpr)
+            readonly property real across: root.held === "start" ? 0 : K.Look.snap((floating.width - width) / 2, root.dpr)
 
-            x: bubble.centred + floating.shift
+            x: bubble.across + floating.shift
             y: floating.height + Tokens.space.s8
             width: K.Look.snapUp(label.implicitWidth + Tokens.space.s8 * 2, root.dpr)
             height: K.Look.snapUp(label.implicitHeight + Tokens.space.s4 * 2, root.dpr)
