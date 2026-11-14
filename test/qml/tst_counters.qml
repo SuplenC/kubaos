@@ -24,7 +24,7 @@ TestCase {
 
     readonly property var formats: ({
             date: "ddd d MMM",
-            time: "HH:mm",
+            time: "H:mm",
             week: "d MMM",
             month: "MMMM yyyy"
         })
@@ -161,10 +161,10 @@ TestCase {
         compare(today.what, "+1");
         compare(today.value, 3);
         compare(today.sign, "");
-        compare(earlier.title, `${Qt.formatDate(new Date(2026, 9, 26), "ddd d MMM")} · 09:05`);
+        compare(earlier.title, "Mon 26 Oct · 9:05");
     }
 
-    function test_a_group_reads_its_span_its_changes_and_what_they_added() {
+    function test_a_group_reads_its_span_its_changes_and_what_they_added_never_below_zero() {
         const day = Logic.historyLine({
             at: seconds(new Date(2026, 9, 27)),
             value: 3,
@@ -189,7 +189,7 @@ TestCase {
         compare(day.sign + day.value, "+4");
         compare(week.title, `Week of ${Qt.formatDate(new Date(2026, 9, 26), "d MMM")}`);
         compare(week.what, "1 change");
-        compare(week.sign + week.value, "−2");
+        compare(week.sign + week.value, "+0");
         compare(month.title, Qt.formatDate(new Date(2026, 9, 1), "MMMM yyyy"));
     }
 
