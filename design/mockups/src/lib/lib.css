@@ -310,6 +310,12 @@
   transition: none;
 }
 
+/* A bubble made under the pointer starts hidden, so it fades in as one made before would. */
+.k-hinted > .k-hint[data-arriving] {
+  opacity: 0;
+  transition: none;
+}
+
 /* A sample's room for its control's hint, which floats and takes none of its own: below the
    control, and as wide as the bubble where it is wider, the control in the middle on a whole
    device pixel. */

@@ -27,10 +27,13 @@
   overflow: clip;
 }
 
+/* Tabular whatever its style, as its slot is: a narrow figure (a 1) sits in a figure's room, never
+   leaving a hole before what follows the number, a percent sign or a unit. */
 .k-roll-figure {
   position: absolute;
   top: 0;
   left: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Going up, the old figure leaves upward and the new one comes in from below; down, the reverse. */

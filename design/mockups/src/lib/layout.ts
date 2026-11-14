@@ -204,11 +204,20 @@ export function containerPadding(width: number): string {
 
 /** `box` padded at its sides by the container's step for its own width, kept as it resizes. */
 function padByWidth(box: HTMLElement): void {
-  const pad = () => {
-    const space = containerPadding(box.clientWidth / scaleIn(box));
+  let shown = containerSteps()[0]!.space;
+  let scale: { readonly at: number; readonly is: number } | null = null;
+  // The observer hands over the box's width it has already laid out, and the scale is read once
+  // for each the page is drawn at, so a page shown again reads nothing back; the padding changes
+  // only when its step does.
+  const pad = (entries: ResizeObserverEntry[]) => {
+    const width = entries.at(-1)?.borderBoxSize[0]?.inlineSize ?? box.clientWidth;
+    if (scale?.at !== settings().scale) scale = { at: settings().scale, is: scaleIn(box) };
+    const space = containerPadding(width / scale.is);
+    if (space === shown) return;
+    shown = space;
     box.style.setProperty("--padding", `var(--space-${space})`);
   };
-  box.style.setProperty("--padding", `var(--space-${containerSteps()[0]!.space})`);
+  box.style.setProperty("--padding", `var(--space-${shown})`);
   new ResizeObserver(pad).observe(box);
 }
 

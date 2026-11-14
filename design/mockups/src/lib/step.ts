@@ -151,15 +151,45 @@ export function step(options: StepOptions): HTMLElement {
   element.append(line);
   if (end && !options.mark) chipGivesWay(element, line, end as HTMLElement, options.title);
   if (options.pressable) {
-    element.classList.add("k-control");
-    element.dataset.hot = "";
-    element.setAttribute("role", "button");
-    element.tabIndex = 0;
+    pressable(element, true);
     pin(element, options.pinned);
-    const ring = focusRing(element, "row", "accent", false);
-    ring.dataset.pressable = "";
-    if (options.box === "rail") ring.style.setProperty("--corner", "var(--step-corner)");
   }
   const named = variant(state.is, options.icon ? "icon" : "", options.mark ? "mark" : "", options.failed ? "failed" : "", options.running ? "running" : "");
   return probe(element, { role: "component", name: "Step", variant: named, fixed: { width: false, height: false } });
+}
+
+/**
+ * Moves a rail step drawn by `step` to `state`, in place: its look follows from its attributes and
+ * its mark, so a rail changing page changes no more than that. Whether it takes a press, and a
+ * failed symbol, are drawn by `step`.
+ */
+export function setStepState(element: HTMLElement, state: StepState, running: boolean): void {
+  if (element.dataset.state === state.is && element.hasAttribute("data-running") === running) return;
+  element.dataset.state = state.is;
+  element.toggleAttribute("data-selected", state.is === "current");
+  element.toggleAttribute("data-running", running);
+  element.firstElementChild?.lastElementChild?.replaceWith(stateMark(state));
+  const probed = element.dataset.probe ? (JSON.parse(element.dataset.probe) as { variant?: string }) : null;
+  if (probed?.variant !== undefined) {
+    const words = probed.variant.split(" ").filter((word) => !["todo", "done", "current", "action", "running"].includes(word));
+    probed.variant = variant(state.is, ...words, running ? "running" : "");
+    element.dataset.probe = JSON.stringify(probed);
+  }
+}
+
+/**
+ * Makes a step take a press, or stop taking one, in place: a control in the state model with its
+ * focus ring (made the first time, kept after), or a plain row the keyboard passes by.
+ */
+export function pressable(element: HTMLElement, takes: boolean): void {
+  element.classList.toggle("k-control", takes);
+  element.toggleAttribute("data-hot", takes);
+  if (takes) element.setAttribute("role", "button");
+  else element.removeAttribute("role");
+  element.tabIndex = takes ? 0 : -1;
+  if (takes && !element.querySelector(":scope > .k-ring")) {
+    const ring = focusRing(element, "row", "accent", false);
+    ring.dataset.pressable = "";
+    if (element.dataset.box === "rail") ring.style.setProperty("--corner", "var(--step-corner)");
+  }
 }

@@ -10,7 +10,7 @@
 
 import "./rolling-number.css";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
-import { advance, centreFor, text, type TypeStyle } from "./text.ts";
+import { centreFor, tabularFigure, text, type TypeStyle } from "./text.ts";
 import { raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
 
@@ -71,7 +71,7 @@ export function rollingNumber(options: RollingOptions): Rolling {
   element.className = "k-rolling";
   element.setAttribute("role", "status");
   element.style.setProperty("--slots", String(options.widest.length));
-  element.style.setProperty("--figure", String(advance(style, "0")));
+  element.style.setProperty("--figure", String(tabularFigure(style)));
   element.style.setProperty("--t-line", `var(--type-${style}-line)`);
   let value = options.value;
   let shown = COUNT.format(value);

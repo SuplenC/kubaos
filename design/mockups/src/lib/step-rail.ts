@@ -20,7 +20,7 @@ import { keyHints, type KeyHint } from "./keycap.ts";
 import { fill, filling, fillingHeight, gap, inset, page, row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { scroll } from "./scroll.ts";
-import { step, type StepOptions, type StepState } from "./step.ts";
+import { pressable, setStepState, step, type StepOptions, type StepState } from "./step.ts";
 import { text, wrapped } from "./text.ts";
 import { cubic, length, raw } from "./tokens.ts";
 import { palette } from "../site/recolour.ts";
@@ -147,40 +147,57 @@ export function battery(percent: number, charging = false): HTMLElement {
 }
 
 /** The rail: the brand, `space.s20`, the steps on their wire, then the hints and the foot at its bottom. */
-function rail(options: StepRailOptions, current: number, reached: number, go: (to: number) => void): HTMLElement {
-  const first = backTo(options.pages, current, options.locked ?? false);
-  const steps = options.pages.map((each, index) => {
-    const pressable = index !== current && index >= first && index <= reached;
-    const element = step({
-      ...each.step,
-      state: stateOf(index, current),
-      ...(index === current && options.failed ? { failed: true } : {}),
-      ...(index === current && options.locked ? { running: true } : {}),
-      box: "rail",
-      mark: true,
-      pressable,
+/** The rail, drawn once and moved to each page in place. */
+interface Rail {
+  readonly element: HTMLElement;
+  /** Moves it to `current`, with every page up to `reached` reached. */
+  set(current: number, reached: number): void;
+}
+
+function rail(options: StepRailOptions, current: number, reached: number, go: (to: number) => void): Rail {
+  /** What step `index` shows with the rail on `at`. */
+  const look = (index: number, at: number, upTo: number) => {
+    const first = backTo(options.pages, at, options.locked ?? false);
+    return {
+      state: stateOf(index, at),
+      pressable: index !== at && index >= first && index <= upTo,
+      failed: index === at && (options.failed ?? false),
+      running: index === at && (options.locked ?? false),
+    };
+  };
+  const make = (index: number, shown: ReturnType<typeof look>) => {
+    const each = options.pages[index]!;
+    const element = step({ ...each.step, state: shown.state, ...(shown.failed ? { failed: true } : {}), ...(shown.running ? { running: true } : {}), box: "rail", mark: true, pressable: shown.pressable });
+    // Wired once: whether it takes a press is read as it is pressed, so the rail can change it.
+    element.addEventListener("click", () => {
+      if (element.dataset.pressable === "true") go(index);
     });
-    if (pressable) {
-      element.addEventListener("click", () => go(index));
-      // Enter stays the page's `Filled` action wherever the keyboard is: Space presses a step.
-      element.addEventListener("keydown", (event) => {
-        if (event.key === " " && !event.repeat) {
-          event.preventDefault();
-          go(index);
-        }
-      });
-    }
+    // Enter stays the page's `Filled` action wherever the keyboard is: Space presses a step.
+    element.addEventListener("keydown", (event) => {
+      if (event.key === " " && !event.repeat && element.dataset.pressable === "true") {
+        event.preventDefault();
+        go(index);
+      }
+    });
+    element.dataset.pressable = String(shown.pressable);
+    element.dataset.failed = String(shown.failed);
     return element;
-  });
-  arrows(steps);
+  };
+  const steps = options.pages.map((_, index) => make(index, look(index, current, reached)));
   const column = stack(0, "start", ...steps, wire(steps.length, current));
   column.classList.add("k-rail-steps");
+  arrows(column);
   // Cut at its own box: the brand's `space.s20` and the hints' `space.s16` stay clear of the steps
   // scrolling between them.
   const { box: scroller } = scroll(column, { height: "100%", above: 0, below: 0, noGutter: true });
-  const parts: Element[] = [inset(options.brand, 0, "s12"), gap("s20"), fillingHeight(scroller)];
-  const hints = options.hints(current);
-  if (hints.length > 0) parts.push(gap("s16"), inset(hintColumn(hints), 0, "s12"));
+  const hintsRoom = document.createElement("span");
+  hintsRoom.className = "k-rail-hints";
+  const drawHints = (at: number) => {
+    const hints = options.hints(at);
+    hintsRoom.replaceChildren(...(hints.length > 0 ? [gap("s16"), inset(hintColumn(hints), 0, "s12")] : []));
+  };
+  drawHints(current);
+  const parts: Element[] = [inset(options.brand, 0, "s12"), gap("s20"), fillingHeight(scroller), hintsRoom];
   if (options.foot) {
     const foot: Element[] = [];
     if (options.foot.power) {
@@ -195,7 +212,32 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
   const box = document.createElement("span");
   box.className = "k-rail";
   box.append(fillingHeight(stack(0, "start", ...parts)));
-  return probe(box, { role: "component", name: "StepRail", variant: options.host, fixed: { width: true, height: false } });
+  probe(box, { role: "component", name: "StepRail", variant: options.host, fixed: { width: true, height: false } });
+  let hintsAt = current;
+  return {
+    element: box,
+    set(at, upTo) {
+      steps.forEach((element, index) => {
+        const shown = look(index, at, upTo);
+        // A failed symbol is drawn whole; every other change, taking a press included, is in place.
+        if (element.dataset.failed !== String(shown.failed)) {
+          const fresh = make(index, shown);
+          element.replaceWith(fresh);
+          steps[index] = fresh;
+          return;
+        }
+        setStepState(element, shown.state, shown.running);
+        if (element.dataset.pressable !== String(shown.pressable)) {
+          pressable(element, shown.pressable);
+          element.dataset.pressable = String(shown.pressable);
+        }
+      });
+      column.querySelector<HTMLElement>(".k-rail-wire-lit")?.style.setProperty("--wire-lit", String(at));
+      // Two pages taking the same keys keep the hints they share as they are.
+      if (JSON.stringify(options.hints(at)) !== JSON.stringify(options.hints(hintsAt))) drawHints(at);
+      hintsAt = at;
+    },
+  };
 }
 
 /**
@@ -255,17 +297,16 @@ function travel(steps: HTMLElement, from: number, to: number, failed: boolean): 
   });
 }
 
-/** ↑ and ↓ (k and j) move the keyboard between the steps that take a press. */
-function arrows(steps: readonly HTMLElement[]): void {
-  const pressable = steps.filter((each) => each.tabIndex === 0);
-  pressable.forEach((each, index) => {
-    each.addEventListener("keydown", (event) => {
-      const by = event.key === "ArrowDown" || event.key === "j" ? 1 : event.key === "ArrowUp" || event.key === "k" ? -1 : 0;
-      const next = pressable[index + by];
-      if (by === 0 || !next) return;
-      event.preventDefault();
-      next.focus({ preventScroll: true });
-    });
+/** ↑ and ↓ (k and j) move the keyboard between the steps that take a press, as they stand now. */
+function arrows(column: HTMLElement): void {
+  column.addEventListener("keydown", (event) => {
+    const by = event.key === "ArrowDown" || event.key === "j" ? 1 : event.key === "ArrowUp" || event.key === "k" ? -1 : 0;
+    if (by === 0) return;
+    const pressable = [...column.querySelectorAll<HTMLElement>(":scope > .k-step")].filter((each) => each.tabIndex === 0);
+    const next = pressable[pressable.indexOf(event.target as HTMLElement) + by];
+    if (!next) return;
+    event.preventDefault();
+    next.focus({ preventScroll: true });
   });
 }
 
@@ -418,10 +459,8 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
     side.append(made.room);
     return made;
   };
-  // The rail as it stands on each page a done step goes back to, drawn ahead with the page; any
-  // drawn for a rail that has since changed is dropped as the rail is drawn again.
-  const rails = new Map<number, HTMLElement>();
-  const railOf = (index: number): HTMLElement => rails.get(index) ?? rail(options, index, Math.max(reached, index), go);
+  // The rail is drawn once; each page change moves its steps in place.
+  let theRail: Rail | null = null;
   const showOnly = (index: number) => {
     for (const [at, made] of rooms) {
       const hidden = at !== index;
@@ -438,8 +477,10 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
     const scrolled = box.querySelector(".k-rail .k-scroll-view")?.scrollTop ?? 0;
     // Drawing the rail again replaces what has the keyboard, which would drop it out of the template.
     const keyboardIn = box.contains(document.activeElement);
-    box.replaceChildren(railOf(current), side);
-    rails.clear();
+    if (!theRail) {
+      theRail = rail(options, current, reached, go);
+      box.replaceChildren(theRail.element, side);
+    } else theRail.set(current, reached);
     const steps = box.querySelector<HTMLElement>(".k-rail-steps");
     // Kept in view once the frame lays it out, not read back inside the press that drew it.
     if (steps) requestAnimationFrame(() => keepInView(steps, current, scrolled));
@@ -452,15 +493,15 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
     // The template holds the keys on a page with nothing to do yet: Enter and Esc still work. The
     // keyboard moves with the next frame, which lays the page out anyway, not inside the press.
     if (keyboardIn) {
-      box.focus({ preventScroll: true });
+      // The rail is moved in place, so what had the keyboard still has it this frame.
       requestAnimationFrame(() => {
-        if (box.contains(document.activeElement) && document.activeElement === box) (made.first ?? box).focus({ preventScroll: true });
+        if (box.contains(document.activeElement) || document.activeElement === document.body) (made.first ?? box).focus({ preventScroll: true });
       });
     }
     ahead();
   };
 
-  /** Draws, one an idle moment, the pages a press most likely goes back to, and their rails. */
+  /** Draws, one an idle moment, the pages a press most likely goes back to. */
   const ahead = () => {
     const first = backTo(options.pages, current, options.locked ?? false);
     // The two a press most often takes: the page before (Back, Esc) and the first done step.
@@ -472,7 +513,6 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
         roomOf(index);
         showOnly(current);
       }
-      if (!rails.has(index)) rails.set(index, rail(options, index, reached, go));
       requestIdleCallback(one);
     };
     requestIdleCallback(one);

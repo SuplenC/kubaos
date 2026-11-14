@@ -362,9 +362,11 @@ function keys(hints: readonly KeyHint[]): HTMLElement {
 }
 
 /**
- * The 完了 hanko stands on the mark's baseline: its foot on the foot of the mark's lowest stroke,
- * as a seal is pressed beside a signature. Where that foot is, in the mark's box, is the drawing's
- * own (its strokes and their width), which only the drawing knows, so it is read from it.
+ * The 完了 hanko stands on the mark's optical baseline, as a seal is pressed beside a signature. The
+ * lowest stroke ends in a round cap, which overshoots the baseline as a round letter does, so the
+ * baseline is the stroke's end plus half its cap's radius (a quarter of the tube's width), not the
+ * cap's lowest pixel. Where that is in the mark's box is the drawing's own (its strokes and their
+ * width), which only the drawing knows, so it is read from it, and holds at every scale.
  */
 function sealed(row: HTMLElement, drawn: SVGSVGElement): void {
   const place = () => {
@@ -372,10 +374,10 @@ function sealed(row: HTMLElement, drawn: SVGSVGElement): void {
     const view = drawn.viewBox.baseVal;
     if (!tubes || !view || view.height === 0 || drawn.clientHeight === 0) return;
     const ink = tubes.getBBox();
-    const half = Number.parseFloat(tubes.querySelector("path")?.getAttribute("stroke-width") ?? "0") / 2;
+    const overshoot = Number.parseFloat(tubes.querySelector("path")?.getAttribute("stroke-width") ?? "0") / 4;
     const frame = drawn.querySelector("g[transform]")?.getAttribute("transform")?.match(/translate\(([\d.]+) ([\d.]+)\)/);
     const shift = frame ? Number.parseFloat(frame[2]!) : 0;
-    const foot = ((shift + ink.y + ink.height + half) / view.height) * drawn.clientHeight;
+    const foot = ((shift + ink.y + ink.height + overshoot) / view.height) * drawn.clientHeight;
     row.style.setProperty("--kobo-ink-foot", `${foot}px`);
   };
   new ResizeObserver(place).observe(drawn);
@@ -591,9 +593,14 @@ export function room(options: RoomOptions): HTMLElement {
   // Kōbō runs on the live ISO, which is always dark.
   element.dataset.mode = "dark";
   paint(element, palette(settings().theme, "dark"));
-  new ResizeObserver(() => {
-    const wide = element.clientWidth >= 2 * length("size-column") * (Number.parseFloat(getComputedStyle(element).getPropertyValue("--scale")) || settings().scale);
-    element.style.setProperty("--kobo-margin", wide ? "var(--space-s32)" : "var(--space-s16)");
+  // The width the observer hands over, at the scale read once a scale: a room shown again reads
+  // nothing back, and the margin changes only when its step does.
+  let scaled: { readonly at: number; readonly is: number } | null = null;
+  new ResizeObserver((entries) => {
+    const width = entries.at(-1)?.borderBoxSize[0]?.inlineSize ?? element.clientWidth;
+    if (scaled?.at !== settings().scale) scaled = { at: settings().scale, is: Number.parseFloat(getComputedStyle(element).getPropertyValue("--scale")) || settings().scale };
+    const margin = width >= 2 * length("size-column") * scaled.is ? "var(--space-s32)" : "var(--space-s16)";
+    if (element.style.getPropertyValue("--kobo-margin") !== margin) element.style.setProperty("--kobo-margin", margin);
   }).observe(element);
 
   let where: At = options.at;
