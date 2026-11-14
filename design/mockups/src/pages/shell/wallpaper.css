@@ -530,6 +530,25 @@
   bottom: var(--space-s24);
 }
 
+/* On the full screen the button would lie on the picture, so it goes, and comes back on the wall,
+   as the bar's full-screen parts change: its symbol fades over their time and curve. The button
+   itself is hidden at once, out of reach of Tab and the pointer, and its symbol stays visible
+   through it only to fade; the button's own transitions are left alone. `?` still opens the
+   shortcuts, which are the anchor's and so stay shown. */
+.gl-screen[data-full] .gl-info > .k-button {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.gl-info > .k-button > .k-icon-slot {
+  visibility: visible;
+  transition: opacity var(--step-time, 0ms) var(--step-curve, var(--easing-emphasized_decel));
+}
+
+.gl-screen[data-full] .gl-info > .k-button > .k-icon-slot {
+  opacity: 0;
+}
+
 /* A control's name and key, floating `space.s8` over it while the pointer or the keyboard is on it. */
 .gl-tip {
   position: absolute;

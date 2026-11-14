@@ -770,7 +770,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
   /** The bar lifted over the password's sheet, up on an awake lock on the full screen. */
   const liftBar = () => bar.toggleAttribute("data-lifted", S.full && S.view === "lock" && S.awake);
 
-  /** The bar's full-screen look, at once or over the picture's step (`time`). */
+  /** The bar's full-screen look, the shortcuts' button gone, at once or over the picture's step (`time`). */
   const barFull = (full: boolean, time = 0) => {
     screen.style.setProperty("--step-time", `${time}ms`);
     screen.style.setProperty("--step-curve", curveOf(reducedFor(screen) ? "standard" : "emphasized_decel"));
@@ -865,7 +865,8 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     // to ease from and would jump to the full screen's widths at once.
     liftBar();
     const time = full ? ms("slow") : ms("long");
-    // The bar changes with the picture's step, over its time and curve; with reduce motion a short fade.
+    // The bar and the shortcuts' button change with the picture's step, over its time and curve;
+    // with reduce motion a short fade.
     barFull(full, reducedFor(screen) ? ms("short") : time);
     await stepTo(full ? 1 : 0, time);
     S.busy = false;
