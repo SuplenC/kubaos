@@ -2088,7 +2088,11 @@
 }
 
 /* A colour picker's choice (`lib/colour-picker.ts`): Auto and the swatches in a row, one stop for
-   Tab. */
+   Tab. The picked swatch's ring and its gap reach past the swatch; the row's ends pad by that reach
+   on top of `space.s4`, so a ring at either end clears the focus tube by `space.s4`, as it clears
+   the swatch beside it. `--k-colour-surface` is the surface it sits on, which the gap round the
+   ring is painted in: `surface_container_high`, the well a setting with sub-settings sits in,
+   unless the surface round it says otherwise. */
 .k-colour {
   position: relative;
   display: flex;
@@ -2096,7 +2100,7 @@
   align-items: center;
   gap: var(--space-s8);
   justify-self: start;
-  padding: var(--space-s4);
+  padding: var(--space-s4) calc(var(--space-s4) + 2 * var(--stroke-thin));
   border-radius: var(--radius-full);
   outline: none;
 }
@@ -2115,27 +2119,44 @@
 }
 
 /* A swatch: `size.chip` round. The ring of the one picked is cut from what it sits on by a gap of
-   `surface_container_high`, the well a setting with sub-settings sits in. */
+   the picker's surface. It lights and presses as a pressable Neutral chip does: the accent's tube
+   inside its edge, running to the core pressed, and by day pressed the accent as a faint tint over
+   it (`--tint`). */
 .k-colour-swatch {
   all: unset;
   position: relative;
   width: var(--size-chip);
   height: var(--size-chip);
   border-radius: var(--radius-full);
-  background: var(--k-colour-swatch);
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: linear-gradient(var(--tint), var(--tint)), var(--k-colour-swatch);
   cursor: pointer;
   box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-on_surface) r g b / var(--elevation-rim));
 }
 
+/* Its own transitions: `all: unset` above throws out `.k-control`'s. */
+.k-colour-swatch.k-control {
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+.k-colour-swatch.k-control[data-pinned],
+[data-sequence] .k-colour-swatch.k-control {
+  transition: none;
+}
+
 .k-colour-swatch[aria-pressed="true"] {
   box-shadow:
-    0 0 0 var(--stroke-thin) var(--color-surface_container_high),
+    0 0 0 var(--stroke-thin) var(--k-colour-surface, var(--color-surface_container_high)),
     0 0 0 calc(2 * var(--stroke-thin)) var(--color-primary);
 }
 
 /* Custom: the hues round the wheel, the colour picked in its middle once it is one. */
 .k-colour-swatch[data-custom] {
-  background: conic-gradient(in oklch longer hue, oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 0), oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 359.9));
+  background:
+    linear-gradient(var(--tint), var(--tint)),
+    conic-gradient(in oklch longer hue, oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 0), oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 359.9));
 }
 
 .k-colour-swatch[data-custom]::after {
@@ -2143,21 +2164,33 @@
   position: absolute;
   inset: calc(var(--size-chip) / 4);
   border-radius: var(--radius-full);
-  background: var(--k-colour-swatch, var(--color-surface_container_high));
-  box-shadow: 0 0 0 var(--stroke-thin) var(--color-surface_container_high);
+  background: linear-gradient(var(--tint), var(--tint)), var(--k-colour-swatch, var(--k-colour-surface, var(--color-surface_container_high)));
+  box-shadow: 0 0 0 var(--stroke-thin) var(--k-colour-surface, var(--color-surface_container_high));
 }
 
 /* The hue track: the hues at one light tone round the wheel, `size.slider_compact` tall, a ring at
    the hue picked, its value at the far end. The tone and chroma it draws the hues at are the
-   picker's own (`--k-colour-hue-tone`, `--k-colour-hue-chroma`). */
+   picker's own (`--k-colour-hue-tone`, `--k-colour-hue-chroma`). It lights and is held as a
+   slider is, the hues brightening toward the palette's bright end as a slider's fill does: by
+   `opacity.press` lit, by `opacity.held` held. */
 .k-colour-hue {
   position: relative;
   height: var(--size-slider_compact);
   border-radius: var(--radius-full);
-  background: linear-gradient(90deg in oklch longer hue, oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 0), oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 359.9));
+  --bright: color-mix(in srgb, var(--color-on_surface), var(--color-surface) calc(var(--day) * 100%));
+  --lift: calc(var(--lit) * var(--opacity-press) + var(--press) * (var(--opacity-held) - var(--opacity-press)));
+  --lifted: rgb(from var(--bright) r g b / var(--lift));
+  background:
+    linear-gradient(var(--lifted), var(--lifted)),
+    linear-gradient(90deg in oklch longer hue, oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 0), oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 359.9));
   cursor: pointer;
   outline: none;
   touch-action: none;
+}
+
+.k-colour-hue[data-held]:not([aria-disabled="true"]) {
+  --lit: 1;
+  --press: 1;
 }
 
 .k-colour-hue[aria-disabled="true"] {

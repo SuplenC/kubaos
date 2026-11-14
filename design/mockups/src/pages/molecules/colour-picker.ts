@@ -23,18 +23,24 @@ const CUSTOM: PickedColour<Role> = { mode: "custom", h: 40, l: 0.8 };
 
 type Options = Partial<ColourPickerOptions<Role>>;
 
-/** The picker's controls in a setting's well: Colour, and under it Hue and Tone when offered. */
-function well(options: Options = {}): HTMLElement {
+/**
+ * The picker's controls in a setting's well: Colour, and under it Hue and Tone. On `surface`, a
+ * colour role, the well is that role and says so to the picker (`--k-colour-surface`).
+ */
+function well(options: Options = {}, surface?: string): HTMLElement {
   const made = colourPicker<Role>({ picked: AUTO, swatches: ROLES, ...options });
   const box = document.createElement("span");
   box.className = "f-colour-well";
+  if (surface) {
+    box.style.background = `var(--color-${surface})`;
+    box.style.setProperty("--k-colour-surface", `var(--color-${surface})`);
+  }
   const label = (words: string, sub: boolean) => {
     const said = text(words, "label", "on_surface_variant");
     said.toggleAttribute("data-sub", sub);
     return said;
   };
-  box.append(label("Colour", false), made.choice);
-  if (made.hue && made.tone) box.append(label("Hue", true), made.hue, label("Tone", true), made.tone);
+  box.append(label("Colour", false), made.choice, label("Hue", true), made.hue, label("Tone", true), made.tone);
   return within("var(--size-panel)", box);
 }
 
@@ -87,8 +93,7 @@ export default page({
   stage: { live, hint: "click a swatch, or Tab and ← →", daylight: true },
   variants: [
     { name: "Auto, roles and Custom", for: "the lock clock's colour, in the clock editor", sample: () => well({ picked: SECONDARY }) },
-    { name: "Without Auto", for: "a colour with no automatic choice", sample: () => well({ picked: SECONDARY, auto: false }) },
-    { name: "Roles only", for: "the scheme's roles alone: no Custom, no Hue or Tone", sample: () => well({ picked: SECONDARY, auto: false, custom: false }) },
+    { name: "On another surface", for: "`--k-colour-surface` set: the ring's gap in `surface_container`", sample: () => well({ picked: SECONDARY }, "surface_container") },
   ],
   sizes: doesntApply("one size: swatches `size.chip`, the hue track `size.slider_compact`."),
   states: {
@@ -102,8 +107,8 @@ export default page({
     rows: nonEmpty(ROWS.map(({ name, picked }) => ({ name, cell: (state: MatrixState) => inState({ picked }, state) }))),
     looks: {
       rest: "the pick ringed in `primary`; Hue and Tone live with Custom",
-      lit: "focus tube round the choice",
-      pressed: "Auto's chip pressed; a swatch has no pressed look",
+      lit: "the choice's focus tube; a hovered pick or track, its own",
+      pressed: "next pick's tube white-hot; track held, hues up `opacity.held`",
       disabled: "everything at `opacity.disabled_content`, the hues' chroma lowered too",
     },
   },
@@ -111,6 +116,7 @@ export default page({
     tubes: [
       { name: "The choice, keyboard on it", tone: "accent", filled: false, content: false },
       { name: "The hue track, keyboard on it", tone: "accent", filled: false, content: false },
+      { name: "A swatch, the pointer on it", tone: "accent", filled: false, content: false },
     ],
     looks: {
       lit: "tube round the choice or the track, glowing",
@@ -119,7 +125,7 @@ export default page({
     signsOff: (index: number) => inState({ picked: ROWS[index]!.picked }, "signs-off"),
   },
   content: {
-    text: doesntApply("its words are fixed: Auto, and the hue in degrees."),
+    text: doesntApply("its words are its user's: Auto, Custom and Hue by default, and the hue in degrees."),
     missingPicture: doesntApply("no pictures."),
     counts: [
       { name: "No roles", for: "Auto and Custom alone", sample: () => well({ picked: AUTO, swatches: [] }) },
@@ -152,8 +158,8 @@ export default page({
   },
   keyboard: {
     keys: [
-      { keys: ["←", "h"], does: "on the choice: picks the one before, stopping at the first" },
-      { keys: ["→", "l"], does: "on the choice: picks the one after, stopping at the last" },
+      { keys: ["←", "h"], does: "on the choice: picks the one before, round from the first" },
+      { keys: ["→", "l"], does: "on the choice: picks the one after, round from the last" },
       { keys: ["←", "→", "h", "l"], does: "on Hue: a twentieth of the wheel; Shift, a degree" },
       { keys: ["Home", "End"], does: "on Hue: the first or the last degree" },
       { keys: ["Tab", "Shift+Tab"], does: "the choice, then Hue and Tone while Custom is picked" },
@@ -168,6 +174,7 @@ export default page({
     ]),
     measures: [
       { part: "Choice padding", token: "space-s4" },
+      { part: "Choice ends, past the ring", token: "stroke-thin" },
       { part: "Between picks", token: "space-s8" },
       { part: "Swatch", token: "size-chip" },
       { part: "Picked ring and its gap", token: "stroke-thin" },
