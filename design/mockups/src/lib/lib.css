@@ -35,9 +35,10 @@
 }
 
 /* Text that breaks between words in the room it is given, as iced's text does: as wide as its
-   longest line, and as tall as its lines. */
+   longest line rounded up to a device pixel, a hair under one counting as that pixel (`snap`), and
+   as tall as its lines. */
 .k-text[data-wrapped] {
-  width: auto;
+  width: calc-size(auto, round(up, calc(size - 0.001px), 1px));
   max-width: 100%;
   height: auto;
   white-space: normal;
