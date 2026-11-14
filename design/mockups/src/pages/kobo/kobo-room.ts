@@ -314,8 +314,9 @@ function hanko(): HTMLElement {
   return seal;
 }
 
+/** Done's lede. Its quoted words are one name, so a space that never breaks holds them on one line. */
 export function doneLine(): string {
-  return `That's it. Done in ${duration(TOTAL)}. Not bad: Windows would still be on “Getting ready”. Pull the stick, reboot, type your password at boot and you're on the desktop as mika.`;
+  return `That's it. Done in ${duration(TOTAL)}. Not bad: Windows would still be on “Getting\u00a0ready”. Pull the stick, reboot, type your password at boot and you're on the desktop as mika.`;
 }
 
 /** What Done says once Reboot is taken, in the actions' place. */
@@ -337,6 +338,9 @@ export function doneColumn(going = false, headline = DONE_HEADLINE.short): HTMLE
   reboot.classList.add("kobo-reboot");
   const stay = button({ label: "Stay in the live system", kind: "Text", size: "Lg" });
   const actions = going ? restarting() : row("s8", "centre", reboot, stay);
+  // Stay's padding hangs past the row's end, so the pair centred is what you see: Reboot's fill to
+  // Stay's last letter, not to its unseen padding.
+  if (!going) actions.dataset.hangs = "";
   actions.classList.add("kobo-status");
   const drawn = neonMark();
   const mark = row("s8", "start", drawn, part(hanko(), "stamp"));
