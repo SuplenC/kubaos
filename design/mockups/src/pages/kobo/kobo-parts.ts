@@ -541,7 +541,7 @@ function bar(disk: Disk, pieces: readonly Piece[]): HTMLElement {
     const thousandths = share(disk, each.bytes);
     // A partition under a hundredth of the disk holds no words: it is a sliver of its own width.
     if (thousandths < 10) box.dataset.sliver = "";
-    box.style.setProperty("--kobo-share", String(each.hidden ? 0 : thousandths));
+    box.style.setProperty("--kobo-share", String(each.hidden ? 0 : thousandths / 1000));
     box.style.setProperty("--kobo-shown", each.hidden ? "0" : "1");
     const filled = document.createElement("span");
     filled.className = "kobo-part-fill";

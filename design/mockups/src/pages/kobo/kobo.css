@@ -43,7 +43,7 @@
   initial-value: 0;
 }
 
-/* A partition's share of its bar, in thousandths of the disk, and how far it shows. */
+/* A partition's share of its bar, as a fraction of the disk, and how far it shows. */
 @property --kobo-share {
   syntax: "<number>";
   inherits: false;
@@ -251,7 +251,9 @@
   display: flex;
   box-sizing: border-box;
   min-width: 0;
-  flex: var(--kobo-share) 1 0;
+  /* Grown in thousandths, which always add up to at least the whole bar: shares that round to a
+     sum under 1 would leave the end of the bar empty. */
+  flex: calc(var(--kobo-share) * 1000) 1 0;
   padding-inline-start: calc(var(--space-s4) * var(--kobo-shown));
   opacity: var(--kobo-shown);
 }
