@@ -30,4 +30,7 @@ Text {
     font.kerning: root.shaped
     font.preferShaping: root.shaped
     font.hintingPreference: Font.PreferNoHinting
+    // Drawn as `K.Text` draws, by the font engine: the rows sit beside the pane's and the hints'
+    // `K.Text` on one surface, and Qt's own rendering would set them in other glyphs beside it.
+    renderType: Text.NativeRendering
 }

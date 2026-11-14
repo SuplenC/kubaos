@@ -139,6 +139,9 @@ FocusScope {
         font.kerning: false
         font.preferShaping: false
         font.hintingPreference: Font.PreferNoHinting
+        // Drawn by the font engine as `Text` draws its words, so typed text and its placeholder
+        // set in the same glyphs as the labels round the field.
+        renderType: TextInput.NativeRendering
         onAccepted: root.accepted()
         // The `forwardTo` items see a key first, then a `keyPressed` handler, then the text.
         Keys.forwardTo: root.forwardTo
@@ -154,6 +157,7 @@ FocusScope {
             verticalAlignment: Text.AlignVCenter
             color: root.disabled ? root.disabledContent : K.Look.alpha(Tokens.color.on_surface_variant, Tokens.opacity.placeholder_text)
             font: input.font
+            renderType: Text.NativeRendering
         }
     }
 

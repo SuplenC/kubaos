@@ -34,6 +34,10 @@ Flickable {
             font.family: K.Tokens.type.body.family
             font.weight: K.Tokens.type.body.weight
             font.pixelSize: K.Tokens.type.body.size
+            // Drawn as `K.Text` draws, the metadata under it included, so the pane sets in one
+            // kind of glyph.
+            font.hintingPreference: Font.PreferNoHinting
+            renderType: Text.NativeRendering
         }
 
         K.Split {
