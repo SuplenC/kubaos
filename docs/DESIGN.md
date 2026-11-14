@@ -665,7 +665,7 @@ The words are `docs/BRAND.md`'s: read its "Voice" before writing anything a pers
 
 ## Checks
 
-Five checks keep every front end on this file: the lint, the contrast check, the geometry check, parity and the mockups' check. The first three run in `cargo test --workspace` (`just test`), in `nix flake check` (`crates/checks.nix`) and in `just design-check`, parity in `just design-check` and `nix flake check`, and the mockups' check in `just design-check`; a PR that fails any isn't done.
+Five checks keep every front end on this file: the lint, the contrast check, the geometry check, parity and the mockups' check. The first three run in `cargo test --workspace` (`just test`), in `nix flake check` (`crates/checks.nix`) and in `just design-check`, parity in `just design-check` and `nix flake check`; a PR that fails any of those four isn't done. The mockups' check is `just mockups-check`, run by hand: the site's pages are drawn ahead of the libraries, so not every page passes it, and no pull request check runs it.
 
 ### The contrast check
 

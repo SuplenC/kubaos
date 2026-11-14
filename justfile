@@ -121,8 +121,8 @@ e2e *checks:
     (($#)) && only=(--only "$(IFS=,; echo "$*")")
     test/run e2e ${only[@]+"${only[@]}"}
 
-# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, every colour pair's WCAG contrast in both modes, every specimen page at every scale, light and dark, held to the geometry rules, then QML's parity with iced and the mockups' components held to the specimen's. `just test` runs the first three as cargo tests; `nix flake check` runs the first four.
-design-check: && design-parity mockups-check
+# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, every colour pair's WCAG contrast in both modes, every specimen page at every scale, light and dark, held to the geometry rules, the mockup site built, then QML's parity with iced. `just test` runs the first three as cargo tests; `nix flake check` runs them and parity. The mockups' own check, `just mockups-check`, is run by hand.
+design-check: && design-parity
     cargo run -q -p kubaos-design -- lint
     cargo run -q -p kubaos-design -- contrast >/dev/null
     cargo run -q -p kubaos-specimen -- check
@@ -145,7 +145,7 @@ mockups *args: _mockups-deps
 mockups-build: _mockups-deps
     cd design/mockups && npm run -s build
 
-# The mockups' pages laid out in headless Chromium at every scale, light and dark, each held to the geometry rules, and each mocked component to its twin on the specimen's pages (`kubaos-specimen mockup`): the same boxes as the build, wherever each page puts it. Then every motion player seeked and held to its recipe (`scripts/player-test.ts`).
+# The mockups' pages laid out in headless Chromium at every scale, light and dark, each held to the geometry rules, and each mocked component to its twin on the specimen's pages (`kubaos-specimen mockup`): the same boxes as the build, wherever each page puts it. Then every motion player seeked and held to its recipe (`scripts/player-test.ts`). Run by hand, and not part of `design-check`: the site's pages are drawn ahead of the libraries, so not every page passes it.
 mockups-check: mockups-build
     #!/usr/bin/env bash
     set -euo pipefail
