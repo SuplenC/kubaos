@@ -29,7 +29,7 @@ use crate::specimen::Message;
 pub const SECTION: Section = Section {
     title: "Selects and menus",
     lede: Some(
-        "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control. A danger item lights in the error, and presses deeper. A held item is taken only once held: the error sweeps across it.",
+        "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control. A danger item lights in the error, and presses deeper. A held item is taken only once held: the error sweeps across it. An item may end in a value of its own.",
     ),
     view,
 };
@@ -131,6 +131,7 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(counter)
         .push(danger(look, None))
         .push(danger(look, Some(Preview::Pressed)))
+        .push(auto_reset(look))
         .into()
 }
 
@@ -157,6 +158,26 @@ fn danger<'a>(look: &Look, preview: Option<Preview>) -> Element<'a, Message> {
                     .view(look),
                 menu_separator(look),
                 kill.view(look),
+            ],
+        ),
+    )
+}
+
+/// A counter's Auto reset choices: When it reaches carries its stop as a value of its own.
+fn auto_reset<'a>(look: &Look) -> Element<'a, Message> {
+    popover(
+        look,
+        Extent::Fixed(Size::Menu),
+        menu(
+            look,
+            [
+                menu_item("Never").checked(false).on_press(Message::Sample).view(look),
+                menu_item("When it reaches")
+                    .value("10")
+                    .checked(true)
+                    .highlighted(true)
+                    .on_press(Message::Sample)
+                    .view(look),
             ],
         ),
     )

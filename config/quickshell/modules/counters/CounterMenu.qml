@@ -7,7 +7,7 @@ import "counters.js" as Logic
 // now, Auto reset, History, then Hold to remove, held to confirm. Auto reset opens in its place:
 // Back, the box a rule is typed into (a `Prompt` in the menu, saying what it reads and when the
 // next reset is as it is typed), then Never and When it reaches N, which asks for N in a prompt
-// under it. Esc steps back from Auto reset, then closes it; a press anywhere else closes it.
+// under N. Esc steps back from Auto reset, then closes it; a press anywhere else closes it.
 Item {
     id: root
 
@@ -182,8 +182,8 @@ Item {
                         root.close();
                     } else {
                         stop.text = String(Logic.stopOf(root.counter));
-                        // Under the menu as it is laid out once Auto reset has taken its place.
-                        Qt.callLater(() => stop.show(choices, "end"));
+                        // Under N as it is laid out once Auto reset has taken its place.
+                        Qt.callLater(() => stop.show(choices.entryItem(index).valueItem, "end"));
                     }
                 }
                 onDismissed: root.showMenu()
@@ -191,7 +191,7 @@ Item {
         }
     }
 
-    // N for When it reaches, under the menu's last item.
+    // N for When it reaches, under N.
     K.Prompt {
         id: stop
 

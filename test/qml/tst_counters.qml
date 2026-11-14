@@ -134,10 +134,11 @@ TestCase {
         }));
 
         verify(never[0].checked);
-        compare(never[1].text, "When it reaches 10");
+        compare(never[1].text, "When it reaches");
+        compare(never[1].value, "10");
         verify(!stopped[0].checked);
         verify(stopped[1].checked);
-        compare(stopped[1].text, "When it reaches 8");
+        compare(stopped[1].value, "8");
         verify(!ruled[0].checked && !ruled[1].checked);
     }
 
