@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # test/shots/shots-test: test/shots/lib.sh, what `just shots` renders for a change and how it
 # prunes its cache. The table of surfaces is checked as the repo has it: every surface lists its
-# own sources, every source exists, and a page of the specimen is in it when `kubaos-specimen`
-# draws it. The pruning runs on a throwaway repository and cache. Needs bash, coreutils,
+# own sources, every source exists, a page of the specimen is in it when `kubaos-specimen` draws
+# it, and a page of the mockups when `design/mockups/src/pages/index.ts` lists it, by its slug,
+# with its own file on its line. The pruning runs on a throwaway repository and cache. Needs bash, coreutils,
 # findutils, util-linux's flock, git, and cargo for the specimen's pages.
 #
 #   test/shots/shots-test REPO
@@ -207,11 +208,51 @@ the_mockup_sites_own_code_renders_every_mockup_page() {
   expect "the renderer" "$(touched test/shots/mockups)" "$(mockup_pages "$TABLE" | tr '\n' ' ')"
 }
 
-every_page_of_the_mockups_is_in_the_table() {
-  local drawn
-  drawn=$(cd "$REPO/design/mockups/src/pages" && find . -mindepth 2 -name '*.ts' | sed 's#^.*/##; s#\.ts$##; s#^#mockups/#' | sort)
+# site_pages: the mockup site's pages as it registers them, `mockups/SLUG FILE` a line: each file
+# that `pages/index.ts` imports and lists in PAGES, by the slug it declares. The slug names the
+# page in its URL and for the renderer, and may differ from the file's name; a file the list
+# leaves out is a part of other pages, not a page.
+site_pages() {
+  local pages=$REPO/design/mockups/src/pages files file
+  local -a slugs
+  files=$(awk '
+    /^import [A-Za-z0-9_]+ from "\.\/[^"]+\.ts";$/ { file[$2] = substr($4, 4, length($4) - 5) }
+    /^export const PAGES/ { listing = 1 }
+    listing {
+      text = text $0
+      if (/\];/) listing = 0
+    }
+    END {
+      sub(/^[^=]*=[[:space:]]*\[/, "", text)
+      sub(/\].*$/, "", text)
+      gsub(/[[:space:]]/, "", text)
+      n = split(text, name, ",")
+      for (i = 1; i <= n; i++) {
+        if (!(name[i] in file)) { print "PAGES lists " name[i] ", which index.ts imports from no file" > "/dev/stderr"; exit 1 }
+        print file[name[i]]
+      }
+    }' "$pages/index.ts")
+  [[ -n $files ]] || { echo "pages/index.ts lists no page in PAGES"; return 1; }
+  while read -r file; do
+    mapfile -t slugs < <(sed -nE 's/^  slug: "([^"]+)",$/\1/p' "$pages/$file")
+    ((${#slugs[@]} == 1)) || { echo "pages/$file declares ${#slugs[@]} slugs, not one"; return 1; }
+    echo "mockups/${slugs[0]} design/mockups/src/pages/$file"
+  done <<<"$files"
+}
 
-  expect "the pages" "$(mockup_pages "$TABLE")" "$drawn"
+every_page_of_the_mockups_is_in_the_table() {
+  local listed site table slug file
+  listed=$(site_pages)
+  site=$(cut -d' ' -f1 <<<"$listed" | LC_ALL=C sort)
+  table=$(mockup_pages "$TABLE" | LC_ALL=C sort)
+
+  # The renderer names a page's shots by its slug alone, so two pages of one would draw over each other.
+  expect "slugs two pages share" "$(uniq -d <<<"$site")" ""
+  expect "pages missing from the table" "$(comm -13 <(echo "$table") <(echo "$site"))" ""
+  expect "lines for no page" "$(comm -23 <(echo "$table") <(echo "$site"))" ""
+  while read -r slug file; do
+    [[ " $(touched "$file") " == *" $slug "* ]] || { echo "$file doesn't render $slug"; return 1; }
+  done <<<"$listed"
 }
 
 every_page_of_the_specimen_is_in_the_table() {

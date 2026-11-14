@@ -52,7 +52,7 @@ The shared inputs render the surfaces built against them:
 
 None reaches the boot screens or the pointer but the first row. A file no line lists renders nothing, as the shell's services do: they are stand-ins.
 
-A new surface (a line in `scenarios`, a page of the specimen) gets its own line, or `just shots-test` fails: every surface has sources, every source exists, and every page `kubaos-specimen pages` lists is in the table. A path under a `*` path listed by another line fails it too, as it would render that line alone, and so does a shell module or a file of the harness no line lists (but its tests and the icon themes' sheet).
+A new surface (a line in `scenarios`, a page of the specimen) gets its own line, or `just shots-test` fails: every surface has sources, every source exists, every page `kubaos-specimen pages` lists is in the table, and so is every page the mockup site lists in `PAGES` (`design/mockups/src/pages/index.ts`), as `mockups/SLUG` by the slug it declares, no two pages sharing one, with its own file on its line. A mockup page's line lists, after its own file, every file another mockup line lists that the page imports, so a shared part renders every page drawn with it; the test doesn't follow imports, so that is the line's author's to keep. A path under a `*` path listed by another line fails it too, as it would render that line alone, and so does a shell module or a file of the harness no line lists (but its tests and the icon themes' sheet).
 
 ## How it renders
 

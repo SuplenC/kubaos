@@ -18,7 +18,11 @@
 # Every surface has a line of its own (`test/shots/shots-test` checks it): the shell's, kobo,
 # terminals (test/shots/terminals), plymouth, grub and cursor (test/shots/boot), and the
 # specimen's pages, `specimen/PAGE` for kubaos-specimen's and `specimen/qml` for qml-specimen's, and
-# the mockups' pages, `mockups/PAGE` for `design/mockups/src/pages/LEVEL/PAGE.ts`.
+# the mockups' pages, `mockups/SLUG` for each page `design/mockups/src/pages/index.ts` lists, SLUG
+# being the slug the page declares (it names the page's shots, so no two pages share one). A mockup
+# page's line lists its own file first, then every file listed elsewhere among the mockups' lines
+# that it imports, directly or through another: a shared part listed on one page's line renders
+# only the lines that list it. A part listed on none renders every page, through `mockups`.
 # The shell's services are stand-ins (fakes/qs/services): of config/quickshell/services, only the
 # JavaScript the stand-ins load is drawn. The specimen's `pages/icons.rs` is in `specimen`: every
 # page loads its fonts.
@@ -82,7 +86,7 @@ mockups/colour-picker design/mockups/src/pages/molecules/colour-picker.ts
 mockups/select      design/mockups/src/pages/molecules/select.ts
 mockups/popover     design/mockups/src/pages/molecules/popover.ts
 mockups/menu        design/mockups/src/pages/molecules/menu.ts
-mockups/prompt design/mockups/src/pages/molecules/prompt.ts design/mockups/src/lib/prompt.ts design/mockups/src/lib/prompt.css design/mockups/src/pages/shell/counters-parts.ts design/mockups/src/pages/shell/counters.css
+mockups/prompt      design/mockups/src/pages/molecules/prompt.ts design/mockups/src/lib/prompt.ts design/mockups/src/lib/prompt.css design/mockups/src/pages/shell/counters-parts.ts design/mockups/src/pages/shell/counters.css design/mockups/src/lib/rolling-number.css design/mockups/src/lib/rolling-number.ts design/mockups/src/pages/notifications.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
 mockups/calendar    design/mockups/src/pages/molecules/calendar.ts
 mockups/tile        design/mockups/src/pages/molecules/tile.ts
 mockups/collapsible design/mockups/src/pages/molecules/collapsible.ts
@@ -98,13 +102,23 @@ mockups/pill        design/mockups/src/pages/molecules/pill.ts
 mockups/progress-bar design/mockups/src/pages/molecules/progress-bar.ts
 mockups/progress-panel design/mockups/src/pages/molecules/progress-panel.ts
 mockups/spinner-in-context design/mockups/src/pages/molecules/spinner-in-context.ts
-mockups/empty-state design/mockups/src/pages/molecules/empty-state.ts
+mockups/empty-state design/mockups/src/pages/molecules/empty-state.ts design/mockups/src/pages/molecules/list.ts
 mockups/error-block design/mockups/src/pages/molecules/error-block.ts
-mockups/log         design/mockups/src/pages/molecules/log.ts
+mockups/log         design/mockups/src/pages/molecules/log.ts design/mockups/src/pages/molecules/error-block.ts
 mockups/meter       design/mockups/src/pages/molecules/meter.ts
-mockups/sparkline   design/mockups/src/pages/molecules/sparkline.ts
+mockups/sparkline   design/mockups/src/pages/molecules/sparkline.ts design/mockups/src/pages/molecules/meter.ts
 mockups/banner      design/mockups/src/pages/molecules/banner.ts
 mockups/step        design/mockups/src/pages/molecules/step.ts
+mockups/shortcuts   design/mockups/src/pages/molecules/shortcuts.ts
+mockups/button-bar  design/mockups/src/pages/molecules/button-bar.ts
+mockups/depth-picture design/mockups/src/pages/molecules/depth-picture.ts design/mockups/src/assets/lock design/mockups/src/pages/notifications.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/templates/locks.ts
+mockups/list        design/mockups/src/pages/molecules/list.ts
+mockups/scrolling-list design/mockups/src/pages/molecules/scrolling-list.ts design/mockups/src/pages/molecules/list.ts
+mockups/live-list   design/mockups/src/pages/molecules/live-list.ts design/mockups/src/pages/molecules/list.ts
+mockups/empty-list  design/mockups/src/pages/molecules/empty-list.ts design/mockups/src/pages/molecules/list.ts
+mockups/table       design/mockups/src/pages/molecules/table.ts design/mockups/src/pages/molecules/list.ts
+mockups/description-list design/mockups/src/pages/molecules/description-list.ts
+mockups/scroll      design/mockups/src/pages/molecules/scroll.ts
 mockups/sidebar-page design/mockups/src/pages/templates/sidebar-page.ts
 mockups/canvas-page design/mockups/src/pages/templates/canvas-page.ts
 mockups/colour      design/mockups/src/pages/foundations/colour.ts
@@ -116,39 +130,39 @@ mockups/focus       design/mockups/src/pages/foundations/focus.ts
 mockups/motion      design/mockups/src/pages/foundations/motion.ts
 mockups/icons       design/mockups/src/pages/foundations/icons.ts
 mockups/step-rail-page  design/mockups/src/pages/templates/step-rail-page.ts design/mockups/src/pages/templates/step-rail-page.css
-mockups/list-detail     design/mockups/src/pages/templates/list-detail.ts design/mockups/src/pages/templates/list-detail-page.css
-mockups/panel-page  design/mockups/src/pages/templates/panel-page.ts
-mockups/backdrop    design/mockups/src/pages/templates/backdrop.ts
-mockups/lock        design/mockups/src/pages/templates/lock.ts design/mockups/src/pages/templates/locks.ts design/mockups/src/assets/lock
-mockups/control-center design/mockups/src/pages/shell/control-center.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
-mockups/control-center-toggles design/mockups/src/pages/shell/control-center-toggles.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
-mockups/control-center-capture design/mockups/src/pages/shell/control-center-capture.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
-mockups/control-center-wifi design/mockups/src/pages/shell/control-center-wifi.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
-mockups/control-center-bluetooth design/mockups/src/pages/shell/control-center-bluetooth.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
-mockups/control-center-keyboard design/mockups/src/pages/shell/control-center-keyboard.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css
+mockups/list-detail design/mockups/src/pages/templates/list-detail.ts design/mockups/src/pages/templates/list-detail-page.css design/mockups/src/lib/list-detail.css design/mockups/src/lib/list-detail.ts
+mockups/panel-page  design/mockups/src/pages/templates/panel-page.ts design/mockups/src/pages/notifications.css design/mockups/src/pages/notifications.ts
+mockups/backdrop    design/mockups/src/pages/templates/backdrop.ts design/mockups/src/pages/notifications.css design/mockups/src/pages/notifications.ts
+mockups/lock        design/mockups/src/pages/templates/lock.ts design/mockups/src/pages/templates/locks.ts design/mockups/src/assets/lock design/mockups/src/pages/notifications.css design/mockups/src/pages/notifications.ts
+mockups/control-center design/mockups/src/pages/shell/control-center.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
+mockups/control-center-toggles design/mockups/src/pages/shell/control-center-toggles.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
+mockups/control-center-capture design/mockups/src/pages/shell/control-center-capture.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
+mockups/control-center-wifi design/mockups/src/pages/shell/control-center-wifi.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
+mockups/control-center-bluetooth design/mockups/src/pages/shell/control-center-bluetooth.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
+mockups/control-center-keyboard design/mockups/src/pages/shell/control-center-keyboard.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
 mockups/bar         design/mockups/src/pages/shell/bar.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.ts design/mockups/src/pages/shell/workspaces.css
 mockups/bar-contents design/mockups/src/pages/shell/bar-contents.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.ts design/mockups/src/pages/shell/workspaces.css
 mockups/workspaces  design/mockups/src/pages/shell/workspaces-page.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.ts design/mockups/src/pages/shell/workspaces.css
 mockups/tray        design/mockups/src/pages/shell/tray.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.ts design/mockups/src/pages/shell/workspaces.css
 mockups/recording   design/mockups/src/pages/shell/recording.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.ts design/mockups/src/pages/shell/workspaces.css
-mockups/frame       design/mockups/src/pages/shell/frame.ts design/mockups/src/pages/shell/frame.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.ts design/mockups/src/pages/shell/workspaces.css
+mockups/frame       design/mockups/src/pages/shell/frame.ts design/mockups/src/pages/shell/frame.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.ts design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/notifications.css design/mockups/src/pages/notifications.ts
 mockups/notification-card design/mockups/src/pages/molecules/notification-card.ts design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css
-mockups/notification-popup design/mockups/src/pages/molecules/notification-popup.ts design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css
-mockups/notification-group design/mockups/src/pages/molecules/notification-group.ts design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css
+mockups/notification-popup design/mockups/src/pages/molecules/notification-popup.ts design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css design/mockups/src/pages/molecules/notification-card.ts
+mockups/notification-group design/mockups/src/pages/molecules/notification-group.ts design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css design/mockups/src/pages/molecules/notification-card.ts
 mockups/notifications-panel design/mockups/src/pages/shell/notifications-panel.ts design/mockups/src/pages/shell/notification-parts.ts design/mockups/src/pages/shell/notification-parts.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css
 mockups/popup-stack design/mockups/src/pages/shell/popup-stack.ts design/mockups/src/pages/shell/notification-parts.ts design/mockups/src/pages/shell/notification-parts.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css
-mockups/counters design/mockups/src/pages/shell/counters.ts design/mockups/src/pages/shell/counters-parts.ts design/mockups/src/pages/shell/counters.css
+mockups/counters    design/mockups/src/pages/shell/counters.ts design/mockups/src/pages/shell/counters-parts.ts design/mockups/src/pages/shell/counters.css design/mockups/src/lib/prompt.css design/mockups/src/lib/prompt.ts design/mockups/src/lib/rolling-number.css design/mockups/src/lib/rolling-number.ts design/mockups/src/pages/molecules/prompt.ts design/mockups/src/pages/notifications.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
 mockups/notification-peek design/mockups/src/pages/shell/notification-peek.ts design/mockups/src/pages/shell/notification-parts.ts design/mockups/src/pages/shell/notification-parts.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/notifications.css
-mockups/menu design/mockups/src/pages/shell/menu.ts design/mockups/src/pages/shell/menu-parts.ts design/mockups/src/pages/shell/menu.css design/mockups/src/lib/list-detail.ts design/mockups/src/lib/list-detail.css
+mockups/command-menu design/mockups/src/pages/shell/menu.ts design/mockups/src/pages/shell/menu-parts.ts design/mockups/src/pages/shell/menu.css design/mockups/src/lib/list-detail.ts design/mockups/src/lib/list-detail.css
 mockups/menu-actions design/mockups/src/pages/shell/menu-actions.ts design/mockups/src/pages/shell/menu-parts.ts design/mockups/src/pages/shell/menu.css design/mockups/src/lib/list-detail.ts design/mockups/src/lib/list-detail.css
 mockups/menu-views design/mockups/src/pages/shell/menu-views.ts design/mockups/src/pages/shell/menu-parts.ts design/mockups/src/pages/shell/menu.css design/mockups/src/lib/list-detail.ts design/mockups/src/lib/list-detail.css
 mockups/menu-form design/mockups/src/pages/shell/menu-form.ts design/mockups/src/pages/shell/menu-parts.ts design/mockups/src/pages/shell/menu.css design/mockups/src/lib/list-detail.ts design/mockups/src/lib/list-detail.css
 mockups/menu-footer design/mockups/src/pages/shell/menu-footer.ts design/mockups/src/pages/shell/menu-parts.ts design/mockups/src/pages/shell/menu.css design/mockups/src/lib/list-detail.ts design/mockups/src/lib/list-detail.css
-mockups/sysmon      design/mockups/src/pages/shell/sysmon.ts design/mockups/src/pages/shell/sysmon-parts.ts design/mockups/src/pages/shell/sysmon.css
-mockups/sysmon-processes design/mockups/src/pages/shell/sysmon-processes.ts design/mockups/src/pages/shell/sysmon-parts.ts design/mockups/src/pages/shell/sysmon.css
-mockups/clock       design/mockups/src/pages/shell/clock.ts design/mockups/src/pages/shell/clock-parts.ts design/mockups/src/pages/shell/clock.css
-mockups/clock-settings design/mockups/src/pages/shell/clock-settings.ts design/mockups/src/pages/shell/clock-parts.ts design/mockups/src/pages/shell/clock.css
-mockups/wallpaper   design/mockups/src/pages/shell/wallpaper.ts design/mockups/src/pages/shell/wallpaper-parts.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts
-mockups/power-menu  design/mockups/src/pages/shell/power-menu.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts
-mockups/osd         design/mockups/src/pages/shell/osd.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts
-mockups/polkit      design/mockups/src/pages/shell/polkit.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts
+mockups/sysmon      design/mockups/src/pages/shell/sysmon.ts design/mockups/src/pages/shell/sysmon-parts.ts design/mockups/src/pages/shell/sysmon.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
+mockups/sysmon-processes design/mockups/src/pages/shell/sysmon-processes.ts design/mockups/src/pages/shell/sysmon-parts.ts design/mockups/src/pages/shell/sysmon.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
+mockups/clock       design/mockups/src/pages/shell/clock.ts design/mockups/src/pages/shell/clock-parts.ts design/mockups/src/pages/shell/clock.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
+mockups/clock-settings design/mockups/src/pages/shell/clock-settings.ts design/mockups/src/pages/shell/clock-parts.ts design/mockups/src/pages/shell/clock.css design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
+mockups/wallpaper   design/mockups/src/pages/shell/wallpaper.ts design/mockups/src/pages/shell/wallpaper-parts.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/assets/lock design/mockups/src/pages/notifications.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts design/mockups/src/pages/templates/locks.ts
+mockups/power-menu  design/mockups/src/pages/shell/power-menu.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/assets/lock design/mockups/src/pages/notifications.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts design/mockups/src/pages/templates/locks.ts
+mockups/osd         design/mockups/src/pages/shell/osd.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
+mockups/polkit      design/mockups/src/pages/shell/polkit.ts design/mockups/src/pages/shell/screen-parts.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/control-center-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/control-center.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts
