@@ -68,55 +68,102 @@ export function backdrop(options: BackdropOptions): HTMLElement {
   thing.append(options.content);
   element.append(...(options.under ? [options.under] : []), layers, thing);
 
-  // The thing's place is its size's, which only layout knows: centred on whole device pixels, the
-  // odd one after it, and what gives way gone while the room can't hold it.
-  const place = () => {
-    const room = element.clientHeight - 2 * lengthIn(element, "space-s32");
-    // A glass panel is `space.s32` in from the screen's edges where the screen holds two columns
-    // side by side, and `space.s16` on a narrower one, as Kōbō's is.
-    const wide = element.clientWidth >= 2 * lengthIn(element, "size-column");
-    element.style.setProperty("--panel-margin", wide ? "var(--space-s32)" : "var(--space-s16)");
-    const parts = [...thing.querySelectorAll<HTMLElement>("[data-gives-way]")];
-    for (const part of parts) delete part.dataset.gone;
-    for (const part of parts) {
-      if (thing.offsetHeight <= room) break;
-      part.dataset.gone = "";
-    }
-    element.style.setProperty("--thing-x", `${Math.floor((element.clientWidth - thing.offsetWidth) / 2)}px`);
-    element.style.setProperty("--thing-y", `${Math.floor((element.clientHeight - thing.offsetHeight) / 2)}px`);
-    element.style.setProperty("--thing-height", `${thing.offsetHeight}px`);
-    // A glass panel's blurred picture lies where the screen's does, so it is moved back by the
-    // panel's own place.
-    element.style.setProperty("--panel-left", `${thing.offsetLeft}px`);
-  };
-  const watch = new ResizeObserver(place);
-  watch.observe(element);
-  watch.observe(options.content);
+  places.set(element, { thing });
+  placer.observe(element);
+  placer.observe(options.content);
   return probe(element, { role: "component", name: "Backdrop", variant: options.scrim, fixed: { width: false, height: false, holds: true } });
 }
 
-/** Each backdrop's lengths measured so far, at the scale they were measured at. */
-const measured = new WeakMap<HTMLElement, { readonly scale: string; readonly lengths: Map<string, number> }>();
+/** Each backdrop's thing, which placing centres. */
+const places = new WeakMap<HTMLElement, { readonly thing: HTMLElement }>();
+
+/** What placing a backdrop read: its size, its thing's, and what it can hold. */
+interface Read {
+  readonly element: HTMLElement;
+  readonly thing: HTMLElement;
+  readonly width: number;
+  readonly height: number;
+  readonly room: number;
+  readonly wide: boolean;
+  readonly thingWidth: number;
+  readonly thingHeight: number;
+  readonly thingLeft: number;
+}
+
+function read(element: HTMLElement, thing: HTMLElement): Read {
+  return {
+    element,
+    thing,
+    width: element.clientWidth,
+    height: element.clientHeight,
+    room: element.clientHeight - 2 * lengthIn(element, "space-s32"),
+    // A glass panel is `space.s32` in from the screen's edges where the screen holds two columns
+    // side by side, and `space.s16` on a narrower one, as Kōbō's is.
+    wide: element.clientWidth >= 2 * lengthIn(element, "size-column"),
+    thingWidth: thing.offsetWidth,
+    thingHeight: thing.offsetHeight,
+    thingLeft: thing.offsetLeft,
+  };
+}
+
+/**
+ * The thing's place is its size's, which only layout knows: centred on whole device pixels, the
+ * odd one after it, and what gives way gone while the room can't hold it. Only a backdrop whose
+ * parts must give way or come back reads again after writing.
+ */
+function write(measured: Read): void {
+  const { element, thing } = measured;
+  let shown = measured;
+  const parts = [...thing.querySelectorAll<HTMLElement>("[data-gives-way]")];
+  const gone = parts.some((part) => part.dataset.gone !== undefined);
+  if (parts.length > 0 && (measured.thingHeight > measured.room || gone)) {
+    for (const part of parts) delete part.dataset.gone;
+    for (const part of parts) {
+      if (thing.offsetHeight <= measured.room) break;
+      part.dataset.gone = "";
+    }
+    shown = read(element, thing);
+  }
+  element.style.setProperty("--panel-margin", shown.wide ? "var(--space-s32)" : "var(--space-s16)");
+  element.style.setProperty("--thing-x", `${Math.floor((shown.width - shown.thingWidth) / 2)}px`);
+  element.style.setProperty("--thing-y", `${Math.floor((shown.height - shown.thingHeight) / 2)}px`);
+  element.style.setProperty("--thing-height", `${shown.thingHeight}px`);
+  // A glass panel's blurred picture lies where the screen's does, so it is moved back by the
+  // panel's own place.
+  element.style.setProperty("--panel-left", `${shown.thingLeft}px`);
+}
+
+/**
+ * One observer for every backdrop: it reads every backdrop that changed before it writes any, so
+ * a page of many lays them out once, not once each (49 forced layouts on a page of Kōbō's).
+ */
+const placer = new ResizeObserver((entries) => {
+  const changed = new Set<HTMLElement>();
+  for (const entry of entries) {
+    const element = (entry.target as HTMLElement).closest<HTMLElement>(".k-backdrop");
+    if (element && places.has(element)) changed.add(element);
+  }
+  const reads = [...changed].map((element) => read(element, places.get(element)!.thing));
+  for (const measured of reads) write(measured);
+});
+
+/** The lengths measured so far, by the scale they were measured at and their token. */
+const measured = new Map<string, number>();
 
 /**
  * The length token `name` in the CSS pixels `element` is laid out in. Measuring adds a box and
- * lays it out, so each length is measured once a backdrop and scale: placing runs on every resize.
+ * lays it out, so each length is measured once a scale, for every backdrop at it.
  */
 function lengthIn(element: HTMLElement, name: string): number {
-  const scale = getComputedStyle(element).getPropertyValue("--px");
-  let known = measured.get(element);
-  if (known?.scale !== scale) {
-    known = { scale, lengths: new Map() };
-    measured.set(element, known);
-  }
-  const had = known.lengths.get(name);
+  const key = `${getComputedStyle(element).getPropertyValue("--px")} ${name}`;
+  const had = measured.get(key);
   if (had !== undefined) return had;
   const meter = document.createElement("span");
   meter.style.cssText = `position:absolute;visibility:hidden;width:var(--${name})`;
   element.append(meter);
   const width = meter.offsetWidth;
   meter.remove();
-  known.lengths.set(name, width);
+  measured.set(key, width);
   return width;
 }
 

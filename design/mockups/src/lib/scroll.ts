@@ -43,6 +43,41 @@ export interface ScrollOptions {
   readonly fadePinned?: boolean;
 }
 
+/** What each scroll reads to place its thumb, by its content and its view. */
+const placing = new WeakMap<Element, () => () => void>();
+
+/** Reads every scroll in `measures` before it writes any, so many lay a page out once. */
+function placeAll(measures: Iterable<() => () => void>): void {
+  const writes = [...measures].map((measure) => measure());
+  for (const write of writes) write();
+}
+
+/**
+ * One observer for every scroll: a page of Kōbō's screens laid out 60 times placing them one at a
+ * time, each read after the last one's write.
+ */
+const sizer = new ResizeObserver((entries) => {
+  const changed = new Set<() => () => void>();
+  for (const entry of entries) {
+    const measure = placing.get(entry.target);
+    if (measure) changed.add(measure);
+  }
+  placeAll(changed);
+});
+
+/** The scrolls drawn this frame, placed together on the next. */
+let queued: (() => () => void)[] = [];
+
+function soon(measure: () => () => void): void {
+  if (queued.length === 0)
+    requestAnimationFrame(() => {
+      const now = queued;
+      queued = [];
+      placeAll(now);
+    });
+  queued.push(measure);
+}
+
 /** `content` scrolling in a box `options.height` tall, reaching past it. Returns the box and what scrolls. */
 export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTMLElement; view: HTMLElement } {
   const box = document.createElement("span");
@@ -71,22 +106,30 @@ export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTM
     box.append(fade);
   }
 
-  function place(): void {
-    const overflow = view.scrollHeight - view.clientHeight;
-    thumb.toggleAttribute("data-shown", overflow > 1);
-    box.toggleAttribute("data-scrolled", view.scrollTop >= 1);
-    if (overflow <= 1) return;
-    const tall = Math.round((view.clientHeight * view.clientHeight) / view.scrollHeight);
-    thumb.style.setProperty("--top", `${Math.round(((view.clientHeight - tall) * view.scrollTop) / overflow)}px`);
-    thumb.style.setProperty("--tall", `${tall}px`);
+  /** Reads what the thumb follows, and returns what writes it. */
+  function measure(): () => void {
+    const height = view.scrollHeight;
+    const shown = view.clientHeight;
+    const top = view.scrollTop;
+    return () => {
+      const overflow = height - shown;
+      thumb.toggleAttribute("data-shown", overflow > 1);
+      box.toggleAttribute("data-scrolled", top >= 1);
+      if (overflow <= 1) return;
+      const tall = Math.round((shown * shown) / height);
+      thumb.style.setProperty("--top", `${Math.round(((shown - tall) * top) / overflow)}px`);
+      thumb.style.setProperty("--tall", `${tall}px`);
+    };
   }
 
+  const place = () => measure()();
   view.addEventListener("scroll", place, { passive: true });
   // Either side can change what overflows: the content growing, or the room it shows in, which a
   // panel placed by script sizes after the scroll is drawn.
-  const resized = new ResizeObserver(place);
-  resized.observe(body);
-  resized.observe(view);
+  placing.set(body, measure);
+  placing.set(view, measure);
+  sizer.observe(body);
+  sizer.observe(view);
   thumb.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     thumb.setPointerCapture(event.pointerId);
@@ -106,10 +149,12 @@ export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTM
     thumb.addEventListener("pointerup", end, { once: true });
     thumb.addEventListener("pointercancel", end, { once: true });
   });
-  requestAnimationFrame(() => {
-    if (options.down !== undefined) view.scrollTop = Math.round((view.scrollHeight - view.clientHeight) * options.down);
-    place();
-  });
+  if (options.down === undefined) soon(measure);
+  else
+    requestAnimationFrame(() => {
+      if (options.down !== undefined) view.scrollTop = Math.round((view.scrollHeight - view.clientHeight) * options.down);
+      place();
+    });
   probe(box, { role: "component", name: "Scroll", variant: "", fixed: { width: false, height: false } });
   return { box, view };
 }

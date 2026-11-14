@@ -887,8 +887,11 @@
   border-radius: inherit;
 }
 
+/* Once the picture is in, its placeholder is hidden and still: a breath nobody sees still asks for
+   a frame every time it changes. */
 .k-media-box[data-arrival="loaded"] > .k-media-placeholder {
   visibility: hidden;
+  animation: none;
 }
 
 .k-media-picture {

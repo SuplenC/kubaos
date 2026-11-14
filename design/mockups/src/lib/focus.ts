@@ -83,11 +83,22 @@ export function glowMask(width: number, height: number, corner: number, reach: n
   if (!context || reach === 0) return "none";
   const image = context.createImageData(canvas.width, canvas.height);
   const r = Math.min(corner, width / 2, height / 2);
+  // Along the box's straight sides every pixel across the box is inside it, at no distance, so
+  // only the columns beside the box are worked out there: the same mask, for a fraction of the
+  // work (a glow's pixels were most of a Kōbō screen's first draw).
+  const across = { from: Math.ceil((canvas.width - width) / 2 - 0.5), to: Math.floor((canvas.width + width) / 2 - 0.5) };
+  const paint = (px: number, py: number) => {
+    const d = outside(px + 0.5 - canvas.width / 2, py + 0.5 - canvas.height / 2, width / 2, height / 2, r);
+    if (d > 0) image.data[(py * canvas.width + px) * 4 + 3] = Math.round(Math.min(1, opacity(d)) * 255);
+  };
   for (let py = 0; py < canvas.height; py++) {
+    const straight = Math.abs(py + 0.5 - canvas.height / 2) <= height / 2 - r;
     for (let px = 0; px < canvas.width; px++) {
-      const d = outside(px + 0.5 - canvas.width / 2, py + 0.5 - canvas.height / 2, width / 2, height / 2, r);
-      if (d <= 0) continue;
-      image.data[(py * canvas.width + px) * 4 + 3] = Math.round(Math.min(1, opacity(d)) * 255);
+      if (straight && px >= across.from && px <= across.to) {
+        px = across.to;
+        continue;
+      }
+      paint(px, py);
     }
   }
   context.putImageData(image, 0, 0);
