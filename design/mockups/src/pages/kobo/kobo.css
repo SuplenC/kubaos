@@ -1,0 +1,367 @@
+/* Kōbō's installer (`kobo-room.ts`, `kobo-parts.ts`): its room, where the full-screen scenes and
+   the glass panel lie over one wallpaper, the scenes' parts, and the organisms only Kōbō draws. */
+
+/* How far a scene's part has still to rise into place, in `space.s24`s. */
+@property --kobo-rise {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How brightly the welcome's neon sign burns: 0 dark, 1 lit. */
+@property --kobo-sign {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* How much of a stroke of the クバ mark is still to be drawn: 1 none of it, 0 all of it. */
+@property --kobo-stroke {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How brightly the written mark burns, its glow and its cores: 0 unlit glass, 1 lit. */
+@property --kobo-burn {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+/* How far the hanko has been stamped: 0 not yet, 1 on the page. */
+@property --kobo-stamp {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* A partition's share of its bar, in thousandths of the disk, and how far it shows. */
+@property --kobo-share {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --kobo-shown {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* How far the hold to install has come: 0 to 1 over `hold`. */
+@property --kobo-held {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* The room: one screen, the scenes and the panel stacked over the same wallpaper. */
+.kobo-room {
+  position: relative;
+  display: block;
+  flex: none;
+  overflow: hidden;
+  width: var(--kobo-width);
+  height: var(--kobo-height);
+  background: var(--color-surface_container_lowest);
+  outline: none;
+}
+
+.kobo-room > .k-backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+/* The room stacks its own layers: one drawn ahead of its time lies under the rest. */
+.kobo-room {
+  isolation: isolate;
+}
+
+.kobo-room > .k-backdrop[data-under] {
+  z-index: -1;
+}
+
+/* With a layer under it, the one over it has no base: as its picture fades, that layer shows. */
+.kobo-room:has(> .k-backdrop[data-under]) > .k-backdrop:not([data-under]) {
+  background: none;
+}
+
+/* A backdrop lying over another, as one hands over to the next, has no base of its own: as its
+   picture fades the one under it shows, not `surface_container_lowest`. */
+.kobo-room > .k-backdrop + .k-backdrop {
+  background: none;
+}
+
+/* A scene's part: it rises `space.s24` into place on whole device pixels. */
+.kobo-part {
+  translate: 0 round(nearest, calc(var(--kobo-rise) * var(--space-s24)), 1px);
+}
+
+.kobo-column {
+  width: var(--size-column);
+}
+
+.kobo-column > .kobo-part {
+  align-self: center;
+}
+
+.kobo-sign {
+  display: block;
+  width: var(--size-column);
+  opacity: var(--kobo-sign);
+}
+
+/* The line under the welcome's action and the install's progress: always a line tall, so what
+   it says can change without moving anything. */
+.kobo-status {
+  min-height: var(--type-body-line);
+}
+
+/* The foot of every scene: the power button and the battery where the rail's foot holds them, and
+   the release between them, so they stand still as the screens change. */
+.kobo-foot {
+  position: absolute;
+  bottom: var(--kobo-margin);
+  left: round(down, calc((100% - var(--kobo-panel)) / 2), 1px);
+  display: grid;
+  box-sizing: border-box;
+  width: var(--kobo-panel);
+  padding: 0 calc(2 * var(--space-s12)) var(--space-s16);
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  --kobo-panel: min(calc(100% - 2 * var(--kobo-margin)), calc(var(--size-rail) + 2 * var(--space-s40) + 2 * var(--size-column)));
+}
+
+.kobo-foot > :last-child {
+  justify-self: end;
+}
+
+/* The install's big figure: the rolling percent and its sign, one line of `hero_number`. */
+.kobo-percent {
+  display: flex;
+  align-items: baseline;
+}
+
+/* The tip shown while the install runs: a line tall, the next one fading in over the last. */
+.kobo-tip {
+  display: grid;
+  justify-items: center;
+}
+
+.kobo-tip > * {
+  grid-area: 1 / 1;
+}
+
+/* The クバ mark written in as lit tubes, `size.neon_mark` square: each stroke drawn along its
+   length by its dash's offset, `--kobo-stroke`, 1 not yet drawn, 0 whole; the glow and the white-hot cores burn with `--kobo-burn`,
+   the tube itself unlit glass until then. */
+.kobo-mark {
+  display: block;
+  width: var(--size-neon_mark);
+  height: var(--size-neon_mark);
+  overflow: visible;
+}
+
+.kobo-mark path {
+  fill: none;
+  stroke-dasharray: 1 2;
+  stroke-dashoffset: var(--kobo-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.kobo-mark [data-layer="glow"] {
+  opacity: calc(var(--shadow-glow-opacity) * var(--kobo-burn) * (1 - var(--day)));
+}
+
+.kobo-mark [data-layer="tube"] path[data-tone="warm"] {
+  stroke: color-mix(in srgb, var(--color-primary_unlit), var(--color-primary) calc(var(--kobo-burn) * 100%));
+}
+
+.kobo-mark [data-layer="tube"] path[data-tone="cold"] {
+  stroke: color-mix(in srgb, var(--color-cold_unlit), var(--color-cold) calc(var(--kobo-burn) * 100%));
+}
+
+.kobo-mark [data-layer="glow"] path[data-tone="warm"] {
+  stroke: var(--color-primary);
+}
+
+.kobo-mark [data-layer="glow"] path[data-tone="cold"] {
+  stroke: var(--color-cold);
+}
+
+.kobo-mark [data-layer="core"] {
+  opacity: var(--kobo-burn);
+}
+
+.kobo-mark [data-layer="core"] path[data-tone="warm"] {
+  stroke: var(--color-logo_core_warm);
+}
+
+.kobo-mark [data-layer="core"] path[data-tone="cold"] {
+  stroke: var(--color-logo_core_cold);
+}
+
+/* The 完了 hanko: a seal `size.hanko` square in `primary_container`, its ring the thin stroke, its
+   two characters stacked; it lands from `scale.near` as it is stamped. */
+.kobo-hanko {
+  display: flex;
+  box-sizing: border-box;
+  width: var(--size-hanko);
+  height: var(--size-hanko);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: max(1px, round(nearest, var(--stroke-thin), 1px)) solid var(--color-primary_container);
+  border-radius: var(--radius-control);
+  color: var(--color-primary_container);
+  opacity: var(--kobo-stamp);
+  scale: calc(var(--scale-near) - (var(--scale-near) - 1) * var(--kobo-stamp));
+}
+
+.kobo-hanko > .k-text {
+  font-family: var(--font-jp);
+  color: var(--color-primary_container);
+}
+
+/* The disk's map: a bar for now and one for after the install, each partition as wide as its
+   share of the disk, a sliver at least, `space.s4` apart. */
+.kobo-map {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-s8) var(--space-s16);
+  align-items: center;
+}
+
+.kobo-bar {
+  display: flex;
+  height: var(--size-control_sm);
+  min-width: 0;
+}
+
+.kobo-part-box {
+  display: flex;
+  box-sizing: border-box;
+  min-width: 0;
+  flex: var(--kobo-share) 1 0;
+  padding-inline-start: calc(var(--space-s4) * var(--kobo-shown));
+  opacity: var(--kobo-shown);
+}
+
+.kobo-part-box:first-child {
+  padding-inline-start: 0;
+}
+
+.kobo-part-box[data-sliver] {
+  flex: 0 0 calc((var(--space-s8) + var(--space-s4)) * var(--kobo-shown));
+}
+
+.kobo-part-box[data-sliver]:first-child {
+  flex-basis: calc(var(--space-s8) * var(--kobo-shown));
+}
+
+.kobo-part-fill {
+  display: flex;
+  overflow: hidden;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+  padding: 0 var(--space-s8);
+  border-radius: var(--radius-small);
+  white-space: nowrap;
+}
+
+.kobo-part-fill[data-kind="system"] {
+  background: var(--color-cold_container);
+  color: var(--color-on_cold_container);
+}
+
+.kobo-part-fill[data-kind="plumbing"],
+.kobo-part-fill[data-kind="data"] {
+  background: var(--color-surface_container_highest);
+  color: var(--color-on_surface_variant);
+}
+
+.kobo-part-fill[data-kind="free"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline);
+  color: var(--color-on_surface_variant);
+}
+
+.kobo-part-fill[data-kind="kubaos"] {
+  background: var(--color-primary);
+  color: var(--color-on_primary);
+  box-shadow: 0 var(--shadow-glow-y) var(--shadow-glow-blur) rgb(from var(--color-primary) r g b / calc(var(--shadow-glow-opacity) * (1 - var(--day))));
+}
+
+/* Erasing: what goes is struck through in `error`, so the bar says what the danger is. */
+.kobo-part-fill[data-gone] {
+  background: transparent;
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-error);
+  color: var(--color-error);
+}
+
+/* The hold to install: a Danger or Filled lg button whose held share fills the banner's foot. */
+.kobo-hold {
+  display: flex;
+  align-items: center;
+}
+
+/* The password's strength beside its meter: the meter a column, the word after it. */
+.kobo-strength {
+  display: grid;
+  grid-template-columns: 1fr max-content;
+  gap: var(--space-s12);
+  align-items: center;
+}
+
+/* A setting in a card: its tile, its name over what it does, its switch at the end. */
+.kobo-setting {
+  display: grid;
+  grid-template-columns: max-content 1fr max-content;
+  gap: var(--space-s16);
+  align-items: center;
+}
+
+/* The power dialog over a scene: the scene dims under the scrim. */
+.kobo-over {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
+}
+
+/* Two columns side by side, the first as tall as the second: Language's list runs down to the end
+   of the card beside it. */
+.kobo-columns {
+  align-items: stretch;
+}
+
+.kobo-columns > :first-child {
+  height: 100%;
+}
+
+/* A screen's scroll reaches across the page's padding at its end, so the thumb floats in that
+   padding and the content runs to the same edge as the footer band's Continue. */
+.kobo-scrolls {
+  margin-inline-end: calc(-1 * var(--padding));
+}
+
+.kobo-scrolled {
+  box-sizing: border-box;
+  padding-inline-end: var(--padding);
+}
+
+/* A review card's Change: a small control centred on the title's line, which is shorter. */
+.kobo-change {
+  margin-block: calc((var(--type-subheading-line) - var(--size-control_sm)) / 2);
+}
+
+/* What a move between the room's places lifts and fades, each on a layer of its own, so the
+   browser moves it rather than drawing it again every frame. */
+.kobo-room > .k-backdrop > :is(.k-backdrop-thing, .k-backdrop-layers) {
+  will-change: translate, opacity;
+}
