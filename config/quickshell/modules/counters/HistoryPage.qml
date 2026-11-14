@@ -9,7 +9,8 @@ import "counters.js" as Logic
 // when grouped), then its changes in a well, each with its time, what it was and the value after
 // it, or a group with how many changes it holds and how much they added. Past `mostRows` rows the
 // well scrolls. A counter never changed shows that it has no history yet. It opens with the
-// keyboard on the page, so Tab reaches Back and Esc goes back, and nothing lights for a pointer.
+// keyboard on Back, so Enter or Esc goes back; Back lights only once a key has been used in the
+// sheet, so nothing lights for a pointer.
 FocusScope {
     id: root
 
@@ -23,17 +24,23 @@ FocusScope {
     property int sort: 0
     // The rows the well shows before it scrolls.
     readonly property int mostRows: 8
+    // A row's day as the shell's short date writes it ("Wed 11 Nov"), and its time with no
+    // leading zero ("9:14"), as the counters' rules write theirs.
     readonly property var formats: ({
             date: Time.shortDateFormat,
-            time: Time.timeFormat,
+            time: Time.twelveHour ? "h:mm AP" : "H:mm",
             week: Time.dayFirst ? "d MMM" : "MMM d",
             month: "MMMM yyyy"
         })
     // Today, as the rows' days are told from it: set as the page opens.
     property date now: Time.now
     readonly property int changes: root.rows.reduce((sum, row) => sum + row.changes, 0)
+    // A key has been used in the sheet since it opened.
+    property bool keyed: false
 
     signal back
+    // A key was pressed on the page.
+    signal keyPressed
 
     // Reads the history again, for the grouping and order picked.
     function read(): void {
@@ -62,11 +69,18 @@ FocusScope {
         root.rows = [];
         root.lines = [];
         root.read();
-        root.forceActiveFocus();
+        backButton.forceActiveFocus();
     }
 
     implicitHeight: column.implicitHeight
-    Keys.onEscapePressed: root.back()
+    // Every key reaches this first, Tab included, as Back and the tabs leave it unaccepted.
+    Keys.onPressed: event => {
+        root.keyPressed();
+        if (event.key === Qt.Key_Escape) {
+            root.back();
+            event.accepted = true;
+        }
+    }
 
     // A change made while it shows (the key, the menu, an auto reset) is in the history at once.
     Connections {
@@ -94,10 +108,13 @@ FocusScope {
             align: "centre"
 
             K.IconButton {
+                id: backButton
+
                 icon: "arrow_back"
                 label: "Back"
                 kind: "Text"
                 size: "Sm"
+                focused: backButton.activeFocus && root.keyed
                 onActivated: root.back()
             }
 

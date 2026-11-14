@@ -64,7 +64,7 @@ function ruleNote(typed, reading) {
     if (reading.ok && reading.typed === typed) {
         const words = reading.words ?? "";
         const phrase = words.charAt(0).toLowerCase() + words.slice(1);
-        return reading.when ? `Resets ${phrase}. ${reading.when}.` : `Resets ${phrase}.`;
+        return reading.when ? `Resets ${phrase}. ${reading.when}` : `Resets ${phrase}`;
     }
     return tryWords(reading.examples ?? []);
 }
@@ -148,17 +148,18 @@ function sameDay(a, b) {
 
 // A history row's day: "Today", or the date as `formats.date` writes it.
 function dayOf(at, now, formats) {
-    return sameDay(at, now) ? "Today" : Qt.formatDate(at, formats.date);
+    return sameDay(at, now) ? "Today" : Qt.formatDateTime(at, formats.date);
 }
 
 // A history row as it reads: `{ title, what, value, sign }`. A change is its day and time, its kind
 // and the value after it; a group is its day, week or month, how many changes it holds and how
-// much they added. `formats` are the shell's: `{ date, time, week, month }` for Qt.formatDate.
+// much they added, never below +0. `formats` are the shell's: `{ date, time, week, month }` for
+// `Qt.formatDateTime`, as the rest of the shell writes its dates.
 function historyLine(row, group, now, formats) {
     const at = new Date(row.at * 1000);
     if (group === "change") {
         return {
-            title: `${dayOf(at, now, formats)} · ${Qt.formatTime(at, formats.time)}`,
+            title: `${dayOf(at, now, formats)} · ${Qt.formatDateTime(at, formats.time)}`,
             what: row.label,
             value: row.value,
             sign: ""
@@ -166,14 +167,15 @@ function historyLine(row, group, now, formats) {
     }
     let title = dayOf(at, now, formats);
     if (group === "week")
-        title = `Week of ${Qt.formatDate(at, formats.week)}`;
+        title = `Week of ${Qt.formatDateTime(at, formats.week)}`;
     else if (group === "month")
-        title = Qt.formatDate(at, formats.month);
+        title = Qt.formatDateTime(at, formats.month);
     return {
         title: title,
         what: row.changes === 1 ? "1 change" : `${row.changes} changes`,
-        value: Math.abs(row.added),
-        sign: row.added < 0 ? "−" : "+"
+        // A group says only what it added: one that went down added nothing.
+        value: Math.max(0, row.added),
+        sign: "+"
     };
 }
 

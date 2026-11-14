@@ -65,11 +65,11 @@ fn counter_json(counter: &Counter, format: Option<TimeFormat>) -> Value {
     })
 }
 
-/// The line under a counter's name: `Resets every day at 9:00`, `Stops at 100`, or nothing.
+/// The line under a counter's name: `Resets every day at 9:00`, `Resets at 100`, or nothing.
 pub fn detail(reset: AutoReset, format: Option<TimeFormat>) -> String {
     match reset {
         AutoReset::Rule(rule) => format!("Resets {}", rule.phrase(format)),
-        AutoReset::Stop(stop) => format!("Stops at {stop}"),
+        AutoReset::Stop(stop) => format!("Resets at {stop}"),
         AutoReset::Never => String::new(),
     }
 }
@@ -91,7 +91,7 @@ pub fn write(path: &Path, state: &Value) -> io::Result<()> {
 ///
 /// ```json
 /// {"ok": true, "rule": "every day at 9:00", "words": "Every day at 9:00",
-///  "next": 1794560400, "when": "Next tomorrow at 9:00"}
+///  "next": 1794560400, "when": "Next: tomorrow, Fri 13 Nov, 9:00"}
 /// {"ok": false, "error": "`soon` isn't a time…", "examples": ["every day at 9", …]}
 /// ```
 pub fn check(typed: &str, now: &Zoned, format: Option<TimeFormat>) -> Value {
@@ -103,7 +103,7 @@ pub fn check(typed: &str, now: &Zoned, format: Option<TimeFormat>) -> Value {
                 "rule": rule.to_string(),
                 "words": rule.words(format),
                 "next": next.as_ref().map_or(0, |at| at.timestamp().as_second()),
-                "when": next.map_or_else(String::new, |at| format!("Next {}", when(&at, now, format))),
+                "when": next.map_or_else(String::new, |at| format!("Next: {}", next_reset(&at, now, format))),
             })
         }
         Err(err) => json!({
@@ -131,13 +131,31 @@ pub fn history(rows: &[Row]) -> Value {
         .collect()
 }
 
+/// When a rule next resets, from `now`, as its box says it under the rule: `today 9:00`,
+/// `tomorrow, Fri 13 Nov, 9:00`, or `Mon 16 Nov, 9:00`, the time as `format` writes it. Past today
+/// the date is always there, so a reset days away is never read as this week's.
+pub fn next_reset(at: &Zoned, now: &Zoned, format: Option<TimeFormat>) -> String {
+    let time = clock(at, format);
+    let date = at.strftime("%a %-d %b");
+    match (at.date() - now.date()).get_days() {
+        0 => format!("today {time}"),
+        1 => format!("tomorrow, {date}, {time}"),
+        _ => format!("{date}, {time}"),
+    }
+}
+
+/// `at`'s hour and minutes, as `format` writes them.
+fn clock(at: &Zoned, format: Option<TimeFormat>) -> String {
+    match format {
+        Some(TimeFormat::TwelveHour) => at.strftime("%-I:%M %p").to_string(),
+        _ => at.strftime("%-H:%M").to_string(),
+    }
+}
+
 /// When `at` is, from `now`: `today at 9:00`, `tomorrow at 9:00`, `Monday at 9:00` within the week,
 /// or `16 November at 9:00`, the time as `format` writes it.
 pub fn when(at: &Zoned, now: &Zoned, format: Option<TimeFormat>) -> String {
-    let time = match format {
-        Some(TimeFormat::TwelveHour) => at.strftime("%-I:%M %p").to_string(),
-        _ => at.strftime("%-H:%M").to_string(),
-    };
+    let time = clock(at, format);
     match (at.date() - now.date()).get_days() {
         0 => format!("today at {time}"),
         1 => format!("tomorrow at {time}"),

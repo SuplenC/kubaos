@@ -71,7 +71,7 @@ fn new_counter_comes_first_then_a_counter_an_item_in_order() {
     assert_eq!(items[0].actions[0].arguments[0].placeholder.as_deref(), Some("Counter"));
     assert_eq!(items[1].id, "counter:1");
     assert_eq!(items[1].subtitle.as_deref(), Some("3 · Resets every day at 9:00"));
-    assert_eq!(items[2].subtitle.as_deref(), Some("2 · Stops at 2"));
+    assert_eq!(items[2].subtitle.as_deref(), Some("2 · Resets at 2"));
     assert_eq!(items[3].subtitle.as_deref(), Some("0"));
     assert_eq!(ids().collect::<Vec<_>>(), [NEW_ID]);
 }

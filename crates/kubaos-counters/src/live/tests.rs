@@ -30,7 +30,7 @@ fn the_state_lists_each_counter_with_its_reset_and_the_last_used() {
             "detail": "Resets every day at 9:00",
         })
     );
-    assert_eq!(state["counters"][1]["detail"], "Stops at 4");
+    assert_eq!(state["counters"][1]["detail"], "Resets at 4");
     assert_eq!(state["counters"][1]["stop"], 4);
     assert_eq!(state["counters"][2]["detail"], "");
     assert_eq!(state["counters"][2]["next"], 0);
@@ -83,15 +83,15 @@ fn a_rule_that_reads_says_its_words_and_next_time() {
         answer,
         json!({
             "ok": true, "rule": "every Monday at 8:00", "words": "Every Monday at 8:00",
-            "next": 1_794_812_400, "when": "Next Monday at 8:00",
+            "next": 1_794_812_400, "when": "Next: Mon 16 Nov, 8:00",
         })
     );
-    assert_eq!(check("every day at 11", &now(), None)["when"], "Next today at 11:00");
-    assert_eq!(check("every day at 9", &now(), None)["when"], "Next tomorrow at 9:00");
+    assert_eq!(check("every day at 11", &now(), None)["when"], "Next: today 11:00");
     assert_eq!(
-        check("1st of the month", &now(), None)["when"],
-        "Next 1 December at 0:00"
+        check("every day at 9", &now(), None)["when"],
+        "Next: tomorrow, Fri 13 Nov, 9:00"
     );
+    assert_eq!(check("1st of the month", &now(), None)["when"], "Next: Tue 1 Dec, 0:00");
 }
 
 #[test]
