@@ -17,7 +17,7 @@
 
 import { type Pinned, pin, sideways } from "./control.ts";
 import { focusRing } from "./focus.ts";
-import { withHint } from "./hint.ts";
+import { makeHints, withHint } from "./hint.ts";
 import { iconButton } from "./icon-button.ts";
 import { filling, row } from "./layout.ts";
 import { probe, variant } from "./probe.ts";
@@ -414,6 +414,11 @@ export function calendar(options: CalendarOptions): HTMLElement {
     } else return;
     event.preventDefault();
   });
+
+  // The keyboard's day shows its holiday's hint while the month has the keyboard, which the day
+  // itself never takes, so the month's hints are made as it gets the keyboard and as the keys move
+  // its days.
+  for (const type of ["focusin", "keydown"]) grid.addEventListener(type, () => makeHints(rows));
 
   year.addEventListener("keydown", (event) => {
     const k = event.key;

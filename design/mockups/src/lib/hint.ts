@@ -70,8 +70,23 @@ export function hint(words: string, options: HintOptions = {}): HTMLElement {
   return probe(bubble, { role: "component", name: "Hint", variant: "", fixed: { width: false, height: true } }, { floats: true });
 }
 
-/** The hints of controls drawn but not yet pointed at or reached by the keyboard. */
-const pending = new WeakMap<Element, () => void>();
+/** The hint each control drawn but not yet pointed at or reached by the keyboard will make. */
+const pending = new WeakMap<Element, (arriving: boolean) => void>();
+
+/** The controls already listening for the pointer and the keyboard: a control named again keeps them. */
+const listening = new WeakSet<Element>();
+
+/** Controls given a hint since the last frame, whose pin or key may have come after it. */
+let unseen: Element[] = [];
+
+/** Makes the hints of the controls given one since the last frame that show whatever the pointer does. */
+function makePinned(): void {
+  const these = unseen;
+  unseen = [];
+  for (const control of these) {
+    if (control.hasAttribute("data-pinned") || control.hasAttribute("data-keyed")) pending.get(control)?.(false);
+  }
+}
 
 /**
  * Gives `control` its hint, `words`: under it while the pointer is over it, or while it is lit
@@ -81,12 +96,13 @@ const pending = new WeakMap<Element, () => void>();
  * not with the control: a page of hinted controls lays out none of them until one is wanted. One
  * made while its control is already pointed at is laid in hidden and its hidden look worked out
  * before it is let go, so it fades in as one made before would, on the same frame. A bubble shown
- * whatever the pointer does (pinned, keyed, or every sample drawn at once) is made at once.
+ * whatever the pointer does (pinned or keyed, by the next frame, or every sample drawn at once) is
+ * made then, and a control named again while it is pointed at or holds the keyboard shows its new
+ * one at once, as it showed the old.
  */
 export function withHint<E extends HTMLElement>(control: E, words: string, options: HintOptions = {}): E {
   control.classList.add("k-hinted");
-  const build = (arriving: boolean) => {
-    if (!pending.has(control)) return;
+  pending.set(control, (arriving) => {
     pending.delete(control);
     const bubble = hint(words, options);
     if (arriving) bubble.dataset.arriving = "";
@@ -96,20 +112,29 @@ export function withHint<E extends HTMLElement>(control: E, words: string, optio
       delete bubble.dataset.arriving;
     }
     if (options.side !== "above") flipWhenCut(control, bubble);
-  };
-  pending.set(control, () => build(false));
-  if (options.shown || ALL || control.hasAttribute("data-pinned") || control.hasAttribute("data-keyed")) {
-    requestAnimationFrame(() => build(false));
+  });
+  if (options.shown || ALL) {
+    requestAnimationFrame(() => pending.get(control)?.(false));
     return control;
   }
-  control.addEventListener("pointerenter", () => build(true), { once: true });
-  control.addEventListener("focusin", () => build(true), { once: true });
+  if (!listening.has(control)) {
+    listening.add(control);
+    const wanted = () => pending.get(control)?.(true);
+    control.addEventListener("pointerenter", wanted);
+    control.addEventListener("focusin", wanted);
+  }
+  if (control.isConnected && control.matches(":hover, :focus-within")) {
+    pending.get(control)?.(false);
+    return control;
+  }
+  if (!unseen.length) requestAnimationFrame(makePinned);
+  unseen.push(control);
   return control;
 }
 
 /** Makes every hint under `root` not made yet: a sample whose move plays its bubble. */
 export function makeHints(root: ParentNode): void {
-  for (const control of root.querySelectorAll(".k-hinted")) pending.get(control)?.();
+  for (const control of root.querySelectorAll(".k-hinted")) pending.get(control)?.(false);
 }
 
 /**
