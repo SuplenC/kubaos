@@ -202,7 +202,7 @@ export default page<Shown>({
     },
     rows: [{ name: "The sheet", cell }],
     looks: {
-      rest: "the pill lit while it is open; the rows",
+      rest: "the pill at its rest look while it is open; the rows",
       lit: "the keyboard's row on `secondary_container`",
       pressed: "+ pressed, the value rolling",
       open: "a row's menu at the pointer",
