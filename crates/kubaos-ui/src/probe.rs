@@ -310,11 +310,9 @@ impl Collect {
                     .map(|c| rectangle(c.bounds))
                     .reduce(|a, b| a.union(&b))
                     .unwrap_or_default();
-                Some(Node {
-                    role: Role::Box,
-                    bounds: rect(union),
-                    children,
-                })
+                let mut node = Node::new(Role::Box, rect(union));
+                node.children = children;
+                Some(node)
             }
         }
     }
@@ -339,11 +337,9 @@ impl Collect {
         {
             return only;
         }
-        Node {
-            role: node.role.clone(),
-            bounds: rect(node.bounds),
-            children,
-        }
+        let mut built = Node::new(node.role.clone(), rect(node.bounds));
+        built.children = children;
+        built
     }
 
     fn scope(&mut self) -> &mut Scope {

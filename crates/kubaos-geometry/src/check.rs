@@ -82,8 +82,25 @@ struct Walk<'a> {
 struct Ancestor {
     label: String,
     bounds: Rect,
-    /// Whether its content scrolls in it.
+    /// Whether its content scrolls in it, down.
     scrolls: bool,
+    /// Whether its content scrolls in it sideways too.
+    across: bool,
+    /// Whether it starts a space of its own ([`starts_space`]): what is inside is held to it and
+    /// the boxes inside it, never to the boxes around it.
+    space: bool,
+}
+
+/// Whether `node` starts a space of its own: a picture, laid out at its own size and drawn
+/// scaled, whose layout the room it is drawn in doesn't hold; a layer floating over the page,
+/// which its control's box doesn't hold; or a part that hangs past the part it is placed over.
+fn starts_space(node: &Node) -> bool {
+    node.marks.picture.is_some() || node.marks.floats || node.marks.overhangs
+}
+
+/// The children a layout places one after another: those in its flow, not those placed over it.
+fn in_flow(node: &Node) -> Vec<&Node> {
+    node.children.iter().filter(|child| !child.marks.over).collect()
 }
 
 impl Walk<'_> {
@@ -165,6 +182,8 @@ impl Walk<'_> {
             label: label.clone(),
             bounds: node.bounds,
             scrolls: matches!(node.role, Role::Scroll { .. }),
+            across: matches!(node.role, Role::Scroll { .. }) && node.marks.across,
+            space: starts_space(node),
         });
         for (index, child) in node.children.iter().enumerate() {
             let segment = !matches!(node.role, Role::Box);
@@ -265,8 +284,10 @@ impl Walk<'_> {
     /// Text that fits its box, and text and icons inside every box around them.
     fn fits(&mut self, node: &Node, path: &[String], ancestors: &[Ancestor]) {
         let b = node.bounds;
+        // Words that vary are cut with an ellipsis where they don't fit: their width isn't a clip.
         if let Role::Text { natural, .. } = &node.role
-            && (self.device(natural.width - b.width) >= EPSILON || self.device(natural.height - b.height) >= EPSILON)
+            && ((!node.marks.variable && self.device(natural.width - b.width) >= EPSILON)
+                || self.device(natural.height - b.height) >= EPSILON)
         {
             let message = format!(
                 "the text needs {}×{} and its box is {}×{}",
@@ -275,18 +296,25 @@ impl Walk<'_> {
             self.report(Rule::ClippedText, path, &node.role, message);
             return;
         }
-        if !matches!(node.role, Role::Text { .. } | Role::Icon { .. }) {
+        if !matches!(node.role, Role::Text { .. } | Role::Icon { .. }) || starts_space(node) {
             return;
         }
+        // A space of its own holds what is in it; the boxes around it don't.
+        let held = ancestors
+            .iter()
+            .rposition(|ancestor| ancestor.space)
+            .map_or(ancestors, |start| &ancestors[start..]);
         // From the nearest scroll out, the content may run above or below the boxes around it:
-        // that is scrolling, not clipping. Scrolls only scroll down, so across it still clips.
-        let mut scrolled = false;
-        let outside = ancestors.iter().rev().find_map(|ancestor| {
+        // that is scrolling, not clipping. A scroll scrolls down; across it still clips, unless it
+        // scrolls sideways too.
+        let (mut scrolled, mut scrolled_across) = (false, false);
+        let outside = held.iter().rev().find_map(|ancestor| {
             let a = ancestor.bounds;
             let across = self.device(a.x - b.x) >= EPSILON || self.device(b.right() - a.right()) >= EPSILON;
             let down = self.device(a.y - b.y) >= EPSILON || self.device(b.bottom() - a.bottom()) >= EPSILON;
             scrolled |= ancestor.scrolls;
-            let clipped = across || (down && !scrolled);
+            scrolled_across |= ancestor.across;
+            let clipped = (across && !scrolled_across) || (down && !scrolled);
             clipped.then_some((&ancestor.label, a))
         });
         if let Some((label, a)) = outside {
@@ -296,7 +324,8 @@ impl Walk<'_> {
     }
 
     fn layout(&mut self, node: &Node, axis: Axis, gap: f32, align: Align, path: &[String]) {
-        for pair in node.children.windows(2) {
+        let flow = in_flow(node);
+        for pair in flow.windows(2) {
             let (prev, next) = (pair[0].bounds, pair[1].bounds);
             let between = next.start(axis) - prev.end(axis);
             if !self.same(between, gap) {
@@ -311,9 +340,8 @@ impl Walk<'_> {
             Axis::X => Axis::Y,
             Axis::Y => Axis::X,
         };
-        let placed: Vec<&Node> = node
-            .children
-            .iter()
+        let placed: Vec<&Node> = flow
+            .into_iter()
             .filter(|c| !matches!(c.role, Role::Spacer { .. }))
             .collect();
         self.lined_up(&placed, cross, align, path, &node.role, "the layout");
@@ -321,9 +349,10 @@ impl Walk<'_> {
 
     fn grid(&mut self, node: &Node, columns: u16, gap: f32, align: Align, path: &[String]) {
         let columns = usize::from(columns.max(1));
-        let rows: Vec<&[Node]> = node.children.chunks(columns).collect();
+        let flow = in_flow(node);
+        let rows: Vec<&[&Node]> = flow.chunks(columns).collect();
         for column in 0..columns {
-            let cells: Vec<&Node> = rows.iter().filter_map(|row| row.get(column)).collect();
+            let cells: Vec<&Node> = rows.iter().filter_map(|row| row.get(column).copied()).collect();
             self.lined_up(
                 &cells,
                 Axis::X,
@@ -334,7 +363,7 @@ impl Walk<'_> {
             );
         }
         for (index, row) in rows.iter().enumerate() {
-            let cells: Vec<&Node> = row.iter().collect();
+            let cells: Vec<&Node> = row.to_vec();
             self.lined_up(&cells, Axis::Y, align, path, &node.role, &format!("row {index}"));
         }
         for (index, pair) in rows.windows(2).enumerate() {
@@ -568,8 +597,12 @@ fn same_parts(a: &[Part], b: &[Part]) -> bool {
 
 /// A frame's boxes in order, each with its role's label. A text's words and an icon's symbol are
 /// content, which a mode may change (a contrast ratio, a switch naming the other mode), so they
-/// are left out, and with them the width the words take; where the text sits still counts.
+/// are left out, and with them the width the words take; where the text sits still counts. A box
+/// drawn in one mode only is left out, with what it holds.
 fn flatten(node: &Node, into: &mut Vec<(String, Rect)>) {
+    if node.marks.only.is_some() {
+        return;
+    }
     let (label, bounds) = match node.role {
         Role::Text { .. } => (
             "Text".to_owned(),
@@ -590,6 +623,9 @@ fn flatten(node: &Node, into: &mut Vec<(String, Rect)>) {
 /// Each page's light frame with the same boxes as its dark one at the same scale: changing modes
 /// changes colours, never geometry.
 fn mode_invariant(frames: &[Frame], findings: &mut Vec<Finding>) {
+    for frame in frames {
+        drawn_in_its_mode(frame, &frame.root, &mut Vec::new(), findings);
+    }
     for (index, frame) in frames.iter().enumerate() {
         let Some(other) = frames[..index]
             .iter()
@@ -621,6 +657,35 @@ fn mode_invariant(frames: &[Frame], findings: &mut Vec<Finding>) {
             path: frame.page.clone(),
             message,
         });
+    }
+}
+
+/// Every box of `node` that says it is drawn in one mode only, held to being drawn in that mode: a
+/// declaration a mode outgrew is stale, and fails.
+fn drawn_in_its_mode(frame: &Frame, node: &Node, path: &mut Vec<String>, findings: &mut Vec<Finding>) {
+    if let Some(only) = &node.marks.only
+        && *only != frame.mode
+    {
+        findings.push(Finding {
+            frame: frame.name(),
+            rule: Rule::ModeInvariant,
+            path: path_text(path, &node.role),
+            message: format!(
+                "{} says it is drawn in {only} only, and is drawn in {}",
+                node.role.label(),
+                frame.mode
+            ),
+        });
+    }
+    let segment = !matches!(node.role, Role::Box);
+    for (index, child) in node.children.iter().enumerate() {
+        if segment {
+            path.push(format!("{}[{index}]", node.role.label()));
+        }
+        drawn_in_its_mode(frame, child, path, findings);
+        if segment {
+            path.pop();
+        }
     }
 }
 

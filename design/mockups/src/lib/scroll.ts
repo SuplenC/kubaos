@@ -17,7 +17,7 @@
 // the view's whole reach, and fades in and out over `micro`.
 
 import "./lists.css";
-import { probe } from "./probe.ts";
+import { probe, scrolls } from "./probe.ts";
 
 export interface ScrollOptions {
   /** Its height, a length's CSS. */
@@ -54,7 +54,8 @@ export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTM
   box.style.setProperty("--above", reach(options.above));
   box.style.setProperty("--below", reach(options.below));
   box.toggleAttribute("data-no-gutter", options.noGutter ?? false);
-  const view = document.createElement("span");
+  // What scrolls: content past it is scrolled out of view, not cut.
+  const view = scrolls(document.createElement("span"));
   view.className = "k-scroll-view";
   const body = document.createElement("span");
   body.className = "k-scroll-body";

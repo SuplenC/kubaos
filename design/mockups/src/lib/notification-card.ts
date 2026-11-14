@@ -14,7 +14,7 @@ import { focusRing } from "./focus.ts";
 import { icon } from "./icon.ts";
 import { iconButton } from "./icon-button.ts";
 import { iconTile } from "./icon-tile.ts";
-import { probe } from "./probe.ts";
+import { declare, probe } from "./probe.ts";
 import { nested, role } from "./radius.ts";
 import { type Pinned } from "./control.ts";
 import { clamped, refit, text, unclamp } from "./text.ts";
@@ -77,13 +77,13 @@ function marksRead(label: string): boolean {
 function words(note: Note): HTMLElement {
   const parts: HTMLElement[] = [];
   if (note.summary !== "") {
-    const summary = clamped(note.summary, "body_strong", "on_surface", 2);
+    const summary = declare(clamped(note.summary, "body_strong", "on_surface", 2), { variable: true });
     summary.classList.add("k-notif-summary");
     summary.dataset.wrapped = "";
     parts.push(summary);
   }
   if (note.body !== "") {
-    const body = clamped(note.body, "body", "on_surface_variant", 2);
+    const body = declare(clamped(note.body, "body", "on_surface_variant", 2), { variable: true });
     body.classList.add("k-notif-body");
     body.dataset.wrapped = "";
     parts.push(body);
@@ -126,7 +126,7 @@ export function card(note: Note, options: CardOptions = {}): HTMLElement {
   tile.className = "k-notif-tile";
   tile.append(iconTile({ glyph: note.critical ? "warning" : "notifications", size: "Sm", danger: note.critical ?? false, ...(note.photo ? { photo: note.photo } : {}) }));
   if (note.unread && (options.dot ?? true)) tile.append(badge({ accent: true }));
-  const app = clamped(note.app || "Notification", "label");
+  const app = declare(clamped(note.app || "Notification", "label"), { variable: true });
   app.classList.add("k-notif-app");
   const who = document.createElement("span");
   who.className = "k-notif-who";

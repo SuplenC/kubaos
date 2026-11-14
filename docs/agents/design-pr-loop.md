@@ -12,7 +12,7 @@ How a PR that changes how something looks gets its screenshots and its review. T
 
 ## Reviewing a mockup
 
-A mockup is reviewed live, not through pictures alone. The agent pushes its branch and names the pages it added or changed; Kuba runs `just mockups` in that branch's checkout and opens them, switches the toolbar through light and dark, the four scales, reduce motion, the speed, the text lengths and the window sizes, plays the motion, and tries the keys. He may change the page himself. Before it reaches him the agent has run `just mockups-check` (the mocked components' boxes held to the specimen's), rendered the pages with `just shots mockups --full`, reviewed them against `docs/agents/design-review.md`, and, for a part that exists already, compared them with its current build's shots, listing every difference as a question. The mockup is approved when Kuba says so.
+A mockup is reviewed live, not through pictures alone. The agent pushes its branch and names the pages it added or changed; Kuba runs `just mockups` in that branch's checkout and opens them, switches the toolbar through light and dark, the four scales, reduce motion, the speed, the text lengths and the window sizes, plays the motion, and tries the keys. He may change the page himself. Before it reaches him the agent has run `just mockups-check PAGE…` on its pages (the mocked components' boxes held to the specimen's; a page that passes joins `design/mockups/checked-pages`), rendered the pages with `just shots mockups --full`, reviewed them against `docs/agents/design-review.md`, and, for a part that exists already, compared them with its current build's shots, listing every difference as a question. The mockup is approved when Kuba says so.
 
 ## Live preview
 

@@ -58,20 +58,75 @@ pub struct Node {
     #[serde(flatten)]
     pub role: Role,
     pub bounds: Rect,
+    /// What the box is beyond its role: how it is drawn, and what its probe declares.
+    #[serde(flatten)]
+    pub marks: Marks,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<Node>,
 }
 
 impl Node {
-    /// A node with no children yet.
+    /// A node with no children yet and no marks.
     #[must_use]
     pub fn new(role: Role, bounds: Rect) -> Node {
         Node {
             role,
             bounds,
+            marks: Marks::default(),
             children: Vec::new(),
         }
     }
+}
+
+/// What a box is beyond its role, each left out of a frame when it doesn't apply. The toolkits'
+/// own layouts report none; a mockup's frame reports how each box is drawn (`picture`), and its
+/// probes declare the rest by name, each a rule's exception for that box alone
+/// (`docs/DESIGN.md`, "The geometry check").
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Each is a mark of its own that a frame's JSON spells as a flag, any of them on together."
+)]
+pub struct Marks {
+    /// A picture of UI: the box and everything in it drawn scaled by this ratio, as a gallery's
+    /// small copy of a screen or windows stepped back behind a lock. Its boxes are reported at the
+    /// size they are laid out at, from its own top left on a whole device pixel, and its texts and
+    /// icons are held to the boxes from it inward: the room it is drawn in holds the picture,
+    /// not its layout.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub picture: Option<f32>,
+    /// Placed over its parent, out of its flow (CSS `position: absolute`): not one of its layout's
+    /// children, so the layout's gaps and lines leave it out.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub over: bool,
+    /// A layer of its own over the page, anchored to a control but not inside it: a hint's bubble,
+    /// a tooltip, an open list. Its texts and icons are held to the boxes from it inward, not to
+    /// its control's.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub floats: bool,
+    /// On a scroll: its content scrolls sideways as well as down, so content past its left or
+    /// right is scrolled out of view, not clipped: a screen wider than the page, in a pane the site
+    /// lets scroll.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub across: bool,
+    /// On a text: its words are content that varies (a window's title, a notification's body, a
+    /// network's name), cut with an ellipsis where they don't fit, so needing more width than its
+    /// box is how it is drawn, not a clip. Its height and its place are held as any text's.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub variable: bool,
+    /// Hangs past the part it is placed over by design, as a count badge over its icon's corner:
+    /// it and what it holds are held to the boxes from it inward.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub overhangs: bool,
+    /// Drawn in this mode only (`dark` or `light`), as a sample of a look only night has: left out
+    /// when a page's modes are compared, and a finding where it is drawn in the other mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub only: Option<String>,
+    /// On a component: it is drawn ahead of its twin in the libraries, which haven't caught up
+    /// yet, for this reason (`"menu.md: a menu's popover is 4 inside"`). Its differences from its
+    /// twin are listed, not counted; once it matches its twin, the declaration is stale and fails.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ahead: Option<String>,
 }
 
 /// What a box is, as much as the toolkit knows.

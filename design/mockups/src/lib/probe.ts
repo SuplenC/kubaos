@@ -21,9 +21,57 @@ export type Role =
 
 export const FIXED_HEIGHT: Fixed = { width: false, height: true };
 
-/** Marks `element` as `role`. */
-export function probe<E extends HTMLElement | SVGElement>(element: E, role: Role): E {
-  element.dataset.probe = JSON.stringify(role);
+/**
+ * What a probe declares of its box beyond its role, by name, for `site/frame.ts` and the check
+ * (`docs/DESIGN.md`, "What a mockup's frame says"). Each is a rule's exception for that box alone.
+ */
+export interface Declared {
+  /**
+   * It floats over the page when placed out of the flow: a bubble or a card anchored to a control
+   * but drawn in a layer of its own, held to its own boxes rather than its control's.
+   */
+  readonly floats?: true;
+  /**
+   * On a text: its words are content that varies (a window's title, a notification's body, a
+   * network's name), cut with an ellipsis where they don't fit, so needing more room across than
+   * its box is how it is drawn, not a clip. Fixed words that get cut still fail.
+   */
+  readonly variable?: true;
+  /** It hangs past the part it is placed over by design: a count badge over its icon's corner. */
+  readonly overhangs?: true;
+  /**
+   * It is drawn in this mode only: a sample of a look one mode has, left out when the page's modes
+   * are compared, and a finding where it is drawn in the other mode.
+   */
+  readonly only?: "dark" | "light";
+  /**
+   * On a component: it is drawn ahead of its twin in the libraries, for this reason, a doc that
+   * says so first (`"menu.md: …"`). Its differences from its twin are listed, not counted, and the
+   * check fails once it matches, so the declaration goes when the library catches up.
+   */
+  readonly ahead?: string;
+}
+
+/** Adds what `element`'s probe `declares` to it: words of a text that vary, say. */
+export function declare<E extends HTMLElement | SVGElement>(element: E, declares: Declared): E {
+  element.dataset.probe = JSON.stringify({ ...(JSON.parse(element.dataset.probe ?? "{}") as object), ...declares });
+  return element;
+}
+
+/** Marks `element` as `role`, with what it `declares`. */
+export function probe<E extends HTMLElement | SVGElement>(element: E, role: Role, declares: Declared = {}): E {
+  element.dataset.probe = JSON.stringify({ ...role, ...declares });
+  return element;
+}
+
+/**
+ * Marks `element` as what its content scrolls in, as `kubaos-ui` reports a scrollable: content past
+ * its edge is scrolled out of view, not cut (`docs/DESIGN.md`, "The geometry check"). An attribute
+ * of its own, not a probe: only the geometry frame reads it, and the site's parts tree, which every
+ * probe is a line of, leaves a scroll out as parity does.
+ */
+export function scrolls<E extends HTMLElement>(element: E): E {
+  element.dataset.scrollProbe = "";
   return element;
 }
 

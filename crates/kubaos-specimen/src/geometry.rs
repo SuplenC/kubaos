@@ -155,6 +155,9 @@ pub struct Mockup {
     pub compared: usize,
     /// The components with no twin: words the specimen doesn't show, such as the long ones.
     pub unmatched: Vec<String>,
+    /// The components drawn ahead of their twins, each with why and how many places it differs,
+    /// as `Popover reading "Open": 3 difference(s), menu.md: …`.
+    pub ahead: Vec<String>,
     /// Boxes of a component that differ from its twin's.
     pub differences: usize,
     /// Geometry findings in the mockup frames.
@@ -208,6 +211,12 @@ pub fn mockup(dir: &Path) -> Result<Mockup, ParityError> {
             ));
         }
         report.unmatched.extend(found.unmatched);
+        report.ahead.extend(
+            found
+                .ahead
+                .iter()
+                .map(|a| format!("{}: {} difference(s), {}", a.component, a.differences, a.reason)),
+        );
         mockups.push(frame);
     }
     let findings = kubaos_geometry::check(&mockups, &rules());
@@ -215,6 +224,8 @@ pub fn mockup(dir: &Path) -> Result<Mockup, ParityError> {
     report.lines.extend(findings.iter().map(ToString::to_string));
     report.unmatched.sort();
     report.unmatched.dedup();
+    report.ahead.sort();
+    report.ahead.dedup();
     Ok(report)
 }
 

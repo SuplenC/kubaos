@@ -236,16 +236,19 @@ export function wellOf(content: HTMLElement, height = "100%"): HTMLElement {
 
 const lock = "lock";
 
-export const WIFI_KNOWN: readonly ListRowSpec[] = [
+/** Rows whose titles are names that vary: networks, devices. */
+const named = (rows: readonly ListRowSpec[]): readonly ListRowSpec[] => rows.map((each) => ({ ...each, named: true }));
+
+export const WIFI_KNOWN: readonly ListRowSpec[] = named([
   { title: "Shinjuku-5G", subtitle: "Connected · 5 GHz", subtitleIcon: lock, icon: "signal_wifi_4_bar", tile: true, accent: true, checked: true },
   { title: "Golden Gai", subtitle: "Saved", subtitleIcon: lock, icon: "network_wifi_3_bar", tile: true, checked: false, forget: () => undefined },
-];
+]);
 
-export const WIFI_NEARBY: readonly ListRowSpec[] = [
+export const WIFI_NEARBY: readonly ListRowSpec[] = named([
   { title: "7SPOT", subtitle: "Open", icon: "network_wifi_2_bar", tile: true, checked: false },
   { title: "Omoide Yokocho", subtitle: "Secured", subtitleIcon: lock, icon: "network_wifi_2_bar", tile: true, checked: false },
   { title: "Kabukicho Free Wi-Fi", subtitle: "Open", icon: "network_wifi_1_bar", tile: true, checked: false },
-];
+]);
 
 export type WifiState = "rest" | "scanning" | "none" | "off" | "no-adapter";
 
@@ -263,20 +266,20 @@ export function wifiRows(state: WifiState = "rest", nearby: readonly ListRowSpec
 
 // Bluetooth.
 
-export const BT_KNOWN: readonly ListRowSpec[] = [
+export const BT_KNOWN: readonly ListRowSpec[] = named([
   { title: "MX Master 3S", subtitle: "Connected · 45%", subtitleIcon: "battery_1_bar", icon: "mouse", tile: true, accent: true, checked: true },
   { title: "WH-1000XM4", subtitle: "Connected · 80%", subtitleIcon: "battery_3_bar", icon: "headphones", tile: true, accent: true, checked: true },
   { title: "Keychron K3", subtitle: "Not connected", icon: "keyboard", tile: true, checked: false, forget: () => undefined },
   { title: "Pixel 9", subtitle: "Not connected", icon: "smartphone", tile: true, checked: false, forget: () => undefined },
-];
+]);
 
-export const BT_NEARBY: readonly ListRowSpec[] = [
+export const BT_NEARBY: readonly ListRowSpec[] = named([
   { title: "JBL Flip 6", subtitle: "Very close", icon: "speaker", tile: true, checked: false },
   { title: "MX Keys Mini", subtitle: "Nearby", icon: "keyboard", tile: true, checked: false },
   { title: "Galaxy Watch", subtitle: "Far", icon: "bluetooth", tile: true, checked: false },
-];
+]);
 
-export const BT_UNNAMED: readonly ListRowSpec[] = ["4C:2F:9A:01:BE:77", "D8:3A:DD:5E:10:C2", "F1:07:63:A4:29:8B"].map((address) => ({ title: address, subtitle: "Not paired", icon: "bluetooth", tile: true, checked: false }));
+export const BT_UNNAMED: readonly ListRowSpec[] = named(["4C:2F:9A:01:BE:77", "D8:3A:DD:5E:10:C2", "F1:07:63:A4:29:8B"].map((address) => ({ title: address, subtitle: "Not paired", icon: "bluetooth", tile: true, checked: false })));
 
 export type BtState = "rest" | "scanning" | "none" | "failed";
 

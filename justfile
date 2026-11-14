@@ -121,8 +121,8 @@ e2e *checks:
     (($#)) && only=(--only "$(IFS=,; echo "$*")")
     test/run e2e ${only[@]+"${only[@]}"}
 
-# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, every colour pair's WCAG contrast in both modes, every specimen page at every scale, light and dark, held to the geometry rules, the mockup site built, then QML's parity with iced. `just test` runs the first three as cargo tests; `nix flake check` runs them and parity. The mockups' own check, `just mockups-check`, is run by hand.
-design-check: && design-parity
+# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, every colour pair's WCAG contrast in both modes, every specimen page at every scale, light and dark, held to the geometry rules, then QML's parity with iced, then the mockup pages that must pass (`mockups-checked`). `just test` runs the first three as cargo tests; `nix flake check` runs them and parity.
+design-check: && design-parity mockups-checked
     cargo run -q -p kubaos-design -- lint
     cargo run -q -p kubaos-design -- contrast >/dev/null
     cargo run -q -p kubaos-specimen -- check
@@ -145,15 +145,33 @@ mockups *args: _mockups-deps
 mockups-build: _mockups-deps
     cd design/mockups && npm run -s build
 
-# The mockups' pages laid out in headless Chromium at every scale, light and dark, each held to the geometry rules, and each mocked component to its twin on the specimen's pages (`kubaos-specimen mockup`): the same boxes as the build, wherever each page puts it. Then every motion player seeked and held to its recipe (`scripts/player-test.ts`). Run by hand, and not part of `design-check`: the site's pages are drawn ahead of the libraries, so not every page passes it.
-mockups-check: mockups-build
+# The mockup site built into design/mockups/dist for the checks, as `mockups-build` builds it but without the moves' recipes, which it draws every page for.
+_mockups-site: _mockups-deps
+    cd design/mockups && npm run -s typecheck && node scripts/property-check.ts && npx vite build --logLevel warn
+
+# The mockups' check (docs/DESIGN.md, "The mockups"): the walk that reads a page's boxes held to small pages first (`scripts/frame-test.ts`), then each page laid out in headless Chromium at every scale, light and dark, held to the geometry rules, and each mocked component to its twin on the specimen's pages (`kubaos-specimen mockup`), wherever each page puts it; then every motion player seeked and held to its recipe (`scripts/player-test.ts`). With PAGEs (slugs, as `#/atoms/button`), those pages alone, together: the `identical` rule compares their instances with each other's only. With none, the whole site, which not every page passes yet: the site is drawn ahead of the libraries.
+[positional-arguments]
+mockups-check *pages: _mockups-site
     #!/usr/bin/env bash
     set -euo pipefail
     frames="$(mktemp -d)"
     trap 'rm -rf "$frames"' EXIT
-    (cd design/mockups && node scripts/render.ts "$frames" --frames)
+    cd design/mockups
+    node --disable-warning=ExperimentalWarning scripts/frame-test.ts
+    node scripts/render.ts "$frames" --frames "$@"
     cargo run -q -p kubaos-specimen -- mockup "$frames"
-    (cd design/mockups && node scripts/player-test.ts)
+    node scripts/player-test.ts "$@"
+
+# The mockup pages every pull request holds to the mockups' check, by `design-check`: those listed in design/mockups/checked-pages, checked together. A page joins the list once `just mockups-check PAGE` passes it with no finding and no difference.
+mockups-checked:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mapfile -t pages < <(grep -v -e '^#' -e '^$' design/mockups/checked-pages)
+    if ((${#pages[@]} == 0)); then
+      echo "mockups-checked: design/mockups/checked-pages names no page" >&2
+      exit 1
+    fi
+    just mockups-check "${pages[@]}"
 
 # The mockup site's npm dependencies, from its package-lock.json, when node_modules is missing or older than the lock.
 _mockups-deps:

@@ -63,7 +63,7 @@ export function badge(options: BadgeOptions = {}): HTMLElement {
   const words = badgeWords(options.count);
   pill.style.setProperty("--natural", String(advance("label", words)));
   pill.append(text(words, "label", options.accent ? "on_primary" : "on_error"));
-  return probe(pill, { role: "component", name: "Badge", variant: variant("count", tone), fixed: FIXED_HEIGHT });
+  return probe(pill, { role: "component", name: "Badge", variant: variant("count", tone), fixed: FIXED_HEIGHT }, { overhangs: true });
 }
 
 /** The symbol sizes a badged symbol comes in: the bar's 16, and a row's 20 and 24. */

@@ -13,7 +13,7 @@ import { focusRing } from "./focus.ts";
 import { iconButton } from "./icon-button.ts";
 import { iconTile } from "./icon-tile.ts";
 import { card, CORNER, type Note } from "./notification-card.ts";
-import { probe } from "./probe.ts";
+import { declare, probe } from "./probe.ts";
 import { clamped, text } from "./text.ts";
 
 /** A notification as a popup shows it: one, or the newest of several from one app. */
@@ -53,7 +53,7 @@ function face(note: PopupNote, dismiss: HTMLElement): HTMLElement {
   const tile = iconTile({ glyph: "notifications", size: "Sm", ...(count > 1 ? { count } : {}) });
   const lines = document.createElement("span");
   lines.className = "k-notif-pop-lines";
-  lines.append(clamped(note.summary, "label"), clamped(note.body, "small", "on_surface_variant"));
+  lines.append(declare(clamped(note.summary, "label"), { variable: true }), declare(clamped(note.body, "small", "on_surface_variant"), { variable: true }));
   const end = document.createElement("span");
   end.className = "k-notif-pop-end";
   const meta = text(`${note.app || "Notification"} · ${note.when}`, "small", "on_surface_variant");
