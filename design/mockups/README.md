@@ -83,3 +83,22 @@ A move of more than one track renders its parts: under the legend, each part alo
 The recipe follows as tables, the row of whatever is changing at the playhead lit, and the player's loop phase by phase. A shot (`?chrome=off`) holds every player on its first state; with `?all`, as the shots draw, every move has a player of its own. `node scripts/player-test.ts [PAGE…]`, run by `just mockups-check`, seeks every player on the built site with its own tracks, light mode's, reduced motion's, the flicker off's and at speed 2, and holds each ball to the progress the browser is playing (on a property two tracks share, the whole plays the later's), each part alone to the whole or to its own ball where a later track has the property, a tick to its moment and the arrow keys to a frame.
 
 `just mockups-build` writes every page's recipes to `dist/motion/PAGE.json`, the moves as the libraries and a check read them.
+
+## The Gallery's tour
+
+A film of the wallpaper picker, rendered frame by frame rather than recorded, so its motion is even whatever a frame takes to draw. `scripts/tour.ts` serves the site with Vite, opens the live Gallery on a 2560×1440 viewport through the stage's Full screen control, at night and scale 1.5, and plays its tour with key presses alone (no pointer, so no hover and no tooltip): the desktop, opening, two steps along the wall, a floor up and back, the Desktop and Lock views, waking the lock and letting it rest, depth off and on, full screen and back, then Apply. Each move plays out, then the picker rests a moment before the next key.
+
+The page runs on a clock of its own, installed before its scripts: `performance.now`, `Date`, timers, animation frames and idle callbacks read and run on it, and every animation is held paused and set to the clock's time on each frame, so a frame is exactly 1/60 s after the last. Chromium's virtual time is no help here: it moves timers and animation frames but not the timeline transitions and the Web Animations play on.
+
+In `nix develop`, from `design/mockups/` (Chromium runs headless and draws in software, about 0.4 s a frame; the 41 s tour is some 2,450 frames and 7 GB). `--from A --frames B` writes frames A to B alone while the tour still plays from its start on the same clock, so it renders in segments that each fit a short run, and the frames are the ones a single run draws:
+
+```sh
+for range in "0 850" "850 1700" "1700 100000"; do
+  set -- $range
+  nice -n 15 node scripts/tour.ts ~/.cache/kubaos-gallery-tour/frames --from $1 --frames $2
+done
+nice ffmpeg -framerate 60 -i ~/.cache/kubaos-gallery-tour/frames/%05d.png -c:v libx264 -preset slow -crf 16 \
+  -pix_fmt yuv420p -movflags +faststart -threads 8 ~/.cache/kubaos-gallery-tour/gallery-tour.mp4
+```
+
+`--size WxH`, `--scale` and `--port` (5183 by default) change the viewport, the site's scale and Vite's port; `--frames N` alone is a trial of the first N frames. Next to the frames, `beats.txt` gives each beat's first frame and time, and `trace-A.tsv` each written frame's page time, the front picture's box, its step out and the room's light, which show the motion even.
