@@ -2649,8 +2649,9 @@
 }
 
 /* The summary takes its words' width, up to half the line; past that, and where the title needs
-   the room, it ends in an ellipsis. */
-.k-collapsible-summary {
+   the room, it ends in an ellipsis. As specific as a clamped text's own `max-width: 100%`, and
+   after it, so the half holds. */
+.k-text.k-collapsible-summary {
   flex: 0 1 auto;
   min-width: 0;
   max-width: 50%;
