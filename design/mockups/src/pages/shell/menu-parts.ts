@@ -252,8 +252,8 @@ export const LAYOUTS: readonly Item[] = [
 
 // ---------------------------------------------------------------- the footer --
 
-/** The footer's keys. */
-export const footerKeys = (hints: readonly KeyHint[]) => keyHints(hints);
+/** The footer's keys: a hint that would pass the room left is left out whole. */
+export const footerKeys = (hints: readonly KeyHint[]) => keyHints(hints, { room: "100%" });
 
 /** A line of the footer's words in `small`: why an Action failed, in `error`, or what is down. */
 export function footerWords(words: string, failed: boolean): HTMLElement {
@@ -279,7 +279,7 @@ export function confirmLine(question: string): HTMLElement {
 /** `left` with the problems the Daemon knows of at the line's end, Text sm, `space.s12` clear. */
 export function withProblems(left: HTMLElement, count: number, pinned?: Pinned): HTMLElement {
   const problems = button({ label: count === 1 ? "1 problem" : `${count} problems`, kind: "Text", size: "Sm", ...(pinned ? { pinned } : {}) });
-  const line = row("s12", "centre", filling(left), fill(), problems);
+  const line = row("s12", "centre", filling(left), problems);
   return filling(line);
 }
 

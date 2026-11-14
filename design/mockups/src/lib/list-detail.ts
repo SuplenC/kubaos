@@ -232,7 +232,8 @@ export function commandMenu(options: MenuOptions, measures: MenuMeasures): HTMLE
   const rule = document.createElement("span");
   rule.className = "k-menu-rule";
   rule.append(divider());
-  const foot = row(0, "centre", options.footer ?? keyHints(hints));
+  // A hint that would pass the footer's end is left out whole, never cut through a keycap.
+  const foot = row(0, "centre", options.footer ?? keyHints(hints, { room: "100%" }));
   foot.classList.add("k-menu-footer");
   const panel = document.createElement("span");
   panel.className = "k-command";

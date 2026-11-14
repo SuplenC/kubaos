@@ -133,6 +133,13 @@
   --toward: -1;
 }
 
+/* The note or the blocker gives way before the buttons do, its words breaking in the room left. */
+.k-step-footer > :is(.k-step-note, .k-step-blocker),
+.k-step-blocker > .k-text {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .k-step-blocker {
   --nudge-ink: color-mix(in srgb, var(--color-on_surface_variant), var(--color-error) calc(var(--nudge) * 100%));
 }

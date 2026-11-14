@@ -21,7 +21,7 @@ import { fill, filling, fillingHeight, gap, inset, page, row, stack } from "./la
 import { probe } from "./probe.ts";
 import { scroll } from "./scroll.ts";
 import { step, type StepOptions, type StepState } from "./step.ts";
-import { text } from "./text.ts";
+import { text, wrapped } from "./text.ts";
 import { cubic, length, raw } from "./tokens.ts";
 import { palette } from "../site/recolour.ts";
 import { settings } from "../site/settings.ts";
@@ -245,7 +245,8 @@ export interface FooterPins {
 /**
  * The footer band: Back on the left, then the note or the blocker, `space.s16` apart, and the one
  * Filled button on the right. A blocker is the `error` symbol and its reason in `small`, flashing
- * in `error` as Enter is refused.
+ * in `error` as Enter is refused. A note or a reason longer than the room between the buttons
+ * breaks between words, so it is read whole and pushes neither button.
  */
 export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: () => void = () => {}, pinned: FooterPins = {}): { band: HTMLElement; nudge: HTMLElement | null; next: HTMLElement } {
   const back = button({ label: "Back", kind: "Text", icon: "arrow_back", ...(pinned.back ? { pinned: pinned.back } : {}) });
@@ -253,13 +254,15 @@ export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: ()
   const parts: Element[] = [back, fill()];
   let nudge: HTMLElement | null = null;
   if (spec.blocker) {
-    const reason = text(spec.blocker, "small");
+    const reason = wrapped(spec.blocker, "small");
     reason.style.color = "var(--nudge-ink)";
     nudge = row("s8", "centre", icon("error", "var(--type-small-icon)", "var(--nudge-ink)"), reason);
     nudge.classList.add("k-step-blocker");
     parts.push(nudge);
   } else if (spec.note) {
-    parts.push(text(spec.note, "small", "on_surface_variant"));
+    const note = wrapped(spec.note, "small", "on_surface_variant");
+    note.classList.add("k-step-note");
+    parts.push(note);
   }
   const next = button({ label: spec.next ?? "Continue", kind: "Filled", icon: "arrow_forward", trailing: true, ...(spec.blocker ? { disabled: true } : {}), ...(pinned.next ? { pinned: pinned.next } : {}) });
   next.addEventListener("click", onNext);
