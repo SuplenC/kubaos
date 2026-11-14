@@ -5,6 +5,7 @@
 // is its own box, already whole device pixels wide, so every child starts on one.
 
 import "./layout.css";
+import { centredOffset, centreOnPixels } from "./centre.ts";
 import { type Align, probe } from "./probe.ts";
 import { text, wrapped } from "./text.ts";
 import { length, names, raw } from "./tokens.ts";
@@ -155,19 +156,21 @@ function weighted(weights: readonly number[], gap: string, children: readonly El
       box.style.setProperty("--rows", `${share}px`);
     }
     if (options.centred) centreRows(box, count);
+    // The columns move what the page's pass centred in them, after it: their content is centred again.
+    centreOnPixels(box);
   };
   new ResizeObserver(arrange).observe(box);
   return probe(box, { role: "grid", columns: count, gap: length(`space-${gap}`), align: options.centred ? "centre" : "start" });
 }
 
-/** Each row's cells centred down it, their offsets rounded to whole device pixels. */
+/** Each row's cells centred down it on whole device pixels, an odd spare one after the cell. */
 function centreRows(box: HTMLElement, count: number): void {
   const cells = [...box.children] as HTMLElement[];
   for (const cell of cells) cell.style.marginTop = "0px";
   for (let first = 0; first < cells.length; first += count) {
     const line = cells.slice(first, first + count);
     const height = Math.max(...line.map((cell) => cell.offsetHeight));
-    for (const cell of line) cell.style.marginTop = `${Math.round((height - cell.offsetHeight) / 2)}px`;
+    for (const cell of line) cell.style.marginTop = `${centredOffset((height - cell.offsetHeight) / 2)}px`;
   }
 }
 

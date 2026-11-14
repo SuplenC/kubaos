@@ -149,7 +149,7 @@ mockups-build: _mockups-deps
 _mockups-site: _mockups-deps
     cd design/mockups && npm run -s typecheck && node scripts/property-check.ts && npx vite build --logLevel warn
 
-# The mockups' check (docs/DESIGN.md, "The mockups"): the walk that reads a page's boxes held to small pages first (`scripts/frame-test.ts`), then each page laid out in headless Chromium at every scale, light and dark, held to the geometry rules, and each mocked component to its twin on the specimen's pages (`kubaos-specimen mockup`), wherever each page puts it; then every motion player seeked and held to its recipe (`scripts/player-test.ts`). With PAGEs (slugs, as `#/atoms/button`), those pages alone, together: the `identical` rule compares their instances with each other's only. With none, the whole site, which not every page passes yet: the site is drawn ahead of the libraries.
+# The mockups' check (docs/DESIGN.md, "The mockups"): the walk that reads a page's boxes and the pass that centres them on device pixels held to small pages first (`scripts/frame-test.ts`, `scripts/centre-test.ts`), then each page laid out in headless Chromium at every scale, light and dark, held to the geometry rules, and each mocked component to its twin on the specimen's pages (`kubaos-specimen mockup`), wherever each page puts it; then every motion player seeked and held to its recipe (`scripts/player-test.ts`). With PAGEs (slugs, as `#/atoms/button`), those pages alone, together: the `identical` rule compares their instances with each other's only. With none, the whole site, which not every page passes yet: the site is drawn ahead of the libraries.
 [positional-arguments]
 mockups-check *pages: _mockups-site
     #!/usr/bin/env bash
@@ -158,6 +158,7 @@ mockups-check *pages: _mockups-site
     trap 'rm -rf "$frames"' EXIT
     cd design/mockups
     node --disable-warning=ExperimentalWarning scripts/frame-test.ts
+    node --disable-warning=ExperimentalWarning scripts/centre-test.ts
     node scripts/render.ts "$frames" --frames "$@"
     cargo run -q -p kubaos-specimen -- mockup "$frames"
     node scripts/player-test.ts "$@"

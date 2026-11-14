@@ -9,6 +9,7 @@ import "./fonts.css";
 import "./motion.css";
 import "./lib/lib.css";
 import "./site/site.css";
+import { centreOnPixels } from "./lib/centre.ts";
 import { forgetMasks } from "./lib/focus.ts";
 import { forgetWidths, shareRows } from "./lib/text.ts";
 import { forgetLengths } from "./lib/tokens.ts";
@@ -129,10 +130,11 @@ function draw(): void {
 let painted: Painted = { theme: settings().theme, mode: settings().mode };
 
 /**
- * Lines side by side share a baseline (`shareRows`): set once a frame after anything is drawn, so a
- * sample a player or a live part draws later shares it too. Only where something changed: under
- * the outermost row round each change, or under the change itself; a player's readout turning
- * every frame would otherwise have every row on the page looked at every frame.
+ * Lines side by side share a baseline (`shareRows`), and what is centred lands on whole device
+ * pixels (`centreOnPixels`): set once a frame after anything is drawn, so a sample a player or a
+ * live part draws later does too. Only where something changed: under the outermost row round each
+ * change, or under the change itself; a player's readout turning every frame would otherwise have
+ * every row on the page looked at every frame.
  */
 let sharing = 0;
 const changed = new Set<ParentNode>();
@@ -150,7 +152,9 @@ const rowsDrawn = new MutationObserver((records) => {
     const roots = [...changed].filter((root) => (root as Node).isConnected);
     changed.clear();
     // A root inside another is shared with it.
-    for (const root of roots) if (!roots.some((other) => other !== root && other.contains(root as Node))) shareRows(root);
+    const outermost = roots.filter((root) => !roots.some((other) => other !== root && other.contains(root as Node)));
+    for (const root of outermost) shareRows(root);
+    for (const root of outermost) centreOnPixels(root);
   });
 });
 

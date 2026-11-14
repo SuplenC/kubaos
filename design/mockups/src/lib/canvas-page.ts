@@ -15,6 +15,7 @@
 
 import "./canvas-page.css";
 import { button } from "./button.ts";
+import { centreOnPixels } from "./centre.ts";
 import { chip } from "./chip.ts";
 import { focusRing } from "./focus.ts";
 import { keyHints } from "./keycap.ts";
@@ -189,6 +190,8 @@ export function canvas(options: CanvasOptions): Canvas {
       const tall = (length("type-headline-line") + length("type-mono-line") + 2 * length("space-s8")) * scale;
       if (words) words.hidden = right - left < room || bottom - top < tall;
     }
+    // The boxes move what the page's pass centred in them, after it: their words are centred again.
+    centreOnPixels(stage);
   }
 
   // Every object has its box from the start, so a motion player finds its parts; the fit follows
