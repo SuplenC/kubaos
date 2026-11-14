@@ -325,6 +325,10 @@ function makeDesk(hung: Hung, view: View, mode: Mode, size: { readonly width: st
   // the password's sheet until another comes to the front. Its clock is as set for the picture.
   const made = lock({ width: size.width, height: size.height, wallpaper: hung.wallpaper, phase: PHASES[view], bar: barButtons(false), windows: [stills()], sheet: wakes, clock: lockClock(look, hung.wallpaper, "wide") });
   const element = made.element;
+  // A picture of a lock and a desktop, not one to use: its field and pills take no focus, no
+  // pointer and are not read out, as the site's other pictures of a part are.
+  element.inert = true;
+  element.setAttribute("aria-hidden", "true");
   if (hung.video) {
     const loop = document.createElement("img");
     loop.className = "gl-loop";
@@ -495,8 +499,14 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
       art.append(lamp, frame, placard);
       art.addEventListener("click", (event) => {
         if (!S.open || S.busy || editor?.editing()) return;
-        // The password's sheet, up on an awake lock, keeps its own clicks.
-        if (event.target instanceof Element && event.target.closest(".k-sheet-part")) return;
+        // The password's sheet, up on an awake lock, keeps its own clicks. The lock takes no
+        // pointer, so the click is found on the sheet by where it lands.
+        const sheet = desks.get(art)?.element.dataset.phase === "awake" ? desks.get(art)!.element.querySelectorAll(".k-sheet-part") : [];
+        const on = (part: Element) => {
+          const box = part.getBoundingClientRect();
+          return event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+        };
+        if ([...sheet].some(on)) return;
         // The picture in front of you steps out to the full screen, and a click on it there steps
         // back to the wall, as F does.
         if (level === S.folder && index === S.at[level]) void step(!S.full);

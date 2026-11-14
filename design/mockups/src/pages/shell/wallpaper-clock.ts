@@ -495,9 +495,43 @@ export function clockEditor(host: EditorHost): Editor {
     lock.style.setProperty("--screen-height", "var(--ce-dh)");
     front.frame.closest(".gl-art")?.toggleAttribute("data-staged", true);
     const clock = lock.querySelector<HTMLElement>(".k-lock-clock")!;
-    clock.append(boxOf());
+    const box = boxOf();
+    clock.append(box);
+    liveTo(lock, box);
     lock.append(guides);
     stage.toggleAttribute("data-shown", true);
+  }
+
+  // The staged lock is still a picture of one, but the clock's box on it is the editor's control:
+  // the lock is live only along the path down to the box, each part beside that path still out of
+  // reach of Tab, the pointer and a screen reader, as the whole lock is on the wall.
+  const stilled: HTMLElement[] = [];
+  function liveTo(lock: HTMLElement, box: HTMLElement): void {
+    for (let at: HTMLElement = box; at !== lock && at.parentElement; at = at.parentElement) {
+      for (const beside of at.parentElement.children) {
+        if (beside === at || !(beside instanceof HTMLElement) || beside.inert) continue;
+        beside.inert = true;
+        if (!beside.hasAttribute("aria-hidden")) {
+          beside.setAttribute("aria-hidden", "true");
+          beside.dataset.ceStilled = "";
+        }
+        stilled.push(beside);
+      }
+    }
+    lock.inert = false;
+    lock.removeAttribute("aria-hidden");
+  }
+  /** The lock whole a picture again, as it hangs on the wall. */
+  function stillAgain(lock: HTMLElement): void {
+    for (const each of stilled.splice(0)) {
+      each.inert = false;
+      if (each.hasAttribute("data-ce-stilled")) {
+        each.removeAttribute("aria-hidden");
+        delete each.dataset.ceStilled;
+      }
+    }
+    lock.inert = true;
+    lock.setAttribute("aria-hidden", "true");
   }
 
   /** Gives the lock back to its frame, drawn by itself again with its look. */
@@ -510,6 +544,7 @@ export function clockEditor(host: EditorHost): Editor {
     delete lock.dataset.ceWidth;
     delete lock.dataset.ceHeight;
     lock.style.removeProperty("--push");
+    stillAgain(lock);
     lock.querySelector(".ce-box")?.remove();
     guides.remove();
     front.frame.append(lock);
