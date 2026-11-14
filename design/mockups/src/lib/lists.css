@@ -463,7 +463,9 @@
   align-self: stretch;
   grid-template-columns: var(--columns, minmax(min-content, 1fr) 3fr);
   gap: var(--space-s8);
-  align-items: start;
+  /* A label in `small` sits on its value's first line, baseline to baseline: tops lined up would
+     leave the smaller label riding high. */
+  align-items: baseline;
 }
 
 .k-fact-value {
