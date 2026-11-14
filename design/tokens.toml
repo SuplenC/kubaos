@@ -1438,7 +1438,7 @@ pairs = [
   { fg = "on_error_container", bg = "error_container", need = "text", opacity = "subdued_text", use = "A critical notification's body" },
   { fg = "cold", bg = "surface", need = "text", use = "A holiday in the calendar, a cold chip's label" },
   { fg = "on_cold", bg = "cold", need = "text", use = "Text on the cold accent" },
-  { fg = "warning", bg = "surface", need = "text", use = "A reading close to its limit" },
+  { fg = "warning", bg = "surface", need = "text", use = "A reading close to its limit, a warning chip's label" },
   { fg = "warning", bg = "surface_container_high", need = "graphic", use = "A warning banner's symbol and hairline" },
   { fg = "primary", bg = "surface_container_high", need = "text", use = "An info banner's symbol and hairline, a Text button inside it" },
   { fg = "error", bg = "error_container", need = "graphic", use = "A danger banner's symbol and hairline, and a danger progress bar's fill" },

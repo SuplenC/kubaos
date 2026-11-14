@@ -128,13 +128,9 @@ export const HOLDING: readonly string[] = ["", "", "Keep holding to log out.", "
 /** The line once a held action meets apps that won't quit. */
 export const WAITING = "Waiting on 2 apps. They won't quit on their own.";
 
-/** A chip of a fact in `warning`, which the library's chip has no kind for. */
+/** A chip of a fact in `warning`. */
 function warned(label: string, glyph: string): HTMLElement {
-  const made = chip({ label, icon: glyph });
-  // A Cold chip's look in `warning`: its tint under its words and symbol in the tone.
-  made.style.setProperty("--fill", "rgb(from var(--color-warning) r g b / var(--opacity-tint))");
-  made.style.setProperty("--label", "var(--color-warning)");
-  return made;
+  return chip({ label, icon: glyph, kind: "Warning" });
 }
 
 /** The facts beside the line, as chips. */

@@ -366,7 +366,7 @@ Each component reports its shared name, its variant (the words below that apply,
 |---|---|---|---|
 | `Button` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg`; `leading-icon` or `trailing-icon` | height | control |
 | `IconButton` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg` | both | full |
-| `Chip` | kind `Neutral`, `Selected`, `Accent`, `Cold`, `Filled`; `icon`; `removable` | height | control |
+| `Chip` | kind `Neutral`, `Selected`, `Accent`, `Cold`, `Warning`, `Filled`; `icon`; `removable` | height | control |
 | `IconTile` | size `Sm`, `Md`, `Lg` | both | control |
 | `Badge` | `count` or `dot`; `accent` | height | full |
 | `Skeleton` | `line`, `circle` or `block` | none | small, full, or the caller's |

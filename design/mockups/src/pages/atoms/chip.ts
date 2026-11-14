@@ -1,5 +1,5 @@
 // The Chip page: `docs/design/components/chip.md`, in the state model (`docs/DESIGN.md`, "States"):
-// a plain chip has no states; a pressable one rests, lights, is pressed and disabled, in five kinds,
+// a plain chip has no states; a pressable one rests, lights, is pressed and disabled, in six kinds,
 // by night and by day, and so does its close button.
 
 import { CHIP_KINDS, CHIP_TONES, type ChipKind, type ChipOptions, chip, chipFilled } from "../../lib/chip.ts";
@@ -16,6 +16,7 @@ const SAMPLES: Record<ChipKind, { words: Words; icon: string }> = {
   Selected: { words: { short: "Mac accents", long: "Mac accents on the Option key" }, icon: "keyboard_option_key" },
   Accent: { words: { short: "Default", long: "Recommended for this computer" }, icon: "star" },
   Cold: { words: { short: "Demo", long: "Preview of the next release" }, icon: "info" },
+  Warning: { words: { short: "Not saved", long: "2 apps aren't done: Zed, kitty" }, icon: "warning" },
   Filled: { words: { short: "Reboot", long: "Reboot to finish the update" }, icon: "restart_alt" },
 };
 
@@ -47,6 +48,7 @@ const FOR: Record<ChipKind, string> = {
   Selected: "a pick that is on; `Neutral` while off",
   Accent: "a tag that matters: Recommended, Default",
   Cold: "rarely: a demo, a preview",
+  Warning: "a fact to mind: apps that won't quit",
   Filled: "an action among states: Reboot beside Done",
 };
 
@@ -61,10 +63,10 @@ export default page({
   level: "atoms",
   slug: "chip",
   title: "Chip",
-  lede: "A short fact or pick in a pill: five kinds, an optional icon and close button.",
+  lede: "A short fact or pick in a pill: six kinds, an optional icon and close button.",
   code: { rust: "chip::chip", qml: "Chip" },
   stage: {
-    live: () => row("s8", "start", sample("Neutral", { press: "press", icon: "keyboard", removable: true }), sample("Selected", { press: "toggle", on: true }), sample("Accent", { press: "press" }), sample("Cold", { press: "press" }), sample("Filled", { press: "press" })),
+    live: () => row("s8", "start", sample("Neutral", { press: "press", icon: "keyboard", removable: true }), sample("Selected", { press: "toggle", on: true }), sample("Accent", { press: "press" }), sample("Cold", { press: "press" }), sample("Warning", { press: "press" }), sample("Filled", { press: "press" })),
     hint: "hover it, or Tab; the second toggles",
     daylight: true,
   },

@@ -11,14 +11,14 @@
 // fades between Neutral and its kind on `--checked`.
 
 import { pin, type Pinned } from "./control.ts";
-import { focusRing, type Tone } from "./focus.ts";
+import { focusRing, type Tone, toneColour } from "./focus.ts";
 import { withHint } from "./hint.ts";
 import { icon } from "./icon.ts";
 import { row } from "./layout.ts";
 import { probe, variant } from "./probe.ts";
 import { text } from "./text.ts";
 
-export const CHIP_KINDS = ["Neutral", "Selected", "Accent", "Cold", "Filled"] as const;
+export const CHIP_KINDS = ["Neutral", "Selected", "Accent", "Cold", "Warning", "Filled"] as const;
 export type ChipKind = (typeof CHIP_KINDS)[number];
 
 /** A colour role as CSS. */
@@ -51,6 +51,7 @@ export const CHIP_COLOURS: Record<ChipKind, Colours> = {
   },
   Accent: { fill: tint("primary"), fillPressed: tint("primary"), label: role("primary"), labelLit: role("primary") },
   Cold: { fill: tint("cold"), fillPressed: tint("cold"), label: role("cold"), labelLit: role("cold") },
+  Warning: { fill: tint("warning"), fillPressed: tint("warning"), label: role("warning"), labelLit: role("warning") },
   Filled: {
     fill: role("primary_fill"),
     fillPressed: role("primary_fill_pressed"),
@@ -61,8 +62,8 @@ export const CHIP_COLOURS: Record<ChipKind, Colours> = {
   },
 };
 
-/** The tone each kind lights in: the cold accent on a Cold chip, the accent on every other. */
-export const CHIP_TONES: Record<ChipKind, Tone> = { Neutral: "accent", Selected: "accent", Accent: "accent", Cold: "cold", Filled: "accent" };
+/** The tone each kind lights in: the cold accent on a Cold chip, `warning` on a Warning one, the accent on every other. */
+export const CHIP_TONES: Record<ChipKind, Tone> = { Neutral: "accent", Selected: "accent", Accent: "accent", Cold: "cold", Warning: "warning", Filled: "accent" };
 
 /** Whether a kind is filled with its tone, so its line is the core inside the fill's edge. */
 export function chipFilled(kind: ChipKind): boolean {
@@ -128,7 +129,7 @@ export function chip(options: ChipOptions): HTMLElement {
   element.style.setProperty("--label", between(kind, "label"));
   element.style.setProperty("--label-lit", between(kind, "labelLit"));
   element.style.setProperty("--label-off", "var(--label)");
-  element.style.setProperty("--tone", role(CHIP_TONES[kind] === "cold" ? "cold" : "primary"));
+  element.style.setProperty("--tone", role(toneColour(CHIP_TONES[kind])));
   const colours = CHIP_COLOURS[kind];
   if (colours.edge && colours.edgeOff) {
     element.style.setProperty("--edge", colours.edge);
