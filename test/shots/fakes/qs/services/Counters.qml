@@ -25,7 +25,7 @@ QtObject {
             stop: 8,
             rule: "",
             next: 0,
-            detail: "Stops at 8"
+            detail: "Resets at 8"
         },
         {
             id: 3,
@@ -93,7 +93,7 @@ QtObject {
                 rule: "every day at 9:00",
                 words: "Every day at 9:00",
                 next: 1793170800,
-                when: "Next tomorrow at 9:00"
+                when: "Next: tomorrow, Wed 28 Oct, 9:00"
             };
         else
             root.reading = {

@@ -248,6 +248,8 @@ K.Sheet {
         y: root.padding
         width: root.contentWidth - root.padding * 2
         visible: root.page === "history"
+        keyed: root.keyed
+        onKeyPressed: root.keyed = true
         onBack: root.showList()
     }
 
