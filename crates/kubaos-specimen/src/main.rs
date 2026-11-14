@@ -243,6 +243,12 @@ fn mockup(dir: &Path) -> ExitCode {
             for line in &report.lines {
                 println!("{line}");
             }
+            if !report.ahead.is_empty() {
+                println!("ahead of their twins, listed and not counted:");
+                for component in &report.ahead {
+                    println!("  {component}");
+                }
+            }
             if !report.unmatched.is_empty() {
                 println!("with no twin in the specimen, held to the geometry rules alone:");
                 for component in &report.unmatched {
@@ -250,8 +256,12 @@ fn mockup(dir: &Path) -> ExitCode {
                 }
             }
             eprintln!(
-                "kubaos-specimen mockup: {} frame(s), {} component(s) compared, {} difference(s), {} finding(s)",
-                report.frames, report.compared, report.differences, report.findings
+                "kubaos-specimen mockup: {} frame(s), {} component(s) compared, {} ahead, {} difference(s), {} finding(s)",
+                report.frames,
+                report.compared,
+                report.ahead.len(),
+                report.differences,
+                report.findings
             );
             if report.compared > 0 && report.differences == 0 && report.findings == 0 {
                 ExitCode::SUCCESS

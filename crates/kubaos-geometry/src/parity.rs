@@ -346,6 +346,20 @@ pub struct Components {
     pub unmatched: Vec<String>,
     /// Where a component and its twin part ways.
     pub differences: Vec<Difference>,
+    /// The components drawn ahead of their twins ([`crate::Marks::ahead`]), whose differences are
+    /// listed here rather than counted.
+    pub ahead: Vec<Ahead>,
+}
+
+/// A component drawn ahead of its twin, and how far.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Ahead {
+    /// The component, as `Popover reading "Open Copy path"`.
+    pub component: String,
+    /// Why it is ahead, as its probe says.
+    pub reason: String,
+    /// How many places it parts ways with its twin.
+    pub differences: usize,
 }
 
 /// Every component of `other`, outermost only, held to its twin in `references` of the same mode
@@ -395,9 +409,24 @@ pub fn components(references: &[Frame], other: &Frame, names: (&str, &str)) -> C
             root: moved(node, node.bounds.x, node.bounds.y),
         };
         let stretch = stretch_of(component, twin);
-        report
-            .differences
-            .extend(compare_stretched(&alone(twin), &alone(component), names, stretch));
+        let found = compare_stretched(&alone(twin), &alone(component), names, stretch);
+        match &component.marks.ahead {
+            // A declaration a library caught up with is stale: it would hide the next difference.
+            Some(reason) if found.is_empty() => report.differences.push(Difference {
+                frame: other.name(),
+                path: reading(component),
+                message: format!(
+                    "{} says it is ahead of its twin ({reason}) and matches it: the library caught up, so the declaration goes",
+                    component.role.label()
+                ),
+            }),
+            Some(reason) => report.ahead.push(Ahead {
+                component: reading(component),
+                reason: reason.clone(),
+                differences: found.len(),
+            }),
+            None => report.differences.extend(found),
+        }
     }
     report
 }

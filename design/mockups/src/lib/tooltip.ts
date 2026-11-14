@@ -15,6 +15,9 @@ import { row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { text, wrapped } from "./text.ts";
 
+/** Why a menu's popover is drawn ahead of `kubaos-ui`'s, which pads it 12 and draws its items' symbols 20, 12 from their words. */
+const MENU_AHEAD = "menu.md: a menu's popover is 4 inside, its items' symbols 16, 8 from their words";
+
 /**
  * `content` on a popover `size.menu` wide, raised to `step`, at the control radius: `space.s4`
  * inside round a menu, `space.s12` round anything else. `kubaos-ui`'s `menu::popover`.
@@ -23,7 +26,10 @@ export function popover(step: Step, ...content: Element[]): HTMLElement {
   const card = raise(document.createElement("span"), step);
   card.classList.add("k-popover");
   card.append(...content);
-  return probe(card, { role: "component", name: "Popover", variant: "", fixed: { width: false, height: false, holds: true } });
+  // A menu's popover and its items are drawn as `docs/design/components/menu.md` has them, which
+  // `kubaos-ui`'s haven't caught up with yet.
+  const ahead = content.some((each) => each.matches(".k-menu")) ? { ahead: MENU_AHEAD } : {};
+  return probe(card, { role: "component", name: "Popover", variant: "", fixed: { width: false, height: false, holds: true } }, ahead);
 }
 
 /** The card: `title`, `body` under it when there is one, and `extra` below. */

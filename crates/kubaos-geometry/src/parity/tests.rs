@@ -5,6 +5,7 @@ use crate::Reach;
 use crate::Rect;
 use crate::Role;
 use crate::Size;
+use crate::parity::Ahead;
 use crate::parity::compare;
 use crate::parity::components;
 
@@ -372,4 +373,43 @@ fn a_box_moved_inside_a_part_that_stayed_is_still_a_difference() {
 
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(found[0].path.ends_with("Text \"Continue\""), "{found:?}");
+}
+
+#[test]
+fn a_component_ahead_of_its_twin_is_listed_and_not_counted() {
+    let iced = page_of("components", vec![button(rect(152.0, 640.0, 101.6, 40.0), 52.956)]);
+    let mut ahead = button(rect(0.0, 0.0, 101.6, 40.0), 52.956);
+    ahead.children[0].bounds.x += 4.0;
+    ahead.marks.ahead = Some("button.md: the label 4 further in".to_owned());
+    let mockup = page_of("button", vec![ahead]);
+
+    let report = components(&[iced], &mockup, ("iced", "mockup"));
+
+    assert_eq!(report.differences, []);
+    assert_eq!(
+        report.ahead,
+        [Ahead {
+            component: "Button(Filled Md) reading \"Continue\"".to_owned(),
+            reason: "button.md: the label 4 further in".to_owned(),
+            differences: 1,
+        }]
+    );
+}
+
+#[test]
+fn a_component_declared_ahead_that_matches_its_twin_fails() {
+    let iced = page_of("components", vec![button(rect(152.0, 640.0, 101.6, 40.0), 52.956)]);
+    let mut caught_up = button(rect(0.0, 0.0, 101.6, 40.0), 52.956);
+    caught_up.marks.ahead = Some("button.md: the label 4 further in".to_owned());
+    let mockup = page_of("button", vec![caught_up]);
+
+    let report = components(&[iced], &mockup, ("iced", "mockup"));
+
+    assert_eq!(report.ahead, []);
+    assert_eq!(report.differences.len(), 1);
+    assert!(
+        report.differences[0].message.contains("the library caught up"),
+        "{:?}",
+        report.differences
+    );
 }

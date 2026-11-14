@@ -122,6 +122,11 @@ pub struct Marks {
     /// when a page's modes are compared, and a finding where it is drawn in the other mode.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub only: Option<String>,
+    /// On a component: it is drawn ahead of its twin in the libraries, which haven't caught up
+    /// yet, for this reason (`"menu.md: a menu's popover is 4 inside"`). Its differences from its
+    /// twin are listed, not counted; once it matches its twin, the declaration is stale and fails.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ahead: Option<String>,
 }
 
 /// What a box is, as much as the toolkit knows.

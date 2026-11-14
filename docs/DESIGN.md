@@ -829,9 +829,11 @@ Three exceptions are a probe's to declare, by name, for its own box alone (`decl
 - `overhangs`: a count badge hangs past the icon it is placed over by design; its probe says so, and it is held to its own boxes from there. A dot, or any other part past its box, still fails.
 - `only`: a sample drawn in one mode only (`dark` or `light`), as a motion player's parts for a move that plays other tracks by day, is left out when the page's modes are compared. A box drawn in the mode it doesn't name fails, so the declaration can't outlive the sample; any other box that differs between the modes still fails.
 
+**Ahead of its twin.** The site is drawn ahead of the libraries, so a part redesigned on its mockup page and in its component's page differs from its twin until the library is rebuilt. Its probe says so, with the doc that says so first (`ahead: "menu.md: …"` in `src/lib/probe.ts`): `kubaos-specimen mockup` lists it under "ahead of their twins", with how many places it differs, and doesn't count those differences. Once it matches its twin, the declaration is stale and fails, so it goes when the library catches up.
+
 ```text
 $ just mockups-check
-kubaos-specimen mockup: 8 frame(s), 640 component(s) compared, 0 difference(s), 0 finding(s)
+kubaos-specimen mockup: 8 frame(s), 640 component(s) compared, 0 ahead, 0 difference(s), 0 finding(s)
 ```
 
 ### Screenshot diffs

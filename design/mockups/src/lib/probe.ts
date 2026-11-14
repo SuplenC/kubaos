@@ -44,6 +44,12 @@ export interface Declared {
    * are compared, and a finding where it is drawn in the other mode.
    */
   readonly only?: "dark" | "light";
+  /**
+   * On a component: it is drawn ahead of its twin in the libraries, for this reason, a doc that
+   * says so first (`"menu.md: …"`). Its differences from its twin are listed, not counted, and the
+   * check fails once it matches, so the declaration goes when the library catches up.
+   */
+  readonly ahead?: string;
 }
 
 /** Adds what `element`'s probe `declares` to it: words of a text that vary, say. */
