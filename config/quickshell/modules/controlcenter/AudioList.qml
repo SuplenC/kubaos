@@ -1,13 +1,12 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // The Audio tab: the outputs under an Output label, then the inputs under an Input label. Enter
 // makes the selected device the default of its kind, which carries the check; the keys skip the
 // labels.
-Well {
+K.ScrollingList {
     id: root
 
     // A section's label: an object like the devices, as a model takes one kind of value, and made
@@ -35,7 +34,7 @@ Well {
 
     focused: list.activeFocus
 
-    NavList {
+    K.ListRows {
         id: list
 
         anchors.fill: parent

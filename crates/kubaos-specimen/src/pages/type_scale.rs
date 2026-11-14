@@ -23,7 +23,9 @@ use crate::specimen::Message;
 /// What each style is shown saying: a line it would really carry.
 fn sample(style: Type) -> &'static str {
     match style {
-        Type::Clock => "21:47",
+        Type::ClockRest | Type::Clock => "21:47",
+        Type::ClockPlace => "東京・月曜日",
+        Type::ClockDate => "Monday, 2 November",
         Type::Hero => "Let's fix this shit.",
         Type::HeroNumber => "42%  09:41",
         Type::Display => "Done in 1m 42s.",
@@ -61,7 +63,12 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
     let c = look.colors;
     // The line box, tinted, so its height shows against the grid.
     let line_box = color::alpha(c.primary, Opacity::Tint.value());
+    // The rest clock's digits are wider than the samples' column can be beside the names, so they
+    // take a row of their own across the page, under the clock's name.
+    let across = Type::ClockRest;
+    let mut table = stack(look, Space::S24);
     let mut styles = split(look, &[1, 3], Space::S24);
+    let mut drawn = false;
     for style in Type::ALL {
         let meta = format!(
             "{} / {} · icon {} · {} · {}",
@@ -71,22 +78,29 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             weight(style.weight()),
             style.family().name()
         );
-        styles = styles
+        let name = stack(look, Space::S4)
+            .push(text(format!("{style:?}"), Type::BodyStrong, c.on_surface))
+            .push(text(meta, Type::Mono, c.on_surface_variant));
+        let line = row(look, Space::S8)
+            .center()
+            .push(icon(look, Icon::Star, style.icon(), c.on_surface))
             .push(
-                stack(look, Space::S4)
-                    .push(text(format!("{style:?}"), Type::BodyStrong, c.on_surface))
-                    .push(text(meta, Type::Mono, c.on_surface_variant)),
-            )
-            .push(
-                row(look, Space::S8)
-                    .center()
-                    .push(icon(look, Icon::Star, style.icon(), c.on_surface))
-                    .push(
-                        widget::container(text(sample(style), style, c.on_surface))
-                            .style(move |_theme| container::Style::default().background(line_box)),
-                    ),
+                widget::container(text(sample(style), style, c.on_surface))
+                    .style(move |_theme| container::Style::default().background(line_box)),
             );
+        if style == across {
+            let before = std::mem::replace(&mut styles, split(look, &[1, 3], Space::S24));
+            if drawn {
+                table = table.push(before);
+            }
+            table = table.push(split(look, &[1, 3], Space::S24).push(name)).push(line);
+            drawn = false;
+        } else {
+            styles = styles.push(name).push(line);
+            drawn = true;
+        }
     }
+    let table = table.push(styles);
     let mut families = split(look, &[1, 3], Space::S24).center();
     for (family, style, sample) in [
         (
@@ -106,7 +120,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             look,
             "Styles",
             Some("Largest first. The tint is each style's line box: its height is the line height. The symbol before it is the icon size that sits beside the style."),
-            styles,
+            table,
         ))
         .push(section(look, "Families", None, families))
         .into()

@@ -1,0 +1,161 @@
+use std::path::Path;
+use std::path::PathBuf;
+
+use super::CssTokens;
+use crate::Target;
+use crate::contrast::Mode;
+use crate::target::Kept;
+
+const TOKENS: &str = include_str!("../../../../design/tokens.toml");
+
+fn root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+fn render() -> String {
+    CssTokens
+        .render(&crate::parse(TOKENS).expect("the repo's tokens hold"), &root())
+        .expect("render the file")
+}
+
+/// The block that opens with `selector {`, up to its closing brace.
+fn block(css: &str, selector: &str) -> String {
+    let start = css.find(&format!("\n{selector} {{\n")).expect("the block");
+    let end = css[start + 1..].find("\n}\n").expect("the block's end");
+    css[start..start + 1 + end].to_owned()
+}
+
+#[test]
+fn it_is_built_where_the_mockups_read_it() {
+    assert_eq!(CssTokens.path(), "design/mockups/src/tokens.css");
+    assert_eq!(CssTokens.kept(), Kept::Built);
+}
+
+#[test]
+fn every_length_is_its_logical_pixels_times_the_box_s_scale() {
+    let lengths = block(&render(), ":root,\n.mock");
+
+    for length in [
+        "--px: calc(var(--scale) * 1px);",
+        "--space-s12: calc(12 * var(--px));",
+        "--size-control_md: calc(40 * var(--px));",
+        "--icon-s20: calc(20 * var(--px));",
+        "--icon-two_line: calc(24 * var(--px));",
+        "--radius-control: calc(12 * var(--px));",
+        "--focus-tube: calc(1.5 * var(--px));",
+        "--stroke-thin: calc(2 * var(--px));",
+        "--shadow-panel-y: calc(16 * var(--px));",
+    ] {
+        assert!(lengths.contains(length), "{length}");
+    }
+}
+
+#[test]
+fn the_scale_starts_at_one_and_a_box_may_set_its_own() {
+    let css = render();
+
+    assert!(block(&css, ":root").contains("--scale: 1;"));
+    assert!(!block(&css, ":root,\n.mock").contains("--speed:"));
+    assert!(!block(&css, ":root,\n.mock").contains("--scale:"));
+}
+
+#[test]
+fn a_hairline_is_one_device_pixel_and_a_pill_is_any_length() {
+    let lengths = block(&render(), ":root,\n.mock");
+
+    assert!(lengths.contains("--stroke-hairline_device_px: 1px;"));
+    assert!(lengths.contains("--radius-full: 9999px;"));
+}
+
+#[test]
+fn type_styles_carry_their_size_line_icon_weight_family_and_figures() {
+    let lengths = block(&render(), ":root,\n.mock");
+
+    for property in [
+        "--type-button-size: calc(14 * var(--px));",
+        "--type-button-line: calc(24 * var(--px));",
+        "--type-button-icon: calc(20 * var(--px));",
+        "--type-button-weight: 600;",
+        "--type-button-family: \"Geist\";",
+        "--type-button-features: normal;",
+        "--type-label_number-features: \"tnum\" 1;",
+        "--type-mono-family: \"Geist Mono\";",
+    ] {
+        assert!(lengths.contains(property), "{property}");
+    }
+}
+
+#[test]
+fn durations_are_milliseconds_and_curves_cubic_beziers() {
+    let lengths = block(&render(), ":root,\n.mock");
+
+    assert!(lengths.contains("--duration-micro: 100ms;"));
+    assert!(lengths.contains("--easing-emphasized_decel: cubic-bezier(0.05, 0.7, 0.1, 1);"));
+    assert!(lengths.contains("--opacity-disabled_content: 0.38;"));
+}
+
+#[test]
+fn every_duration_has_a_motion_the_settings_change() {
+    let css = render();
+    let lengths = block(&css, ":root,\n.mock");
+
+    assert!(
+        lengths.contains("--motion-micro: calc(min(var(--duration-micro), var(--cap)) / var(--speed) * var(--slow));")
+    );
+    for default in ["--speed: 1;", "--slow: 1;", "--cap: 3600s;"] {
+        assert!(block(&css, ":root").contains(default), "{default}");
+    }
+}
+
+#[test]
+fn the_neon_strike_is_one_property_per_step() {
+    let lengths = block(&render(), ":root,\n.mock");
+
+    assert!(lengths.contains("--neon-strike-0: "));
+    assert!(lengths.contains("--neon-strike-steps: 10;"));
+}
+
+#[test]
+fn colours_follow_the_mode_of_the_box_they_are_read_in() {
+    let tokens = crate::parse(TOKENS).expect("the repo's tokens hold");
+    let palette = &tokens.color.light;
+    let derived = tokens.color.with_derived(palette, Mode::Light);
+    let css = render();
+    let dark = block(&css, ":root,\n[data-mode=\"dark\"]");
+    let light = block(&css, "[data-mode=\"light\"]");
+
+    assert!(dark.contains(&format!("--color-primary: {:?};", tokens.color.dark["primary"])));
+    assert!(light.contains(&format!("--color-primary: {:?};", palette["primary"])));
+    assert!(dark.contains("--color-on_secondary_container: "));
+    assert!(light.contains(&format!("--color-sharing: {:?};", derived["sharing"])));
+}
+
+#[test]
+fn a_shadow_with_a_light_opacity_takes_it_in_light_alone() {
+    let css = render();
+    let dark = block(&css, ":root,\n[data-mode=\"dark\"]");
+    let light = block(&css, "[data-mode=\"light\"]");
+
+    assert!(dark.contains("--shadow-tucked-opacity: 0.4;"));
+    assert!(light.contains("--shadow-tucked-opacity: 0.16;"));
+    assert!(light.contains("--shadow-panel-opacity: "));
+}
+
+#[test]
+fn it_opens_with_the_built_header() {
+    assert!(render().starts_with("/* @generated by `kubaos-tokens`"));
+}
+
+#[test]
+fn what_the_tokens_say_in_words_is_a_string_a_script_reads_back() {
+    let css = render();
+    let words = css.rsplit("\n:root {\n").next().expect("the words' block");
+
+    assert!(words.contains("--type-body-use: \"Running text, explanations, toasts.\";"));
+    assert!(words.contains("--source-primary: \"primary\";"));
+    assert!(words.contains("--source-warning: \"\";"));
+    assert!(words.contains("--contrast-0-fg: \"on_surface\";"));
+    assert!(words.contains("--contrast-0-minimum: 4.5;"));
+    assert!(words.contains("--contrast-decorative: \"burn_error_glass "));
+    assert!(words.contains("\\\"+N more\\\""));
+}

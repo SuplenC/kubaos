@@ -30,7 +30,7 @@ import qs.services
 // moves fast, the trailing edge follows a little later.
 //
 // It draws its own pill, as tall as the bar's other pills, rather than being
-// a `Pill`: the cells glide their widths every frame, and a positioner
+// a `K.Pill`: the cells glide their widths every frame, and a positioner
 // follows them without running script.
 Item {
     id: root

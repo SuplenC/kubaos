@@ -23,6 +23,7 @@ use std::path::Path;
 use crate::model::Family;
 use crate::model::Rgb;
 use crate::model::Tokens;
+use crate::model::Toward;
 use crate::model::Weight;
 use crate::rust::wrap;
 use crate::target::BUILT_HEADER;
@@ -67,6 +68,7 @@ impl Target for QmlTokens {
         out.line("    // alone.");
         out.line("    property var matugen: null");
         rules(&mut out, tokens);
+        icon_tile(&mut out, tokens);
         lengths(&mut out, tokens);
         container(&mut out, tokens);
         types(&mut out, tokens);
@@ -193,7 +195,7 @@ fn header(out: &mut Writer) {
 }
 
 /// A number as QML writes it: `1`, `0.25`.
-fn number(value: f32) -> String {
+pub(crate) fn number(value: f32) -> String {
     let text = format!("{value:?}");
     text.strip_suffix(".0").map_or(text.clone(), str::to_owned)
 }
@@ -277,6 +279,35 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
     });
 }
 
+/// The icon tile's measures for an app icon.
+fn icon_tile(out: &mut Writer, tokens: &Tokens) {
+    let icon_tile = &tokens.icon_tile;
+    out.group(
+        "    ",
+        Some("An icon tile's app icon, measured once when it loads: a plate fills the tile, a shape sits inside it."),
+        "icon_tile",
+        |out| {
+            out.line("        // The alpha above which a pixel is part of the drawing's box.");
+            out.line(format!("        readonly property real ink: {}", number(icon_tile.ink)));
+            out.line("        // The alpha above which a pixel counts as covering the box.");
+            out.line(format!(
+                "        readonly property real opaque: {}",
+                number(icon_tile.opaque)
+            ));
+            out.line("        // The least share of its long side the box's short side has for a plate.");
+            out.line(format!(
+                "        readonly property real square: {}",
+                number(icon_tile.square)
+            ));
+            out.line("        // The least share of the box its opaque pixels cover for a plate.");
+            out.line(format!(
+                "        readonly property real plate: {}",
+                number(icon_tile.plate)
+            ));
+        },
+    );
+}
+
 fn lengths(out: &mut Writer, tokens: &Tokens) {
     out.group(
         "    ",
@@ -294,11 +325,15 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
         Some("Corner radii by role. A radius between them comes from `Look.nested`, never a number."),
         "radius",
         |out| {
-            out.line("        // Marks inside controls: the checkbox, a hint, focus details, inline tags.");
+            out.line("        // Marks inside controls: the checkbox, a keycap, focus details, inline tags.");
             out.line(format!("        readonly property int small: {}", r.small));
-            out.line("        // Everything clicked or typed in: buttons, fields, list rows, menu items, chips.");
+            out.line("        // A row inside a small or a content box, the box's corner less its padding.");
+            out.line(format!("        readonly property int row: {}", r.row));
+            out.line("        // Everything clicked or typed in, and the small floating things: popovers, menus, toasts.");
             out.line(format!("        readonly property int control: {}", r.control));
-            out.line("        // Everything that holds content: cards, dialogs, popups, panels, list wells.");
+            out.line("        // A content box inside a window or a panel: a card, a list well, a scroll panel, a dialog.");
+            out.line(format!("        readonly property int content: {}", r.content));
+            out.line("        // The shell's big surfaces: panels, the window, the screen frame.");
             out.line(format!("        readonly property int surface: {}", r.surface));
             if r.full {
                 out.comment(
@@ -375,7 +410,9 @@ fn container(out: &mut Writer, tokens: &Tokens) {
     out.line("    }");
     out.group(
         "    ",
-        Some("Aspect ratios, width to height, a picture's box keeps before and after it loads."),
+        Some(
+            "Aspect ratios, width to height: a picture's box's before and after it loads, a surface's at its shortest.",
+        ),
         "aspect",
         |out| {
             for (name, [w, h]) in &tokens.aspect {
@@ -514,6 +551,16 @@ fn surfaces(out: &mut Writer, tokens: &Tokens) {
     );
     out.group(
         "    ",
+        Some("Scale factors a surface is drawn at, round its middle, while it comes or goes."),
+        "scale",
+        |out| {
+            for (name, value) in &tokens.scale {
+                out.line(format!("        readonly property real {name}: {}", number(*value)));
+            }
+        },
+    );
+    out.group(
+        "    ",
         Some(
             "Shadows: how far down and how blurred, in logical pixels, and the `shadow` role's opacity, which follows `mode` where light mode has its own.",
         ),
@@ -555,6 +602,27 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
                 }
                 out.line(format!("        readonly property color {role}: tokens.role({role:?})"));
             }
+            out.line("        // The state model's derived roles (OKLCH lightness and chroma, gamut and contrast");
+            out.line("        // fitting, a recipe for each mode) aren't built here yet: only the mockups' CSS");
+            out.line("        // computes them.");
+            for (role, derived) in &colors.derived {
+                let Some((toward, t)) = derived.toward() else { continue };
+                let function = match toward {
+                    Toward::White => "towardWhite",
+                    Toward::Black => "towardBlack",
+                };
+                out.line(format!(
+                    "        // `{}` taken {} of the way to {}, whatever its colour.",
+                    derived.tone(),
+                    number(t),
+                    toward.name()
+                ));
+                out.line(format!(
+                    "        readonly property color {role}: tokens.{function}(tokens.color.{}, {})",
+                    derived.tone(),
+                    number(t)
+                ));
+            }
         },
     );
     out.blank();
@@ -578,6 +646,21 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
     out.line("        const from = tokens.source[name];");
     out.line("        const live = tokens.matugen && from ? tokens.matugen[from] : undefined;");
     out.line("        return live ?? tokens.palette[tokens.mode === \"light\" ? \"light\" : \"dark\"][name];");
+    out.line("    }");
+    out.blank();
+    out.line("    // `c` taken `t` of the way to white, each 8-bit channel rounded half up, as the tokens compute it.");
+    out.line("    function towardWhite(c: color, t: real): color {");
+    out.line("        const mixed = v => {");
+    out.line("            const byte = Math.round(v * 255);");
+    out.line("            return Math.floor(byte + (255 - byte) * t + 0.5) / 255;");
+    out.line("        };");
+    out.line("        return Qt.rgba(mixed(c.r), mixed(c.g), mixed(c.b), 1);");
+    out.line("    }");
+    out.blank();
+    out.line("    // `c` taken `t` of the way to black, each 8-bit channel rounded half up, as the tokens compute it.");
+    out.line("    function towardBlack(c: color, t: real): color {");
+    out.line("        const mixed = v => Math.floor(Math.round(v * 255) * (1 - t) + 0.5) / 255;");
+    out.line("        return Qt.rgba(mixed(c.r), mixed(c.g), mixed(c.b), 1);");
     out.line("    }");
 }
 

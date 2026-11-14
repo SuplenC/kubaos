@@ -56,6 +56,47 @@ fn curves_end_at_one_one_for_bezier_splines() {
 }
 
 #[test]
+fn the_spring_overshoots_in_its_bezier_spline_too() {
+    assert!(render(&QmlTokens).contains("readonly property list<real> spring: [0.34, 1.25, 0.64, 1, 1, 1]"));
+}
+
+#[test]
+fn an_app_window_s_sizes_and_the_sidebar_are_sizes() {
+    let singleton = render(&QmlTokens);
+
+    for size in [
+        "readonly property int app_width: 1120",
+        "readonly property int app_height: 720",
+        "readonly property int app_min_width: 720",
+        "readonly property int app_min_height: 480",
+        "readonly property int sidebar: 264",
+    ] {
+        assert!(singleton.contains(size), "{size}");
+    }
+}
+
+#[test]
+fn the_fixed_roles_are_written_in_both_palettes() {
+    let tokens = crate::parse(TOKENS).expect("the repo's tokens hold");
+    let singleton = render(&QmlTokens);
+
+    for role in [
+        "sharing",
+        "logo_core_warm",
+        "logo_core_cold",
+        "microphone",
+        "recording",
+        "success",
+    ] {
+        for palette in [&tokens.color.dark, &tokens.color.light] {
+            let line = format!("{role}: \"{:?}\"", palette[role]);
+            assert!(singleton.contains(&line), "{line}");
+        }
+    }
+    assert!(singleton.contains("readonly property color sharing: tokens.role(\"sharing\")"));
+}
+
+#[test]
 fn type_styles_carry_their_size_line_weight_and_family() {
     let singleton = render(&QmlTokens);
 
@@ -111,4 +152,27 @@ fn a_drawing_without_exactly_one_stroke_and_a_colour_is_refused() {
     assert!(recolourable(no_stroke).is_err());
     assert!(recolourable(two_strokes).is_err());
     assert!(recolourable(no_colour).is_err());
+}
+
+#[test]
+fn a_core_is_bound_to_its_tone_not_fixed() {
+    let singleton = render(&QmlTokens);
+
+    assert!(singleton.contains("readonly property color primary_core: tokens.towardWhite(tokens.color.primary, 0.5)"));
+    assert!(singleton.contains("function towardWhite(c: color, t: real): color {"));
+    assert!(
+        !singleton.contains("primary_core: \"#"),
+        "no palette holds a fixed core"
+    );
+}
+
+#[test]
+fn a_state_model_recipe_is_not_built_into_the_singleton_yet() {
+    let singleton = render(&QmlTokens);
+
+    assert!(
+        !singleton.contains("primary_unlit"),
+        "an OKLCH recipe is neither a formula nor a fixed value"
+    );
+    assert!(singleton.contains("function towardBlack(c: color, t: real): color {"));
 }

@@ -1,12 +1,11 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // The Proxy, while it is on or has failed: a locked shield, with the tunnel's endpoint in the
 // hint, and a dot while something is wrong with it. Click opens the control center, where its
 // tile switches it.
-Pill {
+K.Pill {
     id: root
 
     visible: Proxy.on || Proxy.problem !== ""
@@ -22,7 +21,7 @@ Pill {
     }
     onClicked: Panels.open("controlcenter")
 
-    BadgedIcon {
+    K.BadgedIcon {
         name: Proxy.on ? "vpn_lock" : "key"
         color: K.Tokens.color.tertiary
         badged: Proxy.problem !== ""

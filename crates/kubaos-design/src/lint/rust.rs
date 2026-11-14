@@ -7,8 +7,8 @@
 //!   bound to a field that holds one (`width: 1.0`, `radius: 8.0.into()`). Halving (`/ 2.0`) is a
 //!   derivation, not a literal. A size given to iced's window API (`window::Settings`, `min_size`,
 //!   `max_size`, `with_size(`) is the compositor's to change, not layout.
-//! - **Duration:** a number in `Duration::from_millis(` and its siblings, up to the longest
-//!   duration token; a longer one can't be motion. A shorter timeout, poll or blink carries a
+//! - **Duration:** a number in `Duration::from_millis(` and its siblings, up to `scene`, the
+//!   longest a move runs; a longer one can't be motion. A shorter timeout, poll or blink carries a
 //!   `design-allow(duration)` marker saying so.
 //! - **Font:** a family named in `Font::with_name(` or `Family::Name(`.
 //! - **Component:** iced's own controls and layout (`widget::button`, `text_input`, `row!`), which
@@ -121,8 +121,8 @@ const WIDGETS: &[&str] = &[
 /// iced's macros that build the same.
 const MACROS: &[&str] = &["column!", "row!", "text!", "rich_text!"];
 
-/// Each line's hits, up to the file's inline test module. `longest_ms` is the longest duration
-/// token: a literal duration longer than any animation is a timeout or a poll, not motion.
+/// Each line's hits, up to the file's inline test module. `longest_ms` is the longest a move runs:
+/// a literal duration longer than any animation is a timeout or a poll, not motion.
 pub fn hits(lines: &[Line], longest_ms: u32) -> Vec<Vec<Hit>> {
     let mut out = Vec::with_capacity(lines.len());
     let mut in_tests = false;

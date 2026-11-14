@@ -3,10 +3,10 @@
 //! terminals and the TUIs drawn in them.
 //!
 //! A template names each colour role by the matugen colour `[color.source]` reads it from, so the
-//! wallpaper's colours reach every terminal; a role of our own (`warning`) is written out, in the
-//! mode matugen runs in. A tool that reads its file again when it changes takes matugen's
-//! `default` colours, the mode `dot-theme` ran in. foot can't read its colours again, so its
-//! template holds both palettes and `dot-theme` signals the one to show.
+//! wallpaper's colours reach every terminal; a role of our own (the fixed roles, the tubes' cores)
+//! is written out, in the mode matugen runs in. A tool that reads its file again when it changes
+//! takes matugen's `default` colours, the mode `dot-theme` ran in. foot can't read its colours
+//! again, so its template holds both palettes and `dot-theme` signals the one to show.
 //!
 //! # Owns
 //!

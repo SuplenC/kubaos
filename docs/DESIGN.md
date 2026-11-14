@@ -2,12 +2,13 @@
 
 How every KubaOS surface looks and behaves: the shell, the Command menu, Kōbō, the apps to come, the terminals, Plymouth and GRUB. Agents: read this before you build or change anything a person sees, in any toolkit. A rule here has a reason and a picture; follow the rule, and when the reason doesn't fit your case, change the rule here for everyone (see "Changing the design") instead of working round it.
 
-Four places hold the design, each owning one thing:
+Five places hold the design, each owning one thing:
 
 | File | Owns |
 |---|---|
-| `design/tokens.toml` | Every value: colour roles, lengths, type styles, durations, curves, opacities, shadows, the list of symbols, the neon sign's stutter and the クバ mark's strokes. `kubaos-tokens` checks its rules and writes each toolkit's copy, where it is read (see "Where the outputs are generated"): `kubaos-ui`'s `tokens.rs`, `Tokens.qml` and `Symbols.qml` in `KubaOS.Components`, the boot screens' values (Plymouth's script and theme file, GRUB's `theme.txt`), the terminals' settings and matugen templates, Hyprland's `tokens.lua`, Kōbō's `done/neon.rs` and `kubaos-cursor`'s `tokens.rs`. |
+| `design/tokens.toml` | Every value: colour roles, lengths, type styles, durations, curves, opacities, shadows, the list of symbols, the elevation ladder, the neon sign's stutter and the クバ mark's strokes. `kubaos-tokens` checks its rules and writes each toolkit's copy, where it is read (see "Where the outputs are generated"): `kubaos-ui`'s `tokens.rs`, `Tokens.qml` and `Symbols.qml` in `KubaOS.Components`, the boot screens' values (Plymouth's script and theme file, GRUB's `theme.txt`), the terminals' settings and matugen templates, Hyprland's `tokens.lua`, Kōbō's `done/neon.rs`, `kubaos-cursor`'s `tokens.rs` and the mockups' `tokens.css`. |
 | `docs/DESIGN.md` (this file) | The rules and their reasons: which value is for what, the rules every component keeps, the keyboard, focus, scaling; and the index of the components. |
+| `design/mockups/` | The mockups, the single source of truth for every UI: each part, surface and screen as it is meant to be, complete and live, in every state, size, motion and scale (`just mockups`). A build matches its mockup; `.claude/skills/mockup/SKILL.md` says how one is made. |
 | `docs/design/components/` | One page per component: its constructors in both libraries, how it looks and how it behaves. |
 | `docs/BRAND.md` | The words: name, voice, and how errors and buttons read. |
 
@@ -40,22 +41,34 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 
 *The roles as swatches, then each foreground and background pair with its contrast ratio and the minimum it needs. Light: [colour-light-1x.png](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/colour-light-1x.png).*
 
-- **Roles, never hex.** Code names a role (`primary`, `on_surface`, `surface_container_high`, `error`, `cold`, `warning`), never a colour. The roles are Material 3's, plus `cold` and `warning`. The palette changes with the wallpaper, so a hex value in a component is wrong the moment the wallpaper changes.
+- **Roles, never hex.** Code names a role (`primary`, `on_surface`, `surface_container_high`, `error`, `cold`, `warning`, `success`), never a colour. The roles are Material 3's, plus `cold` and the fixed palette below. The palette changes with the wallpaper, so a hex value in a component is wrong the moment the wallpaper changes.
 - **Matugen derives them from the wallpaper** (`scripts/dot-theme`, `scheme-fidelity`). `[color.source]` in the tokens names the matugen colour each role comes from. `[color.dark]` and `[color.light]` are the fallback: matugen's output for the default wallpaper, used until a theme exists and in the specimen.
 - **Cold accent** (`cold`, from matugen's tertiary): the blue of the sign's dakuten. With `scheme-fidelity` tertiary is the wallpaper's complement, so cold follows the wallpaper. Use it rarely: the focus tube on picked cards, where the accent already means picked, and a demo or preview badge. It is never a second primary. It is configurable: the complement is the default, and the user may pick another. *Not enforced yet: lands in #154.*
-- **Error pressed** (`error_pressed`) is ours: `error` with its OKLCH lightness up 0.035 in dark and down 0.04 in light, under a lit danger menu item that is pressed. Material 3's error palette is the same whatever the wallpaper, so a value made from the fallback `error` stays matugen's `error` pressed.
-- **Warning** is ours (Material 3 has none): amber between fine and the error colour, for a reading close to its limit. It keeps its value whatever the wallpaper; the light one is dark enough for text on light surfaces.
+- **The fixed palette** is ours (Material 3 has none of it but `error`) and has no matugen source: it keeps its colours whatever the wallpaper, so one meaning has one colour on every desktop. Each meaning has a burning tone, decided in OKLCH and fitted into sRGB at its hue and lightness: neon-bright at night, deeper by day. A Danger, Success or Warning button burns on its tone ("States"). Every other role carrying the meaning is a recipe over the tone (`[color.derived]`): its text role, the tone with its lightness moved only as far as it takes to hold 4.55:1 on every surface text sits on (`surface` and the five containers); its core, `_core`, 50% toward white; and its unlit form, `_unlit`. The error family is in the palette too: Material 3's error is the same pastel `#ffb4ab` for every wallpaper, which reads rose beside the Danger button's red and is a red wallpaper's primary's twin, so `on_error`, `error_container`, `on_error_container` and the lit danger menu item's pressed fill `error_pressed` (the error a small step lighter at night, darker by day, as every pressed fill is) are recipes over the error's tone as well. `[contrast]` holds every text role as text and as a mark on all six surfaces in both fallback palettes. iced and QML get the text roles and the error family as values, computed from the fallback palettes. **The fit holds a margin.** A text role is fitted once, on the fallback palettes' surfaces, and drawn as that value on every wallpaper, whose surfaces sit a little apart, so it is fitted to 4.5:1 and `fixed_text_margin` (`[color]`, 0.05) more: fitted to 4.5:1 exactly, the night `recording` fell to 4.48:1 on a pink wallpaper's highest container. The margin is room in the fit, not the requirement: `[contrast]` still needs 4.5:1 of every pair. *Not enforced yet: no component draws `success`, `sharing`, `microphone` or `recording`, and no tube is violet; Hyprland, GTK, yazi and hyprlock still read matugen's error.*
+
+  | Meaning | Tone | Night | Day | Text role | For |
+  |---|---|---|---|---|---|
+  | Error | `burn_error` | `oklch(0.66 0.25 27)` `#ff413c` | `oklch(0.56 0.21 27)` `#d42325` | `error` | Something failed, and the action that destroys something. |
+  | Success | `burn_success` | `oklch(0.74 0.18 150)` `#3cc96a` | `oklch(0.62 0.16 150)` `#20a04e` | `success` | Done and installed. Its night chroma is a step under 0.21, which read too loud. |
+  | Warning | `burn_warning` | `oklch(0.85 0.17 88)` `#fcc618` | `oklch(0.84 0.16 85)` `#fac131` | `warning` | Amber, between fine and an error: a reading close to its limit, an action with a cost. |
+  | Sharing | `burn_sharing` | `oklch(0.68 0.21 300)` `#ad74ff` | `oklch(0.52 0.22 300)` `#8038d1` | `sharing` | Violet: anything shared off the machine, the screen above all. Its tube marks what is shared, with `sharing_core` along its middle. |
+  | Microphone | `burn_microphone` | `oklch(0.74 0.19 55)` `#ff8505` | `oklch(0.70 0.18 55)` `#ed7b00` | `microphone` | The privacy dot of a microphone that is listening: orange, clear of the warning's amber and the error's red. |
+  | Recording | `burn_recording` | `#ff0000` | `oklch(0.55 0.22 29)` `#d40f0c` | `recording` | The privacy dot of anything recording, the camera watching or the screen being recorded: pure red at night, the REC light, a step deeper and purer than the error's red. |
+
+- **Derived roles are recipes over the live tone, never values.** `[color.derived]` computes every role that follows from another: a tone's lit core (`primary_core`, `cold_core`, and the fixed palette's `error_core` and the rest), its tone mixed 50% of the way to white, each channel rounded half up; its unlit tone (`primary_unlit` and the rest), deep rather than pale, at 60% of its OKLCH lightness and 1.2 times its chroma; and every colour of a control's states ("States"). A recipe starts from a role, mixed toward white or black in sRGB or as it is, may move its OKLCH lightness and chroma, and may fit its lightness until it holds 4.5:1 on every background it is text on (a fixed text role on the surfaces, `fixed_text_margin` more). **Gamut fitting** lowers chroma alone, at a fixed hue and lightness, until sRGB holds the colour, so a hue never shifts: a yellow darkens to olive, never orange. A role that is only a mix toward white or black is a formula every output computes from the live tone: QML binds it (`Tokens.towardWhite`, `Tokens.towardBlack`), iced computes it from the palette it draws with (`color::derived`), and CSS mixes it from the tone's variable (`color-mix`). With the default wallpaper's palettes `primary_core` is `#ffdbbc` in dark. *Not built yet: the OKLCH recipes, gamut fitting, label fitting and the recipes given per mode exist only in the mockups' CSS output; the iced and QML outputs leave those roles out, and their contrast pairs with them.* The logo keeps its own fixed, paler cores, `logo_core_warm` (`#ffe6cf`) and `logo_core_cold` (`#dcf1ff`), brand art that only the クバ mark draws.
+- **The burning tones are a Danger, Success or Warning button's fill**, `burn_error`, `burn_success` and `burn_warning`, each with its label, `on_burn_error` and the rest, fitted to it ("States"). The accent guard keeps a wallpaper's accent from landing next to them (#323). *Not built yet: the guard is #323.*
 - **Contrast minimums** (WCAG 2.1 AA, `kubaos_ui::color::Contrast`): 4.5:1 for body text and labels; 3:1 for large text (24 px and up, or 19 px semibold and up) and for icons, outlines and other shapes that carry meaning. Decoration (a divider, a well's edge, a disabled control) carries no meaning and has no minimum, as WCAG exempts it.
 - **Every pair is listed and checked.** `[contrast]` in the tokens lists every foreground role the front ends draw on a background role, at the opacity it is drawn at, with what it needs and where it is drawn. `kubaos-tokens` refuses a pair under its minimum in either fallback palette, `kubaos-ui`'s tests hold it, and `kubaos-design contrast` lists every pair with its ratio (see "Checks"). A new pairing adds its line there in the PR that draws it. The fixes that held: a field's placeholder is text, so it takes `placeholder_text`, 0.85 (0.80 left it 4.4:1 on a focused field's fill in light), not the 0.55 of `placeholder`, which a ghost shape keeps (2.8:1 in light); a selected row's subtitle takes `subdued_text`, 0.85, not the 0.75 of `subdued`, which a thumbnail sitting back keeps (4.0:1 in light); `outline` is a graphic's colour, never text's (4.3:1 on light `surface`), so a key hint's words are `on_surface_variant`.
 - **Pictures carry their own contrast.** The logo's wordmark is drawn in `on_surface` and its mark in `primary` and `cold`, so it reads on either mode's surface; the photo of the neon sign is only ever shown over the dark backdrop. An app's icon in the tray is a picture too: one drawn dark on the dark bar is lifted to the content colour (see "Iconography").
-- **Opacities** come from `[opacity]`: the state layer (hover 0.08, focus 0.12, press 0.14), disabled content 0.38 and container 0.10, the scrim, tints, the glass of a panel over a blurred wallpaper (`glass`, 0.80) and the backdrop that turns a wallpaper toward the surface behind full-screen text (`backdrop`, 0.90, fading to nothing away from the words: Kōbō's welcome and done screens, the lock screen), at which every text role keeps 4.5:1 over any wallpaper, black or white. A component never picks its own alpha. The shell's frame and its panels are glass (`frame`, 0.94, which Hyprland blurs behind, and only it: its layer's cut-off, `frame_blur`, 0.85, lies above the scrim under a panel's shadow), and an open panel dims the desktop less than a dialog does (`panel_scrim`, 0.20). A list behind something floating over it fades toward the panel's own surface rather than darkening, every other row at 1 − `recede` (0.60), so it sits back in light as in dark with no edge of its own, and a row the floating thing covers any of fades out whole, so no cut-off piece of it shows through the gaps: a notification group's preview.
+- **Opacities** come from `[opacity]`: the state layer of the libraries' controls (hover 0.08, focus 0.12, press 0.14; the state model has none, "States"), a Text button's pressed tint by day (`press_tint`, 0.10), disabled content 0.38 and container 0.10, the scrim, tints, the glass of a panel over a blurred wallpaper (`glass`, 0.80) and the backdrop that turns a wallpaper toward the surface behind full-screen text (`backdrop`, 0.90, fading to nothing away from the words: Kōbō's welcome and done screens), at which every text role keeps 4.5:1 over any wallpaper, black or white. The lock screen's clock has no backdrop at all: its digits and its kicker take a light tint of the picture behind them, the kicker's date at `clock_date` (0.85) of it, and the kicker stands off the picture on a halo of `surface` round each letter, `halo_edge` (0.50) and `halo` (0.35), the same on every wallpaper (`docs/design/components/lock.md`). A component never picks its own alpha. The shell's frame and its panels are glass (`frame`, 0.94, which Hyprland blurs behind, and only it: its layer's cut-off, `frame_blur`, 0.85, lies above the scrim under a panel's shadow), and an open panel dims the desktop less than a dialog does (`panel_scrim`, 0.20). A list behind something floating over it fades toward the panel's own surface rather than darkening, every other row at 1 − `recede` (0.60), so it sits back in light as in dark with no edge of its own, and a row the floating thing covers any of fades out whole, so no cut-off piece of it shows through the gaps: a notification group's preview. A row a find on its page doesn't match stands back at `miss` (0.45), in its place, so the page doesn't move and the matches read (SidebarPage's find box).
 - **Custom colours:** a seed colour, overrides of single roles, and presets (KubaOS neon among them). The contrast minimums hold for all of them: a custom colour that breaks one is refused, not drawn. *Not enforced yet: lands in #154.*
 
 ### Light and dark
 
 - Both ship in v1. Dark is the default. The switch is manual, with an optional sunset and sunrise schedule. *Not enforced yet: lands in #154.*
 - Each mode has its own wallpaper: a pair the user picks, or one image for both. *Not enforced yet: lands in #154.*
-- The switch crossfades by default (`slow`, 800 ms), or wipes, or is instant, as the user sets it. *Not enforced yet: lands in #154.*
+- The switch is a sequence on one clock for every screen, the theme change's with its own colour path, dawn: the signs lit at night go out, the room brightens, and they stay off in daylight; or the room darkens and every sign strikes on (see "Motion", "The dark ⇄ light switch"). Reduce motion swaps at once. *Not built yet: the mockups play it; no library or the shell does.*
+- In dark mode the neon is lit: a control rests unlit and lights up. In light mode the signs are off and nothing glows: a lit control shows a line and no glow (see "States").
 - Plymouth and GRUB are always dark. Kōbō is dark on the live ISO.
 - Geometry never changes with the mode: the light and dark shots of a page are the same boxes, and the geometry check holds them to it.
 
@@ -63,7 +76,7 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 
 ![Type styles, dark](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/type-dark-1x.png)
 
-*Every style, largest first; the tint behind each is its line box, so the line height is visible. The lock screen's clock, 80, sits on top, then the hero's 64. Light: [type-light-1x.png](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/type-light-1x.png).*
+*Every style, largest first; the tint behind each is its line box, so the line height is visible. The lock screen's clock at rest, 384, sits on top, then the same clock awake, 80, then the hero's 64. Light: [type-light-1x.png](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/type-light-1x.png).*
 
 **Families** (`[font.family]`), and nothing else draws text:
 
@@ -75,19 +88,22 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 
 `kubaos-ui` embeds the fonts it uses, so an app draws the same on a machine with none installed.
 
-**Sizes:** 11, 12, 13, 14, 16, 20, 24, 32, 48, 64, 80 (`rules.font_sizes`). 64 is the hero's alone, and 80 the lock screen's clock's. **Every line height is a multiple of 4**, so text boxes stay on the grid. `kubaos-tokens` refuses any other size, and any line height off the grid.
+**Sizes:** 11, 12, 13, 14, 16, 20, 24, 32, 48, 64, 80, 384 (`rules.font_sizes`). 64 is the hero's alone, 384 the lock screen's clock's at rest, and 80 the clock of the shell's lock surface as it is built. **Every line height is a multiple of 4**, so text boxes stay on the grid. `kubaos-tokens` refuses any other size, and any line height off the grid.
 
 **Styles** (`[type.*]`, the `Type` enum). Pick by what the text is, never by how big you want it:
 
 | Style | Size / line | Weight, family | For |
 |---|---|---|---|
-| `clock` | 80 / 88 | light | The lock screen's clock, the one thing that screen shows: a step above the hero, light like every big figure. The clock popup's time stays `hero_number`. |
+| `clock_rest` | 384 / 384 | light | The lock screen's clock at rest, with only the wallpaper round it: digits about 280 tall, which the city's cut-out may stand in front of. Its line is its size, so the digits sit on the grid wherever the wallpaper places them. |
+| `clock` | 80 / 88 | light | The clock of the shell's lock surface as it is built (`modules/lock/LockSurface.qml`), over its password field: a step above the hero, light like every big figure. The lock's mockup has no awake size of its own: its awake clock is the rest clock `scale.clock_awake` along its flight to the bar. The clock popup's time stays `hero_number`. |
+| `clock_place` | 20 / 24 | medium, M PLUS 1 | Where and which day in Japanese, the first half of the kicker above the lock screen's clock. |
+| `clock_date` | 20 / 24 | medium | The date, the kicker's second half after where and which day: one line with `clock_place`, a style each since Geist draws no kanji. |
 | `hero` | 64 / 72 | semibold | Words at the hero size: Kōbō's welcome line and its done screen's headline, nothing else. The first and the last thing an install shows get the same size. |
 | `hero_number` | 64 / 72 | light | Numbers at the hero size: the install percent, the clock popup's time. Light, so a big figure doesn't shout. |
 | `display` | 48 / 56 | semibold | The heading of a full-screen moment other than Kōbō's welcome and done screens. |
 | `title` | 32 / 40 | semibold | A screen's or page's title. |
-| `headline` | 24 / 32 | semibold | A dialog's title, a big number. |
-| `heading` | 20 / 28 | semibold | A section's title inside a page. |
+| `headline` | 24 / 32 | semibold | A big number. |
+| `heading` | 20 / 28 | semibold | A section's title inside a page; a dialog's title. |
 | `subheading` | 16 / 24 | semibold | A card's or an error's first line. |
 | `body_large` | 16 / 24 | regular | A lede under a display line; the text in a field. |
 | `body` | 14 / 20 | regular | Running text, explanations, toasts. |
@@ -104,19 +120,21 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 | `keycap` | 11 / 20 | medium, Geist Mono | The key on a `Keycap`, on the keycap's 20 line so it centres in it. |
 | `mono_large` | 14 / 20 | regular, Geist Mono | A command or key that is the subject of its line. |
 
-**Tabular figures** (`tabular` on a style, OpenType `tnum`) make every figure one width, so a number that changes in place keeps its width: `label_number` has them. QML turns the feature on (`font.features`, which Qt applies only to shaped text, so such a style is always shaped). iced's text (0.14) has no font features, so iced draws the figures proportional, and a component showing a changing number holds it in a box as wide as its widest value, ending in one place.
+**A line of text is centred for the eye:** in a control, a pill, a row or any box that centres one line, the centre of its ink's mass above the baseline sits in the middle of the box (so "21:47" centres on its figures and "Continue" nearer its lowercase, descenders left out), lines side by side in one row share one baseline on their combined ink, and the baseline lands on the nearest whole device pixel.
+
+**Tabular figures** (`tabular` on a style, OpenType `tnum`) make every figure one width, so a number that changes in place keeps its width: `label_number` has them. A clock keeps its proportional figures: the lock's two clocks and the bar's time, which the lock's clock flies into, are drawn with Geist's own figures, the bar's time centred in a slot as wide as the widest time its clock shows, so the pill keeps its width as the minutes turn (`docs/design/components/bar.md`). QML turns the feature on (`font.features`, which Qt applies only to shaped text, so such a style is always shaped). iced's text (0.14) has no font features, so iced draws the figures proportional, and a component showing a changing number holds it in a box as wide as its widest value, ending in one place.
 
 A single-line control's label takes the control's content box as its line height (a 40 button has a 24 line inside 8 + 8 padding), so the label centres on the grid with no centring arithmetic.
 
 ### Icons by type
 
-Every style names the icon that sits beside it on its line (`icon` in `[type.*]`, `Type::icon()` in Rust, `Tokens.type.<style>.icon` in QML). A component takes its icon's size from its text's style, never a size of its own: a `ListRow`'s symbol is `body_strong`'s, a `Chip`'s `label`'s, a `Md` button's `button`'s. An icon picked by a free number is how icons came to scale badly against the text beside them.
+Every style names the icon that sits beside it on its line (`icon` in `[type.*]`, `Type::icon()` in Rust, `Tokens.type.<style>.icon` in QML). A component takes its icon's size from its text's style, never a size of its own: a `ListRow`'s symbol is `body_strong`'s, a `Chip`'s `label`'s, an md button's `button`'s. An icon picked by a free number is how icons came to scale badly against the text beside them.
 
 | Icon | Beside |
 |---|---|
 | 16 | `caption`, `small`, `label`, `mono`, `keycap`, `accent`, `button_small` |
 | 20 | `body`, `body_strong`, `body_large`, `mono_large`, `button` |
-| 24 | `subheading`, `heading`, `button_large` |
+| 24 | `subheading`, `heading`, `button_large`, `clock_place`, `clock_date` |
 | 32 | `headline`, `title` |
 | 48 | `display`, `hero`, `hero_number`, `clock` |
 
@@ -137,17 +155,21 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | Scale | Tokens |
 |---|---|
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
-| Radii (`[radius]`) | three roles, small 4, control 12, surface 24, and `full`; below |
+| Radii (`[radius]`) | five roles, small 4, row 8, control 12, content 16, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
-| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 36, compact 28, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160; sparkline 48 |
+| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 28, compact 24, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; a collapsible's rail's strip 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the disk passphrase prompt's) 320; column 560; rail 236 (Kōbō's); an app's sidebar 264, its find box 320; a canvas page's settings beside its canvas 400, from a page 1000 wide; an app's window 1120 × 720, at least 720 × 480; log 232; scrollbar 4; the shell's panel 384 and bar 40; the lock's wallpaper's blur once it is awake, 8; a wallpaper's thumbnail 256 × 160; sparkline 48; the mockups' motion plot, from 0 to 1, 160 |
 | Container padding (`[container]`) | 16 under 640, 24 from 640, 32 from 1024 |
-| Aspect ratios (`[aspect]`) | wallpaper 16:10 |
+| Aspect ratios (`[aspect]`) | wallpaper 16:10, dialog 5:2 (its least height), a canvas page's canvas 50:21 (42% of its width tall) |
+
+- **An app's window** (`app_width` × `app_height`, 1120 × 720) opens centred and floating at that size. Tiled, it takes its tile, and never goes below its minimum (`app_min_width` × `app_min_height`, 720 × 480), so its layout is built to hold at the minimum. Its sidebar (`sidebar`, 264), its list of pages, is wider than Kōbō's step rail (`rail`, 236), since it lists settings' names, not a step's few words. *Not enforced yet: no app opens at these sizes, and no window rule places or limits an app's window yet.*
 
 - **Boxes land on device pixels.** Lengths on the grid do so by themselves. A box sized by its text (a label, a chip, a toast) is a fraction of a pixel wide; `kubaos-ui` rounds every such box up to the next device pixel (`snap`), and centring rounds its offset to a whole one (`centre`); a stack centring its children across puts an odd spare device pixel after the child, never before it, in both toolkits. A grid splits its width in device pixels, so its columns differ by one device pixel at most (`grid`).
-- **Hairlines are one device pixel** at every scale (`stroke.hairline_device_px`): dividers, card, field and well outlines, the switch track. They are the one length not on the grid.
+- **Hairlines are one device pixel** at every scale (`stroke.hairline_device_px`): dividers, the edges below, the switch track. They are the one length not on the grid.
+- **An edge is one of two recipes.** *Raised*, a part raised on the ladder (a popover, a menu, a toast, a dialog, a select while it is open): the rim, a hairline inside its edge in the colour of its words (see "Elevation" below); a `Danger` dialog lays its edge of `error` over it. *Sunken*, a part set into its surface or lying flat on it (a list well, a scroll panel, a card, a field, a shut select): one hairline inside its edge, a tone at a strength. A well's, a scroll panel's and a card's is the soft outline, `outline_variant` at `opacity.outline_soft`, decoration with no minimum. A field's and a shut select's is `outline` at full: what takes input keeps 3:1 against what is round it, counting its fill, which the soft line (1.6:1 in dark, 1.4:1 in light) and even `outline_variant` at full (2.0:1, 1.6:1) miss; `[contrast]` holds `outline` on every surface a field sits on. A read-only field's is the same at `opacity.locked`. Marks keep lines of their own: a checkbox's box and a switch's track in `outline`, a keycap's edge and foot. *Not built yet: both libraries draw a field's and a shut select's edge in `outline_variant`; the mockups draw the rule.*
 - **The thin stroke** (`stroke.thin`, 2) is the spinner's, a field's caret's and a partial checkbox's dash. It is drawn as whole device pixels, rounded half up: 2, 3, 3, 4 at 1, 1.25, 1.5, 2. A tick (a full checkbox, a checked `ListRow`) is the `check` symbol, drawn with the symbol stroke like every other icon (see "Iconography"), so it matches the icons beside it.
-- **The focus tube is the control's own edge** (`focus.tube`, 1.5, drawn as whole device pixels rounded half up: 2, 2, 2, 3 at 1, 1.25, 1.5, 2), with its glow outside it, and neither takes layout space: focus moving never moves anything, and a focusable control's edge lines up with a plain one's. Whatever clips the control clips its glow too (see "Focus").
-- **Elevation is two shadows** (`[shadow]`, each with an optional `light_opacity` for light mode): `panel` and `dialog`, both 16 down and 48 blur in the `shadow` role, plus `glow` under a progress bar's fill in the fill's own colour. A notification group's cards take two more, as cards lying on cards: `tucked` (4 down, 8 blur, 0.40, and 0.16 in light, where the dark one's strength turned the edges into grey bands), each card's cast onto the edge tucked under it, cut to that edge, and `lifted` (8 down, 24 blur), each card's own straight under it while its preview floats them over the list; as the cards spread, the one eases into the other over the spread's duration and curve, and back as they tuck in. Nothing else casts a shadow; a surface sits higher by its container role (`surface_container` up to `surface_container_highest`), not by a stronger shadow.
+- **The tabs' rail** (`tabs.rail`, 2 at night; `tabs.rail_day`, 3 by day) runs along the bottom edge of `Tabs`' well, the picked choice's stretch of it lit. It is drawn as whole device pixels, rounded half up: 2, 3, 3, 4 at night and 3, 4, 5, 6 by day. By day the lit stretch is the tone with no glow, so it takes the extra pixel to read as picked. A `Collapsible`'s rail, down its open content, is as thick.
+- **The focus line is inside the control's own edge** (the tube, `focus.tube`, 1.5, drawn as whole device pixels rounded half up: 2, 2, 2, 3 at 1, 1.25, 1.5, 2; on a filled control its core, `stroke.thin`), with its glow outside it, and neither takes layout space: focus moving never moves anything, and a focusable control's edge lines up with a plain one's. Whatever clips the control clips its glow too (see "States").
+- **Elevation is two planes and a ladder** (`[elevation]`, `[shadow]`). The desktop plane is the wallpaper and the windows: every window casts one constant neutral shadow, 16 down and 48 blur in `shadow` at `opacity.window_shadow`, and the active window's glow (the focus family, below) is laid over it, never changing it. The shell plane is the bar and the frame, the panels, the notifications, the OSD and the system dialogs (the password prompt, the share-screen prompt): always above every window, it casts `shadow.panel` (16 down, 48 blur) over a window and over the wallpaper alike. The lock screen is above everything and casts nothing. Inside every window and every panel a part rises on the ladder, which restarts from 0 in each, so a menu in a window and a menu in a panel are one: 0 the window's or the panel's own surface, 1 a tucked notification or a card being dragged, 2 a menu, a popover, an open select, a toast or a lifted notification, 3 a dialog inside an app or a panel, 4 a tooltip. Only what floats above the page rises: a card is part of the page and lies flat on it, with no shadow and no rim (see `Card`), and being dragged is the one time a card is raised. A toast floats over its window or panel as a popover does, so it stands at 2 with them. Each step casts one shadow, measured from the plane's surface rather than from what it lies on, in two layers of `shadow`: contact, 4 blur at every step, and ambient, 4 down and 16 blur per step, both on the grid at every step. At night the layers are 0.70 and 0.80 and a raised part takes the container role one above its day one (a dialog `surface_container_highest` where by day it is `surface_container_high`, a menu or a tooltip `surface_container_high` over `surface_container`); a toast keeps its inverse fill, `on_surface`, in both; by day they are 0.24 and 0.28. Every raised part draws a rim, a hairline inside its edge, at `elevation.rim` (8 %) at night and `light_rim` (6 %) by day, in the colour its words are in: `on_surface` on a surface's fill, `surface` on a toast's inverse one, where `on_surface` would be the fill itself. The rim is the fill's own ink catching its edge, so it is the same faint line on every raised part; a toast's edge already stands on its fill's contrast with what is under it, and the rim keeps it drawn as every other raised part is. A menu or a tooltip that reaches past its window's edge keeps its step's shadow. `glow` under a progress bar's fill, in the fill's own colour, is light, not a shadow. *Not built yet: the shell and `kubaos-ui` still cast `shadow.dialog`, `tucked` and `lifted` for a dialog and a notification group's cards, and Hyprland's window shadow is the glow's falloff in `shadow`; the mockups draw the ladder.*
 
 ### The container
 
@@ -156,8 +178,8 @@ Every page and every panel's body is padded by the container at its sides, so th
 - **The padding is Tailwind's container** (`px-4 sm:px-6 lg:px-8`) on Tailwind's default breakpoints: 16 under 640, 24 from 640, 32 from 1024 (`[container]`). It goes by the container's own width, not the screen's, so a 384 panel takes 16 on any screen and Kōbō's content pane beside its rail takes 32 on a 1080p screen and 24 on a 1280 one. A panel as wide as its content takes the padding its padded width reaches (`Tokens.containerPaddingAround`).
 - **Sides only, as Tailwind's is.** Above and below, the content keeps the spacing steps it is laid out with at its natural height: a `Page` 32 below its top and 24 above its foot, where a footer's buttons sit; a toolbar band a small control's 16 above and below; a panel its own step (the clock 20; the control center, the notifications panel and the system monitor 16).
 - **On the 4 px grid**: every padding is a spacing step and every breakpoint a multiple of 4, which `kubaos-tokens` checks.
-- **A container inside a container** doesn't pad again: a card or a list inside a page keeps its own padding (16, 12), and the page's padding is the only one around them.
-- **A panel whose body is something else keeps that thing's own padding**: one list (the power menu's rows and Kōbō's rail, 12 in so their corners are concentric with the panel's), a dialog (polkit, 32), a stack of cards (the notification popups, 8 in), the OSD's one bar.
+- **A container inside a container** doesn't pad again: a card or a list inside a page keeps its own padding (16, 8), and the page's padding is the only one around them.
+- **A panel whose body is something else keeps that thing's own padding**: one list (the power menu's rows and Kōbō's rail, 12 in so their corners are concentric with the panel's), a dialog (polkit, 24), a stack of cards (the notification popups, 8 in), the OSD's one bar.
 - The geometry check's `container-padding` rule holds every `Page` and `Container` to it (see "Checks").
 
 ### No wasted space
@@ -172,24 +194,39 @@ Dense, never cramped (principle 8): room that holds nothing is a bug, as an edge
 
 ### Radii by role
 
-Every radius means something: what the shape is. There are three, plus full, and a component takes the one its role names. A radius that isn't a role only ever comes out of nesting.
+Every radius means something: what the shape is. There are five, plus full, on one ladder of boxes, and a component takes the one its role names.
 
 | Role | `Radius` | px | For |
 |---|---|---|---|
-| Small | `Small` | 4 | Marks inside controls: the checkbox, a hint, focus details, inline tags. |
-| Control | `Control` | 12 | Everything you click or type in: buttons, fields, list rows, menu items, chips. |
-| Surface | `Surface` | 24 | Everything that holds content: cards, dialogs, popups, toasts, panels, list wells, the screen frame. |
-| Full | `Full` | half the shorter side | Pills and circles: switches, icon buttons, radios, progress bars, sliders, avatars, badges. |
+| Small | `Small` | 4 | Marks inside controls: the checkbox, a keycap, a skeleton's line, a field's selection, focus details. |
+| Row | `Row` | 8 | A row inside a small or a content box, the box's corner less its padding: a menu's and a select's items, a list well's rows, a table's rows; and a hint. |
+| Control | `Control` | 12 | Everything you click or type in: buttons, fields, chips, tiles, a calendar's title and months; and the small floating things, raised over what opened them: a popover, a menu, a select's open list, a toast. |
+| Content | `Content` | 16 | A content box inside a window or a panel: a card, a list well, a dialog. A step under a surface, so a box inside reads as a part of what holds it, not a second window. |
+| Surface | `Surface` | 24 | The shell's big surfaces alone: a panel, a window, the screen frame. |
+| Full | `Full` | half the shorter side | Pills and circles: switches, icon buttons, radios, progress bars, sliders, the tabs' well, avatars, badges. |
 
-- **Nesting is derived, never picked.** A shape that fills another less an inset takes the outer radius minus the inset, so both corners share a centre: `nested(outer, inset)`, which refuses an inset that reaches the outer radius (in a `const`, that stops the build). A pill in a pill is a pill.
+- **A row follows the box it sits in.** A row's corner is the box's corner less the box's padding, so both corners share a centre: `nested(outer, inset)`, which refuses an inset that reaches the outer radius (in a `const`, that stops the build). The rows of the small and the content boxes all come to 8, `radius.row`. A pill in a pill is a pill.
+- **A box's padding goes with what it holds:**
+
+  | Padding | Round | In |
+  |---|---|---|
+  | 4 (`space.s4`) | rows in a floating box | a menu, a select's open list |
+  | 8 (`space.s8`) | rows in a content box | a list well |
+  | 12 (`space.s12`) | words in a small floating thing | a popover holding words, a toast |
+  | 16 (`space.s16`) | content in a content box, or in a panel | a card, a shell panel |
+  | 24 (`space.s24`) | a dialog's content | the dialog alone |
+
+  A hint, the smallest floating thing, keeps 8 by 4: at 12 a one-line hint would be 44 tall, too heavy for a name.
 - **Worked examples:**
-  - A list well is a surface, 24, with 12 inside: its rows take 24 − 12 = 12, the control radius, so a row is both concentric and a control.
-  - A card filling a surface 8 in takes 24 − 8 = 16; 12 in, 12; 4 in from that 16, 12.
+  - A list well is a content box, 16, with 8 inside: its rows take 16 − 8 = 8, the row radius, and are 16 inside their sides, so their words start 24 from the well's edge.
+  - Every raised list (a popover's menu, a select's open list) is built one way: the surface at the control radius, 12, with 4 inside, so its rows, 32 (`control_sm`) tall, take 12 − 4 = 8 and run parallel to it; a row is 8 inside, so its words start 12 from the surface's edge, and a hairline between groups is inset to the words. A popover holding words of its own is 12 inside, at the same 12.
   - The screen frame is a surface, 24. A window sits 8 inside it, so the window's outer edge is 24 − 8 = 16: Hyprland's `rounding = 14` plus its 2 px border.
-  - The focus tube takes its control's own corner, 12 on a button, 24 on a card; each ring of its glow is concentric with it, its radius the control's plus its distance out. A pill's glow is a pill.
-- **8, 16 and 20 aren't choices.** They appear only where nesting produces them. A control placed inside content (a button in a card, a field in a dialog) isn't filling its parent, so it keeps its role; nesting is for a shape that fills one less an inset.
-- **Why roles:** six radii with no reason to pick one over another meant every surface picked its own, and nothing told a 16 card from a 16 button. A role says what the shape is, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.
+  - A picture filling a card less its 16 would take 16 − 16, nothing: `nested` refuses it, and the picture takes the row radius, 8.
+  - The focus tube takes its control's own corner, 12 on a button, 16 on a card; each ring of its glow is concentric with it, its radius the control's plus its distance out. A pill's glow is a pill.
+- **A control placed inside content keeps its role.** A button in a card or a field in a dialog isn't filling its parent, so it keeps the control radius; nesting is for a shape that fills one less an inset. The marks (a checkbox, a keycap) keep the small radius wherever they are.
+- **Why roles:** radii with no reason to pick one over another meant every surface picked its own, and nothing told a 16 card from a 16 button. A role says what the shape is, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.
 - The lint fails on a radius written as a number, a shell radius that isn't a role (`Theme.rounding.lg`), and a radius derived by hand (`outer - inset`); see "Checks".
+- *Not built yet: `kubaos-ui` and `KubaOS.Components` still draw a card, a list well, a toast and a dialog at the surface radius (24), a well 12 inside with its rows at 12, a table's rows at 12, a banner, an error block and a log at 24, a step at 12 in a well, and a hint at 4; the mockups draw the ladder.*
 
 ## Motion
 
@@ -202,13 +239,20 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | Duration (`[duration.*]`) | ms | For |
 |---|---|---|
 | `instant` | 0 | The caret, text appearing as it is typed, reduce motion's moves. |
-| `micro` | 100 | Hover and press state layers, a colour change under the pointer. |
-| `short` | 200 | A switch's knob, a check mark, focus moving, a toast fading in, a slider settling on its step and its anchor dot popping in. |
-| `medium` | 300 | A panel or popup leaving, a log opening, a list reordering, a toast fading out, a neon tube striking on (the focus tube too). |
+| `micro` | 100 | A control pressed, a state layer, a colour change under the pointer. |
+| `short` | 200 | A control lighting up or going back to rest (hover and focus), a switch's knob, a check mark, a toast fading in, a slider settling on its step and its anchor dot popping in. |
+| `medium` | 300 | A panel or popup leaving, a log opening, a list reordering, a toast fading out, a neon tube striking on. |
 | `long` | 500 | A panel or dialog arriving, a page sliding in. |
-| `slow` | 800 | A wallpaper fading in, the light/dark crossfade, a live list's new row fading in. |
-| `hold` | 1100 | Not a move but a timer: a held control until it acts (Kōbō's Install, a held menu item). Reduce motion keeps it. |
-| `scene` | 1200 | A whole scene changing once: the lock lifting, Kōbō's welcome settling. |
+| `slow` | 800 | A wallpaper fading in, a live list's new row fading in. |
+| `scene` | 1200 | A whole scene changing once: the lock arriving, Kōbō's welcome settling. |
+| `recolour` | 700 | Every colour role changing together in a theme change or the dark ⇄ light switch. |
+| `settle` | 400 | The dark beat in the new colours after a theme change's colours change, before the lights strike. |
+| `strike` | 600 | Every light striking on together at the end of a theme change or a switch to dark. |
+| `swap_lag` | 50 | How long after a twin panel's content starts leaving the arriving one starts moving in: half a `micro`. |
+| `swap_fade` | 150 | The arriving twin panel's content fading in, from when the leaving one is gone until it lands: `short` less `swap_lag`. |
+| `toast` | 3600 | A toast staying once it has arrived, long enough to read its line twice. Not a move: reduce motion doesn't cap it. |
+| `hold` | 1100 | A held button held until it acts, its timed bar filling meanwhile: Kōbō's Install, the hold that erases a disk, a held menu item. Not a move: reduce motion doesn't cap it. *Not built yet: Kōbō times its hold with a constant of its own.* |
+| `lock_idle` | 20000 | The awake lock left alone until it goes back to rest: time to find a key or a finger, short enough that an empty field doesn't sit lit. Not a move: reduce motion doesn't cap it. |
 
 | Curve (`[easing.*]`) | Bézier | For |
 |---|---|---|
@@ -219,15 +263,35 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `emphasized_accel` | 0.3, 0, 0.8, 0.15 | Things leaving: panels and dialogs closing. |
 | `linear` | 0, 0, 1, 1 | Progress that tracks a real quantity, and spinners. |
 | `pop` | 0.2, 0.9, 0.3, 1.3 | A small mark popping in, a little past its size and back: a slider's anchor dot. |
+| `spring` | 0.34, 1.25, 0.64, 1 | Something gliding into place with a small overshoot, over `long`: the wallpaper carousel's step. *Not enforced yet: nothing moves on it.* |
+| `gather` | 0.11, 0, 0.5, 0 | A colour change gathering speed: the theme change and the dark ⇄ light switch. *Not built yet: only the mockups move on it.* |
 
+- **A surface that steps back shrinks to `scale.behind`** (0.96) round its middle as it fades, and grows back from it: the desktop's windows as the lock comes up and gives way. A wallpaper that comes toward you grows to `scale.push` (1.025) round the middle of the screen's bottom edge, and its city, where it has depth, further, to `scale.near` (1.05), so the city stands off the sky: the lock's picture as it comes up, back to 1:1 as it gives way. The lock's clock, awake, stands `scale.clock_awake` (0.2) of the way along its flight to the bar's clock, its size, its place and its colour together. A scale factor, and a share of a flight, is a token of `[scale]`, never a number of its own.
 - **Arriving is slower than leaving** (`long` in, `medium` out): you look at what arrives, and what leaves is already done with.
 - **A surface a key summons to act and go is one step quicker**: the Command menu arrives over `short` and leaves over `micro`, its Action panel the same, and its Views slide in over `medium`. A key opens and closes it many times an hour, and what it runs waits for it to be gone, so a panel's `long` and `medium` would be felt on every run.
-- **A panel swapped for its twin keeps its surface** (the system monitor, the notifications panel and the control center, `docs/design/components/sheet.md`): only the content moves, `space.s24` sideways. What leaves goes over `micro`, what arrives comes over `short` half a `micro` later and fades in once the other is gone, about 250 ms in all, so switching straight from one to the other feels like one surface changing its mind, not two panels passing.
+- **A panel swapped for its twin keeps its surface** (the system monitor, the notifications panel and the control center, `docs/design/components/sheet.md`): only the content moves, `space.s24` sideways. What leaves goes over `micro`, what arrives comes over `short` half a `micro` later (`swap_lag`, 50) and fades in over `swap_fade` (150) once the other is gone, about 250 ms in all, so switching straight from one to the other feels like one surface changing its mind, not two panels passing.
 - **Speed** 0.5× to 2× divides every duration (`kubaos_ui::motion::Motion`). *Not enforced yet: lands in #154, the setting; `Motion` applies it once there is one.*
-- **Reduce motion** caps every duration at `short` and turns moves into fades, or into nothing. *Not enforced yet: lands in #154, the setting; `Motion` caps the durations once there is one.*
+- **Reduce motion** caps every duration at `short` and turns moves into fades, or into nothing. A spinner keeps turning: one standing still reads as work that has hung. *Not enforced yet: lands in #154, the setting; `Motion` caps the durations once there is one.*
 - **A choreographed scene** (Kōbō's done screen, `crates/kubaos-kobo/src/done.rs`) starts its parts on cues, the times its picked draft set. A cue says when a part starts; how long it then moves, and on which curve, is a token. A neon tube strikes as the boot splash's do, the same stutter (`neon.strike`) through even steps over `medium`. A neon tube's hum is a slow pulse, 2.4 s, not a move: it redraws only when the glow has changed by a couple of levels (about 30 times a second on the GPU, 10 in software, where each redraw costs more), and it never rebuilds the view. Reduce motion shows every part in place and holds the hum still.
-- **A live list never jumps.** A list a scan updates while it shows (the control center's Wi-Fi and Bluetooth tabs) keeps each row by its key and changes only what changed: a row that arrives opens its room over `medium` (`standard_decel`) and fades in over `slow`; one that leaves fades and gives its room back over `medium` (`standard_accel`), taking no press while it goes, so a click can't land on the row that slides under the pointer; one that changes place glides there over `medium` (`standard_decel`). A list the user reorders takes the same glide.
-- **What never animates:** typed text and the caret (`instant`), layout around focus (the tube and its glow take no layout), a window's size or place, and anything while the user drags it.
+- **Flicker means power; light-up is a fade.** Two motions, each with its own use:
+  - **The flicker** (`neon.strike`'s stutter) plays when a sign really turns on for the first time or goes off for good, a boot-up: the theme change (lights out, the colours change, lights on), dark ⇄ light, a new window or surface appearing, its tube striking on for the first time, and a definite off, a window or surface closing. With the stutter off, the same steps are fades on the same timings.
+  - **Light on and off** is a quick fade with no stutter, on something already powered: hover, focus and press on a control (`short` to light up or go back to rest, `micro` to press, on `standard`), focus moving between controls, and focus moving between windows that are already open.
+
+  So a control's focus never strikes: it lights up. This holds for every component, the window border and every sequence. *Not built yet: the libraries and `config/hypr/focus.lua` still strike focus, on a control and on a window, through `neon.strike`; the mockups play the rule.*
+- **A lit control is lit with the signs on or off, never gone; a control at rest just recolours,** in every sequence. At night a lit control has its signs on while the lights burn, so as they flicker out it flickers down to its signs-off look, step for step, its line turning to glass and staying, and as they strike it strikes back to its signs-on look. By day the signs are off, so a lit control keeps its daylight lit look through a theme change. With the stutter off the steps are fades on the same timings; reduce motion swaps at once.
+- **The theme change** is a new wallpaper's accent or a custom colour, played as one sequence on one clock for everything on every screen, 2.3 s in all:
+  1. **Flicker out,** `medium` (300 ms). Every light goes dark together, `neon.strike`'s steps played backwards, like a sign switching off. The lights are a lit control's line, glow and burning label, the glow of a switch that is on and of a slider's fill, and the active window's border; fills and text aren't lights. At each step every lit control goes to its signs-off look and back, its line glass.
+  2. **Pause,** `medium` (300 ms). Everything is dark and still, every lit control in its signs-off look.
+  3. **Colours change,** `recolour` (700 ms) on `gather`, through grey, all together. In OKLCH, every colour role's lightness moves from its old value to its new over the whole fade; its chroma drains from the old value to 0 by the middle, then rises from 0 to the new value; its hue jumps at the grey middle, so nothing passes through an odd in-between colour. The derived roles go from the old theme's to the new's on the same path, a lit control's glass with them.
+  4. **Pause,** `settle` (400 ms). Dark, in the new colours.
+  5. **Strike in,** `strike` (600 ms). Every light strikes on together through `neon.strike`'s steps, in the new colours, and every lit control strikes back to its signs-on look.
+
+  In light mode the same clock runs with nothing to flicker, so only the colours are seen to change.
+- **The dark ⇄ light switch** is the theme change's sequence with the signs lit at night and off in daylight, on its own colour path, **dawn**. To light, about 1.7 s: flicker out (`medium`), every lit control flickering down to its signs-off look; pause (`medium`); colours change on dawn (`recolour`, `gather`) as the night turns to day, the signs-off look becoming the daylight lit look, the same look in daylight colours; then a closing pause (`settle`); the signs stay off. To dark, about 2 s: pause (`medium`); colours change on dawn (`recolour`, `gather`), a lit control holding its daylight lit look, its glass following the palette into the night; pause (`settle`); then strike in (`strike`), every lit control striking to its signs-on look. **Dawn** runs in OKLCH so the room brightens or darkens before the colours are seen to change: lightness moves first, over the first 60% of the fade, while each colour keeps its own chroma and hue; chroma and hue then settle over the last 60% (from 40% to 100%), the hue the short way round.
+- **Both sequences keep one clock.** Nothing lights on its own during one: a control lit or a switch turned on mid-way waits for the strike and strikes with the rest. Reduce motion swaps the colours at once, with nothing going dark. The speed scales the whole sequence. The mockups' Button, Colour, Focus and Motion pages play each with its recipe as data (`design/mockups/src/site/sequences.ts`), and the toolbar's theme and mode play them across the page. *Not built yet: no library or the shell plays either.*
+- **A pick travels.** Picking a tab sends its lit stretch from the old choice to the new one: the leading edge over `short`, the trailing edge a `micro` later over `medium`, both on `emphasized_decel`, so it stretches and catches up; as it lands its core flashes to `primary_flash` over `micro` and settles over `long`, on `standard`. The flash is not the flicker: nothing powers on, the tube only lands somewhere new. Reduce motion puts the stretch on the new choice at once and keeps the flash, settling over `short` (`docs/design/components/tabs.md`).
+- **A live list never jumps.** A list a scan updates while it shows (`LiveList`: the control center's Wi-Fi and Bluetooth tabs) keeps each row by its key and changes only what changed: a row that arrives opens its room over `medium` (`standard_decel`) and fades in over `slow`; one that leaves fades and gives its room back over `medium` (`standard_accel`), taking no press while it goes, so a click can't land on the row that slides under the pointer; one that changes place glides there over `medium` (`standard_decel`). A list the user reorders takes the same glide.
+- **What never animates:** typed text and the caret (`instant`), layout around a control's state (its line and glow take no layout), a window's size or place, and anything while the user drags it.
 - **Full refresh rate, always.** An animation that drops a frame is a bug, measured with the frame times, not judged by eye. *Not enforced yet: nothing measures frame times today, and no issue builds it yet.*
 
 ## Iconography
@@ -254,7 +318,8 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 - **An app's tray icon is the app's drawing**, not ours, at the bar's 16. Where it is drawn dark on the dark bar (a monochrome symbolic icon from a light theme), the bar draws it in the content colour instead, so no tray icon is dark on dark; a coloured one keeps its colours.
 - **Optically centred.** A symbol's box is centred in its slot on a whole device pixel; the drawing's own optical centre is Tabler's grid, which ours follow.
 - **Apps show as uniform tiles** in our UI: the app's icon on a tile of one size and radius, so a list of apps reads as one set, whatever each vendor drew. *Not enforced yet: lands in #93.*
-- **The logo** is two things, as `docs/BRAND.md` says: the neon sign photo wherever it shows large (boot splash, GRUB, Kōbō, the README), and the vector クバ mark at small sizes (icons, tray, fastfetch). The neon sign is never redrawn as a symbol, and the mark is never used large, with one exception: Kōbō's done screen draws it as lit neon tubes (`neon_mark`, 200), writing itself in beside the 完了 hanko (`hanko`, 120), its tubes in `primary` and `cold` with `primary_core` and `cold_core` along their middles (`crates/kubaos-kobo/src/done.rs`). The mark has one drawing: its strokes, their order and tones, and its tubes' and cores' widths are tokens (`[neon.mark]`), which the logo's SVGs (`branding/make.py`) and the done screen both draw from, and the boot splash's sign strikes with the same stutter (`neon.strike`).
+- **An app's icon is measured, then fills the tile or sits inside it.** The `IconTile` measures each icon once when it loads and keeps the result for that icon. The drawing's box is the box of its pixels with alpha above `icon_tile.ink`, so the margin its theme leaves drops away. The icon is a plate when that box is square (`icon_tile.square`, 0.95) and its pixels with alpha above `icon_tile.opaque` cover at least `icon_tile.plate` (85%) of it; a rounded square covers about 95% and a disc 78.5%. A plate fills the tile and the tile's corners cut it, so the two make one edge; a shape fits `space.s4` inside it. Both are kept whole, never cropped or stretched, and snapped to whole device pixels. A fixed scale-up for every icon would be arbitrary; measuring fits each icon to what it draws ([IconTile](design/components/icon-tile.md)). *Not built yet* in the iced and QML builds, which still inset an app's icon at the symbol's size.
+- **The logo** is two things, as `docs/BRAND.md` says: the neon sign photo wherever it shows large (boot splash, GRUB, Kōbō, the README), and the vector クバ mark at small sizes (icons, tray, fastfetch). The neon sign is never redrawn as a symbol, and the mark is never used large, with one exception: Kōbō's done screen draws it as lit neon tubes (`neon_mark`, 200), writing itself in beside the 完了 hanko (`hanko`, 120), its tubes in `primary` and `cold` with the logo's cores, `logo_core_warm` and `logo_core_cold`, along their middles (`crates/kubaos-kobo/src/done.rs`). The mark has one drawing: its strokes, their order and tones, and its tubes' and cores' widths are tokens (`[neon.mark]`), which the logo's SVGs (`branding/make.py`) and the done screen both draw from, and the boot splash's sign strikes with the same stutter (`neon.strike`).
 - **The system icon theme** for GTK and Qt apps is Colloid, its orange variant, picked by Kuba from `test/shots/icon-themes`' sheet of the same 24 icons in Papirus, Adwaita, MoreWaita, Colloid, Fluent and Tela (#152). Its symbolic icons are thin rounded outlines, the closest to KubaOS Symbols, and its orange sits beside the amber palette; it covers the apps', Files' and the tray's icons itself. GTK and Qt take `Colloid-Orange-Dark`, as their colour scheme is dark; the light mode's switch takes `Colloid-Orange-Light` with it. *Not enforced yet: lands in #154.*
 
 ## Components
@@ -278,12 +343,12 @@ Everything a person sees is built from a few levels, each made only from the one
 |---|---|---|---|
 | **Tokens** | Every value: colour, length, type, duration, curve | `control_md`, `primary`, `short` | `design/tokens.toml` |
 | **Atoms** | The smallest parts, which don't split further | `Text`, `Icon`, `Button`, `Switch`, `Field`, `Chip`, `Divider`, `Keycap`, `Spinner` | The library |
-| **Molecules** | A few atoms doing one job together | `ListRow`, `Step`, `Tile`, `Slider`, `Select`, `Tabs`, `Toast`, `EmptyState`, `ErrorBlock` | The library; an app-only one in its app |
+| **Molecules** | A few atoms doing one job together | `ListRow`, `Step`, `Tile`, `Slider`, `Select`, `Tabs`, `ButtonBar`, `Toast`, `EmptyState`, `ErrorBlock` | The library; an app-only one in its app |
 | **Organisms** | A part of a screen, from molecules and atoms, doing one of the app's jobs | Wi-Fi's network list, a notification group, a page of settings | The app |
 | **Templates** | A screen's layout, empty: its regions, how it reflows as its window resizes, and how it moves between its pages | a sidebar beside a page, a step rail beside a page (Kōbō), a panel | The library |
 | **Apps and surfaces** | A template filled with organisms and real data | Kōbō, Screens; the control center | An app's own crate; a surface's shell module |
 
-"The library" is both libraries below, with the same names. A molecule may stay in its app only when it means something only there and is unlikely to be needed elsewhere; when a second surface needs it, it moves into the library. An app never builds a part of a lower level itself: `docs/agents/building-ui.md` is how a new UI gets the parts it needs, and in what order.
+"The library" is both libraries below, with the same names. A part only the shell has (the bar's `Pill`) may be in `KubaOS.Components` alone: its page says so, and it stays out of the variants table and the components page until `kubaos-ui` has it, since parity holds the two components pages to each other box for box. It shows in its states on the QML specimen's "Shell only" page instead (`qml/specimen/ShellOnly.qml`, a section per part in `qml/specimen/shell/`), which `qml-specimen` lays out under the components page and leaves out of the frame the parity check reads; when `kubaos-ui` gets the part, its section moves onto the components page, on both sides. A molecule may stay in its app only when it means something only there and is unlikely to be needed elsewhere; when a second surface needs it, it moves into the library. An app never builds a part of a lower level itself: `docs/agents/building-ui.md` is how a new UI gets the parts it needs, and in what order.
 
 *Not enforced yet:* the library has no templates; the first ones come with the next app (no issue yet).
 
@@ -294,27 +359,27 @@ Everything a person sees is built from a few levels, each made only from the one
 
 ### What the geometry check compares
 
-Each component reports its shared name, its variant (the words below that apply, in this order, joined by spaces) and the measures it fixes. The corner column is its radius role; the `Hint`, which isn't probed, is small. The `identical` rule holds every instance of one name and variant to the same fixed measures, at every scale, with its icons and label in the same place along them. A measure a component doesn't fix follows its content or its parent. `KubaOS.Components` reports the same names, words and measures. `kubaos-specimen`'s tests fail when this table and the code disagree.
+Each component reports its shared name, its variant (the words below that apply, in this order, joined by spaces) and the measures it fixes. The corner column is its radius role; the `Hint`, which isn't probed, is row. The `identical` rule holds every instance of one name and variant to the same fixed measures, at every scale, with its icons and label in the same place along them. A measure a component doesn't fix follows its content or its parent. `KubaOS.Components` reports the same names, words and measures. `kubaos-specimen`'s tests fail when this table and the code disagree.
 
 <!-- variants:start -->
 | Name | Variant words | Fixed | Corner |
 |---|---|---|---|
 | `Button` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg`; `leading-icon` or `trailing-icon` | height | control |
 | `IconButton` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg` | both | full |
-| `Chip` | kind `Neutral`, `Selected`, `Accent`, `Cold`, `Filled`; `icon`; `removable` | height | control |
+| `Chip` | kind `Neutral`, `Selected`, `Accent`, `Cold`, `Warning`, `Filled`; `icon`; `removable` | height | control |
 | `IconTile` | size `Sm`, `Md`, `Lg` | both | control |
 | `Badge` | `count` or `dot`; `accent` | height | full |
 | `Skeleton` | `line`, `circle` or `block` | none | small, full, or the caller's |
-| `ListRow` | `one-line` or `two-line`; `icon` or `tile` | height | control, nested 12 in a surface |
+| `ListRow` | `one-line` or `two-line`; `icon` or `tile` | height | row, nested 8 in a content box |
 | `Field` | `icon` | height | control |
 | `Select` | `icon` | height | control |
-| `Popover` | none | none, holds content | surface |
-| `Tooltip` | none | width | surface, its popover's |
+| `Popover` | none | none, holds content | control |
+| `Tooltip` | none | width | control, its popover's |
 | `Menu` | none | none | none |
-| `MenuItem` | `icon`, `check`, `danger` | height | control, nested 12 in a popover |
+| `MenuItem` | `icon`, `check`, `danger` | height | row, nested 4 in a popover |
 | `Prompt` | `menu` | width | surface, its popover's; none in a menu |
 | `Table` | none | none | none |
-| `TableRow` | none | height | control |
+| `TableRow` | none | height | row |
 | `Collapsible` | `open` | none, holds content | control, its header |
 | `Spinner` | size `16`, `20`, `24`, `32`, `48` | both | none |
 | `Switch` | none | both | full |
@@ -326,20 +391,22 @@ Each component reports its shared name, its variant (the words below that apply,
 | `RollingNumber` | none | height | none |
 | `Tabs` | none | height | control |
 | `Tile` | `detail` | height | control |
-| `Calendar` | `year` | both | full, its days and title; control, its months |
+| `Calendar` | `year` | both | full, its days; control, its title and months |
 | `Meter` | none | height | full |
 | `Sparkline` | none | height | none |
 | `Sheet` | none | none, holds content | surface |
-| `Dialog` | tone `Normal`, `Danger` | width | surface |
+| `Dialog` | tone `Normal`, `Danger` | width | content |
 | `Banner` | tone `Info`, `Warning`, `Danger` | none | surface |
 | `Step` | `todo`, `current`, `done` or `action`; `icon`; `mark` | none | control, nested 12 in a surface |
 | `DescriptionList` | none | none | none |
 | `ErrorBlock` | `long` | none | surface |
-| `List` | `Flush` | none | surface; none when flush |
-| `EmptyList`, `Toast`, `Log` | none | none | surface |
-| `Media` | none | none | the caller's: control in a picker, nested in a card |
+| `List` | `Flush` | none | content; none when flush |
+| `EmptyList` | none | none | content |
+| `Toast` | none | none | control |
+| `Log` | none | none | surface |
+| `Media` | none | none | the caller's: control in a picker, row in a card |
 | `PictureChoice` | `name-over` or `name-under` | none, holds content | control |
-| `Card`, `ChoiceCard` | none | none, holds content | surface |
+| `Card`, `ChoiceCard` | none | none, holds content | content |
 | `Page`, `Container`, `Section` | none | none, holds content | none |
 | `Header`, `Divider`, `Labelled`, `Note`, `EmptyState`, `KeyHints` | none | none | none |
 <!-- variants:end -->
@@ -350,22 +417,30 @@ Every interactive component has these states, shown in the specimen: **resting, 
 
 ### The components
 
-Each component has a page of its own under `design/components/`: its constructors in both libraries, how it looks and how it behaves. A new component adds its page and its line here, and its row in the table above.
+Each component has a page of its own under `design/components/`: its constructors in both libraries, how it looks and how it behaves. A new component adds its page and its line here, and, once both libraries have it, its row in the table above.
 
 **Layout**
 
 - [Layout](design/components/layout.md): `Page`, `Container`, `Header`, `Section`, `Stack`, `Row`, `Grid`, `Split`, `Divider`, `Fill`, `Gap`, `Flow`
-- [Scroll](design/components/scroll.md)
+- [Scroll and HeaderFade](design/components/scroll.md)
 
 **Buttons**
 
 - [Button](design/components/button.md)
+- [Button bar](design/components/button-bar.md)
 - [IconButton and Hint](design/components/icon-button.md)
 - [Tooltip](design/components/tooltip.md)
+
+**Text and icons**
+
+- [Text](design/components/text.md)
+- [Icon](design/components/icon.md)
+- [Figure](design/components/figure.md)
 
 **Keys**
 
 - [Keycap and KeyHints](design/components/keycap.md)
+- [Shortcuts](design/components/shortcuts.md)
 - [RollingNumber](design/components/rolling-number.md)
 
 **Inputs**
@@ -379,6 +454,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Tile](design/components/tile.md)
 - [Calendar](design/components/calendar.md)
 - [Select](design/components/select.md)
+- [ColourPicker](design/components/colour-picker.md)
 
 **Menus, tables and collapsibles**
 
@@ -389,20 +465,24 @@ Each component has a page of its own under `design/components/`: its constructor
 
 **Lists, chips and cards**
 
-- [List, ListRow and EmptyList](design/components/list.md)
+- [List, ScrollingList, ListRows, ListRow, LiveList and EmptyList](design/components/list.md)
 - [Chip](design/components/chip.md)
 - [IconTile](design/components/icon-tile.md)
-- [Badge](design/components/badge.md)
+- [Badge and BadgedIcon](design/components/badge.md)
 - [Skeleton](design/components/skeleton.md)
 - [Card and ChoiceCard](design/components/card.md)
+- [NotificationCard and NotificationPopup](design/components/notification-card.md)
+- [NotificationGroup](design/components/notification-group.md)
 - [Media](design/components/media.md)
 - [PictureChoice](design/components/picture-choice.md)
+- [DepthPicture](design/components/depth-picture.md)
 
 **Feedback**
 
 - [Dialog and Scrim](design/components/dialog.md)
 - [Toast](design/components/toast.md)
 - [ProgressBar](design/components/progress-bar.md)
+- [ProgressPanel](design/components/progress-panel.md)
 - [Spinner](design/components/spinner.md)
 - [EmptyState](design/components/empty-state.md)
 - [ErrorBlock](design/components/error-block.md)
@@ -414,9 +494,23 @@ Each component has a page of its own under `design/components/`: its constructor
 - [DescriptionList](design/components/description-list.md)
 - [FocusRing](design/components/focus-ring.md)
 
-**Panels**
+**Templates**
+
+- [PanelPage](design/components/panel-page.md)
+- [Backdrop](design/components/backdrop.md)
+- [Lock](design/components/lock.md)
+- [StepRailPage](design/components/step-rail-page.md)
+- [ListDetail](design/components/list-detail.md)
+- [SidebarPage and SidebarRow](design/components/sidebar-page.md)
+- [CanvasPage, Canvas and CanvasObject](design/components/canvas-page.md)
+
+**Panels and the bar**
 
 - [Sheet](design/components/sheet.md)
+- [PopupStack](design/components/popup-stack.md)
+- [Wallpaper picker](design/components/wallpaper-picker.md)
+- [Pill](design/components/pill.md)
+- [Bar](design/components/bar.md)
 
 ### Rules every component keeps
 
@@ -428,8 +522,8 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 - **A group of controls that belong together but aren't a list** (Capture's buttons beside what they do, a proxy's details) sits in a `Card`: 16 inside.
 - **The panel's own controls** (its header, the quick toggles, the sliders) sit on the panel, with nothing around them: wrapping them would put a box round the whole panel.
 - A card or a well is never inside another; the container padding is the only padding around them.
-- **A form takes its list's place.** Connecting to an item of a list (a Wi-Fi network's password, a Bluetooth pairing) turns the list's well into the form, the two cross-fading over `short` (`standard`), so nothing floats over the list. The form is centred in the well: the item's `Lg` icon tile, its name in `headline` 12 under it, a `small` line under that (Secured · WPA2, what to do on the device), then 16 under it what it asks for (a `Field`, or a pairing code in `headline`), a `small` status line under that (Connecting…, or the error, which keeps the form open), and the buttons 16 under it: Cancel (`Text`) on the left, the action (`Filled`) on the right. Enter does the action and Esc cancels, with no key hints; Tab goes field, Cancel, action. Success goes back to the list. Wi-Fi and Bluetooth share it (`modules/controlcenter/ConnectForm.qml`).
-- **What scrolls in a well or a card is cut by its own shape**, not by a rectangle inside its padding: the rows scroll right up to the well's rounded edge, and the padding is the scroll's padding, the room above the first row and below the last. In the shell the well clips to its rounded shape (`components/Well.qml`). iced 0.14 clips only to rectangles, so `kubaos-ui`'s scrolling list cuts at the well's own rectangle, with the padding inside the scroll; at its rounded corners a row passing the curve, and the thumb at either end of its rail, show past it until iced clips to shapes. In both, the well's hairline and focus tube are drawn over the rows, so a row scrolled to the edge never covers them. A grid of pictures scrolls a whole row at a time, so no picture is ever cut.
+- **A form takes its list's place.** Connecting to an item of a list (a Wi-Fi network's password, a Bluetooth pairing) turns the list's well into the form, the two cross-fading over `short` (`standard`), so nothing floats over the list. The form is centred in the well: the item's lg icon tile, its name in `headline` 12 under it, a `small` line under that (Secured · WPA2, what to do on the device), then 16 under it what it asks for (a `Field`, or a pairing code in `headline`), a `small` status line under that (Connecting…, or the error, which keeps the form open), and the buttons 16 under it: Cancel (`Text`) on the left, the action (`Filled`) on the right. Enter does the action and Esc cancels, with no key hints; Tab goes field, Cancel, action. Success goes back to the list. Wi-Fi and Bluetooth share it (`modules/controlcenter/ConnectForm.qml`).
+- **What scrolls in a well or a card is cut by its own shape**, not by a rectangle inside its padding: the rows scroll right up to the well's rounded edge, and the padding is the scroll's padding, the room above the first row and below the last. In the shell the well clips to its rounded shape (`ScrollingList`). iced 0.14 clips only to rectangles, so `kubaos-ui`'s scrolling list cuts at the well's own rectangle, with the padding inside the scroll; at its rounded corners a row passing the curve, and the thumb at either end of its rail, show past it until iced clips to shapes. In both, the well's hairline and focus tube are drawn over the rows, so a row scrolled to the edge never covers them. A grid of pictures scrolls a whole row at a time, so no picture is ever cut.
 
 Rules the feedback components carry:
 
@@ -459,24 +553,66 @@ Everything works from the keyboard, in every app, the same way. Shortcuts are on
 A new surface implements the whole map, not the keys it happens to need. Today neither front end has all of it:
 
 - **Kōbō** (`translate` in `crates/kubaos-kobo/src/app.rs`): Tab and Shift+Tab, the arrows, Ctrl+N, Ctrl+P, Ctrl+J and Ctrl+K (in its search fields too), h j k l where no field takes the letters (on the Language and Time zone screens, typing goes to the search), Home and End, Page Up and Page Down, Enter once per press, Space, Esc.
-- **The shell's lists** (`config/quickshell/components/NavList.qml`): ↑ ↓, Ctrl+N, Ctrl+P, Ctrl+J, Ctrl+K, j and k, Home and End, Page Up and Page Down, Enter once per press; in a list laid out across, ← → and h and l. Plain letters and Home and End stay the field's where a text field forwards its keys to the list. `KubaOS.Components` presses a focused control with Enter or Space, once per press.
+- **The shell's lists** (`KubaOS.Components`' `ListRows`): ↑ ↓, Ctrl+N, Ctrl+P, Ctrl+J, Ctrl+K, j and k, Home and End, Page Up and Page Down, Enter once per press; in a list laid out across, ← → and h and l. Plain letters and Home and End stay the field's where a text field forwards its keys to the list. `KubaOS.Components` presses a focused control with Enter or Space, once per press.
 
-### Focus
+### States
 
-- **Always visible: a neon edge.** The focused control's own edge lights up as a neon tube, with a soft glow outside it, like a lit sign. It is the accent, the cold accent on a `ChoiceCard`, where the accent already means picked, or the error colour on an `Invalid` field, so focus never hides what is wrong.
-  - **The tube is the control's border.** It is `focus.tube` (1.5) wide, whole device pixels rounded half up, drawn on the control's edge with its corner, inside its box. It draws over the control's own outline, so a field, a checkbox, a radio, a select or a card has one line, recoloured, and nothing dark sits between the tube and its glow. A control filled with the focus colour (a `Filled` button, a tile that is on) can't show a tube of its own colour, so its fill is the tube and the tube's hot core rides just outside it: a line of `primary_core` (`cold_core` for the cold accent), the thin stroke wide (`stroke.thin`, whole device pixels), with the glow beyond it (`focus_ring_on_fill`, `FocusRing.filled`). Only fills take the core; every other tube is the focus colour alone.
-  - **The glow is outside only**: a near glow fading out over `focus.near` (8) from `focus.near_opacity` (0.45), and a far, faint one over `focus.far` (20) from `focus.far_opacity` (0.14), in the tube's colour. It is drawn as bands that all start at the control's edge, each a device pixel wider than the last, laid over one another so that together they give the glow's opacity at the middle of every device pixel out: it lands on device pixels at every scale, no two edges meet along a curve (so the corners show no seams), and it is the same in both toolkits.
-  - **The contrast check holds the tube** against every surface it is drawn on: the page, a well, a panel, a card or a dialog, a field's fill, a picked card's, in the accent, the cold accent and the error colour (`[contrast]`).
+- **A control's states follow the neon: rest, lit, pressed and disabled.**
+  - **Rest:** at night, unlit. The control's tone is its deep unlit look: an unlit fill, or a dimmed label.
+  - **Lit:** hovered or focused from the keyboard, one state, the same whichever got there. It has two looks, and the scene picks one, never the user:
+    - **Lit, signs on:** at night at rest. The line inside the edge burns (the tone's core on a fill, the tube elsewhere) with the glow outside it, and the label brightens.
+    - **Lit, signs off:** the same control still lit with the neon unpowered: by day always, and at night whenever the signs are off, through the theme change and dark ⇄ light. The line stays inside the edge as unlit glass (a `_glass` role: the tone unlit), with no glow, and the label is at its rest colour, holding 4.5:1. Daylight lit is this look in daylight colours: each `_glass` role is by day the daylight lit line.
+
+    A lit control is lit with the signs on or off, never gone.
+  - **Pressed:** overdriven, and always lit as well: the fill goes a touch brighter and the glow a touch stronger (`focus.pressed_glow`, 1.25 times the lit one).
+  - **Disabled:** grey, with no tone, no line and no glow: content at `opacity.disabled_content` of `on_surface`, a fill at `opacity.disabled_container`.
+
+  There is no state layer: each state is its own colours, computed from the live tone. A component's mockup page shows rest, lit, pressed and disabled for every variant and size, by night and by day, with a "Lit · signs off" column after Lit at night (by day Lit is that look). *Not built yet: the libraries draw a hover and press state layer and a separate focused look; the mockups draw the rule.*
+- **Six kinds of button, an emphasis ladder and three meanings.**
+  - **Filled:** the one main action, the most emphasis: an unlit fill with lit letters.
+  - **Tonal:** medium emphasis, the accent's quieter sibling (matugen's secondary), on `secondary_container`.
+  - **Text:** minor actions: a label in the tone, no fill.
+  - **Danger, Success, Warning:** carry a meaning, not an emphasis, and burn.
+
+  *Not built yet: the libraries have `Filled`, `Tonal`, `Text` and `Danger` on `error`; Success and Warning, and the burning tones, are the mockups' alone.*
+- **Filled at night: the fill stays unlit and the letters light.** At rest the fill is `primary_fill`, the tone at 60% of its OKLCH lightness and 1.2 times its chroma, gamut fitted, so it reads as a dark, rich unlit tube rather than a greyed one; on hues already at the gamut's edge there (cyan, green, yellow) that is the most saturated fill the lightness allows. Its label, `on_primary_fill`, is near white tinted 18% with the tone. Lit, the fill doesn't change: the core (`primary_fill_line`, the tone 50% of the way to white) is the line inside the edge, `stroke.thin` wide, with the glow outside, and the label goes brighter, `on_primary_fill_lit`, tinted 8%, with a tiny glow, the tone at `focus.label_glow` (0.3) over `focus.label_near` (2). Pressed, the label and its glow don't change; the fill lifts by 0.035 OKLCH lightness (`primary_fill_pressed`) and the glow brightens. Lit with the signs off, the line is glass the fill's hue, the unlit fill lifted 0.12 in lightness so it shows on it (`primary_fill_glass`), and the label is `on_primary_fill`.
+- **Tonal and Text at night.** Tonal's label rests dimmed (`on_secondary_container_rest`, its lightness cut by a fifth, fitted) and lights to `on_secondary_container`; lit adds the tube, `primary` at `focus.tube`, and the glow; pressed lifts the container by 0.035 (`secondary_container_pressed`). Text's label rests as the tone unlit (`primary_rest`, the accent's `_unlit` lifted only as far as it holds on every surface) and burns lit as the core (`primary_lit`), with a faint near glow round its letters and icon (`focus.content_glow`, 0.4, over `focus.content_near`, 3), and the tube inside its edge; pressed, the tube runs white-hot, to the core. Lit with the signs off, each draws its tube as glass, the accent unlit (`primary_glass`), with its label at rest.
+- **The burning kinds are always lit.** Danger, Success and Warning rest on the bright neon of their fixed tone (`burn_error`, `burn_success`, `burn_warning`) with a dark label, `on_burn_error` and the rest: the tone at a quarter of its OKLCH lightness, made darker still where it must be to hold. Lit, the fill moves 50% of the way toward the core (the tone 25% toward white, `burn_error_lit`), with the core inside the edge (`burn_error_line`) and the glow outside; pressed takes the lit fill 8% further toward white (`burn_error_pressed`), and the glow brightens. The label doesn't change. Lit with the signs off, the lit fill stays, since a fill isn't a light, and the line is glass on it, the tone unlit (`burn_error_glass`). **Why:** with Filled unlit at rest, a burning kind can't be taken for any wallpaper's accent, even one of the same hue (a yellow wallpaper beside Warning), and the accent guard keeps an accent from landing next to them (#323).
+- **By day the signs are off, so nothing glows,** and lit is always its signs-off look.
+  - **Filled** rests at its full colour lifted to OKLCH lightness 0.80, at the same hue with as much of its chroma as fits, its label the tone's dark (`on_primary_fill`), holding 4.5:1. Lit adds a dark line inside the edge, the fill at 62% of its lightness; pressed goes 0.04 darker. Lightness 0.56 to 0.64 is a dead zone where neither a white nor a dark label reads, so the fill sits above it.
+  - **Tonal** is its container; lit adds the tone's 1.5 px line. Pressed goes 0.04 darker.
+  - **Text** is a tone label; lit adds the tone's line, and pressed lays a tint of the tone under it (`opacity.press_tint`, 0.10).
+  - **Danger, Success, Warning burn by day too**, on their deeper daylight tones: lit is 0.035 darker with a dark line inside the edge (the tone at 60% of its lightness), pressed 0.06 darker, and the label is fitted to 4.5:1 (on Danger's red that is a near-white label, since no dark one holds there).
+- **Every colour is a formula over the live tone** (`[color.derived]`, "Colour"): the unlit fill, the lit and pressed fills, the labels and the lines, each computed from the wallpaper's tone or the fixed one, with gamut fitting that lowers chroma at a fixed hue and lightness, so a hue never shifts.
+- **Every label holds 4.5:1 on every fill it sits on, on every wallpaper.** A label's recipe fits its lightness on each fill it sits on, at rest, lit and pressed, moving it only as far as it takes, so it holds by construction; `[contrast]` lists each pair, and the contrast check holds them in both fallback palettes and in the mockups' sample themes. With the default wallpaper, Filled reads 5.6 at rest, 5.9 lit and 5.1 pressed at night, and the burning labels 5.6, 8.5 and 11.1.
+- **One line, inside the control's edge, on every component.** The line is drawn inside the control's box, at the control's own corner, so nothing on a lit control reaches past its box but the glow, and its shape never seems to grow. On a control without a fill, the line is the tube: `focus.tube` (1.5) wide, whole device pixels rounded half up, in the tone, over the control's own outline, so a field, a checkbox, a radio, a select or a card has one line, recoloured, and nothing dark sits between the tube and its glow. A filled control (Filled, Danger, Success, Warning, a tile that is on) draws its line inside the fill's edge, the thin stroke wide (`stroke.thin`, whole device pixels): the core at night, a dark line by day. A slider's focus already draws this way. *Not built yet: `focus_ring_on_fill` and `FocusRing.filled` still draw the core just outside the fill, its width past the control's box.*
+- **The glow is outside only**, and only at night: a near glow fading out over `focus.near` (8) from `focus.near_opacity` (0.45), and a far, faint one over `focus.far` (20) from `focus.far_opacity` (0.14), in the tone. It is drawn as bands that all start at the control's edge, each a device pixel wider than the last, laid over one another so that together they give the glow's opacity at the middle of every device pixel out: it lands on device pixels at every scale, no two edges meet along a curve (so the corners show no seams), and it is the same in both toolkits.
+- **The neon takes the control's tone.** The line and its glow are the colour of the control they light; a control with no tone of its own takes the accent, and a burning kind its fixed tone. So focus never hides what a control is for or what is wrong with it.
+
+  | Tone | Tube and glow | Core | Unlit | Lights |
+  |---|---|---|---|---|
+  | Accent | `primary` | `primary_core` | `primary_unlit` | Every control without a tone: `Filled`, `Tonal` and `Text` buttons and icon buttons, fields, selects, switches, checkboxes, radios, sliders, chips, lists, tiles. |
+  | Cold | `cold` | `cold_core` | `cold_unlit` | A `ChoiceCard` and a picked `PictureChoice`, where the accent already means picked; a `Cold` chip. |
+  | Error | `error` | `error_core` | `error_unlit` | An `Invalid` field. |
+  | Burning | `burn_error`, `burn_success`, `burn_warning` | `burn_error_line` and the rest | none: they burn | A `Danger`, `Success` or `Warning` button. |
+  | Success | `success` | `success_core` | `success_unlit` | A control in the success tone. |
+  | Warning | `warning` | `warning_core` | `warning_unlit` | A control in the warning tone. |
+  | Sharing | `sharing` | `sharing_core` | `sharing_unlit` | A control marking what is shared off the machine. |
+
+  *Not built yet: the libraries light a `Danger` button in `error`, and a `Danger` icon button and a `Cold` chip in the accent. No control has the success, warning or sharing tone yet.*
+- **Fixed signals are always lit,** so they stand out against the unlit accent controls. A status message's tone is a rail of neon down its start side, inside the box from the top padding to the bottom one with round ends, the tabs' and the collapsible's rail: the core with the tone's glow at night, the tone by day: a `Banner`'s and an `ErrorBlock`'s. *Not built yet: no library draws it; the mockups do.*
+- **The contrast check holds the tube** against every surface it is drawn on: the page, a well, a panel, a card or a dialog, a field's fill, a picked card's, in the accent, the cold accent and the error colour (`[contrast]`).
 - **Focus is a state of the control**, as CSS's `focus:` is: drawn as part of the control, it follows the control's rules. The glow is always its full size, never shrunk to fit; whatever clips the control clips the glow, at rest or while scrolling, so a focused field scrolled half out of view shows its glow trimmed where the scroll cuts it. It sits in the control's place in the draw order: what is drawn after the control (the next tile in a grid) covers its glow, and what is drawn before shows under it.
 - **The glow is cut only at an edge you can see**: a well's or a card's outline, a menu's or a log's edge, the panel's or the window's own edge. A scroll with no visible edge of its own (a page's, a panel's) reaches out past its box, so it never cuts a resting control's glow (see `Scroll`); a panel's room that holds its content without scrolling (the control center's tab) doesn't clip at all, so the panel's edge cuts the glow; one that scrolls on a short screen (the Keyboard tab) scrolls in a `Scroll`.
-- **The stutter.** As focus arrives, the tube strikes on as the boot sign's tubes do: `neon.strike`'s ten steps over `medium`. It is on by default and a setting: `focusStutter` in the user layer's `desktop/quickshell/settings.json`, and the Command menu's "Focus stutter: on/off" Item, which writes it. With it off, or with reduce motion on, the tube fades in over `short`. Focus leaving fades it out over `short`. Each toolkit reads it from its motion settings, `kubaos_ui::motion::Motion` in the `Look` and the `Motion` singleton of `KubaOS.Components`, which the shell sets from its settings; Kōbō runs before the user layer exists and keeps the default.
-- **Cost.** Only a focused control draws its tube and glow, and nothing redraws once the stutter or the fade is done.
-- **The active window is in the focus family.** Hyprland draws its border as the tube, `primary` alone, `border_size` wide, and its glow as the window's shadow in `primary`: at the tube, the near and far glows' opacity together, falling off over `focus.far` at whichever of Hyprland's shadow powers (1 to 4) comes closest to the two glows, one falloff for every window's shadow. Inactive windows keep their neutral border (`surface_container_highest` at `opacity.window_border`) and shadow (`shadow` at `opacity.window_shadow`). Focus moving to another window strikes the border and the glow through `neon.strike` over `medium`, once, from the inactive look up to lit; the window's content never dims. The steps are steps because Hyprland's border and shadow fades are off while a window strikes, so the window that lost focus drops to its inactive look at once, rather than fading out over `medium`. It follows the same `focusStutter` and its Item: with the stutter off, nothing strikes, and the border and the glow fade in, and the old ones out, with Hyprland's border and shadow fades (`medium`). A workspace switch, a special workspace, a new window and focus coming back to the window that had it (after a lock or a closed menu) don't strike. `config/hypr/focus.lua` plays it, from the tokens in `config/hypr/tokens.lua`.
+- **Lighting up is a fade, never the stutter** ("Motion"): a control lights up over `short` and goes back to rest over `short`, and presses over `micro`. The stutter is a setting for the power changes: `focusStutter` in the user layer's `desktop/quickshell/settings.json`, and the Command menu's "Focus stutter: on/off" Item, which writes it; each toolkit reads it from its motion settings, `kubaos_ui::motion::Motion` in the `Look` and the `Motion` singleton of `KubaOS.Components`, which the shell sets from its settings; Kōbō runs before the user layer exists and keeps the default. *Not built yet: the libraries and Hyprland still strike focus through `neon.strike` as it arrives, and the setting and its Item are named for that.*
+- **A theme change flickers every lit control down to its signs-off look and strikes it back on its clock** (see "Motion", "The theme change"): its line turns to glass and stays, and a control lit mid-way waits for the strike.
+- **Cost.** Only a lit control draws its line and glow, and nothing redraws once the fade is done.
+- **The active window is in the focus family.** Hyprland draws its border as the tube, `primary` alone, `border_size` wide, and its glow as the window's shadow in `primary`: at the tube, the near and far glows' opacity together, falling off over `focus.far` at whichever of Hyprland's shadow powers (1 to 4) comes closest to the two glows, one falloff for every window's shadow. Inactive windows keep their neutral border (`surface_container_highest` at `opacity.window_border`) and shadow (`shadow` at `opacity.window_shadow`). Focus moving to another window lights its border and glow with a fade, as on a control, since the window is already open; the window's content never dims. A window appearing strikes its tube on for the first time, and a window closing goes off for good, both through `neon.strike`. *Not built yet: Hyprland strikes the border on every focus move, as below.* Today focus moving to another window strikes the border and the glow through `neon.strike` over `medium`, once, from the inactive look up to lit. The steps are steps because Hyprland's border and shadow fades are off while a window strikes, so the window that lost focus drops to its inactive look at once, rather than fading out over `medium`. It follows the same `focusStutter` and its Item: with the stutter off, nothing strikes, and the border and the glow fade in, and the old ones out, with Hyprland's border and shadow fades (`medium`). A workspace switch, a special workspace, a new window and focus coming back to the window that had it (after a lock or a closed menu) don't strike. `config/hypr/focus.lua` plays it, from the tokens in `config/hypr/tokens.lua`.
 - **Focus never moves layout.** The tube and its glow take no space; a focused control is the same box as a resting one. The geometry check compares them.
 - **One place at a time.** The app owns where focus is and passes it to components as a flag; a list shows its focused row by its own selection, and the tube lights the list's well.
 - **The disk passphrase prompt** is the one exception: Plymouth draws it from pictures (`branding/boot.py`), with a plain ring `stroke.thin` wide 4 outside its field.
 - **Focus starts on the first thing to do**: the field to type in, or the `Filled` button. Opening a dialog moves focus into it, onto its last action unless it names another (a `Danger` dialog starts on Cancel, a prompt in its field); Tab goes round its field and buttons and never leaves it; closing it puts focus back where it was, and Esc closes it as its dismiss button does. The app owns focus, so it does this: Kōbō's power menu names Cancel, so Enter twice in a row never takes the machine down.
-- Focus moves over `short` with `standard`: the tube fades out of one control as it strikes on, or fades in, on the next.
+- Focus moves over `short` with `standard`: one control fades back to rest as the next lights up.
 
 ### Scaling
 
@@ -505,12 +641,12 @@ What can't use the libraries still follows the tokens as far as it can go:
 - **The terminals** (Ghostty, foot, tmux, Neovim, btop, lazygit, bat, fuzzel, oh-my-posh, fastfetch) follow `[terminal]` in the tokens. `kubaos-tokens` writes Ghostty's and foot's settings (`config/ghostty/tokens`, `config/foot/tokens.ini`) and the matugen templates of their palette and of the roles the TUIs read, so every terminal draws the same thing:
   - **Type:** `mono_large`, Geist Mono 14 on a 20 line (10.5 pt, since terminals size in points). Ghostty stretches Geist Mono's own line (1.3 times its size) to the 20, foot sets it outright, so a cell is whole device pixels tall at every scale. Glyphs Geist Mono lacks (the prompt's and the file managers' icons, the pills' round caps) come from Geist Mono's Nerd Font, on the same metrics; a font of KubaOS Symbols would draw Tabler's stroke at a fractional width at a terminal's sizes, the blur "Iconography" avoids.
   - **Space:** 12 at the sides and 8 above and below the cells.
-  - **Colour:** the window is `glass` over the blurred wallpaper. The cursor is the accent, a selection a selected row's tinted bar (`secondary_container`), links `cold`, the background and text `surface` and `on_surface`. ANSI 0, 7 and 15 are roles; 1 to 6 are six hues (Tokyo Night's, harmonized toward the wallpaper by matugen); 9 to 14 stand 6 lightness points further from the surface; ANSI 8, dim text (comments, suggestions), is 7 moved 16 points toward it, as far as keeps 4.5:1, since `outline` is never text. tmux and Neovim read every role by name (`#{@color_primary}`, `c.primary`), and a role of our own (`warning`) is written out for the mode.
+  - **Colour:** the window is `glass` over the blurred wallpaper. The cursor is the accent, a selection a selected row's tinted bar (`secondary_container`), links `cold`, the background and text `surface` and `on_surface`. ANSI 0, 7 and 15 are roles; 1 to 6 are six hues (Tokyo Night's, harmonized toward the wallpaper by matugen); 9 to 14 stand 6 lightness points further from the surface; ANSI 8, dim text (comments, suggestions), is 7 moved 16 points toward it, as far as keeps 4.5:1, since `outline` is never text. tmux and Neovim read every role by name (`#{@color_primary}`, `c.primary`), and every role of our own, with no matugen source (the fixed roles, the tubes' cores), is written out for the mode.
   - **Light and dark:** the mode `dot-theme` runs matugen in (dark by default; `DOT_THEME_MODE=light`, until the Settings panel's switch). Ghostty, tmux, Neovim and oh-my-posh read their file again when it changes; foot holds both palettes and is signalled the one to show.
   - **fuzzel**, the fallback launcher, is a panel of the shell's: body text in rows a small control tall (32), the narrowest container's padding (16), a surface's corners, the frame's glass. fuzzel gives the prompt the rows' height and centres the text in it, so its `vertical-pad` is the padding less a row's room round its line (10): the prompt's and the last row's text sit 16 in, once, as at the sides.
 - **Plymouth and GRUB** are always dark: the dark palette, on `surface_container_lowest`. They run before anything could read the tokens, so `kubaos-tokens` writes the values they need into their own files (the token block of `kubaos.script`, `kubaos.plymouth`, GRUB's `theme.txt` from `theme.txt.in`), and `branding/boot.py` draws their pictures from the same tokens. They draw in device pixels: Plymouth at 1, or 2 on a screen `boot.plymouth_2x_from` (1600) px tall; GRUB at one scale on every screen, `boot.grub_scale` (1.5, the desktop's own on the laptop's panel), since it can't tell a screen's size. A boot scale is one of `rules.scales`, so every length is whole device pixels.
   - **The splash** is the neon sign (`docs/BRAND.md`, "Boot"), striking with the done screen's stutter. It ticks at 60 fps; a sprite redraws only when it changes, and the hum steps ten times a second, so a lit sign costs nothing in between.
-  - **The disk passphrase prompt** is the lock screen's: a `Field` the `password` width with the lock icon, the placeholder, bullets, the caret and the focus ring, and a `Note` under it with the `Enter` and `Caps Lock` keys as keycaps. Busy, it loses the ring and takes the hourglass; wrong, it takes the error colour and the lock screen's shake. It fades in over `short` and out over `medium`. The sign's glow is its clear space, so the field sits right under the sign, and its room is kept while it is hidden, so it never moves the sign. Every word of it is a picture in its type style: the initramfs has one regular and one monospace font and no UTF-8.
+  - **The disk passphrase prompt** is a `Field` the `password` width with the lock icon, the placeholder, bullets, the caret and the focus ring, and a `Note` under it with the `Enter` and `Caps Lock` keys as keycaps. Busy, it loses the ring and takes the hourglass; wrong, it takes the error colour and the lock screen's shake. It fades in over `short` and out over `medium`. The sign's glow is its clear space, so the field sits right under the sign, and its room is kept while it is hidden, so it never moves the sign. Every word of it is a picture in its type style: the initramfs has one regular and one monospace font and no UTF-8.
   - **The GRUB menu** is the screen's one list, so the screen is its well, as the power menu's panel is: the entries are `ListRow`s, `row` tall and `space.s4` apart in `body_strong`, the picked one in `secondary_container`, under the sign; the keys under it are keycaps (`KeyHints`). GRUB can't size a box to its rows, so a well round them would hold air. The editor and the shell sit in a surface's hairline, in Geist Mono.
 - **The cursor** is recoloured from the palette (`kubaos-cursor`). Its size is a multiple of the grid (`kubaos cursor size` refuses others), and its XCursor theme holds it at every one of `rules.scales`, so an XWayland or GTK 3 app on any output gets a pointer drawn at its size, whole device pixels, never the nearest one.
 - **GTK and Qt apps** get the colour roles, Geist and Geist Mono, and an icon theme close to KubaOS Symbols: Colloid's orange variant (see "Iconography").
@@ -520,6 +656,7 @@ What can't use the libraries still follows the tokens as far as it can go:
 The words are `docs/BRAND.md`'s: read its "Voice" before writing anything a person reads. What it means for UI copy:
 
 - **Sentence case** everywhere: titles, buttons, labels, menu Items. "Save log", never "Save Log".
+- **Sizes are lowercase abbreviations** in anything a person reads: sm, md, lg (and xs, xl), never "Sm" or "Lg", in labels, headings, descriptions and docs alike, even at the start of a label or a sentence ("md's padding"). An identifier keeps its language's case: `ButtonSize::Lg` in Rust, `size: "Lg"` in QML, and the probes' variant words (`Filled Md`) in the variants table below.
 - **A label stays a label.** Field names, settings' titles and buttons that only say what they do are plain; the attitude goes in messages and subtitles (BRAND.md rule 2).
 - **Name things with `GLOSSARY.md`'s terms**: a Suite, the User layer, Kōbō, never a synonym.
 - **An error says the cause and the next action**: "Fuck. The disk is in use, so nothing got written. Free it and try again." The `ErrorBlock`'s message is the cause, its hint the next action.
@@ -528,7 +665,7 @@ The words are `docs/BRAND.md`'s: read its "Voice" before writing anything a pers
 
 ## Checks
 
-Four checks keep every front end on this file: the lint, the contrast check, the geometry check and parity. The first three run in `cargo test --workspace` (`just test`), in `nix flake check` (`crates/checks.nix`) and in `just design-check`, and parity in `just design-check` and `nix flake check`; a PR that fails any isn't done.
+Five checks keep every front end on this file: the lint, the contrast check, the geometry check, parity and the mockups' check. The first three run in `cargo test --workspace` (`just test`), in `nix flake check` (`crates/checks.nix`) and in `just design-check`, parity in `just design-check` and `nix flake check`; a PR that fails any of those four isn't done. The mockups' check is `just mockups-check`, run by hand: the site's pages are drawn ahead of the libraries, so not every page passes it, and no pull request check runs it.
 
 ### The contrast check
 
@@ -562,7 +699,7 @@ It knows which roles are drawn, not which is drawn on which: a role already in o
 | `space` | A number in a gap, padding, margin or inset: QML's `spacing`, `*Margin`, `padding`; iced's `.padding(`, `.spacing(`, `Padding`. |
 | `size` | A number in a width, height, position, stroke or icon size: QML's `width`, `implicitHeight`, `Layout.preferred*`, `border.width`; iced's `.width(`, `Length::Fixed(`, `Length::from(`, `Size::new(`, `Pixels(`, `Pixels::from(`, `40.0.into()` in those places. A size given to iced's window API (`window::Settings`, `min_size`, `max_size`, `with_size(`) is the window's, not layout, and passes. Any other window size, or a canvas program's coordinates in units of its own size, carries a marker. |
 | `radius` | A number in a corner radius; a shell radius that isn't a role (`Theme.rounding.lg`, 16); a radius derived by hand (`outer - inset`), which `nested()` computes instead. The finding names the roles. |
-| `duration` | A number in QML's `duration` or `…Duration`; iced's `Duration::from_millis(`, `Duration::new(` and friends, up to the longest duration token (`scene`, 1200 ms): any of them could be motion, whatever it is called. A longer one can't, and passes. A shorter timeout, poll or caret blink is behaviour, not motion, and carries a `design-allow(duration)` marker saying so. |
+| `duration` | A number in QML's `duration` or `…Duration`; iced's `Duration::from_millis(`, `Duration::new(` and friends, up to `scene` (1200 ms), the longest a move runs: any of them could be motion, whatever it is called. A longer one can't, and passes; the duration tokens that aren't moves (`toast`, `lock_idle`) run longer and don't raise that limit. A shorter timeout, poll or caret blink is behaviour, not motion, and carries a `design-allow(duration)` marker saying so. |
 | `font` | A family named in a string, a pixel or point size, a weight named in place (`Font.Medium`), a line height, letter spacing, in a binding or a `Qt.font({ … })`. |
 | `component` | A toolkit's own control where the library has the component: Qt Quick Controls' `Button`, `TextField`, `Switch` and the rest, in a file that imports them; iced's `button`, `text_input`, `text`, `checkbox`, `row`, `column`, `row!`. `kubaos-ui` and `KubaOS.Components` themselves may build on them. |
 
@@ -674,13 +811,21 @@ That run is Qt drawing `mono` text in a proportional font from the desktop's own
 
 The QML shots come from the same runner, `nix run .#checks.x86_64-linux.qml-specimen -- shots DIR`. Headless, Qt draws with its software renderer, which leaves `RectangularShadow` out: the dialogs' shadow and the progress bar's glow are missing from these shots.
 
+**The mockups.** Every mocked element in `design/mockups/` carries the same probe, and the site reports a page's boxes as a frame (`scripts/render.ts --frames`, in headless Chromium at every scale, light and dark). `just mockups-check` holds each frame to the rules above, and each mocked component to its twin on the specimen's pages, of the same name, variant and words at the same mode and scale, wherever each page puts it (`kubaos-specimen mockup DIR`): its boxes to a hundredth of a device pixel and its texts' natural sizes to a hundredth of a logical pixel, as parity does. A component whose words the specimen doesn't show (a translation's) is held to the rules alone.
+
+```text
+$ just mockups-check
+kubaos-specimen mockup: 8 frame(s), 640 component(s) compared, 0 difference(s), 0 finding(s)
+```
+
 ### Screenshot diffs
 
 The specimen's pictures aren't in the repo, so two PRs that change how different things look never touch the same file. A PR that changes how anything looks renders its before and after with `just shots specimen` (`kubaos-specimen shots DIR` and `qml-specimen shots DIR`) and attaches the pairs that changed to the PR (`docs/agents/design-pr-loop.md`), so the change shows in review. On each push to main, CI renders every page and publishes the iced pages at 1×, light and dark, and the QML components page at 1× and 1.5×, dark, to the image-only branch `chore/shots-specimen`, which this file's pictures show (`.github/workflows/specimen.yml`). Kōbō's tour screens, 1× light and dark, are under `design/kobo/`, from `KOBO_SHOTS=DIR cargo test -p kubaos-kobo --release shots -- --ignored`, which draws every screen at every scale. Each front end's alignment issue (#148 to #153) attaches its screens before and after, at every scale, light and dark; diffing them on the test machine comes with those issues. The boot screens and the pointer render headless too: `just shots plymouth grub cursor` (`test/shots/boot`).
 
 ## Changing the design
 
-- **A new kind, size, component or value changes this file or the component's page first**, then `design/tokens.toml`, then both libraries, in one PR, with the specimen showing it. A component's samples are a section of their own on each side, by the same name: a module under `crates/kubaos-specimen/src/pages/components/` and a file under `qml/specimen/sections/`, each listed in its page at the same place (`mod` and `SECTIONS` in `components.rs`, the stack in `Components.qml`), so PRs adding different components touch different files and a line of each list.
+- **Anything a person sees is sketched, then mocked up, then built** (`docs/agents/building-ui.md`, and the mockup skill, `.claude/skills/mockup/SKILL.md`). Its mockup page in `design/mockups/` is the source of truth: Kuba approves it before anything is built, and a change to how something looks or behaves changes the mockup first.
+- **A new kind, size, component or value changes its mockup, then this file or the component's page**, then `design/tokens.toml`, then both libraries, in one PR, with the specimen showing it and `just mockups-check` holding the libraries' boxes to the mockup's. A component's samples are a section of their own on each side, by the same name: a module under `crates/kubaos-specimen/src/pages/components/` and a file under `qml/specimen/sections/`, each listed in its page at the same place (`mod` and `SECTIONS` in `components.rs`, the stack in `Components.qml`), so PRs adding different components touch different files and a line of each list.
 - **A rule a front end can't follow changes for everyone.** There is no exception column: if the shell can't keep a rule, the rule changes here and every front end follows the new one.
 - **Values change in `design/tokens.toml` only.** The builds write the outputs from it; `just tokens` rewrites the checked-in ones, and a test fails while one is stale.
 - **Every decision keeps its reason.** A rule with no reason here is a candidate for deletion, not for following.
@@ -695,6 +840,7 @@ Each output of `kubaos-tokens` is generated where it is read, so the repo holds 
 | `Tokens.qml` and `Symbols.qml` in `KubaOS.Components` | By the Nix build (`design/package.nix`), into the module `qml/package.nix` builds | The shell, the Command menu, parity and the QML logic tests load the module from the store. |
 | The terminals' settings (`config/{ghostty,foot,fuzzel}/tokens*`, `config/tmux/colors.conf`, `config/fastfetch/theme.jsonc`, `config/ohmyposh/config.toml`), their matugen templates, `config/hypr/tokens.lua` | By the Nix build, linked into `~/.config` beside `config/`'s own files (`home/links.nix`) | The home links `config/` from the store, never from the checkout. |
 | `kubaos.plymouth`, GRUB's `theme.txt` | Checked in, folded in GitHub's diffs (`.gitattributes`); a test fails while one is stale | `system/` installs them as root from the checkout, at install and at every update, before any Nix build. |
+| The mockups' `design/mockups/src/tokens.css` | By the mockup site's Vite build (`just mockups`, `just mockups-build`), which runs `kubaos-tokens build` into the checkout, again whenever `design/tokens.toml` changes | Only the site reads it, from the checkout it is served from. |
 | The token block of `kubaos.script`, the hues in `config/matugen/config.toml` | Checked in; a test fails while one is stale | A generated block inside a hand-written file. |
 
 **In a checkout**, `just tokens` writes them all: the checked-in ones after a change to the tokens, and the ignored ones for what reads them from the checkout, such as an editor's QML language server. `just shots` writes the ignored ones into each tree it renders. **A merge conflict** in `kubaos.plymouth` or `theme.txt` keeps one side when the clone has `git config merge.ours.driver true`; `just tokens` then writes the merged tokens' version, and the test fails until it has. `kubaos.script` and matugen's `config.toml` merge as text: take either side of the block, and `just tokens` rewrites it.

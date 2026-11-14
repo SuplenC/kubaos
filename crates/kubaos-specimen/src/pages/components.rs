@@ -26,13 +26,17 @@ mod dialogs;
 mod empty_states;
 mod errors;
 mod fields;
+mod focus_rings;
+mod hints;
 mod icon_buttons;
 mod icon_tiles;
 mod keycaps;
+mod layouts;
 mod lists;
 mod media;
 mod menus;
 mod meters;
+mod notes;
 mod page_scroll;
 mod progress;
 mod prompts;
@@ -68,7 +72,10 @@ pub struct Section {
 const SECTIONS: &[Section] = &[
     buttons::SECTION,
     icon_buttons::SECTION,
+    hints::SECTION,
     fields::SECTION,
+    notes::SECTION,
+    focus_rings::SECTION,
     toggles::SECTION,
     sliders::SECTION,
     tabs::SECTION,
@@ -77,6 +84,7 @@ const SECTIONS: &[Section] = &[
     skeletons::SECTION,
     lists::SECTION,
     page_scroll::SECTION,
+    layouts::SECTION,
     chips::SECTION,
     keycaps::SECTION,
     rolling_numbers::SECTION,

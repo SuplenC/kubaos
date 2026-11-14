@@ -14,7 +14,9 @@ use std::fmt;
 
 use crate::contrast;
 use crate::contrast::Mode;
+use crate::model::Derived;
 use crate::model::Family;
+use crate::model::IconTile;
 use crate::model::Need;
 use crate::model::Tokens;
 
@@ -40,8 +42,18 @@ pub enum Violation {
     CurveOutOfRange { token: String },
     /// An opacity outside 0..=1.
     OpacityOutOfRange { token: String, value: f32 },
+    /// A scale factor that isn't a finite number above 0.
+    ScaleNotPositive { token: String, value: f32 },
     /// A colour role missing from one of `source`, `dark` and `light`.
     RoleMissing { role: String, table: &'static str },
+    /// A role both derived and given values of its own, or derived and read from matugen.
+    RoleTwice { role: String },
+    /// A derived role that names both `white` and `black`, or neither.
+    DerivedWay { role: String },
+    /// A derived role's recipe that can't be computed: it starts from both `mix` and `from` or
+    /// neither, gives one mode's recipe without the other's or beside its own, moves a lightness
+    /// or chroma out of range, or reads itself.
+    DerivedRecipe { role: String, why: &'static str },
     /// A symbol that names both a Tabler icon and a drawing of ours, or neither.
     SymbolSource { token: String },
     /// A type style's icon that isn't one of the icon sizes.
@@ -109,9 +121,22 @@ impl fmt::Display for Violation {
             Violation::OpacityOutOfRange { token, value } => {
                 write!(f, "{token} is {value}, outside 0..=1")
             }
+            Violation::ScaleNotPositive { token, value } => {
+                write!(f, "{token} is {value}, not a share of a size above 0")
+            }
             Violation::RoleMissing { role, table } => {
                 write!(f, "colour role {role} is missing from color.{table}")
             }
+            Violation::RoleTwice { role } => {
+                write!(
+                    f,
+                    "colour role {role} is in color.derived and has a matugen source or a value"
+                )
+            }
+            Violation::DerivedWay { role } => {
+                write!(f, "color.derived.{role} needs exactly one of `white` and `black`")
+            }
+            Violation::DerivedRecipe { role, why } => write!(f, "color.derived.{role} {why}"),
             Violation::SymbolSource { token } => {
                 write!(f, "{token} needs exactly one of `tabler` and `drawn`")
             }
@@ -169,7 +194,9 @@ pub fn check(tokens: &Tokens) -> Vec<Violation> {
     let mut found = Vec::new();
     check_rules(tokens, &mut found);
     check_lengths(tokens, &mut found);
+    check_icon_tile(&tokens.icon_tile, &mut found);
     check_container(tokens, &mut found);
+    check_scales(tokens, &mut found);
     check_types(tokens, &mut found);
     check_motion(tokens, &mut found);
     check_colors(tokens, &mut found);
@@ -289,7 +316,7 @@ fn check_contrast(tokens: &Tokens, found: &mut Vec<Violation>) {
     for pair in &tokens.contrast.pairs {
         let roles = [&pair.fg, &pair.bg]
             .into_iter()
-            .filter(|role| !tokens.color.source.contains_key(*role));
+            .filter(|role| !tokens.color.source.contains_key(*role) && !tokens.color.derived.contains_key(*role));
         let opacity = pair.opacity.iter().filter(|name| !tokens.opacity.contains_key(*name));
         for name in roles.chain(opacity) {
             found.push(Violation::UnknownInPair {
@@ -299,7 +326,7 @@ fn check_contrast(tokens: &Tokens, found: &mut Vec<Violation>) {
         }
     }
     for name in &tokens.contrast.decorative {
-        if !tokens.color.source.contains_key(name) {
+        if !tokens.color.source.contains_key(name) && !tokens.color.derived.contains_key(name) {
             found.push(Violation::UnknownInPair {
                 token: "contrast.decorative".into(),
                 name: name.clone(),
@@ -341,7 +368,18 @@ fn check_rules(tokens: &Tokens, found: &mut Vec<Violation>) {
     }
 }
 
+/// The lengths: each on the grid and each scale in order, then the opacities the same tables give,
+/// and the pairs whose first must stay under its second.
 fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
+    check_on_grid(tokens, found);
+    check_ascending(tokens, found);
+    check_opacities(tokens, found);
+    check_ordered_pairs(tokens, found);
+}
+
+/// Every length a multiple of `rules.grid`, but the sizes `rules.off_grid` names, which must be
+/// sizes.
+fn check_on_grid(tokens: &Tokens, found: &mut Vec<Violation>) {
     let grid = tokens.rules.grid;
     let mut on_grid = |token: String, value: u16| {
         if !value.is_multiple_of(grid) {
@@ -351,10 +389,14 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     on_grid("focus.offset".into(), tokens.focus.offset);
     on_grid("focus.near".into(), tokens.focus.near);
     on_grid("focus.far".into(), tokens.focus.far);
+    on_grid("caret.height".into(), tokens.caret.height);
+    on_grid("caret.near".into(), tokens.caret.near);
     let radius = &tokens.radius;
     for (role, value) in [
         ("small", radius.small),
+        ("row", radius.row),
         ("control", radius.control),
+        ("content", radius.content),
         ("surface", radius.surface),
     ] {
         on_grid(format!("radius.{role}"), value);
@@ -378,6 +420,14 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
         on_grid(format!("shadow.{name}.y"), shadow.y);
         on_grid(format!("shadow.{name}.blur"), shadow.blur);
     }
+    let elevation = &tokens.elevation;
+    for (layer, values) in [("contact", &elevation.contact), ("ambient", &elevation.ambient)] {
+        for step in elevation.raised() {
+            let (y, blur) = values.at(step);
+            on_grid(format!("elevation.{layer}.y at step {step}"), y);
+            on_grid(format!("elevation.{layer}.blur at step {step}"), blur);
+        }
+    }
     for (name, style) in &tokens.types {
         on_grid(format!("type.{name}.line"), style.line);
     }
@@ -393,11 +443,15 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
             });
         }
     }
+}
 
-    let roles = [radius.small, radius.control, radius.surface];
+/// Each scale smallest first.
+fn check_ascending(tokens: &Tokens, found: &mut Vec<Violation>) {
+    let radius = &tokens.radius;
+    let roles = [radius.small, radius.row, radius.control, radius.content, radius.surface];
     for (table, values) in [
         ("space.values", &tokens.space.values),
-        ("radius.small, control, surface", &roles.to_vec()),
+        ("radius.small, row, control, content, surface", &roles.to_vec()),
         ("icon.sizes", &tokens.icon.sizes),
         ("rules.font_sizes", &tokens.rules.font_sizes),
     ] {
@@ -405,6 +459,10 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
             found.push(Violation::NotAscending { token: table.into() });
         }
     }
+}
+
+/// Every opacity, and every share held to the same 0 to 1.
+fn check_opacities(tokens: &Tokens, found: &mut Vec<Violation>) {
     for (name, shadow) in &tokens.shadow {
         check_opacity(format!("shadow.{name}.opacity"), shadow.opacity, found);
         if let Some(light) = shadow.light_opacity {
@@ -414,8 +472,41 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     for (name, &value) in &tokens.opacity {
         check_opacity(format!("opacity.{name}"), value, found);
     }
+    let elevation = &tokens.elevation;
+    for (layer, values) in [("contact", &elevation.contact), ("ambient", &elevation.ambient)] {
+        check_opacity(format!("elevation.{layer}.opacity"), values.opacity, found);
+        check_opacity(format!("elevation.{layer}.light_opacity"), values.light_opacity, found);
+    }
+    check_opacity("elevation.rim".into(), elevation.rim, found);
+    check_opacity("elevation.light_rim".into(), elevation.light_rim, found);
     check_opacity("focus.near_opacity".into(), tokens.focus.near_opacity, found);
     check_opacity("focus.far_opacity".into(), tokens.focus.far_opacity, found);
+    check_opacity("focus.content_glow".into(), tokens.focus.content_glow, found);
+    check_opacity("focus.label_glow".into(), tokens.focus.label_glow, found);
+    check_opacity("caret.glow".into(), tokens.caret.glow, found);
+    // Not an opacity, but a share of the ring held to the same 0 to 1.
+    check_opacity("spinner.arc".into(), tokens.spinner.arc, found);
+    let edge = 1.0 - (1.0 - tokens.focus.near_opacity) * (1.0 - tokens.focus.far_opacity);
+    check_opacity(
+        "focus.pressed_glow, at the edge".into(),
+        edge * tokens.focus.pressed_glow,
+        found,
+    );
+}
+
+/// The pairs whose first must stay under its second: the rails by day and night, the focus glow's
+/// near and far edges.
+fn check_ordered_pairs(tokens: &Tokens, found: &mut Vec<Violation>) {
+    if tokens.tabs.rail > tokens.tabs.rail_day {
+        found.push(Violation::NotAscending {
+            token: "tabs.rail, tabs.rail_day".into(),
+        });
+    }
+    if tokens.banner.rail > tokens.banner.rail_day {
+        found.push(Violation::NotAscending {
+            token: "banner.rail, banner.rail_day".into(),
+        });
+    }
     if tokens.focus.near >= tokens.focus.far {
         found.push(Violation::NotAscending {
             token: "focus.near, focus.far".into(),
@@ -455,6 +546,26 @@ fn check_frame_blur(tokens: &Tokens, found: &mut Vec<Violation>) {
     let shade = 1.0 - (1.0 - scrim.max(panel_scrim)) * (1.0 - shadow.opacity * glass);
     if cutoff <= shade || cutoff >= glass {
         found.push(Violation::FrameBlurOffGlass { cutoff, shade, glass });
+    }
+}
+
+/// The icon tile's alphas and shares, which aren't opacities laid over a role but are held to
+/// the same 0 to 1.
+fn check_icon_tile(icon_tile: &IconTile, found: &mut Vec<Violation>) {
+    check_opacity("icon_tile.ink".into(), icon_tile.ink, found);
+    check_opacity("icon_tile.opaque".into(), icon_tile.opaque, found);
+    check_opacity("icon_tile.square".into(), icon_tile.square, found);
+    check_opacity("icon_tile.plate".into(), icon_tile.plate, found);
+}
+
+fn check_scales(tokens: &Tokens, found: &mut Vec<Violation>) {
+    for (name, &value) in &tokens.scale {
+        if !(value.is_finite() && value > 0.0) {
+            found.push(Violation::ScaleNotPositive {
+                token: format!("scale.{name}"),
+                value,
+            });
+        }
     }
 }
 
@@ -523,7 +634,8 @@ fn check_colors(tokens: &Tokens, found: &mut Vec<Violation>) {
     let every: BTreeSet<&String> = tables.iter().flat_map(|(_, roles)| roles.iter().copied()).collect();
     for role in every {
         for (table, roles) in &tables {
-            if !roles.contains(role) {
+            let given = *table != "source" && colors.by_recipe(role);
+            if !roles.contains(role) && !given {
                 found.push(Violation::RoleMissing {
                     role: role.clone(),
                     table,
@@ -531,11 +643,105 @@ fn check_colors(tokens: &Tokens, found: &mut Vec<Violation>) {
             }
         }
     }
+    for (role, derived) in &colors.derived {
+        let valued = colors.dark.contains_key(role) || colors.light.contains_key(role);
+        if colors.source.get(role).is_some_and(|source| !source.is_empty()) || valued {
+            found.push(Violation::RoleTwice { role: role.clone() });
+        }
+        check_derived(tokens, role, derived, found);
+    }
     for name in names(tokens) {
         if !is_identifier(&name) {
             found.push(Violation::BadName { token: name });
         }
     }
+}
+
+fn check_derived(tokens: &Tokens, role: &str, derived: &Derived, found: &mut Vec<Violation>) {
+    let colors = &tokens.color;
+    let mut whys: Vec<&'static str> = Vec::new();
+    if derived.by_mode() {
+        if derived.dark.is_none() || derived.light.is_none() {
+            whys.push("gives one mode's recipe without the other's");
+        }
+        if derived.mix.is_some() || derived.from.is_some() || derived.moves_oklch() || derived.text_on.is_some() {
+            whys.push("gives a recipe of its own beside each mode's");
+        }
+    }
+    let recipes: Vec<&Derived> = if derived.by_mode() {
+        derived
+            .dark
+            .iter()
+            .chain(derived.light.iter())
+            .map(|recipe| &**recipe)
+            .collect()
+    } else {
+        vec![derived]
+    };
+    for recipe in recipes {
+        if recipe.by_mode() {
+            whys.push("gives a mode's recipe inside a mode's recipe");
+        }
+        match (&recipe.mix, &recipe.from) {
+            (Some(_), None) => match recipe.way() {
+                None => found.push(Violation::DerivedWay { role: role.to_owned() }),
+                Some((toward, t)) if !(0.0..=1.0).contains(&t) => found.push(Violation::OpacityOutOfRange {
+                    token: format!("color.derived.{role}.{}", toward.name()),
+                    value: t,
+                }),
+                Some(_) => {}
+            },
+            (None, Some(_)) if recipe.white.is_some() || recipe.black.is_some() => {
+                whys.push("moves toward white or black without a `mix`");
+            }
+            (None, Some(_)) => {}
+            _ => whys.push("needs exactly one of `mix` and `from`"),
+        }
+        let amounts = [recipe.lightness, recipe.chroma, recipe.lighter, recipe.darker];
+        if amounts.into_iter().flatten().any(|value| value < 0.0) {
+            whys.push("moves a lightness or chroma by a negative amount");
+        }
+        if recipe.at_lightness.is_some_and(|at| !(0.0..=1.0).contains(&at)) {
+            whys.push("sets a lightness outside 0..=1");
+        }
+    }
+    let known = |name: &String| colors.source.contains_key(name) || colors.derived.contains_key(name);
+    let mut unknown = BTreeSet::new();
+    for mode in Mode::ALL {
+        unknown.extend(derived.reads(mode).filter(|name| !known(name)).cloned());
+    }
+    if Mode::ALL
+        .into_iter()
+        .any(|mode| reads_itself(colors, role, role, mode, &mut Vec::new()))
+    {
+        whys.push("reads itself, through the roles it reads");
+    }
+    for name in unknown {
+        found.push(Violation::UnknownName {
+            token: format!("color.derived.{role}"),
+            name,
+        });
+    }
+    for why in whys {
+        found.push(Violation::DerivedRecipe {
+            role: role.to_owned(),
+            why,
+        });
+    }
+}
+
+/// Whether `name`'s recipe in `mode` reads `role`, directly or through the derived roles it reads.
+fn reads_itself(colors: &crate::model::Colors, role: &str, name: &str, mode: Mode, seen: &mut Vec<String>) -> bool {
+    let Some(derived) = colors.derived.get(name) else {
+        return false;
+    };
+    if seen.iter().any(|each| each == name) {
+        return false;
+    }
+    seen.push(name.to_owned());
+    derived
+        .reads(mode)
+        .any(|read| read == role || reads_itself(colors, role, read, mode, seen))
 }
 
 fn check_symbols(tokens: &Tokens, found: &mut Vec<Violation>) {
@@ -608,15 +814,17 @@ fn is_mark_path(path: &str) -> bool {
 
 /// Every name that becomes an identifier in an output, as `table.name`.
 fn names(tokens: &Tokens) -> Vec<String> {
-    let tables: [(&str, Vec<&String>); 9] = [
+    let tables: [(&str, Vec<&String>); 11] = [
         ("size", tokens.size.keys().collect()),
         ("aspect", tokens.aspect.keys().collect()),
         ("type", tokens.types.keys().collect()),
         ("duration", tokens.duration.keys().collect()),
         ("easing", tokens.easing.keys().collect()),
         ("opacity", tokens.opacity.keys().collect()),
+        ("scale", tokens.scale.keys().collect()),
         ("shadow", tokens.shadow.keys().collect()),
         ("color", tokens.color.source.keys().collect()),
+        ("color", tokens.color.derived.keys().collect()),
         ("symbols", tokens.symbols.keys().collect()),
     ];
     tables

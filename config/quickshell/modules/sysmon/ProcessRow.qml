@@ -45,7 +45,7 @@ Item {
 
     // The row's shape while the processes are counted: a bar in each column where its words or
     // its number will be, on the row's line, as a `TableRow` lays its cells out.
-    K.Grid {
+    K.Split {
         id: bars
 
         x: K.Tokens.space.s12

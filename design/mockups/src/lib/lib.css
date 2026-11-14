@@ -1,0 +1,3431 @@
+/* The mocked components. Every length is a token in the page's own CSS pixels, which are device
+   pixels (`main.ts` zooms the page by the display's ratio), so a length rounded to `1px` is
+   rounded to a device pixel. */
+
+/* Text: as wide as its advances, rounded up to a device pixel, a hair under one counting as that
+   pixel (`Look.snapUp`), and its style's line tall. iced lays plain ASCII out unkerned and with
+   no ligatures, and shapes anything else. */
+.k-text {
+  display: block;
+  flex: none;
+  width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+  height: var(--t-line);
+  font-family: var(--t-family);
+  font-size: var(--t-size);
+  font-weight: var(--t-weight);
+  line-height: var(--t-line);
+  font-feature-settings: var(--t-features);
+  font-kerning: none;
+  font-variant-ligatures: none;
+  text-rendering: geometricPrecision;
+  white-space: pre;
+}
+
+/* A line of text is centred for the eye: the centre of its ink's mass above the baseline, weighed
+   from the glyphs (`--mass`, in ems, `inkMass` in `text.ts`), sits in the middle of its box, so
+   "21:47" centres on its figures and "Continue" nearer its lowercase; descenders are left out.
+   Lines side by side in one row share the row's mass, and so one baseline. The box stays the
+   style's line tall: the line is trimmed to its caps and baseline (`text-box`) and set down so the
+   baseline lands on the whole device pixel nearest that, where the browser draws it anyway. Wrapped
+   text keeps its leading, and a part that trims its own text says so. */
+:where(.k-text:not([data-wrapped], [data-clamped="lines"])) {
+  box-sizing: border-box;
+  padding-top: calc(round(nearest, calc(var(--t-line) / 2 + var(--mass, 0.35) * var(--t-size)), 1px) - 1cap);
+  text-box: trim-both cap alphabetic;
+}
+
+/* Text that breaks between words in the room it is given, as iced's text does: as wide as its
+   longest line, and as tall as its lines. */
+.k-text[data-wrapped] {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.k-text[data-shaped] {
+  font-kerning: normal;
+  font-variant-ligatures: normal;
+}
+
+/* A symbol: 2 of its 24 units, scaled to its size in device pixels, rounded half up and never
+   under one, then given back in its drawing's units. */
+.k-icon {
+  display: block;
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  --device-stroke: max(1, round(nearest, calc(var(--icon-size) / 1px * var(--stroke-symbol) / 24), 1));
+  stroke-width: calc(var(--device-stroke) * 24 / (var(--icon-size) / 1px));
+}
+
+/* An icon beside a label: a box as wide as the icon and the label's line tall, the icon centred
+   down it on a whole device pixel, half a pixel rounding down the box (`Look.snap`). */
+.k-icon-line {
+  display: block;
+  flex: none;
+  position: relative;
+  width: var(--icon-size);
+  height: var(--line);
+}
+
+.k-icon-line > .k-icon {
+  position: absolute;
+  left: 0;
+  top: round(nearest, calc((var(--line) - var(--icon-size)) / 2), 1px);
+}
+
+/* A disclosing button's chevron (`disclosure`), turned a half while what it discloses is open,
+   turning with it over `medium` on `standard`. */
+.k-button-chevron > .k-icon {
+  rotate: calc(var(--disclosed, 0) * 180deg);
+  transition: rotate var(--motion-medium) var(--easing-standard);
+}
+
+/* A button holding its alternatives' width (`alternatives`): the label centred in it. */
+.k-button[data-held] .k-button-label {
+  text-align: center;
+}
+
+.k-row,
+.k-stack {
+  display: flex;
+  flex: none;
+  gap: var(--gap);
+}
+
+.k-stack {
+  flex-direction: column;
+}
+
+.k-row[data-align="start"] { align-items: flex-start; }
+.k-row[data-align="centre"] { align-items: center; }
+.k-row[data-align="end"] { align-items: flex-end; }
+.k-stack[data-align="start"] { align-items: flex-start; }
+.k-stack[data-align="centre"] { align-items: center; }
+.k-stack[data-align="end"] { align-items: flex-end; }
+
+/* A button: its height, its label's line in the middle of it, its padding at the sides. */
+.k-button {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  height: var(--height);
+  padding: calc((var(--height) - var(--line)) / 2) var(--padding);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+/* An icon button: a circle as tall as the label button of its size, its symbol centred on a whole
+   device pixel. */
+.k-button[data-icon-only] {
+  width: var(--height);
+  padding: 0;
+  border-radius: var(--radius-full);
+}
+
+.k-icon-slot {
+  display: block;
+  flex: none;
+  position: relative;
+  width: var(--height);
+  height: var(--height);
+}
+
+.k-icon-slot > .k-icon {
+  position: absolute;
+  left: round(nearest, calc((var(--height) - var(--icon-size)) / 2), 1px);
+  top: round(nearest, calc((var(--height) - var(--icon-size)) / 2), 1px);
+}
+
+/* A Text button pressed by day: its tone as a faint tint under it. By night it has no fill. */
+.k-button[data-kind="Text"] {
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+.k-button:disabled {
+  cursor: default;
+  --shown: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+}
+
+.k-button:disabled[data-kind="Text"] {
+  background: none;
+}
+
+/* The focus ring. A control lights up as focus arrives, a fade over `short`, and goes back to rest
+   over `short`; the flicker is for power changes only. A control pinned lit shows at once, since
+   nothing moved.
+
+   Lit has two looks, picked by `--signs`, how brightly the signs burn: at night while the lights
+   do (`--before`, `--after`), never by day. Signs on, the line is the tube or the core in its lit
+   colour with the glow outside; signs off, the same line is unlit glass and nothing glows. So a
+   sequence flickers a lit ring down to its signs-off look and strikes it back, and its line is
+   never gone. A ring inside a control (`.k-control`) keeps the control's states. */
+.k-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--corner);
+  pointer-events: none;
+  --lit: 0;
+  --line: max(1px, round(nearest, var(--focus-tube), 1px));
+  transition: --lit var(--motion-short) var(--easing-standard);
+}
+
+:not(.k-control, .k-control *) > .k-ring {
+  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  --tube: color-mix(in srgb, var(--tube-unlit), var(--tube-lit) calc(var(--signs) * 100%));
+  --core: color-mix(in srgb, var(--core-unlit), var(--core-lit) calc(var(--signs) * 100%));
+}
+
+/* On a fill, the line inside the fill's edge is the core, the thin stroke wide. */
+.k-ring[data-filled] {
+  --line: max(1px, round(nearest, var(--stroke-thin), 1px));
+}
+
+:not(.k-control, :disabled):is(:focus-visible, [data-pinned]) > .k-ring {
+  --lit: 1;
+}
+
+/* Lit with the signs off, whatever the scene: the line glass, the neon and its glow out. */
+:not(.k-control, :disabled)[data-pinned="signs-off"] > .k-ring {
+  --signs: 0;
+}
+
+:not(.k-control)[data-pinned] > .k-ring,
+[data-sequence] .k-ring {
+  transition: none;
+}
+
+/* The glow: the tone through its mask, which `lib/focus.ts` works out per device pixel. It is
+   only ever outside the control's box. With the signs off it is out, even where a player moves
+   its opacity. */
+.k-glow {
+  position: absolute;
+  inset: calc(-1 * var(--glow-reach));
+  --glow-reach: round(up, calc(var(--focus-far) - 0.001px), 1px);
+  background: var(--tube-lit);
+  opacity: var(--lit);
+  filter: opacity(var(--signs));
+  mask-size: 100% 100%;
+}
+
+/* The line inside the control's edge, at its corner: the tube, or on a fill the core. It lights by
+   its opacity, as the glow does, so a motion player moves each part by its own. */
+.k-tube {
+  position: absolute;
+  inset: 0;
+  /* Apart, not the `border` shorthand: a button sets no `--tube` of its own, and an unset colour
+     would throw out the width with it. */
+  border-width: var(--line);
+  border-style: solid;
+  border-color: var(--tube);
+  border-radius: var(--corner);
+  opacity: var(--lit);
+}
+
+.k-ring[data-filled] > .k-tube {
+  border-color: var(--core);
+}
+
+/* Content drawn in the control's tone, lit as a tube (a Text button's label and icon): a copy of
+   it in the tone's core over it, with a faint near glow round its letters and no far one, burning
+   on the ring's `--lit` as the glow does. With the signs off, it is out and the content below is
+   its own tone. It sits where the content does: the content is centred in the control, between
+   equal paddings. */
+.k-lit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  --shown: var(--core-lit);
+  opacity: var(--lit);
+  filter: opacity(var(--signs));
+}
+
+.k-lit-glow {
+  position: absolute;
+  background: var(--tube-lit);
+  mask-size: 100% 100%;
+}
+
+/* A hint (`lib/hint.ts`): the bubble floats `space.s8` under its control, centred on it on a whole
+   device pixel or held to its start, as wide as its words rounded up to a device pixel and its padding. It shows while
+   the pointer is over the control, or the control is lit from the keyboard, pressed by a key or
+   pinned lit, and
+   fades in and out over `short`. The pointer never takes it. */
+.k-hint {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + var(--space-s8));
+  --width: calc(round(up, calc(var(--natural) * var(--px) - 0.001px), 1px) + 2 * var(--space-s8));
+  left: round(nearest, calc((100% - var(--width)) / 2), 1px);
+  display: block;
+  box-sizing: border-box;
+  width: var(--width);
+  padding: var(--space-s4) var(--space-s8);
+  border-radius: var(--radius-row);
+  background: var(--color-on_surface);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+/* Above its control (`side`): asked for, or no room below in the box that cuts or scrolls it. */
+.k-hint[data-side="above"] {
+  top: auto;
+  bottom: calc(100% + var(--space-s8));
+}
+
+/* A bubble on its own, shown as itself: in the flow, where its sample puts it. */
+:not(.k-hinted) > .k-hint {
+  position: relative;
+  top: auto;
+  left: auto;
+}
+
+/* A control at the window's end: its bubble is held inside the window, its end on the window's. */
+.k-hint[data-held="end"] {
+  left: auto;
+  right: 0;
+}
+
+/* A control at the start of something wider (a slider's icon): its bubble starts where it does, so
+   a long name never hangs past that edge. */
+.k-hint[data-held="start"] {
+  left: 0;
+}
+
+.k-hinted:is(:hover, :focus-visible, [data-pinned], [data-keyed]) > .k-hint,
+.k-hint[data-shown] {
+  opacity: 1;
+}
+
+.k-hinted[data-pinned] > .k-hint,
+.k-hint[data-shown] {
+  transition: none;
+}
+
+/* A sample's room for its control's hint, which floats and takes none of its own: below the
+   control, and as wide as the bubble where it is wider, the control in the middle on a whole
+   device pixel. */
+.k-hint-room {
+  --bubble: calc(round(up, calc(var(--natural) * var(--px) - 0.001px), 1px) + 2 * var(--space-s8));
+  display: block;
+  width: max(var(--control-side), var(--bubble));
+  padding-bottom: calc(var(--space-s8) + var(--type-label-line) + 2 * var(--space-s4));
+}
+
+.k-hint-room > * {
+  margin-left: max(0px, round(down, calc((var(--bubble) - var(--control-side)) / 2), 1px));
+}
+
+.k-hint-room[data-held="start"] > * {
+  margin-left: 0;
+}
+
+.k-hint-room[data-held="end"] > * {
+  margin-left: max(0px, calc(var(--bubble) - var(--control-side)));
+}
+
+/* A switch (`lib/switch.ts`): its track, a circle at each end, and its knob, both following
+   `--checked` from off to on. Off, the track is the highest container with a hairline of `outline`
+   inside its edge and a knob of `outline`, which brightens to `on_surface_variant` while lit with
+   the signs on. On, it is filled with the accent: at night the unlit fill (`primary_fill`) with a
+   knob of `on_primary_fill`, which brightens to `on_primary_fill_lit` with the signs on, as a
+   Filled button's label does; pressed, the fill lifts. Off and pressed by day, the tone tints the
+   track, as under a Text button. Its line is the tube off and the core on (`--edge`). */
+.k-switch {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--size-switch_width);
+  height: var(--size-switch_height);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  --track-on: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--press) * 100%));
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press) * (1 - var(--checked))));
+  background:
+    linear-gradient(var(--tint), var(--tint)),
+    color-mix(in srgb, var(--color-surface_container_highest), var(--track-on) calc(var(--checked) * 100%));
+  --knob-off: color-mix(in srgb, var(--color-outline), var(--color-on_surface_variant) calc(var(--on) * 100%));
+  --knob-on: color-mix(in srgb, var(--color-on_primary_fill), var(--color-on_primary_fill_lit) calc(var(--on) * 100%));
+  --knob: color-mix(in srgb, var(--knob-off), var(--knob-on) calc(var(--checked) * 100%));
+  --edge: color-mix(in srgb, var(--color-primary), var(--color-primary_fill_line) calc(var(--checked) * 100%));
+  --edge-off: color-mix(
+    in srgb,
+    var(--color-primary_glass),
+    var(--color-primary_fill_glass) calc(var(--checked) * 100%)
+  );
+}
+
+/* The hairline inside the track's edge while off, fading as it turns on. */
+.k-switch::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid var(--color-outline);
+  border-radius: inherit;
+  opacity: calc(1 - var(--checked));
+}
+
+.k-switch-knob {
+  position: absolute;
+  --diameter: calc(var(--size-switch_knob_off) + (var(--size-switch_knob_on) - var(--size-switch_knob_off)) * var(--checked));
+  left: calc(var(--size-switch_height) / 2 + (var(--size-switch_width) - var(--size-switch_height)) * var(--checked) - var(--diameter) / 2);
+  top: calc((var(--size-switch_height) - var(--diameter)) / 2);
+  width: var(--diameter);
+  height: var(--diameter);
+  border-radius: var(--radius-full);
+  background: var(--knob);
+}
+
+.k-switch:disabled {
+  cursor: default;
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --knob: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+.k-switch:disabled::before {
+  opacity: 0;
+}
+
+/* A checkbox or a radio (`lib/check.ts`): its box, then its label, one press target. Unpicked,
+   the box is the highest container with a hairline of `outline` inside its edge. Picked, it is
+   filled with the accent: at night the unlit fill (`primary_fill`) with its mark `on_primary_fill`,
+   brightening to `on_primary_fill_lit` with the signs on, as a Filled button's label does;
+   pressed, the fill lifts. Unpicked and pressed by day, the tone tints the box, as under a Text
+   button. The fill, the outline and the mark fade on `--checked`; its line is the tube unpicked
+   and the core picked (`--edge`). The label is `on_surface` and doesn't light. */
+.k-check {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  cursor: pointer;
+  --fill-on: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--press) * 100%));
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press) * (1 - var(--checked))));
+  --box: color-mix(in srgb, var(--color-surface_container_highest), var(--fill-on) calc(var(--checked) * 100%));
+  --mark: color-mix(in srgb, var(--color-on_primary_fill), var(--color-on_primary_fill_lit) calc(var(--on) * 100%));
+  --words: var(--color-on_surface);
+  --edge: color-mix(in srgb, var(--color-primary), var(--color-primary_fill_line) calc(var(--checked) * 100%));
+  --edge-off: color-mix(
+    in srgb,
+    var(--color-primary_glass),
+    var(--color-primary_fill_glass) calc(var(--checked) * 100%)
+  );
+}
+
+.k-check-box {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--size-check);
+  height: var(--size-check);
+  border-radius: var(--radius-small);
+  background: linear-gradient(var(--tint), var(--tint)), var(--box);
+}
+
+.k-check-box[data-shape="disc"] {
+  border-radius: var(--radius-full);
+}
+
+/* The hairline inside the box's edge while unpicked, fading as it is picked. */
+.k-check-box::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid var(--color-outline);
+  border-radius: inherit;
+  opacity: calc(1 - var(--checked));
+}
+
+.k-check-mark {
+  position: absolute;
+  inset: 0;
+  opacity: var(--checked);
+}
+
+/* The tick: `icon.s16` centred in the box on a whole device pixel. */
+.k-check-tick {
+  position: absolute;
+  left: round(nearest, calc((var(--size-check) - var(--icon-s16)) / 2), 1px);
+  top: round(nearest, calc((var(--size-check) - var(--icon-s16)) / 2), 1px);
+}
+
+/* A partial tick: the box less `space.s4` at each side wide, a thin stroke tall, on whole device
+   pixels. */
+.k-check-dash {
+  position: absolute;
+  --thick: max(1px, round(nearest, var(--stroke-thin), 1px));
+  left: var(--space-s4);
+  top: round(nearest, calc((var(--size-check) - var(--thick)) / 2), 1px);
+  width: calc(var(--size-check) - 2 * var(--space-s4));
+  height: var(--thick);
+  background: var(--mark);
+}
+
+.k-check:not([data-tick="Full"]) .k-check-tick,
+.k-check:not([data-tick="Partial"]) .k-check-dash {
+  display: none;
+}
+
+/* A picked radio's dot, `size.radio_dot` across, centred on a whole device pixel. */
+.k-check-dot {
+  position: absolute;
+  left: round(nearest, calc((var(--size-check) - var(--size-radio_dot)) / 2), 1px);
+  top: round(nearest, calc((var(--size-check) - var(--size-radio_dot)) / 2), 1px);
+  width: var(--size-radio_dot);
+  height: var(--size-radio_dot);
+  border-radius: var(--radius-full);
+  background: var(--mark);
+}
+
+.k-check:disabled {
+  cursor: default;
+  --box: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --mark: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --words: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+.k-check:disabled .k-check-box::before {
+  opacity: 0;
+}
+
+/* A chip (`lib/chip.ts`): `size.chip` tall at the control radius, a pill; its label starts where
+   the curve ends, an icon sits closer in, and a close button ends it with no padding after. Its
+   content is centred down it: every part is an even number of device pixels shorter than the chip
+   at every scale. Its colours are its kind's (`.k-kind`); pressed by day, a chip with no fill of
+   its tone's own takes its tone as a faint tint, as a Text button does. Disabled, it is grey. */
+.k-chip {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  box-sizing: border-box;
+  height: var(--size-chip);
+  padding: 0 var(--space-s12);
+  border-radius: var(--radius-control);
+  outline: none;
+  --tint: rgb(from var(--tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+.k-chip[data-icon] {
+  padding-left: var(--space-s8);
+}
+
+.k-chip[data-removable] {
+  padding-right: 0;
+}
+
+.k-chip.k-control {
+  cursor: pointer;
+}
+
+.k-chip.k-control[data-hot] {
+  background-image: linear-gradient(var(--tint), var(--tint));
+}
+
+.k-chip[aria-disabled="true"] {
+  cursor: default;
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --shown: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+/* Its close button: a circle as tall as the chip, its symbol `space.s4` in, which lights as a Text
+   icon button does in the chip's tone: the tube inside its edge, whose curve is the chip's own, or
+   the core on a Filled chip. Over it, the pointer lights the close button alone. */
+.k-chip-close {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--size-chip);
+  height: var(--size-chip);
+  padding: var(--space-s4);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  --tint: rgb(from var(--tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: var(--tint);
+}
+
+.k-chip-close:disabled {
+  cursor: default;
+}
+
+.k-chip.k-control:has(.k-chip-close:is(:hover, :active)):not(:focus-visible, [data-pinned]) {
+  --lit: 0;
+  --press: 0;
+}
+
+/* A control painted in its kind's roles (a button, an icon button, a chip): its fill and label at
+   rest (`--fill`, `--label`), lit with the signs on (`--fill-lit`, `--label-lit`) and off
+   (`--fill-off`, `--label-off`), and pressed (`--fill-pressed`), crossfaded as it lights, as the
+   signs go off and on, and as it is pressed. `--shown` is the label's colour now. A chip that is
+   no control rests: its signs don't matter. */
+.k-kind {
+  --lit-fill: color-mix(in srgb, var(--fill-off), var(--fill-lit) calc(var(--signs) * 100%));
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--fill), var(--lit-fill) calc(var(--lit) * 100%)),
+    var(--fill-pressed) calc(var(--press) * 100%)
+  );
+  --lit-label: color-mix(in srgb, var(--label-off), var(--label-lit) calc(var(--signs) * 100%));
+  --shown: color-mix(in srgb, var(--label), var(--lit-label) calc(var(--lit) * 100%));
+}
+
+:where(.k-kind:not(.k-control)) {
+  --signs: 0;
+}
+
+/* A control in the state model (`docs/DESIGN.md`, "States"): a button, an icon button, a switch,
+   a checkbox, a radio, a pressable chip. Its states are numbers: `--lit`, hovered or focused, and
+   `--press`. Lit has two looks, picked by `--signs`, how brightly the signs burn: at night while
+   the lights do (`--before`, `--after`), never by day. Signs on, the neon burns; signs off, the
+   line is glass and nothing glows. So a sequence flickers a lit control down to its signs-off look
+   and strikes it back, and its line is never gone. `--on` is how much of the neon shows. Each is
+   worked out here, on the control, so a ring anywhere inside it (a checkbox's on its box) keeps
+   them: a ring's own `--lit` is for a bare one. Placed after every control's own rule, whose
+   `all: unset` would throw out its transition. */
+.k-control {
+  --lit: 0;
+  --press: 0;
+  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  --on: calc(var(--lit) * var(--signs));
+  --line-shown: var(--lit);
+  /* Hover, focus, press, turning on or picking, a slider toggling and a field turning invalid
+     are fades, never the flicker, which is for power changes. */
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard),
+    --checked var(--motion-short) var(--easing-standard),
+    --toggled var(--motion-short) var(--easing-standard),
+    --invalid var(--motion-short) var(--easing-standard);
+}
+
+.k-control:not(:disabled, [aria-disabled="true"]):is(:hover, :focus-visible, [data-pinned], [data-keyed]) {
+  --lit: 1;
+}
+
+/* `data-keyed`: held by a key that another control has the focus for, as Space on a slider holds
+   its icon's button. */
+.k-control:not(:disabled, [aria-disabled="true"]):is(:active, [data-pinned="pressed"], [data-keyed]) {
+  --press: 1;
+}
+
+/* Lit with the signs off, whatever the scene: the line glass, the neon and its glow out. */
+.k-control:not(:disabled, [aria-disabled="true"])[data-pinned="signs-off"] {
+  --signs: 0;
+}
+
+/* Pinned or in a sequence, a state shows at once: nothing moved, or the sequence's clock moves it. */
+.k-control[data-pinned],
+[data-sequence] .k-control {
+  transition: none;
+}
+
+/* A control's line and glow (`lib/focus.ts`'s ring): the line inside its edge whenever it is lit,
+   with the signs on in its lit colour and with them off as glass; the glow outside only with the
+   signs on, a pressed glow `focus.pressed_glow` times the lit one (the mask holds the pressed glow;
+   lit shows it at its share). A control names its line's two colours (`--edge`, `--edge-off`) when
+   they are roles of its own (a filled one's core and glass); otherwise the line is the ring's tube
+   and its glass, the tone's solid `_glass`. A label that glows lit (a Filled button's, a
+   Text button's) keeps its own colour: only the glow round it shows, with the signs on. */
+.k-control .k-ring > .k-tube {
+  border-color: color-mix(in srgb, var(--edge-off, var(--tube-unlit)), var(--edge, var(--tube-lit)) calc(var(--signs) * 100%));
+  opacity: var(--line-shown);
+}
+
+.k-control .k-ring > .k-glow {
+  opacity: calc(var(--on) * (1 + (var(--focus-pressed_glow) - 1) * var(--press)) / var(--focus-pressed_glow));
+  filter: none;
+}
+
+.k-control .k-ring > .k-lit {
+  opacity: var(--on);
+  filter: none;
+}
+
+.k-control .k-ring > .k-lit > :not(.k-lit-glow) {
+  visibility: hidden;
+}
+
+/* A control whose line is a tube with nothing filled under it (a Text button, a switch that is
+   off, an empty checkbox), pressed with the signs on: its tube runs white-hot, to the core. */
+.k-control[data-hot] .k-ring > .k-tube {
+  border-color: color-mix(
+    in srgb,
+    var(--core-lit) calc(var(--press) * var(--signs) * 100%),
+    color-mix(in srgb, var(--edge-off, var(--tube-unlit)), var(--edge, var(--tube-lit)) calc(var(--signs) * 100%))
+  );
+}
+
+/* An active window's tube (`windowRing` in `lib/focus.ts`, `config/hypr/focus.lua`): the window's
+   neutral border under the tube, and its neutral shadow, `shadow` at `opacity.window_shadow` at the
+   edge falling off as the glow does, under the glow. The lit tube is laid over the border as
+   Hyprland blends them; the shadow gives way as the glow comes, so lit with the signs on, only the
+   glow is left. */
+.k-ring[data-window] > .k-border {
+  position: absolute;
+  inset: 0;
+  border: var(--line) solid rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border));
+  border-radius: var(--corner);
+}
+
+.k-ring[data-window] > .k-shade {
+  position: absolute;
+  inset: calc(-1 * var(--glow-reach));
+  --glow-reach: round(up, calc(var(--focus-far) - 0.001px), 1px);
+  --edge: calc(1 - (1 - var(--focus-near_opacity)) * (1 - var(--focus-far_opacity)));
+  background: rgb(from var(--color-shadow) r g b / calc(var(--opacity-window_shadow) / var(--edge)));
+  opacity: calc(1 - var(--lit) * var(--signs));
+  mask-size: 100% 100%;
+}
+
+/* An icon tile (`lib/icon-tile.ts`): its symbol centred on a whole device pixel, the odd one after
+   it; an app's picture placed by its measured drawing; a photo covering the tile. The symbol shows
+   until the picture has loaded. */
+.k-icon-tile {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--side);
+  height: var(--side);
+  border-radius: var(--radius-control);
+  background: var(--tint);
+  overflow: hidden;
+}
+
+.k-icon-tile > .k-icon {
+  position: absolute;
+  left: round(down, calc((var(--side) - var(--icon)) / 2), 1px);
+  top: round(down, calc((var(--side) - var(--icon)) / 2), 1px);
+  width: var(--icon);
+  height: var(--icon);
+}
+
+/* A count in the symbol's place, centred on whole device pixels as the symbol is. */
+.k-icon-tile > .k-icon-tile-count {
+  position: absolute;
+  left: round(down, calc((var(--side) - round(up, calc(var(--natural) * var(--px) - 0.001px), 1px)) / 2), 1px);
+  top: round(down, calc((var(--side) - var(--t-line)) / 2), 1px);
+}
+
+/* An app's picture, scaled so its drawing's box fits `--fit` whole, the box snapped to whole
+   device pixels and centred as the symbol is; the picture's own margin runs past the box, and the
+   tile clips it. The shares (`--box-*`, `--picture-*`, of the box's long side) are its
+   measurement's. A shape fits `space.s4` inside the tile; a plate fills it, so the tile's corners
+   cut it and the two make one edge. */
+.k-icon-tile > .k-icon-tile-picture {
+  --fit: calc(var(--side) - 2 * var(--space-s4));
+  --drawn-width: round(calc(var(--fit) * var(--box-width)), 1px);
+  --drawn-height: round(calc(var(--fit) * var(--box-height)), 1px);
+  position: absolute;
+  left: calc(round(down, calc((var(--side) - var(--drawn-width)) / 2), 1px) - var(--fit) * var(--box-x));
+  top: calc(round(down, calc((var(--side) - var(--drawn-height)) / 2), 1px) - var(--fit) * var(--box-y));
+  width: calc(var(--fit) * var(--picture-width));
+  height: calc(var(--fit) * var(--picture-height));
+}
+
+.k-icon-tile > .k-icon-tile-picture[data-plate] {
+  --fit: var(--side);
+}
+
+.k-icon-tile > .k-icon-tile-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.k-icon-tile > img:not([data-loaded]),
+.k-icon-tile:has(> img[data-loaded]) > .k-icon {
+  visibility: hidden;
+}
+
+/* A card (`lib/card.ts`): part of the page, so flat, with no shadow and no rim, at the content
+   radius, `space.s16` inside, as wide as its room. Its fill is one container role above the surface
+   it sits on: `surface_container` on a window's `surface`, by default; a host on a container names
+   the role above its own as `--card-fill`. Its edge is the sunken soft hairline (`.k-sunken`), the
+   list well's, which holds the edge by day where the two tones are close. */
+.k-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  align-self: stretch;
+  padding: var(--space-s16);
+  border-radius: var(--radius-content);
+  outline: none;
+  background-color: var(--card-fill, var(--color-surface_container));
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--sunken-line);
+}
+
+.k-card[data-pressable],
+.k-choice-card {
+  cursor: pointer;
+}
+
+/* Pressed by day, the tone tints a pressable card's fill as it does a Text button: by night its
+   tube runs white-hot instead. */
+.k-card.k-control {
+  --tint-tone: var(--color-primary);
+  background-image: linear-gradient(
+    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press))),
+    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)))
+  );
+}
+
+.k-card[aria-disabled="true"] {
+  cursor: default;
+}
+
+/* Disabled, the card keeps its resting surface and what it holds dims. */
+.k-card[aria-disabled="true"]:not(.k-choice-card) > .k-card-content {
+  opacity: var(--opacity-disabled_content);
+}
+
+/* A choice card's title and symbol: `on_surface`, the accent's words (`primary_lit`) while it is
+   picked or pressed, fading over `short`, with the label glow round them at night while the signs
+   are on. Its mark is the checkbox's and the radio's own box, lit and pressed with the card. */
+.k-choice-card {
+  --tint-tone: var(--color-cold);
+  --title-colour: color-mix(in srgb, var(--color-on_surface), var(--color-primary_lit) calc(max(var(--picked), var(--press)) * 100%));
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard),
+    --checked var(--motion-short) var(--easing-standard),
+    --picked var(--motion-short) var(--easing-standard);
+}
+
+.k-choice-card[data-pinned],
+[data-sequence] .k-choice-card {
+  transition: none;
+}
+
+.k-choice-card .k-card-title-line > :not(.k-choice-mark) {
+  filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--picked) * var(--signs))));
+}
+
+/* The mark centred on the title's first line, on a whole device pixel. */
+.k-choice-mark {
+  margin-top: round(down, calc((var(--type-subheading-line) - var(--size-check)) / 2), 1px);
+  cursor: inherit;
+}
+
+.k-choice-mark .k-check-mark {
+  opacity: var(--checked);
+}
+
+.k-choice-card[role="radio"] .k-choice-mark .k-check-tick,
+.k-choice-card[role="checkbox"] .k-choice-mark .k-check-dot {
+  display: none;
+}
+
+/* Disabled: grey, with no tone, on the resting surface: the words, the symbol and the mark at
+   `opacity.disabled_content` of `on_surface`, the mark's box at `opacity.disabled_container`. */
+.k-choice-card[aria-disabled="true"] {
+  --title-colour: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --subtitle-colour: var(--title-colour);
+}
+
+.k-choice-card[aria-disabled="true"] .k-card-title-line > * {
+  filter: none;
+}
+
+.k-choice-card[aria-disabled="true"] .k-check {
+  --box: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --mark: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+.k-choice-card[aria-disabled="true"] .k-check-box::before {
+  opacity: 0;
+}
+
+/* A set of choice cards: `--columns` across, `space.s16` apart, each column as wide as the room
+   split in device pixels, the cards of a row one height. */
+.k-choice-group {
+  display: grid;
+  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
+  gap: var(--space-s16);
+  align-self: stretch;
+}
+
+/* A picture's box (`lib/media.ts`): as wide as its room and as tall as `--aspect` makes it, down
+   to the 4 px grid, cut at `--corner`. The placeholder fills it until the picture covers it; a
+   caption sits `space.s8` under it. */
+.k-media {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  flex: none;
+  align-self: stretch;
+  container-type: inline-size;
+}
+
+.k-media-box {
+  position: relative;
+  display: block;
+  width: 100cqw;
+  height: round(down, calc(100cqw / (var(--aspect))), var(--grid));
+  border-radius: var(--corner);
+  overflow: hidden;
+}
+
+.k-media-box > .k-media-placeholder {
+  position: absolute;
+  inset: 0;
+  height: auto;
+  border-radius: inherit;
+}
+
+.k-media-box[data-arrival="loaded"] > .k-media-placeholder {
+  visibility: hidden;
+}
+
+.k-media-picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.k-media[data-dimmed] .k-media-placeholder {
+  animation: none;
+  box-shadow: none;
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+}
+
+.k-media[data-dimmed] .k-media-picture {
+  opacity: var(--opacity-disabled_content);
+}
+
+.k-media[data-dimmed] {
+  --caption-colour: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+/* A picture to pick (`lib/picture-choice.ts`): the tile, its picture edge to edge at the control
+   radius, and its name `space.s8` under it, in `small`, `on_surface_variant`, `on_surface` while
+   picked. Picked, the accent's line burns inside its edge with the glow outside at night, fading
+   in and out over `short`; lit, the cold tube takes its place. */
+.k-picture-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  align-self: stretch;
+  --name-colour: color-mix(in srgb, var(--color-on_surface_variant), var(--color-on_surface) calc(var(--checked) * 100%));
+  transition: --checked var(--motion-short) var(--easing-standard);
+}
+
+[data-sequence] .k-picture-choice {
+  transition: none;
+}
+
+.k-picture-tile {
+  position: relative;
+  display: block;
+  align-self: stretch;
+  border-radius: var(--radius-control);
+  outline: none;
+  cursor: pointer;
+}
+
+/* The pick fades on the whole choice, name and tile together, which the tile takes as it is. */
+.k-picture-tile.k-control {
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+.k-picture-tile.k-control[data-pinned],
+[data-sequence] .k-picture-tile.k-control {
+  transition: none;
+}
+
+.k-picture-tile .k-picked-ring {
+  --line-shown: calc(var(--checked) * (1 - var(--lit)));
+  --on: calc(var(--line-shown) * var(--signs));
+}
+
+.k-picture-tile[aria-disabled="true"] {
+  cursor: default;
+}
+
+.k-picture-tile[aria-disabled="true"] .k-picked-ring {
+  display: none;
+}
+
+/* Pressed by day, the cold tone tints the picture, as it does a Text button. */
+.k-picture-tint {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: rgb(from var(--color-cold) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+/* Its name over its foot: light on the scrim darkening from nothing 40% down the tile to the
+   backdrop's opacity at its foot, whatever the mode, since it is on a photo; `space.s12` in. */
+.k-picture-scrim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(rgb(from var(--color-scrim) r g b / 0) 40%, rgb(from var(--color-scrim) r g b / var(--opacity-backdrop)));
+}
+
+.k-picture-name-over {
+  position: absolute;
+  left: var(--space-s12);
+  right: var(--space-s12);
+  bottom: var(--space-s12);
+}
+
+.k-picture-tile[aria-disabled="true"] .k-picture-scrim,
+.k-picture-tile[aria-disabled="true"] .k-picture-name-over {
+  opacity: var(--opacity-disabled_content);
+}
+
+.k-picture-choice:has(> .k-picture-tile[aria-disabled="true"]) {
+  --name-colour: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+/* A chip over a corner, `space.s8` in: a badge at the top left, the mark at the top right, showing
+   while it is picked. */
+.k-picture-tag {
+  position: absolute;
+  top: var(--space-s8);
+  display: flex;
+}
+
+.k-picture-tag[data-side="start"] {
+  left: var(--space-s8);
+}
+
+.k-picture-tag[data-side="end"] {
+  right: var(--space-s8);
+  opacity: var(--checked);
+}
+
+/* A part set into its surface (a list's well, a scroll panel, a field, a shut select): its edge is
+   one hairline inside it, `--sunken-tone` at `--sunken-strength`, which the part draws as
+   `--sunken-line`. By default that is the soft outline, `outline_variant` at
+   `opacity.outline_soft`: a well's edge, decoration. A part that takes input names `outline` at
+   full instead, so its boundary keeps 3:1 against what is round it. */
+.k-sunken {
+  --sunken-tone: var(--color-outline_variant);
+  --sunken-strength: var(--opacity-outline_soft);
+  --sunken-line: rgb(from var(--sunken-tone) r g b / var(--sunken-strength));
+}
+
+/* A field (`lib/field.ts`): `size.control_md` tall at the control radius, filling its room, its
+   sunken edge in `outline` at full, or `error` while invalid. Lit, hovered or with the
+   keyboard in it, its fill rises to the highest container (an invalid one keeps its own) and its
+   tube is drawn over the hairline. Its value is clipped to its room, `space.s12` in at each side
+   (or past the icon and `space.s8` more, and as far before a trailing one); with the keyboard in
+   it, the text scrolls left to keep the caret inside the room. */
+.k-field {
+  position: relative;
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--field-height, var(--size-control_md));
+  border-radius: var(--radius-control);
+  outline: none;
+  cursor: text;
+  /* The field draws its own selection, so the browser's never shows. */
+  user-select: none;
+  --lit: 0;
+  --start: var(--space-s12);
+  --end: var(--space-s12);
+  --thin: max(1px, round(nearest, var(--stroke-thin), 1px));
+  --rest-fill: var(--color-surface_container_high);
+  --lit-fill: color-mix(
+    in srgb,
+    var(--color-surface_container_highest),
+    var(--color-surface_container_high) calc(var(--invalid) * 100%)
+  );
+  background: color-mix(in srgb, var(--rest-fill), var(--lit-fill) calc(var(--lit) * 100%));
+  --sunken-tone: var(--color-outline);
+  --sunken-strength: 1;
+  --edge-line: color-mix(in srgb, var(--sunken-line), var(--color-error) calc(var(--invalid) * 100%));
+  --value: var(--color-on_surface);
+  --placeholder: rgb(from var(--color-on_surface_variant) r g b / var(--opacity-placeholder_text));
+  --mark: var(--color-on_surface_variant);
+  --caret-tone: color-mix(in srgb, var(--color-primary), var(--color-error) calc(var(--invalid) * 100%));
+  --caret-core: color-mix(in srgb, var(--color-primary_core), var(--color-error_core) calc(var(--invalid) * 100%));
+  --caret-glass: color-mix(in srgb, var(--color-primary_glass), var(--color-error_glass) calc(var(--invalid) * 100%));
+  --caret-reach: calc(var(--thin) / 2);
+}
+
+.k-field[data-icon] {
+  --start: calc(var(--space-s12) + var(--type-body_large-icon) + var(--space-s8));
+}
+
+.k-field[data-trailing] {
+  --end: calc(var(--space-s12) + var(--type-body_large-icon) + var(--space-s8));
+}
+
+.k-field::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid var(--edge-line);
+  border-radius: inherit;
+}
+
+/* A field takes no press of its own: a press puts the caret where it lands, and the field is lit. */
+.k-field.k-control:not([aria-disabled="true"]):is(:active, [data-pinned]) {
+  --press: 0;
+}
+
+.k-field.k-control:focus {
+  --lit: 1;
+}
+
+/* Read-only: dimmed, lit and lit fill alike. It lights and selects as any field does, but it
+   never edits. */
+.k-field[data-state="Locked"] {
+  --rest-fill: rgb(from var(--color-surface_container_high) r g b / var(--opacity-locked));
+  --lit-fill: rgb(from var(--color-surface_container_highest) r g b / var(--opacity-locked));
+  --sunken-strength: var(--opacity-locked);
+  --value: var(--color-on_surface_variant);
+}
+
+/* Disabled: grey, with no tone, no line and no glow. Its value can still be selected, so the
+   pointer stays the text one. */
+.k-field[data-state="Disabled"] {
+  --rest-fill: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --edge-line: var(--rest-fill);
+  --value: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --placeholder: var(--value);
+  --mark: var(--value);
+  --trailing-mark: var(--value);
+}
+
+/* The icon `space.s12` in, centred down the field on a whole device pixel. */
+.k-field-mark {
+  position: absolute;
+  left: var(--space-s12);
+  top: round(nearest, calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-icon)) / 2), 1px);
+}
+
+/* The trailing icon, `space.s12` in from the far side, in its own role (`--trailing`) unless the
+   field is disabled. */
+.k-field-trailing {
+  left: auto;
+  right: var(--space-s12);
+}
+
+.k-field-clip {
+  position: absolute;
+  left: var(--start);
+  right: var(--end);
+  top: calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-line)) / 2);
+  height: var(--type-body_large-line);
+  overflow: hidden;
+}
+
+/* The room the value has. `--shift` scrolls the line left until the caret, `--caret-at` logical
+   pixels into it and `--caret-reach` past that, ends inside the room. A percentage in a custom
+   property is resolved where it is used, so in the line it is the room's width. */
+.k-field-room {
+  position: absolute;
+  inset: 0;
+  --shift: min(0px, calc(100% - var(--caret-at) * var(--px) - var(--caret-reach)));
+}
+
+.k-field:not(:focus, [data-keyboard]) .k-field-room {
+  --shift: 0px;
+}
+
+.k-field-line,
+.k-field-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.k-field-line {
+  left: var(--shift);
+  height: 100%;
+}
+
+.k-field-line > .k-text {
+  position: relative;
+}
+
+/* The selected text's highlight: the accent at `opacity.selection`, at the small radius. */
+.k-field-selection {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  left: calc(var(--from) * var(--px));
+  width: calc((var(--to) - var(--from)) * var(--px));
+  border-radius: var(--radius-small);
+  background: rgb(from var(--color-primary) r g b / var(--opacity-selection));
+}
+
+/* The caret: one core line the thin stroke wide with rounded ends, `caret.height` tall and centred
+   down the field, and centred across the boundary between the letters either side, on a whole
+   device pixel. It sits on the field, outside the text's clip, so its glow is never cut; its place
+   is the room's scroll worked out against the field's width, the room being the field less its
+   insets. At night
+   it is the tone's core with the signs on and its glass with them off; by day, the tone. It is
+   steady: it strikes on with focus (`lib/field.ts`) and never blinks. */
+.k-field-caret {
+  display: none;
+  position: absolute;
+  top: round(nearest, calc((var(--field-height, var(--size-control_md)) - var(--caret-height)) / 2), 1px);
+  height: var(--caret-height);
+  width: var(--thin);
+  left: round(
+    nearest,
+    calc(
+      var(--start) +
+        min(var(--caret-at) * var(--px), 100% - var(--start) - var(--end) - var(--caret-reach)) -
+        var(--thin) / 2
+    ),
+    1px
+  );
+  border-radius: calc(var(--thin) / 2);
+  background: color-mix(
+    in srgb,
+    var(--caret-tone),
+    color-mix(in srgb, var(--caret-glass), var(--caret-core) calc(var(--signs) * 100%)) calc((1 - var(--day)) * 100%)
+  );
+}
+
+.k-field:is(:focus, [data-keyboard]):not([data-selecting], [data-state="Disabled"]) .k-field-caret {
+  display: block;
+}
+
+/* The glow round the caret while you type: the tone through its mask, which `lib/field.ts` works
+   out per device pixel round the caret's rounded line. Its opacity is how much of it shows, moved
+   from script; with the signs off, by day always, it is out. */
+.k-field-caret-glow {
+  position: absolute;
+  background: var(--caret-tone);
+  opacity: 0;
+  filter: opacity(var(--signs));
+  mask-size: 100% 100%;
+  pointer-events: none;
+}
+
+.k-field:not(:focus, [data-keyboard]) .k-field-selection {
+  display: none;
+}
+
+/* A field under its label, with its note: one column as wide as its room. */
+.k-labelled {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
+  width: 100%;
+}
+
+.k-labelled-head {
+  width: 100%;
+  height: var(--size-control_sm);
+}
+
+.k-fill {
+  flex: 1;
+}
+
+.k-field-box {
+  display: block;
+  flex: none;
+  width: var(--room);
+}
+
+/* A keycap (`lib/keycap.ts`): `size.keycap` tall, as wide as its key and `space.s4` either side
+   (the key rounded up to a device pixel), never narrower than tall. Its edge fills the whole key
+   and its face stands on it one hairline short of the foot, so the edge shows a hairline at the
+   top and the sides and two at the foot. The key is centred across it on a whole device pixel. */
+.k-keycap {
+  position: relative;
+  display: block;
+  flex: none;
+  --key-ink: var(--color-on_surface_variant);
+  --key-edge: var(--color-outline_variant);
+  --inner: calc(round(up, calc(var(--natural) * var(--px) - 0.001px), 1px) + 2 * var(--space-s4));
+  width: max(var(--size-keycap), var(--inner));
+  height: var(--size-keycap);
+  border-radius: var(--radius-small);
+  background: var(--key-edge);
+}
+
+.k-keycap::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 var(--stroke-hairline_device_px);
+  box-sizing: border-box;
+  border: var(--stroke-hairline_device_px) solid var(--key-edge);
+  border-radius: inherit;
+  background: var(--color-surface_container_highest);
+}
+
+.k-keycap-label {
+  position: relative;
+  padding: 0 var(--space-s4);
+  margin-left: round(nearest, calc((max(var(--size-keycap), var(--inner)) - var(--inner)) / 2), 1px);
+}
+
+/* Key hints given a room: a hint past it wraps onto a line of its own, which is cut away, and so
+   does every hint after it, so none is cut through a keycap. */
+.k-key-hints[data-room] {
+  flex-wrap: wrap;
+  max-width: var(--room);
+  height: var(--size-keycap);
+  overflow: hidden;
+}
+
+/* A part raised inside its plane (`lib/elevation.ts`, `[elevation]`): its step's contact and
+   ambient layers of `shadow`, and the rim, a hairline inside its edge in the colour its words are
+   in (`--rim-tone`): `on_surface` on a surface's fill, `surface` on the inverse one (a toast),
+   where `on_surface` would be the fill itself. Its fill is its day role (`--fill`) by day and the
+   role above it (`--fill-night`) at night, where `--elevation-lighter` is 1. A part that rises as
+   it opens (a select) names how far it is up as `--raised`, 0 to 1, which its shadow and rim come
+   up with. */
+.k-raised {
+  --raised-by: var(--raised, 1);
+  background: color-mix(in srgb, var(--fill), var(--fill-night) calc(var(--elevation-lighter) * 100%));
+  box-shadow:
+    inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--rim-tone, var(--color-on_surface)) r g b / calc(var(--elevation-rim) * var(--raised-by))),
+    0 var(--contact-y) var(--contact-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-contact-opacity) * var(--raised-by))),
+    0 var(--ambient-y) var(--ambient-blur) rgb(from var(--color-shadow) r g b / calc(var(--elevation-ambient-opacity) * var(--raised-by)));
+}
+
+.k-raised[data-step="1"] {
+  --contact-y: var(--elevation-1-contact-y);
+  --contact-blur: var(--elevation-1-contact-blur);
+  --ambient-y: var(--elevation-1-ambient-y);
+  --ambient-blur: var(--elevation-1-ambient-blur);
+}
+
+.k-raised[data-step="2"] {
+  --contact-y: var(--elevation-2-contact-y);
+  --contact-blur: var(--elevation-2-contact-blur);
+  --ambient-y: var(--elevation-2-ambient-y);
+  --ambient-blur: var(--elevation-2-ambient-blur);
+}
+
+.k-raised[data-step="3"] {
+  --contact-y: var(--elevation-3-contact-y);
+  --contact-blur: var(--elevation-3-contact-blur);
+  --ambient-y: var(--elevation-3-ambient-y);
+  --ambient-blur: var(--elevation-3-ambient-blur);
+}
+
+.k-raised[data-step="4"] {
+  --contact-y: var(--elevation-4-contact-y);
+  --contact-blur: var(--elevation-4-contact-blur);
+  --ambient-y: var(--elevation-4-ambient-y);
+  --ambient-blur: var(--elevation-4-ambient-blur);
+}
+
+/* A popover (`lib/tooltip.ts`): `size.menu` wide, at the control radius, raised on
+   `surface_container` (`surface_container_high` at night). Holding words it is `space.s12` inside;
+   holding a menu, `space.s4`, as a select's open list is, so the items' corners run parallel to its
+   own and their words still start `space.s12` from its edge. */
+.k-popover {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--popover-width, var(--size-menu));
+  padding: var(--space-s12);
+  border-radius: var(--radius-control);
+  --fill: var(--color-surface_container);
+  --fill-night: var(--color-surface_container_high);
+}
+
+/* A tooltip's name and key on one line: as wide as they are, `size.menu` at most. */
+.k-tooltip[data-line] > .k-popover {
+  width: max-content;
+  max-width: var(--size-menu);
+}
+
+/* The shortcuts popover (`lib/shortcuts.ts`): `size.panel` wide, each row as tall as a compact row,
+   its keys in a column at its end. */
+.k-popover.k-shortcuts {
+  --popover-width: var(--size-panel);
+}
+
+.k-shortcut-groups,
+.k-shortcut-group,
+.k-shortcut {
+  align-self: stretch;
+}
+
+.k-shortcut {
+  justify-content: space-between;
+  min-height: var(--size-row_compact);
+}
+
+.k-shortcut-keys {
+  flex: none;
+}
+
+/* Over its button, `space.s8` above it from its start, fading in over `long` as a panel arrives and
+   out over `medium`; its button's tooltip stays away while it is open. */
+.k-shortcuts-anchor > .k-shortcuts {
+  position: absolute;
+  z-index: 4;
+  bottom: calc(100% + var(--space-s8));
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.k-shortcuts-anchor[data-open] > .k-shortcuts {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.k-shortcuts-anchor[data-open] > .k-tooltip {
+  visibility: hidden;
+}
+
+.k-popover:has(> .k-menu) {
+  padding: var(--space-s4);
+}
+
+/* A tooltip's card over its control: shown while the control is lit, fading in and out over
+   `short`, never flickering; the pointer never takes it. */
+.k-tooltip {
+  display: block;
+  flex: none;
+}
+
+.k-tip-room > .k-tooltip {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+/* Over a disabled control it still shows under the pointer, so the control still says what it does. */
+.k-tip-room:has(> .k-control:is(:hover, :focus-visible, [data-pinned])) > .k-tooltip,
+.k-tip-room > .k-tooltip[data-shown] {
+  opacity: 1;
+}
+
+.k-tip-room:has(> .k-control[data-pinned]) > .k-tooltip,
+.k-tip-room > .k-tooltip[data-shown] {
+  transition: none;
+}
+
+/* A floating tooltip (`floatingTooltip` in `lib/tooltip.ts`): the card hangs `space.s8` below its
+   control (or above), lined up with its start or its end, over whatever is there; the anchor is the
+   control's own size, so nothing round it moves. */
+.k-tip-anchor {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+
+.k-tip-anchor > .k-tooltip {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + var(--space-s8));
+  left: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.k-tip-anchor > .k-tooltip[data-side="above"] {
+  top: auto;
+  bottom: calc(100% + var(--space-s8));
+}
+
+.k-tip-anchor > .k-tooltip[data-held="end"] {
+  left: auto;
+  right: 0;
+}
+
+.k-tip-anchor:has(> .k-control:is(:hover, :focus-visible, [data-pinned])) > .k-tooltip,
+.k-tip-anchor > .k-tooltip[data-shown] {
+  opacity: 1;
+}
+
+.k-tip-anchor:has(> .k-control[data-pinned]) > .k-tooltip,
+.k-tip-anchor > .k-tooltip[data-shown] {
+  transition: none;
+}
+
+/* One line, or `--lines`, in the room the text is given, the last ending in an ellipsis where the
+   words don't fit; never wider than its words. */
+.k-text[data-clamped] {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.k-text[data-clamped="lines"] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines);
+  width: auto;
+  height: auto;
+  max-height: calc(var(--lines) * var(--t-line));
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Room that takes what is left along its row, or the whole width across its stack. */
+.k-row > [data-fill] {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-stack > [data-fill] {
+  align-self: stretch;
+}
+
+/* A hairline across all the room it is given, in the soft outline: one device pixel at every
+   scale. */
+.k-divider {
+  display: block;
+  flex: none;
+  align-self: stretch;
+  height: var(--stroke-hairline_device_px);
+  background: rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
+}
+
+/* A badge: a pill `size.badge` tall, as wide as `--badge-width` works out, its count's text
+   centred on a whole device pixel, an odd spare pixel after it (`centre_x`). */
+.k-badge {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--badge-width);
+  height: var(--size-badge);
+  padding-left: round(down, calc((var(--badge-width) - round(up, calc(var(--natural, 0) * var(--px) - 0.001px), 1px)) / 2), 1px);
+  border-radius: var(--radius-full);
+  background: var(--badge-tone, var(--color-error));
+}
+
+.k-badge[data-accent] {
+  background: var(--color-primary);
+}
+
+.k-badge[data-dot] {
+  height: var(--size-badge_dot);
+  padding: 0;
+}
+
+/* A symbol with a badge centred on its top right corner: the box takes the half of the badge past
+   the symbol on both sides while it shows. The badge hangs past the box's top. */
+.k-badged {
+  display: block;
+  flex: none;
+  position: relative;
+  --overhang: 0px;
+  padding: 0 var(--overhang);
+}
+
+.k-badged[data-badged] {
+  --overhang: round(up, calc(var(--badge-width) / 2), 1px);
+}
+
+.k-badged > .k-badge {
+  position: absolute;
+  left: round(nearest, calc(var(--overhang) + var(--glyph) - var(--badge-width) / 2), 1px);
+  top: round(nearest, calc(var(--size-badge) / -2), 1px);
+}
+
+.k-badged > .k-badge[data-dot] {
+  top: round(nearest, calc(var(--size-badge_dot) / -2), 1px);
+}
+
+/* How far a pill has eased from its old width to its new, 0 to 1. */
+@property --grown {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* A pill (`lib/pill.ts`): `size.control_sm` tall at the full radius on its fill, its content a row
+   centred on device pixels, `space.s12` at each end, `space.s8` round a lone symbol. While its
+   content changes width it is `--from` wide easing to `--to`, its content cut at its edge. An
+   interactive one pressed by day takes its tone's tint, as a Text button does. */
+.k-pill {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  box-sizing: border-box;
+  height: var(--size-control_sm);
+  border-radius: var(--radius-full);
+  --end: var(--space-s12);
+  background:
+    linear-gradient(rgb(from var(--ink) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press, 0))), rgb(from var(--ink) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press, 0)))),
+    var(--fill);
+  color: var(--ink);
+}
+
+.k-pill[data-lone] {
+  --end: var(--space-s8);
+}
+
+.k-pill[style*="--from"] {
+  width: round(up, calc(var(--from) + (var(--to) - var(--from)) * var(--grown)), 1px);
+}
+
+.k-pill.k-control {
+  cursor: pointer;
+}
+
+.k-pill-clip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0 var(--end);
+  border-radius: inherit;
+  overflow: clip;
+}
+
+/* A ticking number: as wide as the same text with every digit a 0, its text at the left. */
+.k-figure {
+  display: block;
+  flex: none;
+  width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+  height: var(--t-line);
+}
+
+/* How far round the spinner's arc has run, in turns. */
+@property --spin {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A spinner: a lit stretch of neon running round an unlit glass ring, `stroke.thin` rounded half
+   up to whole device pixels, the ring's middle a stroke in from the box. The ring is the tone at
+   `opacity.spinner_track`; the arc, `spinner.arc` of the ring with round ends, is the tone's core
+   at night with the content glow round it, and the tone by day with none, as any lit line. It
+   turns once every `spinner.turn` on `linear` and never breathes: a tube is lit or it isn't. A
+   shot holds it 0.7 of a turn in. */
+.k-spinner {
+  display: block;
+  flex: none;
+  width: var(--spinner-size);
+  height: var(--spinner-size);
+  --thin: max(1px, round(nearest, var(--stroke-thin), 1px));
+  animation: k-spin calc(var(--spinner-turn) / var(--speed) * var(--slow)) linear infinite;
+}
+
+.k-spinner[data-held] {
+  animation: none;
+  --spin: 0.7;
+}
+
+.k-spinner > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.k-spinner circle {
+  cx: 50%;
+  cy: 50%;
+  r: calc(var(--spinner-size) / 2 - var(--thin));
+  fill: none;
+  stroke-width: var(--thin);
+}
+
+.k-spinner-ring {
+  stroke: rgb(from var(--tone) r g b / var(--opacity-spinner_track));
+}
+
+.k-spinner-arc {
+  stroke: color-mix(in srgb, var(--tone), var(--core) calc((1 - var(--day)) * 100%));
+  stroke-linecap: round;
+  stroke-dasharray: calc(360 * var(--spinner-arc)) 360;
+  transform-origin: 50% 50%;
+  transform: rotate(calc(var(--spin) * 1turn));
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--tone) r g b / calc(var(--focus-content_glow) * (1 - var(--day)))));
+}
+
+@keyframes k-spin {
+  from { --spin: 0; }
+  to { --spin: 1; }
+}
+
+/* How warm the skeleton's glass is: 0 at rest, 1 at its breath's peak. */
+@property --hum {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* A skeleton: glass of the accent warming up, as a sign's gas does before it lights. Its fill is
+   `primary` at `opacity.skeleton` (`skeleton_light` by day), breathing to `skeleton_peak` and back
+   over `hum` each way on `standard`, every bone together, for as long as it shows; at night a faint
+   glow comes in with the peak, `skeleton_glow` fading out over `focus.near`. It has no edge. With
+   reduce motion it holds still at rest. */
+.k-skeleton {
+  display: block;
+  flex: none;
+  align-self: stretch;
+  height: var(--height);
+  border-radius: var(--corner);
+  --rest: calc(var(--opacity-skeleton) * (1 - var(--day)) + var(--opacity-skeleton_light) * var(--day));
+  --peak: calc(var(--opacity-skeleton_peak) * (1 - var(--day)) + var(--opacity-skeleton_light_peak) * var(--day));
+  background: rgb(from var(--color-primary) r g b / calc(var(--rest) + (var(--peak) - var(--rest)) * var(--hum)));
+  box-shadow: 0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--opacity-skeleton_glow) * var(--hum) * (1 - var(--day))));
+  animation: k-hum var(--motion-hum) var(--easing-standard) infinite alternate;
+}
+
+.k-row > .k-skeleton:not([data-bone="circle"]) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-skeleton[data-bone="circle"] {
+  width: var(--height);
+  align-self: auto;
+}
+
+[data-reduced] .k-skeleton,
+.k-skeleton[data-still] {
+  animation: none;
+}
+
+@keyframes k-hum {
+  from { --hum: 0; }
+  to { --hum: 1; }
+}
+
+/* Parts one over the other in the same room: a skeleton and what takes its place, so what arrives
+   moves nothing; a popover over the surface it floats on. */
+.k-overlap {
+  display: grid;
+}
+
+.k-overlap > * {
+  grid-area: 1 / 1;
+}
+
+/* What takes a skeleton's place: out until it arrives. */
+.k-arrive-content {
+  opacity: 0;
+}
+
+/* A room of a set width, whatever its children hold: a skeleton's or a divider's room. */
+.k-within {
+  width: var(--room);
+}
+
+.k-within > * {
+  align-self: stretch;
+}
+
+/* How far along its track a slider's fill shows, 0 to 1: it eases as a value is set from
+   elsewhere and onto a stop after a drag. */
+@property --slider-shown {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A slider (`lib/slider.ts`): a pill as wide as its room, `size.slider` tall or `slider_compact`.
+   The track is the highest container at `opacity.track`; the fill, from the start to the value's
+   round end on a whole device pixel, is the accent, fading to the softer `secondary` as
+   `--toggled` goes to 1, and lifts toward the palette's bright end (`on_surface` at night,
+   `surface` by day) by `opacity.press` while lit and by `opacity.held` while held. Its content is
+   the fill's content colour on the fill and `on_surface` on the track. Disabled, every part is at
+   `opacity.disabled_content`. */
+.k-slider {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  align-self: stretch;
+  min-width: 0;
+  height: var(--side);
+  border-radius: var(--radius-full);
+  container-type: inline-size;
+  outline: none;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  --side: var(--size-slider);
+  --anchor: var(--size-slider_anchor);
+  --dim: 1;
+  --tone: color-mix(in srgb, var(--color-primary), var(--color-secondary) calc(var(--toggled) * 100%));
+  --on-tone: color-mix(in srgb, var(--color-on_primary), var(--color-on_secondary) calc(var(--toggled) * 100%));
+  --bright: color-mix(in srgb, var(--color-on_surface), var(--color-surface) calc(var(--day) * 100%));
+  --lift: calc(var(--lit) * var(--opacity-press) + var(--press) * (var(--opacity-held) - var(--opacity-press)));
+  --on-fill: rgb(from var(--on-tone) r g b / var(--dim));
+  --on-track: rgb(from var(--color-on_surface) r g b / var(--dim));
+}
+
+.k-row > .k-slider {
+  flex: 1 1 0;
+}
+
+.k-slider[data-compact] {
+  --side: var(--size-slider_compact);
+  --anchor: var(--size-slider_anchor_compact);
+}
+
+.k-slider:is([data-held], [data-dragging]):not([aria-disabled="true"]) {
+  --lit: 1;
+  --press: 1;
+}
+
+.k-slider[aria-disabled="true"] {
+  cursor: default;
+  --dim: var(--opacity-disabled_content);
+}
+
+.k-slider-track {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(from var(--color-surface_container_highest) r g b / calc(var(--opacity-track) * var(--dim)));
+}
+
+.k-slider-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(100%, round(nearest, calc(var(--side) + (100% - var(--side)) * var(--slider-shown)), 1px));
+  overflow: hidden;
+  border-radius: inherit;
+  background: rgb(from color-mix(in srgb, var(--tone), var(--bright) calc(var(--lift) * 100%)) r g b / var(--dim));
+}
+
+/* What the fill shows, laid out across the whole slider and cut where the fill ends. */
+.k-slider-on-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100cqw;
+  height: 100%;
+}
+
+/* The icon, `label`'s, centred in the circle at the fill's start on a whole device pixel. */
+.k-slider-icon {
+  position: absolute;
+  display: block;
+  left: round(nearest, calc((var(--side) - var(--type-label-icon)) / 2), 1px);
+  top: round(nearest, calc((var(--side) - var(--type-label-icon)) / 2), 1px);
+  width: var(--type-label-icon);
+  height: var(--type-label-icon);
+}
+
+.k-slider-icon > .k-icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* The value or its name, `space.s12` in from the far end, once over the track and once over the
+   fill, the same place: the fill cuts the one over it where it ends. */
+.k-slider-label {
+  position: absolute;
+  right: var(--space-s12);
+  top: round(nearest, calc((var(--side) - var(--t-line)) / 2), 1px);
+  transition: opacity var(--motion-micro) var(--easing-standard);
+}
+
+/* A compact slider's number shows only lit or held; a name always shows. */
+.k-slider[data-compact][data-numeric] .k-slider-label {
+  opacity: 0;
+}
+
+.k-slider[data-compact][data-numeric]:is(:hover, :focus-visible, [data-pinned], [data-held], [data-dragging]) .k-slider-label {
+  opacity: 1;
+}
+
+.k-slider-dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* A step's dot, `size.slider_stop`, centred on its point: in the fill's content colour at
+   `opacity.subdued` where the fill has passed it, `on_surface_variant` ahead. */
+.k-slider-dot {
+  position: absolute;
+  width: var(--size-slider_stop);
+  height: var(--size-slider_stop);
+  left: calc(var(--side) / 2 + (100% - var(--side)) * var(--at) - var(--size-slider_stop) / 2);
+  top: calc((var(--side) - var(--size-slider_stop)) / 2);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-on_surface_variant) r g b / var(--dim));
+}
+
+.k-slider-dot[data-passed] {
+  background: rgb(from var(--on-tone) r g b / calc(var(--opacity-subdued) * var(--dim)));
+}
+
+.k-slider-dot[data-hidden] {
+  visibility: hidden;
+}
+
+/* The mark the value rests on, solid in the fill's content colour, popping in over `short`. */
+.k-slider-anchor {
+  position: absolute;
+  width: var(--anchor);
+  height: var(--anchor);
+  left: calc(var(--side) / 2 + (100% - var(--side)) * var(--at, 0) - var(--anchor) / 2);
+  top: calc((var(--side) - var(--anchor)) / 2);
+  border-radius: var(--radius-full);
+  background: var(--on-fill);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.k-slider-anchor[data-shown] {
+  visibility: visible;
+}
+
+/* The icon's button, where the icon steps or toggles: the circle at the fill's start, holding the
+   icon. At rest nothing shows it is a button. Lit, it is a Filled icon button in the fill's tone:
+   its circle lifts toward the bright end as the fill does, by `opacity.press` lit and
+   `opacity.held` pressed, and its tube burns inside the circle's edge. The circle shows only as
+   far as it is lit, so at rest the fill shows through it. */
+.k-slider-icon-button {
+  all: unset;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--side);
+  height: var(--side);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  --lift: calc(var(--lit) * var(--opacity-press) + var(--press) * (var(--opacity-held) - var(--opacity-press)));
+  background: rgb(from color-mix(in srgb, var(--tone), var(--bright) calc(var(--lift) * 100%)) r g b / var(--lit));
+}
+
+/* Under the pointer or pinned, the icon's button is what is lit and pressed, not the slider. */
+.k-slider:has(.k-slider-icon-button:is(:hover, :active, [data-pinned])):not(:focus-visible, [data-pinned], [data-held], [data-dragging]) {
+  --lit: 0;
+  --press: 0;
+}
+
+/* Held by Space, the icon's button is lit and pressed instead of the focused slider. */
+.k-slider:has(> .k-slider-icon-button[data-keyed]) {
+  --lit: 0;
+  --press: 0;
+}
+
+/* How far a choice of the tabs is picked, 0 to 1: its words fade between their two colours. */
+@property --picked {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far the tabs' lit stretch has travelled to the pick: `--lead` its leading edge, `--trail`
+   its trailing one. At rest both are there. Each is the stretch's own, so a player moves it alone. */
+@property --lead {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+@property --trail {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+/* How far the tabs' lit stretch is through its flash as it lands, 0 at its colour, 1 at its peak. */
+@property --flash {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* Tabs (`lib/tabs.ts`): one well, a pill `size.control_sm` tall in the highest container at
+   `opacity.track`, as the slider's track is, `space.s4` round its choices. An unlit rail runs along
+   its bottom edge across the flat part between the round ends, half the well's height in from each
+   side: the tone at the spinner's ring's `opacity.spinner_track`. The picked choice's stretch of it
+   is lit, under its words, square at both ends: the core at night with the content glow round it,
+   as the spinner's arc, the tone by day with none, and solid glass (`primary_glass`) while the
+   signs are off. The rail is `tabs.rail` thick at night and `tabs.rail_day` by day, in whole device
+   pixels. The focus tube is the whole well's edge, drawn under the rail. Disabled, every part is at
+   `opacity.disabled_content`, with no glow. */
+.k-tabs {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  box-sizing: border-box;
+  height: var(--size-control_sm);
+  padding: var(--space-s4);
+  border-radius: var(--radius-full);
+  --dim: 1;
+  --rail-signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  --rail: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
+  background: rgb(from var(--color-surface_container_highest) r g b / calc(var(--opacity-track) * var(--dim)));
+}
+
+.k-tabs:is([data-pinned="signs-off"], [aria-disabled="true"]) {
+  --rail-signs: 0;
+}
+
+.k-tabs[aria-disabled="true"] {
+  --dim: var(--opacity-disabled_content);
+}
+
+.k-tabs:has(> .k-tab:focus-visible) > .k-ring {
+  --lit: 1;
+}
+
+.k-tabs[aria-disabled="true"] > .k-ring {
+  display: none;
+}
+
+.k-tabs-rail,
+.k-tabs-lit {
+  position: absolute;
+  bottom: 0;
+  height: var(--rail);
+  pointer-events: none;
+}
+
+.k-tabs-rail {
+  left: calc(var(--size-control_sm) / 2);
+  right: calc(var(--size-control_sm) / 2);
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-spinner_track) * var(--dim)));
+}
+
+/* The lit stretch between where it was and the pick: travelling right its right edge leads, left
+   its left one. Each edge lands on a whole device pixel. At its flash the core goes toward
+   `primary_flash` and its glow swells to `focus.pressed_glow` times its own, overdriven. */
+.k-tabs-lit {
+  --left-at: var(--trail);
+  --right-at: var(--lead);
+  --left: round(nearest, calc(var(--from-left, 0px) + (var(--to-left, 0px) - var(--from-left, 0px)) * var(--left-at)), 1px);
+  --right: round(nearest, calc(var(--from-right, 0px) + (var(--to-right, 0px) - var(--from-right, 0px)) * var(--right-at)), 1px);
+  left: var(--left);
+  width: max(0px, calc(var(--right) - var(--left)));
+  --colour: color-mix(in srgb, var(--color-primary_glass), var(--color-primary_core) calc(var(--rail-signs) * 100%));
+  --flashed: color-mix(in srgb, var(--colour), var(--color-primary_flash) calc(var(--flash) * 100%));
+  background: rgb(from var(--flashed) r g b / var(--dim));
+  --glow: calc(var(--focus-content_glow) * var(--rail-signs) * (1 + (var(--focus-pressed_glow) - 1) * var(--flash)));
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / var(--glow)));
+}
+
+.k-tabs[data-toward="left"] > .k-tabs-lit {
+  --left-at: var(--lead);
+  --right-at: var(--trail);
+}
+
+/* A choice: as tall as the well less its padding, `space.s12` inside its sides, its words
+   `button_small` with an optional symbol `space.s4` before them. Not picked, the words are
+   `on_surface_variant`, brightening to `on_surface` under the pointer (`--lit`); picked, they are
+   `primary_lit` (the core at night, fitted to the well; the tone by day), at night with the label
+   glow round them while the signs are on. Pressed, a choice's words go to the picked colour over
+   `micro`, before letting go picks it. The pick fades the words over `short`. */
+.k-tab {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: calc(var(--size-control_sm) - 2 * var(--space-s4));
+  padding: 0 var(--space-s12);
+  cursor: pointer;
+  --rest-words: color-mix(in srgb, var(--color-on_surface_variant), var(--color-on_surface) calc(var(--lit) * 100%));
+  --picked-words: color-mix(in srgb, var(--rest-words), var(--color-primary_lit) calc(max(var(--picked), var(--press)) * 100%));
+  --words: rgb(from var(--picked-words) r g b / var(--dim));
+}
+
+/* Filling its room: the choices share the well equally, their words centred, so the last one ends
+   at the well's own end. */
+.k-tabs[data-fill] {
+  display: flex;
+  flex: 1 1 auto;
+}
+
+.k-tabs[data-fill] > .k-tab {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+.k-tab[aria-selected="true"] {
+  --picked: 1;
+}
+
+.k-tab:disabled {
+  cursor: default;
+}
+
+.k-tab.k-control {
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard),
+    --picked var(--motion-short) var(--easing-standard);
+}
+
+.k-tab.k-control[data-pinned],
+[data-sequence] .k-tab.k-control {
+  transition: none;
+}
+
+.k-tab-words {
+  filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--picked) * var(--rail-signs))));
+}
+
+/* A colour picker's choice (`lib/colour-picker.ts`): Auto and the swatches in a row, one stop for
+   Tab. The picked swatch's ring and its gap reach past the swatch; the row's ends pad by that reach
+   on top of `space.s4`, so a ring at either end clears the focus tube by `space.s4`, as it clears
+   the swatch beside it. `--k-colour-surface` is the surface it sits on, which the gap round the
+   ring is painted in: `surface_container_high`, the well a setting with sub-settings sits in,
+   unless the surface round it says otherwise. */
+.k-colour {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s8);
+  justify-self: start;
+  padding: var(--space-s4) calc(var(--space-s4) + 2 * var(--stroke-thin));
+  border-radius: var(--radius-full);
+  outline: none;
+}
+
+.k-colour[aria-disabled="true"] .k-colour-swatch {
+  opacity: var(--opacity-disabled_content);
+  cursor: default;
+}
+
+/* Disabled, the hues are dimmed as a disabled control is, and their chroma lowered by the same
+   share: at the same opacity a wheel of every hue still reads brighter than a one-colour fill
+   beside it, so the share is taken off its colour too, not only its strength. */
+.k-colour[aria-disabled="true"] .k-colour-swatch[data-custom],
+.k-colour-hue[aria-disabled="true"] {
+  --k-colour-hue-shown: calc(var(--k-colour-hue-chroma) * var(--opacity-disabled_content));
+}
+
+/* A swatch: `size.chip` round. The ring of the one picked is cut from what it sits on by a gap of
+   the picker's surface. It lights and presses as a pressable Neutral chip does: the accent's tube
+   inside its edge, running to the core pressed, and by day pressed the accent as a faint tint over
+   it (`--tint`). */
+.k-colour-swatch {
+  all: unset;
+  position: relative;
+  width: var(--size-chip);
+  height: var(--size-chip);
+  border-radius: var(--radius-full);
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: linear-gradient(var(--tint), var(--tint)), var(--k-colour-swatch);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-on_surface) r g b / var(--elevation-rim));
+}
+
+/* Its own transitions: `all: unset` above throws out `.k-control`'s. */
+.k-colour-swatch.k-control {
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+.k-colour-swatch.k-control[data-pinned],
+[data-sequence] .k-colour-swatch.k-control {
+  transition: none;
+}
+
+.k-colour-swatch[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 var(--stroke-thin) var(--k-colour-surface, var(--color-surface_container_high)),
+    0 0 0 calc(2 * var(--stroke-thin)) var(--color-primary);
+}
+
+/* Custom: the hues round the wheel, the colour picked in its middle once it is one. */
+.k-colour-swatch[data-custom] {
+  background:
+    linear-gradient(var(--tint), var(--tint)),
+    conic-gradient(in oklch longer hue, oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 0), oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 359.9));
+}
+
+.k-colour-swatch[data-custom]::after {
+  content: "";
+  position: absolute;
+  inset: calc(var(--size-chip) / 4);
+  border-radius: var(--radius-full);
+  background: linear-gradient(var(--tint), var(--tint)), var(--k-colour-swatch, var(--k-colour-surface, var(--color-surface_container_high)));
+  box-shadow: 0 0 0 var(--stroke-thin) var(--k-colour-surface, var(--color-surface_container_high));
+}
+
+/* The hue track: the hues at one light tone round the wheel, `size.slider_compact` tall, a ring at
+   the hue picked, its value at the far end. The tone and chroma it draws the hues at are the
+   picker's own (`--k-colour-hue-tone`, `--k-colour-hue-chroma`). It lights and is held as a
+   slider is, the hues brightening toward the palette's bright end as a slider's fill does: by
+   `opacity.press` lit, by `opacity.held` held. */
+.k-colour-hue {
+  position: relative;
+  height: var(--size-slider_compact);
+  border-radius: var(--radius-full);
+  --bright: color-mix(in srgb, var(--color-on_surface), var(--color-surface) calc(var(--day) * 100%));
+  --lift: calc(var(--lit) * var(--opacity-press) + var(--press) * (var(--opacity-held) - var(--opacity-press)));
+  --lifted: rgb(from var(--bright) r g b / var(--lift));
+  background:
+    linear-gradient(var(--lifted), var(--lifted)),
+    linear-gradient(90deg in oklch longer hue, oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 0), oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 359.9));
+  cursor: pointer;
+  outline: none;
+  touch-action: none;
+}
+
+.k-colour-hue[data-held]:not([aria-disabled="true"]) {
+  --lit: 1;
+  --press: 1;
+}
+
+.k-colour-hue[aria-disabled="true"] {
+  opacity: var(--opacity-disabled_content);
+  cursor: default;
+}
+
+.k-colour-hue-knob {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--size-slider_compact) / 2 + (100% - var(--size-slider_compact)) * var(--k-colour-hue-at, 0));
+  width: calc(var(--size-slider_stop) + 2 * var(--stroke-thin));
+  height: calc(var(--size-slider_stop) + 2 * var(--stroke-thin));
+  translate: -50% -50%;
+  border-radius: var(--radius-full);
+  background: var(--color-on_surface);
+  box-shadow: 0 0 0 var(--stroke-thin) var(--color-surface);
+}
+
+/* The hues are light in both modes, so their value is the dark end of the palette in both: by night
+   `surface`, by day `on_surface`, following the nearest mode's `--day`. */
+.k-colour-hue-value {
+  color: color-mix(in srgb, var(--color-surface), var(--color-on_surface) calc(var(--day) * 100%));
+  position: absolute;
+  right: var(--space-s12);
+  top: round(nearest, calc((var(--size-slider_compact) - var(--t-line)) / 2), 1px);
+}
+
+/* A menu (`lib/menu.ts`): its items one under the other across its popover. Past `--most` small
+   controls it scrolls, with no bar of its own, as the libraries' do. */
+.k-menu {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  max-height: calc(var(--size-control_sm) * var(--most, 1000));
+  overflow-y: auto;
+  scrollbar-width: none;
+  outline: none;
+}
+
+/* A menu's item, a select's option too: `size.control_sm` tall, `space.s8` inside, at the row
+   radius, concentric inside its surface's (`radius.control` − `space.s4`). Lit (the keyboard on
+   it, which the pointer moves), it fades onto `secondary_container` with its words, symbol and
+   check `on_secondary_container`, and its keycaps' keys and edges `primary`, over `short`;
+   pressed, the container lifts to
+   `secondary_container_pressed` over `micro`. At rest its content is `on_surface`, or `error` on a
+   danger item, whose keycaps keep their own colours; disabled, `on_surface` at
+   `opacity.disabled_content`. */
+.k-menu-item {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--size-control_sm);
+  padding: 0 var(--space-s8);
+  border-radius: var(--radius-row);
+  cursor: pointer;
+  --lit: 0;
+  --press: 0;
+  --rest-ink: var(--color-on_surface);
+  --ink: color-mix(in srgb, var(--rest-ink), var(--color-on_secondary_container) calc(var(--lit) * 100%));
+  --container: color-mix(in srgb, var(--color-secondary_container), var(--color-secondary_container_pressed) calc(var(--press) * 100%));
+  background: color-mix(in srgb, transparent, var(--container) calc(var(--lit) * 100%));
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+/* A danger item lights in the error itself, not the accent's container, so under the pointer and
+   the keyboard it reads as what it is: a step that destroys something. */
+.k-menu-item[data-danger] {
+  --rest-ink: var(--color-error);
+  --ink: color-mix(in srgb, var(--rest-ink), var(--color-on_error) calc(var(--lit) * 100%));
+  --container: color-mix(in srgb, var(--color-error), var(--color-error_pressed) calc(var(--press) * 100%));
+}
+
+.k-menu-item:is([data-current], [data-pinned]) {
+  --lit: 1;
+}
+
+.k-menu-item:is(:active, [data-pinned="pressed"]):not([aria-disabled="true"]) {
+  --press: 1;
+}
+
+.k-menu-item[data-pinned],
+[data-sequence] .k-menu-item {
+  transition: none;
+}
+
+.k-menu-item[aria-disabled="true"] {
+  cursor: default;
+  --lit: 0;
+  --ink: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+/* A disabled item's keys dim with its words, so the shortcut doesn't read as working. */
+.k-menu-item[aria-disabled="true"] .k-keycap {
+  opacity: var(--opacity-disabled_content);
+}
+
+/* The item's parts across all of it, its words taking what the rest leave, so its keys sit at its end. */
+.k-menu-item > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-menu-words {
+  display: block;
+}
+
+.k-menu-keys {
+  margin-inline-start: auto;
+}
+
+.k-menu-item:not([data-danger]) .k-keycap {
+  --key-ink: color-mix(in srgb, var(--color-on_surface_variant), var(--color-primary) calc(var(--lit) * 100%));
+  --key-edge: color-mix(in srgb, var(--color-outline_variant), var(--color-primary) calc(var(--lit) * 100%));
+}
+
+/* The check's room, the symbol's, kept when unchecked so the items' ends line up. */
+.k-menu-check {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--icon-s16);
+  height: var(--icon-s16);
+}
+
+.k-menu-check > .k-icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* How far a held item's sweep has gone across it, 0 to 1. */
+@property --hold {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A held item (`holdable` in `lib/menu.ts`): lit, `error` at `opacity.tint` under its `error` words,
+   so the sweep has room to show. The sweep is `error` from its start to `--hold` of its width, over
+   the item's content, its own copy of it `on_error`, so the words read on either side of its edge;
+   the item's corners round its start, and its edge is straight. */
+.k-menu-item[data-held]:not([aria-disabled="true"]) {
+  --ink: var(--color-error);
+  background: color-mix(in srgb, transparent, rgb(from var(--color-error) r g b / var(--opacity-tint)) calc(var(--lit) * 100%));
+}
+
+.k-menu-hold {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 0 var(--space-s8);
+  border-radius: inherit;
+  background: var(--color-error);
+  clip-path: inset(0 calc((1 - var(--hold)) * 100%) 0 0);
+  pointer-events: none;
+}
+
+.k-menu-hold > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* The hairline between two groups, `space.s4` clear of each, inset as the items' words are, so it
+   starts and ends `space.s12` from the popover's edge, as a select's rule does. */
+.k-menu-separator {
+  align-self: stretch;
+  padding: var(--space-s4) var(--space-s8);
+}
+
+
+/* How far a select is open, 0 to 1: its surface grows, rises and lifts its fill, its hairline goes
+   and its chevron turns, all together. */
+@property --select-open {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A select's room (`lib/select.ts`): a shut select's height in the flow, whatever the select does.
+   Its list's visible part, `--drop`, is `--rows` small controls and the list's padding. It opens
+   over `medium` on `emphasized_decel` and folds over `short` on `emphasized_accel`; a pick folds it
+   a `micro` later, once the option has shown pressed. With reduced motion it opens and folds at
+   once. A sample of the open state takes the open surface's height in the flow. */
+.k-select-room {
+  position: relative;
+  display: block;
+  flex: none;
+  align-self: stretch;
+  height: var(--size-control_md);
+  --drop: calc(var(--rows) * var(--size-control_sm) + 2 * var(--space-s4));
+  transition: --select-open var(--motion-short) var(--easing-emphasized_accel);
+}
+
+.k-select-room[data-open] {
+  --select-open: 1;
+  transition: --select-open var(--motion-medium) var(--easing-emphasized_decel);
+}
+
+.k-select-room[data-taken] {
+  transition: --select-open var(--motion-short) var(--easing-emphasized_accel) var(--motion-micro);
+}
+
+.k-select-room[data-shown] {
+  height: calc(var(--size-control_md) + var(--drop));
+}
+
+.k-select-room[data-shown],
+[data-reduced] .k-select-room {
+  transition: none;
+}
+
+/* The select: shut, a field's look, `size.control_md` tall at the control radius,
+   `surface_container_high` with a field's sunken edge, `outline` at full. Lit, as a field
+   is, its fill rises to the highest container and its tube burns inside its edge; pressed, the
+   glow brightens. Open, the same box grows by its list into a surface raised to step 2: the step's
+   shadow and rim, `surface_container_high` by day and the highest container at night; its hairline
+   goes and so does its tube. It grows down from where it is, or up where `data-up` says. */
+.k-select {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: block;
+  box-sizing: border-box;
+  height: calc(var(--size-control_md) + var(--drop) * var(--select-open));
+  border-radius: var(--radius-control);
+  outline: none;
+  cursor: pointer;
+  --raised: var(--select-open);
+  --rest-fill: var(--color-surface_container_high);
+  --shut-fill: color-mix(in srgb, var(--rest-fill), var(--color-surface_container_highest) calc(var(--lit) * 100%));
+  --fill: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_high) calc(var(--select-open) * 100%));
+  --fill-night: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_highest) calc(var(--select-open) * 100%));
+  --sunken-tone: var(--color-outline);
+  --sunken-strength: 1;
+  --edge-line: var(--sunken-line);
+  --value: var(--color-on_surface);
+  --mark: var(--color-on_surface_variant);
+}
+
+.k-select-room[data-up] > .k-select {
+  top: auto;
+  bottom: 0;
+}
+
+.k-select-room:is([data-open], [data-folding]) > .k-select {
+  z-index: 10;
+}
+
+/* Open or folding, nothing lights it: the keyboard is in its list. */
+.k-select-room:is([data-open], [data-folding]) > .k-select.k-control {
+  --lit: 0;
+  --press: 0;
+}
+
+.k-select::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid var(--edge-line);
+  border-radius: inherit;
+  opacity: calc(1 - var(--select-open));
+  pointer-events: none;
+}
+
+.k-select[data-placeholder] {
+  --value: var(--color-on_surface_variant);
+}
+
+.k-select[aria-disabled="true"] {
+  cursor: default;
+  --rest-fill: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --edge-line: var(--rest-fill);
+  --value: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --mark: var(--value);
+}
+
+/* The value row, a shut select's box at the surface's top (its bottom, growing up): `space.s12`
+   inside, its ring the box's own, so the glow is never cut by the list's clip. */
+.k-select-head {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--size-control_md);
+  padding: 0 var(--space-s12);
+  border-radius: var(--radius-control);
+}
+
+.k-select-room[data-up] .k-select-head {
+  top: auto;
+  bottom: 0;
+}
+
+.k-select-head > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-select-value {
+  display: block;
+}
+
+/* The chevron turns up with the surface. */
+.k-select-chevron {
+  transform: rotate(calc(var(--select-open) * 180deg));
+}
+
+/* What the surface clips as it grows: the list, held at its visible height beside the value row,
+   so the clip cuts it at the surface's edge and scrolling it never moves the row. A clip, not a
+   hidden overflow: nothing can scroll the pane, so a shut list never shows past the row. */
+.k-select-pane {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  border-radius: inherit;
+}
+
+.k-select-room[data-folding] .k-select-pane {
+  pointer-events: none;
+}
+
+/* The options: menu items `space.s4` inside, eight in view, then it scrolls with no bar of its own,
+   as a menu does. Their words line up with the value row's start, `space.s12` in. */
+.k-select-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--size-control_md);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: var(--drop);
+  padding: var(--space-s4);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.k-select-room[data-up] .k-select-list {
+  top: auto;
+  bottom: var(--size-control_md);
+}
+
+.k-select-list > .k-menu-item[data-taken] {
+  --press: 1;
+}
+
+/* The picked option's words are `primary_lit`, as a picked tab's, with the label glow round them at
+   night while the signs are on; highlighted, they take the highlight's colours. */
+.k-select-list > .k-menu-item[data-picked] {
+  --rest-ink: var(--color-primary_lit);
+}
+
+.k-select-list > .k-menu-item[data-picked] .k-menu-words {
+  filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--signs) * (1 - var(--lit)))));
+}
+
+/* The rule between the value row and the list, `space.s12` in from the sides: a divider's soft
+   outline, at the list's edge, so the options scroll away under it. */
+.k-select-rule {
+  position: absolute;
+  left: var(--space-s12);
+  right: var(--space-s12);
+  top: var(--size-control_md);
+  height: var(--stroke-hairline_device_px);
+  background: rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
+}
+
+.k-select-room[data-up] .k-select-rule {
+  top: auto;
+  bottom: var(--size-control_md);
+}
+
+/* How far a collapsible is open, 0 to 1. */
+@property --collapsible-open {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A collapsible (`lib/collapsible.ts`): its header, then the room for what it holds, which eases
+   from nothing to the content's height (`--content-height`) as `--collapsible-open` goes to 1:
+   over `medium` on `standard_decel` opening, and over `short` on `standard_accel` closing, the
+   chevron turning and the rail growing with it. A shut one sets its own 0, so one inside an open
+   one doesn't inherit its parent's. Moving, the room cuts what it holds; fully open it doesn't, so
+   a lit control inside keeps its glow. With reduce motion it opens and closes at once, the chevron
+   jumps, and what it holds fades in over `short`. */
+.k-collapsible {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-self: stretch;
+  --content-height: 0px;
+  --collapsible-open: 0;
+  transition: --collapsible-open var(--motion-short) var(--easing-standard_accel);
+}
+
+.k-collapsible[data-open] {
+  --collapsible-open: 1;
+  transition: --collapsible-open var(--motion-medium) var(--easing-standard_decel);
+}
+
+[data-reduced] .k-collapsible,
+[data-sequence] .k-collapsible {
+  transition: none;
+}
+
+/* The header: `size.row` tall at the control radius, `space.s12` inside, no fill. Its title is
+   `on_surface`, its chevron and summary `on_surface_variant`; lit it draws the tube, pressed by
+   day the tone tints it as under a Text button. Disabled, all three are at
+   `opacity.disabled_content`. */
+.k-collapsible-header {
+  appearance: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--size-row);
+  margin: 0;
+  padding: 0 var(--space-s12);
+  border: 0;
+  border-radius: var(--radius-control);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+  --title: var(--color-on_surface);
+  --mark: var(--color-on_surface_variant);
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+.k-collapsible-header > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-collapsible-header:disabled {
+  cursor: default;
+  --title: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --mark: var(--title);
+}
+
+/* Shut it points right, a quarter turn back from open, where it points down. */
+.k-collapsible-chevron {
+  transform: rotate(calc((var(--collapsible-open) - 1) * 90deg));
+}
+
+/* The summary takes its words' width, up to half the line; past that, and where the title needs
+   the room, it ends in an ellipsis. */
+.k-collapsible-summary {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
+}
+
+.k-collapsible-body {
+  display: block;
+  height: calc(var(--content-height) * var(--collapsible-open));
+  overflow: clip;
+}
+
+.k-collapsible[data-settled] > .k-collapsible-body {
+  overflow: visible;
+}
+
+/* What it holds: `space.s8` under the header, `space.s12` in at the end, and at the start in line
+   with the title, past the chevron and its gap. */
+.k-collapsible-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-s8) var(--space-s12) 0 calc(2 * var(--space-s12) + var(--type-body_strong-icon));
+}
+
+@keyframes k-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+[data-reduced] .k-collapsible[data-open] > .k-collapsible-body > .k-collapsible-content {
+  animation: k-fade-in var(--motion-short) var(--easing-standard);
+}
+
+/* The rail: a strip `size.collapsible_rail` wide down what it holds, from its top to its foot
+   inside its padding, centred under the chevron, that takes the pointer; the line drawn down its
+   middle, `tabs.rail` thick at night and `tabs.rail_day` by day in whole device pixels, as the
+   tabs' rail is. At rest the line is the tone at the spinner's ring's `opacity.spinner_track`; lit
+   under the pointer it fades over `short` to the core with the content glow round it at night, the
+   tone by day, and solid glass (`primary_glass`) with the signs off. Pressed, at night the core
+   goes toward `primary_flash` and the glow swells to `focus.pressed_glow` times its own; by day the
+   tone tints the strip at `opacity.press_tint`. Disabled, the line is at
+   `opacity.disabled_content` and the strip takes no pointer. */
+.k-collapsible-rail {
+  position: absolute;
+  top: var(--space-s8);
+  bottom: 0;
+  left: round(nearest, calc(var(--space-s12) + (var(--type-body_strong-icon) - var(--size-collapsible_rail)) / 2), 1px);
+  width: var(--size-collapsible_rail);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  --dim: 1;
+  --rail: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+.k-collapsible-rail[aria-disabled="true"] {
+  pointer-events: none;
+  --dim: var(--opacity-disabled_content);
+}
+
+.k-collapsible-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: round(nearest, calc((var(--size-collapsible_rail) - var(--rail)) / 2), 1px);
+  width: var(--rail);
+  --unlit: rgb(from var(--color-primary) r g b / var(--opacity-spinner_track));
+  --colour: color-mix(in srgb, var(--color-primary_glass), var(--color-primary_core) calc(var(--signs) * 100%));
+  --flashed: color-mix(in srgb, var(--colour), var(--color-primary_flash) calc(var(--press) * var(--signs) * 100%));
+  background: color-mix(in srgb, var(--unlit), var(--flashed) calc(var(--lit) * 100%));
+  opacity: var(--dim);
+  --glow: calc(var(--focus-content_glow) * var(--on) * (1 + (var(--focus-pressed_glow) - 1) * var(--press)));
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / var(--glow)));
+}
+
+/* Its hint, "Close" and the title, beside the rail at the pointer's height (`--at`, the middle
+   when pinned), `space.s8` past the strip's end as a hint is under its control, kept within the
+   rail's length on whole device pixels. */
+.k-collapsible-rail > .k-hint {
+  --tall: calc(var(--type-label-line) + 2 * var(--space-s4));
+  top: clamp(0px, round(nearest, calc(var(--at, 50%) - var(--tall) / 2), 1px), calc(100% - var(--tall)));
+  left: calc(100% + var(--space-s8));
+}
+
+/* A tile (`lib/tile.ts`): `size.row_two_line` tall at the control radius, `space.s12` inside,
+   filling its room. Off, `surface_container_high`, rising to the highest container lit, as a
+   select's fill does; its title `on_surface`, its symbol and status line `on_surface_variant`; by
+   day the tone tints it pressed. On, filled with the accent: at night the unlit fill
+   (`primary_fill`), every part of its content `on_primary_fill`, brightening to
+   `on_primary_fill_lit` with the signs on, as a Filled button's label does; pressed, the fill
+   lifts. It fades between the two over `short` on `--checked`; its line is the tube off and the
+   core on (`--edge`). */
+.k-tile {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--size-row_two_line);
+  padding: 0 var(--space-s12);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  outline: none;
+  --off-fill: color-mix(in srgb, var(--color-surface_container_high), var(--color-surface_container_highest) calc(var(--lit) * 100%));
+  --on-fill: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--press) * 100%));
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press) * (1 - var(--checked))));
+  background:
+    linear-gradient(var(--tint), var(--tint)),
+    color-mix(in srgb, var(--off-fill), var(--on-fill) calc(var(--checked) * 100%));
+  --on-ink: color-mix(in srgb, var(--color-on_primary_fill), var(--color-on_primary_fill_lit) calc(var(--on) * 100%));
+  --title: color-mix(in srgb, var(--color-on_surface), var(--on-ink) calc(var(--checked) * 100%));
+  --muted: color-mix(in srgb, var(--color-on_surface_variant), var(--on-ink) calc(var(--checked) * 100%));
+  --glyph: var(--muted);
+  --edge: color-mix(in srgb, var(--color-primary), var(--color-primary_fill_line) calc(var(--checked) * 100%));
+  --edge-off: color-mix(in srgb, var(--color-primary_glass), var(--color-primary_fill_glass) calc(var(--checked) * 100%));
+}
+
+.k-tile > .k-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* The words end before the detail arrow and its inset. */
+.k-tile[data-detail] {
+  padding-right: calc(2 * var(--space-s12) + var(--size-control_sm));
+}
+
+.k-tile[aria-disabled="true"] {
+  cursor: default;
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --title: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --muted: var(--title);
+}
+
+/* While the pointer is on the detail arrow, the tile gives way to it: only the arrow is lit. */
+.k-tile.k-control:has(.k-tile-detail:is(:hover, :active, [data-pinned])):not(:focus-visible, [data-pinned]) {
+  --lit: 0;
+  --press: 0;
+}
+
+/* The detail arrow: a circle `size.control_sm` across, `space.s12` from the tile's end and centred
+   down it on a whole device pixel, no fill; pressed by day the tone tints it. */
+.k-tile-detail {
+  position: absolute;
+  right: var(--space-s12);
+  top: round(nearest, calc((var(--size-row_two_line) - var(--size-control_sm)) / 2), 1px);
+  display: block;
+  width: var(--size-control_sm);
+  height: var(--size-control_sm);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+.k-tile[aria-disabled="true"] > .k-tile-detail {
+  pointer-events: none;
+  --lit: 0;
+  --press: 0;
+}
+
+/* How far under its place a toast still is as it arrives, 1 to 0, in `space.s32`s. */
+@property --toast-rise {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A toast (`lib/toast.ts`): the inverse colours, `on_surface` behind `surface`, in both modes,
+   raised to the ladder's step 2 with its rim in `surface`; `space.s12` inside at the control
+   radius, as wide as what it says up to its room, then its words wrap. It rises into place a whole
+   device pixel at a time, and its shadow fades with it. */
+.k-toast {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: var(--space-s12);
+  border-radius: var(--radius-control);
+  --fill: var(--color-on_surface);
+  --fill-night: var(--color-on_surface);
+  --rim-tone: var(--color-surface);
+  translate: 0 round(nearest, calc(var(--toast-rise) * var(--space-s32)), 1px);
+}
+
+.k-toast > .k-row,
+.k-toast-said {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.k-toast-words {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Where a surface's toasts show: along its bottom, `space.s24` above the edge and `space.s24` in
+   from its sides, each centred across it by `lib/toast.ts`. A toast arrives over `short` on
+   `emphasized_decel`, rising as it fades in, and leaves over `medium` on `standard_accel`, or over
+   `micro` when a new one takes its place. With reduce motion it doesn't rise. */
+.k-toast-room {
+  position: absolute;
+  left: var(--space-s24);
+  right: var(--space-s24);
+  bottom: var(--space-s24);
+  pointer-events: none;
+}
+
+.k-toast-room > .k-toast {
+  position: absolute;
+  bottom: 0;
+  pointer-events: auto;
+  transition:
+    opacity var(--motion-short) var(--easing-emphasized_decel),
+    --toast-rise var(--motion-short) var(--easing-emphasized_decel);
+
+  @starting-style {
+    opacity: 0;
+    --toast-rise: 1;
+  }
+}
+
+[data-reduced] .k-toast-room > .k-toast {
+  @starting-style {
+    --toast-rise: 0;
+  }
+}
+
+.k-toast-room > .k-toast[data-leaving] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-medium) var(--easing-standard_accel);
+}
+
+.k-toast-room > .k-toast[data-leaving="micro"] {
+  transition-duration: var(--motion-micro);
+}
+
+/* A surface a toast shows over, for a sample: a window's or a panel's own room. */
+.k-toast-surface {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: var(--room);
+  height: var(--tall);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_low);
+  overflow: hidden;
+}
+
+.k-toast-surface > .k-toast-still {
+  position: absolute;
+  bottom: var(--space-s24);
+}
+
+/* What a sample surface holds besides its toasts, `space.s24` in from its edges. */
+.k-toast-inside {
+  position: absolute;
+  left: var(--space-s24);
+  top: var(--space-s24);
+}
+
+.k-toast-surface > .k-toast-still {
+  max-width: calc(100% - 2 * var(--space-s24));
+}
+
+/* How far under its place a dialog still is as it arrives, 1 to 0, in `space.s16`s. */
+@property --dialog-rise {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A dialog (`lib/dialog.ts`): `size.dialog` wide, `space.s24` inside, at the content radius, raised
+   to the ladder's step 3: `surface_container_high` by day, the highest container at night, the
+   step's shadow and the rim. A Danger dialog's edge is `error` at `opacity.danger_edge`, over the
+   rim. It is at least `aspect.dialog` of its width tall, on the grid, and at most its room less
+   `space.s48` above and below. It arrives rising `space.s16` into place a whole device pixel at a
+   time (`--dialog-rise`). */
+.k-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--size-dialog);
+  min-height: round(nearest, calc(var(--size-dialog) / (var(--aspect-dialog))), var(--grid));
+  max-height: calc(100% - 2 * var(--space-s48));
+  padding: var(--space-s24);
+  border-radius: var(--radius-content);
+  --fill: var(--color-surface_container_high);
+  --fill-night: var(--color-surface_container_highest);
+  translate: 0 round(nearest, calc(var(--dialog-rise) * var(--space-s16)), 1px);
+}
+
+.k-dialog[data-danger]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid rgb(from var(--color-error) r g b / var(--opacity-danger_edge));
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* The title, the middle and the buttons, filling the dialog's height and shrinking with it, the
+   middle alone below its own height. */
+.k-dialog > .k-dialog-column {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.k-dialog-column > * {
+  align-self: stretch;
+}
+
+/* The middle, `space.s12` under the title, its scroller clipped at its edges with a rule on each. */
+.k-dialog-middle {
+  --foot: var(--space-s24);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: var(--space-s12);
+}
+
+.k-dialog-column > .k-dialog-middle {
+  flex: 0 1 auto;
+}
+
+/* The body and what follows it, on the dialog's content edge under the symbol and the title,
+   scrolling with no bar of its own. It reaches out to the dialog's edges and holds the whole `space.s24` above the buttons under its
+   end (`--foot`), so a lit field's glow inside it is never cut and never reads as more to scroll.
+   While more is below, it shows only down to its rule, `--foot` above its end. Tab scrolls what
+   it lands on `space.s12` clear of the edges it shows. */
+.k-dialog-middle > .k-dialog-scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+  margin-inline: calc(-1 * var(--space-s24));
+  padding: 0 var(--space-s24) var(--foot);
+  overflow-y: auto;
+  scrollbar-width: none;
+  scroll-padding-block: var(--space-s12) calc(var(--foot) + var(--space-s12));
+  outline: none;
+}
+
+.k-dialog-column[data-bare] > .k-dialog-middle {
+  --foot: 0px;
+}
+
+.k-dialog-middle[data-below] > .k-dialog-scroll {
+  clip-path: inset(0 0 var(--foot));
+}
+
+.k-dialog-scroll > * {
+  align-self: stretch;
+}
+
+.k-dialog-scroll > .k-dialog-follows {
+  margin-top: var(--space-s16);
+}
+
+/* The room the dialog's least height leaves over, above the buttons and under the middle's own
+   `space.s24`. */
+.k-dialog-column > .k-dialog-spare {
+  flex: 1 0 0;
+}
+
+/* A divider at the middle's top or bottom edge, across the dialog's padding, the middle scrolling
+   under it: there while more is that way, fading over `short` on `standard` as that end comes. */
+.k-dialog-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.k-dialog-rule[data-at="above"] {
+  top: 0;
+}
+
+/* No higher than the middle's top, where too short a room has squeezed it. */
+.k-dialog-rule[data-at="below"] {
+  bottom: min(var(--foot), 100%);
+}
+
+.k-dialog-middle[data-above] > .k-dialog-rule[data-at="above"],
+.k-dialog-middle[data-below] > .k-dialog-rule[data-at="below"] {
+  opacity: 1;
+}
+
+/* The button bar: as wide as the room its surface gives it, with no padding of its own. */
+.k-button-bar {
+  display: block;
+  flex: none;
+  align-self: stretch;
+}
+
+/* A row of buttons that ends a surface (`hangs` in `lib/button-bar.ts`): a Text button at its start
+   or end hangs its own padding outside it, so its label, or its leading symbol, is on the content's
+   edge, and its tube and press fill reach into the surface's padding. A surface whose padding has
+   no room for it sets `--hang` to 0, and the button's box stays on the edge. */
+[data-hangs] > .k-button[data-kind="Text"]:not([data-icon-only]):first-child {
+  margin-inline-start: calc(-1 * var(--hang, 1) * var(--padding));
+}
+
+[data-hangs] > .k-button[data-kind="Text"]:not([data-icon-only]):last-child {
+  margin-inline-end: calc(-1 * var(--hang, 1) * var(--padding));
+}
+
+/* A card's `space.s16` would leave a hung button 4 from its edge, and a banner's padding is its
+   rail's lane, which the button would meet. */
+:is(.k-card, .k-status) {
+  --hang: 0;
+}
+
+/* Stacked, the one Enter presses on top and the dismiss button at the bottom, each full width:
+   nothing hangs. */
+.k-button-bar[data-stacked] > .k-row {
+  flex-direction: column-reverse;
+  align-items: stretch;
+}
+
+.k-button-bar[data-stacked] > .k-row > .k-button {
+  margin-inline: 0;
+}
+
+.k-button-bar[data-stacked] > .k-row > .k-fill {
+  display: none;
+}
+
+.k-button-bar[data-stacked] .k-button {
+  justify-content: center;
+}
+
+/* The scrim: `scrim` at `opacity.scrim` over everything behind a dialog, filling its room. */
+.k-scrim {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: inherit;
+  background: rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
+}
+
+/* A window's room a dialog opens in: `surface_container_low` with what it holds, the scrim over
+   all of it and the dialog in its middle. Drawn still, the dialog sits `space.s32` in from its
+   edges. Live, the scrim fades in over `long` on `emphasized_decel` as the dialog fades in and
+   rises; both fade out over `medium` on `emphasized_accel` as it closes. With reduce motion they
+   fade, capped at `short`, with no rise. */
+.k-dialog-room {
+  position: relative;
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  padding: var(--space-s32);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_low);
+  overflow: hidden;
+}
+
+/* Drawn still, the room is as tall as its dialog, so it has no height to cap the dialog by. */
+.k-dialog-room:not([data-tall], [data-live]) > .k-dialog {
+  max-height: none;
+}
+
+/* A room as short as `--tall`, the dialog in its middle and capped by it. */
+.k-dialog-room[data-tall] {
+  display: flex;
+  align-items: center;
+  height: var(--tall);
+  padding-block: 0;
+}
+
+.k-dialog-room[data-live] {
+  width: var(--room);
+  height: var(--tall);
+  padding: 0;
+}
+
+.k-dialog-room[data-live] > .k-dialog {
+  position: absolute;
+}
+
+.k-dialog-room[data-live] > :is(.k-scrim, .k-dialog) {
+  transition:
+    opacity var(--motion-long) var(--easing-emphasized_decel),
+    --dialog-rise var(--motion-long) var(--easing-emphasized_decel);
+
+  @starting-style {
+    opacity: 0;
+    --dialog-rise: 1;
+  }
+}
+
+[data-reduced] .k-dialog-room[data-live] > .k-dialog {
+  @starting-style {
+    --dialog-rise: 0;
+  }
+}
+
+/* A dialog the room is drawn with is already there: it only moves on leaving. */
+.k-dialog-room[data-live] > [data-at-rest] {
+  @starting-style {
+    opacity: 1;
+    --dialog-rise: 0;
+  }
+}
+
+.k-dialog-room[data-live] > [data-leaving] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+/* What the window holds behind the scrim, `space.s24` in from its edges. */
+.k-dialog-behind {
+  position: absolute;
+  left: var(--space-s24);
+  top: var(--space-s24);
+}
+
+/* How far a calendar's new month still is from its place, 1 to 0, in `space.s64`s toward the side
+   it came from (`--from`, 1 the next month, -1 the last). */
+@property --cal-slide {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far a calendar shows its year rather than its month, 0 to 1. */
+@property --year {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* A calendar (`lib/calendar.ts`): a week number's column `size.control_sm` wide and seven days
+   `size.control_md` each, the header `space.s8` over the month. The month and the year cross-fade
+   over `short` on `emphasized_decel`. */
+.k-calendar {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-s8);
+  width: calc(var(--size-control_sm) + 7 * var(--size-control_md));
+  transition: --year var(--motion-short) var(--easing-emphasized_decel);
+}
+
+.k-calendar[data-year] {
+  --year: 1;
+}
+
+[data-sequence] .k-calendar {
+  transition: none;
+}
+
+/* The arrows at either end and the title in the middle, a small control tall. */
+.k-cal-head {
+  position: relative;
+  display: block;
+  height: var(--size-control_sm);
+}
+
+.k-cal-head > .k-row {
+  width: 100%;
+}
+
+/* Words centred in their box on whole device pixels, the odd one after them. */
+.k-cal-centred {
+  position: absolute;
+  left: round(down, calc((100% - round(up, calc(var(--natural) * var(--px) - 0.001px), 1px)) / 2), 1px);
+  top: round(nearest, calc((100% - var(--t-line)) / 2), 1px);
+}
+
+/* The title: a small control tall at the control radius, as the year's months are, `space.s12`
+   inside, its words `subheading` in
+   `on_surface`; open on the year, Tonal: `secondary_container` with `on_secondary_container`. Lit,
+   its tube; pressed by day, the tone's tint. */
+.k-cal-title {
+  appearance: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--size-control_sm);
+  margin: 0;
+  padding: 0 var(--space-s12);
+  border: 0;
+  border-radius: var(--radius-control);
+  font: inherit;
+  cursor: pointer;
+  outline: none;
+  --words: var(--color-on_surface);
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: linear-gradient(var(--tint), var(--tint)), transparent;
+}
+
+.k-cal-head .k-cal-title {
+  position: absolute;
+  top: 0;
+}
+
+.k-cal-title[data-open] {
+  --words: var(--color-on_secondary_container);
+  background: linear-gradient(var(--tint), var(--tint)), var(--color-secondary_container);
+}
+
+.k-cal-body {
+  position: relative;
+  display: block;
+  height: calc(var(--space-s24) + 6 * var(--size-control_md));
+}
+
+/* A new month slides in under the names, cut at the month's edge while it moves. */
+.k-cal-body[data-sliding] {
+  overflow: clip;
+}
+
+.k-cal-grid {
+  display: block;
+  outline: none;
+  opacity: calc(1 - var(--year));
+}
+
+.k-cal-names,
+.k-cal-week {
+  display: flex;
+}
+
+.k-cal-name {
+  position: relative;
+  flex: none;
+  width: var(--size-control_md);
+  height: var(--space-s24);
+}
+
+.k-cal-name:first-child,
+.k-cal-week-number {
+  position: relative;
+  flex: none;
+  width: var(--size-control_sm);
+}
+
+.k-cal-week-number {
+  height: var(--size-control_md);
+}
+
+.k-cal-weeks {
+  display: block;
+  translate: round(nearest, calc(var(--cal-slide) * var(--from, 1) * var(--space-s64)), 1px) 0;
+}
+
+/* A day: a regular control holding a small control's disc, a pill, `space.s4` in. Its number is
+   `body` in `on_surface`, a weekend's `on_surface_variant`, a holiday's `tertiary`; the months
+   around dim theirs to `opacity.disabled_content`. Today's disc is `primary`, its number
+   `body_strong` in `on_primary`. The picked day's disc is ringed in `primary`, the thin stroke
+   wide, fading in on `--picked`. A holiday's `tertiary` dot sits `space.s4` above the disc's foot. */
+.k-cal-day {
+  position: relative;
+  flex: none;
+  display: block;
+  width: var(--size-control_md);
+  height: var(--size-control_md);
+  cursor: pointer;
+  --dim: 1;
+  --num-rest: var(--color-on_surface);
+  --num: rgb(from var(--num-rest) r g b / calc(alpha * var(--dim)));
+  --dot: var(--color-tertiary);
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard),
+    --picked var(--motion-short) var(--easing-standard);
+}
+
+.k-cal-day[data-pinned],
+[data-sequence] .k-cal-day {
+  transition: none;
+}
+
+.k-cal-day[data-weekend] {
+  --num-rest: var(--color-on_surface_variant);
+}
+
+.k-cal-day[data-holiday] {
+  --num-rest: var(--color-tertiary);
+}
+
+.k-cal-day[data-picked] {
+  --picked: 1;
+}
+
+.k-cal-day[data-other] {
+  --dim: var(--opacity-disabled_content);
+}
+
+.k-cal-day[data-today] {
+  --num-rest: var(--color-on_primary);
+  --dot: var(--color-on_primary);
+}
+
+/* The keyboard's day, while the month has the keyboard: lit, with its holiday's hint. */
+.k-cal-grid:focus-visible .k-cal-day[data-current] {
+  --lit: 1;
+}
+
+.k-cal-grid:focus-visible .k-cal-day[data-current] > .k-hint {
+  opacity: 1;
+}
+
+.k-cal-disc {
+  position: absolute;
+  left: var(--space-s4);
+  top: var(--space-s4);
+  width: var(--size-control_sm);
+  height: var(--size-control_sm);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+.k-cal-day[data-today] > .k-cal-disc {
+  background: var(--color-primary);
+}
+
+.k-cal-disc::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: max(1px, round(nearest, var(--stroke-thin), 1px)) solid var(--color-primary);
+  border-radius: inherit;
+  opacity: var(--picked);
+}
+
+.k-cal-dot {
+  position: absolute;
+  left: round(down, calc((100% - var(--space-s4)) / 2), 1px);
+  top: calc(100% - 2 * var(--space-s4));
+  width: var(--space-s4);
+  height: var(--space-s4);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--dot) r g b / calc(alpha * var(--dim)));
+}
+
+/* The year: twelve months three to a row, `space.s8` apart, in the middle of the month's room,
+   its columns differing by a device pixel at most. */
+.k-cal-year {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  --across: calc(100% - 2 * var(--space-s8));
+  --first: round(down, calc(var(--across) / 3), 1px);
+  grid-template-columns: var(--first) round(down, calc((var(--across) - var(--first)) / 2), 1px) 1fr;
+  grid-auto-rows: var(--size-control_md);
+  gap: var(--space-s8);
+  align-content: center;
+  outline: none;
+  opacity: var(--year);
+}
+
+/* A month of the year: `size.control_md` tall at the control radius, `surface_container_high`
+   with its name `body_strong` in `on_surface`; the one shown `primary` with `on_primary`. */
+.k-cal-month {
+  position: relative;
+  display: block;
+  height: var(--size-control_md);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  --num: var(--color-on_surface);
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: linear-gradient(var(--tint), var(--tint)), var(--color-surface_container_high);
+}
+
+.k-cal-month[data-shown] {
+  --num: var(--color-on_primary);
+  background: var(--color-primary);
+}
+
+.k-cal-year:focus-visible .k-cal-month[data-current] {
+  --lit: 1;
+}

@@ -51,12 +51,17 @@ fn radii_are_roles_not_numbers() {
 
     for role in [
         "Radius::Small => Some(4),",
+        "Radius::Row => Some(8),",
         "Radius::Control => Some(12),",
+        "Radius::Content => Some(16),",
         "Radius::Surface => Some(24),",
     ] {
         assert!(module.contains(role), "{role}");
     }
-    assert!(!module.contains("Radius::R"));
+    let numbered = module
+        .match_indices("Radius::R")
+        .any(|(at, found)| module[at + found.len()..].starts_with(|c: char| c.is_ascii_digit()));
+    assert!(!numbered);
 }
 
 #[test]
@@ -95,4 +100,71 @@ fn every_symbol_names_its_drawing() {
     assert!(module.contains("Icon::ArrowBack => drawing!(\"arrow_back\"),"));
     assert!(module.contains("Icon::HardDrive => None,"));
     assert!(module.contains("Icon::ArrowBack => Some(\"arrow-left\"),"));
+}
+
+#[test]
+fn the_fixed_roles_are_written_in_both_palettes() {
+    let tokens = crate::parse(TOKENS).expect("the repo's tokens hold");
+    let module = module();
+
+    for role in [
+        "sharing",
+        "logo_core_warm",
+        "logo_core_cold",
+        "microphone",
+        "recording",
+        "success",
+    ] {
+        for palette in [&tokens.color.dark, &tokens.color.light] {
+            let rgb = palette[role];
+            let line = format!(
+                "{role}: Rgb {{ r: {:#04x}, g: {:#04x}, b: {:#04x} }},",
+                rgb.r, rgb.g, rgb.b
+            );
+            assert!(module.contains(&line), "{line}");
+        }
+    }
+}
+
+#[test]
+fn the_spring_is_a_curve_like_the_others() {
+    assert!(module().contains("Easing::Spring => [0.34, 1.25, 0.64, 1.0],"));
+}
+
+#[test]
+fn an_app_window_has_a_default_and_a_minimum_size() {
+    let module = module();
+
+    for size in [
+        "Size::AppWidth => 1120,",
+        "Size::AppHeight => 720,",
+        "Size::AppMinWidth => 720,",
+        "Size::AppMinHeight => 480,",
+        "Size::Sidebar => 264,",
+        "Size::Rail => 236,",
+    ] {
+        assert!(module.contains(size), "{size}");
+    }
+}
+
+#[test]
+fn a_core_is_written_as_its_tone_and_how_far_to_white() {
+    let module = module();
+
+    assert!(module.contains("pub const PRIMARY_CORE: Derived = Derived { tone: Role::Primary, white: 0.5 };"));
+    assert!(!module.contains("    primary_core: "), "no palette holds a fixed core");
+}
+
+#[test]
+fn a_state_model_recipe_is_not_built_into_the_module_yet() {
+    let module = module();
+
+    assert!(
+        !module.contains("PRIMARY_UNLIT"),
+        "an OKLCH recipe isn't a `Derived` or `Darkened`"
+    );
+    assert!(
+        !module.contains("    primary_unlit: "),
+        "nor a fixed value in a palette"
+    );
 }

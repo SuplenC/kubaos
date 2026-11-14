@@ -1,0 +1,164 @@
+# The mockup site
+
+Every UI KubaOS has, as it is meant to be: the single source of truth the builds match. The mockup skill (`.claude/skills/mockup/SKILL.md`) says what a mockup is and what its page must show; this file says how the site works and how a page is added.
+
+## Running it
+
+In `nix develop`, which provides Node, the tokens' generator and Chromium:
+
+| Command | What |
+|---|---|
+| `just mockups` | Serves the site with hot reload at the address Vite prints. A change to `design/tokens.toml` regenerates `src/tokens.css` and the page follows it. |
+| `just mockups-build` | Type-checks, holds each registered custom property to one registration (`scripts/property-check.ts`) and builds it static into `dist/`, then draws each page in headless Chromium to write its moves' recipes into `dist/motion/PAGE.json`. |
+| `just mockups-check` | Draws every page at every scale, light and dark, and holds its boxes to the geometry rules and each mocked component to its twin on the specimen's pages (`docs/DESIGN.md`, "The mockups"), then holds every motion player to its recipe (`scripts/player-test.ts`). Run by hand: `just design-check` doesn't run it, and not every page passes it. |
+| `just shots mockups` | Renders the pages' shots, before and after (`docs/agents/design-pr-loop.md`). |
+| `npm run perf -- PAGE…` | Measures the pages named for speed and holds them to their budgets ("Speed", below). |
+
+Plain HTML, CSS and TypeScript, built by Vite; no UI framework. The npm dependencies are locked in `package-lock.json`, and `playwright-core` is the version of nixpkgs' Playwright, whose Chromium draws the shots and frames. Use a Chromium-based browser: the icons' stroke uses CSS typed arithmetic.
+
+## The top bar
+
+Every page has it: each setting the page is shown at, grouped under a label as the library's segmented controls. Look is the mode (Night, Day, or Both, the stage's night and day panes side by side with the rest of the page in the last mode picked) and the theme; Scale (1, 1.25, 1.5, 2); Text, the words' length (short, long, a translation 40% longer); Motion, the speed and Flicker, Steady (the power changes' flicker off) or Reduced; Window, the window size a template's reflow is shown at, off on a page with none. The bar holds one row at 1920 wide and wraps in a narrower window. The page's box is zoomed out by the display's own pixel ratio, so inside it a CSS pixel is a device pixel at every scale: hairlines and the grid land as they do in the builds. Mode, scale and motion apply through CSS custom properties at once; the text's length, Both and the scale draw the page again. Picking a theme plays the theme change across the whole page, and picking light or dark plays the dark ⇄ light switch, each from the recipe its player shows (`src/site/sequences.ts`, `src/site/change.ts`); with reduce motion on, the colours swap at once. The themes (`src/site/themes.ts`) are the tokens' own palette and three others matugen made from seed colours, so no page is judged in one accent alone. Each setting is kept in the address (`?mode=light&scale=1.5`) and for the next visit.
+
+A CSS pixel is a device pixel only at a whole pixel ratio: Chromium lays a page out in steps that don't divide a fractional one. On a screen at 1.25, the top bar says so and names the browser zoom that makes the ratio whole (80%). The shots and `just mockups-check` draw at a ratio of 1.
+
+## How a page is laid out
+
+The navigation on the left is SidebarPage's sidebar (`src/site/nav.ts`, `sidebarFold` and `sidebarLink` in `src/lib/sidebar-page.ts`): the search field on top, a hairline, then each level that has pages as a section's row with its symbol and a chevron, opening and shutting its pages' sub-section rows as a Collapsible does. The page shown is current as SidebarPage's current sub-section is, its level filled as the current section, and centred among the rows when it opens out of view. A level opens with its page and otherwise stays as the viewer left it, kept in the browser. The rows scroll on their own under the field. Typing filters them by title and opens every level with a match, Enter opens the first page left, and `/` reaches the field unless a sample with the keyboard takes that key; the right rail lists the page's sections ("On this page"), lights the one read now and jumps to one (`src/site/rail.ts`). The page fills the room between them, its padding the tokens' `[container]` padding for the width it takes (`src/site/settle.ts`).
+
+A page opens with its header: the crumb (Level › Page), the title, a one-line lede, and tags for its names in code (Rust, QML) and what isn't built yet, only as its component page gives them. Then the stage, which leads it: the thing itself, live and large, in a night pane and a day pane side by side (one with Night or Day picked), under one bar of chips that drives both: Live, then each state the page shows, pinned on every row (`src/site/parts/stage.ts`). A mono hint at the bar's end says how to try it, or what the pinned state looks like; a sample wider than its pane is scaled to fit, and the pane says by how much. A stage of whole screens stands its panes one under the other, each across the stage, so they are drawn about twice as large. A sample that is a whole screen (on the stage, on a section's stage or in a motion player) has a Full screen control: it draws the sample afresh on the whole real screen, laid out for its size, live; Esc goes to the mockup and Ctrl+Esc leaves (`src/site/full-screen.ts`).
+
+Every section after it is tables and samples, not prose (`src/site/parts/table.ts`): a component's Anatomy (Part, Token and the token's value at the scale picked, beside State and Look, then its lit line), Variants, Motion, Keyboard (Key and Does, beside where focus goes), Content, Every state (the compact state matrix, night then day) and Reflow; two short tables sit side by side where the width holds them. A part that doesn't apply is one muted line in its place, not a section. Words are a text column wide at most and read from the left. The page never scrolls sideways: a sample wider than the container is let out of it, centred, and one wider than the page scrolls in its own box.
+
+Samples are laid out by their size, decided in one place (`src/site/parts/shelf.ts`). Samples as small as a component (the variants, the sizes, a missing picture, none/one/many, the measured samples) are a wrapping grid of cards, each the live sample over its name and words, as many a row as fit at the widest sample's width, so they compare side by side; the measured samples' cards share the page's whole width, each at least a text column wide, its parts tree beside its spec list. A sample as big as a window (wider than a text column, a whole screen or template, or a foundation's shown part, which fills the room it has) goes on its section's one stage, and the rest of its group stay cards: a row of chips per level of the samples' places (a mode, a row, a state; Variants or Sizes when a section has both) picks the one shown, at its real size, never scaled, its name and words beside it or under it as the width allows. The state matrix and the content's text by length stay grids while their cells are small, and go on the stage whole when one isn't. A page marks a sample that draws a whole screen (`screen` in `src/site/page.ts`): it goes on the stage whatever its width, so the site needn't draw it to place it, and it is drawn when its chip is first picked, so a page of many screens is drawn in the time of the few shown. With `?all` every sample is drawn at once. A sample scrolled out of view holds its endless loops (a video's breath, a skeleton's hum, a spinner) until it comes back, so a page at rest asks for no frames.
+
+A wheel over a sample scrolls the page, as over any other part of it, until the reader clicks into the sample: then its own lists and scroll views take the wheel, until Esc or a click outside lets it go (`src/site/scroll.ts`). No sample's focus scrolls the page.
+
+The Anatomy section's samples draw nothing over them at rest. Pointing at a part, in a sample or in the parts tree beside it (built from the `data-probe` nesting, alike siblings folded as `ListRow ×3`), draws that part alone: its box with its size in logical pixels outside it, its padding in green and its gaps in purple, and the spec list beside the tree gives its measures by token. Pointing at a row of the table by token lights every place the section's samples use that token instead, with a count over the table. A click pins either, and clicking it again or Esc lets it go; a part pinned in its sample takes the wheel as any clicked sample does. Where a token is used is read from the cascade (`src/site/parts/uses.ts`): each token is set to a value it never has on a hidden clone of the sample, and the elements whose geometry changes use it; a box script works out from a token's value is marked with `workedOut` (`src/lib/probe.ts`).
+
+`?all` draws every case at once: each stage's samples one under another, and every move in a player of its own at its sample's own size, its parts alone one full row each. The shots, the geometry frames and the player test draw with it.
+
+## Where things are
+
+| Path | What |
+|---|---|
+| `src/tokens.css` | Generated by `kubaos-tokens` (ignored by git): every token as a custom property. A length is its logical pixels times `--px`, recomputed in every `.mock` box. What the tokens say in words, where each colour role comes from and the contrast pairs are strings on `:root`. |
+| `src/lib/` | The mocked components and their parts (`text`, `icon`, `layout` with every layout primitive and the divider, `button`, `icon-button`, `hint`, `field`, `keycap`, `tooltip`, `icon-tile`, `tile`, `badge`, `spinner`, `skeleton`, `figure`, the focus ring, and the feedback parts: `progress`, `progress-panel`, `empty-state`, `status` with `error-block` and `banner`, `log`, `meter`, `step`, drawn by `feedback.css`; the templates' parts: `sheet` with the screen and its frame, `panel-page`, `backdrop`, and `step-rail`, `list-detail`, `sidebar-page` and `canvas-page`, each with its own CSS), each the twin of `kubaos-ui`'s and carrying the specimens' probe; `control.ts` and `.k-control` in `lib.css`, the states every control shares. |
+| `src/site/page.ts` | The page API: what a page says, in short words held to their most (`MOST`, `wordy`). |
+| `src/site/recipe.ts` | A move's recipe: its tracks on the player's loop as the keyframes it plays, and as the JSON a library reads. |
+| `src/site/recolour.ts` | Every colour role moving from one palette to another along a typed OKLCH path (through grey, dawn), as CSS formulas of one animated number. |
+| `src/site/moves.ts` | The moves every control makes: lighting up, pressed, and the power changes played on its lit samples. |
+| `src/site/sequences.ts`, `src/site/change.ts` | The theme change and the dark ⇄ light switch as moves, and their run across the page. |
+| `src/site/themes.ts` | The themes the top bar paints in. |
+| `src/site/contrast.ts` | The contrast pairs and their ratios in any palette, by `kubaos-design contrast`'s arithmetic. |
+| `src/site/parts/` | The parts every page is drawn with: the stage, the tables, the shelf (cards or a stage of samples), the state matrix, the motion player, the keyboard's tables, the measures (the anatomy table, each sample's inspector and where each token is used); and a foundation's shown parts, its painted boxes, swatches and tables. |
+| `src/site/scroll.ts` | Who a wheel over a sample scrolls: the page, until the sample is clicked into. |
+| `src/pages/LEVEL/PAGE.ts` | One page each; `src/pages/index.ts` lists them. |
+| `scripts/render.ts` | Draws the built site in headless Chromium, as shots and geometry frames, or as each page's motion recipes (`--motion`). |
+| `scripts/player-test.ts` | Seeks every motion player on the built site and holds its plot and its parts to what plays. |
+| `scripts/perf.ts`, `scripts/perf-trace.ts`, `scripts/perf-budgets.ts` | The speed check: it drives the pages named, reads their traces, and holds them to the budgets. |
+
+## Adding a page
+
+1. Write `src/pages/LEVEL/PAGE.ts` with `page({ … })` from `src/site/page.ts`, LEVEL one of `layout`, `atoms`, `molecules`, `templates`, `shell`, `kobo` or `apps`; or with `foundation({ … })` under `foundations`. `src/pages/atoms/button.ts` and `src/pages/foundations/colour.ts` are the examples.
+2. Add it to `PAGES` in `src/pages/index.ts`.
+3. Add its line to `test/shots/surfaces`: `mockups/SLUG  design/mockups/src/pages/LEVEL/PAGE.ts`, SLUG being the page's own `slug`, unique across the site (the shots are named by it), then every file it imports that another mockup line lists, such as a surface's `*-parts.ts` or another page's file. A file that is no page (a part of other pages) stays out of `PAGES` and needs no line of its own.
+4. Run `npm run perf -- PAGE` and keep the page within its budgets ("Speed", below).
+
+Every part is required, and the types refuse a page without one, or with an empty list where one is needed: `lede`, `code` (its names in code, from its component page), `stage` (the thing itself, live, how to try it, and its day pane or why not), `variants`, `sizes`, `states`, `content` (text, a missing picture, none/one/many), `focus` (each line the part lights and its tone, and what lit makes of it in each look, `docs/DESIGN.md`, "States"), `motion` (arriving, leaving, between states, each move as data, below), `keyboard`, `measures` (the samples to inspect, every part by its token, and the reflow across window sizes). A part that doesn't apply is `doesntApply("why")`, a note the page shows as one muted line in its place. The states name those shown, each with a few words of its look; each of the others (rest, lit, pressed, disabled, selected, loading, empty, error) gets its reason in `absent`.
+
+A page's words are short, and the site refuses to draw a page with one past its kind's most (`MOST` in `src/site/page.ts`, a `backticked` token counting as one word): the lede is one sentence; a name or a part is a label of a few words; what a variant is for, a state's look, a key's action and a check are table cells of a few words; a move's `what`, the focus order, the reflow and a reason something doesn't apply are notes of one line. No sentence restates what the sample shows: the full reference is the component's page under `docs/design/components/`.
+
+A foundation is one family of tokens, shown as it is used. It isn't a component, so it has no states, keyboard or focus line; its own parts are just as required: `lede` and `stage`, `tokens` (every token of the family, live, by its token), `rules` (each rule the values keep, with a worked example), `modes` (light beside dark), `themes` (every theme the top bar paints in), `scales` (1, 1.25, 1.5 and 2, in device pixels), `content` (the longest word, a translation 40% longer), `motion` (moves as data, as a component's) and `checks` (what holds the family to its rules, a few words each). Each shown part is a name, a one-line note and a live sample. A foundation lists its tokens from the tokens' CSS (`names` in `src/lib/tokens.ts`), so a token added to `design/tokens.toml` shows on its page without the page changing; what the tokens say in words (a type style's use, where a colour role comes from, the contrast pairs) is a string there too, read with `words`.
+
+A mock is built only from `src/lib`'s parts and the tokens: no number, colour or duration written out. A new mocked component is a module in `src/lib/` that wraps its root in `probe()` with its shared name, variant and fixed measures, as `kubaos-ui`'s `probe::component` does, so `just mockups-check` can hold the builds to it.
+
+## Motion
+
+A move is data, not prose: its `tracks`, one per part that moves (a control lighting up or pressed, the tube, the glow, the core, the colours, the lights), each naming the property it animates, its `from` and `to` (a number, or an opacity, colour or length token), its duration token, its cue after the move's start (a duration token, or the sum of several, one per phase before it), and its curve, an easing token, `neon.strike`'s steps or those steps played backwards. A track that moves every colour role (`--recolour`, 0 to 1) names its path and the two palettes; the path (`PATHS` in `src/site/recolour.ts`) says over which share of the fade each of lightness, chroma and hue moves. A move says what reduced motion plays (`reduced`: the same, or other tracks), what plays in light mode where it differs (`daylight`), what plays with the flicker off (`unflickered`, required of a move that flickers), a still closing beat that belongs to it (`tail`), and whether the loop plays the move back or cuts back to its first state. The speed setting divides every duration, cue and beat.
+
+A section's moves are listed by when they play (Arriving, Leaving, Between states) as chips over one player, which plays the move picked. Motion is reviewed for its timing, not its pixels, so a sample wider than its stage is drawn scaled down to fit it, and the player's 1:1 shows it at its own size.
+
+The player animates the sample with the Web Animations API from that same object (`src/site/recipe.ts`), so the recipe it shows is what plays. It loops: the first state held for `duration.scene`, the move, the last state held, then back. Under it are Pause, Restart, Slow ×10 and Copy as JSON, then the plot (`src/site/parts/plot.ts`), an SVG in the page's device pixels: the whole loop across in milliseconds, holds included, and each track's progress up, from its `from` (0) to its `to` (1), with room above 1 for a curve that overshoots (`pop`, `spring`). Each track is a curve from its cue for its duration: its easing token's cubic Bézier, or `neon.strike`'s steps, then back along the same curve, or cut back at the loop's end, as the move says. A track takes a colour and a dash, keyed in the legend and on its recipe row; a ball per track rides its curve at the vertical playhead, its height worked out from the curve as Chromium does. Dragging or clicking the plot holds that exact moment, computed from the keyframes rather than a CSS animation stopped midway; ← and → step one 60 Hz frame (16.67 ms), Shift with them ten, and the time and the frame show under it. The ticks under the x axis are each part's start and end and each keyframe, and clicking one goes to it. Reduced motion, light mode, the speed and the flicker draw the curves again for what plays then.
+
+A move of more than one track renders its parts: under the legend, each part alone on a stage of its own, as many a row as a dialog's width fits, in the legend's order, the sample drawn again with the other parts' layers hidden and only the controls the part is on, its layer animated by the same keyframes. A part that is a whole copy of the sample is drawn as its stage comes within two screens' height of the view, one at a time while the reader is still (no wheel, scroll, pointer or key for a moment), a stand-in holding its box meanwhile; with `?all` every part is drawn at once. Every stage, the plot and the recipe's rows run on the player's one clock, so pausing, seeking or stepping moves them all to the same frame. Pointing at a part's row, curve, legend key or stage picks it everywhere, and outlines its layers on the whole sample. In light mode a part its daylight tracks leave out keeps its row, its sample still, saying it doesn't play there, and the legend keeps the room of the other mode's, so a page is as tall in either mode.
+
+The recipe follows as tables, the row of whatever is changing at the playhead lit, and the player's loop phase by phase. A shot (`?chrome=off`) holds every player on its first state; with `?all`, as the shots draw, every move has a player of its own. `node scripts/player-test.ts [PAGE…]`, run by `just mockups-check`, seeks every player on the built site with its own tracks, light mode's, reduced motion's, the flicker off's and at speed 2, and holds each ball to the progress the browser is playing (on a property two tracks share, the whole plays the later's), each part alone to the whole or to its own ball where a later track has the property, a tick to its moment and the arrow keys to a frame.
+
+`just mockups-build` writes every page's recipes to `dist/motion/PAGE.json`, the moves as the libraries and a check read them.
+
+## Speed
+
+`npm run perf -- PAGE [PAGE…]`, in `nix develop` from `design/mockups/`, measures the pages named (by slug, as in `#/atoms/button`) and nothing else: with no page it prints its usage and fails. It builds the site unminified into `~/.cache/kubaos-mockups-perf/site`, so a culprit is named by its function and its module, serves it with `vite preview` on port 5184, and loads each page as a reader sees it, top bar and navigation included (`?chrome=off` holds every player, spinner and live sample still). One headless Chromium, drawing in software, loads one page at a time, three times, each in a fresh context and under a Chrome trace with the V8 sampler on. A page takes 30 to 60 seconds.
+
+Each load goes through four phases:
+
+| Phase | What happens | Measures |
+|---|---|---|
+| Load | From navigation until `window.kubaos.ready` | the time to ready; script, style recalculation, layout and paint time on the main thread; the long tasks (over 50 ms), their count and time; the page's elements |
+| Rest | One second still, then two seconds watched | the main thread's busy time a second; style recalculations, layouts, and timers and frame callbacks a second; the animations running |
+| Scroll | The wheel turned 120 px a step through the page's height (at most 150 steps), a frame's wait after each, the pointer over the middle of the page's box, so hover answers as it would for a reader | the median and worst frame's main-thread time; style and layout a frame; the style and layout script forced, their count and their time a frame; long tasks |
+| Press | Space on the first control in the stage's live sample (a button or a control's role, then a field, then anything focusable; never a link), and the second after it | the longest task, frames over 16.7 ms, the main thread's busy time. A sample with no control skips it, and the output says so |
+
+It prints a table a page: each measure's median over the three loads, the three values, its budget and `ok` or `OVER`; then what it pressed and how far it scrolled; then, under each measure over budget, what it points at. The machine's load average is printed before and after. It exits 1 when any budget is broken.
+
+### Which numbers mean something here
+
+Chromium draws in software here, with no GPU: paint is shown but held to no budget, and nothing is said about the GPU, raster or compositing, which Kuba's machine does in hardware. A frame is the main thread's work for it, not a frame rate. What holds across runs and machines is the main thread's own work: script, style recalculation and layout time, the forced style and layout, long tasks, the element count and what runs at rest. Counts (elements, forced layouts, long tasks, what runs at rest) repeat exactly from run to run; times move with the machine's load, as the three values in each row show. Compare a page's times with the reference pages measured at a similar load average, and measure again when the load average is far above the core count.
+
+### The budgets
+
+`scripts/perf-budgets.ts` holds one budget a measure in `BUDGETS`. They are set so the Button page, a light page, passes each with room for this machine's swings, from the Button, Tabs and Control Center pages measured at a load average of 10 to 30 on 24 cores:
+
+| Measure | Budget | Button | Tabs | Control Center |
+|---|---|---|---|---|
+| Load: navigation to ready | 2000 ms | 1023 ms | 671 ms | 1350 ms |
+| Load: script | 1000 ms | 529 ms | 329 ms | 672 ms |
+| Load: style recalculation | 600 ms | 329 ms | 191 ms | 344 ms |
+| Load: layout | 200 ms | 52 ms | 36 ms | 129 ms |
+| Load: long tasks | 5 | 3 | 3 | 3 |
+| Load: long tasks' time | 1800 ms | 926 ms | 569 ms | 1228 ms |
+| Load: elements | 12000 | 5492 | 3197 | 18298 |
+| Rest: animations running | 0 | 0 | 0 | 0 |
+| Rest: main thread busy | 5 ms/s | 0.4 | 0.4 | 0.4 |
+| Rest: style recalculations, layouts | 2 /s | 0 | 0 | 0 |
+| Rest: timers and frame callbacks | 5 /s | 0 | 0 | 0 |
+| Scroll: median frame | 8 ms | 2.1 ms | 2.6 ms | 3.3 ms |
+| Scroll: worst frame | 80 ms | 34 ms | 21 ms | 162 ms |
+| Scroll: style + layout a frame | 3 ms | 0.6 ms | 0.8 ms | 1.5 ms |
+| Scroll: forced style and layout a frame | 1 ms | 0.2 ms | 0.2 ms | 0.3 ms |
+| Scroll: long tasks | 0 | 0 | 0 | 3 |
+| Press: longest task | 50 ms | 6 ms | 6 ms | 46 ms |
+| Press: frames over 16.7 ms | 2 | 0 | 0 | 1 |
+| Press: main thread busy in 1 s | 200 ms | 59 ms | 40 ms | 159 ms |
+
+At rest a page does nothing: no animation, no timer, no restyle, on all three; a live clock ticking once a second still passes. A long task is one a reader notices, so a scroll has none and a press stays within one. The Control Center is over on its elements and on its scroll, where pointing at the Anatomy table's rows reads every element of its samples. A page that needs more than a budget gets an entry in `PAGE_BUDGETS` for that measure, with its reason; the table marks it `*` and prints the reason under it.
+
+### Reading a failure
+
+Under each measure over budget are the lines that point at its cause, from the run in the middle:
+
+- `function · module 12.3 ms`: the V8 sampler's time in that function over the phase, or in the task or frame named, most first. `module` is the source file, so `measure · src/site/parts/shelf.ts` is where to look.
+- `forced by inner · module ← caller · module ×n, t ms`: script read a size or a style after a write, and the browser styled or laid the page out then and there, n times for t ms. The fix is to read every box before writing any, or to read before the first write of the frame.
+- `restyled by inner ← caller ×n`: the script whose writes made the page's style or layout stale.
+- `250 ms task (style 180 ms, script 60 ms, …)`: a long task, by what it did, then the code that ran longest in it.
+- `animation div.k-spinner spin`: an animation still running at rest, by its element and its name.
+
+## The Gallery's tour
+
+A film of the wallpaper picker, rendered frame by frame rather than recorded, so its motion is even whatever a frame takes to draw. `scripts/tour.ts` serves the site with Vite, opens the live Gallery on a 2560×1440 viewport through the stage's Full screen control, at night and scale 1.5, and plays its tour with key presses alone (no pointer, so no hover and no tooltip): the desktop, opening, two steps along the wall, a floor up and back, the Desktop and Lock views, waking the lock and letting it rest, depth off and on, full screen and back, then Apply. Each move plays out, then the picker rests a moment before the next key.
+
+The page runs on a clock of its own, installed before its scripts: `performance.now`, `Date`, timers, animation frames and idle callbacks read and run on it, and every animation is held paused and set to the clock's time on each frame, so a frame is exactly 1/60 s after the last. Chromium's virtual time is no help here: it moves timers and animation frames but not the timeline transitions and the Web Animations play on. The wall's screens are drawn scaled by `zoom` rather than `scale` in the film: software drawing reads a backdrop filter under a scaled box from the wrong place, which mirrored the awake lock's blurred city.
+
+In `nix develop`, from `design/mockups/` (Chromium runs headless and draws in software, about 0.4 s a frame; the 41 s tour is some 2,450 frames and 7 GB). `--from A --frames B` writes frames A to B alone while the tour still plays from its start on the same clock, so it renders in segments that each fit a short run, and the frames are the ones a single run draws:
+
+```sh
+for range in "0 850" "850 1700" "1700 100000"; do
+  set -- $range
+  nice -n 15 node scripts/tour.ts ~/.cache/kubaos-gallery-tour/frames --from $1 --frames $2
+done
+nice ffmpeg -framerate 60 -i ~/.cache/kubaos-gallery-tour/frames/%05d.png -c:v libx264 -preset slow -crf 16 \
+  -pix_fmt yuv420p -movflags +faststart -threads 8 ~/.cache/kubaos-gallery-tour/gallery-tour.mp4
+```
+
+`--size WxH`, `--scale` and `--port` (5183 by default) change the viewport, the site's scale and Vite's port; `--frames N` alone is a trial of the first N frames. Next to the frames, `beats.txt` gives each beat's first frame and time, and `trace-A.tsv` each written frame's page time, the front picture's box, its step out and the room's light, which show the motion even.

@@ -50,9 +50,10 @@ pub fn toast<'a, M: 'a>(look: &Look, message: &'a str, leading: Option<Icon>) ->
     probe::component("Toast", ["", "", ""], Fixed::NONE, view)
 }
 
-/// How long a toast stays once it has arrived, before it leaves: long enough to read its line
-/// twice.
-pub const DEFAULT_STAY: time::Duration = time::Duration::from_millis(3600);
+/// How long a toast stays once it has arrived, before it leaves: [`Duration::Toast`], long enough
+/// to read its line twice. Reduce motion caps a move, not a stay, so it is read as it is, not
+/// through [`Motion::duration`].
+pub const DEFAULT_STAY: time::Duration = time::Duration::from_millis(Duration::Toast.ms() as u64);
 
 /// A toast's whole life when it stays `stay`: arriving, staying and leaving.
 pub fn life(stay: time::Duration) -> time::Duration {

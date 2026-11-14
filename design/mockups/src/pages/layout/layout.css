@@ -1,0 +1,17 @@
+/* The layout pages' own boxes: the worked example's window, which SidebarPage fills to its edges,
+   and the outlined boxes of a sample that shows a layout's room. */
+
+.page-window:has(> .k-sp) {
+  padding: 0;
+}
+
+/* A sample's room, so a layout's boxes show where nothing is drawn: a dashed outline in the soft
+   outline, taking no room. */
+.l-room {
+  outline: var(--stroke-hairline_device_px) dashed rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
+}
+
+/* A clear page's own surface under it, as Kōbō's glass panel is. */
+.l-room[data-glass] {
+  background: var(--color-surface_container_low);
+}

@@ -1,0 +1,12 @@
+/* The ListDetail page: its windows and screens fill the reflow's frame edge to edge. */
+
+.page-window:has(> .k-setup, > .k-menu-screen) {
+  padding: 0;
+}
+
+/* A sample's window: the template fills the box it is shown in. */
+.t-frame > .k-setup,
+.t-frame > .k-menu-screen {
+  flex: 1 1 0;
+  min-height: 0;
+}

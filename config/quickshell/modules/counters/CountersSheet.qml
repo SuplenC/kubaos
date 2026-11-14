@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 import qs.services
 import "counters.js" as Logic
 
@@ -157,7 +156,7 @@ K.Sheet {
 
                 implicitHeight: Math.max(0, Math.min(list.count, root.mostRows) * (K.Tokens.size.row_two_line + list.spacing) - list.spacing)
 
-                NavList {
+                K.ListRows {
                     id: list
 
                     readonly property string widest: Logic.widest(Counters.list)

@@ -1,6 +1,5 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Keep awake and a scheduled action, while either is on: a cup, and the
@@ -8,7 +7,7 @@ import qs.services
 // tooltip says when Keep awake ends: a time, a battery level, or never, and
 // whether it holds the lid. Click stops Keep awake, or cancels the action when
 // only that is on.
-Pill {
+K.Pill {
     id: root
 
     visible: Idle.keepAwake || Idle.scheduledPending

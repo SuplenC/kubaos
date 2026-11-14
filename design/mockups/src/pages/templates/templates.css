@@ -1,0 +1,54 @@
+/* The template pages' own boxes: the window a template is shown in, at the surface radius with a
+   hairline round it outside its box, so the window is its whole size inside; the live one resizes by its corner, from the app's
+   minimum to a 1080p screen, in a room that scrolls sideways where the page is narrower. */
+
+.t-room {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: var(--space-s8);
+}
+
+.t-window {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  margin: var(--stroke-hairline_device_px);
+  border-radius: var(--radius-surface);
+  box-shadow: 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+  overflow: hidden;
+}
+
+.t-window[data-resizes] {
+  resize: both;
+  min-width: var(--size-app_min_width);
+  min-height: var(--size-app_min_height);
+  /* A 1080p screen's size, the screen's and not a design value, as the toolbar's window sizes are. */
+  max-width: calc(1920 * var(--px));
+  max-height: calc(1080 * var(--px));
+}
+
+.page-window:has(> .k-sp) {
+  padding: 0;
+}
+
+/* A sidebar row shown alone, on the sidebar's band, `space.s12` round it as the band holds it. */
+.k-sp-side.t-band {
+  height: auto;
+  padding: var(--space-s12);
+}
+
+/* A fit's sample: the canvas shown, and its twins fitted the way it was and the way it goes, laid
+   out unseen over it and read back. */
+.t-fit {
+  position: relative;
+  display: flex;
+}
+
+.t-twin {
+  position: absolute !important;
+  inset: 0 auto auto 0;
+  visibility: hidden;
+}

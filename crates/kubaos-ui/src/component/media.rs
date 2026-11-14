@@ -14,6 +14,7 @@
 //! - Decoding and caching pictures: the app's, which hands over a handle once one is ready.
 
 use iced::Background;
+use iced::Color;
 use iced::ContentFit;
 use iced::Element;
 use iced::Event;
@@ -37,6 +38,7 @@ use iced::widget;
 use iced::widget::container;
 use iced::widget::image;
 
+use crate::color;
 use crate::look::Corner;
 use crate::look::Look;
 use crate::look::radius;
@@ -45,6 +47,7 @@ use crate::probe::Fixed;
 use crate::scale::Scale;
 use crate::tokens;
 pub use crate::tokens::Aspect;
+use crate::tokens::Opacity;
 
 /// `picture` filling a box as wide as the room (a thumbnail's width where the room has no end) and
 /// as tall as `aspect` makes it, cut to cover it, with `corner`'s radius; without a picture yet,
@@ -68,10 +71,46 @@ pub fn media_under<'a, M: 'a>(
     corner: impl Into<Corner>,
     over: impl IntoIterator<Item = Element<'a, M>>,
 ) -> Element<'a, M> {
+    media_drawn(look, picture, aspect, corner, over, None)
+}
+
+/// [`media_under`] for a control that can't be used now: the picture at the disabled opacity, and
+/// the placeholder the disabled container.
+pub(crate) fn media_disabled<'a, M: 'a>(
+    look: &Look,
+    picture: Option<image::Handle>,
+    aspect: Aspect,
+    corner: impl Into<Corner>,
+    over: impl IntoIterator<Item = Element<'a, M>>,
+) -> Element<'a, M> {
+    let c = look.colors;
+    let dimmed = Dimmed {
+        picture: Opacity::DisabledContent.value(),
+        placeholder: color::alpha(c.on_surface, Opacity::DisabledContainer.value()),
+    };
+    media_drawn(look, picture, aspect, corner, over, Some(dimmed))
+}
+
+/// How a disabled box draws its picture and its placeholder.
+#[derive(Debug, Clone, Copy)]
+struct Dimmed {
+    picture: f32,
+    placeholder: Color,
+}
+
+fn media_drawn<'a, M: 'a>(
+    look: &Look,
+    picture: Option<image::Handle>,
+    aspect: Aspect,
+    corner: impl Into<Corner>,
+    over: impl IntoIterator<Item = Element<'a, M>>,
+    dimmed: Option<Dimmed>,
+) -> Element<'a, M> {
     let corner = radius(corner);
-    let placeholder = look.colors.surface_container_high;
+    let placeholder = dimmed.map_or(look.colors.surface_container_high, |d| d.placeholder);
     let inner: Element<'a, M> = if let Some(handle) = picture {
         widget::image(handle)
+            .opacity(dimmed.map_or(1.0, |d| d.picture))
             .content_fit(ContentFit::Cover)
             .width(Length::Fill)
             .height(Length::Fill)

@@ -53,7 +53,7 @@ const DURATIONS: [Duration; 8] = [
     Duration::Scene,
 ];
 
-const EASINGS: [Easing; 7] = [
+const EASINGS: [Easing; 8] = [
     Easing::Standard,
     Easing::StandardDecel,
     Easing::StandardAccel,
@@ -61,6 +61,7 @@ const EASINGS: [Easing; 7] = [
     Easing::EmphasizedAccel,
     Easing::Linear,
     Easing::Pop,
+    Easing::Spring,
 ];
 
 /// The frames the onion skins and filmstrips show: nine, evenly spaced in time.
@@ -73,9 +74,20 @@ fn use_of(duration: Duration) -> &'static str {
         Duration::Short => "A switch's knob, a check mark, focus moving, a toast arriving.",
         Duration::Medium => "A panel or popup leaving, the log opening, a toast leaving.",
         Duration::Long => "A panel or dialog arriving, a page sliding in.",
-        Duration::Slow => "A wallpaper fading in, the light/dark crossfade.",
-        Duration::Hold => "A held control until it acts: Install, a held menu item.",
+        Duration::Slow => "A wallpaper fading in, a live list's new row.",
         Duration::Scene => "A whole scene once: the lock lifting, Kōbō's welcome settling.",
+        Duration::Recolour => "A theme change's colours, all together.",
+        Duration::Settle => "A theme change's dark beat before the lights strike.",
+        Duration::Strike => "Every light striking on after a theme change.",
+        Duration::SwapLag => "A twin panel's arriving content starting after the leaving one.",
+        Duration::CaretGlow => "The caret's glow coming in on a key.",
+        Duration::SwapFade => "A twin panel's arriving content fading in.",
+        Duration::CaretHold => "The caret's glow holding after the last key.",
+        Duration::CaretFade => "The caret's glow fading once typing stops.",
+        Duration::Hold => "A held button held until it acts.",
+        Duration::Hum => "Half a skeleton's breath.",
+        Duration::Toast => "A toast staying once it has arrived.",
+        Duration::LockIdle => "The awake lock left alone until it goes back to rest.",
     }
 }
 
@@ -84,10 +96,12 @@ fn curve_use(easing: Easing) -> &'static str {
         Easing::Standard => "Small changes that stay: toggles, colour, focus.",
         Easing::StandardDecel => "Something moving settling in: a list, a slider's step.",
         Easing::Pop => "A small mark popping in: a slider's anchor dot.",
+        Easing::Spring => "Gliding into place, a little past: the carousel's step.",
         Easing::StandardAccel => "Something small leaving for good: a toast.",
         Easing::EmphasizedDecel => "Arriving: panels, dialogs, pages, the log.",
         Easing::EmphasizedAccel => "Leaving: panels and dialogs closing.",
         Easing::Linear => "Real quantities, spinners.",
+        Easing::Gather => "A colour change gathering speed: a theme change.",
     }
 }
 

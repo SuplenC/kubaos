@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick as Q
 import KubaOS.Components as K
 
 // Key hints side by side, 16 apart: each combination's keys as `Keycap`s 4 apart, then what it
@@ -8,7 +9,12 @@ import KubaOS.Components as K
 // and the menu write them, `↵ Open · Tab Enter app · ⌃K Actions`: each part's first word the
 // combination, the rest what it does. A combination is written `Ctrl+K`; each of its keys is a
 // keycap of its own, and so is each modifier or arrow glyph written together (`⌃K`, `↑↓`);
-// only `+` parts the rest, so `Left Alt` is one key.
+// only `+` parts the rest, so `Left Alt` is one key. A hint that would pass `room` is left out
+// whole, and so is every hint after it, so none is cut through a keycap.
+//
+// HAZARD: no layout primitives in here; each box is placed with token arithmetic, and the
+// delegates go by count. A keystroke that moves the Command menu's selection changes its footer's
+// and its detail pane's hints, and the menu must answer on the next frame.
 Item {
     id: root
 
@@ -17,7 +23,10 @@ Item {
     // The hints in Kotodama's form; empty for `hints`.
     property string text: ""
     property color color: Tokens.color.on_surface_variant
+    // The widest the hints may take; hints past it are left out.
+    property real room: Infinity
 
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     // The pairs shown, from `text` when there is one.
     readonly property var shown: root.text === "" ? root.hints : root.parse(root.text)
     readonly property var probe: ({
@@ -65,33 +74,70 @@ Item {
         return found;
     }
 
-    implicitWidth: line.implicitWidth
-    implicitHeight: line.implicitHeight
+    implicitWidth: line.width
+    implicitHeight: Tokens.size.keycap
 
-    K.Row {
+    // The hints that fit, side by side: the box iced's row of them is, which the geometry check
+    // holds this to, as it holds each hint and its keys below.
+    Item {
         id: line
 
-        gap: Tokens.space.s16
-        align: "centre"
+        readonly property var probe: ({
+                role: "layout",
+                axis: "x",
+                gap: Tokens.space.s16,
+                align: "centre"
+            })
+
+        width: {
+            let end = 0;
+            for (let i = 0; i < hints.count; i++) {
+                const hint = hints.itemAt(i);
+                if (hint && hint.visible)
+                    end = hint.x + hint.width;
+            }
+            return end;
+        }
+        height: Tokens.size.keycap
 
         // By count, not by the pairs themselves: a new text with as many hints keeps the same
         // delegates and only rebinds their words, rather than making them all again.
         Repeater {
+            id: hints
+
             model: root.shown.length
 
-            K.Row {
+            Item {
                 id: hint
 
                 required property int index
                 readonly property var pair: root.shown[hint.index] ?? ["", ""]
                 readonly property var caps: root.keys(hint.pair[0])
+                readonly property string does: hint.pair[1]
+                readonly property Item before: hint.index > 0 ? hints.itemAt(hint.index - 1) : null
+                readonly property var probe: ({
+                        role: "layout",
+                        axis: "x",
+                        gap: Tokens.space.s8,
+                        align: "centre"
+                    })
 
-                gap: Tokens.space.s8
-                align: "centre"
+                x: hint.before ? hint.before.x + hint.before.width + Tokens.space.s16 : 0
+                width: keys.width + (hint.does === "" ? 0 : Tokens.space.s8 + what.width)
+                height: Tokens.size.keycap
+                visible: (!hint.before || hint.before.visible) && hint.x + hint.width <= root.room
 
-                K.Row {
-                    gap: Tokens.space.s4
-                    align: "centre"
+                Q.Row {
+                    id: keys
+
+                    readonly property var probe: ({
+                            role: "layout",
+                            axis: "x",
+                            gap: Tokens.space.s4,
+                            align: "centre"
+                        })
+
+                    spacing: Tokens.space.s4
 
                     Repeater {
                         model: hint.caps.length
@@ -105,8 +151,12 @@ Item {
                 }
 
                 K.Text {
-                    visible: hint.pair[1] !== ""
-                    text: hint.pair[1]
+                    id: what
+
+                    x: keys.width + Tokens.space.s8
+                    y: K.Look.snap((Tokens.size.keycap - Tokens.type.caption.line) / 2, root.dpr)
+                    visible: hint.does !== ""
+                    text: hint.does
                     style: Tokens.type.caption
                     color: root.color
                 }

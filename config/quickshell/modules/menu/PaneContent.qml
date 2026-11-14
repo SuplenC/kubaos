@@ -8,8 +8,8 @@ import "words.js" as Words
 // each Action's keys, and the keys the row takes. `entry` is what DetailPane hands it; see
 // `Menu.qml`'s `paneEntry`.
 //
-// It changes with every move of the selection, so it is set in `Label`s on Qt's positioners, as
-// the rows are: arrowing down the list at key repeat redraws it thirty times a second.
+// It changes with every move of the selection, so it is set on Qt's positioners rather than the
+// layout primitives: arrowing down the list at key repeat redraws it thirty times a second.
 Item {
     id: content
 
@@ -55,35 +55,35 @@ Item {
             height: K.Tokens.space.s16
         }
 
-        Label {
+        K.Text {
             width: parent.width
+            room: parent.width
+            maximumLines: 3
             text: content.entry?.title ?? ""
-            type: K.Tokens.type.heading
-            wrapMode: Text.Wrap
-            maximumLineCount: 3
+            style: K.Tokens.type.heading
         }
 
         Item {
             height: K.Tokens.space.s4
         }
 
-        Label {
+        K.Text {
             width: parent.width
+            room: parent.width
+            maximumLines: 4
             visible: text !== ""
             text: content.entry?.subtitle ?? ""
-            type: K.Tokens.type.body
-            wrapMode: Text.Wrap
-            maximumLineCount: 4
+            style: K.Tokens.type.body
             color: K.Tokens.color.on_surface_variant
         }
 
-        Label {
+        K.Text {
             width: parent.width
+            room: parent.width
+            maximumLines: 3
             visible: !content.runs
             text: content.entry?.unavailable ?? ""
-            type: K.Tokens.type.body
-            wrapMode: Text.Wrap
-            maximumLineCount: 3
+            style: K.Tokens.type.body
             color: K.Tokens.color.error
         }
 
@@ -92,10 +92,11 @@ Item {
         }
 
         // The kind, and the Alias the query named it by.
-        Label {
+        K.Text {
             width: parent.width
+            maximumLines: 1
             text: [Words.kindLabel(content.entry?.extension ?? ""), content.entry?.alias ?? ""].filter(word => word !== "").join(" · ")
-            type: K.Tokens.type.label
+            style: K.Tokens.type.label
             color: K.Tokens.color.on_surface_variant
         }
     }
@@ -114,10 +115,9 @@ Item {
         visible: (content.entry?.actions ?? []).length > 0
         spacing: K.Tokens.space.s8
 
-        Label {
-            width: parent.width
+        K.Text {
             text: "Actions"
-            type: K.Tokens.type.label
+            style: K.Tokens.type.label
             color: K.Tokens.color.on_surface_variant
         }
 
@@ -134,23 +134,29 @@ Item {
                 width: actions.width
                 spacing: K.Tokens.space.s8
 
-                Label {
+                // An Extension's name over its Contributed actions, 8 under the row above.
+                Item {
                     width: parent.width
                     height: K.Tokens.space.s8 + K.Tokens.type.label.line
                     visible: action.heading
-                    verticalAlignment: Text.AlignBottom
-                    text: Words.kindLabel(action.modelData.group)
-                    type: K.Tokens.type.label
-                    color: K.Tokens.color.on_surface_variant
+
+                    K.Text {
+                        y: K.Tokens.space.s8
+                        width: parent.width
+                        maximumLines: 1
+                        text: Words.kindLabel(action.modelData.group)
+                        style: K.Tokens.type.label
+                        color: K.Tokens.color.on_surface_variant
+                    }
                 }
 
                 Item {
                     width: parent.width
                     height: K.Tokens.type.body.line
 
-                    Label {
+                    K.Text {
                         width: shortcut.x - K.Tokens.space.s8
-                        height: parent.height
+                        maximumLines: 1
                         text: action.modelData.title
                         color: action.index === 0 ? K.Tokens.color.on_surface : K.Tokens.color.on_surface_variant
                     }
@@ -167,7 +173,7 @@ Item {
                         Repeater {
                             model: shortcut.keys.length
 
-                            Keycap {
+                            K.Keycap {
                                 required property int index
 
                                 key: shortcut.keys[index] ?? ""
@@ -179,7 +185,7 @@ Item {
         }
     }
 
-    KeyHints {
+    K.KeyHints {
         id: keys
 
         anchors.bottom: parent.bottom

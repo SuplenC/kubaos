@@ -1,0 +1,144 @@
+/* The bar's workspaces (`workspaces.ts`). Its slots, its tints and its indicator are drawn in one
+   stacking context, so the indicator sits over the tints and under the numbers. */
+
+@property --present {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+@property --ws-shown {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+@property --ws-start {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --ws-end {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+.shell-ws {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  box-sizing: border-box;
+  height: var(--size-control_sm);
+  padding: var(--space-s4);
+  border-radius: var(--radius-full);
+  background: var(--color-surface_container);
+}
+
+.shell-ws-cells {
+  position: relative;
+  display: flex;
+  height: var(--size-chip);
+  overflow: clip;
+}
+
+.shell-ws-content {
+  display: flex;
+}
+
+.shell-ws-slot {
+  position: relative;
+  display: block;
+  flex: none;
+  width: round(nearest, calc(var(--slot-width) * var(--px) * var(--present)), 1px);
+  height: var(--size-chip);
+  overflow: clip;
+}
+
+.shell-ws-slot > * {
+  opacity: var(--ws-shown);
+}
+
+/* A borrowed group's tint: each slot draws its piece, reaching past its inner edges, so only the
+   group's two ends round off. */
+.shell-ws-tint {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: calc(-1 * var(--size-chip) / 2);
+  right: calc(-1 * var(--size-chip) / 2);
+  height: var(--size-chip);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-secondary) r g b / var(--opacity-tint));
+}
+
+.shell-ws-tint[data-head] {
+  left: 0;
+}
+
+.shell-ws-tint[data-tail] {
+  right: 0;
+}
+
+.shell-ws-indicator {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: round(nearest, calc(max(0, var(--ws-start)) * var(--size-chip)), 1px);
+  width: max(0px, round(nearest, calc((var(--ws-end) - max(0, var(--ws-start))) * var(--size-chip)), 1px));
+  height: var(--size-chip);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+}
+
+.shell-ws-rule {
+  position: absolute;
+  left: round(down, calc((100% - var(--stroke-hairline_device_px)) / 2), 1px);
+  top: round(down, calc(var(--size-chip) / 4), 1px);
+  width: var(--stroke-hairline_device_px);
+  height: calc(var(--size-chip) / 2);
+  background: var(--color-outline_variant);
+}
+
+.shell-ws-name {
+  position: absolute;
+  z-index: 2;
+  left: calc(var(--inset) * var(--px));
+  top: round(down, calc((var(--size-chip) - var(--t-line)) / 2), 1px);
+}
+
+.shell-ws-slot[data-kind="label"],
+.shell-ws-cell {
+  cursor: pointer;
+}
+
+.shell-ws-cell {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: var(--size-chip);
+  height: var(--size-chip);
+}
+
+.shell-ws-cell > * {
+  grid-area: 1 / 1;
+}
+
+.shell-ws-number {
+  transition: color var(--motion-short) var(--easing-standard), opacity var(--motion-short) var(--easing-standard);
+}
+
+.shell-ws-ghost {
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.shell-ws-cell[data-ghost] > .shell-ws-number {
+  opacity: 0;
+}
+
+.shell-ws-cell[data-ghost] > .shell-ws-ghost {
+  opacity: var(--opacity-placeholder);
+}

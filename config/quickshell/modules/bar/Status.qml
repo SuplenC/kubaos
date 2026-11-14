@@ -1,10 +1,9 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // System indicators. Click opens the control center, scroll changes volume.
-Pill {
+K.Pill {
     id: root
 
     interactive: true

@@ -3,7 +3,9 @@ use iced::Color;
 use super::Contrast;
 use super::colors;
 use super::contrast_ratio;
+use super::derived;
 use super::over;
+use crate::tokens;
 use crate::tokens::Mode;
 
 #[test]
@@ -93,6 +95,30 @@ fn the_fallback_palettes_meet_the_contrast_minimums() {
             ("on_error on error", c.on_error, c.error, Contrast::Text),
             ("cold on surface", c.cold, c.surface, Contrast::Text),
             ("warning on surface", c.warning, c.surface, Contrast::Text),
+            (
+                "sharing on surface_container_highest",
+                c.sharing,
+                c.surface_container_highest,
+                Contrast::Text,
+            ),
+            (
+                "microphone on surface_container_highest",
+                c.microphone,
+                c.surface_container_highest,
+                Contrast::Text,
+            ),
+            (
+                "recording on surface_container_highest",
+                c.recording,
+                c.surface_container_highest,
+                Contrast::Text,
+            ),
+            (
+                "success on surface_container_highest",
+                c.success,
+                c.surface_container_highest,
+                Contrast::Text,
+            ),
             ("surface on on_surface (toast)", c.surface, c.on_surface, Contrast::Text),
             ("outline on surface", c.outline, c.surface, Contrast::Graphic),
             (
@@ -107,4 +133,30 @@ fn the_fallback_palettes_meet_the_contrast_minimums() {
             assert!(need.holds(fg, bg), "{mode:?}: {name} is {ratio:.2}:1");
         }
     }
+}
+
+#[test]
+fn a_core_follows_the_primary_it_is_drawn_with() {
+    let fallback = colors(Mode::Dark);
+    let live = super::Colors {
+        primary: Color::from_rgb8(0x3a, 0x7b, 0xd5),
+        ..fallback
+    };
+
+    // The core is its primary half way to white, a half rounded up, worked out apart from the
+    // library's own mix.
+    let half_way = |primary: Color| {
+        let [r, g, b, a] = primary.into_rgba8();
+        let channel = |c: u8| u8::try_from((u16::from(c) + 255).div_ceil(2)).expect("at most 255");
+        [channel(r), channel(g), channel(b), a]
+    };
+
+    assert_eq!(
+        derived(&fallback, tokens::PRIMARY_CORE).into_rgba8(),
+        half_way(fallback.primary)
+    );
+    assert_eq!(
+        derived(&live, tokens::PRIMARY_CORE).into_rgba8(),
+        half_way(live.primary)
+    );
 }

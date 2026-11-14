@@ -1,0 +1,213 @@
+/* The bar's own boxes, as `config/quickshell/modules/bar/` lays them out. */
+
+/* The bar along the screen's top: the left group from the start, the clock in the middle, the right
+   group to the end, so the clock stays centred whatever either side holds. */
+.shell-bar-row {
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  height: var(--size-bar);
+}
+
+.shell-bar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s8);
+  min-width: 0;
+  /* space.s40 clear of the clock, at every width. */
+  padding-right: var(--space-s40);
+}
+
+.shell-bar-left > .shell-title {
+  /* space.s12 after the pills: the row's gap and a step more. */
+  margin-left: var(--space-s4);
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.shell-bar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-s8);
+  min-width: 0;
+  padding-left: var(--space-s40);
+}
+
+/* A bar alone, without its screen: the frame's surface under it, at the frame's glass. It is a
+   screen's width and never narrower: squeezed into a narrow card, its right group would run over
+   the clock, which the bar does only on a screen too narrow for it. */
+.shell-bar-strip {
+  position: relative;
+  display: flex;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--strip-width);
+  min-width: var(--strip-width);
+  max-width: none;
+  height: var(--size-bar);
+  padding: 0 var(--space-s8);
+  background: rgb(from var(--color-surface) r g b / var(--opacity-frame));
+}
+
+/* The title of the focused window: one line, cut where its room ends, sliding in from below. */
+@property --title-fade {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --title-rise {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+.shell-title {
+  display: block;
+  overflow: hidden;
+}
+
+.shell-title > .k-text {
+  max-width: 100%;
+  opacity: var(--title-fade);
+  translate: 0 calc(var(--space-s8) * (1 - var(--title-rise)));
+}
+
+/* The recording pill's mark: the radio button's dot, hollow in replay. */
+.shell-dot {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--size-radio_dot);
+  height: var(--size-radio_dot);
+  border-radius: var(--radius-full);
+  background: var(--color-error);
+}
+
+.shell-dot[data-hollow] {
+  background: none;
+  border: max(var(--stroke-hairline_device_px), round(nearest, var(--stroke-thin), var(--stroke-hairline_device_px))) solid var(--color-error);
+}
+
+/* A system monitor reading: as wide as "100%" at least, so the pill keeps its width as the numbers
+   change; its text at the left, straight after its symbol, the room it doesn't use after it. */
+.shell-reading {
+  display: flex;
+  justify-content: flex-start;
+  flex: none;
+  min-width: round(up, calc(var(--widest) * var(--px) - 0.001px), 1px);
+}
+
+/* The tray: each app's picture in a circle a chip tall, which takes the state layer. */
+.shell-tray-item {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--size-chip);
+  height: var(--size-chip);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  background: rgb(from var(--color-on_surface) r g b / calc(var(--opacity-hover) * var(--hovered, 0) + (var(--opacity-press) - var(--opacity-hover)) * var(--held, 0)));
+  transition: --hovered var(--motion-short) var(--easing-standard);
+}
+
+@property --hovered {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --held {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.shell-tray-item:hover,
+.shell-tray-item[data-pinned="lit"],
+.shell-tray-item[data-pinned="pressed"] {
+  --hovered: 1;
+}
+
+.shell-tray-item:active,
+.shell-tray-item[data-pinned="pressed"] {
+  --held: 1;
+}
+
+.shell-tray-picture {
+  display: block;
+  width: var(--icon-s16);
+  height: var(--icon-s16);
+  object-fit: contain;
+}
+
+/* A grey picture that would vanish into the bar, drawn in the content colour in its shape. */
+.shell-tray-picture[data-lifted] {
+  background: var(--color-on_surface);
+  mask: var(--picture) center / contain no-repeat;
+}
+
+/* The tray's menu, hanging `space.s12` under its icon. */
+.shell-tray-room {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Its top `space.s12` under the icon's circle, which is `space.s4` inside the pill. */
+.shell-tray-menu {
+  margin-top: calc(var(--space-s12) - var(--space-s4));
+  margin-left: var(--menu-x, 0px);
+}
+
+/* A screen holding only the bar and a strip of desktop under it. */
+.shell-screen-strip {
+  display: block;
+}
+
+/* The system monitor, compact: its rings fill the circle edge to edge, the rim CPU. */
+/* Over a lone pill's own ends: the circle is the rings, nothing round them. */
+.k-pill.shell-rim-pill[data-lone] {
+  --end: 0px;
+}
+
+.shell-rim {
+  display: block;
+  width: var(--size-control_sm);
+  height: var(--size-control_sm);
+}
+
+.shell-rim-track {
+  stroke: var(--tone);
+  stroke-opacity: var(--opacity-spinner_track);
+}
+
+.shell-rim-arc {
+  stroke: var(--tone);
+  stroke-linecap: round;
+}
+
+/* The bar's steps: each bar at its own size, scrolling sideways in its row where it is wider than
+   the page. */
+.shell-steps {
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.shell-steps-live {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* The clock's time, centred in a slot as wide as the widest time it shows (`clockTime`). */
+.shell-clock-time {
+  --time-width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+  --slot-width: round(up, calc(var(--slot) * var(--px) - 0.001px), 1px);
+  width: var(--slot-width);
+  padding-inline-start: round(down, calc((var(--slot-width) - var(--time-width)) / 2), 1px);
+}

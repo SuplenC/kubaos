@@ -6,6 +6,7 @@ singleton ButtonMetrics 1.0 ButtonMetrics.qml
 singleton LayoutPasses 1.0 LayoutPasses.qml
 singleton FrameQueue 1.0 FrameQueue.qml
 singleton Motion 1.0 Motion.qml
+singleton Advances 1.0 Advances.qml
 SheetPath 1.0 sheetpath.js
 Text 1.0 Text.qml
 Icon 1.0 Icon.qml
@@ -13,6 +14,8 @@ Layout 1.0 Layout.qml
 Row 1.0 Row.qml
 Stack 1.0 Stack.qml
 Grid 1.0 Grid.qml
+Split 1.0 Split.qml
+Flow 1.0 Flow.qml
 Slot 1.0 Slot.qml
 Fill 1.0 Fill.qml
 Gap 1.0 Gap.qml
@@ -77,3 +80,13 @@ Meter 1.0 Meter.qml
 Sparkline 1.0 Sparkline.qml
 Sheet 1.0 Sheet.qml
 Calendar 1.0 Calendar.qml
+Keyed 1.0 keyed.js
+ListRows 1.0 ListRows.qml
+ScrollingList 1.0 ScrollingList.qml
+LiveList 1.0 LiveList.qml
+LiveRow 1.0 LiveRow.qml
+Pill 1.0 Pill.qml
+HeaderFade 1.0 HeaderFade.qml
+BadgedIcon 1.0 BadgedIcon.qml
+Figure 1.0 Figure.qml
+ProgressPanel 1.0 ProgressPanel.qml

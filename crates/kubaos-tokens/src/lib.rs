@@ -5,9 +5,10 @@
 //! design/tokens.toml ─▶ parse ─▶ rules::check ─▶ Tokens ─▶ Target::render
 //!   ├▶ by each crate's build script, into its OUT_DIR: kubaos-ui's tokens.rs, Kōbō's done/neon.rs,
 //!   │  kubaos-cursor's tokens.rs
-//!   ├▶ by the Nix build, or `just tokens` in a checkout: qml/KubaOS/Components/{Tokens,Symbols}.qml,
+//!   ├▶ by the Nix build, or `just tokens` (and the mockups' Vite build) in a checkout:
+//!   │  qml/KubaOS/Components/{Tokens,Symbols}.qml,
 //!   │  config/{ghostty,foot,fuzzel}, config/tmux/colors.conf, config/matugen/templates/{ghostty,…},
-//!   │  config/hypr/tokens.lua
+//!   │  config/hypr/tokens.lua, design/mockups/src/tokens.css
 //!   └▶ checked in: the Plymouth script's tokens, kubaos.plymouth, GRUB's theme.txt,
 //!      config/matugen/config.toml's hues
 //! ```
@@ -25,10 +26,12 @@
 
 pub mod boot;
 pub mod contrast;
+pub mod css;
 pub mod cursor;
 pub mod hypr;
 pub mod model;
 pub mod neon;
+pub mod oklch;
 pub mod qml;
 pub mod rules;
 pub mod rust;
@@ -70,9 +73,10 @@ pub enum Error {
 /// [`Error::Parse`] when `text` isn't the tokens' shape, [`Error::Invalid`] with every broken rule
 /// when it is but breaks some.
 pub fn parse(text: &str) -> Result<Tokens, Error> {
-    let tokens: Tokens = toml::from_str(text).map_err(Error::Parse)?;
+    let mut tokens: Tokens = toml::from_str(text).map_err(Error::Parse)?;
     let violations = rules::check(&tokens);
     if violations.is_empty() {
+        tokens.color.fill_recipes();
         Ok(tokens)
     } else {
         Err(Error::Invalid(violations))

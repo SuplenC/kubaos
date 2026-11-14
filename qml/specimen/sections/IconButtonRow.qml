@@ -3,7 +3,7 @@ import KubaOS.Components as K
 import "samples.js" as Samples
 
 // One kind of icon button of `size`, in every state, under the label buttons' columns.
-K.Grid {
+K.Split {
     id: line
 
     property string kind

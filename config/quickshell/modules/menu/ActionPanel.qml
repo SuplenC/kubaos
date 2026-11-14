@@ -108,15 +108,20 @@ Item {
                         spacing: K.Tokens.space.s4
 
                         // An Extension's name over its Contributed actions, 8 under the row above.
-                        Label {
-                            x: K.Tokens.space.s12
-                            width: parent.width - K.Tokens.space.s12 * 2
+                        Item {
+                            width: parent.width
                             height: K.Tokens.space.s8 + K.Tokens.type.label.line
                             visible: entry.heading
-                            verticalAlignment: Text.AlignBottom
-                            type: K.Tokens.type.label
-                            text: Words.kindLabel(entry.modelData.group)
-                            color: K.Tokens.color.on_surface_variant
+
+                            K.Text {
+                                x: K.Tokens.space.s12
+                                y: K.Tokens.space.s8
+                                width: parent.width - K.Tokens.space.s12 * 2
+                                maximumLines: 1
+                                style: K.Tokens.type.label
+                                text: Words.kindLabel(entry.modelData.group)
+                                color: K.Tokens.color.on_surface_variant
+                            }
                         }
 
                         Rectangle {
@@ -125,12 +130,12 @@ Item {
                             radius: panel.rowRadius
                             color: entry.current ? K.Tokens.color.secondary_container : "transparent"
 
-                            Label {
+                            K.Text {
                                 x: K.Tokens.space.s12
                                 y: (parent.height - height) / 2
                                 width: shortcut.x - K.Tokens.space.s12 * 2
-                                height: K.Tokens.type.body_strong.line
-                                type: K.Tokens.type.body_strong
+                                maximumLines: 1
+                                style: K.Tokens.type.body_strong
                                 text: entry.modelData.title
                                 color: entry.main
                             }
@@ -148,7 +153,7 @@ Item {
                                 Repeater {
                                     model: shortcut.keys.length
 
-                                    Keycap {
+                                    K.Keycap {
                                         required property int index
 
                                         key: shortcut.keys[index] ?? ""

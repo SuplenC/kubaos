@@ -54,15 +54,25 @@ impl Reading<'_> {
     }
 }
 
-/// Every pair's contrast in each mode, pair by pair.
+/// Every pair's contrast in each mode, pair by pair, the derived roles computed from the palette.
 pub fn readings(tokens: &Tokens) -> Vec<Reading<'_>> {
+    let palettes = [
+        tokens.color.with_derived(&tokens.color.dark, Mode::Dark),
+        tokens.color.with_derived(&tokens.color.light, Mode::Light),
+    ];
+    readings_in(tokens, &palettes)
+}
+
+/// Every pair's contrast in `palettes`, the dark one and the light one, each with its derived
+/// roles.
+pub fn readings_in<'a>(tokens: &'a Tokens, palettes: &[BTreeMap<String, Rgb>; 2]) -> Vec<Reading<'a>> {
     let mut found = Vec::new();
     for pair in &tokens.contrast.pairs {
         for mode in Mode::ALL {
-            let palette = match mode {
-                Mode::Dark => &tokens.color.dark,
-                Mode::Light => &tokens.color.light,
-            };
+            let palette = &palettes[match mode {
+                Mode::Dark => 0,
+                Mode::Light => 1,
+            }];
             found.push(Reading {
                 pair,
                 mode,

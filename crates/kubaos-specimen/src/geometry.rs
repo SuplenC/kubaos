@@ -5,8 +5,8 @@
 //!
 //! # Owns
 //!
-//! - The frames of every page ([`frames`]), the rules from the tokens ([`rules`]), and the parity
-//!   report ([`parity`]).
+//! - The frames of every page ([`frames`]), the rules from the tokens ([`rules`]), the parity
+//!   report ([`parity`]), and the mockups' components held to the specimen's ([`mockup`]).
 //!
 //! # Not here
 //!
@@ -143,6 +143,78 @@ pub fn parity(dir: &Path) -> Result<Parity, ParityError> {
     let findings = kubaos_geometry::check(&qml_frames, &rules());
     report.findings = findings.len();
     report.lines.extend(findings.iter().map(ToString::to_string));
+    Ok(report)
+}
+
+/// What holding the mockups' frames to the specimen found.
+#[derive(Debug, Default)]
+pub struct Mockup {
+    /// How many mockup frames were read.
+    pub frames: usize,
+    /// How many of their components had a twin in the specimen.
+    pub compared: usize,
+    /// The components with no twin: words the specimen doesn't show, such as the long ones.
+    pub unmatched: Vec<String>,
+    /// Boxes of a component that differ from its twin's.
+    pub differences: usize,
+    /// Geometry findings in the mockup frames.
+    pub findings: usize,
+    /// What to print: the first differences of each frame, then the findings.
+    pub lines: Vec<String>,
+}
+
+/// The mockup site's frames in `dir` (`PAGE-MODE-SCALEx.json`, from `scripts/render.ts`), each
+/// held to the geometry rules, and each of its components to its twin on the specimen's pages at
+/// the same mode and scale, wherever each page puts it.
+///
+/// # Errors
+///
+/// When `dir` or a frame in it can't be read, or a page of the specimen can't be laid out.
+pub fn mockup(dir: &Path) -> Result<Mockup, ParityError> {
+    let read = |path: &Path| {
+        fs::read_to_string(path).map_err(|source| ParityError::Read {
+            path: path.to_path_buf(),
+            source,
+        })
+    };
+    let entries = fs::read_dir(dir).map_err(|source| ParityError::Read {
+        path: dir.to_path_buf(),
+        source,
+    })?;
+    let mut paths: Vec<_> = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .collect();
+    paths.sort();
+    let specimen = frames().map_err(ParityError::Shot)?;
+    let mut report = Mockup::default();
+    let mut mockups = Vec::new();
+    for path in paths {
+        let text = read(&path)?;
+        let frame: Frame = serde_json::from_str(&text).map_err(|source| ParityError::Frame { path, source })?;
+        let found = parity::components(&specimen, &frame, ("iced", "mockup"));
+        report.frames += 1;
+        report.compared += found.compared;
+        report.differences += found.differences.len();
+        report
+            .lines
+            .extend(found.differences.iter().take(parity::SHOWN).map(ToString::to_string));
+        if found.differences.len() > parity::SHOWN {
+            report.lines.push(format!(
+                "{}: {} more difference(s)",
+                frame.name(),
+                found.differences.len() - parity::SHOWN
+            ));
+        }
+        report.unmatched.extend(found.unmatched);
+        mockups.push(frame);
+    }
+    let findings = kubaos_geometry::check(&mockups, &rules());
+    report.findings = findings.len();
+    report.lines.extend(findings.iter().map(ToString::to_string));
+    report.unmatched.sort();
+    report.unmatched.dedup();
     Ok(report)
 }
 

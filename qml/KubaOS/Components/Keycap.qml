@@ -5,6 +5,10 @@ import KubaOS.Components as K
 // sits inline with body and caption text; the `keycap` type on the highest container, a hairline
 // edge with a heavier bottom, the small radius, 4 either side of the key and never narrower than
 // tall, so a one-letter key is square.
+//
+// HAZARD: no layout primitives in here; the key is placed with token arithmetic. The Command
+// menu's footer, Action panel and detail pane make their keycaps again as the selection moves, on
+// the keystroke's frame.
 Item {
     id: root
 
@@ -22,7 +26,7 @@ Item {
             }
         })
 
-    implicitWidth: Math.max(Tokens.size.keycap, K.Look.snapUp(label.implicitWidth, root.dpr))
+    implicitWidth: Math.max(Tokens.size.keycap, padded.width)
     implicitHeight: Tokens.size.keycap
 
     // The edge fills the whole key; the face stands on it one hairline short of the bottom, so
@@ -42,14 +46,26 @@ Item {
         border.color: Tokens.color.outline_variant
     }
 
-    K.Row {
-        id: label
+    // The key and the 4 either side of it, centred: the box iced's padded row is, which the
+    // geometry check holds this to.
+    Item {
+        id: padded
 
-        x: K.Look.snap((root.width - label.implicitWidth) / 2, root.dpr)
-        leftPadding: Tokens.space.s4
-        rightPadding: Tokens.space.s4
+        readonly property var probe: ({
+                role: "layout",
+                axis: "x",
+                gap: 0,
+                align: "start"
+            })
+
+        x: K.Look.snap((root.width - padded.width) / 2, root.dpr)
+        width: label.implicitWidth + Tokens.space.s4 * 2
+        height: label.implicitHeight
 
         K.Text {
+            id: label
+
+            x: Tokens.space.s4
             text: root.key
             style: Tokens.type.keycap
             color: Tokens.color.on_surface_variant

@@ -1,0 +1,210 @@
+// One of a few views or values, picked along a rail of neon: `kubaos-ui`'s `tabs::tabs`,
+// `KubaOS.Components`' `Tabs` (`docs/design/components/tabs.md`). The choices sit in one well, a
+// pill as tall as a small control, with an unlit rail along its bottom edge; the picked choice's
+// stretch of the rail is lit, and its words are the accent. The same well is a setting's segmented
+// control (Always, On AC, Never). `.k-tabs` in `lib.css` draws it.
+//
+// A pick sends the lit stretch from the old choice to the new one: its leading edge goes over
+// `short` and its trailing edge follows a `micro` later over `medium`, both on `emphasized_decel`,
+// so it stretches as it travels and catches up, and its core flashes toward white as it lands. A
+// pick made mid-flight starts from wherever the stretch is. With reduce motion the stretch is on
+// the new choice at once and only the colours fade.
+//
+// The row is one stop for Tab, on the picked choice, and the focus tube lights the whole well's
+// edge: ← and → (h and l) pick the neighbour, round from either end, and the keyboard follows the
+// pick. Disabled, everything dims, the pick still shown, and the row takes no press and is no stop
+// for Tab.
+
+import { iconInLine } from "./button.ts";
+import { type Pinned, pin } from "./control.ts";
+import { focusRing } from "./focus.ts";
+import { row } from "./layout.ts";
+import { FIXED_HEIGHT, probe } from "./probe.ts";
+import { text } from "./text.ts";
+import { raw } from "./tokens.ts";
+import { CHROME, settings } from "../site/settings.ts";
+
+export interface Tab {
+  readonly label: string;
+  readonly icon?: string;
+}
+
+export interface TabsOptions {
+  readonly choices: readonly Tab[];
+  readonly picked?: number;
+  readonly disabled?: boolean;
+  /**
+   * The row pinned in a state: lit or lit with the signs off, as the keyboard on the row lights
+   * it; pressed, the choice after the picked one held under the pointer.
+   */
+  readonly pinned?: Pinned;
+  /**
+   * The choice a pick comes from, for a move's sample: the lit stretch and the words start there
+   * and the move's player takes them to the picked one.
+   */
+  readonly from?: number;
+  /** What a pick does besides picking: the view it shows. */
+  readonly onPick?: (index: number) => void;
+  /**
+   * The well as wide as the room it is given, its choices sharing it equally with their words
+   * centred: a setting's row, where the well ends in line with the controls under it.
+   */
+  readonly fill?: boolean;
+}
+
+/** A lit stretch's two edges along the well, in CSS pixels from its left edge. */
+interface Edges {
+  readonly left: number;
+  readonly right: number;
+}
+
+/** The duration token `name` in milliseconds under the speed setting. */
+function duration(name: string): number {
+  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+}
+
+export function tabs(options: TabsOptions): HTMLElement {
+  const count = options.choices.length;
+  const clamp = (index: number) => Math.max(0, Math.min(count - 1, index));
+  let picked = clamp(options.picked ?? 0);
+  const from = options.from === undefined ? null : clamp(options.from);
+
+  const well = document.createElement("span");
+  well.className = "k-tabs";
+  well.setAttribute("role", "tablist");
+  if (options.disabled) well.setAttribute("aria-disabled", "true");
+  if (options.fill) well.dataset.fill = "";
+  if (options.pinned !== "pressed") pin(well, options.pinned);
+  focusRing(well, "full", "accent", false);
+
+  const buttons = options.choices.map((choice, index) => {
+    const each = document.createElement("button");
+    each.className = "k-tab k-control";
+    each.type = "button";
+    each.setAttribute("role", "tab");
+    each.disabled = options.disabled ?? false;
+    const words = text(choice.label, "button_small");
+    words.style.color = "var(--words)";
+    const glyph = choice.icon ? iconInLine(choice.icon, "button_small", "var(--words)") : null;
+    const content = row("s4", "start", ...(glyph ? [glyph, words] : [words]));
+    content.classList.add("k-tab-words");
+    each.append(content);
+    each.addEventListener("click", () => pick(index, false));
+    each.addEventListener("keydown", (event) => {
+      const by = event.key === "ArrowLeft" || event.key === "h" ? -1 : event.key === "ArrowRight" || event.key === "l" ? 1 : 0;
+      if (by === 0) return;
+      event.preventDefault();
+      pick((picked + by + count) % count, true);
+    });
+    return each;
+  });
+  if (options.pinned === "pressed") pin(buttons[(picked + 1) % count]!, "pressed");
+  if (from !== null && from !== picked) buttons[from]!.dataset.was = "";
+
+  const rail = document.createElement("span");
+  rail.className = "k-tabs-rail";
+  const lit = document.createElement("span");
+  lit.className = "k-tabs-lit";
+  well.append(...buttons, rail, lit);
+
+  /** Marks the pick on every choice: its words, its stop for Tab and what it reads out. */
+  function mark(): void {
+    for (const [index, each] of buttons.entries()) {
+      const current = index === picked;
+      each.setAttribute("aria-selected", String(current));
+      each.tabIndex = current && !options.disabled ? 0 : -1;
+    }
+  }
+
+  // Where a choice's stretch of the rail runs is its words' width, which only layout knows: the
+  // choice's box less its label padding on each side, read back from the laid-out well. The page's
+  // box is zoomed to the display's ratio, so a box read in the viewport's pixels is brought back to
+  // the well's own by its width over its layout width.
+  /** `part`'s edges in the well's own CSS pixels from its padding edge. */
+  function within(part: Element): Edges {
+    const outer = well.getBoundingClientRect();
+    const box = part.getBoundingClientRect();
+    const ratio = well.offsetWidth / Math.max(1, outer.width);
+    const origin = outer.left;
+    return { left: (box.left - origin) * ratio - well.clientLeft, right: (box.right - origin) * ratio - well.clientLeft };
+  }
+
+  /** The lit stretch's edges under choice `index`: its box less the label padding either side. */
+  function under(index: number): Edges {
+    const each = buttons[index]!;
+    const box = within(each);
+    const style = getComputedStyle(each);
+    return { left: box.left + Number.parseFloat(style.paddingLeft), right: box.right - Number.parseFloat(style.paddingRight) };
+  }
+
+  /** Where the lit stretch is drawn now, mid-flight or at rest. */
+  function where(): Edges {
+    return within(lit);
+  }
+
+  /** Sets the stretch's travel, from `start` to `end`, its leading edge the one in the way of travel. */
+  function travel(start: Edges, end: Edges): void {
+    well.style.setProperty("--from-left", `${start.left}px`);
+    well.style.setProperty("--from-right", `${start.right}px`);
+    well.style.setProperty("--to-left", `${end.left}px`);
+    well.style.setProperty("--to-right", `${end.right}px`);
+    well.dataset.toward = end.left >= start.left ? "right" : "left";
+  }
+
+  let flying: Animation[] = [];
+
+  /**
+   * Plays the stretch's travel and its flash on the page's clock: the leading edge over `short`,
+   * the trailing one a `micro` later over `medium`, and the core rising to its flash over `micro`
+   * and settling over `long`. Reduce motion leaves the stretch where it lands and keeps the flash,
+   * settling within its cap.
+   */
+  function fly(): void {
+    for (const each of flying) each.cancel();
+    flying = [];
+    if (!CHROME || !well.isConnected) return;
+    const reduced = settings().reduced;
+    const decel = raw("easing-emphasized_decel");
+    const standard = raw("easing-standard");
+    if (!reduced) {
+      flying.push(lit.animate([{ "--lead": "0" }, { "--lead": "1" }], { duration: duration("short"), easing: decel }));
+      flying.push(
+        lit.animate([{ "--trail": "0" }, { "--trail": "1" }], { duration: duration("medium"), delay: duration("micro"), easing: decel, fill: "backwards" }),
+      );
+    }
+    const rise = duration("micro");
+    const settle = duration(reduced ? "short" : "long");
+    flying.push(
+      lit.animate(
+        [
+          { "--flash": "0", easing: standard },
+          { "--flash": "1", offset: rise / (rise + settle), easing: standard },
+          { "--flash": "0" },
+        ],
+        { duration: rise + settle },
+      ),
+    );
+  }
+
+  function pick(index: number, focus: boolean): void {
+    if (focus) buttons[index]?.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
+    if (index === picked) return;
+    const start = where();
+    picked = index;
+    mark();
+    travel(start, under(picked));
+    fly();
+    options.onPick?.(index);
+  }
+
+  /** Lays the stretch on the pick, or for a move's sample its travel from `from`, whenever the well's size changes. */
+  function lay(): void {
+    if (!well.isConnected || flying.some((each) => each.playState === "running")) return;
+    const end = under(picked);
+    travel(from !== null && from !== picked ? under(from) : end, end);
+  }
+
+  mark();
+  new ResizeObserver(lay).observe(well);
+  return probe(well, { role: "component", name: "Tabs", variant: "", fixed: FIXED_HEIGHT });
+}

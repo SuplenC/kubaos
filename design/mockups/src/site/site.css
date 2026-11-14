@@ -1,0 +1,2250 @@
+/* The site around the mocks (the top bar, the navigation, the rail) at scale 1, and the page's
+   parts, drawn at the page's scale like the mocks they hold. Every value is a token. */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+/* Every glyph at its outline's own advance, unhinted, so the words wrap the same whatever the
+   machine's font settings are, and a mock below them lands where its frame says. */
+html,
+body {
+  text-rendering: geometricPrecision;
+  background: var(--color-surface);
+  color: var(--color-on_surface);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+
+/* The site's own controls: the toolbar's choices and the motion players' buttons. */
+.site-control {
+  all: unset;
+  font-family: var(--type-label-family);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  line-height: var(--type-label-line);
+  padding: var(--space-s4) var(--space-s8);
+  border-radius: var(--radius-small);
+  color: var(--color-on_surface_variant);
+  background: var(--color-surface_container);
+  cursor: pointer;
+}
+
+.site-control[aria-pressed="true"] {
+  color: var(--color-on_secondary_container);
+  background: var(--color-secondary_container);
+}
+
+.site-control:disabled {
+  cursor: default;
+  color: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+.site-control:focus-visible {
+  outline: max(1px, round(nearest, var(--focus-tube), 1px)) solid var(--color-primary);
+}
+
+/* The top bar: the brand and the settings' groups, over the page and the floating hints among it.
+   It wraps onto more rows in a narrow window. */
+.site-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s12);
+  padding: var(--space-s12) var(--space-s16);
+  background: var(--color-surface_container_low);
+  border-bottom: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.site-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s8);
+}
+
+/* The navigation, the page and the rail: the page fills the room between the two. */
+.site-body {
+  display: grid;
+  grid-template-columns: var(--size-sidebar) minmax(0, 1fr) var(--size-rail);
+  align-items: start;
+}
+
+/* The navigation and the rail stick under the top bar, so no link hides under the bar or past the
+   window's foot. */
+.site-nav,
+.site-rail {
+  position: sticky;
+  top: var(--site-toolbar-height, 0px);
+  display: flex;
+  flex-direction: column;
+}
+
+.site-rail {
+  max-height: calc(100vh - var(--site-toolbar-height, 0px));
+  overflow-y: auto;
+}
+
+/* The navigation is SidebarPage's sidebar (`lib/sidebar-page.css`): a band `size.sidebar` wide in
+   `surface_container_low`, the window's height under the top bar, its rows `space.s12` in and
+   `space.s4` apart. The search field is its first part, then a hairline `space.s8` clear of the
+   field and of the rows, as under SidebarPage's Home. The rows scroll on their own under it, the
+   band's padding their scroll's padding and the thumb's room; the band's edges cut the glow. */
+.site-nav {
+  height: calc(100vh - var(--site-toolbar-height, 0px));
+  overflow: clip;
+  background: var(--color-surface_container_low);
+}
+
+.site-nav-head {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  padding: var(--space-s12) var(--space-s12) 0;
+}
+
+.site-nav-rule {
+  display: flex;
+  padding-top: var(--space-s8);
+}
+
+.site-nav-rule > .k-divider {
+  flex: 1;
+}
+
+.site-nav > .k-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.site-nav-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
+  padding: var(--space-s8) var(--space-s12) var(--space-s12);
+}
+
+/* A level: its section's row over its pages' rows, `space.s4` apart as SidebarPage's are, the
+   rows' own start in line with the section's words. It opens and shuts as a Collapsible does
+   (`.k-collapsible` in `lib/lib.css`). */
+.site-nav-level > .k-collapsible-body > .k-collapsible-content {
+  padding: var(--space-s4) 0 0;
+}
+
+.site-nav-level[hidden],
+.site-nav .k-sp-row[hidden] {
+  display: none;
+}
+
+/* The search field, the library's, with its key on a keycap at its end while it is empty and the
+   keyboard is elsewhere: `space.s12` in, as the field's words are from its start. */
+.site-search {
+  --end: calc(var(--space-s12) + var(--size-keycap) + var(--space-s8));
+}
+
+.site-search > .k-keycap {
+  position: absolute;
+  top: 50%;
+  right: var(--space-s12);
+  translate: 0 -50%;
+}
+
+.site-search:is(:focus, [data-filled]) > .k-keycap {
+  visibility: hidden;
+}
+
+.site-rail-link {
+  display: block;
+  color: var(--color-on_surface_variant);
+  text-decoration: none;
+}
+
+.site-rail {
+  gap: var(--space-s4);
+  padding: var(--space-s32) var(--space-s24);
+  border-left: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.site-rail > .k-text {
+  padding-bottom: var(--space-s8);
+}
+
+/* A link's mark is a line down its start, lit in the accent on the section read now. */
+.site-rail-link {
+  padding: var(--space-s4) 0 var(--space-s4) var(--space-s12);
+  border-left: var(--stroke-thin) solid var(--color-outline_variant);
+}
+
+.site-rail-link:hover,
+.site-rail-link[aria-current] {
+  color: var(--color-on_surface);
+}
+
+.site-rail-link[aria-current] {
+  border-left-color: var(--color-primary);
+}
+
+/* The page: its parts at the page's scale, in a container that fills the room between the
+   navigation and the rail. The page is a layer of its own: a part that lifts itself inside it (a
+   lit list's ring, an open select) stays under the top bar as the page scrolls past it. It never
+   scrolls sideways: a sample wider than its room scrolls in its own box (`site/settle.ts`). */
+.page {
+  isolation: isolate;
+  min-width: 0;
+  overflow-x: clip;
+  padding: var(--space-s32) 0 var(--space-s64);
+  background: var(--color-surface);
+}
+
+/* Its padding for the width it takes, picked by `site/settle.ts`. */
+.page-container {
+  padding-inline: var(--container-0-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s64);
+}
+
+.page-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s32);
+}
+
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+.page-header > .page-prose {
+  max-width: none;
+}
+
+/* The library's parts a surface is built from, each a link to its page. */
+.page-from-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: var(--space-s4);
+}
+
+.page-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s8);
+  padding-top: var(--space-s8);
+}
+
+/* A name in code: a pill with a hairline, in the error's colour for what isn't built yet. */
+.page-code-tag {
+  display: flex;
+  padding: var(--space-s4) var(--space-s12);
+  border-radius: var(--radius-full);
+  background: var(--color-surface_container_low);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.page-code-tag[data-warn] {
+  outline-color: var(--color-error);
+}
+
+.page-code-tag[data-warn] > .k-text {
+  color: var(--color-error) !important;
+}
+
+.page-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s8);
+}
+
+/* A section: its heading, then its tables and samples. */
+.page-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s24);
+}
+
+.page-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+}
+
+.page-prose {
+  max-width: var(--size-column);
+  font-family: var(--t-family);
+  font-size: var(--t-size);
+  font-weight: var(--t-weight);
+  line-height: var(--t-line);
+}
+
+.page-code {
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+  color: var(--color-on_surface_variant);
+}
+
+/* The stage: the panes side by side, then the bar of chips that drives them, all one surface in
+   a hairline. Each pane is painted in its own mode; a sample wider than it is scaled to fit. */
+.page-hero {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-surface);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+/* Nothing clips the stage: a sample that opens (a select's list, a menu) spills past its pane, over
+   the bar and the page under it. So the corners are rounded part by part. */
+.page-panes {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--panes, 1), minmax(0, 1fr));
+}
+
+.page-panes > .page-pane:first-child {
+  border-top-left-radius: var(--radius-surface);
+}
+
+.page-panes > .page-pane:last-child {
+  border-top-right-radius: var(--radius-surface);
+}
+
+.page-hero[data-panes="2"] {
+  --panes: 2;
+}
+
+/* A stage of whole screens stands its panes one under the other, each across the stage, so they
+   are drawn about twice as large as side by side; the night pane above takes both top corners. */
+.page-hero[data-screen] .page-panes {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.page-hero[data-screen] .page-panes > .page-pane:first-child {
+  border-top-right-radius: var(--radius-surface);
+}
+
+.page-hero[data-screen] .page-panes > .page-pane:last-child:not(:first-child) {
+  border-top-right-radius: 0;
+}
+
+.f-painted.page-pane {
+  min-width: 0;
+  gap: var(--space-s24);
+  padding: var(--space-s32);
+  border-radius: 0;
+}
+
+.page-pane-head {
+  display: flex;
+  justify-content: space-between;
+  align-self: stretch;
+}
+
+.page-pane-fit {
+  align-self: stretch;
+}
+
+/* `?all` draws the panes one under another at their samples' own size (`site/parts/stage.ts`). */
+[data-all] .page-panes {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+[data-all] .page-pane-fit {
+  overflow-x: auto;
+}
+
+/* A sample drawn in one pane (a template with no daylight) stands in the stage's middle. */
+.page-hero[data-panes="1"] .page-stage-flow {
+  justify-content: center;
+}
+
+.page-stage-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-s24) var(--space-s32);
+  transform-origin: 0 0;
+}
+
+.page-stage-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s16);
+  padding: var(--space-s12) var(--space-s16);
+  background: var(--color-surface_container_low);
+  border-top: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  border-radius: 0 0 var(--radius-surface) var(--radius-surface);
+}
+
+.page-stage-hint {
+  margin-left: auto;
+  text-align: right;
+}
+
+.page-hero > .page-na {
+  padding: var(--space-s12) var(--space-s16);
+  border-top: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+/* The page's tables: on the low container at the content radius, a hairline under each row. */
+.page-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--size-column)), 1fr));
+  gap: var(--space-s24) var(--space-s32);
+  align-items: start;
+}
+
+.page-titled {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s12);
+  min-width: 0;
+}
+
+.page-spec-box {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container_low);
+}
+
+.page-spec-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.page-spec-table th,
+.page-spec-table td {
+  padding: var(--space-s8) var(--space-s16);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.page-spec-table tbody tr:last-child > td {
+  border-bottom: 0;
+}
+
+/* A state the part doesn't have reads as a footnote to the ones it has. */
+.page-spec-table tr[data-muted] > td {
+  opacity: var(--opacity-disabled_content);
+}
+
+.page-spec-table .page-spec-value {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.page-spec-table .page-prose {
+  max-width: none;
+}
+
+.page-tokens tbody tr {
+  cursor: pointer;
+}
+
+.page-tokens tbody tr[data-lit] > td {
+  background: var(--color-secondary_container);
+}
+
+.page-tokens tbody tr[data-pinned] > td {
+  background: var(--color-secondary_container_pressed);
+}
+
+.page-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s4) var(--space-s12);
+}
+
+.page-combination {
+  display: inline-flex;
+  gap: var(--space-s4);
+}
+
+/* A sample clicked into, which takes the wheel until Esc or a click outside lets it go
+   (`site/scroll.ts`): its box's edge, a hairline. */
+[data-sample][data-engaged] {
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+/* A sample out of view (`sampleBox` in `site/dom.ts`) holds its endless loops where they are, so a
+   page asks for no frames for what nobody sees; they go on from there when it comes back. Only the
+   loops: a move that ends is left to end, so a sample scrolled to later has landed as it would. */
+[data-sample][data-away] :is(.gl-loop, .k-skeleton, .k-spinner, .k-step[data-running] > .k-row > .k-step-bead, .f-race) {
+  animation-play-state: paused;
+}
+
+/* A sample's own box on a stage or beside a description: as wide as the sample, the container's
+   width at most, unless `site/settle.ts` lets it out; one wider than the page scrolls inside. */
+.page-view {
+  flex: none;
+  display: flex;
+  max-width: 100%;
+}
+
+.page-view[data-scrolls] {
+  overflow-x: auto;
+}
+
+/* Where the shelf measures its samples (`site/parts/shelf.ts`): each at its own width, unseen. */
+.page-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+}
+
+.page-measure-item {
+  display: flex;
+}
+
+.page-measure-column {
+  width: var(--size-column);
+}
+
+/* Small samples: a grid of cards, as many a row as fit at the widest sample's width, each the
+   sample over its name and words. Every card is that one width, a whole number of device pixels,
+   so every sample starts on one. The card is a hairline on the
+   page's own surface, so every sample is seen on the surface it is drawn for; its padding is past
+   the focus glow's reach. */
+.page-cards {
+  display: grid;
+  align-items: start;
+  grid-template-columns: repeat(auto-fill, min(100%, max(var(--size-rail), calc(var(--widest) + 2 * var(--space-s24)))));
+  gap: var(--space-s16);
+}
+
+.page-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  padding: var(--space-s24);
+  border-radius: var(--radius-surface);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.page-card-sample {
+  display: flex;
+  align-items: flex-start;
+}
+
+.page-cards[data-filled] {
+  align-items: stretch;
+  grid-template-columns: repeat(auto-fill, var(--card));
+}
+
+.page-card-words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
+}
+
+/* A window-sized sample's stage: its switcher's rows of chips, then the one picked at its real
+   size, its name and words beside it while `size.rail` fits there, under it when it doesn't. */
+.page-stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s24);
+}
+
+.page-stage-switch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+.page-stage-switch > [hidden],
+.page-stage-item[hidden] {
+  display: none;
+}
+
+.page-stage-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-s16) var(--space-s32);
+}
+
+/* A sample that fills its room is laid out across the stage, as a column's one child, under its
+   words, which say what to read in it. */
+.page-stage-item[data-fluid] > .page-view {
+  flex: 1 1 100%;
+  flex-direction: column;
+}
+
+.page-stage-item[data-fluid] > .page-stage-words {
+  order: -1;
+}
+
+.page-stage-words {
+  flex: 1 1 var(--size-rail);
+  max-width: var(--size-column);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
+}
+
+.page-heading,
+.page-subheading,
+.page-title {
+  font: inherit;
+}
+
+.page-subheading {
+  margin-top: var(--space-s8);
+}
+
+/* A grid of samples: the names' column, then a column per state or length, as wide as their
+   widest cell, so every cell starts on a whole device pixel. */
+/* A grid's bands, when its columns are wider than the page: one under another, a band apart. */
+/* As wide as its room, never its widest band, so the bands are split for the room they are in. */
+.page-bands {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s32);
+  align-self: stretch;
+  min-width: 0;
+}
+
+.page-matrix {
+  display: grid;
+  grid-template-columns: repeat(calc(var(--columns) + 1), max-content);
+  gap: var(--space-s24) var(--space-s32);
+}
+
+/* A cell of the page's own words is centred down its row; one holding a mock starts at its top,
+   and `site/settle.ts` centres the mock on a whole device pixel. */
+.page-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.page-cell[data-mock] {
+  justify-content: flex-start;
+}
+
+
+
+
+
+.page-players {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+}
+
+.page-player {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s12);
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_low);
+}
+
+/* A player's sample in a box of its own, which the player's animations move. Wider than the page
+   at a large scale, it scrolls on its own rather than the page; its padding is past the glow's
+   reach, so the scroll cuts no glow. */
+.page-player-stage {
+  position: relative;
+  display: flex;
+  justify-content: flex-start;
+  padding: var(--space-s24);
+  overflow-x: auto;
+}
+
+/* A sample scaled to fit its stage: the outer box is as big as it is drawn, the inner one at the
+   sample's own size, scaled from its top left (`refit` in `site/parts/motion.ts`). */
+.page-fit {
+  flex: none;
+}
+
+/* The sample in it is laid out as on the stage itself: a flex row's one item, at its own width. */
+.page-fit-inner {
+  display: flex;
+  width: max-content;
+  transform-origin: 0 0;
+}
+
+/* The section's moves, a row of chips for each time they play, over the one player. */
+.page-motion-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-s12) var(--space-s24);
+  align-items: start;
+}
+
+.page-motion-group {
+  display: contents;
+}
+
+.page-motion-when {
+  display: flex;
+  align-items: center;
+  min-height: var(--size-chip);
+}
+
+.page-player-controls > [hidden] {
+  display: none;
+}
+
+/* The picked part's layers, outlined on the whole sample. */
+.page-player-outlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.page-player-outline {
+  position: absolute;
+  outline: var(--stroke-hairline_device_px) dashed var(--color-on_surface);
+}
+
+/* Each part alone under the legend, in the legend's order, as many a row as fit a dialog's width,
+   each on its own stage, its sample scaled down to fit it. With `?all`, as the checks draw it, one
+   full row each at the sample's own size, so every box is the one the page draws elsewhere. */
+.page-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--size-dialog)), 1fr));
+  gap: var(--space-s16);
+}
+
+[data-all] .page-parts {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-parts:empty {
+  display: none;
+}
+
+.page-part-alone,
+.page-part-resting {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+.page-part-stage {
+  display: flex;
+  overflow-x: auto;
+  padding: var(--space-s24);
+  border-radius: var(--radius-control);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.page-part-alone[data-picked] > .page-part-stage {
+  outline-color: var(--color-on_surface);
+}
+
+.page-player-words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
+}
+
+.page-player-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s8);
+}
+
+/* The plot: the loop across, each track's progress up, a curve and a ball per track. Its axes and
+   grid are the soft outline; each track takes a colour and a dash, told apart in colour and without. */
+.page-plot-box {
+  cursor: pointer;
+  touch-action: none;
+}
+
+.page-plot-box:focus-visible {
+  outline: max(1px, round(nearest, var(--focus-tube), 1px)) solid var(--color-primary);
+}
+
+.page-plot {
+  display: block;
+}
+
+/* Only the curves and the marks answer the pointer; the rest of the plot is the seek. */
+.page-plot-grid,
+.page-plot-labels,
+.page-plot-head,
+.page-plot-ball {
+  pointer-events: none;
+}
+
+.page-plot-grid line {
+  stroke: var(--color-outline_variant);
+  stroke-width: var(--stroke-hairline_device_px);
+}
+
+.page-plot-text {
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  fill: var(--color-on_surface_variant);
+}
+
+.page-plot-mark line {
+  stroke: var(--color-on_surface_variant);
+  stroke-width: var(--stroke-hairline_device_px);
+}
+
+.page-plot-mark[data-kind="key"] line {
+  stroke: var(--color-cold);
+}
+
+.page-plot-hit {
+  fill: transparent;
+}
+
+.page-plot-curve {
+  fill: none;
+  stroke-linejoin: round;
+}
+
+.page-plot-head {
+  stroke: var(--color-on_surface);
+}
+
+[data-track="0"] { --track: var(--color-primary); }
+[data-track="1"] { --track: var(--color-cold); --dash: var(--space-s8) var(--space-s4); }
+[data-track="2"] { --track: var(--color-sharing); --dash: var(--space-s4) var(--space-s4); }
+[data-track="3"] { --track: var(--color-success); --dash: var(--space-s12) var(--space-s4) var(--space-s4) var(--space-s4); }
+
+.page-plot-curve[data-track] {
+  stroke: var(--track);
+  stroke-dasharray: var(--dash, none);
+}
+
+.page-plot-ball[data-track] {
+  fill: var(--track);
+}
+
+.page-plot-curve-hit {
+  fill: none;
+  stroke: transparent;
+  pointer-events: stroke;
+}
+
+/* A part picked: the other curves and balls step back, the picked one stays. */
+[data-picking] .page-plot-curve[data-pick]:not([data-picked]),
+[data-picking] .page-plot-ball:not([data-picked]) {
+  opacity: var(--opacity-disabled_content);
+}
+
+[data-picking] .page-plot-key[data-pick]:not([data-picked]) {
+  opacity: var(--opacity-disabled_content);
+}
+
+.page-table tr[data-picked] > td {
+  box-shadow: inset 0 calc(-1 * var(--stroke-hairline_device_px)) var(--color-on_surface), inset 0 var(--stroke-hairline_device_px) var(--color-on_surface);
+}
+
+/* The legend playing, and the other mode's unseen in the same place, holding the taller's room. */
+.page-plot-keys {
+  display: grid;
+}
+
+.page-plot-keys > * {
+  grid-area: 1 / 1;
+}
+
+.page-plot-legend,
+.page-plot-legend-room {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: var(--space-s4) var(--space-s16);
+}
+
+.page-plot-legend-room {
+  visibility: hidden;
+}
+
+/* A track's key: its swatch on its words' first line, the words wrapping in the room the page
+   gives them, over the other mode's words held unseen in the same place. */
+.page-plot-key {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-s8);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.page-plot-words {
+  display: grid;
+  min-width: 0;
+}
+
+.page-plot-words > * {
+  grid-area: 1 / 1;
+}
+
+.page-plot-words > [aria-hidden] {
+  visibility: hidden;
+}
+
+.page-plot-swatch {
+  display: inline-flex;
+  flex: none;
+  width: var(--space-s24);
+  height: var(--type-small-line);
+}
+
+.page-plot-swatch svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.page-plot-swatch .page-plot-curve {
+  stroke-width: max(1px, round(nearest, var(--stroke-thin), 1px));
+}
+
+.page-plot-time {
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+  color: var(--color-on_surface_variant);
+}
+
+/* A move's recipe: its tables, each row lit while what it says is playing. */
+.page-recipe,
+.page-recipe-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+.page-table {
+  align-self: flex-start;
+  border-collapse: collapse;
+}
+
+/* A recipe's table, wider than the page at a large scale, scrolls on its own rather than the page. */
+.page-table-scroll {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.page-table th,
+.page-table td {
+  padding: var(--space-s4) var(--space-s8);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.page-table tr[data-now] {
+  background: var(--color-secondary_container);
+}
+
+/* What doesn't apply: one muted line in the part's place. */
+.page-na > .page-prose {
+  max-width: none;
+}
+
+/* The measures (`site/parts/measures.ts`): a sample in its box, clean at rest, and the layer over
+   it drawing one part or one token's places at a time; beside it or under it, the parts tree and
+   the spec list. The colours are the spec list's legend: a box in the cold role, a padding in
+   success's, a gap or a margin in sharing's. */
+/* Room above and below a sample for a size tag, so even the whole sample's is outside it: the
+   room the layer reaches over, never laid out, so the sample lines up with its words. */
+.page-measured {
+  position: relative;
+  display: flex;
+  padding-block: calc(var(--type-mono-line) + var(--space-s4));
+  margin-block: calc(-1 * (var(--type-mono-line) + var(--space-s4)));
+}
+
+/* The sample's own layers (a list's sticky rows, a panel's frame) stack inside it, so the layer
+   drawn after it is over all of them. */
+.page-measured > :first-child {
+  isolation: isolate;
+}
+
+.page-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The clone `site/parts/uses.ts` reads each token's places on: in the cascade, never drawn. */
+.page-uses {
+  display: none;
+}
+
+/* A box: a hairline inside its edge, so it stays on the box's own device pixels; a token's box is
+   tinted too, so a box among many reads as lit. */
+.page-mark {
+  position: absolute;
+  outline: var(--stroke-hairline_device_px) solid var(--color-cold);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.page-mark[data-lit] {
+  background: rgb(from var(--color-cold) r g b / var(--opacity-tint));
+}
+
+/* A padding, a gap or a margin: the space itself, tinted as a selection is. */
+.page-band {
+  position: absolute;
+  background: rgb(from var(--color-success) r g b / var(--opacity-selection));
+}
+
+.page-band[data-kind="gap"] {
+  background: rgb(from var(--color-sharing) r g b / var(--opacity-selection));
+}
+
+/* A part's size, on a solid fill where `inspector.ts` puts it: outside the part's box. */
+.page-tag {
+  position: absolute;
+  padding-inline: var(--space-s4);
+  border-radius: var(--radius-small);
+  background: var(--color-cold);
+  color: var(--color-on_cold);
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+  white-space: nowrap;
+}
+
+/* The parts tree and the spec list, side by side while each has a rail's width. */
+.page-inspect {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--size-rail)), 1fr));
+  gap: var(--space-s16);
+  min-width: 0;
+}
+
+/* The parts tree: a line a part, indented by its depth, scrolling in a column's height at most. */
+.page-tree {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--size-column);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+}
+
+.page-tree-line {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-s4);
+  padding-inline: calc(var(--space-s4) + var(--depth) * var(--space-s12)) var(--space-s4);
+  border-radius: var(--radius-small);
+  color: var(--color-on_surface);
+  cursor: default;
+}
+
+.page-tree-line[data-lit] {
+  background: rgb(from var(--color-cold) r g b / var(--opacity-press));
+}
+
+.page-tree-line[data-pinned] {
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-cold);
+}
+
+.page-tree-words {
+  display: flex;
+  gap: var(--space-s8);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.page-tree-words > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Only a text's words give way to the room: a part's name and its count stay whole. */
+.page-tree-words > :not(.page-tree-detail) {
+  flex: none;
+}
+
+.page-tree-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-on_surface_variant);
+}
+
+.page-tree-count {
+  color: var(--color-on_surface_variant);
+}
+
+/* Each of a fold's alike parts, by its place: the one the line stands for now is filled. */
+.page-tree-chip {
+  padding-inline: var(--space-s4);
+  border-radius: var(--radius-small);
+  color: var(--color-on_surface_variant);
+}
+
+.page-tree-chip[data-shown] {
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-press));
+  color: var(--color-on_surface);
+}
+
+/* The spec list: each measure of the part inspected (its tree line names it), its swatch the
+   colour it is drawn in. It keeps the height of the most it says, seven measures a line each, so
+   pointing at a part or a token never moves what is under it. */
+.page-spec {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-auto-rows: var(--type-mono-line);
+  align-content: start;
+  gap: var(--space-s4) var(--space-s16);
+  height: calc(7 * var(--type-mono-line) + 6 * var(--space-s4));
+  overflow: hidden;
+  margin: 0;
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+}
+
+.page-spec > dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s8);
+  color: var(--color-on_surface_variant);
+}
+
+.page-spec > dt,
+.page-spec > dd {
+  white-space: nowrap;
+}
+
+.page-spec > dd {
+  display: flex;
+  gap: var(--space-s8);
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  color: var(--color-on_surface);
+}
+
+.page-spec > .page-spec-hint {
+  grid-column: 1 / -1;
+}
+
+/* The hint wraps down into the rows the measures would take. */
+.page-spec > .page-spec-hint {
+  display: block;
+  overflow: visible;
+  white-space: normal;
+  color: var(--color-on_surface_variant);
+}
+
+.page-swatch {
+  flex: none;
+  width: var(--space-s8);
+  height: var(--space-s8);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-cold);
+}
+
+.page-swatch[data-kind="padding"] {
+  background: var(--color-success);
+  box-shadow: none;
+}
+
+.page-swatch[data-kind="gap"] {
+  background: var(--color-sharing);
+  box-shadow: none;
+}
+
+.page-swatch[data-kind="none"] {
+  box-shadow: none;
+}
+
+/* The measures by token: what is lit, its count on the line over the table, and its row's token
+   filled; a pinned one outlined too. */
+.page-token-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+  color: var(--color-on_surface_variant);
+}
+
+.page-token-status[data-lit] {
+  color: var(--color-on_surface);
+}
+
+/* A scroll view for a sample: a panel's body, six rows tall, that scrolls with no bar of its own.
+   Its outline is the edge the scroll cuts at, and its padding is the panel's, so a lit control
+   inside keeps its glow until it scrolls past that edge. */
+.page-scroll-view {
+  display: block;
+  box-sizing: border-box;
+  width: var(--size-panel);
+  height: calc(6 * var(--size-row));
+  padding: var(--space-s16) var(--container-0-padding);
+  overflow-y: auto;
+  scrollbar-width: none;
+  border-radius: var(--radius-surface);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.page-window {
+  box-sizing: border-box;
+  padding: var(--space-s24);
+  border: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  border-radius: var(--radius-surface);
+  overflow: hidden;
+}
+
+/* A theme change's or a switch's scene: its own surface, painted in its palettes, so the page
+   around it keeps the toolbar's. */
+.page-scene {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  padding: var(--space-s24);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
+}
+
+/* A foundation's shown thing, under its words, as wide as the page: a grid of bands needs the
+   room to know how many bands it takes, and a table keeps to its own width at the left. */
+.page-shown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+}
+
+/* A box in a theme's palette in a mode, whatever the toolbar picks; in a table, a tight one. */
+.f-painted {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-s16);
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
+  color: var(--color-on_surface);
+}
+
+.f-painted[data-tight] {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-s8);
+  padding: var(--space-s8);
+  border-radius: var(--radius-control);
+}
+
+/* Things side by side, wrapping onto lines in a narrow window. */
+.f-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-s16);
+}
+
+.f-swatch {
+  flex: none;
+  width: var(--size-control_lg);
+  height: var(--size-control_lg);
+  border-radius: var(--radius-control);
+  background: var(--swatch);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.f-swatch-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-s4);
+}
+
+/* Each mode's roles take half the width, their families flowing in columns across it. */
+.f-roles {
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.f-roles > .f-painted {
+  align-items: stretch;
+}
+
+.f-families {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-menu), 1fr));
+  gap: var(--space-s16) var(--space-s24);
+  align-items: start;
+}
+
+/* A control filled with a tone, the line inside its fill's edge in a colour derived from it: how
+   a focused Filled button draws its core, lit or unlit. */
+.f-filled {
+  flex: none;
+  width: var(--size-control_lg);
+  height: var(--size-control_sm);
+  border-radius: var(--radius-control);
+  background: var(--tone);
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--line-colour);
+}
+
+/* A role at an opacity over the background it is drawn on. */
+.f-layer {
+  flex: none;
+  display: flex;
+  width: var(--size-control_lg);
+  height: var(--size-control_lg);
+  padding: var(--space-s8);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+/* The layer fills the box less its inset, so its corner is nested (`lib/radius.ts`), set by the
+   page. */
+.f-layer > div {
+  flex: 1;
+  border-radius: var(--nested);
+  background: var(--under);
+}
+
+.f-layer > div > div {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: rgb(from var(--over) r g b / var(--alpha));
+}
+
+/* A card in a scene: the highest surface but one, holding words and buttons. */
+.f-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-s16);
+  padding: var(--space-s24);
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container_high);
+}
+
+/* A ratio under its pair's minimum. */
+.f-fails {
+  color: var(--color-error);
+}
+
+/* A foreground on the background it is drawn on, in a contrast pair. */
+.f-ground {
+  display: flex;
+  padding: var(--space-s8);
+  border-radius: var(--radius-control);
+  background: var(--ground);
+}
+
+/* A lit tube of a tone with its core along the middle, the core centred on a whole device pixel. */
+.f-tube {
+  position: relative;
+  flex: none;
+  width: var(--size-control_lg);
+  height: var(--space-s8);
+  border-radius: var(--radius-full);
+  background: var(--tone);
+  --core-line: max(1px, round(nearest, var(--stroke-thin), 1px));
+}
+
+.f-tube::after {
+  content: "";
+  position: absolute;
+  left: var(--space-s4);
+  right: var(--space-s4);
+  top: round(down, calc((var(--space-s8) - var(--core-line)) / 2), 1px);
+  height: var(--core-line);
+  border-radius: var(--radius-full);
+  background: var(--core);
+}
+
+/* A colour role as a tile: filled with the role and the role drawn on it named on it, or a role
+   alone as a swatch beside its name. As wide as a menu, so tiles line up in a column. */
+.f-tile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s12);
+  width: var(--size-menu);
+  padding: var(--space-s12);
+  border-radius: var(--radius-control);
+}
+
+.f-tile[data-filled] {
+  background: var(--tile);
+}
+
+/* A line of text with its icon, its line box tinted so its height shows. */
+.f-line {
+  display: flex;
+  align-self: flex-start;
+  background: rgb(from var(--color-primary) r g b / var(--opacity-tint));
+}
+
+/* Words that wrap in the room they have, in a type style, its figures as the style draws them; a
+   word longer than its column breaks at the edge. */
+.f-wrap {
+  max-width: 100%;
+  font-family: var(--t-family);
+  font-size: var(--t-size);
+  font-weight: var(--t-weight);
+  line-height: var(--t-line);
+  font-feature-settings: var(--t-features);
+  overflow-wrap: anywhere;
+}
+
+/* A column of numbers, ending in one place. */
+.f-figures {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-s4);
+}
+
+/* The 4 grid drawn behind what sits on it: a hairline every `grid`. */
+.f-grid-paper {
+  align-self: flex-start;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--color-outline_variant) 0 var(--stroke-hairline_device_px),
+    transparent var(--stroke-hairline_device_px) var(--grid)
+  );
+}
+
+/* A sample drawn at a scale of its own. */
+.f-at-scale {
+  display: flex;
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_low);
+}
+
+/* A column as wide as a panel, and one as narrow as a rail, the words wrapping inside. */
+.f-measure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  width: var(--size-panel);
+}
+
+.f-narrow {
+  width: var(--size-rail);
+  outline: var(--stroke-hairline_device_px) dashed var(--color-outline_variant);
+}
+
+/* A padding, shaded as the measures overlay shades one, round content tinted as a component is. */
+.f-pad {
+  align-self: flex-start;
+  padding: var(--pad-block, 0) var(--pad-inline, 0);
+  background: rgb(from var(--color-warning) r g b / var(--opacity-press));
+}
+
+.f-content {
+  display: flex;
+  background: rgb(from var(--color-cold) r g b / var(--opacity-tint));
+}
+
+/* A length drawn along a line, or as a square on a side: exact, with no rounded ends. */
+.f-bar {
+  width: var(--length);
+  height: var(--space-s8);
+  background: var(--color-primary);
+}
+
+.f-square {
+  width: var(--length);
+  height: var(--length);
+  background: var(--color-primary);
+}
+
+/* Something wider than the page at a large scale scrolls on its own, rather than the page. */
+.f-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.f-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-s24);
+}
+
+/* Rows of a list at their natural height, a hairline between them. */
+.f-rows {
+  display: flex;
+  flex-direction: column;
+  width: var(--size-panel);
+  background: var(--color-surface_container_low);
+}
+
+.f-row-box {
+  display: flex;
+  align-items: center;
+  height: var(--height);
+  padding-inline: var(--space-s16);
+  border-bottom: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.f-row-box:last-child {
+  border-bottom: none;
+}
+
+.f-card-box {
+  align-self: flex-start;
+  display: flex;
+  padding: var(--space-s16);
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container_high);
+}
+
+/* A dialog in small, raised to its step. */
+.f-dialog-box {
+  --fill: var(--color-surface_container_high);
+  --fill-night: var(--color-surface_container_highest);
+}
+
+/* A panel in small, at the surface radius. */
+.f-surface-box {
+  border-radius: var(--radius-surface);
+}
+
+/* A plain shape with a corner, at the sizes the radii page draws it. */
+.f-shape {
+  flex: none;
+  border-radius: var(--corner);
+  background: var(--color-secondary_container);
+}
+
+.f-shape-wide {
+  width: var(--size-thumbnail_height);
+  height: var(--size-row_two_line);
+}
+
+.f-shape-check {
+  width: var(--size-check);
+  height: var(--size-check);
+  background: none;
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-outline);
+}
+
+.f-shape-switch {
+  width: var(--size-switch_width);
+  height: var(--size-switch_height);
+  background: var(--color-primary);
+}
+
+/* A shape filling another less an inset, both outlined, and the centre their corners share. */
+.f-nest-cell {
+  width: var(--size-thumbnail_width);
+}
+
+.f-nest {
+  position: relative;
+  width: var(--size-thumbnail_width);
+  height: var(--size-thumbnail_height);
+  padding: var(--inset);
+  border-radius: var(--outer);
+  background: var(--color-surface_container_high);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.f-nest-inner {
+  height: 100%;
+  border-radius: var(--inner);
+  background: var(--color-secondary_container);
+  outline: var(--stroke-hairline_device_px) solid var(--color-on_secondary_container);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.f-nest[data-refused] > .f-nest-inner {
+  outline-color: var(--color-error);
+}
+
+.f-centre {
+  position: absolute;
+  left: calc(var(--centre) - var(--size-badge_dot) / 2);
+  top: calc(var(--centre) - var(--size-badge_dot) / 2);
+  width: var(--size-badge_dot);
+  height: var(--size-badge_dot);
+  border-radius: var(--radius-full);
+  background: var(--color-cold);
+}
+
+/* The room a filling Tabs is shown in: a menu wide. */
+.f-tabs-room {
+  display: flex;
+  width: var(--size-menu);
+}
+
+/* A list well: a content box with its rows 8 in, at the row radius. */
+.f-well {
+  display: flex;
+  flex-direction: column;
+  width: var(--size-panel);
+  padding: var(--space-s8);
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container_low);
+}
+
+.f-well-row {
+  display: flex;
+  align-items: center;
+  height: var(--size-row);
+  padding-inline: var(--space-s16);
+  border-radius: var(--corner);
+}
+
+.f-well-row[data-selected] {
+  background: var(--color-secondary_container);
+}
+
+/* The elevation scene (`pages/foundations/elevation.ts`): a desktop an app's window wide and as
+   tall as its minimum, the shell's bar along its top. Every place in it is a sum of tokens. */
+.f-elev-scenes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s24);
+}
+
+.f-elev-desktop {
+  position: relative;
+  flex: none;
+  width: var(--size-app_width);
+  height: var(--size-app_min_height);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_lowest);
+  overflow: clip;
+}
+
+/* A window: its constant neutral shadow, the shell panel's drop and blur in `shadow` at
+   `opacity.window_shadow`, and its neutral border, Hyprland's `border_size`, under any glow. */
+.f-elev-window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  box-sizing: border-box;
+  padding: var(--space-s16);
+  border-radius: var(--corner);
+  background: var(--color-surface);
+  box-shadow:
+    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
+    0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
+}
+
+.f-elev-window[data-window="back"] {
+  left: var(--space-s32);
+  top: calc(var(--size-bar) + var(--space-s32));
+  width: var(--size-panel);
+  height: var(--size-thumbnail_width);
+}
+
+.f-elev-window[data-window="front"] {
+  left: calc(3 * var(--space-s64));
+  top: calc(var(--size-bar) + var(--space-s64));
+  width: var(--size-app_min_width);
+  bottom: var(--space-s32);
+}
+
+/* The scene's card, the library's, a thumbnail wide. */
+.k-card.f-elev-card {
+  align-self: flex-start;
+  width: var(--size-thumbnail_width);
+}
+
+/* The open menu, the button its tooltip is over and the tooltip, placed in the front window from
+   its padding: the menu beside the card, the button at the bottom with its card `space.s8` above. */
+.f-elev-menu {
+  position: absolute;
+  left: calc(var(--space-s16) + var(--size-thumbnail_width) + var(--space-s16));
+  top: calc(var(--space-s16) + var(--type-body_strong-line) + var(--space-s16));
+}
+
+.f-elev-sort {
+  position: absolute;
+  left: var(--space-s16);
+  bottom: var(--space-s16);
+}
+
+.f-elev-tip {
+  position: absolute;
+  left: var(--space-s16);
+  bottom: calc(var(--space-s16) + var(--size-control_sm) + var(--space-s8));
+}
+
+/* The shell: the bar along the top and a panel growing out of it `space.s8` in from the edge,
+   both glass at `opacity.frame`, casting `shadow.panel` over the window and the wallpaper alike. */
+.f-elev-bar,
+.f-elev-panel {
+  position: absolute;
+  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
+  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
+}
+
+.f-elev-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  inset: 0 0 auto;
+  height: var(--size-bar);
+  padding-inline: var(--space-s16);
+}
+
+/* The panel's body is `surface_container`, so a card on it takes the role above. */
+.f-elev-panel {
+  --card-fill: var(--color-surface_container_high);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  right: var(--space-s8);
+  top: calc(var(--size-bar) + var(--space-s8));
+  width: var(--size-panel);
+  box-sizing: border-box;
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+}
+
+/* The planes from the side: each plane a row, its name beside its slabs. */
+.f-elev-planes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s32);
+  padding-bottom: var(--space-s32);
+}
+
+.f-elev-plane {
+  display: grid;
+  grid-template-columns: var(--size-rail) var(--size-column);
+  gap: var(--space-s24);
+  align-items: end;
+}
+
+.f-elev-slabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-s8);
+}
+
+.f-elev-slab {
+  display: flex;
+  align-items: center;
+  height: var(--size-chip);
+  padding-inline: var(--space-s8);
+  border-radius: var(--radius-small);
+  background: var(--color-surface_container);
+  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
+}
+
+.f-elev-slab-lock {
+  flex: 1;
+  background: var(--color-surface_container_highest);
+  box-shadow: none;
+}
+
+.f-elev-slab-panel,
+.f-elev-slab-prompt {
+  width: var(--size-thumbnail_height);
+}
+
+.f-elev-slab-window {
+  width: var(--size-thumbnail_width);
+  background: var(--color-surface);
+  box-shadow:
+    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
+    0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
+}
+
+.f-elev-slab-wallpaper {
+  flex: 1 0 100%;
+  background: var(--color-surface_container_lowest);
+  box-shadow: none;
+}
+
+/* A step's sample on the plane's surface, and the steps side by side with the room their shadows
+   fall into. */
+.f-elev-step:not(.k-raised) {
+  background: var(--color-surface);
+}
+
+.f-elev-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control_lg);
+  height: var(--size-control_lg);
+  border-radius: var(--radius-control);
+}
+
+.f-elev-steps {
+  display: flex;
+  gap: var(--space-s24);
+  padding: var(--space-s16) var(--space-s16) var(--space-s64);
+}
+
+.f-elev-hosts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s24);
+}
+
+.f-elev-host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  padding: var(--space-s24) var(--space-s24) var(--space-s48);
+  border-radius: var(--radius-surface);
+}
+
+.f-elev-host-window {
+  background: var(--color-surface);
+}
+
+.f-elev-host-panel {
+  background: var(--color-surface_container);
+}
+
+/* Hairlines: one device pixel, at every scale. */
+.f-divided {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s12);
+  width: var(--size-rail);
+  padding: var(--space-s12) var(--space-s16);
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container_low);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.f-divider {
+  height: var(--stroke-hairline_device_px);
+  background: var(--color-outline_variant);
+}
+
+.f-outlined,
+.f-caret-field {
+  display: flex;
+  align-items: center;
+  width: var(--size-rail);
+  height: var(--size-control_md);
+  padding-inline: var(--space-s12);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.f-track-outline {
+  width: var(--size-switch_width);
+  height: var(--size-switch_height);
+  border-radius: var(--radius-full);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+/* Thin strokes: `stroke.thin` rounded half up to device pixels. */
+.f-caret-field,
+.f-check,
+.f-spinner,
+.f-drop {
+  --thin: max(1px, round(nearest, var(--stroke-thin), 1px));
+}
+
+.f-caret {
+  width: var(--thin);
+  height: var(--type-body_large-line);
+  background: var(--color-primary);
+}
+
+.f-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-check);
+  height: var(--size-check);
+  border-radius: var(--radius-small);
+  background: var(--color-primary);
+}
+
+.f-dash {
+  width: var(--space-s8);
+  height: var(--thin);
+  background: var(--color-on_primary);
+}
+
+.f-spinner {
+  width: var(--icon-s24);
+  height: var(--icon-s24);
+  border-radius: var(--radius-full);
+  border: var(--thin) solid rgb(from var(--color-primary) r g b / var(--opacity-spinner_track));
+  border-top-color: var(--color-primary);
+}
+
+.f-drop {
+  width: var(--size-rail);
+  height: var(--thin);
+  margin-top: var(--space-s8);
+  background: var(--color-primary);
+}
+
+/* A painted box with room round what it holds for the whole glow: its padding past `focus.far`. */
+.f-painted[data-room] {
+  padding: var(--space-s32);
+}
+
+/* A control's shape, drawn for its focus line alone (a field, a checkbox, a radio, a chip, a card,
+   a tile or a switch that is on), its ring the library's (`lib/focus.ts`). Each sets its measures
+   by token. */
+.f-control {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: var(--justify, flex-start);
+  gap: var(--space-s4);
+  width: var(--width, auto);
+  height: var(--height, auto);
+  padding: var(--pad-block, 0) var(--pad-inline, 0);
+  border-radius: var(--corner);
+  background: var(--fill, transparent);
+  outline: none;
+}
+
+.f-control[data-outlined] {
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+}
+
+.f-control[data-shape="card"] {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* A switch's knob, on: at the end of its track. */
+.f-knob {
+  width: var(--size-switch_knob_on);
+  height: var(--size-switch_knob_on);
+  border-radius: var(--radius-full);
+  background: var(--color-on_primary);
+}
+
+/* A box drawn round a control: its own box, which nothing but the glow passes. */
+[data-boxed] > .f-control,
+[data-boxed] > .k-button {
+  outline: var(--stroke-hairline_device_px) dashed var(--color-on_surface_variant);
+}
+
+/* Where a glow is cut. A scroll with no edge of its own clips `focus.far` past its box, its box
+   drawn dashed; a card's or a panel's edge clips at its shape; tiles in a grid paint in order. */
+.f-cut-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  height: var(--size-thumbnail_height);
+  /* A clip path, not `overflow: clip` with an `overflow-clip-margin`: Chromium drops that margin to
+     0 for any `calc()`. */
+  clip-path: inset(calc(-1 * var(--focus-far)));
+  outline: var(--stroke-hairline_device_px) dashed var(--color-on_surface_variant);
+}
+
+.f-cut-scroll[data-scrolled] > :first-child {
+  margin-top: calc(-1 * (var(--focus-far) + var(--size-control_md) / 2));
+}
+
+.f-cut-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-s8);
+  padding: var(--space-s24);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container);
+}
+
+.f-cut-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-s8);
+  padding: var(--space-s16);
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container_high);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+  overflow: clip;
+}
+
+/* The windows on the desktop: an app's window `space.s8` from the next, Hyprland's gaps. */
+.f-desktop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s8);
+  padding: var(--space-s32);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_lowest);
+}
+
+.f-window {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  width: var(--size-panel);
+  height: var(--size-thumbnail_height);
+  padding: var(--space-s16);
+  border-radius: var(--corner);
+  background: var(--color-surface);
+  outline: none;
+}
+
+/* `neon.strike`'s steps as bars, each its brightness of a large control's height. */
+.f-steps {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-s4);
+  height: var(--size-control_lg);
+}
+
+.f-step {
+  width: var(--space-s16);
+  height: calc(var(--step) * var(--size-control_lg));
+  background: var(--color-primary);
+}
+
+/* The glow device pixel by device pixel out from the tube, each a square at its opacity. */
+.f-glow-strip {
+  display: flex;
+}
+
+.f-glow-strip > div {
+  width: var(--space-s16);
+  height: var(--size-control_lg);
+  background: rgb(from var(--color-primary) r g b / var(--alpha));
+}
+
+.f-glow-strip > div:first-child {
+  background: var(--color-primary);
+}
+
+/* Every duration racing from one start: `--race` runs the same for every row, over twice
+   `duration.scene`, and each row's fill is how far its duration, at the speed picked and capped by
+   reduce motion (`--motion-*`), has come. The track is the duration at speed 1, `space.s16` for
+   every 100 ms. */
+@property --race {
+  syntax: "<time>";
+  inherits: true;
+  initial-value: 0s;
+}
+
+@keyframes f-race {
+  to { --race: calc(2 * var(--duration-scene)); }
+}
+
+.f-race {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  align-items: center;
+  gap: var(--space-s8) var(--space-s16);
+  animation: f-race calc(2 * var(--duration-scene)) linear infinite;
+}
+
+.f-race-track {
+  height: var(--space-s8);
+  width: calc(var(--d) / 100ms * var(--space-s16));
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+}
+
+.f-race-fill {
+  height: 100%;
+  width: calc(clamp(0, var(--race) / var(--motion), 1) * var(--motion) / 100ms * var(--space-s16));
+  background: var(--color-primary);
+}
+
+/* A curve's rail: the ball rides it from one end to the other as `--ridden` goes 0 to 1, past the
+   end and back on a curve that overshoots. */
+@property --ridden {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.f-rail {
+  position: relative;
+  width: var(--size-panel);
+  height: var(--space-s16);
+  border-radius: var(--radius-full);
+  background: var(--color-surface_container_highest);
+}
+
+.f-ball {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--space-s16);
+  height: var(--space-s16);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  translate: calc(var(--ridden) * (var(--size-panel) - var(--space-s16))) 0;
+}
+
+/* A curve drawn small: its progress over its duration, the room past 0 and 1 where it overshoots. */
+.f-curve {
+  display: block;
+  width: var(--size-motion_plot);
+  height: var(--size-motion_plot);
+  background: var(--color-surface_container_low);
+}
+
+.f-curve line {
+  stroke: var(--color-outline_variant);
+  stroke-width: var(--stroke-hairline_device_px);
+}
+
+.f-curve path {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: max(1px, round(nearest, var(--stroke-thin), 1px));
+  stroke-linejoin: round;
+}
+
+/* The whole symbol set: a cell per symbol, its name under it at 16, 20 and 24. */
+.f-symbols {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-menu), 1fr));
+  gap: var(--space-s16);
+}
+
+.f-symbol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  padding: var(--space-s12);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_low);
+}
+
+.f-symbol[data-ours] {
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-primary);
+}
+
+/* A symbol's box drawn round it: its size, the ink 2 of its 24 units clear inside. */
+.f-icon-box {
+  position: relative;
+  flex: none;
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+/* A symbol on its 24 unit grid, a line every unit, the 2 unit margin shaded. */
+.f-icon-grid {
+  position: relative;
+  flex: none;
+  width: var(--icon-s48);
+  height: var(--icon-s48);
+  background-image:
+    repeating-linear-gradient(to right, var(--color-outline_variant) 0 var(--stroke-hairline_device_px), transparent var(--stroke-hairline_device_px) calc(var(--icon-s48) / 24)),
+    repeating-linear-gradient(to bottom, var(--color-outline_variant) 0 var(--stroke-hairline_device_px), transparent var(--stroke-hairline_device_px) calc(var(--icon-s48) / 24));
+  box-shadow: inset 0 0 0 calc(var(--icon-s48) / 12) rgb(from var(--color-warning) r g b / var(--opacity-press));
+}
+
+.f-icon-grid > .k-icon {
+  position: absolute;
+  inset: 0;
+}
+
+/* A slot a symbol is centred in, its middle marked across and down. */
+.f-slot {
+  position: relative;
+  flex: none;
+  width: var(--side);
+  height: var(--side);
+  outline: var(--stroke-hairline_device_px) dashed var(--color-on_surface_variant);
+  background:
+    linear-gradient(var(--color-outline_variant), var(--color-outline_variant)) center / 100% var(--stroke-hairline_device_px) no-repeat,
+    linear-gradient(var(--color-outline_variant), var(--color-outline_variant)) center / var(--stroke-hairline_device_px) 100% no-repeat;
+}
+
+.f-slot > .k-icon {
+  position: absolute;
+  left: round(down, calc((var(--side) - var(--icon-size)) / 2), 1px);
+  top: round(down, calc((var(--side) - var(--icon-size)) / 2), 1px);
+}
+
+/* The full-screen control (`site/full-screen.ts`) on a pane's head line, after the scale it is
+   shown at, without making the line taller; under a stage sample's words, at its own width. */
+.page-full-screen[hidden] {
+  display: none;
+}
+
+.page-pane-head:has(> .page-full-screen:not([hidden])) {
+  align-items: center;
+  gap: var(--space-s8);
+}
+
+.page-pane-head:has(> .page-full-screen:not([hidden])) > .page-pane-scale {
+  margin-inline-start: auto;
+}
+
+.page-pane-head > .page-full-screen {
+  margin-block: calc(-1 * var(--space-s4));
+}
+
+.page-stage-words > .page-full-screen {
+  align-self: flex-start;
+}
+
+/* The room a screen is shown in on the whole screen: over the whole page until the browser's full
+   screen takes it, the screen from its top left. */
+.site-full-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  overflow: hidden;
+  background: var(--color-surface_container_lowest);
+  outline: none;
+}
+
+/* The ColourPicker page's samples: the picker's three controls in a setting's well, a label column
+   beside them, as a settings panel lays out a setting with sub-settings. */
+.f-colour-well {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-auto-rows: minmax(var(--size-row_compact), auto);
+  align-items: center;
+  column-gap: var(--space-s12);
+  row-gap: var(--space-s4);
+  padding: var(--space-s4) var(--space-s8);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+}
+
+/* A sub-setting's label, in by `space.s12` under its setting's. */
+.f-colour-well > [data-sub] {
+  margin-inline-start: var(--space-s12);
+}

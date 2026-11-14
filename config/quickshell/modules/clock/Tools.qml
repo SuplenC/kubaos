@@ -50,7 +50,7 @@ Item {
                 visible: Time.timerSet
                 centred: true
 
-                Figure {
+                K.Figure {
                     text: Time.face(Time.timerEnd > 0 ? Time.timerEnd - root.now : Time.timerLeft, false)
                     style: K.Tokens.type.headline
                     color: Time.timerEnd > 0 ? K.Tokens.color.on_surface : K.Tokens.color.on_surface_variant
@@ -105,11 +105,13 @@ Item {
                 Repeater {
                     model: ["5m", "10m", "25m", "1h"]
 
-                    Chip {
+                    K.Chip {
                         required property string modelData
 
-                        label: modelData
-                        onClicked: Time.startTimer(modelData, error => root.error = error)
+                        text: modelData
+                        pressable: true
+                        tabStop: false
+                        onActivated: Time.startTimer(modelData, error => root.error = error)
                     }
                 }
             }
@@ -124,7 +126,7 @@ Item {
             centred: true
             visible: root.tab === 1
 
-            Figure {
+            K.Figure {
                 text: Time.face(Time.stopwatchElapsed(root.now), false)
                 style: K.Tokens.type.headline
                 color: K.Tokens.color.on_surface
@@ -158,7 +160,7 @@ Item {
             Repeater {
                 model: Time.laps.slice(0, 2)
 
-                Figure {
+                K.Figure {
                     required property real modelData
                     required property int index
 

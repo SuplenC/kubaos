@@ -17,6 +17,7 @@ use std::path::Path;
 use crate::model::Family;
 use crate::model::Rgb;
 use crate::model::Tokens;
+use crate::model::Toward;
 use crate::model::TypeStyle;
 use crate::model::Weight;
 use crate::target::Kept;
@@ -167,6 +168,16 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
     out.line("/// room (a wallpaper thumbnail in its grid cell), in logical pixels. A scroll is not held to it:");
     out.line("/// it reaches past its box as far as the far glow.");
     out.line(format!("pub const FOCUS_OFFSET: u16 = {};", focus.offset));
+    let icon_tile = &tokens.icon_tile;
+    out.blank();
+    out.line("/// An icon tile's app icon, measured once when it loads: its drawing's box is its pixels more");
+    out.line("/// opaque than `ICON_TILE_INK`; it is a plate, filling the tile, when the box's short side is at");
+    out.line("/// least `ICON_TILE_SQUARE` of its long one and its pixels more opaque than `ICON_TILE_OPAQUE`");
+    out.line("/// cover at least `ICON_TILE_PLATE` of it, and a shape fitted inside the tile otherwise.");
+    out.line(format!("pub const ICON_TILE_INK: f32 = {:?};", icon_tile.ink));
+    out.line(format!("pub const ICON_TILE_OPAQUE: f32 = {:?};", icon_tile.opaque));
+    out.line(format!("pub const ICON_TILE_SQUARE: f32 = {:?};", icon_tile.square));
+    out.line(format!("pub const ICON_TILE_PLATE: f32 = {:?};", icon_tile.plate));
     out.blank();
     out.line("/// A neon tube striking: its brightness, 0 to 1, through even steps over `medium`.");
     out.line(format!(
@@ -266,17 +277,27 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
     let mut radii: Vec<(String, Option<String>, String)> = vec![
         (
             "Small".into(),
-            Some("Marks inside controls: the checkbox, a hint, focus details, inline tags.".into()),
+            Some("Marks inside controls: the checkbox, a keycap, focus details, inline tags.".into()),
             format!("Some({})", r.small),
         ),
         (
+            "Row".into(),
+            Some("A row inside a small or a content box, the box's corner less its padding.".into()),
+            format!("Some({})", r.row),
+        ),
+        (
             "Control".into(),
-            Some("Everything clicked or typed in: buttons, fields, list rows, menu items, chips.".into()),
+            Some("Everything clicked or typed in, and the small floating things: popovers, menus, toasts.".into()),
             format!("Some({})", r.control),
         ),
         (
+            "Content".into(),
+            Some("A content box inside a window or a panel: a card, a list well, a scroll panel, a dialog.".into()),
+            format!("Some({})", r.content),
+        ),
+        (
             "Surface".into(),
-            Some("Everything that holds content: cards, dialogs, popups, panels, list wells.".into()),
+            Some("The shell's big surfaces: panels, the window, the screen frame.".into()),
             format!("Some({})", r.surface),
         ),
     ];
@@ -379,7 +400,7 @@ fn container(out: &mut Writer, tokens: &Tokens) {
     scale(
         out,
         &Scale {
-            doc: "An aspect ratio a picture's box keeps before and after it loads.",
+            doc: "An aspect ratio, a picture's box's before and after it loads or a surface's at its shortest.",
             name: "Aspect",
             variants: tokens
                 .aspect
@@ -450,7 +471,17 @@ fn contrast(out: &mut Writer, tokens: &Tokens) {
     out.line("}");
     out.blank();
     out.line("/// Every foreground role the front ends draw on a background role, and the contrast it needs.");
-    let pairs = &tokens.contrast.pairs;
+    out.line("/// The pairs of the state model's derived roles aren't built here yet.");
+    let pairs: Vec<_> = tokens
+        .contrast
+        .pairs
+        .iter()
+        .filter(|pair| {
+            [&pair.fg, &pair.bg]
+                .iter()
+                .all(|role| tokens.color.source.contains_key(*role))
+        })
+        .collect();
     out.line(format!("pub const CONTRAST: [ContrastPair; {}] = [", pairs.len()));
     for pair in pairs {
         let need = match pair.need {
@@ -670,6 +701,21 @@ fn surfaces(out: &mut Writer, tokens: &Tokens) {
             ty: "f32",
         },
     );
+    scale(
+        out,
+        &Scale {
+            doc: "A scale factor a surface is drawn at, round its middle, while it comes or goes.",
+            name: "ScaleFactor",
+            variants: tokens
+                .scale
+                .iter()
+                .map(|(name, value)| (camel(name), None, format!("{value:?}")))
+                .collect(),
+            getter_doc: "The share of the surface's size, above 0.",
+            getter: "value",
+            ty: "f32",
+        },
+    );
     out.blank();
     out.line("impl Opacity {");
     out.line("    /// The opacity's name in `design/tokens.toml`.");
@@ -775,6 +821,39 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
     out.line("        Mode::Dark => DARK,");
     out.line("    }");
     out.line("}");
+    out.blank();
+    out.line("/// A role computed from another role of whichever palette is drawn, so it follows the wallpaper:");
+    out.line("/// `tone` taken `white` of the way to white.");
+    out.line("#[derive(Debug, Clone, Copy, PartialEq)]");
+    out.line("pub struct Derived {");
+    out.line("    pub tone: Role,");
+    out.line("    pub white: f32,");
+    out.line("}");
+    out.blank();
+    out.line("/// A role computed from another role of whichever palette is drawn, so it follows the wallpaper:");
+    out.line("/// `tone` taken `black` of the way to black.");
+    out.line("#[derive(Debug, Clone, Copy, PartialEq)]");
+    out.line("pub struct Darkened {");
+    out.line("    pub tone: Role,");
+    out.line("    pub black: f32,");
+    out.line("}");
+    out.blank();
+    out.line("// The state model's derived roles (OKLCH lightness and chroma, gamut and contrast fitting, a");
+    out.line("// recipe for each mode) aren't built here yet: only the mockups' CSS computes them.");
+    for (role, derived) in &colors.derived {
+        let Some((toward, t)) = derived.toward() else { continue };
+        let (kind, field) = match toward {
+            Toward::White => ("Derived", "white"),
+            Toward::Black => ("Darkened", "black"),
+        };
+        out.blank();
+        out.line(format!("/// `{}` taken {t:?} of the way to {field}.", derived.tone()));
+        out.line(format!(
+            "pub const {}: {kind} = {kind} {{ tone: Role::{}, {field}: {t:?} }};",
+            role.to_uppercase(),
+            camel(derived.tone()),
+        ));
+    }
 }
 
 fn palette(out: &mut Writer, name: &str, doc: &str, roles: &BTreeMap<String, Rgb>) {

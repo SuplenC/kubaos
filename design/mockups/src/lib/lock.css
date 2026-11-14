@@ -1,0 +1,598 @@
+/* The lock (`lib/lock.ts`): a screen with its frame, the wallpaper and its plate, its clock and its
+   city at rest; the frame closed in, the picture and its city blurred and dimmed, the clock a
+   short way along its flight to the bar and the password's sheet up when awake; and the desktop's still, its windows and its
+   bar, which locking leaves and unlocking comes back to. Numbers move it, each 0 at rest but the
+   push. */
+
+/* The frame, from out past the screen's edges (0) to where the shell draws it (1): each edge slides
+   in at its own thickness, its inner corners at `radius.surface` throughout. */
+@property --framed {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* The bar, from out above the screen (0) to the frame's top edge (1): a band `size.bar` tall
+   carrying the bar's pills, sliding in over the frame's thin top edge. */
+@property --barred {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* The picture's blur, from sharp (0) to `size.lock_blur` (1). */
+@property --wake {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* Waking, for the clock: from rest (0) to awake (1), where it stands `scale.clock_awake` of the way
+   along its flight to the bar's clock. */
+@property --clock-lift {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* The picture and its city, from the desktop's 1:1 (0) to pushed in, the picture to `scale.push`
+   and its city to `scale.near` (1). */
+@property --push {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* The clock, from where waking left it (0) to the bar's clock (1): the rest of its flight. */
+@property --dock {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* Whether the clock flies above the frame (1) or stands behind the cut-out (0). */
+@property --clock-above {
+  syntax: "<integer>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How far the reader's mark has turned from `primary` (0) to `error` (1) for a finger it doesn't
+   know. */
+@property --lock-reader-missed {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How far the wrong password's shake has the field, in `space.s4`s sideways. */
+@property --jolt {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.k-screen.k-lock {
+  --push: 1;
+  --pushed: calc(1 + (var(--scale-push) - 1) * var(--push));
+  /* The city's scale: the picture's, and `scale.near`'s lead over it as far as depth is on
+     (`--depth`, `lib/depth-picture.css`), so turning depth off settles the city onto the sky. */
+  --neared: calc(var(--pushed) + (var(--scale-near) - var(--scale-push)) * var(--push) * var(--depth));
+  /* Out, an edge is past the screen's edge by its own thickness and the fillet its inner corners
+     curve through, so neither the edge nor its corners leave a pixel on the screen. The top edge is
+     the thin edge or the bar, whichever reaches further in. */
+  --frame-side: round(nearest, calc(var(--space-s8) - (var(--space-s8) + var(--radius-surface)) * (1 - var(--framed))), 1px);
+  --bar-shift: round(nearest, calc(-1 * (var(--size-bar) + var(--radius-surface)) * (1 - var(--barred))), 1px);
+  --frame-top: max(var(--frame-side), var(--bar-shift) + var(--size-bar));
+  /* The screen's middle across, which the picture and its city are pushed in round. */
+  --screen-middle: calc(var(--screen-width) / 2);
+  /* How much of each layer set in front of the clock cuts it: all, or none with depth off. */
+  --layer-cut: 1;
+}
+
+.k-lock[data-phase="awake"] {
+  --framed: 1;
+  --wake: 1;
+  --clock-lift: 1;
+}
+
+.k-lock[data-phase="desktop"] {
+  --framed: 1;
+  --barred: 1;
+  --dock: 1;
+  --push: 0;
+}
+
+/* The picture alone, as the wallpaper picker's wall hangs it: no frame, no bar and no clock, the
+   picture pushed in and its city off the sky, as at rest. */
+.k-lock[data-phase="picture"] .k-lock-clock {
+  opacity: 0;
+}
+
+/* Depth off, once it has settled: the picture alone, and the clock in front of it, uncut. */
+.k-lock[data-flat] :is(.k-lock-plate, .k-lock-cutout) {
+  visibility: hidden;
+}
+
+.k-lock[data-flat] .k-lock-clock {
+  --city-cut: 0;
+  --layer-cut: 0;
+}
+
+/* With reduce motion nothing pushes: the lock holds the desktop's 1:1 picture, and only fades. */
+[data-reduced] .k-lock[data-phase] {
+  --push: 0;
+}
+
+/* The depth: the picture and its plate push in to `scale.push` and the city in front of them
+   further, to `scale.near`, all round the middle of the screen's bottom edge, where the city
+   stands, so its roofs only ever grow over the sky and what it uncovers is a band along the sides
+   of its towers that face the middle. The plate comes in with the push, so at 1:1 the lock is the
+   desktop's picture exactly and by the time the city has moved off the picture's own outline the
+   plate covers it. At rest and awake it holds still. */
+.k-lock .k-screen-wallpaper,
+.k-lock-plate {
+  transform-origin: 50% 100%;
+  scale: var(--pushed);
+}
+
+.k-lock-plate {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: calc(var(--push) * var(--depth));
+}
+
+/* The frame's shadow goes with it, as strong as the frame is in. `shadow.panel` falls far past the
+   fillet: with the frame out by its thickness and fillet, a shadow at full strength still darkens
+   the screen's top rows by a fifth, and by a thirtieth with its drop and blur added to the slide. */
+.k-lock .k-screen-glass {
+  filter: drop-shadow(0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / calc(var(--shadow-panel-opacity) * var(--framed))));
+}
+
+/* The picture's blur: what is under it, its edges held rather than faded, so the blurred picture
+   still reaches the screen's edges. */
+.k-lock-blur {
+  position: absolute;
+  inset: 0;
+  display: block;
+  backdrop-filter: blur(calc(var(--size-lock_blur) * var(--wake)));
+}
+
+/* The desktop's windows, as the still shows them: tiled `space.s8` inside the frame as Hyprland's
+   `gaps_out` puts them, `space.s8` apart, the bar's height at the top. Locking shrinks them to
+   `scale.behind` round the middle of the screen as they fade; at rest and awake they are gone. */
+.k-lock-windows {
+  position: absolute;
+  inset: calc(var(--size-bar) + var(--space-s8)) var(--space-s16) var(--space-s16);
+  display: flex;
+  gap: var(--space-s8);
+  opacity: 0;
+  scale: var(--scale-behind);
+}
+
+.k-lock[data-phase="desktop"] .k-lock-windows {
+  opacity: 1;
+  scale: 1;
+}
+
+/* A window of the still: the desktop plane's, as the Elevation page draws one, its corner the
+   frame's surface radius less the gap inside it. */
+.k-lock-window {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--space-s8);
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--space-s16);
+  border-radius: var(--corner);
+  background: var(--color-surface);
+  box-shadow:
+    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
+    0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
+}
+
+/* The bar's pills ride on the bar's band, which slides straight up out of the screen and back:
+   they keep their place along it as the side edges slide out. */
+.k-lock .k-bar {
+  top: var(--bar-shift);
+  left: var(--space-s8);
+  right: var(--space-s8);
+  height: var(--size-bar);
+}
+
+/* The bar's clock, centred on the screen as `modules/bar/Bar.qml` centres it, on whole device
+   pixels. */
+.k-lock-bar-clock {
+  position: absolute;
+  left: round(down, calc((100% - var(--pill-width, 0px)) / 2), 1px);
+}
+
+/* The bar's time: a slot as wide as the widest time its format shows (`--slot`, measured from the
+   font), the time centred in it on whole device pixels, the odd one after, as the lock's clock is
+   centred, so the pill never changes its width and the clock lands on the time exactly. */
+.k-lock .k-lock-bar-time {
+  --time-width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
+  --slot-width: round(up, calc(var(--slot) * var(--px) - 0.001px), 1px);
+  box-sizing: border-box;
+  width: var(--slot-width);
+  padding-inline-start: round(down, calc((var(--slot-width) - var(--time-width)) / 2), 1px);
+}
+
+/* A mark of no size on the bar's time's baseline, read once and removed. */
+.k-lock-baseline {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  vertical-align: baseline;
+}
+
+/* The clock: the digits' box, their cap height down to their baseline, with the kicker
+   `scale.lock_date_gap` of the clock over its cap top, to its baseline. Its size is the screen's
+   share (`--rest-size`), and `type.clock_rest` the 1080 tall screen's. It flies one path, from the rest clock, the
+   same place on every wallpaper, to the bar's time in `type.body` where the pill puts it, its size, its place
+   and its colour moving together: `--flown` is how far along it stands. Waking takes it
+   `scale.clock_awake` of the way (`--clock-lift`) and docking the rest from there (`--dock`), so an
+   unlock from awake goes on from where waking stopped.
+   The box is on whole device pixels, and the kicker centred on the same middle, each with the
+   odd pixel after it. It stands in front of the picture and behind the city, and above everything
+   while it flies to or from the bar. */
+.k-lock-clock {
+  position: absolute;
+  z-index: var(--clock-above);
+  display: block;
+  --woken: calc(var(--clock-lift) * var(--scale-clock_awake));
+  --flown: calc(var(--woken) + (1 - var(--woken)) * var(--dock));
+  /* The rest clock's size, the screen's share (`lib/lock.ts`); `type.clock_rest` until it is placed. */
+  --rest: var(--rest-size, var(--type-clock_rest-size));
+  --k: calc(1 + (var(--type-body-size) / var(--rest) - 1) * var(--flown));
+  /* Geist Light's figures are a little narrower than Regular's, so as the clock flies its letters
+     spread by what the bar's time is wider, an even share after each: it lands as wide as the bar's
+     time, each figure within a fifth of a logical pixel of the bar's. */
+  --spread: calc((var(--bar-natural, 0) - var(--digits-natural) * var(--type-body-size) / var(--rest)) * var(--flown));
+  --digits-width: round(up, calc((var(--digits-natural) * var(--k) + var(--spread)) * var(--px) - 0.001px), 1px);
+  --digits-height: calc(var(--cap-height) * var(--rest) * var(--k));
+  /* The kicker scales with the clock's size as it is now, awake and along the flight as at rest
+     (`--k`), never under `size.lock_date_least`; each word's box on whole device pixels as a
+     text's box is. */
+  --kicker-rest: var(--kicker-size, var(--type-clock_date-size));
+  --kicker-k: max(var(--k), var(--size-lock_date_least) / var(--kicker-rest));
+  --kicker-height: calc(var(--kicker-line, max(var(--type-clock_place-line), var(--type-clock_date-line))) * var(--kicker-k));
+  --place-width: round(up, calc(var(--place-natural, 0) * var(--kicker-k) * var(--px) - 0.001px), 1px);
+  --date-width: round(up, calc(var(--date-natural, 0) * var(--kicker-k) * var(--px) - 0.001px), 1px);
+  --kicker-width: calc(var(--place-width) + var(--date-width));
+  --bar-top: calc(var(--bar-shift) + (var(--size-bar) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-body-size));
+  /* The rest place is the screen's, not the picture's: the middle, the digits' cap top where
+     `lib/lock.ts` puts it from `scale.lock_clock_base`; it holds still as the picture pushes in. */
+  --rest-top: var(--rest-top-at, 0px);
+  --cx: calc(var(--middle) + (var(--bar-cx, var(--middle)) - var(--middle)) * var(--flown));
+  /* `--clock-above` for the digits, which don't inherit it. */
+  --city-cut: var(--clock-above);
+  --clock-left: round(down, calc(var(--cx) - var(--digits-width) / 2), 1px);
+  --clock-top: round(nearest, calc(var(--rest-top) + (var(--bar-top) - var(--rest-top)) * var(--flown)), 1px);
+  left: var(--clock-left);
+  top: var(--clock-top);
+  width: var(--digits-width);
+  height: var(--digits-height);
+}
+
+.k-lock[data-phase="desktop"] .k-lock-clock {
+  --clock-above: 1;
+  opacity: 0;
+}
+
+/* The kicker stands its gap (`--kicker-gap`, `scale.lock_date_gap` of the clock, scaling with it) over the digits, measured as the eye does: from the digits' cap
+   top, which is their box's, to the kicker's baseline (`--kicker-base`, its depth in its line, read
+   off the font), so its descenders and its line's leading don't count. */
+.k-lock-clock {
+  --kicker-top: round(nearest, calc(-1 * (var(--kicker-gap, var(--space-s40)) * var(--k) + var(--kicker-base-share, 1.2) * var(--kicker-rest) * var(--kicker-k))), 1px);
+  --kicker-left: calc(round(down, calc(var(--cx) - var(--kicker-width) / 2), 1px) - round(down, calc(var(--cx) - var(--digits-width) / 2), 1px));
+}
+
+.k-lock-clock > .k-lock-kicker {
+  position: absolute;
+  top: var(--kicker-top);
+  left: var(--kicker-left);
+  width: max-content;
+}
+
+.k-lock[data-phase="desktop"] .k-lock-kicker {
+  opacity: 0;
+}
+
+/* The kicker: at rest the digits' tint, the date `opacity.clock_date` of it, so where and which day
+   lead; in the bar its own roles, where and which day in `primary` and the date in
+   `on_surface_variant`. The tint gives way along the flight as the digits' does, so awake it keeps
+   most of the tint. Round each letter a halo of
+   `surface`, a tight shadow holding the strokes' edges and a soft one round the word: it follows the
+   glyphs, so no shape shows, and it is the same on every wallpaper. */
+.k-lock-kicker {
+  --tint: var(--digits-tint, var(--color-on_surface));
+  text-shadow:
+    0 0 var(--size-halo_edge) rgb(from var(--color-surface) r g b / var(--opacity-halo_edge)),
+    0 0 var(--size-halo) rgb(from var(--color-surface) r g b / var(--opacity-halo));
+}
+
+.k-lock .k-lock-place {
+  width: var(--place-width);
+  /* Its text's size and line, which its ink's centring and its box are worked out from too. */
+  --t-size: calc(var(--kicker-rest) * var(--kicker-k));
+  --t-line: var(--kicker-height);
+  color: color-mix(in oklab, var(--color-primary) calc(var(--flown) * 100%), var(--tint));
+}
+
+.k-lock .k-lock-date {
+  width: var(--date-width);
+  /* Its text's size and line, which its ink's centring and its box are worked out from too. */
+  --t-size: calc(var(--kicker-rest) * var(--kicker-k));
+  --t-line: var(--kicker-height);
+  color: color-mix(in oklab, var(--color-on_surface_variant) calc(var(--flown) * 100%), rgb(from var(--tint) r g b / var(--opacity-clock_date)));
+}
+
+/* The digits: at rest a light tint of the picture behind them (`--digits-tint`, worked out from the
+   picture), so they read as part of it; in the bar `on_surface`, as the bar's words are. The tint
+   gives way along the flight, so awake it is still mostly the picture's. */
+.k-lock .k-lock-digits {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  font-size: calc(var(--rest) * var(--k));
+  line-height: calc(var(--rest) * var(--k));
+  letter-spacing: calc(var(--spread) / var(--letters, 1) * var(--px));
+  text-box: trim-both cap alphabetic;
+  /* Its box is its caps, placed by the lock: none of a line's centring above them. */
+  padding-top: 0;
+  color: color-mix(in oklab, var(--color-on_surface) calc(var(--flown) * 100%), var(--digits-tint, var(--color-on_surface)));
+  /* While the clock flies above the frame it is still behind the city: the city's alpha, laid where
+     the city stands on the screen as it pushes in, is taken out of the digits, so they are cut
+     wherever the city stands in front of them, as they are when the clock stands behind it. Behind
+     the city it is nothing: the layer is no size. `--city` is unset without a cut-out.
+     Chromium clips a mask to the border box even with `no-clip`, and the box is trimmed to the cap
+     height, which round digits overshoot: a line of padding each way, taken back by the margin,
+     gives the mask room, and the mask is laid from the unpadded box. */
+  padding-block: 1lh;
+  margin-block: -1lh;
+  mask-origin: content-box;
+  mask-image: linear-gradient(var(--color-surface), var(--color-surface)), var(--city);
+  mask-composite: subtract, add;
+  mask-repeat: repeat, no-repeat;
+  mask-clip: no-clip;
+  mask-size:
+    100% 100%,
+    calc(var(--city-flat-width) * var(--neared) * var(--city-cut)) calc(var(--city-flat-height) * var(--neared) * var(--city-cut));
+  mask-position:
+    0 0,
+    calc(var(--screen-middle) + (var(--city-flat-left) - var(--screen-middle)) * var(--neared) + var(--city-lead) - var(--clock-left)) calc(var(--screen-height) + (var(--city-flat-top) - var(--screen-height)) * var(--neared) - var(--clock-top));
+}
+
+/* The city: the picture through the cut-out's alpha, in front of the clock, pushed in to
+   `scale.near`. It blurs and dims with the picture under it: its blur is drawn before its push, so
+   it is divided by it, to blur as far as the picture under the frame's blur does, and the dim is
+   `scrim`, which is black in every scheme, so the dim over it is its brightness lowered by as
+   much. */
+.k-lock-cutout {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-origin: 50% 100%;
+  scale: var(--neared);
+  /* Ahead of its sky while its picture slides past the wallpaper picker's wall. */
+  translate: var(--city-lead) 0;
+  filter: blur(calc(var(--size-lock_blur) * var(--wake) / var(--neared))) brightness(calc(1 - var(--opacity-panel_scrim) * var(--panel-dim)));
+  pointer-events: none;
+}
+
+.k-lock[data-open] .k-lock-cutout {
+  --panel-dim: 1;
+}
+
+/* The cut-out's alpha laid on the picture as `object-fit: cover` lays the picture, so the city
+   lies exactly over itself. */
+.k-lock-city {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mask-size: cover;
+  mask-position: 50% 50%;
+  mask-repeat: no-repeat;
+}
+
+/* The field's `lock` and the reader's `fingerprint`, and the `lock_open` in `primary` laid over
+   each, that the right password and a known finger turn them to. */
+.k-lock-open,
+.k-lock-reader-open {
+  opacity: 0;
+}
+
+/* An unknown finger shakes the reader's mark alone, half the wrong password's jolt: the field
+   wasn't wrong, so it stays still. */
+.k-lock-reader {
+  --trailing: color-mix(in srgb, var(--color-primary), var(--color-error) calc(var(--lock-reader-missed) * 100%));
+  translate: round(nearest, calc(var(--jolt) * var(--space-s4)), 1px) 0;
+}
+
+.k-lock-reader[data-missed] {
+  --lock-reader-missed: 1;
+}
+
+/* The sheet's content: `size.panel` wide, `space.s16` inside at its top and its foot, the
+   container's padding at its sides, as a PanelPage is. */
+.k-lock-sheet {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: var(--size-panel);
+  padding: var(--space-s16) 0;
+}
+
+.k-lock-field {
+  align-self: stretch;
+  translate: round(nearest, calc(var(--jolt) * var(--space-s4)), 1px) 0;
+}
+
+/* Measures the digits in the rest clock's style, and Geist Light's cap height:
+   a digit in that size, trimmed as the digits are. */
+.k-lock-meter {
+  position: absolute;
+  visibility: hidden;
+  width: max-content;
+  white-space: pre;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  font-family: var(--type-clock_rest-family);
+  font-size: var(--type-clock_rest-size);
+  font-weight: var(--type-clock_rest-weight);
+  font-feature-settings: var(--type-clock_rest-features);
+  line-height: var(--type-clock_rest-size);
+  text-box: trim-both cap alphabetic;
+}
+
+/* A live lock eases between rest and awake: waking on the sheet's opening, the clock moving along
+   its flight over `long` on `emphasized_decel`; going back to rest, the frame and the sheet leaving over `medium`
+   on `emphasized_accel` and the blur clearing over `long`. The city dims as the dim under it
+   does. */
+.k-lock[data-live] {
+  transition:
+    --framed var(--motion-medium) var(--easing-emphasized_accel),
+    --wake var(--motion-long) var(--easing-standard),
+    --clock-lift var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.k-lock[data-live][data-phase="awake"] {
+  transition:
+    --framed var(--motion-long) var(--easing-emphasized_decel),
+    --wake var(--motion-long) var(--easing-emphasized_decel),
+    --clock-lift var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.k-lock[data-live] .k-lock-cutout {
+  transition: --panel-dim var(--motion-medium) var(--easing-standard);
+}
+
+/* With reduce motion the live lock slides and flies nothing, as the Lock page's reduced players
+   play it: the frame stands in place while its glass fades, the blur and the dim ease over `short`,
+   and the sheet fades in place. Waking, the clock stands awake at once and fades in; going back to
+   rest, everything fades out over `short`, then the frame, the sheet and the clock go to rest at once
+   and the clock fades back in (its fades are `liveLock`'s, in `pages/templates/locks.ts`). */
+[data-reduced] .k-lock[data-live] {
+  transition:
+    --framed 0s var(--motion-short),
+    --wake var(--motion-short) var(--easing-standard),
+    --clock-lift 0s var(--motion-short);
+}
+
+[data-reduced] .k-lock[data-live][data-phase="awake"] {
+  transition:
+    --framed 0s,
+    --wake var(--motion-short) var(--easing-standard),
+    --clock-lift 0s;
+}
+
+[data-reduced] .k-lock[data-live] :is(.k-screen-dim, .k-lock-cutout) {
+  transition: --panel-dim var(--motion-short) var(--easing-standard);
+}
+
+[data-reduced] .k-lock[data-live] .k-sheet-part[data-live] {
+  opacity: 0;
+  transition:
+    --reveal 0s var(--motion-short),
+    opacity var(--motion-short) var(--easing-standard);
+}
+
+[data-reduced] .k-lock[data-live] .k-sheet-part[data-live][data-shown] {
+  opacity: 1;
+  transition:
+    --reveal 0s,
+    opacity var(--motion-short) var(--easing-standard);
+}
+
+[data-reduced] .k-lock[data-live] .k-screen-glass {
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+[data-reduced] .k-lock[data-live][data-phase="awake"] .k-screen-glass {
+  opacity: var(--opacity-frame);
+}
+
+/* A clock set for its picture (`LockClock`): its kicker stands on the digits' ink, its left edge on
+   their first figure's, its middle on theirs or its right edge on their last figure's
+   (`--kicker-align`), so it lines up with what the eye sees rather than the box. */
+.k-lock[data-clocked] .k-lock-clock {
+  --ink-l: calc(var(--ink-left, 0) * var(--rest) * var(--k));
+  --ink-r: calc(var(--ink-right, 0) * var(--rest) * var(--k));
+  --kicker-left: round(nearest, calc(var(--ink-l) + var(--kicker-align, 0.5) * (var(--digits-width) - var(--ink-l) - var(--ink-r) - var(--kicker-width))), 1px);
+  /* Where the screen crops the picture, worked out here from the picture's size so a screen
+     changing shape crops the layers as it crops the picture, every frame. */
+  --cover: max(calc(var(--screen-width) / (var(--picture-width, 1) * 1px)), calc(var(--screen-height) / (var(--picture-height, 1) * 1px)));
+  --city-flat-width: calc(var(--picture-width, 1) * 1px * var(--cover));
+  --city-flat-height: calc(var(--picture-height, 1) * 1px * var(--cover));
+  --city-flat-left: calc((var(--screen-width) - var(--city-flat-width)) / 2);
+  --city-flat-top: calc((var(--screen-height) - var(--city-flat-height)) / 2);
+}
+
+/* A set clock stands over the city at every step and takes each layer set in front of it out of
+   its digits and its kicker alike (their masks, `lib/lock.ts`), so the date stands at the clock's
+   depth, a step changes the clock alone and the picture is never redrawn. With no layers in front
+   nothing cuts it: not the city's own mask either. The kicker gets the digits' room for its mask:
+   Chromium clips a mask to the border box. */
+.k-lock[data-clocked] .k-lock-clock {
+  z-index: 1;
+}
+
+.k-lock[data-clocked]:not([data-layered]) .k-lock-digits {
+  mask-image: none;
+}
+
+.k-lock[data-layered] .k-lock-kicker {
+  padding: var(--kicker-height);
+  margin: calc(-1 * var(--kicker-height));
+  mask-origin: content-box;
+  mask-clip: no-clip;
+}
+
+/* A set clock's glow, under the digits and the kicker in its colour, as strong as set: a tight
+   ring that edges the strokes and a wide one that quiets the picture round them, each a share of
+   the type size. It fades as the clock flies to the bar, and it takes the kicker's halo's place.
+   The digits get room beside them for it, as they have above and below. */
+.k-lock[data-clocked] .k-lock-digits {
+  box-sizing: content-box;
+  padding-inline: 1lh;
+  margin-inline: -1lh;
+}
+
+.k-lock[data-glow] :is(.k-lock-digits, .k-lock-place, .k-lock-date) {
+  --glow-fade: calc(1 - var(--flown));
+  filter:
+    drop-shadow(0 0 calc(var(--scale-clock_glow_edge) * 1em) rgb(from var(--glow-colour) r g b / calc(min(1, var(--scale-clock_glow_edge_gain) * var(--glow-strength)) * var(--glow-fade))))
+    drop-shadow(0 0 calc(var(--scale-clock_glow) * 1em) rgb(from var(--glow-colour) r g b / calc(min(1, var(--scale-clock_glow_gain) * var(--glow-strength)) * var(--glow-fade))));
+}
+
+.k-lock[data-glow] .k-lock-kicker {
+  text-shadow: none;
+}
+
+/* A picture set to show no clock: the lock at rest is the picture alone, and nothing flies to the
+   bar or from it. The bar's time is then the bar's like its other words, there whenever the bar
+   is, sliding in and out with it: it takes the place of the flight's own fades of it, which a
+   rule marked important wins over. */
+.k-lock[data-clockless] .k-lock-clock {
+  visibility: hidden;
+}
+
+.k-lock[data-clockless] .k-lock-bar-time {
+  opacity: 1 !important;
+}
+
+/* A picture set to show no date: the digits alone, flying as they do with it. */
+.k-lock[data-undated] .k-lock-kicker {
+  visibility: hidden;
+}
+

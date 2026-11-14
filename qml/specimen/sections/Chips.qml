@@ -58,5 +58,12 @@ K.Section {
             icon: "check"
             removable: true
         }
+
+        K.Chip {
+            text: "German"
+            pressable: true
+            removable: true
+            enabled: false
+        }
     }
 }

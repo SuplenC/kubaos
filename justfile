@@ -121,7 +121,7 @@ e2e *checks:
     (($#)) && only=(--only "$(IFS=,; echo "$*")")
     test/run e2e ${only[@]+"${only[@]}"}
 
-# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, every colour pair's WCAG contrast in both modes, every specimen page at every scale, light and dark, held to the geometry rules, then QML's parity with iced. `just test` runs the first three as cargo tests; `nix flake check` runs them all.
+# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, every colour pair's WCAG contrast in both modes, every specimen page at every scale, light and dark, held to the geometry rules, the mockup site built, then QML's parity with iced. `just test` runs the first three as cargo tests; `nix flake check` runs them and parity. The mockups' own check, `just mockups-check`, is run by hand.
 design-check: && design-parity
     cargo run -q -p kubaos-design -- lint
     cargo run -q -p kubaos-design -- contrast >/dev/null
@@ -135,6 +135,34 @@ design-parity:
     trap 'rm -rf "$frames"' EXIT
     nix run .#checks.{{host}}-linux.qml-specimen -- frames "$frames" >/dev/null
     cargo run -q -p kubaos-specimen -- parity "$frames"
+
+# The mockup site (design/mockups, docs/agents/building-ui.md), served with hot reload at the address Vite prints: every page, the toolbar and the navigation. A change to design/tokens.toml regenerates its CSS live. Arguments go to Vite, as `just mockups --port 5174`.
+[positional-arguments]
+mockups *args: _mockups-deps
+    cd design/mockups && npx vite "$@"
+
+# The mockup site built static into design/mockups/dist, after the type check and the check of its registered custom properties (`scripts/property-check.ts`): open it from any static server.
+mockups-build: _mockups-deps
+    cd design/mockups && npm run -s build
+
+# The mockups' pages laid out in headless Chromium at every scale, light and dark, each held to the geometry rules, and each mocked component to its twin on the specimen's pages (`kubaos-specimen mockup`): the same boxes as the build, wherever each page puts it. Then every motion player seeked and held to its recipe (`scripts/player-test.ts`). Run by hand, and not part of `design-check`: the site's pages are drawn ahead of the libraries, so not every page passes it.
+mockups-check: mockups-build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    frames="$(mktemp -d)"
+    trap 'rm -rf "$frames"' EXIT
+    (cd design/mockups && node scripts/render.ts "$frames" --frames)
+    cargo run -q -p kubaos-specimen -- mockup "$frames"
+    (cd design/mockups && node scripts/player-test.ts)
+
+# The mockup site's npm dependencies, from its package-lock.json, when node_modules is missing or older than the lock.
+_mockups-deps:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd design/mockups
+    if [[ ! node_modules/.package-lock.json -nt package-lock.json ]]; then
+      npm ci --no-audit --no-fund
+    fi
 
 # Write the token outputs a checkout keeps (docs/DESIGN.md, "Where the outputs are generated"): the checked-in boot files after a change to design/tokens.toml, and the ones git ignores (Tokens.qml, the terminals' tokens, Hyprland's tokens.lua), which the Nix build writes for the home, for an editor or a test reading them from the checkout. The crates' build scripts write their own.
 tokens:

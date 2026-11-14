@@ -10,7 +10,7 @@ Tools check some of these rules: `shellcheck` in the shell harness (`test/lib/e2
 
 ## Comments, in every language
 
-The comment rules hold for Rust, shell, Nix, QML, Lua and config files alike, written with that language's line comment (`//`, `#`, `--`).
+The comment rules hold for Rust, shell, Nix, QML, Lua, TypeScript, CSS and config files alike, written with that language's line comment (`//`, `#`, `--`; CSS, which has none, `/* */`).
 
 Comments are written for a human: the developer reading the code to understand it, and the reviewer of the change. Developers read code first, so the code explains itself. When something is long or strange, the first fix is to split it into well-named functions; a comment is the fallback for logic that stays non-obvious. Obvious code carries no comment at all.
 
@@ -36,7 +36,7 @@ Comments are written for a human: the developer reading the code to understand i
 
 - **Full sentences, capitalised, ending with a period**, declarative and about the code: "The watcher re-arms on the new target", never "we re-arm".
 - **Above the code, never trailing.** No comment after code on the same line, and no labels on closing braces. A `shellcheck disable=` directive may trail, with its reason after `#`.
-- **Line comments only**: `//` in Rust and QML (never `/* */`), `#` in shell and Nix, `--` in Lua. Wrap at 100 columns.
+- **Line comments only**: `//` in Rust, QML and TypeScript (never `/* */`), `#` in shell and Nix, `--` in Lua; CSS has only `/* */`. Wrap at 100 columns.
 - **Markdown is allowed** inside comments: backticks, emphasis, short lists.
 - **A comment needing paragraphs means the block wants to be a function**: extract it and put the prose in its doc comment. The header of a script or a config file is the exception (see below).
 - **Numbered steps (`# 1. …`) only where a sequence is genuinely non-obvious** and splitting it into functions would not make it clearer.
@@ -70,7 +70,7 @@ KubaOS isn't translated yet, but its text is written so it can be, in every lang
 - **One message per thing said, with placeholders**, never a sentence glued together from pieces: `"{count} snapshots · size unknown"` as one string, not `count + " snapshots" + " · " + "size unknown"`. Word order differs between languages.
 - **A count's word is part of the message**, chosen by the count, never `"snapshot" + (n > 1 ? "s" : "")`: other languages have more than two plural forms.
 - **No text in pictures or icons**, and no meaning carried by a string's position alone.
-- **Text can grow**: translations run up to a third longer, so text fits by wrapping, eliding or the layout giving it room, never by a fixed width chosen for the English string.
+- **Text can grow**: translations run up to 40% longer, so text fits by wrapping, eliding or the layout giving it room, never by a fixed width chosen for the English string.
 - **Dates, times and numbers go through the locale's formatting** (`Qt.formatDateTime`, `Number.toLocaleString`, chrono's formatting in Rust), never assembled by hand.
 
 ## Performance comes before style
@@ -129,7 +129,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 
 - **Generic spelling by shape**: `impl Trait` for a simple, single-use bound; a named parameter when a caller may turbofish it or it repeats; a `where` clause once bounds no longer fit on the line.
 - **String arguments: `impl AsRef<str>` when the function only reads**; `impl Into<String>` only when it keeps the string.
-- **An on/off tunable is a pair of setters, `x()` and `no_x()`**, never a `bool` argument.
+- **An on/off tunable is a pair of setters, `x()` and `no_x()`**, never a `bool` argument. A state the app works out each frame (`focused`, `picked`, `disabled`) is one setter taking the `bool` it worked out.
 - **A builder method returns `Self` and is `#[must_use]`**, and so is every constructor. Source: C-BUILDER.
 - **Every public type implements `Debug`.** A type holding a secret (a password, a LUKS passphrase, a token) writes `Debug` by hand and prints `<redacted>`. Source: M-PUBLIC-DEBUG, C-DEBUG.
 - **Clone an `Arc` as `Arc::clone(&x)`.** Clippy `clone_on_ref_ptr`.
@@ -186,6 +186,18 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 - **No magic numbers in layout**: colours, sizes, spacing, radii, durations and fonts come from the tokens, as "Design" below says. A named property holding a literal (`property int iconSize: 22`) is still a literal.
 - **A search over a list in the shell uses Kotodama's engine, never a hand-rolled filter.** The list's entries are Items of a Kotodama app (an Extension with a word, in `crates/kotodama-kubaos`), and the view embeds a `KotodamaSearch` of its own that enters the app and draws its Results, so typing matches the way the Command menu does, accents, typos and frecency included, and the same list is in the menu. `modules/controlcenter/KeyboardAddView.qml` is the example. A field that parses what is typed (a time, a password) isn't a search and stays as it is.
 
+## TypeScript and CSS (the mockups)
+
+`design/mockups/` is plain TypeScript and CSS built by Vite (`design/mockups/README.md`).
+
+- **TypeScript is strict**: `tsconfig.json`'s `strict`, `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`, checked by `just mockups-build`. No `any`; a cast says why in a comment when the reason isn't plain.
+- **Only erasable syntax** (`erasableSyntaxOnly`): no enums or namespaces, so Node runs the scripts as they are.
+- **A file opens with a comment on what it owns**, and an exported function, type or constant whose name doesn't say everything gets a `/** */` doc comment, shown on hover as rustdoc is.
+- **The DOM is built in TypeScript, the look is CSS.** A mock sets custom properties naming tokens (`var(--space-s8)`) and CSS draws it; a length worked out in script is one the CSS can't express (a text's advance, a glow's mask) and says so.
+- **A registered custom property (`@property`) is named for its component and means one thing.** A registration is global: the page keeps the last for the name, and every use anywhere is held to its syntax and inheritance, so a colour in a `<number>` or a second registration breaks another component without an error. `scripts/property-check.ts`, run by the build, fails a name registered two ways or a number property given a colour.
+- **No literal design values**, as "Design" below says: every length, colour, duration and curve is a token's custom property, and a length rounds to device pixels in CSS (`round()`), never by a fixed offset.
+- **No UI framework, no dependency beyond the locked dev tools.** A new npm package is a decision for the PR, with its reason.
+
 ## Design
 
 Every surface a person sees follows `docs/DESIGN.md`, in every toolkit, and each component its page under `docs/design/components/`. Read them before writing or reviewing UI code.
@@ -199,7 +211,7 @@ Every surface a person sees follows `docs/DESIGN.md`, in every toolkit, and each
 - **A justified literal** (a value that isn't a design value: a protocol's size, a font in the specimen's comparison sheet) carries a marker on its own line directly above it, naming the rule and the reason; it allows those rules on that one line: `// design-allow(size): the tray icon's size is the StatusNotifierItem spec's.` The reason is required; a marker that allows nothing fails. Source: kubaos.
 - **The geometry check** (`kubaos-specimen check`) holds every specimen page to the grid at 1, 1.25, 1.5 and 2, light and dark. A change to `kubaos-ui` or the specimen passes it, and a change to how anything looks attaches its `just shots specimen` pairs to the PR; the repo keeps no pictures of the specimen (`docs/DESIGN.md`, "Screenshot diffs"). `just design-check` runs the lint, the contrast check, the geometry check and parity; `cargo test --workspace` and `nix flake check` run the first three. Source: kubaos.
 - **Every colour a front end draws on another is a listed pair** in `[contrast]`, with what it needs (WCAG 2.1 AA) and the opacity it is drawn at; a new pairing adds its line, and `kubaos-tokens` refuses one under its minimum. `outline` is never text. Source: kubaos.
-- **Icons take their size from the text beside them** (`Type::icon()`, `Tokens.type.<style>.icon`), every key named on screen is a `Keycap` (in the Command menu, its own `Keycap` of the same boxes; in a `Hint` bubble, words), every page or panel body is a `Page` or `Container` (a panel as wide as its content takes the same padding from `Tokens.containerPaddingAround`) unless it is one list, a dialog or a stack of cards, and every picture is a `Media`. Source: kubaos.
+- **Icons take their size from the text beside them** (`Type::icon()`, `Tokens.type.<style>.icon`), every key named on screen is a `Keycap` (in a `Hint` bubble, words), every page or panel body is a `Page` or `Container` (a panel as wide as its content takes the same padding from `Tokens.containerPaddingAround`) unless it is one list, a dialog or a stack of cards, and every picture is a `Media`. Source: kubaos.
 
 ## Lua (Hyprland, Neovim)
 

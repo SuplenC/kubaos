@@ -267,7 +267,9 @@ pub fn scan(root: &Path) -> Result<Scan, Error> {
 /// What the rules read from the tokens.
 #[derive(Debug, Clone, Default)]
 pub struct Context {
-    /// The longest duration token, in milliseconds: a longer duration can't be motion.
+    /// The longest a move runs, in milliseconds: `scene`, a whole scene changing once. A longer
+    /// duration can't be motion. The duration tokens past it, a toast staying or the lock's idle
+    /// wait, aren't moves, so they don't stretch the rule over ordinary timeouts.
     pub longest_ms: u32,
     /// The radius roles as a finding names them: `small 4, control 12, surface 24, full`.
     pub roles: String,
@@ -296,7 +298,7 @@ impl Context {
             .filter(|(_, px)| !roles.contains(px) && *px < SHELL_FULL)
             .collect();
         Ok(Context {
-            longest_ms: tokens.duration.values().map(|d| d.ms).max().unwrap_or(0),
+            longest_ms: tokens.duration.get("scene").ok_or(Error::NoScene)?.ms,
             roles: format!(
                 "small {}, control {}, surface {}{}",
                 r.small,

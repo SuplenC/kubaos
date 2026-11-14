@@ -5,7 +5,9 @@ import KubaOS.Components as K
 // The picked one is tonal and the rest text, 4 apart, each with an optional symbol before its
 // label. The same row is a setting's segmented control (Always, On AC, Never). The owner keeps the
 // state: bind `currentIndex`, handle `picked()`. The row is one stop for Tab; Left and Right, or
-// h and l, pick the neighbouring choice, and the focus tube lights the picked one.
+// h and l, pick the neighbouring choice, and the focus tube lights the picked one. Disabled
+// (`enabled: false`), every choice dims, the picked one still tonal, and the row takes no press
+// and is no stop for Tab.
 Item {
     id: root
 
@@ -32,7 +34,7 @@ Item {
 
     implicitWidth: line.implicitWidth
     implicitHeight: line.implicitHeight
-    activeFocusOnTab: true
+    activeFocusOnTab: root.enabled
 
     function relayout(): void {
         line.relayout();

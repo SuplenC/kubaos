@@ -15,6 +15,10 @@ use std::fmt;
 use serde::Deserialize;
 use serde::de;
 
+use crate::contrast::Mode;
+use crate::oklch::Oklch;
+use crate::oklch::fit_text;
+
 /// Every token in `design/tokens.toml`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -22,13 +26,19 @@ pub struct Tokens {
     pub rules: Rules,
     pub stroke: Stroke,
     pub focus: Focus,
+    pub caret: Caret,
+    pub spinner: Spinner,
+    pub tabs: Tabs,
+    pub banner: Banner,
+    pub step_rail: StepRail,
+    pub icon_tile: IconTile,
     pub space: Steps,
     pub radius: Radii,
     pub icon: IconSizes,
     /// Fixed dimensions of components, by name.
     pub size: BTreeMap<String, u16>,
     pub container: Container,
-    /// Aspect ratios a picture's box keeps, width to height, by name.
+    /// Aspect ratios, width to height, by name: a picture's box's, a surface's at its shortest.
     pub aspect: BTreeMap<String, [u16; 2]>,
     pub font: Font,
     #[serde(rename = "type")]
@@ -37,7 +47,10 @@ pub struct Tokens {
     pub easing: BTreeMap<String, Easing>,
     /// Opacities laid over a colour role, by name.
     pub opacity: BTreeMap<String, f32>,
+    /// Scale factors a surface is drawn at while it comes or goes, by name.
+    pub scale: BTreeMap<String, f32>,
     pub shadow: BTreeMap<String, Shadow>,
+    pub elevation: Elevation,
     pub neon: Neon,
     pub boot: Boot,
     pub color: Colors,
@@ -87,9 +100,87 @@ pub struct Focus {
     pub far: u16,
     /// The far glow's opacity at the tube.
     pub far_opacity: f32,
+    /// Content drawn in its tone, lit: its near glow's reach outside the content, in logical
+    /// pixels.
+    pub content_near: u16,
+    /// Content drawn in its tone, lit: its near glow's opacity at the content.
+    pub content_glow: f32,
+    /// A lit label on a fill (a Filled button's, at night): its glow's reach outside the letters,
+    /// in logical pixels.
+    pub label_near: u16,
+    /// A lit label on a fill: its glow's opacity at the letters.
+    pub label_glow: f32,
+    /// How much brighter a pressed control's glow is than a lit one's, as a multiple.
+    pub pressed_glow: f32,
     /// The band a picture keeps round itself inside its own box where its neighbours leave no
     /// more room, in logical pixels.
     pub offset: u16,
+}
+
+/// The spinner: a lit arc running round its unlit ring.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Spinner {
+    /// One turn of the arc, in milliseconds.
+    pub turn: u32,
+    /// The arc's length, as a share of the ring.
+    pub arc: f32,
+}
+
+/// Tabs: the rail of neon along their well's bottom edge.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Tabs {
+    /// The rail's thickness at night, in logical pixels, rounded half up to whole device pixels.
+    pub rail: u16,
+    /// The rail's thickness by day, in logical pixels, rounded half up to whole device pixels.
+    pub rail_day: u16,
+}
+
+/// A banner's and an error block's rail of neon down their start side.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Banner {
+    /// The rail's thickness at night, in logical pixels, rounded half up to whole device pixels.
+    pub rail: u16,
+    /// The rail's thickness by day, in logical pixels, rounded half up to whole device pixels.
+    pub rail_day: u16,
+}
+
+/// A step rail's progress: the wire down its steps' symbols, and the disc each symbol sits on.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StepRail {
+    /// The wire's thickness, in logical pixels, rounded half up to whole device pixels.
+    pub wire: u16,
+    /// How far a symbol's disc reaches past the symbol on every side, in logical pixels.
+    pub bead: u16,
+}
+
+/// An icon tile's app icon: what its measured drawing must be to fill the tile as a plate.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IconTile {
+    /// The alpha above which a pixel is part of the drawing's box, 0 to 1.
+    pub ink: f32,
+    /// The alpha above which a pixel counts as covering the box, 0 to 1.
+    pub opaque: f32,
+    /// The least share of its long side the box's short side has for a plate.
+    pub square: f32,
+    /// The least share of the box its opaque pixels cover for a plate.
+    pub plate: f32,
+}
+
+/// A field's caret: its shape and the glow round it while you type.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Caret {
+    /// Its height in logical pixels, centred on the value's line.
+    pub height: u16,
+    /// The glow's reach outside the caret, in logical pixels.
+    pub near: u16,
+    /// The glow's opacity at the caret's edge.
+    pub glow: f32,
 }
 
 /// A scale of lengths, smallest first.
@@ -104,9 +195,13 @@ pub struct Steps {
 pub struct Radii {
     /// Marks inside controls.
     pub small: u16,
-    /// Everything clicked or typed in.
+    /// A row inside a small or a content box.
+    pub row: u16,
+    /// Everything clicked or typed in, and the small floating things.
     pub control: u16,
-    /// Everything that holds content.
+    /// A content box inside a window or a panel.
+    pub content: u16,
+    /// The shell's big surfaces.
     pub surface: u16,
     /// Whether there is a pill radius, half the shape's shorter side.
     pub full: bool,
@@ -274,6 +369,64 @@ pub struct Shadow {
     pub light_opacity: Option<f32>,
 }
 
+/// The ladder a part rises on inside its plane: steps 1 to `steps` over the plane's surface, each
+/// casting a contact layer and an ambient one, with a rim inside its edge.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Elevation {
+    pub steps: u16,
+    /// How many container roles above its day one a raised part sits at night.
+    pub lighter_at_night: u16,
+    /// The rim's opacity of `on_surface`, at night and by day.
+    pub rim: f32,
+    pub light_rim: f32,
+    pub contact: Layer,
+    pub ambient: Layer,
+}
+
+impl Elevation {
+    /// Every step a part rises to, the plane's own surface (0) left out.
+    pub fn raised(&self) -> std::ops::RangeInclusive<u16> {
+        1..=self.steps
+    }
+
+    pub fn rim_in(&self, mode: Mode) -> f32 {
+        match mode {
+            Mode::Dark => self.rim,
+            Mode::Light => self.light_rim,
+        }
+    }
+}
+
+/// One layer of every step's shadow, in the `shadow` role.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Layer {
+    pub y: u16,
+    pub blur: u16,
+    /// What each step adds to the offset and the blur.
+    #[serde(default)]
+    pub y_step: u16,
+    #[serde(default)]
+    pub blur_step: u16,
+    pub opacity: f32,
+    pub light_opacity: f32,
+}
+
+impl Layer {
+    /// The offset down and the blur at `step`.
+    pub fn at(&self, step: u16) -> (u16, u16) {
+        (self.y + step * self.y_step, self.blur + step * self.blur_step)
+    }
+
+    pub fn opacity_in(&self, mode: Mode) -> f32 {
+        match mode {
+            Mode::Dark => self.opacity,
+            Mode::Light => self.light_opacity,
+        }
+    }
+}
+
 /// The neon sign: how a tube strikes, and the クバ mark drawn as tubes.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -316,9 +469,9 @@ pub struct MarkStroke {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Tone {
-    /// `primary`, with `primary_core` along its middle.
+    /// `primary`, with `logo_core_warm` along its middle.
     Warm,
-    /// `cold`, with `cold_core` along its middle.
+    /// `cold`, with `logo_core_cold` along its middle.
     Cold,
 }
 
@@ -346,11 +499,284 @@ pub struct Symbol {
 pub struct Colors {
     /// The matugen colour each role is read from; empty for a role of our own.
     pub source: BTreeMap<String, String>,
+    /// The fallback palettes. A role of our own given by a recipe has its value here too once the
+    /// tokens are read ([`Colors::fill_recipes`]).
     pub dark: BTreeMap<String, Rgb>,
     pub light: BTreeMap<String, Rgb>,
+    /// The roles computed from another role, whatever its value in a palette: never a fixed value,
+    /// so they follow the wallpaper. A role of our own may be one of them instead of a value in
+    /// each palette.
+    #[serde(default)]
+    pub derived: BTreeMap<String, Derived>,
+    /// How far over the text minimum, as a ratio, a fixed role fits its lightness on backgrounds
+    /// that follow the wallpaper. The fit is computed once, on the fallback palettes' surfaces,
+    /// and drawn on every wallpaper's, which sit slightly apart from them; fitted to the minimum
+    /// exactly, the role falls a hair under it on a nearby wallpaper.
+    pub fixed_text_margin: f32,
 }
 
-/// An opaque colour, written `#rrggbb`.
+/// A role computed from others, whichever palette is drawn, so it follows the wallpaper. A recipe
+/// starts from a role (`mix` moved toward white or black in sRGB, or `from` as it is), may move its
+/// OKLCH lightness and chroma (fitted back into sRGB at the same hue and lightness), and may then
+/// fit its lightness until it holds text contrast on every role in `text_on`. A role with a recipe
+/// for each mode gives it in `dark` and `light` and nothing else. `rules` refuses anything else.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Derived {
+    /// The role it is mixed from, in sRGB, toward white or black.
+    #[serde(default)]
+    pub mix: Option<String>,
+    /// How far toward white, 0 to 1.
+    #[serde(default)]
+    pub white: Option<f32>,
+    /// How far toward black, 0 to 1.
+    #[serde(default)]
+    pub black: Option<f32>,
+    /// The role it starts from as it is.
+    #[serde(default)]
+    pub from: Option<String>,
+    /// Its OKLCH lightness times this.
+    #[serde(default)]
+    pub lightness: Option<f32>,
+    /// Its OKLCH lightness set to this.
+    #[serde(default)]
+    pub at_lightness: Option<f32>,
+    /// Its OKLCH lightness raised by this.
+    #[serde(default)]
+    pub lighter: Option<f32>,
+    /// Its OKLCH lightness lowered by this.
+    #[serde(default)]
+    pub darker: Option<f32>,
+    /// Its OKLCH chroma times this, as far as sRGB holds it.
+    #[serde(default)]
+    pub chroma: Option<f32>,
+    /// The backgrounds it is text on: its lightness moves until it holds [`Colors::fit_minimum`] on
+    /// each.
+    #[serde(default)]
+    pub text_on: Option<Vec<String>>,
+    /// Its recipe in dark mode, for a role computed differently in each mode.
+    #[serde(default)]
+    pub dark: Option<Box<Derived>>,
+    /// Its recipe in light mode.
+    #[serde(default)]
+    pub light: Option<Box<Derived>>,
+}
+
+/// Which way a derived role moves from its tone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Toward {
+    White,
+    Black,
+}
+
+impl Toward {
+    /// Its name, as the tokens and the outputs write it.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Toward::White => "white",
+            Toward::Black => "black",
+        }
+    }
+}
+
+impl Derived {
+    /// Which way it moves and how far, for a role that is only its tone mixed toward white or
+    /// black, the same in both modes: one every toolkit computes as a formula of the live tone.
+    /// `None` for every other recipe.
+    #[must_use]
+    pub fn toward(&self) -> Option<(Toward, f32)> {
+        if !self.is_mix() {
+            return None;
+        }
+        self.way()
+    }
+
+    /// Which way its `mix` moves and how far, or `None` for one that names both or neither.
+    #[must_use]
+    pub fn way(&self) -> Option<(Toward, f32)> {
+        match (self.white, self.black) {
+            (Some(t), None) => Some((Toward::White, t)),
+            (None, Some(t)) => Some((Toward::Black, t)),
+            _ => None,
+        }
+    }
+
+    /// Whether it is only `mix` toward white or black, in one recipe for both modes.
+    #[must_use]
+    pub fn is_mix(&self) -> bool {
+        self.mix.is_some() && !self.moves_oklch() && self.from.is_none() && self.text_on.is_none() && !self.by_mode()
+    }
+
+    /// The role its `mix` names, or nothing.
+    #[must_use]
+    pub fn tone(&self) -> &str {
+        self.mix.as_deref().unwrap_or_default()
+    }
+
+    /// Whether it gives a recipe for each mode.
+    #[must_use]
+    pub fn by_mode(&self) -> bool {
+        self.dark.is_some() || self.light.is_some()
+    }
+
+    /// Whether it moves the colour's OKLCH lightness or chroma.
+    #[must_use]
+    pub fn moves_oklch(&self) -> bool {
+        self.lightness.is_some()
+            || self.at_lightness.is_some()
+            || self.lighter.is_some()
+            || self.darker.is_some()
+            || self.chroma.is_some()
+    }
+
+    /// Its recipe in `mode`.
+    #[must_use]
+    pub fn in_mode(&self, mode: Mode) -> &Derived {
+        let own = match mode {
+            Mode::Dark => self.dark.as_deref(),
+            Mode::Light => self.light.as_deref(),
+        };
+        own.unwrap_or(self)
+    }
+
+    /// Every role its recipe in `mode` reads.
+    pub fn reads(&self, mode: Mode) -> impl Iterator<Item = &String> {
+        let recipe = self.in_mode(mode);
+        recipe
+            .mix
+            .iter()
+            .chain(recipe.from.iter())
+            .chain(recipe.text_on.iter().flatten())
+    }
+
+    /// Its colour in `mode` from the roles it reads, as `role` gives them, its text fitted to hold
+    /// `minimum`, or `None` when a role is missing.
+    fn compute(&self, mode: Mode, minimum: f32, role: &mut dyn FnMut(&str) -> Option<Rgb>) -> Option<Rgb> {
+        let recipe = self.in_mode(mode);
+        let mut colour = match (&recipe.mix, &recipe.from, recipe.way()) {
+            (Some(mix), None, Some((Toward::White, t))) => role(mix)?.toward_white(t),
+            (Some(mix), None, Some((Toward::Black, t))) => role(mix)?.toward_black(t),
+            (None, Some(from), None) => role(from)?,
+            _ => return None,
+        };
+        if recipe.moves_oklch() {
+            let mut lch = Oklch::of(colour);
+            if let Some(at) = recipe.at_lightness {
+                lch.l = f64::from(at);
+            }
+            lch.l *= f64::from(recipe.lightness.unwrap_or(1.0));
+            lch.l += f64::from(recipe.lighter.unwrap_or(0.0)) - f64::from(recipe.darker.unwrap_or(0.0));
+            lch.c *= f64::from(recipe.chroma.unwrap_or(1.0));
+            colour = lch.to_rgb();
+        }
+        if let Some(on) = &recipe.text_on {
+            let backgrounds = on.iter().map(|name| role(name)).collect::<Option<Vec<_>>>()?;
+            colour = fit_text(colour, &backgrounds, minimum);
+        }
+        Some(colour)
+    }
+}
+
+impl Colors {
+    /// Whether `role` is one of ours given by a recipe rather than by a value in each palette.
+    #[must_use]
+    pub fn by_recipe(&self, role: &str) -> bool {
+        self.source.get(role).is_some_and(String::is_empty) && self.derived.contains_key(role)
+    }
+
+    /// The ratio `role`'s recipe in `mode` fits its text to: the text minimum, and
+    /// `fixed_text_margin` over it for a role of ours given by a recipe that is text on a
+    /// background following the wallpaper.
+    #[must_use]
+    pub fn fit_minimum(&self, role: &str, mode: Mode) -> f32 {
+        let on_wallpaper = self
+            .derived
+            .get(role)
+            .and_then(|derived| derived.in_mode(mode).text_on.as_ref())
+            .is_some_and(|on| on.iter().any(|bg| self.follows_wallpaper(bg, mode, &mut Vec::new())));
+        if self.by_recipe(role) && on_wallpaper {
+            Need::Text.minimum() + self.fixed_text_margin
+        } else {
+            Need::Text.minimum()
+        }
+    }
+
+    /// Whether `role` changes with the wallpaper in `mode`: one matugen gives, or one derived from
+    /// a role that does, but never one of ours given by a recipe, which keeps its fallback value.
+    fn follows_wallpaper(&self, role: &str, mode: Mode, seen: &mut Vec<String>) -> bool {
+        if self.source.get(role).is_some_and(|source| !source.is_empty()) {
+            return true;
+        }
+        if self.by_recipe(role) || seen.iter().any(|each| each == role) {
+            return false;
+        }
+        seen.push(role.to_owned());
+        self.derived
+            .get(role)
+            .is_some_and(|derived| derived.reads(mode).any(|read| self.follows_wallpaper(read, mode, seen)))
+    }
+
+    /// Puts each role of ours given by a recipe into both fallback palettes, computed from them,
+    /// so the outputs that draw a palette as values (iced, QML, the terminals) have it.
+    pub fn fill_recipes(&mut self) {
+        let dark = self.with_derived(&self.dark, Mode::Dark);
+        let light = self.with_derived(&self.light, Mode::Light);
+        let roles: Vec<String> = self
+            .source
+            .keys()
+            .filter(|role| self.by_recipe(role))
+            .cloned()
+            .collect();
+        for role in roles {
+            if let Some(&rgb) = dark.get(&role) {
+                self.dark.insert(role.clone(), rgb);
+            }
+            if let Some(&rgb) = light.get(&role) {
+                self.light.insert(role, rgb);
+            }
+        }
+    }
+
+    /// `palette`, the colours of `mode`, with the derived roles computed from its own values. A
+    /// derived role whose roles the palette lacks, or that reads itself, is left out; `rules`
+    /// refuses either.
+    #[must_use]
+    pub fn with_derived(&self, palette: &BTreeMap<String, Rgb>, mode: Mode) -> BTreeMap<String, Rgb> {
+        let mut out = palette.clone();
+        let mut reading = Vec::new();
+        for role in self.derived.keys() {
+            self.resolve(role, mode, &mut out, &mut reading);
+        }
+        out
+    }
+
+    fn resolve(
+        &self,
+        name: &str,
+        mode: Mode,
+        out: &mut BTreeMap<String, Rgb>,
+        reading: &mut Vec<String>,
+    ) -> Option<Rgb> {
+        if let Some(&known) = out.get(name) {
+            return Some(known);
+        }
+        let derived = self.derived.get(name)?;
+        if reading.iter().any(|each| each == name) {
+            return None;
+        }
+        reading.push(name.to_owned());
+        let minimum = self.fit_minimum(name, mode);
+        let colour = derived.compute(mode, minimum, &mut |role| self.resolve(role, mode, out, reading));
+        reading.pop();
+        if let Some(colour) = colour {
+            out.insert(name.to_owned(), colour);
+        }
+        colour
+    }
+}
+
+/// An opaque colour, written `#rrggbb`, or `oklch(L C H)` for a fixed tone decided in OKLCH.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Rgb {
     pub r: u8,
@@ -374,6 +800,21 @@ impl Rgb {
     }
 }
 
+impl Rgb {
+    /// Reads `oklch(L C H)`, fitted into sRGB at its hue and lightness, or `None` for anything
+    /// else.
+    pub fn parse_oklch(written: &str) -> Option<Rgb> {
+        let inside = written.strip_prefix("oklch(")?.strip_suffix(')')?;
+        let numbers: Vec<f64> = inside
+            .split_whitespace()
+            .map(str::parse)
+            .collect::<Result<_, _>>()
+            .ok()?;
+        let [l, c, h] = numbers.as_slice() else { return None };
+        Some(Oklch { l: *l, c: *c, h: *h }.to_rgb())
+    }
+}
+
 impl fmt::Debug for Rgb {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "#{:02x}{:02x}{:02x}", self.r, self.g, self.b)
@@ -382,12 +823,53 @@ impl fmt::Debug for Rgb {
 
 impl<'de> Deserialize<'de> for Rgb {
     fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let hex = String::deserialize(deserializer)?;
-        Rgb::parse(&hex).ok_or_else(|| de::Error::custom(format!("`{hex}` isn't a colour written #rrggbb")))
+        let written = String::deserialize(deserializer)?;
+        Rgb::parse(&written)
+            .or_else(|| Rgb::parse_oklch(&written))
+            .ok_or_else(|| de::Error::custom(format!("`{written}` isn't a colour written #rrggbb or oklch(L C H)")))
     }
 }
 
 impl Rgb {
+    /// This colour mixed `t` of the way to white, each channel rounded half up.
+    #[must_use]
+    pub fn toward_white(self, t: f32) -> Rgb {
+        let channel = |c: u8| {
+            let c = f32::from(c);
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "Clamped to 0..=255 and rounded first."
+            )]
+            let byte = (c + (255.0 - c) * t + 0.5).floor().clamp(0.0, 255.0) as u8;
+            byte
+        };
+        Rgb {
+            r: channel(self.r),
+            g: channel(self.g),
+            b: channel(self.b),
+        }
+    }
+
+    /// This colour mixed `t` of the way to black, each channel rounded half up.
+    #[must_use]
+    pub fn toward_black(self, t: f32) -> Rgb {
+        let channel = |c: u8| {
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "Clamped to 0..=255 and rounded first."
+            )]
+            let byte = (f32::from(c) * (1.0 - t) + 0.5).floor().clamp(0.0, 255.0) as u8;
+            byte
+        };
+        Rgb {
+            r: channel(self.r),
+            g: channel(self.g),
+            b: channel(self.b),
+        }
+    }
+
     /// This colour with its HSL lightness moved by `points` of 100, clamped: matugen's `lighten`.
     #[must_use]
     pub fn lighten(self, points: f32) -> Rgb {

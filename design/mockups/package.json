@@ -1,0 +1,20 @@
+{
+  "name": "kubaos-mockups",
+  "private": true,
+  "type": "module",
+  "description": "KubaOS's mockups: every UI as it is meant to be, the source of truth the builds match",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && node scripts/property-check.ts && vite build && node scripts/render.ts dist/motion --motion",
+    "typecheck": "tsc --noEmit",
+    "property-check": "node scripts/property-check.ts",
+    "render": "node scripts/render.ts",
+    "perf": "node scripts/perf.ts"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "playwright-core": "1.59.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.5"
+  }
+}
