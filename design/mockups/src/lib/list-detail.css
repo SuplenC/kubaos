@@ -110,11 +110,69 @@
   background: var(--color-surface);
 }
 
+/* The side's edge is a visible one, so it cuts what its scroll reaches past it. */
 .k-setup-side {
   display: flex;
   flex: none;
+  flex-direction: column;
   min-height: 0;
+  overflow: clip;
   background: rgb(from var(--color-surface_container_low) r g b / var(--opacity-well));
+}
+
+/* The header stays: a page's top padding over it, the gap to the list under it. */
+.k-setup-head {
+  flex: none;
+  padding-top: var(--space-s32);
+  padding-bottom: var(--space-s20);
+}
+
+.k-setup-scroll {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* What is under the header fills the room it scrolls in, so the list takes what is left; past
+   that it scrolls as one. A page's foot under it. */
+.k-setup-scroll .k-scroll-body {
+  box-sizing: border-box;
+  min-height: 100%;
+}
+
+.k-setup-below {
+  flex: 1 0 auto;
+  padding-bottom: var(--space-s24);
+}
+
+.k-setup-below > .k-stack {
+  flex: 1 0 auto;
+}
+
+/* The keys: out whole where they would take the list below its three cards. Going, they fade over
+   `short` in their room, then give it up; coming back, they take it, then fade in. Reduce motion
+   keeps the fade, which `short` already is. */
+.k-setup-keys {
+  display: block;
+  padding-top: var(--space-s16);
+}
+
+.k-setup-keys[data-settled] {
+  transition:
+    opacity var(--motion-short) var(--easing-standard),
+    display var(--motion-short) allow-discrete;
+}
+
+.k-setup-keys[data-out] {
+  display: none;
+  opacity: 0;
+}
+
+@starting-style {
+  .k-setup-keys[data-settled]:not([data-out]) {
+    opacity: 0;
+  }
 }
 
 .k-setup-detail {
