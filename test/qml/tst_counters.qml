@@ -79,10 +79,10 @@ TestCase {
             typed: "every day at 9",
             ok: true,
             words: "Every day at 9:00",
-            when: "Next tomorrow at 9:00"
+            when: "Next: tomorrow, Fri 13 Nov, 9:00"
         };
 
-        compare(Logic.ruleNote("every day at 9", reading), "Resets every day at 9:00. Next tomorrow at 9:00.");
+        compare(Logic.ruleNote("every day at 9", reading), "Resets every day at 9:00. Next: tomorrow, Fri 13 Nov, 9:00");
         compare(Logic.checkRule("every day at 9", reading), "");
     }
 
@@ -103,7 +103,7 @@ TestCase {
             typed: "every day at 9",
             ok: true,
             words: "Every day at 9:00",
-            when: "Next tomorrow at 9:00",
+            when: "Next: tomorrow, Fri 13 Nov, 9:00",
             examples: ["every day at 9"]
         };
 

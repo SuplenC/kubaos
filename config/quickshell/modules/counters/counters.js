@@ -64,7 +64,7 @@ function ruleNote(typed, reading) {
     if (reading.ok && reading.typed === typed) {
         const words = reading.words ?? "";
         const phrase = words.charAt(0).toLowerCase() + words.slice(1);
-        return reading.when ? `Resets ${phrase}. ${reading.when}.` : `Resets ${phrase}.`;
+        return reading.when ? `Resets ${phrase}. ${reading.when}` : `Resets ${phrase}`;
     }
     return tryWords(reading.examples ?? []);
 }
