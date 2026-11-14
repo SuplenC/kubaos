@@ -508,6 +508,11 @@ pub struct Colors {
     /// each palette.
     #[serde(default)]
     pub derived: BTreeMap<String, Derived>,
+    /// How far over the text minimum, as a ratio, a fixed role fits its lightness on backgrounds
+    /// that follow the wallpaper. The fit is computed once, on the fallback palettes' surfaces,
+    /// and drawn on every wallpaper's, which sit slightly apart from them; fitted to the minimum
+    /// exactly, the role falls a hair under it on a nearby wallpaper.
+    pub fixed_text_margin: f32,
 }
 
 /// A role computed from others, whichever palette is drawn, so it follows the wallpaper. A recipe
@@ -545,7 +550,8 @@ pub struct Derived {
     /// Its OKLCH chroma times this, as far as sRGB holds it.
     #[serde(default)]
     pub chroma: Option<f32>,
-    /// The backgrounds it is text on: its lightness moves until it holds 4.5:1 on each.
+    /// The backgrounds it is text on: its lightness moves until it holds [`Colors::fit_minimum`] on
+    /// each.
     #[serde(default)]
     pub text_on: Option<Vec<String>>,
     /// Its recipe in dark mode, for a role computed differently in each mode.
@@ -644,9 +650,9 @@ impl Derived {
             .chain(recipe.text_on.iter().flatten())
     }
 
-    /// Its colour in `mode` from the roles it reads, as `role` gives them, or `None` when one is
-    /// missing.
-    fn compute(&self, mode: Mode, role: &mut dyn FnMut(&str) -> Option<Rgb>) -> Option<Rgb> {
+    /// Its colour in `mode` from the roles it reads, as `role` gives them, its text fitted to hold
+    /// `minimum`, or `None` when a role is missing.
+    fn compute(&self, mode: Mode, minimum: f32, role: &mut dyn FnMut(&str) -> Option<Rgb>) -> Option<Rgb> {
         let recipe = self.in_mode(mode);
         let mut colour = match (&recipe.mix, &recipe.from, recipe.way()) {
             (Some(mix), None, Some((Toward::White, t))) => role(mix)?.toward_white(t),
@@ -666,7 +672,7 @@ impl Derived {
         }
         if let Some(on) = &recipe.text_on {
             let backgrounds = on.iter().map(|name| role(name)).collect::<Option<Vec<_>>>()?;
-            colour = fit_text(colour, &backgrounds, Need::Text.minimum());
+            colour = fit_text(colour, &backgrounds, minimum);
         }
         Some(colour)
     }
@@ -677,6 +683,38 @@ impl Colors {
     #[must_use]
     pub fn by_recipe(&self, role: &str) -> bool {
         self.source.get(role).is_some_and(String::is_empty) && self.derived.contains_key(role)
+    }
+
+    /// The ratio `role`'s recipe in `mode` fits its text to: the text minimum, and
+    /// `fixed_text_margin` over it for a role of ours given by a recipe that is text on a
+    /// background following the wallpaper.
+    #[must_use]
+    pub fn fit_minimum(&self, role: &str, mode: Mode) -> f32 {
+        let on_wallpaper = self
+            .derived
+            .get(role)
+            .and_then(|derived| derived.in_mode(mode).text_on.as_ref())
+            .is_some_and(|on| on.iter().any(|bg| self.follows_wallpaper(bg, mode, &mut Vec::new())));
+        if self.by_recipe(role) && on_wallpaper {
+            Need::Text.minimum() + self.fixed_text_margin
+        } else {
+            Need::Text.minimum()
+        }
+    }
+
+    /// Whether `role` changes with the wallpaper in `mode`: one matugen gives, or one derived from
+    /// a role that does, but never one of ours given by a recipe, which keeps its fallback value.
+    fn follows_wallpaper(&self, role: &str, mode: Mode, seen: &mut Vec<String>) -> bool {
+        if self.source.get(role).is_some_and(|source| !source.is_empty()) {
+            return true;
+        }
+        if self.by_recipe(role) || seen.iter().any(|each| each == role) {
+            return false;
+        }
+        seen.push(role.to_owned());
+        self.derived
+            .get(role)
+            .is_some_and(|derived| derived.reads(mode).any(|read| self.follows_wallpaper(read, mode, seen)))
     }
 
     /// Puts each role of ours given by a recipe into both fallback palettes, computed from them,
@@ -728,7 +766,8 @@ impl Colors {
             return None;
         }
         reading.push(name.to_owned());
-        let colour = derived.compute(mode, &mut |role| self.resolve(role, mode, out, reading));
+        let minimum = self.fit_minimum(name, mode);
+        let colour = derived.compute(mode, minimum, &mut |role| self.resolve(role, mode, out, reading));
         reading.pop();
         if let Some(colour) = colour {
             out.insert(name.to_owned(), colour);

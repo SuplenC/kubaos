@@ -693,6 +693,47 @@ fn a_role_with_a_recipe_for_each_mode_takes_each_in_its_own() {
 }
 
 #[test]
+fn a_fixed_text_role_holds_its_margin_over_the_minimum_on_every_surface() {
+    let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
+    let held = crate::model::Need::Text.minimum() + tokens.color.fixed_text_margin;
+
+    for (palette, mode) in [(&tokens.color.dark, Mode::Dark), (&tokens.color.light, Mode::Light)] {
+        for role in ["error", "success", "warning", "sharing", "microphone", "recording"] {
+            assert!(
+                (tokens.color.fit_minimum(role, mode) - held).abs() < f32::EPSILON,
+                "{role}"
+            );
+            let surfaces = tokens.color.derived[role].in_mode(mode).text_on.as_ref().expect("text");
+            for surface in surfaces {
+                let ratio = contrast::ratio(contrast::channels(palette[role]), contrast::channels(palette[surface]));
+                assert!(ratio >= held, "{role} on {surface} in {}: {ratio}", mode.name());
+            }
+        }
+    }
+}
+
+#[test]
+fn a_label_on_a_fill_that_never_changes_or_that_follows_the_wallpaper_takes_no_margin() {
+    let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
+
+    for mode in Mode::ALL {
+        for role in [
+            "on_error",
+            "on_error_container",
+            "on_burn_error",
+            "on_primary_fill",
+            "primary_rest",
+        ] {
+            let fit = tokens.color.fit_minimum(role, mode);
+            assert!(
+                (fit - crate::model::Need::Text.minimum()).abs() < f32::EPSILON,
+                "{role}: {fit}"
+            );
+        }
+    }
+}
+
+#[test]
 fn a_label_fitted_on_its_fills_holds_on_every_one() {
     let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
 

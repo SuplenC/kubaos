@@ -104,21 +104,25 @@ fn every_symbol_names_its_drawing() {
 
 #[test]
 fn the_fixed_roles_are_written_in_both_palettes() {
+    let tokens = crate::parse(TOKENS).expect("the repo's tokens hold");
     let module = module();
 
     for role in [
-        "sharing: Rgb { r: 0xb4, g: 0x84, b: 0xff },",
-        "sharing: Rgb { r: 0x80, g: 0x38, b: 0xd1 },",
-        "logo_core_warm: Rgb { r: 0xff, g: 0xe6, b: 0xcf },",
-        "logo_core_cold: Rgb { r: 0xdc, g: 0xf1, b: 0xff },",
-        "microphone: Rgb { r: 0xff, g: 0x85, b: 0x05 },",
-        "microphone: Rgb { r: 0x9e, g: 0x50, b: 0x00 },",
-        "recording: Rgb { r: 0xff, g: 0x6e, b: 0x5d },",
-        "recording: Rgb { r: 0xcd, g: 0x00, b: 0x03 },",
-        "success: Rgb { r: 0x3c, g: 0xc9, b: 0x6a },",
-        "success: Rgb { r: 0x00, g: 0x75, b: 0x33 },",
+        "sharing",
+        "logo_core_warm",
+        "logo_core_cold",
+        "microphone",
+        "recording",
+        "success",
     ] {
-        assert!(module.contains(role), "{role}");
+        for palette in [&tokens.color.dark, &tokens.color.light] {
+            let rgb = palette[role];
+            let line = format!(
+                "{role}: Rgb {{ r: {:#04x}, g: {:#04x}, b: {:#04x} }},",
+                rgb.r, rgb.g, rgb.b
+            );
+            assert!(module.contains(&line), "{line}");
+        }
     }
 }
 

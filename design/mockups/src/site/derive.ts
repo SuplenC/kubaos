@@ -5,7 +5,8 @@
 //
 // A recipe starts from a role, mixed toward white or black in sRGB or as it is, may move its OKLCH
 // lightness and chroma (fitted back into sRGB by lowering its chroma alone, so its hue and
-// lightness hold), and may fit its lightness until it holds 4.5:1 on every background it is text on.
+// lightness hold), and may fit its lightness until it holds the ratio its recipe names on every
+// background it is text on: 4.5:1, or a little over for a fixed role on the surfaces.
 
 import { words } from "../lib/tokens.ts";
 import { ratio } from "./contrast.ts";
@@ -24,6 +25,8 @@ interface Recipe {
   readonly darker?: number;
   readonly chroma?: number;
   readonly text_on?: readonly string[];
+  /** The ratio its text is fitted to on `text_on`: the tokens' CSS writes it with every `text_on`. */
+  readonly holds?: number;
   /** A tone mixed toward white or black alone: a `color-mix` formula in the tokens' CSS. */
   readonly formula: boolean;
 }
@@ -116,9 +119,9 @@ function mixed(hex: string, toward: "white" | "black", t: number): string {
   return `#${[1, 3, 5].map((at) => channel(at).toString(16).padStart(2, "0")).join("")}`;
 }
 
-/** `colour`'s lightness moved only as far as it takes to hold 4.5:1 on every one of `backgrounds`. */
-function fitText(colour: string, backgrounds: readonly string[]): string {
-  const holds = (c: string) => backgrounds.every((bg) => ratio(c, bg) >= 4.5);
+/** `colour`'s lightness moved only as far as it takes to hold `minimum` on every one of `backgrounds`. */
+function fitText(colour: string, backgrounds: readonly string[], minimum: number): string {
+  const holds = (c: string) => backgrounds.every((bg) => ratio(c, bg) >= minimum);
   if (holds(colour)) return colour;
   const start = toLch(colour);
   const lighter = backgrounds.every((bg) => toLch(bg).l <= start.l);
@@ -153,10 +156,10 @@ function compute(recipe: Recipe, role: (name: string) => string | undefined): st
     lch.c *= recipe.chroma ?? 1;
     colour = toHex(lch);
   }
-  if (recipe.text_on) {
+  if (recipe.text_on && recipe.holds !== undefined) {
     const backgrounds = recipe.text_on.map(role);
     if (backgrounds.some((each) => each === undefined)) return undefined;
-    colour = fitText(colour, backgrounds as string[]);
+    colour = fitText(colour, backgrounds as string[], recipe.holds);
   }
   return colour;
 }
@@ -188,7 +191,7 @@ export interface Described {
   readonly role: string;
   /** The role it is computed from: a tone, or another derived role. */
   readonly tone: string;
-  /** The roles it is text on, fitted to hold 4.5:1 on each; empty for a role that isn't text. */
+  /** The roles it is text on, fitted to hold its ratio on each; empty for a role that isn't text. */
   readonly textOn: readonly string[];
   readonly words: string;
 }
@@ -206,7 +209,7 @@ export function described(mode: Mode): Described[] {
       ...(recipe.chroma !== undefined ? [`chroma × ${recipe.chroma}`] : []),
     ];
     const fitted = moves.length > 0 ? [`${moves.join(", ")}, fitted into sRGB by its chroma alone`] : [];
-    const text = recipe.text_on ? [`its lightness fitted to hold 4.5:1 on ${recipe.text_on.map((each) => `\`${each}\``).join(", ")}`] : [];
+    const text = recipe.text_on ? [`its lightness fitted to hold ${recipe.holds}:1 on ${recipe.text_on.map((each) => `\`${each}\``).join(", ")}`] : [];
     return { role, tone, textOn: recipe.text_on ?? [], words: [start, ...fitted, ...text].join("; ") };
   });
 }

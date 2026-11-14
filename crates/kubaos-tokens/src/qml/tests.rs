@@ -77,23 +77,23 @@ fn an_app_window_s_sizes_and_the_sidebar_are_sizes() {
 
 #[test]
 fn the_fixed_roles_are_written_in_both_palettes() {
+    let tokens = crate::parse(TOKENS).expect("the repo's tokens hold");
     let singleton = render(&QmlTokens);
 
     for role in [
-        "sharing: \"#b484ff\"",
-        "sharing: \"#8038d1\"",
-        "logo_core_warm: \"#ffe6cf\"",
-        "logo_core_cold: \"#dcf1ff\"",
-        "microphone: \"#ff8505\"",
-        "microphone: \"#9e5000\"",
-        "recording: \"#ff6e5d\"",
-        "recording: \"#cd0003\"",
-        "success: \"#3cc96a\"",
-        "success: \"#007533\"",
-        "readonly property color sharing: tokens.role(\"sharing\")",
+        "sharing",
+        "logo_core_warm",
+        "logo_core_cold",
+        "microphone",
+        "recording",
+        "success",
     ] {
-        assert!(singleton.contains(role), "{role}");
+        for palette in [&tokens.color.dark, &tokens.color.light] {
+            let line = format!("{role}: \"{:?}\"", palette[role]);
+            assert!(singleton.contains(&line), "{line}");
+        }
     }
+    assert!(singleton.contains("readonly property color sharing: tokens.role(\"sharing\")"));
 }
 
 #[test]

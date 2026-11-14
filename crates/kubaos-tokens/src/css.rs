@@ -371,6 +371,7 @@ fn recipes(tokens: &Tokens, mode: Mode) -> String {
         }
         if let Some(on) = &recipe.text_on {
             fields.push(format!("\"text_on\":[{}]", list(on)));
+            fields.push(format!("\"holds\":{}", number(tokens.color.fit_minimum(role, mode))));
         }
         fields.push(format!("\"formula\":{}", derived.toward().is_some()));
         entries.push(format!("{role:?}:{{{}}}", fields.join(",")));
