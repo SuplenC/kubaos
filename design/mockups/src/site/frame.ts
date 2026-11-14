@@ -4,7 +4,7 @@
 // plain box, since the layout's rules hold its edges, and a plain box around one child with its
 // bounds is that child, as iced reports them.
 //
-// The frame is what a person sees, so the walk reports three things the DOM alone doesn't say:
+// The frame is what a person sees, so the walk reports what the DOM alone doesn't say:
 //
 // - A box drawn scaled (CSS `scale`, or a `transform` that scales) is a picture of UI, such as
 //   the Gallery's small screens or windows stepped back behind a lock: it and everything in it
@@ -17,8 +17,11 @@
 //   pushed past its box is still reported, and sticks out of it.
 // - A box out of the flow (`position: absolute`) is marked `over`, so its parent's layout leaves
 //   it out; one its probe says floats (a hint's bubble) is marked `floats` too, so it is held to
-//   its own boxes, not its control's. A box the site lets scroll sideways (a screen wider than the
-//   page under `?all`) is a `scroll` that scrolls `across`.
+//   its own boxes, not its control's.
+// - A box whose content scrolls past it is a `scroll`: a well's rows' says so (`scrolls` in
+//   `lib/probe.ts`), and a box that says nothing and scrolls is one too. A probed box that scrolls its own content (a
+//   dialog's middle) is reported inside a scroll, as tall as its content. A box the site lets
+//   scroll sideways (a screen wider than the page under `?all`) is a `scroll` marked `across`.
 //
 // The root is the page's own box, which claims nothing, so every mock on the page is one frame.
 
@@ -99,10 +102,11 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
     return;
   }
   const probe = element.dataset.probe;
-  const declared = probe ? (JSON.parse(probe) as Record<string, unknown>) : null;
+  const declared = probe ? (JSON.parse(probe) as Record<string, unknown>) : element.dataset.scrollProbe !== undefined ? { role: "scroll" } : null;
   const picture = matrix ? pictureOf(matrix) : null;
   const scroller = sideways(element, style);
-  let role: Record<string, unknown> | null = declared ?? (laidOut || picture ? { role: "box" } : scroller ? { role: "scroll" } : null);
+  const scrollsDown = downward(element, style);
+  let role: Record<string, unknown> | null = declared ?? (laidOut || picture ? { role: "box" } : scroller || scrollsDown ? { role: "scroll" } : null);
   const part = at.part || declared?.role === "component";
   const clips = holding(element, style, drawn, at.clips, moved, part);
   if (!role) {
@@ -142,7 +146,20 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
     into.push(kept[0]!);
     return;
   }
-  into.push({ ...role, role: String(role.role), bounds, children: kept });
+  const node: FrameNode = { ...role, role: String(role.role), bounds, children: kept };
+  into.push(scrollsDown && role.role !== "scroll" ? scrolledOf(element, style, node) : node);
+}
+
+/**
+ * A probed box that scrolls its own content (a dialog's middle, a long menu) as a scroll round it,
+ * as the toolkits report it: the scroll is the box drawn, and the box inside it is as tall as its
+ * content, from where its content starts.
+ */
+function scrolledOf(element: Element, style: CSSStyleDeclaration, node: FrameNode): FrameNode {
+  const [width] = laidOutSize(style);
+  const perCss = width > 0 ? node.bounds.width / width : 0;
+  const inner = { ...node, bounds: { ...node.bounds, y: node.bounds.y - element.scrollTop * perCss, height: element.scrollHeight * perCss } };
+  return { role: "scroll", bounds: node.bounds, children: [inner] };
 }
 
 /** Whether a box says more than that it is a box: what folding it into its child would lose. */
@@ -198,6 +215,14 @@ function holding(element: Element, style: CSSStyleDeclaration, drawn: DOMRectRea
  */
 function sideways(element: Element, style: CSSStyleDeclaration): boolean {
   return element.getAttribute("data-probe") === null && /auto|scroll/.test(style.overflowX) && element.scrollWidth > element.clientWidth + 1;
+}
+
+/**
+ * Whether `element` scrolls its content down and the content runs past it: a list's well, a long
+ * dialog, a menu taller than its room. One whose probe already says it is a scroll needn't.
+ */
+function downward(element: Element, style: CSSStyleDeclaration): boolean {
+  return /auto|scroll/.test(style.overflowY) && element.scrollHeight > element.clientHeight + 1;
 }
 
 /**

@@ -227,6 +227,40 @@ const CASES: Case[] = [
       return scrolls.length === 1 && scrolls[0]!.across === true ? null : `${scrolls.length} scrolls across`;
     },
   },
+  {
+    name: "a box marked as what a well's rows scroll in is a scroll, overflowing or not",
+    html: `<span ${BOX} style="display: block; width: 200px">
+      <span data-scroll-probe style="display: block; overflow-y: auto; height: 40px">
+        <span ${TEXT} style="display: block; width: 40px; height: 20px">One</span>
+      </span>
+    </span>`,
+    check: (root) => (one(root, "Box").children[0]?.role === "scroll" ? null : "the pane is no scroll"),
+  },
+  {
+    name: "a box that says nothing is a scroll only while its content runs past it",
+    html: `<div style="overflow-y: auto; width: 200px; height: 40px">
+      <span ${BOX} style="display: block; width: 40px; height: 80px"></span>
+    </div>
+    <div style="overflow-y: auto; width: 200px; height: 40px">
+      <span ${BOX} style="display: block; width: 40px; height: 20px"></span>
+    </div>`,
+    check: (root) => {
+      const scrolls = all(root, "scroll");
+      return scrolls.length === 1 && scrolls[0]!.across === undefined ? null : `${scrolls.length} scrolls`;
+    },
+  },
+  {
+    name: "a probed box that scrolls its own content is inside a scroll, as tall as its content",
+    html: `<span ${ROW.replace('"axis":"x"', '"axis":"y"')} style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; width: 200px; height: 40px">
+      <span ${BOX} style="flex: none; height: 40px"></span>
+      <span ${BOX} style="flex: none; height: 40px"></span>
+    </span>`,
+    check: (root) => {
+      const scroll = root.children[0]!;
+      if (scroll.role !== "scroll") return `the stack is in a ${scroll.role}`;
+      return boxIs(scroll, 0, 0, 200, 40) ?? boxIs(scroll.children[0]!, 0, 0, 200, 88);
+    },
+  },
 ];
 
 async function main(): Promise<void> {

@@ -40,6 +40,17 @@ export function probe<E extends HTMLElement | SVGElement>(element: E, role: Role
 }
 
 /**
+ * Marks `element` as what its content scrolls in, as `kubaos-ui` reports a scrollable: content past
+ * its edge is scrolled out of view, not cut (`docs/DESIGN.md`, "The geometry check"). An attribute
+ * of its own, not a probe: only the geometry frame reads it, and the site's parts tree, which every
+ * probe is a line of, leaves a scroll out as parity does.
+ */
+export function scrolls<E extends HTMLElement>(element: E): E {
+  element.dataset.scrollProbe = "";
+  return element;
+}
+
+/**
  * Names the tokens script worked `element`'s box out from, which its styles hold only as a number:
  * a menu between one column and two wide, a side a third of its window up to a column. The site's
  * measures light the box for them (`site/parts/uses.ts`).

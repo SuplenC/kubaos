@@ -31,7 +31,7 @@ import { icon, missingIcon } from "./icon.ts";
 import { iconTile } from "./icon-tile.ts";
 import { keycap, keys } from "./keycap.ts";
 import { filling, row, stack } from "./layout.ts";
-import { FIXED_HEIGHT, probe, variant } from "./probe.ts";
+import { FIXED_HEIGHT, probe, scrolls, variant } from "./probe.ts";
 import { skeleton } from "./skeleton.ts";
 import { switchControl } from "./switch.ts";
 import { focusRing } from "./focus.ts";
@@ -537,7 +537,8 @@ export function scrollingList(specs: readonly ListItem[], options: ScrollingOpti
  * live one share. Returns the well, what scrolls, and what places the thumb.
  */
 export function scrolled(name: string, content: HTMLElement, options: { readonly height: string; readonly thumbPinned?: boolean }): { box: HTMLElement; pane: HTMLElement; thumb: () => void } {
-  const pane = document.createElement("span");
+  // The rows scroll in it: rows past the well's edge are scrolled out of view, not cut.
+  const pane = scrolls(document.createElement("span"));
   pane.className = "k-list-pane";
   pane.append(content);
   const rail = document.createElement("span");
