@@ -18,6 +18,7 @@
 import "./wallpaper-clock.css";
 import { button } from "../../lib/button.ts";
 import { buttonBar } from "../../lib/button-bar.ts";
+import { colourPicker, customColour, type PickedColour } from "../../lib/colour-picker.ts";
 import { icon } from "../../lib/icon.ts";
 import { type ClockAt, type ClockDate, type ClockPlace, clockFigures, drawClock, inkEdges, type Lock, type LockClock, TIME, type Wallpaper } from "../../lib/lock.ts";
 import { TINT_LIGHTNESS } from "../../lib/lock-tint.ts";
@@ -31,11 +32,23 @@ import type { Duration, Easing } from "../../site/page.ts";
 import { bezier, milliseconds } from "../../site/recipe.ts";
 import { oklch } from "../../site/recolour.ts";
 import { settings } from "../../site/settings.ts";
-import { type ClockColour, colourPicker, customColour } from "./wallpaper-colour.ts";
 import { stepsOf } from "./wallpaper-layers.ts";
 
 export type Shape = "wide" | "portrait";
 export type GlowMode = "off" | "dark" | "light" | "auto";
+
+/** A role the clock can take: they follow the wallpaper's scheme. */
+export type ClockRole = "primary" | "secondary" | "cold" | "on_surface";
+
+/** The roles the clock's colour offers as swatches, by name. */
+const ROLES: readonly (readonly [ClockRole, string])[] = [
+  ["primary", "Primary"],
+  ["secondary", "Secondary"],
+  ["cold", "Cold"],
+  ["on_surface", "Text"],
+];
+
+export type ClockColour = PickedColour<ClockRole>;
 
 /** The clock as set for one picture: place and date per screen shape, the rest for both. */
 export interface ClockLook {
@@ -747,21 +760,20 @@ export function clockEditor(host: EditorHost): Editor {
 
     // Colour: Auto, the scheme's roles, or Custom with its Hue and Tone.
     const night = getComputedStyle(front.lock.element);
-    const picker = colourPicker(
-      set.colour,
-      (role) => night.getPropertyValue(`--color-${role}`).trim(),
-      (colour) => {
+    const picker = colourPicker<ClockRole>({
+      picked: set.colour,
+      swatches: ROLES.map(([role, name]) => ({ role, name, colour: night.getPropertyValue(`--color-${role}`).trim() })),
+      disabled: !shown,
+      onPick: (colour) => {
         set.colour = colour;
         restyle();
         refresh();
       },
-      (h, l) => {
+      onTune: (h, l) => {
         set.colour = { mode: "custom", h, l };
         restyle();
-        picker.choice.querySelector<HTMLElement>(".ce-swatch[data-custom]")?.style.setProperty("--swatch", customColour(h, l));
       },
-      !shown,
-    );
+    });
 
     // Glow: Off, Dark, Light or Auto (the one opposing the clock's colour), and its strength.
     const glow = tabs({
@@ -873,7 +885,7 @@ export function clockEditor(host: EditorHost): Editor {
     lookGroup.className = "ce-group";
     lookGroup.append(
       heading("Look"),
-      well(row("colour", "Colour", picker.choice), row("hue", "Hue", picker.hue, true), row("tone", "Tone", picker.tone, true)),
+      well(row("colour", "Colour", picker.choice), row("hue", "Hue", picker.hue!, true), row("tone", "Tone", picker.tone!, true)),
       well(row("glow", "Glow", glow), row("strength", "Strength", strength, true)),
       well(row("date", "Date", dateSwitch), row("align", "Align", align, true), row("dsize", "Size", dateSize, true), row("dgap", "Gap", dateGap, true)),
     );
@@ -890,7 +902,7 @@ export function clockEditor(host: EditorHost): Editor {
   /** The rows the keys walk: every row whose control takes them now. */
   const rows = () => [...panel.querySelectorAll<HTMLElement>(".ce-row")].filter((each) => focusable(each) !== null);
   const focusable = (each: HTMLElement) =>
-    each.querySelector<HTMLElement>(".k-slider:not([aria-disabled='true']), .ce-hue:not([aria-disabled='true']), .k-tabs:not([aria-disabled='true']) .k-tab[aria-selected='true'], .ce-swatches:not([aria-disabled='true']), .k-switch:not(:disabled)");
+    each.querySelector<HTMLElement>(".k-slider:not([aria-disabled='true']), .k-colour-hue:not([aria-disabled='true']), .k-tabs:not([aria-disabled='true']) .k-tab[aria-selected='true'], .k-colour:not([aria-disabled='true']), .k-switch:not(:disabled)");
   function focusRow(name: string): void {
     const found = rows().find((each) => each.dataset.row === name) ?? rows()[0];
     if (found) focusable(found)?.focus({ preventScroll: true });
@@ -1071,14 +1083,14 @@ export function clockEditor(host: EditorHost): Editor {
       closeTimer = window.setTimeout(tryClose, ms("micro"));
       return;
     }
-    if (keysUp || panel.querySelector(".k-slider[data-dragging], .ce-hue[data-held]") || (pointer && inKeep(pointer))) return;
+    if (keysUp || panel.querySelector(".k-slider[data-dragging], .k-colour-hue[data-held]") || (pointer && inKeep(pointer))) return;
     peek(false);
   }
 
   // The drag: anywhere on the panel at full screen but its controls.
   let drag: { mode: "dock" | "float"; p0: Point; y0: number; gx: number; gy: number; anchor: Point; caught: { t0: number; from: Spot } | null; inSticky: "left" | "right" | null } | null = null;
   let dragFrame = 0;
-  const CONTROLS = ".k-control, .k-slider, .k-tabs, .ce-swatches, .ce-hue, button, [role='slider']";
+  const CONTROLS = ".k-control, .k-slider, .k-tabs, .k-colour, .k-colour-hue, button, [role='slider']";
 
   panel.addEventListener("pointerdown", (event) => {
     if (!host.live || !atFull() || event.button !== 0 || (event.target as Element).closest(CONTROLS)) return;
@@ -1200,7 +1212,7 @@ export function clockEditor(host: EditorHost): Editor {
       return;
     }
     if (fs.mode !== "dock") return;
-    const held = panel.querySelector(".k-slider[data-dragging], .ce-hue[data-held]") !== null;
+    const held = panel.querySelector(".k-slider[data-dragging], .k-colour-hue[data-held]") !== null;
     if (event.buttons && !held) return;
     if (!open) {
       if (inTrigger(pointer)) {

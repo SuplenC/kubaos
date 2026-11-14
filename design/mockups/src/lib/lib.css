@@ -2087,6 +2087,105 @@
   filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--picked) * var(--rail-signs))));
 }
 
+/* A colour picker's choice (`lib/colour-picker.ts`): Auto and the swatches in a row, one stop for
+   Tab. */
+.k-colour {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s8);
+  justify-self: start;
+  padding: var(--space-s4);
+  border-radius: var(--radius-full);
+  outline: none;
+}
+
+.k-colour[aria-disabled="true"] .k-colour-swatch {
+  opacity: var(--opacity-disabled_content);
+  cursor: default;
+}
+
+/* Disabled, the hues are dimmed as a disabled control is, and their chroma lowered by the same
+   share: at the same opacity a wheel of every hue still reads brighter than a one-colour fill
+   beside it, so the share is taken off its colour too, not only its strength. */
+.k-colour[aria-disabled="true"] .k-colour-swatch[data-custom],
+.k-colour-hue[aria-disabled="true"] {
+  --k-colour-hue-shown: calc(var(--k-colour-hue-chroma) * var(--opacity-disabled_content));
+}
+
+/* A swatch: `size.chip` round. The ring of the one picked is cut from what it sits on by a gap of
+   `surface_container_high`, the well a setting with sub-settings sits in. */
+.k-colour-swatch {
+  all: unset;
+  position: relative;
+  width: var(--size-chip);
+  height: var(--size-chip);
+  border-radius: var(--radius-full);
+  background: var(--k-colour-swatch);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-on_surface) r g b / var(--elevation-rim));
+}
+
+.k-colour-swatch[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 var(--stroke-thin) var(--color-surface_container_high),
+    0 0 0 calc(2 * var(--stroke-thin)) var(--color-primary);
+}
+
+/* Custom: the hues round the wheel, the colour picked in its middle once it is one. */
+.k-colour-swatch[data-custom] {
+  background: conic-gradient(in oklch longer hue, oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 0), oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 359.9));
+}
+
+.k-colour-swatch[data-custom]::after {
+  content: "";
+  position: absolute;
+  inset: calc(var(--size-chip) / 4);
+  border-radius: var(--radius-full);
+  background: var(--k-colour-swatch, var(--color-surface_container_high));
+  box-shadow: 0 0 0 var(--stroke-thin) var(--color-surface_container_high);
+}
+
+/* The hue track: the hues at one light tone round the wheel, `size.slider_compact` tall, a ring at
+   the hue picked, its value at the far end. The tone and chroma it draws the hues at are the
+   picker's own (`--k-colour-hue-tone`, `--k-colour-hue-chroma`). */
+.k-colour-hue {
+  position: relative;
+  height: var(--size-slider_compact);
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg in oklch longer hue, oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 0), oklch(var(--k-colour-hue-tone) var(--k-colour-hue-shown, var(--k-colour-hue-chroma)) 359.9));
+  cursor: pointer;
+  outline: none;
+  touch-action: none;
+}
+
+.k-colour-hue[aria-disabled="true"] {
+  opacity: var(--opacity-disabled_content);
+  cursor: default;
+}
+
+.k-colour-hue-knob {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--size-slider_compact) / 2 + (100% - var(--size-slider_compact)) * var(--k-colour-hue-at, 0));
+  width: calc(var(--size-slider_stop) + 2 * var(--stroke-thin));
+  height: calc(var(--size-slider_stop) + 2 * var(--stroke-thin));
+  translate: -50% -50%;
+  border-radius: var(--radius-full);
+  background: var(--color-on_surface);
+  box-shadow: 0 0 0 var(--stroke-thin) var(--color-surface);
+}
+
+/* The hues are light in both modes, so their value is the dark end of the palette in both: by night
+   `surface`, by day `on_surface`, following the nearest mode's `--day`. */
+.k-colour-hue-value {
+  color: color-mix(in srgb, var(--color-surface), var(--color-on_surface) calc(var(--day) * 100%));
+  position: absolute;
+  right: var(--space-s12);
+  top: round(nearest, calc((var(--size-slider_compact) - var(--t-line)) / 2), 1px);
+}
+
 /* A menu (`lib/menu.ts`): its items one under the other across its popover. Past `--most` small
    controls it scrolls, with no bar of its own, as the libraries' do. */
 .k-menu {
