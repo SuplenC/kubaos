@@ -29,10 +29,7 @@ const rings = new Set<HTMLElement>();
 // (a Show action swapped for Hide) or one that grows never shows a glow without its mask, which
 // would paint the whole glow box in the tone.
 const resized = new ResizeObserver((entries) => {
-  for (const entry of entries) {
-    const ring = entry.target as HTMLElement;
-    if (ring.isConnected) draw(ring, scaleOf(ring));
-  }
+  drawAll(entries.map((entry) => entry.target as HTMLElement).filter((ring) => ring.isConnected));
 });
 
 /**
@@ -241,41 +238,74 @@ async function contentMask(lit: HTMLElement, reach: number, scale: number, which
   return `url(${canvas.toDataURL()})`;
 }
 
-/** Draws the glow round `ring`'s lit content for its size now, at `scale`. */
-function drawContent(ring: HTMLElement, scale: number): void {
+/**
+ * A ring's drawing, worked out from what it read of the page: what it writes, and its content's
+ * glow, which reads the content as laid out once everything is written.
+ */
+interface Drawing {
+  readonly write: () => void;
+  readonly glowContent: () => void;
+}
+
+/** The glow round `ring`'s lit content for its size now, at `scale`; null when it is drawn. */
+function planContent(ring: HTMLElement, scale: number): Drawing | null {
   const lit = ring.querySelector<HTMLElement>(".k-lit");
   const glowing = lit?.querySelector<HTMLElement>(".k-lit-glow");
-  if (!lit || !glowing) return;
+  if (!lit || !glowing) return null;
   const which: ContentGlow = lit.dataset.glow === "label" ? "label" : "content";
   const reach = Math.max(0, Math.ceil(length(`focus-${which}_near`) * scale - 1e-3));
   const key = `${lit.offsetWidth}x${lit.offsetHeight}+${reach}@${scale}`;
-  if (glowing.dataset.drawn === key) return;
-  glowing.dataset.drawn = key;
-  glowing.style.inset = `${-reach}px`;
-  void contentMask(lit, reach, scale, which).then((made) => {
-    if (glowing.dataset.drawn === key) glowing.style.maskImage = made;
-  });
+  if (glowing.dataset.drawn === key) return null;
+  return {
+    write: () => {
+      glowing.dataset.drawn = key;
+      glowing.style.inset = `${-reach}px`;
+    },
+    glowContent: () => {
+      void contentMask(lit, reach, scale, which).then((made) => {
+        if (glowing.dataset.drawn === key) glowing.style.maskImage = made;
+      });
+    },
+  };
 }
 
 /**
- * Draws `ring`'s glow for its control's size now, at `scale`; on a window, its neutral shadow
- * through the same mask.
+ * `ring`'s glow for its control's size now, at `scale`, and on a window its neutral shadow through
+ * the same mask; null when it has none.
  */
-function draw(ring: HTMLElement, scale: number): void {
+function plan(ring: HTMLElement, scale: number): Drawing | null {
   const glowing = ring.querySelector<HTMLElement>(".k-glow");
-  if (!glowing || !ring.isConnected) return;
-  drawContent(ring, scale);
+  if (!glowing || !ring.isConnected) return null;
+  const content = planContent(ring, scale);
   const width = ring.offsetWidth;
   const height = ring.offsetHeight;
   const corner = Number.parseFloat(getComputedStyle(ring).borderTopLeftRadius);
   const boost = ring.hasAttribute("data-pressable") ? number("focus-pressed_glow") : 1;
   const key = `${width}x${height}r${corner}@${scale}x${boost}`;
-  if (glowing.dataset.drawn === key) return;
-  glowing.dataset.drawn = key;
-  const made = mask(width, height, corner, scale, boost);
-  glowing.style.maskImage = made;
-  const shade = ring.querySelector<HTMLElement>(".k-shade");
-  if (shade) shade.style.maskImage = made;
+  const drawn = glowing.dataset.drawn === key;
+  return {
+    write: () => {
+      content?.write();
+      if (drawn) return;
+      glowing.dataset.drawn = key;
+      const made = mask(width, height, corner, scale, boost);
+      glowing.style.maskImage = made;
+      const shade = ring.querySelector<HTMLElement>(".k-shade");
+      if (shade) shade.style.maskImage = made;
+    },
+    glowContent: () => content?.glowContent(),
+  };
+}
+
+/**
+ * Draws `drawn`'s rings for their controls' sizes now. Every ring is read before any is written,
+ * and every content glow, which reads its content, starts once all are: a ring written before the
+ * next was read had the page styled again for each, 500 times as the Button's page loaded.
+ */
+function drawAll(drawn: Iterable<HTMLElement>): void {
+  const drawings = [...drawn].map((ring) => plan(ring, scaleOf(ring)));
+  for (const drawing of drawings) drawing?.write();
+  for (const drawing of drawings) drawing?.glowContent();
 }
 
 /**
@@ -362,10 +392,9 @@ export function focusRing(control: HTMLElement, corner: string, tone: Tone, fill
  *  no longer on it. */
 export function redrawRings(): void {
   for (const ring of rings) {
-    if (ring.isConnected) draw(ring, scaleOf(ring));
-    else {
-      rings.delete(ring);
-      resized.unobserve(ring);
-    }
+    if (ring.isConnected) continue;
+    rings.delete(ring);
+    resized.unobserve(ring);
   }
+  drawAll(rings);
 }
