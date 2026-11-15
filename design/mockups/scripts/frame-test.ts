@@ -228,6 +228,30 @@ const CASES: Case[] = [
     },
   },
   {
+    name: "a layout's room that scrolls sideways is a scroll across, round a box as wide as its content",
+    html: `<span ${ROW} style="display: flex; width: 200px">
+      <div style="overflow-x: auto; width: 200px">
+        <span style="display: block; width: 400px; height: 40px"><span ${TEXT} style="display: block; width: 380px; height: 20px">One</span></span>
+      </div>
+    </span>`,
+    check: (root) => {
+      const scroll = root.children[0]!.children[0]!;
+      if (scroll.role !== "scroll" || scroll.across !== true) return `the room is a ${scroll.role} across ${String(scroll.across)}`;
+      return boxIs(scroll.children[0]!, 0, 0, 400, 40);
+    },
+  },
+  {
+    name: "a layout drawn in reverse lists its children in the order they are drawn",
+    html: `<span ${ROW.replace('"axis":"x"', '"axis":"y"')} style="display: flex; flex-direction: column-reverse; gap: 8px; width: 200px">
+      <span ${probe({ role: "component", name: "First", variant: "", fixed: { width: false, height: false } })} style="display: block; height: 20px"></span>
+      <span ${probe({ role: "component", name: "Second", variant: "", fixed: { width: false, height: false } })} style="display: block; height: 20px"></span>
+    </span>`,
+    check: (root) => {
+      const order = root.children[0]!.children.map((child) => String(child.name)).join(" ");
+      return order === "Second First" ? null : `the children are listed ${order}`;
+    },
+  },
+  {
     name: "a box marked as what a well's rows scroll in is a scroll, overflowing or not",
     html: `<span ${BOX} style="display: block; width: 200px">
       <span data-scroll-probe style="display: block; overflow-y: auto; height: 40px">
