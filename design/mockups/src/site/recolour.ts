@@ -144,14 +144,24 @@ function fallback(mode: Mode): Palette {
       if (!(rule instanceof CSSStyleRule)) continue;
       for (const property of rule.style) {
         if (!property.startsWith("--color-")) continue;
-        const value = style.getPropertyValue(property).trim();
-        if (/^#[0-9a-f]{6}$/i.test(value)) found[property.slice("--color-".length)] = value;
+        const value = hexOf(style.getPropertyValue(property).trim());
+        if (value) found[property.slice("--color-".length)] = value;
       }
     }
   }
   probe.remove();
   read.set(mode, found);
   return found;
+}
+
+/**
+ * `value` as `#rrggbb`, or null when it is no hex colour. The built site's CSS is minified, which
+ * writes black and white, and any colour whose digits pair up, in three digits (`#fff`).
+ */
+function hexOf(value: string): string | null {
+  if (/^#[0-9a-f]{6}$/i.test(value)) return value.toLowerCase();
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(value);
+  return short ? `#${short.slice(1).map((digit) => digit + digit).join("")}`.toLowerCase() : null;
 }
 
 /** Forgets the fallback palettes and the recipes read: the tokens changed. */
