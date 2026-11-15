@@ -79,11 +79,15 @@ function stateChip(state: StepState, selected: boolean, words: StepOptions["word
   return chip({ label, kind: as.kind, ...(glyph ? { icon: glyph } : {}) });
 }
 
-/** The mark at its end in a rail: a check when done, the action's symbol in the accent, else its room. */
-function stateMark(state: StepState): Element {
+/**
+ * The mark at its end in a rail: a check when done, the action's symbol in the accent, other words'
+ * symbol muted (Waiting, Not here), else its room.
+ */
+function stateMark(state: StepState, words?: StepOptions["words"]): Element {
   const size = "var(--type-body_strong-icon)";
   if (state.is === "done") return icon("check", size, "var(--step-ink)");
   if (state.is === "action") return icon(state.glyph, size, "var(--color-primary)");
+  if (words?.glyph) return icon(words.glyph, size, "var(--step-muted)");
   const room = document.createElement("span");
   room.className = "k-step-mark-room";
   return room;
@@ -145,7 +149,7 @@ export function step(options: StepOptions): HTMLElement {
     parts.push(options.box === "rail" ? bead(symbol) : symbol);
   }
   parts.push(filling(stack("s4", "start", ...lines)));
-  const end = options.mark ? stateMark(state) : stateChip(state, selected, options.words);
+  const end = options.mark ? stateMark(state, options.words) : stateChip(state, selected, options.words);
   if (end) parts.push(end);
   const line = filling(row("s12", "centre", ...parts));
   element.append(line);

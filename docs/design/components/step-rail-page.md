@@ -14,6 +14,8 @@ A step rail beside a page with a footer band, and how it moves between its pages
 
 **Between pages** the new page slides 32 in from the direction of travel and fades in over `long` on `emphasized_decel`, on whole device pixels; the page left goes at once. The rail's rows change at once; the wire's lit length grows to the new current symbol (or retracts to it) over `long` on `emphasized_decel`, its end on whole device pixels, and each symbol it reaches lights over `short` as the light gets there (the new current one from `medium` in), one it leaves going out as the light leaves it. Reduce motion makes the page a fade and the wire and symbols change at once.
 
+**In any order** (first boot): every step takes a press, whatever has been reached, and each step shows its own standing rather than its place in the flow: its check once done, a reboot's symbol in `primary`, Waiting and Not here as their muted symbols (`Step`'s mark), its symbol humming while its work runs, `error` once it failed. The current step is still the quiet fill. Going on or back passes by a step that isn't on this machine, though a press still opens it. The band then has a `Text` Skip before the `Filled` button, which does the page's own work (Enroll a finger, with its symbol before its words) and stays on the page while it runs, its blocker saying One thing at a time.; once the work is done the button is Continue. A page's work moving on redraws its body in place and its step with it, with no move of the template's own.
+
 **Pages kept.** A page shown once stays drawn, hidden and out of the keyboard's reach, so going back to it only shows it again, with its footer worked out anew; the page before the current one and the first done step are drawn in idle time with the rail as it will stand there, so a press on either draws nothing in the press. A page whose body reads the whole flow (Kōbō's Last look, the install) is drawn each time it shows.
 
 **Its host's ends.** Back or Esc on the first page and Continue or Enter on the last are its host's to take: in Kōbō the first goes back to the welcome, and the last page's own action (the held install) hands over to the install's scene.
@@ -22,6 +24,6 @@ A step rail beside a page with a footer band, and how it moves between its pages
 
 **The battery** at the rail's foot shows how full it is (`battery_full`, then three, two and one bar, or `battery_charging_full` on the charger) beside its percent in `label`, both `on_surface_variant`; at 20% or under on battery, both `warning`.
 
-**Keys:** Enter is the page's `Filled` action; Esc goes back a page; ↑ ↓ (k j) move between the rail's pressable steps; Tab goes rail, page, Back, Continue. A page arriving puts the keyboard on its first thing to do.
+**Keys:** Enter is the page's `Filled` action; Esc goes back a page; ↑ ↓ (k j) move between the rail's pressable steps and Space opens one; Tab goes rail, page, Back, Skip, Continue. A page arriving puts the keyboard on its first thing to do.
 
 *Not built yet: neither library has the template; Kōbō draws its rail, panel and footer by hand (`crates/kubaos-kobo/src/view.rs`), and the updater doesn't exist.*
