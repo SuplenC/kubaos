@@ -26,7 +26,7 @@
 import { iconInLine } from "./button.ts";
 import { type Action, buttonBar, type Tone } from "./button-bar.ts";
 import { raise } from "./elevation.ts";
-import { divider, filling, row, stack } from "./layout.ts";
+import { divider, filling, gap, row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { text, wrapped } from "./text.ts";
 import { length } from "./tokens.ts";
@@ -83,12 +83,10 @@ export function dialog(options: DialogOptions): Dialog {
   const middle: Element[] = [body];
   if (options.lists) {
     const listed = stack(0, "start", ...options.lists.map((each) => text(each, "body")));
-    listed.classList.add("k-dialog-follows");
-    middle.push(listed);
+    middle.push(gap("s16"), listed);
   }
   if (options.asks) {
-    options.asks.classList.add("k-dialog-follows");
-    middle.push(options.asks);
+    middle.push(gap("s16"), options.asks);
   }
   const scroller = stack(0, "start", ...middle);
   scroller.classList.add("k-dialog-scroll");
@@ -108,7 +106,7 @@ export function dialog(options: DialogOptions): Dialog {
     : undefined;
   const dismiss = bar?.dismiss ?? null;
   const actions = bar?.actions ?? [];
-  const column = stack(0, "start", head, room);
+  const column = stack(0, "start", head, gap("s12"), room);
   column.classList.add("k-dialog-column");
   if (bar) {
     // What the dialog's least height leaves over goes here, above its buttons.

@@ -169,7 +169,8 @@ export function slider(options: SliderOptions): HTMLElement {
   const overFill = text("", "label", "on_primary");
   overFill.classList.add("k-slider-label");
   overFill.style.color = "var(--on-fill)";
-  const glyph = document.createElement("span");
+  // The icon's slot is the circle at the fill's start, the icon centred in it.
+  const glyph = probe(document.createElement("span"), { role: "box" });
   glyph.className = "k-slider-icon";
   onFill.append(overFill);
   const dots = document.createElement("span");

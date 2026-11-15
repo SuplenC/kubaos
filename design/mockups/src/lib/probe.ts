@@ -17,7 +17,9 @@ export type Role =
   | { readonly role: "component"; readonly name: string; readonly variant: string; readonly fixed: Fixed }
   | { readonly role: "text" }
   | { readonly role: "icon"; readonly name: string }
-  | { readonly role: "spacer"; readonly fill: boolean };
+  | { readonly role: "spacer"; readonly fill: boolean }
+  /** A slot that claims nothing but where its content sits: a field's icon, drawn over it. */
+  | { readonly role: "box" };
 
 export const FIXED_HEIGHT: Fixed = { width: false, height: true };
 

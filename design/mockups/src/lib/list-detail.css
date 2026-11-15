@@ -43,12 +43,19 @@
   translate: round(nearest, var(--view-push) * var(--space-s24), 1px) 0;
 }
 
-/* The hairline over the footer runs across the whole panel, at the top of the gap above it. */
+/* The hairline over the footer runs across the whole panel, at the top of the gap above it: over
+   the panel's padding, out of the flow, so the stack's parts keep one left edge. */
 .k-menu-rule {
   display: block;
+  position: relative;
   align-self: stretch;
   height: 0;
-  margin: 0 calc(-1 * var(--space-s12));
+}
+
+.k-menu-rule > .k-divider {
+  position: absolute;
+  top: 0;
+  inset-inline: calc(-1 * var(--space-s12));
 }
 
 .k-menu-footer {

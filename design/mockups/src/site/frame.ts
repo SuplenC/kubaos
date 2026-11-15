@@ -138,6 +138,9 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
     role.content = element.textContent ?? "";
     role.natural = naturalOf(element, style, drawn, bounds, at.perCss);
   }
+  // A layout drawn in reverse (a stacked button bar, the dismiss button at the bottom but first for
+  // Tab) lists its children in the order they are drawn, as a toolkit's column would hold them.
+  if (role.role === "layout" && style.flexDirection.endsWith("-reverse")) children.reverse();
   let kept = children;
   while (kept.length === 1 && kept[0]!.role === "box" && !marked(kept[0]!) && same(kept[0]!.bounds, bounds)) kept = kept[0]!.children;
   if (role.role === "box" && !marked(role) && kept.length === 1 && same(kept[0]!.bounds, bounds)) {
@@ -145,19 +148,21 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
     return;
   }
   const node: FrameNode = { ...role, role: String(role.role), bounds, children: kept };
-  into.push(scrollsDown && role.role !== "scroll" ? scrolledOf(element, style, node) : node);
+  into.push((scrollsDown || scroller) && role.role !== "scroll" ? scrolledOf(element, style, node, scroller) : node);
 }
 
 /**
- * A probed box that scrolls its own content (a dialog's middle, a long menu) as a scroll round it,
- * as the toolkits report it: the scroll is the box drawn, and the box inside it is as tall as its
- * content, from where its content starts.
+ * A box that scrolls its own content (a dialog's middle, a long menu, a layout's room for a sample
+ * wider than it) as a scroll round it, as the toolkits report it: the scroll is the box drawn, and
+ * the box inside it is as tall as its content, and as wide where it scrolls sideways (`across`),
+ * from where its content starts.
  */
-function scrolledOf(element: Element, style: CSSStyleDeclaration, node: FrameNode): FrameNode {
+function scrolledOf(element: Element, style: CSSStyleDeclaration, node: FrameNode, across: boolean): FrameNode {
   const [width] = laidOutSize(style);
   const perCss = width > 0 ? node.bounds.width / width : 0;
-  const inner = { ...node, bounds: { ...node.bounds, y: node.bounds.y - element.scrollTop * perCss, height: element.scrollHeight * perCss } };
-  return { role: "scroll", bounds: node.bounds, children: [inner] };
+  const sideways = across ? { x: node.bounds.x - element.scrollLeft * perCss, width: element.scrollWidth * perCss } : {};
+  const inner = { ...node, bounds: { ...node.bounds, y: node.bounds.y - element.scrollTop * perCss, height: element.scrollHeight * perCss, ...sideways } };
+  return { role: "scroll", ...(across ? { across: true } : {}), bounds: node.bounds, children: [inner] };
 }
 
 /** Whether a box says more than that it is a box: what folding it into its child would lose. */

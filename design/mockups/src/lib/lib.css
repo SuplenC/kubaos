@@ -823,10 +823,16 @@
   filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--picked) * var(--signs))));
 }
 
-/* The mark centred on the title's first line, on a whole device pixel. */
+/* The mark's slot is the title's first line, from the row's top as the title's is; the mark is
+   centred on it, on a whole device pixel. */
 .k-choice-mark {
-  margin-top: round(down, calc((var(--type-subheading-line) - var(--size-check)) / 2), 1px);
+  align-items: flex-start;
+  height: var(--type-subheading-line);
   cursor: inherit;
+}
+
+.k-choice-mark > .k-check-box {
+  margin-top: round(down, calc((var(--type-subheading-line) - var(--size-check)) / 2), 1px);
 }
 
 .k-choice-mark .k-check-mark {
@@ -1124,18 +1130,23 @@
   --trailing-mark: var(--value);
 }
 
-/* The icon `space.s12` in, centred down the field on a whole device pixel. */
+/* The icon's slot, as `kubaos-ui` draws it: the field's height and `space.s12` either side of the
+   icon, which is centred down it on a whole device pixel. */
 .k-field-mark {
   position: absolute;
-  left: var(--space-s12);
-  top: round(nearest, calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-icon)) / 2), 1px);
+  top: 0;
+  left: 0;
+  display: block;
+  box-sizing: border-box;
+  height: var(--field-height, var(--size-control_md));
+  padding: round(nearest, calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-icon)) / 2), 1px) var(--space-s12) 0;
 }
 
-/* The trailing icon, `space.s12` in from the far side, in its own role (`--trailing`) unless the
+/* The trailing icon's slot, at the far side, its icon in its own role (`--trailing`) unless the
    field is disabled. */
 .k-field-trailing {
   left: auto;
-  right: var(--space-s12);
+  right: 0;
 }
 
 .k-field-clip {
@@ -1380,7 +1391,6 @@
 }
 
 .k-shortcut {
-  justify-content: space-between;
   min-height: var(--size-row_compact);
 }
 
@@ -1833,18 +1843,19 @@
 
 /* The icon, `label`'s, centred in the circle at the fill's start on a whole device pixel. */
 .k-slider-icon {
+  --at: round(nearest, calc((var(--side) - var(--type-label-icon)) / 2), 1px);
   position: absolute;
   display: block;
-  left: round(nearest, calc((var(--side) - var(--type-label-icon)) / 2), 1px);
-  top: round(nearest, calc((var(--side) - var(--type-label-icon)) / 2), 1px);
-  width: var(--type-label-icon);
-  height: var(--type-label-icon);
+  left: 0;
+  top: 0;
+  width: var(--side);
+  height: var(--side);
 }
 
 .k-slider-icon > .k-icon {
   position: absolute;
-  left: 0;
-  top: 0;
+  left: var(--at);
+  top: var(--at);
 }
 
 /* The value or its name, `space.s12` in from the far end, once over the track and once over the
@@ -2980,14 +2991,14 @@
   align-self: stretch;
 }
 
-/* The middle, `space.s12` under the title, its scroller clipped at its edges with a rule on each. */
+/* The middle, `space.s12` under the title (a gap of the column's), its scroller clipped at its
+   edges with a rule on each. */
 .k-dialog-middle {
   --foot: var(--space-s24);
   position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin-top: var(--space-s12);
 }
 
 .k-dialog-column > .k-dialog-middle {
@@ -3020,10 +3031,6 @@
 
 .k-dialog-scroll > * {
   align-self: stretch;
-}
-
-.k-dialog-scroll > .k-dialog-follows {
-  margin-top: var(--space-s16);
 }
 
 /* The room the dialog's least height leaves over, above the buttons and under the middle's own

@@ -219,7 +219,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
     const mark = document.createElement("span");
     mark.className = "k-field-mark";
     mark.append(icon(options.icon, "var(--type-body_large-icon)", "var(--mark)"));
-    element.append(mark);
+    element.append(probe(mark, { role: "box" }));
   }
   if (options.trailing) {
     element.dataset.trailing = "";
@@ -227,7 +227,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
     mark.className = "k-field-mark k-field-trailing";
     mark.style.setProperty("--trailing", `var(--color-${options.trailing.color})`);
     mark.append(icon(options.trailing.icon, "var(--type-body_large-icon)", "var(--trailing-mark, var(--trailing))"));
-    element.append(mark);
+    element.append(probe(mark, { role: "box" }));
   }
   const clip = document.createElement("span");
   clip.className = "k-field-clip";

@@ -3,11 +3,13 @@
 # together, so the `identical` rule compares their components with each other's. One slug a line,
 # as in `#/atoms/button`. A page joins once `just mockups-check PAGE` passes it, and leaves only
 # with the reason in its pull request (docs/DESIGN.md, "The mockups").
+backdrop
 badge
 button
 checkbox
 divider
 figure
+header
 hint
 icon
 icon-button

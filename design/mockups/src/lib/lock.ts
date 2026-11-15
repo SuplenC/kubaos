@@ -241,7 +241,7 @@ export function lockField(moment: Moment, live = false, error = "", reader = tru
     const open = document.createElement("span");
     open.className = "k-field-mark k-lock-open";
     open.append(icon("lock_open", "var(--type-body_large-icon)", "var(--color-primary)"));
-    shut.after(open);
+    shut.after(probe(open, { role: "box" }));
   }
   const print = made.querySelector<HTMLElement>(".k-field-trailing");
   if (print && !busy) {
@@ -252,7 +252,7 @@ export function lockField(moment: Moment, live = false, error = "", reader = tru
     const open = document.createElement("span");
     open.className = "k-field-mark k-field-trailing k-lock-reader-open";
     open.append(icon("lock_open", "var(--type-body_large-icon)", "var(--color-primary)"));
-    print.after(open);
+    print.after(probe(open, { role: "box" }));
   }
   return made;
 }
@@ -338,7 +338,10 @@ export function lock(options: LockOptions): Lock {
   const dateNatural = advance("clock_date", ` · ${words.date}`);
   clock.style.setProperty("--place-natural", String(placeNatural));
   clock.style.setProperty("--date-natural", String(dateNatural));
-  clock.append(kicker, digits);
+  const ink = document.createElement("span");
+  ink.className = "k-lock-ink";
+  ink.append(digits);
+  clock.append(kicker, ink);
   dim.after(clock);
 
   if (wallpaper.depth) {
@@ -561,7 +564,7 @@ function clockOn(element: HTMLElement, clock: HTMLElement, set: LockClock): void
   const layers = set.layers ?? [];
   element.toggleAttribute("data-layered", layers.length > 0);
   for (const [part, x, y] of [
-    [".k-lock-digits", "var(--clock-left)", "var(--clock-top)"],
+    [".k-lock-ink", "var(--clock-left)", "var(--clock-top)"],
     [".k-lock-kicker", "var(--clock-left) - var(--kicker-left)", "var(--clock-top) - var(--kicker-top)"],
   ] as const) {
     const each = clock.querySelector<HTMLElement>(part)!;

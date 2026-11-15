@@ -240,7 +240,11 @@ export function listRow(spec: ListRowSpec, current = false, pinned?: RowPinned):
   if (spec.loading) item.append(bones(spec));
   else {
     const first = lead(spec);
-    item.append(filling(row("s12", "centre", ...(first ? [first] : []), words(spec), ...ends(spec))));
+    const rest = [words(spec), ...ends(spec)];
+    // A clear tile stands `space.s16` from the rest, which keep `space.s12` between them: two rows,
+    // so each says the one gap it draws.
+    if (first && item.hasAttribute("data-clear")) item.append(filling(row("s16", "centre", first, filling(row("s12", "centre", ...rest)))));
+    else item.append(filling(row("s12", "centre", ...(first ? [first] : []), ...rest)));
   }
   if (spec.toggle !== undefined && !inert) {
     item.addEventListener("click", () => {
