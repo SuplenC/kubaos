@@ -107,7 +107,8 @@
 .k-stack[data-align="centre"] { align-items: center; }
 .k-stack[data-align="end"] { align-items: flex-end; }
 
-/* A button: its height, its label's line in the middle of it, its padding at the sides. */
+/* A button: its height, its label's line in the middle of it on a whole device pixel, the odd one
+   below it, its padding at the sides. */
 .k-button {
   all: unset;
   box-sizing: border-box;
@@ -115,7 +116,7 @@
   display: inline-flex;
   flex: none;
   height: var(--height);
-  padding: calc((var(--height) - var(--line)) / 2) var(--padding);
+  padding: round(down, calc((var(--height) - var(--line)) / 2), 1px) var(--padding) round(up, calc((var(--height) - var(--line)) / 2), 1px);
   border-radius: var(--radius-control);
   cursor: pointer;
 }
@@ -1141,7 +1142,7 @@
   position: absolute;
   left: var(--start);
   right: var(--end);
-  top: calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-line)) / 2);
+  top: round(down, calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-line)) / 2), 1px);
   height: var(--type-body_large-line);
   overflow: hidden;
 }
