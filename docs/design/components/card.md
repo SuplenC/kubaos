@@ -18,7 +18,7 @@ What it holds runs top to bottom `space.s16` apart: a header (a symbol at `subhe
 
 Rust `card::choice_card`; QML `ChoiceCard`. Its mockup page is the source of truth: Molecules, ChoiceCard, in `design/mockups/`.
 
-A card picked from a set, saying what each choice means: one of the set, as radios, or any of it, as checkboxes, laid in a grid of two `space.s16` apart. It is a `Card`, flat on the page on the card's fill and edge, its header the card's, with a mark ending the title's first line: a radio's disc or a checkbox's box. Picked, its title and symbol are the accent's words (`primary_lit`, the label glow at night while the signs are on) and its mark is filled; its surface doesn't change.
+A card picked from a set, saying what each choice means: one of the set, as radios, or any of it, as checkboxes, laid in a grid of two or three `space.s16` apart, each column an equal share in whole device pixels, the spare ones to the first. It is a `Card`, flat on the page on the card's fill and edge, its header the card's, with a mark ending the title's first line: a radio's disc or a checkbox's box. Picked, its title and symbol are the accent's words (`primary_lit`, the label glow at night while the signs are on) and its mark is filled; its surface doesn't change.
 
 **States:** rest, lit (the cold tube, since the accent already means picked), pressed (the tube white-hot, by day the cold tone's tint, its title going to the picked words) and disabled (its resting surface kept; its words, symbol and mark grey at `opacity.disabled_content`, no line, skipped by the keys). The set is one stop for Tab, on its picked card; the arrows move, and in a set of one pick as they go; Space and Enter pick or turn a card.
 
