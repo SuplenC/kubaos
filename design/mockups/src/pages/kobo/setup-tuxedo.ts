@@ -60,7 +60,7 @@ export default page<Shown>({
   motion: {
     arrives: [arrivesAt("tuxedo", "secure")],
     leaves: doesntApply("Continue slides the next card in: Fingerprint's page shows it."),
-    between: [refused(CELLS.error), finishesAt("tuxedo", "queued"), FAILS],
+    between: [refused(CELLS.error), finishesAt("tuxedo", "done"), FAILS],
   },
   keyboard: {
     keys: [...CARD_KEYS, { keys: ["Space"], does: "Show or Hide the password" }],

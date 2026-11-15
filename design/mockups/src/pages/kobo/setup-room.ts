@@ -191,7 +191,7 @@ function endingLede(views: Views, skipped: ReadonlySet<CardId>): string {
   const left = named(isLeft);
   const many = CARD_IDS.filter(isLeft).length > 1;
   const reboot = CARD_IDS.some((id) => state(id).state === "reboot");
-  const tally = `${done} done.`;
+  const tally = done === 0 ? "Nothing done. Fair enough." : `${done} done.`;
   const waits = left ? ` ${left} ${many ? "wait" : "waits"} in the Command menu; I won't bring ${many ? "them" : "it"} up again.` : "";
   if (reboot) return `${tally}${waits} The TUXEDO drivers load after a reboot.`;
   if (left) return `${tally}${waits}`;

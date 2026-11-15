@@ -523,9 +523,9 @@ const phone: Card = {
   first: "off",
   views: {
     off: { state: "needed", summary: "Off. Set it up to share the clipboard and files with your phone.", found: `Off. Phones can't see this laptop; once it's on, it shows up as ${USER.host}.` },
-    starting: { state: "needed", summary: "Off. Set it up to share the clipboard and files with your phone.", prompt: { kind: "wait", text: "Starting KDE Connect…" } },
-    waiting: { state: "waiting", summary: `Waiting for your phone: open KDE Connect on it and tap ${USER.host}.`, prompt: { kind: "phone", text: `Open KDE Connect on the phone, tap ${USER.host}, then Request pairing.` } },
-    address: { state: "waiting", summary: `Waiting for your phone: open KDE Connect on it and tap ${USER.host}.`, prompt: { kind: "phone", text: `Open KDE Connect on the phone, tap ${USER.host}, then Request pairing.` } },
+    starting: { state: "needed", summary: "Off. Set it up to share the clipboard and files with your phone.", found: `Off. Phones can't see this laptop; once it's on, it shows up as ${USER.host}.`, prompt: { kind: "wait", text: "Starting KDE Connect…" } },
+    waiting: { state: "waiting", summary: `Waiting for your phone: open KDE Connect on it and tap ${USER.host}.`, found: `On, showing up as ${USER.host}. No phone has asked yet.`, prompt: { kind: "phone", text: `Open KDE Connect on the phone, tap ${USER.host}, then Request pairing.` } },
+    address: { state: "waiting", summary: `Waiting for your phone: open KDE Connect on it and tap ${USER.host}.`, found: `On, showing up as ${USER.host}. No phone has asked in 30 s.`, prompt: { kind: "phone", text: `Open KDE Connect on the phone, tap ${USER.host}, then Request pairing.` } },
     request: { state: "needed", summary: "Pixel 9 wants to pair. Check the key, then accept.", wants: { label: "Wants to pair", glyph: "smartphone" }, prompt: { kind: "pair", text: "Does the phone show the same key?", key: PHONE_KEY } },
     pairing: { state: "needed", summary: "Pixel 9 wants to pair. Check the key, then accept.", prompt: { kind: "wait", text: "Pairing…" } },
     done: { state: "done", summary: "Paired with Pixel 9, in reach, battery 82%." },
