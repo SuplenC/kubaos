@@ -1,0 +1,189 @@
+// Centring on whole device pixels, where CSS centres in room it can't know the size of: a row's
+// children centred down it, a stack's across it, a part centred in a box its content sizes. CSS
+// puts a centred box half the spare room in, which is half a device pixel whenever the spare is
+// odd; the builds round that offset to a whole pixel, the odd one after the box (`kubaos-ui`'s
+// `Scale::centre`, `Look.centre` in QML). A part that centres between two sizes the CSS knows
+// rounds there, with `round(down, …, 1px)`; this does the rest, once the CSS has laid the page out.
+//
+// A box its parent centres (a flex line, a grid cell, a centred line of text) whose offset falls
+// between device pixels gets the odd pixel as a margin after it, along the axis it is centred on.
+// The centring shares that margin out, so the box moves half a pixel toward its start and nothing
+// changes size: the box is shorter than its room by at least the pixel it takes. Along a flex
+// line's main axis the line's last box takes it, so the whole line moves together.
+//
+// The page's CSS pixels are device pixels (`main.ts` zooms the page by the display's ratio), so a
+// margin is in device pixels and a box read in the viewport's pixels is turned into them by
+// `devicePixelRatio`. A box drawn scaled (a picture of a screen, a sample fitted to its pane) isn't
+// on the device grid as drawn, and is left where the CSS puts it.
+
+/** Under this much of a device pixel apart, two edges are the same: float error, not layout. */
+const EPSILON = 1e-2;
+
+type Axis = "x" | "y";
+type Side = "marginRight" | "marginBottom";
+
+const SIDE: Record<Axis, Side> = { x: "marginRight", y: "marginBottom" };
+
+/** A margin this set, and the one the CSS gives, so the next pass knows where the CSS put the box. */
+interface Correction {
+  readonly base: number;
+  readonly shift: number;
+}
+
+const corrections = new WeakMap<HTMLElement, Partial<Record<Side, Correction>>>();
+
+function whole(device: number): boolean {
+  return Math.abs(device - Math.round(device)) < EPSILON;
+}
+
+/**
+ * `offset` device pixels, half a spare, on a whole device pixel as the builds round it: to the
+ * nearest, a tie toward the start, so an odd spare pixel goes after the box.
+ */
+export function centredOffset(offset: number): number {
+  // HAZARD: half of an odd count is a tie, which float error breaks either way; a hair under rounds
+  // it down, as `Scale::centre` does.
+  return Math.round(offset - 1e-3);
+}
+
+function isCentre(value: string): boolean {
+  return value === "center" || value === "safe center" || value === "unsafe center";
+}
+
+/** Whether `parent` centres `child` along `axis`, and along its flex line's main axis if so. */
+function centring(parentStyle: CSSStyleDeclaration, child: HTMLElement, axis: Axis, offset: number): { readonly main: boolean } | null {
+  const display = parentStyle.display;
+  if (display.endsWith("flex")) {
+    const main = parentStyle.flexDirection.startsWith("row") === (axis === "x");
+    if (main) return parentStyle.flexWrap === "nowrap" && isCentre(parentStyle.justifyContent) ? { main } : null;
+    const self = getComputedStyle(child).alignSelf;
+    return isCentre(self === "auto" ? parentStyle.alignItems : self) ? { main } : null;
+  }
+  if (display.endsWith("grid")) {
+    const style = getComputedStyle(child);
+    const self = axis === "x" ? style.justifySelf : style.alignSelf;
+    const items = axis === "x" ? parentStyle.justifyItems : parentStyle.alignItems;
+    if (isCentre(self === "auto" ? items : self)) return { main: false };
+    const tracks = axis === "x" ? parentStyle.gridTemplateColumns : parentStyle.gridTemplateRows;
+    const gap = Number.parseFloat(axis === "x" ? parentStyle.columnGap : parentStyle.rowGap) || 0;
+    return symmetric(tracks, gap, offset) ? { main: false } : null;
+  }
+  if (axis === "x" && parentStyle.textAlign === "center" && getComputedStyle(child).display.startsWith("inline")) {
+    return { main: true };
+  }
+  return null;
+}
+
+/**
+ * Whether a grid's `tracks` (its resolved sizes, `1fr auto 1fr` as `612.5px 55px 612.5px`) are laid
+ * out alike on both sides of the middle one, and the box `offset` into its content starts it: a bar's clock between its
+ * two groups. The box is centred by the tracks, and a margin after it grows its track by that
+ * much, which the tracks round it give up half each.
+ */
+function symmetric(tracks: string, gap: number, offset: number): boolean {
+  const sizes = tracks.split(" ").map((each) => Number.parseFloat(each));
+  if (sizes.length < 3 || sizes.length % 2 === 0 || sizes.some((each) => Number.isNaN(each))) return false;
+  const middle = (sizes.length - 1) / 2;
+  const before = sizes.slice(0, middle).reduce((sum, each) => sum + each + gap, 0);
+  if (Math.abs(offset - before) >= EPSILON) return false;
+  return sizes.every((each, index) => Math.abs(each - sizes[sizes.length - 1 - index]!) < EPSILON);
+}
+
+/** The boxes `parent` lays out in its flow, first to last: those a centred line is made of. */
+function inFlow(parent: HTMLElement): HTMLElement[] {
+  return [...parent.children].filter((child): child is HTMLElement => {
+    if (!(child instanceof HTMLElement) || child.getClientRects().length === 0) return false;
+    const position = getComputedStyle(child).position;
+    return position !== "absolute" && position !== "fixed";
+  });
+}
+
+/**
+ * Moves every box under `roots` that its parent centres onto whole device pixels, the odd pixel
+ * after it. Every box is read, then every margin set: the page is laid out once more at most.
+ */
+export function centreOnPixels(...roots: ParentNode[]): void {
+  const perCss = devicePixelRatio;
+  const origin = document.getElementById("page") ?? document.documentElement;
+  const rects = new Map<Element, DOMRect>();
+  const rectOf = (element: Element): DOMRect => {
+    let rect = rects.get(element);
+    if (!rect) {
+      rect = element.getBoundingClientRect();
+      rects.set(element, rect);
+    }
+    return rect;
+  };
+  const startOf = (element: Element, axis: Axis) => (axis === "x" ? rectOf(element).left : rectOf(element).top) * perCss;
+  const off = (element: Element, axis: Axis, from: Element) => !whole(startOf(element, axis) - startOf(from, axis));
+
+  const planned = new Map<HTMLElement, Partial<Record<Side, number>>>();
+  // What each box, or each line along its main axis, was centred along already in this pass.
+  const looked = new WeakMap<Element, Set<string>>();
+
+  // The boxes the geometry check reads: every probed one, and every child of a layout, which it
+  // reads as a plain box.
+  const boxes = roots.flatMap((root) => [...root.querySelectorAll<HTMLElement>("[data-probe], [data-layout] > *")]);
+  for (const element of boxes) {
+    if (!origin.contains(element)) continue;
+    const own = rectOf(element);
+    if (own.width === 0 && own.height === 0) continue;
+    for (const axis of ["x", "y"] as const) {
+      // The box that put it between pixels: itself, or the nearest box round it whose start falls
+      // between them against its parent's.
+      let box: HTMLElement = element;
+      if (!element.parentElement || !off(element, axis, element.parentElement)) {
+        if (!off(element, axis, origin)) continue;
+        let up = element.parentElement;
+        while (up && up !== origin && up.parentElement && !off(up, axis, up.parentElement)) up = up.parentElement;
+        if (!up || up === origin || !up.parentElement) continue;
+        box = up;
+      }
+      plan(box, axis);
+    }
+  }
+
+  for (const [carrier, sides] of planned) {
+    const had = corrections.get(carrier) ?? {};
+    for (const side of ["marginRight", "marginBottom"] as const) {
+      const shift = sides[side];
+      if (shift === undefined) continue;
+      const before = had[side];
+      if (before && Math.abs(before.shift - shift) < EPSILON) continue;
+      const base = before?.base ?? Number.parseFloat(getComputedStyle(carrier)[side]);
+      had[side] = { base, shift };
+      carrier.style[side] = `${base + shift}px`;
+    }
+    corrections.set(carrier, had);
+  }
+
+  function plan(box: HTMLElement, axis: Axis): void {
+    let parent = box.parentElement;
+    let parentStyle = parent ? getComputedStyle(parent) : null;
+    while (parent && parentStyle?.display === "contents") {
+      parent = parent.parentElement;
+      parentStyle = parent ? getComputedStyle(parent) : null;
+    }
+    if (!parent || !parentStyle) return;
+    const edge = axis === "x" ? "Left" : "Top";
+    const contentStart = startOf(parent, axis) + Number.parseFloat(parentStyle[`border${edge}Width`]) + Number.parseFloat(parentStyle[`padding${edge}`]);
+    const how = centring(parentStyle, box, axis, startOf(box, axis) - contentStart);
+    if (!how) return;
+    const owner = how.main ? parent : box;
+    const kind = `${axis} ${how.main ? "main" : "cross"}`;
+    const seen = looked.get(owner) ?? new Set<string>();
+    if (seen.has(kind)) return;
+    looked.set(owner, seen.add(kind));
+    const drawn = rectOf(parent);
+    if (Math.abs(drawn.width * perCss - parent.offsetWidth) > 1 || Math.abs(drawn.height * perCss - parent.offsetHeight) > 1) return;
+    const line = how.main ? inFlow(parent) : [box];
+    const lead = line[0];
+    const carrier = line.at(-1);
+    if (!lead || !carrier) return;
+    const side = SIDE[axis];
+    // Where the CSS centres the line, before a correction moved it half its margin toward the start.
+    const offset = startOf(lead, axis) - contentStart + (corrections.get(carrier)?.[side]?.shift ?? 0) / 2;
+    const shift = 2 * (offset - centredOffset(offset));
+    planned.set(carrier, { ...planned.get(carrier), [side]: shift });
+  }
+}

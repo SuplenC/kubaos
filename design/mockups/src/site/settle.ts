@@ -5,6 +5,7 @@
 // room, which is half a device pixel whenever that is odd; a mock is placed as the builds place a
 // child, the odd device pixel after it (`kubaos-ui`'s `centre`).
 
+import { centreOnPixels } from "../lib/centre.ts";
 import { redrawRings } from "../lib/focus.ts";
 import { length, raw } from "../lib/tokens.ts";
 import { reflowBands } from "./parts/bands.ts";
@@ -117,6 +118,7 @@ export function settle(page: HTMLElement): void {
   breakOut(page);
   refitStages();
   centreMocks(page);
+  centreOnPixels(page);
   redrawRings();
   redrawOverlays();
 }

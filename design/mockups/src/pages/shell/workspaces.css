@@ -104,7 +104,7 @@
 .shell-ws-name {
   position: absolute;
   z-index: 2;
-  left: calc(var(--inset) * var(--px));
+  left: round(nearest, calc(var(--inset) * var(--px)), 1px);
   top: round(down, calc((var(--size-chip) - var(--t-line)) / 2), 1px);
 }
 

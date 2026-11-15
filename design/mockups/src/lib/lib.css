@@ -35,9 +35,10 @@
 }
 
 /* Text that breaks between words in the room it is given, as iced's text does: as wide as its
-   longest line, and as tall as its lines. */
+   longest line rounded up to a device pixel, a hair under one counting as that pixel (`snap`), and
+   as tall as its lines. */
 .k-text[data-wrapped] {
-  width: auto;
+  width: calc-size(auto, round(up, calc(size - 0.001px), 1px));
   max-width: 100%;
   height: auto;
   white-space: normal;
@@ -106,7 +107,8 @@
 .k-stack[data-align="centre"] { align-items: center; }
 .k-stack[data-align="end"] { align-items: flex-end; }
 
-/* A button: its height, its label's line in the middle of it, its padding at the sides. */
+/* A button: its height, its label's line in the middle of it on a whole device pixel, the odd one
+   below it, its padding at the sides. */
 .k-button {
   all: unset;
   box-sizing: border-box;
@@ -114,7 +116,7 @@
   display: inline-flex;
   flex: none;
   height: var(--height);
-  padding: calc((var(--height) - var(--line)) / 2) var(--padding);
+  padding: round(down, calc((var(--height) - var(--line)) / 2), 1px) var(--padding) round(up, calc((var(--height) - var(--line)) / 2), 1px);
   border-radius: var(--radius-control);
   cursor: pointer;
 }
@@ -1140,7 +1142,7 @@
   position: absolute;
   left: var(--start);
   right: var(--end);
-  top: calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-line)) / 2);
+  top: round(down, calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-line)) / 2), 1px);
   height: var(--type-body_large-line);
   overflow: hidden;
 }
@@ -2061,14 +2063,17 @@
 }
 
 /* Filling its room: the choices share the well equally, their words centred, so the last one ends
-   at the well's own end. */
+   at the well's own end. Each share is whole device pixels, the spare ones one each to the first
+   choices, as `kubaos-ui`'s grid splits a width (`grid::weighted`). */
 .k-tabs[data-fill] {
   display: flex;
   flex: 1 1 auto;
 }
 
 .k-tabs[data-fill] > .k-tab {
-  flex: 1 1 0;
+  --share: round(down, calc(100% / var(--count)), 1px);
+  flex: none;
+  width: calc(var(--share) + clamp(0px, 100% - var(--share) * var(--count) - var(--index) * 1px, 1px));
   justify-content: center;
 }
 
