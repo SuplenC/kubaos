@@ -14,10 +14,11 @@
 import { pin, type Pinned } from "./control.ts";
 import { focusRing } from "./focus.ts";
 import { icon } from "./icon.ts";
-import { filling, row, stack } from "./layout.ts";
+import { filling, row, split, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { wrapped } from "./text.ts";
 import { length } from "./tokens.ts";
+import { settings } from "../site/settings.ts";
 
 export interface HeaderOptions {
   /** A symbol before the title, `subheading`'s 24. */
@@ -211,6 +212,14 @@ export function choiceGroup(picks: Picks, columns: number, cells: readonly HTMLE
   grid.style.setProperty("--columns", String(columns));
   grid.setAttribute("role", picks === "one" ? "radiogroup" : "group");
   grid.append(...cells);
+  // Equal shares in whole device pixels, the spare ones to the first columns, as the layout's
+  // grid lays them: a fraction of the room each would put the cards' edges between pixels.
+  new ResizeObserver(() => {
+    const scale = Number.parseFloat(getComputedStyle(grid).getPropertyValue("--scale")) || settings().scale;
+    const apart = Math.round(length("space-s16") * scale);
+    const widths = split(Math.floor(grid.clientWidth + 1e-3), apart, Array.from({ length: columns }, () => 1));
+    grid.style.setProperty("--tracks", widths.map((each) => `${each}px`).join(" "));
+  }).observe(grid);
   const targets = cells.map(target);
   const usable = (at: number) => targets[at]!.getAttribute("aria-disabled") !== "true";
   const isPicked = (at: number) => cells[at]!.getAttribute("aria-checked") === "true";
