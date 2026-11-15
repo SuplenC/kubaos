@@ -382,6 +382,14 @@
   transition: none;
 }
 
+/* A live list as tall as its rows (`liveList` with no height): its rooms straight in the well, the
+   last room's gap given back, so the well's padding under the last row is its own. */
+.k-list[data-grows] > .k-live-rows {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: calc(-1 * var(--space-s4));
+}
+
 /* A label's room: its line with `space.s12` above it, as a label after rows stands; the first room
    of the list is the well's padding's alone. Its words sit at the room's foot. */
 .k-live-row[data-label] {

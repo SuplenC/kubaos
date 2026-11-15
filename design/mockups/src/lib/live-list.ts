@@ -12,7 +12,7 @@
 // fits its well, or is at its top), or the row itself would change place, the update waits until
 // the pointer leaves and the keyboard does, then plays.
 
-import { type ListOptions, type ListRowSpec, listLabel, listRow, listRows, scaleOf, scrolled, twoLines } from "./list.ts";
+import { type ListOptions, type ListRowSpec, listLabel, listRow, listRows, scaleOf, scrolled, twoLines, well } from "./list.ts";
 import { length } from "./tokens.ts";
 
 export type LiveRowSpec = ListRowSpec & {
@@ -34,8 +34,11 @@ function isLabel(item: LiveItem): item is LiveLabelSpec {
 }
 
 export interface LiveOptions extends ListOptions {
-  /** The well's height, a length's CSS. */
-  readonly height: string;
+  /**
+   * The well's height, a length's CSS, its rows scrolling in it; none for a well as tall as its
+   * rows, a `List`'s, which grows and shrinks with them and leaves the scrolling to its page.
+   */
+  readonly height?: string;
 }
 
 /** A live list, and what updates it. */
@@ -82,8 +85,10 @@ export function liveList(initial: readonly LiveItem[], options: LiveOptions): Li
     rooms.set(spec.key, room);
     column.append(room);
   }
-  const { box, pane } = scrolled("ScrollingList", column, { height: options.height });
+  const grows = options.height === undefined;
+  const { box, pane } = options.height === undefined ? { box: well("List", column), pane: null } : scrolled("ScrollingList", column, { height: options.height });
   box.classList.add("k-live");
+  box.toggleAttribute("data-grows", grows);
   const rows = () => [...column.querySelectorAll<HTMLElement>(".k-live-row:not([data-leaving]) > .k-list-row")];
   const keys = listRows(box, pane, rows, options);
   let waiting: readonly LiveItem[] | null = null;
@@ -101,9 +106,11 @@ export function liveList(initial: readonly LiveItem[], options: LiveOptions): Li
   }
 
   function update(next: readonly LiveItem[]): void {
-    const anchor = held();
+    // A well as tall as its rows has nothing of its own to scroll: the rows above the held one
+    // move it as they would any other.
+    const anchor = pane ? held() : null;
     const scale = scaleOf(box);
-    if (anchor) {
+    if (anchor && pane) {
       const key = anchor.dataset.key!;
       const before = specs.findIndex((each) => each.key === key);
       const after = next.findIndex((each) => each.key === key);
@@ -119,7 +126,7 @@ export function liveList(initial: readonly LiveItem[], options: LiveOptions): Li
         return;
       }
       play(next);
-      if (shift !== 0) follow(anchor);
+      if (shift !== 0) follow(anchor, pane);
       return;
     }
     play(next);
@@ -140,7 +147,7 @@ export function liveList(initial: readonly LiveItem[], options: LiveOptions): Li
   }
 
   /** Scrolls the list with `anchor` while the rows above it open and close, so it stays still. */
-  function follow(anchor: HTMLElement): void {
+  function follow(anchor: HTMLElement, pane: HTMLElement): void {
     const from = anchor.offsetTop - pane.scrollTop;
     const until = performance.now() + 1000 * 2;
     const frame = () => {

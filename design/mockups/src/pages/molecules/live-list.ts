@@ -216,7 +216,10 @@ export default page({
     { name: "The keyboard in it", for: "that row held still as the scan goes on", sample: () => cell(FOUND, "lit") },
     { name: "In sections", for: "labels kept by key, as rows are", sample: () => within(WELL_ROOM, liveList(SECTIONS, { height: FIVE }).element) },
   ],
-  sizes: doesntApply("a `ScrollingList`, as tall as its place; its rows are a `List`'s."),
+  sizes: [
+    { name: "In its own well", for: "as tall as its place; it scrolls", sample: () => still(FOUND, FIVE) },
+    { name: "As tall as its rows", for: "the page scrolls instead", sample: () => within(WELL_ROOM, liveList(FOUND.slice(0, 3), {}).element) },
+  ],
   states: {
     shown: ["rest", "lit"],
     absent: {
