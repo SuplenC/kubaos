@@ -37,7 +37,7 @@ export default page<Shown>({
     { name: "Still looking", for: "skeleton rows and what it does", sample: CELLS.loading },
     { name: "None in range", for: "the cable row alone", sample: CELLS.empty },
   ],
-  sizes: doesntApply("the panel's sizes are StepRailPage's; this screen fills its page."),
+  sizes: doesntApply("the screen's sizes are StepRailPage's; this question fills its page."),
   states: {
     shown: ["rest", "selected", "loading", "empty", "error"],
     absent: { lit: "its rows and field light on their pages", pressed: "its rows press on their pages", disabled: "every network can be picked" },
@@ -61,7 +61,7 @@ export default page<Shown>({
     ],
   },
   motion: {
-    arrives: [onward("network", CELLS.rest)],
+    arrives: [onward("network")],
     leaves: doesntApply("Continue slides the next screen in: You's page shows it."),
     between: [refused(CELLS.error)],
   },

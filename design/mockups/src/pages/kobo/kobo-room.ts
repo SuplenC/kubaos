@@ -1,7 +1,8 @@
-// Kōbō's room: one screen, its wallpaper under everything, and on it either a full-screen scene
-// (the welcome, the install running, the done screen) or the glass panel the questions are asked
-// in (StepRailPage). The live room is the whole installer: Let's go lifts the welcome off the
-// panel, holding the last button hands over to the install, and the install hands over to Done.
+// Kōbō's room: one screen, its wallpaper under everything, and on it either a scene (the welcome,
+// the install running, the done screen) or the questions (StepRailPage), every one of them the
+// whole screen: the questions are the street gone out of focus behind glass, with the steps on it.
+// The live room is the whole installer: Let's go takes the welcome off the questions, holding the
+// last button hands over to the install, and the install hands over to Done.
 //
 // Every move between them is a recipe (`Track`s), and the live room plays the same recipe the
 // pages' players show, so what plays and what a library reads never disagree.
@@ -12,7 +13,7 @@ import blurred from "../../../../../crates/kubaos-kobo/assets/wallpaper-blur.jpg
 import markSvg from "../../../../../crates/kubaos-kobo/assets/logo/kubaos-mark.svg?raw";
 import wordmark from "../../../../../crates/kubaos-kobo/assets/logo/kubaos-wordmark.svg?raw";
 import sign from "../../../../../crates/kubaos-kobo/assets/logo/kubaos-sign-1024.png?url";
-import { backdrop, givesWay, glassPanel } from "../../lib/backdrop.ts";
+import { backdrop, givesWay } from "../../lib/backdrop.ts";
 import { button } from "../../lib/button.ts";
 import { hangs } from "../../lib/button-bar.ts";
 import { shown, type Words } from "../../lib/content.ts";
@@ -36,7 +37,6 @@ import {
   type Answers,
   detailsBody,
   diskBody,
-  type DiskView,
   diskProblem,
   failedBody,
   filledAnswers,
@@ -48,17 +48,14 @@ import {
   networkProblem,
   reviewBody,
   type ReviewView,
-  wallpaperNote,
   youBody,
-  yoursBody,
-  yoursProblem,
 } from "./kobo-parts.ts";
 
 /** The sample laptop: one disk with Windows, the stick, on battery, no cable in. */
 export const LAPTOP: Machine = { disks: [LAPTOP_DISK, STICK], online: false, networks: NETWORKS, battery: { percent: 82, charging: false } };
 
-/** A screen of the panel. */
-export type Panel = "language" | "network" | "you" | "disk" | "yours" | "review" | "details" | "failed";
+/** A question, or the install's details and failure, on glass. */
+export type Panel = "language" | "network" | "you" | "disk" | "review" | "details" | "failed";
 
 /** What the welcome waits on: the hardware being read, a failed read, a stick with no image. */
 export type Moment = "rest" | "loading" | "error" | "noimage";
@@ -86,12 +83,10 @@ export interface RoomOptions {
   readonly opening?: boolean;
   /** A move's first state: the layer it leaves drawn over the one it arrives on. */
   readonly leaving?: At;
+  /** The question the room's page was reached from, drawn leaving it: a step move's first state. */
+  readonly stepFrom?: Panel;
   readonly language?: LanguageView;
-  readonly disk?: DiskView;
   readonly review?: ReviewView;
-  readonly gitOpen?: boolean;
-  /** The first wallpaper set's name, as the content's extremes show it. */
-  readonly setName?: string;
   /** The words on the welcome and the done screen, at the toolbar's length. */
   readonly hero?: string;
   readonly lede?: string;
@@ -222,25 +217,34 @@ function tipLine(index: number): HTMLElement {
   return row("s12", "centre", keyHints([[tip.keys, ""]]), text(tip.does, "body", "on_surface_variant"));
 }
 
+/** How long is left `share` of the way through, as the status line says it. */
+function timeLeft(share: number): string {
+  const minutes = Math.max(1, Math.ceil((TOTAL * (1 - share)) / 60));
+  return new Intl.NumberFormat("en-GB", { style: "unit", unit: "minute", unitDisplay: "long", maximumFractionDigits: 0 }).format(minutes);
+}
+
+/**
+ * The line under the install's bar: the step running and how much of it is done, then how long is
+ * left at its end. Drawn whole each time either changes: a text's box is as wide as the words it
+ * was made with, so words written into an old one run over what is beside it.
+ */
+function installStatus(share: number): HTMLElement {
+  const step = STEPS[stepAt(share).index]!;
+  const doing = row("s12", "centre", text(step.title, "body_strong"), ...(step.detail ? [text(step.detail, "mono", "primary")] : []));
+  doing.classList.add("kobo-doing");
+  const now = row("s12", "centre", doing, fill(), icon("timer", "var(--icon-s16)", "var(--color-on_surface_variant)"), text(`About ${timeLeft(share)} left`, "small", "on_surface_variant"));
+  now.classList.add("kobo-status");
+  now.dataset.says = `${step.title}|${step.detail ?? ""}|${timeLeft(share)}`;
+  return now;
+}
+
 /** The install as its scene shows it, `share` of the way through. */
 export function installingColumn(share: number, tip = 0): HTMLElement {
-  const { index } = stepAt(share);
   // Two figures' room: at 100 the install hands over to the done screen.
   const percent = rollingNumber({ value: Math.min(99, Math.round(share * 100)), widest: "00", style: "hero_number" });
   const figure = row(0, "end", percent.element, text("%", "hero_number"));
   figure.classList.add("kobo-percent");
-  const left = Math.max(0, TOTAL * (1 - share));
-  const timing = new Intl.NumberFormat("en-GB", { style: "unit", unit: "minute", unitDisplay: "long", maximumFractionDigits: 0 }).format(Math.max(1, Math.ceil(left / 60)));
-  const now = row(
-    "s12",
-    "centre",
-    text(STEPS[index]!.title, "body_strong"),
-    text(STEPS[index]!.detail ?? "", "mono", "primary"),
-    fill(),
-    icon("timer", "var(--icon-s16)", "var(--color-on_surface_variant)"),
-    text(`About ${timing} left`, "small", "on_surface_variant"),
-  );
-  now.classList.add("kobo-status");
+  const now = installStatus(share);
   const tips = document.createElement("span");
   tips.className = "kobo-tip";
   const shownTip = tipLine(tip);
@@ -306,7 +310,7 @@ export function neonMark(): SVGSVGElement {
   return drawing;
 }
 
-/** The 完了 hanko, stamped beside the mark. */
+/** The 完了 hanko, stamped beside the mark as first boot ends. */
 export function hanko(): HTMLElement {
   const seal = document.createElement("span");
   seal.className = "kobo-hanko";
@@ -342,13 +346,11 @@ export function doneColumn(going = false, headline = DONE_HEADLINE.short): HTMLE
   // Stay's last letter, not to its unseen padding.
   if (!going) actions.dataset.hangs = "";
   actions.classList.add("kobo-status");
-  const drawn = neonMark();
-  const mark = row("s8", "start", drawn, part(hanko(), "stamp"));
-  mark.classList.add("kobo-sealed");
-  sealed(mark, drawn);
+  const sign = document.createElement("span");
+  sign.append(neonMark());
   return column(
     "done",
-    mark,
+    part(sign, "sign-on"),
     gap("s24"),
     line,
     gap("s16"),
@@ -400,9 +402,9 @@ function foot(machine: Machine): HTMLElement {
 
 // ---------------------------------------------------------------- The flow --
 
-/** The panel's pages in the order the person meets them; Wi-Fi only with no network. */
+/** The questions in the order the person meets them; Wi-Fi only with no network. */
 function panels(machine: Machine): Panel[] {
-  return ["language", ...(machine.online ? [] : (["network"] as const)), "you", "disk", "yours", "review", "details"] as Panel[];
+  return ["language", ...(machine.online ? [] : (["network"] as const)), "you", "disk", "review", "details"] as Panel[];
 }
 
 /** The keys a screen takes that nothing on it shows, listed at the rail's foot. */
@@ -411,7 +413,6 @@ const HINTS: Record<Panel, readonly KeyHint[]> = {
   network: [["↑ ↓", "pick"], ["Tab", "next field"]],
   you: [["Tab", "next field"]],
   disk: [["↑ ↓", "pick"], ["Space", "switch"]],
-  yours: [["Space", "pick or drop"], ["Tab", "next set"]],
   review: [["Esc", "back"]],
   details: [["Esc", "back to the view"]],
   failed: [["Tab", "move"]],
@@ -425,7 +426,7 @@ interface Flow {
   go(to: At): void;
 }
 
-/** The panel at `at`: StepRailPage with Kōbō's lockup, the flow's pages, power and battery. */
+/** The questions at `at`: StepRailPage with Kōbō's lockup, the flow's pages, power and battery. */
 function panelTemplate(flow: Flow, at: Panel): HTMLElement {
   const { answers, machine, options } = flow;
   const order = panels(machine);
@@ -441,11 +442,9 @@ function panelTemplate(flow: Flow, at: Panel): HTMLElement {
       case "you":
         return { step: { title: "You", icon: "person" }, body: () => youBody(answers), blocker: () => accountProblem(answers) };
       case "disk":
-        return { step: { title: "Disk", icon: "hard_drive" }, body: () => diskBody(answers, machine, options.disk), blocker: () => diskProblem(answers, machine) };
-      case "yours":
-        return { step: { title: "Make it yours", icon: "wallpaper" }, body: () => yoursBody(answers, { ...(options.gitOpen ? { gitOpen: true } : {}), ...(options.setName ? { first: options.setName } : {}) }), blocker: () => yoursProblem(answers), note: () => wallpaperNote(answers) };
+        return { step: { title: "Disk", icon: "hard_drive" }, body: () => diskBody(answers, machine), blocker: () => diskProblem(answers, machine) };
       case "review":
-        return { step: { title: "Last look", icon: "list_alt" }, body: () => reviewBody(answers, machine, goTo, held, options.review), footless: true, fresh: true };
+        return { step: { title: "Last look", icon: "list_alt" }, body: () => reviewBody(answers, machine, goTo, held, options.review), footless: true, fresh: true, lands: ".kobo-hold-button" };
       default:
         return {
           step: { title: "Install", icon: "download" },
@@ -465,6 +464,7 @@ function panelTemplate(flow: Flow, at: Panel): HTMLElement {
     reached: index,
     ...(failed ? { failed: true } : {}),
     ...(at === "details" ? { locked: true } : {}),
+    ...(options.stepFrom ? { leaving: order.indexOf(options.stepFrom) } : {}),
     hints: (page) => HINTS[failed ? "failed" : (order[page] ?? "language")],
     foot: { power: true, ...(machine.battery ? { battery: machine.battery.percent, charging: machine.battery.charging } : {}) },
     ...(options.live ? { onExit: (forward: boolean) => (forward ? undefined : flow.go({ scene: "welcome" })) } : {}),
@@ -569,9 +569,9 @@ function sceneLayer(at: Extract<At, { scene: string }>, options: RoomOptions, wi
   return layer;
 }
 
+/** The questions' layer: the street out of focus behind glass, the steps filling the screen on it. */
 function panelLayer(flow: Flow, at: Panel, width: string, height: string): HTMLElement {
-  const panel = glassPanel(blurred, panelTemplate(flow, at));
-  const layer = backdrop({ width, height, picture: wallpaper, scrim: "dim", content: panel });
+  const layer = backdrop({ width, height, picture: blurred, scrim: "glass", content: panelTemplate(flow, at) });
   layer.classList.add("kobo-panel");
   return layer;
 }
@@ -617,7 +617,7 @@ export function room(options: RoomOptions): HTMLElement {
   const draw = (at: At, leaving?: At): HTMLElement => {
     const arriving = layerOf(at);
     const layers: HTMLElement[] = leaving ? [layerOf(leaving), arriving] : [arriving];
-    // A scene leaving lies over the panel it lifts off; a scene arriving lies over the panel it covers.
+    // A scene leaving lies over the questions it lifts off; a scene arriving lies over those it covers.
     const scene = "scene" in at || (leaving !== undefined && "scene" in leaving);
     const parts: Element[] = [...orderLayers(layers)];
     if (scene) parts.push(foot(machine));
@@ -628,7 +628,7 @@ export function room(options: RoomOptions): HTMLElement {
 
   /**
    * Builds `at`'s layer beside the one shown, as a move's first state: a scene over what it
-   * covers, a panel under the scene it is revealed by; the scene's foot with it.
+   * covers, the questions under the scene they are revealed by; the scene's foot with it.
    */
   const arrive = (at: At): HTMLElement => {
     const arriving = layerOf(at);
@@ -651,7 +651,7 @@ export function room(options: RoomOptions): HTMLElement {
     return layer;
   };
 
-  /** The panel under any scene, a scene over the panel. */
+  /** The questions under any scene, a scene over the questions. */
   const orderLayers = (layers: Element[]) => [...layers].sort((a, b) => Number(a.classList.contains("kobo-scene")) - Number(b.classList.contains("kobo-scene")));
 
   const layerOf = (at: At): HTMLElement => ("panel" in at ? panelLayer(flow, at.panel, width, height) : sceneLayer(at, options, width, height));
@@ -664,7 +664,7 @@ export function room(options: RoomOptions): HTMLElement {
   };
 
   // The live room builds the next place a press reveals once it is idle, under what shows, where
-  // the picture hides it: the panel under the welcome, the install's scene under the panel. The
+  // the picture hides it: the questions under the welcome, the install's scene under them. The
   // press then only plays the move, with nothing to build in it.
   const prebuilt = new Map<string, HTMLElement>();
   const keyOf = (at: At): string => ("panel" in at ? "panel" : at.scene);
@@ -783,11 +783,9 @@ function simulate(element: HTMLElement, from: number, done: () => void): { stop:
         if (bar) setProgress(bar, share);
         const dark = scene.querySelector<HTMLElement>(".k-backdrop-dark");
         if (dark) dark.style.opacity = String(dusk() * (1 - share));
-        const { index } = stepAt(share);
-        const status = column.querySelector(".kobo-status");
-        const words = status?.querySelectorAll(".k-text");
-        if (words?.[0]) words[0].textContent = STEPS[index]!.title;
-        if (words?.[1]) words[1].textContent = STEPS[index]!.detail ?? "";
+        const status = column.querySelector<HTMLElement>(".kobo-status");
+        const next = installStatus(share);
+        if (status && status.dataset.says !== next.dataset.says) status.replaceWith(next);
       }
       const now = Math.floor(((performance.now() - start) / milliseconds("scene")) / 3);
       if (now !== tip) {
@@ -862,17 +860,17 @@ export const OPENING: Move = {
   sample: () => room({ at: { scene: "welcome" } }),
 };
 
-/** Let's go: the welcome lifts off the panel; the panel rises in; the rail's wire strikes on. */
+/** Let's go: the welcome lifts off, the street goes out of focus, the questions rise in. */
 export const ENTERING: Move = {
-  name: "Let's go: into the panel",
-  what: "The welcome's words rise off and its band clears; the glass panel rises in; the wire strikes on.",
+  name: "Let's go: into the questions",
+  what: "The welcome's words rise off; the street goes out of focus behind glass; the questions rise in; the wire strikes on.",
   tracks: [
     { part: "the welcome's words", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the words' rise", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "--backdrop-rise", from: 0, to: -1, duration: "medium", curve: "emphasized_accel" },
     { part: "the band", on: WELCOME, target: ".kobo-scene > .k-backdrop-layers", property: "opacity", from: 1, to: 0, duration: "long", curve: "emphasized_accel" },
     { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
-    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
-    { part: "the panel's rise", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
+    { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
+    { part: "their rise", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
     { part: "the wire", on: "the rail", target: ".k-rail-wire", property: "opacity", from: 0, to: 1, duration: "medium", cue: ["micro", "long"], curve: "neon.strike" },
   ],
   unflickered: [
@@ -880,33 +878,33 @@ export const ENTERING: Move = {
     { part: "the words' rise", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "--backdrop-rise", from: 0, to: -1, duration: "medium", curve: "emphasized_accel" },
     { part: "the band", on: WELCOME, target: ".kobo-scene > .k-backdrop-layers", property: "opacity", from: 1, to: 0, duration: "long", curve: "emphasized_accel" },
     { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
-    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
-    { part: "the panel's rise", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
+    { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
+    { part: "their rise", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
     { part: "the wire", on: "the rail", target: ".k-rail-wire", property: "opacity", from: 0, to: 1, duration: "medium", cue: ["micro", "long"], curve: "standard" },
   ],
   reduced: [
     { part: "the welcome", on: WELCOME, target: ".kobo-scene", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
+    { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => room({ at: { panel: "language" }, leaving: { scene: "welcome" } }),
 };
 
-/** Back from the first question: the welcome comes back over the panel. */
+/** Back from the first question: the welcome comes back over the questions. */
 export const LEAVING: Move = {
   name: "Back to the welcome",
-  what: "Esc or Back on Language: the panel sinks off, the band and the welcome's words come back.",
+  what: "Esc or Back on Language: the questions sink off, the street comes into focus, the welcome's words come back.",
   tracks: [
-    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: "the panel's sink", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
+    { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
+    { part: "their sink", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
     { part: "the band", on: WELCOME, target: ".kobo-scene > .k-backdrop-layers", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: "the welcome's words", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "medium", curve: "emphasized_decel" },
     { part: "the words' fall", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "--backdrop-rise", from: -1, to: 0, duration: "long", cue: "medium", curve: "emphasized_decel" },
     { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
   ],
   reduced: [
-    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the welcome", on: WELCOME, target: ".kobo-scene", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
     { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
@@ -916,13 +914,13 @@ export const LEAVING: Move = {
 
 const INSTALL = "the install";
 
-/** Held to the end: the panel goes, the room dims to a scrim's dark, the install's scene rises in. */
+/** Held to the end: the questions go, the street comes into focus at a scrim's dark, the install rises in. */
 export const STARTING: Move = {
   name: "Held: the install starts",
-  what: "The panel sinks off; the room goes down to a scrim's dark; the figure and its bar rise in.",
+  what: "The questions sink off; the street comes back into focus at a scrim's dark; the figure and its bar rise in.",
   tracks: [
-    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: "the panel's sink", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
+    { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
+    { part: "their sink", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
     { part: "the scene", on: INSTALL, target: ".kobo-scene > .k-backdrop-layers", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: "the room's dark", on: INSTALL, target: ".kobo-scene .k-backdrop-dark", property: "opacity", from: 0, to: { opacity: "scrim" }, duration: "slow", curve: "emphasized_decel" },
     ...rising(".kobo-installing > .kobo-accent, .kobo-installing > .kobo-figure", "the figure", INSTALL, "medium"),
@@ -931,7 +929,7 @@ export const STARTING: Move = {
     { part: "the foot", on: INSTALL, target: ".kobo-foot", property: "opacity", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
   ],
   reduced: [
-    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the scene", on: INSTALL, target: ".kobo-scene", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
     { part: "the foot", on: INSTALL, target: ".kobo-foot", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
@@ -976,42 +974,42 @@ function tipMove(count = 2): Move {
 
 export const TIP: Move = tipMove();
 
-/** The details: the scene lifts off the panel, which rises with the steps and the log. */
+/** The details: the scene lifts off, and the questions' screen rises with the steps and the log. */
 export const DETAILS: Move = {
   name: "Show the steps and the log",
-  what: "Tab and Enter: the scene's words rise off and its band clears; the panel rises in on Install.",
+  what: "Tab and Enter: the scene's words rise off, the street goes out of focus; Install rises in with the steps and the log.",
   tracks: [
     { part: "the scene's words", on: INSTALL, target: ".kobo-scene > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the words' rise", on: INSTALL, target: ".kobo-scene > .k-backdrop-thing", property: "--backdrop-rise", from: 0, to: -1, duration: "medium", curve: "emphasized_accel" },
     { part: "the band", on: INSTALL, target: ".kobo-scene > .k-backdrop-layers", property: "opacity", from: 1, to: 0, duration: "long", curve: "emphasized_accel" },
     { part: "the scene's foot", on: INSTALL, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
-    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
-    { part: "the panel's rise", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
+    { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
+    { part: "their rise", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
   ],
   reduced: [
     { part: "the scene", on: INSTALL, target: ".kobo-scene", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the scene's foot", on: INSTALL, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
+    { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => room({ at: { panel: "details" }, leaving: { scene: "installing", share: 0.41 } }),
 };
 
-/** A failure: the bar turns `error` where it stopped, then the panel rises in on what broke. */
+/** A failure: the bar turns `error` where it stopped, then the glass rises in on what broke. */
 export const FAILING: Move = {
   name: "A step fails",
-  what: "The bar drains to `error` where it stopped; the scene lifts off and the panel rises in on what broke.",
+  what: "The bar drains to `error` where it stopped; the scene lifts off and Install rises in on what broke.",
   tracks: [
     { part: "the scene's words", on: INSTALL, target: ".kobo-scene > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", cue: "short", curve: "emphasized_accel" },
     { part: "the band", on: INSTALL, target: ".kobo-scene > .k-backdrop-layers", property: "opacity", from: 1, to: 0, duration: "long", cue: "short", curve: "emphasized_accel" },
     { part: "the scene's foot", on: INSTALL, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "micro", cue: "short", curve: "standard" },
-    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
-    { part: "the panel's rise", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
+    { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
+    { part: "their rise", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
   ],
   reduced: [
     { part: "the scene", on: INSTALL, target: ".kobo-scene", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the scene's foot", on: INSTALL, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "the panel", on: "the panel", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
+    { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => room({ at: { panel: "failed" }, leaving: { scene: "installing", share: 0.38 } }),
@@ -1039,24 +1037,28 @@ export function writing(): Track<"standard">[] {
   }));
 }
 
+/**
+ * The arrival: the street goes dark as クバ is written in as unlit glass, then it strikes, and as it
+ * comes on the street lights up again round it and comes toward you: the machine is on, and yours.
+ */
 const DONE_TRACKS = (strike: "neon.strike" | "standard"): Track[] => [
-  { part: "the street coming close", on: DONE, target: ".kobo-scene .k-backdrop-picture", property: "scale", from: 1, to: { scale: "push" }, duration: "scene", curve: "emphasized_decel" },
+  { part: "the street going dark", on: DONE, target: ".kobo-scene .k-backdrop-dark", property: "opacity", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
   ...writing(),
   { part: "the mark, struck", on: DONE, target: ".kobo-mark", property: "--kobo-burn", from: 0, to: 1, duration: "medium", cue: "scene", curve: strike },
-  { part: "the hanko", on: DONE, target: ".kobo-hanko", property: "--kobo-stamp", from: 0, to: 1, duration: "short", cue: ["scene", "medium"], curve: "pop" },
+  { part: "the street lighting up", on: DONE, target: ".kobo-scene .k-backdrop-dark", property: "opacity", from: 1, to: 0, duration: "slow", cue: ["scene", "short"], curve: "emphasized_decel" },
+  { part: "the street coming close", on: DONE, target: ".kobo-scene .k-backdrop-picture", property: "scale", from: 1, to: { scale: "push" }, duration: "scene", cue: ["scene", "short"], curve: "emphasized_decel" },
   ...words(["scene", "medium"]),
   ...rising(".kobo-done > .kobo-lede", "the lede", DONE, ["scene", "medium", "short"]),
   ...rising(".kobo-done > .kobo-act", "the actions", DONE, ["scene", "medium", "medium"]),
 ];
 
-/** The install done: the street comes close, the mark writes itself in and strikes, the hanko lands. */
+/** The install done: the street goes dark, the mark writes itself in and strikes, the street lights. */
 export const ARRIVING: Move = {
   name: "Done: the arrival",
-  what: "The street comes toward you; クバ writes itself in and strikes; 完了 is stamped; the headline rises word by word.",
+  what: "The street goes dark as クバ writes itself in, unlit; it strikes, the street lights up and comes close; the headline rises.",
   tracks: DONE_TRACKS("neon.strike") as unknown as NonEmpty<Track>,
   unflickered: DONE_TRACKS("standard") as unknown as NonEmpty<Track<Easing>>,
   reduced: [
-    { part: "the street coming close", on: DONE, target: ".kobo-scene .k-backdrop-picture", property: "scale", from: 1, to: { scale: "push" }, duration: "short", curve: "standard" },
     fading(".kobo-done", "the done screen", DONE),
   ],
   back: "cuts",
@@ -1124,7 +1126,7 @@ function between(from: At, to: At): Move | null {
   return null;
 }
 
-/** The moves a panel page shares, as their words. */
+/** The words the welcome and the done screen show, as their extremes. */
 export const WORDS: { readonly hero: Words; readonly lede: Words; readonly headline: Words } = { hero: HERO, lede: LEDE, headline: DONE_HEADLINE };
 
 export { shown };

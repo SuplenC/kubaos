@@ -42,6 +42,15 @@ const ERASING: Move = {
   sample: at("disk"),
 };
 
+const OWN: Move = {
+  name: "Use my password off",
+  what: "The passphrase's two fields open under the switch over `medium`, fading in; on again, they shut over `short`.",
+  tracks: [{ part: "the passphrase's fields", on: "the encryption card", target: ".kobo-reveal[data-reveal='passphrase']", property: "--kobo-open", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
+  reduced: [{ part: "the passphrase's fields", on: "the encryption card", target: ".kobo-reveal[data-reveal='passphrase']", property: "--kobo-open", from: 0, to: 1, duration: "instant", curve: "standard" }],
+  back: "plays",
+  sample: at("disk", () => ({ samePassword: false })),
+};
+
 const MODEL: Words = { short: "SD card", long: "Samsung SSD 990 PRO with Heatsink 2TB (MZ-V9P2T0GW)" };
 
 export default page<Shown>({
@@ -50,7 +59,7 @@ export default page<Shown>({
   title: "Disk",
   lede: "Where it goes: the safe answer picked, and a map of what each answer does to the disk.",
   code: { unbuilt: "Kōbō draws the old screen" },
-  from: ["step-rail-page", "list", "choice-card", "card", "switch", "collapsible", "empty-state"],
+  from: ["step-rail-page", "list", "choice-card", "card", "switch", "field", "empty-state"],
   stage: { live: live("disk"), hint: "pick Erase: the map shows what goes", daylight: doesntApply("the live ISO is always dark: the installer has no day.") },
   variants: [
     { name: "Next to Windows", for: "picked for you: Windows stays, KubaOS takes the free space", sample: CELLS.rest },
@@ -60,10 +69,11 @@ export default page<Shown>({
     { name: "Two disks", for: "the data disk too; the stick listed, never a target", sample: at("disk", () => ({}), machine(LAPTOP_DISK, DATA_DISK, { ...STICK, path: "/dev/sdb" })) },
     { name: "Too small", for: "a warning chip; the blocker", sample: CELLS.error },
     { name: "No disks", for: "an empty state with what to check", sample: CELLS.empty },
-    { name: "Its own passphrase", for: "the Collapsible open, two fields", sample: at("disk", () => ({ samePassword: false }), { disk: { encryptionOpen: true } }) },
+    { name: "Its own passphrase", for: "Use my password off: its two fields under it", sample: at("disk", () => ({ samePassword: false })) },
+    { name: "Passphrases differ", for: "the blocker names it", sample: at("disk", () => ({ samePassword: false, passphrase: "kissa no hoshi", passphraseConfirm: "kissa no hoshl" })) },
     { name: "Encryption off", for: "the switch off, the cost said plainly", sample: at("disk", () => ({ encrypt: false })) },
   ],
-  sizes: doesntApply("the panel's sizes are StepRailPage's; this screen fills its page."),
+  sizes: doesntApply("the screen's sizes are StepRailPage's; this question fills its page."),
   states: {
     shown: ["rest", "selected", "disabled", "empty", "error"],
     absent: { lit: "its cards, rows and switches light on their pages", pressed: "they press on their pages", loading: "the probe found the disks before the welcome" },
@@ -87,20 +97,20 @@ export default page<Shown>({
     ],
   },
   motion: {
-    arrives: [onward("disk", CELLS.rest)],
-    leaves: doesntApply("Continue slides Make it yours in: its page shows it."),
-    between: [ERASING, refused(CELLS.error)],
+    arrives: [onward("disk")],
+    leaves: doesntApply("Continue slides Last look in: its page shows it."),
+    between: [ERASING, OWN, refused(CELLS.error)],
   },
   keyboard: {
     keys: [
       { keys: ["↑", "↓"], does: "picks a disk; the stick takes no pick" },
       { keys: ["←", "→"], does: "next to Windows, or erase" },
       { keys: ["Space"], does: "turns the switch it is on" },
-      { keys: ["Tab", "Shift+Tab"], does: "disks, the choice, the switches, the passphrase, Back, Continue" },
+      { keys: ["Tab", "Shift+Tab"], does: "disks, the choice, the two switches, the passphrase, Back, Continue" },
       { keys: ["Enter"], does: "Continue, or the reason flashes" },
       { keys: ["Esc"], does: "back a screen" },
     ],
-    order: "The disks, the two choices as one stop, Encrypt, its own passphrase's header and fields, Back, Continue.",
+    order: "The disks, the two choices as one stop, Encrypt, Use my password, the passphrase's fields while it is off, Back, Continue.",
     lands: "On the choice picked for you, so ← → is the first thing to try.",
   },
   measures: {

@@ -1,18 +1,15 @@
-// Kōbō's installer screens inside its glass panel, as organisms of library parts: Language, Network,
-// You, Disk, Make it yours, Last look, and the install's details and failure. Each screen's body
+// Kōbō's installer screens, each the whole screen on glass, as organisms of library parts: Language,
+// Network, You, Disk, Last look, and the install's details and failure. Each screen's body
 // reads and writes one `Answers`, and says when what its footer shows has changed (`RECHECK`).
 //
-// The common path is upfront on every screen, already answered where a good answer can be guessed;
-// what only an advanced user changes (more layouts, the username and the machine's name, the
-// encryption passphrase, Git) sits behind a Collapsible or a quiet button on the same screen.
+// The common path is upfront on every screen, already answered where a good answer can be guessed.
+// Whatever everyone is asked (the username and the machine's name among it) is on the page, never
+// behind a press; only what few people change (another layout) waits behind a quiet button.
 
 import { banner } from "../../lib/banner.ts";
 import { button } from "../../lib/button.ts";
 import { hangs } from "../../lib/button-bar.ts";
 import { card, choiceCard, setPicked } from "../../lib/card.ts";
-import { checkbox } from "../../lib/check.ts";
-import { chip } from "../../lib/chip.ts";
-import { collapsible } from "../../lib/collapsible.ts";
 import { descriptionList } from "../../lib/description.ts";
 import { emptyState } from "../../lib/empty-state.ts";
 import { errorBlock } from "../../lib/error-block.ts";
@@ -24,12 +21,11 @@ import { fill, filling, fillingHeight, gap, grid, header, row, stack } from "../
 import { type ListRowSpec, list, scrollingList } from "../../lib/list.ts";
 import { log } from "../../lib/log.ts";
 import { meter } from "../../lib/meter.ts";
-import { pictureChoice } from "../../lib/picture-choice.ts";
 import { progressBar } from "../../lib/progress.ts";
 import { scroll } from "../../lib/scroll.ts";
 import { select } from "../../lib/select.ts";
 import { spinner } from "../../lib/spinner.ts";
-import { RECHECK } from "../../lib/step-rail.ts";
+import { GO_ON, RECHECK } from "../../lib/step-rail.ts";
 import { step } from "../../lib/step.ts";
 import { switchControl } from "../../lib/switch.ts";
 import { text, wrapped } from "../../lib/text.ts";
@@ -47,7 +43,6 @@ import {
   type Network,
   RELEASE,
   SAMPLE_TIME,
-  SETS,
   signalIcon,
   STEPS,
   stepAt,
@@ -81,13 +76,6 @@ export interface Answers {
   samePassword: boolean;
   passphrase: string;
   passphraseConfirm: string;
-  /** The wallpapers picked, as `set/name`. */
-  wallpapers: Set<string>;
-  gitName: string;
-  gitEmail: string;
-  /** The username and machine name drawn open. */
-  namesOpen: boolean;
-  gitOpen: boolean;
 }
 
 /** What the probe found: the disks, the network, the battery. */
@@ -98,11 +86,6 @@ export interface Machine {
   readonly networks: readonly Network[] | "scanning";
   /** The battery's percent and whether it charges; none on a desktop. */
   readonly battery?: { readonly percent: number; readonly charging: boolean };
-}
-
-/** The key a wallpaper is picked by. */
-export function wallpaperKey(set: string, name: string): string {
-  return `${set}/${name}`;
 }
 
 /** A disk can take KubaOS beside what is on it. */
@@ -133,11 +116,6 @@ export function freshAnswers(machine: Machine): Answers {
     samePassword: true,
     passphrase: "",
     passphraseConfirm: "",
-    wallpapers: new Set(SETS.flatMap((set) => set.wallpapers.map((each) => wallpaperKey(set.name, each.name)))),
-    gitName: "",
-    gitEmail: "",
-    namesOpen: false,
-    gitOpen: false,
   };
 }
 
@@ -222,25 +200,17 @@ export function networkProblem(answers: Answers, machine: Machine): string | und
   return undefined;
 }
 
-export function looksLikeEmail(words: string): boolean {
-  const [user, host] = words.split("@");
-  return Boolean(user) && host !== undefined && host.includes(".") && !host.startsWith(".") && !host.endsWith(".");
+/**
+ * Enter on the row already picked goes on as Continue does; a press with the pointer on it does
+ * nothing. The list marks the row Enter took (`data-keyed`) as it takes it.
+ */
+function goOn(from: Element): void {
+  if (from.querySelector(".k-list-row[data-keyed]")) from.dispatchEvent(new Event(GO_ON, { bubbles: true }));
 }
 
-export function yoursProblem(answers: Answers): string | undefined {
-  if (answers.wallpapers.size === 0) return "Pick at least one wallpaper.";
-  const [name, email] = [answers.gitName.trim(), answers.gitEmail.trim()];
-  if (name === "" && email !== "") return "Git wants a name to go with that email.";
-  if (email !== "" && !looksLikeEmail(email)) return "That isn't an email address.";
-  return undefined;
-}
-
-/** How many wallpapers there are and how many are picked, as the footer says it. */
-export function wallpaperNote(answers: Answers): string | undefined {
-  const total = SETS.reduce((sum, set) => sum + set.wallpapers.length, 0);
-  const picked = answers.wallpapers.size;
-  if (picked === 0) return undefined;
-  return picked === total ? `All ${total} picked.` : `${picked} of ${total} picked.`;
+/** Puts the keyboard back on `content`'s list after a pick redrew it, if it had it. */
+function keepKeys(content: HTMLElement, had: boolean, where = ".k-list"): void {
+  if (had) content.querySelector<HTMLElement>(where)?.focus({ preventScroll: true });
 }
 
 /** Tells the footer the answers changed. */
@@ -409,10 +379,14 @@ export function networkBody(answers: Answers, machine: Machine): HTMLElement {
     }
     const wells = list(rows, {
       onTake: (index) => {
+        if (answers.network === index - 1) return goOn(content);
+        const had = content.contains(document.activeElement);
         answers.network = index - 1;
         answers.networkPassword = "";
         draw();
         recheck(content);
+        // A secured network asks its password next, so the keyboard goes there.
+        keepKeys(content, had, content.querySelector(".k-field") ? ".k-field" : ".k-list");
       },
     });
     const parts: Element[] = [filling(wells)];
@@ -459,21 +433,16 @@ function strengthLine(password: string): HTMLElement {
 
 export function youBody(answers: Answers): HTMLElement {
   const content = stack("s20", "start");
-  const login = text("", "mono", "on_surface_variant");
-  const showLogin = () => login.replaceChildren(`${answers.username || "you"}@${answers.host || "this-machine"}`);
-  showLogin();
 
   const username = typed({ placeholder: "you", value: answers.username, ...(answers.username && usernameProblem(answers.username) ? { state: "Invalid" as const } : {}) }, (value) => {
     answers.username = value;
     answers.ownUsername = value !== "";
     setInvalid(username, value !== "" && usernameProblem(value) !== undefined);
-    showLogin();
     recheck(content);
   });
   const host = typed({ placeholder: "this-machine", value: answers.host, ...(answers.host && hostProblem(answers.host) ? { state: "Invalid" as const } : {}) }, (value) => {
     answers.host = value;
     setInvalid(host, value !== "" && hostProblem(value) !== undefined);
-    showLogin();
     recheck(content);
   });
   const name = typed({ placeholder: "Your name", value: answers.name }, (value) => {
@@ -482,16 +451,16 @@ export function youBody(answers: Answers): HTMLElement {
       answers.username = usernameOf(value);
       username.querySelector(".k-field-value")?.replaceChildren(answers.username);
     }
-    showLogin();
     recheck(content);
   });
   const userProblem = answers.username ? usernameProblem(answers.username) : undefined;
   const hostWrong = answers.host ? hostProblem(answers.host) : undefined;
+  // Both are asked of everyone, so they are fields on the page, already answered from the name and
+  // the machine: most people only read them.
   const names = grid(2, "s20", [
     labelled("Username", username, userProblem ? { note: userProblem, invalid: true } : { note: "Your login and your home folder." }),
     labelled("Machine name", host, hostWrong ? { note: hostWrong, invalid: true } : { note: "On the network and in your prompt." }),
   ]);
-  const more = hangs(collapsible({ title: "Username and machine name", summary: `${answers.username || "you"}@${answers.host || "this-machine"}`, content: names, open: answers.namesOpen || Boolean(userProblem || hostWrong) }));
 
   const strong = stack(0, "start", strengthLine(answers.password));
   const password = typed({ secret: true, icon: "key", value: answers.password }, (value) => {
@@ -509,7 +478,7 @@ export function youBody(answers: Answers): HTMLElement {
     labelled("Password", stack("s8", "start", filling(password), filling(strong)), { note: "You type it at boot too: it unlocks the disk." }),
     labelled("Type it again", confirm, { action: showToggle(() => [password, confirm]), ...(mismatch ? { note: "The passwords don't match.", invalid: true } : {}) }),
   ]);
-  content.append(filling(labelled("Your name", name)), filling(more), filling(passwords));
+  content.append(filling(labelled("Your name", name)), filling(names), filling(passwords));
   return body("アカウント", "You", "Your name and a password you'll still remember at 2am. The rest follows from them.", content);
 }
 
@@ -601,12 +570,7 @@ function setting(glyph: string, title: string, subtitle: string, on: boolean, fl
   return line;
 }
 
-/** The disk screen's options: drawn with the encryption's own passphrase open. */
-export interface DiskView {
-  readonly encryptionOpen?: boolean;
-}
-
-export function diskBody(answers: Answers, machine: Machine, view: DiskView = {}): HTMLElement {
+export function diskBody(answers: Answers, machine: Machine): HTMLElement {
   const content = stack("s24", "start");
   const draw = () => {
     const targets = machine.disks.filter((each) => !each.stick);
@@ -636,10 +600,13 @@ export function diskBody(answers: Answers, machine: Machine, view: DiskView = {}
       onTake: (index) => {
         const disk = machine.disks[index];
         if (!disk || disk.stick) return;
+        if (answers.disk === index) return goOn(content);
+        const had = content.contains(document.activeElement);
         answers.disk = index;
         answers.mode = disk.other && fitsAlongside(disk) ? "alongside" : "erase";
         draw();
         recheck(content);
+        keepKeys(content, had);
       },
     });
     const parts: Element[] = [filling(labelled("Where it goes", disks))];
@@ -675,50 +642,76 @@ export function diskBody(answers: Answers, machine: Machine, view: DiskView = {}
       const under = wrapped(plumbing(disk, answers.mode), "small", "on_surface_variant");
       parts.push(filling(stack("s12", "start", filling(grid(2, "s16", [alongside, erase])), filling(map), under)));
 
-      const encryption = stack("s16", "start");
-      const drawEncryption = () => {
-        const lines: Element[] = [
-          filling(
-            setting("lock", "Encrypt the disk", answers.encrypt ? "Lose the laptop, keep your secrets. Your password opens it at boot." : "Anyone holding the disk can read it. Your call.", answers.encrypt, (on) => {
-              answers.encrypt = on;
-              drawEncryption();
-              morph(map, disk, answers.mode, on);
-              recheck(content);
-            }),
-          ),
-        ];
-        if (answers.encrypt) {
-          const passphrase = typed({ secret: true, icon: "key", value: answers.passphrase }, (value) => {
-            answers.passphrase = value;
+      // Each answer is on the card itself: Use my password under Encrypt while it encrypts, and the
+      // passphrase's two fields under that once it is off.
+      const passphrase = typed({ secret: true, icon: "key", value: answers.passphrase }, (value) => {
+        answers.passphrase = value;
+        recheck(content);
+      });
+      const again = typed({ secret: true, icon: "key", value: answers.passphraseConfirm }, (value) => {
+        answers.passphraseConfirm = value;
+        recheck(content);
+      });
+      const fields = revealed("passphrase", filling(grid(2, "s16", [labelled("Passphrase", passphrase), labelled("Type it again", again, { action: showToggle(() => [passphrase, again]) })])), answers.encrypt && !answers.samePassword);
+      const same = revealed(
+        "same",
+        filling(
+          setting("key", "Use my password", answers.samePassword ? "One password for boot and login." : "The disk gets a passphrase of its own, typed at boot.", answers.samePassword, (on) => {
+            answers.samePassword = on;
+            same.querySelector(".kobo-setting .k-text[data-wrapped]")?.replaceWith(wrapped(on ? "One password for boot and login." : "The disk gets a passphrase of its own, typed at boot.", "small", "on_surface_variant"));
+            reveal(fields, !on);
             recheck(content);
-          });
-          const again = typed({ secret: true, icon: "key", value: answers.passphraseConfirm }, (value) => {
-            answers.passphraseConfirm = value;
-            recheck(content);
-          });
-          const own = stack(
-            "s16",
-            "start",
-            filling(
-              setting("key", "Use my password", "One password for boot and login.", answers.samePassword, (on) => {
-                answers.samePassword = on;
-                drawEncryption();
-                recheck(content);
-              }),
-            ),
-            ...(answers.samePassword ? [] : [filling(grid(2, "s16", [labelled("Passphrase", passphrase), labelled("Type it again", again, { action: showToggle(() => [passphrase, again]) })]))]),
-          );
-          lines.push(filling(hangs(collapsible({ title: "Its own passphrase", summary: answers.samePassword ? "Your password" : "Its own", content: own, open: view.encryptionOpen ?? !answers.samePassword }))));
-        }
-        encryption.replaceChildren(...lines);
-      };
-      drawEncryption();
+          }),
+        ),
+        answers.encrypt,
+      );
+      const encrypt = setting("lock", "Encrypt the disk", answers.encrypt ? "Lose the laptop, keep your secrets. Your password opens it at boot." : "Anyone holding the disk can read it. Your call.", answers.encrypt, (on) => {
+        answers.encrypt = on;
+        encrypt.querySelector(".k-text[data-wrapped]")?.replaceWith(wrapped(on ? "Lose the laptop, keep your secrets. Your password opens it at boot." : "Anyone holding the disk can read it. Your call.", "small", "on_surface_variant"));
+        reveal(same, on);
+        reveal(fields, on && !answers.samePassword);
+        morph(map, disk, answers.mode, on);
+        recheck(content);
+      });
+      const encryption = stack(0, "start", filling(encrypt), filling(same), filling(fields));
       parts.push(filling(card({ body: [encryption] })));
     }
     content.replaceChildren(...parts);
   };
   draw();
   return body("ディスク", "Disk", "Where it goes. Nothing is written until you hold the button on the last screen.", content);
+}
+
+/**
+ * `content` in a room of its own under what goes before it, `space.s16` below it, open or shut as
+ * `open` says, named `name` for a move to find; `reveal` opens and shuts it in place. Shut, it takes
+ * no room and no keyboard.
+ */
+function revealed(name: string, content: HTMLElement, open: boolean): HTMLElement {
+  const box = stack(0, "start", gap("s16"), content);
+  box.classList.add("kobo-reveal");
+  box.dataset.reveal = name;
+  box.style.setProperty("--kobo-open", open ? "1" : "0");
+  box.inert = !open;
+  return box;
+}
+
+/**
+ * Opens or shuts a `revealed` room in place, as a Collapsible's does: it eases from nothing to what
+ * it holds as it fades in over `medium` on `standard_decel`, and back over `short` on
+ * `standard_accel`; with reduced motion it changes at once.
+ */
+function reveal(box: HTMLElement, open: boolean): void {
+  const to = open ? 1 : 0;
+  const from = Number.parseFloat(getComputedStyle(box).getPropertyValue("--kobo-open"));
+  box.getAnimations().forEach((each) => each.cancel());
+  box.style.setProperty("--kobo-open", String(to));
+  box.inert = !open;
+  if (settings().reduced || from === to) return;
+  box.animate([{ "--kobo-open": from }, { "--kobo-open": to }], {
+    duration: milliseconds(open ? "medium" : "short") / settings().speed,
+    easing: `cubic-bezier(${bezier(open ? "standard_decel" : "standard_accel").join(", ")})`,
+  });
 }
 
 /**
@@ -749,68 +742,6 @@ function morph(map: HTMLElement, disk: Disk, mode: Answers["mode"], encrypt: boo
   });
 }
 
-// -------------------------------------------------------------- Make it yours --
-
-export function yoursBody(answers: Answers, view: { readonly gitOpen?: boolean; readonly first?: string } = {}): HTMLElement {
-  const content = stack("s32", "start");
-  const draw = () => {
-    const sets = SETS.map((set) => {
-      const keys = set.wallpapers.map((each) => wallpaperKey(set.name, each.name));
-      const on = keys.filter((key) => answers.wallpapers.has(key)).length;
-      const tick = on === 0 ? "Empty" : on === keys.length ? "Full" : "Partial";
-      const head = checkbox({ label: set === SETS[0] && view.first ? view.first : set.name, tick });
-      head.addEventListener("click", () => {
-        for (const key of keys) {
-          if (tick === "Full") answers.wallpapers.delete(key);
-          else answers.wallpapers.add(key);
-        }
-        draw();
-        recheck(content);
-      });
-      const count = keys.length === 1 && tick !== "Partial" ? "1 wallpaper" : tick === "Full" ? `all ${keys.length}` : tick === "Empty" ? `${keys.length} wallpapers` : `${on} of ${keys.length}`;
-      const pictures = set.wallpapers.map((each) => {
-        const key = wallpaperKey(set.name, each.name);
-        const picked = answers.wallpapers.has(key);
-        const tile = pictureChoice({ source: each.picture, name: each.name, place: "over", picked, mark: { icon: "check", label: "Picked" }, many: true, ...(each.video ? { badge: { icon: "play_arrow", label: "Video" } } : {}) });
-        tile.addEventListener("click", () => {
-          if (answers.wallpapers.has(key)) answers.wallpapers.delete(key);
-          else answers.wallpapers.add(key);
-          draw();
-          recheck(content);
-        });
-        return tile;
-      });
-      return stack("s12", "start", row("s12", "centre", head, chip({ label: count, kind: tick === "Full" ? "Selected" : "Neutral" })), filling(grid(3, "s16", pictures)));
-    });
-    const name = typed({ placeholder: "Your name", value: answers.gitName }, (value) => {
-      answers.gitName = value;
-      preview.replaceChildren(gitconfig(answers));
-      recheck(content);
-    });
-    const email = typed({ placeholder: "you@example.com", icon: "mail", value: answers.gitEmail }, (value) => {
-      answers.gitEmail = value;
-      preview.replaceChildren(gitconfig(answers));
-      recheck(content);
-    });
-    const preview = stack(0, "start", gitconfig(answers));
-    const git = hangs(collapsible({
-      title: "Git identity",
-      summary: answers.gitEmail ? answers.gitEmail : "Later",
-      open: view.gitOpen ?? answers.gitOpen,
-      content: stack("s16", "start", filling(grid(2, "s20", [labelled("Name", name), labelled("Email", email, answers.gitEmail && !looksLikeEmail(answers.gitEmail) ? { note: "That isn't an email address.", invalid: true } : { note: "No email: you set it up later." })])), filling(card({ body: [preview] }))),
-    }));
-    content.replaceChildren(...sets.map(filling), filling(git));
-  };
-  draw();
-  return body("壁紙", "Make it yours", "The wallpapers the picker shows; a set's name takes all of it. Change any of it later.", content);
-}
-
-/** `~/.gitconfig` as the install writes it. */
-function gitconfig(answers: Answers): HTMLElement {
-  const entry = (key: string, value: string) => row(0, "centre", text(key, "mono_large", "cold"), text(` = ${value || "…"}`, "mono_large"));
-  return stack("s4", "start", text("~/.gitconfig", "mono", "on_surface_variant"), gap("s4"), text("[user]", "mono_large", "primary"), entry("    name", answers.gitName.trim()), entry("    email", answers.gitEmail.trim()));
-}
-
 // --------------------------------------------------------------- Last look --
 
 /** The hold to install's options: held this far, as a still sample of the hold. */
@@ -819,8 +750,12 @@ export interface ReviewView {
   readonly lowBattery?: number;
 }
 
-/** A card of the review: its symbol and title, a Change that goes back to its screen, the facts. */
-function block(glyph: string, title: string, facts: Parameters<typeof descriptionList>[0], change: () => void): HTMLElement {
+/**
+ * A card of the review: its symbol and title, a Change that goes back to the screen that asked it,
+ * the facts. What no screen asks (the release, a cable's network) has no Change.
+ */
+function block(glyph: string, title: string, facts: Parameters<typeof descriptionList>[0], change?: () => void): HTMLElement {
+  if (!change) return card({ header: { glyph, title }, body: [descriptionList(facts)] });
   const back = button({ label: "Change", kind: "Text", size: "Sm" });
   back.classList.add("kobo-change");
   back.addEventListener("click", change);
@@ -852,8 +787,8 @@ export function reviewBody(answers: Answers, machine: Machine, go: (page: string
     ], () => go("language")),
     block("person", "You", [
       { label: "Name", value: answers.name || "…" },
-      { label: "Login", value: `${answers.username}@${answers.host}` },
-      { label: "Git", value: answers.gitEmail ? answers.gitName : "Later", ...(answers.gitEmail ? { detail: answers.gitEmail } : {}) },
+      { label: "Username", value: answers.username },
+      { label: "Machine name", value: answers.host },
     ], () => go("you")),
     block("hard_drive", "Disk", [
       { label: "Disk", value: disk?.model ?? "None picked", ...(disk ? { detail: `${disk.path} · ${bytes(disk.bytes)}` } : {}) },
@@ -862,9 +797,8 @@ export function reviewBody(answers: Answers, machine: Machine, go: (page: string
     ], () => go("disk")),
     block("deployed_code", "System", [
       { label: "Release", value: `KubaOS ${RELEASE.version} ${RELEASE.codename}`, detail: `${RELEASE.commit} · Linux ${RELEASE.kernel}` },
-      { label: "Wallpapers", value: wallpaperNote(answers) ?? "None" },
       { label: "Wi-Fi", value: networks[answers.network]?.name ?? "None" },
-    ], () => go("yours")),
+    ], machine.online ? undefined : () => go("network")),
   ]);
   const words = holdWords(answers, machine);
   const hold = button({ label: view.held ? "Keep holding…" : words.cta, kind: words.danger ? "Danger" : "Filled", size: "Lg", icon: "download", alternatives: [words.cta, "Keep holding…"] });
@@ -912,7 +846,7 @@ export function installLog(share: number, failed: boolean, height = "var(--size-
   return log(lines, { height }).box;
 }
 
-/** The install's details in the panel: the figure, the bar, the steps, the log, a way back. */
+/** The install's details on glass: the figure, the bar, the steps, the log, a way back. */
 export function detailsBody(share: number, back: () => void): HTMLElement {
   const { index } = stepAt(share);
   const percent = new Intl.NumberFormat("en-GB", { style: "percent" }).format(share);
