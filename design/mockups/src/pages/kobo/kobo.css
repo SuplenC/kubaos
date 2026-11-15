@@ -52,7 +52,7 @@
 
 @property --kobo-shown {
   syntax: "<number>";
-  inherits: false;
+  inherits: true;
   initial-value: 1;
 }
 
@@ -232,6 +232,12 @@
   color: var(--color-primary_container);
 }
 
+/* A scene's lede is centred, so its lines are kept near one length: a last line of two words under
+   two full ones reads as a leftover. */
+.kobo-lede {
+  text-wrap: balance;
+}
+
 /* The disk's map: a bar for now and one for after the install, each partition as wide as its
    share of the disk, a sliver at least, `space.s4` apart. */
 .kobo-map {
@@ -279,6 +285,12 @@
   padding: 0 var(--space-s8);
   border-radius: var(--radius-small);
   white-space: nowrap;
+}
+
+/* A part on its way out loses its words in the first third of the move, before its narrowing box
+   would cut them short. */
+.kobo-part-fill > .k-text {
+  opacity: clamp(0, calc(var(--kobo-shown) * 3 - 2), 1);
 }
 
 .kobo-part-fill[data-kind="system"] {

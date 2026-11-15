@@ -294,6 +294,6 @@ export const TIPS: readonly { readonly keys: string; readonly does: string }[] =
 export const HERO: Words = { short: "Let's fix this shit.", long: "Let's fix this shit, once and for all, properly this time." };
 export const LEDE: Words = {
   short: "Whatever's on here, it's had its chance.",
-  long: "Whatever's on here, it's had its chance. Kuba's own Linux: a fast, keyboard-driven desktop for writing Rust all day without the OS getting in the way.",
+  long: "Whatever's on here, it's had its chance. Kuba's own Linux: a fast, keyboard-\u2060driven desktop for writing Rust all day without the OS getting in the way.",
 };
 export const DONE_HEADLINE: Words = { short: "Fixed. You're welcome.", long: "Fixed, finally. You're very welcome, by the way." };

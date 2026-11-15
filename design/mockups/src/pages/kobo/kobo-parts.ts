@@ -393,7 +393,7 @@ export function networkBody(answers: Answers, machine: Machine): HTMLElement {
   const content = stack("s20", "start");
   const draw = () => {
     const networks = machine.networks;
-    const rows: ListRowSpec[] = [{ title: "No Wi-Fi: I've got a cable, or I'll do it later", icon: "wifi_off", checked: answers.network === -1 }];
+    const rows: ListRowSpec[] = [{ title: "No Wi-Fi", subtitle: "I've got a cable, or I'll do it later", icon: "wifi_off", checked: answers.network === -1 }];
     if (networks !== "scanning") {
       networks.forEach((each, index) =>
         rows.push({
