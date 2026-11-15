@@ -22,7 +22,7 @@ export default page<Shown>({
   lede: "Off until set up here; then the phone's app, its pairing request, and what works each way.",
   code: { unbuilt: "Kōbō draws the old checklist" },
   from: ["step-rail-page", "card", "banner", "collapsible", "error-block"],
-  stage: { live: liveCard("phone"), hint: "Enter turns it on; the phone asks by itself", daylight: true },
+  stage: { live: liveCard("phone"), hint: "Enter turns it on; the phone asks by itself", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
   variants: [
     { name: "Off", for: "the app to get first", sample: CELLS.rest },
     { name: "Starting", for: "KDE Connect coming up", sample: CELLS.loading },
@@ -34,7 +34,7 @@ export default page<Shown>({
     { name: "Stopped", for: "on, but not running", sample: atCard("phone", "stopped") },
     { name: "Failed", for: "the cause; journalctl", sample: CELLS.error },
   ],
-  sizes: doesntApply("the window's sizes are StepRailPage's; the card fills its page."),
+  sizes: doesntApply("the screen's sizes are StepRailPage's Kōbō host's; the card fills its page."),
   states: {
     shown: ["rest", "loading", "selected", "error", "empty"],
     absent: { lit: "its buttons light on their pages", pressed: "its buttons press on their pages", disabled: "every machine can pair a phone: always there" },

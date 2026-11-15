@@ -30,7 +30,7 @@ export default page<Shown>({
   lede: "The ending: the desktop comes close, クバ strikes, and the desktop is handed over.",
   code: { unbuilt: "Kōbō ends on Done for now" },
   from: ["step", "button", "keycap", "spinner", "backdrop"],
-  stage: { live: screen(() => setupRoom({ place: { at: "ending" }, views: SOME, skipped: LATER, live: true, width: windowSize().width, height: windowSize().height })), hint: "Enter: the desktop; the words lift off it", daylight: true },
+  stage: { live: screen(() => setupRoom({ place: { at: "ending" }, views: SOME, skipped: LATER, live: true, width: windowSize().width, height: windowSize().height })), hint: "Enter: the desktop; the words lift off it", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
   variants: [
     { name: "Some for later", for: "where they wait", sample: CELLS.rest },
     { name: "All of it", for: "nothing left", sample: at(ALL_DONE) },

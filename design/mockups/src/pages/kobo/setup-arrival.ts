@@ -24,7 +24,7 @@ export default page<Shown>({
   lede: "The first frame of KubaOS proper: one window on the new desktop, what's ahead, one button.",
   code: { unbuilt: "Kōbō opens on the checklist" },
   from: ["step", "button", "keycap", "spinner", "backdrop"],
-  stage: { live: screen(() => setupRoom({ place: { at: "arrival" }, live: true, width: windowSize().width, height: windowSize().height })), hint: "Enter deals the cards; Esc goes to the desktop", daylight: true },
+  stage: { live: screen(() => setupRoom({ place: { at: "arrival" }, live: true, width: windowSize().width, height: windowSize().height })), hint: "Enter deals the cards; Esc goes to the desktop", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
   variants: [
     { name: "First login", for: "what's ahead; Let's go", sample: CELLS.rest },
     { name: "Setup opens", for: "the opening, played as it is picked", sample: screen(() => setupRoom({ place: { at: "arrival" }, live: true, opening: true })) },

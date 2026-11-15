@@ -5,7 +5,7 @@
 
 import { doesntApply, nonEmpty, page, screen } from "../../site/page.ts";
 import { refused } from "./kobo-pages.ts";
-import { aloneAt, atCard, arrivesAt, CARD_KEYS, CARD_MEASURES, finishesAt, liveCard } from "./setup-pages.ts";
+import { aloneAt, atCard, fullHd, arrivesAt, CARD_KEYS, CARD_MEASURES, finishesAt, liveCard } from "./setup-pages.ts";
 import { FAILS } from "./setup-room.ts";
 
 type Shown = "rest" | "loading" | "selected" | "error";
@@ -24,7 +24,7 @@ export default page<Shown>({
   lede: "The machine's maker recognised: what works already, and what its drivers would fix.",
   code: { unbuilt: "Kōbō draws the TUXEDO card" },
   from: ["step-rail-page", "list", "banner", "field", "collapsible", "error-block"],
-  stage: { live: liveCard("drivers"), hint: "Enter installs: the password, the build, then Reboot", daylight: true },
+  stage: { live: liveCard("drivers"), hint: "Enter installs: the password, the build, then Reboot", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
   variants: [
     { name: "TUXEDO, Secure Boot on", for: "a part to install; the blue screen's password", sample: CELLS.rest },
     { name: "A part chosen too", for: "Control Center ticked", sample: atCard("drivers", "choose") },
@@ -43,7 +43,10 @@ export default page<Shown>({
     { name: "No key made", for: "DKMS's fault; the fix", sample: atCard("drivers", "nokey") },
     { name: "From the Command menu", for: "the card alone", sample: aloneAt("drivers", "secure") },
   ],
-  sizes: doesntApply("the window's sizes are StepRailPage's; the card fills its page."),
+  sizes: [
+    { name: "Laptop", for: "1280 × 800, TUXEDO", sample: atCard("drivers", "secure") },
+    { name: "Full HD", for: "1920 × 1080, TUXEDO", sample: fullHd("drivers", "secure") },
+  ],
   states: {
     shown: ["rest", "loading", "selected", "error"],
     absent: {

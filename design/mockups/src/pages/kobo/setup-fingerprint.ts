@@ -22,7 +22,7 @@ export default page<Shown>({
   lede: "The reader, the finger, and each touch counted until sudo takes it instead of the password.",
   code: { unbuilt: "Kōbō draws the old checklist" },
   from: ["step-rail-page", "card", "progress-bar", "select", "collapsible", "error-block"],
-  stage: { live: liveCard("fingerprint"), hint: "Enter enrols: the password, then eight touches", daylight: true },
+  stage: { live: liveCard("fingerprint"), hint: "Enter enrols: the password, then eight touches", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
   variants: [
     { name: "To enrol", for: "the reader found; right index picked", sample: CELLS.rest },
     { name: "The password", for: "polkit's dialog is up", sample: atCard("fingerprint", "password") },
@@ -35,7 +35,7 @@ export default page<Shown>({
     { name: "Not on this machine", for: "no reader: passed by", sample: CELLS.disabled },
     { name: "Under the hood", for: "the reader, the command", sample: atCard("fingerprint", "enroll", { hood: true }) },
   ],
-  sizes: doesntApply("the window's sizes are StepRailPage's; the card fills its page."),
+  sizes: doesntApply("the screen's sizes are StepRailPage's Kōbō host's; the card fills its page."),
   states: {
     shown: ["rest", "loading", "selected", "error", "disabled"],
     absent: { lit: "its fields and buttons light on their pages", pressed: "its buttons press on their pages", empty: "a card always has its words" },

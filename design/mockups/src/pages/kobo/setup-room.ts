@@ -4,9 +4,10 @@
 // Live, it is the whole first boot: Let's go deals the cards, each card's work runs and finishes in
 // place, the last one hands over to the ending, and the ending to the desktop.
 //
-// Unlike the installer it follows the desktop's mode: it runs on the installed system, which has a
-// day as well as a night. Opened from the Command menu on one card, over a desktop in use, it is a
-// window instead: a card is a tool you came to use, beside what you were doing.
+// It is a night place, as the installer is: the sign and the street are lit tubes in the dark, and
+// a day band would wash them out. Opened from the Command menu on one card, over a desktop in use,
+// it is a window instead, in the desktop's mode: a card is a tool you came to use, beside what you
+// were doing.
 //
 // It is the installer's room in its parts and its moves: the same Backdrop scrims, StepRailPage's
 // Kōbō host, the welcome's sign and the done screen's ending (`kobo-room.ts`), each move a recipe
@@ -30,6 +31,7 @@ import { koboBrand, RECHECK, stepRailPage } from "../../lib/step-rail.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import type { Duration, Easing, Move, NonEmpty, Track } from "../../site/page.ts";
 import { milliseconds } from "../../site/recipe.ts";
+import { paint, palette } from "../../site/recolour.ts";
 import { settings } from "../../site/settings.ts";
 import { RELEASE } from "./kobo-data.ts";
 import { TURNING_REDUCED, turning } from "./kobo-pages.ts";
@@ -266,6 +268,10 @@ export function setupRoom(options: SetupOptions): HTMLElement {
   element.tabIndex = -1;
   element.style.setProperty("--kobo-width", width);
   element.style.setProperty("--kobo-height", height);
+  if (!options.alone) {
+    element.dataset.mode = "dark";
+    paint(element, palette(settings().theme, "dark"));
+  }
   let place: Place = options.place;
   const timers = new Set<number>();
   // The cards' bodies shown now, each redrawn in place as its card's work moves on; Make it yours

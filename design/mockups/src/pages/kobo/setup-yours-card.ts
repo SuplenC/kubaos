@@ -286,7 +286,8 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
       parts.progress.hidden = state.phase !== "installing";
       const bar = parts.progress.querySelector<HTMLElement>(".k-progress");
       if (bar) setProgress(bar, total === 0 ? 0 : state.installed.size / total);
-      parts.progress.querySelector(".setup-yours-count")?.replaceChildren(`${state.installed.size} of ${total}`);
+      // A text is as wide as its words were when drawn: a new count is a new text.
+      parts.progress.querySelector(".setup-yours-count")?.replaceChildren(text(`${state.installed.size} of ${total}`, "small", "on_surface_variant"));
     }
     if (parts.more) parts.more.style.visibility = state.phase === "choosing" ? "" : "hidden";
     const wanted = { git: state.picked.has("developer"), bitwarden: kept(state).some((each) => each.id === "bitwarden") };
@@ -408,8 +409,9 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
         refresh();
       },
     });
-    parts.progress = stack("s4", "start", filling(progressBar({ fraction: 0 })), filling(row("s8", "centre", text("Installing", "small", "on_surface_variant"), fill(), text("", "small", "on_surface_variant"))));
-    parts.progress.querySelector(".k-row > :last-child")?.classList.add("setup-yours-count");
+    const count = document.createElement("span");
+    count.className = "setup-yours-count";
+    parts.progress = stack("s4", "start", filling(progressBar({ fraction: 0 })), filling(row("s8", "centre", text("Installing", "small", "on_surface_variant"), fill(), count)));
     parts.progress.classList.add("setup-yours-progress");
     const column = stack("s12", "start", filling(head), filling(parts.progress), filling(live.element));
     column.classList.add("setup-yours-apps");

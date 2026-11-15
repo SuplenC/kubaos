@@ -8,7 +8,7 @@ import type { Move, NonEmpty, Track } from "../../site/page.ts";
 import { doesntApply, nonEmpty, page, screen } from "../../site/page.ts";
 import { refused } from "./kobo-pages.ts";
 import { APPS } from "./setup-data.ts";
-import { aloneAt, atCard, CARD_KEYS, CARD_MEASURES, finishesAt, liveCard } from "./setup-pages.ts";
+import { aloneAt, atCard, fullHd, CARD_KEYS, CARD_MEASURES, finishesAt, liveCard } from "./setup-pages.ts";
 import { FAILS, setupRoom } from "./setup-room.ts";
 
 type Shown = "rest" | "empty" | "selected" | "loading" | "error";
@@ -82,7 +82,7 @@ export default page<Shown>({
   lede: "What you use it for, the apps that brings, and the settings that come with them.",
   code: { unbuilt: "Kōbō has no such card" },
   from: ["step-rail-page", "choice-card", "live-list", "field", "select", "progress-bar", "error-block"],
-  stage: { live: liveCard("yours"), hint: "Pick any; untick an app; Enter installs in the background", daylight: true },
+  stage: { live: liveCard("yours"), hint: "Pick any; untick an app; Enter installs in the background", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
   variants: [
     { name: "Nothing picked", for: "the three choices; the well waits", sample: CELLS.empty },
     { name: "Developer", for: "its apps; Git, email empty", sample: CELLS.rest },
@@ -95,7 +95,10 @@ export default page<Shown>({
     { name: "An app failed", for: "the cause; Try it again", sample: CELLS.error },
     { name: "From the Command menu", for: "the card alone", sample: aloneAt("yours", "done") },
   ],
-  sizes: doesntApply("the window's sizes are StepRailPage's; the card fills its page."),
+  sizes: [
+    { name: "Laptop", for: "1280 × 800, all three", sample: atCard("yours", "all") },
+    { name: "Full HD", for: "1920 × 1080, all three", sample: fullHd("yours", "all") },
+  ],
   states: {
     shown: ["rest", "empty", "selected", "loading", "error"],
     absent: {
