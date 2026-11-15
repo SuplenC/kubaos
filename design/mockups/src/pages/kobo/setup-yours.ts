@@ -28,24 +28,35 @@ const DESIGNER_ONLY = `.k-live-row:is([data-key="group-designer"], ${APPS.filter
   .map((each) => `[data-key="${each.id}"]`)
   .join(", ")})`;
 
-/** Developer picked on the empty card: its label and apps arrive in the well, Git rises in beside it. */
+/** The first pick on the empty card: the list and the settings rise in under the choices, the rows opening in the list. */
 const PICKED: Move = {
-  name: "A profile picked",
-  what: "Its label and apps open their room over `medium` and fade in over `slow`; Git rises in beside them.",
+  name: "The first pick",
+  what: "The list and its settings rise in as one over `long`; the rows open their room over `medium` and fade in over `slow`.",
   tracks: [
+    { part: "the columns' fade", on: CARD, target: ".setup-yours-columns", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: "the columns' rise", on: CARD, target: ".setup-yours-columns", property: "--kobo-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
     { part: "the rows' room", on: CARD, target: ".setup-yours-apps .k-live-row", property: "--grow", from: 0, to: 1, duration: "medium", curve: "standard_decel" },
     { part: "the rows' fade", on: CARD, target: ".setup-yours-apps .k-live-row", property: "opacity", from: 0, to: 1, duration: "slow", curve: "standard_decel" },
-    { part: "the empty words", on: CARD, target: ".setup-yours-empty", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "Git's fade", on: CARD, target: ".setup-yours-git", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "Git's rise", on: CARD, target: ".setup-yours-git", property: "--kobo-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
   ] as unknown as NonEmpty<Track<"standard_decel">>,
   reduced: [
+    { part: "the columns' fade", on: CARD, target: ".setup-yours-columns", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "the rows' fade", on: CARD, target: ".setup-yours-apps .k-live-row", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: "the empty words", on: CARD, target: ".setup-yours-empty", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "Git's fade", on: CARD, target: ".setup-yours-git", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-  ] as unknown as NonEmpty<Track<"standard">>,
+  ],
   back: "cuts",
   sample: () => setupRoom({ place: { at: "card", card: "yours" }, views: { yours: "developer" } }),
+};
+
+/** Developer picked beside another: Git rises in beside the list as Developer's apps arrive in it. */
+const GIT: Move = {
+  name: "Developer picked: Git",
+  what: "Git rises in over `long` where it lands, Bitwarden under it moving down as its rows open.",
+  tracks: [
+    { part: "Git's fade", on: CARD, target: ".setup-yours-git", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: "Git's rise", on: CARD, target: ".setup-yours-git", property: "--kobo-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+  ],
+  reduced: [{ part: "Git's fade", on: CARD, target: ".setup-yours-git", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+  back: "cuts",
+  sample: () => setupRoom({ place: { at: "card", card: "yours" }, views: { yours: "two" } }),
 };
 
 /** Designer unpicked beside Developer: what only it brought closes up; what both bring stays. */
@@ -114,7 +125,7 @@ export default page<Shown>({
   motion: {
     arrives: [PICKED],
     leaves: [UNPICKED],
-    between: [refused(atCard("yours", "invalid")), finishesAt("yours", "done"), FAILS],
+    between: [GIT, refused(atCard("yours", "invalid")), finishesAt("yours", "done"), FAILS],
   },
   keyboard: {
     keys: [

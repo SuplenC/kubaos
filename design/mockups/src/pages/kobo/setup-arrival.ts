@@ -1,13 +1,14 @@
 // First boot's arrival: the first frame of KubaOS proper. The window opens on the new desktop, says
 // what's ahead and that all of it can wait, and one button deals the cards.
 
+import { windowSize } from "../../site/settings.ts";
 import { doesntApply, nonEmpty, page, screen } from "../../site/page.ts";
 import { ALL_DONE, TOWER } from "./setup-cards.ts";
 import { BACK, CARDS_IN, HERO, type Moment, OPENS, setupRoom } from "./setup-room.ts";
 
 type Shown = "rest" | "loading" | "selected" | "disabled";
 
-const at = (moment: Moment, more: Partial<Parameters<typeof setupRoom>[0]> = {}) => screen(() => setupRoom({ place: { at: "arrival", moment }, desk: true, ...more }));
+const at = (moment: Moment, more: Partial<Parameters<typeof setupRoom>[0]> = {}) => screen(() => setupRoom({ place: { at: "arrival", moment }, ...more }));
 
 const CELLS: Record<Shown, () => HTMLElement> = {
   rest: at("rest"),
@@ -23,17 +24,17 @@ export default page<Shown>({
   lede: "The first frame of KubaOS proper: one window on the new desktop, what's ahead, one button.",
   code: { unbuilt: "Kōbō opens on the checklist" },
   from: ["step", "button", "keycap", "spinner", "backdrop"],
-  stage: { live: screen(() => setupRoom({ place: { at: "arrival" }, desk: true, live: true })), hint: "Enter deals the cards; Esc goes to the desktop", daylight: true },
+  stage: { live: screen(() => setupRoom({ place: { at: "arrival" }, live: true, width: windowSize().width, height: windowSize().height })), hint: "Enter deals the cards; Esc goes to the desktop", daylight: true },
   variants: [
     { name: "First login", for: "what's ahead; Let's go", sample: CELLS.rest },
-    { name: "Setup opens", for: "the opening, played as it is picked", sample: screen(() => setupRoom({ place: { at: "arrival" }, desk: true, live: true, opening: true })) },
+    { name: "Setup opens", for: "the opening, played as it is picked", sample: screen(() => setupRoom({ place: { at: "arrival" }, live: true, opening: true })) },
     { name: "Checking the machine", for: "detection running; Let's go waits", sample: CELLS.loading },
     { name: "Offline", for: "what waits on the network, in `warning`", sample: at("offline") },
     { name: "A desktop, no reader", for: "a maker I don't know; no reader", sample: CELLS.disabled },
     { name: "After the MOK reboot", for: "opened once more to check", sample: at("rebooted", { views: { yours: "done", drivers: "done", fingerprint: "done" } }) },
     { name: "Nothing to do", for: "opened again with all done", sample: CELLS.selected },
   ],
-  sizes: [{ name: "The window alone", for: "1024 × 680, as Hyprland floats it", sample: at("rest", { desk: false }) }],
+  sizes: [{ name: "Full HD", for: "the column in the middle", sample: at("rest", { width: "calc(1920 * var(--px))", height: "calc(1080 * var(--px))" }) }],
   states: {
     shown: ["rest", "loading", "selected", "disabled"],
     absent: { lit: "Let's go lights as a `Filled` button", pressed: "Let's go presses as a `Filled` button", empty: "there are always five cards", error: "detection never fails: a card it can't read is To do" },
@@ -47,7 +48,7 @@ export default page<Shown>({
   },
   focus: doesntApply("no line of its own: Let's go and Later light as buttons do."),
   content: {
-    text: [{ name: "The hero line", words: HERO, sample: screen((words: string) => setupRoom({ place: { at: "arrival" }, desk: true, hero: words })) }],
+    text: [{ name: "The hero line", words: HERO, sample: screen((words: string) => setupRoom({ place: { at: "arrival" }, hero: words })) }],
     missingPicture: doesntApply("the wallpaper is the desktop's own, on the disk since the install."),
     counts: [
       { name: "Three of five", for: "a desktop with no reader", sample: CELLS.disabled },
@@ -80,6 +81,6 @@ export default page<Shown>({
       { part: "Keys → promise", token: "space-s24" },
       { part: "Window's padding", token: "space-s32" },
     ],
-    reflow: { note: "The column stays in the window's middle; the plan keeps two cards to a row.", sample: at("rest", { desk: false }) },
+    reflow: { note: "The column stays in the screen's middle; on a short screen the sign gives way first.", sample: screen(() => setupRoom({ place: { at: "arrival" }, width: windowSize().width, height: windowSize().height })) },
   },
 });

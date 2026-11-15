@@ -3,6 +3,7 @@
 // then what got done, what waits in the Command menu, and the way to the desktop; a queued key
 // asks for the reboot first.
 
+import { windowSize } from "../../site/settings.ts";
 import { doesntApply, nonEmpty, page, screen } from "../../site/page.ts";
 import { ALL_DONE, CARD_IDS, type CardId, type Views } from "./setup-cards.ts";
 import { DESKTOP, ENDS, REBOOT, setupRoom } from "./setup-room.ts";
@@ -14,7 +15,7 @@ const LATER: readonly CardId[] = ["yubikey", "phone"];
 const COMING: Partial<Views> = { yours: "installing", drivers: "done", fingerprint: "done", yubikey: "done" };
 const QUEUED: Partial<Views> = { yours: "done", drivers: "queued", fingerprint: "done", yubikey: "done" };
 
-const at = (views: Partial<Views>, skipped: readonly CardId[] = [], going = false, desk = true) => screen(() => setupRoom({ place: { at: "ending", going }, views, skipped, desk }));
+const at = (views: Partial<Views>, skipped: readonly CardId[] = [], going = false, size: { width?: string; height?: string } = {}) => screen(() => setupRoom({ place: { at: "ending", going }, views, skipped, ...size }));
 
 const CELLS: Record<Shown, () => HTMLElement> = {
   rest: at(SOME, LATER),
@@ -29,7 +30,7 @@ export default page<Shown>({
   lede: "The ending: the desktop comes close, クバ strikes, and the desktop is handed over.",
   code: { unbuilt: "Kōbō ends on Done for now" },
   from: ["step", "button", "keycap", "spinner", "backdrop"],
-  stage: { live: screen(() => setupRoom({ place: { at: "ending" }, views: SOME, skipped: LATER, desk: true, live: true })), hint: "Enter: the desktop; the window steps back", daylight: true },
+  stage: { live: screen(() => setupRoom({ place: { at: "ending" }, views: SOME, skipped: LATER, live: true, width: windowSize().width, height: windowSize().height })), hint: "Enter: the desktop; the words lift off it", daylight: true },
   variants: [
     { name: "Some for later", for: "where they wait", sample: CELLS.rest },
     { name: "All of it", for: "nothing left", sample: at(ALL_DONE) },
@@ -37,9 +38,9 @@ export default page<Shown>({
     { name: "A reboot waits", for: "Reboot now first", sample: CELLS.selected },
     { name: "Restarting", for: "Reboot taken", sample: CELLS.loading },
     { name: "Everything skipped", for: "all of it for later", sample: at({}, CARD_IDS) },
-    { name: "The desktop", for: "the window gone", sample: screen(() => setupRoom({ place: { at: "desktop" }, desk: true })) },
+    { name: "The desktop", for: "handed over, at its own size", sample: screen(() => setupRoom({ place: { at: "desktop" } })) },
   ],
-  sizes: [{ name: "The window alone", for: "1024 × 680", sample: at(SOME, LATER, false, false) }],
+  sizes: [{ name: "Full HD", for: "the column in the middle", sample: at(SOME, LATER, false, { width: "calc(1920 * var(--px))", height: "calc(1080 * var(--px))" }) }],
   states: {
     shown: ["rest", "selected", "loading"],
     absent: { lit: "its buttons light as buttons do", pressed: "its buttons press as buttons do", disabled: "the way out always works", empty: "there are always five cards", error: "a card's failure stays on its card" },
@@ -79,6 +80,6 @@ export default page<Shown>({
       { part: "Lede → plan → actions", token: "space-s32" },
       { part: "Actions → keys", token: "space-s12" },
     ],
-    reflow: { note: "The column stays in the window's middle.", sample: at(SOME, LATER, false, false) },
+    reflow: { note: "The column stays in the screen's middle; on a short screen the mark keeps its size.", sample: screen(() => setupRoom({ place: { at: "ending" }, views: SOME, skipped: LATER, width: windowSize().width, height: windowSize().height })) },
   },
 });

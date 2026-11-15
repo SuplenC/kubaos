@@ -23,7 +23,7 @@ import { RECHECK, type RailPage, type RailStatus } from "../../lib/step-rail.ts"
 import { text, wrapped } from "../../lib/text.ts";
 import { bezier, milliseconds } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
-import { body, looksLikeEmail, showToggle } from "./kobo-parts.ts";
+import { body, showToggle } from "./kobo-parts.ts";
 import { CARDS, USER } from "./setup-cards.ts";
 import { type App, APPS, app, PROFILES, type ProfileId, proposed } from "./setup-data.ts";
 
@@ -123,6 +123,11 @@ function others(state: Yours): readonly App[] {
 /** A count of apps, its word chosen by the count. */
 export function apps(count: number): string {
   return count === 1 ? "1 app" : `${count} apps`;
+}
+
+/** Something before an @, something after it with a dot inside: what an email looks like. */
+function looksLikeEmail(words: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(words.trim());
 }
 
 /** The Git email typed and not an email: what keeps the install waiting. */
@@ -236,12 +241,31 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
   let element: HTMLElement | null = null;
   let live: LiveList | null = null;
   let timer = 0;
-  const parts = { status: null as HTMLElement | null, profiles: [] as HTMLElement[], progress: null as HTMLElement | null, settings: null as HTMLElement | null, failure: null as HTMLElement | null, hood: null as HTMLElement | null, more: null as HTMLElement | null, well: null as HTMLElement | null };
+  const parts = { status: null as HTMLElement | null, profiles: [] as HTMLElement[], progress: null as HTMLElement | null, settings: null as HTMLElement | null, failure: null as HTMLElement | null, hood: null as HTMLElement | null, more: null as HTMLElement | null, columns: null as HTMLElement | null };
 
   const recheck = () => element?.dispatchEvent(new Event(RECHECK, { bubbles: true }));
   // Which settings show, so only one that arrives moves.
   const shown = { git: false, bitwarden: false };
   let drawn = false;
+  // The list and the settings beside it show once something is picked: arriving, they rise in as
+  // one, the settings in them with them.
+  let arriving = false;
+  let hiding = 0;
+  const showColumns = (any: boolean) => {
+    const columns = parts.columns;
+    if (!columns) return;
+    window.clearTimeout(hiding);
+    if (any) {
+      arriving = drawn && columns.hidden === true;
+      columns.hidden = false;
+      if (arriving) rise(columns);
+      return;
+    }
+    arriving = false;
+    // Nothing picked: the rows leave as the list moves them, then the columns go with nothing in them.
+    if (!drawn) columns.hidden = true;
+    else hiding = window.setTimeout(() => (columns.hidden = rows(state).length === 0), milliseconds("medium") / settings().speed);
+  };
 
   /** Every part that follows the state, brought to it; the list moves its own rows. */
   const refresh = () => {
@@ -256,7 +280,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     }
     const items = rows(state);
     live?.update(items);
-    parts.well?.toggleAttribute("data-empty", items.length === 0);
+    showColumns(items.length > 0);
     if (parts.progress) {
       const total = kept(state).length;
       parts.progress.hidden = state.phase !== "installing";
@@ -271,7 +295,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
       parts.settings.replaceChildren(...blocks);
       // A setting that comes with what was just picked rises in where it lands; one that goes
       // simply goes, and what is under it closes up.
-      if (drawn)
+      if (drawn && !arriving)
         for (const block of blocks) {
           const fresh = (block.classList.contains("setup-yours-git") && !shown.git) || (block.classList.contains("setup-yours-bitwarden") && !shown.bitwarden);
           if (fresh) rise(block);
@@ -302,8 +326,8 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
         }),
         { note: invalid ? "That doesn't look like an email." : "Public on every commit. Empty: set it later.", ...(invalid ? { invalid: true } : {}) },
       );
-      const block = stack("s16", "start", filling(heading("Git", "The name and email on every commit you make.")), filling(name), filling(email));
-      block.classList.add("setup-yours-git");
+      const block = stack("s16", "start", filling(heading("Git", "The name and email on every commit you make.")), filling(grid(2, "s16", [name, email])));
+      block.classList.add("setup-yours-git", "kobo-part");
       blocks.push(filling(block));
     }
     if (kept(state).some((each) => each.id === "bitwarden")) {
@@ -311,14 +335,9 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
       const email = labelled("Email", typed({ value: state.bitwarden.email, placeholder: "you@example.com", icon: "mail" }, (value) => (state.bitwarden.email = value)));
       const password = labelled("Master password", typed({ value: state.bitwarden.password, secret: true, icon: "key" }, (value) => (state.bitwarden.password = value)), { action: showToggle(() => [password]), note: "In memory, never on disk." });
       const code = labelled("Two-step code", typed({ value: state.bitwarden.code, placeholder: "123 456" }, (value) => (state.bitwarden.code = value)));
-      const block = stack("s16", "start", filling(heading("Bitwarden", "Log in once: passwords, SSH keys and commit signing come from the vault. Empty: log in later, in the app.")), filling(email), filling(password), filling(grid(2, "s16", [server, code])));
-      block.classList.add("setup-yours-bitwarden");
+      const block = stack("s16", "start", filling(heading("Bitwarden", "Log in once: passwords, SSH keys and commit signing come from the vault. Empty: log in later, in the app.")), filling(grid(2, "s16", [email, password, server, code])));
+      block.classList.add("setup-yours-bitwarden", "kobo-part");
       blocks.push(filling(block));
-    }
-    if (blocks.length === 0) {
-      const none = wrapped("Git and Bitwarden come with what you pick.", "small", "on_surface_variant");
-      none.classList.add("setup-yours-none");
-      blocks.push(filling(none));
     }
     return blocks;
   };
@@ -331,12 +350,12 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     ];
     const lines = state.phase === "choosing" ? null : installLog(state);
     const content = stack("s16", "start", filling(descriptionList(facts)), filling(stack("s8", "start", text("The same in a terminal", "label", "on_surface_variant"), wrapped(spec.command, "mono"))), ...(lines ? [filling(log(lines).box)] : []));
-    const summary = lines ? `${lines.length} lines of log` : `Installs: ${apps(kept(state).length)}`;
+    const summary = lines ? `${lines.length} lines of log` : kept(state).length === 0 ? "Installs nothing yet" : `Installs ${apps(kept(state).length)}`;
     return hangs(collapsible({ title: "Under the hood", summary, content, open: (options.hood ?? false) || state.failed !== undefined }));
   };
 
   const pickProfiles = (): HTMLElement => {
-    parts.profiles = PROFILES.map((profile) => choiceCard({ glyph: profile.icon, title: profile.title, subtitle: profile.line, picks: "many", picked: state.picked.has(profile.id), disabled: state.phase === "installing" }));
+    parts.profiles = PROFILES.map((profile) => choiceCard({ glyph: profile.icon, title: profile.title, subtitle: profile.line, size: "Lg", picks: "many", picked: state.picked.has(profile.id), disabled: state.phase === "installing" }));
     const group = choiceGroup("many", 3, parts.profiles);
     group.classList.add("setup-yours-profiles");
     const sync = () =>
@@ -366,16 +385,15 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
       state.more = !state.more;
       more.style.setProperty("--disclosed", state.more ? "1" : "0");
       refresh();
-      // The apps arrive at the list's end: it scrolls to them, so what the press did shows.
-      const pane = element?.querySelector<HTMLElement>(".setup-yours-apps .k-list-pane");
-      const label = pane?.querySelector<HTMLElement>('[data-key="group-more"]');
-      if (state.more && pane && label) pane.scrollTo({ top: label.offsetTop, behavior: settings().reduced ? "auto" : "smooth" });
+      // The apps arrive at the list's end: the page scrolls to them, so what the press did shows.
+      const label = element?.querySelector<HTMLElement>('.setup-yours-apps [data-key="group-more"]');
+      if (state.more && label) label.scrollIntoView({ block: "start", behavior: settings().reduced ? "auto" : "smooth" });
     });
     parts.more = hangs(more);
     const head = row("s8", "centre", text("Apps", "subheading"), fill(), parts.more);
     head.classList.add("setup-yours-head");
+    // The list is as tall as its apps: the page is the one thing that scrolls.
     live = liveList(rows(state), {
-      height: "100%",
       onTake: (index) => {
         const taken = rows(state).filter((each) => !("label" in each))[index];
         if (!taken || state.phase === "installing") return;
@@ -390,17 +408,10 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
         refresh();
       },
     });
-    const empty = document.createElement("span");
-    empty.className = "setup-yours-empty";
-    empty.append(wrapped("Pick what you use it for, and its apps show up here.", "body", "on_surface_variant"));
-    const well = document.createElement("span");
-    well.className = "setup-yours-well";
-    well.append(live.element, empty);
-    parts.well = well;
     parts.progress = stack("s4", "start", filling(progressBar({ fraction: 0 })), filling(row("s8", "centre", text("Installing", "small", "on_surface_variant"), fill(), text("", "small", "on_surface_variant"))));
     parts.progress.querySelector(".k-row > :last-child")?.classList.add("setup-yours-count");
     parts.progress.classList.add("setup-yours-progress");
-    const column = stack("s12", "start", filling(head), filling(parts.progress), filling(well));
+    const column = stack("s12", "start", filling(head), filling(parts.progress), filling(live.element));
     column.classList.add("setup-yours-apps");
     return column;
   };
@@ -413,11 +424,12 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     parts.failure.className = "setup-yours-failure";
     parts.settings = stack("s32", "start");
     parts.settings.classList.add("setup-yours-settings");
-    const columns = splitColumns([1, 1], "s24", [filling(appsColumn()), filling(parts.settings)]);
+    parts.columns = splitColumns([1, 1], "s24", [filling(appsColumn()), filling(parts.settings)]);
+    parts.columns.classList.add("setup-yours-columns", "kobo-part");
     parts.hood = hood();
     const later = row("s12", "centre", wrapped(spec.skip, "small", "on_surface_variant"), keyHints([["Super+Space", `then “${spec.later}”`]]));
     later.classList.add("setup-later");
-    const content = stack("s20", "start", ...[parts.status, pickProfiles(), parts.failure, columns, later, parts.hood].map((each) => filling(each)));
+    const content = stack("s20", "start", ...[parts.status, pickProfiles(), parts.failure, parts.columns, later, parts.hood].map((each) => filling(each)));
     element = body(spec.accent, spec.title, spec.why, content);
     element.classList.add("setup-yours");
     refresh();
