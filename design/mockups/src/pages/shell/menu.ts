@@ -49,6 +49,14 @@ const TITLE: Words = { short: "Files", long: "Files, the file manager that opens
 /** The Items with the first's title `title`. */
 const titled = (title: string): Item[] => [{ ...ITEMS[0]!, title }, ...ITEMS.slice(1)];
 
+/** The menu on a screen of the toolbar's window size, both ways: its rows and place follow the height. */
+function atWindow(): HTMLElement {
+  const size = windowSize();
+  const room = within(size.width, menuOnScreen({ results: results("fi"), query: "fi" }));
+  room.style.height = size.height;
+  return room;
+}
+
 const OPENS: Move = {
   name: "Opens",
   what: "Super+Space: the panel fades in and drops `space.s8` into place, its Results there in the first frame.",
@@ -131,7 +139,7 @@ export default page<Shown>({
     { name: "Full HD", for: "half the screen, 9 rows, the pane", sample: () => panel({ screen: "full" }) },
     { name: "1080p at 1.25", for: "a dialog and a rail wide: the pane", sample: () => panel({ screen: "laptop" }) },
     { name: "1280 × 800", for: "no pane: the footer shows the row's keys", sample: () => panel({ screen: "narrow" }) },
-    { name: "At the toolbar's window", for: "width, rows and place follow the screen", sample: () => within(windowSize().width, menuOnScreen({ results: results("fi"), query: "fi" })) },
+    { name: "At the toolbar's window", for: "width, rows and place follow the screen", sample: atWindow },
   ],
   states: {
     shown: ["rest", "selected", "disabled", "loading", "empty", "error"],
