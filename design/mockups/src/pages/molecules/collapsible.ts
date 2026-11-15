@@ -6,6 +6,7 @@
 import { button } from "../../lib/button.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { type CollapsibleOptions, collapsible } from "../../lib/collapsible.ts";
+import { makeHints } from "../../lib/hint.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { filling, flow, row, stack, within } from "../../lib/layout.ts";
 import { wrapped } from "../../lib/text.ts";
@@ -83,7 +84,10 @@ function cell(open: boolean, rail: boolean, state: MatrixState): HTMLElement {
 
 /** An open part for the rail's moves, its hint at the rail's middle where the pointer is. */
 function railed(): HTMLElement {
-  return within(ROOM, collapsible({ title: "firefox · pid 4127", summary: "12 · 4.1 GB", content: actions(), open: true }));
+  const room = within(ROOM, collapsible({ title: "firefox · pid 4127", summary: "12 · 4.1 GB", content: actions(), open: true }));
+  // Its moves play the rail's bubble, which is otherwise made on the pointer's first visit.
+  makeHints(room);
+  return room;
 }
 
 /** An open part for closing from the rail: its room cuts what it holds, as it does while moving. */

@@ -6,7 +6,7 @@ import { backdrop } from "../../lib/backdrop.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { windowSize } from "../../site/settings.ts";
-import { atSize, DONE, done, HERO, LEDE, type Moment, polkit, SAMPLE, stepRailHost, welcome, welcomeColumn } from "./backdrops.ts";
+import { atSize, DONE, done, HERO, LEDE, type Moment, moved, polkit, SAMPLE, stepRailHost, welcome, welcomeColumn } from "./backdrops.ts";
 
 const LAYERS = "the picture and its scrim";
 const FADE = "the thing's fade";
@@ -86,6 +86,7 @@ export default page({
     { name: "Kōbō's welcome", for: "the words' band over the wallpaper", sample: () => welcome() },
     { name: "Kōbō's done screen", for: "the same band: neon mark, headline, two actions", sample: () => done() },
     { name: "Kōbō's step-rail screens", for: "the dim, and the glass panel StepRailPage fills", sample: () => stepRailHost() },
+    { name: "Pushed in, half dark", for: "the picture at `scale.push`, half way to black", sample: () => moved(0.5) },
   ],
   sizes: doesntApply("as large as its screen; the thing keeps its own width."),
   states: {

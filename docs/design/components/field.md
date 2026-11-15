@@ -34,7 +34,7 @@ The app owns the value and its editing: it keeps the `Caret` (where it is, what 
 
 Rust `field::labelled`; QML `Labelled`.
 
-A control under its `label`-type label in `on_surface_variant`, with an optional small action at the label's right (Show, a small Text button) and an optional note under it, each 4 apart. The label row is 32 tall (`control_sm`) whether or not it has an action, so fields side by side line up.
+A control under its `label`-type label in `on_surface_variant`, with an optional small action at the label's right (Show, a small Text button) and an optional note under it, each 4 apart. The label row is 32 tall (`control_sm`) whether or not it has an action, so fields side by side line up. A Text button as the action hangs its padding past the row's end, so its label ends on the field's edge under it.
 
 ## `Note`
 

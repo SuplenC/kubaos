@@ -633,20 +633,24 @@ function player(move: Move): Player {
     const standIn = el("div", "page-fit-later");
     const later: Fit = { ...fitIn(box, standIn), twin: fits[0]! };
     fits.push(later);
+    // A box that leaves the two screens before its turn goes back to waiting: a scroll past the
+    // player queues every part, and the reader is elsewhere by the time they would be drawn.
     nearing ??= new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           const job = waiting.get(entry.target);
-          if (!entry.isIntersecting || !job) continue;
-          waiting.delete(entry.target);
-          nearing?.unobserve(entry.target);
-          queued.push(job);
+          if (!job) continue;
+          const at = queued.indexOf(job);
+          if (entry.isIntersecting && at < 0) queued.push(job);
+          else if (!entry.isIntersecting && at >= 0) queued.splice(at, 1);
         }
         if (queued.length > 0 && !pumping) pumping = whenStill(pump);
       },
       { rootMargin: "200% 0px" },
     );
     waiting.set(box, () => {
+      waiting.delete(box);
+      nearing?.unobserve(box);
       const alone = draw();
       standIn.replaceWith(alone);
       delete later.twin;

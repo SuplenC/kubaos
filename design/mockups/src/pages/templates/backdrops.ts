@@ -101,6 +101,11 @@ export function welcome(moment: Moment = "rest", hero?: string, lede?: string, s
   return backdrop({ ...size, picture: wallpaper, scrim: "band", content: welcomeColumn(moment, hero, lede) });
 }
 
+/** Kōbō's welcome with its picture come toward you and gone `dark` of the way to black. */
+export function moved(dark: number): HTMLElement {
+  return backdrop({ ...SAMPLE, picture: wallpaper, scrim: "band", content: welcomeColumn(), push: 1, dark });
+}
+
 export function doneColumn(headline = DONE.short): HTMLElement {
   const neon = document.createElement("img");
   neon.className = "k-backdrop-mark";

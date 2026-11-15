@@ -310,6 +310,12 @@
   transition: none;
 }
 
+/* A bubble made under the pointer starts hidden, so it fades in as one made before would. */
+.k-hinted > .k-hint[data-arriving] {
+  opacity: 0;
+  transition: none;
+}
+
 /* A sample's room for its control's hint, which floats and takes none of its own: below the
    control, and as wide as the bubble where it is wider, the control in the middle on a whole
    device pixel. */
@@ -887,8 +893,11 @@
   border-radius: inherit;
 }
 
+/* Once the picture is in, its placeholder is hidden and still: a breath nobody sees still asks for
+   a frame every time it changes. */
 .k-media-box[data-arrival="loaded"] > .k-media-placeholder {
   visibility: hidden;
+  animation: none;
 }
 
 .k-media-picture {
@@ -3059,6 +3068,13 @@
 
 [data-hangs] > .k-button[data-kind="Text"]:not([data-icon-only]):last-child {
   margin-inline-end: calc(-1 * var(--hang, 1) * var(--padding));
+}
+
+/* A Collapsible on a page or in a card (`hangs` on it) hangs its header's `space.s12` the same
+   way, so its chevron is on the content's edge, in line with the fields round it, and its
+   summary ends on the other edge; its lit tube reaches into the padding. */
+.k-collapsible[data-hangs] {
+  margin-inline: calc(-1 * var(--hang, 1) * var(--space-s12));
 }
 
 /* A card's `space.s16` would leave a hung button 4 from its edge, and a banner's padding is its

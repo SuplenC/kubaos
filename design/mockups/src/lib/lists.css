@@ -52,6 +52,13 @@
   initial-value: 0;
 }
 
+/* How far the room below a scroll with a foot fade is masked out: 1 while more is below. */
+@property --faded-below {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 /* A list's well (`lib/list.ts`): a content box at the content radius, `surface_container_low` at
    `opacity.well`, `space.s8` inside, its sunken edge (`.k-sunken`) and its focus tube drawn
    over what it holds, so a row at its edge never covers them. The tube lights while the list has
@@ -456,7 +463,9 @@
   align-self: stretch;
   grid-template-columns: var(--columns, minmax(min-content, 1fr) 3fr);
   gap: var(--space-s8);
-  align-items: start;
+  /* A label in `small` sits on its value's first line, baseline to baseline: tops lined up would
+     leave the smaller label riding high. */
+  align-items: baseline;
 }
 
 .k-fact-value {
@@ -549,6 +558,31 @@
     to bottom,
     rgb(0 0 0 / calc(1 - var(--faded))) var(--above),
     #000 calc(var(--above) + var(--space-s16))
+  );
+}
+
+/* A foot fade, the header fade's mirror: while more of the content is below, the view is masked out
+   over the room below its box, where a footer band stands, and fades out over the `space.s16` above
+   it, so nothing runs under the band. A focused control scrolls in clear of either fade. */
+.k-scroll[data-foot-fade] {
+  --faded-below: 0;
+  transition:
+    --faded var(--motion-micro) var(--easing-standard),
+    --faded-below var(--motion-micro) var(--easing-standard);
+}
+
+.k-scroll[data-foot-fade][data-more] {
+  --faded-below: 1;
+}
+
+.k-scroll[data-foot-fade] > .k-scroll-view {
+  scroll-padding-block: calc(var(--above) + var(--space-s16)) calc(var(--below) + var(--space-s16));
+  mask-image: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / calc(1 - var(--faded))) var(--above),
+    #000 calc(var(--above) + var(--space-s16)),
+    #000 calc(100% - var(--below) - var(--space-s16)),
+    rgb(0 0 0 / calc(1 - var(--faded-below))) calc(100% - var(--below))
   );
 }
 

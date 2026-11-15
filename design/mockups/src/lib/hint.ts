@@ -5,6 +5,7 @@
 // layout, and it never takes the pointer. It opens `space.s8` above its control instead where a part
 // asks for that, or where its container has no room for it below: a toolbar at a well's foot.
 
+import { ALL } from "../site/settings.ts";
 import { probe } from "./probe.ts";
 import { advance, text } from "./text.ts";
 
@@ -40,8 +41,9 @@ function container(element: HTMLElement): HTMLElement | null {
 }
 
 /**
- * Opens `bubble` above its control when its container has no room for it below. The bubble has
- * its size once it is laid out, so this runs then, and again whenever the container resizes.
+ * Opens `bubble` above its control when its container has no room for it below, now and whenever
+ * the container resizes. It runs as the bubble is made, laid out, so it never shows on the wrong
+ * side for a frame.
  */
 function flipWhenCut(control: HTMLElement, bubble: HTMLElement): void {
   const place = () => {
@@ -51,11 +53,9 @@ function flipWhenCut(control: HTMLElement, bubble: HTMLElement): void {
     // Laid out below while hidden too, so where it would end is where it ends now.
     if (bubble.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 0.5) bubble.dataset.side = "above";
   };
-  requestAnimationFrame(() => {
-    place();
-    const box = container(control);
-    if (box) new ResizeObserver(place).observe(box);
-  });
+  place();
+  const box = container(control);
+  if (box) new ResizeObserver(place).observe(box);
 }
 
 /** The bubble saying `words`. */
@@ -70,16 +70,71 @@ export function hint(words: string, options: HintOptions = {}): HTMLElement {
   return probe(bubble, { role: "component", name: "Hint", variant: "", fixed: { width: false, height: true } }, { floats: true });
 }
 
+/** The hint each control drawn but not yet pointed at or reached by the keyboard will make. */
+const pending = new WeakMap<Element, (arriving: boolean) => void>();
+
+/** The controls already listening for the pointer and the keyboard: a control named again keeps them. */
+const listening = new WeakSet<Element>();
+
+/** Controls given a hint since the last frame, whose pin or key may have come after it. */
+let unseen: Element[] = [];
+
+/** Makes the hints of the controls given one since the last frame that show whatever the pointer does. */
+function makePinned(): void {
+  const these = unseen;
+  unseen = [];
+  for (const control of these) {
+    if (control.hasAttribute("data-pinned") || control.hasAttribute("data-keyed")) pending.get(control)?.(false);
+  }
+}
+
 /**
  * Gives `control` its hint, `words`: under it while the pointer is over it, or while it is lit
  * from the keyboard or pinned lit. Returns the control.
+ *
+ * The bubble is made the first time the pointer comes over the control or the keyboard reaches it,
+ * not with the control: a page of hinted controls lays out none of them until one is wanted. One
+ * made while its control is already pointed at is laid in hidden and its hidden look worked out
+ * before it is let go, so it fades in as one made before would, on the same frame. A bubble shown
+ * whatever the pointer does (pinned or keyed, by the next frame, or every sample drawn at once) is
+ * made then, and a control named again while it is pointed at or holds the keyboard shows its new
+ * one at once, as it showed the old.
  */
 export function withHint<E extends HTMLElement>(control: E, words: string, options: HintOptions = {}): E {
   control.classList.add("k-hinted");
-  const bubble = hint(words, options);
-  control.append(bubble);
-  if (options.side !== "above") flipWhenCut(control, bubble);
+  pending.set(control, (arriving) => {
+    pending.delete(control);
+    const bubble = hint(words, options);
+    if (arriving) bubble.dataset.arriving = "";
+    control.append(bubble);
+    if (arriving) {
+      void getComputedStyle(bubble).opacity;
+      delete bubble.dataset.arriving;
+    }
+    if (options.side !== "above") flipWhenCut(control, bubble);
+  });
+  if (options.shown || ALL) {
+    requestAnimationFrame(() => pending.get(control)?.(false));
+    return control;
+  }
+  if (!listening.has(control)) {
+    listening.add(control);
+    const wanted = () => pending.get(control)?.(true);
+    control.addEventListener("pointerenter", wanted);
+    control.addEventListener("focusin", wanted);
+  }
+  if (control.isConnected && control.matches(":hover, :focus-within")) {
+    pending.get(control)?.(false);
+    return control;
+  }
+  if (!unseen.length) requestAnimationFrame(makePinned);
+  unseen.push(control);
   return control;
+}
+
+/** Makes every hint under `root` not made yet: a sample whose move plays its bubble. */
+export function makeHints(root: ParentNode): void {
+  for (const control of root.querySelectorAll(".k-hinted")) pending.get(control)?.(false);
 }
 
 /**

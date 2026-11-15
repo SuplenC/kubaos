@@ -20,7 +20,7 @@ import { keyHints, type KeyHint } from "./keycap.ts";
 import { fill, filling, fillingHeight, gap, inset, page, row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { scroll } from "./scroll.ts";
-import { step, type StepOptions, type StepState } from "./step.ts";
+import { pressable, setStepState, step, type StepOptions, type StepState } from "./step.ts";
 import { text, wrapped } from "./text.ts";
 import { cubic, length, raw } from "./tokens.ts";
 import { palette } from "../site/recolour.ts";
@@ -30,20 +30,35 @@ import { THEMES } from "../site/themes.ts";
 /** Where the template is drawn: an app's window, or Kōbō's glass panel over its backdrop. */
 export type RailHost = "window" | "kobo";
 
+/** A value given as it is, or worked out each time it is read: a page's answers change it. */
+export type Live<T> = T | (() => T);
+
+function now<T>(value: Live<T>): T {
+  return typeof value === "function" ? (value as () => T)() : value;
+}
+
+/**
+ * The event a page's body sends when its answers change what its footer says: the band is drawn
+ * again in place, its blocker, note and Continue's words worked out anew.
+ */
+export const RECHECK = "k-step-recheck";
+
 /** One page of the flow: its step in the rail and what the page holds. */
 export interface RailPage {
   /** Its step: a title and a symbol; where it stands comes from the flow. */
   readonly step: Pick<StepOptions, "title" | "icon">;
   /** The page's body, drawn each time the page shows. */
   readonly body: () => HTMLElement;
-  /** Continue's words: Continue, Skip, Install. */
-  readonly next?: string;
+  /** Continue's words: Continue, Skip, Install; worked out again as the page changes. */
+  readonly next?: Live<string>;
   /** Why Continue does nothing yet: Enter flashes it in the error colour. */
-  readonly blocker?: string;
+  readonly blocker?: Live<string | undefined>;
   /** What the footer says before Continue when nothing blocks it: 12 of 40 picked. */
-  readonly note?: string;
+  readonly note?: Live<string | undefined>;
   /** A page with no footer: the review, whose action is in its body, and the running steps. */
   readonly footless?: boolean;
+  /** Its body reads the whole flow (the review), so it is drawn again each time it shows. */
+  readonly fresh?: boolean;
   /** Going back past it is refused: it can't be undone (the install started). */
   readonly fixed?: boolean;
 }
@@ -53,6 +68,7 @@ export interface RailFoot {
   readonly power: boolean;
   /** The battery's percent, or none on a desktop. */
   readonly battery?: number;
+  readonly charging?: boolean;
 }
 
 /** The pictures behind Kōbō's panel: the wallpaper, and the same blurred for its glass. */
@@ -83,6 +99,11 @@ export interface StepRailOptions {
   readonly nudged?: number;
   /** The current page arriving from this side, held this far in, as a still sample of the slide. */
   readonly arriving?: { readonly forward: boolean; readonly shown: number };
+  /**
+   * What its host does past either end: Back or Esc on the first page (`forward` false), Continue
+   * or Enter on the last (`forward` true). Kōbō's welcome before it, its install after it.
+   */
+  readonly onExit?: (forward: boolean) => void;
 }
 
 /** A rail step's state: done before the current one, the current one, to do after it. */
@@ -108,61 +129,115 @@ export function hintColumn(hints: readonly KeyHint[]): HTMLElement {
   return stack("s4", "start", ...hints.map((hint) => keyHints([hint])));
 }
 
-/** The battery: its symbol and the percent, muted, in `label`. */
-function battery(percent: number): HTMLElement {
+/** At or under this percent, running on it, a battery is low: an install outlasts it. */
+const LOW_BATTERY = 20;
+
+/**
+ * The battery: its symbol by how full it is (charging, its own), and the percent in `label`, muted;
+ * low and not charging, both in `warning`.
+ */
+export function battery(percent: number, charging = false): HTMLElement {
   const words = new Intl.NumberFormat(undefined, { style: "percent" }).format(percent / 100);
-  return row("s4", "centre", icon("battery_full", "var(--icon-s16)", "var(--color-on_surface_variant)"), text(words, "label", "on_surface_variant"));
+  const low = !charging && percent <= LOW_BATTERY;
+  const glyph = charging ? "battery_charging_full" : percent >= 80 ? "battery_full" : percent >= 50 ? "battery_3_bar" : percent >= 25 ? "battery_2_bar" : "battery_1_bar";
+  const tone = low ? "warning" : "on_surface_variant";
+  const line = row("s4", "centre", icon(glyph, "var(--icon-s16)", `var(--color-${tone})`), text(words, "label", tone));
+  line.classList.add("k-battery");
+  return line;
 }
 
 /** The rail: the brand, `space.s20`, the steps on their wire, then the hints and the foot at its bottom. */
-function rail(options: StepRailOptions, current: number, reached: number, go: (to: number) => void): HTMLElement {
-  const first = backTo(options.pages, current, options.locked ?? false);
-  const steps = options.pages.map((each, index) => {
-    const pressable = index !== current && index >= first && index <= reached;
-    const element = step({
-      ...each.step,
-      state: stateOf(index, current),
-      ...(index === current && options.failed ? { failed: true } : {}),
-      ...(index === current && options.locked ? { running: true } : {}),
-      box: "rail",
-      mark: true,
-      pressable,
+/** The rail, drawn once and moved to each page in place. */
+interface Rail {
+  readonly element: HTMLElement;
+  /** Moves it to `current`, with every page up to `reached` reached. */
+  set(current: number, reached: number): void;
+}
+
+function rail(options: StepRailOptions, current: number, reached: number, go: (to: number) => void): Rail {
+  /** What step `index` shows with the rail on `at`. */
+  const look = (index: number, at: number, upTo: number) => {
+    const first = backTo(options.pages, at, options.locked ?? false);
+    return {
+      state: stateOf(index, at),
+      pressable: index !== at && index >= first && index <= upTo,
+      failed: index === at && (options.failed ?? false),
+      running: index === at && (options.locked ?? false),
+    };
+  };
+  const make = (index: number, shown: ReturnType<typeof look>) => {
+    const each = options.pages[index]!;
+    const element = step({ ...each.step, state: shown.state, ...(shown.failed ? { failed: true } : {}), ...(shown.running ? { running: true } : {}), box: "rail", mark: true, pressable: shown.pressable });
+    // Wired once: whether it takes a press is read as it is pressed, so the rail can change it.
+    element.addEventListener("click", () => {
+      if (element.dataset.pressable === "true") go(index);
     });
-    if (pressable) {
-      element.addEventListener("click", () => go(index));
-      // Enter stays the page's `Filled` action wherever the keyboard is: Space presses a step.
-      element.addEventListener("keydown", (event) => {
-        if (event.key === " " && !event.repeat) {
-          event.preventDefault();
-          go(index);
-        }
-      });
-    }
+    // Enter stays the page's `Filled` action wherever the keyboard is: Space presses a step.
+    element.addEventListener("keydown", (event) => {
+      if (event.key === " " && !event.repeat && element.dataset.pressable === "true") {
+        event.preventDefault();
+        go(index);
+      }
+    });
+    element.dataset.pressable = String(shown.pressable);
+    element.dataset.failed = String(shown.failed);
     return element;
-  });
-  arrows(steps);
+  };
+  const steps = options.pages.map((_, index) => make(index, look(index, current, reached)));
   const column = stack(0, "start", ...steps, wire(steps.length, current));
   column.classList.add("k-rail-steps");
+  arrows(column);
   // Cut at its own box: the brand's `space.s20` and the hints' `space.s16` stay clear of the steps
   // scrolling between them.
   const { box: scroller } = scroll(column, { height: "100%", above: 0, below: 0, noGutter: true });
-  const parts: Element[] = [inset(options.brand, 0, "s12"), gap("s20"), fillingHeight(scroller)];
-  const hints = options.hints(current);
-  if (hints.length > 0) parts.push(gap("s16"), inset(hintColumn(hints), 0, "s12"));
+  const hintsRoom = document.createElement("span");
+  hintsRoom.className = "k-rail-hints";
+  const drawHints = (at: number) => {
+    const hints = options.hints(at);
+    hintsRoom.replaceChildren(...(hints.length > 0 ? [gap("s16"), inset(hintColumn(hints), 0, "s12")] : []));
+  };
+  drawHints(current);
+  const parts: Element[] = [inset(options.brand, 0, "s12"), gap("s20"), fillingHeight(scroller), hintsRoom];
   if (options.foot) {
     const foot: Element[] = [];
     if (options.foot.power) {
       const power = button({ label: "Power", kind: "Text", size: "Sm", icon: "power_settings_new" });
+      power.dataset.power = "";
       foot.push(power);
     }
     foot.push(fill());
-    if (options.foot.battery !== undefined) foot.push(battery(options.foot.battery));
+    if (options.foot.battery !== undefined) foot.push(battery(options.foot.battery, options.foot.charging));
     parts.push(gap("s16"), inset(hangs(row("s8", "centre", ...foot)), 0, "s12"));
   }
   const box = document.createElement("span");
   box.className = "k-rail";
   box.append(fillingHeight(stack(0, "start", ...parts)));
-  return probe(box, { role: "component", name: "StepRail", variant: options.host, fixed: { width: true, height: false } });
+  probe(box, { role: "component", name: "StepRail", variant: options.host, fixed: { width: true, height: false } });
+  let hintsAt = current;
+  return {
+    element: box,
+    set(at, upTo) {
+      steps.forEach((element, index) => {
+        const shown = look(index, at, upTo);
+        // A failed symbol is drawn whole; every other change, taking a press included, is in place.
+        if (element.dataset.failed !== String(shown.failed)) {
+          const fresh = make(index, shown);
+          element.replaceWith(fresh);
+          steps[index] = fresh;
+          return;
+        }
+        setStepState(element, shown.state, shown.running);
+        if (element.dataset.pressable !== String(shown.pressable)) {
+          pressable(element, shown.pressable);
+          element.dataset.pressable = String(shown.pressable);
+        }
+      });
+      column.querySelector<HTMLElement>(".k-rail-wire-lit")?.style.setProperty("--wire-lit", String(at));
+      // Two pages taking the same keys keep the hints they share as they are.
+      if (JSON.stringify(options.hints(at)) !== JSON.stringify(options.hints(hintsAt))) drawHints(at);
+      hintsAt = at;
+    },
+  };
 }
 
 /**
@@ -222,17 +297,16 @@ function travel(steps: HTMLElement, from: number, to: number, failed: boolean): 
   });
 }
 
-/** ↑ and ↓ (k and j) move the keyboard between the steps that take a press. */
-function arrows(steps: readonly HTMLElement[]): void {
-  const pressable = steps.filter((each) => each.tabIndex === 0);
-  pressable.forEach((each, index) => {
-    each.addEventListener("keydown", (event) => {
-      const by = event.key === "ArrowDown" || event.key === "j" ? 1 : event.key === "ArrowUp" || event.key === "k" ? -1 : 0;
-      const next = pressable[index + by];
-      if (by === 0 || !next) return;
-      event.preventDefault();
-      next.focus({ preventScroll: true });
-    });
+/** ↑ and ↓ (k and j) move the keyboard between the steps that take a press, as they stand now. */
+function arrows(column: HTMLElement): void {
+  column.addEventListener("keydown", (event) => {
+    const by = event.key === "ArrowDown" || event.key === "j" ? 1 : event.key === "ArrowUp" || event.key === "k" ? -1 : 0;
+    if (by === 0) return;
+    const pressable = [...column.querySelectorAll<HTMLElement>(":scope > .k-step")].filter((each) => each.tabIndex === 0);
+    const next = pressable[pressable.indexOf(event.target as HTMLElement) + by];
+    if (!next) return;
+    event.preventDefault();
+    next.focus({ preventScroll: true });
   });
 }
 
@@ -253,18 +327,20 @@ export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: ()
   back.addEventListener("click", onBack);
   const parts: Element[] = [back, fill()];
   let nudge: HTMLElement | null = null;
-  if (spec.blocker) {
-    const reason = wrapped(spec.blocker, "small");
+  const blocker = spec.blocker === undefined ? undefined : now(spec.blocker);
+  const note = spec.note === undefined ? undefined : now(spec.note);
+  if (blocker) {
+    const reason = wrapped(blocker, "small");
     reason.style.color = "var(--nudge-ink)";
     nudge = row("s8", "centre", icon("error", "var(--type-small-icon)", "var(--nudge-ink)"), reason);
     nudge.classList.add("k-step-blocker");
     parts.push(nudge);
-  } else if (spec.note) {
-    const note = wrapped(spec.note, "small", "on_surface_variant");
-    note.classList.add("k-step-note");
-    parts.push(note);
+  } else if (note) {
+    const shown = wrapped(note, "small", "on_surface_variant");
+    shown.classList.add("k-step-note");
+    parts.push(shown);
   }
-  const next = button({ label: spec.next ?? "Continue", kind: "Filled", icon: "arrow_forward", trailing: true, ...(spec.blocker ? { disabled: true } : {}), ...(pinned.next ? { pinned: pinned.next } : {}) });
+  const next = button({ label: spec.next === undefined ? "Continue" : now(spec.next), kind: "Filled", icon: "arrow_forward", trailing: true, ...(blocker ? { disabled: true } : {}), ...(pinned.next ? { pinned: pinned.next } : {}) });
   next.addEventListener("click", onNext);
   parts.push(next);
   const band = hangs(row("s16", "centre", ...parts));
@@ -311,21 +387,39 @@ const TAKES_KEYS = "[tabindex='0'], button:not(:disabled)";
  * is its first thing to do, where the keyboard lands: the body's first control, or Continue while
  * nothing blocks it.
  */
-function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void): { room: HTMLElement; nudge: HTMLElement | null; first: HTMLElement | null } {
+/** Whether something blocks Continue on `spec` now. */
+function blocked(spec: RailPage): boolean {
+  return spec.blocker !== undefined && Boolean(now(spec.blocker));
+}
+
+function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void): { room: HTMLElement; nudge: () => HTMLElement | null; first: HTMLElement | null } {
   const body = spec.body();
   const parts: Element[] = [fillingHeight(filling(body))];
   let nudge: HTMLElement | null = null;
   let first = body.querySelector<HTMLElement>(TAKES_KEYS);
-  if (!spec.footless) {
-    const made = footer(spec, onBack, onNext);
-    nudge = made.nudge;
-    first ??= spec.blocker ? null : made.next;
-    parts.push(gap("s16"), filling(made.band));
-  }
   const room = document.createElement("span");
+  const made = { nudge: null as HTMLElement | null };
+  if (!spec.footless) {
+    const drawn = footer(spec, onBack, onNext);
+    nudge = drawn.nudge;
+    made.nudge = nudge;
+    first ??= blocked(spec) ? null : drawn.next;
+    let band = filling(drawn.band);
+    parts.push(gap("s16"), band);
+    // The answers changed: the band is drawn again where it was, the keyboard kept on Continue.
+    room.addEventListener(RECHECK, () => {
+      const had = band.contains(document.activeElement);
+      const again = footer(spec, onBack, onNext);
+      const fresh = filling(again.band);
+      band.replaceWith(fresh);
+      band = fresh;
+      made.nudge = again.nudge;
+      if (had) again.next.focus({ preventScroll: true });
+    });
+  }
   room.className = "k-step-room";
   room.append(page(fillingHeight(stack(0, "start", ...parts)), { clear: true }));
-  return { room, nudge, first };
+  return { room, nudge: () => made.nudge, first };
 }
 
 /**
@@ -343,30 +437,92 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   box.dataset.whole = "";
   box.tabIndex = -1;
   // The blocker of the page showing, which Enter refused flashes.
-  const shown: { nudge: HTMLElement | null } = { nudge: null };
+  const shown: { nudge: () => HTMLElement | null } = { nudge: () => null };
+
+  // Every page drawn so far, kept in the page's side, hidden, laid out: going back to one only
+  // shows it again, and the page before and the first done step are drawn in idle time, so a press
+  // on either builds nothing. A page whose body reads the whole flow (`fresh`) is drawn each time.
+  const side = document.createElement("span");
+  side.className = "k-step-side";
+  const rooms = new Map<number, ReturnType<typeof pageRoom>>();
+  const roomOf = (index: number): ReturnType<typeof pageRoom> | null => {
+    const spec = options.pages[index];
+    if (!spec) return null;
+    const kept = rooms.get(index);
+    if (kept && !spec.fresh) {
+      kept.room.dispatchEvent(new Event(RECHECK));
+      return kept;
+    }
+    kept?.room.remove();
+    const made = pageRoom(spec, () => go(current - 1), next);
+    rooms.set(index, made);
+    side.append(made.room);
+    return made;
+  };
+  // The rail is drawn once; each page change moves its steps in place.
+  let theRail: Rail | null = null;
+  const showOnly = (index: number) => {
+    for (const [at, made] of rooms) {
+      const hidden = at !== index;
+      made.room.toggleAttribute("data-kept", hidden);
+      made.room.inert = hidden;
+    }
+  };
 
   const draw = (from: number | null) => {
-    const spec = options.pages[current];
-    if (!spec) return;
-    const made = pageRoom(spec, () => go(current - 1), next);
+    const made = roomOf(current);
+    if (!made) return;
+    showOnly(current);
     shown.nudge = made.nudge;
-    const side = document.createElement("span");
-    side.className = "k-step-side";
-    side.append(made.room);
     const scrolled = box.querySelector(".k-rail .k-scroll-view")?.scrollTop ?? 0;
-    // Drawing replaces what has the keyboard, which would drop it out of the template.
+    // Drawing the rail again replaces what has the keyboard, which would drop it out of the template.
     const keyboardIn = box.contains(document.activeElement);
-    box.replaceChildren(rail(options, current, reached, go), side);
+    if (!theRail) {
+      theRail = rail(options, current, reached, go);
+      box.replaceChildren(theRail.element, side);
+    } else theRail.set(current, reached);
     const steps = box.querySelector<HTMLElement>(".k-rail-steps");
-    if (steps) keepInView(steps, current, scrolled);
-    if (from === null) return;
+    // Kept in view once the frame lays it out, not read back inside the press that drew it.
+    if (steps) requestAnimationFrame(() => keepInView(steps, current, scrolled));
+    if (from === null) {
+      ahead();
+      return;
+    }
     arrive(made.room, current > from);
     if (steps) travel(steps, from, current, options.failed ?? false);
-    // The template holds the keys on a page with nothing to do yet: Enter and Esc still work.
-    if (keyboardIn) (made.first ?? box).focus({ preventScroll: true });
+    // The template holds the keys on a page with nothing to do yet: Enter and Esc still work. The
+    // keyboard moves with the next frame, which lays the page out anyway, not inside the press.
+    if (keyboardIn) {
+      // The rail is moved in place, so what had the keyboard still has it this frame.
+      requestAnimationFrame(() => {
+        if (box.contains(document.activeElement) || document.activeElement === document.body) (made.first ?? box).focus({ preventScroll: true });
+      });
+    }
+    ahead();
+  };
+
+  /** Draws, one an idle moment, the pages a press most likely goes back to. */
+  const ahead = () => {
+    const first = backTo(options.pages, current, options.locked ?? false);
+    // The two a press most often takes: the page before (Back, Esc) and the first done step.
+    const waiting = [...new Set([current - 1, first])].filter((index) => index >= first && index <= reached && index !== current && !options.pages[index]?.fresh);
+    const one = () => {
+      const index = waiting.shift();
+      if (index === undefined || !box.isConnected) return;
+      if (!rooms.has(index)) {
+        roomOf(index);
+        showOnly(current);
+      }
+      requestIdleCallback(one);
+    };
+    requestIdleCallback(one);
   };
 
   function go(to: number): void {
+    if (options.onExit && !options.locked && (to === -1 || to === options.pages.length)) {
+      options.onExit(to === options.pages.length);
+      return;
+    }
     if (to < backTo(options.pages, current, options.locked ?? false) || to < 0 || to >= options.pages.length || to === current) return;
     const from = current;
     current = to;
@@ -376,8 +532,9 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
 
   function next(): void {
     const spec = options.pages[current];
-    if (spec?.blocker) {
-      if (shown.nudge) flash(shown.nudge);
+    if (spec && blocked(spec)) {
+      const nudge = shown.nudge();
+      if (nudge) flash(nudge);
       return;
     }
     go(current + 1);
@@ -392,9 +549,9 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   });
 
   draw(null);
-  if (options.nudged !== undefined) shown.nudge?.style.setProperty("--nudge", String(options.nudged));
+  if (options.nudged !== undefined) shown.nudge()?.style.setProperty("--nudge", String(options.nudged));
   if (options.arriving) {
-    const room = box.querySelector<HTMLElement>(".k-step-room");
+    const room = box.querySelector<HTMLElement>(".k-step-room:not([data-kept])");
     if (room) {
       room.dataset.from = options.arriving.forward ? "end" : "start";
       room.style.opacity = String(options.arriving.shown);

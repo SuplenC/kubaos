@@ -435,6 +435,9 @@ export function labelled(label: string, control: HTMLElement, options: LabelledO
   fill.className = "k-fill";
   const head = row(0, "centre", text(label, "label", "on_surface_variant"), fill, ...(options.action ? [options.action] : []));
   head.classList.add("k-labelled-head");
+  // A Text button as the action hangs its padding past the row's end, so its label ends on the
+  // field's edge under it.
+  head.dataset.hangs = "";
   const parts = [head, control, ...(options.note ? [note(options.note, options.invalid ?? false)] : [])];
   const column = document.createElement("span");
   column.className = "k-labelled";

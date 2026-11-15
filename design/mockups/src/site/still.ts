@@ -21,6 +21,12 @@ export function whenStill(work: () => void): () => void {
       timer = window.setTimeout(check, wait);
       return;
     }
+    // A move playing on the page (a page arriving, a scene handing over) is the reader watching:
+    // building now would drop its frames.
+    if (moving()) {
+      timer = window.setTimeout(check, STILL);
+      return;
+    }
     idle = requestIdleCallback(() => {
       idle = 0;
       // The reader moved while the page waited for an idle moment.
@@ -33,4 +39,32 @@ export function whenStill(work: () => void): () => void {
     clearTimeout(timer);
     if (idle) cancelIdleCallback(idle);
   };
+}
+
+/** Whether a move with an end is playing on the page; the players' endless loops aren't moves. */
+function moving(): boolean {
+  return document.getAnimations().some((animation) => animation.playState === "running" && Number.isFinite(Number(animation.effect?.getComputedTiming().endTime)));
+}
+
+/** How long after the wheel last turned the page the page counts as still: a few frames. */
+const SETTLED = 120;
+
+let wheeled = Number.NEGATIVE_INFINITY;
+addEventListener("wheel", () => (wheeled = performance.now()), { capture: true, passive: true });
+
+let afterWheel = 0;
+
+/**
+ * Runs `work` once the wheel has stopped moving the page, in place of any work asked for before
+ * it, at once when it isn't moving: what a part or a row under a resting pointer lights is read
+ * only once the page under it has stopped.
+ */
+export function whenWheelStops(work: () => void): void {
+  clearTimeout(afterWheel);
+  afterWheel = window.setTimeout(work, Math.max(0, SETTLED - (performance.now() - wheeled)));
+}
+
+/** Forgets the work `whenWheelStops` was asked for. */
+export function forgetWheelWork(): void {
+  clearTimeout(afterWheel);
 }

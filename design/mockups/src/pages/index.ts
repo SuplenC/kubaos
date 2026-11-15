@@ -109,8 +109,17 @@ import shellWallpaper from "./shell/wallpaper.ts";
 import shellPowerMenu from "./shell/power-menu.ts";
 import shellOsd from "./shell/osd.ts";
 import shellPolkit from "./shell/polkit.ts";
+import koboWelcome from "./kobo/welcome.ts";
+import koboLanguage from "./kobo/language.ts";
+import koboNetwork from "./kobo/network.ts";
+import koboAccount from "./kobo/account.ts";
+import koboDisk from "./kobo/disk.ts";
+import koboPersonal from "./kobo/personal.ts";
+import koboReview from "./kobo/review.ts";
+import koboInstalling from "./kobo/installing.ts";
+import koboDone from "./kobo/done.ts";
 
-export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, rollingNumber, slider, tabs, colourPicker, select, popover, shortcutsPage, menu, prompt, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, notificationCard, notificationPopup, notificationGroup, media, pictureChoice, depthPicture, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll, progressBar, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, shellBar, shellContents, shellWorkspaces, shellTray, shellRecording, shellFrame, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard, notificationsPanel, popupStack, notificationPeek, shellCounters, shellMenu, shellMenuActions, shellMenuViews, shellMenuForm, shellMenuFooter, shellSysmon, shellSysmonProcesses, shellClock, shellClockSettings, shellWallpaper, shellPowerMenu, shellOsd, shellPolkit];
+export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, rollingNumber, slider, tabs, colourPicker, select, popover, shortcutsPage, menu, prompt, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, notificationCard, notificationPopup, notificationGroup, media, pictureChoice, depthPicture, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, table, descriptionList, scroll, progressBar, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, shellBar, shellContents, shellWorkspaces, shellTray, shellRecording, shellFrame, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard, notificationsPanel, popupStack, notificationPeek, shellCounters, shellMenu, shellMenuActions, shellMenuViews, shellMenuForm, shellMenuFooter, shellSysmon, shellSysmonProcesses, shellClock, shellClockSettings, shellWallpaper, shellPowerMenu, shellOsd, shellPolkit, koboWelcome, koboLanguage, koboNetwork, koboAccount, koboDisk, koboPersonal, koboReview, koboInstalling, koboDone];
 
 export function pagesOf(level: Level): AnyPage[] {
   return PAGES.filter((page) => page.level === level);

@@ -114,6 +114,26 @@ function laidOut(style: TypeStyle, words: string, shape: boolean): number {
   return width;
 }
 
+const figures = new Map<TypeStyle, number>();
+
+/**
+ * A tabular figure's advance in `style`, in logical pixels: every figure's, with the style's own
+ * figures proportional or not, as a number that changes in place sets them (`RollingNumber`).
+ */
+export function tabularFigure(style: TypeStyle): number {
+  const known = figures.get(style);
+  if (known !== undefined) return known;
+  const meter = document.createElement("span");
+  meter.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font-variant-numeric:tabular-nums";
+  meter.style.font = font(style).font;
+  meter.textContent = "0";
+  document.documentElement.append(meter);
+  const width = meter.getBoundingClientRect().width / font(style).times;
+  meter.remove();
+  figures.set(style, width);
+  return width;
+}
+
 /** Sets `element`'s font to `style`'s. */
 export function typeset(element: HTMLElement, style: TypeStyle): void {
   for (const [property, token] of [
