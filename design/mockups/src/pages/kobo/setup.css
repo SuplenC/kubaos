@@ -24,7 +24,7 @@
 }
 
 /* Gone to the desktop: what the move leaves, held. */
-.setup-window[data-away] {
+.setup-window[data-left] {
   opacity: 0;
   scale: var(--scale-behind);
 }
@@ -78,9 +78,21 @@
   min-height: calc(2 * var(--type-heading-line));
 }
 
-/* Waiting on a hand or a device: the symbol hums, as a running step's bead does. */
+/* Waiting on a hand or a device: the symbol hums, as a running step's bead does, and with reduce
+   motion holds still as the bead does. */
 .setup-hum {
-  animation: setup-hum var(--duration-hum) var(--easing-standard) infinite alternate;
+  display: flex;
+  flex: none;
+  animation: setup-hum var(--motion-hum) var(--easing-standard) infinite alternate;
+}
+
+[data-reduced] .setup-hum {
+  animation: none;
+}
+
+/* A card the rail keeps drawn out of sight hums for nobody. */
+.k-step-room[data-kept] .setup-hum {
+  animation: none;
 }
 
 @keyframes setup-hum {

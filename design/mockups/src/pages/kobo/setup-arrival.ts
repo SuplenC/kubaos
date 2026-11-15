@@ -26,6 +26,7 @@ export default page<Shown>({
   stage: { live: screen(() => setupRoom({ place: { at: "arrival" }, desk: true, live: true })), hint: "Enter deals the cards; Esc goes to the desktop", daylight: true },
   variants: [
     { name: "First login", for: "what's ahead; Let's go", sample: CELLS.rest },
+    { name: "Setup opens", for: "the opening, played as it is picked", sample: screen(() => setupRoom({ place: { at: "arrival" }, desk: true, live: true, opening: true })) },
     { name: "Checking the machine", for: "detection running; Let's go waits", sample: CELLS.loading },
     { name: "Offline", for: "what waits on the network, in `warning`", sample: at("offline") },
     { name: "A desktop, no reader", for: "two cards Not here", sample: CELLS.disabled },

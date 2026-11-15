@@ -479,7 +479,7 @@ body {
 /* A sample out of view (`sampleBox` in `site/dom.ts`) holds its endless loops where they are, so a
    page asks for no frames for what nobody sees; they go on from there when it comes back. Only the
    loops: a move that ends is left to end, so a sample scrolled to later has landed as it would. */
-[data-sample][data-away] :is(.gl-loop, .k-skeleton, .k-spinner, .k-step[data-running] > .k-row > .k-step-bead, .f-race) {
+[data-sample][data-away] :is(.gl-loop, .k-skeleton, .k-spinner, .k-step[data-running] > .k-row > .k-step-bead, .f-race, .setup-hum) {
   animation-play-state: paused;
 }
 

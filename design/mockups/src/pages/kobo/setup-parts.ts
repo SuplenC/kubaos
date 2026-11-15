@@ -71,8 +71,12 @@ function statusLine(view: View): HTMLElement {
  * under them; a prompt whose words never change takes only the lines it has.
  */
 export function promptCard(prompt: Prompt): HTMLElement {
-  const lead = prompt.kind === "wait" ? spinner("s48") : icon(PROMPT_GLYPH[prompt.kind], "var(--icon-s48)", "var(--color-primary)");
-  if (prompt.kind !== "wait") lead.classList.add("setup-hum");
+  // The hum is the symbol's box's, not the drawing's: a box's opacity moves on the compositor, an
+  // SVG's restyles the page every frame.
+  const hum = document.createElement("span");
+  hum.className = "setup-hum";
+  hum.append(icon(PROMPT_GLYPH[prompt.kind], "var(--icon-s48)", "var(--color-primary)"));
+  const lead = prompt.kind === "wait" ? spinner("s48") : hum;
   const heading = wrapped(prompt.text, "heading");
   heading.classList.add("setup-prompt-words");
   heading.toggleAttribute("data-counted", prompt.count !== undefined);

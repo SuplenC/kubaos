@@ -57,6 +57,8 @@ export interface SetupOptions {
   readonly leaving?: Place;
   /** The arrival's hero line, at the toolbar's length. */
   readonly hero?: string;
+  /** The place it opens on plays its arrival as it is drawn. */
+  readonly opening?: boolean;
 }
 
 /** A laptop's screen, and the window Hyprland floats on it: 80 % of its width, 85 % of its height. */
@@ -342,7 +344,7 @@ export function setupRoom(options: SetupOptions): HTMLElement {
     // The window's tube stays: only its layers change.
     for (const old of win.querySelectorAll(":scope > .setup-layer")) old.remove();
     win.prepend(...layers);
-    win.toggleAttribute("data-away", at.at === "desktop" && !leaving);
+    win.toggleAttribute("data-left", at.at === "desktop" && !leaving);
     return arriving;
   };
 
@@ -370,7 +372,7 @@ export function setupRoom(options: SetupOptions): HTMLElement {
     const settle = () => {
       if (place !== to) return;
       for (const old of win.querySelectorAll(":scope > .setup-layer")) if (old !== kept) old.remove();
-      win.toggleAttribute("data-away", to.at === "desktop");
+      win.toggleAttribute("data-left", to.at === "desktop");
       (win.querySelector<HTMLElement>(".setup-start, .setup-reboot, .setup-desktop") ?? win.querySelector<HTMLElement>(".k-step-room:not([data-kept]) [tabindex='0'], .k-step-room:not([data-kept]) button:not(:disabled)") ?? win).focus({ preventScroll: true });
     };
     if (!move) return settle();
@@ -402,8 +404,8 @@ export function setupRoom(options: SetupOptions): HTMLElement {
       } else return;
       event.preventDefault();
     });
-    requestAnimationFrame(() => void play(element, tracksNow(place.at === "arrival" ? OPENS : place.at === "ending" ? ARRIVES : OPENS_CARD)));
   }
+  if (options.opening) requestAnimationFrame(() => void play(element, tracksNow(place.at === "arrival" ? OPENS : place.at === "ending" ? ARRIVES : OPENS_CARD)));
   return element;
 }
 
@@ -521,9 +523,9 @@ export const TOUCH: Move = {
 /** Waiting on a hand or a device: the prompt's symbol hums until it comes. */
 export const HUM: Move = {
   name: "Waiting on a hand",
-  what: "The symbol hums down to `opacity.hum` and back over `duration.hum`, until the touch comes.",
+  what: "The symbol hums down to `opacity.hum` and back over `hum`, until the touch comes; reduced, it holds still.",
   tracks: [{ part: "the symbol", on: "the prompt", target: ".setup-prompt .setup-hum", property: "opacity", from: 1, to: { opacity: "hum" }, duration: "hum", curve: "standard" }],
-  reduced: "same",
+  reduced: [{ part: "the symbol", on: "the prompt", target: ".setup-prompt .setup-hum", property: "opacity", from: 1, to: 1, duration: "instant", curve: "standard" }],
   back: "plays",
   sample: () => setupRoom({ place: { at: "card", card: "fingerprint" }, views: { fingerprint: "touch" } }),
 };
