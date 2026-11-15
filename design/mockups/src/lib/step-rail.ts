@@ -376,7 +376,10 @@ function reaching(token: string, share: number): number {
 function travel(steps: HTMLElement, from: number, to: number, failed: boolean): void {
   if (settings().reduced || from === to) return;
   const long = timed("long");
-  for (const light of steps.querySelectorAll(".k-rail-wire-lit")) light.animate([{ "--wire-lit": from }, { "--wire-lit": to }], { duration: long, easing: curve("emphasized_decel") });
+  // Only the lengths between the two steps change: each animated length is styled again every frame
+  // on the main thread, so the rest are left alone.
+  const lights = [...steps.querySelectorAll<HTMLElement>(".k-rail-wire-lit")].slice(Math.min(from, to), Math.max(from, to));
+  for (const light of lights) light.animate([{ "--wire-lit": from }, { "--wire-lit": to }], { duration: long, easing: curve("emphasized_decel") });
   const rows = [...steps.querySelectorAll<HTMLElement>(":scope > .k-step")];
   const look = (index: number, at: number, fails: boolean) => ({ "--bead-lit": index <= at ? 1 : 0, "--bead-glow": index < at || (index === at && !fails) ? 1 : 0 });
   rows.forEach((each, index) => {
