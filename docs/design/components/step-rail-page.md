@@ -18,7 +18,7 @@ A step rail beside a page with a footer band, and how it moves between its pages
 
 **Pages kept.** A page shown once stays drawn, hidden and out of the keyboard's reach, so going back to it only shows it again, with its footer worked out anew; the page before the current one and the first done step are drawn in idle time with the rail as it will stand there, so a press on either draws nothing in the press. A page whose body reads the whole flow (Kōbō's Last look, the install) is drawn each time it shows.
 
-**Its host's ends.** Back or Esc on the first page and Continue or Enter on the last are its host's to take: in Kōbō the first goes back to the welcome, and the last page's own action (the held install) hands over to the install's scene.
+**Its host's ends.** Back or Esc on the first page and Continue or Enter on the last are its host's to take: in Kōbō the first goes back to the welcome, and the last page's own action (the held install) hands over to the install's scene. A flow opened on one page alone (a first-boot card from the Command menu) has nothing before it: its Back reads Close (`Text`, `close`), and Close or Esc closes its host.
 
 **Answers that change.** A page's blocker, its note and Continue's words follow its answers as they are typed: the band is drawn again in place, with no motion, the keyboard staying on Continue if it was there.
 
