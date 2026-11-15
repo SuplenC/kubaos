@@ -67,13 +67,15 @@ function statusLine(view: View): HTMLElement {
 /**
  * What the person has to do right now, big: the symbol (humming while it waits on a hand or a
  * device, a spinner while the machine works), the words, the touches counted, and where to do it.
- * The words keep two lines' room, so the next prompt's words move nothing under them.
+ * While touches are counted, the words keep two lines' room, so the next touch's words move nothing
+ * under them; a prompt whose words never change takes only the lines it has.
  */
 export function promptCard(prompt: Prompt): HTMLElement {
   const lead = prompt.kind === "wait" ? spinner("s48") : icon(PROMPT_GLYPH[prompt.kind], "var(--icon-s48)", "var(--color-primary)");
   if (prompt.kind !== "wait") lead.classList.add("setup-hum");
   const heading = wrapped(prompt.text, "heading");
   heading.classList.add("setup-prompt-words");
+  heading.toggleAttribute("data-counted", prompt.count !== undefined);
   const words = stack("s8", "start", filling(heading));
   if (prompt.count) {
     const [done, of] = prompt.count;
@@ -184,7 +186,8 @@ function hood(spec: Card, name: string, view: View, opened: boolean): HTMLElemen
   const facts = spec.facts(name);
   const parts: HTMLElement[] = [descriptionList(facts), stack("s8", "start", text("The same in a terminal", "label", "on_surface_variant"), wrapped(spec.command, "mono"))];
   if (view.log) parts.push(log(view.log).box);
-  const summary = view.log ? `${view.log.length} lines of log` : (facts[0]?.value ?? "");
+  const first = facts[0];
+  const summary = view.log ? `${view.log.length} lines of log` : first ? `${first.label}: ${first.value}` : "";
   return hangs(collapsible({ title: "Under the hood", summary, content: stack("s16", "start", ...parts.map(filling)), open: opened || view.failed !== undefined }));
 }
 

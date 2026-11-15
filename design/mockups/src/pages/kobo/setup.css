@@ -72,8 +72,9 @@
   min-height: 0;
 }
 
-/* The prompt's words keep two lines' room, so the next prompt's words move nothing under them. */
-.setup-prompt-words {
+/* While touches are counted the prompt's words keep two lines' room, so the next touch's words move
+   nothing under them. */
+.setup-prompt-words[data-counted] {
   min-height: calc(2 * var(--type-heading-line));
 }
 
