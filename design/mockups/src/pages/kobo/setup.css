@@ -1,0 +1,90 @@
+/* Kōbō's first boot (`setup-room.ts`): the window on the desktop, the layers it hands over between,
+   its scenes and the card pages' own parts. */
+
+/* The window: the desktop's surface, its scenes and its rail lying over one another as they hand
+   over; floated on the desktop it has an active window's corner and tube. */
+.setup-window {
+  position: relative;
+  text-align: start;
+  display: block;
+  box-sizing: border-box;
+  flex: none;
+  width: var(--setup-window-width);
+  height: var(--setup-window-height);
+  border-radius: var(--corner, 0);
+  background: var(--color-surface);
+  outline: none;
+  isolation: isolate;
+}
+
+.setup-window > .setup-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* Gone to the desktop: what the move leaves, held. */
+.setup-window[data-gone] {
+  opacity: 0;
+  scale: var(--scale-behind);
+}
+
+/* A scene: one column in the middle of the window, on its surface, so the rail under it shows
+   only as the scene fades. */
+.setup-scene {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-s32);
+  background: var(--color-surface);
+}
+
+.setup-column {
+  width: var(--size-column);
+  max-width: 100%;
+}
+
+.setup-column > :is(.setup-hero, .setup-lede, .setup-accent) {
+  text-align: center;
+  text-wrap: balance;
+}
+
+.setup-column > .setup-plan {
+  align-self: stretch;
+}
+
+/* A card's body, drawn again in place as its work moves on: it fills the page above the band. */
+.setup-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.setup-card > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* The prompt's words keep two lines' room, so the next prompt's words move nothing under them. */
+.setup-prompt-words {
+  min-height: calc(2 * var(--type-heading-line));
+}
+
+/* Waiting on a hand or a device: the symbol hums, as a running step's bead does. */
+.setup-hum {
+  animation: setup-hum var(--duration-hum) var(--easing-standard) infinite alternate;
+}
+
+@keyframes setup-hum {
+  to {
+    opacity: var(--opacity-hum);
+  }
+}
+
+/* The desktop round the window is the wallpaper as it is: there are no words on the picture for a
+   Backdrop's band to stand behind. */
+.setup-room.k-backdrop .k-backdrop-scrim {
+  display: none;
+}
