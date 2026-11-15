@@ -1,6 +1,6 @@
 // The Backdrop page: `docs/design/components/backdrop.md`. A full-screen moment, a picture, its scrim
-// and one thing in the middle: polkit's prompt, Kōbō's welcome and done screens, and the glass panel
-// Kōbō's step-rail screens hold.
+// and one thing in the middle: polkit's prompt, Kōbō's welcome and done screens, and the glass
+// Kōbō's questions fill.
 
 import { backdrop } from "../../lib/backdrop.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
@@ -85,7 +85,7 @@ export default page({
     { name: "Polkit", for: "the desktop dimmed, the prompt's `Dialog` in the middle", sample: () => polkit() },
     { name: "Kōbō's welcome", for: "the words' band over the wallpaper", sample: () => welcome() },
     { name: "Kōbō's done screen", for: "the same band: neon mark, headline, two actions", sample: () => done() },
-    { name: "Kōbō's step-rail screens", for: "the dim, and the glass panel StepRailPage fills", sample: () => stepRailHost() },
+    { name: "Kōbō's questions", for: "glass over the blurred wallpaper; StepRailPage fills it", sample: () => stepRailHost() },
     { name: "Pushed in, half dark", for: "the picture at `scale.push`, half way to black", sample: () => moved(0.5) },
   ],
   sizes: doesntApply("as large as its screen; the thing keeps its own width."),
@@ -134,7 +134,7 @@ export default page({
   measures: {
     samples: nonEmpty([
       { name: "Kōbō's welcome", for: "the column and the gaps in it", sample: () => welcome() },
-      { name: "Kōbō's step-rail screens", for: "the glass panel's margin", sample: () => stepRailHost() },
+      { name: "Kōbō's questions", for: "their margin from the screen's edge", sample: () => stepRailHost() },
     ]),
     measures: [
       { part: "Polkit's dialog", token: "size-dialog" },
@@ -145,9 +145,8 @@ export default page({
       { part: "Lede → action", token: "space-s40" },
       { part: "Neon mark", token: "size-neon_mark" },
       { part: "Rise, arriving and lifting", token: "space-s24" },
-      { part: "Sign's room; glass panel's margin", token: "space-s32" },
-      { part: "Rail, in the panel's widest", token: "size-rail" },
-      { part: "Glass panel's corners", token: "radius-surface" },
+      { part: "Sign's room; the questions' margin", token: "space-s32" },
+      { part: "Rail, in the questions' widest", token: "size-rail" },
     ],
     reflow: {
       note: "The column stays `size.column` in the middle; at the minimum the sign gives way and the words stay.",

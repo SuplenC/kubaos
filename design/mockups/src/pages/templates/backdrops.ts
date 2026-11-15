@@ -1,5 +1,5 @@
 // The full-screen moments the Backdrop page shows: polkit's prompt over the desktop, Kōbō's welcome
-// and done screens, and the glass panel Kōbō's step-rail screens hold. Their words and parts are
+// and done screens, and the glass Kōbō's questions fill. Their words and parts are
 // stand-ins from the library; each screen's own organisms (the done screen's neon strokes) are its
 // surface's pages.
 
@@ -8,7 +8,7 @@ import blurred from "../../../../../crates/kubaos-kobo/assets/wallpaper-blur.jpg
 import wallpaper from "../../../../../crates/kubaos-kobo/assets/wallpaper.jpg?url";
 import sign from "../../../../../crates/kubaos-kobo/assets/logo/kubaos-sign-1024.png?url";
 import mark from "../../../../../crates/kubaos-kobo/assets/logo/kubaos-mark.svg?url";
-import { backdrop, givesWay, glassPanel } from "../../lib/backdrop.ts";
+import { backdrop, givesWay } from "../../lib/backdrop.ts";
 import { button } from "../../lib/button.ts";
 import type { Words } from "../../lib/content.ts";
 import { dialog } from "../../lib/dialog.ts";
@@ -132,11 +132,12 @@ export function done(headline?: string): HTMLElement {
   return backdrop({ ...SAMPLE, picture: wallpaper, scrim: "band", content: doneColumn(headline) });
 }
 
-/** Kōbō's glass panel over the dimmed wallpaper: the room StepRailPage fills, on its own page. */
+/** Kōbō's questions: the wallpaper blurred under glass, the room StepRailPage fills, on its own page. */
 export function stepRailHost(width: string = SAMPLE.width, height: string = SAMPLE.height): HTMLElement {
-  const panel = glassPanel(blurred, label("StepRailPage, on its own page", "small"));
-  panel.classList.add("k-backdrop-host");
-  return backdrop({ width, height, picture: wallpaper, scrim: "dim", content: panel });
+  const room = document.createElement("span");
+  room.className = "k-backdrop-host";
+  room.append(label("StepRailPage, on its own page", "small"));
+  return backdrop({ width, height, picture: blurred, scrim: "glass", content: room });
 }
 
 /** A screen at the toolbar's window size: each of the moments, as the reflow shows them. */
