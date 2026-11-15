@@ -161,7 +161,7 @@ export function arrivalColumn(views: Views, moment: Moment = "rest", hero = HERO
   const foot =
     moment === "offline"
       ? promise("wifi_off", "Offline: drivers, fprintd and Bitwarden need the internet. The rest works without it.", "warning")
-      : promise("info", "All of it stays in the Command menu: Super Space, then “First boot”.");
+      : row("s8", "centre", icon("info", "var(--type-small-icon)", "var(--color-on_surface_variant)"), text("All of it stays in the Command menu:", "small", "on_surface_variant"), keyHints([["Super+Space", "then “First boot”"]]));
   const box = stack(
     0,
     "centre",
@@ -342,7 +342,7 @@ export function setupRoom(options: SetupOptions): HTMLElement {
     // The window's tube stays: only its layers change.
     for (const old of win.querySelectorAll(":scope > .setup-layer")) old.remove();
     win.prepend(...layers);
-    win.toggleAttribute("data-gone", at.at === "desktop" && !leaving);
+    win.toggleAttribute("data-away", at.at === "desktop" && !leaving);
     return arriving;
   };
 
@@ -370,7 +370,7 @@ export function setupRoom(options: SetupOptions): HTMLElement {
     const settle = () => {
       if (place !== to) return;
       for (const old of win.querySelectorAll(":scope > .setup-layer")) if (old !== kept) old.remove();
-      win.toggleAttribute("data-gone", to.at === "desktop");
+      win.toggleAttribute("data-away", to.at === "desktop");
       (win.querySelector<HTMLElement>(".setup-start, .setup-reboot, .setup-desktop") ?? win.querySelector<HTMLElement>(".k-step-room:not([data-kept]) [tabindex='0'], .k-step-room:not([data-kept]) button:not(:disabled)") ?? win).focus({ preventScroll: true });
     };
     if (!move) return settle();

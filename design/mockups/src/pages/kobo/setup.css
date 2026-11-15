@@ -5,7 +5,6 @@
    over; floated on the desktop it has an active window's corner and tube. */
 .setup-window {
   position: relative;
-  text-align: start;
   display: block;
   box-sizing: border-box;
   flex: none;
@@ -25,7 +24,7 @@
 }
 
 /* Gone to the desktop: what the move leaves, held. */
-.setup-window[data-gone] {
+.setup-window[data-away] {
   opacity: 0;
   scale: var(--scale-behind);
 }
@@ -44,6 +43,12 @@
 .setup-column {
   width: var(--size-column);
   max-width: 100%;
+}
+
+/* A window is no thing in the Backdrop's middle: its words read from the left, as a window's do,
+   and only a scene's column is centred. */
+.setup-room .setup-window .k-text[data-wrapped]:not(.setup-column > *) {
+  text-align: start;
 }
 
 .setup-column > :is(.setup-hero, .setup-lede, .setup-accent) {
