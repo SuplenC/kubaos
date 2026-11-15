@@ -259,7 +259,7 @@ function scrolled(content: HTMLElement): HTMLElement {
 }
 
 /** A screen's body: its header, then what it asks, `space.s24` apart, the rest scrolling. */
-function body(accent: string, title: string, subtitle: string, content: HTMLElement, scrolls = true): HTMLElement {
+export function body(accent: string, title: string, subtitle: string, content: HTMLElement, scrolls = true): HTMLElement {
   const top = header({ accent, title, subtitle });
   if (!scrolls) return stack("s24", "start", filling(top), fillingHeight(filling(content)));
   const { box } = scroll(scrolled(content), { height: "100%", above: "s24", below: "s16", noGutter: true, fade: "s24", footFade: true });
@@ -273,7 +273,7 @@ function typed(options: Parameters<typeof field>[0], set: (value: string) => voi
 }
 
 /** The Show and Hide toggle for the secret fields on a screen, at a label's right. */
-function showToggle(fields: () => readonly HTMLElement[]): HTMLElement {
+export function showToggle(fields: () => readonly HTMLElement[]): HTMLElement {
   const toggle = button({ label: "Show", kind: "Text", size: "Sm", icon: "visibility", alternatives: ["Show", "Hide"] });
   let shown = false;
   toggle.addEventListener("click", () => {

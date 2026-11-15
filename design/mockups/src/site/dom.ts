@@ -89,7 +89,7 @@ export function holdScaled(outer: HTMLElement, inner: HTMLElement, by: number, h
 }
 
 /** The endless loops `site.css` holds in a sample's box that is `data-away`. */
-const LOOPS = ".gl-loop, .k-skeleton, .k-spinner, .k-step-bead, .f-race";
+const LOOPS = ".gl-loop, .k-skeleton, .k-spinner, .k-step-bead, .f-race, .setup-hum";
 
 // Every sample's box holding an endless loop is `data-away` while none of it is in the viewport,
 // which holds its loops (`site.css`): a page scrolled past its samples asks for no frames. A box

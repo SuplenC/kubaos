@@ -1,0 +1,109 @@
+/* Kōbō's first boot (`setup-room.ts`): the window on the desktop, the layers it hands over between,
+   its scenes and the card pages' own parts. */
+
+/* The window: Kōbō's glass panel at the window's size and corner, its active tube round it (outside
+   the glass, which cuts what lies on it to its corner); its scenes and its rail lie on the glass,
+   one over another as they hand over. */
+.setup-window {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  flex: none;
+  width: var(--setup-window-width);
+  height: var(--setup-window-height);
+  border-radius: var(--corner);
+  outline: none;
+  isolation: isolate;
+}
+
+.setup-window > .k-glass-panel {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.setup-window .setup-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* Gone to the desktop: what the move leaves, held. */
+.setup-window[data-left] {
+  opacity: 0;
+  scale: var(--scale-behind);
+}
+
+/* A scene: one column in the middle of the window, on the glass. It hands over to the rail and
+   back one after the other, never both on the glass at once. */
+.setup-scene {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-s32);
+}
+
+.setup-column {
+  width: var(--size-column);
+  max-width: 100%;
+}
+
+/* A window is no thing in the Backdrop's middle: its words read from the left, as a window's do,
+   and only a scene's column is centred. */
+.setup-room .setup-window .k-text[data-wrapped]:not(.setup-column > *) {
+  text-align: start;
+}
+
+.setup-column > :is(.setup-hero, .setup-lede, .setup-accent) {
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* A card's body, drawn again in place as its work moves on: it fills the page above the band. */
+.setup-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.setup-card > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* While touches are counted the prompt's words keep two lines' room, so the next touch's words move
+   nothing under them. */
+.setup-prompt-words[data-counted] {
+  min-height: calc(2 * var(--type-heading-line));
+}
+
+/* Waiting on a hand or a device: the symbol hums, as a running step's bead does, and with reduce
+   motion holds still as the bead does. */
+.setup-hum {
+  display: flex;
+  flex: none;
+  animation: setup-hum var(--motion-hum) var(--easing-standard) infinite alternate;
+}
+
+[data-reduced] .setup-hum {
+  animation: none;
+}
+
+/* A card the rail keeps drawn out of sight hums for nobody. */
+.k-step-room[data-kept] .setup-hum {
+  animation: none;
+}
+
+@keyframes setup-hum {
+  to {
+    opacity: var(--opacity-hum);
+  }
+}
+
+/* The desktop round the window is the wallpaper as it is: there are no words on the picture for a
+   Backdrop's band to stand behind. */
+.setup-room.k-backdrop .k-backdrop-scrim {
+  display: none;
+}

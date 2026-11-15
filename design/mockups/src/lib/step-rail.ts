@@ -20,6 +20,7 @@ import { keyHints, type KeyHint } from "./keycap.ts";
 import { fill, filling, fillingHeight, gap, inset, page, row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { scroll } from "./scroll.ts";
+import { spinner } from "./spinner.ts";
 import { pressable, setStepState, step, type StepOptions, type StepState } from "./step.ts";
 import { text, wrapped } from "./text.ts";
 import { cubic, length, raw } from "./tokens.ts";
@@ -35,6 +36,11 @@ export type Live<T> = T | (() => T);
 
 function now<T>(value: Live<T>): T {
   return typeof value === "function" ? (value as () => T)() : value;
+}
+
+/** A page's own standing, as it is now. */
+function statusOf(spec: RailPage): RailStatus | undefined {
+  return spec.status === undefined ? undefined : now(spec.status);
 }
 
 /**
@@ -61,6 +67,31 @@ export interface RailPage {
   readonly fresh?: boolean;
   /** Going back past it is refused: it can't be undone (the install started). */
   readonly fixed?: boolean;
+  /** Where it stands on its own, not by its place in the flow: first boot's cards (`free`). */
+  readonly status?: Live<RailStatus>;
+  /** A quieter way on, a `Text` button before the `Filled` one: Skip. */
+  readonly skip?: Live<string | undefined>;
+  /** The `Filled` button's symbol, before its words, when it does the page's own work: Enroll. */
+  readonly nextIcon?: Live<string | undefined>;
+  /** The `Filled` button's own work: true keeps the page, which shows the work; false goes on. */
+  readonly act?: () => boolean;
+  /** Told as Skip passes the page by, before the next one shows. */
+  readonly skipped?: () => void;
+  /**
+   * The page's own work is running, in these words: the `Filled` button keeps its room, a spinner
+   * and the words in its place, and Enter waits for the work.
+   */
+  readonly busy?: Live<string | undefined>;
+}
+
+/** A step's own standing in a free flow: its state, its other words, and whether it is there. */
+export interface RailStatus {
+  readonly state: StepState;
+  readonly words?: StepOptions["words"];
+  readonly failed?: boolean;
+  readonly running?: boolean;
+  /** Not on this machine: going on or back passes it by, though a press still opens it. */
+  readonly out?: boolean;
 }
 
 /** What the rail shows at its foot besides the key hints: Kōbō's power button and battery. */
@@ -90,6 +121,8 @@ export interface StepRailOptions {
   readonly failed?: boolean;
   /** The current step is running (the install): no step takes a press until it ends. */
   readonly locked?: boolean;
+  /** Every page takes a press, in any order, each step showing its own `status`: first boot. */
+  readonly free?: boolean;
   /** The keys the current page takes, at the rail's foot. */
   readonly hints: (page: number) => readonly KeyHint[];
   readonly foot?: RailFoot;
@@ -157,9 +190,21 @@ interface Rail {
 function rail(options: StepRailOptions, current: number, reached: number, go: (to: number) => void): Rail {
   /** What step `index` shows with the rail on `at`. */
   const look = (index: number, at: number, upTo: number) => {
+    const own = options.free ? statusOf(options.pages[index]!) : undefined;
+    if (own) {
+      return {
+        state: own.state,
+        ...(own.words ? { words: own.words } : {}),
+        selected: index === at,
+        pressable: index !== at && !(options.locked ?? false),
+        failed: own.failed ?? false,
+        running: own.running ?? false,
+      };
+    }
     const first = backTo(options.pages, at, options.locked ?? false);
     return {
       state: stateOf(index, at),
+      selected: false,
       pressable: index !== at && index >= first && index <= upTo,
       failed: index === at && (options.failed ?? false),
       running: index === at && (options.locked ?? false),
@@ -167,7 +212,8 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
   };
   const make = (index: number, shown: ReturnType<typeof look>) => {
     const each = options.pages[index]!;
-    const element = step({ ...each.step, state: shown.state, ...(shown.failed ? { failed: true } : {}), ...(shown.running ? { running: true } : {}), box: "rail", mark: true, pressable: shown.pressable });
+    const element = step({ ...each.step, state: shown.state, ...("words" in shown ? { words: shown.words } : {}), ...(shown.selected ? { selected: true } : {}), ...(shown.failed ? { failed: true } : {}), ...(shown.running ? { running: true } : {}), box: "rail", mark: true, pressable: shown.pressable });
+    element.dataset.shown = JSON.stringify(shown);
     // Wired once: whether it takes a press is read as it is pressed, so the rail can change it.
     element.addEventListener("click", () => {
       if (element.dataset.pressable === "true") go(index);
@@ -184,7 +230,9 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
     return element;
   };
   const steps = options.pages.map((_, index) => make(index, look(index, current, reached)));
-  const column = stack(0, "start", ...steps, wire(steps.length, current));
+  const doneRuns = (at: number) => (options.free ? runs(options.pages.map((_, index) => look(index, at, 0).state.is === "done")) : null);
+  let theWire = wire(steps.length, current, doneRuns(current));
+  const column = stack(0, "start", ...steps, theWire);
   column.classList.add("k-rail-steps");
   arrows(column);
   // Cut at its own box: the brand's `space.s20` and the hints' `space.s16` stay clear of the steps
@@ -219,8 +267,9 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
     set(at, upTo) {
       steps.forEach((element, index) => {
         const shown = look(index, at, upTo);
-        // A failed symbol is drawn whole; every other change, taking a press included, is in place.
-        if (element.dataset.failed !== String(shown.failed)) {
+        // A failed symbol is drawn whole, as is any change to a free step's own standing; every
+        // other change, taking a press included, is in place.
+        if (element.dataset.failed !== String(shown.failed) || (options.free && element.dataset.shown !== JSON.stringify(shown))) {
           const fresh = make(index, shown);
           element.replaceWith(fresh);
           steps[index] = fresh;
@@ -232,7 +281,14 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
           element.dataset.pressable = String(shown.pressable);
         }
       });
-      column.querySelector<HTMLElement>(".k-rail-wire-lit")?.style.setProperty("--wire-lit", String(at));
+      if (options.free) {
+        // In any order the wire's light joins what is done, wherever the reader stands.
+        const again = wire(steps.length, at, doneRuns(at));
+        if (again.dataset.runs !== theWire.dataset.runs) {
+          theWire.replaceWith(again);
+          theWire = again;
+        }
+      } else column.querySelector<HTMLElement>(".k-rail-wire-lit")?.style.setProperty("--wire-lit", String(at));
       // Two pages taking the same keys keep the hints they share as they are.
       if (JSON.stringify(options.hints(at)) !== JSON.stringify(options.hints(hintsAt))) drawHints(at);
       hintsAt = at;
@@ -245,7 +301,26 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
  * Each symbol is a bead on it: the wire is cut away round each, so whatever is under the bead (the
  * rail's fill, or the current row's) shows there, glass and all.
  */
-function wire(count: number, current: number): HTMLElement {
+/** The runs of two or more steps in a row that are done, as their first and last index. */
+function runs(done: readonly boolean[]): [number, number][] {
+  const found: [number, number][] = [];
+  let start = -1;
+  done.forEach((is, index) => {
+    if (is && start < 0) start = index;
+    if ((!is || index === done.length - 1) && start >= 0) {
+      const end = is ? index : index - 1;
+      if (end > start) found.push([start, end]);
+      start = -1;
+    }
+  });
+  return found;
+}
+
+/**
+ * The wire, lit down to `current`; or, in a free flow, lit along each of `lit`'s runs of done
+ * steps, each its own tube from its first symbol to its last.
+ */
+function wire(count: number, current: number, lit: readonly [number, number][] | null = null): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-rail-wire";
   box.style.setProperty("--count", String(count));
@@ -253,10 +328,18 @@ function wire(count: number, current: number): HTMLElement {
   box.style.maskImage = Array.from({ length: count }, (_, index) => cut(index)).join(", ");
   const track = document.createElement("span");
   track.className = "k-rail-wire-track";
-  const lit = document.createElement("span");
-  lit.className = "k-rail-wire-lit";
-  lit.style.setProperty("--wire-lit", String(current));
-  box.append(track, lit);
+  const tube = (from: number, to: number) => {
+    const shown = document.createElement("span");
+    shown.className = "k-rail-wire-lit";
+    shown.style.setProperty("--wire-from", String(from));
+    shown.style.setProperty("--wire-lit", String(to));
+    // The steps a run joins, so a move can pick out the one a step just joined.
+    shown.dataset.steps = Array.from({ length: to - from + 1 }, (_, index) => from + index).join(" ");
+    return shown;
+  };
+  const tubes = lit ? lit.map(([from, to]) => tube(from, to)) : [tube(0, current)];
+  box.dataset.runs = JSON.stringify(lit);
+  box.append(track, ...tubes);
   return box;
 }
 
@@ -322,7 +405,7 @@ export interface FooterPins {
  * in `error` as Enter is refused. A note or a reason longer than the room between the buttons
  * breaks between words, so it is read whole and pushes neither button.
  */
-export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: () => void = () => {}, pinned: FooterPins = {}): { band: HTMLElement; nudge: HTMLElement | null; next: HTMLElement } {
+export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: () => void = () => {}, pinned: FooterPins = {}, onSkip: () => void = () => {}): { band: HTMLElement; nudge: HTMLElement | null; next: HTMLElement } {
   const back = button({ label: "Back", kind: "Text", icon: "arrow_back", ...(pinned.back ? { pinned: pinned.back } : {}) });
   back.addEventListener("click", onBack);
   const parts: Element[] = [back, fill()];
@@ -340,9 +423,27 @@ export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: ()
     shown.classList.add("k-step-note");
     parts.push(shown);
   }
-  const next = button({ label: spec.next === undefined ? "Continue" : now(spec.next), kind: "Filled", icon: "arrow_forward", trailing: true, ...(blocker ? { disabled: true } : {}), ...(pinned.next ? { pinned: pinned.next } : {}) });
+  const skip = spec.skip === undefined ? undefined : now(spec.skip);
+  if (skip) {
+    const quiet = button({ label: skip, kind: "Text" });
+    quiet.addEventListener("click", onSkip);
+    parts.push(quiet);
+  }
+  const own = spec.nextIcon === undefined ? undefined : now(spec.nextIcon);
+  const symbol = own ? { icon: own } : { icon: "arrow_forward", trailing: true };
+  const next = button({ label: spec.next === undefined ? "Continue" : now(spec.next), kind: "Filled", ...symbol, ...(blocker ? { disabled: true } : {}), ...(pinned.next ? { pinned: pinned.next } : {}) });
   next.addEventListener("click", onNext);
-  parts.push(next);
+  const busy = spec.busy === undefined ? undefined : now(spec.busy);
+  if (busy) {
+    // The button keeps its room, so nothing beside it moves while the work runs.
+    next.inert = true;
+    const working = row("s8", "centre", spinner("s20"), text(busy, "body", "on_surface_variant"));
+    working.classList.add("k-step-busy-words");
+    const room = document.createElement("span");
+    room.className = "k-step-busy";
+    room.append(next, working);
+    parts.push(room);
+  } else parts.push(next);
   const band = hangs(row("s16", "centre", ...parts));
   band.classList.add("k-step-footer");
   return { band, nudge, next };
@@ -392,7 +493,7 @@ function blocked(spec: RailPage): boolean {
   return spec.blocker !== undefined && Boolean(now(spec.blocker));
 }
 
-function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void): { room: HTMLElement; nudge: () => HTMLElement | null; first: HTMLElement | null } {
+function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void, onSkip: () => void): { room: HTMLElement; nudge: () => HTMLElement | null; first: HTMLElement | null } {
   const body = spec.body();
   const parts: Element[] = [fillingHeight(filling(body))];
   let nudge: HTMLElement | null = null;
@@ -400,7 +501,7 @@ function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void): { roo
   const room = document.createElement("span");
   const made = { nudge: null as HTMLElement | null };
   if (!spec.footless) {
-    const drawn = footer(spec, onBack, onNext);
+    const drawn = footer(spec, onBack, onNext, {}, onSkip);
     nudge = drawn.nudge;
     made.nudge = nudge;
     first ??= blocked(spec) ? null : drawn.next;
@@ -409,7 +510,7 @@ function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void): { roo
     // The answers changed: the band is drawn again where it was, the keyboard kept on Continue.
     room.addEventListener(RECHECK, () => {
       const had = band.contains(document.activeElement);
-      const again = footer(spec, onBack, onNext);
+      const again = footer(spec, onBack, onNext, {}, onSkip);
       const fresh = filling(again.band);
       band.replaceWith(fresh);
       band = fresh;
@@ -454,7 +555,11 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
       return kept;
     }
     kept?.room.remove();
-    const made = pageRoom(spec, () => go(current - 1), next);
+    const skip = () => {
+      spec.skipped?.();
+      go(along(current, 1));
+    };
+    const made = pageRoom(spec, () => go(along(current, -1)), next, skip);
     rooms.set(index, made);
     side.append(made.room);
     return made;
@@ -489,7 +594,7 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
       return;
     }
     arrive(made.room, current > from);
-    if (steps) travel(steps, from, current, options.failed ?? false);
+    if (steps && !options.free) travel(steps, from, current, options.failed ?? false);
     // The template holds the keys on a page with nothing to do yet: Enter and Esc still work. The
     // keyboard moves with the next frame, which lays the page out anyway, not inside the press.
     if (keyboardIn) {
@@ -523,7 +628,7 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
       options.onExit(to === options.pages.length);
       return;
     }
-    if (to < backTo(options.pages, current, options.locked ?? false) || to < 0 || to >= options.pages.length || to === current) return;
+    if ((!options.free && to < backTo(options.pages, current, options.locked ?? false)) || to < 0 || to >= options.pages.length || to === current) return;
     const from = current;
     current = to;
     reached = Math.max(reached, current);
@@ -537,17 +642,28 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
       if (nudge) flash(nudge);
       return;
     }
-    go(current + 1);
+    if (spec?.busy !== undefined && now(spec.busy)) return;
+    if (spec?.act?.()) return;
+    go(along(current, 1));
+  }
+
+  /** The page `by` one way from `from`, past any a free flow says isn't there. */
+  function along(from: number, by: 1 | -1): number {
+    let to = from + by;
+    while (options.free && to >= 0 && to < options.pages.length && statusOf(options.pages[to]!)?.out) to += by;
+    return to;
   }
 
   box.addEventListener("keydown", (event) => {
     if (event.defaultPrevented || event.repeat) return;
     if (event.key === "Enter") next();
-    else if (event.key === "Escape") go(current - 1);
+    else if (event.key === "Escape") go(along(current, -1));
     else return;
     event.preventDefault();
   });
 
+  // A page's answers or its work changed: in a free flow its step stands where the page says.
+  if (options.free) box.addEventListener(RECHECK, () => theRail?.set(current, reached));
   draw(null);
   if (options.nudged !== undefined) shown.nudge()?.style.setProperty("--nudge", String(options.nudged));
   if (options.arriving) {

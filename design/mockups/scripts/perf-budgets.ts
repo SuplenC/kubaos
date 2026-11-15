@@ -97,7 +97,15 @@ export interface Override {
 }
 
 /** Overrides by page slug. */
-export const PAGE_BUDGETS: Record<string, Partial<Record<Measure, Override>>> = {};
+export const PAGE_BUDGETS: Record<string, Partial<Record<Measure, Override>>> = {
+  "setup-yubikey": {
+    "load.animations": {
+      budget: 1,
+      reason:
+        "Its live card waits for the key at first boot, so the key's symbol hums in view: a box's opacity on the compositor, measured at 2.4 ms/s busy and 0 restyles a second at rest.",
+    },
+  },
+};
 
 /** The budget `measure` is held to on `slug`, and the reason when it is the page's own. */
 export function budgetFor(slug: string, measure: Measure): { budget: number; reason?: string } | null {
