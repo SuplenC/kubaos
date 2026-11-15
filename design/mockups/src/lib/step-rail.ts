@@ -7,7 +7,8 @@
 // steps' corners are concentric with its own: the brand or the title, `space.s20`, the steps back
 // to back across its width (`Step`, each a mark at its end), scrolling where they don't fit, then
 // `space.s16` and at its foot the key hints and, in Kōbō, the power button and the battery. A wire
-// runs down the steps' symbols, lit down to the current one; each symbol is a bead on it. The page
+// runs down the steps' symbols, lit down to the current one, and the symbols it reaches are lit and
+// glow with it, one neon sign. The page
 // beside it is a clear `Page`: its body, then `space.s16` above the footer band, which has no
 // hairline: Back on the left, the one Filled button on the right, and a note just before it.
 
@@ -226,7 +227,7 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
       }
     });
     element.dataset.pressable = String(shown.pressable);
-    element.dataset.failed = String(shown.failed);
+    element.dataset.railFailed = String(shown.failed);
     return element;
   };
   const steps = options.pages.map((_, index) => make(index, look(index, current, reached)));
@@ -269,7 +270,7 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
         const shown = look(index, at, upTo);
         // A failed symbol is drawn whole, as is any change to a free step's own standing; every
         // other change, taking a press included, is in place.
-        if (element.dataset.failed !== String(shown.failed) || (options.free && element.dataset.shown !== JSON.stringify(shown))) {
+        if (element.dataset.railFailed !== String(shown.failed) || (options.free && element.dataset.shown !== JSON.stringify(shown))) {
           const fresh = make(index, shown);
           element.replaceWith(fresh);
           steps[index] = fresh;
@@ -288,7 +289,7 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
           theWire.replaceWith(again);
           theWire = again;
         }
-      } else column.querySelector<HTMLElement>(".k-rail-wire-lit")?.style.setProperty("--wire-lit", String(at));
+      } else for (const light of column.querySelectorAll<HTMLElement>(".k-rail-wire-lit")) light.style.setProperty("--wire-lit", String(at));
       // Two pages taking the same keys keep the hints they share as they are.
       if (JSON.stringify(options.hints(at)) !== JSON.stringify(options.hints(hintsAt))) drawHints(at);
       hintsAt = at;
@@ -296,11 +297,6 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
   };
 }
 
-/**
- * The progress wire down the steps' symbols, from the first to the last, lit down to `current`.
- * Each symbol is a bead on it: the wire is cut away round each, so whatever is under the bead (the
- * rail's fill, or the current row's) shows there, glass and all.
- */
 /** The runs of two or more steps in a row that are done, as their first and last index. */
 function runs(done: readonly boolean[]): [number, number][] {
   const found: [number, number][] = [];
@@ -317,29 +313,29 @@ function runs(done: readonly boolean[]): [number, number][] {
 }
 
 /**
- * The wire, lit down to `current`; or, in a free flow, lit along each of `lit`'s runs of done
- * steps, each its own tube from its first symbol to its last.
+ * The progress wire down the steps' symbols: a length of tube between each symbol and the next,
+ * stopping `step_rail.bead` short of both, so the tube runs into each symbol and no line crosses a
+ * glyph. Each length is unlit glass with its light over it, filled as far as the light has come:
+ * down to `current`, or, in a free flow, along each of `lit`'s runs of done steps.
  */
 function wire(count: number, current: number, lit: readonly [number, number][] | null = null): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-rail-wire";
-  box.style.setProperty("--count", String(count));
-  const cut = (index: number) => `radial-gradient(circle at var(--wire-x) calc(${index} * var(--size-row) + var(--wire-top)), transparent var(--bead-r), black var(--bead-r))`;
-  box.style.maskImage = Array.from({ length: count }, (_, index) => cut(index)).join(", ");
-  const track = document.createElement("span");
-  track.className = "k-rail-wire-track";
-  const tube = (from: number, to: number) => {
-    const shown = document.createElement("span");
-    shown.className = "k-rail-wire-lit";
-    shown.style.setProperty("--wire-from", String(from));
-    shown.style.setProperty("--wire-lit", String(to));
-    // The steps a run joins, so a move can pick out the one a step just joined.
-    shown.dataset.steps = Array.from({ length: to - from + 1 }, (_, index) => from + index).join(" ");
-    return shown;
-  };
-  const tubes = lit ? lit.map(([from, to]) => tube(from, to)) : [tube(0, current)];
+  const joined = (index: number) => lit?.some(([from, to]) => index >= from && index < to) ?? false;
+  for (let index = 0; index < count - 1; index++) {
+    const track = document.createElement("span");
+    track.className = "k-rail-wire-track";
+    track.style.setProperty("--i", String(index));
+    const light = document.createElement("span");
+    light.className = "k-rail-wire-lit";
+    light.style.setProperty("--i", String(index));
+    // A free flow's light is whole lengths, each lit where both its steps are done.
+    light.style.setProperty("--wire-lit", String(lit ? (joined(index) ? index + 1 : index) : current));
+    // The two steps it joins, so a move can pick out the light a step just joined.
+    light.dataset.steps = `${index} ${index + 1}`;
+    box.append(track, light);
+  }
   box.dataset.runs = JSON.stringify(lit);
-  box.append(track, ...tubes);
   return box;
 }
 
@@ -367,9 +363,9 @@ function reaching(token: string, share: number): number {
 function travel(steps: HTMLElement, from: number, to: number, failed: boolean): void {
   if (settings().reduced || from === to) return;
   const long = timed("long");
-  steps.querySelector(".k-rail-wire-lit")?.animate([{ "--wire-lit": from }, { "--wire-lit": to }], { duration: long, easing: curve("emphasized_decel") });
+  for (const light of steps.querySelectorAll(".k-rail-wire-lit")) light.animate([{ "--wire-lit": from }, { "--wire-lit": to }], { duration: long, easing: curve("emphasized_decel") });
   const rows = [...steps.querySelectorAll<HTMLElement>(":scope > .k-step")];
-  const look = (index: number, at: number, fails: boolean) => ({ "--bead-lit": index <= at ? 1 : 0, "--bead-glow": index === at && !fails ? 1 : 0 });
+  const look = (index: number, at: number, fails: boolean) => ({ "--bead-lit": index <= at ? 1 : 0, "--bead-glow": index < at || (index === at && !fails) ? 1 : 0 });
   rows.forEach((each, index) => {
     const before = look(index, from, false);
     const after = look(index, to, failed);

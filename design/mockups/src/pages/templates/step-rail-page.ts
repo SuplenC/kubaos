@@ -324,7 +324,7 @@ export default page<"rest" | "lit" | "pressed" | "disabled" | "selected" | "load
       { part: "Key → its words", token: "space-s8" },
       { part: "Between hints; under the lockup", token: "space-s4" },
       { part: "Wire's thickness", token: "step_rail-wire" },
-      { part: "Bead past the symbol", token: "step_rail-bead" },
+      { part: "Wire short of a symbol", token: "step_rail-bead" },
       { part: "Page's top, its slide; Kōbō's inset", token: "space-s32" },
       { part: "Page's foot", token: "space-s24" },
       { part: "Band's buttons", token: "size-control_md" },
