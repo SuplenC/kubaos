@@ -2,6 +2,7 @@
 // `config/hypr/rules.lua` gives it, and in it either a scene (the arrival, the ending) or the step
 // rail of the cards. Live, it is the whole first boot: Let's go deals the cards, each card's work
 // runs and finishes in place, the last one hands over to the ending, and the ending to the desktop.
+// Opened from the Command menu on one card, the rail holds that card alone.
 //
 // Unlike the installer it follows the desktop's mode: it is the first window of the installed
 // system, which has a day as well as a night.
@@ -28,9 +29,10 @@ import type { Duration, Easing, Move, NonEmpty, Track } from "../../site/page.ts
 import { milliseconds } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
 import { RELEASE } from "./kobo-data.ts";
-import { hanko, neonMark, neonSign, play, sealed, writing } from "./kobo-room.ts";
+import { neonMark, neonSign, play, writing } from "./kobo-room.ts";
 import { CARD_IDS, type CardId, CARDS, firstViews, open, running, type Views } from "./setup-cards.ts";
 import { cardBody, cardPage } from "./setup-parts.ts";
+import { apps, installing, yoursCard } from "./setup-yours-card.ts";
 
 /** What the arrival waits on or finds: detection running, no network, nothing left, a reboot behind it. */
 export type Moment = "rest" | "detecting" | "offline" | "settled" | "rebooted";
@@ -59,6 +61,8 @@ export interface SetupOptions {
   readonly hero?: string;
   /** The place it opens on plays its arrival as it is drawn. */
   readonly opening?: boolean;
+  /** Opened from the Command menu on its card alone: no arrival, no ending, the rail that card. */
+  readonly alone?: boolean;
 }
 
 /** A laptop's screen, and the window Hyprland floats on it: 80 % of its width, 85 % of its height. */
@@ -123,7 +127,7 @@ function promise(glyph: string, words: string, tone = "on_surface_variant"): HTM
 /** How many cards want the person, said as a count. */
 function wanted(views: Views): string {
   const left = CARD_IDS.filter((id) => open(CARDS[id].views[views[id]]!)).length;
-  const words = ["None", "One", "Two", "Three", "Four", "Five", "Six"];
+  const words = ["None", "One", "Two", "Three", "Four", "Five"];
   return `${words[left] ?? left} ${left === 1 ? "thing" : "things"}`;
 }
 
@@ -133,11 +137,11 @@ function arrivalWords(moment: Moment, views: Views): { hero?: string; lede: stri
     case "settled":
       return { hero: "Nothing to do.", lede: "Every card is done or not on this machine. Setup checks again each time it opens, so done stays done." };
     case "rebooted":
-      return { hero: "Back again.", lede: `The TUXEDO drivers loaded, which is what this was waiting for. ${wanted(views)} left, if you like.` };
+      return { hero: "Back again.", lede: `The drivers loaded, which is what this was waiting for. ${wanted(views)} left, if you like.` };
     case "detecting":
-      return { lede: "KubaOS is on the disk and running. Checking what this machine has: the reader, the keys, the vault." };
+      return { lede: "KubaOS is on the disk and running. Checking what this machine has: the maker, the reader, the keys." };
     default:
-      return { lede: `KubaOS is on the disk and running. ${wanted(views)} need your fingers, your keys or your phone, so the install left them to you. A minute each; skip any, it'll wait.` };
+      return { lede: `KubaOS is on the disk and running. ${wanted(views)} to go: what you use it for, then what needs your hardware, your fingers or your phone. A minute each; skip any, it'll wait.` };
   }
 }
 
@@ -156,7 +160,7 @@ export function arrivalColumn(views: Views, moment: Moment = "rest", hero = HERO
   const foot = detecting
     ? row("s8", "centre", spinner("s20"), text("Checking what this machine has…", "small", "on_surface_variant"))
     : moment === "offline"
-      ? promise("wifi_off", "Offline: drivers, fprintd and Bitwarden need the internet. The rest works without it.", "warning")
+      ? promise("wifi_off", "Offline: apps, drivers and fprintd need the internet. The rest works without it.", "warning")
       : row("s8", "centre", icon("info", "var(--type-small-icon)", "var(--color-on_surface_variant)"), text("All of it stays in the Command menu:", "small", "on_surface_variant"), keyHints([["Super+Space", "then “First boot”"]]));
   const box = stack(
     0,
@@ -183,30 +187,36 @@ function named(test: (id: CardId) => boolean): string {
   return titles.length < 2 ? (titles[0] ?? "") : `${titles.slice(0, -1).join(", ")} and ${titles.at(-1)}`;
 }
 
-/** The ending's lede: what got done, what waits and where, or the reboot it needs. */
+/** The ending's lede: what got done, what waits and where, the apps still coming, the reboot. */
 function endingLede(views: Views, skipped: ReadonlySet<CardId>): string {
   const state = (id: CardId) => CARDS[id].views[views[id]]!;
+  // Apps still installing aren't left to do: they finish on their own.
+  const coming = views.yours === "installing";
   const done = CARD_IDS.filter((id) => state(id).state === "done").length;
-  const isLeft = (id: CardId) => open(state(id)) || skipped.has(id);
+  const isLeft = (id: CardId) => !(id === "yours" && coming) && (open(state(id)) || skipped.has(id));
   const left = named(isLeft);
   const many = CARD_IDS.filter(isLeft).length > 1;
   const reboot = CARD_IDS.some((id) => state(id).state === "reboot");
-  const tally = done === 0 ? "Nothing done. Fair enough." : `${done} done.`;
+  const tally = done === 0 && !coming ? "Nothing done. Fair enough." : `${done} done.`;
   const waits = left ? ` ${left} ${many ? "wait" : "waits"} in the Command menu; I won't bring ${many ? "them" : "it"} up again.` : "";
-  if (reboot) return `${tally}${waits} The TUXEDO drivers load after a reboot.`;
-  if (left) return `${tally}${waits}`;
+  const apps_ = coming ? ` ${capitalised(apps(installing("installing")))} still installing; they show up as they land.` : "";
+  if (reboot) return `${tally}${waits}${apps_} The drivers load after a reboot.`;
+  if (left || coming) return `${tally}${waits}${apps_}`;
   return `${tally} Your machine, your rules. Go break something.`;
 }
 
-/** The ending, as Kōbō's done screen: クバ writes itself in, 完了 stamped beside it, the headline word by word. */
+function capitalised(words: string): string {
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * The ending: the desktop comes toward you as the installer's street does, クバ writes itself in on
+ * the glass and strikes, alone in the middle, and the headline rises word by word.
+ */
 export function endingColumn(views: Views, skipped: ReadonlySet<CardId>, going = false): HTMLElement {
   const reboot = CARD_IDS.some((id) => CARDS[id].views[views[id]]!.state === "reboot");
-  const drawn = neonMark();
-  const seal = part(hanko(), "stamp");
-  seal.classList.add("kobo-stamp");
-  const mark = row("s8", "start", drawn, seal);
-  mark.classList.add("kobo-sealed");
-  sealed(mark, drawn);
+  const mark = neonMark();
+  mark.classList.add("setup-mark");
   const words = "That's it.".split(" ").map((word, index) => part(text(index === 0 ? word : ` ${word}`, "hero"), `word-${index}`));
   const headline = row(0, "end", ...words);
   headline.classList.add("setup-headline");
@@ -218,7 +228,7 @@ export function endingColumn(views: Views, skipped: ReadonlySet<CardId>, going =
   if (reboot && !going) actions.dataset.hangs = "";
   actions.classList.add("setup-actions");
   const hints: readonly KeyHint[] = going ? [] : reboot ? [["Enter", "reboot"], ["Tab", "move"]] : [["Enter", "the desktop"]];
-  const parts: HTMLElement[] = [
+  const parts: Element[] = [
     mark,
     gap("s24"),
     headline,
@@ -228,7 +238,7 @@ export function endingColumn(views: Views, skipped: ReadonlySet<CardId>, going =
     part(stack("s12", "centre", actions, keys(hints)), "act"),
   ];
   // The blue screen comes right after this reboot, so its steps are said here, where they are needed.
-  const queued = CARD_IDS.some((id) => id === "tuxedo" && views[id] === "queued");
+  const queued = views.drivers === "queued";
   if (queued) parts.push(gap("s24"), part(promise("key", "On the blue screen after it: Enroll MOK → Continue → Yes → your one-time password → Reboot."), "promise"));
   const box = stack(0, "centre", ...parts);
   box.classList.add("kobo-part", "setup-column", "setup-ending");
@@ -239,7 +249,7 @@ export function endingColumn(views: Views, skipped: ReadonlySet<CardId>, going =
 
 /** The first open card, or the first that is there at all. */
 function firstCard(views: Views): CardId {
-  return CARD_IDS.find((id) => open(CARDS[id].views[views[id]]!)) ?? CARD_IDS.find((id) => CARDS[id].views[views[id]]!.state !== "absent") ?? "git";
+  return CARD_IDS.find((id) => open(CARDS[id].views[views[id]]!)) ?? CARD_IDS.find((id) => CARDS[id].views[views[id]]!.state !== "absent") ?? "yours";
 }
 
 /** How far the window lies from the desktop's edges: Hyprland centres it. */
@@ -276,18 +286,24 @@ export function setupRoom(options: SetupOptions): HTMLElement {
   const { win, body } = windowBox(options.desk ?? false);
   win.tabIndex = -1;
   const size = options.desk ? DESK : WINDOW;
-  const element = backdrop({ width: size.width, height: size.height, picture: wallpaper, scrim: "band", content: win, dark: 0 });
+  const element = backdrop({ width: size.width, height: size.height, picture: wallpaper, scrim: "band", content: win, dark: 0, ...(["ending", "desktop"].includes(options.place.at) ? { push: 1 } : {}) });
   element.classList.add("setup-room");
   element.dataset.whole = "";
   let place: Place = options.place;
   const timers = new Set<number>();
-  // The cards' bodies shown now, each redrawn in place as its card's work moves on.
+  // The cards' bodies shown now, each redrawn in place as its card's work moves on; Make it yours
+  // is drawn once and changes itself.
   const holders = new Map<CardId, HTMLElement>();
+  const yours = yoursCard(views.yours, { hood: opened.has("yours") });
+  yours.onFinished = (failed) => {
+    views.yours = failed ? "failed" : "done";
+    void play(element, tracksNow(failed ? FAILS : finishing(CARD_IDS.indexOf("yours"))));
+  };
 
   const drawCard = (id: CardId) => {
     const holder = holders.get(id) ?? document.createElement("span");
     holder.className = "setup-card";
-    holder.replaceChildren(cardBody(id, views[id], opened.has(id)));
+    holder.replaceChildren(id === "yours" ? yours.body() : cardBody(id, views[id], opened.has(id)));
     holders.set(id, holder);
     return holder;
   };
@@ -314,6 +330,11 @@ export function setupRoom(options: SetupOptions): HTMLElement {
   };
 
   const act = (id: CardId) => (): boolean => {
+    if (id === "yours") {
+      const started = yours.install();
+      if (started) views.yours = "installing";
+      return started;
+    }
     const at = views[id];
     if (CARDS[id].action(at)?.label === "Reboot now") {
       go({ at: "ending", going: true });
@@ -326,15 +347,19 @@ export function setupRoom(options: SetupOptions): HTMLElement {
   };
 
   const railLayer = (id: CardId): HTMLElement => {
-    const pages = CARD_IDS.map((each) => ({ ...cardPage(each, () => views, () => drawCard(each), act(each), () => skipped.has(each)), skipped: () => skipped.add(each) }));
+    const shown = options.alone ? [id] : CARD_IDS;
+    const pages = shown.map((each) => {
+      const page = each === "yours" ? yours.page(act(each), () => skipped.has(each)) : cardPage(each, () => views, () => drawCard(each), act(each), () => skipped.has(each));
+      return { ...page, body: () => drawCard(each), skipped: () => skipped.add(each) };
+    });
     const rail = stepRailPage({
       host: "window",
-      brand: koboBrand(markSvg, wordmark, `First boot · ${RELEASE.codename} ${RELEASE.version}`),
+      brand: koboBrand(markSvg, wordmark, options.alone ? `${CARDS[id].title} · ${RELEASE.codename} ${RELEASE.version}` : `First boot · ${RELEASE.codename} ${RELEASE.version}`),
       pages,
-      current: CARD_IDS.indexOf(id),
+      current: shown.indexOf(id),
       free: true,
       hints: () => HINTS,
-      ...(options.live ? { onExit: (forward: boolean) => go(forward ? { at: "ending" } : { at: "arrival" }) } : {}),
+      ...(options.live ? { onExit: (forward: boolean) => go(options.alone ? { at: "desktop" } : forward ? { at: "ending" } : { at: "arrival" }) } : {}),
     });
     rail.classList.add("setup-layer", "setup-rail");
     return rail;
@@ -367,7 +392,7 @@ export function setupRoom(options: SetupOptions): HTMLElement {
     if (from.at === "arrival" && to.at === "card") return CARDS_IN;
     if (from.at === "card" && to.at === "arrival") return BACK;
     if (from.at === "card" && to.at === "ending") return to.going ? null : ENDS;
-    if (from.at === "ending" && to.at === "desktop") return DESKTOP;
+    if ((from.at === "ending" || from.at === "card") && to.at === "desktop") return DESKTOP;
     if (to.at === "ending" && to.going) return REBOOT;
     return null;
   };
@@ -479,7 +504,7 @@ export const CARDS_IN: Move = {
   ],
   reduced: [fading(".setup-scene", "the arrival", ARRIVAL, 1, 0), fading(".setup-rail", "the rail", "the rail")],
   back: "cuts",
-  sample: () => setupRoom({ place: { at: "card", card: "tuxedo" }, leaving: { at: "arrival" } }),
+  sample: () => setupRoom({ place: { at: "card", card: "yours" }, leaving: { at: "arrival" } }),
 };
 
 /** Esc on the first card: the rail fades and the arrival comes back down. */
@@ -493,7 +518,7 @@ export const BACK: Move = {
   ],
   reduced: [fading(".setup-rail", "the rail", "the rail", 1, 0), fading(".setup-scene", "the arrival", ARRIVAL)],
   back: "cuts",
-  sample: () => setupRoom({ place: { at: "arrival" }, leaving: { at: "card", card: "tuxedo" } }),
+  sample: () => setupRoom({ place: { at: "arrival" }, leaving: { at: "card", card: "yours" } }),
 };
 
 /** Continue or Skip: the next card slides in from the right as the wire's light grows to it. */
@@ -562,10 +587,16 @@ export const FAILS: Move = {
 
 const ENDING = "the ending";
 
+/**
+ * The desktop coming toward you behind the window, as the installer's street does on its done
+ * screen: the wallpaper and the glass's blurred copy of it grow together.
+ */
+const PUSH = <C extends "emphasized_decel" | "standard">(first: Duration[], duration: Duration, curve: C): Track<C> => ({ part: "the desktop coming close", on: "the desktop", target: ".k-backdrop-layers, .setup-window", property: "--backdrop-push", from: 0, to: 1, duration, ...after(first), curve });
+
 const ENDING_TRACKS = (first: Duration[], strike: "neon.strike" | "standard"): Track[] => [
+  PUSH(first, "scene", "emphasized_decel"),
   ...writing().map((track) => ({ ...track, on: ENDING, target: `.setup-ending ${track.target}`, ...after(first, track.cue) })),
   { part: "the mark, struck", on: ENDING, target: ".setup-ending .kobo-mark", property: "--kobo-burn", from: 0, to: 1, duration: "medium", ...after(first, "scene"), curve: strike },
-  { part: "the hanko", on: ENDING, target: ".setup-ending .kobo-stamp", property: "--kobo-stamp", from: 0, to: 1, duration: "short", ...after(first, ["scene", "medium"]), curve: "pop" },
   ...rising(".setup-ending .setup-word-0", "“That's”", ENDING, after(first, ["scene", "medium"]).cue),
   ...rising(".setup-ending .setup-word-1", "“it.”", ENDING, after(first, ["scene", "medium", "micro"]).cue),
   ...rising(".setup-ending > .setup-lede", "the lede", ENDING, after(first, ["scene", "medium", "short"]).cue),
@@ -575,23 +606,23 @@ const ENDING_TRACKS = (first: Duration[], strike: "neon.strike" | "standard"): T
 /** The ending shown on its own, opened on it. */
 const ARRIVES: Move = {
   name: "That's it",
-  what: "クバ writes itself in and strikes; 完了 is stamped beside it; the headline rises word by word.",
+  what: "The desktop comes close behind the glass; クバ writes itself in and strikes; the headline rises word by word.",
   tracks: ENDING_TRACKS([], "neon.strike") as unknown as NonEmpty<Track>,
   unflickered: ENDING_TRACKS([], "standard") as unknown as NonEmpty<Track<Easing>>,
-  reduced: [fading(".setup-ending", "the ending", ENDING)],
+  reduced: [PUSH([], "short", "standard"), fading(".setup-ending", "the ending", ENDING)],
   back: "cuts",
-  sample: () => setupRoom({ place: { at: "ending" }, views: { tuxedo: "done", fingerprint: "done", yubikey: "done", git: "done" }, skipped: ["bitwarden", "phone"], desk: true }),
+  sample: () => setupRoom({ place: { at: "ending" }, views: { yours: "done", drivers: "done", fingerprint: "done" }, skipped: ["yubikey", "phone"], desk: true }),
 };
 
 /** Past the last card: the rail fades off and the ending arrives over it. */
 export const ENDS: Move = {
   name: "Past the last card: That's it",
-  what: "The rail fades over `medium`; クバ writes itself in and strikes, 完了 stamped beside it; the headline rises.",
+  what: "The rail fades over `medium`; the desktop comes close; クバ writes itself in and strikes; the headline rises.",
   tracks: [{ part: "the rail's fade", on: "the rail", target: ".setup-rail", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }, ...ENDING_TRACKS(["medium"], "neon.strike")] as unknown as NonEmpty<Track>,
   unflickered: [{ part: "the rail's fade", on: "the rail", target: ".setup-rail", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }, ...ENDING_TRACKS(["medium"], "standard")] as unknown as NonEmpty<Track<Easing>>,
-  reduced: [fading(".setup-rail", "the rail", "the rail", 1, 0), fading(".setup-scene", "the ending", ENDING)],
+  reduced: [fading(".setup-rail", "the rail", "the rail", 1, 0), PUSH(["short"], "short", "standard"), fading(".setup-scene", "the ending", ENDING)],
   back: "cuts",
-  sample: () => setupRoom({ place: { at: "ending" }, views: { tuxedo: "done", fingerprint: "done", yubikey: "done", git: "done" }, skipped: ["bitwarden", "phone"], leaving: { at: "card", card: "phone" } }),
+  sample: () => setupRoom({ place: { at: "ending" }, views: { yours: "done", drivers: "done", fingerprint: "done" }, skipped: ["yubikey", "phone"], leaving: { at: "card", card: "phone" } }),
 };
 
 /** Go to the desktop: the window steps back and is gone; the desktop is what's left. */
@@ -604,7 +635,7 @@ export const DESKTOP: Move = {
   ],
   reduced: [{ part: "the window's fade", on: "the window", target: ".setup-window", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }],
   back: "cuts",
-  sample: () => setupRoom({ place: { at: "ending" }, views: { tuxedo: "done", fingerprint: "done", yubikey: "done", git: "done" }, skipped: ["bitwarden", "phone"], desk: true }),
+  sample: () => setupRoom({ place: { at: "ending" }, views: { yours: "done", drivers: "done", fingerprint: "done" }, skipped: ["yubikey", "phone"], desk: true }),
 };
 
 /** Reboot now: Restarting…, and the desktop goes dark with the window. */
@@ -620,5 +651,5 @@ export const REBOOT: Move = {
     { part: "the dark", on: "the desktop", target: ".k-backdrop-dark", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   back: "cuts",
-  sample: () => setupRoom({ place: { at: "ending", going: true }, views: { tuxedo: "queued", fingerprint: "done", git: "done" }, skipped: ["yubikey", "bitwarden", "phone"], desk: true }),
+  sample: () => setupRoom({ place: { at: "ending", going: true }, views: { yours: "done", drivers: "queued", fingerprint: "done" }, skipped: ["yubikey", "phone"], desk: true }),
 };

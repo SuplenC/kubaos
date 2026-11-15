@@ -5,8 +5,8 @@ import { type Measure, type Move, type NonEmpty, screen } from "../../site/page.
 import { type CardId, CARD_IDS, type Views } from "./setup-cards.ts";
 import { finishing, onward, setupRoom, type SetupOptions } from "./setup-room.ts";
 
-/** Where each card ends when it is gone through in order: TUXEDO's key queued for its reboot. */
-const WALKED: Views = { tuxedo: "queued", fingerprint: "done", yubikey: "done", bitwarden: "done", git: "done", phone: "done" };
+/** Where each card ends when it is gone through in order: the apps in, the drivers' key queued. */
+const WALKED: Views = { yours: "done", drivers: "queued", fingerprint: "done", yubikey: "done", phone: "done" };
 
 /** The way to `card` taken in order: the cards before it gone through, the ones after it untouched. */
 function walk(card: CardId): Partial<Views> {
@@ -21,6 +21,11 @@ export function atCard(card: CardId, view: string, more: Partial<SetupOptions> =
 /** The live stage: the window on the desktop at `card`, reached in order, going on through first boot. */
 export function liveCard(card: CardId): () => HTMLElement {
   return screen(() => setupRoom({ place: { at: "card", card }, live: true, desk: true, views: walk(card) }));
+}
+
+/** The window as the Command menu opens it on `card` alone, at `view`, on the desktop. */
+export function aloneAt(card: CardId, view: string, live = false): () => HTMLElement {
+  return screen(() => setupRoom({ place: { at: "card", card }, alone: true, desk: true, live, views: { [card]: view } }));
 }
 
 /** Continue or Skip onto `card`: its page slides in as the wire's light grows to its step. */

@@ -107,3 +107,67 @@
 .setup-room.k-backdrop .k-backdrop-scrim {
   display: none;
 }
+
+/* Make it yours (`setup-yours-card.ts`): the apps' column takes the height the settings beside it take,
+   at least five two-line rows of it, and its well fills what is left under its heading. */
+.setup-yours-apps {
+  align-self: stretch;
+  min-height: calc(5 * (var(--size-row_two_line) + var(--space-s4)) + 2 * var(--space-s12) + var(--size-control_sm) + var(--space-s12));
+}
+
+.setup-yours-well {
+  position: relative;
+  display: grid;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.setup-yours-well > * {
+  grid-area: 1 / 1;
+  min-height: 0;
+}
+
+/* The well's words while it holds nothing: in its middle, a text column at most, fading out as the
+   first rows arrive. */
+.setup-yours-empty {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-s24);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.setup-yours-well[data-empty] > .setup-yours-empty {
+  opacity: 1;
+}
+
+.setup-yours-empty > .k-text {
+  text-align: center;
+}
+
+.setup-yours-progress[hidden],
+.setup-yours-failure[hidden] {
+  display: none;
+}
+
+/* The ending's desktop coming close: the glass's blurred copy of it grows with it, from the same
+   point at the screen's foot, so what shows through the glass stays what lies under it. */
+.setup-room .k-glass-picture {
+  scale: calc(1 + (var(--scale-push) - 1) * var(--backdrop-push));
+  transform-origin: 50% 100%;
+}
+
+/* The ending's mark, alone in the middle of the column. */
+.setup-ending > .setup-mark {
+  align-self: center;
+}
+
+/* With nothing picked the settings' column says what comes there, on the Apps heading's line. */
+.setup-yours-none {
+  display: flex;
+  align-items: center;
+  min-height: var(--size-control_sm);
+}

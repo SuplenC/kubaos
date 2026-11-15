@@ -58,7 +58,7 @@ export default page<Shown>({
   },
   motion: {
     arrives: [arrivesAt("yubikey", "plug")],
-    leaves: doesntApply("Continue slides the next card in: Bitwarden's page shows it."),
+    leaves: doesntApply("Continue slides the next card in: Your phone's page shows it."),
     between: [HUM, finishesAt("yubikey", "done"), FAILS],
   },
   keyboard: {

@@ -7,7 +7,6 @@ import { banner } from "../../lib/banner.ts";
 import { button } from "../../lib/button.ts";
 import { hangs } from "../../lib/button-bar.ts";
 import { card } from "../../lib/card.ts";
-import { checkbox, radio, radioGroup } from "../../lib/check.ts";
 import { chip } from "../../lib/chip.ts";
 import { collapsible } from "../../lib/collapsible.ts";
 import { descriptionList } from "../../lib/description.ts";
@@ -16,6 +15,7 @@ import { field, labelled } from "../../lib/field.ts";
 import { icon } from "../../lib/icon.ts";
 import { keyHints } from "../../lib/keycap.ts";
 import { fill, filling, grid, row, stack } from "../../lib/layout.ts";
+import { list } from "../../lib/list.ts";
 import { log } from "../../lib/log.ts";
 import { progressBar } from "../../lib/progress.ts";
 import { rollingNumber } from "../../lib/rolling-number.ts";
@@ -24,6 +24,7 @@ import { spinner } from "../../lib/spinner.ts";
 import type { RailPage, RailStatus } from "../../lib/step-rail.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { body, showToggle } from "./kobo-parts.ts";
+import { type Maker, MAKERS } from "./setup-data.ts";
 import { type Ask, type Card, type CardId, CARDS, open, type Prompt, PROMPT_WHERE, running, type View, type Views } from "./setup-cards.ts";
 
 /** The symbol a prompt shows big, beside its words. */
@@ -31,9 +32,6 @@ const PROMPT_GLYPH: Record<Prompt["kind"], string> = { password: "lock", finger:
 
 /** The fingers fprintd knows, the next one to enrol first. */
 const FINGERS = ["Right index", "Right middle", "Left index", "Left middle", "Right thumb", "Left thumb"];
-
-/** The vault's folders a person can take SSH keys from; `env/` ones hold project env, not keys. */
-const FOLDERS = ["ssh", "work", "old laptop"];
 
 function capital(words: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
@@ -109,44 +107,16 @@ function buttons(labels: readonly string[]): HTMLElement {
   return hangs(row("s12", "centre", ...labels.map((label) => button({ label, kind: quiet.has(label) ? "Text" : "Tonal" }))));
 }
 
-/** The vault's folders as checkboxes, none ticked for the whole vault, behind their summary. */
-function folders(): HTMLElement {
-  const boxes = row("s20", "centre", ...FOLDERS.map((label) => checkbox({ label })));
-  const content = stack("s12", "start", wrapped("The whole vault. Tick folders to take keys from those only; Pull again to apply.", "small", "on_surface_variant"), boxes);
-  return hangs(collapsible({ title: "SSH keys from", summary: "The whole vault", content }));
+/** What a maker's drivers bring, one row a part: what it fixes, then the package, ticked to install. */
+function partsList(maker: Maker, ticked: readonly number[] | undefined): HTMLElement {
+  const rows = maker.parts.map((part, index) => ({ title: part.title, subtitle: part.line, icon: part.icon, tile: true, detail: part.package, checked: ticked ? ticked.includes(index) : part.offered }));
+  return list(rows);
 }
 
-/** Bitwarden's login: the server, the account and the code upfront; another way in behind it. */
-function bitwardenForm(ask: Extract<Ask, { is: "bitwarden" }>): HTMLElement {
-  const servers = ["bitwarden.eu", "bitwarden.com", "Self-hosted"].map((label, index) => radio({ label, checked: index === ask.server }));
-  const parts: Element[] = [labelled("Server", radioGroup("s20", ...servers))];
-  if (ask.server === 2) parts.push(input("Server address", "Your server's https:// address.", { value: "https://vault.nowak.dev", icon: "public" }));
-  const password = (show: boolean) => input("Master password", "In memory, never on disk.", { value: "correct horse battery staple", secret: true, icon: "key" }, false, show ? showToggle(() => []) : undefined);
-  // The whole login on one row: the account, its password and its code read as one question.
-  if (ask.method === "apikey") {
-    parts.push(grid(3, "s20", [input("client_id", "Web vault: Security, Keys.", { value: "user.6f1c…" }), input("client_secret", "Beside client_id.", { value: "8Hq2kX9v", secret: true }), password(true)]));
-  } else {
-    const code = ask.missing === "code" ? {} : { value: "482 913" };
-    parts.push(grid(3, "s20", [input("Email", "Saved, with the server.", { value: "mika@nowak.dev", icon: "mail" }), password(true), input("Two-step code", "From your authenticator app.", { placeholder: "123456", ...code })]));
-  }
-  const methods = ["Authenticator app", "YubiKey OTP", "API key"].map((label, index) => radio({ label, checked: index === (ask.method === "apikey" ? 2 : 0) }));
-  const way = stack("s12", "start", radioGroup("s20", ...methods), wrapped("bw can't use the YubiKey Bio for two-step login: use the authenticator app's code, or the API key for an account with no code.", "small", "on_surface_variant"));
-  parts.push(hangs(collapsible({ title: "Another way to log in", summary: ask.method === "apikey" ? "API key" : "Authenticator app", content: way, open: ask.method === "apikey" })));
-  return stack("s20", "start", ...parts.map((each) => filling(each as HTMLElement)));
-}
-
-/** The SSH keys the last pull found, read-only: what each became, and what serves them. */
-function keysCard(): HTMLElement {
-  return card({
-    header: { glyph: "key", title: "SSH keys" },
-    body: [
-      descriptionList([
-        { label: "github (ssh)", value: "Host block for github.com; signs your commits" },
-        { label: "hetzner (ssh)", value: "Host block for *.nowak.dev" },
-        { label: "The agent", value: "Serves 2 keys" },
-      ]),
-    ],
-  });
+/** What works on the machine as it is, one row each, and with `fixed` what the drivers made work. */
+function worksList(maker: Maker, fixed: boolean): HTMLElement {
+  const works = [...(fixed ? maker.parts.filter((part) => part.offered).map((part) => ({ title: part.title, found: `${part.package}, loaded`, icon: part.icon })) : []), ...maker.works];
+  return list(works.map((each) => ({ title: each.title, subtitle: each.found, icon: each.icon, tile: true, chips: [{ kind: "Accent" as const, label: "Works" }] })));
 }
 
 /** One of the things a card asks, drawn. */
@@ -168,17 +138,10 @@ function drawAsk(ask: Ask): HTMLElement {
       return grid(2, "s20", [labelled("Finger", select({ options: FINGERS, picked: 0, icon: "fingerprint" }), { note: "Any finger works; enrol a second one later." })]);
     case "fingers":
       return hangs(row("s8", "centre", ...ask.names.map((name) => chip({ label: name, kind: "Neutral", icon: "fingerprint" })), fill(), button({ label: "Add another finger", kind: "Tonal" })));
-    case "bitwarden":
-      return bitwardenForm(ask);
-    case "unlock":
-      return stack("s20", "start", filling(grid(2, "s20", [input("Master password", "Logged in already: this only unlocks the vault.", { value: "correct horse battery staple", secret: true, icon: "key" }, false, showToggle(() => []))])), filling(folders()));
-    case "keys":
-      return stack("s20", "start", filling(keysCard()), filling(folders()));
-    case "git":
-      return grid(2, "s20", [
-        input("Your name", "From your account; the way commits show it.", { value: "Mika Nowak", icon: "person" }),
-        input("Email", ask.email === "mika@nowak" ? "That doesn't look like an email." : "Public on every commit. GitHub's noreply address works too.", { value: ask.email, icon: "mail", ...(ask.email === "mika@nowak" ? { state: "Invalid" as const } : {}) }, ask.email === "mika@nowak"),
-      ]);
+    case "parts":
+      return partsList(MAKERS[ask.maker]!, ask.ticked);
+    case "works":
+      return worksList(MAKERS[ask.maker]!, ask.fixed ?? false);
     case "buttons":
       return buttons(ask.labels);
   }
