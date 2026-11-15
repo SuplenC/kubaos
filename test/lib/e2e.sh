@@ -1849,6 +1849,21 @@ c_shell_supervisor() {
   [[ -z $now ]] && echo "ok   qs kill stops the shell for good" ||
     { echo "FAIL Quickshell '$now' runs after qs kill"; bad=1; }
 
+  # A shell with no supervisor, restarted, gets one: killed, it comes back.
+  # Unlocked, or restart-shell would wait for an unlock.
+  as_user rm -f "$RUNTIME_DIR/kubaos-session-lock"
+  in_session "exec qs --no-color >>$QS_LOG 2>&1" &
+  shell_back "" 5 || { echo "FAIL a bare qs didn't start"; bad=1; }
+  pid="$now"
+  in_session "bash '$REPO/scripts/dot-session' restart-shell >>$QS_LOG 2>&1" &
+  shell_back "$pid" 6 || { echo "FAIL Quickshell is '$now' after restart-shell with no supervisor, was '$pid'"; bad=1; }
+  pid="$now"
+  pkill -KILL -u "$USER_NAME" -x .quickshell-wra
+  shell_back "$pid" 7 && echo "ok   restart-shell puts an unsupervised shell under a supervisor ($pid -> $now)" ||
+    { echo "FAIL Quickshell is '$now' after a kill of a shell restart-shell started, was '$pid'"; tail -20 "$QS_LOG"; bad=1; }
+  in_session 'qs kill' >/dev/null 2>&1
+  sleep 3
+
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
   session_stop
   as_user rm -f "$RUNTIME_DIR/kubaos-session-lock"
