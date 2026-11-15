@@ -4,7 +4,7 @@
 
 import { type ColourPickerOptions, colourPicker, type PickedColour, type Swatch } from "../../lib/colour-picker.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
-import { within } from "../../lib/layout.ts";
+import { row, stack, within } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
@@ -29,18 +29,24 @@ type Options = Partial<ColourPickerOptions<Role>>;
  */
 function well(options: Options = {}, surface?: string): HTMLElement {
   const made = colourPicker<Role>({ picked: AUTO, swatches: ROLES, ...options });
-  const box = document.createElement("span");
-  box.className = "f-colour-well";
+  // Each row is its label's slot and its control, `space.s12` apart; the slots line up as the
+  // well's label column, as wide as its widest label.
+  const line = (words: string, sub: boolean, control: HTMLElement) => {
+    const said = text(words, "label", "on_surface_variant");
+    said.toggleAttribute("data-sub", sub);
+    const slot = document.createElement("span");
+    slot.className = "f-colour-label";
+    slot.append(said);
+    const made = row("s12", "centre", slot, control);
+    made.classList.add("f-colour-line");
+    return made;
+  };
+  const box = stack("s4", "start", line("Colour", false, made.choice), line("Hue", true, made.hue), line("Tone", true, made.tone));
+  box.classList.add("f-colour-well");
   if (surface) {
     box.style.background = `var(--color-${surface})`;
     box.style.setProperty("--k-colour-surface", `var(--color-${surface})`);
   }
-  const label = (words: string, sub: boolean) => {
-    const said = text(words, "label", "on_surface_variant");
-    said.toggleAttribute("data-sub", sub);
-    return said;
-  };
-  box.append(label("Colour", false), made.choice, label("Hue", true), made.hue, label("Tone", true), made.tone);
   return within("var(--size-panel)", box);
 }
 

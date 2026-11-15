@@ -4,7 +4,7 @@
 // surface can show no key hints and still say every key it takes.
 
 import { keycap, keys } from "./keycap.ts";
-import { row, stack } from "./layout.ts";
+import { filling, row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { text } from "./text.ts";
 import { popover } from "./tooltip.ts";
@@ -18,7 +18,8 @@ export interface ShortcutGroup {
 /**
  * The popover: `size.panel` wide on the ladder's step 2, `space.s16` between groups, `space.s4`
  * from a group's name to its rows, each row `size.row_compact` tall at least, its words at its
- * start and its keycaps `space.s4` apart in a column at its end.
+ * start, filling the room the keycaps leave, and its keycaps `space.s4` apart in a column at its
+ * end, `space.s16` clear of them.
  */
 export function shortcuts(groups: readonly ShortcutGroup[]): HTMLElement {
   const made = popover(
@@ -34,7 +35,7 @@ export function shortcuts(groups: readonly ShortcutGroup[]): HTMLElement {
           ...group.keys.map(([combination, does]) => {
             const caps = row("s4", "centre", ...keys(combination).map(keycap));
             caps.classList.add("k-shortcut-keys");
-            const line = row("s16", "centre", text(does, "body"), caps);
+            const line = row("s16", "centre", filling(text(does, "body")), caps);
             line.classList.add("k-shortcut");
             return line;
           }),

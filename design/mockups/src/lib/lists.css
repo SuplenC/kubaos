@@ -260,10 +260,6 @@
   min-width: 0;
 }
 
-.k-list-row[data-clear] .k-list-lead {
-  margin-inline-end: calc(var(--space-s16) - var(--space-s12));
-}
-
 .k-list-detail {
   flex: 0 1 auto;
 }

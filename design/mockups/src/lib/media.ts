@@ -11,6 +11,7 @@
 import { probe } from "./probe.ts";
 import type { Corner } from "./radius.ts";
 import { wrapped } from "./text.ts";
+import { length } from "./tokens.ts";
 
 /** Where the picture is: on its way, there, or unreadable. */
 export type Arrival = "loading" | "loaded" | "broken";
@@ -78,5 +79,7 @@ export function media(options: MediaOptions): HTMLElement {
     caption.style.color = "var(--caption-colour, var(--color-on_surface_variant))";
     room.append(caption);
   }
-  return room;
+  // The room is a stack: the caption `space.s8` under the box, both its width.
+  room.dataset.layout = "";
+  return probe(room, { role: "layout", axis: "y", gap: length("space-s8"), align: "start" });
 }

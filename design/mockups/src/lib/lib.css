@@ -823,10 +823,16 @@
   filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--picked) * var(--signs))));
 }
 
-/* The mark centred on the title's first line, on a whole device pixel. */
+/* The mark's slot is the title's first line, from the row's top as the title's is; the mark is
+   centred on it, on a whole device pixel. */
 .k-choice-mark {
-  margin-top: round(down, calc((var(--type-subheading-line) - var(--size-check)) / 2), 1px);
+  align-items: flex-start;
+  height: var(--type-subheading-line);
   cursor: inherit;
+}
+
+.k-choice-mark > .k-check-box {
+  margin-top: round(down, calc((var(--type-subheading-line) - var(--size-check)) / 2), 1px);
 }
 
 .k-choice-mark .k-check-mark {
@@ -1385,7 +1391,6 @@
 }
 
 .k-shortcut {
-  justify-content: space-between;
   min-height: var(--size-row_compact);
 }
 
@@ -2986,14 +2991,14 @@
   align-self: stretch;
 }
 
-/* The middle, `space.s12` under the title, its scroller clipped at its edges with a rule on each. */
+/* The middle, `space.s12` under the title (a gap of the column's), its scroller clipped at its
+   edges with a rule on each. */
 .k-dialog-middle {
   --foot: var(--space-s24);
   position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin-top: var(--space-s12);
 }
 
 .k-dialog-column > .k-dialog-middle {
@@ -3026,10 +3031,6 @@
 
 .k-dialog-scroll > * {
   align-self: stretch;
-}
-
-.k-dialog-scroll > .k-dialog-follows {
-  margin-top: var(--space-s16);
 }
 
 /* The room the dialog's least height leaves over, above the buttons and under the middle's own
