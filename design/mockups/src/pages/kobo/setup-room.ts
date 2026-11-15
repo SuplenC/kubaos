@@ -155,8 +155,9 @@ export function arrivalColumn(views: Views, moment: Moment = "rest", hero = HERO
     : moment === "offline"
       ? promise("wifi_off", "Offline: apps, drivers and fprintd need the internet. The rest works without it.", "warning")
       : row("s8", "centre", icon("info", "var(--type-small-icon)", "var(--color-on_surface_variant)"), text("All of it stays in the Command menu: Super, then “First boot”.", "small", "on_surface_variant"));
+  // It is Kōbō's welcome, on the installed system: the welcome's column, moved as the welcome is.
   return column(
-    "arrival",
+    "welcome",
     part(text("初期設定", "accent", "primary"), "accent"),
     gap("s8"),
     neonSign(),
