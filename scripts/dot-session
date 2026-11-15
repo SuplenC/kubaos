@@ -15,7 +15,8 @@
 #                               `qs kill` or the end of the session. Hyprland's
 #                               autostart runs it.
 #   dot-session restart-shell   in the session: restart the default Quickshell
-#                               once the screen is unlocked
+#                               once the screen is unlocked, under the
+#                               supervisor (`shell`), started if none runs
 #   dot-session restart-idle    in the session: restart hypridle, if it runs
 #   dot-session start-idle      in the session: restart hypridle, or start it if it
 #                               isn't running. `kubaos-idle` runs it after a change
@@ -176,10 +177,13 @@ restart_shell() {
   # `dot-session shell` starts the new one.
   supervised && return 0
   wait_gone pgrep -u "$(id -u)" -x .quickshell-wra
-  # HAZARD: close the lock before exec. Quickshell would hold it for as long
+  # HAZARD: close the lock before exec. The shell would hold it for as long
   # as it runs, and every later restart would skip.
   exec 9>&-
-  exec qs
+  # Under a supervisor of its own, never a bare `qs`: a shell nothing watches
+  # that then dies with the screen locked leaves Hyprland locked with no lock
+  # screen until someone restarts it from another tty.
+  exec "$SELF" shell
 }
 
 restart_idle() {
