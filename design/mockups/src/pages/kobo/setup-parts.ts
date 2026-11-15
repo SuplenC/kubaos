@@ -22,13 +22,12 @@ import { rollingNumber } from "../../lib/rolling-number.ts";
 import { select } from "../../lib/select.ts";
 import { spinner } from "../../lib/spinner.ts";
 import type { RailPage, RailStatus } from "../../lib/step-rail.ts";
-import type { StepOptions } from "../../lib/step.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { body, showToggle } from "./kobo-parts.ts";
 import { type Ask, type Card, type CardId, CARDS, open, type Prompt, PROMPT_WHERE, running, type View, type Views } from "./setup-cards.ts";
 
 /** The symbol a prompt shows big, beside its words. */
-const PROMPT_GLYPH: Record<Prompt["kind"], string> = { password: "lock", finger: "fingerprint", key: "key", wait: "schedule", plug: "key", phone: "smartphone" };
+const PROMPT_GLYPH: Record<Prompt["kind"], string> = { password: "lock", finger: "fingerprint", key: "key", wait: "schedule", plug: "key", phone: "smartphone", pair: "smartphone" };
 
 /** The fingers fprintd knows, the next one to enrol first. */
 const FINGERS = ["Right index", "Right middle", "Left index", "Left middle", "Right thumb", "Left thumb"];
@@ -43,6 +42,8 @@ function capital(words: string): string {
 /** A card's state as its chip says it: to do plain, done tonal with a check, a reboot on the accent. */
 export function stateChip(view: View, skipped = false): HTMLElement {
   if (running(view)) return chip({ label: "Running", kind: "Neutral", icon: "progress_activity" });
+  // Something asks for the person now: it is the next thing to do, so it carries the accent.
+  if (view.wants) return chip({ label: view.wants.label, kind: "Filled", icon: view.wants.glyph });
   switch (view.state) {
     case "done":
       return chip({ label: "Done", kind: "Accent", icon: "check" });
@@ -59,7 +60,7 @@ export function stateChip(view: View, skipped = false): HTMLElement {
 
 /** Where the card stands: its state's chip, then the engine's summary in its own slot. */
 function statusLine(view: View): HTMLElement {
-  const line = row("s12", "start", stateChip(view), filling(wrapped(view.summary, "body", "on_surface_variant")));
+  const line = row("s12", "start", stateChip(view), filling(wrapped(view.found ?? view.summary, "body", "on_surface_variant")));
   line.classList.add("setup-status");
   return line;
 }
@@ -76,7 +77,8 @@ export function promptCard(prompt: Prompt): HTMLElement {
   const hum = document.createElement("span");
   hum.className = "setup-hum";
   hum.append(icon(PROMPT_GLYPH[prompt.kind], "var(--icon-s48)", "var(--color-primary)"));
-  const lead = prompt.kind === "wait" ? spinner("s48") : hum;
+  // A request waits on a decision, not on a hand or a device: its symbol stays still.
+  const lead = prompt.kind === "wait" ? spinner("s48") : prompt.kind === "pair" ? icon(PROMPT_GLYPH.pair, "var(--icon-s48)", "var(--color-primary)") : hum;
   const heading = wrapped(prompt.text, "heading");
   heading.classList.add("setup-prompt-words");
   heading.toggleAttribute("data-counted", prompt.count !== undefined);
@@ -85,6 +87,10 @@ export function promptCard(prompt: Prompt): HTMLElement {
     const [done, of] = prompt.count;
     const count = rollingNumber({ value: done, widest: "0", style: "small", color: "on_surface_variant" });
     words.append(filling(stack("s4", "start", filling(progressBar({ fraction: done / of })), row(0, "centre", count.element, text(` of ${of}`, "small", "on_surface_variant")))));
+  }
+  if (prompt.key) {
+    const key = text(prompt.key, "mono_large");
+    words.append(key);
   }
   words.append(wrapped(PROMPT_WHERE[prompt.kind], "small", "on_surface_variant"));
   const shown = card({ body: [row("s20", "centre", lead, filling(words))] });
@@ -113,16 +119,15 @@ function folders(): HTMLElement {
 /** Bitwarden's login: the server, the account and the code upfront; another way in behind it. */
 function bitwardenForm(ask: Extract<Ask, { is: "bitwarden" }>): HTMLElement {
   const servers = ["bitwarden.eu", "bitwarden.com", "Self-hosted"].map((label, index) => radio({ label, checked: index === ask.server }));
-  const parts: Element[] = [labelled("Server", radioGroup("s20", ...servers), { note: "Where the account lives: the address you log in at." })];
+  const parts: Element[] = [labelled("Server", radioGroup("s20", ...servers))];
   if (ask.server === 2) parts.push(input("Server address", "Your server's https:// address.", { value: "https://vault.nowak.dev", icon: "public" }));
-  const password = input("Master password", "In memory until this is done, never on disk.", { value: "correct horse battery staple", secret: true, icon: "key" }, false, showToggle(() => []));
+  const password = (show: boolean) => input("Master password", "In memory, never on disk.", { value: "correct horse battery staple", secret: true, icon: "key" }, false, show ? showToggle(() => []) : undefined);
+  // The whole login on one row: the account, its password and its code read as one question.
   if (ask.method === "apikey") {
-    parts.push(grid(2, "s20", [input("client_id", "Web vault: Settings, Security, Keys.", { value: "user.6f1c…" }), input("client_secret", "From the same page as client_id.", { value: "8Hq2kX9v", secret: true })]));
-    parts.push(grid(2, "s20", [password]));
+    parts.push(grid(3, "s20", [input("client_id", "Web vault: Security, Keys.", { value: "user.6f1c…" }), input("client_secret", "Beside client_id.", { value: "8Hq2kX9v", secret: true }), password(true)]));
   } else {
-    parts.push(grid(2, "s20", [input("Email", "Only the email and server are saved.", { value: "mika@nowak.dev", icon: "mail" }), password]));
     const code = ask.missing === "code" ? {} : { value: "482 913" };
-    parts.push(grid(2, "s20", [input("Two-step code", "The 6-digit code from your authenticator app.", { placeholder: "123456", ...code })]));
+    parts.push(grid(3, "s20", [input("Email", "Saved, with the server.", { value: "mika@nowak.dev", icon: "mail" }), password(true), input("Two-step code", "From your authenticator app.", { placeholder: "123456", ...code })]));
   }
   const methods = ["Authenticator app", "YubiKey OTP", "API key"].map((label, index) => radio({ label, checked: index === (ask.method === "apikey" ? 2 : 0) }));
   const way = stack("s12", "start", radioGroup("s20", ...methods), wrapped("bw can't use the YubiKey Bio for two-step login: use the authenticator app's code, or the API key for an account with no code.", "small", "on_surface_variant"));
@@ -154,8 +159,9 @@ function drawAsk(ask: Ask): HTMLElement {
     case "notice":
       return card({ header: { glyph: ask.icon, title: ask.title }, body: ask.lines.map((line) => wrapped(line, "body", "on_surface_variant")) });
     case "mok": {
-      const first = input("One-time password", "8 to 16 letters and digits, for the blue screen.", { value: "kobo2026", secret: true, icon: "key" }, false, showToggle(() => []));
-      const again = input("Same again", ask.mismatch ? "The two passwords don't match." : "Typed twice: a typo here costs a reboot.", { value: ask.mismatch ? "kobo2062" : "kobo2026", secret: true, icon: "key", ...(ask.mismatch ? { state: "Invalid" as const } : {}) }, ask.mismatch);
+      const first = input("One-time password", "8 to 16 letters and digits: it assumes a US keyboard.", { value: "kobo2026", secret: true, icon: "key" });
+      // Show reveals both, so it ends the pair, over the second field, as the installer's does.
+      const again = input("Same again", ask.mismatch ? "The two passwords don't match." : "Typed twice: a typo here costs a reboot.", { value: ask.mismatch ? "kobo2062" : "kobo2026", secret: true, icon: "key", ...(ask.mismatch ? { state: "Invalid" as const } : {}) }, ask.mismatch, showToggle(() => []));
       return grid(2, "s20", [first, again]);
     }
     case "finger":
@@ -180,7 +186,7 @@ function drawAsk(ask: Ask): HTMLElement {
 
 /** What skipping costs, and the Command menu's Item that does it later. */
 function laterLine(spec: Card): HTMLElement {
-  const line = stack("s8", "start", wrapped(spec.skip, "small", "on_surface_variant"), keyHints([["Super+Space", `then “${spec.later}”, any time`]]));
+  const line = row("s12", "centre", wrapped(spec.skip, "small", "on_surface_variant"), keyHints([["Super+Space", `then “${spec.later}”`]]));
   line.classList.add("setup-later");
   return line;
 }
@@ -215,6 +221,7 @@ export function railStatus(id: CardId, name: string, skipped = false): RailStatu
   const view = CARDS[id].views[name]!;
   const going = running(view);
   const failed = view.failed !== undefined;
+  if (view.wants) return { state: { is: "action", label: view.wants.label, glyph: view.wants.glyph } };
   switch (view.state) {
     case "done":
       return { state: { is: "done" } };
@@ -229,14 +236,6 @@ export function railStatus(id: CardId, name: string, skipped = false): RailStatu
   }
 }
 
-/** The card's step as a row of a plan: the arrival's and the ending's, its state a chip. */
-export function planStep(id: CardId, name: string, skipped = false): StepOptions {
-  const status = railStatus(id, name, skipped);
-  // A chip has room for its words, so Not here needs no symbol there, as the checklist's chip has none.
-  const words = status.out ? { label: "Not here" } : status.words;
-  return { title: CARDS[id].title, icon: CARDS[id].icon, state: status.state, ...(words ? { words } : {}) };
-}
-
 /** What a card's footer band shows at `name`: its work, Skip while it is open, what blocks it. */
 export function cardPage(id: CardId, views: () => Views, draw: () => HTMLElement, act: () => boolean, skipped: () => boolean = () => false): RailPage {
   const spec = CARDS[id];
@@ -249,7 +248,9 @@ export function cardPage(id: CardId, views: () => Views, draw: () => HTMLElement
     next: () => spec.action(at())?.label ?? "Continue",
     nextIcon: () => spec.action(at())?.icon,
     skip: () => (spec.action(at()) && (open(view()) || view().state === "reboot") ? (view().state === "reboot" ? "Later" : "Skip") : undefined),
-    blocker: () => (running(view()) ? "One thing at a time." : spec.blocker?.(at())),
+    // While its work runs nothing is wrong, so nothing blocks: the band says it is working.
+    blocker: () => (running(view()) ? undefined : spec.blocker?.(at())),
+    busy: () => (running(view()) ? "Running…" : undefined),
     act,
   };
 }

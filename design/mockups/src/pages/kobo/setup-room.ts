@@ -11,26 +11,26 @@
 import "./kobo.css";
 import "./setup.css";
 import wallpaper from "../../../../../crates/kubaos-kobo/assets/wallpaper.jpg?url";
+import blurred from "../../../../../crates/kubaos-kobo/assets/wallpaper-blur.jpg?url";
 import markSvg from "../../../../../crates/kubaos-kobo/assets/logo/kubaos-mark.svg?raw";
 import wordmark from "../../../../../crates/kubaos-kobo/assets/logo/kubaos-wordmark.svg?raw";
-import { backdrop } from "../../lib/backdrop.ts";
+import { backdrop, glassPanel } from "../../lib/backdrop.ts";
 import { button } from "../../lib/button.ts";
 import { focusRing, windowRing } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
 import { type KeyHint, keyHints } from "../../lib/keycap.ts";
-import { gap, grid, row, stack } from "../../lib/layout.ts";
+import { gap, row, stack } from "../../lib/layout.ts";
 import { nested, role } from "../../lib/radius.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { koboBrand, RECHECK, stepRailPage } from "../../lib/step-rail.ts";
-import { step } from "../../lib/step.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import type { Duration, Easing, Move, NonEmpty, Track } from "../../site/page.ts";
 import { milliseconds } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
 import { RELEASE } from "./kobo-data.ts";
-import { play } from "./kobo-room.ts";
+import { hanko, neonMark, neonSign, play, sealed, writing } from "./kobo-room.ts";
 import { CARD_IDS, type CardId, CARDS, firstViews, open, running, type Views } from "./setup-cards.ts";
-import { cardBody, cardPage, planStep } from "./setup-parts.ts";
+import { cardBody, cardPage } from "./setup-parts.ts";
 
 /** What the arrival waits on or finds: detection running, no network, nothing left, a reboot behind it. */
 export type Moment = "rest" | "detecting" | "offline" | "settled" | "rebooted";
@@ -101,24 +101,11 @@ function fading(target: string, name: string, on: string, from = 0, to = 1): Tra
   return { part: `${name}'s fade`, on, target, property: "opacity", from, to, duration: "short", curve: "standard" };
 }
 
-/** The cue of a plan's row: `after`, then a `micro` more for each row before it. */
-function dealt(after: NonEmpty<Duration>, index: number): NonEmpty<Duration> {
-  return [...after, ...Array.from({ length: index }, () => "micro" as const)];
-}
-
 // ----------------------------------------------------------------- Scenes --
 
 function part<E extends HTMLElement>(element: E, name: string): E {
   element.classList.add("kobo-part", `setup-${name}`);
   return element;
-}
-
-/** The cards as a plan, two to a row, each its symbol, its title and where it stands. */
-function plan(views: Views, skipped: ReadonlySet<CardId>): HTMLElement {
-  const rows = CARD_IDS.map((id) => part(step(planStep(id, views[id], skipped.has(id))), "row"));
-  const box = grid(2, "s8", rows);
-  box.classList.add("setup-plan");
-  return box;
 }
 
 /** Key hints that keep a keycap's line of room with none to show, so nothing under them moves. */
@@ -133,20 +120,28 @@ function promise(glyph: string, words: string, tone = "on_surface_variant"): HTM
   return row("s8", "centre", icon(glyph, "var(--type-small-icon)", `var(--color-${tone})`), wrapped(words, "small", tone));
 }
 
+/** How many cards want the person, said as a count. */
+function wanted(views: Views): string {
+  const left = CARD_IDS.filter((id) => open(CARDS[id].views[views[id]]!)).length;
+  const words = ["None", "One", "Two", "Three", "Four", "Five", "Six"];
+  return `${words[left] ?? left} ${left === 1 ? "thing" : "things"}`;
+}
+
 /** The arrival's words for what it found. */
 function arrivalWords(moment: Moment, views: Views): { hero?: string; lede: string } {
-  const left = CARD_IDS.filter((id) => open(CARDS[id].views[views[id]]!)).length;
   switch (moment) {
     case "settled":
       return { hero: "Nothing to do.", lede: "Every card is done or not on this machine. Setup checks again each time it opens, so done stays done." };
     case "rebooted":
-      return { hero: "Back again.", lede: `The TUXEDO drivers loaded, which is what this was waiting for. ${left === 0 ? "Nothing else is left." : `${left} more ${left === 1 ? "thing wants" : "things want"} you, if you like.`}` };
+      return { hero: "Back again.", lede: `The TUXEDO drivers loaded, which is what this was waiting for. ${wanted(views)} left, if you like.` };
+    case "detecting":
+      return { lede: "KubaOS is on the disk and running. Checking what this machine has: the reader, the keys, the vault." };
     default:
-      return { lede: "KubaOS is on the disk and running. These need your fingers, your keys or your phone, so the install left them to you. A minute each; skip any, it'll wait." };
+      return { lede: `KubaOS is on the disk and running. ${wanted(views)} need your fingers, your keys or your phone, so the install left them to you. A minute each; skip any, it'll wait.` };
   }
 }
 
-/** The arrival: the first frame of KubaOS proper, what is ahead, and one button. */
+/** The arrival: the first frame of KubaOS proper, the neon sign struck as on Kōbō's welcome, and one button. */
 export function arrivalColumn(views: Views, moment: Moment = "rest", hero = HERO.short): HTMLElement {
   const words = arrivalWords(moment, views);
   const detecting = moment === "detecting";
@@ -158,10 +153,9 @@ export function arrivalColumn(views: Views, moment: Moment = "rest", hero = HERO
   const actions = settled ? row("s8", "centre", start) : row("s8", "centre", start, later);
   if (!settled) actions.dataset.hangs = "";
   const hints: readonly KeyHint[] = detecting ? [] : settled ? [["Enter", "the desktop"]] : [["Enter", "start"], ["Esc", "later"]];
-  const ahead = detecting ? row("s12", "centre", spinner("s20"), text("Checking what this machine has…", "body", "on_surface_variant")) : plan(views, new Set());
-  ahead.classList.add("kobo-part", "setup-ahead");
-  const foot =
-    moment === "offline"
+  const foot = detecting
+    ? row("s8", "centre", spinner("s20"), text("Checking what this machine has…", "small", "on_surface_variant"))
+    : moment === "offline"
       ? promise("wifi_off", "Offline: drivers, fprintd and Bitwarden need the internet. The rest works without it.", "warning")
       : row("s8", "centre", icon("info", "var(--type-small-icon)", "var(--color-on_surface_variant)"), text("All of it stays in the Command menu:", "small", "on_surface_variant"), keyHints([["Super+Space", "then “First boot”"]]));
   const box = stack(
@@ -169,12 +163,12 @@ export function arrivalColumn(views: Views, moment: Moment = "rest", hero = HERO
     "centre",
     part(text("初期設定", "accent", "primary"), "accent"),
     gap("s8"),
+    neonSign(),
+    gap("s20"),
     part(wrapped(words.hero ?? hero, "hero"), "hero"),
     gap("s16"),
     part(wrapped(words.lede, "body_large", "on_surface_variant"), "lede"),
-    gap("s32"),
-    ahead,
-    gap("s32"),
+    gap("s40"),
     part(stack("s12", "centre", actions, keys(hints)), "act"),
     gap("s24"),
     part(foot, "promise"),
@@ -183,24 +177,36 @@ export function arrivalColumn(views: Views, moment: Moment = "rest", hero = HERO
   return box;
 }
 
+/** The titles of the cards `test` picks, as a list in words. */
+function named(test: (id: CardId) => boolean): string {
+  const titles = CARD_IDS.filter(test).map((id) => CARDS[id].title);
+  return titles.length < 2 ? (titles[0] ?? "") : `${titles.slice(0, -1).join(", ")} and ${titles.at(-1)}`;
+}
+
 /** The ending's lede: what got done, what waits and where, or the reboot it needs. */
 function endingLede(views: Views, skipped: ReadonlySet<CardId>): string {
-  const count = (test: (id: CardId) => boolean) => CARD_IDS.filter(test).length;
-  const done = count((id) => CARDS[id].views[views[id]]!.state === "done");
-  const left = count((id) => open(CARDS[id].views[views[id]]!) || skipped.has(id));
-  const reboot = CARD_IDS.some((id) => CARDS[id].views[views[id]]!.state === "reboot");
-  const tally = `${done} done${left > 0 ? `, ${left} for later` : ""}.`;
-  if (reboot) return `${tally} The TUXEDO drivers load after a reboot; setup opens once more after it, to check they did.`;
-  if (left > 0) return `${tally} Whatever's left waits in the Command menu. I won't bring it up again.`;
+  const state = (id: CardId) => CARDS[id].views[views[id]]!;
+  const done = CARD_IDS.filter((id) => state(id).state === "done").length;
+  const isLeft = (id: CardId) => open(state(id)) || skipped.has(id);
+  const left = named(isLeft);
+  const many = CARD_IDS.filter(isLeft).length > 1;
+  const reboot = CARD_IDS.some((id) => state(id).state === "reboot");
+  const tally = `${done} done.`;
+  const waits = left ? ` ${left} ${many ? "wait" : "waits"} in the Command menu; I won't bring ${many ? "them" : "it"} up again.` : "";
+  if (reboot) return `${tally}${waits} The TUXEDO drivers load after a reboot.`;
+  if (left) return `${tally}${waits}`;
   return `${tally} Your machine, your rules. Go break something.`;
 }
 
-/** The ending: 完了 stamped, the headline word by word, what was done, and the way out. */
+/** The ending, as Kōbō's done screen: クバ writes itself in, 完了 stamped beside it, the headline word by word. */
 export function endingColumn(views: Views, skipped: ReadonlySet<CardId>, going = false): HTMLElement {
   const reboot = CARD_IDS.some((id) => CARDS[id].views[views[id]]!.state === "reboot");
-  const seal = document.createElement("span");
-  seal.className = "kobo-hanko";
-  seal.append(text("完", "display"), text("了", "display"));
+  const drawn = neonMark();
+  const seal = part(hanko(), "stamp");
+  seal.classList.add("kobo-stamp");
+  const mark = row("s8", "start", drawn, seal);
+  mark.classList.add("kobo-sealed");
+  sealed(mark, drawn);
   const words = "That's it.".split(" ").map((word, index) => part(text(index === 0 ? word : ` ${word}`, "hero"), `word-${index}`));
   const headline = row(0, "end", ...words);
   headline.classList.add("setup-headline");
@@ -212,19 +218,19 @@ export function endingColumn(views: Views, skipped: ReadonlySet<CardId>, going =
   if (reboot && !going) actions.dataset.hangs = "";
   actions.classList.add("setup-actions");
   const hints: readonly KeyHint[] = going ? [] : reboot ? [["Enter", "reboot"], ["Tab", "move"]] : [["Enter", "the desktop"]];
-  const box = stack(
-    0,
-    "centre",
-    part(seal, "stamp"),
+  const parts: HTMLElement[] = [
+    mark,
     gap("s24"),
     headline,
     gap("s16"),
     part(wrapped(endingLede(views, skipped), "body_large", "on_surface_variant"), "lede"),
-    gap("s32"),
-    plan(views, skipped),
-    gap("s32"),
+    gap("s40"),
     part(stack("s12", "centre", actions, keys(hints)), "act"),
-  );
+  ];
+  // The blue screen comes right after this reboot, so its steps are said here, where they are needed.
+  const queued = CARD_IDS.some((id) => id === "tuxedo" && views[id] === "queued");
+  if (queued) parts.push(gap("s24"), part(promise("key", "On the blue screen after it: Enroll MOK → Continue → Yes → your one-time password → Reboot."), "promise"));
+  const box = stack(0, "centre", ...parts);
   box.classList.add("kobo-part", "setup-column", "setup-ending");
   return box;
 }
@@ -236,32 +242,41 @@ function firstCard(views: Views): CardId {
   return CARD_IDS.find((id) => open(CARDS[id].views[views[id]]!)) ?? CARD_IDS.find((id) => CARDS[id].views[views[id]]!.state !== "absent") ?? "git";
 }
 
+/** How far the window lies from the desktop's edges: Hyprland centres it. */
+const AWAY = { left: "calc((1280 - 1024) / 2 * var(--px))", top: "calc((800 - 680) / 2 * var(--px))" };
+
 /**
- * The window's own surface: the scene or the rail it shows lie in it, one over another as they
- * hand over. On the desktop it is the active window, its corner the frame's less the gap, with its
- * tube lit, as `config/hypr/looks.lua` and `focus.lua` draw it.
+ * The window: Kōbō's glass panel, the wallpaper's blurred copy lying where the wallpaper lies
+ * under it, its scenes and its rail on the glass, one over another as they hand over. On the
+ * desktop it is the active window, its corner the frame's less the gap, its tube lit, as
+ * `config/hypr/looks.lua` and `focus.lua` draw it; drawn alone it is the window's own size.
  */
-function windowBox(desk: boolean): HTMLElement {
-  const box = document.createElement("span");
-  box.className = "setup-window";
-  box.style.setProperty("--setup-window-width", WINDOW.width);
-  box.style.setProperty("--setup-window-height", WINDOW.height);
+function windowBox(desk: boolean): { win: HTMLElement; body: HTMLElement } {
+  const win = document.createElement("span");
+  win.className = "setup-window";
+  win.style.setProperty("--setup-window-width", WINDOW.width);
+  win.style.setProperty("--setup-window-height", WINDOW.height);
+  win.style.setProperty("--panel-left", desk ? AWAY.left : "0px");
+  win.style.setProperty("--panel-margin", desk ? AWAY.top : "0px");
+  const corner = nested(role("surface"), "s8");
+  win.style.setProperty("--corner", corner.css);
+  const glass = glassPanel(blurred);
+  win.append(glass);
   if (desk) {
-    const corner = nested(role("surface"), "s8");
-    box.style.setProperty("--corner", corner.css);
-    windowRing(focusRing(box, "surface", "accent", false), "stroke-thin", corner.css);
-    box.dataset.pinned = "lit";
+    windowRing(focusRing(win, "surface", "accent", false), "stroke-thin", corner.css);
+    win.dataset.pinned = "lit";
   }
-  return box;
+  return { win, body: glass.querySelector<HTMLElement>(".k-glass-body")! };
 }
 
 export function setupRoom(options: SetupOptions): HTMLElement {
   const views: Record<CardId, string> = { ...firstViews(), ...options.views };
   const skipped = new Set(options.skipped ?? []);
   const opened = new Set<CardId>(options.hood && options.place.at === "card" ? [options.place.card] : []);
-  const win = windowBox(options.desk ?? false);
+  const { win, body } = windowBox(options.desk ?? false);
   win.tabIndex = -1;
-  const element = options.desk ? backdrop({ width: DESK.width, height: DESK.height, picture: wallpaper, scrim: "band", content: win, dark: 0 }) : win;
+  const size = options.desk ? DESK : WINDOW;
+  const element = backdrop({ width: size.width, height: size.height, picture: wallpaper, scrim: "band", content: win, dark: 0 });
   element.classList.add("setup-room");
   element.dataset.whole = "";
   let place: Place = options.place;
@@ -342,8 +357,8 @@ export function setupRoom(options: SetupOptions): HTMLElement {
     // A scene lies over the rail it hands over to or from.
     layers.sort((a, b) => Number(a.classList.contains("setup-scene")) - Number(b.classList.contains("setup-scene")));
     // The window's tube stays: only its layers change.
-    for (const old of win.querySelectorAll(":scope > .setup-layer")) old.remove();
-    win.prepend(...layers);
+    for (const old of body.querySelectorAll(":scope > .setup-layer")) old.remove();
+    body.prepend(...layers);
     win.toggleAttribute("data-left", at.at === "desktop" && !leaving);
     return arriving;
   };
@@ -367,11 +382,11 @@ export function setupRoom(options: SetupOptions): HTMLElement {
       win.querySelector(".setup-ending .setup-actions")?.replaceWith(row("s8", "centre", spinner("s20"), text("Restarting…", "body", "on_surface_variant")));
       win.querySelector(".setup-ending .kobo-keys")?.replaceChildren();
     }
-    const kept = to.at === "ending" && to.going && from.at === "ending" ? win.querySelector(":scope > .setup-layer") : to.at === "desktop" ? null : draw(to, move ? from : undefined);
+    const kept = to.at === "ending" && to.going && from.at === "ending" ? body.querySelector(":scope > .setup-layer") : to.at === "desktop" ? null : draw(to, move ? from : undefined);
     // The move's end is the new place drawn: only the layer it left goes.
     const settle = () => {
       if (place !== to) return;
-      for (const old of win.querySelectorAll(":scope > .setup-layer")) if (old !== kept) old.remove();
+      for (const old of body.querySelectorAll(":scope > .setup-layer")) if (old !== kept) old.remove();
       win.toggleAttribute("data-left", to.at === "desktop");
       (win.querySelector<HTMLElement>(".setup-start, .setup-reboot, .setup-desktop") ?? win.querySelector<HTMLElement>(".k-step-room:not([data-kept]) [tabindex='0'], .k-step-room:not([data-kept]) button:not(:disabled)") ?? win).focus({ preventScroll: true });
     };
@@ -412,22 +427,28 @@ export function setupRoom(options: SetupOptions): HTMLElement {
 // ---------------------------------------------------------------- The moves --
 
 const ARRIVAL = "the arrival";
-const ROWS = CARD_IDS.length;
 
-const OPENING_TRACKS: Track[] = [
+/** `cue` after `first`: the sum of both, or `first` alone, or nothing. */
+function after(first: readonly Duration[], cue?: Duration | NonEmpty<Duration>): { cue?: NonEmpty<Duration> } {
+  const all = [...first, ...(cue === undefined ? [] : Array.isArray(cue) ? cue : [cue])];
+  return all.length > 0 ? { cue: all as unknown as NonEmpty<Duration> } : {};
+}
+
+const OPENING_TRACKS = (strike: "neon.strike" | "standard"): Track[] => [
   ...rising(".setup-arrival > .setup-accent", "the accent", ARRIVAL),
-  ...rising(".setup-arrival > .setup-hero", "the hero line", ARRIVAL, "micro"),
-  ...rising(".setup-arrival > .setup-lede", "the lede", ARRIVAL, "short"),
-  ...Array.from({ length: ROWS }, (_, index) => rising(`.setup-arrival .setup-plan > :nth-child(${index + 1})`, `card ${index + 1}`, ARRIVAL, dealt(["medium"], index))).flat(),
-  ...rising(".setup-arrival > .setup-act", "the actions", ARRIVAL, ["long", "short"]),
-  ...rising(".setup-arrival > .setup-promise", "the promise", ARRIVAL, ["long", "medium"]),
+  { part: "the sign", on: ARRIVAL, target: ".setup-arrival .kobo-sign", property: "--kobo-sign", from: 0, to: 1, duration: "medium", cue: "short", curve: strike },
+  ...rising(".setup-arrival > .setup-hero", "the hero line", ARRIVAL, ["short", "medium"]),
+  ...rising(".setup-arrival > .setup-lede", "the lede", ARRIVAL, ["short", "medium", "micro"]),
+  ...rising(".setup-arrival > .setup-act", "the actions", ARRIVAL, ["short", "medium", "short"]),
+  ...rising(".setup-arrival > .setup-promise", "the promise", ARRIVAL, ["short", "medium", "medium"]),
 ];
 
-/** The window opens on the desktop: the words rise in, the cards are dealt, the button comes last. */
+/** The window opens on the desktop: the sign strikes as on Kōbō's welcome, the words rise in. */
 export const OPENS: Move = {
   name: "Setup opens",
-  what: "The words rise in one after another; the cards are dealt `micro` apart; Let's go comes last.",
-  tracks: OPENING_TRACKS as unknown as NonEmpty<Track<Easing>>,
+  what: "The accent rises in; the sign strikes as Kōbō's welcome's does; the words rise in one after another.",
+  tracks: OPENING_TRACKS("neon.strike") as unknown as NonEmpty<Track>,
+  unflickered: OPENING_TRACKS("standard") as unknown as NonEmpty<Track<Easing>>,
   reduced: [fading(".setup-arrival", "the arrival", ARRIVAL)],
   back: "cuts",
   sample: () => setupRoom({ place: { at: "arrival" }, desk: true }),
@@ -449,12 +470,12 @@ const OPENS_CARD: Move = {
 /** Let's go: the arrival's words rise off and the rail comes in on the first open card. */
 export const CARDS_IN: Move = {
   name: "Let's go: the cards",
-  what: "The arrival rises off and fades over `medium`; the rail fades in, its first card sliding in.",
+  what: "The arrival rises off and fades over `medium`; then, on the glass alone, the rail fades in, its first card sliding in.",
   tracks: [
     { part: "the arrival's rise", on: ARRIVAL, target: ".setup-scene .setup-arrival", property: "--kobo-rise", from: 0, to: -1, duration: "medium", curve: "emphasized_accel" },
     { part: "the arrival's fade", on: ARRIVAL, target: ".setup-scene", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: "the rail's fade", on: "the rail", target: ".setup-rail", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
-    { part: "the card's slide", on: "the card", target: ".k-step-room:not([data-kept])", property: "--step-slide", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
+    { part: "the rail's fade", on: "the rail", target: ".setup-rail", property: "opacity", from: 0, to: 1, duration: "long", cue: "medium", curve: "emphasized_decel" },
+    { part: "the card's slide", on: "the card", target: ".k-step-room:not([data-kept])", property: "--step-slide", from: 1, to: 0, duration: "long", cue: "medium", curve: "emphasized_decel" },
   ],
   reduced: [fading(".setup-scene", "the arrival", ARRIVAL, 1, 0), fading(".setup-rail", "the rail", "the rail")],
   back: "cuts",
@@ -464,11 +485,11 @@ export const CARDS_IN: Move = {
 /** Esc on the first card: the rail fades and the arrival comes back down. */
 export const BACK: Move = {
   name: "Back to the arrival",
-  what: "Esc or Back on the first card: the rail fades over `medium`; the arrival settles back down.",
+  what: "Esc or Back on the first card: the rail fades over `medium`; then the arrival settles back down.",
   tracks: [
     { part: "the rail's fade", on: "the rail", target: ".setup-rail", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: "the arrival's fade", on: ARRIVAL, target: ".setup-scene", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
-    { part: "the arrival's fall", on: ARRIVAL, target: ".setup-scene .setup-arrival", property: "--kobo-rise", from: -1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
+    { part: "the arrival's fade", on: ARRIVAL, target: ".setup-scene", property: "opacity", from: 0, to: 1, duration: "long", cue: "medium", curve: "emphasized_decel" },
+    { part: "the arrival's fall", on: ARRIVAL, target: ".setup-scene .setup-arrival", property: "--kobo-rise", from: -1, to: 0, duration: "long", cue: "medium", curve: "emphasized_decel" },
   ],
   reduced: [fading(".setup-rail", "the rail", "the rail", 1, 0), fading(".setup-scene", "the arrival", ARRIVAL)],
   back: "cuts",
@@ -476,15 +497,13 @@ export const BACK: Move = {
 };
 
 /** Continue or Skip: the next card slides in from the right as the wire's light grows to it. */
-export function onward(index: number, sample: () => HTMLElement): Move {
+export function onward(sample: () => HTMLElement): Move {
   return {
     name: "Continue: the next card",
-    what: "It slides `space.s32` in and fades in over `long`; the wire's light grows to its step.",
+    what: "It slides `space.s32` in and fades in over `long`; the wire stays: its light is what's done.",
     tracks: [
       { part: "slide", on: "the card", target: ".k-step-room:not([data-kept])", property: "--step-slide", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
       { part: "fade", on: "the card", target: ".k-step-room:not([data-kept])", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-      { part: "wire", on: "the rail", target: ".k-rail-wire-lit", property: "--wire-lit", from: Math.max(0, index - 1), to: index, duration: "long", curve: "emphasized_decel" },
-      { part: "symbol", on: "the step arrived at", target: `.k-rail-steps > .k-step:nth-child(${index + 1}) .k-step-bead`, property: "--bead-glow", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
     ],
     reduced: [fading(".k-step-room:not([data-kept])", "the card", "the card")],
     back: "cuts",
@@ -493,13 +512,14 @@ export function onward(index: number, sample: () => HTMLElement): Move {
 }
 
 /** A card's work finished: its status settles in and the rail's step takes its check. */
-export function finishing(index: number, sample: () => HTMLElement = () => setupRoom({ place: { at: "card", card: CARD_IDS[index]! }, views: { [CARD_IDS[index]!]: "done" } })): Move {
+export function finishing(index: number, sample: () => HTMLElement = () => setupRoom({ place: { at: "card", card: CARD_IDS[index]! }, views: { [CARD_IDS[index]!]: "done", [CARD_IDS[index === 0 ? 1 : index - 1]!]: "done" } })): Move {
   return {
     name: "Done: the card settles",
-    what: "The prompt gives way at once; the status fades in over `short`; the rail's check with it.",
+    what: "The prompt gives way at once; the status, the rail's check and the wire it joins fade in over `short`.",
     tracks: [
       fading(".k-step-room:not([data-kept]) .setup-status", "the status", "the card"),
       fading(`.k-rail-steps > .k-step:nth-child(${index + 1}) > * > :last-child`, "the check", "the rail"),
+      fading(`.k-rail-wire-lit[data-steps~="${index}"]`, "the wire's light", "the rail"),
     ],
     reduced: "same",
     back: "cuts",
@@ -542,20 +562,22 @@ export const FAILS: Move = {
 
 const ENDING = "the ending";
 
-const ENDING_TRACKS = (after: Duration[]): Track[] => [
-  { part: "the hanko", on: ENDING, target: ".setup-ending > .setup-stamp", property: "--kobo-stamp", from: 0, to: 1, duration: "short", cue: [...after, "micro"] as unknown as NonEmpty<Duration>, curve: "pop" },
-  ...rising(".setup-ending .setup-word-0", "“That's”", ENDING, [...after, "short"] as unknown as NonEmpty<Duration>),
-  ...rising(".setup-ending .setup-word-1", "“it.”", ENDING, [...after, "short", "micro"] as unknown as NonEmpty<Duration>),
-  ...rising(".setup-ending > .setup-lede", "the lede", ENDING, [...after, "medium"] as unknown as NonEmpty<Duration>),
-  ...Array.from({ length: ROWS }, (_, index) => rising(`.setup-ending .setup-plan > :nth-child(${index + 1})`, `card ${index + 1}`, ENDING, dealt([...after, "medium", "short"] as unknown as NonEmpty<Duration>, index))).flat(),
-  ...rising(".setup-ending > .setup-act", "the actions", ENDING, [...after, "long", "medium"] as unknown as NonEmpty<Duration>),
+const ENDING_TRACKS = (first: Duration[], strike: "neon.strike" | "standard"): Track[] => [
+  ...writing().map((track) => ({ ...track, on: ENDING, target: `.setup-ending ${track.target}`, ...after(first, track.cue) })),
+  { part: "the mark, struck", on: ENDING, target: ".setup-ending .kobo-mark", property: "--kobo-burn", from: 0, to: 1, duration: "medium", ...after(first, "scene"), curve: strike },
+  { part: "the hanko", on: ENDING, target: ".setup-ending .kobo-stamp", property: "--kobo-stamp", from: 0, to: 1, duration: "short", ...after(first, ["scene", "medium"]), curve: "pop" },
+  ...rising(".setup-ending .setup-word-0", "“That's”", ENDING, after(first, ["scene", "medium"]).cue),
+  ...rising(".setup-ending .setup-word-1", "“it.”", ENDING, after(first, ["scene", "medium", "micro"]).cue),
+  ...rising(".setup-ending > .setup-lede", "the lede", ENDING, after(first, ["scene", "medium", "short"]).cue),
+  ...rising(".setup-ending > .setup-act", "the actions", ENDING, after(first, ["scene", "medium", "medium"]).cue),
 ];
 
 /** The ending shown on its own, opened on it. */
 const ARRIVES: Move = {
   name: "That's it",
-  what: "完了 is stamped; the headline rises word by word; the cards are dealt; the way out comes last.",
-  tracks: ENDING_TRACKS([]) as unknown as NonEmpty<Track<Easing>>,
+  what: "クバ writes itself in and strikes; 完了 is stamped beside it; the headline rises word by word.",
+  tracks: ENDING_TRACKS([], "neon.strike") as unknown as NonEmpty<Track>,
+  unflickered: ENDING_TRACKS([], "standard") as unknown as NonEmpty<Track<Easing>>,
   reduced: [fading(".setup-ending", "the ending", ENDING)],
   back: "cuts",
   sample: () => setupRoom({ place: { at: "ending" }, views: { tuxedo: "done", fingerprint: "done", yubikey: "done", git: "done" }, skipped: ["bitwarden", "phone"], desk: true }),
@@ -564,8 +586,9 @@ const ARRIVES: Move = {
 /** Past the last card: the rail fades off and the ending arrives over it. */
 export const ENDS: Move = {
   name: "Past the last card: That's it",
-  what: "The rail fades over `medium`; 完了 is stamped; the headline rises word by word; the cards are dealt.",
-  tracks: [{ part: "the rail's fade", on: "the rail", target: ".setup-rail", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }, ...ENDING_TRACKS(["medium"])] as unknown as NonEmpty<Track<Easing>>,
+  what: "The rail fades over `medium`; クバ writes itself in and strikes, 完了 stamped beside it; the headline rises.",
+  tracks: [{ part: "the rail's fade", on: "the rail", target: ".setup-rail", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }, ...ENDING_TRACKS(["medium"], "neon.strike")] as unknown as NonEmpty<Track>,
+  unflickered: [{ part: "the rail's fade", on: "the rail", target: ".setup-rail", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }, ...ENDING_TRACKS(["medium"], "standard")] as unknown as NonEmpty<Track<Easing>>,
   reduced: [fading(".setup-rail", "the rail", "the rail", 1, 0), fading(".setup-scene", "the ending", ENDING)],
   back: "cuts",
   sample: () => setupRoom({ place: { at: "ending" }, views: { tuxedo: "done", fingerprint: "done", yubikey: "done", git: "done" }, skipped: ["bitwarden", "phone"], leaving: { at: "card", card: "phone" } }),

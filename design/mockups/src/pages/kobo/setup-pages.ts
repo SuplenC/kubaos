@@ -5,24 +5,34 @@ import { type Measure, type Move, type NonEmpty, screen } from "../../site/page.
 import { type CardId, CARD_IDS, type Views } from "./setup-cards.ts";
 import { finishing, onward, setupRoom, type SetupOptions } from "./setup-room.ts";
 
-/** The window at `card`'s `view`, the other cards as at the first boot, `more` on top. */
-export function atCard(card: CardId, view: string, more: Partial<SetupOptions> = {}): () => HTMLElement {
-  return screen(() => setupRoom({ place: { at: "card", card }, ...more, views: { ...more.views, [card]: view } }));
+/** Where each card ends when it is gone through in order: TUXEDO's key queued for its reboot. */
+const WALKED: Views = { tuxedo: "queued", fingerprint: "done", yubikey: "done", bitwarden: "done", git: "done", phone: "done" };
+
+/** The way to `card` taken in order: the cards before it gone through, the ones after it untouched. */
+function walk(card: CardId): Partial<Views> {
+  return Object.fromEntries(CARD_IDS.slice(0, CARD_IDS.indexOf(card)).map((id) => [id, WALKED[id]]));
 }
 
-/** The live stage: the window on the desktop at `card`, going on through first boot. */
+/** The window at `card`'s `view`, reached by going through the cards before it, `more` on top. */
+export function atCard(card: CardId, view: string, more: Partial<SetupOptions> = {}): () => HTMLElement {
+  return screen(() => setupRoom({ place: { at: "card", card }, ...more, views: { ...walk(card), ...more.views, [card]: view } }));
+}
+
+/** The live stage: the window on the desktop at `card`, reached in order, going on through first boot. */
 export function liveCard(card: CardId): () => HTMLElement {
-  return screen(() => setupRoom({ place: { at: "card", card }, live: true, desk: true }));
+  return screen(() => setupRoom({ place: { at: "card", card }, live: true, desk: true, views: walk(card) }));
 }
 
 /** Continue or Skip onto `card`: its page slides in as the wire's light grows to its step. */
 export function arrivesAt(card: CardId, view: string): Move {
-  return onward(CARD_IDS.indexOf(card), atCard(card, view));
+  return onward(atCard(card, view));
 }
 
-/** `card`'s work finishing at `view`. */
-export function finishesAt(card: CardId, view: string, views: Partial<Views> = {}): Move {
-  return finishing(CARD_IDS.indexOf(card), atCard(card, view, { views }));
+/** `card`'s work finishing at `view`, beside a card done already, so the wire has a run to light. */
+export function finishesAt(card: CardId, view: string): Move {
+  const index = CARD_IDS.indexOf(card);
+  const neighbour = CARD_IDS[index === 0 ? 1 : index - 1]!;
+  return finishing(index, atCard(card, view, { views: { [neighbour]: "done" } }));
 }
 
 /** The keys every card takes; a card adds its own. */

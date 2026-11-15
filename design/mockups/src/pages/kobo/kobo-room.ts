@@ -164,7 +164,7 @@ function column(name: string, ...parts: Element[]): HTMLElement {
 }
 
 /** Kōbō's neon sign, a column wide, its height its picture's at that width on a whole pixel. */
-function neonSign(): HTMLElement {
+export function neonSign(): HTMLElement {
   const picture = document.createElement("img");
   picture.className = "kobo-sign";
   picture.src = sign;
@@ -307,7 +307,7 @@ export function neonMark(): SVGSVGElement {
 }
 
 /** The 完了 hanko, stamped beside the mark. */
-function hanko(): HTMLElement {
+export function hanko(): HTMLElement {
   const seal = document.createElement("span");
   seal.className = "kobo-hanko";
   seal.append(text("完", "display"), text("了", "display"));
@@ -372,7 +372,7 @@ function keys(hints: readonly KeyHint[]): HTMLElement {
  * cap's lowest pixel. Where that is in the mark's box is the drawing's own (its strokes and their
  * width), which only the drawing knows, so it is read from it, and holds at every scale.
  */
-function sealed(row: HTMLElement, drawn: SVGSVGElement): void {
+export function sealed(row: HTMLElement, drawn: SVGSVGElement): void {
   const place = () => {
     const tubes = drawn.querySelector<SVGGElement>('[data-layer="tube"]');
     const view = drawn.viewBox.baseVal;
@@ -1025,7 +1025,7 @@ function words(cue: readonly Duration[]): Track<"emphasized_decel">[] {
 }
 
 /** The mark written in, a stroke every `short`, each along its length over `short`. */
-function writing(): Track<"standard">[] {
+export function writing(): Track<"standard">[] {
   return [0, 1, 2, 3, 4, 5].map((stroke) => ({
     part: `stroke ${stroke + 1}`,
     on: DONE,

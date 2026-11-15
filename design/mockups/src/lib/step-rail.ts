@@ -20,6 +20,7 @@ import { keyHints, type KeyHint } from "./keycap.ts";
 import { fill, filling, fillingHeight, gap, inset, page, row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { scroll } from "./scroll.ts";
+import { spinner } from "./spinner.ts";
 import { pressable, setStepState, step, type StepOptions, type StepState } from "./step.ts";
 import { text, wrapped } from "./text.ts";
 import { cubic, length, raw } from "./tokens.ts";
@@ -76,6 +77,11 @@ export interface RailPage {
   readonly act?: () => boolean;
   /** Told as Skip passes the page by, before the next one shows. */
   readonly skipped?: () => void;
+  /**
+   * The page's own work is running, in these words: the `Filled` button keeps its room, a spinner
+   * and the words in its place, and Enter waits for the work.
+   */
+  readonly busy?: Live<string | undefined>;
 }
 
 /** A step's own standing in a free flow: its state, its other words, and whether it is there. */
@@ -224,7 +230,9 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
     return element;
   };
   const steps = options.pages.map((_, index) => make(index, look(index, current, reached)));
-  const column = stack(0, "start", ...steps, wire(steps.length, current));
+  const doneRuns = (at: number) => (options.free ? runs(options.pages.map((_, index) => look(index, at, 0).state.is === "done")) : null);
+  let theWire = wire(steps.length, current, doneRuns(current));
+  const column = stack(0, "start", ...steps, theWire);
   column.classList.add("k-rail-steps");
   arrows(column);
   // Cut at its own box: the brand's `space.s20` and the hints' `space.s16` stay clear of the steps
@@ -273,7 +281,14 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
           element.dataset.pressable = String(shown.pressable);
         }
       });
-      column.querySelector<HTMLElement>(".k-rail-wire-lit")?.style.setProperty("--wire-lit", String(at));
+      if (options.free) {
+        // In any order the wire's light joins what is done, wherever the reader stands.
+        const again = wire(steps.length, at, doneRuns(at));
+        if (again.dataset.runs !== theWire.dataset.runs) {
+          theWire.replaceWith(again);
+          theWire = again;
+        }
+      } else column.querySelector<HTMLElement>(".k-rail-wire-lit")?.style.setProperty("--wire-lit", String(at));
       // Two pages taking the same keys keep the hints they share as they are.
       if (JSON.stringify(options.hints(at)) !== JSON.stringify(options.hints(hintsAt))) drawHints(at);
       hintsAt = at;
@@ -286,7 +301,26 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
  * Each symbol is a bead on it: the wire is cut away round each, so whatever is under the bead (the
  * rail's fill, or the current row's) shows there, glass and all.
  */
-function wire(count: number, current: number): HTMLElement {
+/** The runs of two or more steps in a row that are done, as their first and last index. */
+function runs(done: readonly boolean[]): [number, number][] {
+  const found: [number, number][] = [];
+  let start = -1;
+  done.forEach((is, index) => {
+    if (is && start < 0) start = index;
+    if ((!is || index === done.length - 1) && start >= 0) {
+      const end = is ? index : index - 1;
+      if (end > start) found.push([start, end]);
+      start = -1;
+    }
+  });
+  return found;
+}
+
+/**
+ * The wire, lit down to `current`; or, in a free flow, lit along each of `lit`'s runs of done
+ * steps, each its own tube from its first symbol to its last.
+ */
+function wire(count: number, current: number, lit: readonly [number, number][] | null = null): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-rail-wire";
   box.style.setProperty("--count", String(count));
@@ -294,10 +328,18 @@ function wire(count: number, current: number): HTMLElement {
   box.style.maskImage = Array.from({ length: count }, (_, index) => cut(index)).join(", ");
   const track = document.createElement("span");
   track.className = "k-rail-wire-track";
-  const lit = document.createElement("span");
-  lit.className = "k-rail-wire-lit";
-  lit.style.setProperty("--wire-lit", String(current));
-  box.append(track, lit);
+  const tube = (from: number, to: number) => {
+    const shown = document.createElement("span");
+    shown.className = "k-rail-wire-lit";
+    shown.style.setProperty("--wire-from", String(from));
+    shown.style.setProperty("--wire-lit", String(to));
+    // The steps a run joins, so a move can pick out the one a step just joined.
+    shown.dataset.steps = Array.from({ length: to - from + 1 }, (_, index) => from + index).join(" ");
+    return shown;
+  };
+  const tubes = lit ? lit.map(([from, to]) => tube(from, to)) : [tube(0, current)];
+  box.dataset.runs = JSON.stringify(lit);
+  box.append(track, ...tubes);
   return box;
 }
 
@@ -391,7 +433,17 @@ export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: ()
   const symbol = own ? { icon: own } : { icon: "arrow_forward", trailing: true };
   const next = button({ label: spec.next === undefined ? "Continue" : now(spec.next), kind: "Filled", ...symbol, ...(blocker ? { disabled: true } : {}), ...(pinned.next ? { pinned: pinned.next } : {}) });
   next.addEventListener("click", onNext);
-  parts.push(next);
+  const busy = spec.busy === undefined ? undefined : now(spec.busy);
+  if (busy) {
+    // The button keeps its room, so nothing beside it moves while the work runs.
+    next.inert = true;
+    const working = row("s8", "centre", spinner("s20"), text(busy, "body", "on_surface_variant"));
+    working.classList.add("k-step-busy-words");
+    const room = document.createElement("span");
+    room.className = "k-step-busy";
+    room.append(next, working);
+    parts.push(room);
+  } else parts.push(next);
   const band = hangs(row("s16", "centre", ...parts));
   band.classList.add("k-step-footer");
   return { band, nudge, next };
@@ -542,7 +594,7 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
       return;
     }
     arrive(made.room, current > from);
-    if (steps) travel(steps, from, current, options.failed ?? false);
+    if (steps && !options.free) travel(steps, from, current, options.failed ?? false);
     // The template holds the keys on a page with nothing to do yet: Enter and Esc still work. The
     // keyboard moves with the next frame, which lays the page out anyway, not inside the press.
     if (keyboardIn) {
@@ -590,6 +642,7 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
       if (nudge) flash(nudge);
       return;
     }
+    if (spec?.busy !== undefined && now(spec.busy)) return;
     if (spec?.act?.()) return;
     go(along(current, 1));
   }

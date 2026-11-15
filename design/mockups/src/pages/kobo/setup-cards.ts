@@ -23,11 +23,11 @@ export type Engine = "done" | "needed" | "reboot" | "waiting" | "absent";
  * What the person has to do right now, shown big: `kubaos_core::setup::PromptKind` while a card's
  * work runs, and a card waiting on hardware (a key to plug in, a phone to ask) the same way.
  */
-export type PromptKind = "password" | "finger" | "key" | "wait" | "plug" | "phone";
+export type PromptKind = "password" | "finger" | "key" | "wait" | "plug" | "phone" | "pair";
 
 /** A card's work is running: its prompt is the engine's, not a wait on hardware. */
 export function running(view: View): boolean {
-  return view.prompt !== undefined && view.prompt.kind !== "plug" && view.prompt.kind !== "phone";
+  return view.prompt !== undefined && !["plug", "phone", "pair"].includes(view.prompt.kind);
 }
 
 export interface Prompt {
@@ -35,12 +35,21 @@ export interface Prompt {
   readonly text: string;
   /** Touches done, of how many: a finger's enrolment. */
   readonly count?: readonly [number, number];
+  /** What to compare, alone on its line: a phone's pairing key. */
+  readonly key?: string;
 }
 
 /** What the card shows: the engine's state and summary, and its run, if one is going or failed. */
 export interface View {
   readonly state: Engine;
   readonly summary: string;
+  /**
+   * What detection found, beside the state where the engine's summary would only say again what
+   * the card is for: the machine, the reader, nothing plugged in.
+   */
+  readonly found?: string;
+  /** Something asks for the person now: its words and symbol stand for the state. */
+  readonly wants?: { readonly label: string; readonly glyph: string };
   readonly prompt?: Prompt;
   readonly failed?: { readonly error: string; readonly hint: string };
   /** What a run that finished found, said in its own slot: the phone's test copy. */
@@ -111,6 +120,7 @@ export const PROMPT_WHERE: Record<PromptKind, string> = {
   wait: "Nothing for you to do. Under the hood has the log, if you like that sort of thing.",
   plug: "Then Check again. Or skip it; I'll be here.",
   phone: "The request shows up here within a few seconds. No need to press anything.",
+  pair: "Accept only a phone you're holding: other KDE Connect devices on this network can ask too.",
 };
 
 const step = (text: string): LogLine => ({ level: "step", text });
@@ -137,12 +147,11 @@ const SECURE_BOOT: Ask = {
   tone: "Warning",
   icon: "lock",
   title: "Secure Boot is on",
-  lines: [
-    "The drivers are built on this machine, so they're signed with a key made here, and the firmware has to be told to trust it. Pick a one-time password below.",
-    "After the next reboot a blue screen called MokManager appears before KubaOS starts. Enroll MOK → Continue → Yes → type the password → Reboot.",
-    "You need this password exactly once, on that screen. It assumes a US keyboard, so letters and digits only.",
-  ],
+  lines: ["Pick a one-time password. You type it once, on a blue screen after the reboot, so the firmware trusts the drivers."],
 };
+
+/** The machine as detection found it, beside the state. */
+const MACHINE = (secureBoot: boolean, drivers: string) => `${USER.product}. Secure Boot ${secureBoot ? "on" : "off"}, ${drivers}.`;
 
 const tuxedo: Card = {
   id: "tuxedo",
@@ -154,16 +163,16 @@ const tuxedo: Card = {
   later: "Set up TUXEDO drivers",
   first: "secure",
   views: {
-    install: { state: "needed", summary: TUXEDO_NEEDS },
-    secure: { state: "needed", summary: TUXEDO_NEEDS },
-    mismatch: { state: "needed", summary: TUXEDO_NEEDS },
-    password: { state: "needed", summary: TUXEDO_NEEDS, prompt: PASSWORD, log: TUXEDO_LOG.slice(0, 1) },
-    installing: { state: "needed", summary: TUXEDO_NEEDS, prompt: { kind: "wait", text: "Building the modules with DKMS…" }, log: TUXEDO_LOG.slice(0, 6) },
+    install: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(false, "no drivers yet") },
+    secure: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(true, "no drivers yet") },
+    mismatch: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(true, "no drivers yet") },
+    password: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(true, "no drivers yet"), prompt: PASSWORD, log: TUXEDO_LOG.slice(0, 1) },
+    installing: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(true, "no drivers yet"), prompt: { kind: "wait", text: "Building the modules with DKMS…" }, log: TUXEDO_LOG.slice(0, 6) },
     queued: { state: "reboot", summary: "Key queued. Reboot and enroll it on the blue MokManager screen.", log: TUXEDO_LOG },
     load: { state: "reboot", summary: "Installed. The drivers load after a reboot." },
     done: { state: "done", summary: "Drivers loaded: tuxedo_keyboard, tuxedo_io, clevo_wmi." },
-    offline: { state: "waiting", summary: `${TUXEDO_NEEDS} Needs the internet first.` },
-    closed: { state: "needed", summary: TUXEDO_NEEDS, failed: { error: "the password dialog was closed", hint: "Nothing changed. Run it again when you're ready." }, log: TUXEDO_LOG.slice(0, 1) },
+    offline: { state: "waiting", summary: `${TUXEDO_NEEDS} Needs the internet first.`, found: `${MACHINE(true, "no drivers yet")} Needs the internet first.` },
+    closed: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(true, "no drivers yet"), failed: { error: "the password dialog was closed", hint: "Nothing changed. Run it again when you're ready." }, log: TUXEDO_LOG.slice(0, 1) },
     nokey: {
       state: "needed",
       summary: "Drivers are in, but Secure Boot won't load them until you enroll their key.",
@@ -173,15 +182,14 @@ const tuxedo: Card = {
     absent: { state: "absent", summary: "Not on this machine: Dell Inc. isn't a TUXEDO." },
   },
   asks: (view) => {
-    const what: Ask = { is: "para", words: "Setup adds TUXEDO's apt repository and installs tuxedo-drivers. No Control Center: KubaOS runs power profiles instead, one less app phoning home." };
     switch (view) {
       case "install":
-        return [what, { is: "para", words: "Secure Boot is off, so the drivers load as they are. No key to enroll." }];
+        return [{ is: "para", words: "Secure Boot is off, so the drivers load as they are. No key to enroll." }];
       case "secure":
       case "closed":
-        return [what, SECURE_BOOT, { is: "mok", mismatch: false }];
+        return [SECURE_BOOT, { is: "mok", mismatch: false }];
       case "mismatch":
-        return [what, SECURE_BOOT, { is: "mok", mismatch: true }];
+        return [SECURE_BOOT, { is: "mok", mismatch: true }];
       case "nokey":
         return [SECURE_BOOT, { is: "mok", mismatch: false }];
       case "queued":
@@ -201,7 +209,7 @@ const tuxedo: Card = {
       case "load":
         return [{ is: "para", words: "They load on the next boot. Reboot when it suits you." }];
       case "offline":
-        return [what, { is: "para", words: "Connect to a network from the bar, then Check again." }];
+        return [{ is: "para", words: "Connect to a network from the bar, then Check again." }];
       case "absent":
         return [{ is: "para", words: "Nothing to install. The TUXEDO drivers only make sense on a TUXEDO." }];
       default:
@@ -216,6 +224,7 @@ const tuxedo: Card = {
         ]
       : [
           { label: "Machine", value: USER.product },
+          { label: "Installs", value: "tuxedo-drivers from TUXEDO's repository; no Control Center, power profiles do that job" },
           { label: "Secure Boot", value: view === "install" ? "Off" : "On" },
           { label: "Drivers", value: ["done", "queued", "load", "nokey"].includes(view) ? "tuxedo-drivers 4.12.1" : "Not installed" },
           { label: "Signing key", value: view === "queued" ? "Queued for MokManager" : view === "done" ? "Enrolled" : view === "install" ? "Not needed" : "Not enrolled" },
@@ -316,7 +325,7 @@ const yubikey: Card = {
   later: "Enroll a security key",
   first: "plug",
   views: {
-    plug: { state: "waiting", summary: "Plug in your YubiKey to use it for sudo, polkit and the lock screen.", prompt: { kind: "plug", text: "Plug in your YubiKey." } },
+    plug: { state: "waiting", summary: "Plug in your YubiKey to use it for sudo, polkit and the lock screen.", found: "No YubiKey plugged in, none enrolled yet.", prompt: { kind: "plug", text: "Plug in your YubiKey." } },
     enroll: { state: "needed", summary: "YubiKey Bio plugged in, not enrolled yet." },
     prep: { state: "needed", summary: "This key needs a PIN and a fingerprint of its own first." },
     touch: { state: "needed", summary: "YubiKey Bio plugged in, not enrolled yet.", prompt: { kind: "key", text: "Put an enrolled finger on the key's sensor when it blinks." }, log: KEY_LOG },
@@ -513,11 +522,11 @@ const phone: Card = {
   later: "Set up a phone",
   first: "off",
   views: {
-    off: { state: "needed", summary: "Off. Set it up to share the clipboard and files with your phone." },
+    off: { state: "needed", summary: "Off. Set it up to share the clipboard and files with your phone.", found: `Off. Phones can't see this laptop; once it's on, it shows up as ${USER.host}.` },
     starting: { state: "needed", summary: "Off. Set it up to share the clipboard and files with your phone.", prompt: { kind: "wait", text: "Starting KDE Connect…" } },
     waiting: { state: "waiting", summary: `Waiting for your phone: open KDE Connect on it and tap ${USER.host}.`, prompt: { kind: "phone", text: `Open KDE Connect on the phone, tap ${USER.host}, then Request pairing.` } },
     address: { state: "waiting", summary: `Waiting for your phone: open KDE Connect on it and tap ${USER.host}.`, prompt: { kind: "phone", text: `Open KDE Connect on the phone, tap ${USER.host}, then Request pairing.` } },
-    request: { state: "needed", summary: "Pixel 9 wants to pair. Check the key, then accept." },
+    request: { state: "needed", summary: "Pixel 9 wants to pair. Check the key, then accept.", wants: { label: "Wants to pair", glyph: "smartphone" }, prompt: { kind: "pair", text: "Does the phone show the same key?", key: PHONE_KEY } },
     pairing: { state: "needed", summary: "Pixel 9 wants to pair. Check the key, then accept.", prompt: { kind: "wait", text: "Pairing…" } },
     done: { state: "done", summary: "Paired with Pixel 9, in reach, battery 82%." },
     sent: { state: "done", summary: "Paired with Pixel 9, in reach, battery 82%.", result: "Sent “Hello from KubaOS”. Paste it on Pixel 9: that's what should show up." },
@@ -533,8 +542,6 @@ const phone: Card = {
         ];
       case "address":
         return [{ is: "notice", icon: "public", title: "No phone yet?", lines: ["Some networks, at offices and hotels, keep devices from finding each other. Restarting the app on the phone helps sometimes.", "Or add the laptop by its address in the phone's app (Add devices by IP): 192.168.1.23."] }];
-      case "request":
-        return [{ is: "banner", tone: "Warning", icon: "key", title: "A phone wants to pair", lines: [`The phone shows a key too. It must be the same: ${PHONE_KEY}.`, "Accept only a phone you're holding: other KDE Connect devices on this network can ask too."] }];
       case "done":
       case "sent":
         return [

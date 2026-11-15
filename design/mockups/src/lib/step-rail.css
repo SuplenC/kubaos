@@ -103,7 +103,8 @@
 }
 
 .k-rail-wire-lit {
-  height: max(0px, round(nearest, calc(var(--wire-lit) * var(--size-row) - var(--bead-r)), 1px));
+  translate: 0 calc(var(--wire-from, 0) * var(--size-row));
+  height: max(0px, round(nearest, calc((var(--wire-lit) - var(--wire-from, 0)) * var(--size-row) - var(--bead-r)), 1px));
   background: var(--color-primary);
   filter:
     drop-shadow(0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--signs))))
@@ -222,4 +223,27 @@
 .k-kobo-panel > .k-step-rail-page {
   position: relative;
   z-index: 1;
+}
+
+/* The band while the page's own work runs: the `Filled` button keeps its room, unseen, and a
+   spinner and the work's words stand in its place, so nothing beside it moves. */
+.k-step-busy {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+
+.k-step-busy > .k-button {
+  visibility: hidden;
+}
+
+.k-step-busy-words {
+  position: absolute;
+  inset: 0 0 0 auto;
+  white-space: nowrap;
+}
+
+/* A window drawn as glass (first boot) shows its glass, not a surface of the template's own. */
+.k-glass-body .k-step-rail-page[data-host="window"] {
+  background: none;
 }

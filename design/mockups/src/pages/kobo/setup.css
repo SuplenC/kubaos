@@ -1,8 +1,9 @@
 /* Kōbō's first boot (`setup-room.ts`): the window on the desktop, the layers it hands over between,
    its scenes and the card pages' own parts. */
 
-/* The window: the desktop's surface, its scenes and its rail lying over one another as they hand
-   over; floated on the desktop it has an active window's corner and tube. */
+/* The window: Kōbō's glass panel at the window's size and corner, its active tube round it (outside
+   the glass, which cuts what lies on it to its corner); its scenes and its rail lie on the glass,
+   one over another as they hand over. */
 .setup-window {
   position: relative;
   display: block;
@@ -10,13 +11,18 @@
   flex: none;
   width: var(--setup-window-width);
   height: var(--setup-window-height);
-  border-radius: var(--corner, 0);
-  background: var(--color-surface);
+  border-radius: var(--corner);
   outline: none;
   isolation: isolate;
 }
 
-.setup-window > .setup-layer {
+.setup-window > .k-glass-panel {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.setup-window .setup-layer {
   position: absolute;
   inset: 0;
   overflow: hidden;
@@ -29,15 +35,14 @@
   scale: var(--scale-behind);
 }
 
-/* A scene: one column in the middle of the window, on its surface, so the rail under it shows
-   only as the scene fades. */
+/* A scene: one column in the middle of the window, on the glass. It hands over to the rail and
+   back one after the other, never both on the glass at once. */
 .setup-scene {
   display: flex;
   box-sizing: border-box;
   align-items: center;
   justify-content: center;
   padding: var(--space-s32);
-  background: var(--color-surface);
 }
 
 .setup-column {
@@ -54,10 +59,6 @@
 .setup-column > :is(.setup-hero, .setup-lede, .setup-accent) {
   text-align: center;
   text-wrap: balance;
-}
-
-.setup-column > .setup-plan {
-  align-self: stretch;
 }
 
 /* A card's body, drawn again in place as its work moves on: it fills the page above the band. */
