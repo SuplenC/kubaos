@@ -1,6 +1,6 @@
 // A list a scan updates while it shows, which never jumps: `KubaOS.Components`' `LiveList` and
-// `LiveRow` (`docs/design/components/list.md`), in a scrolling list's well. Its rows are kept by
-// their key, so only what changed changes: a row that arrives opens its room over `medium` on
+// `LiveRow` (`docs/design/components/list.md`), in a scrolling list's well. Its rows, and the
+// section labels between them, are kept by their key, so only what changed changes: a row that arrives opens its room over `medium` on
 // `standard_decel` and fades in over `slow`; one that leaves fades and gives its room back over
 // `medium` on `standard_accel`, taking no press while it goes; one that changes place glides there
 // over `medium` on `standard_decel`. With reduced motion a row arrives in its room and fades in over
@@ -12,13 +12,26 @@
 // fits its well, or is at its top), or the row itself would change place, the update waits until
 // the pointer leaves and the keyboard does, then plays.
 
-import { type ListOptions, type ListRowSpec, listRow, listRows, scaleOf, scrolled, twoLines } from "./list.ts";
+import { type ListOptions, type ListRowSpec, listLabel, listRow, listRows, scaleOf, scrolled, twoLines } from "./list.ts";
 import { length } from "./tokens.ts";
 
 export type LiveRowSpec = ListRowSpec & {
   /** What the row stands for across updates: a network's name, a device's address. */
   readonly key: string;
 };
+
+/** A section's label among the rows, kept by its key as a row is: it arrives and leaves as they do. */
+export interface LiveLabelSpec {
+  readonly key: string;
+  readonly label: string;
+}
+
+/** What a live list holds: rows, and the labels of the sections they fall in. */
+export type LiveItem = LiveRowSpec | LiveLabelSpec;
+
+function isLabel(item: LiveItem): item is LiveLabelSpec {
+  return "label" in item;
+}
 
 export interface LiveOptions extends ListOptions {
   /** The well's height, a length's CSS. */
@@ -29,27 +42,37 @@ export interface LiveOptions extends ListOptions {
 export interface LiveList {
   readonly element: HTMLElement;
   /** Brings the list to `rows`, now or once the row held still is let go. */
-  readonly update: (rows: readonly LiveRowSpec[]) => void;
+  readonly update: (rows: readonly LiveItem[]) => void;
   /** Called with whether an update is waiting for the held row to be let go. */
   onWaiting: (waiting: boolean) => void;
 }
 
-/** A row's room: the row and the `space.s4` after it, which it gives back with it as it leaves. */
-function liveRow(spec: LiveRowSpec): HTMLElement {
+/**
+ * A row's room: the row and the `space.s4` after it, which it gives back with it as it leaves. A
+ * label's room is its line with `space.s12` above it, as a label after rows stands, which the first
+ * room of the list leaves out (`lists.css`).
+ */
+function liveRow(spec: LiveItem): HTMLElement {
   const room = document.createElement("span");
   room.className = "k-live-row";
   room.dataset.key = spec.key;
+  if (isLabel(spec)) {
+    room.dataset.label = "";
+    room.append(listLabel(spec.label, false));
+    return room;
+  }
   room.style.setProperty("--row-height", twoLines(spec) ? "var(--size-row_two_line)" : "var(--size-row)");
   room.append(listRow(spec));
   return room;
 }
 
-/** The height a row's room takes in the list once it has settled, in the page's pixels. */
-function settled(spec: LiveRowSpec, scale: number): number {
-  return (length(twoLines(spec) ? "size-row_two_line" : "size-row") + length("space-s4")) * scale;
+/** The height an item's room takes in the list once it has settled, in the page's pixels. */
+function settled(spec: LiveItem, scale: number): number {
+  const own = isLabel(spec) ? length("type-label-line") + length("space-s12") : length(twoLines(spec) ? "size-row_two_line" : "size-row");
+  return (own + length("space-s4")) * scale;
 }
 
-export function liveList(initial: readonly LiveRowSpec[], options: LiveOptions): LiveList {
+export function liveList(initial: readonly LiveItem[], options: LiveOptions): LiveList {
   const column = document.createElement("span");
   column.className = "k-live-rows";
   let specs = [...initial];
@@ -63,7 +86,7 @@ export function liveList(initial: readonly LiveRowSpec[], options: LiveOptions):
   box.classList.add("k-live");
   const rows = () => [...column.querySelectorAll<HTMLElement>(".k-live-row:not([data-leaving]) > .k-list-row")];
   const keys = listRows(box, pane, rows, options);
-  let waiting: readonly LiveRowSpec[] | null = null;
+  let waiting: readonly LiveItem[] | null = null;
 
   const live: LiveList = { element: box, update, onWaiting: () => undefined };
 
@@ -77,18 +100,18 @@ export function liveList(initial: readonly LiveRowSpec[], options: LiveOptions):
     return box.closest("[data-reduced]") !== null;
   }
 
-  function update(next: readonly LiveRowSpec[]): void {
+  function update(next: readonly LiveItem[]): void {
     const anchor = held();
     const scale = scaleOf(box);
     if (anchor) {
       const key = anchor.dataset.key!;
       const before = specs.findIndex((each) => each.key === key);
       const after = next.findIndex((each) => each.key === key);
-      const above = (list: readonly LiveRowSpec[], end: number) => list.slice(0, Math.max(0, end)).reduce((sum, each) => sum + settled(each, scale), 0);
-      const kept = (list: readonly LiveRowSpec[]) => list.filter((each) => specs.some((old) => old.key === each.key) && next.some((now) => now.key === each.key)).map((each) => each.key);
+      const above = (list: readonly LiveItem[], end: number) => list.slice(0, Math.max(0, end)).reduce((sum, each) => sum + settled(each, scale), 0);
+      const kept = (list: readonly LiveItem[]) => list.filter((each) => specs.some((old) => old.key === each.key) && next.some((now) => now.key === each.key)).map((each) => each.key);
       const moved = after >= 0 && kept(specs).indexOf(key) !== kept(next).indexOf(key);
       const shift = after < 0 ? 0 : above(next, after) - above(specs, before);
-      const total = (list: readonly LiveRowSpec[]) => list.reduce((sum, each) => sum + settled(each, scale), 0);
+      const total = (list: readonly LiveItem[]) => list.reduce((sum, each) => sum + settled(each, scale), 0);
       const height = pane.scrollHeight + total(next) - total(specs);
       const room = pane.scrollTop + shift;
       if (moved || after < 0 || (shift !== 0 && (room < 0 || room > height - pane.clientHeight))) {
@@ -102,7 +125,7 @@ export function liveList(initial: readonly LiveRowSpec[], options: LiveOptions):
     play(next);
   }
 
-  function hold(next: readonly LiveRowSpec[]): void {
+  function hold(next: readonly LiveItem[]): void {
     waiting = next;
     live.onWaiting(true);
   }
@@ -128,7 +151,7 @@ export function liveList(initial: readonly LiveRowSpec[], options: LiveOptions):
   }
 
   /** Brings the rows to `next`: the fewest removes, inserts and moves, each with its motion. */
-  function play(next: readonly LiveRowSpec[]): void {
+  function play(next: readonly LiveItem[]): void {
     const wanted = new Set(next.map((each) => each.key));
     const keyed = keys.current()?.parentElement?.dataset.key;
     const tops = new Map<string, number>();
@@ -147,9 +170,12 @@ export function liveList(initial: readonly LiveRowSpec[], options: LiveOptions):
         arrive(room);
       } else if (JSON.stringify(specs.find((each) => each.key === spec.key)) !== JSON.stringify(spec)) {
         const old = room.firstElementChild as HTMLElement;
-        const fresh = listRow(spec);
-        room.replaceChildren(fresh);
-        keys.swap(old, fresh);
+        if (isLabel(spec)) room.replaceChildren(listLabel(spec.label, false));
+        else {
+          const fresh = listRow(spec);
+          room.replaceChildren(fresh);
+          keys.swap(old, fresh);
+        }
       }
       // Each row goes after the one before it in `next`, a leaving row left where it was.
       const place: ChildNode | null = after ? after.nextSibling : column.firstChild;
