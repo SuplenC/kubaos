@@ -78,8 +78,9 @@ export function media(options: MediaOptions): HTMLElement {
     const caption = wrapped(options.caption, "small", "on_surface_variant");
     caption.style.color = "var(--caption-colour, var(--color-on_surface_variant))";
     room.append(caption);
+    // With a caption the room is a stack: the caption `space.s8` under the box, both its width.
+    room.dataset.layout = "";
+    probe(room, { role: "layout", axis: "y", gap: length("space-s8"), align: "start" });
   }
-  // The room is a stack: the caption `space.s8` under the box, both its width.
-  room.dataset.layout = "";
-  return probe(room, { role: "layout", axis: "y", gap: length("space-s8"), align: "start" });
+  return room;
 }
