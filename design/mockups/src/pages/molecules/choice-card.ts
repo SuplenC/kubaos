@@ -91,7 +91,10 @@ export default page({
     { name: "A title alone", for: "no line under it", sample: () => boxed({ glyph: "dark_mode", title: "Dark", picked: true }) },
     { name: "Without a symbol", for: "the title starts at the padding", sample: () => boxed({ title: "Erase the disk", subtitle: "Everything on it goes." }) },
   ],
-  sizes: doesntApply("one padding and one corner; as wide as its cell of the grid."),
+  sizes: [
+    { name: "md", for: "a set of options", sample: () => boxed(SHELL) },
+    { name: "lg", for: "a page's whole question", sample: () => within(HALF, choiceCard({ ...SHELL, size: "Lg", picks: "many", picked: true })) },
+  ],
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],
     absent: {

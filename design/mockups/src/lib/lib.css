@@ -819,7 +819,8 @@
   transition: none;
 }
 
-.k-choice-card .k-card-title-line > :not(.k-choice-mark) {
+.k-choice-card .k-card-title-line > :not(.k-choice-mark),
+.k-choice-card .k-choice-words > .k-card-title {
   filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--picked) * var(--signs))));
 }
 
