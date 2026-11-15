@@ -2257,6 +2257,12 @@ body {
   display: block;
 }
 
+/* The Tone slider stretches across a stack; in its row it is centred on its label, as the hue
+   track is. */
+.k-row.f-colour-line > .k-slider {
+  align-self: center;
+}
+
 /* A sub-setting's label, in by `space.s12` under its setting's. */
 .f-colour-label > [data-sub] {
   margin-inline-start: var(--space-s12);
