@@ -113,6 +113,12 @@
   align-self: center;
 }
 
+/* The install's bar and the line under it take the column's whole width, so neither moves as what
+   the line says changes from step to step. */
+.kobo-column > .kobo-progress {
+  align-self: stretch;
+}
+
 .kobo-sign {
   display: block;
   width: var(--size-column);
@@ -415,4 +421,22 @@
   display: block;
   height: calc(var(--kobo-margin) + var(--space-s16) + var(--size-control_sm) + var(--space-s64));
   background: linear-gradient(rgb(from var(--color-surface) r g b / 0), rgb(from var(--color-surface) r g b / var(--opacity-backdrop)) var(--space-s64));
+}
+
+/* How far a room of the Disk card is open: 0 shut, taking no room, 1 open. */
+@property --kobo-open {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* A room of the Disk card there only while its answer asks for it: as tall as that share of what it
+   holds and as opaque, cut at its foot while it moves; open, a lit field's glow reaches past it. */
+.kobo-reveal {
+  /* A flex item keeps its content's height at least unless told otherwise. */
+  min-height: 0;
+  height: calc-size(auto, size * var(--kobo-open));
+  opacity: var(--kobo-open);
+  --kobo-past: calc(-1 * var(--focus-far));
+  clip-path: inset(var(--kobo-past) var(--kobo-past) calc(var(--kobo-past) * round(down, var(--kobo-open), 1)) var(--kobo-past));
 }

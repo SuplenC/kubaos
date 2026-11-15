@@ -1,5 +1,5 @@
-/* The StepRailPage template (`step-rail.ts`): the rail beside the page, in an app's window or in
-   Kōbō's glass panel over the wallpaper and its scrim. */
+/* The StepRailPage template (`step-rail.ts`): the rail beside the page, in an app's window or, in
+   Kōbō, the whole screen on glass over the wallpaper. */
 
 /* How far a page still has to slide, 1 where it starts `space.s32` off and 0 in place. */
 @property --step-slide {
@@ -11,6 +11,13 @@
 /* How far down the steps the wire is lit, in steps: the current step's index, moving between two
    as the light travels. */
 @property --wire-lit {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How far a Kōbō page's footer band has still to rise into place, in `space.s24`s. */
+@property --step-rise {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
@@ -49,9 +56,10 @@
   background: rgb(from var(--color-surface_container_low) r g b / var(--opacity-well));
 }
 
-/* In Kōbō the rail's outer corners are the panel's. */
+/* In Kōbō the screen is the glass: the rail has no well of its own, only its steps on their wire,
+   so nothing draws a box on the screen. */
 .k-step-rail-page[data-host="kobo"] .k-rail {
-  border-radius: var(--radius-surface) 0 0 var(--radius-surface);
+  background: none;
 }
 
 .k-rail > .k-stack {
@@ -69,42 +77,41 @@
   isolation: isolate;
 }
 
-/* The progress wire: one tube `step_rail.wire` thick down the steps' symbols, centred on them on
-   whole device pixels, from the first symbol's centre to the last's. Unlit it is `outline_variant`;
-   lit, down to the current symbol's bead, it is `primary`, with a lit control's glow round it,
-   near and far, at night while the signs are on, and none by day. Each symbol is a bead: the wire
-   and its glow are cut away in a disc `step_rail.bead` wider than the symbol on every side, so the
-   wire passes behind it whatever the fill under it. It lies over the rows and takes no pointer. */
+/* The progress wire: a length of tube `step_rail.wire` thick between each symbol and the next,
+   centred on them on whole device pixels, stopping `step_rail.bead` short of both with round ends,
+   so the tube runs into the symbols and none of it crosses a glyph. Unlit it is `outline_variant`;
+   its light, `primary`, fills each length as far as the light has come, with a lit control's glow
+   round it, near and far, at night while the signs are on, and none by day. The symbols it reaches
+   are lit and glow as it does (`Step`), so tube and symbols read as one sign. It lies over the rows
+   and takes no pointer. */
 .k-rail-wire {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
   --wire: max(1px, round(nearest, var(--step_rail-wire), 1px));
-  --wire-x: calc(var(--space-s12) + var(--type-body_strong-icon) / 2);
   --wire-top: round(nearest, calc(var(--size-row) / 2), 1px);
   --bead-r: calc(var(--type-body_strong-icon) / 2 + var(--step_rail-bead));
+  --wire-length: round(nearest, calc(var(--size-row) - 2 * var(--bead-r)), 1px);
   --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
-  mask-composite: intersect;
-  mask-repeat: no-repeat;
 }
 
 .k-rail-wire-track,
 .k-rail-wire-lit {
   position: absolute;
-  top: var(--wire-top);
+  top: calc(var(--wire-top) + var(--i) * var(--size-row) + round(nearest, var(--bead-r), 1px));
   left: calc(var(--space-s12) + round(nearest, calc((var(--type-body_strong-icon) - var(--wire)) / 2), 1px));
   width: var(--wire);
+  border-radius: var(--radius-full);
 }
 
 .k-rail-wire-track {
-  height: calc((var(--count) - 1) * var(--size-row));
+  height: var(--wire-length);
   background: var(--color-outline_variant);
 }
 
 .k-rail-wire-lit {
-  translate: 0 calc(var(--wire-from, 0) * var(--size-row));
-  height: max(0px, round(nearest, calc((var(--wire-lit) - var(--wire-from, 0)) * var(--size-row) - var(--bead-r)), 1px));
+  height: round(nearest, calc(clamp(0, var(--wire-lit) - var(--i), 1) * var(--wire-length)), 1px);
   background: var(--color-primary);
   filter:
     drop-shadow(0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--signs))))
@@ -127,12 +134,22 @@
   will-change: translate, opacity;
 }
 
-/* A page drawn before, kept laid out under the one shown, unseen and out of the keyboard's reach. */
+/* A page drawn before, kept laid out under the one shown, unseen and out of the keyboard's reach;
+   in Kōbō the page just left is seen until it has gone. */
 .k-step-side > .k-step-room[data-kept] {
   position: absolute;
   inset: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+.k-step-side > .k-step-room[data-kept][data-leaving] {
+  visibility: visible;
+  will-change: translate, opacity;
+}
+
+.k-step-rail-page[data-host="kobo"] .k-step-footer {
+  translate: 0 round(nearest, calc(var(--step-rise) * var(--space-s24)), 1px);
 }
 
 .k-step-room {
@@ -174,55 +191,6 @@
 .k-lockup-word > svg {
   width: auto;
   height: var(--icon-s24);
-}
-
-/* Kōbō's screen: the wallpaper, the scrim over it, and the glass panel placed by script. */
-.k-kobo {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background-color: var(--color-surface_container_lowest);
-  background-position: center;
-  background-size: cover;
-}
-
-.k-kobo::before {
-  position: absolute;
-  inset: 0;
-  content: "";
-  background: rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
-}
-
-.k-kobo-panel {
-  position: absolute;
-  display: flex;
-  overflow: hidden;
-  border-radius: var(--radius-surface);
-  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
-}
-
-/* The glass: the blurred wallpaper under the surface at `opacity.glass`, in the soft hairline. */
-.k-kobo-panel::after {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-  content: "";
-  background: rgb(from var(--color-surface) r g b / var(--opacity-glass));
-  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
-  pointer-events: none;
-}
-
-.k-kobo-glass {
-  position: absolute;
-  object-fit: cover;
-}
-
-.k-kobo-panel > .k-step-rail-page {
-  position: relative;
-  z-index: 1;
 }
 
 /* The band while the page's own work runs: the `Filled` button keeps its room, unseen, and a

@@ -2,10 +2,13 @@
 // polkit's prompt and Kōbō's welcome, done and step-rail screens are laid out on.
 //
 // A picture, a scrim over it, and one thing in its middle on whole device pixels. The scrim is
-// one of two: behind words, a band of `surface` at `opacity.backdrop` across the screen, from
+// one of three: behind words, a band of `surface` at `opacity.backdrop` across the screen, from
 // `space.s64` above the thing to `space.s64` below it, fading to nothing over those `space.s64`, so
 // the words keep 4.5:1 over any picture and the picture shows round them; behind a dialog or a
-// panel, `scrim` at `opacity.scrim` over all of it.
+// panel, `scrim` at `opacity.scrim` over all of it; and behind a flow of questions that is the
+// whole screen (Kōbō's), glass: the picture's blurred copy under `surface` at `opacity.glass`, the
+// thing filling the screen less its margin, no wider than a rail and two columns with `space.s40`
+// beside each.
 //
 // The picture can come toward you, growing to `scale.push` round the middle of its bottom edge
 // (`--backdrop-push`), and it can go dark toward `surface_container_lowest` (`--backdrop-dark`):
@@ -20,8 +23,8 @@
 import "./backdrop.css";
 import { probe } from "./probe.ts";
 
-/** What lies over the picture: a band behind words, or a dim behind a dialog or a panel. */
-export type Scrim = "band" | "dim";
+/** What lies over the picture: a band behind words, a dim behind a dialog or a panel, or glass. */
+export type Scrim = "band" | "dim" | "glass";
 
 export interface BackdropOptions {
   readonly width: string;
@@ -42,6 +45,7 @@ export interface BackdropOptions {
 export function backdrop(options: BackdropOptions): HTMLElement {
   const element = document.createElement("span");
   element.className = "k-backdrop";
+  element.dataset.scrim = options.scrim;
   // A whole screen: a motion player draws it as it is laid out.
   element.dataset.whole = "";
   element.style.setProperty("--backdrop-width", options.width);

@@ -1,5 +1,6 @@
-// Kōbō's done screen: the arrival. The street comes toward you, クバ writes itself in and strikes,
-// 完了 is stamped beside it, and the headline rises word by word. Reboot switches it all off.
+// Kōbō's done screen: the arrival. The street goes dark while クバ writes itself in as unlit glass,
+// then the sign strikes and the street lights up round it and comes toward you: it worked, and the
+// machine is on and yours. The headline rises word by word under it; Reboot switches it all off.
 
 import { doesntApply, nonEmpty, page, screen } from "../../site/page.ts";
 import { windowSize } from "../../site/settings.ts";
@@ -17,7 +18,7 @@ export default page<Shown>({
   level: "kobo",
   slug: "done",
   title: "Done",
-  lede: "The arrival: the street comes close, クバ writes itself in and strikes, 完了 is stamped.",
+  lede: "The arrival: the street goes dark, クバ writes itself in and strikes, the street lights up.",
   code: { unbuilt: "Kōbō draws the old done screen" },
   from: ["backdrop", "button", "keycap", "spinner", "dialog"],
   stage: {
@@ -26,7 +27,7 @@ export default page<Shown>({
     daylight: doesntApply("the live ISO is always dark: the installer has no day."),
   },
   variants: [
-    { name: "Done", for: "the mark lit, the hanko on, Reboot waiting", sample: CELLS.rest },
+    { name: "Done", for: "the sign lit, the street close, Reboot waiting", sample: CELLS.rest },
     { name: "Restarting", for: "Reboot taken: a spinner and the room going dark", sample: CELLS.loading },
     { name: "Power", for: "pull the stick first, it says", sample: screen(() => room({ at: { scene: "done" }, power: "ask" })) },
   ],
@@ -57,11 +58,9 @@ export default page<Shown>({
     lands: "On Reboot from the first frame, while the mark still writes itself in.",
   },
   measures: {
-    samples: nonEmpty([{ name: "Done", for: "the mark, the hanko and the column", sample: CELLS.rest }]),
+    samples: nonEmpty([{ name: "Done", for: "the sign and the column", sample: CELLS.rest }]),
     measures: [
       { part: "The mark", token: "size-neon_mark" },
-      { part: "The hanko", token: "size-hanko" },
-      { part: "Mark → hanko", token: "space-s16" },
       { part: "Mark → headline", token: "space-s24" },
       { part: "Headline → lede", token: "space-s16" },
       { part: "Lede → actions", token: "space-s40" },

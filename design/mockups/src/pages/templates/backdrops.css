@@ -1,5 +1,5 @@
 /* The Backdrop page's own boxes: Kōbō's sign and mark at their sizes, and the room StepRailPage
-   fills. */
+   fills on glass. */
 .k-backdrop-sign {
   display: block;
   width: var(--size-column);
@@ -11,7 +11,9 @@
   height: var(--size-neon_mark);
 }
 
-.k-backdrop-host > .k-glass-body {
+.k-backdrop-host {
+  display: flex;
+  flex: 1 1 auto;
   align-items: center;
   justify-content: center;
 }

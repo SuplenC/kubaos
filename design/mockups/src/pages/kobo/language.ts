@@ -3,8 +3,8 @@
 
 import type { Words } from "../../lib/content.ts";
 import { doesntApply, nonEmpty, page, screen } from "../../site/page.ts";
-import { at, live, onward, PANEL_MEASURES } from "./kobo-pages.ts";
-import { LAPTOP, room } from "./kobo-room.ts";
+import { at, live, PANEL_MEASURES } from "./kobo-pages.ts";
+import { ENTERING, LAPTOP, room } from "./kobo-room.ts";
 
 const POLSKI = { language: 2, layouts: [3], zone: 2 };
 
@@ -36,7 +36,7 @@ export default page<Shown>({
     { name: "Nothing matches", for: "the list's empty state", sample: CELLS.empty },
     { name: "With a cable in", for: "no Wi-Fi step in the rail", sample: at("language", () => ({}), { machine: { ...LAPTOP, online: true } }, true) },
   ],
-  sizes: doesntApply("the panel's sizes are StepRailPage's; this screen fills its page."),
+  sizes: doesntApply("the screen's sizes are StepRailPage's; this question fills its page."),
   states: {
     shown: ["rest", "selected", "open", "empty"],
     absent: {
@@ -65,8 +65,8 @@ export default page<Shown>({
     ],
   },
   motion: {
-    arrives: [onward("language", CELLS.rest)],
-    leaves: doesntApply("Continue slides the next screen in: You's page shows it."),
+    arrives: [ENTERING],
+    leaves: doesntApply("Continue slides the next question in: Wi-Fi's page shows it."),
     between: doesntApply("its list, selects and fields move as their pages say."),
   },
   keyboard: {

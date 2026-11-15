@@ -40,7 +40,7 @@ export default page<Shown>({
     { name: "Low battery", for: "a Warning banner over the cards", sample: CELLS.error },
     { name: "An empty disk", for: "nothing to lose: There's no undo.", sample: at("review", () => ({ mode: "erase" as const }), { machine: { ...LAPTOP, disks: [EMPTY_DISK, STICK] } }) },
   ],
-  sizes: doesntApply("the panel's sizes are StepRailPage's; the cards scroll above the banner."),
+  sizes: doesntApply("the screen's sizes are StepRailPage's; the cards scroll above the banner."),
   states: {
     shown: ["rest", "pressed", "selected", "error"],
     absent: { lit: "the hold lights as its button kind does", disabled: "the answers are checked before this screen", loading: "nothing to wait for", empty: "four cards, always" },
@@ -59,7 +59,7 @@ export default page<Shown>({
     counts: doesntApply("four cards, always."),
   },
   motion: {
-    arrives: [onward("review", CELLS.rest)],
+    arrives: [onward("review")],
     leaves: [STARTING],
     between: [HOLDING],
   },
@@ -70,7 +70,7 @@ export default page<Shown>({
       { keys: ["Tab", "Shift+Tab"], does: "each card's Change, Back, the hold" },
       { keys: ["Esc"], does: "back a screen" },
     ],
-    order: "The four Changes in reading order, Back, the hold.",
+    order: "Each card's Change in reading order (System's only with Wi-Fi asked), Back, the hold.",
     lands: "On the hold, so Enter held installs and nothing else needs finding.",
   },
   measures: {

@@ -1,9 +1,8 @@
 // The StepRailPage page: `docs/design/components/step-rail-page.md`. A step rail beside a page with
 // a footer band, and how it moves between its pages: in an app's window (the updater), and framed
-// in Kōbō's glass panel over its wallpaper.
+// in Kōbō, the whole screen on glass over its wallpaper.
 
 import "./step-rail-page.css";
-import wallpaper from "../../../../../crates/kubaos-kobo/assets/wallpaper.jpg?url";
 import blurred from "../../../../../crates/kubaos-kobo/assets/wallpaper-blur.jpg?url";
 import mark from "../../../../../crates/kubaos-kobo/assets/logo/kubaos-mark.svg?raw";
 import wordmark from "../../../../../crates/kubaos-kobo/assets/logo/kubaos-wordmark.svg?raw";
@@ -113,7 +112,7 @@ function kobo(extra: Partial<StepRailOptions> = {}): HTMLElement {
     reached: 3,
     hints: koboHints,
     foot: { power: true, battery: 82 },
-    backdrop: { wallpaper, blurred },
+    backdrop: { blurred },
     ...extra,
   });
 }
@@ -175,6 +174,29 @@ const ON: Move = {
   sample: () => framed(updater({ current: 2, arriving: { forward: true, shown: 1 } }), undefined, SAMPLE_HEIGHT),
 };
 
+/** The page shown, not one kept or leaving. */
+const SHOWN = ".k-step-room:not([data-kept])";
+
+const KOBO_ON: Move = {
+  name: "In Kōbō: the next question",
+  what: "The page left slides off and fades over `short`; the next slides in from the right, its band a `micro` after it.",
+  tracks: [
+    { part: "the page left", on: "the page", target: ".k-step-room[data-leaving]", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
+    { part: "its slide off", on: "the page", target: ".k-step-room[data-leaving]", property: "--step-slide", from: 0, to: 1, duration: "short", curve: "emphasized_accel" },
+    { part: "the next page", on: "the page", target: SHOWN, property: "opacity", from: 0, to: 1, duration: "long", cue: "short", curve: "emphasized_decel" },
+    { part: "its slide in", on: "the page", target: SHOWN, property: "--step-slide", from: 1, to: 0, duration: "long", cue: "short", curve: "emphasized_decel" },
+    { part: "the band", on: "the page", target: `${SHOWN} .k-step-footer`, property: "opacity", from: 0, to: 1, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
+    { part: "the band's rise", on: "the page", target: `${SHOWN} .k-step-footer`, property: "--step-rise", from: 1, to: 0, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
+    ...travelling(1, 2),
+  ],
+  reduced: [
+    { part: "the page left", on: "the page", target: ".k-step-room[data-leaving]", property: "opacity", from: 1, to: 0, duration: "instant", curve: "standard" },
+    { part: "the next page", on: "the page", target: SHOWN, property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
+  ],
+  back: "cuts",
+  sample: () => framed(kobo({ current: 2, reached: 2, leaving: 1 }), "var(--size-app_width)", "var(--size-app_height)"),
+};
+
 const BACK: Move = {
   name: "Back: the page before arrives",
   what: "Back, Esc or a done step: the same from the left, the wire retracting.",
@@ -224,11 +246,11 @@ export default page<"rest" | "lit" | "pressed" | "disabled" | "selected" | "load
   },
   variants: [
     { name: "In an app's window", for: "the updater, at an app's minimum", sample: () => framed(updater()) },
-    { name: "Framed in Kōbō", for: "lockup, power and battery; the panel over the wallpaper", sample: () => framed(kobo(), "var(--size-app_width)", "var(--size-app_height)") },
+    { name: "In Kōbō", for: "the whole screen on glass: lockup, power and battery", sample: () => framed(kobo(), "var(--size-app_width)", "var(--size-app_height)") },
   ],
   sizes: [
     { name: "The rail", for: "`size.rail` at every window size; the page takes the rest", sample: () => framed(updater(), "var(--size-app_min_width)", SAMPLE_HEIGHT) },
-    { name: "Kōbō at the toolbar's size", for: "the panel's inset and width follow the screen", sample: () => framed(kobo(), windowSize().width, windowSize().height) },
+    { name: "Kōbō at the toolbar's size", for: "its inset and width follow the screen", sample: () => framed(kobo(), windowSize().width, windowSize().height) },
   ],
   states: {
     shown: ["rest", "lit", "pressed", "disabled", "selected", "loading", "error"],
@@ -298,7 +320,7 @@ export default page<"rest" | "lit" | "pressed" | "disabled" | "selected" | "load
   motion: {
     arrives: doesntApply("it comes with its window, or Kōbō's panel with its Backdrop."),
     leaves: doesntApply("it goes with its window or its Backdrop."),
-    between: [ON, BACK, NUDGE, LIGHT, PRESS, ...powerMoves(() => railStep({ title: "Network", icon: "wifi", state: { is: "done" }, pressable: true, pinned: "lit" }))],
+    between: [ON, KOBO_ON, BACK, NUDGE, LIGHT, PRESS, ...powerMoves(() => railStep({ title: "Network", icon: "wifi", state: { is: "done" }, pressable: true, pinned: "lit" }))],
   },
   keyboard: {
     keys: [
@@ -324,11 +346,10 @@ export default page<"rest" | "lit" | "pressed" | "disabled" | "selected" | "load
       { part: "Key → its words", token: "space-s8" },
       { part: "Between hints; under the lockup", token: "space-s4" },
       { part: "Wire's thickness", token: "step_rail-wire" },
-      { part: "Bead past the symbol", token: "step_rail-bead" },
+      { part: "Wire short of a symbol", token: "step_rail-bead" },
       { part: "Page's top, its slide; Kōbō's inset", token: "space-s32" },
       { part: "Page's foot", token: "space-s24" },
       { part: "Band's buttons", token: "size-control_md" },
-      { part: "Panel's corners", token: "radius-surface" },
       { part: "Beside Kōbō's widest columns", token: "space-s40" },
       { part: "A column of text", token: "size-column" },
     ],

@@ -1,5 +1,5 @@
 // First boot's Git card: the name and email commits carry, the name guessed from the account, the
-// email checked as it is typed. Done at the install when "Make it yours" was given them.
+// email checked as it is typed. The installer never asks them, so this card is where they are set.
 
 import { doesntApply, nonEmpty, page, screen } from "../../site/page.ts";
 import { refused } from "./kobo-pages.ts";

@@ -1,17 +1,19 @@
 // The StepRailPage template: a step rail beside a page with a footer band, and how it moves between
 // its pages (`docs/design/components/step-rail-page.md`). One template with two hosts: in an app's
-// window (the updater) the rail and the page fill the window; in Kōbō they are its glass panel over
-// the wallpaper and the scrim. Its look is `step-rail.css`.
+// window (the updater) the rail and the page fill the window; in Kōbō they are the whole screen, on
+// glass over the wallpaper, with no panel round them. Its look is `step-rail.css`.
 //
 // The rail is `size.rail` wide, `space.s16` in above and below and `space.s12` at its sides, so its
 // steps' corners are concentric with its own: the brand or the title, `space.s20`, the steps back
 // to back across its width (`Step`, each a mark at its end), scrolling where they don't fit, then
 // `space.s16` and at its foot the key hints and, in Kōbō, the power button and the battery. A wire
-// runs down the steps' symbols, lit down to the current one; each symbol is a bead on it. The page
+// runs down the steps' symbols, lit down to the current one, and the symbols it reaches are lit and
+// glow with it, one neon sign. The page
 // beside it is a clear `Page`: its body, then `space.s16` above the footer band, which has no
 // hairline: Back on the left, the one Filled button on the right, and a note just before it.
 
 import "./step-rail.css";
+import { backdrop } from "./backdrop.ts";
 import { button } from "./button.ts";
 import { hangs } from "./button-bar.ts";
 import type { Pinned } from "./control.ts";
@@ -23,7 +25,7 @@ import { scroll } from "./scroll.ts";
 import { spinner } from "./spinner.ts";
 import { pressable, setStepState, step, type StepOptions, type StepState } from "./step.ts";
 import { text, wrapped } from "./text.ts";
-import { cubic, length, raw } from "./tokens.ts";
+import { cubic, raw } from "./tokens.ts";
 import { palette } from "../site/recolour.ts";
 import { settings } from "../site/settings.ts";
 import { THEMES } from "../site/themes.ts";
@@ -49,6 +51,12 @@ function statusOf(spec: RailPage): RailStatus | undefined {
  */
 export const RECHECK = "k-step-recheck";
 
+/**
+ * The event a page's body sends to go on as Continue does: Enter on the row of its list that is
+ * already its answer, which the list itself takes as a pick.
+ */
+export const GO_ON = "k-step-go-on";
+
 /** One page of the flow: its step in the rail and what the page holds. */
 export interface RailPage {
   /** Its step: a title and a symbol; where it stands comes from the flow. */
@@ -65,6 +73,8 @@ export interface RailPage {
   readonly footless?: boolean;
   /** Its body reads the whole flow (the review), so it is drawn again each time it shows. */
   readonly fresh?: boolean;
+  /** Where in its body the keyboard lands, when not on its first control: the review's hold. */
+  readonly lands?: string;
   /** Going back past it is refused: it can't be undone (the install started). */
   readonly fixed?: boolean;
   /** Where it stands on its own, not by its place in the flow: first boot's cards (`free`). */
@@ -102,9 +112,8 @@ export interface RailFoot {
   readonly charging?: boolean;
 }
 
-/** The pictures behind Kōbō's panel: the wallpaper, and the same blurred for its glass. */
+/** The picture behind Kōbō's screen: the wallpaper blurred, under its glass. */
 export interface Backdrop {
-  readonly wallpaper: string;
   readonly blurred: string;
 }
 
@@ -126,12 +135,17 @@ export interface StepRailOptions {
   /** The keys the current page takes, at the rail's foot. */
   readonly hints: (page: number) => readonly KeyHint[];
   readonly foot?: RailFoot;
-  /** Kōbō's wallpaper and its blurred copy, which shows through the glass panel. */
+  /** Kōbō's blurred wallpaper, which shows through the glass the screen is. */
   readonly backdrop?: Backdrop;
   /** The blocker's flash, held this far through, as a still sample of it. */
   readonly nudged?: number;
   /** The current page arriving from this side, held this far in, as a still sample of the slide. */
   readonly arriving?: { readonly forward: boolean; readonly shown: number };
+  /**
+   * In Kōbō, the page the current one was reached from, drawn leaving over it: a move's first state,
+   * which its player takes from there.
+   */
+  readonly leaving?: number;
   /**
    * What its host does past either end: Back or Esc on the first page (`forward` false), Continue
    * or Enter on the last (`forward` true). Kōbō's welcome before it, its install after it.
@@ -226,7 +240,7 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
       }
     });
     element.dataset.pressable = String(shown.pressable);
-    element.dataset.failed = String(shown.failed);
+    element.dataset.railFailed = String(shown.failed);
     return element;
   };
   const steps = options.pages.map((_, index) => make(index, look(index, current, reached)));
@@ -269,7 +283,7 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
         const shown = look(index, at, upTo);
         // A failed symbol is drawn whole, as is any change to a free step's own standing; every
         // other change, taking a press included, is in place.
-        if (element.dataset.failed !== String(shown.failed) || (options.free && element.dataset.shown !== JSON.stringify(shown))) {
+        if (element.dataset.railFailed !== String(shown.failed) || (options.free && element.dataset.shown !== JSON.stringify(shown))) {
           const fresh = make(index, shown);
           element.replaceWith(fresh);
           steps[index] = fresh;
@@ -288,7 +302,7 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
           theWire.replaceWith(again);
           theWire = again;
         }
-      } else column.querySelector<HTMLElement>(".k-rail-wire-lit")?.style.setProperty("--wire-lit", String(at));
+      } else for (const light of column.querySelectorAll<HTMLElement>(".k-rail-wire-lit")) light.style.setProperty("--wire-lit", String(at));
       // Two pages taking the same keys keep the hints they share as they are.
       if (JSON.stringify(options.hints(at)) !== JSON.stringify(options.hints(hintsAt))) drawHints(at);
       hintsAt = at;
@@ -296,11 +310,6 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
   };
 }
 
-/**
- * The progress wire down the steps' symbols, from the first to the last, lit down to `current`.
- * Each symbol is a bead on it: the wire is cut away round each, so whatever is under the bead (the
- * rail's fill, or the current row's) shows there, glass and all.
- */
 /** The runs of two or more steps in a row that are done, as their first and last index. */
 function runs(done: readonly boolean[]): [number, number][] {
   const found: [number, number][] = [];
@@ -317,29 +326,29 @@ function runs(done: readonly boolean[]): [number, number][] {
 }
 
 /**
- * The wire, lit down to `current`; or, in a free flow, lit along each of `lit`'s runs of done
- * steps, each its own tube from its first symbol to its last.
+ * The progress wire down the steps' symbols: a length of tube between each symbol and the next,
+ * stopping `step_rail.bead` short of both, so the tube runs into each symbol and no line crosses a
+ * glyph. Each length is unlit glass with its light over it, filled as far as the light has come:
+ * down to `current`, or, in a free flow, along each of `lit`'s runs of done steps.
  */
 function wire(count: number, current: number, lit: readonly [number, number][] | null = null): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-rail-wire";
-  box.style.setProperty("--count", String(count));
-  const cut = (index: number) => `radial-gradient(circle at var(--wire-x) calc(${index} * var(--size-row) + var(--wire-top)), transparent var(--bead-r), black var(--bead-r))`;
-  box.style.maskImage = Array.from({ length: count }, (_, index) => cut(index)).join(", ");
-  const track = document.createElement("span");
-  track.className = "k-rail-wire-track";
-  const tube = (from: number, to: number) => {
-    const shown = document.createElement("span");
-    shown.className = "k-rail-wire-lit";
-    shown.style.setProperty("--wire-from", String(from));
-    shown.style.setProperty("--wire-lit", String(to));
-    // The steps a run joins, so a move can pick out the one a step just joined.
-    shown.dataset.steps = Array.from({ length: to - from + 1 }, (_, index) => from + index).join(" ");
-    return shown;
-  };
-  const tubes = lit ? lit.map(([from, to]) => tube(from, to)) : [tube(0, current)];
+  const joined = (index: number) => lit?.some(([from, to]) => index >= from && index < to) ?? false;
+  for (let index = 0; index < count - 1; index++) {
+    const track = document.createElement("span");
+    track.className = "k-rail-wire-track";
+    track.style.setProperty("--i", String(index));
+    const light = document.createElement("span");
+    light.className = "k-rail-wire-lit";
+    light.style.setProperty("--i", String(index));
+    // A free flow's light is whole lengths, each lit where both its steps are done.
+    light.style.setProperty("--wire-lit", String(lit ? (joined(index) ? index + 1 : index) : current));
+    // The two steps it joins, so a move can pick out the light a step just joined.
+    light.dataset.steps = `${index} ${index + 1}`;
+    box.append(track, light);
+  }
   box.dataset.runs = JSON.stringify(lit);
-  box.append(track, ...tubes);
   return box;
 }
 
@@ -367,9 +376,12 @@ function reaching(token: string, share: number): number {
 function travel(steps: HTMLElement, from: number, to: number, failed: boolean): void {
   if (settings().reduced || from === to) return;
   const long = timed("long");
-  steps.querySelector(".k-rail-wire-lit")?.animate([{ "--wire-lit": from }, { "--wire-lit": to }], { duration: long, easing: curve("emphasized_decel") });
+  // Only the lengths between the two steps change: each animated length is styled again every frame
+  // on the main thread, so the rest are left alone.
+  const lights = [...steps.querySelectorAll<HTMLElement>(".k-rail-wire-lit")].slice(Math.min(from, to), Math.max(from, to));
+  for (const light of lights) light.animate([{ "--wire-lit": from }, { "--wire-lit": to }], { duration: long, easing: curve("emphasized_decel") });
   const rows = [...steps.querySelectorAll<HTMLElement>(":scope > .k-step")];
-  const look = (index: number, at: number, fails: boolean) => ({ "--bead-lit": index <= at ? 1 : 0, "--bead-glow": index === at && !fails ? 1 : 0 });
+  const look = (index: number, at: number, fails: boolean) => ({ "--bead-lit": index <= at ? 1 : 0, "--bead-glow": index < at || (index === at && !fails) ? 1 : 0 });
   rows.forEach((each, index) => {
     const before = look(index, from, false);
     const after = look(index, to, failed);
@@ -466,13 +478,36 @@ function curve(token: string): string {
 
 /**
  * A page arriving: it slides `space.s32` in from the side it comes from and fades in, over `long`
- * on `emphasized_decel`, its offset on whole device pixels; with reduced motion it only fades.
+ * on `emphasized_decel`, its offset on whole device pixels; with reduced motion it only fades. In
+ * Kōbō, where the page is the screen, it waits the `short` the page leaving takes to go, so the two
+ * never lie over each other, and its footer band follows it in a `micro` later, rising `space.s24`.
  */
-export function arrive(room: HTMLElement, forward: boolean): void {
+export function arrive(room: HTMLElement, forward: boolean, staged = false): void {
   room.dataset.from = forward ? "end" : "start";
   const reduced = settings().reduced;
   const frames: Keyframe[] = reduced ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, "--step-slide": 1 }, { opacity: 1, "--step-slide": 0 }];
-  room.animate(frames, { duration: timed("long"), easing: curve("emphasized_decel") });
+  const after = staged && !reduced ? timed("short") : 0;
+  room.animate(frames, { duration: timed("long"), delay: after, easing: curve("emphasized_decel"), fill: "backwards" });
+  const band = staged && !reduced ? room.querySelector<HTMLElement>(".k-step-footer") : null;
+  band?.animate([{ opacity: 0, "--step-rise": 1 }, { opacity: 1, "--step-rise": 0 }], { duration: timed("long"), delay: after + timed("micro"), easing: curve("emphasized_decel"), fill: "backwards" });
+}
+
+/**
+ * In Kōbō, the page left: it slides `space.s32` on, away from where the next comes in, and fades
+ * out over `short` on `emphasized_accel`, drawn over the page arriving until it is gone; with
+ * reduced motion it goes at once.
+ */
+export function leave(room: HTMLElement, forward: boolean): void {
+  if (settings().reduced) return;
+  room.dataset.from = forward ? "start" : "end";
+  room.dataset.leaving = "";
+  room.animate([{ opacity: 1, "--step-slide": 0 }, { opacity: 0, "--step-slide": 1 }], { duration: timed("short"), easing: curve("emphasized_accel"), fill: "forwards" }).finished.then(
+    (run) => {
+      delete room.dataset.leaving;
+      run.cancel();
+    },
+    () => {},
+  );
 }
 
 /** Enter refused: the blocker's reason in `error` at once, fading back over `slow`. */
@@ -497,7 +532,7 @@ function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void, onSkip
   const body = spec.body();
   const parts: Element[] = [fillingHeight(filling(body))];
   let nudge: HTMLElement | null = null;
-  let first = body.querySelector<HTMLElement>(TAKES_KEYS);
+  let first = body.querySelector<HTMLElement>(spec.lands ?? TAKES_KEYS);
   const room = document.createElement("span");
   const made = { nudge: null as HTMLElement | null };
   if (!spec.footless) {
@@ -581,7 +616,9 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
     shown.nudge = made.nudge;
     const scrolled = box.querySelector(".k-rail .k-scroll-view")?.scrollTop ?? 0;
     // Drawing the rail again replaces what has the keyboard, which would drop it out of the template.
-    const keyboardIn = box.contains(document.activeElement);
+    // A page change always comes from a press in the template, so a keyboard nowhere (the page's
+    // own redraw took what had it, as Enter on a list does) was in it too.
+    const keyboardIn = box.contains(document.activeElement) || document.activeElement === document.body;
     if (!theRail) {
       theRail = rail(options, current, reached, go);
       box.replaceChildren(theRail.element, side);
@@ -593,7 +630,9 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
       ahead();
       return;
     }
-    arrive(made.room, current > from);
+    const left = rooms.get(from)?.room;
+    if (options.host === "kobo" && left && left !== made.room) leave(left, current > from);
+    arrive(made.room, current > from, options.host === "kobo");
     if (steps && !options.free) travel(steps, from, current, options.failed ?? false);
     // The template holds the keys on a page with nothing to do yet: Enter and Esc still work. The
     // keyboard moves with the next frame, which lays the page out anyway, not inside the press.
@@ -662,10 +701,20 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
     event.preventDefault();
   });
 
+  box.addEventListener(GO_ON, () => next());
+
   // A page's answers or its work changed: in a free flow its step stands where the page says.
   if (options.free) box.addEventListener(RECHECK, () => theRail?.set(current, reached));
   draw(null);
   if (options.nudged !== undefined) shown.nudge()?.style.setProperty("--nudge", String(options.nudged));
+  if (options.leaving !== undefined && options.leaving !== current) {
+    const left = roomOf(options.leaving);
+    showOnly(current);
+    if (left) {
+      left.room.dataset.leaving = "";
+      left.room.dataset.from = options.leaving < current ? "start" : "end";
+    }
+  }
   if (options.arriving) {
     const room = box.querySelector<HTMLElement>(".k-step-room:not([data-kept])");
     if (room) {
@@ -730,41 +779,7 @@ export function windowBrand(title: string, line: string): HTMLElement {
   return stack("s4", "start", text(title, "heading"), text(line, "caption", "on_surface_variant"));
 }
 
-/**
- * Kōbō's glass panel, the template inside it, over the wallpaper and its scrim. The panel is inset
- * `space.s32` from the screen's edges where the screen holds two columns of text side by side, else
- * `space.s16`, and no wider than the rail beside two columns and `space.s40` either side of them, so
- * lines stay short on a big screen; centred, on whole device pixels. That inset turns on the
- * screen's own width, which CSS can't compare with a length, so script places it.
- */
-function koboPanel(template: HTMLElement, backdrop: Backdrop): HTMLElement {
-  const screen = document.createElement("span");
-  screen.className = "k-kobo";
-  screen.style.backgroundImage = `url("${backdrop.wallpaper}")`;
-  const glass = document.createElement("img");
-  glass.className = "k-kobo-glass";
-  glass.src = backdrop.blurred;
-  glass.alt = "";
-  const panel = document.createElement("span");
-  panel.className = "k-kobo-panel";
-  panel.append(glass, template);
-  screen.append(panel);
-  new ResizeObserver(() => {
-    const scale = Number.parseFloat(getComputedStyle(screen).getPropertyValue("--scale")) || settings().scale;
-    const width = screen.clientWidth / scale;
-    const height = screen.clientHeight / scale;
-    const margin = length(width >= 2 * length("size-column") ? "space-s32" : "space-s16");
-    const widest = length("size-rail") + 2 * length("space-s40") + 2 * length("size-column");
-    const wide = Math.min(width - 2 * margin, widest);
-    panel.style.left = `${Math.round(((width - wide) / 2) * scale)}px`;
-    panel.style.top = `${Math.round(margin * scale)}px`;
-    panel.style.width = `${Math.round(wide * scale)}px`;
-    panel.style.height = `${Math.round((height - 2 * margin) * scale)}px`;
-    // The blurred wallpaper lies where the wallpaper does, so the glass shows what is behind it.
-    glass.style.left = `-${panel.style.left}`;
-    glass.style.top = `-${panel.style.top}`;
-    glass.style.width = `${screen.clientWidth}px`;
-    glass.style.height = `${screen.clientHeight}px`;
-  }).observe(screen);
-  return screen;
+/** Kōbō's screen: the template filling it, on glass over the blurred wallpaper (`Backdrop`). */
+function koboPanel(template: HTMLElement, pictures: Backdrop): HTMLElement {
+  return backdrop({ width: "100%", height: "100%", picture: pictures.blurred, scrim: "glass", content: template });
 }
