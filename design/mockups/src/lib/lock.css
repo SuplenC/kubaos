@@ -337,11 +337,7 @@
    picture), so they read as part of it; in the bar `on_surface`, as the bar's words are. The tint
    gives way along the flight, so awake it is still mostly the picture's. */
 .k-lock .k-lock-digits {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: auto;
+  display: block;
   font-size: calc(var(--rest) * var(--k));
   line-height: calc(var(--rest) * var(--k));
   letter-spacing: calc(var(--spread) / var(--letters, 1) * var(--px));
@@ -349,15 +345,27 @@
   /* Its box is its caps, placed by the lock: none of a line's centring above them. */
   padding-top: 0;
   color: color-mix(in oklab, var(--color-on_surface) calc(var(--flown) * 100%), var(--digits-tint, var(--color-on_surface)));
-  /* While the clock flies above the frame it is still behind the city: the city's alpha, laid where
-     the city stands on the screen as it pushes in, is taken out of the digits, so they are cut
-     wherever the city stands in front of them, as they are when the clock stands behind it. Behind
-     the city it is nothing: the layer is no size. `--city` is unset without a cut-out.
-     Chromium clips a mask to the border box even with `no-clip`, and the box is trimmed to the cap
-     height, which round digits overshoot: a line of padding each way, taken back by the margin,
-     gives the mask room, and the mask is laid from the unpadded box. */
-  padding-block: 1lh;
-  margin-block: -1lh;
+}
+
+/* What the digits are drawn through. While the clock flies above the frame it is still behind the
+   city: the city's alpha, laid where the city stands on the screen as it pushes in, is taken out
+   of the digits, so they are cut wherever the city stands in front of them, as they are when the
+   clock stands behind it. Behind the city it is nothing: the layer is no size. `--city` is unset
+   without a cut-out.
+   Chromium clips a mask to the border box even with `no-clip`, and the digits' box is trimmed to
+   the cap height, which round digits overshoot: a line of padding each way, taken back by the
+   margin, gives the mask room round the digits, and the mask is laid from the unpadded box. The
+   room is this box's, not the digits', so their own box stays their caps. */
+.k-lock .k-lock-ink {
+  --line: calc(var(--rest) * var(--k));
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  box-sizing: content-box;
+  width: 100%;
+  padding-block: var(--line);
+  margin-block: calc(-1 * var(--line));
   mask-origin: content-box;
   mask-image: linear-gradient(var(--color-surface), var(--color-surface)), var(--city);
   mask-composite: subtract, add;
@@ -547,7 +555,7 @@
   z-index: 1;
 }
 
-.k-lock[data-clocked]:not([data-layered]) .k-lock-digits {
+.k-lock[data-clocked]:not([data-layered]) .k-lock-ink {
   mask-image: none;
 }
 
@@ -562,10 +570,9 @@
    ring that edges the strokes and a wide one that quiets the picture round them, each a share of
    the type size. It fades as the clock flies to the bar, and it takes the kicker's halo's place.
    The digits get room beside them for it, as they have above and below. */
-.k-lock[data-clocked] .k-lock-digits {
-  box-sizing: content-box;
-  padding-inline: 1lh;
-  margin-inline: -1lh;
+.k-lock[data-clocked] .k-lock-ink {
+  padding-inline: var(--line);
+  margin-inline: calc(-1 * var(--line));
 }
 
 .k-lock[data-glow] :is(.k-lock-digits, .k-lock-place, .k-lock-date) {
