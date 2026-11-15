@@ -241,7 +241,7 @@ export function lockField(moment: Moment, live = false, error = "", reader = tru
     const open = document.createElement("span");
     open.className = "k-field-mark k-lock-open";
     open.append(icon("lock_open", "var(--type-body_large-icon)", "var(--color-primary)"));
-    shut.after(open);
+    shut.after(probe(open, { role: "box" }));
   }
   const print = made.querySelector<HTMLElement>(".k-field-trailing");
   if (print && !busy) {
@@ -252,7 +252,7 @@ export function lockField(moment: Moment, live = false, error = "", reader = tru
     const open = document.createElement("span");
     open.className = "k-field-mark k-field-trailing k-lock-reader-open";
     open.append(icon("lock_open", "var(--type-body_large-icon)", "var(--color-primary)"));
-    print.after(open);
+    print.after(probe(open, { role: "box" }));
   }
   return made;
 }

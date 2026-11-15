@@ -1124,18 +1124,23 @@
   --trailing-mark: var(--value);
 }
 
-/* The icon `space.s12` in, centred down the field on a whole device pixel. */
+/* The icon's slot, as `kubaos-ui` draws it: the field's height and `space.s12` either side of the
+   icon, which is centred down it on a whole device pixel. */
 .k-field-mark {
   position: absolute;
-  left: var(--space-s12);
-  top: round(nearest, calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-icon)) / 2), 1px);
+  top: 0;
+  left: 0;
+  display: block;
+  box-sizing: border-box;
+  height: var(--field-height, var(--size-control_md));
+  padding: round(nearest, calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-icon)) / 2), 1px) var(--space-s12) 0;
 }
 
-/* The trailing icon, `space.s12` in from the far side, in its own role (`--trailing`) unless the
+/* The trailing icon's slot, at the far side, its icon in its own role (`--trailing`) unless the
    field is disabled. */
 .k-field-trailing {
   left: auto;
-  right: var(--space-s12);
+  right: 0;
 }
 
 .k-field-clip {
@@ -1833,18 +1838,19 @@
 
 /* The icon, `label`'s, centred in the circle at the fill's start on a whole device pixel. */
 .k-slider-icon {
+  --at: round(nearest, calc((var(--side) - var(--type-label-icon)) / 2), 1px);
   position: absolute;
   display: block;
-  left: round(nearest, calc((var(--side) - var(--type-label-icon)) / 2), 1px);
-  top: round(nearest, calc((var(--side) - var(--type-label-icon)) / 2), 1px);
-  width: var(--type-label-icon);
-  height: var(--type-label-icon);
+  left: 0;
+  top: 0;
+  width: var(--side);
+  height: var(--side);
 }
 
 .k-slider-icon > .k-icon {
   position: absolute;
-  left: 0;
-  top: 0;
+  left: var(--at);
+  top: var(--at);
 }
 
 /* The value or its name, `space.s12` in from the far end, once over the track and once over the
