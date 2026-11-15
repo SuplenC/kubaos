@@ -154,7 +154,7 @@ const rowsDrawn = new MutationObserver((records) => {
     // A root inside another is shared with it.
     const outermost = roots.filter((root) => !roots.some((other) => other !== root && other.contains(root as Node)));
     for (const root of outermost) shareRows(root);
-    for (const root of outermost) centreOnPixels(root);
+    centreOnPixels(...outermost);
   });
 });
 

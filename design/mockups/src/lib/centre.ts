@@ -99,10 +99,10 @@ function inFlow(parent: HTMLElement): HTMLElement[] {
 }
 
 /**
- * Moves every box under `root` that its parent centres onto whole device pixels, the odd pixel
+ * Moves every box under `roots` that its parent centres onto whole device pixels, the odd pixel
  * after it. Every box is read, then every margin set: the page is laid out once more at most.
  */
-export function centreOnPixels(root: ParentNode): void {
+export function centreOnPixels(...roots: ParentNode[]): void {
   const perCss = devicePixelRatio;
   const origin = document.getElementById("page") ?? document.documentElement;
   const rects = new Map<Element, DOMRect>();
@@ -118,21 +118,13 @@ export function centreOnPixels(root: ParentNode): void {
   const off = (element: Element, axis: Axis, from: Element) => !whole(startOf(element, axis) - startOf(from, axis));
 
   const planned = new Map<HTMLElement, Partial<Record<Side, number>>>();
-  const looked = new Set<string>();
-  let looks = 0;
-  const lookedAt = new WeakMap<Element, number>();
-  const keyOf = (element: Element, what: string) => {
-    let id = lookedAt.get(element);
-    if (id === undefined) {
-      id = looks++;
-      lookedAt.set(element, id);
-    }
-    return `${id}:${what}`;
-  };
+  // What each box, or each line along its main axis, was centred along already in this pass.
+  const looked = new WeakMap<Element, Set<string>>();
 
   // The boxes the geometry check reads: every probed one, and every child of a layout, which it
   // reads as a plain box.
-  for (const element of root.querySelectorAll<HTMLElement>("[data-probe], [data-layout] > *")) {
+  const boxes = roots.flatMap((root) => [...root.querySelectorAll<HTMLElement>("[data-probe], [data-layout] > *")]);
+  for (const element of boxes) {
     if (!origin.contains(element)) continue;
     const own = rectOf(element);
     if (own.width === 0 && own.height === 0) continue;
@@ -177,9 +169,11 @@ export function centreOnPixels(root: ParentNode): void {
     const contentStart = startOf(parent, axis) + Number.parseFloat(parentStyle[`border${edge}Width`]) + Number.parseFloat(parentStyle[`padding${edge}`]);
     const how = centring(parentStyle, box, axis, startOf(box, axis) - contentStart);
     if (!how) return;
-    const key = keyOf(how.main ? parent : box, `${axis}${how.main ? "main" : "cross"}`);
-    if (looked.has(key)) return;
-    looked.add(key);
+    const owner = how.main ? parent : box;
+    const kind = `${axis} ${how.main ? "main" : "cross"}`;
+    const seen = looked.get(owner) ?? new Set<string>();
+    if (seen.has(kind)) return;
+    looked.set(owner, seen.add(kind));
     const drawn = rectOf(parent);
     if (Math.abs(drawn.width * perCss - parent.offsetWidth) > 1 || Math.abs(drawn.height * perCss - parent.offsetHeight) > 1) return;
     const line = how.main ? inFlow(parent) : [box];

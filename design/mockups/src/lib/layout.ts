@@ -156,12 +156,25 @@ function weighted(weights: readonly number[], gap: string, children: readonly El
       box.style.setProperty("--rows", `${share}px`);
     }
     if (options.centred) centreRows(box, count);
-    // The columns move what the page's pass centred in them, after it: their content is centred again.
-    centreOnPixels(box);
   };
-  new ResizeObserver(arrange).observe(box);
+  arrangements.set(box, arrange);
+  arranging.observe(box);
   return probe(box, { role: "grid", columns: count, gap: length(`space-${gap}`), align: options.centred ? "centre" : "start" });
 }
+
+/** How each grid lays its columns and rows out, run as it resizes. */
+const arrangements = new WeakMap<Element, () => void>();
+
+/**
+ * Every grid's arrangement as it resizes, all in one callback: the columns move what the page's
+ * pass centred in them, after it, so their content is centred again in one pass, not one a grid
+ * (56 grids on the Control Center's page, each a layout of the whole page).
+ */
+const arranging = new ResizeObserver((entries) => {
+  const boxes = entries.map((entry) => entry.target);
+  for (const box of boxes) arrangements.get(box)?.();
+  centreOnPixels(...boxes.filter((box) => !boxes.some((other) => other !== box && other.contains(box))));
+});
 
 /** Each row's cells centred down it on whole device pixels, an odd spare one after the cell. */
 function centreRows(box: HTMLElement, count: number): void {
