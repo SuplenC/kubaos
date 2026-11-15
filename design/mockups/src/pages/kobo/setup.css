@@ -127,9 +127,10 @@
   min-height: 0;
 }
 
-/* The well's words while it holds nothing: in its middle, a text column at most, fading out as the
+/* The well's words while it holds nothing: in its middle, over the well's fill, fading out as the
    first rows arrive. */
 .setup-yours-empty {
+  position: relative;
   display: flex;
   box-sizing: border-box;
   align-items: center;
@@ -144,8 +145,10 @@
   opacity: 1;
 }
 
-.setup-yours-empty > .k-text {
+/* Its words are the well's, centred in it, not a window's read from the left. */
+.setup-room .setup-window .setup-yours-empty > .k-text[data-wrapped] {
   text-align: center;
+  text-wrap: balance;
 }
 
 .setup-yours-progress[hidden],

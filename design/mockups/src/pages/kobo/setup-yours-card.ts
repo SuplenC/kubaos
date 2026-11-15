@@ -316,7 +316,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
       blocks.push(filling(block));
     }
     if (blocks.length === 0) {
-      const none = wrapped("Git and the Bitwarden login show up here with what needs them.", "small", "on_surface_variant");
+      const none = wrapped("Git and Bitwarden come with what you pick.", "small", "on_surface_variant");
       none.classList.add("setup-yours-none");
       blocks.push(filling(none));
     }

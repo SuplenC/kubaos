@@ -358,7 +358,7 @@ export function setupRoom(options: SetupOptions): HTMLElement {
       pages,
       current: shown.indexOf(id),
       free: true,
-      hints: () => HINTS,
+      hints: () => (options.alone ? HINTS.slice(2) : HINTS),
       ...(options.live ? { onExit: (forward: boolean) => go(options.alone ? { at: "desktop" } : forward ? { at: "ending" } : { at: "arrival" }) } : {}),
     });
     rail.classList.add("setup-layer", "setup-rail");
