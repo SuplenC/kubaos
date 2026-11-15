@@ -49,6 +49,13 @@ COPY system/files/tmpfiles.d/kubaos-zswap.conf /opt/dotfiles/system/files/tmpfil
 COPY system/files/NetworkManager/conf.d/ /opt/dotfiles/system/files/NetworkManager/conf.d/
 COPY system/files/systemd/system.conf.d/ /opt/dotfiles/system/files/systemd/system.conf.d/
 COPY system/files/systemd/user.conf.d/ /opt/dotfiles/system/files/systemd/user.conf.d/
+COPY system/files/systemd/user.slice.d/ /opt/dotfiles/system/files/systemd/user.slice.d/
+COPY system/files/systemd/user-.slice.d/ /opt/dotfiles/system/files/systemd/user-.slice.d/
+COPY system/files/systemd/session-.scope.d/ /opt/dotfiles/system/files/systemd/session-.scope.d/
+COPY system/files/systemd/user@.service.d/ /opt/dotfiles/system/files/systemd/user@.service.d/
+COPY system/files/systemd/user/session.slice.d/ /opt/dotfiles/system/files/systemd/user/session.slice.d/
+COPY system/files/systemd/user/app.slice.d/ /opt/dotfiles/system/files/systemd/user/app.slice.d/
+COPY system/files/systemd/user/kotodamad.service.d/ /opt/dotfiles/system/files/systemd/user/kotodamad.service.d/
 COPY system/files/proxy/ /opt/dotfiles/system/files/proxy/
 COPY system/files/polkit/org.kubaos.proxy.policy system/files/polkit/50-kubaos-proxy.rules /opt/dotfiles/system/files/polkit/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -119,6 +126,7 @@ COPY system/files/xkb/ /opt/dotfiles/system/files/xkb/
 COPY system/files/polkit/ /opt/dotfiles/system/files/polkit/
 COPY system/files/keyboard/ /opt/dotfiles/system/files/keyboard/
 COPY system/files/hyprland-autostart.zsh /opt/dotfiles/system/files/
+COPY system/files/xdg/ /opt/dotfiles/system/files/xdg/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update \
