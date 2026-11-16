@@ -11,8 +11,9 @@
 //! - Which programs run: [`crate::registry`], [`crate::toggles`].
 
 use std::io;
-use std::io::BufRead;
-use std::io::BufReader;
+use std::io::PipeReader;
+use std::io::Read;
+use std::io::Write;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::process::Stdio;
@@ -27,9 +28,13 @@ use kotodama_extension::log;
 /// The delaying thread only sleeps, then starts a program; a background program's threads only
 /// wait for it, or read its lines.
 const DELAY_STACK: usize = 64 * 1024;
-/// How long a background program's output may stay open after it exits: something it started
-/// and left running may hold it for ever.
-const OUTPUT_GRACE: Duration = Duration::from_millis(500);
+/// The longest line of a background program's that is passed on whole, in bytes; the rest of a
+/// longer one is dropped. Far above an update event's JSON, which stays under a few KiB.
+const LINE_CAP: usize = 64 * 1024;
+/// What follows a background program's own output once it exits: its own line, as the newline
+/// before it ends a last line the program left open, and a NUL no line of text or JSON starts
+/// with.
+const END_MARK: &[u8] = b"\n\0kubaos-ended\n";
 
 /// What a background program's lines go to, one at a time.
 pub type OnLine = Box<dyn FnMut(String) + Send>;
@@ -52,8 +57,8 @@ pub trait Runner {
     /// When it can't start. After a delay, that is only logged.
     fn launch(&self, argv: &[String], delay: Duration) -> Result<(), RunError>;
 
-    /// Starts `argv` and leaves it running, giving `line` each line it writes to stdout or
-    /// stderr, then `ended` whether it exited with success.
+    /// Starts `argv` and leaves it running, giving `line` each line that isn't blank it writes to
+    /// stdout or stderr, then, after the last of them, `ended` whether it exited with success.
     ///
     /// # Errors
     ///
@@ -132,15 +137,18 @@ impl Runner for Programs {
             .map_err(RunError::start(&program))
     }
 
-    fn background(&self, argv: &[String], mut line: OnLine, ended: OnEnd) -> Result<(), RunError> {
+    fn background(&self, argv: &[String], line: OnLine, ended: OnEnd) -> Result<(), RunError> {
         let Some((program, rest)) = argv.split_first() else {
             return Err(RunError::start("")(io::Error::from(io::ErrorKind::InvalidInput)));
         };
         let start = RunError::start(program);
         let (reader, writer) = io::pipe().map_err(RunError::start(program))?;
         let stderr = writer.try_clone().map_err(RunError::start(program))?;
-        // A group of its own, so a signal to the Extension's group, as the Daemon stopping it
-        // sends, doesn't stop an install halfway.
+        let mut mark = writer.try_clone().map_err(RunError::start(program))?;
+        // A group of its own, so a signal to the Extension's group, such as Ctrl+C in the
+        // terminal a Daemon runs in, doesn't stop an install halfway. The Daemon itself kills
+        // only the Extension's own process, so the install outlives it: its writes to the closed
+        // output then fail, which `kubaos app --json` ignores, and the run goes on to its end.
         let mut child = Command::new(program)
             .args(rest)
             .stdin(Stdio::null())
@@ -149,16 +157,13 @@ impl Runner for Programs {
             .process_group(0)
             .spawn()
             .map_err(start)?;
-        let (closed, output_closed) = mpsc::channel();
+        let (exited, exit) = mpsc::channel();
         thread::Builder::new()
             .name("background-output".into())
             .stack_size(DELAY_STACK)
             .spawn(move || {
-                for read in BufReader::new(reader).lines() {
-                    let Ok(read) = read else { break };
-                    line(read);
-                }
-                let _ = closed.send(());
+                follow(reader, line);
+                ended(exit.recv().unwrap_or(false));
             })
             .map_err(RunError::start(program))?;
         thread::Builder::new()
@@ -166,12 +171,56 @@ impl Runner for Programs {
             .stack_size(DELAY_STACK)
             .spawn(move || {
                 let succeeded = child.wait().is_ok_and(|status| status.success());
-                let _ = output_closed.recv_timeout(OUTPUT_GRACE);
-                ended(succeeded);
+                let _ = exited.send(succeeded);
+                // Behind everything the program wrote, as a pipe keeps its order. Once the
+                // output thread stopped, it is closed and the write fails, harmlessly.
+                let _ = mark.write_all(END_MARK);
             })
             .map(drop)
             .map_err(RunError::start(program))
     }
+}
+
+/// Passes each line of `output` that isn't blank to `line`, decoded lossily and cut to
+/// [`LINE_CAP`] bytes, until [`END_MARK`] or the output closes.
+///
+/// It stops at the mark, though something the program started and left running may still hold
+/// the output open: the Job is over, and reading on would keep this thread and the pipe for as
+/// long as that process lives. Its later writes then fail, as they would had the Extension gone.
+fn follow(mut output: PipeReader, mut line: OnLine) {
+    let mark = &END_MARK[1..END_MARK.len() - 1];
+    let mut bytes = Vec::new();
+    let mut buf = [0; 4096];
+    loop {
+        let n = match output.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => n,
+            Err(err) if err.kind() == io::ErrorKind::Interrupted => continue,
+            Err(_) => break,
+        };
+        for &byte in &buf[..n] {
+            if byte != b'\n' {
+                if bytes.len() < LINE_CAP {
+                    bytes.push(byte);
+                }
+                continue;
+            }
+            if bytes == mark {
+                return;
+            }
+            pass_on(&mut bytes, &mut line);
+        }
+    }
+    pass_on(&mut bytes, &mut line);
+}
+
+/// Passes `bytes` to `line` as text unless it is blank, and empties it.
+fn pass_on(bytes: &mut Vec<u8>, line: &mut OnLine) {
+    let text = String::from_utf8_lossy(bytes);
+    if !text.trim().is_empty() {
+        line(text.into_owned());
+    }
+    bytes.clear();
 }
 
 #[cfg(test)]
