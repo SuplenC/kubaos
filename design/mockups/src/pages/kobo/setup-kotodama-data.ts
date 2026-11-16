@@ -253,7 +253,7 @@ export const AD = {
   headline: "Your PC is 97% SLOWER than your neighbour's!",
   product: "LongDrive Pro 365",
   maker: "by Wang & Sons Software · 2,000,000 PCs satisfied",
-  rating: "4.9 · “Lasted way longer than my old one.” · Hugh Jass",
+  rating: "4.9 · “My hard drive was never this hard.” · Hugh Jass",
   action: "ENLARGE MY C: DRIVE · FREE*",
-  fine: "*Then €49.99 a month, forever. Results may vary. Hers did. Bofa terms apply.",
+  fine: "*€49.99 a month. Bofa terms apply.",
 } as const;
