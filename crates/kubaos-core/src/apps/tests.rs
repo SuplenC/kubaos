@@ -122,6 +122,31 @@ fn an_app_that_isnt_valid_is_named() {
 }
 
 #[test]
+fn the_status_shows_an_svg_icon_by_its_path_in_the_catalog_whether_or_not_the_app_is_there() {
+    let (_dir, catalog) = catalog_of(&[(
+        "agent",
+        app("Agent", AGENT).replace("name = \"Agent\"", "name = \"Agent\"\nicon = \"agent.svg\""),
+    )]);
+    let journals = tempfile::tempdir().unwrap();
+
+    let status = Status::read(
+        &catalog,
+        &Picks::default(),
+        journals.path(),
+        &journals.path().join("root"),
+        Platform::new("amd64", Unfree::Allowed),
+        None,
+    )
+    .unwrap();
+
+    let dir = &catalog.get("agent").unwrap().dir;
+    assert_eq!(
+        status.get("agent").unwrap().icon.as_deref(),
+        Some(dir.join("agent.svg").to_str().unwrap())
+    );
+}
+
+#[test]
 fn an_installed_app_is_one_whose_user_journal_is_complete() {
     let (_dir, catalog) = catalog_of(&[
         ("agent", app("Agent", AGENT)),

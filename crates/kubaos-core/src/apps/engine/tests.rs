@@ -1885,6 +1885,30 @@ fn world_with_dependencies(apps: &[(&str, &str)]) -> World {
     world
 }
 
+#[test]
+fn an_apps_svg_icon_is_installed_into_the_icon_theme_journaled_and_goes_with_it() {
+    let tool = app("icon = \"tool.svg\"\n\n[[action]]\nname = \"Keep it running\"\nkind = \"linger\"\n");
+    let world = World::new(&[("tool", &tool)]);
+    let svg = "<!-- The tool's logo, MIT. -->\n<svg/>\n";
+    world.folder_file("tool", "tool.svg", svg);
+    let before = world.host.snapshot();
+
+    world.install("tool", true).0.unwrap();
+
+    let icon = world
+        .host_home()
+        .join(".local/share/icons/hicolor/scalable/apps/tool.svg");
+    assert_eq!(fs::read_to_string(&icon).unwrap(), svg);
+    let journal = world.journals("tool").0.unwrap();
+    let entry = journal.entries.iter().find(|e| e.step == 2).unwrap();
+    assert!(
+        matches!(&entry.action.kind, crate::apps::action::Kind::File { text: Some(t), .. } if t == svg),
+        "{entry:?}"
+    );
+    world.remove("tool").0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
 /// A machine with Ubuntu's snap `firefox` (`1:1snap1`), which sorts above the vendor's 160.0, and
 /// `libnss3`, which the vendor's firefox needs, at 3.110 from the user's own pin, where apt would
 /// take it down to 3.98.

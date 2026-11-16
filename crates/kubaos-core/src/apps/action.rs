@@ -814,14 +814,14 @@ fn check_web_app(id: &str, title: &str, url: &str, icon: &str) -> Result<(), Act
     Ok(())
 }
 
-/// Whether a web app's `icon` names an `.svg` in the app's folder, which its install copies.
+/// Whether an `icon` names an `.svg` in the app's folder, which the install copies.
 pub fn is_svg_icon(icon: &str) -> bool {
     is_folder_file(icon) && Path::new(icon).extension().is_some_and(|e| e == "svg")
 }
 
-/// Whether a web app's `icon` is the icon theme's name for an icon, which its desktop entry names
+/// Whether an `icon` is the icon theme's name for an icon, which a desktop entry or a menu names
 /// as it is: an icon name with no extension the theme's lookup would read as a file's.
-fn is_theme_icon(icon: &str) -> bool {
+pub fn is_theme_icon(icon: &str) -> bool {
     is_icon_name(icon)
         && Path::new(icon)
             .extension()
