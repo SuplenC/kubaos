@@ -221,7 +221,7 @@ pub enum UpdateError {
     App {
         what: String,
         #[source]
-        source: EngineError,
+        source: Box<EngineError>,
     },
     /// The catalog has no app of that id.
     #[error("the Apps catalog has no app {id} (kubaos app list)")]

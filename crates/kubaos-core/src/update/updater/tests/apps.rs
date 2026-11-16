@@ -136,8 +136,11 @@ fn lock_down(dir: &Path) {
             lock_down(&path);
         } else {
             let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o100;
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o644 | mode | (mode >> 3) | (mode >> 6)))
-                .unwrap();
+            fs::set_permissions(
+                &path,
+                fs::Permissions::from_mode(0o644 | mode | (mode >> 3) | (mode >> 6)),
+            )
+            .unwrap();
         }
     }
 }
@@ -260,7 +263,9 @@ fn each_step_is_an_event_with_its_name() {
     let mut m = fake(&w, &[]);
     let mut events = Vec::new();
 
-    w.reporting(&mut m, &mut events).add_apps(&names(&["desk"]), None).unwrap();
+    w.reporting(&mut m, &mut events)
+        .add_apps(&names(&["desk"]), None)
+        .unwrap();
 
     let steps: Vec<String> = events
         .iter()
@@ -281,7 +286,9 @@ fn adding_an_app_that_is_installed_changes_nothing_and_asks_for_no_password() {
     let before = host(&m).snapshot();
     let mut events = Vec::new();
 
-    w.reporting(&mut m, &mut events).add_apps(&names(&["desk"]), None).unwrap();
+    w.reporting(&mut m, &mut events)
+        .add_apps(&names(&["desk"]), None)
+        .unwrap();
 
     assert_eq!(host(&m).snapshot(), before);
     assert_eq!(root_starts(&m), 1, "only the first add asked for root");
@@ -293,7 +300,10 @@ fn an_id_the_catalog_lacks_is_refused_before_anything_changes() {
     let w = world();
     let mut m = fake(&w, &[]);
 
-    let err = w.updater(&mut m).add_apps(&names(&["agent", "nope"]), None).unwrap_err();
+    let err = w
+        .updater(&mut m)
+        .add_apps(&names(&["agent", "nope"]), None)
+        .unwrap_err();
 
     assert!(matches!(err, UpdateError::NoApp { ref id } if id == "nope"), "{err:?}");
     assert!(picked(&w).is_empty());
@@ -355,7 +365,11 @@ fn an_update_installs_the_picked_apps_through_sudo_and_a_second_starts_no_root()
     w.reporting(&mut m, &mut events).update(yes()).unwrap();
 
     assert!(has(&m, "agent"));
-    assert!(root_helpers(&m).iter().all(|h| h.starts_with("sudo ")), "{:?}", root_helpers(&m));
+    assert!(
+        root_helpers(&m).iter().all(|h| h.starts_with("sudo ")),
+        "{:?}",
+        root_helpers(&m)
+    );
     assert_eq!(summary(&events).apps.installed, names(&["Agent"]));
     assert!(phases(&events).contains(&Phase::Apps));
 
@@ -429,7 +443,10 @@ fn an_app_with_setups_needs_one_and_a_setup_it_lacks_is_refused() {
 
     let none = w.updater(&mut m).add_apps(&names(&["lab"]), None).unwrap_err();
     let unknown = w.updater(&mut m).add_apps(&names(&["lab"]), Some("cloud")).unwrap_err();
-    let without = w.updater(&mut m).add_apps(&names(&["agent"]), Some("desktop")).unwrap_err();
+    let without = w
+        .updater(&mut m)
+        .add_apps(&names(&["agent"]), Some("desktop"))
+        .unwrap_err();
 
     assert!(matches!(none, UpdateError::NoSetup { .. }), "{none:?}");
     assert!(matches!(unknown, UpdateError::UnknownSetup { .. }), "{unknown:?}");
@@ -454,7 +471,11 @@ fn the_service_setup_pairs_in_a_window_from_the_menu_and_leaves_it_to_a_note_in_
     w.reporting(&mut m, &mut events).update(yes()).unwrap();
 
     assert!(!home.join("paired").exists());
-    assert!(notes(&events).iter().any(|n| n.contains("lab pair")), "{:?}", notes(&events));
+    assert!(
+        notes(&events).iter().any(|n| n.contains("lab pair")),
+        "{:?}",
+        notes(&events)
+    );
 }
 
 #[test]
@@ -590,7 +611,10 @@ fn an_update_records_roots_half_of_an_adopted_app_and_changes_nothing() {
     assert!(summary(&events).apps.installed.is_empty());
     assert_eq!(user_journal(&w, "desk").unwrap().root_adoption, None);
     let root = root_journal(&w, "desk").unwrap();
-    assert!(root.entries.iter().all(|e| e.claims.iter().all(|c| c.owned)), "{root:?}");
+    assert!(
+        root.entries.iter().all(|e| e.claims.iter().all(|c| c.owned)),
+        "{root:?}"
+    );
 }
 
 #[test]

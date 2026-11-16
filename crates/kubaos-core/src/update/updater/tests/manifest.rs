@@ -490,7 +490,10 @@ fn an_update_leaves_the_packages_of_a_catalog_app_to_the_catalog() {
     let without_docker = manifest(&["curl"])
         .replace("[group.docker]", "[group.gone]")
         .replace("packages = [\"docker-ce\"]", "packages = [\"x-gone\"]");
-    w.push(&[(MANIFEST, &without_docker), ("apps/docker/app.toml", DOCKER_APP)], true);
+    w.push(
+        &[(MANIFEST, &without_docker), ("apps/docker/app.toml", DOCKER_APP)],
+        true,
+    );
     put(&w.sys.apt_record(), "docker-ce\tdocker\ncurl\ttools\n");
     let mut m = fake(&["curl", "docker-ce", "libpam-u2f", "x-gone"]);
     let mut events = Vec::new();
@@ -552,7 +555,10 @@ fn a_catalog_it_cant_read_leaves_the_sync_going_and_the_catalogs_packages_alone(
         "optional = \"on\"\npackages = [\"docker-ce\"]",
         "optional = \"off\"\npackages = [\"docker-ce\"]",
     );
-    w.push(&[(MANIFEST, &docker_off), ("apps/docker/app.toml", NEWER_DOCKER_APP)], true);
+    w.push(
+        &[(MANIFEST, &docker_off), ("apps/docker/app.toml", NEWER_DOCKER_APP)],
+        true,
+    );
     // Before the handover migration, the record still has Docker's packages.
     put(&w.sys.apt_record(), "docker-ce\tdocker\ncurl\ttools\n");
     let mut m = fake(&["curl", "docker-ce", "libpam-u2f"]);

@@ -1,12 +1,13 @@
 //! The Apps catalog in the menu: an "Install <Name>" Item for each app of the catalog that isn't on
 //! the machine, a "Remove <Name>" Item for each one that is, never both, so a folder added to the
 //! catalog brings its Items with it. An Install Item's subtitle is the app's summary, and its tags
-//! are keywords of it alone: a word that finds an app to install never ranks its removal. An app with setups has an Install Item for each setup
-//! instead, named for it, as none is the default: all of them while the app isn't on the machine,
-//! and beside its Remove Item those of the setups it isn't in, which switch. Running one starts
-//! `kubaos app add|remove <id> --json` (`add <id> --setup <setup>`) in the background, as a Job the
-//! menu shows with each step and how far it got; the Daemon announces its end on the desktop, named
-//! for the app, with why it failed and where its log is.
+//! are keywords of it alone: a word that finds an app to install never ranks its removal. An app
+//! with setups has an Install Item for each setup instead, named for it, as none is the default:
+//! all of them while the app isn't on the machine, and beside its Remove Item those of the setups
+//! it isn't in, which switch. Running one starts `kubaos app add|remove <id> --json` (`add <id>
+//! --setup <setup>`) in the background, as a Job the menu shows with each step and how far it got;
+//! the Daemon announces its end on the desktop, named for the app, with why it failed and where its
+//! log is.
 //!
 //! Which apps are on the machine is the engine's status (`kubaos app status`): the catalog, the
 //! picks, each app's user journal and one `dpkg-query` for the versions, read on a thread of its
@@ -160,7 +161,8 @@ impl Standing {
     fn offers_install(&self, setup: Option<&SetupInfo>) -> bool {
         let id = setup.map(|s| s.id.as_str());
         if self.app.state.is_installed() {
-            return setup.is_some_and(|setup| self.app.setup.as_deref() != Some(setup.id.as_str()) && self.app.offers(id));
+            return setup
+                .is_some_and(|setup| self.app.setup.as_deref() != Some(setup.id.as_str()) && self.app.offers(id));
         }
         self.app.offers(id)
     }
@@ -197,8 +199,8 @@ impl Apps {
             .map(str::to_owned)
             .collect();
         let dpkg = Dpkg::parse(&runner.output(&query).map_err(ReadError::Dpkg)?);
-        let status = Status::read(&catalog, &picks, &files.journals, apps::arch(), Some(&dpkg))
-            .map_err(ReadError::Journal)?;
+        let status =
+            Status::read(&catalog, &picks, &files.journals, apps::arch(), Some(&dpkg)).map_err(ReadError::Journal)?;
         Ok(Self::new(&status))
     }
 

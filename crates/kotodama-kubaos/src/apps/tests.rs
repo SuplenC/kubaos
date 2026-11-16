@@ -6,11 +6,10 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use kotodama_protocol::JobState;
-use kubaos_core::apps::App;
 use kubaos_core::apps::Catalog;
 use kubaos_core::apps::Picks;
 use kubaos_core::apps::Status;
-use kubaos_core::apps::plan::Facts;
+use kubaos_core::apps::journal::Journal;
 use kubaos_core::apt::Dpkg;
 use kubaos_core::apt::dpkg;
 use kubaos_core::state::Paths;
@@ -20,12 +19,21 @@ use crate::fake::FakeRunner;
 use crate::run::OnEnd;
 use crate::run::OnLine;
 
+/// What every fixture app says it is, beside its name, summary and actions.
+const ABOUT: &str = r#"category = "development"
+description = "An app the tests install."
+description_from = "https://example.com/app"
+"#;
+
 const CHROME: &str = r#"
 name = "Google Chrome"
 summary = "Google's web browser"
+tags = ["browser", "web"]
 icon = "google-chrome"
 
-[apt]
+[[action]]
+name = "Install Google Chrome"
+kind = "apt"
 repo = "google-chrome"
 arch = "amd64"
 packages = ["google-chrome-stable"]
@@ -34,8 +42,11 @@ packages = ["google-chrome-stable"]
 const CLAUDE: &str = r#"
 name = "Claude Code"
 summary = "Anthropic's coding agent, in the terminal"
+tags = ["coding agent"]
 
-[apt]
+[[action]]
+name = "Install Claude Code"
+kind = "apt"
 repo = "claude-code"
 packages = ["claude-code"]
 "#;
@@ -44,23 +55,18 @@ packages = ["claude-code"]
 const ODD: &str = r#"
 name = "Odd"
 summary = "Only for another machine"
+tags = ["odd"]
 
-[deb]
+[[action]]
+name = "Install Odd"
+kind = "deb"
 package = "odd"
 version = "1.0"
-
-[deb.arm64]
-url = "https://example.com/odd-1.0-arm64.deb"
-sha256 = "418c7825f73107b7b5ba3babae5e3b485801dc22d9dc0d518af632f7906cbdd1"
+arm64 = { url = "https://example.com/odd-1.0-arm64.deb", sha256 = "418c7825f73107b7b5ba3babae5e3b485801dc22d9dc0d518af632f7906cbdd1" }
 "#;
 
-fn catalog() -> Catalog {
-    Catalog::new(vec![
-        App::parse("google-chrome", CHROME).unwrap(),
-        App::parse("claude-code", CLAUDE).unwrap(),
-        App::parse("odd", ODD).unwrap(),
-    ])
-}
+/// The catalog of the tests: Chrome, Claude Code and Odd.
+const FOLDERS: [(&str, &str); 3] = [("google-chrome", CHROME), ("claude-code", CLAUDE), ("odd", ODD)];
 
 /// dpkg with `installed`, each `name=version`.
 fn dpkg_with(installed: &[&str]) -> String {
@@ -72,28 +78,48 @@ fn dpkg_with(installed: &[&str]) -> String {
     lines
 }
 
-/// The apps of [`catalog`] on an amd64 machine with these dpkg packages.
+/// Writes `folders`, each `(id, app.toml)`, as the catalog `dir`.
+fn write_catalog(dir: &Path, folders: &[(&str, &str)]) {
+    for (id, text) in folders {
+        fs::create_dir_all(dir.join(id)).unwrap();
+        fs::write(dir.join(id).join("app.toml"), format!("{ABOUT}{text}")).unwrap();
+    }
+}
+
+/// A complete user journal of the app `id`, in `setup`, in `journals`.
+fn installed_journal(journals: &Path, id: &str, setup: Option<&str>) {
+    let mut journal = Journal::new(id, setup);
+    journal.complete = true;
+    journal.save(journals).unwrap();
+}
+
+/// The apps of [`FOLDERS`] on an amd64 machine with these dpkg packages.
 fn apps(installed: &[&str]) -> Apps {
     apps_on("amd64", installed)
 }
 
-/// The apps of [`catalog`] on a machine of `arch` with these dpkg packages.
+/// The apps of [`FOLDERS`] on a machine of `arch` with these dpkg packages.
 fn apps_on(arch: &str, installed: &[&str]) -> Apps {
-    apps_of(&catalog(), arch, installed, &[])
+    apps_of(&FOLDERS, arch, installed, None)
 }
 
-/// The apps of `catalog` on a machine of `arch` with these dpkg packages and setups' markers.
-fn apps_of(catalog: &Catalog, arch: &str, installed: &[&str], markers: &[&str]) -> Apps {
+/// The apps of `folders` on a machine of `arch` with these dpkg packages, each app whose
+/// packages all are installed, an app with setups in `setup` (else its desktop one).
+fn apps_of(folders: &[(&str, &str)], arch: &str, installed: &[&str], setup: Option<&str>) -> Apps {
+    let dir = tempfile::tempdir().unwrap();
+    write_catalog(&dir.path().join("apps"), folders);
+    let catalog = Catalog::load(&dir.path().join("apps")).unwrap();
+    let journals = dir.path().join("journals");
+    let names: Vec<&str> = installed.iter().map(|p| p.split_once('=').unwrap().0).collect();
+    for app in catalog.apps() {
+        let packages = app.packages();
+        if !packages.is_empty() && packages.iter().all(|p| names.contains(p)) {
+            let setup = app.has_setups().then(|| setup.unwrap_or("desktop"));
+            installed_journal(&journals, &app.id, setup);
+        }
+    }
     let dpkg = Dpkg::parse(&dpkg_with(installed));
-    let facts = Facts {
-        catalog,
-        picks: &Picks::default(),
-        arch,
-        dpkg: &dpkg,
-        nix: &BTreeSet::new(),
-        markers: &markers.iter().map(|m| (*m).to_owned()).collect(),
-    };
-    Apps::new(catalog, &Status::new(&facts))
+    Apps::new(&Status::read(&catalog, &Picks::default(), &journals, arch, Some(&dpkg)).unwrap())
 }
 
 fn ids(apps: &Apps) -> Vec<String> {
@@ -148,26 +174,29 @@ fn the_items_are_named_by_the_app_and_found_by_its_name_and_id() {
 }
 
 #[test]
-fn no_word_saying_what_an_app_is_finds_its_install_or_remove_item() {
+fn an_apps_tags_find_its_install_item_and_never_its_removal() {
     let none = apps(&[]);
     let chrome = apps(&["google-chrome-stable=131.0"]);
 
-    for item in [
-        item(&none, "app-install:google-chrome"),
-        item(&chrome, "app-remove:google-chrome"),
-    ] {
-        for word in ["web", "browser"] {
-            assert!(
-                !item.keywords.iter().any(|k| k == word),
-                "`{}` has `{word}` as a keyword, which belongs to opening the app",
-                item.id
-            );
-        }
+    let install = item(&none, "app-install:google-chrome");
+    let remove = item(&chrome, "app-remove:google-chrome");
+
+    for word in ["web", "browser"] {
+        assert!(
+            install.keywords.iter().any(|k| k == word),
+            "{word} in {:?}",
+            install.keywords
+        );
+        assert!(
+            !remove.keywords.iter().any(|k| k == word),
+            "`{}` has `{word}` as a keyword, which belongs to opening the app",
+            remove.id
+        );
     }
 }
 
 #[test]
-fn the_icon_is_the_manifests_or_a_generic_one() {
+fn the_icon_is_the_folders_or_a_generic_one() {
     let apps = apps(&[]);
 
     assert_eq!(
@@ -450,15 +479,17 @@ fn another_jobs_lines_change_nothing_and_once_ended_the_next_app_may_start() {
     assert_ne!(next.id, id);
 }
 
-/// The files of a machine under `dir` whose catalog has `manifests`, each `(id, text)`.
-fn files(dir: &Path, manifests: &[(&str, &str)]) -> AppFiles {
+/// The files of a machine under `dir` whose catalog has `folders`, each `(id, app.toml)`.
+fn files(dir: &Path, folders: &[(&str, &str)]) -> AppFiles {
     let catalog = dir.join("apps");
     fs::create_dir(&catalog).unwrap();
-    for (id, text) in manifests {
-        fs::write(catalog.join(format!("{id}.toml")), text).unwrap();
-    }
-    let paths = Paths::from_vars(Some(dir.join("home").into()), None, None).unwrap();
-    AppFiles::new(catalog, &paths)
+    write_catalog(&catalog, folders);
+    AppFiles::new(catalog, &paths(dir))
+}
+
+/// The paths of the user whose home is `<dir>/home`.
+fn paths(dir: &Path) -> Paths {
+    Paths::from_vars(Some(dir.join("home").into()), None, None).unwrap()
 }
 
 fn query() -> String {
@@ -472,6 +503,7 @@ fn query() -> String {
 fn the_apps_are_read_with_one_dpkg_query() {
     let dir = tempfile::tempdir().unwrap();
     let files = files(dir.path(), &[("google-chrome", CHROME), ("claude-code", CLAUDE)]);
+    installed_journal(&paths(dir.path()).app_journals(), "claude-code", None);
     let runner = FakeRunner {
         outputs: [(query(), dpkg_with(&["claude-code=2.1"]))].into(),
         ..FakeRunner::default()
@@ -480,6 +512,10 @@ fn the_apps_are_read_with_one_dpkg_query() {
     let apps = Apps::read(&files, &runner).unwrap();
 
     assert_eq!(ids(&apps), ["app-remove:claude-code", "app-install:google-chrome"]);
+    assert_eq!(
+        item(&apps, "app-remove:claude-code").subtitle.as_deref(),
+        Some("Installed, version 2.1")
+    );
     assert_eq!(runner.ran(), [query()]);
 }
 
@@ -525,6 +561,8 @@ impl Runner for Answers {
 fn a_reading_that_fails_is_given_to_no_one_so_the_last_one_stands() {
     let dir = tempfile::tempdir().unwrap();
     let files = files(dir.path(), &[("google-chrome", CHROME), ("claude-code", CLAUDE)]);
+    let journals = paths(dir.path()).app_journals();
+    installed_journal(&journals, "claude-code", None);
     let (asked, dpkg_asked) = mpsc::channel();
     let runner = Answers {
         answers: Mutex::new(VecDeque::from([
@@ -540,6 +578,7 @@ fn a_reading_that_fails_is_given_to_no_one_so_the_last_one_stands() {
 
     reader.read();
     let first = readings.recv_timeout(wait).unwrap();
+    Journal::forget(&journals, "claude-code").unwrap();
     reader.read();
     dpkg_asked.recv_timeout(wait).unwrap();
     dpkg_asked.recv_timeout(wait).unwrap();
@@ -551,30 +590,34 @@ fn a_reading_that_fails_is_given_to_no_one_so_the_last_one_stands() {
 }
 
 #[test]
-fn the_watch_covers_dpkg_the_picks_and_the_users_nix_packages() {
-    let paths = Paths::from_vars(Some("/home/u".into()), None, None).unwrap();
-    let files = AppFiles::new("/usr/share/kubaos/apps".into(), &paths);
+fn the_watch_covers_dpkg_the_picks_and_each_apps_journal() {
+    let dir = tempfile::tempdir().unwrap();
+    let files = files(dir.path(), &[("google-chrome", CHROME)]);
+    let paths = paths(dir.path());
 
     let watched = files.watched();
 
     assert!(watched.contains(&PathBuf::from(DPKG_STATUS)), "{watched:?}");
     assert!(watched.contains(&paths.app_picks()), "{watched:?}");
-    assert!(watched.contains(&paths.state_dir().packages_file()), "{watched:?}");
+    assert!(
+        watched.contains(&Journal::file(&paths.app_journals(), "google-chrome")),
+        "{watched:?}"
+    );
 }
 
 /// An app with two setups: its desktop app alone, or a service beside it.
 const LAB: &str = r#"
 name = "Lab"
 summary = "An app for agents"
+tags = ["agents"]
 
-[deb]
+[[action]]
+name = "Install Lab"
+kind = "deb"
 package = "lab"
 version = "2.0"
 self_updates = true
-
-[deb.amd64]
-url = "https://example.com/lab-amd64.deb"
-sha256 = "418c7825f73107b7b5ba3babae5e3b485801dc22d9dc0d518af632f7906cbdd1"
+amd64 = { url = "https://example.com/lab-amd64.deb", sha256 = "418c7825f73107b7b5ba3babae5e3b485801dc22d9dc0d518af632f7906cbdd1" }
 
 [setup.desktop]
 name = "Lab"
@@ -583,21 +626,20 @@ summary = "The desktop app"
 [setup.service]
 name = "Lab as a service"
 summary = "Its agents in a service"
-user_hooks = "lab_service"
-marker = ".config/systemd/user/lab.service"
+
+[[setup.service.action]]
+name = "Keep it running"
+kind = "linger"
 "#;
 
-const LAB_MARKER: &str = ".config/systemd/user/lab.service";
-
-/// Lab alone, on an amd64 machine with these dpkg packages and setups' markers.
-fn lab(installed: &[&str], markers: &[&str]) -> Apps {
-    let catalog = Catalog::new(vec![App::parse("lab", LAB).unwrap()]);
-    apps_of(&catalog, "amd64", installed, markers)
+/// Lab alone, on an amd64 machine with these dpkg packages, installed in `setup` when lab is.
+fn lab(installed: &[&str], setup: Option<&str>) -> Apps {
+    apps_of(&[("lab", LAB)], "amd64", installed, setup)
 }
 
 #[test]
 fn an_app_with_setups_offers_an_install_for_each_and_none_for_the_app_alone() {
-    let apps = lab(&[], &[]);
+    let apps = lab(&[], None);
 
     assert_eq!(ids(&apps), ["app-install:lab:desktop", "app-install:lab:service"]);
     let desktop = item(&apps, "app-install:lab:desktop");
@@ -615,8 +657,8 @@ fn an_app_with_setups_offers_an_install_for_each_and_none_for_the_app_alone() {
 
 #[test]
 fn an_app_in_one_setup_offers_its_removal_and_the_switch_to_each_other() {
-    let desktop = lab(&["lab=2.0"], &[]);
-    let service = lab(&["lab=2.0"], &[LAB_MARKER]);
+    let desktop = lab(&["lab=2.0"], None);
+    let service = lab(&["lab=2.0"], Some("service"));
 
     assert_eq!(ids(&desktop), ["app-remove:lab", "app-install:lab:service"]);
     assert_eq!(
@@ -636,7 +678,7 @@ fn an_app_in_one_setup_offers_its_removal_and_the_switch_to_each_other() {
 
 #[test]
 fn installing_a_setup_runs_kubaos_app_add_with_it_named_for_the_setup() {
-    let (_, runner, started) = start(&lab(&[], &[]), "app-install:lab:service", INSTALL);
+    let (_, runner, started) = start(&lab(&[], None), "app-install:lab:service", INSTALL);
 
     assert_eq!(started.unwrap().title, "Installing Lab as a service");
     assert_eq!(runner.backgrounded(), ["kubaos app add lab --setup service --json"]);
@@ -644,7 +686,7 @@ fn installing_a_setup_runs_kubaos_app_add_with_it_named_for_the_setup() {
 
 #[test]
 fn a_setup_install_ends_installed_when_the_summary_names_the_setup() {
-    let (mut jobs, _, started) = start(&lab(&[], &[]), "app-install:lab:service", INSTALL);
+    let (mut jobs, _, started) = start(&lab(&[], None), "app-install:lab:service", INSTALL);
     let id = started.unwrap().id;
     jobs.heard(Heard::line(&id, summary(&["Lab as a service"])));
 
@@ -658,13 +700,13 @@ fn a_setup_install_ends_installed_when_the_summary_names_the_setup() {
 
 #[test]
 fn a_setup_item_that_doesnt_apply_runs_nothing() {
-    let service = lab(&["lab=2.0"], &[LAB_MARKER]);
+    let service = lab(&["lab=2.0"], Some("service"));
     for (apps, id) in [
         (&service, "app-install:lab:service"),
         (&service, "app-install:lab"),
         (&service, "app-install:lab:server"),
         (&service, "app-remove:lab:service"),
-        (&lab(&[], &[]), "app-install:lab"),
+        (&lab(&[], None), "app-install:lab"),
     ] {
         let action = if id.starts_with("app-remove") { REMOVE } else { INSTALL };
         let (_, runner, started) = start(apps, id, action);
@@ -677,18 +719,16 @@ fn a_setup_item_that_doesnt_apply_runs_nothing() {
 #[test]
 fn hide_may_name_each_setups_install_and_the_removal() {
     assert_eq!(
-        lab(&[], &[]).ids(),
+        lab(&[], None).ids(),
         ["app-install:lab:desktop", "app-install:lab:service", "app-remove:lab"]
     );
 }
 
 #[test]
-fn the_markers_are_read_from_the_home_and_watched() {
+fn the_setup_an_app_is_in_is_its_journals() {
     let dir = tempfile::tempdir().unwrap();
     let files = files(dir.path(), &[("lab", LAB)]);
-    let marker = dir.path().join("home").join(LAB_MARKER);
-    fs::create_dir_all(marker.parent().unwrap()).unwrap();
-    fs::write(&marker, "").unwrap();
+    installed_journal(&paths(dir.path()).app_journals(), "lab", Some("service"));
     let runner = FakeRunner {
         outputs: [(query(), dpkg_with(&["lab=2.0"]))].into(),
         ..FakeRunner::default()
@@ -697,5 +737,4 @@ fn the_markers_are_read_from_the_home_and_watched() {
     let apps = Apps::read(&files, &runner).unwrap();
 
     assert_eq!(ids(&apps), ["app-remove:lab", "app-install:lab:desktop"]);
-    assert!(files.watched().contains(&marker), "{:?}", files.watched());
 }

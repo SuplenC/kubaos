@@ -393,25 +393,29 @@ impl<'h> Keeper<'h> {
             let stale = owned
                 && !look.done
                 && action.path().is_some()
-                && look.claims.iter().any(|c| {
-                    c.owned && c.path().is_some_and(|p| self.host.place(p).symlink_metadata().is_ok())
-                });
+                && look
+                    .claims
+                    .iter()
+                    .any(|c| c.owned && c.path().is_some_and(|p| self.host.place(p).symlink_metadata().is_ok()));
             if !look.done && !stale {
                 continue;
             }
             let (claims, prior) = if owned {
                 adopted(&action, look, lingered_off)
             } else {
-                (look.claims.into_iter().map(|c| Claim::new(c.claim, false)).collect(), look.prior)
+                (
+                    look.claims.into_iter().map(|c| Claim::new(c.claim, false)).collect(),
+                    look.prior,
+                )
             };
-            let state = if claims.iter().any(|c| c.owned) {
+            let settled = if claims.iter().any(|c| c.owned) {
                 State::Done
             } else {
                 State::Found
             };
             journal.put(Entry {
                 step,
-                state,
+                state: settled,
                 claims,
                 prior,
                 action,
@@ -636,6 +640,14 @@ pub struct Finished {
     pub switch: bool,
 }
 
+/// Where an install starts from.
+struct Begun {
+    switching: bool,
+    was_complete: bool,
+    /// The steps either journal has, by side.
+    journaled: BTreeSet<(Side, usize)>,
+}
+
 /// An app taken in by [`Engine::adopt`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Adopted {
@@ -688,48 +700,18 @@ impl<'a> Engine<'a> {
     pub fn install(&mut self, id: &str, setup: Option<&str>) -> Result<Finished, EngineError> {
         let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
         let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
-        let picked = folder.pick(setup).map_err(EngineError::Folder)?;
+        folder.pick(setup).map_err(EngineError::Folder)?;
         let steps: Vec<Action> = folder
             .steps(setup)
             .map_err(EngineError::Folder)?
             .into_iter()
             .cloned()
             .collect();
-        let user_journal = Journal::read(self.user.journals(), id).map_err(EngineError::Journal)?;
-        let root_journal = Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?;
-        let had = user_journal.as_ref().or(root_journal.as_ref()).map(|j| j.setup.clone());
-        let switching = had.as_ref().is_some_and(|had| had.as_deref() != setup);
-        let was_complete = !switching && user_journal.as_ref().is_some_and(|j| j.complete);
-        let root_unsettled = self.unsettled(&folder, setup, root_journal.as_ref(), Side::Root);
-        // An installed app whose every step stands changes nothing, so it needn't be ready: an
-        // update checks it while the app is open.
-        let stands = was_complete
-            && user_journal.as_ref().is_some_and(|j| j.root_adoption.is_none())
-            && !root_unsettled
-            && !self.unsettled(&folder, setup, user_journal.as_ref(), Side::User);
-        if !stands {
-            self.ready(&folder, picked.map(|s| s.id.as_str()))?;
-        }
-        let journaled: BTreeSet<(Side, usize)> = [(Side::User, &user_journal), (Side::Root, &root_journal)]
-            .into_iter()
-            .flat_map(|(side, j)| {
-                j.iter()
-                    .flat_map(move |j| j.entries.iter().map(move |e| (side, e.step)))
-            })
-            .collect();
-        let root_entries = root_journal.as_ref().is_some_and(|j| !j.entries.is_empty());
-        let adopting = user_journal.as_ref().is_some_and(|j| j.root_adoption.is_some());
-        // An app that isn't complete is rolled back whole on a failure, root's steps included.
-        let needs_root = ((switching || !was_complete) && root_entries)
-            || adopting
-            || root_unsettled;
-        if needs_root {
-            self.start_root()?;
-        }
-        if adopting {
-            self.adopt_root(id)?;
-        }
-        self.preflight(id, setup, needs_root)?;
+        let Begun {
+            switching,
+            was_complete,
+            journaled,
+        } = self.begin(&folder, id, setup)?;
         let mut finished = Finished::default();
         if switching {
             finished.switch |= self.switch_away(id, folder.actions.len())?;
@@ -802,6 +784,50 @@ impl<'a> Engine<'a> {
         Ok(finished)
     }
 
+    /// What an install starts from: whether it switches setups and whether the app was complete,
+    /// with its ready checks passed when something will change, root started when a step needs
+    /// it, and root's half of an adopted app recorded. Returns the steps either journal has.
+    fn begin(&mut self, folder: &Folder, id: &str, setup: Option<&str>) -> Result<Begun, EngineError> {
+        let user_journal = Journal::read(self.user.journals(), id).map_err(EngineError::Journal)?;
+        let root_journal = Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?;
+        let had = user_journal.as_ref().or(root_journal.as_ref()).map(|j| j.setup.clone());
+        let switching = had.as_ref().is_some_and(|had| had.as_deref() != setup);
+        let was_complete = !switching && user_journal.as_ref().is_some_and(|j| j.complete);
+        let root_unsettled = self.unsettled(folder, setup, root_journal.as_ref(), Side::Root);
+        // An installed app whose every step stands changes nothing, so it needn't be ready: an
+        // update checks it while the app is open.
+        let stands = was_complete
+            && user_journal.as_ref().is_some_and(|j| j.root_adoption.is_none())
+            && !root_unsettled
+            && !self.unsettled(folder, setup, user_journal.as_ref(), Side::User);
+        if !stands {
+            self.ready(folder, setup)?;
+        }
+        let journaled: BTreeSet<(Side, usize)> = [(Side::User, &user_journal), (Side::Root, &root_journal)]
+            .into_iter()
+            .flat_map(|(side, j)| {
+                j.iter()
+                    .flat_map(move |j| j.entries.iter().map(move |e| (side, e.step)))
+            })
+            .collect();
+        let root_entries = root_journal.as_ref().is_some_and(|j| !j.entries.is_empty());
+        let adopting = user_journal.as_ref().is_some_and(|j| j.root_adoption.is_some());
+        // An app that isn't complete is rolled back whole on a failure, root's steps included.
+        let needs_root = ((switching || !was_complete) && root_entries) || adopting || root_unsettled;
+        if needs_root {
+            self.start_root()?;
+        }
+        if adopting {
+            self.adopt_root(id)?;
+        }
+        self.preflight(id, setup, needs_root)?;
+        Ok(Begun {
+            switching,
+            was_complete,
+            journaled,
+        })
+    }
+
     /// Whether a step of `side` of the install isn't settled: its journal doesn't record it as
     /// settled with the same action, word for word, or its check, run from the user's side,
     /// doesn't say done. A root `run`'s check runs only as root, so such a step never is.
@@ -818,8 +844,8 @@ impl<'a> Engine<'a> {
                 return true;
             };
             let entry = journal.and_then(|j| j.entry(i + 1));
-            let settled = entry
-                .is_some_and(|e| e.action == resolved && e.state.settled(self.windows) && e.replaced.is_none());
+            let settled =
+                entry.is_some_and(|e| e.action == resolved && e.state.settled(self.windows) && e.replaced.is_none());
             if !settled || (side == Side::Root && matches!(resolved.kind, Kind::Run { .. })) {
                 return true;
             }
@@ -897,8 +923,12 @@ impl<'a> Engine<'a> {
     /// [`EngineError`] when the folder or the journals can't be read, or a check can't run.
     pub fn adopt(&mut self, id: &str, owned: bool) -> Result<Option<Adopted>, EngineError> {
         let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
-        if Journal::read(self.user.journals(), id).map_err(EngineError::Journal)?.is_some()
-            || Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?.is_some()
+        if Journal::read(self.user.journals(), id)
+            .map_err(EngineError::Journal)?
+            .is_some()
+            || Journal::read(&self.root_journals, id)
+                .map_err(EngineError::Journal)?
+                .is_some()
         {
             return Ok(None);
         }
@@ -952,7 +982,13 @@ impl<'a> Engine<'a> {
                     break;
                 }
             }
-            match found.or_else(|| folder.setups.iter().find(|s| s.actions.is_empty()).map(|s| s.id.clone())) {
+            match found.or_else(|| {
+                folder
+                    .setups
+                    .iter()
+                    .find(|s| s.actions.is_empty())
+                    .map(|s| s.id.clone())
+            }) {
                 Some(setup) => Some(setup),
                 None => return Ok(None),
             }

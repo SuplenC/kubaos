@@ -3,8 +3,8 @@
 //!
 //! # Owns
 //!
-//! - [`Catalog`]: loading the folders, finding an app, the packages its apps install, and
-//!   checking each app's vendor repositories against the package manifest.
+//! - [`Catalog`]: loading the folders, finding an app, the packages its apps install, and checking
+//!   each app's vendor repositories against the package manifest.
 //!
 //! # Not here
 //!
@@ -40,7 +40,7 @@ pub enum CatalogError {
     App {
         id: String,
         #[source]
-        source: FolderError,
+        source: Box<FolderError>,
     },
     #[error("app {id} takes its packages from repo {repo}, which the package manifest doesn't define")]
     UnknownRepo { id: String, repo: String },
@@ -86,7 +86,10 @@ impl Catalog {
             if !entry.path().join(APP_FILE).is_file() {
                 continue;
             }
-            let app = Folder::load(dir, &id).map_err(|source| CatalogError::App { id, source })?;
+            let app = Folder::load(dir, &id).map_err(|source| CatalogError::App {
+                id,
+                source: Box::new(source),
+            })?;
             apps.push(app);
         }
         Ok(Self::new(apps))
@@ -133,10 +136,6 @@ impl Catalog {
     /// The dpkg packages its apps' `apt` and `deb` actions install: the catalog's, which the
     /// package manifest leaves alone.
     pub fn packages(&self) -> BTreeSet<String> {
-        self.apps
-            .iter()
-            .flat_map(Folder::packages)
-            .map(str::to_owned)
-            .collect()
+        self.apps.iter().flat_map(Folder::packages).map(str::to_owned).collect()
     }
 }

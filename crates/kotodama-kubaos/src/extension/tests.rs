@@ -424,30 +424,26 @@ fn an_action_is_shown_by_whether_a_suite_is_installed() {
 
 /// Claude Code, not on the machine, as the only app of the catalog.
 fn with_claude_code(text: &str) -> Extension<FakeBus, FakeRunner> {
-    use kubaos_core::apps::App;
     use kubaos_core::apps::Catalog;
     use kubaos_core::apps::Picks;
     use kubaos_core::apps::Status;
-    use kubaos_core::apps::plan::Facts;
-    use kubaos_core::apt::Dpkg;
 
-    let catalog = Catalog::new(vec![
-        App::parse(
-            "claude-code",
-            "name = \"Claude Code\"\nsummary = \"A coding agent\"\n[apt]\npackages = [\"claude-code\"]\n",
-        )
-        .unwrap(),
-    ]);
-    let facts = Facts {
-        catalog: &catalog,
-        picks: &Picks::default(),
-        arch: "amd64",
-        dpkg: &Dpkg::default(),
-        nix: &std::collections::BTreeSet::new(),
-        markers: &std::collections::BTreeSet::new(),
-    };
+    let dir = tempfile::tempdir().expect("a temporary folder");
+    let folder = dir.path().join("apps/claude-code");
+    std::fs::create_dir_all(&folder).expect("make the folder");
+    std::fs::write(
+        folder.join("app.toml"),
+        "name = \"Claude Code\"\ncategory = \"ai\"\ntags = [\"coding agent\"]\n\
+         summary = \"A coding agent\"\ndescription = \"A coding agent.\"\n\
+         description_from = \"https://example.com\"\n\
+         [[action]]\nname = \"Install it\"\nkind = \"apt\"\npackages = [\"claude-code\"]\n",
+    )
+    .expect("write the app");
+    let catalog = Catalog::load(&dir.path().join("apps")).expect("the catalog");
+    let status =
+        Status::read(&catalog, &Picks::default(), &dir.path().join("journals"), "amd64", None).expect("the status");
     let mut extension = Extension::new(FakeBus::default(), FakeRunner::default());
-    extension.set_apps(Apps::new(&catalog, &Status::new(&facts)));
+    extension.set_apps(Apps::new(&status));
     let problems = extension.configure(&toml::from_str(text).expect("the test's config"));
     assert!(problems.is_empty(), "{problems:?}");
     extension
