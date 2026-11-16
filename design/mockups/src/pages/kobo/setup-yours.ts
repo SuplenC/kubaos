@@ -97,11 +97,11 @@ const VSCODE_TICKED: Move = {
   name: "VS Code ticked anyway",
   what: "Its tick and its new line fade in over `short`: “Bold. LazyVim is right there.”",
   tracks: [
-    { part: "the tick", on: "VS Code's row", target: `${VSCODE_ROW} .k-list-check`, property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the tick", on: "VS Code's row", target: `${VSCODE_ROW} .k-list-box .k-check-mark`, property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "the line", on: "VS Code's row", target: `${VSCODE_ROW} .k-list-title + *`, property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   reduced: [
-    { part: "the tick", on: "VS Code's row", target: `${VSCODE_ROW} .k-list-check`, property: "opacity", from: 0, to: 1, duration: "instant", curve: "standard" },
+    { part: "the tick", on: "VS Code's row", target: `${VSCODE_ROW} .k-list-box .k-check-mark`, property: "opacity", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: "the line", on: "VS Code's row", target: `${VSCODE_ROW} .k-list-title + *`, property: "opacity", from: 0, to: 1, duration: "instant", curve: "standard" },
   ],
   back: "cuts",
@@ -143,7 +143,7 @@ export default page<Shown>({
     { name: "What for: nothing lit", for: "the newcomer's line; pick apps myself", sample: CELLS.empty },
     { name: "What for: Developer", for: "its card lit; 13 picked for you", sample: CELLS.selected },
     { name: "What for: all three", for: "all lit", sample: atCard("yours", "all") },
-    { name: "Your apps", for: "Designer's lit; two yours", sample: CELLS.rest },
+    { name: "Your apps", for: "Developer's lit; Discord yours", sample: CELLS.rest },
     { name: "Your apps: nothing", for: "every app, none ticked", sample: atCard("yours", "apps-none") },
     { name: "VS Code ticked", for: "its line has an opinion", sample: atCard("yours", "vscode") },
     { name: "Go", for: "the count and the apps", sample: atCard("yours", "go") },
@@ -168,7 +168,7 @@ export default page<Shown>({
     looks: {
       empty: "What for, nothing lit",
       selected: "Developer's card lit",
-      rest: "Your apps; picks lit, two yours",
+      rest: "Your apps; Developer's lit, one yours",
       loading: "Go: the bar; a chip per app",
       error: "the error block; Try Steam again",
     },
@@ -179,7 +179,7 @@ export default page<Shown>({
     missingPicture: doesntApply("stand-in symbols on tiles: an app's own icon fills its tile once metadata has it."),
     counts: [
       { name: "No app", for: "nothing picked", sample: atCard("yours", "go-none") },
-      { name: "Twelve apps", for: "Designer and two", sample: atCard("yours", "go") },
+      { name: "Fifteen apps", for: "Developer and two", sample: atCard("yours", "go") },
       { name: "Thirty apps", for: "all three", sample: CELLS.loading },
     ],
   },

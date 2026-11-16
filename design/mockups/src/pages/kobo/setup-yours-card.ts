@@ -98,13 +98,13 @@ export function yoursAt(view: string): Yours {
     case "all":
       return base(all, 0);
     case "apps":
-      return base(["designer"], 1, { hand: handPicked() });
+      return base(["developer"], 1, { hand: new Map([["discord", true]]) });
     case "apps-none":
       return base([], 1);
     case "vscode":
       return base(["developer"], 1, { hand: new Map([["vscode", true]]) });
     case "go":
-      return base(["designer"], 2, { hand: handPicked() });
+      return base(["developer"], 2, { hand: handPicked() });
     case "go-none":
       return base([], 2);
     case "installing":
@@ -181,7 +181,7 @@ function appSpec(state: Yours, each: App): ListRowSpec {
   const chips = state.hand.get(each.id) === true ? [{ kind: "Cold" as const, label: "Ticked by you", icon: "person", iconOnly: true }] : by.map((id) => ({ kind: "Neutral" as const, label: profile(id).title, icon: profile(id).icon, iconOnly: true }));
   // Ticked anyway, VS Code's line gives way to what Kōbō thinks of that.
   const line = each.id === "vscode" && going ? VSCODE.ticked : each.line;
-  return { title: each.name, subtitle: line, icon: each.icon, tile: true, accent: going, checked: going, chips };
+  return { title: each.name, subtitle: line, icon: each.icon, tile: true, accent: going, checked: going, box: true, chips };
 }
 
 /** A category's label among the apps: its name and how many of its apps go on. */
@@ -309,7 +309,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
         else state.hand.set(each.id, now);
         if (state.phase === "done") state.phase = "choosing";
         const fresh = list.replaceRow(at, appSpec(state, each));
-        changed(fresh.querySelector(".k-list-check"));
+        changed(fresh.querySelector(".k-list-box .k-check-mark"));
         if (each.id === "vscode") changed(fresh.querySelector(".k-list-title")?.nextElementSibling ?? null);
         const category = CATEGORIES.find((c) => c.id === each.category)!;
         // The label stays where it is, its words drawn again: the list keeps its place among the rows.
