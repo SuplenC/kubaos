@@ -1,6 +1,9 @@
 # Devin Desktop, the editor that was Windsurf, from its signed apt repository, whose key
 # system/packages.toml pins ([repo.windsurf]). Built for amd64 only. The repository's windsurf
-# package is now an empty one that brings devin-desktop.
+# package is now an empty one that brings devin-desktop. Of what it recommends, apt's
+# --no-install-recommends leaves out bubblewrap, which its agent's sandbox runs commands in, so
+# the step installs it; socat is on every machine already, the sign-in is kept by gnome-keyring,
+# also there, without libsecret-tools' secret-tool command, and libvulkan1 only speeds up drawing.
 # https://windsurf.com/download/editor?os=linux
 name = "Devin Desktop"
 category = "ai"
@@ -22,4 +25,4 @@ name = "Install Devin Desktop"
 kind = "apt"
 repo = "windsurf"
 arch = "amd64"
-packages = ["devin-desktop"]
+packages = ["devin-desktop", "bubblewrap"]

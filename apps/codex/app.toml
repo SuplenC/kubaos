@@ -5,13 +5,10 @@ name = "Codex CLI"
 category = "ai"
 tags = ["coding agent", "openai", "codex", "terminal"]
 summary = "OpenAI's Codex in your terminal. It writes the diff, you read it. Actually read it."
-# Its README is under the Apache-2.0 licence, which asks for its notice with every copy, so this
-# is ours.
+# The opening of Codex's README, Apache-2.0, Copyright 2025 OpenAI (github.com/openai/codex).
 description = """\
-Codex CLI is OpenAI's coding agent for the terminal. Started in a project, it reads the code, \
-edits files and runs commands in a sandbox, asking before it goes beyond what it has been \
-allowed. It signs in with a ChatGPT plan or works with an OpenAI API key."""
-description_from = "kubaos"
+Codex CLI is a coding agent from OpenAI that runs locally on your computer."""
+description_from = "https://github.com/openai/codex/blob/rust-v0.169.0/README.md"
 # Colloid's OpenAI icon, the system's icon theme (home/curated.nix).
 icon = "openai"
 keeps = """\

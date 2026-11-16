@@ -1,7 +1,11 @@
 # Claude Desktop from Anthropic's signed apt repository, the stable channel, whose key
 # system/packages.toml pins ([repo.claude-desktop]). Claude Desktop for Linux is in beta. Cowork's
 # virtual machine needs QEMU, its UEFI firmware and virtiofsd, which its package only recommends,
-# and the kvm group; without them the rest of the app works and Cowork says what it lacks.
+# and the kvm group; without them the rest of the app works and Cowork says what it lacks. Of what
+# else it recommends, apt's --no-install-recommends leaves out bubblewrap, which Claude Code's
+# sandbox runs commands in, so the step installs it; socat, gnome-keyring, which keeps the
+# sign-in, and libsecret are on every machine already, and the tray needs no appindicator library,
+# as Electron speaks StatusNotifierItem itself.
 # https://code.claude.com/docs/en/desktop-linux
 name = "Claude"
 category = "ai"
@@ -25,4 +29,4 @@ still signed in. Your chats live on Anthropic's servers anyway."""
 name = "Install Claude"
 kind = "apt"
 repo = "claude-desktop"
-packages = ["claude-desktop"]
+packages = ["claude-desktop", "bubblewrap"]

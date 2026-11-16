@@ -19,7 +19,7 @@ use crate::apps::catalog::CATALOG;
 use crate::apps::picks::Picks;
 use crate::unfree::Unfree;
 
-const APPS: [&str; 11] = [
+const APPS: [&str; 10] = [
     "aider",
     "chatgpt",
     "claude-desktop",
@@ -30,7 +30,6 @@ const APPS: [&str; 11] = [
     "github-copilot-cli",
     "lm-studio",
     "opencode",
-    "voxtype",
 ];
 
 /// Chrome as the web apps require it, without the theme helper the shipped one brings.
@@ -158,8 +157,7 @@ fn which_ai_apps_a_machine_can_have_follows_its_architecture_and_the_unfree_sett
             "gemini-cli",
             "github-copilot-cli",
             "lm-studio",
-            "opencode",
-            "voxtype"
+            "opencode"
         ]
     );
     // nixpkgs marks Copilot CLI and LM Studio unfree.
