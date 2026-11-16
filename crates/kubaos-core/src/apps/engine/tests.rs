@@ -1161,6 +1161,30 @@ kind = "linger"
 
 #[test]
 fn a_tarball_unpacks_owned_by_whoever_unpacks_it_and_writable_by_no_one_else() {
+    // tar gives what it unpacks the archive's modes less the umask: under a umask that lets the
+    // group write, as Ubuntu's 002 does, only the action itself keeps the files the owner's. The
+    // test runs again in a child under that umask, so no other test's thread sees it changed.
+    const UNDER_UMASK: &str = "KUBAOS_TEST_UNDER_UMASK_002";
+    if std::env::var_os(UNDER_UMASK).is_none() {
+        let name = module_path!().split_once("::").map_or("", |(_, rest)| rest);
+        let ran = std::process::Command::new("sh")
+            .args(["-c", "umask 002 && exec \"$0\" \"$@\""])
+            .arg(std::env::current_exe().unwrap())
+            .arg(format!(
+                "{name}::a_tarball_unpacks_owned_by_whoever_unpacks_it_and_writable_by_no_one_else"
+            ))
+            .args(["--exact", "--nocapture", "--test-threads=1"])
+            .env(UNDER_UMASK, "1")
+            .output()
+            .unwrap();
+        let out = String::from_utf8_lossy(&ran.stdout);
+        assert!(
+            ran.status.success() && out.contains("1 passed"),
+            "{out}{}",
+            String::from_utf8_lossy(&ran.stderr)
+        );
+        return;
+    }
     let tarball = app(r#"
 [[action]]
 name = "Download the runtime"
@@ -1193,12 +1217,8 @@ amd64 = { url = "https://example.com/runtime.tar.gz", sha256 = "4444444444444444
         ("4".repeat(64), fs::read(&archive).unwrap()),
     );
     let before = world.host.snapshot();
-    // tar gives what it unpacks the archive's modes less the umask: under a umask that lets the
-    // group write, as Ubuntu's 002 does, only the action itself keeps the files the owner's.
-    let umask = Umask::set(0o002);
 
     world.install("runtime", true).0.unwrap();
-    drop(umask);
 
     let runtime = world.host_home().join(".vendor/runtime");
     for path in [runtime.clone(), runtime.join("bin"), runtime.join("bin/tool")] {
@@ -1209,21 +1229,6 @@ amd64 = { url = "https://example.com/runtime.tar.gz", sha256 = "4444444444444444
     assert_eq!(fs::read_to_string(runtime.join("bin/tool")).unwrap(), "#!/bin/sh\n");
     world.remove("runtime").0.unwrap();
     assert_eq!(world.host.snapshot(), before);
-}
-
-/// The process's umask, set for a test and put back when it goes.
-struct Umask(rustix::fs::Mode);
-
-impl Umask {
-    fn set(mask: u32) -> Self {
-        Self(rustix::process::umask(rustix::fs::Mode::from_raw_mode(mask)))
-    }
-}
-
-impl Drop for Umask {
-    fn drop(&mut self) {
-        rustix::process::umask(self.0);
-    }
 }
 
 /// A system unit enabled, from an app named by `name`.
@@ -1733,4 +1738,100 @@ fn a_pulled_in_package_another_app_installs_passes_to_it() {
     world.remove("lib").0.unwrap();
 
     assert!(!world.host.state.borrow().dpkg.contains_key("libtool"));
+}
+
+#[test]
+fn a_release_that_turns_an_unpacked_download_into_a_file_at_the_same_path_replaces_the_folder() {
+    let world = World::new(&[("tool", &fixed_download("1.1", "tar-gz"))]);
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.downloads.insert(
+            "https://example.com/tool-1.1".to_owned(),
+            ("11".repeat(32), tarball("tool 1.1")),
+        );
+        state.downloads.insert(
+            "https://example.com/tool-1.3".to_owned(),
+            ("13".repeat(32), b"tool 1.3".to_vec()),
+        );
+    }
+    let before = world.host.snapshot();
+    world.install("tool", true).0.unwrap();
+    world.write_app("tool", &fixed_download("1.3", "file"));
+
+    world.install("tool", true).0.unwrap();
+
+    assert_eq!(
+        fs::read_to_string(world.host_home().join(".vendor/tool")).unwrap(),
+        "tool 1.3"
+    );
+    world.remove("tool").0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn a_folder_a_stopped_run_left_aside_goes_with_the_next_download() {
+    let world = World::new(&[("tool", &fixed_download("1.1", "tar-gz"))]);
+    for version in ["1.1", "1.3"] {
+        world.host.state.borrow_mut().downloads.insert(
+            format!("https://example.com/tool-{version}"),
+            (version.replace('.', "").repeat(32), tarball(&format!("tool {version}"))),
+        );
+    }
+    let before = world.host.snapshot();
+    world.install("tool", true).0.unwrap();
+    // The run stopped after moving the old folder aside and before moving the new one in.
+    let vendor = world.host_home().join(".vendor");
+    fs::rename(vendor.join("tool"), vendor.join(".tool.old")).unwrap();
+    world.write_app("tool", &fixed_download("1.3", "tar-gz"));
+
+    world.install("tool", true).0.unwrap();
+
+    assert!(!vendor.join(".tool.old").exists());
+    assert_eq!(fs::read_to_string(vendor.join("tool/bin/tool")).unwrap(), "tool 1.3");
+    world.remove("tool").0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn a_pulled_in_package_the_user_installed_by_name_since_stays_when_the_app_goes() {
+    let world = world_with_dependencies(&[("tool", &apt_app("Tool", "\"tool\""))]);
+    world.install("tool", true).0.unwrap();
+    world.host.state.borrow_mut().manual.insert("libtool".to_owned());
+
+    world.remove("tool").0.unwrap();
+
+    let state = world.host.state.borrow();
+    assert!(!state.dpkg.contains_key("tool"));
+    assert!(state.dpkg.contains_key("libtool"));
+}
+
+#[test]
+fn a_json_setting_there_twice_goes_whole_with_the_app() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    fs::create_dir_all(world.settings().parent().unwrap()).unwrap();
+    fs::write(world.settings(), "{\"zoom\": 1}").unwrap();
+    world.install("fixture", true).0.unwrap();
+    fs::write(
+        world.settings(),
+        "{\"zoom\": 1, \"fixture\": {\"enabled\": true, \"enabled\": true}}",
+    )
+    .unwrap();
+
+    world.remove("fixture").0.unwrap();
+
+    assert_eq!(fs::read_to_string(world.settings()).unwrap(), "{\"zoom\": 1}");
+}
+
+#[test]
+fn a_json_setting_in_a_new_table_keeps_the_files_crlf_line_endings() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    fs::create_dir_all(world.settings().parent().unwrap()).unwrap();
+    fs::write(world.settings(), "{\r\n\t\"zoom\": 1.50\r\n}").unwrap();
+
+    world.install("fixture", true).0.unwrap();
+
+    assert_eq!(
+        fs::read_to_string(world.settings()).unwrap(),
+        "{\r\n\t\"zoom\": 1.50,\r\n\t\"fixture\": {\r\n\t\t\"enabled\": true\r\n\t}\r\n}"
+    );
 }
