@@ -91,3 +91,28 @@ fn resolving_fills_in_the_words_and_reads_a_template() {
     assert_eq!(text.as_deref(), Some("User=kuba\nHome=/home/kuba\n"));
     assert_eq!(from, None);
 }
+
+#[test]
+fn root_never_runs_a_program_from_the_home() {
+    let result = action(
+        "name = \"X\"\nkind = \"run\"\ndo = [\"@HOME@/.local/bin/t3\"]\ncheck = [\"true\"]\nundo = [\"true\"]\nroot = true\n",
+    );
+
+    assert!(
+        matches!(result, Err(ActionError::InvalidArgv { key: "do" })),
+        "{result:?}"
+    );
+}
+
+#[test]
+fn dependencies_and_the_configure_stage_are_refused_until_they_exist() {
+    let stage = action("name = \"X\"\nkind = \"linger\"\nstage = \"configure\"\n");
+    let requires = crate::apps::folder::Folder::parse(
+        "x",
+        Path::new("/x"),
+        "name = \"X\"\nsummary = \"Y\"\nrequires = [\"neovim\"]\n[[action]]\nname = \"Z\"\nkind = \"linger\"\n",
+    );
+
+    assert!(stage.is_err());
+    assert!(requires.is_err());
+}

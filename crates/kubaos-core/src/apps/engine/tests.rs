@@ -663,3 +663,26 @@ kind = "linger"
     let (user, _) = world.journals("two-ways");
     assert_eq!(user.unwrap().setup.as_deref(), Some("plain"));
 }
+
+#[test]
+fn an_installed_app_whose_new_step_fails_keeps_what_it_had() {
+    let world = World::new(&[("grouped", GROUPED)]);
+    world.install("grouped", true).0.unwrap();
+    let installed = world.host.snapshot();
+    let grown = format!(
+        "{GROUPED}\n[[action]]\nname = \"Start the service\"\nkind = \"unit\"\nunit = \"fixture.service\"\nscope = \"system\"\nenable = true\n"
+    );
+    fs::write(world.catalog.join("grouped/app.toml"), grown).unwrap();
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("enable:fixture.service".to_owned());
+
+    let (result, _) = world.install("grouped", true);
+
+    assert!(matches!(result, Err(EngineError::Step { .. })), "{result:?}");
+    assert_eq!(world.host.snapshot(), installed);
+    assert!(world.journals("grouped").0.unwrap().complete);
+}
