@@ -237,7 +237,7 @@
   background: var(--color-surface_container_high);
 }
 
-/* The race's room: its three lanes take the height under the header. */
+/* The race's room: the grid takes the height under the header. */
 .setup-kotodama-lanes {
   display: flex;
   flex-direction: column;
@@ -245,22 +245,19 @@
   height: 100%;
 }
 
-.setup-kotodama-lanes > * {
+.setup-kotodama-race {
+  display: grid;
   flex: 1 1 0;
   min-height: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--space-s12) var(--space-s24);
 }
 
-.setup-kotodama-lane {
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-}
-
-/* Draft part: Kotodama's lane, the menu in the primary's lit tube. */
+/* Draft part: Kotodama's lane, the menu itself in the primary's lit tube, filling the lane. */
 .setup-kotodama-ours {
   display: flex;
   min-height: 0;
-  height: 100%;
   border-radius: var(--radius-surface);
   box-shadow:
     0 0 0 var(--focus-tube) var(--color-primary),
@@ -279,7 +276,6 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
   overflow: hidden;
   border-radius: var(--radius-surface);
   background: var(--color-surface_container);
@@ -290,11 +286,54 @@
   flex: 1 1 0;
   min-height: 0;
   padding: var(--space-s12);
+}
+
+/* Everything but the spam is drained of colour; the spam keeps all of its. */
+.setup-kotodama-sad > :not(.setup-kotodama-answers),
+.setup-kotodama-answers > :not(.setup-kotodama-spam, .setup-kotodama-under),
+.setup-kotodama-under > :not(.setup-kotodama-ad) {
   filter: grayscale(1);
 }
 
+/* The answers end at the panel's foot; across, they may run out to the panel's edge, as the
+   spam does, the panel cutting them there. */
 .setup-kotodama-answers {
-  overflow: hidden;
+  overflow-x: visible;
+  overflow-y: clip;
+}
+
+/* Draft part: the spam, its banner twice the width of the room it shows in, standing at the
+   lane's right, cut by the panel's edge. */
+.setup-kotodama-spam {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.setup-kotodama-spam-banner {
+  flex: none;
+  box-sizing: border-box;
+  width: calc(2 * var(--size-rail));
+  margin-right: calc(-1 * var(--size-rail) - var(--space-s12));
+  padding: var(--space-s8) var(--space-s12);
+  border-radius: var(--radius-row) 0 0 var(--radius-row);
+  background: var(--color-error_container);
+  white-space: nowrap;
+}
+
+/* A lane short of room leaves beats out, fullest first (`otherMenu`): the news, the ad's stars
+   and small print and the spam's lines; then the game, the ad's product and the groups' labels. */
+.setup-kotodama-other:not([data-fit="tall"]) :is([data-extra="stories"], [data-more]),
+.setup-kotodama-other[data-fit="short"] :is([data-extra], [data-less], .setup-kotodama-plabel) {
+  display: none;
+}
+
+/* The ad and the groups it covers in one cell, the ad over them. */
+.setup-kotodama-under {
+  display: grid;
+}
+
+.setup-kotodama-under > * {
+  grid-area: 1 / 1;
 }
 
 /* Draft part: the other menu's flat rows and the labels over their groups. */
@@ -321,12 +360,18 @@
 /* A search's bar crawling under the field while the other menu thinks. */
 .setup-kotodama-crawl {
   display: block;
+  transition: opacity var(--motion-medium) var(--easing-standard);
   height: var(--stroke-thin);
   margin-top: var(--space-s4);
   border-radius: var(--radius-full);
   background: linear-gradient(90deg, transparent, var(--color-cold), transparent) no-repeat;
   background-size: 40% 100%;
   animation: setup-kotodama-crawl var(--motion-scene) var(--easing-linear) infinite;
+}
+
+.setup-kotodama-crawl[data-done] {
+  opacity: 0;
+  animation: none;
 }
 
 [data-reduced] .setup-kotodama-crawl {
@@ -345,10 +390,9 @@
 }
 
 .setup-kotodama-ad {
-  position: absolute;
-  left: var(--space-s12);
-  right: var(--space-s12);
-  top: calc(var(--space-s12) * 2 + var(--size-control_md) + var(--space-s4));
+  position: relative;
+  z-index: 1;
+  align-self: start;
   box-sizing: border-box;
   padding: var(--space-s12);
   border-radius: var(--radius-content);

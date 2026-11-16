@@ -227,7 +227,7 @@ export const QUESTION = "wifi";
 /** When each of Start's answers lands, from the moment the key is let go, at speed 1. */
 export const LANDS = {
   /** The web's rows, the news, a game, the ad over them, the weather, then what you wanted, last. */
-  start: { web: 1000, news: 1600, recommended: 2200, ad: 3000, weather: 3600, answer: 4400, done: 5800 },
+  start: { web: 1000, news: 1600, recommended: 2200, ad: 3000, weather: 3600, spam: 4000, answer: 4600, done: 5800 },
 } as const;
 
 /** The other menu's words and the lanes' lines, the question's where it goes. */
@@ -244,6 +244,16 @@ export const OTHERS = {
     stopped: "3 ms",
     roast: "Kotodama: the thing itself, first row, before you let go of the key. Nothing left the machine.",
   },
+} as const;
+
+/**
+ * The second ad, a banner too wide for its slot, sliding in under the weather: only its left part
+ * shows, the rest runs out past the panel's edge, cut mid-word.
+ */
+export const SPAM = {
+  tag: "Sponsored · Vigorex Labs",
+  headline: "ENLARGE YOUR PERFORMANCE",
+  lines: ["Doctors hate this one weird pill", "+7 cm in 2 weeks or your money back", "Discreet shipping. Your neighbour won't know"],
 } as const;
 
 /** The ad Start slides over its answers: a cleaner nobody asked for, in every loud colour there is. */

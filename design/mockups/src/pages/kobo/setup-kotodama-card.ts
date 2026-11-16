@@ -32,7 +32,7 @@ import { bezier, milliseconds } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
 import { body } from "./kobo-parts.ts";
 import { CARDS } from "./setup-cards.ts";
-import { AD, defaultSettings, ENGINES, type Found, LANDS, type MenuSettings, OPENS_WITH, OTHERS, QUESTION, search } from "./setup-kotodama-data.ts";
+import { AD, SPAM, defaultSettings, ENGINES, type Found, LANDS, type MenuSettings, OPENS_WITH, OTHERS, QUESTION, search } from "./setup-kotodama-data.ts";
 
 /** The card's steps, by their index. */
 export const STEPS = ["What", "Why", "Yours", "Try it"] as const;
@@ -156,8 +156,9 @@ function scaleOf(element: HTMLElement): number {
 
 /**
  * The Command menu's measures in a room `width` × `height` logical pixels big: the panel the
- * room's width, as many rows as its height holds, the pane where the panel is as wide as a dialog
- * beside a rail, as the menu has on a screen (`menuMeasures`).
+ * room's whole width and height, the Results as many rows as that holds, the pane where the panel
+ * is as wide as a dialog beside a rail, as the menu has on a screen (`menuMeasures`). The body
+ * takes all the height the rows leave, so the panel ends where its room does.
  */
 function measuresIn(width: number, height: number): MenuMeasures {
   const space = length("space-s12");
@@ -167,7 +168,7 @@ function measuresIn(width: number, height: number): MenuMeasures {
   const panel = Math.floor(width / grid) * grid;
   const rows = Math.max(1, Math.floor((height - chrome + length("space-s4")) / pitch));
   const pane = panel >= length("size-dialog") + length("size-rail") ? Math.max(length("size-rail"), Math.floor(((panel - space * 3) * 0.4) / grid) * grid) : 0;
-  const body = rows * pitch - length("space-s4");
+  const body = Math.max(rows * pitch - length("space-s4"), Math.floor(height - chrome));
   return { width: panel, height: chrome + body, rows, body, pane, top: 0 };
 }
 
@@ -242,7 +243,7 @@ function standIn(prefs: MenuSettings, options: { readonly live: boolean; readonl
   new ResizeObserver(() => {
     const scale = scaleOf(box);
     const next = measuresIn(box.clientWidth / scale, box.clientHeight / scale);
-    if (measures && next.width === measures.width && next.rows === measures.rows) return;
+    if (measures && next.width === measures.width && next.body === measures.body) return;
     measures = next;
     draw();
   }).observe(box);
@@ -324,41 +325,85 @@ function parodyRow(each: Answer): HTMLElement {
   return line;
 }
 
+/** A group of the other menu's answers: its label, its rows, and the beat it is, if it can go. */
+interface Group {
+  readonly label: string;
+  readonly rows: readonly Answer[];
+  /** A beat a short lane leaves out: first the news, then the game. */
+  readonly extra?: "stories" | "recommended";
+}
+
+/** What the other menu holds besides its groups: an ad over the first ones, one in the flow. */
+interface OtherParts {
+  /** Laid over the first `covers` groups, which take its height at the least. */
+  readonly over?: HTMLElement;
+  readonly covers?: number;
+  /** Stands before the last group: what you wanted comes last. */
+  readonly before?: HTMLElement;
+}
+
 /**
  * Draft part, to be promoted: the other menu, drained of colour: its field with a search's bar
  * crawling under it, its answers in one flat list, a label over each group, landing group by
- * group, and the line at its foot that never ends.
+ * group, and the line at its foot that never ends while it searches.
  */
-function otherMenu(q: string, groups: readonly (readonly [string, readonly Answer[]])[], foot: string): { box: HTMLElement; groups: HTMLElement[] } {
+function otherMenu(q: string, groups: readonly Group[], foot: string, more: OtherParts = {}): { box: HTMLElement; groups: HTMLElement[]; answers: HTMLElement; settle: () => void } {
   const words = field({ value: q, icon: "search", pointer: false });
   const bar = document.createElement("span");
   bar.className = "setup-kotodama-crawl";
-  const parts = groups.map(([label, rows]) => {
-    const head = text(label, "caption", "on_surface_variant");
+  const parts = groups.map((group) => {
+    const head = text(group.label, "caption", "on_surface_variant");
     head.classList.add("setup-kotodama-plabel");
-    return stack(0, "start", filling(head), ...rows.map((each) => filling(parodyRow(each))));
+    const part = stack(0, "start", filling(head), ...group.rows.map((each) => filling(parodyRow(each))));
+    if (group.extra) part.dataset.extra = group.extra;
+    return part;
   });
-  const answers = stack("s4", "start", ...parts.map(filling));
+  const covers = more.over ? (more.covers ?? 0) : 0;
+  const flowing: HTMLElement[] = [];
+  if (covers > 0) {
+    // The ad and the groups it covers share one cell: the rows after them start below both.
+    const under = stack("s4", "start", ...parts.slice(0, covers).map(filling));
+    const cell = document.createElement("span");
+    cell.className = "setup-kotodama-under";
+    cell.append(under, more.over!);
+    flowing.push(cell);
+  }
+  flowing.push(...parts.slice(covers, -1), ...(more.before ? [more.before] : []), ...parts.slice(-1).filter(() => parts.length > covers));
+  const answers = stack("s4", "start", ...flowing.map(filling));
   answers.classList.add("setup-kotodama-answers");
-  const status = row("s8", "centre", spinner("s16", "on_surface_variant"), filling(wrapped(foot, "small", "on_surface_variant")));
+  const waiting = spinner("s16", "on_surface_variant");
+  const status = row("s8", "centre", waiting, filling(wrapped(foot, "small", "on_surface_variant")));
   status.classList.add("setup-kotodama-status");
   const inner = stack("s8", "start", filling(stack(0, "start", filling(words), filling(bar))), fillingHeight(filling(answers)), filling(status));
   inner.classList.add("setup-kotodama-sad");
   const box = document.createElement("span");
   box.className = "setup-kotodama-other";
   box.append(inner);
-  return { box, groups: parts };
+  /** The search over: its bar goes and its spinner gives way to a still symbol, nothing moving. */
+  const settle = () => {
+    bar.dataset.done = "";
+    if (waiting.isConnected) waiting.replaceWith(icon("hourglass_top", "var(--icon-s16)", "var(--color-on_surface_variant)"));
+  };
+  // The fullest the lane holds whole: every beat, then without the news, then without the game.
+  const fits = ["tall", "medium", "short"] as const;
+  new ResizeObserver(() => {
+    for (const fit of fits) {
+      box.dataset.fit = fit;
+      if (answers.scrollHeight <= answers.clientHeight + 1) return;
+    }
+  }).observe(answers);
+  return { box, groups: parts, answers, settle };
 }
 
 /** Start's answers for `q`, by group, in the order they land: what you wanted comes last. */
-function startGroups(q: string): (readonly [string, readonly Answer[]])[] {
+function startGroups(q: string): Group[] {
   return [
-    ["Best match", [{ title: q, aside: "See web results", icon: "world", best: true }]],
-    ["Search the web", [{ title: `${q} not working`, icon: "search" }, { title: `${q} near me`, icon: "search" }]],
-    ["Top stories", [{ title: `11 ${q} secrets your router doesn't want you to know`, icon: "notes" }]],
-    ["Recommended", [{ title: "A game you never installed", aside: "Installing anyway", icon: "gamepad", ad: true }]],
-    ["Weather", [{ title: "14° and cloudy", aside: "In a town you left in 2019", icon: "thermostat" }]],
-    ["Settings (1)", [{ title: "Show 1 more", aside: "What you wanted is in here", icon: "expand_more" }]],
+    { label: "Best match", rows: [{ title: q, aside: "See web results", icon: "world", best: true }] },
+    { label: "Search the web", rows: [{ title: `${q} not working`, icon: "search" }] },
+    { label: "Top stories", rows: [{ title: `11 ${q} secrets your router doesn't want you to know`, icon: "notes" }], extra: "stories" },
+    { label: "Recommended", rows: [{ title: "A game you never installed", aside: "Installing anyway", icon: "gamepad", ad: true }], extra: "recommended" },
+    { label: "Weather", rows: [{ title: "14° and cloudy", aside: "In a town you left in 2019", icon: "thermostat" }] },
+    { label: "Settings (1)", rows: [{ title: "Show 1 more", aside: "What you wanted is in here", icon: "expand_more" }] },
   ];
 }
 
@@ -378,9 +423,35 @@ function fakeAd(): HTMLElement {
   const product = row("s12", "start", tile, filling(stack(0, "start", filling(wrapped(AD.product, "subheading", "on_burn_warning")), filling(wrapped(AD.maker, "caption", "on_burn_warning")))));
   const stars = row("s4", "centre", ...Array.from({ length: 5 }, () => icon("star_filled", "var(--type-small-icon)", "var(--color-burn_error)")), filling(wrapped(AD.rating, "caption", "on_burn_warning")));
   const go = button({ label: AD.action, kind: "Danger", size: "Sm", icon: "arrow_forward", trailing: true });
-  const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "subheading", "on_burn_warning")), filling(product), filling(stars), filling(go), filling(wrapped(AD.fine, "caption", "on_burn_warning")));
+  const fine = wrapped(AD.fine, "caption", "on_burn_warning");
+  // A shorter lane leaves out the stars and the small print, then the product.
+  stars.dataset.more = "";
+  fine.dataset.more = "";
+  product.dataset.less = "";
+  const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "subheading", "on_burn_warning")), filling(product), filling(stars), filling(go), filling(fine));
   ad.classList.add("setup-kotodama-ad");
   return ad;
+}
+
+/**
+ * Draft part, to be promoted: the second ad, a spam banner twice as wide as the room it shows in,
+ * its left `size.rail` standing at the lane's right and the rest running out past the panel's
+ * edge, cut there mid-word on purpose. Where the lane is short it keeps to its headline.
+ */
+function spamAd(): HTMLElement {
+  const tagged = (element: HTMLElement) => ((element.dataset.more = ""), element);
+  const banner = stack(
+    "s4",
+    "start",
+    tagged(text(SPAM.tag, "caption", "on_error_container")),
+    text(SPAM.headline, "headline", "burn_warning"),
+    ...SPAM.lines.map((line) => tagged(text(line, "small", "on_error_container"))),
+  );
+  banner.classList.add("setup-kotodama-spam-banner");
+  const slot = document.createElement("span");
+  slot.className = "setup-kotodama-spam";
+  slot.append(banner);
+  return slot;
 }
 
 /**
@@ -397,6 +468,7 @@ function clockChip(words: string, ours: boolean): HTMLElement {
  */
 export function gag(held = false): HTMLElement {
   const other = otherMenu(QUESTION, startGroups(QUESTION), OTHERS.start.searching);
+  if (held || settings().reduced) other.settle();
   // Draft part, to be promoted: the stamp.
   const stamp = text("Nope.", "display", "primary_lit");
   stamp.classList.add("setup-kotodama-stamp");
@@ -531,9 +603,9 @@ export function kotodamaCard(view: string): KotodamaCard {
     const race = () => {
       stop();
       const reduced = settings().reduced;
-      const start = otherMenu(QUESTION, startGroups(QUESTION), OTHERS.start.searching);
+      const spam = spamAd();
       const ad = fakeAd();
-      start.box.append(ad);
+      const start = otherMenu(QUESTION, startGroups(QUESTION), OTHERS.start.searching, { over: ad, covers: 4, before: spam });
       // Kotodama's lane fills its rows with what is on the machine: no web rows under it here.
       const ours = standIn({ ...prefs, web: false }, { live: false, query: QUESTION, hints: [["↑↓", "Select"], ["Enter", "Run"]], took: OTHERS.kotodama.stopped });
       ours.box.inert = true;
@@ -542,16 +614,20 @@ export function kotodamaCard(view: string): KotodamaCard {
       oursClock.append(clockChip(OTHERS.kotodama.stopped, true));
       const read = (words: string) => startClock.replaceChildren(clockChip(words, false));
       let roast = wrapped(OTHERS.start.still, "small", "on_surface_variant");
-      const lane = (name: string, clock: HTMLElement, box: HTMLElement, line: HTMLElement, who: string) => {
-        const each = stack("s12", "start", filling(row("s8", "centre", text(name, "heading"), fill(), clock)), filling(fillingHeight(box)), filling(line));
-        each.classList.add("setup-kotodama-lane");
-        each.dataset.lane = who;
-        return filling(fillingHeight(each));
-      };
       const oursBox = document.createElement("span");
       oursBox.className = "setup-kotodama-ours";
       oursBox.append(ours.box);
-      lanes.replaceChildren(splitColumns([1, 1], "s24", [lane(OTHERS.start.name, startClock, start.box, roast, "start"), lane(OTHERS.kotodama.name, oursClock, oursBox, wrapped(OTHERS.kotodama.roast, "small", "on_surface_variant"), "kotodama")], { fillHeight: true }));
+      // Draft part, to be promoted: the race, one grid: the names and clocks on one line, the two
+      // menus one height, the lines under them starting on one line.
+      const head = (name: string, clock: HTMLElement) => row("s8", "centre", text(name, "heading"), fill(), clock);
+      const grid = document.createElement("span");
+      grid.className = "setup-kotodama-race";
+      const roastHolder = document.createElement("span");
+      roastHolder.append(roast);
+      start.box.dataset.lane = "start";
+      oursBox.dataset.lane = "kotodama";
+      grid.append(head(OTHERS.start.name, startClock), head(OTHERS.kotodama.name, oursClock), start.box, oursBox, roastHolder, wrapped(OTHERS.kotodama.roast, "small", "on_surface_variant"));
+      lanes.replaceChildren(grid);
       const [web, search, news, recommended, weather, answerGroup] = start.groups;
       const parts: readonly (readonly [HTMLElement | undefined, number, string?])[] = [
         [web, LANDS.start.web],
@@ -560,13 +636,16 @@ export function kotodamaCard(view: string): KotodamaCard {
         [recommended, LANDS.start.recommended],
         [ad, LANDS.start.ad, "0 var(--space-s48)"],
         [weather, LANDS.start.weather],
+        [spam, LANDS.start.spam, "var(--space-s48) 0"],
         [answerGroup, LANDS.start.answer],
       ];
       /** Start as it stands `spent` milliseconds after the key: what has landed, and its clock. */
       const at = (spent: number) => {
         for (const [part, lands] of parts) if (part) part.style.opacity = spent >= lands ? "" : "0";
         read(spent >= LANDS.start.done ? OTHERS.start.stopped(seconds(LANDS.start.done)) : seconds(spent));
-        if (spent >= LANDS.start.done && roast.textContent === OTHERS.start.still) roast.replaceWith((roast = wrapped(OTHERS.start.roast(QUESTION), "small", "on_surface_variant")));
+        if (spent < LANDS.start.done) return;
+        start.settle();
+        if (roast.textContent === OTHERS.start.still) roast.replaceWith((roast = wrapped(OTHERS.start.roast(QUESTION), "small", "on_surface_variant")));
       };
       if (reduced || state.raceAt !== undefined) return at(reduced ? LANDS.start.done : (state.raceAt ?? 0));
       at(0);

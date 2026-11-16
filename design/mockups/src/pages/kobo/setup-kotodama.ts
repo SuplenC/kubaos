@@ -47,7 +47,7 @@ const TO_YOURS = turning("Why → Yours", "Why slides off; Yours slides in, the 
 const TO_TRY = turning("Yours → Try it", "Yours slides off; Try it slides in, the menu shut until its keys.", "try<2");
 const BACK_STEP = turning("Back a step", "Back or Esc: Yours slides off to the right; Why slides back in.", "why<2", false);
 
-const lane = (name: string) => `.setup-kotodama-lane[data-lane="${name}"]`;
+const lane = (name: string) => `[data-lane="${name}"]`;
 
 /**
  * The race, after the question's last key is let go: Kotodama's clock has stopped at once; the
@@ -61,7 +61,7 @@ const RACE: Move = {
     { part: "Start's web rows", on: "Start", target: `${lane("start")} .setup-kotodama-answers > :first-child`, property: "opacity", from: 0, to: 1, duration: "long", cue: ["slow", "micro"] as unknown as NonEmpty<"slow">, curve: "emphasized_decel" },
     { part: "Start's ad", on: "Start", target: `${lane("start")} .setup-kotodama-ad`, property: "opacity", from: 0, to: 1, duration: "long", cue: ["scene", "long"] as unknown as NonEmpty<"scene">, curve: "emphasized_decel" },
   ] as unknown as NonEmpty<Track<Easing>>,
-  reduced: [{ part: "the lanes", on: "the race", target: ".setup-kotodama-lane", property: "opacity", from: 1, to: 1, duration: "instant", curve: "standard" }],
+  reduced: [{ part: "the lanes", on: "the race", target: ".setup-kotodama-race", property: "opacity", from: 1, to: 1, duration: "instant", curve: "standard" }],
   back: "cuts",
   sample: at("why"),
 };
