@@ -30,7 +30,7 @@ import { iconButton } from "./icon-button.ts";
 import { icon, missingIcon } from "./icon.ts";
 import { iconTile } from "./icon-tile.ts";
 import { keycap, keys } from "./keycap.ts";
-import { filling, row, stack } from "./layout.ts";
+import { filling, grid, row, stack } from "./layout.ts";
 import { declare, FIXED_HEIGHT, probe, scrolls, variant } from "./probe.ts";
 import { skeleton } from "./skeleton.ts";
 import { switchControl } from "./switch.ts";
@@ -283,8 +283,8 @@ export interface ListOptions {
   /** What taking a row does, by its index among the rows. */
   readonly onTake?: (index: number) => void;
   /**
-   * Its rows flow into as many columns, half a text column wide at least, as its width holds; a
-   * label or a note spans them all. ↑ ↓ move to the row above or below, ← → to the one before or
+   * Its rows flow into as many columns, two thirds of a text column wide at least, as its width
+   * holds, each line of them a grid of whole-pixel columns; a label or a note stands between. ↑ ↓ move to the row above or below, ← → to the one before or
    * after, and Space takes a row as Enter does: a list of things to tick, as first boot's apps.
    */
   readonly flow?: boolean;
@@ -308,6 +308,41 @@ export function flush(box: HTMLElement): HTMLElement {
   box.dataset.flush = "";
   const role = JSON.parse(box.dataset.probe ?? "{}");
   return probe(box, { ...role, variant: "Flush" });
+}
+
+/**
+ * `items` laid in lines of as many columns as `column`'s width holds, each two thirds of a text
+ * column at least and `space.s16` apart, a line a `grid` so its columns are whole device pixels; a
+ * label or a note stands alone between the lines. Laid out again only when the count changes.
+ */
+function flowing(column: HTMLElement, items: readonly HTMLElement[], box: HTMLElement): void {
+  let shown = 1;
+  const arrange = () => {
+    const scale = scaleOf(box);
+    const least = ((length("size-column") * 2) / 3) * scale;
+    const gap = length("space-s16") * scale;
+    const count = Math.max(1, Math.floor((column.clientWidth + gap) / (least + gap)));
+    if (count === shown) return;
+    shown = count;
+    const lines: HTMLElement[] = [];
+    let line: HTMLElement[] = [];
+    const close = () => {
+      if (line.length > 0) lines.push(count === 1 ? line[0]! : filling(grid(count, "s16", line)));
+      line = [];
+    };
+    for (const item of items) {
+      if (!item.classList.contains("k-list-row")) {
+        close();
+        lines.push(item);
+        continue;
+      }
+      line.push(item);
+      if (count === 1 || line.length === count) close();
+    }
+    close();
+    column.replaceChildren(...lines);
+  };
+  new ResizeObserver(arrange).observe(column);
 }
 
 /** The rows `space.s4` apart, as the well holds them. */
@@ -553,6 +588,7 @@ export function listWith(specs: readonly ListItem[], options: ListOptions = {}):
   const column = rowStack(items);
   const box = well("List", column);
   box.toggleAttribute("data-flow", options.flow ?? false);
+  if (options.flow) flowing(column, items, box);
   const keys = listRows(box, null, () => items, options);
   const replaceRow = (index: number, spec: ListRowSpec) => {
     const old = items[index]!;

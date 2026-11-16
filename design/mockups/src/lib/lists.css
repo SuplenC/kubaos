@@ -718,15 +718,3 @@
   border-radius: var(--radius-full);
   background: var(--color-primary);
 }
-
-/* A list whose rows flow into columns (`flow`): as many as its width holds, each half a text column
-   wide at least, `space.s4` apart down and `space.s16` across; a label or a note spans them all. */
-.k-list[data-flow] > .k-list-rows {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--size-column) / 2)), 1fr));
-  gap: var(--space-s4) var(--space-s16);
-}
-
-.k-list[data-flow] > .k-list-rows > :is(.k-list-label, .k-list-note) {
-  grid-column: 1 / -1;
-}
