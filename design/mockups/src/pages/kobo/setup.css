@@ -504,8 +504,9 @@
 }
 
 /* Key cards: each title on one line; three across while they fit, fewer under it. */
+/* Opens with's cards, one under another, closer than a group's cards stand. */
 .setup-kotodama-keycards {
-  --tracks: repeat(auto-fit, minmax(calc(var(--size-rail) - var(--space-s20)), 1fr));
+  gap: var(--space-s8);
 }
 
 .setup-kotodama-keycards .k-card-title {
@@ -524,4 +525,91 @@
 
 .setup-kotodama-choice > :last-child {
   flex: none;
+}
+
+/* The ad's button answers back: its card shows only once pressed (`fakeAd`), never on hover. It
+   stretches across the ad as the button did. */
+.setup-kotodama-ad-reply {
+  display: flex;
+}
+
+.setup-kotodama-ad-reply > .k-button {
+  flex: 1 1 0;
+}
+
+.setup-kotodama-ad-reply.k-tip-anchor:has(> .k-control:is(:hover, :focus-visible)) > .k-tooltip:not([data-shown]) {
+  opacity: 0;
+}
+
+.setup-kotodama-ad-reply > .k-tooltip {
+  z-index: 4;
+  white-space: nowrap;
+}
+
+/* Yours (draft): what it finds on the left, the options on the right, each column scrolling on its
+   own where it is short; stacked, the list first, where the room is too narrow for both. */
+.setup-kotodama-yours {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--space-s40);
+  min-height: 0;
+  height: 100%;
+}
+
+.setup-kotodama-yours[data-stacked] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  overflow-y: auto;
+}
+
+.setup-kotodama-finds,
+.setup-kotodama-options {
+  min-height: 0;
+}
+
+.setup-kotodama-finds {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The engines: rows of a grab handle, a name and a switch; a lifted one stands out; disabled, the
+   whole list recedes and takes no pointer. */
+.setup-kotodama-engines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.setup-kotodama-engines[data-disabled] {
+  opacity: var(--opacity-disabled_content);
+  pointer-events: none;
+}
+
+.setup-kotodama-engine {
+  box-sizing: border-box;
+  min-height: var(--size-control_md);
+  padding: 0 var(--space-s12) 0 var(--space-s8);
+  border-radius: var(--radius-row);
+  background: var(--color-surface_container);
+  outline: none;
+}
+
+.setup-kotodama-engine:focus-visible {
+  box-shadow: inset 0 0 0 var(--focus-tube) var(--color-cold), 0 0 var(--focus-near) rgb(from var(--color-cold) r g b / var(--focus-near_opacity));
+}
+
+.setup-kotodama-engine[data-lifted] {
+  background: var(--color-surface_container_highest);
+  box-shadow: 0 var(--space-s8) var(--space-s24) rgb(from var(--color-surface_container_lowest) r g b / var(--opacity-scrim));
+}
+
+.setup-kotodama-grab {
+  cursor: grab;
+  touch-action: none;
+}
+
+.setup-kotodama-engine[data-lifted] .setup-kotodama-grab {
+  cursor: grabbing;
 }

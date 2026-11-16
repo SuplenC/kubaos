@@ -10,7 +10,7 @@ import type { ListRowSpec } from "../../lib/list.ts";
 import type { Run } from "../../lib/text.ts";
 
 /** Which of Kotodama's Extensions an Item comes from, as the card's switches name them. */
-export type Finds = "apps" | "actions" | "projects" | "windows" | "clipboard" | "emoji" | "calculator";
+export type Finds = "apps" | "actions" | "projects" | "windows" | "system" | "clipboard" | "emoji" | "calculator";
 
 /** One Item: its words, symbol, Extension and what running it says. */
 export interface MenuItem {
@@ -53,6 +53,8 @@ export const MENU_ITEMS: readonly MenuItem[] = [
   { id: "kotodama", title: "kotodama", subtitle: "~/Projects/kotodama", icon: "folder_open", finds: "projects", kind: "Project", keywords: ["repo", "code"], verb: "Open", said: "kotodama opens in its tmux session." },
   { id: "window", title: "Firefox: Issues · kubaos", subtitle: "Workspace 2", icon: "desktop_windows", finds: "windows", kind: "Window", keywords: ["window", "switch"], verb: "Go to", said: "There it is, on workspace 2." },
   { id: "bind", title: "Move window to workspace 3", subtitle: "Super + Shift + 3 does it too", icon: "keyboard_command_key", finds: "windows", kind: "Bind", keywords: ["bind", "shortcut"], verb: "Run", said: "Moved." },
+  { id: "lock", title: "Lock Screen", subtitle: "Lock the session; logind tells the locker", icon: "lock", finds: "system", kind: "Power", keywords: ["lock", "away"], verb: "Run", said: "Locked. Off you go." },
+  { id: "suspend", title: "Suspend", subtitle: "Sleep until a key is pressed", icon: "bedtime", finds: "system", kind: "Power", keywords: ["sleep"], verb: "Run", said: "Good night." },
   { id: "clipboard", title: "Clipboard history", subtitle: "What you copied, newest first", icon: "content_paste", finds: "clipboard", kind: "App", keywords: ["paste", "copy"], verb: "Open", said: "Your clipboard, newest first." },
   { id: "emoji", title: "Emoji", subtitle: "Search them by name; Enter types it", icon: "mood", finds: "emoji", kind: "App", keywords: ["smiley", "face"], verb: "Open", said: "The emoji, by name." },
 ];
@@ -63,21 +65,22 @@ export interface MenuSettings {
   apps: boolean;
   slides: boolean;
   web: boolean;
-  engine: number;
+  /** `[extensions.web-search] engines`, in the menu's order, each offered or not. */
+  readonly engines: { readonly name: string; on: boolean }[];
   typos: boolean;
   comma: boolean;
   readonly finds: Record<Exclude<Finds, "apps">, boolean>;
 }
 
 export function defaultSettings(): MenuSettings {
-  return { key: "super-space", apps: true, slides: true, web: true, engine: 0, typos: true, comma: false, finds: { actions: true, projects: true, windows: true, clipboard: true, emoji: true, calculator: true } };
+  return { key: "super-space", apps: true, slides: true, web: true, engines: ENGINES.map((name) => ({ name, on: true })), typos: true, comma: false, finds: { actions: true, projects: true, windows: true, system: true, clipboard: true, emoji: true, calculator: true } };
 }
 
 /** The keys that open it: Kotodama has no such setting yet; KubaOS binds Super + Space. */
 export const OPENS_WITH = [
   { id: "super-space", keys: "Super+Space", title: "Super + Space", line: "The default" },
-  { id: "alt-space", keys: "Alt+Space", title: "Alt + Space", line: "Keyboards without Super" },
-  { id: "super", keys: "Super", title: "Super, tapped alone", line: "Like Start. Your call" },
+  { id: "alt-space", keys: "Alt+Space", title: "Alt + Space", line: "For keyboards without Super" },
+  { id: "super", keys: "Super", title: "Super, tapped alone", line: "Tapped alone, like Start" },
 ] as const;
 
 /** `[extensions.web-search] engines`, in Kotodama's order. */
@@ -213,7 +216,7 @@ export function search(typed: string, settings: MenuSettings, rows: number): Fou
     .sort((a, b) => a.hit.tier - b.hit.tier || (kinds[a.item.kind] ?? 2) - (kinds[b.item.kind] ?? 2) || a.item.title.length - b.item.title.length);
   for (const { item, hit } of matches) out.push(found(row(item.title, hit.tier === 4 ? `${item.subtitle} · a typo away` : item.subtitle, item.icon, hit.runs), item.kind, item.verb, item.said, { item }));
   if (settings.web && out.length < rows) {
-    const order = [ENGINES[settings.engine]!, ...ENGINES.filter((_, at) => at !== settings.engine)];
+    const order = settings.engines.filter((each) => each.on).map((each) => each.name);
     for (const engine of order.slice(0, Math.min(2, rows - out.length))) out.push(found(row(`Search ${engine} for “${typed.trim()}”`, "Below what is here, never instead of it", "travel_explore"), "Web search", "Open", `${engine} opens in Firefox. Your call, not mine.`));
   }
   return out;
@@ -259,4 +262,5 @@ export const AD = {
   // (the pointer on it) gets the answer.
   fine: ["*€49.99 a month.", "Bofa", "terms apply."],
   fineAnswer: "Bofa deez nuts",
+  reply: "You seriously clicked on that?",
 } as const;

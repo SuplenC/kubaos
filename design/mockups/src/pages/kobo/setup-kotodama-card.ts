@@ -18,7 +18,8 @@ import { collapsible } from "../../lib/collapsible.ts";
 import { field, setValue } from "../../lib/field.ts";
 import { icon } from "../../lib/icon.ts";
 import { type KeyHint, keycap, keyHints, keys } from "../../lib/keycap.ts";
-import { fill, filling, fillingHeight, flow, gap, row, splitColumns, stack } from "../../lib/layout.ts";
+import { fill, filling, fillingHeight, gap, row, splitColumns, stack } from "../../lib/layout.ts";
+import { type ListRowSpec, listWith } from "../../lib/list.ts";
 import { commandMenu, type MenuMeasures } from "../../lib/list-detail.ts";
 import { scroll } from "../../lib/scroll.ts";
 import { spinner } from "../../lib/spinner.ts";
@@ -34,7 +35,7 @@ import { bezier, milliseconds } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
 import { body } from "./kobo-parts.ts";
 import { CARDS } from "./setup-cards.ts";
-import { AD, defaultSettings, ENGINES, type Found, LANDS, type MenuSettings, OPENS_WITH, OTHERS, QUESTION, search } from "./setup-kotodama-data.ts";
+import { AD, defaultSettings, type Found, LANDS, type MenuSettings, OPENS_WITH, OTHERS, QUESTION, search } from "./setup-kotodama-data.ts";
 
 /** The card's steps, by their index. */
 export const STEPS = ["What", "Why", "Yours", "Try it"] as const;
@@ -67,6 +68,8 @@ export interface Kotodama {
   readonly raceAt?: number;
   /** The ad's asked word with its answer shown, as under the pointer: a sample of the tip. */
   readonly tip?: boolean;
+  /** The ad's button just pressed, its reply shown: a sample of it. */
+  readonly reply?: boolean;
   passed: boolean;
 }
 
@@ -92,6 +95,8 @@ export function kotodamaAt(view: string): Kotodama {
       return base(1, { raceAt: 3300 });
     case "why-tip":
       return base(1, { raceAt: 5800, tip: true });
+    case "why-reply":
+      return base(1, { raceAt: 5800, reply: true });
     case "yours":
       return base(2);
     case "yours-more":
@@ -416,7 +421,7 @@ function startGroups(q: string): Group[] {
  * Draft part, to be promoted: the ad Start raises over its answers, loud in the warning and error
  * tones, an invented cleaner for a PC that is fine.
  */
-function fakeAd(tipShown = false): HTMLElement {
+function fakeAd(tipShown = false, replyShown = false): HTMLElement {
   const tag = document.createElement("span");
   tag.className = "setup-kotodama-ad-tag";
   tag.append(text(AD.tag, "label", "burn_warning"));
@@ -438,7 +443,19 @@ function fakeAd(tipShown = false): HTMLElement {
   const term = floatingTooltip(asked, tooltip(AD.fineAnswer, ""), { side: "above", shown: tipShown });
   term.classList.add("setup-kotodama-ad-term");
   fine.replaceChildren(`${AD.fine[0]} `, term, ` ${AD.fine[2]}`);
-  const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "subheading", "on_burn_warning")), filling(product), filling(stars), filling(go), filling(fine));
+  // Draft part, to be promoted: the button answers back. A press shows its card above it for two
+  // holds, then it goes; the next press starts it again. Nothing else happens.
+  const reply = tooltip(AD.reply, "");
+  const answering = floatingTooltip(go, reply, { side: "above", shown: replyShown });
+  answering.classList.add("setup-kotodama-ad-reply");
+  let gone = 0;
+  go.addEventListener("click", () => {
+    window.clearTimeout(gone);
+    reply.removeAttribute("data-shown");
+    requestAnimationFrame(() => reply.setAttribute("data-shown", ""));
+    gone = window.setTimeout(() => reply.removeAttribute("data-shown"), ms("hold") * 2);
+  });
+  const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "subheading", "on_burn_warning")), filling(product), filling(stars), filling(answering), filling(fine));
   ad.classList.add("setup-kotodama-ad");
   return ad;
 }
@@ -502,6 +519,98 @@ function switchRow(title: string, line: string, on: boolean, turned: (on: boolea
   const control = switchControl({ on });
   control.addEventListener("click", () => queueMicrotask(() => turned(control.getAttribute("aria-checked") === "true")));
   return row("s12", "centre", filling(stack(0, "start", text(title, "body"), filling(wrapped(line, "small", "on_surface_variant")))), control);
+}
+
+/** What the menu searches, a row each on Yours: the Extensions KubaOS turns on, as they are. */
+const SOURCES = [
+  { id: "apps", title: "Apps", line: "Installed apps by name · firefox", icon: "desktop_windows" },
+  { id: "actions", title: "Settings and actions", line: "Wi-Fi, volume, updates · wifi", icon: "settings" },
+  { id: "projects", title: "Projects and scripts", line: "~/Projects and ~/Scripts · kubaos", icon: "folder_open" },
+  { id: "windows", title: "Windows and key binds", line: "Open windows, every shortcut", icon: "keyboard_command_key" },
+  { id: "system", title: "Power and session", line: "Lock, suspend, reboot · lock", icon: "power_settings_new" },
+  { id: "clipboard", title: "Clipboard history", line: "What you copied this week · clip", icon: "content_paste" },
+  { id: "emoji", title: "Emoji", line: "By name or keyword · fire", icon: "mood" },
+  { id: "calculator", title: "Sums", line: "Units, money, dates · 5 km in mi", icon: "calculate" },
+  { id: "web", title: "Web search", line: "Only when nothing here matches", icon: "travel_explore" },
+] as const;
+
+/**
+ * `content` in a scroll of its own, which fills its column's height: its thumb inside its own
+ * box, the page's gap kept clear of the band (`kobo.css`).
+ */
+function scrolling(content: HTMLElement): HTMLElement {
+  const padded = stack(0, "start", filling(content));
+  padded.classList.add("kobo-scrolled");
+  const { box } = scroll(padded, { height: "100%", below: "s24", noGutter: true, fade: "s24", footFade: true });
+  box.classList.add("kobo-scrolls");
+  return box;
+}
+
+/**
+ * Draft part, to be promoted: the engines, a list in the menu's order, each with a grab handle, its
+ * name and a switch. A row is dragged by its handle, the others gliding out of its way over
+ * `medium`; Alt + ↑ or ↓ moves the focused row a place. Disabled while the web search is off.
+ */
+function engineList(prefs: MenuSettings): { box: HTMLElement; setDisabled: (off: boolean) => void } {
+  const box = document.createElement("span");
+  box.className = "setup-kotodama-engines";
+  const rows = new Map<string, HTMLElement>();
+  const order = () => prefs.engines.map((each) => rows.get(each.name)!);
+  /** Puts the rows in the settings' order, each gliding from where it was (reduced: at once). */
+  const place = (focus?: HTMLElement) => {
+    const before = new Map(order().map((each) => [each, each.getBoundingClientRect().top]));
+    box.replaceChildren(...order());
+    if (!settings().reduced)
+      for (const [each, top] of before) {
+        const by = top - each.getBoundingClientRect().top;
+        if (by !== 0) each.animate([{ translate: `0 ${by}px` }, { translate: "0 0" }], { duration: ms("medium"), easing: curve("standard_decel") });
+      }
+    focus?.focus({ preventScroll: true });
+  };
+  const move = (name: string, by: number) => {
+    const from = prefs.engines.findIndex((each) => each.name === name);
+    const to = Math.max(0, Math.min(prefs.engines.length - 1, from + by));
+    if (from === to) return;
+    const [taken] = prefs.engines.splice(from, 1);
+    prefs.engines.splice(to, 0, taken!);
+    place(rows.get(name));
+  };
+  for (const engine of prefs.engines) {
+    const handle = icon("swap_vert", "var(--type-body-icon)", "var(--color-on_surface_variant)");
+    handle.classList.add("setup-kotodama-grab");
+    const control = switchControl({ on: engine.on });
+    control.addEventListener("click", () => queueMicrotask(() => (engine.on = control.getAttribute("aria-checked") === "true")));
+    const line = row("s12", "centre", handle, filling(text(engine.name, "body")), control);
+    line.classList.add("setup-kotodama-engine");
+    line.tabIndex = 0;
+    line.addEventListener("keydown", (event) => {
+      if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+      event.preventDefault();
+      move(engine.name, event.key === "ArrowUp" ? -1 : 1);
+    });
+    handle.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      line.dataset.lifted = "";
+      const pitch = line.getBoundingClientRect().height;
+      let start = event.clientY;
+      const follow = (moved: PointerEvent) => {
+        const by = Math.round((moved.clientY - start) / pitch);
+        if (by === 0) return;
+        move(engine.name, by);
+        start += by * pitch;
+      };
+      const drop = () => {
+        delete line.dataset.lifted;
+        window.removeEventListener("pointermove", follow);
+        window.removeEventListener("pointerup", drop);
+      };
+      window.addEventListener("pointermove", follow);
+      window.addEventListener("pointerup", drop);
+    });
+    rows.set(engine.name, line);
+  }
+  box.append(...order());
+  return { box, setDisabled: (off) => box.toggleAttribute("data-disabled", off) };
 }
 
 export function kotodamaCard(view: string): KotodamaCard {
@@ -592,7 +701,7 @@ export function kotodamaCard(view: string): KotodamaCard {
     const race = () => {
       stop();
       const reduced = settings().reduced;
-      const ad = fakeAd(state.tip ?? false);
+      const ad = fakeAd(state.tip ?? false, state.reply ?? false);
       const start = otherMenu(QUESTION, startGroups(QUESTION), OTHERS.start.searching, { over: ad, covers: 4 });
       // Kotodama's lane fills its rows with what is on the machine: no web rows under it here.
       const ours = standIn({ ...prefs, web: false }, { live: false, query: QUESTION, hints: [["↑↓", "Select"], ["Enter", "Run"]], took: OTHERS.kotodama.stopped });
@@ -665,12 +774,37 @@ export function kotodamaCard(view: string): KotodamaCard {
   const yours = (): HTMLElement => {
     // Each setting applies to the menu at once; it is tried in the menu itself, on Try it or with
     // its keys from here, so this step shows no preview of its own.
+
+    // Left: what it finds, a row a source, each switched on or off.
+    const sources = SOURCES.map((each) => ({ ...each, on: () => (each.id === "web" ? prefs.web : each.id === "apps" ? prefs.apps : prefs.finds[each.id]) }));
+    const spec = (each: (typeof sources)[number]): ListRowSpec => ({ title: each.title, subtitle: each.line, icon: each.icon, tile: true, accent: each.on(), toggle: each.on() });
+    const findsList = listWith(sources.map(spec), {
+      onTake: (at) => {
+        const each = sources[at];
+        if (!each) return;
+        const now = !each.on();
+        if (each.id === "web") setWeb(now);
+        else if (each.id === "apps") prefs.apps = now;
+        else prefs.finds[each.id] = now;
+        findsList.replaceRow(at, spec(each));
+      },
+    });
+    findsList.box.addEventListener("keydown", (event) => {
+      if (event.key !== " ") return;
+      event.preventDefault();
+      const current = findsList.rows.current();
+      if (current) current.click();
+    });
+    const left = stack("s8", "start", heading("It finds"), fillingHeight(filling(scrolling(findsList.box))));
+    left.classList.add("setup-kotodama-finds");
+
+    // Right: the options.
     const cards = OPENS_WITH.map((each) => {
-      const card = choiceCard({ title: each.title, subtitle: each.line, picks: "one", picked: prefs.key === each.id });
-      card.querySelector(".k-card-header, .k-card-title-line")?.parentElement?.prepend(caps(each.keys));
+      const card = choiceCard({ title: each.line, picks: "one", picked: prefs.key === each.id });
+      card.querySelector(".k-card-title-line")?.prepend(caps(each.keys));
       return card;
     });
-    const keysGroup = choiceGroup("one", 3, cards);
+    const keysGroup = choiceGroup("one", 1, cards);
     keysGroup.classList.add("setup-kotodama-keycards");
     keysGroup.addEventListener("click", () =>
       queueMicrotask(() => {
@@ -679,29 +813,18 @@ export function kotodamaCard(view: string): KotodamaCard {
         recheck();
       }),
     );
-    const finds = (
-      [
-        ["apps", "Apps"],
-        ["actions", "Settings and actions"],
-        ["projects", "Projects and scripts"],
-        ["windows", "Windows and key binds"],
-        ["clipboard", "Clipboard history"],
-        ["emoji", "Emoji"],
-        ["calculator", "Sums"],
-      ] as const
-    ).map(([id, label]) => {
-      const on = id === "apps" ? prefs.apps : prefs.finds[id];
-      const each = chip({ label, press: "toggle", on, kind: "Accent", icon: "check" });
-      each.addEventListener("click", () =>
-        queueMicrotask(() => {
-          const now = each.getAttribute("aria-pressed") === "true";
-          if (id === "apps") prefs.apps = now;
-          else prefs.finds[id] = now;
-        }),
-      );
-      return each;
-    });
-    const engine = tabs({ choices: ENGINES.map((label) => ({ label })), picked: prefs.engine, onPick: (at) => (prefs.engine = at) });
+    const engines = engineList(prefs);
+    const webSwitch = switchRow("Offer a web search", "Rows at the bottom, in this order, never a guess", prefs.web, (on) => setWeb(on));
+    /** The master switch and the Web search row say the same thing: either turns both. */
+    const setWeb = (on: boolean) => {
+      prefs.web = on;
+      engines.setDisabled(!on);
+      const control = webSwitch.querySelector<HTMLElement>(".k-switch");
+      if (control && (control.getAttribute("aria-checked") === "true") !== on) control.click();
+      const at = sources.findIndex((each) => each.id === "web");
+      if (at >= 0 && findsList.box.isConnected) findsList.replaceRow(at, spec(sources[at]!));
+    };
+    engines.setDisabled(!prefs.web);
     const motion = tabs({ choices: [{ label: "Full" }, { label: "Fades" }], picked: prefs.slides ? 0 : 1, onPick: (at) => (prefs.slides = at === 0) });
     const mark = tabs({ choices: [{ label: "1.5" }, { label: "1,5" }], picked: prefs.comma ? 1 : 0, onPick: (at) => (prefs.comma = at === 1) });
     /** A setting's words and its choice: side by side, the choice going under them when short. */
@@ -710,48 +833,36 @@ export function kotodamaCard(view: string): KotodamaCard {
       line.classList.add("setup-kotodama-choice");
       return line;
     };
-    const web = stack(
-      "s12",
-      "start",
-      heading("When nothing here matches"),
-      filling(switchRow("Offer a web search", "Rows at the bottom, never a guess", prefs.web, (on) => (prefs.web = on))),
-      filling(choiceRow(text("First with", "body"), engine)),
-    );
-    const typing = stack(
-      "s12",
-      "start",
-      heading("Typing and motion"),
-      filling(switchRow("Forgive typos", "“fierfox” finds Firefox", prefs.typos, (on) => (prefs.typos = on))),
-      filling(choiceRow(text("Motion", "body"), motion)),
-    );
     const files = button({ label: "Open in Files", kind: "Text", size: "Sm" });
+    // Typing and motion go into More with the rest: the engines' list takes their room.
     const more = collapsible({
       title: "More",
-      summary: "Decimal mark, aliases, the file",
+      summary: "Typos, motion, the file",
       open: state.more,
-      content: splitColumns([1, 1], "s24", [
+      content: stack(
+        "s12",
+        "start",
+        filling(switchRow("Forgive typos", "“fierfox” finds Firefox", prefs.typos, (on) => (prefs.typos = on))),
+        filling(choiceRow(stack(0, "start", text("Motion", "body"), filling(wrapped("Fades alone: nothing slides", "small", "on_surface_variant"))), motion)),
         filling(choiceRow(stack(0, "start", text("Decimal mark", "body"), filling(wrapped("How sums write a half", "small", "on_surface_variant"))), mark)),
-        filling(stack("s4", "start", text("Aliases, quicklinks, your own actions", "body"), filling(wrapped("All in one file: user.toml", "small", "on_surface_variant")), files)),
-      ]),
+        filling(choiceRow(stack(0, "start", text("Aliases, quicklinks, your own actions", "body"), filling(wrapped("All in one file: user.toml", "small", "on_surface_variant"))), files)),
+      ),
     });
     const section = (title: string, ...content: HTMLElement[]) => stack("s8", "start", heading(title), ...content.map(filling));
-    // One rhythm and one left edge across the whole body: a section's title, its controls, then
-    // `space.s20` to the next.
-    const settingsColumn = stack(
-      "s20",
-      "start",
-      filling(section("Opens with", keysGroup)),
-      filling(section("It finds", flow("s8", ...finds))),
-      filling(splitColumns([1, 1], "s40", [filling(web), filling(typing)])),
-      filling(more),
-    );
-    // Where the room is short, the settings scroll, kept `space.s24` clear of the band as every
-    // Kōbō page's body is (`kobo.css`).
-    const padded = stack(0, "start", filling(settingsColumn));
-    padded.classList.add("kobo-scrolled");
-    const { box } = scroll(padded, { height: "100%", below: "s24", noGutter: true, fade: "s24", footFade: true });
-    box.classList.add("kobo-scrolls");
-    return box;
+    const options = stack("s20", "start", filling(section("Opens with", keysGroup)), filling(section("When nothing here matches", webSwitch, engines.box)), filling(more));
+    const right = scrolling(options);
+    right.classList.add("setup-kotodama-options");
+
+    // Draft part, to be promoted: the two columns, side by side where both read whole, the list
+    // first under it.
+    const room = document.createElement("span");
+    room.className = "setup-kotodama-yours";
+    room.append(left, right);
+    new ResizeObserver(() => {
+      const scale = Number.parseFloat(getComputedStyle(room).getPropertyValue("--scale")) || settings().scale;
+      room.toggleAttribute("data-stacked", room.clientWidth / scale < length("size-column") * 1.25);
+    }).observe(room);
+    return room;
   };
 
   // --------------------------------------------------------------- Try it --
@@ -934,7 +1045,7 @@ export function kotodamaCard(view: string): KotodamaCard {
     body: draw,
     hints: (): readonly KeyHint[] => {
       if (state.step === 1) return [["Enter", "race again"], ["Esc", "back a step"]];
-      if (state.step === 2) return [["← →", "pick a key"], ["Space", "switch it"], ["Tab", "next field"]];
+      if (state.step === 2) return [["Space", "switch it"], ["Alt+↑↓", "move an engine"], ["Tab", "next field"]];
       if (state.step === 3) return [[KEY_OF[prefs.key], "open it"], ["Enter", "run it"], ["Esc", "close it"]];
       return [[KEY_OF[prefs.key], "open it"], ["↑ ↓", "pick a Result"], ["Enter", "run it"]];
     },
