@@ -791,7 +791,7 @@ fn remove_item(standing: &Standing) -> Item {
     )
 }
 
-/// "Configure LazyVim", for an installed app with a configure stage: KubaOS's defaults for it
+/// "Configure Penpot", for an installed app with a configure stage: KubaOS's defaults for it
 /// again.
 fn configure_item(app: &AppStatus) -> Item {
     let title = format!("Configure {}", app.name);

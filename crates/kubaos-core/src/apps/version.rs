@@ -54,8 +54,8 @@ fn parts(version: &str) -> (u64, &str, &str) {
 fn part(a: &str, b: &str) -> Ordering {
     let (mut a, mut b) = (a.as_bytes(), b.as_bytes());
     while !a.is_empty() || !b.is_empty() {
-        let (a_text, a_rest) = split(a, |c| !c.is_ascii_digit());
-        let (b_text, b_rest) = split(b, |c| !c.is_ascii_digit());
+        let (a_text, a_tail) = split(a, |c| !c.is_ascii_digit());
+        let (b_text, b_tail) = split(b, |c| !c.is_ascii_digit());
         let longest = a_text.len().max(b_text.len());
         for i in 0..=longest {
             let order = weight(a_text.get(i).copied()).cmp(&weight(b_text.get(i).copied()));
@@ -63,13 +63,13 @@ fn part(a: &str, b: &str) -> Ordering {
                 return order;
             }
         }
-        let (a_digits, a_next) = split(a_rest, |c| c.is_ascii_digit());
-        let (b_digits, b_next) = split(b_rest, |c| c.is_ascii_digit());
+        let (a_digits, a_after) = split(a_tail, |c| c.is_ascii_digit());
+        let (b_digits, b_after) = split(b_tail, |c| c.is_ascii_digit());
         let order = number(a_digits).cmp(&number(b_digits));
         if order != Ordering::Equal {
             return order;
         }
-        (a, b) = (a_next, b_next);
+        (a, b) = (a_after, b_after);
     }
     Ordering::Equal
 }
