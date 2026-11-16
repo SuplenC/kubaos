@@ -16,9 +16,10 @@
 # install leaves an app that is there alone: a .deb at its pinned version, or one that updates
 # itself at any version. An apt app for another architecture is refused. remove takes the apps'
 # packages away with apt, keeping their configuration, and leaves the vendor repository in place.
-# An app whose manifest names a setup gets install_<setup> from system/lib.sh after the install
-# and remove_<setup> before the removal, for the user who asked: what it needs beyond its
-# packages, such as a group or a systemd unit.
+# An app whose manifest names system_hooks gets install_<hooks> from system/lib.sh after the
+# install, and remove_<hooks> once its packages are gone, for the user who asked: what it needs
+# on the system beyond its packages, such as a group or a systemd unit. A removal apt refuses
+# leaves them in place.
 #
 # `kubaos app add|remove` run it through pkexec (polkit action org.kubaos.apps,
 # system/files/polkit/), one prompt per run; kubaos update runs it through sudo. Installed as
@@ -91,7 +92,7 @@ for f in "$SYSTEM/lib.sh" "$SYSTEM/manifest.sh" "$SYSTEM/apt-repo.sh" "$SYSTEM/p
 done
 # shellcheck source=system/lib.sh
 source "$SYSTEM/lib.sh"
-# The user who asked, whom an app's setup is for: pkexec names them by uid, and lib.sh takes
+# The user who asked, whom an app's system hooks are for: pkexec names them by uid, and lib.sh takes
 # sudo's SUDO_USER, both set by the program that gave root, never by the caller.
 if ((EUID == 0)) && [[ ${PKEXEC_UID:-} =~ ^[0-9]+$ ]]; then
   TARGET_USER="$(id -nu "$PKEXEC_UID")"
@@ -107,7 +108,7 @@ source_of() {
   manifest_dump "$CATALOG/$1.toml" | awk -F'\t' '$1 == "apt" || $1 == "nix" || $1 == "deb" { print $1; exit }'
 }
 
-declare -A kind setup
+declare -A kind hooks
 for id in "${ids[@]}"; do
   root_only "$CATALOG/$id.toml"
   kind[$id]="$(source_of "$id")"
@@ -127,11 +128,11 @@ for id in "${ids[@]}"; do
   if [[ $verb == install && -n $only && $only != "$(arch)" ]]; then
     refuse "$id is for $only only, and this machine is $(arch)"
   fi
-  setup[$id]="$(app_value "$id" "" setup)"
-  if [[ -n ${setup[$id]} ]]; then
-    [[ ${setup[$id]} =~ ^[a-z][a-z0-9_]{0,63}$ ]] || refuse "$id names a setup that isn't one: ${setup[$id]}"
-    for f in "install_${setup[$id]}" "remove_${setup[$id]}"; do
-      [[ $(type -t "$f") == function ]] || refuse "$id's setup needs $f, which system/lib.sh doesn't define"
+  hooks[$id]="$(app_value "$id" "" system_hooks)"
+  if [[ -n ${hooks[$id]} ]]; then
+    [[ ${hooks[$id]} =~ ^[a-z][a-z0-9_]{0,63}$ ]] || refuse "$id names system hooks that can't be: ${hooks[$id]}"
+    for f in "install_${hooks[$id]}" "remove_${hooks[$id]}"; do
+      [[ $(type -t "$f") == function ]] || refuse "$id's system hooks need $f, which system/lib.sh doesn't define"
     done
   fi
 done
@@ -186,15 +187,22 @@ install_apps() {
     [[ ${kind[$id]} == deb ]] && install_deb "$id"
   done
   for id in "${ids[@]}"; do
-    [[ -z ${setup[$id]} ]] || "install_${setup[$id]}"
+    [[ -z ${hooks[$id]} ]] || "install_${hooks[$id]}"
   done
   ok "installed ${ids[*]}"
+}
+
+# remove_hooks: each app's remove hook, once its packages are gone.
+remove_hooks() {
+  local id
+  for id in "${ids[@]}"; do
+    [[ -z ${hooks[$id]} ]] || "remove_${hooks[$id]}"
+  done
 }
 
 remove_apps() {
   local id p remove=()
   for id in "${ids[@]}"; do
-    [[ -z ${setup[$id]} ]] || "remove_${setup[$id]}"
     case "${kind[$id]}" in
       apt) mapfile -t -O "${#remove[@]}" remove < <(app_value "$id" apt packages) ;;
       deb) remove+=("$(app_value "$id" deb package)") ;;
@@ -205,11 +213,13 @@ remove_apps() {
     pkg_installed "$p" && installed+=("$p")
   done
   if ((${#installed[@]} == 0)); then
+    remove_hooks
     ok "${ids[*]}: not installed"
     return 0
   fi
   sudo_run apt-get remove -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
     "${installed[@]}"
+  remove_hooks
   ok "removed ${ids[*]}"
 }
 
