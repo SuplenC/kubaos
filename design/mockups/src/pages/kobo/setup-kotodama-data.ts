@@ -36,7 +36,7 @@ export const MENU_ITEMS: readonly MenuItem[] = [
   { id: "zed", title: "Zed", subtitle: "Fast editor, written in Rust", icon: "bolt", finds: "apps", kind: "App", keywords: ["editor", "code"], verb: "Open", said: "Zed opens. Go write some Rust." },
   { id: "spotify", title: "Spotify", subtitle: "Music", icon: "music", finds: "apps", kind: "App", keywords: ["music", "songs"], verb: "Open", said: "Spotify opens. Turn it up." },
   { id: "signal", title: "Signal", subtitle: "Chat", icon: "message_circle", finds: "apps", kind: "App", keywords: ["chat", "messages"], verb: "Open", said: "Signal opens." },
-  { id: "wifi", title: "Wi-Fi", subtitle: "Turn Wi-Fi on or off", icon: "wifi", finds: "actions", kind: "Toggle", keywords: ["wireless", "network", "internet", "wlan"], verb: "Turn on or off", said: "Wi-Fi off. Bold move. Enter again turns it back on." },
+  { id: "wifi", title: "Wi-Fi", subtitle: "On · Home-5G. Enter turns it off", icon: "wifi", finds: "actions", kind: "Toggle", keywords: ["wireless", "network", "internet", "wlan"], verb: "Turn on or off", said: "Wi-Fi off. Bold move. Enter again turns it back on." },
   { id: "wifi-networks", title: "Wi-Fi networks", subtitle: "Pick a network, type its password", icon: "wifi_find", finds: "actions", kind: "Action", keywords: ["wireless", "network", "ssid"], verb: "Open", said: "The networks open in the control center." },
   { id: "bluetooth", title: "Bluetooth", subtitle: "Turn Bluetooth on or off", icon: "bluetooth", finds: "actions", kind: "Toggle", keywords: ["headphones", "pair"], verb: "Turn on or off", said: "Bluetooth on." },
   { id: "volume", title: "Set volume", subtitle: "Set the volume, from 0 to 100%", icon: "volume_up", finds: "actions", kind: "Toggle", keywords: ["sound", "audio", "loud"], verb: "Set", said: "Type the number after it: volume 40." },
@@ -59,6 +59,7 @@ export const MENU_ITEMS: readonly MenuItem[] = [
 /** What the card's settings say, read by the search and the menu. */
 export interface MenuSettings {
   key: "super-space" | "alt-space" | "super";
+  apps: boolean;
   slides: boolean;
   web: boolean;
   engine: number;
@@ -68,14 +69,14 @@ export interface MenuSettings {
 }
 
 export function defaultSettings(): MenuSettings {
-  return { key: "super-space", slides: true, web: true, engine: 0, typos: true, comma: false, finds: { actions: true, projects: true, windows: true, clipboard: true, emoji: true, calculator: true } };
+  return { key: "super-space", apps: true, slides: true, web: true, engine: 0, typos: true, comma: false, finds: { actions: true, projects: true, windows: true, clipboard: true, emoji: true, calculator: true } };
 }
 
 /** The keys that open it: Kotodama has no such setting yet; KubaOS binds Super + Space. */
 export const OPENS_WITH = [
-  { id: "super-space", keys: "Super+Space", title: "Default", line: "Same spot as the fruit company's." },
-  { id: "alt-space", keys: "Alt+Space", title: "No Super", line: "For a keyboard without one." },
-  { id: "super", keys: "Super", title: "Super alone", line: "Like Start. Old habits, your call." },
+  { id: "super-space", keys: "Super+Space", title: "Super + Space", line: "The default" },
+  { id: "alt-space", keys: "Alt+Space", title: "Alt + Space", line: "Keyboards without Super" },
+  { id: "super", keys: "Super", title: "Super, tapped alone", line: "Like Start. Your call" },
 ] as const;
 
 /** `[extensions.web-search] engines`, in Kotodama's order. */
@@ -186,7 +187,7 @@ const EMPTY = ["wifi", "firefox", "files", "ghostty", "kubaos", "screenshot", "p
 
 /** The Results for `typed`, best first, `rows` of them filled: the web's rows only fill what is left. */
 export function search(typed: string, settings: MenuSettings, rows: number): Found[] {
-  const shown = (item: MenuItem) => item.finds === "apps" || settings.finds[item.finds];
+  const shown = (item: MenuItem) => (item.finds === "apps" ? settings.apps : settings.finds[item.finds]);
   const query = fold(typed.trim());
   if (!query) return EMPTY.map((id) => MENU_ITEMS.find((item) => item.id === id)!).filter(shown).map((item) => found(row(item.title, item.subtitle, item.icon), item.kind, item.verb, item.said, { item }));
   if (query.startsWith(">")) {
@@ -219,15 +220,15 @@ export function search(typed: string, settings: MenuSettings, rows: number): Fou
 
 // ---------------------------------------------------------------- The race --
 
-/** The questions the race offers to ask all three at once. */
-export const QUESTIONS = ["wifi", "firefox", "volume 40", "12*7"] as const;
+/** The question the race asks all three at the same moment. */
+export const QUESTION = "wifi";
 
-/** When each of the others' answers lands, after the key is let go, at speed 1. */
+/** When each of the others' answers lands, from the moment the key is let go, at speed 1. */
 export const LANDS = {
-  /** Start: its spinner, the web's rows, the ad sliding over them, then the weather. */
-  start: { web: 900, ad: 1700, weather: 2300, done: 2600 },
-  /** Spotlight: thinking, a website, a definition; its indexing never ends. */
-  spotlight: { site: 1100, definition: 1400, done: 1400 },
+  /** Start: the web's rows, its recommendations, the ad rising over them, the weather; then it stops. */
+  start: { web: 1000, recommended: 2000, ad: 3000, weather: 3600, done: 5800 },
+  /** Spotlight: a website and a definition, then a web search; its indexing never ends. */
+  spotlight: { site: 1000, web: 2000, done: 2400 },
 } as const;
 
 /** The others' words, the question's where it goes. */
@@ -235,38 +236,32 @@ export const OTHERS = {
   start: {
     name: "Start",
     searching: "Searching the web for something on your computer",
-    rows: (q: string) => [
-      { title: q, subtitle: "See web results", icon: "world" },
-      { title: `${q} not working`, subtitle: "Search the web", icon: "search" },
-      { title: `${q} near me`, subtitle: "Search the web", icon: "search" },
-    ],
-    weather: { title: "14° and cloudy", subtitle: "In a town you left in 2019", icon: "thermostat" },
-    settled: (seconds: string) => `${seconds}, and an ad`,
-    roast: (q: string) => `Asked for “${q}”: the web, a game nobody installed, the weather. What you wanted is under “Show more”.`,
+    still: "Still searching the web for something on your computer…",
+    stopped: (seconds: string) => `${seconds} · an ad`,
+    roast: (q: string) => `Start, asked for “${q}”: the web, a game, an ad, the weather. What you wanted is under “Show 1 more”.`,
   },
   spotlight: {
     name: "Spotlight",
     indexing: "Indexing. About 2 hours left. It said that yesterday",
-    rows: (q: string) => [
-      { title: `${q.replace(/\s+/g, "")}.com`, subtitle: "Suggested website. You didn't ask", icon: "public" },
-      { title: `${q} (noun)`, subtitle: "A thing you were trying to switch on", icon: "books" },
-    ],
-    settled: (seconds: string) => `${seconds}, still indexing`,
-    roast: () => "Found a website and a definition, and it's still indexing.",
+    still: "Still thinking…",
+    stopped: (seconds: string) => `${seconds} · a website`,
+    roast: "Spotlight found a website and a definition, and it's still indexing.",
   },
   kotodama: {
     name: "Kotodama",
-    settled: "3 ms",
-    roast: () => "The thing itself, first row, before you let go of the key. Nothing left the machine.",
+    stopped: "3 ms",
+    roast: "Kotodama: the thing itself, first row, before you let go of the key. Nothing left the machine.",
   },
 } as const;
 
-/** The ad that slides over Start's answers: a game nobody asked for, installing anyway. */
+/** The ad Start slides over its answers: a cleaner nobody asked for, in every loud colour there is. */
 export const AD = {
+  tag: "AD",
   sponsor: "Sponsored · Recommended for you",
-  title: "Gemfall Kingdoms",
-  line: "The match-three that 9 in 10 grandmas can't put down.",
-  action: "Play free now",
-  small: "Installing anyway",
-  fine: "Free with in-game gems. Gems are not free.",
+  headline: "Your PC is 97% SLOWER than your neighbour's!",
+  product: "QuickBoost Ultra 365",
+  maker: "by Hyperzap Labs · 2,000,000 PCs boosted",
+  rating: "4.9 · “Fixed 4,812 problems”",
+  action: "FIX MY PC NOW · FREE*",
+  fine: "*Then €49.99 a month. Forever. Cancel by fax.",
 } as const;

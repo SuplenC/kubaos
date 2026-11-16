@@ -1,30 +1,31 @@
-// First boot's Kotodama card, as an organism of library parts, in four steps of its own on a
-// Stepper under its title, as Make it yours's are. What: the one key, what to type, Enter, beside
-// the Command menu playing by itself. Why: one question typed into Start, Spotlight and Kotodama at
-// once, raced, each clock running until its answer lands. Yours: the keys that open it, what it
-// finds and the web's place, beside a preview that shows each change. Try it: the menu itself, the
-// real Command menu's parts (`lib/list-detail.ts`), and three things to try that tick off.
+// First boot's Kotodama card, in four steps of its own on a Stepper under its title, as Make it
+// yours's are. What: the one key, what to type and Enter, beside the Command menu playing three asks
+// by itself. Why: one question asked of Start, Spotlight and Kotodama at the same moment, raced,
+// each clock running until its answer lands. Yours: the keys that open it, what it finds, the web's
+// place, beside a preview that follows each change. Try it: three tries that tick off, beside the
+// menu itself, the real Command menu's parts (`lib/list-detail.ts`).
 //
 // Wherever it is, Super tapped alone, as for Start, brings up the other menu for a moment, stamped
 // "Nope.": the old habit met where it happens.
+//
+// A draft: its own parts (the big keys, the examples, the lanes, the parodies, the ad, the clock,
+// the tries, the stamp) live here, each marked, until they are promoted to the library.
 
 import { button } from "../../lib/button.ts";
 import { choiceCard, choiceGroup } from "../../lib/card.ts";
 import { chip } from "../../lib/chip.ts";
 import { collapsible } from "../../lib/collapsible.ts";
-import { descriptionList } from "../../lib/description.ts";
 import { field, setValue } from "../../lib/field.ts";
 import { icon } from "../../lib/icon.ts";
-import { type KeyHint, keycap, keys } from "../../lib/keycap.ts";
-import { fill, filling, fillingHeight, gap, row, splitColumns, stack } from "../../lib/layout.ts";
+import { type KeyHint, keycap, keyHints, keys } from "../../lib/keycap.ts";
+import { fill, filling, fillingHeight, flow, gap, row, splitColumns, stack } from "../../lib/layout.ts";
 import { commandMenu, type MenuMeasures } from "../../lib/list-detail.ts";
-import { list, type ListRowSpec, listLabel, listWith } from "../../lib/list.ts";
-import { progressBar } from "../../lib/progress.ts";
-import { scroll } from "../../lib/scroll.ts";
-import { select } from "../../lib/select.ts";
+import { list, type ListRowSpec, listLabel } from "../../lib/list.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { RECHECK, type RailPage, type RailStatus } from "../../lib/step-rail.ts";
 import { setStep, stepper } from "../../lib/stepper.ts";
+import { switchControl } from "../../lib/switch.ts";
+import { tabs } from "../../lib/tabs.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { toastRoom } from "../../lib/toast.ts";
 import { length } from "../../lib/tokens.ts";
@@ -32,17 +33,17 @@ import { bezier, milliseconds } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
 import { body } from "./kobo-parts.ts";
 import { CARDS } from "./setup-cards.ts";
-import { AD, defaultSettings, ENGINES, figure, type Found, LANDS, type MenuSettings, OPENS_WITH, OTHERS, QUESTIONS, search } from "./setup-kotodama-data.ts";
+import { AD, defaultSettings, ENGINES, type Found, LANDS, type MenuSettings, OPENS_WITH, OTHERS, QUESTION, search } from "./setup-kotodama-data.ts";
 
 /** The card's steps, by their index. */
 export const STEPS = ["What", "Why", "Yours", "Try it"] as const;
 export type StepIndex = 0 | 1 | 2 | 3;
 
-/** What the three things to try are, and how each is done. */
+/** The three tries: what to do, the words typed if any, and what it shows. */
 const TRIES = [
-  { id: "open", spec: (done: boolean): ListRowSpec => ({ title: "Open it", subtitle: "Anywhere, any time", icon: "keyboard_command_key", tile: true, keys: "Super+Space", box: true, checked: done, accent: done }) },
-  { id: "wifi", spec: (done: boolean): ListRowSpec => ({ title: "Type “wifi”, then Enter", subtitle: "A setting, no Settings app", icon: "wifi", tile: true, box: true, checked: done, accent: done }) },
-  { id: "sum", spec: (done: boolean): ListRowSpec => ({ title: "Type “12*7”", subtitle: "Sums answer as you type", icon: "calculate", tile: true, box: true, checked: done, accent: done }) },
+  { id: "open", before: "Open it", typed: "", after: "", line: "Super + Space" },
+  { id: "wifi", before: "Try", typed: "wifi", after: ", then Enter", line: "A setting, no Settings app" },
+  { id: "sum", before: "Try", typed: "12*7", after: "", line: "Sums answer as you type" },
 ] as const;
 
 type TryId = (typeof TRIES)[number]["id"];
@@ -134,18 +135,6 @@ function turn(leaving: HTMLElement | null, arriving: HTMLElement, forward: boole
   }
   if (reduced) arriving.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms("short"), easing: curve("standard"), fill: "backwards" });
   else arriving.animate([{ opacity: 0, "--kotodama-slide": -toward }, { opacity: 1, "--kotodama-slide": 0 }], { duration: ms("long"), delay: ms("short"), easing: curve("emphasized_decel"), fill: "backwards" });
-}
-
-/** Something arriving where it is: it rises `space.s8` and fades in over `long`; reduced, it is there. */
-function arrive(element: Element, delay = 0): void {
-  if (settings().reduced) return;
-  element.animate([{ opacity: 0, translate: "0 var(--space-s8)" }, { opacity: 1, translate: "0 0" }], { duration: ms("long"), delay, easing: curve("emphasized_decel"), fill: "backwards" });
-}
-
-/** What changes under the keys (a tick) fades in over `short`. */
-function changed(element: Element | null): void {
-  if (!element || settings().reduced) return;
-  element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms("short"), easing: curve("standard") });
 }
 
 const wait = (milliseconds: number) => new Promise<void>((done) => window.setTimeout(done, milliseconds));
@@ -241,7 +230,9 @@ function standIn(prefs: MenuSettings, options: { readonly live: boolean; readonl
   const draw = () => {
     if (!measures) return;
     found = search(typed, prefs, measures.rows);
-    const panel = commandMenu({ results: found.map((each) => each.result), query: typed, head, current: Math.min(selected, Math.max(0, found.length - 1)), onTake: run }, measures);
+    const took = text(typed ? "2 ms" : "", "mono", "cold");
+    const foot = row("s8", "centre", keyHints([["↑↓", "Select"], ["Enter", "Run"], ["Esc", "Clear"]]), fill(), took);
+    const panel = commandMenu({ results: found.map((each) => each.result), query: typed, head, current: Math.min(selected, Math.max(0, found.length - 1)), onTake: run, footer: filling(foot) }, measures);
     panel.querySelector(".k-list")?.addEventListener("click", () => queueMicrotask(() => head.focus({ preventScroll: true })));
     box.replaceChildren(panel, room);
   };
@@ -284,78 +275,115 @@ function caps(combination: string): HTMLElement {
   return row("s4", "centre", ...keys(combination).map(keycap));
 }
 
+/**
+ * Draft part, to be promoted: the big keys, a combination as large lit keycaps, `size.control_lg`
+ * tall in `button_large`, each in the primary's tube, a plus between.
+ */
+function bigKeys(combination: string): HTMLElement {
+  const parts = keys(combination).flatMap((key, at) => {
+    const cap = document.createElement("span");
+    cap.className = "setup-kotodama-key";
+    cap.append(text(key, "button_large"));
+    return at === 0 ? [cap] : [text("+", "subheading", "on_surface_variant"), cap];
+  });
+  const line = row("s12", "centre", ...parts);
+  line.classList.add("setup-kotodama-keys");
+  return line;
+}
+
 // ---------------------------------------------------------------- The others --
 
-/** A row of the others': a symbol on its tile and two lines, nothing to take. */
-function otherRow(each: { readonly title: string; readonly subtitle: string; readonly icon: string }): ListRowSpec {
-  return { title: each.title, subtitle: each.subtitle, icon: each.icon, tile: true, tall: true };
+interface Answer {
+  readonly title: string;
+  readonly subtitle?: string;
+  readonly icon: string;
+  readonly ad?: boolean;
+}
+
+/** A row of the others': a symbol and its words, nothing to take. */
+function answer(each: Answer): ListRowSpec {
+  return { title: each.title, ...(each.subtitle ? { subtitle: each.subtitle } : {}), icon: each.icon, ...(each.ad ? { chips: [{ kind: "Neutral" as const, label: "Ad" }] } : {}) };
 }
 
 /**
- * The ad Start slides over its answers: a game nobody installed, installing anyway, in all the
- * colours an ad has, the one thing in its lane not drained of them.
+ * Draft part, to be promoted: the other menu, drained of colour: its field with a search's bar
+ * crawling under it, its answers in groups as they land, and the line at its foot that never ends.
+ */
+function otherMenu(q: string, groups: readonly (readonly [string, readonly Answer[]])[], foot: string): { box: HTMLElement; groups: HTMLElement[]; answers: HTMLElement } {
+  const words = field({ value: q, icon: "search", pointer: false });
+  const bar = document.createElement("span");
+  bar.className = "setup-kotodama-crawl";
+  const lists = groups.map(([label, rows]) => list([listLabel(label, false), ...rows.map(answer)]));
+  const answers = stack("s4", "start", ...lists.map(filling));
+  answers.classList.add("setup-kotodama-answers");
+  const status = row("s8", "centre", spinner("s16", "on_surface_variant"), filling(wrapped(foot, "small", "on_surface_variant")));
+  status.classList.add("setup-kotodama-status");
+  const inner = stack("s8", "start", filling(stack(0, "start", filling(words), filling(bar))), fillingHeight(filling(answers)), filling(status));
+  inner.classList.add("setup-kotodama-sad");
+  const box = document.createElement("span");
+  box.className = "setup-kotodama-other";
+  box.append(inner);
+  return { box, groups: lists, answers };
+}
+
+/** Start's answers, by group, in the order they land. */
+function startGroups(q: string): (readonly [string, readonly Answer[]])[] {
+  return [
+    ["Best match", [{ title: q, subtitle: "See web results", icon: "world" }]],
+    ["Search the web", [{ title: `${q} not working`, icon: "search" }, { title: `${q} near me`, icon: "search" }]],
+    ["Recommended", [{ title: "A game you never installed", subtitle: "Installing anyway", icon: "gamepad", ad: true }]],
+    ["Settings (1)", [{ title: "Show 1 more", subtitle: "What you came for is in here", icon: "expand_more" }]],
+    ["Weather", [{ title: "14° and cloudy", subtitle: "In a town you left in 2019", icon: "thermostat" }]],
+  ];
+}
+
+function spotlightGroups(q: string): (readonly [string, readonly Answer[]])[] {
+  return [
+    ["Suggested website", [{ title: `${q}.com`, subtitle: "You didn't ask, it suggested", icon: "public" }]],
+    ["Definition", [{ title: `${q} (noun)`, subtitle: "A thing you were trying to switch on", icon: "books" }, { title: `Search the web for “${q}”`, icon: "search" }]],
+  ];
+}
+
+/**
+ * Draft part, to be promoted: the ad Start raises over its answers, loud in the warning and error
+ * tones, an invented cleaner for a PC that is fine.
  */
 function fakeAd(): HTMLElement {
-  const installing = progressBar({ fraction: 0.12 });
-  const ad = stack(
-    "s8",
-    "start",
-    text(AD.sponsor, "caption", "on_primary_fill"),
-    wrapped(AD.title, "headline", "on_primary_fill"),
-    filling(wrapped(AD.line, "small", "on_primary_fill")),
-    gap("s4"),
-    row("s12", "centre", button({ label: AD.action, size: "Sm", kind: "Tonal" }), filling(stack("s4", "start", text(AD.small, "caption", "on_primary_fill"), filling(installing)))),
-    text(AD.fine, "caption", "on_primary_fill"),
-  );
+  const tag = text(AD.tag, "label", "on_burn_warning");
+  tag.classList.add("setup-kotodama-ad-tag");
+  const close = icon("close", "var(--type-small-icon)", "var(--color-on_burn_warning)");
+  const top = row("s8", "centre", tag, filling(text(AD.sponsor, "caption", "on_burn_warning")), close);
+  const tile = document.createElement("span");
+  tile.className = "setup-kotodama-ad-tile";
+  tile.append(icon("rocket_launch", "var(--type-heading-icon)", "var(--color-on_error)"));
+  const product = row("s12", "start", tile, filling(stack(0, "start", text(AD.product, "subheading", "on_burn_warning"), filling(wrapped(AD.maker, "caption", "on_burn_warning")))));
+  const stars = row("s4", "centre", ...Array.from({ length: 5 }, () => icon("star_filled", "var(--type-small-icon)", "var(--color-error)")), text(AD.rating, "caption", "on_burn_warning"));
+  const go = button({ label: AD.action, kind: "Danger", icon: "arrow_forward", trailing: true });
+  const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "heading", "on_burn_warning")), filling(product), filling(stars), filling(go), filling(wrapped(AD.fine, "caption", "on_burn_warning")));
   ad.classList.add("setup-kotodama-ad");
   return ad;
 }
 
-/** What the other menu shows once it has answered `q`: the web's rows, the ad over them, the weather. */
-function startLane(q: string): { box: HTMLElement; rows: HTMLElement; ad: HTMLElement; weather: HTMLElement; status: HTMLElement; field: HTMLElement } {
-  const words = field({ value: q, icon: "search", pointer: false });
-  const rows = list([listLabel("Best match", false), ...OTHERS.start.rows(q).map(otherRow), listLabel("Settings", true), otherRow({ title: "Show more", subtitle: "What you came for is in here", icon: "expand_more" })]);
-  const weather = list([otherRow(OTHERS.start.weather)]);
-  const ad = fakeAd();
-  const status = row("s8", "centre", spinner("s16", "on_surface_variant"), filling(wrapped(OTHERS.start.searching, "caption", "on_surface_variant")));
-  const answers = stack("s8", "start", filling(rows), filling(weather));
-  answers.classList.add("setup-kotodama-answers");
-  const base = stack("s12", "start", filling(words), fillingHeight(filling(answers)), filling(status));
-  base.classList.add("setup-kotodama-sad");
-  const box = document.createElement("span");
-  box.className = "setup-kotodama-other";
-  box.append(base, ad);
-  return { box, rows, ad, weather, status, field: words };
-}
-
-function spotlightLane(q: string): { box: HTMLElement; rows: HTMLElement[]; field: HTMLElement } {
-  const words = field({ value: q, icon: "search", pointer: false });
-  const [site, definition] = OTHERS.spotlight.rows(q);
-  const first = list([listLabel("Suggested website", false), otherRow(site!)]);
-  const second = list([listLabel("Definition", false), otherRow(definition!)]);
-  const status = row("s8", "centre", spinner("s16", "on_surface_variant"), filling(wrapped(OTHERS.spotlight.indexing, "caption", "on_surface_variant")));
-  const answers = stack("s8", "start", filling(first), filling(second));
-  answers.classList.add("setup-kotodama-answers");
-  const base = stack("s12", "start", filling(words), fillingHeight(filling(answers)), filling(status));
-  base.classList.add("setup-kotodama-sad");
-  const box = document.createElement("span");
-  box.className = "setup-kotodama-other";
-  box.append(base);
-  return { box, rows: [first, second], field: words };
+/**
+ * Draft part, to be promoted: a lane's clock, a chip with a timer, counting in tenths of a second
+ * until its answer lands; Kotodama's in the cold.
+ */
+function clockChip(words: string, ours: boolean): HTMLElement {
+  return chip({ label: words, icon: "timer", kind: ours ? "Cold" : "Neutral" });
 }
 
 /**
- * The gag: the other menu rising from the screen's corner as Super alone opens it, its ad landed,
- * stamped "Nope." in the lit primary, then going back down. Reduced, it shows still and goes.
+ * The gag: the other menu rising from the screen's corner as Super alone opens it, its answers
+ * landed, stamped "Nope." in the lit primary, then going back down. Reduced, it shows still.
  */
 export function gag(held = false): HTMLElement {
-  const lane = startLane("wifi");
-  lane.status.replaceChildren(wrapped("Super alone does nothing here. Super + Space does everything.", "small", "on_surface"));
+  const other = otherMenu(QUESTION, startGroups(QUESTION), OTHERS.start.searching);
+  // Draft part, to be promoted: the stamp.
   const stamp = text("Nope.", "display", "primary_lit");
   stamp.classList.add("setup-kotodama-stamp");
   const over = document.createElement("span");
   over.className = "setup-kotodama-gag";
-  over.append(lane.box, stamp);
+  over.append(other.box, stamp);
   if (held || settings().reduced) return over;
   over.animate([{ opacity: 0, translate: "0 var(--space-s32)" }, { opacity: 1, translate: "0 0" }], { duration: ms("long"), easing: curve("emphasized_decel"), fill: "backwards" });
   stamp.animate([{ opacity: 0, scale: 1.4 }, { opacity: 1, scale: 1 }], { duration: ms("medium"), delay: ms("slow"), easing: curve("pop"), fill: "backwards" });
@@ -373,11 +401,28 @@ export interface KotodamaCard {
 }
 
 const WORDS: Record<StepIndex, string> = {
-  0: "The Command menu. Everything on this machine is in it: apps, settings, projects, windows, sums.",
+  0: "The Command menu. One key, wherever you are: type what you want, Enter does it.",
   1: "One key for everything on this machine, and nothing off it. No ads, no news, no weather nobody asked for.",
-  2: "It works as it is. Change what you like; “Settings: Menu” in the menu has the rest.",
-  3: "Your turn. Nothing here is required: Next works either way.",
+  2: "It works as it is. Change what you like; the menu's “Settings: Menu” has the rest.",
+  3: "Your turn. Three tries, or none: Next works either way.",
 };
+
+/** What's examples: what to type, what it is, and its symbol. */
+const EXAMPLES = [
+  { typed: "firefox", is: "an app", icon: "public" },
+  { typed: "wifi", is: "a setting", icon: "wifi" },
+  { typed: "12*7", is: "a sum", icon: "calculate" },
+] as const;
+
+/** A label over a part of Yours, `subheading`. */
+const heading = (words: string) => text(words, "subheading");
+
+/** A switch with its words, the setting's name over what it does. */
+function switchRow(title: string, line: string, on: boolean, turned: (on: boolean) => void): HTMLElement {
+  const control = switchControl({ on });
+  control.addEventListener("click", () => queueMicrotask(() => turned(control.getAttribute("aria-checked") === "true")));
+  return row("s12", "centre", filling(stack(0, "start", text(title, "body"), filling(wrapped(line, "small", "on_surface_variant")))), control);
+}
 
 export function kotodamaCard(view: string): KotodamaCard {
   const state = kotodamaAt(view);
@@ -389,74 +434,69 @@ export function kotodamaCard(view: string): KotodamaCard {
   let shown: HTMLElement | null = null;
   /** Stops what the step shown is playing: the demo's loop, the race's clocks. */
   let stop = () => undefined as void;
+  /** Races the three again, on Why. */
+  let raceAgain = () => undefined as void;
   const recheck = () => element?.dispatchEvent(new Event(RECHECK, { bubbles: true }));
 
   // ----------------------------------------------------------------- What --
 
   const what = (): HTMLElement => {
-    const beats = list([
-      { title: "Press it", subtitle: "Anywhere, over anything", icon: "keyboard_command_key", tile: true, keys: "Super+Space" },
-      { title: "Type what you want", subtitle: "An app, a setting, a project, a sum", icon: "search", tile: true },
-      { title: "Enter", subtitle: "It does it, and gets out of the way", icon: "check", tile: true, keys: "↵" },
-    ]);
-    beats.classList.add("setup-kotodama-beats");
+    const examples = EXAMPLES.map((each) => {
+      // Draft part, to be promoted: an example, its symbol on a tile, what to type and what it is.
+      const tile = document.createElement("span");
+      tile.className = "setup-kotodama-tile";
+      tile.append(icon(each.icon, "var(--type-body-icon)", "currentColor"));
+      const line = row("s12", "centre", tile, filling(text(each.typed, "mono_large")), text(each.is, "mono", "on_surface_variant"));
+      line.classList.add("setup-kotodama-example");
+      return line;
+    });
     const menu = standIn(prefs, { live: false });
     menu.box.inert = true;
     let playing = true;
-    stop = () => {
+    const quiet = () => {
       playing = false;
     };
-    const lit = (at: number) => beats.querySelectorAll<HTMLElement>(".k-list-row").forEach((each, index) => each.toggleAttribute("data-current", index === at));
+    stop = () => {
+      quiet();
+      window.removeEventListener("keydown", quiet);
+    };
+    window.addEventListener("keydown", quiet, { once: true });
+    const lit = (at: number) => examples.forEach((each, index) => each.toggleAttribute("data-lit", index === at));
     const play = async () => {
       if (settings().reduced) {
-        menu.set("12*7");
+        lit(1);
+        menu.set("wifi");
         return;
       }
-      for (let round = 0; playing; round++) {
-        const asked = ["fire", "wifi", "12*7"][round % 3]!;
-        lit(0);
-        menu.set("");
-        await wait(ms("hold"));
-        lit(1);
-        await menu.type(asked);
-        await wait(ms("hold"));
-        if (!playing) return;
-        lit(2);
-        menu.run();
-        // It holds there as long as a Toast stays: two holds.
+      for (let round = 0; playing; round = (round + 1) % EXAMPLES.length) {
+        lit(round);
+        await menu.type(EXAMPLES[round]!.typed);
+        // It holds on the answer as long as a reader takes over it: two holds.
         await wait(ms("hold") * 2);
+        if (!playing) return;
       }
     };
     requestAnimationFrame(() => void play());
-    return splitColumns([2, 3], "s40", [stack(0, "start", filling(beats)), filling(fillingHeight(menu.box))], { fillHeight: true });
+    const left = stack(
+      0,
+      "start",
+      bigKeys("Super+Space"),
+      gap("s32"),
+      text("Type what you want. Enter.", "headline"),
+      gap("s8"),
+      filling(wrapped("Apps, settings, projects, windows and sums, in one place. It opens over whatever you're doing, on the screen you're on.", "body", "on_surface_variant")),
+      gap("s32"),
+      filling(stack("s8", "start", ...examples.map(filling))),
+    );
+    left.classList.add("setup-kotodama-what");
+    return splitColumns([1, 1], "s40", [filling(left), filling(fillingHeight(menu.box))], { fillHeight: true });
   };
 
   // ------------------------------------------------------------------ Why --
 
   const why = (): HTMLElement => {
-    let racing = 0;
     const lanes = document.createElement("span");
     lanes.className = "setup-kotodama-lanes";
-    const ask = field({
-      value: "wifi",
-      icon: "search",
-      placeholder: "Ask all three",
-      onInput: (value) => {
-        window.clearTimeout(racing);
-        racing = window.setTimeout(() => race(value.trim() || "wifi"), ms("long"));
-      },
-    });
-    const questions = QUESTIONS.map((q) => {
-      const each = chip({ label: q, press: "press" });
-      each.addEventListener("click", () => {
-        setValue(ask, q);
-        race(q);
-      });
-      return each;
-    });
-    const replay = button({ label: "Race again", kind: "Text", size: "Sm", icon: "restart_alt" });
-    replay.addEventListener("click", () => race((ask.querySelector(".k-field-value")?.textContent ?? "").trim() || "wifi"));
-    const top = row("s12", "centre", filling(ask), row("s8", "centre", ...questions), fill(), replay);
     let timers: number[] = [];
     let frame = 0;
     stop = () => {
@@ -465,107 +505,88 @@ export function kotodamaCard(view: string): KotodamaCard {
       cancelAnimationFrame(frame);
     };
 
-    /** The three, asked `q` at the same moment: typed together, then each in its own time. */
-    const race = (q: string) => {
+    /** The three, asked the question at the same moment, each answering in its own time. */
+    const race = () => {
       stop();
       const reduced = settings().reduced;
-      const start = startLane(q);
-      const spotlight = spotlightLane(q);
-      const ours = standIn(prefs, { live: false, query: reduced ? q : "" });
+      const start = otherMenu(QUESTION, startGroups(QUESTION), OTHERS.start.searching);
+      const ad = fakeAd();
+      start.box.append(ad);
+      const spotlight = otherMenu(QUESTION, spotlightGroups(QUESTION), OTHERS.spotlight.indexing);
+      const ours = standIn(prefs, { live: false, query: QUESTION });
       ours.box.inert = true;
-      const clock = (who: string) => {
-        const shownClock = document.createElement("span");
-        shownClock.className = "setup-kotodama-clock";
-        shownClock.dataset.who = who;
-        shownClock.append(text(seconds(0), "mono", "on_surface_variant"));
-        return shownClock;
-      };
-      // A text's box is laid out for its words, so a clock's new reading is a text of its own.
-      const read = (shownClock: HTMLElement, words: string) => {
-        if (shownClock.textContent === words) return;
-        shownClock.replaceChildren(text(words, "mono", shownClock.hasAttribute("data-landed") ? "cold" : "on_surface_variant"));
-      };
-      const clocks = { start: clock("start"), spotlight: clock("spotlight"), kotodama: clock("kotodama") };
-      const lane = (name: string, shownClock: HTMLElement, box: HTMLElement, roast: string, ours = false) => {
-        const each = stack("s12", "start", filling(row("s8", "centre", text(name, "subheading"), fill(), shownClock)), filling(fillingHeight(box)), filling(wrapped(roast, "small", "on_surface_variant")));
+      const clocks = { start: document.createElement("span"), spotlight: document.createElement("span"), kotodama: document.createElement("span") };
+      const read = (who: keyof typeof clocks, words: string) => clocks[who].replaceChildren(clockChip(words, who === "kotodama"));
+      const roasts = { start: wrapped(OTHERS.start.still, "small", "on_surface_variant"), spotlight: wrapped(OTHERS.spotlight.still, "small", "on_surface_variant") };
+      const lane = (who: keyof typeof clocks, box: HTMLElement, roast: HTMLElement) => {
+        const each = stack("s12", "start", filling(row("s8", "centre", text(OTHERS[who].name, "heading"), fill(), clocks[who])), filling(fillingHeight(box)), filling(roast));
         each.classList.add("setup-kotodama-lane");
-        each.dataset.lane = name.toLowerCase();
-        if (ours) each.dataset.ours = "";
-        return each;
+        each.dataset.lane = who;
+        return filling(fillingHeight(each));
       };
+      const oursBox = document.createElement("span");
+      oursBox.className = "setup-kotodama-ours";
+      oursBox.append(ours.box);
       lanes.replaceChildren(
-        splitColumns(
-          [1, 1, 1],
-          "s16",
-          [lane(OTHERS.start.name, clocks.start, start.box, OTHERS.start.roast(q)), lane(OTHERS.spotlight.name, clocks.spotlight, spotlight.box, OTHERS.spotlight.roast()), lane(OTHERS.kotodama.name, clocks.kotodama, ours.box, OTHERS.kotodama.roast(), true)].map((each) => filling(fillingHeight(each))),
-          { fillHeight: true },
-        ),
+        splitColumns([1, 1, 1], "s16", [lane("start", start.box, roasts.start), lane("spotlight", spotlight.box, roasts.spotlight), lane("kotodama", oursBox, wrapped(OTHERS.kotodama.roast, "small", "on_surface_variant"))], { fillHeight: true }),
       );
+      read("kotodama", OTHERS.kotodama.stopped);
       const settle = () => {
-        read(clocks.start, OTHERS.start.settled(seconds(LANDS.start.done)));
-        read(clocks.spotlight, OTHERS.spotlight.settled(seconds(LANDS.spotlight.done)));
-        clocks.kotodama.dataset.landed = "";
-        read(clocks.kotodama, OTHERS.kotodama.settled);
+        read("start", OTHERS.start.stopped(seconds(LANDS.start.done)));
+        read("spotlight", OTHERS.spotlight.stopped(seconds(LANDS.spotlight.done)));
+        roasts.start.replaceWith((roasts.start = wrapped(OTHERS.start.roast(QUESTION), "small", "on_surface_variant")));
+        roasts.spotlight.replaceWith((roasts.spotlight = wrapped(OTHERS.spotlight.roast, "small", "on_surface_variant")));
       };
       if (reduced) {
         settle();
         return;
       }
-      // Until the key is let go, the others have nothing; Kotodama answers each key as it lands.
-      for (const part of [start.rows, start.weather, start.ad, ...spotlight.rows]) part.style.opacity = "0";
-      const typing = [...q].map((_, at) => at * ms("micro"));
-      for (const [at, after] of typing.entries()) {
-        timers.push(
-          window.setTimeout(() => {
-            const sofar = q.slice(0, at + 1);
-            setValue(start.field, sofar);
-            setValue(spotlight.field, sofar);
-            ours.set(sofar);
-          }, after),
-        );
-      }
-      const letGo = typing.at(-1)! + ms("micro");
+      read("start", seconds(0));
+      read("spotlight", seconds(0));
+      const [web, search, recommended, settingsGroup, weather] = start.groups;
+      const [site, definition] = spotlight.groups;
+      for (const part of [web, search, recommended, settingsGroup, weather, ad, site, definition]) if (part) part.style.opacity = "0";
       const speed = settings().speed;
-      const land = (part: HTMLElement, after: number, from = "0 var(--space-s16)") =>
+      const land = (parts: readonly (HTMLElement | undefined)[], after: number, from = "0 var(--space-s16)") =>
         timers.push(
           window.setTimeout(() => {
-            part.style.opacity = "";
-            part.animate([{ opacity: 0, translate: from }, { opacity: 1, translate: "0 0" }], { duration: ms("long"), easing: curve("emphasized_decel") });
-          }, letGo + after / speed),
+            for (const part of parts) {
+              if (!part) continue;
+              part.style.opacity = "";
+              part.animate([{ opacity: 0, translate: from }, { opacity: 1, translate: "0 0" }], { duration: ms("long"), easing: curve("emphasized_decel") });
+            }
+          }, after / speed),
         );
-      land(start.rows, LANDS.start.web);
-      land(start.ad, LANDS.start.ad, "0 100%");
-      land(start.weather, LANDS.start.weather);
-      land(spotlight.rows[0]!, LANDS.spotlight.site);
-      land(spotlight.rows[1]!, LANDS.spotlight.definition);
-      timers.push(
-        window.setTimeout(() => {
-          clocks.kotodama.dataset.landed = "";
-          read(clocks.kotodama, OTHERS.kotodama.settled);
-          const from = performance.now();
-          const tickClocks = () => {
-            const spent = (performance.now() - from) * speed;
-            read(clocks.start, spent >= LANDS.start.done ? OTHERS.start.settled(seconds(LANDS.start.done)) : seconds(spent));
-            read(clocks.spotlight, spent >= LANDS.spotlight.done ? OTHERS.spotlight.settled(seconds(LANDS.spotlight.done)) : seconds(spent));
-            if (spent < LANDS.start.done) frame = requestAnimationFrame(tickClocks);
-            else settle();
-          };
-          frame = requestAnimationFrame(tickClocks);
-        }, letGo),
-      );
+      land([web, search], LANDS.start.web);
+      land([recommended, settingsGroup], LANDS.start.recommended);
+      land([ad], LANDS.start.ad, "0 var(--space-s48)");
+      land([weather], LANDS.start.weather);
+      land([site], LANDS.spotlight.site);
+      land([definition], LANDS.spotlight.web);
+      const from = performance.now();
+      const tick = () => {
+        const spent = (performance.now() - from) * speed;
+        read("start", spent >= LANDS.start.done ? OTHERS.start.stopped(seconds(LANDS.start.done)) : seconds(spent));
+        read("spotlight", spent >= LANDS.spotlight.done ? OTHERS.spotlight.stopped(seconds(LANDS.spotlight.done)) : seconds(spent));
+        if (spent >= LANDS.spotlight.done && roasts.spotlight.textContent === OTHERS.spotlight.still) roasts.spotlight.replaceWith((roasts.spotlight = wrapped(OTHERS.spotlight.roast, "small", "on_surface_variant")));
+        if (spent < LANDS.start.done) frame = requestAnimationFrame(tick);
+        else settle();
+      };
+      frame = requestAnimationFrame(tick);
     };
-    race("wifi");
-    return stack("s16", "start", filling(top), fillingHeight(filling(lanes)));
+    raceAgain = race;
+    race();
+    return stack(0, "start", fillingHeight(filling(lanes)));
   };
 
   // ---------------------------------------------------------------- Yours --
 
   const yours = (): HTMLElement => {
-    const preview = standIn(prefs, { live: true, query: "fi" });
+    const preview = standIn(prefs, { live: true, query: "3/2" });
     const show = (words: string) => preview.set(words);
     const cards = OPENS_WITH.map((each) => {
       const card = choiceCard({ title: each.title, subtitle: each.line, picks: "one", picked: prefs.key === each.id });
-      card.querySelector(".k-card-title-line")?.parentElement?.append(caps(each.keys));
+      card.querySelector(".k-card-header, .k-card-title-line")?.parentElement?.prepend(caps(each.keys));
       return card;
     });
     const keysGroup = choiceGroup("one", 3, cards);
@@ -575,60 +596,74 @@ export function kotodamaCard(view: string): KotodamaCard {
         if (at >= 0) prefs.key = OPENS_WITH[at]!.id;
       }),
     );
-    type Switch = { readonly spec: ListRowSpec; readonly get: () => boolean; readonly set: (on: boolean) => void; readonly shows: string };
-    const switches: Switch[] = [
-      { spec: { title: "Web search when nothing here matches", subtitle: "Rows at the bottom you pick, never a guess", icon: "travel_explore" }, get: () => prefs.web, set: (on) => (prefs.web = on), shows: "zzz" },
-      { spec: { title: "Slide as it opens", subtitle: "Off, it only fades", icon: "motion_photos_on" }, get: () => prefs.slides, set: (on) => (prefs.slides = on), shows: "" },
-      { spec: { title: "Forgive typos", subtitle: "“fierfox” finds Firefox", icon: "keyboard" }, get: () => prefs.typos, set: (on) => (prefs.typos = on), shows: "fierfox" },
-    ];
-    const switchList = (each: readonly Switch[]) => {
-      const made = listWith(
-        each.map((one) => ({ ...one.spec, tile: Boolean(one.spec.icon), toggle: one.get() })),
-        {
-          onTake: (at) => {
-            const one = each[at];
-            if (!one) return;
-            one.set(!one.get());
-            if (one.shows === "" && !settings().reduced) preview.box.firstElementChild?.animate(prefs.slides ? [{ opacity: 0, translate: "0 calc(-1 * var(--space-s8))" }, { opacity: 1, translate: "0 0" }] : [{ opacity: 0 }, { opacity: 1 }], { duration: ms("medium"), easing: curve("emphasized_decel") });
-            else show(one.shows);
-          },
-        },
-      );
-      return made.box;
-    };
-    const finds: Switch[] = (
+    const finds = (
       [
-        ["actions", "Settings and KubaOS's actions", "settings", "wifi"],
-        ["projects", "Projects and scripts", "folder_open", "kubaos"],
-        ["windows", "Windows and key binds", "desktop_windows", "move"],
-        ["clipboard", "Clipboard history", "content_paste", "clip"],
-        ["emoji", "Emoji", "mood", "emoji"],
-        ["calculator", "Sums", "calculate", "3/2"],
+        ["apps", "Apps", "fi"],
+        ["actions", "Settings and actions", "wifi"],
+        ["projects", "Projects and scripts", "kubaos"],
+        ["windows", "Windows and key binds", "move"],
+        ["clipboard", "Clipboard history", "clip"],
+        ["emoji", "Emoji", "emoji"],
+        ["calculator", "Sums", "3/2"],
       ] as const
-    ).map(([id, title, glyph, shows]) => ({ spec: { title, icon: glyph }, get: () => prefs.finds[id], set: (on: boolean) => (prefs.finds[id] = on), shows }));
-    const engine = select({ options: [...ENGINES], picked: prefs.engine, onPick: (at) => ((prefs.engine = at), show("zzz")) });
-    const mark = select({ options: [`${figure(1.5, false)} (point)`, `${figure(1.5, true)} (comma)`], picked: prefs.comma ? 1 : 0, onPick: (at) => ((prefs.comma = at === 1), show(prefs.comma ? "1,5*3" : "1.5*3")) });
-    const rest = descriptionList([
-      { label: "Aliases", value: "Your own short words: ff for Firefox" },
-      { label: "Quicklinks", value: "gh opens GitHub; yt cats searches YouTube" },
-      { label: "Your actions", value: "Any command, with a title and keywords" },
-      { label: "All of it in", value: "~/.config/kubaos/menu/kotodama/user.toml" },
-    ]);
-    const advanced = collapsible({
-      title: "What it finds, and the rest",
-      summary: "Six switches, the engine, the mark",
-      open: state.more,
-      content: stack("s16", "start", filling(switchList(finds)), filling(splitColumns([1, 1], "s16", [filling(stack("s8", "start", text("Search the web with", "label", "on_surface_variant"), filling(engine))), filling(stack("s8", "start", text("Decimal mark", "label", "on_surface_variant"), filling(mark)))])), filling(stack("s8", "start", text("The rest, when you want it", "label", "on_surface_variant"), filling(rest)))),
+    ).map(([id, label, shows]) => {
+      const on = id === "apps" ? prefs.apps : prefs.finds[id];
+      const each = chip({ label, press: "toggle", on, kind: "Accent", icon: "check" });
+      each.addEventListener("click", () =>
+        queueMicrotask(() => {
+          const now = each.getAttribute("aria-pressed") === "true";
+          if (id === "apps") prefs.apps = now;
+          else prefs.finds[id] = now;
+          show(shows);
+        }),
+      );
+      return each;
     });
-    const settingsColumn = stack("s16", "start", text("Opens with", "label", "on_surface_variant"), filling(keysGroup), filling(switchList(switches)), filling(advanced));
-    // What scrolls stands the page's padding in from the scroll's end, its thumb in that padding,
-    // as every Kōbō page's body does (`kobo.css`).
-    const padded = stack(0, "start", filling(settingsColumn));
-    padded.classList.add("kobo-scrolled");
-    const { box: scrolls } = scroll(padded, { height: "100%", below: "s24", noGutter: true, fade: "s24", footFade: true });
-    scrolls.classList.add("kobo-scrolls");
+    const engine = tabs({ choices: ENGINES.map((label) => ({ label })), picked: prefs.engine, onPick: (at) => ((prefs.engine = at), show("zzz")) });
+    const motion = tabs({ choices: [{ label: "Full" }, { label: "Fades" }], picked: prefs.slides ? 0 : 1, onPick: (at) => ((prefs.slides = at === 0), preview.box.animate(prefs.slides ? [{ opacity: 0, translate: "0 calc(-1 * var(--space-s8))" }, { opacity: 1, translate: "0 0" }] : [{ opacity: 0 }, { opacity: 1 }], { duration: ms("medium"), easing: curve("emphasized_decel") })) });
+    const mark = tabs({ choices: [{ label: "1.5" }, { label: "1,5" }], picked: prefs.comma ? 1 : 0, onPick: (at) => ((prefs.comma = at === 1), show(prefs.comma ? "3/2*1" : "3/2")) });
+    const web = stack(
+      "s12",
+      "start",
+      heading("When nothing here matches"),
+      filling(switchRow("Offer a web search", "Rows at the bottom, never a guess", prefs.web, (on) => ((prefs.web = on), show("zzz")))),
+      filling(stack(0, "start", text("First with", "body"), filling(wrapped("The engine on the first web row", "small", "on_surface_variant")))),
+      engine,
+    );
+    const typing = stack(
+      "s12",
+      "start",
+      heading("Typing and motion"),
+      filling(switchRow("Forgive typos", "“fierfox” finds Firefox", prefs.typos, (on) => ((prefs.typos = on), show("fierfox")))),
+      filling(row("s12", "centre", filling(text("Motion", "body")), motion)),
+    );
+    const files = button({ label: "Open in Files", kind: "Text", size: "Sm" });
+    const more = collapsible({
+      title: "More",
+      summary: "Decimal mark, aliases, the file",
+      open: state.more,
+      content: splitColumns([1, 1], "s24", [
+        filling(row("s12", "centre", filling(stack(0, "start", text("Decimal mark", "body"), filling(wrapped("How sums write a half", "small", "on_surface_variant")))), mark)),
+        filling(stack("s4", "start", text("Aliases, quicklinks, your own actions", "body"), filling(wrapped("All in one file: user.toml", "small", "on_surface_variant")), files)),
+      ]),
+    });
+    const left = stack(
+      0,
+      "start",
+      heading("Opens with"),
+      gap("s8"),
+      filling(keysGroup),
+      gap("s16"),
+      heading("It finds"),
+      gap("s8"),
+      filling(flow("s8", ...finds)),
+      gap("s16"),
+      filling(splitColumns([1, 1], "s24", [filling(web), filling(typing)])),
+      gap("s8"),
+      filling(more),
+    );
     const right = stack("s8", "start", text("As it will look", "label", "on_surface_variant"), fillingHeight(filling(preview.box)));
-    return splitColumns([2, 1], "s24", [filling(fillingHeight(scrolls)), filling(fillingHeight(right))], { fillHeight: true });
+    return splitColumns([2, 1], "s24", [filling(left), filling(fillingHeight(right))], { fillHeight: true });
   };
 
   // --------------------------------------------------------------- Try it --
@@ -636,28 +671,31 @@ export function kotodamaCard(view: string): KotodamaCard {
   let openMenu = () => undefined as void;
 
   const tryIt = (): HTMLElement => {
-    const tries = listWith(
-      TRIES.map((each) => each.spec(state.tried.has(each.id))),
-      {
-        onTake: (at) => {
-          const each = TRIES[at];
-          if (!each) return;
-          openMenu();
-          if (each.id === "wifi") void menu.type("wifi");
-          if (each.id === "sum") void menu.type("12*7");
-        },
-      },
-    );
+    const cardsBy = new Map<TryId, HTMLElement>();
+    const tryCard = (each: (typeof TRIES)[number]) => {
+      // Draft part, to be promoted: a try, its round tick lit once done, the words to type in mono.
+      const mark = document.createElement("span");
+      mark.className = "setup-kotodama-tick";
+      mark.append(icon("check", "var(--type-small-icon)", "currentColor"));
+      const title = row(0, "centre", text(each.before, "body_strong"), ...(each.typed ? [gap("s4"), text(each.typed, "mono_large", "primary")] : []), ...(each.after ? [text(each.after, "body_strong")] : []));
+      const card = row("s12", "centre", mark, filling(stack(0, "start", filling(title), text(each.line, "small", "on_surface_variant"))));
+      card.className += " setup-kotodama-try-card";
+      card.toggleAttribute("data-done", state.tried.has(each.id));
+      card.addEventListener("click", () => {
+        openMenu();
+        if (each.typed) void menu.type(each.typed);
+      });
+      cardsBy.set(each.id, card);
+      return filling(card);
+    };
     const tick = (id: TryId) => {
       if (state.tried.has(id)) return;
       state.tried.add(id);
-      const at = TRIES.findIndex((each) => each.id === id);
-      const fresh = tries.replaceRow(at, TRIES[at]!.spec(true));
-      changed(fresh.querySelector(".k-list-box .k-check-mark"));
+      const card = cardsBy.get(id);
+      card?.setAttribute("data-done", "");
+      if (card && !settings().reduced) card.querySelector(".setup-kotodama-tick")?.animate([{ scale: 0.4 }, { scale: 1 }], { duration: ms("medium"), easing: curve("pop") });
       recheck();
     };
-    const holder = document.createElement("span");
-    holder.className = "setup-kotodama-try";
     const menu = standIn(prefs, {
       live: true,
       query: state.query,
@@ -667,31 +705,29 @@ export function kotodamaCard(view: string): KotodamaCard {
       },
       onEscape: () => shut(),
     });
-    const invitation = stack("s16", "centre", caps(KEY_OF[prefs.key]), wrapped("Press it. Or this, just this once.", "body", "on_surface_variant"), button({ label: "Open it", kind: "Tonal", icon: "keyboard_command_key" }));
+    const holder = document.createElement("span");
+    holder.className = "setup-kotodama-try";
+    // Draft part, to be promoted: the shut menu's room, its keys big, a click opening it this once.
+    const invitation = stack("s16", "centre", bigKeys(KEY_OF[prefs.key]), text("Press it. Or click here, this once.", "small", "on_surface_variant"));
     invitation.classList.add("setup-kotodama-invitation");
-    invitation.querySelector("button")?.addEventListener("click", () => openMenu());
-    const showMenu = (opening: boolean) => {
-      holder.replaceChildren(menu.box);
-      if (!opening || settings().reduced) return;
-      menu.box.animate(prefs.slides ? [{ opacity: 0, translate: "0 calc(-1 * var(--space-s8))" }, { opacity: 1, translate: "0 0" }] : [{ opacity: 0 }, { opacity: 1 }], { duration: ms("medium"), easing: curve("emphasized_decel") });
-    };
+    invitation.addEventListener("click", () => openMenu());
     const shut = () => {
       state.open = false;
       holder.replaceChildren(invitation);
-      arrive(invitation);
     };
     openMenu = () => {
       if (!state.open) {
         state.open = true;
-        showMenu(true);
+        holder.replaceChildren(menu.box);
+        if (!settings().reduced) menu.box.animate(prefs.slides ? [{ opacity: 0, translate: "0 calc(-1 * var(--space-s8))" }, { opacity: 1, translate: "0 0" }] : [{ opacity: 0 }, { opacity: 1 }], { duration: ms("medium"), easing: curve("emphasized_decel") });
       }
       tick("open");
       requestAnimationFrame(() => menu.focus());
     };
-    if (state.open) showMenu(false);
-    else holder.append(invitation);
-    const tip = row("s8", "start", icon("info", "var(--type-small-icon)", "var(--color-on_surface_variant)"), filling(wrapped("It opens wherever you are: over any app, on the screen you're on.", "small", "on_surface_variant")));
-    return splitColumns([2, 3], "s24", [filling(stack("s16", "start", filling(tries.box), fillingHeight(gap("s4")), filling(tip))), filling(fillingHeight(holder))], { fillHeight: true });
+    holder.append(state.open ? menu.box : invitation);
+    const tip = row("s8", "start", icon("info", "var(--type-small-icon)", "var(--color-on_surface_variant)"), filling(wrapped("The menu shows up wherever you are: on top of any app, on the screen you're on.", "small", "on_surface_variant")));
+    const left = stack("s12", "start", ...TRIES.map(tryCard), fillingHeight(gap("s4")), filling(tip));
+    return splitColumns([2, 3], "s24", [filling(left), filling(fillingHeight(holder))], { fillHeight: true });
   };
 
   // ----------------------------------------------------------------- Steps --
@@ -739,8 +775,9 @@ export function kotodamaCard(view: string): KotodamaCard {
 
   const listen = () => {
     let alone = false;
+    const here = () => element?.isConnected && !element.closest("[data-kept]");
     window.addEventListener("keydown", (event) => {
-      if (!element?.isConnected || element.closest("[data-kept]")) return;
+      if (!here()) return;
       if (event.key === "Meta" || event.key === "OS") {
         alone = true;
         return;
@@ -754,7 +791,7 @@ export function kotodamaCard(view: string): KotodamaCard {
       }
     });
     window.addEventListener("keyup", (event) => {
-      if (!element?.isConnected || (event.key !== "Meta" && event.key !== "OS") || !alone) return;
+      if (!here() || (event.key !== "Meta" && event.key !== "OS") || !alone) return;
       alone = false;
       if (prefs.key === "super" && state.step === 3) openMenu();
       else habit();
@@ -776,6 +813,12 @@ export function kotodamaCard(view: string): KotodamaCard {
     const content = stack("s24", "start", filling(line), fillingHeight(filling(room)));
     element = body(spec.accent, spec.title, WORDS[state.step], content, false);
     element.classList.add("setup-kotodama");
+    // On Why, Enter races the three again; the band's Next still goes on.
+    element.addEventListener("keydown", (event) => {
+      if (state.step !== 1 || event.key !== "Enter" || (event.target as Element).closest("button")) return;
+      event.preventDefault();
+      raceAgain();
+    });
     if (state.gag) element.append(gag(true));
     listen();
     return element;
@@ -784,15 +827,21 @@ export function kotodamaCard(view: string): KotodamaCard {
   const status = (): RailStatus => ({ state: { is: state.passed ? "done" : "todo" } });
 
   const NEXT: Record<StepIndex, string> = { 0: "Next: why", 1: "Next: yours", 2: "Next: try it", 3: "Next: Git" };
+  const NOTE: Record<StepIndex, () => string> = {
+    0: () => "Nothing here is required",
+    1: () => "Enter races them again",
+    2: () => "Defaults are fine. Really",
+    3: () => (state.tried.size === 3 ? "3 of 3 tried. That's the whole trick" : `${state.tried.size} of 3 tried`),
+  };
 
   return {
     state,
     body: draw,
     hints: (): readonly KeyHint[] => {
-      if (state.step === 1) return [["Tab", "the question"], ["Enter", "next"], ["Esc", "back a step"]];
-      if (state.step === 2) return [["← →", "pick the keys"], ["Space", "switch it"], ["Tab", "next field"]];
-      if (state.step === 3) return [[KEY_OF[prefs.key], "open it"], ["↑ ↓", "pick a Result"], ["Esc", "clear, close"]];
-      return [["Enter", "next"], ["Esc", "back a card"], ["Tab", "next field"]];
+      if (state.step === 1) return [["Enter", "race again"], ["Esc", "back a step"]];
+      if (state.step === 2) return [["← →", "pick a key"], ["Space", "switch it"], ["Tab", "next field"]];
+      if (state.step === 3) return [[KEY_OF[prefs.key], "open it"], ["Enter", "run it"], ["Esc", "close it"]];
+      return [[KEY_OF[prefs.key], "open it"], ["↑ ↓", "pick a Result"], ["Enter", "run it"]];
     },
     page: (skipped) => ({
       step: { title: spec.title, icon: spec.icon },
@@ -800,7 +849,7 @@ export function kotodamaCard(view: string): KotodamaCard {
       status,
       next: () => NEXT[state.step],
       skip: () => (state.passed ? undefined : skipped() ? "Later" : "Skip"),
-      note: () => (state.step === 3 ? (state.tried.size === 3 ? "All three. That's the whole trick." : `${state.tried.size} of 3 tried`) : undefined),
+      note: () => NOTE[state.step](),
       back: () => {
         if (state.step === 0) return false;
         show((state.step - 1) as StepIndex);

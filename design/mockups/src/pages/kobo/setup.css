@@ -191,36 +191,58 @@
   bottom: calc(var(--size-control_sm) + 3 * var(--space-s12));
 }
 
-/* What's beat lit while the menu beside it does it. */
-.setup-kotodama-beats .k-list-row {
-  transition: opacity var(--motion-medium) var(--easing-standard);
+/* Draft part: the big keys, each a large keycap in the primary's tube, glowing at night. */
+.setup-kotodama-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: var(--size-control_lg);
+  min-width: var(--size-control_lg);
+  padding: 0 var(--space-s20);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+  box-shadow:
+    inset 0 0 0 var(--focus-tube) var(--color-primary),
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day)))),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * (1 - var(--day))));
 }
 
-.setup-kotodama-beats:has([data-current]) .k-list-row:not([data-current]) {
-  opacity: var(--opacity-subdued);
-}
-
-/* Try it's room: the menu, or before it opens, what opens it, centred in the same room. */
-.setup-kotodama-try {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
+/* What's left column stands in the middle of its room's height, as the menu beside it is tall. */
+.setup-kotodama-what {
+  justify-content: center;
   height: 100%;
 }
 
-.setup-kotodama-try > .setup-kotodama-invitation {
-  flex: 1 1 0;
-  justify-content: center;
-  border-radius: var(--radius-surface);
-  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+/* Draft part: an example on What, lit while the menu beside it plays it; the others recede. */
+.setup-kotodama-example {
+  height: var(--size-row);
+  opacity: var(--opacity-subdued);
+  color: var(--color-on_surface_variant);
+  transition: opacity var(--motion-medium) var(--easing-standard), color var(--motion-medium) var(--easing-standard);
 }
 
-/* The race's room: its three lanes take the height under the question. */
+.setup-kotodama-example[data-lit] {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
+.setup-kotodama-tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--size-control_sm);
+  height: var(--size-control_sm);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+}
+
+/* The race's room: its three lanes take the height under the header. */
 .setup-kotodama-lanes {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
 }
 
 .setup-kotodama-lanes > * {
@@ -228,25 +250,30 @@
   min-height: 0;
 }
 
-/* The race's lanes: one each, its clock at the end of its name. Kotodama's clock stopped burns in
-   the cold, as a lit tube does at night. */
 .setup-kotodama-lane {
   min-width: 0;
   min-height: 0;
   height: 100%;
 }
 
-.setup-kotodama-clock {
+/* Draft part: Kotodama's lane, the menu in the primary's lit tube. */
+.setup-kotodama-ours {
   display: flex;
-  flex: none;
+  min-height: 0;
+  height: 100%;
+  border-radius: var(--radius-surface);
+  box-shadow:
+    0 0 0 var(--focus-tube) var(--color-primary),
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day)))),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * (1 - var(--day))));
 }
 
-.setup-kotodama-clock[data-landed] {
-  text-shadow: 0 0 var(--focus-label_near) rgb(from var(--color-cold) r g b / calc(var(--focus-label_glow) * (1 - var(--day))));
+.setup-kotodama-ours > .setup-kotodama-menu {
+  flex: 1 1 0;
 }
 
-/* The others: a card drained of colour, its answers cut where the card ends; Start's ad over them in
-   every colour it has. */
+/* Draft part: the other menus, drained of colour, their answers cut where the panel ends; Start's
+   ad over them in every loud colour there is. */
 .setup-kotodama-other {
   position: relative;
   display: flex;
@@ -271,26 +298,127 @@
   mask-image: linear-gradient(#000 calc(100% - var(--space-s24)), transparent);
 }
 
+.setup-kotodama-status {
+  padding-top: var(--space-s8);
+  border-top: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+/* A search's bar crawling under the field while the other menu thinks. */
+.setup-kotodama-crawl {
+  display: block;
+  height: var(--stroke-thin);
+  margin-top: var(--space-s4);
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, transparent, var(--color-cold), transparent) no-repeat;
+  background-size: 40% 100%;
+  animation: setup-kotodama-crawl var(--motion-scene) var(--easing-linear) infinite;
+}
+
+[data-reduced] .setup-kotodama-crawl {
+  animation: none;
+  background-position: 0 0;
+}
+
+@keyframes setup-kotodama-crawl {
+  from {
+    background-position: -40% 0;
+  }
+
+  to {
+    background-position: 140% 0;
+  }
+}
+
 .setup-kotodama-ad {
   position: absolute;
-  left: var(--space-s12);
-  right: var(--space-s12);
-  bottom: calc(var(--space-s12) * 2 + var(--size-control_sm));
-  padding: var(--space-s16);
+  left: var(--space-s24);
+  right: var(--space-s24);
+  top: calc(var(--space-s12) * 2 + var(--size-control_md) + var(--space-s4));
+  padding: var(--space-s12) var(--space-s16);
   border-radius: var(--radius-content);
-  background: linear-gradient(135deg, var(--color-error_container), var(--color-primary_fill) 55%, var(--color-tertiary_container));
+  background: var(--color-burn_warning);
   box-shadow: 0 var(--space-s8) var(--space-s24) rgb(from var(--color-surface_container_lowest) r g b / var(--opacity-scrim));
+}
+
+.setup-kotodama-ad-tag {
+  padding: 0 var(--space-s4);
+  border-radius: var(--radius-small);
+  background: var(--color-on_burn_warning);
+  color: var(--color-burn_warning) !important;
+}
+
+.setup-kotodama-ad-tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--size-control_md);
+  height: var(--size-control_md);
+  border-radius: var(--radius-control);
+  background: var(--color-error);
+}
+
+/* Draft part: a try, a card whose round tick and tube light once it is done. */
+.setup-kotodama-try-card {
+  box-sizing: border-box;
+  min-height: var(--size-row_two_line);
+  padding: var(--space-s12) var(--space-s16);
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+  cursor: pointer;
+  transition: box-shadow var(--motion-medium) var(--easing-standard), background var(--motion-medium) var(--easing-standard);
+}
+
+.setup-kotodama-try-card[data-done] {
+  background: rgb(from var(--color-primary) r g b / var(--opacity-tint));
+  box-shadow:
+    inset 0 0 0 var(--focus-tube) var(--color-primary),
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day))));
+}
+
+.setup-kotodama-tick {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--size-check);
+  height: var(--size-check);
+  border-radius: var(--radius-full);
+  box-shadow: inset 0 0 0 var(--stroke-thin) var(--color-outline);
+  color: transparent;
+}
+
+.setup-kotodama-try-card[data-done] .setup-kotodama-tick {
+  background: var(--color-primary_fill);
+  box-shadow: none;
+  color: var(--color-on_primary_fill);
+}
+
+/* Try it's room: the menu, or before it opens, its keys in an outlined room the menu's size. */
+.setup-kotodama-try {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.setup-kotodama-try > .setup-kotodama-invitation {
+  flex: 1 1 0;
+  justify-content: center;
+  border-radius: var(--radius-surface);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+  cursor: pointer;
 }
 
 /* The gag: the other menu risen in the screen's corner over everything, stamped. */
 .setup-kotodama-gag {
   position: absolute;
   z-index: 3;
-  left: var(--space-s16);
-  bottom: var(--space-s16);
+  left: var(--space-s12);
+  bottom: var(--space-s12);
   display: flex;
-  width: var(--size-panel);
-  height: calc(var(--kobo-height) * 0.7);
+  width: var(--size-dialog);
+  height: calc(var(--kobo-height) * 0.72);
   pointer-events: none;
 }
 
@@ -301,7 +429,7 @@
 .setup-kotodama-stamp {
   position: absolute;
   left: 50%;
-  top: 40%;
+  top: 45%;
   translate: -50% -50%;
   text-shadow: 0 0 var(--focus-far) rgb(from var(--color-primary) r g b / var(--focus-near_opacity));
 }
