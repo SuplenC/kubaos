@@ -380,7 +380,6 @@ const kotodama: Card = {
   first: "what",
   views: {
     what: { state: "needed", summary: "Not seen yet." },
-    gag: { state: "needed", summary: "Not seen yet." },
     why: { state: "needed", summary: "Not seen yet." },
     "why-mid": { state: "needed", summary: "Not seen yet." },
     "why-tip": { state: "needed", summary: "Not seen yet." },

@@ -79,8 +79,8 @@ export function defaultSettings(): MenuSettings {
 /** The keys that open it: Kotodama has no such setting yet; KubaOS binds Super + Space. */
 export const OPENS_WITH = [
   { id: "super-space", keys: "Super+Space", title: "Super + Space", line: "The default" },
-  { id: "alt-space", keys: "Alt+Space", title: "Alt + Space", line: "For keyboards without Super" },
-  { id: "super", keys: "Super", title: "Super, tapped alone", line: "Tapped alone, like Start" },
+  { id: "alt-space", keys: "Alt+Space", title: "Alt + Space", line: "Keyboards without Super" },
+  { id: "super", keys: "Super", title: "Super, tapped alone", line: "Like Start. Your call" },
 ] as const;
 
 /** `[extensions.web-search] engines`, in Kotodama's order. */

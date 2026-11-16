@@ -1,22 +1,20 @@
 // First boot's Kotodama card, in four steps of its own. What: the one key, what to type and Enter,
 // beside the Command menu playing by itself. Why: one question raced through Start and
 // Kotodama, each clock running until its answer lands. Yours: the keys that open it and what it
-// finds, applied as they are made. Try it: the menu itself, three things to try ticking off. Super tapped
-// alone, on any step, brings up the other menu, stamped "Nope.".
+// finds, applied as they are made. Try it: the menu itself, three things to try ticking off.
 
 import type { Easing, Move, NonEmpty, Track } from "../../site/page.ts";
 import { doesntApply, nonEmpty, page, screen } from "../../site/page.ts";
 import { aloneAt, atCard, CARD_MEASURES, fullHd, liveCard } from "./setup-pages.ts";
 import { setupRoom } from "./setup-room.ts";
 
-type Shown = "rest" | "selected" | "loading" | "empty" | "error";
+type Shown = "rest" | "selected" | "loading" | "empty";
 
 const CELLS: Record<Shown, () => HTMLElement> = {
   rest: atCard("kotodama", "what"),
   selected: atCard("kotodama", "try-ticked"),
   loading: atCard("kotodama", "why"),
   empty: atCard("kotodama", "try"),
-  error: atCard("kotodama", "gag"),
 };
 
 const at = (view: string) => () => setupRoom({ place: { at: "card", card: "kotodama" }, views: { kotodama: view } });
@@ -88,19 +86,6 @@ const OPENS: Move = {
   sample: at("try-open"),
 };
 
-/** Super alone: the other menu rises in the corner, is stamped, and goes back down. */
-const NOPE: Move = {
-  name: "Super alone",
-  what: "The other menu rises `space.s32` over `long`; “Nope.” pops on over `medium` a `slow` later; it leaves after three holds.",
-  tracks: [
-    { part: "the other menu", on: "the gag", target: ".setup-kotodama-gag", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "the stamp", on: "the gag", target: ".setup-kotodama-stamp", property: "opacity", from: 0, to: 1, duration: "medium", cue: "slow", curve: "pop" },
-  ],
-  reduced: [{ part: "the other menu", on: "the gag", target: ".setup-kotodama-gag", property: "opacity", from: 1, to: 1, duration: "instant", curve: "standard" }],
-  back: "cuts",
-  sample: CELLS.error,
-};
-
 export default page<Shown>({
   level: "kobo",
   slug: "setup-kotodama",
@@ -108,7 +93,7 @@ export default page<Shown>({
   lede: "Four steps: what the Command menu is, why, your settings, then the menu itself to try.",
   code: { unbuilt: "Kōbō has no such card" },
   from: ["step-rail-page", "stepper", "list-detail", "list", "choice-card", "collapsible", "select", "keycap", "toast"],
-  stage: { live: liveCard("kotodama"), hint: "Enter goes on: What, Why, Yours, Try it; Super alone anywhere", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
+  stage: { live: liveCard("kotodama"), hint: "Enter goes on: What, Why, Yours, Try it", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
   variants: [
     { name: "What", for: "the key; the menu playing by itself", sample: CELLS.rest },
     { name: "Why", for: "the race run out; the clocks", sample: CELLS.loading },
@@ -121,7 +106,6 @@ export default page<Shown>({
     { name: "Try it: open", for: "the menu; one ticked", sample: atCard("kotodama", "try-open") },
     { name: "Try it: wifi", for: "the setting, first row", sample: atCard("kotodama", "try-typed") },
     { name: "Try it: all three", for: "the sum; Next: Git", sample: CELLS.selected },
-    { name: "Super alone", for: "the other menu, stamped", sample: CELLS.error },
     { name: "From the Command menu", for: "“Set up the Command menu”, in a window", sample: aloneAt("kotodama", "try-open") },
   ],
   sizes: [
@@ -131,11 +115,12 @@ export default page<Shown>({
     { name: "Full HD: Try it", for: "the menu with its pane", sample: fullHd("kotodama", "try-typed") },
   ],
   states: {
-    shown: ["rest", "selected", "loading", "empty", "error"],
+    shown: ["rest", "selected", "loading", "empty"],
     absent: {
       lit: "its cards, rows and buttons light on their pages",
       pressed: "its cards and buttons press on their pages",
       disabled: "every machine has it: never passed by",
+      error: "it runs nothing that can fail",
     },
     rows: [{ name: "Kotodama", cell: screen((state: Shown) => CELLS[state]()) }],
     looks: {
@@ -143,7 +128,6 @@ export default page<Shown>({
       selected: "Try it, all three tried",
       loading: "Why: the race running",
       empty: "Try it, the menu shut",
-      error: "Super alone: “Nope.”",
     },
   },
   focus: doesntApply("no line of its own: its cards, rows, fields and buttons light on their pages."),
@@ -159,14 +143,13 @@ export default page<Shown>({
   motion: {
     arrives: [TO_WHY, TO_YOURS, TO_TRY, OPENS],
     leaves: [BACK_STEP],
-    between: [RACE, TICKED, NOPE],
+    between: [RACE, TICKED],
   },
   keyboard: {
     keys: [
       { keys: ["Enter"], does: "Next: the next step; in the menu, runs the Result" },
       { keys: ["Esc"], does: "back a step; in the menu, clears, then shuts it" },
       { keys: ["Super+Space"], does: "Try it: opens the menu, as on the desktop" },
-      { keys: ["Super"], does: "tapped alone, anywhere: the other menu, stamped" },
       { keys: ["↑", "↓"], does: "in the menu, the Result above or below" },
       { keys: ["Tab", "Shift+Tab"], does: "rail, the step's parts, the band" },
     ],
