@@ -292,8 +292,16 @@ impl Sandbox {
     }
 }
 
-/// `tool` as the real `PATH` finds it.
+/// The shell a script's `#!/bin/sh` runs, which the sandbox's `sh` is too: Ubuntu's is dash,
+/// a dev shell's `PATH` puts bash first, and the two differ (a `command -v` that finds nothing
+/// exits 127 in dash, 1 in bash), so a test's `sh -c` would depend on the shell it ran from.
+const SYSTEM_SHELL: &str = "/bin/sh";
+
+/// `tool` as the real `PATH` finds it; `sh` is [`SYSTEM_SHELL`] where the machine has one.
 fn real_tool(tool: &str) -> Option<PathBuf> {
+    if tool == "sh" && Path::new(SYSTEM_SHELL).is_file() {
+        return Some(PathBuf::from(SYSTEM_SHELL));
+    }
     let real = env::var_os("PATH").unwrap_or_default();
     env::split_paths(&real).map(|dir| dir.join(tool)).find(|p| p.is_file())
 }
