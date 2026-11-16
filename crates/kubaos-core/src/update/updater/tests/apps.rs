@@ -107,7 +107,10 @@ fn add_picks_the_apps_and_installs_them_in_one_run_of_the_helper_through_polkit(
     let runs = helper_runs(&m);
     assert_eq!(runs.len(), 1, "{runs:?}");
     assert!(runs[0].starts_with("pkexec "), "{runs:?}");
-    assert!(runs[0].ends_with("/usr/local/libexec/kubaos-apps install agent desk"), "{runs:?}");
+    assert!(
+        runs[0].ends_with("/usr/local/libexec/kubaos-apps install agent desk"),
+        "{runs:?}"
+    );
     assert_eq!(
         summary(&events).apps,
         AppChanges {
@@ -168,7 +171,10 @@ fn remove_drops_the_pick_and_takes_the_app_away_through_polkit() {
     assert_eq!(picked(&w), ["desk"]);
     let runs = helper_runs(&m);
     assert_eq!(runs.len(), 1);
-    assert!(runs[0].starts_with("pkexec ") && runs[0].ends_with("kubaos-apps remove agent"), "{runs:?}");
+    assert!(
+        runs[0].starts_with("pkexec ") && runs[0].ends_with("kubaos-apps remove agent"),
+        "{runs:?}"
+    );
     assert_eq!(summary(&events).apps.removed, ["Agent"]);
     assert!(!m.dpkg.as_ref().unwrap().installed.contains_key("agent"));
 }
@@ -184,7 +190,11 @@ fn an_app_from_nixpkgs_goes_into_kubaos_d_and_the_home_switches_without_root() {
     assert!(packages.contains("\"editor\""), "{packages}");
     assert_eq!(m.switches, 1);
     assert!(helper_runs(&m).is_empty());
-    assert!(fs::read_to_string(w.user.home_nix()).unwrap().contains("kubaos.stateDir"));
+    assert!(
+        fs::read_to_string(w.user.home_nix())
+            .unwrap()
+            .contains("kubaos.stateDir")
+    );
 
     w.updater(&mut m).remove_apps(&names(&["editor"])).unwrap();
 
@@ -204,7 +214,10 @@ fn an_update_installs_the_picked_apps_the_machine_lacks_through_sudo_once() {
 
     let runs = helper_runs(&m);
     assert_eq!(runs.len(), 1, "{runs:?}");
-    assert!(runs[0].starts_with("sudo ") && runs[0].ends_with("kubaos-apps install agent desk"), "{runs:?}");
+    assert!(
+        runs[0].starts_with("sudo ") && runs[0].ends_with("kubaos-apps install agent desk"),
+        "{runs:?}"
+    );
     let packages = fs::read_to_string(w.user.state_dir().packages_file()).unwrap();
     assert!(packages.contains("\"editor\""));
     assert_eq!(m.switches, 1, "the update's own switch installs editor");
@@ -268,11 +281,7 @@ fn the_status_reads_the_catalog_the_picks_and_dpkg() {
 
     let status = w.updater(&mut m).app_status().unwrap();
 
-    let rows: Vec<(&str, bool, AppState)> = status
-        .apps
-        .iter()
-        .map(|a| (a.id.as_str(), a.picked, a.state))
-        .collect();
+    let rows: Vec<(&str, bool, AppState)> = status.apps.iter().map(|a| (a.id.as_str(), a.picked, a.state)).collect();
     assert_eq!(
         rows,
         [

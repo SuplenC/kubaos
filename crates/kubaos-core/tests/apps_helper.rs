@@ -95,10 +95,7 @@ impl Machine {
         let state = root.join("dpkg");
         let state = state.display();
         let line = |name: &str| format!("echo \"{name} $*\" >>'{log}'");
-        executable(
-            &root.join("checkout/system/apt-repo.sh"),
-            &line("apt-repo.sh"),
-        );
+        executable(&root.join("checkout/system/apt-repo.sh"), &line("apt-repo.sh"));
         executable(&root.join("bin/sudo"), "exec \"$@\"");
         executable(&root.join("bin/dpkg"), "echo amd64");
         executable(
@@ -138,7 +135,7 @@ impl Machine {
                 line("curl")
             ),
         );
-        let packages: String = installed.iter().map(|p| format!("{p}\n")).collect();
+        let packages: String = installed.iter().flat_map(|p| [*p, "\n"]).collect();
         fs::write(root.join("dpkg"), packages).expect("write the machine's packages");
         fs::write(m.log_path(), "").expect("start the log");
         m
@@ -241,13 +238,19 @@ fn install_sets_up_the_repo_then_installs_the_apt_packages_and_the_checked_deb()
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let log = m.log();
     assert_eq!(log[0], "apt-repo.sh vendor");
-    assert!(log[1].starts_with("apt-get install -y --no-install-recommends agent agent-data"), "{log:?}");
+    assert!(
+        log[1].starts_with("apt-get install -y --no-install-recommends agent agent-data"),
+        "{log:?}"
+    );
     assert!(
         log[2].starts_with("curl -fsSL --proto =https --tlsv1.2 --retry 2 -o …/")
             && log[2].ends_with("/desk.deb https://example.com/desk-1.2.0-amd64.deb"),
         "{log:?}"
     );
-    assert!(log[3].starts_with("apt-get install -y --no-install-recommends") && log[3].ends_with("/desk.deb"), "{log:?}");
+    assert!(
+        log[3].starts_with("apt-get install -y --no-install-recommends") && log[3].ends_with("/desk.deb"),
+        "{log:?}"
+    );
     assert_eq!(log.len(), 4, "{log:?}");
     assert_eq!(m.installed(), "agent 1.0\nagent-data 1.0\ndesk 1.2.0\n");
 
@@ -264,7 +267,11 @@ fn a_deb_whose_sha256_isnt_the_pin_is_never_installed() {
     let run = m.run(&["install", "desk"]);
 
     assert_eq!(run.code, Some(1));
-    assert!(run.stderr.contains("not the download its manifest pins"), "{}", run.stderr);
+    assert!(
+        run.stderr.contains("not the download its manifest pins"),
+        "{}",
+        run.stderr
+    );
     assert!(m.log().iter().all(|line| !line.starts_with("apt-get")), "{:?}", m.log());
     assert_eq!(m.installed(), "");
 }
