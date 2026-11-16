@@ -335,9 +335,36 @@ fetch_key() {
 # their own; as root it is always the system's, whatever the environment says.
 if ((EUID == 0)); then
   APT_SOURCES_D=/etc/apt/sources.list.d
+  APT_TRUSTED_D=/etc/apt/trusted.gpg.d
 else
   APT_SOURCES_D="${APT_SOURCES_D:-/etc/apt/sources.list.d}"
+  APT_TRUSTED_D="${APT_TRUSTED_D:-/etc/apt/trusted.gpg.d}"
 fi
+
+# untrust_global_keyring FILE FINGERPRINT...: remove FILE, a keyring of APT_TRUSTED_D, where apt
+# trusts its keys for every repository, when each of its primary keys is one of the FINGERPRINTs:
+# a vendor's own setup put it there, and the repository's sources file names the vendor's key
+# itself. A keyring holding any other key, or one gpg can't read, isn't the vendor's alone and
+# stays, with a warning.
+untrust_global_keyring() {
+  local file="$1" fprs fpr
+  shift
+  [[ -f "$file" ]] || return 0
+  fprs="$(gpg --show-keys --with-colons "$file" 2>/dev/null |
+    awk -F: '$1 == "pub" {want = 1; next} want && $1 == "fpr" {print $10; want = 0}')" || fprs=
+  if [[ -z "$fprs" ]]; then
+    warn "$file isn't a keyring gpg can read: leaving it"
+    return 0
+  fi
+  for fpr in $fprs; do
+    if [[ " $* " != *" $fpr "* ]]; then
+      warn "$file trusts $fpr, which isn't the vendor's, for every repository: leaving it"
+      return 0
+    fi
+  done
+  info "$file trusted the vendor's key for every repository; removing it"
+  sudo_run rm -f "$file"
+}
 
 # add_apt_source NAME CONTENT: write $APT_SOURCES_D/NAME.sources, then turn off every other
 # source of its URIs (disable_other_sources).

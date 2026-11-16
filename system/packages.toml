@@ -136,11 +136,17 @@ fingerprint = "DBA36B5181D0C816F630E889D980A17457F6FB06"
 keyring = "/etc/apt/keyrings/signal.gpg"
 
 # Slack's repository on packagecloud, for the app of the catalog
-# (apps/slack/), signed by Slack's own key there. It has amd64 only.
+# (apps/slack/), signed by Slack's own key there. It has amd64 only. The
+# daily job of a Slack installed by hand (/etc/cron.daily/slack) puts that key,
+# and packagecloud's old one (418A7F2F, expired in 2019), in
+# /etc/apt/trusted.gpg.d, where apt trusts them for every repository; repo
+# setup removes the two.
 [repo.slack]
 key_url = "https://packagecloud.io/slacktechnologies/slack/gpgkey"
 fingerprint = "DB085A08CA13B8ACB917E0F6D938EC0D038651BD"
 keyring = "/etc/apt/keyrings/slack.gpg"
+global_keyrings = ["slack-desktop.gpg", "packagecloud.gpg"]
+global_fingerprints = ["418A7F2FB0E1E6E7EABF6FE8C2E73424D59097AB"]
 
 # Element's repository, for the app of the catalog (apps/element/).
 [repo.element]

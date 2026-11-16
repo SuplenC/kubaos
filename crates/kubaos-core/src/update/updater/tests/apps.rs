@@ -1235,7 +1235,8 @@ fn tor_browser_brave_and_chromium_install_and_go_whole() {
 
 /// A sandbox where `curl` saves the URL it is given as the key it downloads, failing for a URL
 /// with `fails` in it, and `gpg` answers for such a key with the fingerprint the package manifest
-/// pins for its URL: a key fetch that works, without the network or the machine's keyrings.
+/// pins for its URL, and for a keyring holding one of a repo's `global_fingerprints` as its text
+/// with that one: a key fetch that works, without the network or the machine's keyrings.
 fn key_sandbox(dir: &Path, fails: &str) -> crate::sandbox::Sandbox {
     let manifest =
         crate::apt::Manifest::read(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../system/packages.toml"))
@@ -1251,6 +1252,10 @@ fn key_sandbox(dir: &Path, fails: &str) -> crate::sandbox::Sandbox {
             if let (Some(url), Some(fingerprint)) = (url, fingerprint) {
                 let _ = writeln!(answers, "[ \"$url\" != '{url}' ] || f={fingerprint}");
             }
+        }
+        // A vendor's older key, in a keyring that holds its fingerprint as its text.
+        for fingerprint in &repo.global_fingerprints {
+            let _ = writeln!(answers, "[ \"$url\" != '{fingerprint}' ] || f={fingerprint}");
         }
     }
     let home = dir.join("home");

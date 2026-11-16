@@ -47,6 +47,10 @@ pub enum ManifestError {
     Escaped { value: String },
     #[error("repo {repo} names some of its next key's next_key_url, next_fingerprint and next_keyring, not all three")]
     HalfNextKey { repo: String },
+    #[error(
+        "repo {repo}: {name:?} is not a keyring's file name in /etc/apt/trusted.gpg.d (a .gpg or .asc of letters, digits, ., _ and -, not starting with .)"
+    )]
+    InvalidGlobalKeyring { repo: String, name: String },
     #[error("group {group} has a when_on or when_off script but isn't optional")]
     ScriptNotOptional { group: String },
 }
@@ -135,6 +139,14 @@ pub struct Repo {
     pub next_fingerprint: Option<String>,
     #[serde(default)]
     pub next_keyring: Option<String>,
+    /// Files of `/etc/apt/trusted.gpg.d` the vendor's own setup writes, where apt trusts their
+    /// keys for every repository: repo setup removes each whose keys are all `fingerprint` or one
+    /// of `global_fingerprints`, as the sources file names the repository's key itself.
+    #[serde(default)]
+    pub global_keyrings: Vec<String>,
+    /// The vendor's older keys, which its setup trusts in `global_keyrings` beside its own.
+    #[serde(default)]
+    pub global_fingerprints: Vec<String>,
 }
 
 impl Repo {
@@ -213,9 +225,17 @@ impl Manifest {
             if next.iter().any(|v| v.is_some()) && !next.iter().all(|v| v.is_some()) {
                 return Err(ManifestError::HalfNextKey { repo: name.clone() });
             }
+            if let Some(keyring) = repo.global_keyrings.iter().find(|k| !is_keyring_name(k)) {
+                return Err(ManifestError::InvalidGlobalKeyring {
+                    repo: name.clone(),
+                    name: keyring.clone(),
+                });
+            }
             let values = [&repo.key_url, &repo.fingerprint, &repo.keyring]
                 .into_iter()
-                .chain(next.into_iter().flatten());
+                .chain(next.into_iter().flatten())
+                .chain(&repo.global_keyrings)
+                .chain(&repo.global_fingerprints);
             for value in values {
                 unescaped(value)?;
             }
@@ -289,6 +309,17 @@ pub fn is_package_name(name: &str) -> bool {
         .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
         && name.len() >= 2
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '+' | '-' | '.'))
+}
+
+/// Whether `name` is a keyring's file name of `/etc/apt/trusted.gpg.d`: letters, digits, `.`,
+/// `_` and `-` only, so the shell can't split or glob it, not starting with `.`, and a `.gpg` or
+/// `.asc`, as apt reads no other there.
+fn is_keyring_name(name: &str) -> bool {
+    let stem = name.strip_suffix(".gpg").or_else(|| name.strip_suffix(".asc"));
+    stem.is_some_and(|s| !s.is_empty() && !s.starts_with('.'))
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
 }
 
 fn unescaped(value: &str) -> Result<(), ManifestError> {
