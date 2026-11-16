@@ -723,26 +723,7 @@ c_flake_check() {
 }
 
 c_shellcheck() {
-  local files=() f
-  cd "$REPO" || return 1
-  while IFS= read -r f; do
-    case "$f" in
-      *.sh) files+=("$f") ;;
-      *) head -1 "$f" | grep -qE '^#!.*\b(ba)?sh\b' && files+=("$f") ;;
-    esac
-  done < <(as_user git -C "$REPO" ls-files apps scripts system migrations test config home/suites crates/self-imports .claude/hooks | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp)$')
-  echo "     ${#files[@]} files"
-  # Gate on warnings and errors; info and style notes are listed, not fatal.
-  local out notes
-  out="$(shellcheck -x -f gcc "${files[@]}" 2>&1 || true)"
-  notes="$(grep -c . <<<"$out" || true)"
-  if grep -qE ': (warning|error):' <<<"$out"; then
-    printf '%s\n' "$out"
-    echo "FAIL shellcheck: warnings or errors above"
-    return 1
-  fi
-  ((notes)) && { echo "     info/style notes (not fatal):"; printf '%s\n' "$out" | sed 's/^/       /'; }
-  echo "ok   shellcheck: no warnings in ${#files[@]} files ($notes info/style notes)"
+  "$REPO/test/shellcheck/check" "$REPO"
 }
 
 c_lua() {

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# test/shellcheck/check: shellcheck over the repo's shell scripts, failing on a warning or an
+# error and listing the info and style notes.
+#
+#   test/shellcheck/check [REPO]   the checkout at REPO, this one by default
+#
+# The scripts are the files git tracks under the folders below that end in .sh or start with a
+# bash or sh shebang. `just shellcheck`, CI's `shellcheck` job and the e2e harness's `shellcheck`
+# check run it. It reads git through `safe.directory`, so root can run it on a user's checkout.
+set -euo pipefail
+
+FOLDERS=(apps scripts system migrations test config home/suites crates/self-imports .claude/hooks)
+
+repo="$(cd "${1:-$(dirname "$0")/../..}" && pwd)"
+cd "$repo"
+
+files=()
+while IFS= read -r f; do
+  case "$f" in
+    *.sh) files+=("$f") ;;
+    *) head -1 "$f" | grep -qE '^#!.*\b(ba)?sh\b' && files+=("$f") ;;
+  esac
+done < <(git -c safe.directory="$repo" ls-files "${FOLDERS[@]}" | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp|svg|yaml|ts|css)$')
+
+echo "     ${#files[@]} files"
+out="$(shellcheck -x -f gcc "${files[@]}" 2>&1 || true)"
+notes="$(grep -c . <<<"$out" || true)"
+if grep -qE ': (warning|error):' <<<"$out"; then
+  printf '%s\n' "$out"
+  echo "FAIL shellcheck: warnings or errors above" >&2
+  exit 1
+fi
+if ((notes)); then
+  echo "     info/style notes (not fatal):"
+  printf '%s\n' "$out" | sed 's/^/       /'
+fi
+echo "ok   shellcheck: no warnings in ${#files[@]} files ($notes info/style notes)"
