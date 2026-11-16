@@ -1,5 +1,9 @@
+use std::collections::VecDeque;
 use std::fmt::Write as _;
 use std::fs;
+use std::path::Path;
+use std::sync::Mutex;
+use std::time::Duration;
 
 use kotodama_protocol::JobState;
 use kubaos_core::apps::App;
@@ -13,6 +17,8 @@ use kubaos_core::state::Paths;
 
 use super::*;
 use crate::fake::FakeRunner;
+use crate::run::OnEnd;
+use crate::run::OnLine;
 
 const CHROME: &str = r#"
 name = "Google Chrome"
@@ -327,6 +333,38 @@ fn a_failed_run_ends_with_why_and_its_log() {
 }
 
 #[test]
+fn a_warning_beside_the_app_installed_is_said_but_fails_nothing() {
+    let warning = r#"{"type":"warning","text":"no log of this run: disk full"}"#;
+    let summary = summary(&["Google Chrome"]);
+
+    let (_, ended) = heard(&[warning, &summary], true);
+
+    assert_eq!(
+        (ended.title.as_str(), ended.state),
+        ("Google Chrome installed", JobState::Succeeded)
+    );
+    assert_eq!(
+        ended.message.as_deref(),
+        Some(
+            "no log of this run: disk full\nThe log: \
+             /home/u/.local/state/kubaos/update/2026-11-16-app.log"
+        )
+    );
+}
+
+#[test]
+fn a_summary_without_the_app_is_a_failure() {
+    let summary = summary(&["Claude Code"]);
+
+    let (_, ended) = heard(&[STARTED, &summary], true);
+
+    assert_eq!(
+        (ended.title.as_str(), ended.state),
+        ("Google Chrome wasn't installed", JobState::Failed)
+    );
+}
+
+#[test]
 fn an_app_missing_after_its_install_is_a_failure() {
     let warning = r#"{"type":"warning","text":"Google Chrome isn't on the machine after its install"}"#;
     let summary = summary(&[]);
@@ -375,29 +413,104 @@ fn another_jobs_lines_change_nothing_and_once_ended_the_next_app_may_start() {
     assert_ne!(next.id, id);
 }
 
+/// The files of a machine under `dir` whose catalog has `manifests`, each `(id, text)`.
+fn files(dir: &Path, manifests: &[(&str, &str)]) -> AppFiles {
+    let catalog = dir.join("apps");
+    fs::create_dir(&catalog).unwrap();
+    for (id, text) in manifests {
+        fs::write(catalog.join(format!("{id}.toml")), text).unwrap();
+    }
+    let paths = Paths::from_vars(Some(dir.join("home").into()), None, None).unwrap();
+    AppFiles::new(catalog, &paths)
+}
+
+fn query() -> String {
+    std::iter::once("dpkg-query")
+        .chain(dpkg::QUERY)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 #[test]
 fn the_apps_are_read_with_one_dpkg_query() {
     let dir = tempfile::tempdir().unwrap();
-    let catalog = dir.path().join("apps");
-    fs::create_dir(&catalog).unwrap();
-    fs::write(catalog.join("google-chrome.toml"), CHROME).unwrap();
-    fs::write(catalog.join("claude-code.toml"), CLAUDE).unwrap();
-    let home = dir.path().join("home");
-    let paths = Paths::from_vars(Some(home.into()), None, None).unwrap();
-    let files = AppFiles::new(catalog, &paths);
-    let query: Vec<String> = std::iter::once("dpkg-query")
-        .chain(dpkg::QUERY)
-        .map(str::to_owned)
-        .collect();
+    let files = files(dir.path(), &[("google-chrome", CHROME), ("claude-code", CLAUDE)]);
     let runner = FakeRunner {
-        outputs: [(query.join(" "), dpkg_with(&["claude-code=2.1"]))].into(),
+        outputs: [(query(), dpkg_with(&["claude-code=2.1"]))].into(),
         ..FakeRunner::default()
     };
 
     let apps = Apps::read(&files, &runner).unwrap();
 
     assert_eq!(ids(&apps), ["app-remove:claude-code", "app-install:google-chrome"]);
-    assert_eq!(runner.ran(), [query.join(" ")]);
+    assert_eq!(runner.ran(), [query()]);
+}
+
+#[test]
+fn an_empty_catalog_asks_dpkg_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let files = files(dir.path(), &[]);
+    let runner = FakeRunner::default();
+
+    let apps = Apps::read(&files, &runner).unwrap();
+
+    assert_eq!(apps, Apps::default());
+    assert!(runner.ran().is_empty(), "{:?}", runner.ran());
+}
+
+/// Answers each `dpkg-query` with the next of `answers`, a failure saying its `Err`, and tells
+/// `asked` once it has.
+struct Answers {
+    answers: Mutex<VecDeque<Result<String, String>>>,
+    asked: mpsc::Sender<()>,
+}
+
+impl Runner for Answers {
+    fn output(&self, argv: &[String]) -> Result<String, RunError> {
+        let answer = self.answers.lock().unwrap().pop_front().expect("an answer left");
+        self.asked.send(()).unwrap();
+        answer.map_err(|stderr| RunError::Failed {
+            program: argv[0].clone(),
+            stderr,
+        })
+    }
+
+    fn launch(&self, _argv: &[String], _delay: Duration) -> Result<(), RunError> {
+        Ok(())
+    }
+
+    fn background(&self, _argv: &[String], _line: OnLine, _ended: OnEnd) -> Result<(), RunError> {
+        Ok(())
+    }
+}
+
+#[test]
+fn a_reading_that_fails_is_given_to_no_one_so_the_last_one_stands() {
+    let dir = tempfile::tempdir().unwrap();
+    let files = files(dir.path(), &[("google-chrome", CHROME), ("claude-code", CLAUDE)]);
+    let (asked, dpkg_asked) = mpsc::channel();
+    let runner = Answers {
+        answers: Mutex::new(VecDeque::from([
+            Ok(dpkg_with(&["claude-code=2.1"])),
+            Err("dpkg-query: database locked".to_owned()),
+            Ok(dpkg_with(&[])),
+        ])),
+        asked,
+    };
+    let (sender, readings) = mpsc::channel();
+    let reader = AppsReader::start(files, runner, move |apps| sender.send(apps).unwrap()).unwrap();
+    let wait = Duration::from_secs(5);
+
+    reader.read();
+    let first = readings.recv_timeout(wait).unwrap();
+    reader.read();
+    dpkg_asked.recv_timeout(wait).unwrap();
+    dpkg_asked.recv_timeout(wait).unwrap();
+    reader.read();
+    let next = readings.recv_timeout(wait).unwrap();
+
+    assert_eq!(ids(&first), ["app-remove:claude-code", "app-install:google-chrome"]);
+    assert_eq!(ids(&next), ["app-install:claude-code", "app-install:google-chrome"]);
 }
 
 #[test]

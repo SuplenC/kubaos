@@ -5,14 +5,14 @@
 //! its end on the desktop, named for the app, with why it failed and where its log is.
 //!
 //! Which apps are on the machine is the engine's status (`kubaos app status`): the catalog, the
-//! picks, one `dpkg-query` and the User flake's `packages.toml`, read at the start, at each
-//! config, when one of the files it comes from changes and when a Job ends, never as the menu
+//! picks, one `dpkg-query` and the User flake's `packages.toml`, read on a thread of its own at
+//! the start, at each config and when one of the files it comes from changes, never as the menu
 //! searches.
 //!
 //! # Owns
 //!
-//! - Reading the status, the app Items, starting a Job and turning its events into the Job's
-//!   progress.
+//! - Reading the status, one read at a time off the protocol loop, the app Items, starting a Job
+//!   and turning its events into the Job's progress.
 //!
 //! # Not here
 //!
@@ -22,8 +22,11 @@
 
 use std::collections::BTreeSet;
 use std::fmt;
+use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::mpsc;
+use std::thread;
 
 use kotodama_extension::Chain;
 use kotodama_protocol::Action;
@@ -146,13 +149,17 @@ impl Apps {
         Apps { apps }
     }
 
-    /// Reads the catalog, the picks, dpkg's packages with one `dpkg-query`, and `packages.toml`.
+    /// Reads the catalog, the picks, dpkg's packages with one `dpkg-query`, and `packages.toml`;
+    /// only the catalog when it has no app.
     ///
     /// # Errors
     ///
     /// [`ReadError`] for the first of them that can't be read.
     pub fn read(files: &AppFiles, runner: &impl Runner) -> Result<Self, ReadError> {
         let catalog = Catalog::load(&files.catalog).map_err(ReadError::Catalog)?;
+        if catalog.apps().is_empty() {
+            return Ok(Apps::default());
+        }
         let picks = Picks::read(&files.picks).map_err(ReadError::Picks)?;
         let query: Vec<String> = std::iter::once("dpkg-query")
             .chain(dpkg::QUERY)
@@ -210,6 +217,45 @@ impl Apps {
             Change::Remove => state.is_installed(),
         };
         applies.then_some((app, change))
+    }
+}
+
+/// Reads the apps on a thread of its own, one read at a time: `dpkg-query` never holds the
+/// protocol loop, and a read never lands after a later one. Requests made while a read runs are
+/// served by one read after it.
+#[derive(Clone, Debug)]
+pub struct AppsReader {
+    requests: mpsc::Sender<()>,
+}
+
+impl AppsReader {
+    /// Starts the thread, which reads `files` with `runner` and gives `read` each reading. A
+    /// reading that fails is logged and given to no one, so what was read last stands.
+    ///
+    /// # Errors
+    ///
+    /// When the thread can't start.
+    pub fn start(
+        files: AppFiles,
+        runner: impl Runner + Send + 'static,
+        mut read: impl FnMut(Apps) + Send + 'static,
+    ) -> io::Result<Self> {
+        let (requests, requested) = mpsc::channel::<()>();
+        thread::Builder::new().name("apps".into()).spawn(move || {
+            while requested.recv().is_ok() {
+                while requested.try_recv().is_ok() {}
+                match Apps::read(&files, &runner) {
+                    Ok(apps) => read(apps),
+                    Err(err) => kotodama_extension::log!("not reading the apps: {}", Chain(&err)),
+                }
+            }
+        })?;
+        Ok(AppsReader { requests })
+    }
+
+    /// Asks for a reading.
+    pub fn read(&self) {
+        let _ = self.requests.send(());
     }
 }
 
@@ -376,14 +422,16 @@ struct Running {
     step: Option<String>,
     progress: Option<Fraction>,
     log: Option<PathBuf>,
-    /// The last warning, which makes the run a failure.
-    warning: Option<String>,
+    /// The run's warnings, each said at its end; one alone fails nothing.
+    warnings: Vec<String>,
     /// Why the run failed, from its `failed` or `declined` event.
     failure: Option<String>,
     /// The last line that wasn't an event: what the program said before its events started, or
     /// instead of them.
     said: Option<String>,
-    summarised: bool,
+    /// Whether the summary has the app among those installed or removed, as asked; `None`
+    /// before the summary.
+    arrived: Option<bool>,
 }
 
 impl Running {
@@ -401,10 +449,10 @@ impl Running {
             step: None,
             progress: None,
             log: None,
-            warning: None,
+            warnings: Vec::new(),
             failure: None,
             said: None,
-            summarised: false,
+            arrived: None,
         }
     }
 
@@ -430,9 +478,13 @@ impl Running {
                 let fraction = done.min(total) as f32 / total as f32;
                 self.progress = Fraction::new(fraction).ok();
             }
-            UpdateEvent::Warning { text } => self.warning = Some(text),
+            UpdateEvent::Warning { text } => self.warnings.push(text),
             UpdateEvent::Summary(summary) => {
-                self.summarised = true;
+                let done = match self.change {
+                    Change::Add => &summary.apps.installed,
+                    Change::Remove => &summary.apps.removed,
+                };
+                self.arrived = Some(done.contains(&self.name));
                 self.log = summary.log.or(self.log.take());
             }
             UpdateEvent::Failed { error, log, .. } => {
@@ -456,21 +508,23 @@ impl Running {
         }
     }
 
-    /// The Job at its end, named for what it came to, with why it failed and the log.
+    /// The Job at its end, named for what it came to, with why it failed, the warnings and the
+    /// log. It failed when the program did, or its summary lacks the app: a warning alone, such as
+    /// a log that couldn't be kept, leaves the app installed or removed.
     fn end(self, succeeded: bool) -> Job {
         let log = self.log.as_ref().map(|log| format!("The log: {}", log.display()));
-        let failed = !succeeded || !self.summarised || self.failure.is_some() || self.warning.is_some();
+        let failed = !succeeded || self.failure.is_some() || self.arrived != Some(true);
         let (title, state, why) = if failed {
             let not = match self.change {
                 Change::Add => "wasn't installed",
                 Change::Remove => "wasn't removed",
             };
-            let why = self
-                .failure
-                .or(self.warning)
-                .or(self.said)
-                .unwrap_or_else(|| format!("{} stopped", self.command));
-            (format!("{} {not}", self.name), JobState::Failed, Some(why))
+            let why = self.failure.or_else(|| {
+                self.warnings
+                    .is_empty()
+                    .then(|| self.said.unwrap_or_else(|| format!("{} stopped", self.command)))
+            });
+            (format!("{} {not}", self.name), JobState::Failed, why)
         } else {
             let done = match self.change {
                 Change::Add => "installed",
@@ -478,7 +532,7 @@ impl Running {
             };
             (format!("{} {done}", self.name), JobState::Succeeded, None)
         };
-        let message: Vec<String> = why.into_iter().chain(log).collect();
+        let message: Vec<String> = why.into_iter().chain(self.warnings).chain(log).collect();
         Job {
             id: self.id,
             title,
