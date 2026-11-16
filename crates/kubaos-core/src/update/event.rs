@@ -47,6 +47,8 @@ pub enum Command {
     /// `kubaos packages enable|disable`: an optional group of the package manifest turned on or
     /// off.
     Packages,
+    /// `kubaos app add|remove`: apps of the catalog installed or removed.
+    App,
 }
 
 impl Command {
@@ -58,6 +60,7 @@ impl Command {
             Self::Rollback => "rollback",
             Self::Check => "check",
             Self::Packages => "packages",
+            Self::App => "app",
         }
     }
 }
@@ -88,6 +91,9 @@ pub enum Phase {
     Manifest,
     /// The release's new system migrations, as root.
     SystemMigrations,
+    /// The picked apps of the catalog the machine lacks, installed; or the apps `kubaos app`
+    /// adds or removes.
+    Apps,
     /// `nix flake update` of the user flake.
     Inputs,
     /// The relink and the home-manager switch, and the running session following it.
@@ -119,6 +125,7 @@ impl Phase {
             Self::Hyprland => "Hyprland pin",
             Self::Manifest => "Package manifest",
             Self::SystemMigrations => "System migrations",
+            Self::Apps => "Apps",
             Self::Inputs => "Nix inputs",
             Self::Home => "Home",
             Self::Suites => "Suites",
@@ -245,6 +252,33 @@ pub struct GroupChange {
     pub removed: Vec<String>,
 }
 
+/// The apps of the catalog a run installed and removed, by name, in the catalog's order.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppChanges {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub installed: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub removed: Vec<String>,
+    /// Apps a removal left as they are: KubaOS didn't install them, so it owns nothing of them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub left: Vec<String>,
+    /// Apps whose configure stage ran again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub configured: Vec<String>,
+}
+
+impl AppChanges {
+    /// Whether no app came or went, was left or configured.
+    pub fn is_empty(&self) -> bool {
+        self.installed.is_empty() && self.removed.is_empty() && self.left.is_empty() && self.configured.is_empty()
+    }
+}
+
+/// What a removal says of an app it left as it is, named `name`.
+pub fn left_line(name: &str) -> String {
+    format!("I didn't install {name}, so it's not mine to bin: I left it. Remove it the way you put it there.")
+}
+
 /// A program an update keeps current outside apt and the user flake, in a phase of its own that
 /// the user can turn off.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -338,6 +372,49 @@ impl SuiteChanges {
     }
 }
 
+/// The app a run goes on to: an install's required apps come first, each through its own steps,
+/// and a removal's dependencies no app needs any more come after it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppEvent {
+    /// The app's id.
+    pub app: String,
+    /// The app as the user reads it: "Neovim".
+    pub name: String,
+    /// Its place in the run, from 1.
+    pub n: usize,
+    /// How many apps the run has.
+    pub of: usize,
+}
+
+/// Where one step of an app's install or removal is.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionEvent {
+    /// The app's id.
+    pub app: String,
+    /// The step's place in the install, from 1.
+    pub step: usize,
+    /// How many steps the install has.
+    pub of: usize,
+    /// The step as the user reads it: "Start the service".
+    pub name: String,
+    pub state: ActionState,
+}
+
+/// How far a step is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionState {
+    /// Done, by this run or one before it.
+    Done,
+    /// Done already when the step came, by something other than the app.
+    Found,
+    /// It opens a window, in a run that may not: its sentence is a note.
+    Skipped,
+    Undoing,
+    Undone,
+    Failed,
+}
+
 /// What a finished update, upgrade, rollback or `kubaos packages enable|disable` did.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Summary {
@@ -357,6 +434,9 @@ pub struct Summary {
     /// What the package manifest's phase installed and removed, by group.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub apt: Vec<GroupChange>,
+    /// The apps of the catalog the run installed and removed.
+    #[serde(default, skip_serializing_if = "AppChanges::is_empty")]
+    pub apps: AppChanges,
     /// The user flake's inputs `nix flake update` moved.
     pub inputs: Vec<String>,
     /// The Nix packages of the home that moved, came in or went away, from `nix store
@@ -425,6 +505,10 @@ pub enum UpdateEvent {
     Warning {
         text: String,
     },
+    /// The app a run goes on to, of those it installs, removes or configures.
+    App(AppEvent),
+    /// One step of an app's install or removal.
+    Action(ActionEvent),
     Preview(Preview),
     Prompt {
         prompt: Prompt,

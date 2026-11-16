@@ -5,7 +5,8 @@
 //!
 //! # Owns
 //!
-//! - [`Machine`] and [`Cmd`], which says how a root command goes through `sudo`.
+//! - [`Machine`] and [`Cmd`], which says how a root command goes through `sudo`, and what the Apps
+//!   catalog's engine acts on ([`AppsHost`]).
 //! - [`Lines`], which cuts a program's output into the lines the updater reports.
 //!
 //! # Not here
@@ -19,6 +20,10 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+
+use crate::apps::host::Host;
+use crate::apps::root::RootSide;
+use crate::packages::Packages;
 
 /// Where Nix's own tools are when the login shell hasn't put them on `PATH`.
 pub const NIX_BIN: &str = "/nix/var/nix/profiles/default/bin";
@@ -281,6 +286,25 @@ pub trait Machine {
     ///
     /// When the filesystem can't be asked.
     fn free_bytes(&self, path: &Path) -> io::Result<u64>;
+
+    /// What the Apps catalog's engine acts on: the machine its user steps change, for the user
+    /// whose home is `host.home`, and the root helper `root` starts (`pkexec <helper> serve`, or
+    /// the same through sudo), not yet started.
+    fn apps(&mut self, host: &AppsHost, root: Vec<OsString>) -> (Box<dyn Host + '_>, Box<dyn RootSide + '_>);
+
+    /// Whether the run has a display a step can open a window on: a Wayland session's, not an SSH
+    /// login's.
+    fn has_display(&self) -> bool;
+}
+
+/// What the user's side of the Apps catalog's engine acts with.
+#[derive(Clone, Debug)]
+pub struct AppsHost {
+    pub home: PathBuf,
+    /// The release's checkout, whose `system/apt-repo.sh` sets up a vendor repository.
+    pub checkout: PathBuf,
+    /// The User flake's `packages.toml`.
+    pub packages: Packages,
 }
 
 /// Cuts a program's output into lines as it arrives, at `\n` and at `\r`, with which apt and nix

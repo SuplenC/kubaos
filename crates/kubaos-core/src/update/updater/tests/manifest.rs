@@ -467,3 +467,121 @@ fn a_packages_only_preview_lists_the_installed_releases_manifest() {
         "jq is in the next release, not this one"
     );
 }
+
+/// The Apps catalog's Docker, whose packages the manifest's docker group lists.
+const DOCKER_APP: &str = r#"
+name = "Docker"
+category = "development"
+tags = ["containers"]
+summary = "Containers"
+description = "Docker Engine."
+description_from = "https://docs.docker.com/engine/"
+
+[[action]]
+name = "Install Docker"
+kind = "apt"
+repo = "docker"
+packages = ["docker-ce"]
+"#;
+
+#[test]
+fn an_update_leaves_the_packages_of_a_catalog_app_to_the_catalog() {
+    let w = World::new(Channel::Edge, true);
+    let without_docker = manifest(&["curl"])
+        .replace("[group.docker]", "[group.gone]")
+        .replace("packages = [\"docker-ce\"]", "packages = [\"x-gone\"]");
+    w.push(
+        &[(MANIFEST, &without_docker), ("apps/docker/app.toml", DOCKER_APP)],
+        true,
+    );
+    put(&w.sys.apt_record(), "docker-ce\tdocker\ncurl\ttools\n");
+    let mut m = fake(&["curl", "docker-ce", "libpam-u2f", "x-gone"]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert!(ran(&m, "sudo apt-get remove").is_empty(), "{:?}", m.ran);
+    assert!(m.dpkg.as_ref().unwrap().installed.contains_key("docker-ce"));
+    assert!(summary(&events).apt.is_empty());
+}
+
+#[test]
+fn a_group_of_the_catalogs_packages_points_to_kubaos_app() {
+    let w = World::new(Channel::Edge, true);
+    w.push(
+        &[(MANIFEST, &manifest(&["curl"])), ("apps/docker/app.toml", DOCKER_APP)],
+        true,
+    );
+    w.updater(&mut fake(&["curl", "libpam-u2f"])).update(yes()).unwrap();
+
+    let on = w.updater(&mut fake(&[])).set_group("docker", Switch::On).unwrap_err();
+    let off = w
+        .updater(&mut fake(&["docker-ce"]))
+        .set_group("docker", Switch::Off)
+        .unwrap_err();
+
+    assert_eq!(
+        on.to_string(),
+        "the docker group's packages come from the Apps catalog: kubaos app add docker"
+    );
+    assert_eq!(
+        off.to_string(),
+        "the docker group's packages come from the Apps catalog: kubaos app remove docker"
+    );
+    assert_eq!(fs::read_to_string(w.sys.apt_choices()).unwrap_or_default(), "");
+}
+
+/// A newer release's Docker, with a key this `kubaos` doesn't know.
+const NEWER_DOCKER_APP: &str = r#"
+name = "Docker"
+category = "development"
+tags = ["containers"]
+summary = "Containers"
+description = "Docker Engine."
+description_from = "https://docs.docker.com/engine/"
+a_newer_key = "x"
+
+[[action]]
+name = "Install Docker"
+kind = "apt"
+repo = "docker"
+packages = ["docker-ce"]
+"#;
+
+#[test]
+fn a_catalog_it_cant_read_leaves_the_sync_going_and_the_catalogs_packages_alone() {
+    let w = World::new(Channel::Edge, true);
+    let docker_off = manifest(&["curl", "git"]).replace(
+        "optional = \"on\"\npackages = [\"docker-ce\"]",
+        "optional = \"off\"\npackages = [\"docker-ce\"]",
+    );
+    w.push(
+        &[(MANIFEST, &docker_off), ("apps/docker/app.toml", NEWER_DOCKER_APP)],
+        true,
+    );
+    // Before the handover migration, the record still has Docker's packages.
+    put(&w.sys.apt_record(), "docker-ce\tdocker\ncurl\ttools\n");
+    let mut m = fake(&["curl", "docker-ce", "libpam-u2f"]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert!(ran(&m, "sudo apt-get remove").is_empty(), "{:?}", m.ran);
+    assert!(m.dpkg.as_ref().unwrap().installed.contains_key("git"));
+    assert!(m.dpkg.as_ref().unwrap().installed.contains_key("docker-ce"));
+    assert!(
+        warnings(&events)
+            .iter()
+            .any(|w| w.starts_with("the Apps catalog can't be read")),
+        "{:?}",
+        warnings(&events)
+    );
+
+    let status = w
+        .updater(&mut fake(&["curl", "docker-ce", "git", "libpam-u2f"]))
+        .package_status();
+    assert!(status.is_ok(), "{status:?}");
+    w.updater(&mut fake(&["curl", "docker-ce", "git", "libpam-u2f"]))
+        .set_group("u2f", Switch::Off)
+        .unwrap();
+}

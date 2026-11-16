@@ -162,6 +162,22 @@ impl Paths {
         kubaos_user_layer::root(&self.config)
     }
 
+    /// The user's picks of the Apps catalog, `~/.config/kubaos/apps.toml`.
+    pub fn app_picks(&self) -> PathBuf {
+        self.user_layer().join(crate::apps::picks::PICKS)
+    }
+
+    /// The journals of the apps' user steps, `~/.local/state/kubaos/apps/`: this machine's, so
+    /// not in the user layer.
+    pub fn app_journals(&self) -> PathBuf {
+        self.state.join(crate::apps::journal::JOURNALS)
+    }
+
+    /// The lock the user's side of an app's install or removal holds, in [`Paths::app_journals`].
+    pub fn app_lock(&self) -> PathBuf {
+        self.app_journals().join(crate::apps::journal::LOCK)
+    }
+
     /// The Projects root, where scaffolded projects go: `~/Projects` unless [`PROJECTS_VAR`]
     /// moved it.
     pub fn projects_root(&self) -> PathBuf {

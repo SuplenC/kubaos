@@ -1,0 +1,39 @@
+# Bitwarden desktop from the .deb of its GitHub release, pinned to its sha256. It is the build
+# Bitwarden documents its SSH agent and system-authentication unlock for, and it ships an AppArmor
+# profile for Electron's sandbox; nixpkgs' build has none for its store path. There's no apt
+# repository, and no arm64 .deb. kubaos update's Bitwarden phase moves it on to the newest release
+# of its series (crates/kubaos-core/src/update/bitwarden.rs), so the pin is where an install
+# starts and an update never puts it back. `system/70-bitwarden.sh --check-updates` names a new
+# release and its sha256.
+# https://github.com/bitwarden/clients/releases
+name = "Bitwarden"
+category = "security"
+tags = ["passwords", "password manager", "ssh", "vault"]
+summary = "Your passwords and SSH keys, locked up. Your dog's name was never a password."
+# From its AppStream metainfo, CC0-1.0 (flathub/com.bitwarden.desktop), without the lines that
+# speak as Bitwarden's team.
+description = """\
+Bitwarden is the easiest and safest way to store all of your logins and passwords while \
+conveniently keeping them synced between all of your devices. Bitwarden stores all of your \
+logins in an encrypted vault that syncs across all of your devices. Since it's fully encrypted \
+before it ever leaves your device, only you have access to your data. Bitwarden is 100% open \
+source software."""
+description_from = "https://github.com/flathub/com.bitwarden.desktop/blob/master/com.bitwarden.desktop.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "bitwarden"
+
+[[action]]
+name = "Install Bitwarden"
+kind = "deb"
+package = "bitwarden"
+version = "2026.10.1"
+self_updates = true
+amd64 = { url = "https://github.com/bitwarden/clients/releases/download/desktop-v2026.10.1/Bitwarden-2026.10.1-amd64.deb", sha256 = "02cb6bc6a429d8d0da9fdf9d23739358165cf7b98a245783d6f641526f75b0a7" }
+
+# Its SSH agent (~/.bitwarden-ssh-agent.sock) answers only while the app runs.
+[[action]]
+name = "Start it at login, for its SSH agent"
+kind = "file"
+to = "/etc/xdg/autostart/bitwarden.desktop"
+from = "bitwarden.desktop"

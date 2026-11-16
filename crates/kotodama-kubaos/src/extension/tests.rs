@@ -421,3 +421,83 @@ fn an_action_is_shown_by_whether_a_suite_is_installed() {
     assert!(unreadable.contains(&"test-tip".to_owned()));
     assert!(installed.contains(&"test-tip".to_owned()));
 }
+
+/// Claude Code, not on the machine, as the only app of the catalog.
+fn with_claude_code(text: &str) -> Extension<FakeBus, FakeRunner> {
+    use kubaos_core::apps::Catalog;
+    use kubaos_core::apps::Picks;
+    use kubaos_core::apps::Status;
+
+    let dir = tempfile::tempdir().expect("a temporary folder");
+    let folder = dir.path().join("apps/claude-code");
+    std::fs::create_dir_all(&folder).expect("make the folder");
+    std::fs::write(
+        folder.join("app.toml"),
+        "name = \"Claude Code\"\ncategory = \"ai\"\ntags = [\"coding agent\"]\n\
+         summary = \"A coding agent\"\ndescription = \"A coding agent.\"\n\
+         description_from = \"https://example.com\"\n\
+         [[action]]\nname = \"Install it\"\nkind = \"apt\"\npackages = [\"claude-code\"]\n",
+    )
+    .expect("write the app");
+    let catalog = Catalog::load(&dir.path().join("apps")).expect("the catalog");
+    let status = Status::read(
+        &catalog,
+        &Picks::default(),
+        &dir.path().join("journals"),
+        &dir.path().join("root-journals"),
+        "amd64",
+        None,
+    )
+    .expect("the status");
+    let mut extension = Extension::new(FakeBus::default(), FakeRunner::default());
+    extension.set_apps(Apps::new(&status));
+    let problems = extension.configure(&toml::from_str(text).expect("the test's config"));
+    assert!(problems.is_empty(), "{problems:?}");
+    extension
+}
+
+#[test]
+fn the_apps_of_the_catalog_come_after_the_suites_and_hide_takes_them_out() {
+    let shown = with_claude_code("");
+    let hidden = with_claude_code(r#"hide = ["app-install:claude-code", "app-remove:claude-code"]"#);
+
+    let mut expected = always();
+    expected.push("app-install:claude-code".to_owned());
+    assert_eq!(ids(&shown), expected);
+    assert_eq!(ids(&hidden), always());
+}
+
+#[test]
+fn installing_an_app_starts_a_job_and_closes_the_menu() {
+    let mut extension = with_claude_code("");
+
+    let ran = extension
+        .run(
+            apps::INSTALL,
+            &item(apps::KIND, "app-install:claude-code"),
+            &BTreeMap::new(),
+        )
+        .unwrap();
+
+    let Ran::Job(job) = ran else {
+        panic!("not a Job: {ran:?}");
+    };
+    assert_eq!(job.title, "Installing Claude Code");
+    assert_eq!(extension.runner.backgrounded(), ["kubaos app add claude-code --json"]);
+    let ended = extension.heard(Heard::ended(&job.id, false)).unwrap();
+    assert_eq!(ended.title, "Claude Code wasn't installed");
+}
+
+#[test]
+fn a_hidden_app_runs_nothing() {
+    let mut extension = with_claude_code(r#"hide = ["app-install:claude-code"]"#);
+
+    let ran = extension.run(
+        apps::INSTALL,
+        &item(apps::KIND, "app-install:claude-code"),
+        &BTreeMap::new(),
+    );
+
+    assert!(ran.is_err());
+    assert!(extension.runner.backgrounded().is_empty());
+}

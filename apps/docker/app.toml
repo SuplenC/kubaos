@@ -1,0 +1,64 @@
+# Docker Engine from Docker's signed apt repository, whose key system/packages.toml pins
+# ([repo.docker]). Docker's own packages, not Ubuntu's docker.io, which trails them. Docker
+# starts on its first use, through docker.socket, not at boot: docker.service wants
+# network-online.target, which would put a wait for the network on the way to the desktop.
+# https://docs.docker.com/engine/install/ubuntu/
+name = "Docker"
+category = "development"
+tags = ["containers", "compose", "docker", "images"]
+summary = "Containers and Compose. Because \"works on my machine\" needed a shipping format."
+# Docker's documentation, Apache-2.0 (github.com/docker/docs).
+description = """\
+Docker Engine is an open source containerization technology for building and containerizing \
+your applications. Docker Engine acts as a client-server application with: a server with a \
+long-running daemon process dockerd; APIs which specify interfaces that programs can use to \
+talk to and instruct the Docker daemon; a command line interface (CLI) client docker. The CLI \
+uses Docker APIs to control or interact with the Docker daemon through scripting or direct CLI \
+commands. Many other Docker applications use the underlying API and CLI. The daemon creates \
+and manages Docker objects, such as images, containers, networks, and volumes."""
+description_from = "https://docs.docker.com/engine/"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "docker"
+
+[[action]]
+name = "Install Docker"
+kind = "apt"
+repo = "docker"
+packages = ["docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"]
+
+[[action]]
+name = "Let you run docker without sudo"
+kind = "group"
+group = "docker"
+
+# The same file system/lib.sh's docker_on_demand puts beside a Docker engine of the user's own. On
+# a machine an older KubaOS set up, its older text is taken in as KubaOS's, and the next run
+# writes this one.
+[[action]]
+name = "Give containers time to stop at shutdown"
+kind = "file"
+to = "/etc/systemd/system/docker.service.d/kubaos-stop.conf"
+from = "kubaos-stop.conf"
+
+[[action]]
+name = "Keep Docker out of the boot"
+kind = "unit"
+unit = "docker.service"
+scope = "system"
+enable = false
+
+[[action]]
+name = "Keep containerd out of the boot"
+kind = "unit"
+unit = "containerd.service"
+scope = "system"
+enable = false
+
+[[action]]
+name = "Start Docker on its first use"
+kind = "unit"
+unit = "docker.socket"
+scope = "system"
+enable = true
+start = true

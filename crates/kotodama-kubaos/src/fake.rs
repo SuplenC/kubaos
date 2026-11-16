@@ -9,6 +9,8 @@ use std::time::Duration;
 use crate::bus::Bus;
 use crate::bus::BusError;
 use crate::bus::Property;
+use crate::run::OnEnd;
+use crate::run::OnLine;
 use crate::run::RunError;
 use crate::run::Runner;
 
@@ -79,6 +81,8 @@ impl Bus for FakeBus {
 pub struct FakeRunner {
     pub ran: RefCell<Vec<Vec<String>>>,
     pub launched: RefCell<Vec<(Vec<String>, Duration)>>,
+    /// What [`Runner::background`] started; the test reports their lines and ends itself.
+    pub backgrounded: RefCell<Vec<Vec<String>>>,
     pub outputs: BTreeMap<String, String>,
     /// Every program fails, saying this.
     pub failing: Option<String>,
@@ -87,6 +91,10 @@ pub struct FakeRunner {
 impl FakeRunner {
     pub fn ran(&self) -> Vec<String> {
         self.ran.borrow().iter().map(|argv| argv.join(" ")).collect()
+    }
+
+    pub fn backgrounded(&self) -> Vec<String> {
+        self.backgrounded.borrow().iter().map(|argv| argv.join(" ")).collect()
     }
 }
 
@@ -110,6 +118,17 @@ impl Runner for FakeRunner {
             ))));
         }
         self.launched.borrow_mut().push((argv.to_vec(), delay));
+        Ok(())
+    }
+
+    fn background(&self, argv: &[String], _line: OnLine, _ended: OnEnd) -> Result<(), RunError> {
+        if self.failing.is_some() {
+            return Err(RunError::Launch(io::Error::other(format!(
+                "couldn't start {}",
+                argv[0]
+            ))));
+        }
+        self.backgrounded.borrow_mut().push(argv.to_vec());
         Ok(())
     }
 }

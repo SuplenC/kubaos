@@ -246,6 +246,9 @@
               pkgs.nixfmt
               self.formatter.${pkgs.stdenv.hostPlatform.system}
               pkgs.sccache
+              # The Apps catalog's user hooks read T3 Code's JSON with jq, as every KubaOS home
+              # has it (home/cli.nix); their tests run them here.
+              pkgs.jq
               pkgs.nodejs_24
               home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
             ];

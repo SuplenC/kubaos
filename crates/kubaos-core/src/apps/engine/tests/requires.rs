@@ -1,0 +1,647 @@
+use std::fs;
+use std::path::PathBuf;
+
+use super::super::Engine;
+use super::super::EngineError;
+use super::super::Keeper;
+use super::super::Ran;
+use super::Events;
+use super::World;
+use crate::apps::action::Side;
+use crate::apps::host::fake::FakeRoot;
+use crate::apps::journal::Journal;
+use crate::apps::picks::Picks;
+use crate::update::event::UpdateEvent;
+
+const ABOUT: &str = "summary = \"An app for the tests\"\ncategory = \"development\"\ntags = [\"editor\"]\n\
+                     description = \"An app the tests install.\"\ndescription_from = \"https://example.com/test\"\n";
+
+/// An editor from apt, with a file of its own as root.
+fn neovim() -> String {
+    format!(
+        r#"name = "Neovim"
+{ABOUT}
+[[action]]
+name = "Install Neovim"
+kind = "apt"
+packages = ["neovim"]
+
+[[action]]
+name = "Write its system-wide defaults"
+kind = "file"
+to = "/etc/xdg/nvim/sysinit.vim"
+text = "set nocompatible\n"
+"#
+    )
+}
+
+/// Neovim's distribution: only its own part, its config and the KubaOS defaults it reads, a
+/// configure step.
+fn lazyvim(requires: &str) -> String {
+    format!(
+        r#"name = "LazyVim"
+{ABOUT}requires = [{requires}]
+
+[[action]]
+name = "Write its config"
+kind = "file"
+to = "~/.config/nvim/init.lua"
+text = "require('config.lazy')\n"
+
+[[action]]
+name = "Write KubaOS's defaults"
+kind = "file"
+stage = "configure"
+to = "~/.config/kubaos/lazyvim/defaults.lua"
+text = "vim.o.number = true\n"
+
+[[action]]
+name = "Sync its plugins"
+kind = "run"
+do = ["./sync"]
+check = ["./synced"]
+undo = ["./unsync"]
+"#
+    )
+}
+
+/// Another app on Neovim, so two apps share it.
+fn notes() -> String {
+    format!(
+        r#"name = "Notes"
+{ABOUT}requires = ["neovim"]
+
+[[action]]
+name = "Write the notes plugin"
+kind = "file"
+to = "~/.config/notes/notes.lua"
+text = "return {{}}\n"
+"#
+    )
+}
+
+fn world(requires: &str) -> World {
+    let (neovim, lazyvim, notes) = (neovim(), lazyvim(requires), notes());
+    let world = World::new(&[("neovim", &neovim), ("lazyvim", &lazyvim), ("notes", &notes)]);
+    world.script("lazyvim", "sync", r#"touch "$HOME/synced""#);
+    world.script("lazyvim", "synced", r#"[ -e "$HOME/synced" ]"#);
+    world.script("lazyvim", "unsync", r#"rm -f "$HOME/synced""#);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .candidates
+        .insert("neovim".to_owned(), "0.10.2-1".to_owned());
+    world
+}
+
+fn picks(ids: &[&str]) -> Picks {
+    let mut picks = Picks::default();
+    for id in ids {
+        picks.add(id);
+    }
+    picks
+}
+
+impl World {
+    /// Runs `go` with an engine of this world, reporting to `events`.
+    fn with<T>(
+        &self,
+        events: &mut Events,
+        go: impl FnOnce(&mut Engine<'_>) -> Result<T, EngineError>,
+    ) -> (Result<T, EngineError>, FakeRoot) {
+        let mut root = self.root();
+        let mut user_host = self.host.clone();
+        let keeper = Keeper::new(&mut user_host, Side::User, &self.catalog, &self.user_journals);
+        let mut engine = Engine::new(keeper, &mut root, &self.root_journals, &self.lock, events, true);
+        let result = go(&mut engine);
+        (result, root)
+    }
+
+    fn add(&self, id: &str, picked: &[&str]) -> (Result<Vec<Ran>, EngineError>, Events) {
+        let mut events = Events::default();
+        let (result, _) = self.with(&mut events, |e| e.add(id, None, &picks(picked)));
+        (result, events)
+    }
+
+    fn remove_with(&self, id: &str, picked: &[&str]) -> (Result<Vec<Ran>, EngineError>, Events) {
+        let mut events = Events::default();
+        let (result, _) = self.with(&mut events, |e| e.remove_with(id, &picks(picked)));
+        (result, events)
+    }
+
+    fn home_file(&self, path: &str) -> PathBuf {
+        self.host_home().join(path)
+    }
+}
+
+impl Events {
+    /// The apps the run went through, as `name n/of`.
+    fn apps(&self) -> Vec<String> {
+        self.0
+            .iter()
+            .filter_map(|e| match e {
+                UpdateEvent::App(app) => Some(format!("{} {}/{}", app.name, app.n, app.of)),
+                _ => None,
+            })
+            .collect()
+    }
+}
+
+fn names(ran: &[Ran]) -> Vec<&str> {
+    ran.iter().map(|r| r.name.as_str()).collect()
+}
+
+#[test]
+fn installing_lazyvim_installs_neovim_first_through_its_own_folder_and_journal() {
+    let world = world("{ id = \"neovim\", min = \"0.10\" }");
+
+    let (result, events) = world.add("lazyvim", &["lazyvim"]);
+
+    assert_eq!(names(&result.unwrap()), ["Neovim", "LazyVim"]);
+    assert_eq!(events.apps(), ["Neovim 1/2", "LazyVim 2/2"]);
+    assert_eq!(world.host.state.borrow().dpkg["neovim"], "1.0");
+    assert!(world.home_file(".config/nvim/init.lua").is_file());
+    let (neovim, neovim_root) = world.journals("neovim");
+    let neovim = neovim.unwrap();
+    assert!(neovim.complete);
+    assert_eq!(neovim.brought_by, ["lazyvim"]);
+    assert!(neovim.entries.is_empty(), "Neovim's steps are root's: {neovim:?}");
+    assert_eq!(neovim_root.unwrap().entries.len(), 2);
+    let lazyvim = world.journals("lazyvim").0.unwrap();
+    assert!(lazyvim.complete);
+    assert!(lazyvim.brought_by.is_empty());
+    assert!(lazyvim.entries.iter().all(|e| e.action.name != "Install Neovim"));
+}
+
+#[test]
+fn a_min_the_required_apps_source_cant_meet_is_refused_before_anything_runs() {
+    let world = world("{ id = \"neovim\", min = \"0.11\" }");
+    let before = world.host.snapshot();
+    let mut events = Events::default();
+
+    let (result, root) = world.with(&mut events, |e| e.add("lazyvim", None, &picks(&["lazyvim"])));
+
+    let Err(EngineError::Refused { app, why }) = result else {
+        panic!("the install went on: {result:?}");
+    };
+    assert_eq!(app, "LazyVim");
+    assert_eq!(
+        why,
+        ["it needs Neovim 0.11 or newer, and this machine would get 0.10.2-1"]
+    );
+    assert_eq!(world.host.snapshot(), before);
+    assert_eq!(world.journals("neovim"), (None, None));
+    assert_eq!(world.journals("lazyvim"), (None, None));
+    assert!(root.calls.borrow().is_empty(), "{:?}", root.calls.borrow());
+}
+
+#[test]
+fn a_min_is_met_by_the_version_the_machine_has_already() {
+    let world = world("{ id = \"neovim\", min = \"0.11\" }");
+    world
+        .host
+        .state
+        .borrow_mut()
+        .dpkg
+        .insert("neovim".to_owned(), "0.11.1".to_owned());
+
+    let (result, _) = world.add("lazyvim", &["lazyvim"]);
+
+    assert_eq!(names(&result.unwrap()), ["Neovim", "LazyVim"]);
+}
+
+#[test]
+fn removing_neovim_while_lazyvim_is_installed_is_refused_naming_lazyvim() {
+    let world = world("\"neovim\"");
+    world.add("lazyvim", &["lazyvim"]).0.unwrap();
+    let before = world.host.snapshot();
+
+    let (result, events) = world.remove_with("neovim", &["lazyvim"]);
+
+    let Err(e) = result else {
+        panic!("Neovim went");
+    };
+    assert_eq!(e.to_string(), "Neovim is needed by LazyVim: remove that first");
+    assert!(events.0.is_empty(), "{:?}", events.0);
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn removing_lazyvim_takes_the_neovim_it_brought_and_leaves_the_machine_as_before() {
+    let world = world("\"neovim\"");
+    let before = world.host.snapshot();
+    world.add("lazyvim", &["lazyvim"]).0.unwrap();
+
+    let (result, events) = world.remove_with("lazyvim", &[]);
+
+    assert_eq!(names(&result.unwrap()), ["LazyVim", "Neovim"]);
+    assert_eq!(events.apps(), ["LazyVim 1/2", "Neovim 2/2"]);
+    assert_eq!(world.host.snapshot(), before);
+    assert_eq!(world.journals("neovim"), (None, None));
+    assert_eq!(world.journals("lazyvim"), (None, None));
+}
+
+#[test]
+fn a_required_app_the_user_picked_stays_when_the_app_that_required_it_goes() {
+    let world = world("\"neovim\"");
+    world.add("neovim", &["neovim"]).0.unwrap();
+    world.add("lazyvim", &["neovim", "lazyvim"]).0.unwrap();
+
+    let (result, _) = world.remove_with("lazyvim", &["neovim"]);
+
+    assert_eq!(names(&result.unwrap()), ["LazyVim"]);
+    let neovim = world.journals("neovim").0.unwrap();
+    assert!(neovim.complete && neovim.brought_by.is_empty(), "{neovim:?}");
+    assert!(world.host.state.borrow().dpkg.contains_key("neovim"));
+}
+
+#[test]
+fn a_required_app_the_user_picks_after_it_came_stays_with_them() {
+    let world = world("\"neovim\"");
+    world.add("lazyvim", &["lazyvim"]).0.unwrap();
+
+    let (result, _) = world.remove_with("lazyvim", &["neovim"]);
+
+    assert_eq!(names(&result.unwrap()), ["LazyVim"]);
+    assert!(world.host.state.borrow().dpkg.contains_key("neovim"));
+}
+
+#[test]
+fn a_required_app_two_apps_brought_goes_with_the_last_of_them() {
+    let world = world("\"neovim\"");
+    fs::create_dir_all(world.home_file(".config")).unwrap();
+    let before = world.host.snapshot();
+    world.add("lazyvim", &["lazyvim"]).0.unwrap();
+    world.add("notes", &["lazyvim", "notes"]).0.unwrap();
+    assert_eq!(world.journals("neovim").0.unwrap().brought_by, ["lazyvim", "notes"]);
+
+    let (first, _) = world.remove_with("lazyvim", &["notes"]);
+
+    assert_eq!(names(&first.unwrap()), ["LazyVim"]);
+    assert_eq!(world.journals("neovim").0.unwrap().brought_by, ["notes"]);
+    let (last, _) = world.remove_with("notes", &[]);
+    assert_eq!(names(&last.unwrap()), ["Notes", "Neovim"]);
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn a_failed_install_takes_back_the_required_app_it_brought() {
+    let world = world("\"neovim\"");
+    world.script("lazyvim", "sync", "exit 1");
+    let before = world.host.snapshot();
+
+    let (result, _) = world.add("lazyvim", &["lazyvim"]);
+
+    let Err(EngineError::Step { name, .. }) = result else {
+        panic!("the install went through: {result:?}");
+    };
+    assert_eq!(name, "Sync its plugins");
+    assert_eq!(world.host.snapshot(), before);
+    assert_eq!(world.journals("neovim"), (None, None));
+    assert_eq!(world.journals("lazyvim"), (None, None));
+}
+
+#[test]
+fn a_failed_install_keeps_a_required_app_that_was_there() {
+    let world = world("\"neovim\"");
+    world.add("neovim", &["neovim"]).0.unwrap();
+    world.script("lazyvim", "sync", "exit 1");
+
+    let (result, _) = world.add("lazyvim", &["neovim", "lazyvim"]);
+
+    assert!(result.is_err());
+    assert!(world.journals("neovim").0.unwrap().complete);
+    assert!(world.host.state.borrow().dpkg.contains_key("neovim"));
+}
+
+#[test]
+fn the_configure_stage_runs_after_the_install_and_alone_again_on_its_own() {
+    let world = world("\"neovim\"");
+    let defaults = world.home_file(".config/kubaos/lazyvim/defaults.lua");
+
+    let (_, events) = world.add("lazyvim", &["lazyvim"]);
+
+    let steps: Vec<String> = events
+        .0
+        .iter()
+        .filter_map(|e| match e {
+            UpdateEvent::Step { text } => Some(text.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        steps,
+        [
+            "Install Neovim",
+            "Write its system-wide defaults",
+            "Write its config",
+            "Sync its plugins",
+            "Write KubaOS's defaults",
+        ]
+    );
+    fs::write(&defaults, "vim.o.number = false\n").unwrap();
+    let mut events = Events::default();
+    let (configured, _) = world.with(&mut events, |e| e.configure("lazyvim"));
+    assert_eq!(configured.unwrap().name, "LazyVim");
+    assert_eq!(fs::read_to_string(&defaults).unwrap(), "vim.o.number = true\n");
+    let ran: Vec<(usize, usize)> = events
+        .0
+        .iter()
+        .filter_map(|e| match e {
+            UpdateEvent::Action(a) => Some((a.step, a.of)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(ran, [(3, 3)]);
+}
+
+#[test]
+fn removing_an_app_undoes_its_configure_steps_with_the_rest() {
+    let world = world("\"neovim\"");
+    let before = world.host.snapshot();
+    world.add("lazyvim", &["lazyvim"]).0.unwrap();
+    let mut events = Events::default();
+    world.with(&mut events, |e| e.configure("lazyvim")).0.unwrap();
+
+    world.remove_with("lazyvim", &[]).0.unwrap();
+
+    assert!(!world.home_file(".config/kubaos/lazyvim").exists());
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn configuring_an_app_not_installed_or_without_a_configure_stage_is_refused() {
+    let world = world("\"neovim\"");
+    let mut events = Events::default();
+
+    let (missing, _) = world.with(&mut events, |e| e.configure("lazyvim"));
+    world.add("neovim", &["neovim"]).0.unwrap();
+    let (none, _) = world.with(&mut events, |e| e.configure("neovim"));
+
+    assert_eq!(missing.unwrap_err().to_string(), "LazyVim isn't installed");
+    assert_eq!(none.unwrap_err().to_string(), "Neovim has nothing to configure");
+}
+
+#[test]
+fn a_removal_says_what_it_keeps_on_purpose() {
+    let mut text = neovim();
+    text = text.replacen(
+        "[[action]]",
+        "keeps = \"Your swap files stay in ~/.local/state/nvim.\"\n\n[[action]]",
+        1,
+    );
+    let world = World::new(&[("neovim", &text)]);
+    world.add("neovim", &["neovim"]).0.unwrap();
+
+    let (_, events) = world.remove_with("neovim", &[]);
+
+    assert!(
+        events.0.contains(&UpdateEvent::Note {
+            text: "Your swap files stay in ~/.local/state/nvim.".to_owned()
+        }),
+        "{:?}",
+        events.0
+    );
+}
+
+#[test]
+fn a_required_app_left_by_a_journal_that_isnt_installed_goes_with_the_next_removal_of_its_bringer() {
+    let world = world("\"neovim\"");
+    world.add("lazyvim", &["lazyvim"]).0.unwrap();
+    let mut journal = Journal::read(&world.user_journals, "neovim").unwrap().unwrap();
+    journal.brought_by = vec!["lazyvim".to_owned(), "gone".to_owned()];
+    journal.save(&world.user_journals).unwrap();
+
+    let (result, _) = world.remove_with("lazyvim", &[]);
+
+    assert_eq!(names(&result.unwrap()), ["LazyVim", "Neovim"]);
+}
+
+#[test]
+fn a_brought_app_that_cant_be_removed_is_a_warning_once_the_app_asked_for_is_gone() {
+    let world = world("\"neovim\"");
+    world.add("lazyvim", &["lazyvim"]).0.unwrap();
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.dpkg.insert("plugin-host".to_owned(), "1.0".to_owned());
+        state
+            .depends
+            .insert("plugin-host".to_owned(), ["neovim".to_owned()].into());
+    }
+
+    let (result, events) = world.remove_with("lazyvim", &[]);
+
+    assert_eq!(names(&result.unwrap()), ["LazyVim"]);
+    assert_eq!(world.journals("lazyvim"), (None, None));
+    let neovim_root = world.journals("neovim").1.unwrap();
+    assert_eq!(
+        neovim_root.entries.len(),
+        1,
+        "the removal stopped at the package: {neovim_root:?}"
+    );
+    let warned = events.0.iter().any(|e| {
+        matches!(e, UpdateEvent::Warning { text }
+            if text.starts_with("Neovim was there only for LazyVim, and couldn't be removed: ")
+                && text.ends_with("; kubaos app remove neovim tries again"))
+    });
+    assert!(warned, "{:?}", events.0);
+}
+
+#[test]
+fn configuring_an_app_a_release_changed_waits_for_the_update_that_brings_it_up_to_date() {
+    let world = world("\"neovim\"");
+    world.add("lazyvim", &["lazyvim"]).0.unwrap();
+    let changed = lazyvim("\"neovim\"").replacen(
+        "[[action]]",
+        "[[action]]\nname = \"Write its options\"\nkind = \"file\"\nto = \"~/.config/nvim/options.lua\"\ntext = \"\"\n\n[[action]]",
+        1,
+    );
+    world.write_app("lazyvim", &changed);
+    let before = world.host.snapshot();
+    let mut events = Events::default();
+
+    let (result, _) = world.with(&mut events, |e| e.configure("lazyvim"));
+
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "LazyVim changed with this release: kubaos update brings it up to date, then configure it"
+    );
+    assert_eq!(world.host.snapshot(), before);
+}
+
+/// An app in two setups, as Penpot is: on the web in a browser, or on an engine of this machine
+/// in the same browser; each ready while its window, `$HOME/open-<setup>`, is closed.
+fn designer() -> String {
+    let setup = |id: &str, name: &str, requires: &str| {
+        format!(
+            r#"
+[setup.{id}]
+name = "{name}"
+summary = "The designer, {id}"
+requires = [{requires}]
+
+[[setup.{id}.ready]]
+check = ["./closed", "{id}"]
+says = "{name}'s window is open: close it, then try again"
+
+[[setup.{id}.action]]
+name = "Put {name} in a window of its own"
+kind = "file"
+to = "~/.config/designer/{id}"
+text = "{id}\n"
+"#
+        )
+    };
+    format!(
+        "name = \"Designer\"\n{ABOUT}{}{}",
+        setup("local", "Designer on this machine", "\"engine\", \"browser\""),
+        setup("web", "Designer", "\"browser\""),
+    )
+}
+
+/// An app of one package from apt.
+fn package_app(name: &str, package: &str) -> String {
+    format!(
+        "name = \"{name}\"\n{ABOUT}\n[[action]]\nname = \"Install {name}\"\nkind = \"apt\"\npackages = [\"{package}\"]\n"
+    )
+}
+
+fn designer_world() -> World {
+    let (designer, browser, engine) = (
+        designer(),
+        package_app("Browser", "browser"),
+        package_app("Engine", "engine"),
+    );
+    let world = World::new(&[("designer", &designer), ("browser", &browser), ("engine", &engine)]);
+    world.script("designer", "closed", r#"[ ! -e "$HOME/open-$1" ]"#);
+    world
+}
+
+impl World {
+    fn add_in(&self, id: &str, setup: &str, picked: &[&str]) -> (Result<Vec<Ran>, EngineError>, Events, usize) {
+        let mut events = Events::default();
+        let (result, root) = self.with(&mut events, |e| e.add(id, Some(setup), &picks(picked)));
+        let calls = root.calls.borrow().len();
+        (result, events, calls)
+    }
+}
+
+#[test]
+fn switching_setups_while_the_old_setups_window_is_open_is_refused_and_changes_nothing() {
+    let world = designer_world();
+    world.add_in("designer", "web", &["designer"]).0.unwrap();
+    fs::write(world.home_file("open-web"), "").unwrap();
+    let before = world.host.snapshot();
+
+    let (result, events, calls) = world.add_in("designer", "local", &["designer"]);
+
+    let Err(EngineError::NotReady(says)) = result else {
+        panic!("the switch went on: {result:?}");
+    };
+    assert_eq!(says, "Designer's window is open: close it, then try again");
+    assert!(events.0.is_empty(), "{:?}", events.0);
+    assert_eq!(calls, 0, "root was asked for");
+    assert_eq!(world.host.snapshot(), before);
+    assert_eq!(world.journals("designer").0.unwrap().setup.as_deref(), Some("web"));
+    assert_eq!(world.journals("engine"), (None, None));
+}
+
+#[test]
+fn switching_setups_takes_the_app_the_old_setup_alone_brought_and_keeps_the_rest() {
+    let world = designer_world();
+    let before = world.host.snapshot();
+    world.add_in("designer", "local", &["designer"]).0.unwrap();
+    assert_eq!(world.journals("engine").0.unwrap().brought_by, ["designer"]);
+
+    let (result, _, _) = world.add_in("designer", "web", &["designer"]);
+
+    let ran = result.unwrap();
+    assert_eq!(names(&ran), ["Browser", "Designer", "Engine"]);
+    assert!(ran[2].finished.removed && !ran[1].finished.removed);
+    assert_eq!(world.journals("engine"), (None, None));
+    assert!(!world.host.state.borrow().dpkg.contains_key("engine"));
+    assert_eq!(world.journals("browser").0.unwrap().brought_by, ["designer"]);
+    world.remove_with("designer", &[]).0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn switching_setups_keeps_an_app_the_old_setup_brought_that_the_user_picked_since() {
+    let world = designer_world();
+    world.add_in("designer", "local", &["designer"]).0.unwrap();
+
+    let (result, _, _) = world.add_in("designer", "web", &["designer", "engine"]);
+
+    assert_eq!(names(&result.unwrap()), ["Browser", "Designer"]);
+    let engine = world.journals("engine").0.unwrap();
+    assert!(engine.complete && engine.brought_by.is_empty(), "{engine:?}");
+}
+
+#[test]
+fn switching_setups_keeps_an_app_also_brought_by_an_app_whose_install_is_incomplete() {
+    let (designer, browser, engine) = (
+        designer(),
+        package_app("Browser", "browser"),
+        package_app("Engine", "engine"),
+    );
+    let tool = format!(
+        "name = \"Tool\"\n{ABOUT}requires = [\"engine\"]\n\n[[action]]\nname = \"Write its config\"\n\
+         kind = \"file\"\nto = \"~/.config/tool/tool.conf\"\ntext = \"\"\n"
+    );
+    let world = World::new(&[
+        ("designer", &designer),
+        ("browser", &browser),
+        ("engine", &engine),
+        ("tool", &tool),
+    ]);
+    world.script("designer", "closed", r#"[ ! -e "$HOME/open-$1" ]"#);
+    world.add_in("designer", "local", &["designer"]).0.unwrap();
+    world.add("tool", &["designer", "tool"]).0.unwrap();
+    let mut journal = Journal::read(&world.user_journals, "tool").unwrap().unwrap();
+    journal.complete = false;
+    journal.save(&world.user_journals).unwrap();
+
+    let (result, _, _) = world.add_in("designer", "web", &["designer", "tool"]);
+
+    assert_eq!(names(&result.unwrap()), ["Browser", "Designer"]);
+    let engine = world.journals("engine").0.unwrap();
+    assert_eq!(engine.brought_by, ["tool"]);
+    assert!(world.host.state.borrow().dpkg.contains_key("engine"));
+}
+
+/// A sink that tries to take the run lock as each app of the run begins, as another run would.
+struct Interloper {
+    lock: PathBuf,
+    took: Vec<bool>,
+}
+
+impl crate::update::event::Sink for Interloper {
+    fn event(&mut self, event: &UpdateEvent) {
+        if matches!(event, UpdateEvent::App(_)) {
+            self.took.push(crate::apps::journal::lock(&self.lock).is_ok());
+        }
+    }
+}
+
+#[test]
+fn another_run_cant_take_the_lock_between_the_apps_of_an_install() {
+    let world = world("\"neovim\"");
+    let mut sink = Interloper {
+        lock: world.lock.clone(),
+        took: Vec::new(),
+    };
+    let mut root = world.root();
+    let mut user_host = world.host.clone();
+    let keeper = Keeper::new(&mut user_host, Side::User, &world.catalog, &world.user_journals);
+    let mut engine = Engine::new(keeper, &mut root, &world.root_journals, &world.lock, &mut sink, true);
+
+    engine.add("lazyvim", None, &picks(&["lazyvim"])).unwrap();
+
+    drop(engine);
+    assert_eq!(sink.took, [false, false]);
+    assert!(
+        crate::apps::journal::lock(&world.lock).is_ok(),
+        "the lock outlived the run"
+    );
+}

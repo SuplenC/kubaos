@@ -75,6 +75,13 @@ pub struct Journal<'a> {
     pub inputs: Vec<String>,
 }
 
+/// The Apps catalog's engine reports through the journal, as the updater does.
+impl Sink for Journal<'_> {
+    fn event(&mut self, event: &UpdateEvent) {
+        self.emit(event);
+    }
+}
+
 impl fmt::Debug for Journal<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Journal")
@@ -324,6 +331,11 @@ fn log_text(event: &UpdateEvent) -> Option<String> {
         UpdateEvent::Output { line } => format!("   {line}"),
         UpdateEvent::Note { text } => text.clone(),
         UpdateEvent::Warning { text } => format!("warning: {text}"),
+        UpdateEvent::App(app) => format!("== {} ({}/{})", app.name, app.n, app.of),
+        UpdateEvent::Action(action) => format!(
+            "   {} {}/{} {}: {:?}",
+            action.app, action.step, action.of, action.name, action.state
+        ),
         UpdateEvent::Preview(preview) => format!("preview: {}", serde_json::to_string(preview).ok()?),
         UpdateEvent::Prompt {
             prompt: Prompt::Confirm { question },

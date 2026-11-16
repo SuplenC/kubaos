@@ -19,7 +19,7 @@ install/image/check [--arch aarch64]      # unpack + chroot checks; writes check
 | `check.txt`, `packages.txt` | Written by `check`, not used by the engine |
 | `check.ok` | Written by `check` when every check passes: the sha256 of the `manifest.json` it checked. `install/iso/build` refuses a payload without a matching one |
 
-The tree is Ubuntu 26.04 after `system/10-strip.sh`, `20-base.sh`, `25-boot.sh`, `40-apps.sh`, `50-hyprland.sh`, `60-nix.sh`, `65-recorder.sh`, `70-bitwarden.sh` and `75-yubikey.sh`, plus what the Server installer would have put there first. That covers `ubuntu-minimal`, systemd, `linux-generic`, initramfs-tools, cryptsetup(-initramfs), btrfs-progs, dosfstools, e2fsprogs, GRUB EFI (plain and signed), shim-signed, efibootmgr, os-prober, locales, tzdata, keyboard-configuration, console-setup and openssh-server. `/nix` is a minimal store holding:
+The tree is Ubuntu 26.04 after `system/10-strip.sh`, `20-base.sh`, `25-boot.sh`, `50-hyprland.sh`, `60-nix.sh`, `65-recorder.sh`, `70-bitwarden.sh` and `75-yubikey.sh`, plus what the Server installer would have put there first. That covers `ubuntu-minimal`, systemd, `linux-generic`, initramfs-tools, cryptsetup(-initramfs), btrfs-progs, dosfstools, e2fsprogs, GRUB EFI (plain and signed), shim-signed, efibootmgr, os-prober, locales, tzdata, keyboard-configuration, console-setup and openssh-server. `/nix` is a minimal store holding:
 
 - the home-manager activation package for `kuba@<host>` (`vm` on aarch64, `tuxedo` on x86_64), built from the user flake with the shipped lock: `manifest.home_generation`, GC root `/nix/var/nix/gcroots/kubaos/home-generation`. `kuba` is the build user
 - what the engine needs to build that generation for another username offline (docs/INSTALL-INTERNALS.md, "Another username"), GC roots `kubaos/rebuild-input-*`. `assemble.sh` builds the generation for a probe user (`kubaos-probe`, from the user flake written for that name) and diffs the two derivation closures. What differs is what names the user. The inputs of those derivations that aren't themselves user-specific (their outputs, through `nix derivation show` and `lib/build-inputs.py`) go into the payload. About 18 MB beyond the generation's own closure
@@ -35,7 +35,7 @@ Nothing else from the build's store goes in.
 
 | File | What |
 |---|---|
-| `image.json` | `version`, `build`, `commit`, `username`, `uid`/`gid` (1000), `hostname`, `home_generation`, `groups` (supplementary groups the scripts gave the user: `sudo`, `docker`, `i2c`), `kubaos`, `user_flake_lock`, `snapper_root_config`, `kernel` |
+| `image.json` | `version`, `build`, `commit`, `username`, `uid`/`gid` (1000), `hostname`, `home_generation`, `groups` (supplementary groups the scripts gave the user: `sudo`, `i2c`), `kubaos`, `user_flake_lock`, `snapper_root_config`, `kernel` |
 | `user-flake.lock` | The user flake's lock: `kubaos` at `release`, the user's `nixpkgs` at KubaOS's revision (`lib/user-flake-lock.py`). The engine writes it to `~/.config/kubaos/home/flake.lock` |
 | `snapper-root.conf` | `KEY=VALUE` lines from `20-base.sh`, for `snapper -c root set-config` |
 
@@ -94,7 +94,6 @@ unsquashfs -f -d /mnt -processors "$(nproc)" -percentage kubaos-shinjuku-x86_64.
    | `os` | `ubuntu:26.04`, the base and boot packages above, the temporary build user `kuba` (uid 1000, NOPASSWD sudo) | the package list |
    | `base` | `system/10-strip.sh`, `20-base.sh` for real | `lib.sh`, `manifest.sh`, the package manifest `packages.toml`, those scripts, `files/{apt,netplan,logind.conf.d}`, `files/systemd/{system,user}.conf.d` |
    | `nix` | Nix from the official installer, with version, URL and sha256 read from `60-nix.sh` | `60-nix.sh` |
-   | `apps` | `system/40-apps.sh` (Docker CE; Chrome on amd64) | that script, `files/chrome`, `files/systemd/docker.service.d` |
    | `desktop` | `50-hyprland.sh`, `70-bitwarden.sh`, `75-yubikey.sh` | those, `files/{getty,pam.d,tmpfiles.d,systemd,udev,keyd,xkb,polkit}`, the autostart snippet |
    | `boot` | `25-boot.sh`: Plymouth with the kubaos theme, the GRUB theme in `/boot/grub/themes/kubaos`, the `10_linux` wrapper. Last, so the splash rebuilds nothing else | that script, `files/{plymouth,grub,fonts,initramfs-tools}` |
 
@@ -102,7 +101,7 @@ unsquashfs -f -d /mnt -processors "$(nproc)" -percentage kubaos-shinjuku-x86_64.
 
 2. **`lib/assemble.sh`** runs in a container `kubaos-image-assemble-<arch>` from that image, 6 CPUs and 8 GB. It mounts two volumes: `kubaos-image-nix-<arch>-<nix version>` at `/nix` (the build's store, kept between builds; Docker seeds it from the image's bare Nix install) and `kubaos-image-work-<arch>` (the payload tree). It does this:
    - writes the KubaOS os-release and GRUB distributor (below), copies the repo snapshot to `/home/kuba/Projects/dotfiles` (for `system/`), puts KubaOS's checkout at `/usr/share/kubaos`, writes the user flake for `kuba` and locks it, builds its `homeConfigurations."kuba@<host>".activationPackage`, then the probe user's to find the build inputs for another username. KubaOS's crates in the generation, `kobo` among them, build with crane (`crates/workspace.nix`, docs/CONTRACTS.md): two dependency builds, then each package on top. None of them names the user, so they're in the payload and the engine never builds them
-   - runs the Nix half of `system/`, which the image stages can't run because they don't have the flake: `60-nix.sh --no-switch --no-gpu --no-chsh` (the pam_fprintd link, and `max-jobs = auto` in `/etc/nix/nix.conf`, which the payload keeps), `65-recorder.sh` (gsr-kms-server with its file cap), `70-bitwarden.sh --no-desktop --no-cli` (the pam_u2f link), and the generation's `non-nixos-gpu-setup`, which is 60-nix.sh's GPU step pointed at the generation, because there's no `~/.nix-profile` yet
+   - runs the Nix half of `system/`, which the image stages can't run because they don't have the flake: `60-nix.sh --no-switch --no-gpu --no-chsh` (the pam_fprintd link, and `max-jobs = auto` in `/etc/nix/nix.conf`, which the payload keeps), `65-recorder.sh` (gsr-kms-server with its file cap), `70-bitwarden.sh --no-cli` (the pam_u2f link), and the generation's `non-nixos-gpu-setup`, which is 60-nix.sh's GPU step pointed at the generation, because there's no `~/.nix-profile` yet
    - `rsync -aHAX` copies the container's own `/` into `/work/root`, incrementally, without mounts, `/home`, apt lists or caches, `/opt/dotfiles`, `/.dockerenv` or `/nix`
    - `nix copy --to local?root=/work/root` copies the closure of the roots listed above into a fresh `/work/root/nix`, then recreates the profiles and GC roots
    - strips identity and build leftovers (next section), enables `nix-daemon.socket` and `.service` offline, disables ssh, writes `/usr/share/kubaos-image/`
@@ -125,7 +124,8 @@ Why not mkosi: it builds Ubuntu images well, but it has no per-step layer cache.
 | apt lists, `.deb` cache, logs, `/tmp`, `policy-rc.d`, `/.dockerenv`, Docker's `docker-*` apt and dpkg configs | Build artefacts | `apt update` before the first install |
 | `home-manager switch` | Needs the user | engine, `home` step: runs `$home_generation/activate` as the user, through the payload's nix-daemon |
 | The user flake `~/.config/kubaos/home` | Needs the user | engine writes it from `/usr/share/kubaos/user-flake/` and `user-flake.lock` |
-| Bitwarden desktop, Chrome, the PPA's Hyprland on aarch64 | amd64 only | aarch64 has Ubuntu's hyprland 0.53 installed, as in `50-hyprland.sh`, but the session runs nixpkgs' Hyprland from the generation (`home/desktop.nix`), because 0.53 can't read the Lua config |
+| Google Chrome, Bitwarden desktop, Docker | Apps of the catalog, which the user picks | `kubaos app add` (`docs/USING.md`, "Apps") |
+| The PPA's Hyprland on aarch64 | amd64 only | aarch64 has Ubuntu's hyprland 0.53 installed, as in `50-hyprland.sh`, but the session runs nixpkgs' Hyprland from the generation (`home/desktop.nix`), because 0.53 can't read the Lua config |
 
 **KubaOS** (`docs/BRAND.md`): `/usr/lib/os-release` says `NAME="KubaOS"`, `PRETTY_NAME="KubaOS Shinjuku"`, `VERSION="0.1 (Shinjuku)"`, `VARIANT`/`VARIANT_ID` Shinjuku. `ID`, `ID_LIKE`, `VERSION_ID`, `VERSION_CODENAME` and `UBUNTU_CODENAME` are copied from Ubuntu's file, so apt, PPAs and install scripts see Ubuntu 26.04. The file is diverted (`dpkg-divert --local --rename`, Ubuntu's copy sits at `/usr/lib/os-release.ubuntu`), so a `base-files` upgrade can't put Ubuntu's back. dpkg warns that renaming a file from an Essential package is dangerous: the risk is a moment with no file during the rename, and the build writes the new one right away. `HOME_URL` comes from `KUBAOS_HOME_URL` at build time and is left out when that's unset (the repo has no public URL yet). The boot menu, its theme and the splash are `system/25-boot.sh`'s (`docs/INSTALL-INTERNALS.md`, "Boot"): `/etc/default/grub.d/10-kubaos.cfg`, the `10_linux` wrapper that names the entries "KubaOS Shinjuku" after `PRETTY_NAME`, and the Plymouth theme. The aarch64 payload adds `console=ttyAMA0 console=tty0 plymouth.ignore-serial-consoles` (`20-kubaos-console.cfg`). The EFI directory stays `EFI/ubuntu`, because shim and the signed GRUB look there.
 
@@ -136,7 +136,7 @@ Kept minimized: the Docker base image has the same dpkg path excludes as Ubuntu 
 `docs/INSTALL-INTERNALS.md` describes what the engine does. Points that depend on the image:
 
 - **gid 1000.** `/usr/local/libexec/dotfiles/gsr-kms-server` is `root:1000 0750` with `cap_sys_admin+ep`. The engine's `useradd -U` with uid 1000 gets gid 1000, because the payload leaves both free (`check` verifies this). If that ever changes, `chgrp` the helper and run `setcap cap_sys_admin+ep` on it again (a chown or chgrp clears file caps), or run `system/65-recorder.sh` on the machine.
-- **Groups.** The scripts put the build user in `sudo`, `i2c` and `docker`, as `image.json` `groups` records. All three are in the engine's list.
+- **Groups.** The scripts put the build user in `sudo` and `i2c`, as `image.json` `groups` records. Both are in the engine's list.
 - **initramfs.** The payload's initrd was built in a container: it has the cryptsetup hook but no crypttab. The engine's `update-initramfs` in the bootloader step is required, not optional.
 - **The user flake** has to belong to the user, down from `~/.config`. `/usr/share/kubaos` stays root's: nothing on the machine writes to it except the updater.
 - **Snapper.** `/usr/share/kubaos-image/snapper-root.conf` has `20-base.sh`'s settings as `KEY=VALUE` lines, written by the script itself in image mode. Read them from there to avoid a second copy.

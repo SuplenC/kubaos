@@ -532,45 +532,41 @@ mod tests {
 
     #[test]
     fn system_files_that_name_the_user_are_rendered_for_them() {
-        // system/50-hyprland.sh and 40-apps.sh rendered these for the build
-        // user; the installed system needs them for the real one.
+        // system/50-hyprland.sh rendered this for the build user; the
+        // installed system needs it for the real one.
         let p = payload();
         let mut cfg = config(&p);
         cfg.user.username = "alice".into();
-        let mut r = DryRunner::new();
         let tpl = "/mnt/t/usr/share/kubaos/system/files";
-        r.files.insert(
-            format!("{tpl}/getty/autologin.conf.in").into(),
-            "ExecStart=-/sbin/agetty --autologin @USER@ %I $TERM\n".into(),
-        );
-        r.files.insert(
-            format!("{tpl}/chrome/dot-chrome-theme.path.in").into(),
-            "PathChanged=@HOME@/.local/state/theme/colors.json\n".into(),
-        );
-        // Installed by the image: the getty drop-in and the path unit, not
-        // the service (as if 40-apps.sh had skipped it).
         let autologin = "/mnt/t/etc/systemd/system/getty@tty1.service.d/autologin.conf";
-        let path_unit = "/mnt/t/etc/systemd/system/dot-chrome-theme.path";
-        r.files.insert(autologin.into(), "--autologin kuba\n".into());
-        r.files.insert(path_unit.into(), "/home/kuba\n".into());
         let opts = RunOptions {
             dry_run: true,
             target_root: Some("/mnt/t".into()),
             log_file: None,
         };
+        let runner = |installed: bool| {
+            let mut r = DryRunner::new();
+            r.files.insert(
+                format!("{tpl}/getty/autologin.conf.in").into(),
+                "ExecStart=-/sbin/agetty --autologin @USER@ %I $TERM\n".into(),
+            );
+            if installed {
+                r.files.insert(autologin.into(), "--autologin kuba\n".into());
+            }
+            r
+        };
+
+        let mut r = runner(true);
         run_with(&cfg, &secrets(), &opts, &mut r, &mut |_| {}).unwrap();
         assert_eq!(
             r.files[Path::new(autologin)],
             "ExecStart=-/sbin/agetty --autologin alice %I $TERM\n"
         );
-        assert_eq!(
-            r.files[Path::new(path_unit)],
-            "PathChanged=/home/alice/.local/state/theme/colors.json\n"
-        );
-        assert!(
-            !r.files
-                .contains_key(Path::new("/mnt/t/etc/systemd/system/dot-chrome-theme.service"))
-        );
+
+        // One the image doesn't have stays out.
+        let mut r = runner(false);
+        run_with(&cfg, &secrets(), &opts, &mut r, &mut |_| {}).unwrap();
+        assert!(!r.files.contains_key(Path::new(autologin)));
     }
 
     #[test]

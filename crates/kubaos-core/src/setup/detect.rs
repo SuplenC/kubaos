@@ -357,7 +357,7 @@ fn yubikey(sys: &mut dyn Sys, env: &Env) -> CardStatus {
 // ---------------------------------------------------------------- Bitwarden
 
 fn bitwarden(sys: &mut dyn Sys, env: &Env) -> CardStatus {
-    let desktop = sys.exists("/opt/Bitwarden");
+    let desktop = sys.exists(agent::DESKTOP);
     let paths = &env.bitwarden;
     let m = sys.bitwarden();
     let config = Config::read(m, paths);

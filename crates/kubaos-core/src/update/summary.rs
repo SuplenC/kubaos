@@ -36,6 +36,7 @@ impl Summary {
             && self.packages == 0
             && self.upgraded.is_empty()
             && self.apt.is_empty()
+            && self.apps.is_empty()
             && self.inputs.is_empty()
             && self.nix_packages.as_ref().is_none_or(Vec::is_empty)
             && self.migrations.is_empty()
@@ -75,6 +76,15 @@ impl Summary {
         }
         if removed > 0 {
             lines.push(counted(removed, "1 apt package removed", "{n} apt packages removed"));
+        }
+        for name in &self.apps.installed {
+            lines.push(format!("{name} installed"));
+        }
+        for name in &self.apps.removed {
+            lines.push(format!("{name} removed"));
+        }
+        for name in &self.apps.left {
+            lines.push(crate::update::event::left_line(name));
         }
         if let Some(nix) = self.nix_packages.as_ref().filter(|nix| !nix.is_empty()) {
             lines.push(counted(nix.len(), "1 Nix package changed", "{n} Nix packages changed"));
@@ -144,13 +154,16 @@ impl Summary {
         if self.from.commit == self.to.commit {
             return match self.command {
                 Command::Rollback => format!("KubaOS rolled back your packages, at {to}"),
+                Command::App => "KubaOS changed your apps".to_owned(),
                 _ => format!("KubaOS updated, still at {to}"),
             };
         }
         match self.command {
             Command::Upgrade => format!("KubaOS upgraded to {to}"),
             Command::Rollback => format!("KubaOS rolled back to {to}"),
-            Command::Update | Command::Check | Command::Packages => format!("KubaOS updated to {to}"),
+            Command::Update | Command::Check | Command::Packages | Command::App => {
+                format!("KubaOS updated to {to}")
+            }
         }
     }
 }

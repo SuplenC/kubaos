@@ -1,6 +1,7 @@
 //! kubaos-core: the engine and its types. The contract between the
 //! engine, the CLI and Kōbō is docs/INSTALL-INTERNALS.md.
 
+pub mod apps;
 pub mod apt;
 pub mod autostart;
 pub mod bitwarden;
@@ -14,6 +15,8 @@ pub mod packages;
 pub mod pins;
 pub mod preview;
 pub mod probe;
+#[cfg(any(test, feature = "sandbox"))]
+pub mod sandbox;
 pub mod setup;
 pub mod state;
 pub mod step;

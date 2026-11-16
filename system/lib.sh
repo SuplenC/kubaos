@@ -259,15 +259,67 @@ fetch_key() {
   rm -rf "$tmp"
 }
 
-# add_apt_source NAME CONTENT: write /etc/apt/sources.list.d/NAME.sources.
+# Where apt reads its sources; the tests point it at a folder of their own after sourcing this.
+APT_SOURCES_D=/etc/apt/sources.list.d
+
+# add_apt_source NAME CONTENT: write $APT_SOURCES_D/NAME.sources, then turn off every other
+# source of its URIs (disable_other_sources).
 add_apt_source() {
-  local name="$1" dest="/etc/apt/sources.list.d/$1.sources"
+  local name="$1" dest="$APT_SOURCES_D/$1.sources" uri
   if [[ -f "$dest" ]] && [[ "$(<"$dest")" == "$2" ]]; then
     ok "apt source $name configured"
-    return 0
+  else
+    printf '%s\n' "$2" | write_root_file "$dest" 0644
+    APT_DIRTY=1
   fi
-  printf '%s\n' "$2" | write_root_file "$dest" 0644
-  APT_DIRTY=1
+  for uri in $(awk '$1 == "URIs:" { for (i = 2; i <= NF; i++) print $i }' <<<"$2"); do
+    disable_other_sources "$dest" "$uri"
+  done
+}
+
+# disable_other_sources OURS URI: comment out the lines of the other .list files, and turn off
+# with "Enabled: no" the stanzas of the other .sources files, that name URI. A vendor's own
+# instructions or package may have set the repository up already, under another file and key
+# path, and apt refuses one repository with two Signed-By values, failing every apt run. Ours
+# names the key the manifest checks, so it is the one kept. A .sources stanza with more URIs
+# than this one is turned off whole, as deb822 can't turn off one of them.
+disable_other_sources() {
+  local ours="$1" uri="${2%/}" f new
+  for f in "$APT_SOURCES_D"/*.list "$APT_SOURCES_D"/*.sources; do
+    [[ -f $f && $f != "$ours" ]] || continue
+    if [[ $f == *.list ]]; then
+      new="$(awk -v uri="$uri" -v ours="${ours##*/}" '
+        /^[[:space:]]*deb(-src)?[[:space:]]/ {
+          line = $0
+          gsub(/\[[^]]*\]/, "", line)
+          split(line, field)
+          u = field[2]
+          sub(/\/$/, "", u)
+          if (u == uri) { print "# " ours " has this repository: " $0; hit = 1; next }
+        }
+        { print }
+        END { exit !hit }' "$f")" || continue
+    else
+      new="$(awk -v uri="$uri" '
+        function flush(   i, off_now) {
+          off_now = found && !off
+          for (i = 1; i <= n; i++) if (!(off_now && tolower(stanza[i]) ~ /^enabled:/)) print stanza[i]
+          if (off_now) { print "Enabled: no"; hit = 1 }
+          n = 0; found = 0; off = 0
+        }
+        /^[[:space:]]*$/ { flush(); print; next }
+        {
+          stanza[++n] = $0
+          key = tolower($1)
+          if (key == "enabled:" && tolower($2) == "no") off = 1
+          if (key == "uris:") for (i = 2; i <= NF; i++) { u = $i; sub(/\/$/, "", u); if (u == uri) found = 1 }
+        }
+        END { flush(); exit !hit }' "$f")" || continue
+    fi
+    info "$f also has $uri; turning it off there, ${ours##*/} has it"
+    printf '%s\n' "$new" | write_root_file "$f" 0644
+    APT_DIRTY=1
+  done
 }
 
 snapper_ready() {
@@ -449,6 +501,55 @@ install_proxy_helper() {
   install_root_file "$FILES_DIR/polkit/50-kubaos-proxy.rules" /etc/polkit-1/rules.d/50-kubaos-proxy.rules 0644
 }
 
+# install_apps_policy: the polkit action pkexec runs the Apps catalog's root
+# helper under (`kubaos app add|remove`), which asks once a run.
+install_apps_policy() {
+  install_root_file "$FILES_DIR/polkit/org.kubaos.apps.policy" /usr/share/polkit-1/actions/org.kubaos.apps.policy 0644
+}
+
+# install_apps_helper: the Apps catalog's root helper, `kubaos-apps` from
+# KUBAOS_DIR's build of the kubaos command (`.#kubaos`, home/curated.nix),
+# pinned with APPS_GCROOT and linked where pkexec and sudo run it, so neither
+# the user nor their profile can change what runs as root. It runs only the
+# typed actions of the root-owned catalog
+# (docs/adr/0009-apps-are-journaled-actions.md). 60-nix.sh and relink.sh
+# (every update and rollback) run it, each after install_apps_policy, which
+# needs no nix.
+APPS_LINK=/usr/local/libexec/kubaos-apps
+APPS_GCROOT=/nix/var/nix/gcroots/kubaos-apps
+install_apps_helper() {
+  local out bin
+  if ((DRY_RUN)); then
+    run nix build --no-link --print-out-paths "$KUBAOS_DIR#kubaos"
+    sudo_run ln -sfn "<kubaos store path>" "$APPS_GCROOT"
+    sudo_run ln -sfn "<kubaos store path>/bin/kubaos-apps" "$APPS_LINK"
+    return 0
+  fi
+  out="$(nix build --no-link --print-out-paths "$KUBAOS_DIR#kubaos")" || die "nix build .#kubaos failed"
+  bin="$out/bin/kubaos-apps"
+  [[ -x "$bin" ]] || die "no kubaos-apps in $out"
+  if [[ "$(readlink "$APPS_GCROOT" 2>/dev/null)" == "$out" && "$(readlink "$APPS_LINK" 2>/dev/null)" == "$bin" ]]; then
+    ok "$APPS_LINK -> $bin"
+    return 0
+  fi
+  # GC root first, so the store path can't be collected while the link points at it.
+  sudo_run ln -sfn "$out" "$APPS_GCROOT"
+  sudo_run install -d -m 0755 "$(dirname "$APPS_LINK")"
+  sudo_run ln -sfn "$bin" "$APPS_LINK"
+}
+
+# install_apps_root: the Apps catalog's polkit action, always, and its root
+# helper when nix is there to build it. A fresh install gets the action even
+# when 60-nix.sh finds no nix: the next update's relink.sh links the helper.
+install_apps_root() {
+  install_apps_policy
+  if ((DRY_RUN)) || command -v nix >/dev/null; then
+    install_apps_helper
+  else
+    warn "nix not found; the Apps catalog's root helper waits for the next update"
+  fi
+}
+
 # install_scx: the CPU scheduler the power stops can run (crates/kubaos-power,
 # `scheduler = "lavd"` in power.toml). scx_lavd from KUBAOS_DIR's curated set
 # (`.#scx-lavd`, home/curated.nix), pinned with SCX_GCROOT and linked where
@@ -515,13 +616,45 @@ install_mac_accents() {
   fi
 }
 
-# install_bitwarden_autostart: Bitwarden desktop starts on login, as a
-# system-wide XDG autostart entry the session's xdg-desktop-autostart.target
-# starts (config/hypr/autostart.lua) and the user can turn off. Without the
-# app (arm64), TryExec skips the entry. 70-bitwarden.sh runs it, and a
-# migration on machines installed before it.
-install_bitwarden_autostart() {
-  install_root_file "$FILES_DIR/xdg/autostart/bitwarden.desktop" /etc/xdg/autostart/bitwarden.desktop 0644
+# What an older KubaOS's base install put on the system for Google Chrome and
+# Bitwarden desktop, which base-apps-setup takes away from a machine without
+# the app. On a machine with it, the Apps catalog's app has them as steps
+# (apps/google-chrome/, apps/bitwarden/).
+
+# chrome_installed: whether any Chrome build that reads Chrome's managed
+# policies, and so the theme's, is installed.
+chrome_installed() {
+  local build
+  for build in google-chrome-stable google-chrome-beta google-chrome-unstable; do
+    pkg_installed "$build" && return 0
+  done
+  return 1
+}
+
+# remove_chrome_theme: the theme helper, its units and the policy it wrote,
+# unless a Chrome build that reads them is still installed. Chrome's policy
+# folder stays, as its package leaves it.
+remove_chrome_theme() {
+  local f found=0
+  if chrome_installed; then
+    ok "a Chrome build is installed: its theme follows the wallpaper still"
+    return 0
+  fi
+  for f in /etc/systemd/system/dot-chrome-theme.path /etc/systemd/system/dot-chrome-theme.service; do
+    [[ -e $f ]] && found=1
+  done
+  ((found)) && sctl disable --now dot-chrome-theme.path
+  for f in /etc/systemd/system/dot-chrome-theme.path /etc/systemd/system/dot-chrome-theme.service \
+    /usr/local/libexec/dot-chrome-theme /etc/opt/chrome/policies/managed/dot-theme.json; do
+    [[ ! -e $f ]] || sudo_run rm -f "$f"
+  done
+  ((found)) && sctl daemon-reload
+  return 0
+}
+
+# remove_bitwarden_autostart: Bitwarden desktop's system-wide autostart entry.
+remove_bitwarden_autostart() {
+  [[ ! -e /etc/xdg/autostart/bitwarden.desktop ]] || sudo_run rm -f /etc/xdg/autostart/bitwarden.desktop
 }
 
 # boot_unit UNIT enable|disable|mask: whether UNIT starts at boot, when it

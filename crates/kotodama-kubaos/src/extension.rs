@@ -7,19 +7,20 @@
 //! - Which Items there are under the current config, `hide` and the states applied, and what the
 //!   update check changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
-//!   user folder, a desk position, a drive, a Suite, an idle setting or Keep awake, a shell
-//!   setting, a counter, the power stop's status, the CPU scheduler's or the Proxy's, or an app's
-//!   start on login.
+//!   user folder, a desk position, a drive, a Suite, an app of the Apps catalog, an idle setting or
+//!   Keep awake, a shell setting, a counter, the power stop's status, the CPU scheduler's or the
+//!   Proxy's, or an app's start on login.
 //!
 //! # Not here
 //!
 //! - Reading the config: [`crate::registry`]. Reading the states: [`crate::states`]. The toggles:
 //!   [`crate::toggles`]. The keyboard layouts: [`crate::keyboard`]. The wallpaper sets:
 //!   [`crate::wallpapers`]. The user folders: [`crate::files`]. The desk positions:
-//!   [`crate::desk`]. The drives: [`crate::drives`]. The Suites: [`crate::suites`]. The idle
-//!   settings: [`crate::idle`]. The counters: [`crate::counters`]. The shell's settings:
-//!   [`crate::shell`]. The power stop's status and the CPU scheduler's: [`crate::power`]. The
-//!   Proxy's status: [`crate::proxy`]. The startup apps: [`crate::startup`].
+//!   [`crate::desk`]. The drives: [`crate::drives`]. The Suites: [`crate::suites`]. The apps and
+//!   their Jobs: [`crate::apps`]. The idle settings: [`crate::idle`]. The counters:
+//!   [`crate::counters`]. The shell's settings: [`crate::shell`]. The power stop's status and the
+//!   CPU scheduler's: [`crate::power`]. The Proxy's status: [`crate::proxy`]. The startup apps:
+//!   [`crate::startup`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -27,6 +28,7 @@ use std::collections::BTreeMap;
 use kotodama_extension::Chain;
 use kotodama_protocol::Item;
 use kotodama_protocol::ItemRef;
+use kotodama_protocol::Job;
 use kotodama_protocol::Table;
 use kotodama_protocol::View;
 use kubaos_power::live::Now;
@@ -34,6 +36,11 @@ use kubaos_power::machine::Machine;
 use kubaos_power::report::Drain;
 use kubaos_power::settings::Settings as PowerSettings;
 
+use crate::apps;
+use crate::apps::AppJobs;
+use crate::apps::Apps;
+use crate::apps::Heard;
+use crate::apps::Reporter;
 use crate::bus::Bus;
 use crate::counters;
 use crate::counters::CounterList;
@@ -75,6 +82,8 @@ pub struct Extension<B, R> {
     drives: Drives,
     counters: CounterList,
     states: States,
+    apps: Apps,
+    app_jobs: AppJobs,
     bus: B,
     runner: R,
 }
@@ -92,6 +101,8 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             drives: Drives::default(),
             counters: CounterList::default(),
             states: States::default(),
+            apps: Apps::default(),
+            app_jobs: AppJobs::default(),
             bus,
             runner,
         }
@@ -110,6 +121,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .chain(proxy::ids())
             .map(str::to_owned)
             .chain(suites::ids())
+            .chain(self.apps.ids())
             .collect();
         let reserved: Vec<&str> = reserved.iter().map(String::as_str).collect();
         let (registry, problems) = Registry::from_config(config, &reserved);
@@ -157,6 +169,22 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.desk = desk;
     }
 
+    /// Takes the apps of the Apps catalog, as the machine now has them.
+    pub fn set_apps(&mut self, apps: Apps) {
+        self.apps = apps;
+    }
+
+    /// Sends what the apps' Jobs' programs do to `reporter`, which hands it back to
+    /// [`Extension::heard`].
+    pub fn set_reporter(&mut self, reporter: Reporter) {
+        self.app_jobs = AppJobs::new(reporter);
+    }
+
+    /// The app Job as `heard` leaves it, when that changes what it shows: always at its end.
+    pub fn heard(&mut self, heard: Heard) -> Option<Job> {
+        self.app_jobs.heard(heard)
+    }
+
     /// Takes the states the actions are shown in, as their files now have them.
     pub fn set_states(&mut self, states: States) {
         self.states = states;
@@ -164,8 +192,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
 
     /// The Items to index: the actions the states show, the toggles, the idle settings, the
     /// counters, the shell's, the power stop's, the CPU scheduler's and the Proxy's status, the
-    /// Suites, the keyboard Items, the wallpaper sets, the user folders, the desk positions and
-    /// the drives `hide` leaves in, the update actions as the update check has them.
+    /// Suites, the apps, the keyboard Items, the wallpaper sets, the user folders, the desk
+    /// positions and the drives `hide` leaves in, the update actions as the update check has
+    /// them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
@@ -202,6 +231,11 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .items()
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
+        let apps = self
+            .apps
+            .items()
+            .into_iter()
+            .filter(|item| !self.registry.hides(&item.id));
         let idle = idle::items().into_iter().filter(|item| !self.registry.hides(&item.id));
         let counters = self
             .counters
@@ -226,6 +260,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .chain(shell)
             .chain(power)
             .chain(suites)
+            .chain(apps)
             .chain(keyboards)
             .chain(wallpapers)
             .chain(folders)
@@ -267,6 +302,10 @@ impl<B: Bus, R: Runner> Extension<B, R> {
                     .suites()
                     .run(&item.id, action, arguments, self.registry.terminal(), &self.runner)
             }
+            apps::KIND if !self.registry.hides(&item.id) => self
+                .app_jobs
+                .start(&self.apps, &item.id, action, &self.runner)
+                .map(Ran::Job),
             idle::KIND if action == idle::CHOOSE && !self.registry.hides(&item.id) => {
                 idle::run(&item.id, arguments, &idle_settings(), &self.runner)
             }

@@ -216,6 +216,12 @@ else
 fi
 
 # --------------------------------------------------------------------------
+# The Apps catalog's root helper and its polkit action. Not tied to DO_SWITCH
+# either.
+step "The Apps catalog's root helper ($APPS_LINK)"
+install_apps_root
+
+# --------------------------------------------------------------------------
 # setup_nix_gpu: home-manager's targets.genericLinux.gpu (home/desktop.nix)
 # builds a driver bundle and ships `non-nixos-gpu-setup`. Run once as root; it
 # writes /etc/tmpfiles.d/non-nixos-gpu.conf so /run/opengl-driver points at

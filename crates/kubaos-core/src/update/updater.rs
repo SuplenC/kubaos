@@ -5,7 +5,8 @@
 //! which is the network check; the release policy's pick; showing it and asking; a snapper
 //! snapshot, the user's `flake.lock` and the Suites' lockfile entries saved and the update recorded
 //! in the history; apt; moving `release`; the Hyprland pin, the package manifest and the system
-//! migrations; `nix flake update` of the user flake; relinking what `system/` took from KubaOS's
+//! migrations; the picked apps of the catalog the machine lacks; `nix flake update` of the user
+//! flake; relinking what `system/` took from KubaOS's
 //! nixpkgs; the switch; the Suites' tools moved to their newest patch releases; the Bitwarden
 //! check; Bitwarden desktop and the Nix daemon moved on within their series, each a phase whose
 //! failure is only a warning; the user migrations; firmware through fwupd; and the new release
@@ -25,6 +26,7 @@
 //! - Running programs and the switch: `machine.rs` and `switch.rs`.
 //! - The package manifest's phase, its status and `kubaos packages enable|disable`:
 //!   `updater/manifest.rs`. The firmware phase: `updater/firmware.rs`.
+//! - The Apps phase, its status and `kubaos app add|remove`: `updater/apps.rs`.
 //! - The Bitwarden and Nix phases: `updater/bitwarden.rs`, `updater/nix.rs`, and what they share,
 //!   `updater/program.rs`.
 //! - The events and the log: `event.rs` and `journal.rs`.
@@ -44,7 +46,9 @@ use std::time::UNIX_EPOCH;
 use self::firmware::Staging;
 use super::changelog::Changelog;
 use super::closure;
+use super::event::AppChanges;
 use super::event::Command;
+use super::event::GroupChange;
 use super::event::PackageChange;
 use super::event::Phase;
 use super::event::Preview;
@@ -86,6 +90,10 @@ use super::record::short;
 use super::security;
 use super::security::CountError;
 use super::version::Version;
+use crate::apps::CatalogError;
+use crate::apps::PicksError;
+use crate::apps::engine::EngineError;
+use crate::apps::journal::JournalError;
 use crate::apt::Manifest;
 use crate::apt::ManifestError;
 use crate::apt::manifest::MANIFEST;
@@ -192,6 +200,60 @@ pub enum UpdateError {
     /// The group isn't one the user may turn on or off.
     #[error("{name} is part of KubaOS: it can't be turned on or off")]
     NotOptional { name: String },
+    /// The group's packages are apps of the catalog, which `kubaos app` adds and removes.
+    #[error("the {name} group's packages come from the Apps catalog: kubaos app {verb} {ids}")]
+    InCatalog {
+        name: String,
+        verb: &'static str,
+        ids: String,
+    },
+    /// The release's Apps catalog can't be read.
+    #[error("reading the Apps catalog")]
+    Catalog(#[source] CatalogError),
+    /// The user's picks of apps can't be read or written.
+    #[error("using your picks of apps")]
+    Picks(#[source] PicksError),
+    /// An app's journal can't be read.
+    #[error("reading the apps' journals")]
+    AppJournal(#[source] JournalError),
+    /// An app's install, removal or taking in didn't go through.
+    #[error("{what}")]
+    App {
+        what: String,
+        #[source]
+        source: Box<EngineError>,
+    },
+    /// The catalog has no app of that id.
+    #[error("the Apps catalog has no app {id} (kubaos app list)")]
+    NoApp { id: String },
+    /// The app has nothing for this machine's architecture.
+    #[error("{id} has nothing for {arch}")]
+    Unavailable { id: String, arch: String },
+    /// The app has setups and none was named: there is no default.
+    #[error(
+        "{id} can be set up more than one way, and none is the default: {}",
+        setup_choices(id, setups)
+    )]
+    NoSetup { id: String, setups: Vec<String> },
+    /// The app has no setup of that id.
+    #[error("{id} has no setup {setup}: {}", setup_choices(id, setups))]
+    UnknownSetup {
+        id: String,
+        setup: String,
+        setups: Vec<String>,
+    },
+    /// A setup was named for apps none of which has setups.
+    #[error("--setup {setup} names a setup, and none of these apps has setups")]
+    SetupWithout { setup: String },
+}
+
+/// How to pick each of `setups` of the app `id`, as the error that asks for one says it.
+fn setup_choices(id: &str, setups: &[String]) -> String {
+    let commands: Vec<String> = setups
+        .iter()
+        .map(|setup| format!("kubaos app add {id} --setup {setup}"))
+        .collect();
+    format!("pick one with {}", commands.join(", or "))
 }
 
 impl UpdateError {
@@ -204,6 +266,16 @@ impl UpdateError {
         let what = what.into();
         move |source| Self::Step { what, source }
     }
+}
+
+/// What an update's system side did: whether the Hyprland pin moved, what the package manifest's
+/// phase changed, the system migrations that ran and the apps installed.
+#[derive(Default)]
+struct SystemSide {
+    relogin: bool,
+    apt: Vec<GroupChange>,
+    migrations: Vec<String>,
+    apps: AppChanges,
 }
 
 /// Whether a command asks before it changes anything.
@@ -509,6 +581,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             packages: 0,
             upgraded: Vec::new(),
             apt: Vec::new(),
+            apps: AppChanges::default(),
             inputs: Vec::new(),
             nix_packages,
             migrations: Vec::new(),
@@ -999,19 +1072,12 @@ impl<'a, M: Machine> Updater<'a, M> {
         if let Some(target) = target {
             self.phase(Phase::Release, |u| u.move_release(&target.commit))?;
         }
-        let mut migrations = Vec::new();
-        let mut relogin = false;
-        if !opts.packages_only {
-            relogin = self.apply_hyprland_pin()?;
-        }
-        let apt = if self.sys.manifest().is_file() {
-            self.phase(Phase::Manifest, |u| u.sync_manifest(None))?
-        } else {
-            Vec::new()
-        };
-        if !opts.packages_only {
-            migrations.extend(self.run_system_migrations()?);
-        }
+        let SystemSide {
+            relogin,
+            apt,
+            mut migrations,
+            apps,
+        } = self.system_side(opts)?;
         self.phase(Phase::Inputs, |u| u.update_inputs(&flake))?;
         let nix_packages = self.phase(Phase::Home, |u| {
             u.relink()?;
@@ -1048,6 +1114,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             packages,
             upgraded,
             apt,
+            apps,
             inputs: self.j.inputs.clone(),
             nix_packages,
             migrations,
@@ -1062,6 +1129,23 @@ impl<'a, M: Machine> Updater<'a, M> {
         };
         self.j.emit(&UpdateEvent::Summary(summary));
         Ok(())
+    }
+
+    /// The steps of an update between moving `release` and the user flake: the Hyprland pin, the
+    /// package manifest, the system migrations and the picked apps, in that order.
+    fn system_side(&mut self, opts: UpdateOptions) -> Result<SystemSide, UpdateError> {
+        let mut side = SystemSide::default();
+        if !opts.packages_only {
+            side.relogin = self.apply_hyprland_pin()?;
+        }
+        if self.sys.manifest().is_file() {
+            side.apt = self.phase(Phase::Manifest, |u| u.sync_manifest(None))?;
+        }
+        if !opts.packages_only {
+            side.migrations = self.run_system_migrations()?;
+        }
+        side.apps = self.reconcile_apps();
+        Ok(side)
     }
 
     /// What the user has to do for the update to apply in full, and why: a reboot when a package
@@ -1577,6 +1661,7 @@ fn write_user(path: &Path, text: &str) -> Result<(), UpdateError> {
     write_atomic(path, text).map_err(UpdateError::io(path))
 }
 
+mod apps;
 mod bitwarden;
 mod firmware;
 mod manifest;

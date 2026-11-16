@@ -78,7 +78,7 @@ check "snapper settings for the install" test -s "$R/usr/share/kubaos-image/snap
 check "no snapper config yet (made on the target)" test ! -e "$R/etc/snapper/configs/root"
 
 sect "services (systemctl in the chroot)"
-for u in NetworkManager.service nix-daemon.socket nix-daemon.service bluetooth.service docker.service \
+for u in NetworkManager.service nix-daemon.socket nix-daemon.service bluetooth.service \
   systemd-resolved.service snapper-timeline.timer snapper-cleanup.timer grub-btrfsd.service; do
   s="$(in_root systemctl is-enabled "$u" 2>/dev/null)"
   [[ "$s" == enabled ]] && ok "$u enabled" || fail "$u is '$s', want enabled"
@@ -99,7 +99,7 @@ v="$(in_root Hyprland --version 2>&1 | head -1)"
 [[ "$v" == Hyprland* ]] && ok "Hyprland --version: $v" || fail "Hyprland --version: $v"
 held="$(in_root apt-mark showhold | tr '\n' ' ')"
 [[ "$held" == *hyprland* ]] && ok "held: $held" || fail "hyprland not held ($held)"
-for c in foot fuzzel zsh git docker bw; do check "$c" in_root sh -c "command -v $c"; done
+for c in foot fuzzel zsh git bw; do check "$c" in_root sh -c "command -v $c"; done
 # What `kubaos bitwarden` runs beside bw: the keyring for project env, and the
 # agent and key checks.
 for c in secret-tool ssh-add ssh-keygen timeout; do check "$c" in_root sh -c "command -v $c"; done
@@ -121,7 +121,7 @@ for b in qs ghostty nvim tmux home-manager gpu-screen-recorder zsh; do
   check "  home-path/bin/$b" in_root test -x "$home_path/bin/$b"
 done
 check "nix-store --verify (database)" in_root "$NIXB/nix-store" --verify
-for l in "$R"/nix/var/nix/gcroots/dotfiles-* "$R"/nix/var/nix/gcroots/kubaos/*; do
+for l in "$R"/nix/var/nix/gcroots/dotfiles-* "$R"/nix/var/nix/gcroots/kubaos-apps "$R"/nix/var/nix/gcroots/kubaos/*; do
   tgt="$(readlink "$l")"
   [[ -e "$R$tgt" ]] && ok "gcroot ${l#"$R"} -> $tgt" || fail "gcroot ${l#"$R"} dangles ($tgt)"
 done
@@ -247,8 +247,12 @@ bad="$(grep -v '^installed ' "$P/packages.txt" | awk '{print $2}' | tr '\n' ' ')
 [[ -z "$bad" ]] && ok "every package fully installed" || fail "not fully installed: $bad"
 a="$(in_root dpkg --audit 2>&1)"
 [[ -z "$a" ]] && ok "dpkg --audit clean" || fail "dpkg --audit: $a"
-for p in linux-generic cryptsetup-initramfs btrfs-progs snapper network-manager docker-ce hyprland hypridle hyprlock; do
+for p in linux-generic cryptsetup-initramfs btrfs-progs snapper network-manager hyprland hypridle hyprlock; do
   grep -q "^installed $p " "$P/packages.txt" && ok "$p $(awk -v p="$p" '$2 == p {print $3}' "$P/packages.txt")" || fail "$p not installed"
+done
+# The Apps catalog's apps come at first boot, from `kubaos app add`, not with the image.
+for p in google-chrome-stable docker-ce bitwarden; do
+  grep -q "^installed $p " "$P/packages.txt" && fail "$p is in the image: it is an app of the catalog" || ok "no $p (an app of the catalog)"
 done
 # kubaos update removes a package the manifest drops only when this record has it.
 check "/var/lib/kubaos/apt-installed records what the scripts installed (nautilus, group files)" \

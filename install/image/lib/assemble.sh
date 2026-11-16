@@ -178,16 +178,17 @@ mapfile -t rebuild_paths < <(printf '%s\n' "${rebuild_paths[@]}" | sort -u)
 echo "    ${#differing[@]} derivations name the user; their builds need ${#rebuild_paths[@]} store paths"
 rm -rf "$probe_flake"
 
-# The Nix half of system/: PAM module links (60-nix.sh, 70-bitwarden.sh), the
-# setcap'd gsr-kms-server (65-recorder.sh). They build from KubaOS's nixpkgs
-# (--inputs-from $KUBAOS, system/lib.sh) and leave GC roots in
-# /nix/var/nix/gcroots/dotfiles-*.
+# The Nix half of system/: PAM module links and the Apps catalog's root helper
+# (60-nix.sh, 70-bitwarden.sh), the setcap'd gsr-kms-server (65-recorder.sh).
+# They build from KubaOS's nixpkgs (--inputs-from $KUBAOS, system/lib.sh) and
+# leave GC roots in /nix/var/nix/gcroots/dotfiles-* and, for the helper,
+# /nix/var/nix/gcroots/kubaos-apps.
 say "system/60-nix.sh --no-switch (pam_fprintd link)"
 as_user "$REPO/system/60-nix.sh" --host "$HOST" --user "$PAYLOAD_USER" --no-switch --no-gpu --no-chsh
 say "system/65-recorder.sh (gsr-kms-server, cap_sys_admin)"
 as_user "$REPO/system/65-recorder.sh"
-say "system/70-bitwarden.sh --no-desktop --no-cli (pam_u2f link)"
-as_user "$REPO/system/70-bitwarden.sh" --no-desktop --no-cli
+say "system/70-bitwarden.sh --no-cli (pam_u2f link)"
+as_user "$REPO/system/70-bitwarden.sh" --no-cli
 
 # 60-nix.sh's GPU step, which looks for the setup tool in ~/.nix-profile:
 # there is no profile yet, so run the generation's copy directly.
@@ -272,7 +273,8 @@ done
 roots=("$gen" "${flake_paths[@]}" "${rebuild_paths[@]}")
 for p in $gpu_paths; do roots+=("$p"); done
 declare -A gcroot_target=()
-for l in /nix/var/nix/gcroots/dotfiles-*; do
+# The system side's own roots: the dotfiles' builds and the Apps catalog's root helper.
+for l in /nix/var/nix/gcroots/dotfiles-* /nix/var/nix/gcroots/kubaos-apps; do
   [[ -L "$l" ]] || continue
   gcroot_target["$(basename "$l")"]="$(readlink "$l")"
   roots+=("$(readlink "$l")")
@@ -288,7 +290,7 @@ for l in "${profile_links[@]}" /nix/var/nix/profiles/per-user/root/profile-*-lin
   if [[ -L "$l" ]]; then roots+=("$(readlink -f "$l")"); fi
 done
 
-# Groups the build user ended up in (sudo, docker, i2c, ...): the engine
+# Groups the build user ended up in (sudo, i2c, ...): the engine
 # gives the real user the same ones.
 mapfile -t user_groups < <(id -nG "$PAYLOAD_USER" | tr ' ' '\n' | grep -vx "$PAYLOAD_USER")
 

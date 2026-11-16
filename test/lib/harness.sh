@@ -182,9 +182,9 @@ switch() {
     tail -40 "$log" >&2
     die "system/60-nix.sh failed (full log: $log)"
   fi
-  if ! as_user bash -l -c "cd '$REPO' && system/70-bitwarden.sh --no-desktop --no-cli" >>"$log" 2>&1; then
+  if ! as_user bash -l -c "cd '$REPO' && system/70-bitwarden.sh --no-cli" >>"$log" 2>&1; then
     tail -30 "$log" >&2
-    die "system/70-bitwarden.sh --no-desktop --no-cli failed (full log: $log)"
+    die "system/70-bitwarden.sh --no-cli failed (full log: $log)"
   fi
   # The GPU setup wrote /etc/tmpfiles.d/non-nixos-gpu.conf; apply it like boot.
   if [[ -f /etc/tmpfiles.d/non-nixos-gpu.conf && ! -e /run/opengl-driver ]]; then

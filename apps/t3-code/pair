@@ -1,0 +1,28 @@
+#!/bin/sh
+# Pairs the desktop app with the service: once the service is up, a one-time pairing link,
+# opened in T3 Code, which asks the user to add the backend on this machine.
+set -eu
+t3="$HOME/.local/bin/t3"
+runtime="$HOME/.t3/userdata/server-runtime.json"
+origin=""
+tries=0
+while [ "$tries" -lt 60 ]; do
+  origin="$(python3 -I -c '
+import json, os, sys
+try:
+    r = json.load(open(sys.argv[1]))
+    os.kill(int(r["pid"]), 0)
+    print(r["origin"] if r.get("serviceManaged") else "")
+except Exception:
+    print("")
+' "$runtime")"
+  [ -n "$origin" ] && break
+  tries=$((tries + 1))
+  sleep 0.5
+done
+[ -n "$origin" ] || { echo "T3 Code's service didn't start: \`t3 service status\` says why" >&2; exit 1; }
+url="$("$t3" auth pairing create --json --ttl 15m --label "T3 Code on this machine" --base-url "$origin" |
+  python3 -I -c 'import json, sys; print(json.load(sys.stdin).get("pairUrl", ""))')"
+[ -n "$url" ] || { echo "t3 gave no pairing link for its service" >&2; exit 1; }
+link="t3code://pair?pairingUrl=$(python3 -I -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$url")"
+setsid -f t3code "$link" >/dev/null 2>&1 </dev/null

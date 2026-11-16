@@ -93,23 +93,10 @@ RUN eval "$(grep -E '^NIX_(VERSION|INSTALL_URL|INSTALL_SHA256)=' /opt/dotfiles/s
  && /nix/var/nix/profiles/default/bin/nix --version
 
 # ---------------------------------------------------------------------------
-# apps: system/40-apps.sh (Docker CE, Chrome on amd64, the Chrome theme helper).
-FROM nix AS apps
-ARG TARGETARCH
-COPY system/40-apps.sh /opt/dotfiles/system/
-COPY system/files/chrome/ /opt/dotfiles/system/files/chrome/
-COPY system/files/systemd/docker.service.d/ /opt/dotfiles/system/files/systemd/docker.service.d/
-RUN --mount=type=cache,id=kubaos-image-apt-cache-${TARGETARCH},target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=kubaos-image-apt-lists-${TARGETARCH},target=/var/lib/apt/lists,sharing=locked \
-    apt-get update \
- && runuser -u kuba -- /opt/dotfiles/system/40-apps.sh
-
-# ---------------------------------------------------------------------------
 # desktop: system/50-hyprland.sh (PPA on amd64, Ubuntu's 0.53 on arm64,
 # autologin, lock-screen PAM, keyd for the accents), 70-bitwarden.sh
-# (desktop .deb on amd64, bw, pam_u2f lines; the Nix half runs in
-# lib/assemble.sh), 75-yubikey.sh.
-FROM apps AS desktop
+# (bw, pam_u2f lines; the Nix half runs in lib/assemble.sh), 75-yubikey.sh.
+FROM nix AS desktop
 ARG TARGETARCH
 COPY system/50-hyprland.sh system/70-bitwarden.sh system/75-yubikey.sh /opt/dotfiles/system/
 COPY system/files/getty/ /opt/dotfiles/system/files/getty/

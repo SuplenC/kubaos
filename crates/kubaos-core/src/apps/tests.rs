@@ -1,0 +1,562 @@
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
+use std::path::PathBuf;
+
+use super::Catalog;
+use super::Picks;
+use super::Status;
+use super::action::Kind;
+use super::action::Words;
+use super::catalog::CATALOG;
+use super::catalog::CatalogError;
+use super::journal::Journal;
+use super::status::AppState;
+use super::status::listing;
+use crate::apt::Dpkg;
+use crate::apt::Manifest;
+use crate::apt::manifest::MANIFEST;
+
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+const ABOUT: &str = r#"category = "development"
+tags = ["fixture"]
+summary = "An app for the tests"
+description = "An app the tests install."
+description_from = "https://example.com/app"
+"#;
+
+fn app(name: &str, actions: &str) -> String {
+    format!("name = \"{name}\"\n{ABOUT}{actions}")
+}
+
+const AGENT: &str = "[[action]]\nname = \"Install Agent\"\nkind = \"apt\"\nrepo = \"vendor\"\npackages = [\"agent\"]\n";
+
+const ARM_ONLY: &str = "[[action]]\nname = \"Install it\"\nkind = \"apt\"\narch = \"arm64\"\npackages = [\"tool\"]\n";
+
+fn catalog_of(apps: &[(&str, String)]) -> (tempfile::TempDir, Catalog) {
+    let dir = tempfile::tempdir().unwrap();
+    for (id, text) in apps {
+        fs::create_dir_all(dir.path().join(id)).unwrap();
+        fs::write(dir.path().join(id).join("app.toml"), text).unwrap();
+    }
+    let catalog = Catalog::load(dir.path()).unwrap();
+    (dir, catalog)
+}
+
+#[test]
+fn the_catalog_loads_every_apps_folder_and_nothing_else() {
+    let (dir, _) = catalog_of(&[("agent", app("Agent", AGENT))]);
+    fs::write(dir.path().join("notes.toml"), "x").unwrap();
+    fs::create_dir_all(dir.path().join("empty")).unwrap();
+    fs::create_dir_all(dir.path().join("Not-An-Id")).unwrap();
+
+    let catalog = Catalog::load(dir.path()).unwrap();
+
+    let ids: Vec<&str> = catalog.apps().iter().map(|a| a.id.as_str()).collect();
+    assert_eq!(ids, ["agent"]);
+    assert_eq!(catalog.packages(), ["agent".to_owned()].into());
+    assert_eq!(Catalog::load(&dir.path().join("missing")).unwrap(), Catalog::default());
+}
+
+#[test]
+fn an_app_requiring_one_the_catalog_lacks_or_one_with_setups_is_refused() {
+    let lab = format!(
+        "{}[setup.a]\nname = \"A\"\nsummary = \"A\"\n[setup.b]\nname = \"B\"\nsummary = \"B\"\n",
+        app("Lab", AGENT)
+    );
+    for (requires, expected) in [
+        ("missing", "requires missing, which the catalog doesn't have"),
+        ("lab", "can be set up more than one way"),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        for (id, text) in [
+            ("agent", app("Agent", &format!("requires = [\"{requires}\"]\n{AGENT}"))),
+            ("lab", lab.clone()),
+        ] {
+            fs::create_dir_all(dir.path().join(id)).unwrap();
+            fs::write(dir.path().join(id).join("app.toml"), text).unwrap();
+        }
+
+        let err = Catalog::load(dir.path()).unwrap_err();
+
+        assert!(err.to_string().contains(expected), "{err}");
+    }
+}
+
+#[test]
+fn apps_requiring_each_other_in_a_circle_are_refused_naming_it() {
+    let dir = tempfile::tempdir().unwrap();
+    for (id, requires) in [("agent", "desk"), ("desk", "editor"), ("editor", "agent")] {
+        fs::create_dir_all(dir.path().join(id)).unwrap();
+        let text = app(id, &format!("requires = [\"{requires}\"]\n{AGENT}"));
+        fs::write(dir.path().join(id).join("app.toml"), text).unwrap();
+    }
+
+    let err = Catalog::load(dir.path()).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "apps require each other in a circle: agent → desk → editor → agent"
+    );
+}
+
+#[test]
+fn an_app_that_isnt_valid_is_named() {
+    let (dir, _) = catalog_of(&[]);
+    fs::create_dir_all(dir.path().join("bad")).unwrap();
+    fs::write(dir.path().join("bad/app.toml"), "name = \"Bad\"\n").unwrap();
+
+    let err = Catalog::load(dir.path()).unwrap_err();
+
+    assert!(
+        matches!(err, CatalogError::App { ref id, .. } if id == "bad"),
+        "{err:?}"
+    );
+}
+
+#[test]
+fn an_installed_app_is_one_whose_user_journal_is_complete() {
+    let (_dir, catalog) = catalog_of(&[
+        ("agent", app("Agent", AGENT)),
+        ("tool", app("Tool", ARM_ONLY)),
+        ("half", app("Half", AGENT)),
+    ]);
+    let journals = tempfile::tempdir().unwrap();
+    let mut done = Journal::new("agent", None);
+    done.complete = true;
+    done.entries.push(super::journal::Entry {
+        step: 1,
+        state: super::journal::State::Done,
+        claims: vec![super::journal::Claim::new("package:agent".to_owned(), true)],
+        prior: super::journal::Prior::default(),
+        action: catalog.get("agent").unwrap().actions[0].clone(),
+        replaced: None,
+    });
+    done.save(journals.path()).unwrap();
+    // A run that stopped: steps journaled, not complete.
+    let mut half = Journal::new("half", None);
+    half.entries.push(super::journal::Entry {
+        step: 1,
+        state: super::journal::State::Doing,
+        claims: Vec::new(),
+        prior: super::journal::Prior::default(),
+        action: catalog.get("half").unwrap().actions[0].clone(),
+        replaced: None,
+    });
+    half.save(journals.path()).unwrap();
+    let mut picks = Picks::default();
+    picks.add("half");
+    let dpkg = Dpkg::parse("installed install agent 1.2\n");
+
+    let status = Status::read(
+        &catalog,
+        &picks,
+        journals.path(),
+        &journals.path().join("root"),
+        "amd64",
+        Some(&dpkg),
+    )
+    .unwrap();
+
+    let state = |id: &str| status.get(id).unwrap().state;
+    assert_eq!(state("agent"), AppState::Installed);
+    assert_eq!(state("half"), AppState::Missing);
+    assert_eq!(state("tool"), AppState::Unavailable);
+    assert_eq!(status.get("agent").unwrap().version.as_deref(), Some("1.2"));
+    assert_eq!(status.get("half").unwrap().version, None);
+}
+
+#[test]
+fn an_app_kubaos_owns_nothing_of_is_found_and_one_with_no_journal_is_read_from_dpkg() {
+    let (_dir, catalog) = catalog_of(&[
+        ("agent", app("Agent", AGENT)),
+        ("other", app("Other", &AGENT.replace("agent", "other"))),
+        ("third", app("Third", &AGENT.replace("agent", "third"))),
+        ("gone", app("Gone", &AGENT.replace("agent", "gone"))),
+    ]);
+    let journals = tempfile::tempdir().unwrap();
+    let mut found = Journal::new("agent", None);
+    found.complete = true;
+    found.root_adoption = Some(super::journal::Adoption::Found);
+    found.save(journals.path()).unwrap();
+    let mut picks = Picks::default();
+    picks.add("third");
+    let dpkg = Dpkg::parse("installed install agent 1.2\ninstalled install other 2.0\ninstalled install third 3.0\n");
+
+    let status = Status::read(
+        &catalog,
+        &picks,
+        journals.path(),
+        &journals.path().join("root"),
+        "amd64",
+        Some(&dpkg),
+    )
+    .unwrap();
+
+    let state = |id: &str| status.get(id).unwrap().state;
+    assert_eq!(state("agent"), AppState::Found);
+    assert_eq!(state("other"), AppState::Found, "installed by hand, not picked");
+    assert_eq!(
+        state("third"),
+        AppState::Installed,
+        "picked, so taking it in makes it KubaOS's"
+    );
+    assert_eq!(state("gone"), AppState::Available);
+    assert_eq!(status.get("other").unwrap().version.as_deref(), Some("2.0"));
+}
+
+#[test]
+fn the_list_and_the_status_say_what_each_app_is_in_json() {
+    let (_dir, catalog) = catalog_of(&[("agent", app("Agent", AGENT))]);
+    let picks = Picks::default();
+
+    let list = serde_json::to_value(listing(&catalog, &picks)).unwrap();
+    let journals = tempfile::tempdir().unwrap();
+    let status = serde_json::to_value(
+        Status::read(
+            &catalog,
+            &picks,
+            journals.path(),
+            &journals.path().join("root"),
+            "amd64",
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(list[0]["category"], "development");
+    assert_eq!(list[0]["tags"][0], "fixture");
+    assert_eq!(status["apps"][0]["summary"], "An app for the tests");
+    assert_eq!(status["apps"][0]["state"], "available");
+}
+
+#[test]
+fn the_picks_keep_the_setup_of_a_picked_app_only() {
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("apps.toml");
+    let mut picks = Picks::default();
+    picks.add("agent");
+    picks.add_setup("studio", "service");
+
+    picks.write(&path).unwrap();
+    let text = fs::read_to_string(&path).unwrap();
+    let back = Picks::read(&path).unwrap();
+
+    assert!(text.starts_with("# The apps of KubaOS's catalog"), "{text}");
+    assert!(
+        text.contains("apps = [\"agent\", \"studio\"]\n\n[setups]\nstudio = \"service\"\n"),
+        "{text}"
+    );
+    assert_eq!(back, picks);
+    fs::write(&path, "apps = [\"agent\"]\n[setups]\nstudio = \"service\"\n").unwrap();
+    assert_eq!(Picks::read(&path).unwrap().setup("studio"), None);
+    fs::write(&path, "apps = [\"editor\"]\n\n[nix_added]\neditor = [\"editor\"]\n").unwrap();
+    assert!(Picks::read(&path).is_err());
+}
+
+/// The shipped catalog, read from the repository.
+fn shipped() -> Catalog {
+    Catalog::load(&repo_root().join(CATALOG)).unwrap()
+}
+
+#[test]
+fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
+    let root = repo_root();
+    let manifest = Manifest::read(&root.join(MANIFEST)).unwrap().unwrap();
+
+    let catalog = shipped();
+
+    catalog.check_repos(&manifest).unwrap();
+    let ids: Vec<&str> = catalog.apps().iter().map(|a| a.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        [
+            "bitwarden",
+            "claude-code",
+            "docker",
+            "google-chrome",
+            "penpot",
+            "t3-code"
+        ]
+    );
+    for app in catalog.apps() {
+        for action in app.all_actions() {
+            if let Kind::Apt { repo: Some(repo), .. } = &action.kind {
+                let sources = root.join(format!("system/files/apt/sources.list.d/{repo}.sources"));
+                assert!(sources.is_file(), "{}: no {}", app.id, sources.display());
+            }
+        }
+    }
+}
+
+#[test]
+fn every_shipped_step_resolves_on_both_architectures_with_its_files_there() {
+    for app in shipped().apps() {
+        for arch in ["amd64", "arm64"] {
+            let words = Words {
+                user: "kuba".to_owned(),
+                home: PathBuf::from("/home/kuba"),
+                arch: arch.to_owned(),
+            };
+            for action in app.all_actions() {
+                action
+                    .resolve(&words, &app.dir)
+                    .unwrap_or_else(|e| panic!("{}: {}: {e}", app.id, action.name));
+            }
+        }
+    }
+}
+
+#[test]
+fn every_script_a_shipped_app_runs_can_run() {
+    for app in shipped().apps() {
+        for action in app.all_actions() {
+            let Kind::Run { run, check, undo, .. } = &action.kind else {
+                continue;
+            };
+            let readies = app.ready.iter().chain(app.setups.iter().flat_map(|s| &s.ready));
+            let programs = [run, check, undo]
+                .into_iter()
+                .chain(readies.map(|r| &r.check))
+                .filter_map(|argv| argv.first()?.strip_prefix("./"));
+            for script in programs {
+                let mode = fs::metadata(app.dir.join(script)).unwrap().permissions().mode();
+                assert_eq!(mode & 0o111, 0o111, "{}: {script} isn't executable", app.id);
+            }
+        }
+    }
+}
+
+#[test]
+fn dockers_drop_in_is_the_one_the_base_installs_for_any_docker() {
+    let root = repo_root();
+
+    assert_eq!(
+        fs::read_to_string(root.join("apps/docker/kubaos-stop.conf")).unwrap(),
+        fs::read_to_string(root.join("system/files/systemd/docker.service.d/kubaos-stop.conf")).unwrap()
+    );
+}
+
+#[test]
+fn t3s_runtime_is_marked_whole_at_the_version_it_downloads() {
+    let catalog = shipped();
+    let t3 = catalog.get("t3-code").unwrap();
+    let service = t3.setup("service").unwrap();
+
+    let version = service
+        .actions
+        .iter()
+        .find_map(|a| match &a.kind {
+            Kind::Download { version, .. } => Some(version.clone()),
+            _ => None,
+        })
+        .unwrap();
+    let marked = service
+        .actions
+        .iter()
+        .find_map(|a| match &a.kind {
+            Kind::Run { run, .. } if run.first().is_some_and(|p| p == "./install-t3") => run.get(1).cloned(),
+            _ => None,
+        })
+        .unwrap();
+
+    assert_eq!(marked, format!("@HOME@/.t3/runtime/versions/{version}"));
+}
+
+#[test]
+fn every_shipped_app_says_what_it_is_in_kubaos_voice_and_upstreams() {
+    for app in shipped().apps() {
+        assert!(!app.tags.is_empty(), "{}", app.id);
+        assert!(
+            !app.description_copied() || app.description_from.starts_with("https://"),
+            "{}",
+            app.id
+        );
+        assert!(
+            app.summary.len() <= 100,
+            "{}: a summary is one line of a menu: {}",
+            app.id,
+            app.summary
+        );
+    }
+}
+
+#[test]
+fn penpot_opens_in_a_window_and_requires_chrome_and_docker_for_its_local_stack() {
+    let catalog = shipped();
+    let penpot = catalog.get("penpot").unwrap();
+
+    let required = |setup: &str| -> Vec<&str> {
+        penpot
+            .requires(penpot.setup(setup))
+            .map(super::folder::Requirement::id)
+            .collect()
+    };
+    assert_eq!(required("web"), ["google-chrome"]);
+    assert_eq!(required("local"), ["docker", "google-chrome"]);
+    let local = penpot.setup("local").unwrap();
+    assert!(
+        local
+            .keeps
+            .as_deref()
+            .is_some_and(|k| k.contains("penpot_penpot_postgres_v15"))
+    );
+    let compose_run = local
+        .actions
+        .iter()
+        .find_map(|a| match &a.kind {
+            Kind::Run { run, root, undo, .. } => Some((run.clone(), *root, undo.clone())),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(compose_run, (vec!["./up".to_owned()], true, vec!["./down".to_owned()]));
+    for arch in ["amd64", "arm64"] {
+        assert_eq!(
+            catalog.available(penpot, penpot.setup("web"), arch),
+            arch == "amd64",
+            "{arch}: Chrome is built for amd64 alone"
+        );
+    }
+}
+
+#[test]
+fn penpots_stack_is_pinned_by_digest_bound_to_this_machine_and_keeps_its_volumes() {
+    let folder = repo_root().join("apps/penpot");
+    let compose = fs::read_to_string(folder.join("docker-compose.yaml")).unwrap();
+    let down = fs::read_to_string(folder.join("down")).unwrap();
+
+    let images: Vec<&str> = compose
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("image: "))
+        .collect();
+    assert_eq!(images.len(), 8, "{images:?}");
+    for image in images {
+        let digest = image.trim_matches('"').split_once("@sha256:").map(|(_, d)| d);
+        assert!(
+            digest.is_some_and(|d| d.len() == 64 && d.chars().all(|c| c.is_ascii_hexdigit())),
+            "{image} isn't pinned by its digest"
+        );
+    }
+    let mut in_ports = false;
+    for line in compose.lines() {
+        let item = line.trim();
+        if item.ends_with(':') {
+            in_ports = item == "ports:";
+        } else if in_ports && let Some(port) = item.strip_prefix("- ") {
+            assert!(port.starts_with("127.0.0.1:"), "{port} reaches past this machine");
+        }
+    }
+    assert!(
+        compose.contains("- 127.0.0.1:9002:8080"),
+        "the socket's service passes 9001 on to 9002"
+    );
+    assert!(compose.contains("PENPOT_PUBLIC_URI: http://localhost:9001"));
+    assert!(compose.contains("PENPOT_TELEMETRY_ENABLED: \"false\""));
+    assert!(
+        !compose.contains("8025"),
+        "the mail catcher's page shows password resets to anyone on the machine"
+    );
+    assert!(down.contains("docker-compose.yaml\" down --remove-orphans\n"), "{down}");
+    assert!(!down.contains("--volumes") && !down.contains(" -v"), "{down}");
+}
+
+#[test]
+fn penpots_proxy_runs_walled_off_as_a_user_of_its_own_and_its_stack_starts_through_up_as_root() {
+    let service = fs::read_to_string(repo_root().join("apps/penpot/kubaos-penpot.service")).unwrap();
+    let lines: Vec<&str> = service.lines().collect();
+
+    for line in [
+        "DynamicUser=yes",
+        "ProtectSystem=strict",
+        "ProtectHome=yes",
+        "NoNewPrivileges=yes",
+        "PrivateDevices=yes",
+        "PrivateTmp=yes",
+        "RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX",
+        "CapabilityBoundingSet=",
+    ] {
+        assert!(lines.contains(&line), "{line} is missing");
+    }
+    assert!(
+        lines.contains(&"ExecStartPre=+/usr/share/kubaos/apps/penpot/up"),
+        "the stack starts as root through `up`, which records the images it pulls"
+    );
+    assert!(repo_root().join("apps/penpot/up").is_file());
+    assert!(lines.contains(&"ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:9002"));
+}
+
+/// Penpot's script `name`, with the stack's folder moved to `dir`.
+fn penpot_script(name: &str, into: &Path, dir: &Path) -> PathBuf {
+    let text = fs::read_to_string(repo_root().join("apps/penpot").join(name)).unwrap();
+    let from = "dir=/etc/kubaos/penpot\n";
+    assert!(text.contains(from), "{name} keeps the stack in /etc/kubaos/penpot");
+    let path = into.join(name);
+    fs::write(&path, text.replace(from, &format!("dir={}\n", dir.display()))).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    path
+}
+
+#[test]
+fn penpots_removal_takes_the_images_its_install_pulled_and_keeps_the_ones_the_machine_had() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (home, dir, images) = (
+        tmp.path().join("home"),
+        tmp.path().join("penpot"),
+        tmp.path().join("images"),
+    );
+    for folder in [&home, &dir, &images] {
+        fs::create_dir_all(folder).unwrap();
+    }
+    let sandbox = crate::sandbox::Sandbox::new(&tmp.path().join("sandbox"), &home, "tester");
+    let (theirs, ours) = (
+        "postgres:15@sha256:2663a9f0fde52de94f5dad3603a1942359f49472f1017c1a6d64f66bfedacb40",
+        "penpotapp/frontend:2.19.2@sha256:27af83e128712c6e621afcbc4dbae5a607204f7acc89a9ae1245b5601b4a66a8",
+    );
+    // A daemon whose images are files named for their references.
+    sandbox.stub(
+        "docker",
+        &format!(
+            r#"images='{images}'
+file() {{ printf '%s/%s' "$images" "$(printf %s "$1" | tr '/:@' '___')"; }}
+case "$1 $2" in
+"image inspect") [ -e "$(file "$3")" ]; exit ;;
+"image rm") rm "$(file "$3")"; exit ;;
+esac
+for arg; do
+	case $arg in
+	config) printf '%s\n' '{theirs}' '{ours}'; exit 0 ;;
+	up) touch "$(file '{theirs}')" "$(file '{ours}')"; exit 0 ;;
+	down) exit 0 ;;
+	esac
+done
+exit 1"#,
+            images = images.display()
+        ),
+    );
+    let had = images.join(theirs.replace(['/', ':', '@'], "_"));
+    fs::write(&had, "").unwrap();
+    let pulled = images.join(ours.replace(['/', ':', '@'], "_"));
+    // The secret an earlier run made, so this run makes only the list of pulled images.
+    fs::write(dir.join("secret.env"), "PENPOT_SECRET_KEY=earlier\n").unwrap();
+    fs::set_permissions(dir.join("secret.env"), fs::Permissions::from_mode(0o600)).unwrap();
+    let (up, down) = (
+        penpot_script("up", tmp.path(), &dir),
+        penpot_script("down", tmp.path(), &dir),
+    );
+
+    let ran_up = sandbox.command(&up).output().unwrap();
+    assert!(ran_up.status.success(), "{ran_up:?}");
+    assert!(pulled.exists() && had.exists());
+    let mode = fs::metadata(dir.join("pulled-images")).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "pulled-images is readable by more than root");
+    let ran_down = sandbox.command(&down).output().unwrap();
+
+    assert!(ran_down.status.success(), "{ran_down:?}");
+    assert!(!pulled.exists(), "the image the install pulled stayed");
+    assert!(had.exists(), "the image the machine had went");
+    assert!(!dir.join("pulled-images").exists() && !dir.join("secret.env").exists());
+}

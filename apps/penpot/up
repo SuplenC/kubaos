@@ -1,0 +1,22 @@
+#!/bin/sh
+# Brings Penpot's stack up, pulling its pinned images, and waits until it is healthy. The install
+# runs it, and so does kubaos-penpot.service each time the window starts the stack. The secret its
+# sessions are signed with is made once, for this machine. Each pinned image the machine hasn't yet
+# is listed in pulled-images before it is pulled: those are the stack's, which `./down` removes;
+# one that was there is the user's. Both files are readable by root alone, as compose runs as root.
+# Usage: ./up
+set -eu
+umask 077
+dir=/etc/kubaos/penpot
+compose() { docker compose --project-name penpot --file "$dir/docker-compose.yaml" "$@"; }
+if [ ! -s "$dir/secret.env" ]; then
+	key=$(head -c 64 /dev/urandom | base64 -w0 | tr '+/' '-_' | tr -d '=')
+	printf 'PENPOT_SECRET_KEY=%s\n' "$key" >"$dir/secret.env.new"
+	mv "$dir/secret.env.new" "$dir/secret.env"
+fi
+for image in $(compose config --images); do
+	if ! docker image inspect "$image" >/dev/null 2>&1; then
+		printf '%s\n' "$image" >>"$dir/pulled-images"
+	fi
+done
+exec docker compose --project-name penpot --file "$dir/docker-compose.yaml" up --detach --wait --quiet-pull

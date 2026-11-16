@@ -17,9 +17,13 @@ thiserror.workspace = true
 [features]
 # The test Suite (`suites::catalog::TEST`), for the test harness's `kubaos` build.
 test-suite = []
+# The tests' wall around the processes they start (`sandbox`), for other crates' tests.
+sandbox = []
 
 [dev-dependencies]
 kubaos-phone = { workspace = true, features = ["fake"] }
+# Its own sandbox, for its tests under `tests/`.
+kubaos-core = { path = ".", features = ["sandbox"] }
 
 [lints]
 workspace = true

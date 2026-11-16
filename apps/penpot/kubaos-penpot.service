@@ -1,0 +1,41 @@
+# KubaOS: Penpot's app (apps/penpot) installs it with Penpot on this machine. Started by
+# kubaos-penpot.socket: brings Penpot's containers up (and Docker, through docker.socket),
+# waits for them, then passes the window's connections on to Penpot's frontend, which the stack
+# publishes on 127.0.0.1:9002 alone.
+[Unit]
+Description=Penpot on this machine
+Requires=kubaos-penpot.socket docker.socket
+After=kubaos-penpot.socket docker.socket
+
+# The proxy runs as a user of its own, walled off: it only passes the socket's connections on.
+# The `+` runs the app's `up` with full privileges, outside that wall, as compose talks to Docker's
+# daemon. Going through `up` records each image it pulls, so the removal takes them.
+[Service]
+ExecStartPre=+/usr/share/kubaos/apps/penpot/up
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:9002
+TimeoutStartSec=5min
+DynamicUser=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+CapabilityBoundingSet=
+UMask=0077

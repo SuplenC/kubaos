@@ -80,7 +80,7 @@ KUBAOS_DEPTH_MODELS=~/.cache/kubaos-depth/models cargo nextest run -p kubaos-dep
 
 **Local flake inputs.** `flake.lock` can point at a checkout on the machine (`git+file://...` or `path:`). Inside the container that path doesn't exist, so `test/run` reads `flake.lock` and bind-mounts each such input read-only at the same absolute path (and a git worktree's main `.git`), and the container lists them as git `safe.directory` (`trust_local_inputs` in `harness.sh`): they're owned by root in there, and git, Nix's fetcher included, won't read a repository owned by someone else otherwise. `test/lib/local-inputs.sh` does the finding, for `install/image/build` too.
 
-Not cached, on purpose: the repo. Each run bind-mounts it read-only at `/src`, copies it to `/home/kuba/Projects/dotfiles` (without `.git` and `docs/screenshots`), makes a fresh one-commit git repo there so the flake sees untracked files, and runs `system/60-nix.sh --host vm` (home-manager switch, the `pam_fprintd` link, the GPU setup, zsh) and `system/70-bitwarden.sh --no-desktop --no-cli` (the `pam_u2f` link) from a bash login shell, the way you would on the laptop. The home directory starts empty every run, so every run is a first activation.
+Not cached, on purpose: the repo. Each run bind-mounts it read-only at `/src`, copies it to `/home/kuba/Projects/dotfiles` (without `.git` and `docs/screenshots`), makes a fresh one-commit git repo there so the flake sees untracked files, and runs `system/60-nix.sh --host vm` (home-manager switch, the `pam_fprintd` link, the GPU setup, zsh) and `system/70-bitwarden.sh --no-cli` (the `pam_u2f` link) from a bash login shell, the way you would on the laptop. The home directory starts empty every run, so every run is a first activation.
 
 Because the image never COPYs `config/`, `home/`, `scripts/`, `flake.*` or `test/`, editing them never rebuilds the image. Editing `home/*.nix` or `flake.lock` only rebuilds the derivations that changed, in the volume.
 
@@ -262,7 +262,7 @@ The Docker harness can't boot an ISO. `test/vm/run` (QEMU, on KVM for a guest of
 
 - The GPU: the container gets no DRM device, so sway uses pixman and everything GL is Mesa llvmpipe. 120 Hz smoothness, VA-API, Vulkan and `non-nixos-gpu-setup` against real drivers need the laptop.
 - Real hardware: LUKS + Btrfs subvolumes, snapper and the GRUB rollback drill (the container's `/` is overlayfs, so those steps skip), lid and idle, the USB4 dock and two monitors, Wi-Fi, Bluetooth, audio devices, the fingerprint reader.
-- `system/30-hardware.sh` (TUXEDO repo and `tuxedo-drivers`, amd64 only, plus MOK) and `system/40-apps.sh` (Docker, Chrome amd64-only). Neither runs in the image.
+- `system/30-hardware.sh` (TUXEDO repo and `tuxedo-drivers`, amd64 only, plus MOK), which doesn't run in the image, and the Apps catalog's apps, which the harness never installs: its tests run the root helper and the migrations against stand-ins.
 - systemd: no PID 1 systemd, so no units, timers, logind, getty autologin or `systemctl --user`; the harness fakes the bits the tests depend on (above).
 - A real FIDO2 key: PAM is tested with a mapping for a key that isn't there (the fallback path), never with a touch or a fingerprint on the key. `dot-u2f-enroll` isn't exercised.
 - Bitwarden desktop: its SSH agent and polkit unlock, which need its window. OpenSSH's agent stands in on the same socket. gh login isn't tested (it would need github.com).

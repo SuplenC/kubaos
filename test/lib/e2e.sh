@@ -730,7 +730,7 @@ c_shellcheck() {
       *.sh) files+=("$f") ;;
       *) head -1 "$f" | grep -qE '^#!.*\b(ba)?sh\b' && files+=("$f") ;;
     esac
-  done < <(as_user git -C "$REPO" ls-files scripts system migrations test config home/suites crates/self-imports .claude/hooks | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp)$')
+  done < <(as_user git -C "$REPO" ls-files apps scripts system migrations test config home/suites crates/self-imports .claude/hooks | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp)$')
   echo "     ${#files[@]} files"
   # Gate on warnings and errors; info and style notes are listed, not fatal.
   local out notes
@@ -764,6 +764,10 @@ c_lua() {
   # launch's rule, when it is on, and the windows it places.
   as_user lua5.5 "$REPO/test/lua/launches_test.lua" "$REPO" ||
     { echo "FAIL test/lua/launches_test.lua"; bad=1; }
+  # The browser binds (config/hypr/keybinds.lua): Chrome when it is
+  # installed, else a notification saying how to install it.
+  as_user lua5.5 "$REPO/test/lua/keybinds_test.lua" "$REPO" ||
+    { echo "FAIL test/lua/keybinds_test.lua"; bad=1; }
   return "$bad"
 }
 
@@ -2139,8 +2143,8 @@ TOML
   printf '/org/freedesktop/UDisks2/drives/SanDisk_Ultra_1234\tSTICK\t/media/%s/STICK\n' "$USER_NAME" >"$drives"
   chown "$USER_NAME:" "$drives"
 
-  # Google Chrome installed: its desktop entry, as the Apps Extension finds it, and its package
-  # group on. The terminal greeting on. The pairs' halves follow these files.
+  # Google Chrome installed: its desktop entry, as the Apps Extension finds it. The PIV package
+  # group on, and the terminal greeting. The pairs' halves follow these files.
   local groups=/etc/kubaos/apt-groups groups_saved="$LOGS/apt-groups.saved"
   local chrome="$USER_HOME/.local/share/applications/google-chrome.desktop" chrome_saved="$LOGS/google-chrome.desktop.saved"
   local no_greeting="$USER_HOME/.config/kubaos/terminal/zsh/no-greeting" greeting_was_off=0
@@ -2148,7 +2152,7 @@ TOML
   [[ -e $groups ]] && cp -p "$groups" "$groups_saved"
   [[ -e $chrome ]] && cp -p "$chrome" "$chrome_saved"
   [[ -e $no_greeting ]] && greeting_was_off=1
-  install -D -m 644 /dev/stdin "$groups" <<<'chrome=on'
+  install -D -m 644 /dev/stdin "$groups" <<<'piv=on'
   install -d -o "$USER_NAME" -g "$USER_NAME" "${chrome%/*}"
   install -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/stdin "$chrome" <<'DESKTOP'
 [Desktop Entry]
@@ -2187,8 +2191,7 @@ DESKTOP
     bad=1
   fi
 
-  # Typing "chrome" with Chrome installed lists the app first, its removal below it, and no
-  # install. Turning the group off swaps the pair, through the choices file alone.
+  # Typing "chrome" with Chrome installed lists the app first, and a web app of it below.
   local ranked
   # The wait above is for the KubaOS Extension; the Apps Extension may still be scanning.
   for i in $(seq 20); do
@@ -2196,30 +2199,32 @@ DESKTOP
     [[ $ranked == " apps/google-chrome "* ]] && break
     sleep 1
   done
-  if [[ $ranked == " apps/google-chrome "* && $ranked == *" kubaos/packages-chrome-off "* &&
-    $ranked != *" kubaos/packages-chrome-on "* ]]; then
-    echo "ok   typing 'chrome' lists the Chrome app first, then its removal, and no install:$ranked"
-  else
-    echo "FAIL typing 'chrome' with Chrome installed lists:$ranked"
-    bad=1
-  fi
   if [[ $ranked == " apps/google-chrome "* && $ranked == *" apps/chrome-"* ]]; then
     echo "ok   a Chrome web app is found by its desktop id, but ranks below the browser:$ranked"
   else
     echo "FAIL typing 'chrome' ranks a web app, found by its desktop id, with the browser:$ranked"
     bad=1
   fi
-  printf 'chrome=off\n' >"$groups.new"
+  # With PIV on, its removal is listed and no install; turning the group off swaps the pair,
+  # through the choices file alone.
+  ranked=" $(in_session "$query piv" 2>&1 | cut -f2 || true) "
+  if [[ $ranked == *" kubaos/packages-piv-off "* && $ranked != *" kubaos/packages-piv-on "* ]]; then
+    echo "ok   with the piv group on, Remove PIV smart card support is listed, and no install"
+  else
+    echo "FAIL with the piv group on, typing 'piv' lists:$ranked"
+    bad=1
+  fi
+  printf 'piv=off\n' >"$groups.new"
   mv "$groups.new" "$groups"
   for i in $(seq 20); do
-    ranked=" $(in_session "$query chrome" 2>&1 | cut -f2 || true) "
-    [[ $ranked == *" kubaos/packages-chrome-on "* && $ranked != *" kubaos/packages-chrome-off "* ]] && break
+    ranked=" $(in_session "$query piv" 2>&1 | cut -f2 || true) "
+    [[ $ranked == *" kubaos/packages-piv-on "* && $ranked != *" kubaos/packages-piv-off "* ]] && break
     sleep 1
   done
-  if [[ $ranked == *" kubaos/packages-chrome-on "* && $ranked != *" kubaos/packages-chrome-off "* ]]; then
-    echo "ok   with the chrome group off, Install Google Chrome is listed instead of Remove (${i}s)"
+  if [[ $ranked == *" kubaos/packages-piv-on "* && $ranked != *" kubaos/packages-piv-off "* ]]; then
+    echo "ok   with the piv group off, its install is listed instead of its removal (${i}s)"
   else
-    echo "FAIL with the chrome group off, typing 'chrome' lists:$ranked"
+    echo "FAIL with the piv group off, typing 'piv' lists:$ranked"
     bad=1
   fi
 
@@ -4235,9 +4240,8 @@ c_warm_target() {
 # is put aside and back by c_rollback), and a user flake on that release like
 # the installer's. apt-get is a shim that logs what it was asked, so nothing
 # is downloaded or installed, and apt-cache one that has a candidate for every
-# package; the container has no snapper. Docker and Chrome are turned off, so
-# the package manifest's sync sets up no vendor repo. The three checks
-# run in this order, each from where the last left the machine.
+# package; the container has no snapper. The three checks run in this order,
+# each from where the last left the machine.
 UPD_KUBAOS=/usr/share/kubaos
 UPD_SAVED=/usr/share/kubaos.harness-saved
 UPD_ORIGIN=/var/tmp/kubaos-origin.git
@@ -4276,7 +4280,6 @@ update_setup() {
       git config --system --add safe.directory "$dir"
   done
   install -d /etc/kubaos /var/lib/kubaos
-  printf 'docker=off\nchrome=off\n' >/etc/kubaos/apt-groups
   as_user git clone -q --bare "$REPO" "$UPD_ORIGIN" || { echo "FAIL cloning the repo copy as origin"; return 1; }
   as_user git clone -q "$UPD_ORIGIN" "$UPD_WORK" || { echo "FAIL cloning origin to work in"; return 1; }
   if [[ -e $UPD_KUBAOS && ! -e $UPD_SAVED ]]; then mv "$UPD_KUBAOS" "$UPD_SAVED"; fi

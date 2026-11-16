@@ -2188,6 +2188,7 @@ dependencies = [
  "kubaos-cursor",
  "kubaos-user-layer",
  "rustix 1.1.5",
+ "serde",
  "serde_json",
  "signal-hook",
  "tempfile",
@@ -2213,6 +2214,7 @@ dependencies = [
 name = "kubaos-core"
 version = "0.1.0"
 dependencies = [
+ "kubaos-core",
  "kubaos-phone",
  "kubaos-user-layer",
  "serde",

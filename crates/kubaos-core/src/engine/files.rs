@@ -165,15 +165,6 @@ pub const USER_TEMPLATES: &[(&str, &str)] = &[
         "system/files/getty/autologin.conf.in",
         "/etc/systemd/system/getty@tty1.service.d/autologin.conf",
     ),
-    // system/40-apps.sh: Chrome's theme color follows the wallpaper
-    (
-        "system/files/chrome/dot-chrome-theme.path.in",
-        "/etc/systemd/system/dot-chrome-theme.path",
-    ),
-    (
-        "system/files/chrome/dot-chrome-theme.service.in",
-        "/etc/systemd/system/dot-chrome-theme.service",
-    ),
 ];
 
 /// `render_template` from system/lib.sh: `@USER@` and `@HOME@`.
@@ -287,10 +278,8 @@ pub fn snapper_settings(user: &str) -> Vec<String> {
 
 /// Groups the first user gets, if the target has them: Ubuntu's defaults
 /// for the user the install creates plus what `system/*.sh` adds (i2c from
-/// 20-base.sh, docker from 40-apps.sh).
-pub const USER_GROUPS: [&str; 9] = [
-    "adm", "sudo", "users", "plugdev", "dip", "video", "render", "i2c", "docker",
-];
+/// 20-base.sh).
+pub const USER_GROUPS: [&str; 8] = ["adm", "sudo", "users", "plugdev", "dip", "video", "render", "i2c"];
 
 /// Names from an `/etc/group` that exist, in `wanted` order.
 pub fn existing_groups(group_file: &str, wanted: &[&str]) -> Vec<String> {
@@ -458,7 +447,7 @@ mod tests {
         assert_eq!(passwd_entry(passwd, "nobody"), None);
         assert_eq!(uid_owner(passwd, 1000), Some("ubuntu".into()));
         assert_eq!(uid_owner(passwd, 1002), None);
-        let groups = "root:x:0:\nsudo:x:27:\nadm:x:4:syslog\ndocker:x:990:\n";
-        assert_eq!(existing_groups(groups, &USER_GROUPS), vec!["adm", "sudo", "docker"]);
+        let groups = "root:x:0:\nsudo:x:27:\nadm:x:4:syslog\ni2c:x:990:\n";
+        assert_eq!(existing_groups(groups, &USER_GROUPS), vec!["adm", "sudo", "i2c"]);
     }
 }

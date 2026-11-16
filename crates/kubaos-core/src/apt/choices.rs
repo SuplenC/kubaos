@@ -1,6 +1,6 @@
 //! The user's choices of optional package groups, `/etc/kubaos/apt-groups`: one `<group>=on` or
 //! `<group>=off` line per group the user decided, the rest following the manifest's default. The
-//! install's flags write it (`--no-docker`, `--piv`), and so does `kubaos packages enable|disable`.
+//! install's flags write it (`--no-u2f`, `--piv`), and so does `kubaos packages enable|disable`.
 //!
 //! # Owns
 //!

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Takes Penpot's stack down: its containers and network go, and the images `./up` pulled, but its
+# volumes, the designs, stay. An image the machine had before the stack is the user's and stays;
+# one another container still uses stays too: it's that container's.
+# Usage: ./down
+set -eu
+dir=/etc/kubaos/penpot
+docker compose --project-name penpot --file "$dir/docker-compose.yaml" down --remove-orphans
+if [ -f "$dir/pulled-images" ]; then
+	sort -u "$dir/pulled-images" | while read -r image; do
+		docker image rm "$image" >/dev/null 2>&1 || true
+	done
+fi
+rm -f "$dir/secret.env" "$dir/pulled-images"

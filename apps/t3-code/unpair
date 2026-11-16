@@ -1,0 +1,14 @@
+#!/bin/sh
+# Undo: the pairing links this step made that no one used yet, revoked. A client that paired is
+# T3's to keep, with the threads and projects.
+t3="$HOME/.local/bin/t3"
+[ -x "$t3" ] || exit 0
+"$t3" auth pairing list --json 2>/dev/null |
+  python3 -I -c '
+import json, sys
+for link in json.load(sys.stdin):
+    if link.get("label") == "T3 Code on this machine":
+        print(link["id"])
+' | while read -r id; do
+  "$t3" auth pairing revoke "$id" || true
+done

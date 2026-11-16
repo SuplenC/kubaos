@@ -70,6 +70,23 @@ struct Fake {
     sequences: Vec<(&'static str, Vec<String>)>,
     /// home-manager's GC root and the generation a switch points it at.
     generation: Option<(PathBuf, &'static str)>,
+    /// The machine the Apps catalog's engine acts on, both sides of it.
+    apps: Option<FakeApps>,
+}
+
+/// The Apps catalog's fake machine: its user side, and its root helper, served in this process
+/// through the real server from the checkout's catalog into `journals`.
+struct FakeApps {
+    host: crate::apps::host::fake::FakeHost,
+    /// Whether the session has a display, as a desktop's has and an SSH login's hasn't.
+    display: bool,
+    catalog: PathBuf,
+    journals: PathBuf,
+    owner: u32,
+    /// The root helper is never started: the password prompt is declined.
+    declined: bool,
+    /// Each root helper's `start` and requests, in order.
+    root_calls: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
 }
 
 /// A machine's packages, for the package manifest's tests.
@@ -83,6 +100,8 @@ struct FakeDpkg {
     unavailable: Vec<String>,
     /// What removing a package takes along with it.
     takes: BTreeMap<String, Vec<String>>,
+    /// The packages the Apps catalog's root helper installs and removes for each app id.
+    apps: BTreeMap<String, Vec<String>>,
 }
 
 impl FakeDpkg {
@@ -113,6 +132,19 @@ impl FakeDpkg {
     fn answer(&mut self, cmd: &Cmd) -> Option<String> {
         let args: Vec<String> = cmd.argv().iter().map(|a| a.to_string_lossy().into_owned()).collect();
         let has = |word: &str| args.iter().any(|a| a == word);
+        if let Some(at) = args.iter().position(|a| a.ends_with("/kubaos-apps")) {
+            let verb = args.get(at + 1).cloned().unwrap_or_default();
+            for id in &args[at + 2..] {
+                for p in self.apps.get(id).cloned().unwrap_or_default() {
+                    if verb == "install" {
+                        self.installed.entry(p).or_insert(false);
+                    } else {
+                        self.installed.remove(&p);
+                    }
+                }
+            }
+            return Some(String::new());
+        }
         let names = Self::names(cmd);
         match cmd.program().as_str() {
             "dpkg-query" if has("${db:Status-Status} ${db:Status-Want} ${Package} ${Version}\n") => {
@@ -200,6 +232,7 @@ impl Fake {
             no_to: None,
             sequences: Vec::new(),
             generation: None,
+            apps: None,
         }
     }
 
@@ -334,6 +367,9 @@ impl Machine for Fake {
     fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError> {
         self.ran.push("switch".to_owned());
         self.switches += 1;
+        if self.failing.contains(&"switch") {
+            return Err(MachineError::Switch("failing (test)".to_owned()));
+        }
         if let Some((root, after)) = &self.generation {
             let _ = fs::remove_file(root);
             std::os::unix::fs::symlink(after, root).unwrap();
@@ -375,6 +411,34 @@ impl Machine for Fake {
 
     fn free_bytes(&self, _path: &Path) -> io::Result<u64> {
         Ok(self.free)
+    }
+
+    fn has_display(&self) -> bool {
+        self.apps.as_ref().is_none_or(|apps| apps.display)
+    }
+
+    fn apps(
+        &mut self,
+        _host: &crate::update::machine::AppsHost,
+        root: Vec<std::ffi::OsString>,
+    ) -> (
+        Box<dyn crate::apps::host::Host + '_>,
+        Box<dyn crate::apps::root::RootSide + '_>,
+    ) {
+        let line: Vec<String> = root.iter().map(|a| a.to_string_lossy().into_owned()).collect();
+        self.ran.push(format!("root helper: {}", line.join(" ")));
+        let apps = self.apps.as_ref().expect("a fake machine with the Apps catalog's");
+        let root = crate::apps::host::fake::FakeRoot {
+            host: apps.host.clone(),
+            catalog: apps.catalog.clone(),
+            journals: apps.journals.clone(),
+            owner: apps.owner,
+            declined: apps.declined,
+            started: false,
+            requests: Vec::new(),
+            calls: std::rc::Rc::clone(&apps.root_calls),
+        };
+        (Box::new(apps.host.clone()), Box::new(root))
     }
 }
 
@@ -1362,6 +1426,7 @@ fn an_update_without_a_live_preview_has_no_such_phase() {
     assert!(!m.ran.iter().any(|line| line == "leave preview"));
 }
 
+mod apps;
 mod firmware;
 mod manifest;
 mod programs;

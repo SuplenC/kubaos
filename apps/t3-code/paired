@@ -1,0 +1,6 @@
+#!/bin/sh
+# Done: the service has a client session that came from a pairing link.
+t3="$HOME/.local/bin/t3"
+[ -x "$t3" ] || exit 1
+"$t3" auth session list --json 2>/dev/null |
+  python3 -I -c 'import json, sys; sys.exit(0 if any(s.get("subject") == "one-time-token" for s in json.load(sys.stdin)) else 1)'

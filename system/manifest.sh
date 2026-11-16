@@ -14,6 +14,8 @@
 #   choice_set GROUP on|off     record the user's choice
 #   group_install GROUP...      set up the groups' repos, install what they
 #                               lack, hold a held group, record what it installed
+#   record_drop PKG...          take packages out of the record, which hands
+#                               them to whatever owns them now
 #   repo_setup REPO...          the vendor repo's key and sources file
 #
 # Install and record go through lib.sh's run and sudo_run, so --dry-run
@@ -164,6 +166,16 @@ record_lines() {
       printf '%s\n' "${lines[@]}"
     } | awk -F'\t' 'NF && !seen[$1]++' | sort
   } >"$tmp"
+  write_root_file "$APT_RECORD" 0644 <"$tmp"
+  rm -f "$tmp"
+}
+
+record_drop() {
+  local tmp
+  [[ -r "$APT_RECORD" ]] || return 0
+  grep -q -F -x -f <(printf '%s\n' "$@") <(awk -F'\t' '!/^#/ { print $1 }' "$APT_RECORD") || return 0
+  tmp="$(mktemp)"
+  awk -F'\t' 'NR == FNR { drop[$0] = 1; next } /^#/ || !($1 in drop)' <(printf '%s\n' "$@") "$APT_RECORD" >"$tmp"
   write_root_file "$APT_RECORD" 0644 <"$tmp"
   rm -f "$tmp"
 }
