@@ -56,7 +56,7 @@ Every action has a `name` ("Download the t3 tool"), the step the user sees. Each
 | `output` | `path` | by `path` | nothing | always done | `path` goes: a file a program of the app writes later (Chrome's theme policy), which the app owns all the same |
 | `run` | `do`, `check`, `undo` (argvs), `root`, `window`? | `root`, default no | `do` | `check` exits 0 | `undo` |
 
-**`run` is the one escape hatch**, for vendor tools (`t3 service install`). Its `check` and `undo` are mandatory: the author says how to tell it is done and how to take it back, or there is no `run`. Its argvs are a program on the fixed `PATH`, `./<script>` in the app's folder, or one under the home (`@HOME@/.local/bin/t3`); `@HOME@` and the rest are filled in, nothing else is. It runs as the user unless `root = true`, in the home, with the folder as its working directory. With `window` (the sentence of the step left to the person), it opens a window, so it runs only in a run that may open one (`kubaos app add`); in one that may not (`kubaos update`), it is skipped, its sentence becomes a note, and the install is complete all the same. It is the only place an author's command runs.
+**`run` is the one escape hatch**, for vendor tools (`t3 service install`). Its `check` and `undo` are mandatory: the author says how to tell it is done and how to take it back, or there is no `run`. Its argvs are a program on the fixed `PATH`, `./<script>` in the app's folder, or, as the user only, one under the home (`@HOME@/.local/bin/t3`): root never runs a program the user could change; `@HOME@` and the rest are filled in, nothing else is. It runs as the user unless `root = true`, with `HOME` the user's and the app's folder its working directory. With `window` (the sentence of the step left to the person), it opens a window, so it runs only in a run that may open one (`kubaos app add`); in one that may not (`kubaos update`), it is skipped, its sentence becomes a note, and the install is complete all the same. It is the only place an author's command runs.
 
 The set is sized to the six apps and stays small: a new kind is a decision for its PR, with do, check and undo written down here.
 
@@ -79,11 +79,10 @@ setup = "service"
 complete = true
 
 [[entry]]
-step = 4
-name = "Start the service"
+step = 6
 state = "done"
-action = { kind = "run", do = ["@HOME@/.local/bin/t3", "service", "install"], … }
 claims = [{ claim = "run", owned = true }]
+action = { name = "Start the service", kind = "run", do = ["/home/kuba/.local/bin/t3", "service", "install"], … }
 ```
 
 An entry holds the action as it was done, its words filled in, so a removal undoes what was done even after a release changed the folder, and its **prior state**: what the undo needs and nothing else (a key's old value, whether the unit was enabled, whether lingering was on).
@@ -108,7 +107,7 @@ Each step is an event of the run's `UpdateEvent`s: `action` with the app, the st
 
 ### Root
 
-**The root half is the `kubaos-apps` binary, not shell.** A root run starts one root process (`pkexec /usr/local/libexec/kubaos-apps serve` for `kubaos app`, through sudo inside `kubaos update`), one polkit prompt a run, which answers requests on its stdin, one JSON line each: `preflight` (an install's root steps checked against the root journals' claims), `step` (do one step of an app's setup) and `undo` (undo one step of the root journal). A request names an app id, a setup id and a step number, nothing else: the binary reads the action from the root-owned catalog (`/usr/share/kubaos/apps/<id>/app.toml`, refused unless the file and its folders are root's and no one else may write them), refuses a step whose action isn't root's (a user action, or a `run` without `root = true`), and undoes only what the root journal, which only root writes, recorded. It holds `/run/lock/kubaos-apps.lock` while it serves, so only one run changes a machine at a time; the user's side holds `~/.local/state/kubaos/apps/lock`.
+**The root half is the `kubaos-apps` binary, not shell.** A root run starts one root process (`pkexec /usr/local/libexec/kubaos-apps serve` for `kubaos app`, through sudo inside `kubaos update`), one polkit prompt a run, which answers requests on its stdin, one JSON line each: `preflight` (an install's root steps checked against the root journals' claims), `step` (do one step of an app's setup) and `undo` (undo one step of the root journal). A request names an app id, a setup id and a step number, nothing else: the binary reads the action from the root-owned catalog (`/usr/share/kubaos/apps/<id>/app.toml`, refused unless the file and its folders are root's and no one else may write them), refuses a step whose action isn't root's (a user action, or a `run` without `root = true`), and undoes only what the root journal, which only root writes, recorded. It holds `/run/lock/kubaos-apps.lock` while it serves, so only one run changes a machine at a time; the user's side holds `~/.local/state/kubaos/apps/.lock`.
 
 Why a binary: the actions are Rust, typed and tested once; a shell root helper would have to implement the vocabulary a second time in the language least able to check it, which is how `kubaos-apps` grew to two hundred lines of manifest parsing in awk. The binary is small to audit because its surface is: its `main` takes `serve` and nothing else, and every request is three validated words; the actions it runs are the same code the tests prove. It is built with the release (`.#kubaos`, a second binary of `kubaos-cli`), linked from the Nix store into `/usr/local/libexec/` by root, as `install_scx` links `scx_lavd`, so neither the user nor their profile can change what pkexec runs.
 

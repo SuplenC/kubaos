@@ -499,9 +499,13 @@ impl Action {
             }
             Kind::Linger {} => {}
             Kind::Output { path } => check_path(path)?,
-            Kind::Run { run, check, undo, .. } => {
+            Kind::Run {
+                run, check, undo, root, ..
+            } => {
                 for (key, argv) in [("do", run), ("check", check), ("undo", undo)] {
-                    if !is_argv(argv) {
+                    // HAZARD: root never runs a program from the home: the user could change it.
+                    let from_home = argv.first().is_some_and(|p| p.starts_with("@HOME@/"));
+                    if !is_argv(argv) || (*root && from_home) {
                         return Err(ActionError::InvalidArgv { key });
                     }
                 }

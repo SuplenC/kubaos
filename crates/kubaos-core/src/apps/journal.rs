@@ -35,6 +35,9 @@ pub const JOURNAL: &str = "journal.toml";
 /// Where a user's journals are, under the home.
 pub const USER_JOURNALS: &str = ".local/state/kubaos/apps";
 
+/// The lock the user's side of a run holds, under the home.
+pub const USER_LOCK: &str = ".local/state/kubaos/apps/.lock";
+
 /// Where root's journals are.
 pub const ROOT_JOURNALS: &str = "/var/lib/kubaos/apps";
 
