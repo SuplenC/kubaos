@@ -1,0 +1,22 @@
+# opencode from nixpkgs, through the User flake. Its project keeps no apt repository and Ubuntu
+# doesn't package it.
+# https://github.com/anomalyco/opencode
+name = "opencode"
+category = "ai"
+tags = ["coding agent", "terminal", "open source", "models"]
+summary = "An open-source coding agent that takes any model you throw at it. Bring your own keys."
+# Its README is under the MIT licence, which asks for its notice with every copy, so this is ours.
+description = """\
+opencode is an open-source AI coding agent for the terminal. It works on the project it is \
+started in, editing files and running commands, and talks to the models of many providers \
+(Anthropic, OpenAI, Google and others, or a model on this machine) with the keys or \
+subscriptions you sign in with."""
+description_from = "kubaos"
+keeps = """\
+Your settings stay in ~/.config/opencode, and your sign-ins and sessions in \
+~/.local/share/opencode: install opencode again and they're all there."""
+
+[[action]]
+name = "Install opencode"
+kind = "nix"
+packages = ["opencode"]

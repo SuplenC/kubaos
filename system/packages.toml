@@ -102,6 +102,33 @@ key_url = "https://repo.librewolf.net/pubkey.gpg"
 fingerprint = "662E3CDD6FE329002D0CA5BB40339DD82B12EF16"
 keyring = "/etc/apt/keyrings/librewolf.gpg"
 
+# Anthropic's repository of Claude Desktop, for the app of the catalog
+# (apps/claude-desktop/), signed by the same key as Claude Code's. Claude
+# Desktop's postinst writes claude-desktop.list only while no other source has
+# the repository, so it leaves this one alone.
+[repo.claude-desktop]
+key_url = "https://downloads.claude.ai/claude-desktop/key.asc"
+fingerprint = "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
+keyring = "/etc/apt/keyrings/claude-desktop.gpg"
+
+# Anysphere's repository of Cursor, for the app of the catalog (apps/cursor/).
+# Cursor's postinst rewrites cursor.sources on every upgrade, and its postrm
+# deletes it and the key; ours is byte-identical to what it writes, at the same
+# keyring path, so the two never fight over the file. The postinst writes the
+# key only where there is none, so the pinned one stays.
+[repo.cursor]
+key_url = "https://downloads.cursor.com/keys/anysphere.asc"
+fingerprint = "380FF4BCDC34A4BD92A3565342A1772E62E492D6"
+keyring = "/usr/share/keyrings/anysphere.gpg"
+
+# Cognition's repository of Devin Desktop, which was Windsurf, for the app of
+# the catalog (apps/devin-desktop/). Built for amd64 only. Its package writes
+# no source of its own.
+[repo.windsurf]
+key_url = "https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/windsurf.gpg"
+fingerprint = "EE2C46CC44E1578C23135B0E9E608A1B9FD62A3F"
+keyring = "/etc/apt/keyrings/windsurf.gpg"
+
 # ppa:cppiber/hyprland, the Launchpad PPA of Constantin Piber.
 [repo.cppiber-hyprland]
 key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xA54D23B62FF3FCC76EFF71E8FDBAAA1CF0CCF48E"

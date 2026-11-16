@@ -1,0 +1,24 @@
+# Voxtype from nixpkgs, through the User flake: push-to-talk dictation for Wayland on
+# whisper.cpp, typing what you say where the cursor is through wtype. Ubuntu doesn't package it
+# and its project keeps no apt repository. Its speech model, the key that starts it and its
+# service are the user's to set up with `voxtype setup`, as nixpkgs' packages land with the
+# switch after the run.
+# https://voxtype.io/
+name = "Voxtype"
+category = "ai"
+tags = ["dictation", "speech to text", "voice", "whisper", "transcription", "offline"]
+summary = "Talk, and it types. On your own machine, so nobody else hears you mumble."
+# Its README is under the MIT licence, which asks for its notice with every copy, so this is ours.
+description = """\
+Voxtype is push-to-talk dictation for Wayland. Hold a key, speak, let go, and it transcribes \
+what you said with whisper.cpp on this machine and types it where the cursor is, or puts it on \
+the clipboard. Nothing is sent anywhere."""
+description_from = "kubaos"
+keeps = """\
+Your settings stay in ~/.config/voxtype, and the speech models you downloaded in \
+~/.local/share/voxtype: install Voxtype again and they're all there."""
+
+[[action]]
+name = "Install Voxtype and wtype, which types what it heard"
+kind = "nix"
+packages = ["voxtype", "wtype"]

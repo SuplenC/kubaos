@@ -454,19 +454,30 @@ fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
     assert_eq!(
         ids,
         [
+            "aider",
             "bitwarden",
             "brave",
+            "chatgpt",
             "chromium",
             "claude-code",
+            "claude-desktop",
+            "codex",
+            "cursor",
+            "devin-desktop",
             "docker",
             "firefox",
+            "gemini-cli",
+            "github-copilot-cli",
             "google-chrome",
             "librewolf",
+            "lm-studio",
             "microsoft-edge",
+            "opencode",
             "penpot",
             "t3-code",
             "tor-browser",
             "vivaldi",
+            "voxtype",
             "zen-browser"
         ]
     );

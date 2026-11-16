@@ -1,0 +1,22 @@
+# LM Studio from nixpkgs, through the User flake, which marks it unfree. LM Studio keeps no apt
+# repository, Ubuntu doesn't package it, and its own AppImage comes with no published checksum.
+# https://lmstudio.ai/
+name = "LM Studio"
+category = "ai"
+tags = ["llm", "local models", "chat", "offline", "gguf"]
+summary = "Language models on your own machine. Your GPU earns its keep, and your fans earn theirs."
+# LM Studio's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+LM Studio downloads open language models and runs them on this machine, on its graphics card \
+where it can. It chats with them offline, answers questions about your documents, and serves \
+them to other apps through a local server that speaks OpenAI's API."""
+description_from = "kubaos"
+keeps = """\
+Your models and chats stay in ~/.lmstudio, and LM Studio's settings in ~/.config/LM Studio: \
+install it again and they're all there."""
+
+[[action]]
+name = "Install LM Studio"
+kind = "nix"
+packages = ["lmstudio"]
+unfree = true
