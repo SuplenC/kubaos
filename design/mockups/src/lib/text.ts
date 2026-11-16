@@ -193,52 +193,6 @@ export function inkMass(style: TypeStyle, words: string): Mass {
   return mass;
 }
 
-/**
- * Where `words`' ink centre sits from a line drawn with no line height (`line-height: 0`), in ems
- * of `style`'s size: across from where the line starts, at the centre of its ink's weight, and
- * down from its top, at the middle of its ink's height. A glyph centred on its own in a small box
- * (a step's number) is placed by this. Across, the weight decides, so a 1's light flag doesn't pull
- * its stem off the middle; down, the ink's top and foot do, so a 2's heavy base doesn't sink it.
- */
-export function inkCentre(style: TypeStyle, words: string): { readonly x: number; readonly y: number } {
-  const key = `centre|${style}|${words}`;
-  const known = centres.get(key);
-  if (known) return known;
-  scale ??= document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-  if (!scale) throw new Error("no 2D canvas to measure text with");
-  const face = font(style).font.replace(/[\d.]+px/, `${WEIGHED_AT}px`);
-  scale.font = face;
-  const m = scale.measureText(words);
-  const pad = WEIGHED_AT;
-  const width = Math.ceil(m.actualBoundingBoxLeft + m.actualBoundingBoxRight) + 2 * pad;
-  const height = WEIGHED_AT * 2;
-  const baselineAt = Math.round(WEIGHED_AT * 1.5);
-  scale.canvas.width = width;
-  scale.canvas.height = height;
-  scale.font = face;
-  scale.fillStyle = "#000";
-  scale.textBaseline = "alphabetic";
-  scale.fillText(words, pad, baselineAt);
-  const pixels = scale.getImageData(0, 0, width, height).data;
-  let sum = 0;
-  let moment = 0;
-  for (let x = 0; x < width; x++) {
-    let column = 0;
-    for (let y = 0; y < height; y++) column += pixels[(y * width + x) * 4 + 3]!;
-    sum += column;
-    moment += column * (x + 0.5);
-  }
-  // With no line height, a line's baseline lies half its font's ascent less descent below its top.
-  const baseline = (m.fontBoundingBoxAscent - m.fontBoundingBoxDescent) / 2;
-  const inkMiddle = (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
-  const across = sum === 0 ? m.width / 2 : moment / sum - pad;
-  const centre = { x: across / WEIGHED_AT, y: (baseline - inkMiddle) / WEIGHED_AT };
-  centres.set(key, centre);
-  return centre;
-}
-
-const centres = new Map<string, { readonly x: number; readonly y: number }>();
-
 /** The size `style` is drawn at, in logical pixels. */
 function sizeOf(style: TypeStyle): number {
   const meter = font(style);

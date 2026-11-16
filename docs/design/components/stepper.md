@@ -6,7 +6,7 @@ A molecule: [DESIGN.md, "Levels and where they live"](../../DESIGN.md#levels-and
 
 A page's own few steps (two to five) on one line under its title: where the reader is among them, and the way back a step. First boot's Make it yours is one card of the rail and three steps of its own (What for, Your apps, Go); its Stepper says which. The pages of a flow are a [StepRailPage](step-rail-page.md)'s rail, never a Stepper, so the two never say the same thing.
 
-Each step is a bead `type.body`'s symbol wide (20) holding its number in `label`, then its label in `label`, 8 after it; the number is centred in the bead by its ink, not its advance or its line: across at the centre of its ink's weight (so a 1's flag doesn't push its stem off the middle), down at the middle of its ink's height, rounded to whole device pixels; the steps sit 24 apart and wrap onto a second line, 8 under the first, where the room ends.
+Each step is a bead `type.body`'s symbol wide (20) holding its number in `label_number`, then its label in `label`, 8 after it; the bead is a flex box centring the number both ways, and the number is a plain line with a line height of one em, so its box is its font's size and the browser centres it, with no offset of its own; the steps sit 24 apart and wrap onto a second line, 8 under the first, where the room ends.
 
 - **Not reached:** the bead a ring `stroke.thin` thick in `outline`, its number and label in `on_surface_variant`.
 - **Current:** the ring and the number `primary`, glowing near (`focus.near`) at night as the rail's lit symbols do, none by day; the label `primary_lit`.

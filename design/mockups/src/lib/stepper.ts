@@ -10,7 +10,7 @@
 // flow are a StepRailPage's rail, never a Stepper.
 
 import { probe, variant } from "./probe.ts";
-import { inkCentre, text, typeset } from "./text.ts";
+import { text, typeset } from "./text.ts";
 
 export interface StepperOptions {
   readonly steps: readonly string[];
@@ -33,19 +33,15 @@ function setState(step: HTMLButtonElement, state: State, onBack?: (index: number
 }
 
 /**
- * A bead's number, its ink centred in the bead on whole device pixels: a figure's advance and its
- * line sit its ink off the middle (a 1's stem is left of its advance's centre, a line's room above
- * its figures more than below), and the eye judges the ink. One figure in a fixed bead needs no
- * tabular advance, so it is set in `label`, whose figures the measure reads as drawn.
+ * A bead's number: a plain line of `label_number`, its line height one em, so its box is its font's
+ * size, which the bead centres both ways as a flex box does. It is no probed text, so the site's
+ * centring pass (`lib/centre.ts`) leaves it where the browser puts it.
  */
 function number(words: string): HTMLElement {
   const figure = document.createElement("span");
   figure.className = "k-stepper-number";
-  typeset(figure, "label");
+  typeset(figure, "label_number");
   figure.textContent = words;
-  const ink = inkCentre("label", words);
-  figure.style.setProperty("--ink-x", String(ink.x));
-  figure.style.setProperty("--ink-y", String(ink.y));
   return figure;
 }
 
