@@ -74,6 +74,7 @@ export default page({
     ...CHIP_KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind) })),
     { name: "With an icon", for: "the left side pads `space.s8`, not `space.s12`", sample: () => sample("Neutral", { icon: SAMPLES.Neutral.icon }) },
     { name: "Removable", for: "any kind; the close's curve is the chip's own", sample: () => sample("Neutral", { removable: true }) },
+    { name: "Its icon alone", for: "a square; its label its name", sample: () => sample("Neutral", { icon: SAMPLES.Neutral.icon, iconOnly: true }) },
     {
       name: "Pressable, with a tooltip",
       for: "its name in a hint while it is lit",

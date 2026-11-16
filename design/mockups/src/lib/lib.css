@@ -528,6 +528,13 @@
   padding-left: var(--space-s8);
 }
 
+/* A chip of its symbol alone: a square, the symbol centred in it. */
+.k-chip[data-icon-only] {
+  justify-content: center;
+  width: var(--size-chip);
+  padding: 0;
+}
+
 .k-chip[data-removable] {
   padding-right: 0;
 }
