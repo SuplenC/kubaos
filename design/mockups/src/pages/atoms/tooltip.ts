@@ -49,8 +49,8 @@ function inSentence(shownNow = true): HTMLElement {
 
 /** A button whose card answers its press, shown as just after one: room above for the card. */
 function answering(shownNow = true): HTMLElement {
-  const copy = button({ label: "Copy", kind: "Tonal", size: "Sm", icon: "content_copy" });
-  return inset(stack(0, "start", floatingTooltip(copy, tooltip("Copied", ""), { side: "above", shown: shownNow, shows: "pressed" })), "s48");
+  const save = button({ label: "Save", kind: "Tonal", size: "Sm", icon: "save" });
+  return inset(stack(0, "start", floatingTooltip(save, tooltip("Saved", ""), { side: "above", shown: shownNow, shows: "pressed" })), "s48");
 }
 
 /** A card shown over its lit chip: what a power change plays on, the card just recolouring. */

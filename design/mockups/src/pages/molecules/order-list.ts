@@ -52,7 +52,7 @@ export default page<"rest" | "selected" | "disabled">({
   states: {
     shown: ["rest", "selected", "disabled"],
     absent: {
-      lit: "a row lit is the Switch's, and the row's focus tube from the keyboard",
+      lit: "its Switch lights; a row takes the focus tube",
       pressed: "a press on its handle lifts the row: the Lifted variant",
       loading: "its things are known when it is drawn",
       empty: "a list to order has two things at least",

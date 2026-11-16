@@ -30,7 +30,7 @@ import { toastRoom } from "../../lib/toast.ts";
 import { floatingTooltip, term, termed, tooltip } from "../../lib/tooltip.ts";
 import { length } from "../../lib/tokens.ts";
 import { bezier, milliseconds } from "../../site/recipe.ts";
-import { settings } from "../../site/settings.ts";
+import { CHROME, settings } from "../../site/settings.ts";
 import { body } from "./kobo-parts.ts";
 import { CARDS } from "./setup-cards.ts";
 import { AD, defaultSettings, type Found, LANDS, type MenuSettings, OPENS_WITH, OTHERS, QUESTION, search } from "./setup-kotodama-data.ts";
@@ -365,7 +365,7 @@ function otherMenu(q: string, groups: readonly Group[], foot: string, more: Othe
   answers.classList.add("setup-kotodama-answers");
   const waiting = spinner("s16", "on_surface_variant");
   const status = row("s8", "centre", waiting, filling(wrapped(foot, "small", "on_surface_variant")));
-  const inner = stack("s8", "start", filling(stack(0, "start", filling(words), filling(bar))), fillingHeight(filling(answers)), divider(), filling(status));
+  const inner = stack("s8", "start", filling(stack("s4", "start", filling(words), filling(bar))), fillingHeight(filling(answers)), divider(), filling(status));
   inner.classList.add("setup-kotodama-sad");
   const box = document.createElement("span");
   box.className = "setup-kotodama-other";
@@ -570,6 +570,12 @@ export function kotodamaCard(view: string): KotodamaCard {
         menu.set("wifi");
         return;
       }
+      // Drawn for a shot (`?chrome=off`), it stands on its first ask, typed.
+      if (!CHROME) {
+        lit(0);
+        menu.set(EXAMPLES[0].typed);
+        return;
+      }
       for (let round = 0; playing; round = (round + 1) % EXAMPLES.length) {
         lit(round);
         await menu.type(EXAMPLES[round]!.typed);
@@ -661,7 +667,8 @@ export function kotodamaCard(view: string): KotodamaCard {
         start.settle();
         if (roast.textContent === OTHERS.start.still) roast.replaceWith((roast = wrapped(OTHERS.start.roast(QUESTION), "small", "on_surface_variant")));
       };
-      if (reduced || state.raceAt !== undefined) return at(reduced ? LANDS.start.done : (state.raceAt ?? 0));
+      // Reduced, or drawn for a shot (`?chrome=off`), the race stands run out, the same every time.
+      if (reduced || !CHROME || state.raceAt !== undefined) return at(reduced || !CHROME ? LANDS.start.done : (state.raceAt ?? 0));
       at(0);
       const speed = settings().speed;
       for (const [part, lands, from] of parts) {

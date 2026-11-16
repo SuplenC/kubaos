@@ -310,7 +310,6 @@
   display: block;
   transition: opacity var(--motion-medium) var(--easing-standard);
   height: var(--stroke-thin);
-  margin-top: var(--space-s4);
   border-radius: var(--radius-full);
   background: linear-gradient(90deg, transparent, var(--color-cold), transparent) no-repeat;
   background-size: 40% 100%;

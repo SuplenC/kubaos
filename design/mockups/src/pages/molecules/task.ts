@@ -53,7 +53,7 @@ export default page<"rest" | "selected">({
   states: {
     shown: ["rest", "selected"],
     absent: {
-      lit: "a press goes to what it asks for; it lights only once done",
+      lit: "a press goes to what it asks; it lights once done",
       pressed: "a press starts the thing to try; nothing stays pressed",
       disabled: "nothing to try is ever out of reach",
       loading: "it knows what it asks for when drawn",
