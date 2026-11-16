@@ -6,9 +6,11 @@
 //! which the update holds already. Its nixpkgs half is the User flake's `packages.toml`, as
 //! `kubaos package add` writes it, and a switch: `kubaos app` switches itself, an update's own
 //! switch comes after the phase. A setup's own parts are the user's: the user helper sets them up
-//! and takes them away as the user, never as root. An add or a remove that fails puts the picks
-//! back, so a declined prompt changes nothing; the record of the nixpkgs names each app added
-//! (`apps::added`) keeps what was written to `packages.toml`, which is the apps' still.
+//! and takes them away as the user, never as root, and an update has it open no window, so a
+//! step such as pairing is a note for the user. An add or a remove that fails puts the picks
+//! back, so a declined prompt changes nothing: a removal asks for root before it takes a setup's
+//! parts away. The record of the nixpkgs names each app added (`apps::added`) keeps what was
+//! written to `packages.toml`, which is the apps' still.
 //!
 //! # Owns
 //!
@@ -51,6 +53,9 @@ use crate::update::event::chain;
 use crate::update::firmware::Firmware;
 use crate::update::machine::Cmd;
 use crate::update::machine::Machine;
+
+/// How the user helper starts a line naming a step a setup leaves to the user.
+const USER_HELPER_NEXT: &str = "user-helper: next: ";
 
 /// What the apps' plan reads.
 struct AppsState {
@@ -252,14 +257,12 @@ impl<M: Machine> Updater<'_, M> {
             ));
         }
         for app in plan::unsettled(&state.facts()) {
-            let setups: Vec<String> = app.setups.iter().map(|setup| setup.id.clone()).collect();
-            self.j.warn(
-                UpdateError::NoSetup {
-                    id: app.id.clone(),
-                    setups,
-                }
-                .to_string(),
-            );
+            let setups: Vec<&str> = app.setups.iter().map(|setup| setup.id.as_str()).collect();
+            self.j.warn(format!(
+                "{id} is picked with no setup, so nothing installs it: kubaos app add {id} --setup <{setups}>",
+                id = app.id,
+                setups = setups.join("|"),
+            ));
         }
         let wanted = plan::installs(&state.facts());
         if wanted.is_empty() {
@@ -313,11 +316,34 @@ impl<M: Machine> Updater<'_, M> {
     fn remove_parts(&mut self, leaving: &[(&App, &Setup)]) -> Result<(), UpdateError> {
         for (app, setup) in leaving {
             self.j.step(format!("Removing {}", setup.name));
-            let helper = self.user_helper("remove", app, setup);
-            self.run(&helper)
-                .map_err(UpdateError::step(format!("removing {}", setup.name)))?;
+            let helper = self.user_helper(&["remove"], app, setup);
+            self.run_user_helper(&helper, format!("removing {}", setup.name))?;
         }
         Ok(())
+    }
+
+    /// Checks that each setup of `parts` can be taken away now, through the user helper, which
+    /// changes nothing.
+    fn ready_to_remove(&mut self, parts: &[(&App, &Setup)]) -> Result<(), UpdateError> {
+        for (app, setup) in parts {
+            let helper = self.user_helper(&["ready", "remove"], app, setup);
+            self.run_user_helper(&helper, format!("removing {}", setup.name))?;
+        }
+        Ok(())
+    }
+
+    /// Runs the user helper's `helper`, and repeats each step it leaves to the user as a note.
+    fn run_user_helper(&mut self, helper: &Cmd, what: String) -> Result<(), UpdateError> {
+        let mut next = Vec::new();
+        let ran = self.run_with(helper, |line| {
+            if let Some(step) = line.strip_prefix(USER_HELPER_NEXT) {
+                next.push(step.trim_end().to_owned());
+            }
+        });
+        for step in next {
+            self.j.note(step);
+        }
+        ran.map_err(UpdateError::step(what))
     }
 
     /// Installs `wanted`: the root half in one run of the helper, the nixpkgs half into
@@ -359,12 +385,17 @@ impl<M: Machine> Updater<'_, M> {
                 self.switch()?;
             }
         }
+        // An update runs unattended: a setup opens no window in one, and leaves its steps, such as
+        // pairing, to the notes.
+        let verb: &[&str] = match root {
+            Root::Polkit => &["install", "--window"],
+            Root::Sudo => &["install"],
+        };
         for install in wanted {
             if let (true, Some(setup)) = (install.parts, install.setup) {
                 self.j.step(format!("Setting up {}", setup.name));
-                let helper = self.user_helper("install", install.app, setup);
-                self.run(&helper)
-                    .map_err(UpdateError::step(format!("setting up {}", setup.name)))?;
+                let helper = self.user_helper(verb, install.app, setup);
+                self.run_user_helper(&helper, format!("setting up {}", setup.name))?;
             }
         }
         let after = self.apps_state(state.catalog.clone(), state.picks.clone())?;
@@ -381,9 +412,10 @@ impl<M: Machine> Updater<'_, M> {
         Ok(changes)
     }
 
-    /// Removes `apps`: each setup's own parts that are there through the user helper, the root
-    /// half in one run of the helper, and from `packages.toml` the nixpkgs names they added that
-    /// no other picked app needs, then a switch.
+    /// Removes `apps`: the root half in one run of the helper, once the user helper says each
+    /// setup's own parts that are there can go, then those parts, and from `packages.toml` the
+    /// nixpkgs names they added that no other picked app needs, then a switch. Root comes before
+    /// the parts, so a declined prompt leaves every setup as it was.
     fn uninstall_apps(&mut self, state: &AppsState, apps: &[&App]) -> Result<AppChanges, UpdateError> {
         if apps.is_empty() {
             self.j.detail("not installed");
@@ -399,7 +431,7 @@ impl<M: Machine> Updater<'_, M> {
                     .map(move |setup| (*app, setup))
             })
             .collect();
-        self.remove_parts(&parts)?;
+        self.ready_to_remove(&parts)?;
         self.j.step(format!("Removing {}", names.join(", ")));
         let as_root: Vec<&str> = apps
             .iter()
@@ -410,6 +442,7 @@ impl<M: Machine> Updater<'_, M> {
             let helper = self.helper(Root::Polkit).arg("remove").args(&as_root);
             self.run(&helper).map_err(UpdateError::step("removing the apps"))?;
         }
+        self.remove_parts(&parts)?;
         let path = self.user.apps_added();
         let mut added = Added::read(&path).map_err(UpdateError::AppsAdded)?;
         let before = added.clone();
@@ -434,10 +467,11 @@ impl<M: Machine> Updater<'_, M> {
 
     /// The user helper's `verb` of `app`'s setup `setup`, run as the user, for the home the
     /// updater works on.
-    fn user_helper(&self, verb: &str, app: &App, setup: &Setup) -> Cmd {
+    fn user_helper(&self, verb: &[&str], app: &App, setup: &Setup) -> Cmd {
         Cmd::user("bash")
             .arg(self.sys.apps_user_helper())
-            .args([verb, app.id.as_str(), setup.id.as_str()])
+            .args(verb)
+            .args([app.id.as_str(), setup.id.as_str()])
             .env("HOME", self.user.home())
     }
 
