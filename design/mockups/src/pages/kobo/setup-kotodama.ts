@@ -71,7 +71,7 @@ const RACE: Move = {
 const TICKED: Move = {
   name: "A try ticks off",
   what: "Its tick fades in over `short`; the row's tile takes the accent.",
-  tracks: [{ part: "the tick", on: "the try", target: ".setup-kotodama-step .k-list-row[data-picked] .k-list-box .k-check-mark", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+  tracks: [{ part: "the tick", on: "the try", target: ".setup-kotodama-try-card[data-done] .setup-kotodama-tick", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
   reduced: "same",
   back: "cuts",
   sample: at("try-ticked"),
