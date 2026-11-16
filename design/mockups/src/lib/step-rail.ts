@@ -161,6 +161,11 @@ export interface StepRailOptions {
    * or Enter on the last (`forward` true). Kōbō's welcome before it, its install after it.
    */
   readonly onExit?: (forward: boolean) => void;
+  /**
+   * Draws the page after the one shown in idle time too, so Continue builds nothing: a template
+   * someone moves through, not a still of one, whose next page would only add to what loads.
+   */
+  readonly drawsAhead?: boolean;
 }
 
 /** A rail step's state: done before the current one, the current one, to do after it. */
@@ -495,14 +500,15 @@ function curve(token: string): string {
  * Kōbō, where the page is the screen, it waits the `short` the page leaving takes to go, so the two
  * never lie over each other, and its footer band follows it in a `micro` later, rising `space.s24`.
  */
-export function arrive(room: HTMLElement, forward: boolean, staged = false): void {
+export function arrive(room: HTMLElement, forward: boolean, staged = false): Promise<unknown> {
   room.dataset.from = forward ? "end" : "start";
   const reduced = settings().reduced;
   const frames: Keyframe[] = reduced ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, "--step-slide": 1 }, { opacity: 1, "--step-slide": 0 }];
   const after = staged && !reduced ? timed("short") : 0;
-  room.animate(frames, { duration: timed("long"), delay: after, easing: curve("emphasized_decel"), fill: "backwards" });
+  const page = room.animate(frames, { duration: timed("long"), delay: after, easing: curve("emphasized_decel"), fill: "backwards" });
   const band = staged && !reduced ? room.querySelector<HTMLElement>(".k-step-footer") : null;
-  band?.animate([{ opacity: 0, "--step-rise": 1 }, { opacity: 1, "--step-rise": 0 }], { duration: timed("long"), delay: after + timed("micro"), easing: curve("emphasized_decel"), fill: "backwards" });
+  const rise = band?.animate([{ opacity: 0, "--step-rise": 1 }, { opacity: 1, "--step-rise": 0 }], { duration: timed("long"), delay: after + timed("micro"), easing: curve("emphasized_decel"), fill: "backwards" });
+  return Promise.allSettled([page.finished, ...(rise ? [rise.finished] : [])]);
 }
 
 /**
@@ -591,8 +597,9 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   const shown: { nudge: () => HTMLElement | null } = { nudge: () => null };
 
   // Every page drawn so far, kept in the page's side, hidden, laid out: going back to one only
-  // shows it again, and the page before and the first done step are drawn in idle time, so a press
-  // on either builds nothing. A page whose body reads the whole flow (`fresh`) is drawn each time.
+  // shows it again, and the page before and the first done step (and the page after, `drawsAhead`)
+  // are drawn in idle time, so a press on any of them builds nothing. A page whose body reads the
+  // whole flow (`fresh`) is drawn each time.
   const side = document.createElement("span");
   side.className = "k-step-side";
   const rooms = new Map<number, ReturnType<typeof pageRoom>>();
@@ -651,7 +658,7 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
     }
     const left = rooms.get(from)?.room;
     if (options.host === "kobo" && left && left !== made.room) leave(left, current > from);
-    arrive(made.room, current > from, options.host === "kobo");
+    const arrived = arrive(made.room, current > from, options.host === "kobo");
     if (steps && !options.free) travel(steps, from, current, options.failed ?? false);
     // The template holds the keys on a page with nothing to do yet: Enter and Esc still work. The
     // keyboard moves with the next frame, which lays the page out anyway, not inside the press.
@@ -661,14 +668,23 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
         if (box.contains(document.activeElement) || document.activeElement === document.body) (made.first ?? box).focus({ preventScroll: true });
       });
     }
-    ahead();
+    // Pages drawn ahead wait for the page to have arrived: a page drawn in an idle moment of its
+    // move would take that frame and the next.
+    const at = current;
+    void arrived.then(() => {
+      if (current === at) ahead();
+    });
   };
 
-  /** Draws, one an idle moment, the pages a press most likely goes back to. */
+  /** Draws, one an idle moment, the pages a press most likely goes to. */
   const ahead = () => {
     const first = backTo(options.pages, current, options.locked ?? false);
-    // The two a press most often takes: the page before (Back, Esc) and the first done step.
-    const waiting = [...new Set([current - 1, first])].filter((index) => index >= first && index <= reached && index !== current && !options.pages[index]?.fresh);
+    // The pages a press most often takes: the page after (Continue, Enter), the page before (Back,
+    // Esc) and the first done step. Drawn hidden, their controls' glows are worked out then too.
+    const after = along(current, 1);
+    const going = options.drawsAhead && after < options.pages.length ? [after] : [];
+    const back = [current - 1, first].filter((index) => index >= first && index <= reached);
+    const waiting = [...new Set([...going, ...back])].filter((index) => index !== current && !options.pages[index]?.fresh);
     const one = () => {
       const index = waiting.shift();
       if (index === undefined || !box.isConnected) return;
