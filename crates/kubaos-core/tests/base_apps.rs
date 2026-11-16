@@ -4,7 +4,8 @@
 //! and catalog, with sudo, dpkg and dpkg-query stand-ins over a list of installed packages, and
 //! the removal of what an older base install left standing in as lines in a log. Then the package
 //! manifest's plan of the next update reads the machine they left. Taking the apps in, the user
-//! migration apps-adopt, is `kubaos app adopt`, which the updater's tests cover.
+//! migration apps-adopt, is `kubaos app adopt`, which the updater's tests cover. Last, the Apps
+//! catalog's polkit action, which `system/lib.sh` installs on a machine without nix too.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -321,4 +322,32 @@ fn the_picks_the_user_had_stay_and_a_second_run_changes_nothing() {
         picks.add("t3-code");
         picks
     });
+}
+
+#[test]
+fn a_machine_without_nix_still_gets_the_apps_polkit_action() {
+    // Regression: the action came only with the helper, which 60-nix.sh skips without nix.
+    let bin = tempfile::tempdir().expect("a temp dir");
+    let lib = repo_root().join("system/lib.sh");
+    let script = format!(
+        "source '{}'\n\
+         install_root_file() {{ echo \"file $2\"; }}\n\
+         install_apps_helper() {{ echo helper; }}\n\
+         install_apps_root",
+        lib.display()
+    );
+
+    let out = Command::new("bash")
+        .args(["-euo", "pipefail", "-c", &script])
+        .env_clear()
+        .env("PATH", format!("{}:/usr/bin:/bin", bin.path().display()))
+        .env("HOME", bin.path())
+        .output()
+        .expect("run bash");
+
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "file /usr/share/polkit-1/actions/org.kubaos.apps.policy\n"
+    );
 }

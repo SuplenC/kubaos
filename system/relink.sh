@@ -44,6 +44,7 @@ link_wallpapers
 link_pam_fprintd
 if [[ -L "$PAM_U2F_LINK" ]] || ((DRY_RUN)); then link_pam_u2f; fi
 install_scx
+install_apps_policy
 install_apps_helper
 if [[ -e /usr/local/libexec/dotfiles/gsr-kms-server ]]; then
   rec_args=()

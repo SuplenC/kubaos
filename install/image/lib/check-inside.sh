@@ -121,7 +121,7 @@ for b in qs ghostty nvim tmux home-manager gpu-screen-recorder zsh; do
   check "  home-path/bin/$b" in_root test -x "$home_path/bin/$b"
 done
 check "nix-store --verify (database)" in_root "$NIXB/nix-store" --verify
-for l in "$R"/nix/var/nix/gcroots/dotfiles-* "$R"/nix/var/nix/gcroots/kubaos/*; do
+for l in "$R"/nix/var/nix/gcroots/dotfiles-* "$R"/nix/var/nix/gcroots/kubaos-apps "$R"/nix/var/nix/gcroots/kubaos/*; do
   tgt="$(readlink "$l")"
   [[ -e "$R$tgt" ]] && ok "gcroot ${l#"$R"} -> $tgt" || fail "gcroot ${l#"$R"} dangles ($tgt)"
 done

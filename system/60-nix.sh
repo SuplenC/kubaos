@@ -216,14 +216,10 @@ else
 fi
 
 # --------------------------------------------------------------------------
-# The Apps catalog's root helper, from this release's build of the kubaos
-# command, and its polkit action. Not tied to DO_SWITCH either.
+# The Apps catalog's root helper and its polkit action. Not tied to DO_SWITCH
+# either.
 step "The Apps catalog's root helper ($APPS_LINK)"
-if ((DRY_RUN)) || command -v nix >/dev/null; then
-  install_apps_helper
-else
-  warn "nix not found; skipping"
-fi
+install_apps_root
 
 # --------------------------------------------------------------------------
 # setup_nix_gpu: home-manager's targets.genericLinux.gpu (home/desktop.nix)
