@@ -12,8 +12,8 @@
 //!
 //! # Owns
 //!
-//! - Writing the picks and the record of added names as a run goes, running the root helper and
-//!   the user helper, switching an app's setup, and the Apps phase.
+//! - Writing the picks and the record of added names as a run goes, running the root helper and the
+//!   user helper, switching an app's setup, and the Apps phase.
 //!
 //! # Not here
 //!
@@ -165,7 +165,9 @@ impl<M: Machine> Updater<'_, M> {
             let state = u.apps_state(catalog, picks)?;
             let done = match change {
                 Change::Add => u.add_in_setups(state, ids),
-                Change::Remove => u.uninstall_apps(&state, &plan::removals(&state.facts(), ids)).map(|done| (done, state)),
+                Change::Remove => u
+                    .uninstall_apps(&state, &plan::removals(&state.facts(), ids))
+                    .map(|done| (done, state)),
             };
             if done.is_err() && changed {
                 before.write(&path).map_err(UpdateError::Picks)?;
@@ -251,11 +253,13 @@ impl<M: Machine> Updater<'_, M> {
         }
         for app in plan::unsettled(&state.facts()) {
             let setups: Vec<String> = app.setups.iter().map(|setup| setup.id.clone()).collect();
-            self.j.warn(UpdateError::NoSetup {
-                id: app.id.clone(),
-                setups,
-            }
-            .to_string());
+            self.j.warn(
+                UpdateError::NoSetup {
+                    id: app.id.clone(),
+                    setups,
+                }
+                .to_string(),
+            );
         }
         let wanted = plan::installs(&state.facts());
         if wanted.is_empty() {
@@ -284,7 +288,11 @@ impl<M: Machine> Updater<'_, M> {
             .iter()
             .filter(|app| ids.contains(&app.id))
             .filter_map(|app| Some((app, facts.picked_setup(app)?)))
-            .flat_map(|(app, setup)| plan::leaving(&facts, app, setup).into_iter().map(move |other| (app, other)))
+            .flat_map(|(app, setup)| {
+                plan::leaving(&facts, app, setup)
+                    .into_iter()
+                    .map(move |other| (app, other))
+            })
             .collect();
         let state = if leaving.is_empty() {
             state
@@ -385,7 +393,11 @@ impl<M: Machine> Updater<'_, M> {
         let facts = state.facts();
         let parts: Vec<(&App, &Setup)> = apps
             .iter()
-            .flat_map(|app| plan::parts_there(&facts, app).into_iter().map(move |setup| (*app, setup)))
+            .flat_map(|app| {
+                plan::parts_there(&facts, app)
+                    .into_iter()
+                    .map(move |setup| (*app, setup))
+            })
             .collect();
         self.remove_parts(&parts)?;
         self.j.step(format!("Removing {}", names.join(", ")));

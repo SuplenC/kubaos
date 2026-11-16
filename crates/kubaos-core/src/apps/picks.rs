@@ -1,6 +1,6 @@
 //! The user's picks, `~/.config/kubaos/apps.toml`: the apps of the catalog they want on the
-//! machine, and for an app with setups the one they picked. It is the source of truth `kubaos update` reconciles to; `kubaos app add|remove`
-//! rewrite it whole, sorted, under the update lock.
+//! machine, and for an app with setups the one they picked. It is the source of truth `kubaos
+//! update` reconciles to; `kubaos app add|remove` rewrite it whole, sorted, under the update lock.
 //!
 //! # Owns
 //!

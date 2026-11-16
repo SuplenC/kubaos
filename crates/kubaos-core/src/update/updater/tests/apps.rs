@@ -182,7 +182,9 @@ fn adding_an_app_that_is_there_only_picks_it() {
     let mut m = fake(&["agent"]);
     let mut events = Vec::new();
 
-    w.reporting(&mut m, &mut events).add_apps(&names(&["agent"]), None).unwrap();
+    w.reporting(&mut m, &mut events)
+        .add_apps(&names(&["agent"]), None)
+        .unwrap();
 
     assert_eq!(picked(&w), ["agent"]);
     assert!(helper_runs(&m).is_empty(), "{:?}", m.ran);
@@ -437,7 +439,9 @@ fn adding_an_app_with_setups_without_one_refuses_and_names_them() {
 
     let added = w.updater(&mut m).add_apps(&names(&["agent", "lab"]), None);
 
-    let Err(err) = added else { panic!("added without a setup") };
+    let Err(err) = added else {
+        panic!("added without a setup")
+    };
     assert!(matches!(&err, UpdateError::NoSetup { id, setups } if id == "lab" && setups == &["desktop", "service"]));
     assert_eq!(
         err.to_string(),
@@ -493,7 +497,11 @@ fn the_service_setup_installs_the_app_then_its_own_parts_as_the_user() {
     assert!(runs.len() == 1 && runs[0].starts_with("pkexec "), "{runs:?}");
     let helper = format!("bash {} install lab service", w.sys.apps_user_helper().display());
     let at = |line: &str| m.ran.iter().position(|ran| ran.starts_with(line));
-    assert!(at("pkexec").unwrap() < at(&helper).expect("the user helper ran, not as root"), "{:?}", m.ran);
+    assert!(
+        at("pkexec").unwrap() < at(&helper).expect("the user helper ran, not as root"),
+        "{:?}",
+        m.ran
+    );
     assert_eq!(user_helper_runs(&w), ["install lab service"]);
     assert!(lab_service_there(&w));
     assert_eq!(Picks::read(&w.user.app_picks()).unwrap().setup("lab"), Some("service"));
@@ -545,8 +553,15 @@ fn a_service_set_up_by_hand_is_that_setup_and_nothing_installs_over_it() {
         .unwrap();
 
     let lab = status.apps.iter().find(|a| a.id == "lab").unwrap();
-    assert_eq!((lab.state, lab.setup.as_deref()), (AppState::Installed, Some("service")));
-    assert!(helper_runs(&m).is_empty() && user_helper_runs(&w).is_empty(), "{:?}", m.ran);
+    assert_eq!(
+        (lab.state, lab.setup.as_deref()),
+        (AppState::Installed, Some("service"))
+    );
+    assert!(
+        helper_runs(&m).is_empty() && user_helper_runs(&w).is_empty(),
+        "{:?}",
+        m.ran
+    );
     assert_eq!(summary(&events).apps.installed, ["Lab as a service"]);
 }
 
@@ -562,7 +577,10 @@ fn removing_takes_the_setups_parts_then_the_app_and_drops_the_setup() {
 
     assert_eq!(user_helper_runs(&w), ["remove lab service"]);
     let runs = helper_runs(&m);
-    assert!(runs.len() == 1 && runs[0].ends_with("kubaos-apps remove lab"), "{runs:?}");
+    assert!(
+        runs.len() == 1 && runs[0].ends_with("kubaos-apps remove lab"),
+        "{runs:?}"
+    );
     assert!(!lab_service_there(&w));
     let picks = fs::read_to_string(w.user.app_picks()).unwrap();
     assert!(!picks.contains("lab"), "{picks}");
@@ -603,7 +621,9 @@ fn an_update_installs_a_picked_setups_missing_parts_and_warns_of_a_pick_without_
 
     let warned = warnings(&events);
     assert!(
-        warned.iter().any(|w| w.starts_with("lab can be set up more than one way")),
+        warned
+            .iter()
+            .any(|w| w.starts_with("lab can be set up more than one way")),
         "{warned:?}"
     );
     assert!(helper_runs(&m).is_empty() && user_helper_runs(&unsettled).is_empty());

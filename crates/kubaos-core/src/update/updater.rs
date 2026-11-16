@@ -225,7 +225,10 @@ pub enum UpdateError {
     #[error("{id} has nothing for {arch}")]
     Unavailable { id: String, arch: String },
     /// The app has setups and none was named: there is no default.
-    #[error("{id} can be set up more than one way, and none is the default: {}", setup_choices(id, setups))]
+    #[error(
+        "{id} can be set up more than one way, and none is the default: {}",
+        setup_choices(id, setups)
+    )]
     NoSetup { id: String, setups: Vec<String> },
     /// The app has no setup of that id.
     #[error("{id} has no setup {setup}: {}", setup_choices(id, setups))]

@@ -116,10 +116,20 @@ impl Machine {
             dir: tempfile::tempdir().expect("a temp dir"),
         };
         let root = m.dir.path();
-        for dir in ["checkout/apps", "checkout/system", "bin", "home", "runtime/t3-9.9.9-linux-x64"] {
+        for dir in [
+            "checkout/apps",
+            "checkout/system",
+            "bin",
+            "home",
+            "runtime/t3-9.9.9-linux-x64",
+        ] {
             fs::create_dir_all(root.join(dir)).expect("make the folders");
         }
-        fs::copy(repo_root().join("apps/user-helper"), root.join("checkout/apps/user-helper")).expect("copy the helper");
+        fs::copy(
+            repo_root().join("apps/user-helper"),
+            root.join("checkout/apps/user-helper"),
+        )
+        .expect("copy the helper");
         fs::copy(
             repo_root().join("system/manifest.sh"),
             root.join("checkout/system/manifest.sh"),
@@ -233,7 +243,8 @@ impl Machine {
     }
 
     fn desktop_settings(&self) -> serde_json::Value {
-        let text = fs::read_to_string(self.home().join(".t3/userdata/desktop-settings.json")).expect("read the settings");
+        let text =
+            fs::read_to_string(self.home().join(".t3/userdata/desktop-settings.json")).expect("read the settings");
         serde_json::from_str(&text).expect("the settings are JSON")
     }
 }
@@ -275,7 +286,10 @@ fn install_hands_the_hook_the_pinned_download_once_its_sha256_is_the_manifests()
 
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let log = m.log();
-    assert!(log[0].starts_with("curl ") && log[0].contains("--proto =https"), "{log:?}");
+    assert!(
+        log[0].starts_with("curl ") && log[0].contains("--proto =https"),
+        "{log:?}"
+    );
     assert!(log[0].ends_with("https://example.com/lab-cli-2.0.tar.gz"), "{log:?}");
     assert!(
         log[1].starts_with("install_lab_service …/") && log[1].ends_with("/download 2.0"),
@@ -290,8 +304,16 @@ fn a_download_that_isnt_the_pinned_one_never_reaches_the_hook() {
     let run = m.run(&["install", "lab", "service"], false);
 
     assert_eq!(run.code, Some(1));
-    assert!(run.stderr.contains("is not the download its manifest pins"), "{}", run.stderr);
-    assert!(!m.log().iter().any(|l| l.starts_with("install_lab_service")), "{:?}", m.log());
+    assert!(
+        run.stderr.contains("is not the download its manifest pins"),
+        "{}",
+        run.stderr
+    );
+    assert!(
+        !m.log().iter().any(|l| l.starts_with("install_lab_service")),
+        "{:?}",
+        m.log()
+    );
 }
 
 #[test]
@@ -315,7 +337,10 @@ fn t3_codes_service_is_t3s_runtime_its_service_and_the_desktop_app_paired_to_it(
 
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let runtime = m.home().join(".t3/runtime/versions/9.9.9");
-    assert_eq!(fs::read_to_string(runtime.join(".install-complete")).unwrap(), "9.9.9\n");
+    assert_eq!(
+        fs::read_to_string(runtime.join(".install-complete")).unwrap(),
+        "9.9.9\n"
+    );
     assert!(runtime.join("t3").is_file());
     let t3: Vec<String> = m.log().into_iter().filter(|l| l.starts_with("t3 ")).collect();
     assert_eq!(
@@ -338,7 +363,11 @@ fn t3_codes_service_is_t3s_runtime_its_service_and_the_desktop_app_paired_to_it(
         "{:?}",
         m.log()
     );
-    assert!(run.stdout.contains("asks to add the backend on this machine"), "{}", run.stdout);
+    assert!(
+        run.stdout.contains("asks to add the backend on this machine"),
+        "{}",
+        run.stdout
+    );
 }
 
 #[test]
@@ -350,7 +379,10 @@ fn without_a_graphical_session_the_service_is_set_up_and_the_pairing_is_left_to_
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(!m.log().iter().any(|l| l.starts_with("t3code ")), "{:?}", m.log());
     assert!(run.stdout.contains("run `t3 pair`"), "{}", run.stdout);
-    assert_eq!(m.desktop_settings(), serde_json::json!({"localEnvironmentEnabled": false}));
+    assert_eq!(
+        m.desktop_settings(),
+        serde_json::json!({"localEnvironmentEnabled": false})
+    );
 }
 
 #[test]
@@ -371,7 +403,11 @@ fn removing_t3_codes_service_is_t3s_uninstall_and_gives_the_desktop_app_its_serv
     let m = Machine::new(None);
     assert_eq!(m.run(&["install", "t3-code", "service"], false).code, Some(0));
     let settings = m.home().join(".t3/userdata/desktop-settings.json");
-    fs::write(&settings, "{\"localEnvironmentEnabled\": false, \"mainWindowMaximized\": true}").unwrap();
+    fs::write(
+        &settings,
+        "{\"localEnvironmentEnabled\": false, \"mainWindowMaximized\": true}",
+    )
+    .unwrap();
     fs::write(m.log_path(), "").unwrap();
 
     let run = m.run(&["remove", "t3-code", "service"], false);

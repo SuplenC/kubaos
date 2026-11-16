@@ -3,13 +3,14 @@
 //! the catalog brings its Items with it. An app with setups has an Install Item for each setup
 //! instead, named for it, as none is the default: all of them while the app isn't on the machine,
 //! and beside its Remove Item those of the setups it isn't in, which switch. Running one starts
-//! `kubaos app add|remove <id> --json` (`add <id> --setup <setup>`) in the background, as a Job the menu shows with each step and how far it got; the Daemon announces
-//! its end on the desktop, named for the app, with why it failed and where its log is.
+//! `kubaos app add|remove <id> --json` (`add <id> --setup <setup>`) in the background, as a Job the
+//! menu shows with each step and how far it got; the Daemon announces its end on the desktop, named
+//! for the app, with why it failed and where its log is.
 //!
 //! Which apps are on the machine is the engine's status (`kubaos app status`): the catalog, the
-//! picks, one `dpkg-query`, the User flake's `packages.toml` and the setups' markers, read on a thread of its own at
-//! the start, at each config and when one of the files it comes from changes, never as the menu
-//! searches.
+//! picks, one `dpkg-query`, the User flake's `packages.toml` and the setups' markers, read on a
+//! thread of its own at the start, at each config and when one of the files it comes from changes,
+//! never as the menu searches.
 //!
 //! # Owns
 //!
@@ -170,7 +171,9 @@ impl Standing {
     /// another setup.
     fn offers_install(&self, setup: Option<&Setup>, arch: &str) -> bool {
         if self.state.is_installed() {
-            return setup.is_some_and(|setup| self.setup.as_deref() != Some(setup.id.as_str()) && self.app.available(arch, Some(setup)));
+            return setup.is_some_and(|setup| {
+                self.setup.as_deref() != Some(setup.id.as_str()) && self.app.available(arch, Some(setup))
+            });
         }
         self.app.available(arch, setup)
     }

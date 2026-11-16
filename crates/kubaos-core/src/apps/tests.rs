@@ -401,7 +401,10 @@ fn a_manifest_lists_its_setups_by_id_with_their_own_parts() {
     assert_eq!(setups, [("desktop", "Studio"), ("service", "Studio as a service")]);
     assert!(app.setup("desktop").unwrap().parts.is_none());
     let parts = app.setup("service").unwrap().parts.clone().unwrap();
-    assert_eq!((parts.user_hooks.as_str(), parts.marker.as_str()), ("studio_service", MARKER));
+    assert_eq!(
+        (parts.user_hooks.as_str(), parts.marker.as_str()),
+        ("studio_service", MARKER)
+    );
     let pinned = parts.download.unwrap();
     assert_eq!(pinned.version, "2.0");
     assert_eq!(pinned.download("amd64").unwrap().sha256, SHA);
@@ -420,19 +423,64 @@ fn setups_that_cant_be_told_apart_or_installed_safely_are_refused() {
             "two setups without parts",
             format!("{only_service}\n[setup.other]\nname = \"O\"\nsummary = \"O\"\n{desktop}"),
         ),
-        ("user hooks without a marker", text.replace("marker = \".config/systemd/user/studio.service\"\n", "")),
-        ("a marker without user hooks", text.replace("user_hooks = \"studio_service\"\n", "")),
-        ("an absolute marker", text.replace("\".config/systemd", "\"/etc/systemd")),
-        ("a marker leaving the home", text.replace("\".config/systemd", "\"../.config/systemd")),
-        ("a marker with a dot part", text.replace("\".config/systemd", "\"./.config/systemd")),
-        ("a download that doesn't keep itself current", text.replace("version = \"2.0\"\nself_updates = true\n\n[setup", "version = \"2.0\"\n\n[setup")),
-        ("a download without a version", text.replace("version = \"2.0\"\nself_updates = true\n\n[setup", "self_updates = true\n\n[setup")),
-        ("a setup's download over http", text.replace("https://example.com/studio-cli", "http://example.com/studio-cli")),
-        ("user hooks that aren't a function name", text.replace("\"studio_service\"", "\"studio; reboot\"")),
-        ("a setup id that isn't one", text.replace("[setup.desktop]", "[setup.Desktop]")),
-        ("a setup's system hooks", text.replace("[setup.desktop]\n", "[setup.desktop]\nsystem_hooks = \"x\"\n")),
-        ("a setup's own source", format!("{text}\n[setup.desktop.apt]\npackages = [\"x\"]\n")),
-        ("an empty setup name", text.replace("name = \"Studio as a service\"", "name = \"\"")),
+        (
+            "user hooks without a marker",
+            text.replace("marker = \".config/systemd/user/studio.service\"\n", ""),
+        ),
+        (
+            "a marker without user hooks",
+            text.replace("user_hooks = \"studio_service\"\n", ""),
+        ),
+        (
+            "an absolute marker",
+            text.replace("\".config/systemd", "\"/etc/systemd"),
+        ),
+        (
+            "a marker leaving the home",
+            text.replace("\".config/systemd", "\"../.config/systemd"),
+        ),
+        (
+            "a marker with a dot part",
+            text.replace("\".config/systemd", "\"./.config/systemd"),
+        ),
+        (
+            "a download that doesn't keep itself current",
+            text.replace(
+                "version = \"2.0\"\nself_updates = true\n\n[setup",
+                "version = \"2.0\"\n\n[setup",
+            ),
+        ),
+        (
+            "a download without a version",
+            text.replace(
+                "version = \"2.0\"\nself_updates = true\n\n[setup",
+                "self_updates = true\n\n[setup",
+            ),
+        ),
+        (
+            "a setup's download over http",
+            text.replace("https://example.com/studio-cli", "http://example.com/studio-cli"),
+        ),
+        (
+            "user hooks that aren't a function name",
+            text.replace("\"studio_service\"", "\"studio; reboot\""),
+        ),
+        (
+            "a setup id that isn't one",
+            text.replace("[setup.desktop]", "[setup.Desktop]"),
+        ),
+        (
+            "a setup's system hooks",
+            text.replace("[setup.desktop]\n", "[setup.desktop]\nsystem_hooks = \"x\"\n"),
+        ),
+        (
+            "a setup's own source",
+            format!("{text}\n[setup.desktop.apt]\npackages = [\"x\"]\n"),
+        ),
+        (
+            "an empty setup name",
+            text.replace("name = \"Studio as a service\"", "name = \"\""),
+        ),
     ];
     for (what, text) in cases {
         assert!(App::parse("studio", &text).is_err(), "{what} was accepted:\n{text}");
@@ -444,7 +492,10 @@ fn each_setup_installs_the_source_it_lacks_and_its_own_parts_it_lacks() {
     on_studio(&picked_in("desktop"), &[], &[], |facts| {
         let installs = installs(facts);
         assert_eq!(installs.len(), 1);
-        assert_eq!((installs[0].source, installs[0].parts, installs[0].name()), (true, false, "Studio"));
+        assert_eq!(
+            (installs[0].source, installs[0].parts, installs[0].name()),
+            (true, false, "Studio")
+        );
     });
     on_studio(&picked_in("service"), &[], &[], |facts| {
         let installs = installs(facts);
@@ -507,7 +558,11 @@ fn switching_takes_only_the_other_setups_parts_that_are_there() {
         let leaving: Vec<&str> = leaving(facts, app, desktop).iter().map(|s| s.id.as_str()).collect();
         assert_eq!(leaving, ["service"]);
         assert!(leaving_ids(facts, app, service).is_empty());
-        assert_eq!(facts.state(app), AppState::Installed, "the desktop app is there as picked");
+        assert_eq!(
+            facts.state(app),
+            AppState::Installed,
+            "the desktop app is there as picked"
+        );
     });
     on_studio(&picked_in("service"), &["studio=2.0"], &[], |facts| {
         assert!(leaving_ids(facts, app, service).is_empty());
@@ -550,7 +605,10 @@ fn the_status_and_the_list_name_the_setups_in_json() {
     assert_eq!(listed[0]["setup"], "service");
     assert_eq!(listed[0]["setups"][1]["id"], "service");
     let plain = serde_json::to_value(listing(&catalog(false), &Picks::default())).unwrap();
-    assert!(plain[0].get("setup").is_none() && plain[0].get("setups").is_none(), "{plain}");
+    assert!(
+        plain[0].get("setup").is_none() && plain[0].get("setups").is_none(),
+        "{plain}"
+    );
 }
 
 #[test]
@@ -576,7 +634,10 @@ fn the_picks_keep_the_setup_of_a_picked_app_only() {
     let text = std::fs::read_to_string(&path).unwrap();
     let back = Picks::read(&path).unwrap();
 
-    assert!(text.contains("apps = [\"agent\", \"studio\"]\n\n[setups]\nstudio = \"service\"\n"), "{text}");
+    assert!(
+        text.contains("apps = [\"agent\", \"studio\"]\n\n[setups]\nstudio = \"service\"\n"),
+        "{text}"
+    );
     assert_eq!(back, picks);
     assert_eq!(back.setup("studio"), Some("service"));
     std::fs::write(&path, "apps = [\"agent\"]\n[setups]\nstudio = \"service\"\n").unwrap();
