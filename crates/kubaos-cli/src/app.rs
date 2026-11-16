@@ -9,8 +9,9 @@
 //! `list` is the catalog and which apps are picked, read from two files and nothing else, for the
 //! Command menu. `status` adds where each app stands on the machine, from one dpkg query. `add`
 //! picks apps and installs those the machine lacks; `remove` drops them and takes them away.
-//! Both ask for root once, through polkit, show their progress as `kubaos update` does, and with
-//! `--json` write its events; `kubaos update` installs a picked app the machine lacks. Exit
+//! Both ask for root once, through polkit, when an app has a root half (apt, a pinned `.deb`) and
+//! for nothing otherwise, show their progress as `kubaos update` does, and with `--json` write its
+//! events; `kubaos update` installs a picked app the machine lacks. Exit
 //! codes: 0 ok, 1 the work failed, 2 usage.
 //!
 //! # Owns

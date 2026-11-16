@@ -5,6 +5,9 @@
 # Docker on its first use rather than at boot.
 name = "Docker"
 summary = "Containers and Compose"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "docker"
 system_hooks = "docker_access"
 
 [apt]
