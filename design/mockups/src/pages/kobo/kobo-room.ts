@@ -99,6 +99,9 @@ export interface RoomOptions {
 /** The room's whole-screen size: the toolbar's window, or a laptop's screen. */
 export const SCREEN = { width: "calc(1280 * var(--px))", height: "calc(800 * var(--px))" };
 
+/** A room's layer's size: the room's own, whatever it is set to. */
+export const ROOM = { width: "var(--kobo-width)", height: "var(--kobo-height)" };
+
 // ---------------------------------------------------------------- Playing --
 
 /** A duration token in milliseconds at the speed picked. */
@@ -667,7 +670,9 @@ export function room(options: RoomOptions): HTMLElement {
   /** The questions under any scene, a scene over the questions. */
   const orderLayers = (layers: Element[]) => [...layers].sort((a, b) => Number(a.classList.contains("kobo-scene")) - Number(b.classList.contains("kobo-scene")));
 
-  const layerOf = (at: At): HTMLElement => ("panel" in at ? panelLayer(flow, at.panel, width, height) : sceneLayer(at, options, width, height));
+  // Its layers take the room's size, so a room made a whole screen (the site's full screen) takes
+  // them with it.
+  const layerOf = (at: At): HTMLElement => ("panel" in at ? panelLayer(flow, at.panel, ROOM.width, ROOM.height) : sceneLayer(at, options, ROOM.width, ROOM.height));
 
   const setPower = (next: Power | undefined) => {
     power = next;

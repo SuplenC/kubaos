@@ -35,7 +35,7 @@ import { paint, palette } from "../../site/recolour.ts";
 import { settings } from "../../site/settings.ts";
 import { RELEASE } from "./kobo-data.ts";
 import { TURNING_REDUCED, turning } from "./kobo-pages.ts";
-import { after, arrival, column, ENTERING, endingColumn, GOING, keys, LEAVING, neonSign, OPENING, part, play } from "./kobo-room.ts";
+import { after, arrival, column, ENTERING, ROOM, endingColumn, GOING, keys, LEAVING, neonSign, OPENING, part, play } from "./kobo-room.ts";
 import { CARD_IDS, type CardId, CARDS, firstViews, open, running, type Views } from "./setup-cards.ts";
 import { cardBody, cardPage } from "./setup-parts.ts";
 import { kotodamaCard } from "./setup-kotodama-card.ts";
@@ -359,14 +359,14 @@ export function setupRoom(options: SetupOptions): HTMLElement {
   /** A place's layer: words over the wallpaper, or the cards on glass over it out of focus. */
   const layerOf = (at: Place): HTMLElement => {
     if (at.at === "card") {
-      const layer = backdrop({ width, height, picture: blurred, scrim: "glass", content: rail(at.card) });
+      const layer = backdrop({ ...ROOM, picture: blurred, scrim: "glass", content: rail(at.card) });
       layer.classList.add("kobo-panel");
       return layer;
     }
     const content = at.at === "arrival" ? arrivalColumn(views, at.moment ?? "rest", options.hero) : at.at === "ending" ? endingScene(views, skipped, at.going ?? false) : document.createElement("span");
     // The ending's desktop has come close; handed over, it is the desktop as it is.
     const push = at.at === "ending" ? 1 : 0;
-    const layer = backdrop({ width, height, picture: wallpaper, scrim: "band", content, push, dark: at.at === "ending" && at.going ? 1 : 0 });
+    const layer = backdrop({ ...ROOM, picture: wallpaper, scrim: "band", content, push, dark: at.at === "ending" && at.going ? 1 : 0 });
     layer.classList.add("kobo-scene");
     layer.dataset.scene = at.at;
     return layer;
@@ -431,7 +431,7 @@ export function setupRoom(options: SetupOptions): HTMLElement {
     const layer = rail(options.place.at === "card" ? options.place.card : "yours");
     layer.classList.add("setup-layer");
     body.append(layer);
-    const desk = backdrop({ width, height, picture: wallpaper, scrim: "band", content: win });
+    const desk = backdrop({ ...ROOM, picture: wallpaper, scrim: "band", content: win });
     desk.classList.add("kobo-scene", "setup-desk");
     element.append(desk);
   } else draw(place, options.leaving);
