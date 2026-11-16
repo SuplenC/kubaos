@@ -243,13 +243,13 @@ pub fn channel(args: &ChannelArgs) -> ExitCode {
 
 /// The events shown in the [`Mode`] the run picks, and the summary sent as a notification when
 /// [`notifies`] says nobody else shows it.
-struct Shown {
+pub(crate) struct Shown {
     ui: Ui,
     notify: bool,
 }
 
 impl Shown {
-    fn new(json: bool) -> Self {
+    pub(crate) fn new(json: bool) -> Self {
         Self {
             ui: Ui::new(Mode::detect(json)),
             notify: notifies(json, io::stdout().is_terminal(), io::stderr().is_terminal()),

@@ -33,6 +33,7 @@ use kubaos_core::update::changelog::Change;
 use kubaos_core::update::changelog::Changelog;
 use kubaos_core::update::changelog::Section;
 use kubaos_core::update::event::Command;
+use kubaos_core::update::event::AppChanges;
 use kubaos_core::update::event::GroupChange;
 use kubaos_core::update::event::Outcome;
 use kubaos_core::update::event::PackageChange;
@@ -404,8 +405,12 @@ impl Text {
         let s = self.style;
         let row = |label: &str, value: &str| format!("  {}{value}\n", s.dim(&format!("{label:<LABEL_WIDTH$}")));
         let mut out = String::from("\n");
-        if summary.command == Command::Packages {
-            out.push_str(&self.apt_rows(&summary.apt, "nothing changed"));
+        if matches!(summary.command, Command::Packages | Command::App) {
+            if summary.command == Command::Packages {
+                out.push_str(&self.apt_rows(&summary.apt, "nothing changed"));
+            } else {
+                out.push_str(&self.app_rows(&summary.apps, "nothing changed"));
+            }
             if let Some(log) = &summary.log {
                 out.push_str(&row("Log", &self.path(log)));
             }
@@ -433,7 +438,7 @@ impl Text {
             (_, false) => "KubaOS",
             (Command::Upgrade, true) => "Upgraded",
             (Command::Rollback, true) => "Rolled back",
-            (Command::Update | Command::Check | Command::Packages, true) => "Updated",
+            (Command::Update | Command::Check | Command::Packages | Command::App, true) => "Updated",
         };
         out.push_str(&row(label, &release));
         out.push_str(&self.change_rows(&summary.changelog));
@@ -445,6 +450,9 @@ impl Text {
                     let _ = writeln!(out, "{indent}{line}");
                 }
             }
+        }
+        if !summary.apps.is_empty() {
+            out.push_str(&self.app_rows(&summary.apps, ""));
         }
         if let Some(nix) = &summary.nix_packages {
             if nix.is_empty() {
@@ -534,6 +542,20 @@ impl Text {
         let first = lines.next().unwrap_or_else(|| none.to_owned());
         let n = apt.len().max(1);
         self.rows("Apt", std::iter::once(first).chain(lines), n, n)
+    }
+
+    /// The summary's `Apps` rows: one line an app installed or removed, or `none` when no app
+    /// came or went.
+    fn app_rows(&self, apps: &AppChanges, none: &str) -> String {
+        let lines: Vec<String> = apps
+            .installed
+            .iter()
+            .map(|name| format!("{name} installed"))
+            .chain(apps.removed.iter().map(|name| format!("{name} removed")))
+            .collect();
+        let n = lines.len().max(1);
+        let lines = if lines.is_empty() { vec![none.to_owned()] } else { lines };
+        self.rows("Apps", lines, n, n)
     }
 
     /// The row `label` with the first of `lines` on it and the rest under it, `shown` of the
