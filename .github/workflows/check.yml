@@ -42,21 +42,20 @@
 name: Check
 
 on:
-  # `edited` is for a pull request retargeted onto main, which fires nothing
-  # else; the jobs skip an edit that left the base alone.
+  # No edit trigger: a title edit would record the checks as skipped on the
+  # same commit, and a skipped required check counts as passed. A pull request
+  # retargeted onto main gets its run from its next push, or from closing and
+  # reopening it.
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
 permissions:
   contents: read
 
-# An edit that skips every job takes a group of its own, so it never cancels
-# a real run of the same pull request.
 concurrency:
-  group: check-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'edited' && !github.event.changes.base && '-edit' || '' }}
+  group: check-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -73,7 +72,6 @@ env:
 jobs:
   changes:
     name: changes
-    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -113,7 +111,6 @@ jobs:
 
   flake:
     name: flake
-    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -130,7 +127,6 @@ jobs:
 
   lint:
     name: fmt and lint
-    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -171,7 +167,6 @@ jobs:
 
   nextest:
     name: nextest
-    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -209,7 +204,6 @@ jobs:
 
   nextest-slow:
     name: nextest (slow)
-    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -248,7 +242,6 @@ jobs:
 
   qml:
     name: qml
-    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -268,7 +261,6 @@ jobs:
 
   design:
     name: design
-    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -308,7 +300,6 @@ jobs:
 
   mockups:
     name: mockups
-    if: github.event.action != 'edited' || github.event.changes.base
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -338,7 +329,6 @@ jobs:
 
   apps-verify:
     name: apps verify
-    if: github.event.action != 'edited' || github.event.changes.base
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -398,7 +388,6 @@ jobs:
 
   shellcheck:
     name: shellcheck
-    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -416,7 +405,6 @@ jobs:
 
   system-files:
     name: system files
-    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -436,7 +424,7 @@ jobs:
   check:
     name: check (x86_64-linux)
     needs: [changes, flake, lint, nextest, nextest-slow, qml, design, mockups, apps-verify, shellcheck, system-files]
-    if: always() && (github.event.action != 'edited' || github.event.changes.base)
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

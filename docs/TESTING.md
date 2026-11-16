@@ -237,7 +237,7 @@ On a quieter machine the cold test build takes about 70 s. Running the tests tak
 
 | Job | Runs |
 |---|---|
-| `changes` | which gated jobs a pull request needs, from the files it changes since its merge base with `main`; a push to `main` needs `mockups` and no `apps verify`. A pull request runs on its pushes and when retargeted onto `main`; an edit that leaves the base alone skips every job |
+| `changes` | which gated jobs a pull request needs, from the files it changes since its merge base with `main`; a push to `main` needs `mockups` and no `apps verify`. A pull request into `main` runs on opening, its pushes and reopening; one retargeted onto `main` runs from its next push, or after closing and reopening it (an edit trigger would let a title edit mark the checks skipped, which counts as passed) |
 | `flake` | `nix flake check --no-build`, which evaluates the flake and builds nothing |
 | `fmt and lint` | `just fmt-check`, `just lint` |
 | `nextest` | `just nextest`, every test but Kōbō's `every_screen_keeps_to_the_grid` |
