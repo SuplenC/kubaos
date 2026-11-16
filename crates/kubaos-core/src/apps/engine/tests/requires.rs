@@ -578,6 +578,38 @@ fn switching_setups_keeps_an_app_the_old_setup_brought_that_the_user_picked_sinc
     assert!(engine.complete && engine.brought_by.is_empty(), "{engine:?}");
 }
 
+#[test]
+fn switching_setups_keeps_an_app_also_brought_by_an_app_whose_install_is_incomplete() {
+    let (designer, browser, engine) = (
+        designer(),
+        package_app("Browser", "browser"),
+        package_app("Engine", "engine"),
+    );
+    let tool = format!(
+        "name = \"Tool\"\n{ABOUT}requires = [\"engine\"]\n\n[[action]]\nname = \"Write its config\"\n\
+         kind = \"file\"\nto = \"~/.config/tool/tool.conf\"\ntext = \"\"\n"
+    );
+    let world = World::new(&[
+        ("designer", &designer),
+        ("browser", &browser),
+        ("engine", &engine),
+        ("tool", &tool),
+    ]);
+    world.script("designer", "closed", r#"[ ! -e "$HOME/open-$1" ]"#);
+    world.add_in("designer", "local", &["designer"]).0.unwrap();
+    world.add("tool", &["designer", "tool"]).0.unwrap();
+    let mut journal = Journal::read(&world.user_journals, "tool").unwrap().unwrap();
+    journal.complete = false;
+    journal.save(&world.user_journals).unwrap();
+
+    let (result, _, _) = world.add_in("designer", "web", &["designer", "tool"]);
+
+    assert_eq!(names(&result.unwrap()), ["Browser", "Designer"]);
+    let engine = world.journals("engine").0.unwrap();
+    assert_eq!(engine.brought_by, ["tool"]);
+    assert!(world.host.state.borrow().dpkg.contains_key("engine"));
+}
+
 /// A sink that tries to take the run lock as each app of the run begins, as another run would.
 struct Interloper {
     lock: PathBuf,

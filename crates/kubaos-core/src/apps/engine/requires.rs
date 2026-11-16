@@ -282,7 +282,7 @@ impl Engine<'_> {
     }
 
     /// Lets go of the apps in `left`, which the setup the app `id` left required: each forgets
-    /// that `id` brought it, and one that nothing installed brought besides, no installed app
+    /// that `id` brought it, and one that nothing with a journal brought besides, no installed app
     /// requires and `picks` hasn't goes, through [`Engine::remove_with`], each reported removed.
     /// One that can't be removed is a warning, and keeps `id` as what brought it, so the app's
     /// own removal takes it.
@@ -302,9 +302,11 @@ impl Engine<'_> {
             if !journal.brought_by.iter().any(|by| by == id) {
                 continue;
             }
-            let installed = |app: &str| journals.iter().any(|j| j.app == app && j.complete);
+            // An app whose install stopped part way still needs what it brought: its next run
+            // finishes the install on it.
+            let journaled = |app: &str| journals.iter().any(|j| j.app == app);
             let kept = picks.has(gone)
-                || journal.brought_by.iter().any(|by| by != id && installed(by))
+                || journal.brought_by.iter().any(|by| by != id && journaled(by))
                 || self.needing(gone, &[]).is_ok_and(|n| !n.is_empty());
             if kept {
                 journal.brought_by.retain(|by| by != id);
