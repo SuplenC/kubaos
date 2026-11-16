@@ -83,6 +83,8 @@ struct FakeDpkg {
     unavailable: Vec<String>,
     /// What removing a package takes along with it.
     takes: BTreeMap<String, Vec<String>>,
+    /// The packages the Apps catalog's root helper installs and removes for each app id.
+    apps: BTreeMap<String, Vec<String>>,
 }
 
 impl FakeDpkg {
@@ -113,6 +115,19 @@ impl FakeDpkg {
     fn answer(&mut self, cmd: &Cmd) -> Option<String> {
         let args: Vec<String> = cmd.argv().iter().map(|a| a.to_string_lossy().into_owned()).collect();
         let has = |word: &str| args.iter().any(|a| a == word);
+        if let Some(at) = args.iter().position(|a| a.ends_with("/kubaos-apps")) {
+            let verb = args.get(at + 1).cloned().unwrap_or_default();
+            for id in &args[at + 2..] {
+                for p in self.apps.get(id).cloned().unwrap_or_default() {
+                    if verb == "install" {
+                        self.installed.entry(p).or_insert(false);
+                    } else {
+                        self.installed.remove(&p);
+                    }
+                }
+            }
+            return Some(String::new());
+        }
         let names = Self::names(cmd);
         match cmd.program().as_str() {
             "dpkg-query" if has("${db:Status-Status} ${db:Status-Want} ${Package} ${Version}\n") => {
@@ -1362,6 +1377,7 @@ fn an_update_without_a_live_preview_has_no_such_phase() {
     assert!(!m.ran.iter().any(|line| line == "leave preview"));
 }
 
+mod apps;
 mod firmware;
 mod manifest;
 mod programs;

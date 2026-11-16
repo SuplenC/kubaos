@@ -34,6 +34,7 @@ use crate::apt::plan;
 use crate::apt::plan::Facts;
 use crate::apt::plan::Want;
 use crate::update::changelog::Changelog;
+use crate::update::event::AppChanges;
 use crate::update::event::Command;
 use crate::update::event::GroupChange;
 use crate::update::event::Phase;
@@ -173,6 +174,7 @@ impl<M: Machine> Updater<'_, M> {
             packages: 0,
             upgraded: Vec::new(),
             apt,
+            apps: AppChanges::default(),
             inputs: Vec::new(),
             nix_packages: None,
             migrations: Vec::new(),
@@ -278,7 +280,7 @@ impl<M: Machine> Updater<'_, M> {
         Ok(changes.into_vec())
     }
 
-    fn dpkg(&mut self) -> Result<Dpkg, UpdateError> {
+    pub(super) fn dpkg(&mut self) -> Result<Dpkg, UpdateError> {
         let out = self
             .quiet(&Cmd::user("dpkg-query").args(dpkg::QUERY))
             .map_err(UpdateError::step("listing the installed packages"))?;

@@ -5,7 +5,8 @@
 //! which is the network check; the release policy's pick; showing it and asking; a snapper
 //! snapshot, the user's `flake.lock` and the Suites' lockfile entries saved and the update recorded
 //! in the history; apt; moving `release`; the Hyprland pin, the package manifest and the system
-//! migrations; `nix flake update` of the user flake; relinking what `system/` took from KubaOS's
+//! migrations; the picked apps of the catalog the machine lacks; `nix flake update` of the user
+//! flake; relinking what `system/` took from KubaOS's
 //! nixpkgs; the switch; the Suites' tools moved to their newest patch releases; the Bitwarden
 //! check; Bitwarden desktop and the Nix daemon moved on within their series, each a phase whose
 //! failure is only a warning; the user migrations; firmware through fwupd; and the new release
@@ -25,6 +26,7 @@
 //! - Running programs and the switch: `machine.rs` and `switch.rs`.
 //! - The package manifest's phase, its status and `kubaos packages enable|disable`:
 //!   `updater/manifest.rs`. The firmware phase: `updater/firmware.rs`.
+//! - The Apps phase, its status and `kubaos app add|remove`: `updater/apps.rs`.
 //! - The Bitwarden and Nix phases: `updater/bitwarden.rs`, `updater/nix.rs`, and what they share,
 //!   `updater/program.rs`.
 //! - The events and the log: `event.rs` and `journal.rs`.
@@ -44,6 +46,7 @@ use std::time::UNIX_EPOCH;
 use self::firmware::Staging;
 use super::changelog::Changelog;
 use super::closure;
+use super::event::AppChanges;
 use super::event::Command;
 use super::event::PackageChange;
 use super::event::Phase;
@@ -86,13 +89,18 @@ use super::record::short;
 use super::security;
 use super::security::CountError;
 use super::version::Version;
+use crate::apps::CatalogError;
+use crate::apps::PicksError;
 use crate::apt::Manifest;
 use crate::apt::ManifestError;
 use crate::apt::manifest::MANIFEST;
 use crate::engine::files::utc_datetime;
 use crate::mise;
 use crate::mise::Mise;
+use crate::packages::EditError;
 use crate::state::Paths;
+use crate::state::ReadError;
+use crate::state::migrate::MigrateError;
 use crate::state::write_atomic;
 
 /// The space an update needs free on `/` and `/nix`: a new home-manager generation, a kernel and
@@ -192,6 +200,27 @@ pub enum UpdateError {
     /// The group isn't one the user may turn on or off.
     #[error("{name} is part of KubaOS: it can't be turned on or off")]
     NotOptional { name: String },
+    /// The release's Apps catalog can't be read.
+    #[error("reading the Apps catalog")]
+    Catalog(#[source] CatalogError),
+    /// The user's picks of apps can't be read or written.
+    #[error("using your picks of apps")]
+    Picks(#[source] PicksError),
+    /// The catalog has no app of that id.
+    #[error("the Apps catalog has no app {id} (kubaos app list)")]
+    NoApp { id: String },
+    /// The app has nothing for this machine's architecture.
+    #[error("{id} has no download for {arch}")]
+    Unavailable { id: String, arch: String },
+    /// `home.nix` couldn't be wired to the state directory for an app from nixpkgs.
+    #[error("wiring home.nix to kubaos.d/")]
+    Wire(#[source] MigrateError),
+    /// The User flake's `packages.toml` can't be read.
+    #[error("reading kubaos.d/packages.toml")]
+    NixList(#[source] ReadError),
+    /// An app's nixpkgs packages couldn't be added to or removed from `packages.toml`.
+    #[error("changing kubaos.d/packages.toml")]
+    NixPackages(#[source] EditError),
 }
 
 impl UpdateError {
@@ -509,6 +538,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             packages: 0,
             upgraded: Vec::new(),
             apt: Vec::new(),
+            apps: AppChanges::default(),
             inputs: Vec::new(),
             nix_packages,
             migrations: Vec::new(),
@@ -1012,6 +1042,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         if !opts.packages_only {
             migrations.extend(self.run_system_migrations()?);
         }
+        let apps = self.reconcile_apps();
         self.phase(Phase::Inputs, |u| u.update_inputs(&flake))?;
         let nix_packages = self.phase(Phase::Home, |u| {
             u.relink()?;
@@ -1048,6 +1079,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             packages,
             upgraded,
             apt,
+            apps,
             inputs: self.j.inputs.clone(),
             nix_packages,
             migrations,
@@ -1577,6 +1609,7 @@ fn write_user(path: &Path, text: &str) -> Result<(), UpdateError> {
     write_atomic(path, text).map_err(UpdateError::io(path))
 }
 
+mod apps;
 mod bitwarden;
 mod firmware;
 mod manifest;
