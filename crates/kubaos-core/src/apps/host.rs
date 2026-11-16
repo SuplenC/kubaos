@@ -18,6 +18,7 @@ pub mod fake;
 pub mod system;
 
 use std::collections::BTreeSet;
+use std::ffi::OsString;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
@@ -138,6 +139,35 @@ pub enum Downgrade {
     Allow,
 }
 
+/// How a tarball is compressed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Compression {
+    Gzip,
+    Zstd,
+}
+
+/// tar's arguments that unpack `archive` into `into`, as [`Host::untar`] says.
+pub fn untar_args(archive: &Path, into: &Path, compression: Compression, strip: u32) -> Vec<OsString> {
+    let mut args: Vec<OsString> = vec!["-x".into(), compression.tar_option().into(), "-f".into()];
+    args.push(archive.into());
+    args.push("-C".into());
+    args.push(into.into());
+    args.push(format!("--strip-components={strip}").into());
+    args.push("--no-same-owner".into());
+    args.push("--no-same-permissions".into());
+    args
+}
+
+impl Compression {
+    /// tar's option that reads it.
+    pub fn tar_option(self) -> &'static str {
+        match self {
+            Self::Gzip => "--gzip",
+            Self::Zstd => "--zstd",
+        }
+    }
+}
+
 /// A change apt is asked to simulate, to learn what else it would install or remove.
 #[derive(Clone, Copy, Debug)]
 pub enum AptPlan<'a> {
@@ -242,6 +272,14 @@ pub trait Host {
     ///
     /// [`HostError::Sha256`] for another download, else the download that failed.
     fn fetch(&mut self, url: &str, sha256: &str, to: &Path) -> Result<(), HostError>;
+
+    /// The tarball `archive`, compressed with `compression`, unpacked into the folder `into`, its
+    /// first `strip` folders left out, owned by whoever unpacks it, with no mode of the archive's.
+    ///
+    /// # Errors
+    ///
+    /// When tar fails, or can't be started.
+    fn untar(&mut self, archive: &Path, into: &Path, compression: Compression, strip: u32) -> Result<(), HostError>;
 
     /// The names in the User flake's `packages.toml`.
     ///

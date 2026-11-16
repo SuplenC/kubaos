@@ -21,11 +21,13 @@ use std::process::Stdio;
 
 use super::AptPlan;
 use super::AptSimulation;
+use super::Compression;
 use super::Downgrade;
 use super::Host;
 use super::HostError;
 use super::UNIT_PROPERTIES;
 use super::UnitState;
+use super::untar_args;
 use crate::apps::action::RUN_PATH;
 use crate::apps::action::Scope;
 use crate::apps::version::compare;
@@ -261,6 +263,10 @@ impl Host for SystemHost {
             command.arg("--allow-downgrades");
         }
         Self::out(command.args(APT_OPTIONS).args(packages)).map(drop)
+    }
+
+    fn untar(&mut self, archive: &Path, into: &Path, compression: Compression, strip: u32) -> Result<(), HostError> {
+        Self::out(self.command("tar").args(untar_args(archive, into, compression, strip))).map(drop)
     }
 
     fn deb_install(&mut self, deb: &Path) -> Result<(), HostError> {

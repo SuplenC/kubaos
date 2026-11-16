@@ -15,10 +15,12 @@ use std::rc::Rc;
 
 use super::AptPlan;
 use super::AptSimulation;
+use super::Compression;
 use super::Downgrade;
 use super::Host;
 use super::HostError;
 use super::UnitState;
+use super::untar_args;
 use crate::apps::action::Scope;
 use crate::apps::action::Side;
 use crate::apps::engine::Keeper;
@@ -453,6 +455,27 @@ impl Host for FakeHost {
         state.dpkg.extend(moving);
         state.log.push(format!("apt install {}", packages.join(" ")));
         Ok(())
+    }
+
+    fn untar(&mut self, archive: &Path, into: &Path, compression: Compression, strip: u32) -> Result<(), HostError> {
+        let output = self
+            .sandbox
+            .command("tar")
+            .args(untar_args(archive, into, compression, strip))
+            .output()
+            .map_err(|source| HostError::Spawn {
+                program: "tar".to_owned(),
+                source,
+            })?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(HostError::Failed {
+                command: format!("tar -x {}", archive.display()),
+                code: output.status.code(),
+                stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+            })
+        }
     }
 
     fn deb_install(&mut self, deb: &Path) -> Result<(), HostError> {

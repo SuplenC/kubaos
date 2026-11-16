@@ -32,6 +32,7 @@ use super::settings::SettingsError;
 use super::version_matches;
 use crate::apps::host::AptPlan;
 use crate::apps::host::AptSimulation;
+use crate::apps::host::Compression;
 use crate::apps::host::Downgrade;
 use crate::apps::host::Host;
 use crate::apps::host::HostError;
@@ -1078,29 +1079,15 @@ fn download_to(
                     fs::rename(&file, path).map_err(PerformError::io(path))
                 }
             }
-            Unpack::TarGz => {
+            Unpack::TarGz | Unpack::TarZst => {
                 fs::create_dir(&stage).map_err(PerformError::io(&stage))?;
-                let out = std::process::Command::new("tar")
-                    .arg("-xzf")
-                    .arg(&file)
-                    .arg("-C")
-                    .arg(&stage)
-                    .arg(format!("--strip-components={strip}"))
-                    .args(["--no-same-owner", "--no-same-permissions"])
-                    .output()
-                    .map_err(|source| {
-                        PerformError::Host(HostError::Spawn {
-                            program: "tar".to_owned(),
-                            source,
-                        })
-                    })?;
-                if !out.status.success() {
-                    return Err(PerformError::Host(HostError::Failed {
-                        command: format!("tar -xzf {}", file.display()),
-                        code: out.status.code(),
-                        stderr: String::from_utf8_lossy(&out.stderr).trim().to_owned(),
-                    }));
-                }
+                let compression = if unpack == Unpack::TarZst {
+                    Compression::Zstd
+                } else {
+                    Compression::Gzip
+                };
+                host.untar(&file, &stage, compression, strip)
+                    .map_err(PerformError::Host)?;
                 only_owner_writes(&stage)?;
                 replace_with(&stage, path)
             }

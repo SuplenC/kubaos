@@ -14,6 +14,7 @@ use crate::apps::host::fake::FakeRoot;
 use crate::apps::host::fake::Unit;
 use crate::apps::journal::Journal;
 use crate::apps::root::Reply;
+use crate::sandbox::Sandbox;
 use crate::unfree::Unfree;
 use crate::update::event::ActionState;
 use crate::update::event::Sink;
@@ -1753,12 +1754,21 @@ amd64 = {{ url = "https://example.com/tool-{version}", sha256 = "{sha}" }}
 
 /// A gzipped tarball holding `bin/tool` with `text`.
 fn tarball(text: &str) -> Vec<u8> {
+    packed(text, "tar-gz")
+}
+
+/// An archive of `unpack` (`tar-gz` or `tar-zst`) holding `bin/tool` with `text`, made by the tar
+/// of a sandbox.
+fn packed(text: &str, unpack: &str) -> Vec<u8> {
     let src = tempfile::tempdir().unwrap();
     fs::create_dir_all(src.path().join("bin")).unwrap();
     fs::write(src.path().join("bin/tool"), text).unwrap();
-    let archive = src.path().join("tool.tar.gz");
-    let made = std::process::Command::new("tar")
-        .arg("-czf")
+    let sandbox = Sandbox::new(&src.path().join("sandbox"), src.path(), "kuba");
+    let archive = src.path().join("tool.tar");
+    let compress = if unpack == "tar-zst" { "--zstd" } else { "--gzip" };
+    let made = sandbox
+        .command("tar")
+        .args(["-c", compress, "-f"])
         .arg(&archive)
         .arg("-C")
         .arg(src.path())
@@ -1771,12 +1781,12 @@ fn tarball(text: &str) -> Vec<u8> {
 
 #[test]
 fn a_release_that_bumps_a_download_at_the_same_path_downloads_it_again() {
-    for unpack in ["file", "tar-gz"] {
+    for unpack in ["file", "tar-gz", "tar-zst"] {
         let world = World::new(&[("tool", &fixed_download("1.1", unpack))]);
         for version in ["1.1", "1.3"] {
             let bytes = match unpack {
                 "file" => format!("tool {version}").into_bytes(),
-                _ => tarball(&format!("tool {version}")),
+                _ => packed(&format!("tool {version}"), unpack),
             };
             let sha = version.replace('.', "").repeat(32);
             world
