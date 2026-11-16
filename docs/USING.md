@@ -347,6 +347,8 @@ kubaos app status                # each app: installed, missing (the next update
 kubaos app status --json         # the same for a program
 ```
 
+In the Command menu, type the app's name: "claude" offers "Install Claude Code", or "Remove Claude Code" once it's there. It asks for your password (or security key) once, then works in the background: the menu shows each step while it runs, and a notification says when it's done or why it failed, with where its log is. One app at a time. `hide` in `~/.config/kubaos/menu/kotodama/user.toml` takes either out (`app-install:<id>`, `app-remove:<id>`).
+
 Your picks are `~/.config/kubaos/apps.toml`; editing it by hand works too, and the next `kubaos update` installs what it lists and the machine lacks. An app you have but didn't pick is left alone. apt apps move with `kubaos update`'s apt upgrade; T3 Code updates itself. [`docs/CONTRACTS.md`](CONTRACTS.md), "The Apps catalog", has the manifest format, for adding an app.
 
 ### KubaOS's apt packages
