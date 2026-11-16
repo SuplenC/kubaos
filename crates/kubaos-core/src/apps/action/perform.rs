@@ -117,6 +117,38 @@ fn same_download(had: &Action, want: &Action, arch: &str) -> bool {
     pin(had).is_some() && pin(had) == pin(want)
 }
 
+/// Whether `path`, a download's place in the folder named `version`, is there in a folder of a
+/// newer version beside it: where a vendor's updater put the version it moved on to, after
+/// removing the one the pin downloaded.
+fn newer_version_there(host: &dyn Host, path: &Path, version: &str) -> bool {
+    let Some(folder) = path.ancestors().find(|dir| dir.file_name().is_some_and(|n| n == version)) else {
+        return false;
+    };
+    let (Some(versions), Ok(rest)) = (folder.parent(), path.strip_prefix(folder)) else {
+        return false;
+    };
+    let Ok(entries) = fs::read_dir(host.place(versions)) else {
+        return false;
+    };
+    entries.flatten().any(|entry| {
+        entry
+            .file_name()
+            .to_str()
+            .is_some_and(|name| newer_version(name, version))
+            && host.place(&versions.join(entry.file_name()).join(rest)).symlink_metadata().is_ok()
+    })
+}
+
+/// Whether `a` is a version newer than `b`, both dot-separated numbers; a name that isn't one is
+/// no version.
+fn newer_version(a: &str, b: &str) -> bool {
+    let parts = |v: &str| -> Option<Vec<u64>> { v.split('.').map(|part| part.parse().ok()).collect() };
+    match (parts(a), parts(b)) {
+        (Some(a), Some(b)) => a > b,
+        _ => false,
+    }
+}
+
 /// Where the path `named` (`~/…` or absolute) is, as the actions name it.
 pub fn logical(host: &dyn Host, named: &str) -> PathBuf {
     match named.strip_prefix("~/") {
@@ -293,7 +325,12 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             let listed = host.nix_list().map_err(PerformError::Host)?;
             Ok(parts("nix", packages, |p| listed.contains(p)))
         }
-        Kind::Download { to, .. } => {
+        Kind::Download {
+            to,
+            version,
+            self_updates,
+            ..
+        } => {
             let path = logical(host, to);
             let there = host.place(&path).symlink_metadata().is_ok();
             let holds = match recorded {
@@ -301,7 +338,8 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
                 Recorded::Unsettled(had) => had.path() != action.path(),
                 Recorded::Done(_) | Recorded::Nothing => true,
             };
-            Ok(at_path(host, &path, there && holds))
+            let moved_on = *self_updates && !there && newer_version_there(host, &path, version);
+            Ok(at_path(host, &path, (there && holds) || moved_on))
         }
         Kind::File { to, text, mode, .. } => {
             let path = logical(host, to);

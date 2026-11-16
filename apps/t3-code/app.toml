@@ -47,6 +47,8 @@ summary = "Your agents keep running in a service on this machine; the desktop ap
 check = ["./closed"]
 says = "T3 Code is open: quit it, then try again"
 
+# `t3 update` moves the runtime on to a newer version folder and removes this one, which the newer
+# one then stands for.
 [[setup.service.action]]
 name = "Download the t3 runtime"
 kind = "download"
@@ -54,6 +56,7 @@ to = "~/.t3/runtime/versions/@VERSION@"
 version = "0.1.9"
 unpack = "tar-gz"
 strip = 1
+self_updates = true
 amd64 = { url = "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/t3-0.1.9-linux-x64.tar.gz", sha256 = "0141025335da334759cecd8db3483e09772f3600ca03674698524e7d94291362" }
 arm64 = { url = "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/t3-0.1.9-linux-arm64.tar.gz", sha256 = "52023bc5728a4dee4de361ad6fef7c236f1efb2742ff25e29d5c55e2fb662eea" }
 

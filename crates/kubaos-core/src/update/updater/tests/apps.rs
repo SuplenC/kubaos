@@ -723,3 +723,120 @@ fn a_file_kubaos_put_there_with_an_older_releases_text_is_owned_and_brought_to_t
     w.updater(&mut m).remove_apps(&names(&["desk"])).unwrap();
     assert!(!entry.exists(), "the file an older release wrote was KubaOS's");
 }
+
+/// The release's T3 Code folder in the checkout's catalog, its scripts that reach this machine's
+/// systemd and processes (the service's check, its undo, the ready check) replaced by ones that
+/// read the fake home.
+fn with_t3_code(w: &World) {
+    let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/t3-code");
+    let to = w.sys.catalog().join("t3-code");
+    fs::create_dir_all(&to).unwrap();
+    for entry in fs::read_dir(&from).unwrap() {
+        let entry = entry.unwrap();
+        fs::copy(entry.path(), to.join(entry.file_name())).unwrap();
+    }
+    let toml = to.join("app.toml");
+    let text = fs::read_to_string(&toml).unwrap();
+    let systemctl = r#"check = ["systemctl", "--user", "is-enabled", "--quiet", "t3code.service"]"#;
+    assert!(text.contains(systemctl), "the service's check moved");
+    fs::write(&toml, text.replace(systemctl, r#"check = ["./service-enabled"]"#)).unwrap();
+    script(
+        &to.join("service-enabled"),
+        r#"[ -e "$HOME/.config/systemd/user/t3code.service" ]"#,
+    );
+    // HAZARD: the real undo runs `systemctl --user`, which stops this machine's T3 Code service.
+    script(
+        &to.join("service-away"),
+        r#"rm -f "$HOME/.config/systemd/user/t3code.service""#,
+    );
+    script(&to.join("closed"), "true");
+    for name in ["closed", "service-away", "service-enabled"] {
+        let text = fs::read_to_string(to.join(name)).unwrap();
+        assert!(!text.contains("systemctl") && !text.contains("pgrep"), "{name} reaches the machine");
+    }
+    lock_down(&to);
+}
+
+/// T3 Code's service as KubaOS set it up, after `t3 update` moved the runtime from the pinned
+/// 0.1.9 on to 0.2.0 and removed 0.1.9; lingering on, which the older mark says was off.
+fn t3_service_after_t3_update(w: &World) -> Fake {
+    let m = fake(w, &["t3code"]);
+    let home = host(&m).home().to_path_buf();
+    let runtime = home.join(".t3/runtime/versions/0.2.0");
+    script(&runtime.join("t3"), r#"[ "$1 $2 $3" = "auth session list" ] && echo "[]""#);
+    put(&runtime.join(".install-complete"), "0.2.0\n");
+    fs::create_dir_all(home.join(".local/bin")).unwrap();
+    std::os::unix::fs::symlink(runtime.join("t3"), home.join(".local/bin/t3")).unwrap();
+    put(&home.join(".config/systemd/user/t3code.service"), "[Service]\n");
+    put(
+        &home.join(".t3/userdata/desktop-settings.json"),
+        "{\n  \"localEnvironmentEnabled\": false\n}\n",
+    );
+    host(&m).state.borrow_mut().linger = true;
+    put(&w.user.app_journals().join("t3-code-linger-was-off"), "");
+    m
+}
+
+#[test]
+fn a_picked_t3_service_whose_pinned_runtime_t3_removed_is_taken_in_as_the_service() {
+    // Regression: the service was taken in as the desktop app, and the linger mark lost.
+    let w = world();
+    with_t3_code(&w);
+    let mut picks = Picks::default();
+    picks.add_setup("t3-code", "service");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = t3_service_after_t3_update(&w);
+
+    w.updater(&mut m).adopt_apps().unwrap();
+
+    let journal = user_journal(&w, "t3-code").unwrap();
+    assert_eq!(journal.setup.as_deref(), Some("service"));
+    assert!(journal.complete);
+    let linger = journal
+        .entries
+        .iter()
+        .find(|e| matches!(e.action.kind, crate::apps::action::Kind::Linger {}))
+        .expect("the linger step is recorded");
+    assert!(linger.claims.iter().all(|c| c.owned), "{linger:?}");
+    assert!(!w.user.app_journals().join("t3-code-linger-was-off").exists());
+    let before = host(&m).snapshot();
+    let from = host(&m).state.borrow().log.len();
+
+    w.updater(&mut m).update(yes()).unwrap();
+
+    let log = host(&m).state.borrow().log[from..].to_vec();
+    assert!(!log.iter().any(|l| l.starts_with("fetch")), "{log:?}");
+    assert_eq!(host(&m).snapshot(), before);
+}
+
+#[test]
+fn a_linger_mark_stays_when_the_app_is_taken_in_without_a_linger_step() {
+    let w = world();
+    let mut picks = Picks::default();
+    picks.add_setup("lab", "desktop");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = fake(&w, &["lab"]);
+    let mark = w.user.app_journals().join("lab-linger-was-off");
+    put(&mark, "");
+
+    w.updater(&mut m).adopt_apps().unwrap();
+
+    assert_eq!(user_journal(&w, "lab").unwrap().setup.as_deref(), Some("desktop"));
+    assert!(mark.exists(), "the mark is the only word on lingering until a linger step holds it");
+}
+
+#[test]
+fn a_picked_app_is_taken_in_its_picked_setup_and_the_next_update_does_what_it_lacks() {
+    let w = world();
+    let mut picks = Picks::default();
+    picks.add_setup("lab", "service");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = fake(&w, &["lab"]);
+
+    w.updater(&mut m).adopt_apps().unwrap();
+
+    assert_eq!(user_journal(&w, "lab").unwrap().setup.as_deref(), Some("service"));
+    w.updater(&mut m).update(yes()).unwrap();
+    let unit = host(&m).home().join(".config/systemd/user/lab.service");
+    assert!(unit.exists(), "the service step an older setup lacked is done");
+}
