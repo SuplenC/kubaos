@@ -174,6 +174,54 @@ mockups-checked:
     fi
     just mockups-check "${pages[@]}"
 
+# One mockup page's states, each drawn alone (solo mode, `?solo=STATE`), captured as PNGs into ~/.cache/kubaos-mockups/shots/ by headless Chromium (design/mockups/scripts/shot.ts): every state with none named, or `just mockup-shot setup-yours go rest --mode light --scale 1.5 --keys Tab,Enter --frames 0,120,240 --at 1920x1080 --sheet --out DIR`. It captures from your own dev server with `--port N` or PORT=N, or starts Vite on a free port from 5188 up for the run; never 5174, the review server's. In `nix develop`.
+[positional-arguments]
+mockup-shot page *args: _mockups-deps
+    cd design/mockups && node scripts/shot.ts "$@"
+
+# A checkout's mockup site served with hot reload on PORT as a transient user unit, so the site follows an agent's edits and commits there live: `just mockup-preview ~/.t3/worktrees/kubaos/NAME`, this checkout by default. The unit is kubaos-mockups-preview on 5175 (kubaos-mockups-preview-PORT on another port), and a preview already running on that port is replaced. It prints the address once the site answers. Never 5174, the review server's.
+mockup-preview worktree=justfile_directory() port="5175":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    port={{port}}
+    if [[ $port == 5174 ]]; then
+      echo "mockup-preview: 5174 is the review server's" >&2
+      exit 2
+    fi
+    site="$(realpath "{{worktree}}")"
+    [[ -f $site/vite.config.ts ]] || site="$site/design/mockups"
+    if [[ ! -f $site/vite.config.ts ]]; then
+      echo "mockup-preview: no mockup site in {{worktree}}" >&2
+      exit 2
+    fi
+    unit=kubaos-mockups-preview
+    [[ $port == 5175 ]] || unit="kubaos-mockups-preview-$port"
+    (cd "$site" && { [[ node_modules/.package-lock.json -nt package-lock.json ]] || npm ci --no-audit --no-fund; })
+    systemctl --user stop "$unit" 2>/dev/null || true
+    systemctl --user reset-failed "$unit" 2>/dev/null || true
+    systemd-run --user --quiet --unit="$unit" --collect --working-directory="$site" --setenv=PATH="$PATH" \
+      npx vite --port "$port" --strictPort
+    # The first start generates the tokens' CSS, which builds kubaos-tokens in that checkout.
+    for _ in $(seq 300); do
+      if curl -sf -o /dev/null "http://127.0.0.1:$port/"; then
+        echo "http://localhost:$port/ serves $site ($unit)"
+        exit 0
+      fi
+      if ! systemctl --user is-active --quiet "$unit"; then break; fi
+      sleep 1
+    done
+    echo "mockup-preview: $unit didn't start:" >&2
+    journalctl --user -u "$unit" -n 20 --no-pager >&2 || true
+    exit 1
+
+# Stops the preview `mockup-preview` started on PORT.
+mockup-preview-stop port="5175":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    unit=kubaos-mockups-preview
+    [[ {{port}} == 5175 ]] || unit="kubaos-mockups-preview-{{port}}"
+    systemctl --user stop "$unit"
+
 # The mockup site's npm dependencies, from its package-lock.json, when node_modules is missing or older than the lock.
 _mockups-deps:
     #!/usr/bin/env bash

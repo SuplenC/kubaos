@@ -99,7 +99,7 @@ export function fullScreenMove(move: Move, sample: Element, at: () => number, ra
  * `move` looping on `sample` from `t`, as its player plays it: a picture of the move, so it takes
  * no pointer or focus. Space pauses and plays, ← and → step a frame, Home starts it again.
  */
-function played(move: Move, sample: Element, t: number, rate: number): Playing {
+export function played(move: Move, sample: Element, t: number, rate: number): Playing {
   sample.setAttribute("inert", "");
   const playing = loop(move);
   const animations = playing.timed.flatMap((timed) =>
@@ -156,6 +156,32 @@ function sizedAs(size: Size, elements: Iterable<HTMLElement>): HTMLElement[] {
 /** `root` and every element in it with a screen's size set. */
 function withSizes(root: Element): HTMLElement[] {
   return [...(root instanceof HTMLElement ? [root] : []), ...root.querySelectorAll<HTMLElement>(SIZED)];
+}
+
+/**
+ * Lays the screen `sample` draws out at `width` by `height` (CSS lengths), as the full screen lays
+ * one out for the real screen: every custom property in it set to the first screen's width or
+ * height takes the new one, so a room sizing its layers by its own properties (Kōbō's) follows,
+ * and so does a screen it draws later. False where it draws no screen.
+ */
+export function sizeScreen(sample: Element, width: string, height: string): boolean {
+  const first = withSizes(sample).find((each) => each.matches(SIZED));
+  if (!first) return false;
+  const [wasWidth, wasHeight] = sizeOf(first).was;
+  const resize = (each: Element) => {
+    if (!(each instanceof HTMLElement)) return;
+    for (const name of [...each.style].filter((property) => property.startsWith("--"))) {
+      const value = each.style.getPropertyValue(name);
+      if (value === wasWidth) each.style.setProperty(name, width);
+      else if (value === wasHeight) each.style.setProperty(name, height);
+    }
+  };
+  const within = (root: Element) => [root, ...root.querySelectorAll("[style]")].forEach(resize);
+  within(sample);
+  new MutationObserver((records) => {
+    for (const node of records.flatMap((record) => [...record.addedNodes])) if (node instanceof Element) within(node);
+  }).observe(sample, { childList: true, subtree: true });
+  return true;
 }
 
 /** Shows `opening` on the whole screen, until it is left; focus goes back to `from`. */

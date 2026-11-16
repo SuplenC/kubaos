@@ -52,6 +52,13 @@ A mockup page is **exhaustive**. It shows every one of these that applies, live,
 
 Every mocked element carries the specimens' probe, so the geometry check can hold the builds to it.
 
+### Draft, then harden
+
+A mockup is built in two phases (`design/mockups/README.md`, "Draft, then harden").
+
+- **Draft**, until Kuba approves the look, in rounds of minutes. One scale; look at the page through solo captures, `just mockup-shot PAGE [STATE…]` (`--keys`, `--click`, `--frames`, `--sheet`; `--port` for your own dev server); `npx tsc --noEmit` is the only check: no perf run, no geometry check. A part the library lacks may stay local to the page, marked as a draft part. The keyboard only as far as the page's main path. Commit often, so a live preview (`just mockup-preview CHECKOUT`) follows.
+- **Harden**, once Kuba approves the look: the draft parts promoted to the library with their pages and their docs, `just mockups-check PAGE` passing, captures at every scale, light and dark, and the page added to `design/mockups/checked-pages`.
+
 **Done when** every line above is shown or marked as not applying, every difference from the current build is asked about, and Kuba has approved the mockup page.
 
 ## 3. Hand over to the build

@@ -9,6 +9,8 @@ In `nix develop`, which provides Node, the tokens' generator and Chromium:
 | Command | What |
 |---|---|
 | `just mockups` | Serves the site with hot reload at the address Vite prints. A change to `design/tokens.toml` regenerates `src/tokens.css` and the page follows it. |
+| `just mockup-shot PAGE [STATE…]` | Captures a page's states, each drawn alone, as PNGs ("Solo mode", below). |
+| `just mockup-preview [CHECKOUT] [PORT]` | Serves a checkout's site with hot reload on 5175 as a user unit, so it follows an agent's edits and commits live; `just mockup-preview-stop` stops it ("Live preview", below). |
 | `just mockups-build` | Type-checks, holds each registered custom property to one registration (`scripts/property-check.ts`) and builds it static into `dist/`, then draws each page in headless Chromium to write its moves' recipes into `dist/motion/PAGE.json`. |
 | `just mockups-check [PAGE…]` | Draws the pages named, or every page, at every scale, light and dark, and holds its boxes to the geometry rules and each mocked component to its twin on the specimen's pages (`docs/DESIGN.md`, "The mockups"), then holds every motion player to its recipe (`scripts/player-test.ts`). `just design-check` runs it on the pages listed in `checked-pages`, which every pull request must keep passing; a page joins that list once it passes with no finding and no difference. |
 | `just shots mockups` | Renders the pages' shots, before and after (`docs/agents/design-pr-loop.md`). |
@@ -23,6 +25,50 @@ Every page has it: each setting the page is shown at, grouped under a label as t
 A CSS pixel is a device pixel only at a whole pixel ratio: Chromium lays a page out in steps that don't divide a fractional one. On a screen at 1.25, the top bar says so and names the browser zoom that makes the ratio whole (80%). The shots and `just mockups-check` draw at a ratio of 1.
 
 Every box lands on whole device pixels as the builds place it (`docs/DESIGN.md`, "Space and shape"). A length in logical pixels rounds to the nearest device pixel and a box sized by its text, wrapped or not, rounds up, in CSS (`round()`, `calc-size()`); equal shares (a filled Tabs) are whole device pixels, the spare ones one each to the first. Centring rounds half the spare room to a whole device pixel, a tie toward the start, so an odd spare pixel goes after the centred box, as `kubaos-ui`'s `Scale::centre` and QML's `Look.centre` put it: where the CSS knows both sizes it rounds the offset itself (`round(down, …, 1px)`), and where the room or the box is sized by its content (a row's children centred down it, a grid's middle track between two alike), `centreOnPixels` (`src/lib/centre.ts`) moves the box after layout, once a page settles and on the frame after anything is drawn, by giving it the odd pixel as a margin after it, so nothing changes size. A box drawn scaled is a picture and is left as the CSS places it.
+
+## Draft, then harden
+
+A mockup is built in two phases.
+
+**Draft**, until Kuba approves the look. Quick rounds of minutes:
+
+- One scale. Look at the page through solo captures (`just mockup-shot`, below), not full-page shots.
+- `npx tsc --noEmit` is the only check: no perf run, no geometry check, no `just mockups-check`.
+- A part the library lacks may stay local to the page, as a draft part: a function in the page's own file, or its `*-parts.ts`, named and commented as a draft part, built from the library's parts and the tokens like any mock.
+- The keyboard only as far as the page's main path.
+- Commit often: a live preview (`just mockup-preview`) follows the commits.
+
+**Harden**, once Kuba approves the look:
+
+- Draft parts are promoted to the library: a module in `src/lib/` with its probe, its own page and its page under `docs/design/components/` ("Adding a page", below).
+- `just mockups-check PAGE` passes, and the page is added to `checked-pages`.
+- Captures at every scale, light and dark (`just mockup-shot … --scale 1.5`, `just shots mockups/SLUG --full`), reviewed against `docs/agents/design-review.md`.
+
+## Solo mode
+
+`?solo=STATE#/LEVEL/PAGE` draws one state of one page and nothing else: no top bar, navigation or rail, the state alone at its own size on the page's background, with a stage pane's padding round it unless it is a whole screen (`src/site/solo.ts`). Only that state is built, so a page of many screens loads in the time of one. The settings come from the address as on the full page (`mode`, `scale`, `theme`, `reduced`, `speed`, `flicker`, `text`, `window`), and `at=WxH` lays a whole screen out at W by H logical pixels.
+
+A page's states are every sample it names, in the page's order: the stage's chips (Live, then each state, as the picker shows them), then its variants, sizes, content, measured samples, reflow and moves, or a foundation's shown parts. A state is found by its name (`Go: no apps`) or its slug (`go-no-apps`); where two share a name, the slug carries its group (`variant-installed`, `motion-installed`). A move's state plays its loop from the start, as its player does. `?solo` with no state, or one the page lacks, lists the page's states as links, and a page that doesn't exist lists every page. `window.kubaos.states()` gives the list to a script, `window.kubaos.solo` the state drawn, and `window.kubaos.ready` resolves once it is drawn, as on the full page. Every page splits this way: a state is a sample the page already draws on its own.
+
+`just mockup-shot PAGE [STATE…]` (`scripts/shot.ts`) captures states this way in one headless Chromium, several at a time, each in a page of its own, into `~/.cache/kubaos-mockups/shots/` as `SLUG-STATE-MODE-SCALEx.png`, and prints each path and every error the page throws or logs, failing on any. PAGE is a slug or `LEVEL/SLUG`; with no STATE, every state of the page.
+
+| Option | What |
+|---|---|
+| `--port N`, `PORT=N` | Captures from the dev server already running there (yours, mid-work). Without it, Vite is started on a free port from 5188 up for the run, which takes some ten seconds. Never 5174, the review server's. |
+| `--mode light`, `--scale 1.5`, `--theme rose`, `--text long`, `--reduced` | The settings, dark and 1 by default. |
+| `--size WxH` | Lays the state out in a window of that size and shoots the window; by default the shot is the state's own box. |
+| `--at WxH` | A whole screen laid out at W by H logical pixels. |
+| `--keys Tab,ArrowDown,Enter`, `--click CSS` | Acts on the state before the shot, in the order given; each can repeat. |
+| `--frames 0,120,240` | Shoots at those milliseconds after the actions instead of once the state is still. The page runs on a clock of its own (`scripts/clock.ts`), so a frame is the same however long it takes to draw. |
+| `--sheet` | Also tiles every shot into `SLUG-sheet-MODE-SCALEx.png`, a row a state with `--frames`. |
+| `--still` | Holds spinners, clocks and live samples, as the shots do (`?chrome=off`). |
+| `--out DIR` | Where the PNGs go. |
+
+Chromium is fed every response through Node (`throughNode`, `scripts/browser.ts`): it aborts any load in flight when the machine's network interfaces change, which containers starting and stopping do every few seconds. A state whose page the dev server reloaded mid-capture, as it does when a file changes, is captured once more.
+
+## Live preview
+
+`just mockup-preview CHECKOUT` serves that checkout's site (this one by default) with hot reload on 5175, as the transient user unit `kubaos-mockups-preview`, replacing a preview already running there, and prints the address once the site answers; its first start builds the tokens' generator in that checkout. An agent's edits and commits in that checkout reach the open page as they land. A second argument picks another port (unit `kubaos-mockups-preview-PORT`); `just mockup-preview-stop [PORT]` stops it.
 
 ## How a page is laid out
 
@@ -57,6 +103,8 @@ The Anatomy section's samples draw nothing over them at rest. Pointing at a part
 | `src/site/scroll.ts` | Who a wheel over a sample scrolls: the page, until the sample is clicked into. |
 | `src/pages/LEVEL/PAGE.ts` | One page each; `src/pages/index.ts` lists them. |
 | `scripts/render.ts` | Draws the built site in headless Chromium, as shots and geometry frames, or as each page's motion recipes (`--motion`). |
+| `src/site/solo.ts`, `scripts/shot.ts` | Solo mode, one state of a page alone, and the captures drawn with it. |
+| `scripts/clock.ts` | The page's own clock, which the captures of motion (`shot.ts --frames`, `tour.ts`) step a frame at a time. |
 | `scripts/player-test.ts` | Seeks every motion player on the built site and holds its plot and its parts to what plays. |
 | `checked-pages` | The pages every pull request holds to the mockups' check, one slug a line (`just mockups-checked`). |
 | `scripts/frame-test.ts` | Walks small pages of probed boxes into geometry frames and holds the walk (`src/site/frame.ts`) to what is drawn. |
@@ -152,7 +200,7 @@ Under each measure over budget are the lines that point at its cause, from the r
 
 A film of the wallpaper picker, rendered frame by frame rather than recorded, so its motion is even whatever a frame takes to draw. `scripts/tour.ts` serves the site with Vite, opens the live Gallery on a 2560×1440 viewport through the stage's Full screen control, at night and scale 1.5, and plays its tour with key presses alone (no pointer, so no hover and no tooltip): the desktop, opening, two steps along the wall, a floor up and back, the Desktop and Lock views, waking the lock and letting it rest, depth off and on, full screen and back, then Apply. Each move plays out, then the picker rests a moment before the next key.
 
-The page runs on a clock of its own, installed before its scripts: `performance.now`, `Date`, timers, animation frames and idle callbacks read and run on it, and every animation is held paused and set to the clock's time on each frame, so a frame is exactly 1/60 s after the last. Chromium's virtual time is no help here: it moves timers and animation frames but not the timeline transitions and the Web Animations play on. The wall's screens are drawn scaled by `zoom` rather than `scale` in the film: software drawing reads a backdrop filter under a scaled box from the wrong place, which mirrored the awake lock's blurred city.
+The page runs on a clock of its own (`scripts/clock.ts`), installed before its scripts: `performance.now`, `Date`, timers, animation frames and idle callbacks read and run on it, and every animation is held paused and set to the clock's time on each frame, so a frame is exactly 1/60 s after the last. Chromium's virtual time is no help here: it moves timers and animation frames but not the timeline transitions and the Web Animations play on. The wall's screens are drawn scaled by `zoom` rather than `scale` in the film: software drawing reads a backdrop filter under a scaled box from the wrong place, which mirrored the awake lock's blurred city.
 
 In `nix develop`, from `design/mockups/` (Chromium runs headless and draws in software, about 0.4 s a frame; the 41 s tour is some 2,450 frames and 7 GB). `--from A --frames B` writes frames A to B alone while the tour still plays from its start on the same clock, so it renders in segments that each fit a short run, and the frames are the ones a single run draws:
 
