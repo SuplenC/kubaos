@@ -10,6 +10,9 @@
 # serves the vault's keys.
 name = "Bitwarden"
 summary = "Passwords and SSH keys"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "bitwarden"
 system_hooks = "bitwarden_autostart"
 
 [deb]

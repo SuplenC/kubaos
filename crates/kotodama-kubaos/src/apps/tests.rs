@@ -27,6 +27,7 @@ icon = "google-chrome"
 
 [apt]
 repo = "google-chrome"
+arch = "amd64"
 packages = ["google-chrome-stable"]
 "#;
 
@@ -73,12 +74,17 @@ fn dpkg_with(installed: &[&str]) -> String {
 
 /// The apps of [`catalog`] on an amd64 machine with these dpkg packages.
 fn apps(installed: &[&str]) -> Apps {
+    apps_on("amd64", installed)
+}
+
+/// The apps of [`catalog`] on a machine of `arch` with these dpkg packages.
+fn apps_on(arch: &str, installed: &[&str]) -> Apps {
     let catalog = catalog();
     let dpkg = Dpkg::parse(&dpkg_with(installed));
     let facts = Facts {
         catalog: &catalog,
         picks: &Picks::default(),
-        arch: "amd64",
+        arch,
         dpkg: &dpkg,
         nix: &BTreeSet::new(),
     };
@@ -100,6 +106,13 @@ fn each_app_offers_only_the_half_that_applies() {
 
     assert_eq!(ids(&none), ["app-install:claude-code", "app-install:google-chrome"]);
     assert_eq!(ids(&chrome), ["app-install:claude-code", "app-remove:google-chrome"]);
+}
+
+#[test]
+fn an_apt_app_built_for_one_architecture_has_no_item_on_another() {
+    let arm = apps_on("arm64", &[]);
+
+    assert_eq!(ids(&arm), ["app-install:claude-code", "app-install:odd"]);
 }
 
 #[test]
@@ -126,6 +139,25 @@ fn the_items_are_named_by_the_app_and_found_by_its_name_and_id() {
             "{word} in {:?}",
             remove.keywords
         );
+    }
+}
+
+#[test]
+fn no_word_saying_what_an_app_is_finds_its_install_or_remove_item() {
+    let none = apps(&[]);
+    let chrome = apps(&["google-chrome-stable=131.0"]);
+
+    for item in [
+        item(&none, "app-install:google-chrome"),
+        item(&chrome, "app-remove:google-chrome"),
+    ] {
+        for word in ["web", "browser"] {
+            assert!(
+                !item.keywords.iter().any(|k| k == word),
+                "`{}` has `{word}` as a keyword, which belongs to opening the app",
+                item.id
+            );
+        }
     }
 }
 

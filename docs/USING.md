@@ -341,7 +341,7 @@ KubaOS knows how to install a few essential apps well, each from one pinned, ver
 
 ```sh
 kubaos app list                  # the catalog, and which apps you picked
-kubaos app add google-chrome bitwarden docker   # pick them and install them: asks for your password (or security key) once
+kubaos app add google-chrome bitwarden docker   # pick them and install them: asks for your password (or security key) once; a nixpkgs app asks for none
 kubaos app remove t3-code        # drop it and remove it
 kubaos app status                # each app: installed, missing (the next update installs it), available
 kubaos app status --json         # the same for a program
