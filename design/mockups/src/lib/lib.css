@@ -528,6 +528,13 @@
   padding-left: var(--space-s8);
 }
 
+/* A chip of its symbol alone: a square, the symbol centred in it. */
+.k-chip[data-icon-only] {
+  justify-content: center;
+  width: var(--size-chip);
+  padding: 0;
+}
+
 .k-chip[data-removable] {
   padding-right: 0;
 }
@@ -817,6 +824,53 @@
 .k-choice-card[data-pinned],
 [data-sequence] .k-choice-card {
   transition: none;
+}
+
+/* How brightly a lit card's light burns as it strikes on: 0 dark, 1 lit. */
+@property --choice-burn {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+/* An lg choice card is lit when picked, as the neon is: its tube `focus.tube` thick inside its edge
+   in `primary`, glowing near at `focus.near_opacity` and far at the near's opacity too, so the light
+   reads round the whole card, at night while the signs are on; its tile tinted `primary` at
+   `opacity.tint` and glowing far, its symbol, its title and its box glowing near; the lines at its
+   foot lit. Its fill takes `primary` only at `opacity.hover`, so its words keep their contrast. By
+   day there is no glow: the tube, the tile and the title say it. The cold tube of the pointer and
+   the keyboard (the card's ring) stays over it. */
+.k-choice-card[data-size="Lg"] {
+  --lit-now: calc(var(--picked) * var(--choice-burn));
+  --lit-glow: calc(var(--lit-now) * (1 - var(--day)));
+  --foot-ink: color-mix(in srgb, var(--color-on_surface_variant), var(--color-primary) calc(var(--lit-now) * 100%));
+  background-color: color-mix(in srgb, var(--card-fill, var(--color-surface_container)), var(--color-primary) calc(var(--opacity-hover) * var(--lit-now) * 100%));
+  box-shadow:
+    inset 0 0 0 var(--stroke-hairline_device_px) var(--sunken-line),
+    inset 0 0 0 calc(var(--focus-tube) * var(--lit-now)) var(--color-primary),
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--lit-glow))),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--lit-glow)));
+}
+
+.k-choice-card[data-size="Lg"] .k-choice-tile {
+  --tile-tint: color-mix(in srgb, var(--color-surface_container_highest), var(--color-primary) calc(var(--opacity-tint) * var(--lit-now) * 100%));
+  --tile-ink: color-mix(in srgb, var(--color-on_surface_variant), var(--color-primary) calc(var(--lit-now) * 100%));
+  box-shadow: 0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--lit-glow)));
+}
+
+.k-choice-card[data-size="Lg"] .k-choice-tile > .k-icon,
+.k-choice-card[data-size="Lg"] .k-choice-words > .k-card-title,
+.k-choice-card[data-size="Lg"] .k-choice-mark > .k-check-box {
+  filter: drop-shadow(0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--lit-glow))));
+}
+
+/* An lg card fills the height its set gives it, its foot at its bottom. */
+.k-choice-card[data-size="Lg"] > .k-card-content {
+  height: 100%;
+}
+
+.k-choice-card[data-size="Lg"] > .k-card-content > .k-fill {
+  flex: 1 1 0;
 }
 
 .k-choice-card .k-card-title-line > :not(.k-choice-mark),
@@ -3460,4 +3514,80 @@
 
 .k-cal-year:focus-visible .k-cal-month[data-current] {
   --lit: 1;
+}
+
+/* A Stepper (`lib/stepper.ts`): its steps on one line, `space.s24` apart, each a bead `type.body`'s
+   symbol wide with its number, its label `space.s8` after it. Not reached: an `outline` ring, the
+   number and label in `on_surface_variant`. Current: the ring and number `primary`, glowing near
+   at night, the label `primary_lit`. Done: filled `primary_fill`, the number `on_primary_fill`.
+   Each look fades to the next over `short`. */
+.k-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s8) var(--space-s24);
+}
+
+.k-stepper-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s8);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--color-on_surface_variant);
+  --ring: var(--color-outline);
+  --bead: transparent;
+  --number: var(--color-on_surface_variant);
+  --bead-glow: 0;
+  transition: color var(--motion-short) var(--easing-standard);
+}
+
+.k-stepper-step:not(:disabled) {
+  cursor: pointer;
+}
+
+.k-stepper-step > .k-text {
+  color: inherit;
+}
+
+.k-stepper-bead {
+  display: grid;
+  flex: none;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--type-body-icon);
+  height: var(--type-body-icon);
+  border-radius: var(--radius-full);
+  background: var(--bead);
+  box-shadow:
+    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--ring),
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--bead-glow) * (1 - var(--day))));
+  transition: background var(--motion-short) var(--easing-standard), box-shadow var(--motion-short) var(--easing-standard);
+}
+
+.k-stepper-bead > .k-text {
+  color: var(--number);
+  transition: color var(--motion-short) var(--easing-standard);
+}
+
+.k-stepper-step[data-state="current"] {
+  color: var(--color-primary_lit);
+  --ring: var(--color-primary);
+  --number: var(--color-primary);
+  --bead-glow: 1;
+}
+
+.k-stepper-step[data-state="done"] {
+  color: var(--color-on_surface);
+  --ring: var(--color-primary_fill);
+  --bead: var(--color-primary_fill);
+  --number: var(--color-on_primary_fill);
+}
+
+[data-reduced] .k-stepper-step,
+[data-reduced] .k-stepper-bead,
+[data-reduced] .k-stepper-bead > .k-text {
+  transition-duration: 0s;
 }

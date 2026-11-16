@@ -89,6 +89,11 @@ export interface ChipOptions {
   /** A pressable chip's name, in a hint under it while it is lit. */
   readonly tooltip?: string;
   readonly disabled?: boolean;
+  /**
+   * Only its symbol shows, a square chip: where a row of them would repeat words a symbol says (a
+   * row's origin, by its profile's symbol). Its label is still its name, read by a screen reader.
+   */
+  readonly iconOnly?: boolean;
   /** A state the chip is pinned in, or its close button: `close` names which. */
   readonly pinned?: Pinned;
   readonly pinnedClose?: Pinned;
@@ -137,10 +142,13 @@ export function chip(options: ChipOptions): HTMLElement {
   }
   element.toggleAttribute("data-icon", options.icon !== undefined);
   element.toggleAttribute("data-removable", options.removable ?? false);
+  const iconOnly = (options.iconOnly ?? false) && options.icon !== undefined;
+  element.toggleAttribute("data-icon-only", iconOnly);
+  if (iconOnly) element.setAttribute("aria-label", options.label);
   const words = text(options.label, "label");
   words.style.color = "var(--shown)";
   const glyph = options.icon ? icon(options.icon, "var(--type-label-icon)", "var(--shown)") : null;
-  const parts: Element[] = [...(glyph ? [glyph] : []), words, ...(options.removable ? [close(kind, disabled, options.pinnedClose)] : [])];
+  const parts: Element[] = [...(glyph ? [glyph] : []), ...(iconOnly ? [] : [words]), ...(options.removable ? [close(kind, disabled, options.pinnedClose)] : [])];
   element.append(row("s4", "centre", ...parts));
   if (disabled) element.setAttribute("aria-disabled", "true");
   if (press !== "none") {
@@ -162,6 +170,6 @@ export function chip(options: ChipOptions): HTMLElement {
     }
     if (options.tooltip) withHint(element, options.tooltip);
   }
-  const named = variant(kind, options.icon ? "icon" : "", options.removable ? "removable" : "");
+  const named = variant(kind, options.icon ? (iconOnly ? "icon-only" : "icon") : "", options.removable ? "removable" : "");
   return probe(element, { role: "component", name: "Chip", variant: named, fixed: { width: false, height: true } });
 }

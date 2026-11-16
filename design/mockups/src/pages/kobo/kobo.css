@@ -132,10 +132,11 @@
 }
 
 /* The foot of every scene: the power button and the battery where the rail's foot holds them, and
-   the release between them, so they stand still as the screens change. */
+   the release between them, so they stand still as the screens change: as far off the screen's
+   foot as the questions on glass stand (`--panel-foot` in `backdrop.css`). */
 .kobo-foot {
   position: absolute;
-  bottom: var(--kobo-margin);
+  bottom: var(--space-s12);
   left: round(down, calc((100% - var(--kobo-panel)) / 2), 1px);
   display: grid;
   box-sizing: border-box;
@@ -419,7 +420,7 @@
   position: absolute;
   inset: auto 0 0;
   display: block;
-  height: calc(var(--kobo-margin) + var(--space-s16) + var(--size-control_sm) + var(--space-s64));
+  height: calc(var(--space-s12) + var(--space-s16) + var(--size-control_sm) + var(--space-s64));
   background: linear-gradient(rgb(from var(--color-surface) r g b / 0), rgb(from var(--color-surface) r g b / var(--opacity-backdrop)) var(--space-s64));
 }
 

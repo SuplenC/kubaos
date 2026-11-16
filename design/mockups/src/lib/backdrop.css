@@ -111,14 +111,20 @@
 }
 
 /* A glass panel, and the flow of questions on glass, fill the screen less the margin, no wider
-   than a rail and two columns with `space.s40` beside each, centred on whole device pixels. */
+   than a rail and two columns with `space.s40` beside each, centred on whole device pixels. The
+   questions on glass stand only `space.s12` off the screen's foot (`--panel-foot`): their footer
+   band's buttons and the rail's foot sit low, and the page's body takes the height. */
 .k-backdrop-thing:has(> .k-glass-panel),
 .k-backdrop[data-scrim="glass"] > .k-backdrop-thing {
   --panel-width: min(calc(100% - 2 * var(--panel-margin, var(--space-s32))), calc(var(--size-rail) + 2 * var(--space-s40) + 2 * var(--size-column)));
   left: round(down, calc((100% - var(--panel-width)) / 2), 1px);
   top: var(--panel-margin, var(--space-s32));
   width: var(--panel-width);
-  height: calc(100% - 2 * var(--panel-margin, var(--space-s32)));
+  height: calc(100% - var(--panel-margin, var(--space-s32)) - var(--panel-foot, var(--panel-margin, var(--space-s32))));
+}
+
+.k-backdrop[data-scrim="glass"] > .k-backdrop-thing {
+  --panel-foot: var(--space-s12);
 }
 
 .k-glass-panel {

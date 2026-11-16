@@ -335,7 +335,9 @@ export function setupRoom(options: SetupOptions): HTMLElement {
     const shown = options.alone ? [id] : CARD_IDS;
     const pages = shown.map((each) => {
       const page = each === "yours" ? yours.page(act(each), () => skipped.has(each)) : cardPage(each, () => views, () => drawCard(each), act(each), () => skipped.has(each));
-      return { ...page, body: () => drawCard(each), skipped: () => skipped.add(each), ...(options.alone ? { closes: true } : {}) };
+      // Alone, Back closes the window, but for Make it yours's later steps, where it goes back a step.
+      const closes = each === "yours" ? () => yours.state.step === 0 || yours.state.phase !== "choosing" : true;
+      return { ...page, body: () => drawCard(each), skipped: () => skipped.add(each), ...(options.alone ? { closes } : {}) };
     });
     return stepRailPage({
       host: options.alone ? "window" : "kobo",
@@ -343,9 +345,10 @@ export function setupRoom(options: SetupOptions): HTMLElement {
       pages,
       current: shown.indexOf(id),
       free: true,
-      hints: () => (options.alone ? HINTS.slice(2) : HINTS),
+      // Make it yours says what its keys do on the step it shows; the other cards share the rail's.
+      hints: (page) => (shown[page] === "yours" ? yours.hints() : options.alone ? HINTS.slice(2) : HINTS),
       ...(options.turnedFrom && !options.alone ? { leaving: CARD_IDS.indexOf(options.turnedFrom) } : {}),
-      ...(options.live ? { onExit: (forward: boolean) => go(options.alone ? { at: "desktop" } : forward ? { at: "ending" } : { at: "arrival" }) } : {}),
+      ...(options.live ? { onExit: (forward: boolean) => go(options.alone ? { at: "desktop" } : forward ? { at: "ending" } : { at: "arrival" }), drawsAhead: true } : {}),
     });
   };
 

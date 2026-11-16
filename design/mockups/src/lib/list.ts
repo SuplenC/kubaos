@@ -30,7 +30,7 @@ import { iconButton } from "./icon-button.ts";
 import { icon, missingIcon } from "./icon.ts";
 import { iconTile } from "./icon-tile.ts";
 import { keycap, keys } from "./keycap.ts";
-import { filling, row, stack } from "./layout.ts";
+import { filling, grid, row, stack } from "./layout.ts";
 import { declare, FIXED_HEIGHT, probe, scrolls, variant } from "./probe.ts";
 import { skeleton } from "./skeleton.ts";
 import { switchControl } from "./switch.ts";
@@ -43,6 +43,9 @@ import { settings } from "../site/settings.ts";
 export interface RowChip {
   readonly kind: ChipKind;
   readonly label: string;
+  readonly icon?: string;
+  /** Its symbol alone, its label its name: a chip whose words the symbol already says. */
+  readonly iconOnly?: boolean;
 }
 
 /**
@@ -83,6 +86,11 @@ export type ListRowSpec = RowTaking & {
   readonly keys?: string;
   /** A switch at its end, on or off: a setting the row turns. */
   readonly toggle?: boolean;
+  /**
+   * A checkbox's box at its end, empty or ticked as `checked` says, the row the control: one of
+   * many things to tick, so even an unticked row says it is a choice (first boot's apps).
+   */
+  readonly box?: boolean;
   /** Its action can't be taken back: Shut down. */
   readonly danger?: boolean;
   readonly disabled?: boolean;
@@ -154,7 +162,7 @@ function words(spec: ListRowSpec): HTMLElement {
 /** The parts at a row's end, in order: chips, the detail, keys, a switch, then a chevron or a tick. */
 function ends(spec: ListRowSpec): Element[] {
   const parts: Element[] = [];
-  for (const each of spec.chips ?? []) parts.push(chip({ label: each.label, kind: each.kind }));
+  for (const each of spec.chips ?? []) parts.push(chip({ label: each.label, kind: each.kind, ...(each.icon ? { icon: each.icon } : {}), ...(each.iconOnly ? { iconOnly: true } : {}) }));
   if (spec.detail !== undefined) {
     const detail = clamped(spec.detail, "mono");
     detail.classList.add("k-list-detail");
@@ -173,7 +181,8 @@ function ends(spec: ListRowSpec): Element[] {
     toggle.classList.add("k-list-switch");
     parts.push(toggle);
   }
-  if (spec.opens) parts.push(icon("chevron_right", "var(--type-body_strong-icon)", "var(--muted)"));
+  if (spec.box) parts.push(checkMark(spec.checked ?? false));
+  else if (spec.opens) parts.push(icon("chevron_right", "var(--type-body_strong-icon)", "var(--muted)"));
   else if (spec.checked !== undefined || spec.forget || spec.adds) {
     const room = document.createElement("span");
     room.className = "k-list-check";
@@ -186,6 +195,25 @@ function ends(spec: ListRowSpec): Element[] {
     parts.push(room);
   }
   return parts;
+}
+
+/** A checkbox's box as a row's mark: the row takes the press, the box shows what it is. */
+function checkMark(ticked: boolean): HTMLElement {
+  const slot = document.createElement("span");
+  slot.className = "k-check k-list-box";
+  slot.dataset.tick = ticked ? "Full" : "Empty";
+  slot.style.setProperty("--checked", ticked ? "1" : "0");
+  const box = document.createElement("span");
+  box.className = "k-check-box";
+  box.dataset.shape = "box";
+  const holder = document.createElement("span");
+  holder.className = "k-check-mark";
+  const tick = icon("check", "var(--icon-s16)", "var(--mark)");
+  tick.classList.add("k-check-tick");
+  holder.append(tick);
+  box.append(holder);
+  slot.append(box);
+  return slot;
 }
 
 /**
@@ -279,6 +307,12 @@ export interface ListOptions {
   readonly fieldKeys?: boolean;
   /** What taking a row does, by its index among the rows. */
   readonly onTake?: (index: number) => void;
+  /**
+   * Its rows flow into as many columns, two thirds of a text column wide at least, as its width
+   * holds, each line of them a grid of whole-pixel columns; a label or a note stands between. ↑ ↓ move to the row above or below, ← → to the one before or
+   * after, and Space takes a row as Enter does: a list of things to tick, as first boot's apps.
+   */
+  readonly flow?: boolean;
 }
 
 /** A list's well: the rows' room, with its hairline and focus tube drawn over what it holds. */
@@ -301,6 +335,41 @@ export function flush(box: HTMLElement): HTMLElement {
   return probe(box, { ...role, variant: "Flush" });
 }
 
+/**
+ * `items` laid in lines of as many columns as `column`'s width holds, each two thirds of a text
+ * column at least and `space.s16` apart, a line a `grid` so its columns are whole device pixels; a
+ * label or a note stands alone between the lines. Laid out again only when the count changes.
+ */
+function flowing(column: HTMLElement, items: readonly HTMLElement[], box: HTMLElement): void {
+  let shown = 1;
+  const arrange = () => {
+    const scale = scaleOf(box);
+    const least = ((length("size-column") * 2) / 3) * scale;
+    const gap = length("space-s16") * scale;
+    const count = Math.max(1, Math.floor((column.clientWidth + gap) / (least + gap)));
+    if (count === shown) return;
+    shown = count;
+    const lines: HTMLElement[] = [];
+    let line: HTMLElement[] = [];
+    const close = () => {
+      if (line.length > 0) lines.push(count === 1 ? line[0]! : filling(grid(count, "s16", line)));
+      line = [];
+    };
+    for (const item of items) {
+      if (!item.classList.contains("k-list-row")) {
+        close();
+        lines.push(item);
+        continue;
+      }
+      line.push(item);
+      if (count === 1 || line.length === count) close();
+    }
+    close();
+    column.replaceChildren(...lines);
+  };
+  new ResizeObserver(arrange).observe(column);
+}
+
 /** The rows `space.s4` apart, as the well holds them. */
 function rowStack(rows: readonly HTMLElement[]): HTMLElement {
   const column = stack("s4", "start", ...rows);
@@ -318,6 +387,8 @@ export interface Rows {
   readonly refresh: () => void;
   /** `fresh` takes `old`'s place, and the keyboard with it if it was there. */
   readonly swap: (old: HTMLElement, fresh: HTMLElement) => void;
+  /** Puts the keyboard on `item`, as the pointer moving onto it would: an index jumping to it. */
+  readonly put: (item: HTMLElement) => void;
 }
 
 /**
@@ -354,6 +425,20 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
     const bottom = offsetIn(item, pane) + item.offsetHeight + inset;
     if (top < pane.scrollTop) pane.scrollTop = top;
     else if (bottom > pane.scrollTop + pane.clientHeight) pane.scrollTop = bottom - pane.clientHeight;
+  }
+
+  /** To the nearest row on the line above or below, the one most nearly under the current one. */
+  function across(by: 1 | -1): void {
+    const here = at ?? rowsOf().find(takes);
+    if (!here) return;
+    const rows = rowsOf().filter(takes);
+    const lines = rows.filter((each) => (by > 0 ? each.offsetTop > here.offsetTop + 1 : each.offsetTop < here.offsetTop - 1));
+    if (lines.length === 0) return;
+    const line = by > 0 ? Math.min(...lines.map((each) => each.offsetTop)) : Math.max(...lines.map((each) => each.offsetTop));
+    const onLine = lines.filter((each) => Math.abs(each.offsetTop - line) <= 1);
+    const best = onLine.reduce((a, b) => (Math.abs(b.offsetLeft - here.offsetLeft) < Math.abs(a.offsetLeft - here.offsetLeft) ? b : a));
+    move(rowsOf().indexOf(best));
+    best.scrollIntoView({ block: "nearest" });
   }
 
   function step(by: 1 | -1): void {
@@ -417,7 +502,14 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
     const ctrl = event.ctrlKey;
     const key = event.key.toLowerCase();
     const plain = (options.vimKeys ?? true) && !ctrl;
-    if (event.key === "ArrowDown" || (plain && key === "j") || (ctrl && (key === "j" || key === "n"))) step(1);
+    if (options.flow && event.key === "ArrowDown") across(1);
+    else if (options.flow && event.key === "ArrowUp") across(-1);
+    else if (options.flow && (event.key === "ArrowRight" || event.key === "ArrowLeft")) {
+      step(event.key === "ArrowRight" ? 1 : -1);
+      at?.scrollIntoView({ block: "nearest" });
+    } else if (options.flow && event.key === " ") {
+      if (!event.repeat) take();
+    } else if (event.key === "ArrowDown" || (plain && key === "j") || (ctrl && (key === "j" || key === "n"))) step(1);
     else if (event.key === "ArrowUp" || (plain && key === "k") || (ctrl && (key === "k" || key === "p"))) step(-1);
     else if (!options.fieldKeys && event.key === "Home") jump(0);
     else if (!options.fieldKeys && event.key === "End") jump(rowsOf().length - 1);
@@ -441,7 +533,11 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
     if (at === old) at = fresh;
     show();
   };
-  return { current: () => at, pointed: () => pointer, refresh: show, swap };
+  const put = (item: HTMLElement) => {
+    const to = rowsOf().indexOf(item);
+    if (to >= 0) move(to);
+  };
+  return { current: () => at, pointed: () => pointer, refresh: show, swap, put };
 }
 
 /**
@@ -505,10 +601,29 @@ function itemsOf(items: readonly ListItem[], options: ListOptions): HTMLElement[
 }
 
 export function list(specs: readonly ListItem[], options: ListOptions = {}): HTMLElement {
-  const rows = itemsOf(specs, options);
-  const box = well("List", rowStack(rows));
-  listRows(box, null, () => rows, options);
-  return box;
+  return listWith(specs, options).box;
+}
+
+/**
+ * `list`, with what keeps it: its rows, which a row redrawn in place (`replaceRow`) keeps the
+ * keyboard on, for an owner whose rows change as they are taken.
+ */
+export function listWith(specs: readonly ListItem[], options: ListOptions = {}): { box: HTMLElement; rows: Rows; replaceRow: (index: number, spec: ListRowSpec) => HTMLElement } {
+  const items = itemsOf(specs, options);
+  const column = rowStack(items);
+  const box = well("List", column);
+  box.toggleAttribute("data-flow", options.flow ?? false);
+  if (options.flow) flowing(column, items, box);
+  const keys = listRows(box, null, () => items, options);
+  const replaceRow = (index: number, spec: ListRowSpec) => {
+    const old = items[index]!;
+    const fresh = listRow(spec);
+    old.replaceWith(fresh);
+    items[index] = fresh;
+    keys.swap(old, fresh);
+    return fresh;
+  };
+  return { box, rows: keys, replaceRow };
 }
 
 export interface ScrollingOptions extends ListOptions {

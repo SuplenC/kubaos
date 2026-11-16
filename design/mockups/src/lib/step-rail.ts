@@ -70,10 +70,15 @@ export interface RailPage {
   /** What the footer says before Continue when nothing blocks it: 12 of 40 picked. */
   readonly note?: Live<string | undefined>;
   /**
+   * Back's own work: true keeps the page (it went back a step inside itself, as Make it yours's
+   * steps do); false, or none, goes back a page. Esc does the same.
+   */
+  readonly back?: () => boolean;
+  /**
    * Back closes its host: the one page of a flow opened on it alone (a first-boot card from the
    * Command menu), where there is no page before it to go back to. Back then reads Close.
    */
-  readonly closes?: boolean;
+  readonly closes?: Live<boolean>;
   /** A page with no footer: the review, whose action is in its body, and the running steps. */
   readonly footless?: boolean;
   /** Its body reads the whole flow (the review), so it is drawn again each time it shows. */
@@ -156,6 +161,11 @@ export interface StepRailOptions {
    * or Enter on the last (`forward` true). Kōbō's welcome before it, its install after it.
    */
   readonly onExit?: (forward: boolean) => void;
+  /**
+   * Draws the page after the one shown in idle time too, so Continue builds nothing: a template
+   * someone moves through, not a still of one, whose next page would only add to what loads.
+   */
+  readonly drawsAhead?: boolean;
 }
 
 /** A rail step's state: done before the current one, the current one, to do after it. */
@@ -259,8 +269,12 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
   const { box: scroller } = scroll(column, { height: "100%", above: 0, below: 0, noGutter: true });
   const hintsRoom = document.createElement("span");
   hintsRoom.className = "k-rail-hints";
+  // What the hints say as drawn: a page whose keys change as it changes (Make it yours's steps)
+  // draws them again when they differ from these.
+  let drawnHints = "";
   const drawHints = (at: number) => {
     const hints = options.hints(at);
+    drawnHints = JSON.stringify(hints);
     hintsRoom.replaceChildren(...(hints.length > 0 ? [gap("s16"), inset(hintColumn(hints), 0, "s12")] : []));
   };
   drawHints(current);
@@ -280,7 +294,6 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
   box.className = "k-rail";
   box.append(fillingHeight(stack(0, "start", ...parts)));
   probe(box, { role: "component", name: "StepRail", variant: options.host, fixed: { width: true, height: false } });
-  let hintsAt = current;
   return {
     element: box,
     set(at, upTo) {
@@ -309,8 +322,7 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
         }
       } else for (const light of column.querySelectorAll<HTMLElement>(".k-rail-wire-lit")) light.style.setProperty("--wire-lit", String(at));
       // Two pages taking the same keys keep the hints they share as they are.
-      if (JSON.stringify(options.hints(at)) !== JSON.stringify(options.hints(hintsAt))) drawHints(at);
-      hintsAt = at;
+      if (JSON.stringify(options.hints(at)) !== drawnHints) drawHints(at);
     },
   };
 }
@@ -423,7 +435,8 @@ export interface FooterPins {
  * breaks between words, so it is read whole and pushes neither button.
  */
 export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: () => void = () => {}, pinned: FooterPins = {}, onSkip: () => void = () => {}): { band: HTMLElement; nudge: HTMLElement | null; next: HTMLElement } {
-  const back = button({ label: spec.closes ? "Close" : "Back", kind: "Text", icon: spec.closes ? "close" : "arrow_back", ...(pinned.back ? { pinned: pinned.back } : {}) });
+  const closes = spec.closes === undefined ? false : now(spec.closes);
+  const back = button({ label: closes ? "Close" : "Back", kind: "Text", icon: closes ? "close" : "arrow_back", ...(pinned.back ? { pinned: pinned.back } : {}) });
   back.addEventListener("click", onBack);
   const parts: Element[] = [back, fill()];
   let nudge: HTMLElement | null = null;
@@ -487,14 +500,15 @@ function curve(token: string): string {
  * Kōbō, where the page is the screen, it waits the `short` the page leaving takes to go, so the two
  * never lie over each other, and its footer band follows it in a `micro` later, rising `space.s24`.
  */
-export function arrive(room: HTMLElement, forward: boolean, staged = false): void {
+export function arrive(room: HTMLElement, forward: boolean, staged = false): Promise<unknown> {
   room.dataset.from = forward ? "end" : "start";
   const reduced = settings().reduced;
   const frames: Keyframe[] = reduced ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, "--step-slide": 1 }, { opacity: 1, "--step-slide": 0 }];
   const after = staged && !reduced ? timed("short") : 0;
-  room.animate(frames, { duration: timed("long"), delay: after, easing: curve("emphasized_decel"), fill: "backwards" });
+  const page = room.animate(frames, { duration: timed("long"), delay: after, easing: curve("emphasized_decel"), fill: "backwards" });
   const band = staged && !reduced ? room.querySelector<HTMLElement>(".k-step-footer") : null;
-  band?.animate([{ opacity: 0, "--step-rise": 1 }, { opacity: 1, "--step-rise": 0 }], { duration: timed("long"), delay: after + timed("micro"), easing: curve("emphasized_decel"), fill: "backwards" });
+  const rise = band?.animate([{ opacity: 0, "--step-rise": 1 }, { opacity: 1, "--step-rise": 0 }], { duration: timed("long"), delay: after + timed("micro"), easing: curve("emphasized_decel"), fill: "backwards" });
+  return Promise.allSettled([page.finished, ...(rise ? [rise.finished] : [])]);
 }
 
 /**
@@ -546,9 +560,9 @@ function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void, onSkip
     made.nudge = nudge;
     first ??= blocked(spec) ? null : drawn.next;
     let band = filling(drawn.band);
-    // In Kōbō the body's own faded foot is the room between it and the band: a gap under it would
-    // only take height from what the page asks.
-    parts.push(...(host === "kobo" ? [] : [gap("s16")]), band);
+    // In Kōbō what scrolls stays `space.s24` clear of the band's buttons: its view reaches through
+    // the gap, where its foot fade hides what runs on, and its end rests on the gap's top.
+    parts.push(gap(host === "kobo" ? "s24" : "s16"), band);
     // The answers changed: the band is drawn again where it was, the keyboard kept on Continue.
     room.addEventListener(RECHECK, () => {
       const had = band.contains(document.activeElement);
@@ -583,8 +597,9 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   const shown: { nudge: () => HTMLElement | null } = { nudge: () => null };
 
   // Every page drawn so far, kept in the page's side, hidden, laid out: going back to one only
-  // shows it again, and the page before and the first done step are drawn in idle time, so a press
-  // on either builds nothing. A page whose body reads the whole flow (`fresh`) is drawn each time.
+  // shows it again, and the page before and the first done step (and the page after, `drawsAhead`)
+  // are drawn in idle time, so a press on any of them builds nothing. A page whose body reads the
+  // whole flow (`fresh`) is drawn each time.
   const side = document.createElement("span");
   side.className = "k-step-side";
   const rooms = new Map<number, ReturnType<typeof pageRoom>>();
@@ -601,7 +616,11 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
       spec.skipped?.();
       go(along(current, 1));
     };
-    const made = pageRoom(spec, () => go(along(current, -1)), next, skip, options.host);
+    const back = () => {
+      if (spec.back?.()) return;
+      go(along(current, -1));
+    };
+    const made = pageRoom(spec, back, next, skip, options.host);
     rooms.set(index, made);
     side.append(made.room);
     return made;
@@ -639,7 +658,7 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
     }
     const left = rooms.get(from)?.room;
     if (options.host === "kobo" && left && left !== made.room) leave(left, current > from);
-    arrive(made.room, current > from, options.host === "kobo");
+    const arrived = arrive(made.room, current > from, options.host === "kobo");
     if (steps && !options.free) travel(steps, from, current, options.failed ?? false);
     // The template holds the keys on a page with nothing to do yet: Enter and Esc still work. The
     // keyboard moves with the next frame, which lays the page out anyway, not inside the press.
@@ -649,14 +668,23 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
         if (box.contains(document.activeElement) || document.activeElement === document.body) (made.first ?? box).focus({ preventScroll: true });
       });
     }
-    ahead();
+    // Pages drawn ahead wait for the page to have arrived: a page drawn in an idle moment of its
+    // move would take that frame and the next.
+    const at = current;
+    void arrived.then(() => {
+      if (current === at) ahead();
+    });
   };
 
-  /** Draws, one an idle moment, the pages a press most likely goes back to. */
+  /** Draws, one an idle moment, the pages a press most likely goes to. */
   const ahead = () => {
     const first = backTo(options.pages, current, options.locked ?? false);
-    // The two a press most often takes: the page before (Back, Esc) and the first done step.
-    const waiting = [...new Set([current - 1, first])].filter((index) => index >= first && index <= reached && index !== current && !options.pages[index]?.fresh);
+    // The pages a press most often takes: the page after (Continue, Enter), the page before (Back,
+    // Esc) and the first done step. Drawn hidden, their controls' glows are worked out then too.
+    const after = along(current, 1);
+    const going = options.drawsAhead && after < options.pages.length ? [after] : [];
+    const back = [current - 1, first].filter((index) => index >= first && index <= reached);
+    const waiting = [...new Set([...going, ...back])].filter((index) => index !== current && !options.pages[index]?.fresh);
     const one = () => {
       const index = waiting.shift();
       if (index === undefined || !box.isConnected) return;
@@ -703,7 +731,9 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   box.addEventListener("keydown", (event) => {
     if (event.defaultPrevented || event.repeat) return;
     if (event.key === "Enter") next();
-    else if (event.key === "Escape") go(along(current, -1));
+    else if (event.key === "Escape") {
+      if (!options.pages[current]?.back?.()) go(along(current, -1));
+    }
     else return;
     event.preventDefault();
   });

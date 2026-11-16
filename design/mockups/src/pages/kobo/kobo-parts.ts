@@ -231,7 +231,7 @@ function scrolled(content: HTMLElement): HTMLElement {
 export function body(accent: string, title: string, subtitle: string, content: HTMLElement, scrolls = true): HTMLElement {
   const top = header({ accent, title, subtitle });
   if (!scrolls) return stack("s24", "start", filling(top), fillingHeight(filling(content)));
-  const { box } = scroll(scrolled(content), { height: "100%", above: "s24", below: "s16", noGutter: true, fade: "s24", footFade: true });
+  const { box } = scroll(scrolled(content), { height: "100%", above: "s24", below: "s24", noGutter: true, fade: "s24", footFade: true });
   box.classList.add("kobo-scrolls");
   return stack("s24", "start", filling(top), fillingHeight(filling(box)));
 }

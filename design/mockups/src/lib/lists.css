@@ -538,7 +538,7 @@
   position: absolute;
   z-index: 2;
   right: 0;
-  top: calc(var(--top) - var(--above));
+  top: var(--top);
   display: none;
   width: var(--size-scrollbar);
   height: var(--tall);
@@ -717,4 +717,9 @@
   margin-inline: var(--space-s12);
   border-radius: var(--radius-full);
   background: var(--color-primary);
+}
+
+/* A row's checkbox (`box`): the library's box at its end, taking no press of its own. */
+.k-list-box {
+  cursor: inherit;
 }

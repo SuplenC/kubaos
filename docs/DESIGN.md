@@ -491,6 +491,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Sparkline](design/components/sparkline.md)
 - [Banner](design/components/banner.md)
 - [Step](design/components/step.md)
+- [Stepper](design/components/stepper.md)
 - [DescriptionList](design/components/description-list.md)
 - [FocusRing](design/components/focus-ring.md)
 

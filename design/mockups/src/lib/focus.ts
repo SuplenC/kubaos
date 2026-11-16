@@ -91,8 +91,18 @@ export function glowMask(width: number, height: number, corner: number, reach: n
     const d = outside(px + 0.5 - canvas.width / 2, py + 0.5 - canvas.height / 2, width / 2, height / 2, r);
     if (d > 0) image.data[(py * canvas.width + px) * 4 + 3] = Math.round(Math.min(1, opacity(d)) * 255);
   };
+  // Every row beside the straight sides is the same row, as far from the box at each column: it
+  // is worked out once and copied, so a tall box (a long list's well) works out no more pixels
+  // than a short one.
+  const stride = canvas.width * 4;
+  let straightRow = -1;
   for (let py = 0; py < canvas.height; py++) {
     const straight = Math.abs(py + 0.5 - canvas.height / 2) <= height / 2 - r;
+    if (straight && straightRow >= 0) {
+      image.data.copyWithin(py * stride, straightRow * stride, (straightRow + 1) * stride);
+      continue;
+    }
+    if (straight) straightRow = py;
     for (let px = 0; px < canvas.width; px++) {
       if (straight && px >= across.from && px <= across.to) {
         px = across.to;
