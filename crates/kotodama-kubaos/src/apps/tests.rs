@@ -8,12 +8,14 @@ use std::time::Duration;
 use kotodama_protocol::JobState;
 use kubaos_core::apps::Catalog;
 use kubaos_core::apps::Picks;
+use kubaos_core::apps::Platform;
 use kubaos_core::apps::Status;
 use kubaos_core::apps::journal::Adoption;
 use kubaos_core::apps::journal::Journal;
 use kubaos_core::apt::Dpkg;
 use kubaos_core::apt::dpkg;
 use kubaos_core::state::Paths;
+use kubaos_core::unfree::Unfree;
 
 use super::*;
 use crate::fake::FakeRunner;
@@ -127,7 +129,7 @@ fn apps_of(folders: &[(&str, &str)], arch: &str, installed: &[&str], setup: Opti
             &Picks::default(),
             &journals,
             &journals.join("root"),
-            arch,
+            Platform::new(arch, Unfree::Allowed),
             Some(&dpkg),
         )
         .unwrap(),
@@ -745,6 +747,17 @@ fn the_watch_covers_dpkg_the_picks_and_each_apps_journal() {
 }
 
 #[test]
+fn turning_unfree_packages_on_or_off_is_watched_as_it_changes_which_apps_can_be_installed() {
+    let dir = tempfile::tempdir().unwrap();
+    let files = files(dir.path(), &[("google-chrome", CHROME)]);
+    let state_dir = paths(dir.path()).state_dir().root().to_path_buf();
+
+    assert!(files.watched_dirs().contains(&state_dir));
+    assert!(files.changes(&state_dir.join("nixpkgs.toml")));
+    assert!(!files.changes(&state_dir.join("packages.toml")));
+}
+
+#[test]
 fn the_journals_folder_is_watched_before_any_app_has_one() {
     // Regression: right after the update that brought journals, their folder wasn't there, and
     // the menu never heard of the first one.
@@ -809,7 +822,7 @@ fn an_app_installed_by_other_means_has_no_remove_item() {
             &Picks::default(),
             &journals,
             &journals.join("root"),
-            "amd64",
+            Platform::new("amd64", Unfree::Allowed),
             Some(&dpkg),
         )
         .unwrap(),

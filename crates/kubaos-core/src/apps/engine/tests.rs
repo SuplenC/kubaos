@@ -17,6 +17,7 @@ use crate::apps::root::Reply;
 use crate::update::event::ActionState;
 use crate::update::event::Sink;
 use crate::update::event::UpdateEvent;
+use crate::unfree::Unfree;
 
 /// Four steps, root and user in turn: a package, a file, a service, a setting.
 const FIXTURE: &str = r#"
@@ -1541,6 +1542,46 @@ icon = "sketch.svg"
 
     assert_eq!(world.host.snapshot(), before);
     assert!(world.host.state.borrow().nix.contains("fd"));
+}
+
+#[test]
+fn an_unfree_nix_step_is_refused_while_the_users_nixpkgs_refuses_unfree_and_lists_nothing() {
+    let chat = app(r#"
+[[action]]
+name = "Install Chat"
+kind = "nix"
+packages = ["discord"]
+unfree = true
+"#);
+    let world = World::new(&[("chat", &chat)]);
+    world.host.state.borrow_mut().unfree = Unfree::Refused;
+    let before = world.host.snapshot();
+
+    let err = world.install("chat", true).0.unwrap_err();
+
+    assert!(err.to_string().contains("Install Chat"), "{err}");
+    assert!(world.host.state.borrow().nix.is_empty());
+    assert_eq!(world.host.snapshot(), before);
+
+    world.host.state.borrow_mut().unfree = Unfree::Allowed;
+    world.install("chat", true).0.unwrap();
+    assert!(world.host.state.borrow().nix.contains("discord"));
+}
+
+#[test]
+fn a_nix_step_for_another_architecture_is_refused_and_lists_nothing() {
+    let zoom = app(r#"
+[[action]]
+name = "Install Zoom"
+kind = "nix"
+arch = "arm64"
+packages = ["zoom-us"]
+"#);
+    let world = World::new(&[("zoom", &zoom)]);
+
+    world.install("zoom", true).0.unwrap_err();
+
+    assert!(world.host.state.borrow().nix.is_empty());
 }
 
 #[test]

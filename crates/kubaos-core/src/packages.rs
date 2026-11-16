@@ -162,6 +162,13 @@ impl Packages {
         }
     }
 
+    /// The state directory `packages.toml` is in, whose `nixpkgs.toml` says whether the user's
+    /// nixpkgs takes unfree packages.
+    #[must_use]
+    pub fn state(&self) -> &StateDir {
+        &self.state
+    }
+
     /// The names in `packages.toml`, sorted. A missing file lists none.
     ///
     /// # Errors

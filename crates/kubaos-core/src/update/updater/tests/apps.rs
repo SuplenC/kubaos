@@ -326,6 +326,35 @@ fn an_id_the_catalog_lacks_is_refused_before_anything_changes() {
 }
 
 #[test]
+fn an_app_with_unfree_nixpkgs_is_refused_while_the_user_refuses_unfree_and_nothing_changes() {
+    let w = world();
+    let chat = w.sys.catalog().join("chat");
+    put(
+        &chat.join("app.toml"),
+        &format!(
+            "{ABOUT}name = \"Chat\"\nsummary = \"Talk\"\n\n[[action]]\nname = \"Install Chat\"\nkind = \"nix\"\n\
+             packages = [\"discord\"]\nunfree = true\n"
+        ),
+    );
+    lock_down(&chat);
+    put(&w.user.state_dir().root().join("nixpkgs.toml"), "allow_unfree = false\n");
+    let mut m = fake(&w, &[]);
+    let before = host(&m).snapshot();
+
+    let err = w.updater(&mut m).add_apps(&names(&["chat"]), None).unwrap_err();
+    let status = w.updater(&mut m).app_status().unwrap();
+
+    assert!(matches!(err, UpdateError::Unfree { ref id } if id == "chat"), "{err:?}");
+    assert!(err.to_string().contains("kubaos package unfree on"), "{err}");
+    assert!(picked(&w).is_empty());
+    assert_eq!(host(&m).snapshot(), before);
+    assert_eq!(status.get("chat").unwrap().state, AppState::Unavailable);
+    put(&w.user.state_dir().root().join("nixpkgs.toml"), "allow_unfree = true\n");
+    let status = w.updater(&mut m).app_status().unwrap();
+    assert_eq!(status.get("chat").unwrap().state, AppState::Available);
+}
+
+#[test]
 fn a_declined_password_changes_nothing_and_puts_the_picks_back() {
     let w = world();
     let mut m = fake(&w, &[]);

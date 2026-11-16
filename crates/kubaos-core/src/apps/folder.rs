@@ -30,6 +30,8 @@ use super::action::Side;
 use super::action::Stage;
 use super::action::is_argv;
 use super::action::is_icon_name;
+use crate::apps::Platform;
+use crate::unfree::Unfree;
 
 /// The file of an app's folder.
 pub const APP_FILE: &str = "app.toml";
@@ -577,13 +579,16 @@ impl Folder {
         self.actions.iter().chain(self.setups.iter().flat_map(|s| &s.actions))
     }
 
-    /// Whether every step of its own install in `setup` has something for a machine of `arch`; the
-    /// apps it requires are the catalog's to say ([`super::Catalog::available`]).
-    pub fn available(&self, arch: &str, setup: Option<&FolderSetup>) -> bool {
+    /// Whether every step of its own install in `setup` has something for `platform`: its
+    /// architecture, and unfree nixpkgs only where the user's nixpkgs takes them. The apps it
+    /// requires are the catalog's to say ([`super::Catalog::available`]).
+    pub fn available(&self, platform: Platform<'_>, setup: Option<&FolderSetup>) -> bool {
         self.actions
             .iter()
             .chain(setup.into_iter().flat_map(|s| &s.actions))
-            .all(|action| action.available(arch))
+            .all(|action| {
+                action.available(platform.arch) && (platform.unfree == Unfree::Allowed || !action.needs_unfree())
+            })
     }
 
     /// Whether an install in `setup` runs a program in its install stage and names no source:

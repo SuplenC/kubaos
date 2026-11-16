@@ -24,10 +24,10 @@ use std::ffi::OsString;
 use super::UpdateError;
 use super::Updater;
 use super::release_of;
-use crate::apps;
 use crate::apps::Catalog;
 use crate::apps::Folder;
 use crate::apps::Picks;
+use crate::apps::Platform;
 use crate::apps::Status;
 use crate::apps::action::Side;
 use crate::apps::engine::Engine;
@@ -36,6 +36,7 @@ use crate::apps::engine::Keeper;
 use crate::apps::journal::Journal;
 use crate::apps::status;
 use crate::packages::Packages;
+use crate::unfree::Unfree;
 use crate::update::changelog::Changelog;
 use crate::update::event::AppChanges;
 use crate::update::event::Command;
@@ -84,7 +85,7 @@ impl<M: Machine> Updater<'_, M> {
             &picks,
             &self.user.app_journals(),
             &self.sys.app_journals(),
-            apps::arch(),
+            self.platform(),
             Some(&dpkg),
         )
         .map_err(UpdateError::AppJournal)
@@ -165,7 +166,7 @@ impl<M: Machine> Updater<'_, M> {
             Ok((lock, installed))
         })?;
         let catalog = Catalog::load(&self.sys.catalog()).map_err(UpdateError::Catalog)?;
-        let chosen = chosen_setups(&catalog, ids, change, setup)?;
+        let chosen = chosen_setups(&catalog, ids, change, setup, self.platform())?;
         let path = self.user.app_picks();
         let before = Picks::read(&path).map_err(UpdateError::Picks)?;
         let mut picks = before.clone();
@@ -338,7 +339,7 @@ impl<M: Machine> Updater<'_, M> {
                 ));
                 continue;
             }
-            if !catalog.available(app, setup, apps::arch()) {
+            if !catalog.available(app, setup, self.platform()) {
                 continue;
             }
             let complete = journal.is_some_and(|j| j.complete);
@@ -398,6 +399,11 @@ impl<M: Machine> Updater<'_, M> {
 
     /// Runs `work` with the engine: this user's side in this process, root's through the helper
     /// started the way `root` says, which may open a window when `windows` says so.
+    /// This machine, with the setting of the user's nixpkgs for unfree packages.
+    fn platform(&self) -> Platform<'static> {
+        Platform::this_machine(self.user.state_dir().root())
+    }
+
     fn with_engine<T>(
         &mut self,
         root: Root,
@@ -460,6 +466,7 @@ fn chosen_setups(
     ids: &[String],
     change: Change,
     setup: Option<&str>,
+    platform: Platform<'_>,
 ) -> Result<Vec<Option<String>>, UpdateError> {
     let mut chosen = Vec::with_capacity(ids.len());
     for id in ids {
@@ -483,10 +490,15 @@ fn chosen_setups(
                 setups: setups(),
             })?),
         };
-        if !catalog.available(app, picked, apps::arch()) {
-            return Err(UpdateError::Unavailable {
-                id: id.clone(),
-                arch: apps::arch().to_owned(),
+        if !catalog.available(app, picked, platform) {
+            let unfree_only = catalog.available(app, picked, Platform::new(platform.arch, Unfree::Allowed));
+            return Err(if unfree_only {
+                UpdateError::Unfree { id: id.clone() }
+            } else {
+                UpdateError::Unavailable {
+                    id: id.clone(),
+                    arch: platform.arch.to_owned(),
+                }
             });
         }
         chosen.push(picked.map(|s| s.id.clone()));

@@ -29,6 +29,7 @@ use crate::apps::root::RootSide;
 use crate::apps::root::Server;
 use crate::apps::version::compare;
 use crate::sandbox::Sandbox;
+use crate::unfree::Unfree;
 
 /// Root's side of the fake machine, its requests sent as JSON lines through the real server.
 #[derive(Debug)]
@@ -82,6 +83,8 @@ pub struct State {
     /// <version>`.
     pub downloads: BTreeMap<String, (String, Vec<u8>)>,
     pub nix: BTreeSet<String>,
+    /// Whether the user's nixpkgs takes unfree packages.
+    pub unfree: Unfree,
     /// Group to its members.
     pub groups: BTreeMap<String, BTreeSet<String>>,
     /// `<scope>:<unit>` to its state.
@@ -460,6 +463,10 @@ impl Host for FakeHost {
 
     fn nix_list(&mut self) -> Result<BTreeSet<String>, HostError> {
         Ok(self.state.borrow().nix.clone())
+    }
+
+    fn unfree(&mut self) -> Result<Unfree, HostError> {
+        Ok(self.state.borrow().unfree)
     }
 
     fn nix_add(&mut self, names: &[String]) -> Result<(), HostError> {

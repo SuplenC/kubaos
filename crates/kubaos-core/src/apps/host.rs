@@ -24,6 +24,7 @@ use std::path::PathBuf;
 
 pub use self::system::SystemHost;
 use super::action::Scope;
+use crate::unfree::Unfree;
 
 /// What the machine refused.
 #[derive(Debug, thiserror::Error)]
@@ -247,6 +248,13 @@ pub trait Host {
     ///
     /// When it can't be written.
     fn nix_remove(&mut self, names: &[String]) -> Result<(), HostError>;
+
+    /// Whether the user's nixpkgs takes unfree packages: `nixpkgs.toml` beside `packages.toml`.
+    ///
+    /// # Errors
+    ///
+    /// When it can't be read.
+    fn unfree(&mut self) -> Result<Unfree, HostError>;
 
     /// Whether `group` exists.
     ///

@@ -24,7 +24,9 @@ use super::folder::Folder;
 use super::folder::FolderError;
 use super::folder::FolderSetup;
 use super::folder::is_app_id;
+use crate::apps::Platform;
 use crate::apt::Manifest;
+use crate::unfree::Unfree;
 
 /// The catalog's folder, inside the release's checkout.
 pub const CATALOG: &str = "apps";
@@ -207,25 +209,27 @@ impl Catalog {
             .filter(|app| app.packages().iter().any(|p| packages.iter().any(|q| q == p)))
     }
 
-    /// Whether an install of `app` in `setup` has something for a machine of `arch`: every step
-    /// of its own, and of every app it requires, through what those require.
-    pub fn available(&self, app: &Folder, setup: Option<&FolderSetup>, arch: &str) -> bool {
-        app.available(arch, setup)
+    /// Whether an install of `app` in `setup` has something for `platform`: every step of its
+    /// own, and of every app it requires, through what those require.
+    pub fn available(&self, app: &Folder, setup: Option<&FolderSetup>, platform: Platform<'_>) -> bool {
+        app.available(platform, setup)
             && app.requires(setup).all(|r| {
                 self.get(r.id())
-                    .is_some_and(|required| self.available(required, None, arch))
+                    .is_some_and(|required| self.available(required, None, platform))
             })
     }
 
     /// The architectures `app` installs on, in one setup at least, of the ones the catalog knows.
+    /// An unfree package counts as let in: whether it is, is the user's to change at any time.
     pub fn arches(&self, app: &Folder) -> Vec<&'static str> {
         ARCHES
             .into_iter()
             .filter(|arch| {
+                let platform = Platform::new(arch, Unfree::Allowed);
                 if app.has_setups() {
-                    app.setups.iter().any(|s| self.available(app, Some(s), arch))
+                    app.setups.iter().any(|s| self.available(app, Some(s), platform))
                 } else {
-                    self.available(app, None, arch)
+                    self.available(app, None, platform)
                 }
             })
             .collect()
