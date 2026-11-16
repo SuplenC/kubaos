@@ -79,16 +79,21 @@ fn apps(installed: &[&str]) -> Apps {
 
 /// The apps of [`catalog`] on a machine of `arch` with these dpkg packages.
 fn apps_on(arch: &str, installed: &[&str]) -> Apps {
-    let catalog = catalog();
+    apps_of(&catalog(), arch, installed, &[])
+}
+
+/// The apps of `catalog` on a machine of `arch` with these dpkg packages and setups' markers.
+fn apps_of(catalog: &Catalog, arch: &str, installed: &[&str], markers: &[&str]) -> Apps {
     let dpkg = Dpkg::parse(&dpkg_with(installed));
     let facts = Facts {
-        catalog: &catalog,
+        catalog,
         picks: &Picks::default(),
         arch,
         dpkg: &dpkg,
         nix: &BTreeSet::new(),
+        markers: &markers.iter().map(|m| (*m).to_owned()).collect(),
     };
-    Apps::new(&catalog, &Status::new(&facts))
+    Apps::new(catalog, &Status::new(&facts))
 }
 
 fn ids(apps: &Apps) -> Vec<String> {
@@ -555,4 +560,139 @@ fn the_watch_covers_dpkg_the_picks_and_the_users_nix_packages() {
     assert!(watched.contains(&PathBuf::from(DPKG_STATUS)), "{watched:?}");
     assert!(watched.contains(&paths.app_picks()), "{watched:?}");
     assert!(watched.contains(&paths.state_dir().packages_file()), "{watched:?}");
+}
+
+/// An app with two setups: its desktop app alone, or a service beside it.
+const LAB: &str = r#"
+name = "Lab"
+summary = "An app for agents"
+
+[deb]
+package = "lab"
+version = "2.0"
+self_updates = true
+
+[deb.amd64]
+url = "https://example.com/lab-amd64.deb"
+sha256 = "418c7825f73107b7b5ba3babae5e3b485801dc22d9dc0d518af632f7906cbdd1"
+
+[setup.desktop]
+name = "Lab"
+summary = "The desktop app"
+
+[setup.service]
+name = "Lab as a service"
+summary = "Its agents in a service"
+user_hooks = "lab_service"
+marker = ".config/systemd/user/lab.service"
+"#;
+
+const LAB_MARKER: &str = ".config/systemd/user/lab.service";
+
+/// Lab alone, on an amd64 machine with these dpkg packages and setups' markers.
+fn lab(installed: &[&str], markers: &[&str]) -> Apps {
+    let catalog = Catalog::new(vec![App::parse("lab", LAB).unwrap()]);
+    apps_of(&catalog, "amd64", installed, markers)
+}
+
+#[test]
+fn an_app_with_setups_offers_an_install_for_each_and_none_for_the_app_alone() {
+    let apps = lab(&[], &[]);
+
+    assert_eq!(ids(&apps), ["app-install:lab:desktop", "app-install:lab:service"]);
+    let desktop = item(&apps, "app-install:lab:desktop");
+    let service = item(&apps, "app-install:lab:service");
+    assert_eq!(
+        (desktop.title.as_str(), desktop.subtitle.as_deref()),
+        ("Install Lab", Some("The desktop app"))
+    );
+    assert_eq!(
+        (service.title.as_str(), service.subtitle.as_deref()),
+        ("Install Lab as a service", Some("Its agents in a service"))
+    );
+    assert_eq!(service.actions[0].title, "Install Lab as a service");
+}
+
+#[test]
+fn an_app_in_one_setup_offers_its_removal_and_the_switch_to_each_other() {
+    let desktop = lab(&["lab=2.0"], &[]);
+    let service = lab(&["lab=2.0"], &[LAB_MARKER]);
+
+    assert_eq!(ids(&desktop), ["app-remove:lab", "app-install:lab:service"]);
+    assert_eq!(
+        item(&desktop, "app-remove:lab").subtitle.as_deref(),
+        Some("Installed: Lab, version 2.0")
+    );
+    assert_eq!(
+        item(&desktop, "app-install:lab:service").subtitle.as_deref(),
+        Some("Replaces Lab: Its agents in a service")
+    );
+    assert_eq!(ids(&service), ["app-remove:lab", "app-install:lab:desktop"]);
+    assert_eq!(
+        item(&service, "app-remove:lab").subtitle.as_deref(),
+        Some("Installed: Lab as a service, version 2.0")
+    );
+}
+
+#[test]
+fn installing_a_setup_runs_kubaos_app_add_with_it_named_for_the_setup() {
+    let (_, runner, started) = start(&lab(&[], &[]), "app-install:lab:service", INSTALL);
+
+    assert_eq!(started.unwrap().title, "Installing Lab as a service");
+    assert_eq!(runner.backgrounded(), ["kubaos app add lab --setup service --json"]);
+}
+
+#[test]
+fn a_setup_install_ends_installed_when_the_summary_names_the_setup() {
+    let (mut jobs, _, started) = start(&lab(&[], &[]), "app-install:lab:service", INSTALL);
+    let id = started.unwrap().id;
+    jobs.heard(Heard::line(&id, summary(&["Lab as a service"])));
+
+    let ended = jobs.heard(Heard::ended(&id, true)).unwrap();
+
+    assert_eq!((ended.title.as_str(), ended.state), ("Lab as a service installed", JobState::Succeeded));
+}
+
+#[test]
+fn a_setup_item_that_doesnt_apply_runs_nothing() {
+    let service = lab(&["lab=2.0"], &[LAB_MARKER]);
+    for (apps, id) in [
+        (&service, "app-install:lab:service"),
+        (&service, "app-install:lab"),
+        (&service, "app-install:lab:server"),
+        (&service, "app-remove:lab:service"),
+        (&lab(&[], &[]), "app-install:lab"),
+    ] {
+        let action = if id.starts_with("app-remove") { REMOVE } else { INSTALL };
+        let (_, runner, started) = start(apps, id, action);
+
+        assert!(started.is_err(), "{id} started");
+        assert!(runner.backgrounded().is_empty(), "{id} ran");
+    }
+}
+
+#[test]
+fn hide_may_name_each_setups_install_and_the_removal() {
+    assert_eq!(
+        lab(&[], &[]).ids(),
+        ["app-install:lab:desktop", "app-install:lab:service", "app-remove:lab"]
+    );
+}
+
+#[test]
+fn the_markers_are_read_from_the_home_and_watched() {
+    let dir = tempfile::tempdir().unwrap();
+    let files = files(dir.path(), &[("lab", LAB)]);
+    let marker = dir.path().join("home").join(LAB_MARKER);
+    fs::create_dir_all(marker.parent().unwrap()).unwrap();
+    fs::write(&marker, "").unwrap();
+    let runner = FakeRunner {
+        outputs: [(query(), dpkg_with(&["lab=2.0"]))].into(),
+        ..FakeRunner::default()
+    };
+
+    let apps = Apps::read(&files, &runner).unwrap();
+
+    assert_eq!(ids(&apps), ["app-remove:lab", "app-install:lab:desktop"]);
+    assert!(files.watched().contains(&marker), "{:?}", files.watched());
 }

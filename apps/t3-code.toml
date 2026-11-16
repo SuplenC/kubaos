@@ -2,6 +2,13 @@
 # behind the releases. The app keeps itself current from the same releases (electron-updater,
 # resources/app-update.yml in the package), so an update never puts it back to this pin.
 # https://github.com/pingdotgg/t3code/releases
+#
+# It comes two ways, and neither is the default. The desktop app runs its own server while its
+# window is open. As a service, T3's `t3` runtime comes from the same release's CLI archive, the
+# one T3's own installer and `t3 update` take, its sha256 the one the release's SHA256SUMS lists;
+# apps/user-hooks.sh (install_t3_service) sets up the background service on this machine only and
+# the desktop app as its client. `t3 update` keeps the runtime current.
+# https://github.com/pingdotgg/t3code/blob/main/docs/user/background-service.md
 name = "T3 Code"
 summary = "A desktop app for coding agents"
 
@@ -17,3 +24,24 @@ sha256 = "418c7825f73107b7b5ba3babae5e3b485801dc22d9dc0d518af632f7906cbdd1"
 [deb.arm64]
 url = "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/T3-Code-0.1.9-arm64.deb"
 sha256 = "7959976b4d7fc4443c9fb770128774d4e86f14db01044be36901e488908f3bb4"
+
+[setup.desktop]
+name = "T3 Code"
+summary = "The desktop app, which runs your agents while it is open"
+
+[setup.service]
+name = "T3 Code as a service"
+summary = "Your agents keep running in a service on this machine; the desktop app connects to it"
+user_hooks = "t3_service"
+# What `t3 service install` writes and `t3 uninstall` takes away.
+marker = ".config/systemd/user/t3code.service"
+version = "0.1.9"
+self_updates = true
+
+[setup.service.amd64]
+url = "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/t3-0.1.9-linux-x64.tar.gz"
+sha256 = "0141025335da334759cecd8db3483e09772f3600ca03674698524e7d94291362"
+
+[setup.service.arm64]
+url = "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/t3-0.1.9-linux-arm64.tar.gz"
+sha256 = "52023bc5728a4dee4de361ad6fef7c236f1efb2742ff25e29d5c55e2fb662eea"

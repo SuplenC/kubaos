@@ -5,7 +5,9 @@
 //! a machine): an apt package from Ubuntu's archive or a vendor repository of the package
 //! manifest, a package of the user's nixpkgs, or a vendor's `.deb` pinned to its sha256. The
 //! user's picks, `~/.config/kubaos/apps.toml`, are what `kubaos update` reconciles the machine to.
-//! Whether an app is installed is read from the machine each time, never recorded.
+//! An app may offer setups, one installed at a time, each adding its own parts in the user's home
+//! to the source they share. Whether an app is installed, and in which setup, is read from the
+//! machine each time, never recorded.
 //!
 //! # Owns
 //!
@@ -31,6 +33,7 @@ pub use self::catalog::Catalog;
 pub use self::catalog::CatalogError;
 pub use self::manifest::App;
 pub use self::manifest::ManifestError;
+pub use self::manifest::Setup;
 pub use self::manifest::Source;
 pub use self::picks::Picks;
 pub use self::picks::PicksError;

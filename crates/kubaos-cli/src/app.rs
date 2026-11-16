@@ -2,13 +2,15 @@
 //! them (`~/.config/kubaos/apps.toml`).
 //!
 //!   kubaos app list [--json]
-//!   kubaos app add ID... [--json]
+//!   kubaos app add ID... [--setup SETUP] [--json]
 //!   kubaos app remove ID... [--json]
 //!   kubaos app status [--json]
 //!
 //! `list` is the catalog and which apps are picked, read from two files and nothing else, for the
 //! Command menu. `status` adds where each app stands on the machine, from one dpkg query. `add`
-//! picks apps and installs those the machine lacks; `remove` drops them and takes them away.
+//! picks apps and installs those the machine lacks; an app with setups needs `--setup`, as none
+//! is the default, and one the machine has in another setup switches. `remove` drops apps and
+//! takes them away.
 //! Both ask for root once, through polkit, when an app has a root half (apt, a pinned `.deb`) and
 //! for nothing otherwise, show their progress as `kubaos update` does, and with `--json` write its
 //! events; `kubaos update` installs a picked app the machine lacks. Exit
@@ -56,6 +58,9 @@ pub enum AppCmd {
     Add {
         #[arg(required = true)]
         ids: Vec<String>,
+        /// The setup, for an app that can be set up more than one way (kubaos app list).
+        #[arg(long, value_name = "SETUP")]
+        setup: Option<String>,
         /// Write one JSON event per line on stdout, for a graphical front end.
         #[arg(long)]
         json: bool,
@@ -79,7 +84,7 @@ pub enum AppCmd {
 pub fn main(cmd: AppCmd) -> ExitCode {
     match cmd {
         AppCmd::List { json } => list(json),
-        AppCmd::Add { ids, json } => change(&ids, Change::Add, json),
+        AppCmd::Add { ids, setup, json } => change(&ids, Change::Add(setup.as_deref()), json),
         AppCmd::Remove { ids, json } => change(&ids, Change::Remove, json),
         AppCmd::Status { json } => status(json),
     }
@@ -115,14 +120,23 @@ fn list(json: bool) -> ExitCode {
     for app in &listed {
         let mark = if app.picked { "picked" } else { "" };
         let _ = writeln!(text, "{:<6}  {:<width$}  {}: {}", mark, app.id, app.name, app.summary);
+        for setup in app.setups {
+            let mark = if app.setup == Some(setup.id.as_str()) { "picked" } else { "" };
+            let _ = writeln!(
+                text,
+                "{:<6}  {:<width$}    --setup {}: {}, {}",
+                mark, "", setup.id, setup.name, setup.summary
+            );
+        }
     }
     print!("{text}");
     ExitCode::SUCCESS
 }
 
 #[derive(Clone, Copy)]
-enum Change {
-    Add,
+enum Change<'a> {
+    /// In the setup, for the apps that have setups.
+    Add(Option<&'a str>),
     Remove,
 }
 
@@ -134,7 +148,7 @@ fn change(ids: &[String], change: Change, json: bool) -> ExitCode {
     let mut shown = Shown::new(json);
     let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut shown);
     let done = match change {
-        Change::Add => updater.add_apps(ids),
+        Change::Add(setup) => updater.add_apps(ids, setup),
         Change::Remove => updater.remove_apps(ids),
     };
     match done {
@@ -175,12 +189,17 @@ fn table(status: &Status) -> String {
     let mut out = format!("KubaOS's apps ({})\n\n", status.arch);
     for app in &status.apps {
         let picked = if app.picked { "picked" } else { "" };
+        let name = app
+            .setup
+            .as_ref()
+            .and_then(|id| app.setups.iter().find(|setup| setup.id == *id))
+            .map_or(&app.name, |setup| &setup.name);
         let mut line = format!(
             "  {:<11} {:<6}  {:<width$}  {}",
             app.state.word(),
             picked,
             app.id,
-            app.name
+            name
         );
         if let Some(version) = &app.version {
             let _ = write!(line, "  {version}");

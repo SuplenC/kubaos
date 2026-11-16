@@ -147,6 +147,12 @@ impl SystemPaths {
         self.checkout().join(crate::apps::catalog::CATALOG)
     }
 
+    /// The Apps catalog's user helper, which sets up a setup's own parts as the user,
+    /// `/usr/share/kubaos/apps/user-helper`.
+    pub fn apps_user_helper(&self) -> PathBuf {
+        self.catalog().join(crate::apps::catalog::USER_HELPER)
+    }
+
     /// The Apps catalog's root helper, `/usr/local/libexec/kubaos-apps`.
     pub fn apps_helper(&self) -> PathBuf {
         self.join(APPS_HELPER)

@@ -3,8 +3,9 @@
 //!
 //! # Owns
 //!
-//! - [`Catalog`]: loading the folder, finding an app, the packages its apps install, and checking
-//!   each app's vendor repository against the package manifest.
+//! - [`Catalog`]: loading the folder, finding an app, the packages its apps install, which of its
+//!   setups' markers are in a home, and checking each app's vendor repository against the package
+//!   manifest.
 //!
 //! # Not here
 //!
@@ -23,6 +24,10 @@ use crate::apt::Manifest;
 
 /// The catalog's folder, inside the release's checkout.
 pub const CATALOG: &str = "apps";
+
+/// The user helper inside the catalog's folder: `install|remove ID SETUP` of a setup's own parts,
+/// as the user.
+pub const USER_HELPER: &str = "user-helper";
 
 /// The catalog could not be read, or an app in it isn't valid.
 #[derive(Debug, thiserror::Error)]
@@ -134,6 +139,23 @@ impl Catalog {
                 Source::Deb(deb) => vec![deb.package.clone()],
                 Source::Nix { .. } => Vec::new(),
             })
+            .collect()
+    }
+
+    /// Every setup's marker, as the manifests name them: paths under the home.
+    pub fn markers(&self) -> impl Iterator<Item = &str> {
+        self.apps
+            .iter()
+            .flat_map(|app| &app.setups)
+            .filter_map(|setup| setup.parts.as_ref())
+            .map(|parts| parts.marker.as_str())
+    }
+
+    /// The setups' markers that are there under `home`, a link to nothing included.
+    pub fn markers_there(&self, home: &Path) -> BTreeSet<String> {
+        self.markers()
+            .filter(|marker| home.join(marker).symlink_metadata().is_ok())
+            .map(str::to_owned)
             .collect()
     }
 

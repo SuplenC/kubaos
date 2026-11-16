@@ -50,15 +50,68 @@ summary = "An editor"
 packages = ["editor"]
 "#;
 
-/// A world whose checked-out release has the catalog agent, desk and editor, and whose home.nix
-/// can be wired to kubaos.d/.
+/// An app with setups: its desktop app alone, or a service of the user's beside it.
+const LAB: &str = r#"
+name = "Lab"
+summary = "An app for agents"
+
+[deb]
+package = "lab"
+version = "2.0"
+self_updates = true
+
+[deb.amd64]
+url = "https://example.com/lab-amd64.deb"
+sha256 = "418c7825f73107b7b5ba3babae5e3b485801dc22d9dc0d518af632f7906cbdd1"
+
+[setup.desktop]
+name = "Lab"
+summary = "The desktop app"
+
+[setup.service]
+name = "Lab as a service"
+summary = "Its agents in a service"
+user_hooks = "lab_service"
+marker = ".config/systemd/user/lab.service"
+"#;
+
+/// Lab's service's marker, under the home.
+const LAB_MARKER: &str = ".config/systemd/user/lab.service";
+
+/// A stand-in for the user helper: it writes down how it was called, and sets lab's service's
+/// marker or takes it away, unless `$HOME/user-helper-fails` is there.
+const USER_HELPER: &str = r#"
+echo "$*" >>"$HOME/user-helper.log"
+[[ ! -e $HOME/user-helper-fails ]] || exit 1
+case "$1" in
+  install) mkdir -p "$HOME/.config/systemd/user" && touch "$HOME/.config/systemd/user/lab.service" ;;
+  remove) rm -f "$HOME/.config/systemd/user/lab.service" ;;
+esac
+"#;
+
+/// A world whose checked-out release has the catalog agent, desk, editor and lab, with a stand-in
+/// user helper, and whose home.nix can be wired to kubaos.d/.
 fn world() -> World {
     let w = World::new(Channel::Edge, true);
-    for (id, text) in [("agent", AGENT), ("desk", DESK), ("editor", EDITOR)] {
+    for (id, text) in [("agent", AGENT), ("desk", DESK), ("editor", EDITOR), ("lab", LAB)] {
         put(&w.sys.catalog().join(format!("{id}.toml")), text);
     }
+    put(&w.sys.apps_user_helper(), USER_HELPER);
     put(&w.user.home_nix(), "{\n}\n");
     w
+}
+
+/// The user helper's runs, as its stand-in wrote them down.
+fn user_helper_runs(w: &World) -> Vec<String> {
+    fs::read_to_string(w.user.home().join("user-helper.log"))
+        .unwrap_or_default()
+        .lines()
+        .map(str::to_owned)
+        .collect()
+}
+
+fn lab_service_there(w: &World) -> bool {
+    w.user.home().join(LAB_MARKER).exists()
 }
 
 /// A machine with `installed`, whose helper installs each app's package.
@@ -67,6 +120,7 @@ fn fake(installed: &[&str]) -> Fake {
     let mut dpkg = FakeDpkg::with(installed);
     dpkg.apps.insert("agent".into(), vec!["agent".into()]);
     dpkg.apps.insert("desk".into(), vec!["desk".into()]);
+    dpkg.apps.insert("lab".into(), vec!["lab".into()]);
     m.dpkg = Some(dpkg);
     m
 }
@@ -101,7 +155,7 @@ fn add_picks_the_apps_and_installs_them_in_one_run_of_the_helper_through_polkit(
     let mut events = Vec::new();
 
     w.reporting(&mut m, &mut events)
-        .add_apps(&names(&["desk", "agent"]))
+        .add_apps(&names(&["desk", "agent"]), None)
         .unwrap();
 
     assert_eq!(picked(&w), ["agent", "desk"]);
@@ -128,7 +182,7 @@ fn adding_an_app_that_is_there_only_picks_it() {
     let mut m = fake(&["agent"]);
     let mut events = Vec::new();
 
-    w.reporting(&mut m, &mut events).add_apps(&names(&["agent"])).unwrap();
+    w.reporting(&mut m, &mut events).add_apps(&names(&["agent"]), None).unwrap();
 
     assert_eq!(picked(&w), ["agent"]);
     assert!(helper_runs(&m).is_empty(), "{:?}", m.ran);
@@ -156,7 +210,7 @@ fn an_id_the_catalog_lacks_is_refused_before_anything_changes() {
     let w = world();
     let mut m = fake(&[]);
 
-    let added = w.updater(&mut m).add_apps(&names(&["agent", "../etc"]));
+    let added = w.updater(&mut m).add_apps(&names(&["agent", "../etc"]), None);
 
     assert!(matches!(added, Err(UpdateError::NoApp { id }) if id == "../etc"));
     assert!(picked(&w).is_empty());
@@ -170,7 +224,7 @@ fn a_failed_or_declined_install_puts_the_picks_back() {
     let mut m = fake(&["desk"]);
     m.failing.push("pkexec");
 
-    let added = w.updater(&mut m).add_apps(&names(&["agent"]));
+    let added = w.updater(&mut m).add_apps(&names(&["agent"]), None);
 
     assert!(added.is_err());
     assert_eq!(picked(&w), ["desk"]);
@@ -203,7 +257,7 @@ fn an_app_from_nixpkgs_goes_into_kubaos_d_and_the_home_switches_without_root() {
     let w = world();
     let mut m = fake(&[]);
 
-    w.updater(&mut m).add_apps(&names(&["editor"])).unwrap();
+    w.updater(&mut m).add_apps(&names(&["editor"]), None).unwrap();
 
     let packages = fs::read_to_string(w.user.state_dir().packages_file()).unwrap();
     assert!(packages.contains("\"editor\""), "{packages}");
@@ -307,6 +361,7 @@ fn the_status_reads_the_catalog_the_picks_and_dpkg() {
             ("agent", true, AppState::Missing),
             ("desk", false, AppState::Installed),
             ("editor", true, AppState::Missing),
+            ("lab", false, AppState::Available),
         ]
     );
     assert_eq!(m.ran.len(), 1, "one dpkg query, nothing else: {:?}", m.ran);
@@ -318,7 +373,7 @@ fn removing_an_app_from_nixpkgs_leaves_a_package_the_user_had_added_themselves()
     put(&w.user.state_dir().packages_file(), "packages = [\"editor\"]\n");
     let mut m = fake(&[]);
 
-    w.updater(&mut m).add_apps(&names(&["editor"])).unwrap();
+    w.updater(&mut m).add_apps(&names(&["editor"]), None).unwrap();
     w.updater(&mut m).remove_apps(&names(&["editor"])).unwrap();
 
     let packages = fs::read_to_string(w.user.state_dir().packages_file()).unwrap();
@@ -336,8 +391,8 @@ fn a_package_two_apps_share_goes_only_with_the_last_of_them() {
     let mut m = fake(&[]);
     let packages = || fs::read_to_string(w.user.state_dir().packages_file()).unwrap();
 
-    w.updater(&mut m).add_apps(&names(&["editor"])).unwrap();
-    w.updater(&mut m).add_apps(&names(&["studio"])).unwrap();
+    w.updater(&mut m).add_apps(&names(&["editor"]), None).unwrap();
+    w.updater(&mut m).add_apps(&names(&["studio"]), None).unwrap();
     w.updater(&mut m).remove_apps(&names(&["editor"])).unwrap();
 
     assert!(packages().contains("\"editor\""), "{}", packages());
@@ -354,7 +409,7 @@ fn an_add_that_fails_after_its_packages_are_written_keeps_the_record_of_them() {
     let mut m = fake(&[]);
     m.failing.push("switch");
 
-    let added = w.updater(&mut m).add_apps(&names(&["editor"]));
+    let added = w.updater(&mut m).add_apps(&names(&["editor"]), None);
 
     assert!(added.is_err());
     assert!(picked(&w).is_empty());
@@ -367,10 +422,189 @@ fn the_record_of_added_packages_is_state_and_the_picks_stay_a_list() {
     let w = world();
     let mut m = fake(&[]);
 
-    w.updater(&mut m).add_apps(&names(&["editor"])).unwrap();
+    w.updater(&mut m).add_apps(&names(&["editor"]), None).unwrap();
 
     let picks = fs::read_to_string(w.user.app_picks()).unwrap();
     assert!(!picks.contains("[nix_added]"), "{picks}");
     assert_eq!(Added::read(&w.user.apps_added()).unwrap().of("editor"), ["editor"]);
     assert!(!w.user.apps_added().starts_with(w.user.config_home()));
+}
+
+#[test]
+fn adding_an_app_with_setups_without_one_refuses_and_names_them() {
+    let w = world();
+    let mut m = fake(&[]);
+
+    let added = w.updater(&mut m).add_apps(&names(&["agent", "lab"]), None);
+
+    let Err(err) = added else { panic!("added without a setup") };
+    assert!(matches!(&err, UpdateError::NoSetup { id, setups } if id == "lab" && setups == &["desktop", "service"]));
+    assert_eq!(
+        err.to_string(),
+        "lab can be set up more than one way, and none is the default: pick one with \
+         kubaos app add lab --setup desktop, or kubaos app add lab --setup service"
+    );
+    assert!(picked(&w).is_empty());
+    assert!(helper_runs(&m).is_empty() && user_helper_runs(&w).is_empty());
+}
+
+#[test]
+fn a_setup_the_app_lacks_or_one_for_apps_without_setups_is_refused() {
+    let w = world();
+    let mut m = fake(&[]);
+
+    let unknown = w.updater(&mut m).add_apps(&names(&["lab"]), Some("server"));
+    let without = w.updater(&mut m).add_apps(&names(&["agent"]), Some("service"));
+
+    assert!(matches!(unknown, Err(UpdateError::UnknownSetup { setup, .. }) if setup == "server"));
+    assert!(matches!(without, Err(UpdateError::SetupWithout { setup }) if setup == "service"));
+    assert!(picked(&w).is_empty());
+    assert!(helper_runs(&m).is_empty());
+}
+
+#[test]
+fn the_desktop_setup_is_the_app_alone_and_the_picks_record_it() {
+    let w = world();
+    let mut m = fake(&[]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events)
+        .add_apps(&names(&["lab"]), Some("desktop"))
+        .unwrap();
+
+    assert!(helper_runs(&m)[0].ends_with("kubaos-apps install lab"), "{:?}", m.ran);
+    assert!(user_helper_runs(&w).is_empty());
+    let picks = Picks::read(&w.user.app_picks()).unwrap();
+    assert_eq!(picks.setup("lab"), Some("desktop"));
+    assert_eq!(summary(&events).apps.installed, ["Lab"]);
+}
+
+#[test]
+fn the_service_setup_installs_the_app_then_its_own_parts_as_the_user() {
+    let w = world();
+    let mut m = fake(&[]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events)
+        .add_apps(&names(&["lab"]), Some("service"))
+        .unwrap();
+
+    let runs = helper_runs(&m);
+    assert!(runs.len() == 1 && runs[0].starts_with("pkexec "), "{runs:?}");
+    let helper = format!("bash {} install lab service", w.sys.apps_user_helper().display());
+    let at = |line: &str| m.ran.iter().position(|ran| ran.starts_with(line));
+    assert!(at("pkexec").unwrap() < at(&helper).expect("the user helper ran, not as root"), "{:?}", m.ran);
+    assert_eq!(user_helper_runs(&w), ["install lab service"]);
+    assert!(lab_service_there(&w));
+    assert_eq!(Picks::read(&w.user.app_picks()).unwrap().setup("lab"), Some("service"));
+    assert_eq!(summary(&events).apps.installed, ["Lab as a service"]);
+}
+
+#[test]
+fn switching_to_the_desktop_app_takes_the_service_away_and_keeps_the_app() {
+    let w = world();
+    put(&w.user.app_picks(), "apps = [\"lab\"]\n\n[setups]\nlab = \"service\"\n");
+    put(&w.user.home().join(LAB_MARKER), "");
+    let mut m = fake(&["lab"]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events)
+        .add_apps(&names(&["lab"]), Some("desktop"))
+        .unwrap();
+
+    assert_eq!(user_helper_runs(&w), ["remove lab service"]);
+    assert!(!lab_service_there(&w));
+    assert!(helper_runs(&m).is_empty(), "the app stays: {:?}", m.ran);
+    assert_eq!(Picks::read(&w.user.app_picks()).unwrap().setup("lab"), Some("desktop"));
+    assert_eq!(summary(&events).apps.installed, ["Lab"]);
+}
+
+#[test]
+fn switching_to_the_service_adds_only_its_parts() {
+    let w = world();
+    put(&w.user.app_picks(), "apps = [\"lab\"]\n\n[setups]\nlab = \"desktop\"\n");
+    let mut m = fake(&["lab"]);
+
+    w.updater(&mut m).add_apps(&names(&["lab"]), Some("service")).unwrap();
+
+    assert_eq!(user_helper_runs(&w), ["install lab service"]);
+    assert!(helper_runs(&m).is_empty(), "{:?}", m.ran);
+    assert!(lab_service_there(&w));
+}
+
+#[test]
+fn a_service_set_up_by_hand_is_that_setup_and_nothing_installs_over_it() {
+    let w = world();
+    put(&w.user.home().join(LAB_MARKER), "");
+    let mut m = fake(&["lab"]);
+    let mut events = Vec::new();
+
+    let status = w.updater(&mut m).app_status().unwrap();
+    w.reporting(&mut m, &mut events)
+        .add_apps(&names(&["lab"]), Some("service"))
+        .unwrap();
+
+    let lab = status.apps.iter().find(|a| a.id == "lab").unwrap();
+    assert_eq!((lab.state, lab.setup.as_deref()), (AppState::Installed, Some("service")));
+    assert!(helper_runs(&m).is_empty() && user_helper_runs(&w).is_empty(), "{:?}", m.ran);
+    assert_eq!(summary(&events).apps.installed, ["Lab as a service"]);
+}
+
+#[test]
+fn removing_takes_the_setups_parts_then_the_app_and_drops_the_setup() {
+    let w = world();
+    put(&w.user.app_picks(), "apps = [\"lab\"]\n\n[setups]\nlab = \"service\"\n");
+    put(&w.user.home().join(LAB_MARKER), "");
+    let mut m = fake(&["lab"]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).remove_apps(&names(&["lab"])).unwrap();
+
+    assert_eq!(user_helper_runs(&w), ["remove lab service"]);
+    let runs = helper_runs(&m);
+    assert!(runs.len() == 1 && runs[0].ends_with("kubaos-apps remove lab"), "{runs:?}");
+    assert!(!lab_service_there(&w));
+    let picks = fs::read_to_string(w.user.app_picks()).unwrap();
+    assert!(!picks.contains("lab"), "{picks}");
+    assert_eq!(summary(&events).apps.removed, ["Lab"]);
+}
+
+#[test]
+fn a_setup_that_fails_to_set_up_puts_the_picks_back() {
+    let w = world();
+    put(&w.user.home().join("user-helper-fails"), "");
+    let mut m = fake(&["lab"]);
+
+    let added = w.updater(&mut m).add_apps(&names(&["lab"]), Some("service"));
+
+    assert!(matches!(added, Err(UpdateError::Step { .. })), "{added:?}");
+    assert!(picked(&w).is_empty());
+}
+
+#[test]
+fn an_update_installs_a_picked_setups_missing_parts_and_warns_of_a_pick_without_one() {
+    let w = world();
+    put(&w.user.app_picks(), "apps = [\"lab\"]\n\n[setups]\nlab = \"service\"\n");
+    let mut m = fake(&["lab"]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert_eq!(user_helper_runs(&w), ["install lab service"]);
+    assert!(helper_runs(&m).is_empty(), "{:?}", m.ran);
+    assert_eq!(summary(&events).apps.installed, ["Lab as a service"]);
+
+    let unsettled = world();
+    put(&unsettled.user.app_picks(), "apps = [\"lab\"]\n");
+    let mut m = fake(&[]);
+    let mut events = Vec::new();
+
+    unsettled.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    let warned = warnings(&events);
+    assert!(
+        warned.iter().any(|w| w.starts_with("lab can be set up more than one way")),
+        "{warned:?}"
+    );
+    assert!(helper_runs(&m).is_empty() && user_helper_runs(&unsettled).is_empty());
 }
