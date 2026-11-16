@@ -190,6 +190,7 @@ fn fake(w: &World, installed: &[&str]) -> Fake {
     let mut m = Fake::new();
     m.apps = Some(FakeApps {
         host,
+        display: true,
         catalog: w.sys.catalog(),
         journals: w.sys.app_journals(),
         owner: fs::metadata(w.sys.catalog()).unwrap().uid(),
@@ -488,6 +489,27 @@ fn the_service_setup_pairs_in_a_window_from_the_menu_and_leaves_it_to_a_note_in_
         "{:?}",
         notes(&events)
     );
+}
+
+#[test]
+fn adding_the_service_without_a_display_leaves_pairing_to_a_note() {
+    // Regression: `kubaos app add` over SSH ran the pairing and marked it done, opening nothing.
+    let w = world();
+    let mut m = fake(&w, &[]);
+    m.apps.as_mut().unwrap().display = false;
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).add_apps(&names(&["lab"]), Some("service")).unwrap();
+
+    assert!(!host(&m).home().join("paired").exists(), "the pairing ran");
+    assert!(
+        notes(&events).iter().any(|n| n.contains("lab pair")),
+        "{:?}",
+        notes(&events)
+    );
+    let journal = user_journal(&w, "lab").unwrap();
+    let pairing = journal.entries.iter().find(|e| e.action.name == "Pair Lab").unwrap();
+    assert_eq!(pairing.state, crate::apps::journal::State::Skipped);
 }
 
 #[test]

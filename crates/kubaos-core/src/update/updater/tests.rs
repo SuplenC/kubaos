@@ -78,6 +78,8 @@ struct Fake {
 /// through the real server from the checkout's catalog into `journals`.
 struct FakeApps {
     host: crate::apps::host::fake::FakeHost,
+    /// Whether the session has a display, as a desktop's has and an SSH login's hasn't.
+    display: bool,
     catalog: PathBuf,
     journals: PathBuf,
     owner: u32,
@@ -409,6 +411,10 @@ impl Machine for Fake {
 
     fn free_bytes(&self, _path: &Path) -> io::Result<u64> {
         Ok(self.free)
+    }
+
+    fn has_display(&self) -> bool {
+        self.apps.as_ref().is_none_or(|apps| apps.display)
     }
 
     fn apps(
