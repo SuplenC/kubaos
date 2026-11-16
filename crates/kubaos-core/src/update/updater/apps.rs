@@ -26,6 +26,7 @@ use super::Updater;
 use super::release_of;
 use crate::apps::Catalog;
 use crate::apps::Folder;
+use crate::apps::FolderSetup;
 use crate::apps::Picks;
 use crate::apps::Platform;
 use crate::apps::Status;
@@ -326,6 +327,7 @@ impl<M: Machine> Updater<'_, M> {
             ));
         }
         let journals = self.user.app_journals();
+        let platform = self.platform();
         let mut wanted: Vec<(&Folder, Option<String>, bool)> = Vec::new();
         for app in catalog.apps().iter().filter(|app| picks.has(&app.id)) {
             let journal = Journal::read(&journals, &app.id).ok().flatten();
@@ -339,7 +341,8 @@ impl<M: Machine> Updater<'_, M> {
                 ));
                 continue;
             }
-            if !catalog.available(app, setup, self.platform()) {
+            if let Some(why) = unavailable(&catalog, app, setup, platform) {
+                self.j.warn(format!("{why}, so the update leaves it"));
                 continue;
             }
             let complete = journal.is_some_and(|j| j.complete);
@@ -397,13 +400,13 @@ impl<M: Machine> Updater<'_, M> {
         changes
     }
 
-    /// Runs `work` with the engine: this user's side in this process, root's through the helper
-    /// started the way `root` says, which may open a window when `windows` says so.
     /// This machine, with the setting of the user's nixpkgs for unfree packages.
     fn platform(&self) -> Platform<'static> {
         Platform::this_machine(self.user.state_dir().root())
     }
 
+    /// Runs `work` with the engine: this user's side in this process, root's through the helper
+    /// started the way `root` says, which may open a window when `windows` says so.
     fn with_engine<T>(
         &mut self,
         root: Root,
@@ -490,16 +493,8 @@ fn chosen_setups(
                 setups: setups(),
             })?),
         };
-        if !catalog.available(app, picked, platform) {
-            let unfree_only = catalog.available(app, picked, Platform::new(platform.arch, Unfree::Allowed));
-            return Err(if unfree_only {
-                UpdateError::Unfree { id: id.clone() }
-            } else {
-                UpdateError::Unavailable {
-                    id: id.clone(),
-                    arch: platform.arch.to_owned(),
-                }
-            });
+        if let Some(why) = unavailable(catalog, app, picked, platform) {
+            return Err(why);
         }
         chosen.push(picked.map(|s| s.id.clone()));
     }
@@ -511,4 +506,27 @@ fn chosen_setups(
         });
     }
     Ok(chosen)
+}
+
+/// Why `app` in `setup` can't install on `platform`: [`UpdateError::Unfree`] when letting unfree
+/// packages in would do, else [`UpdateError::Unavailable`]; `None` when it can.
+fn unavailable(
+    catalog: &Catalog,
+    app: &Folder,
+    setup: Option<&FolderSetup>,
+    platform: Platform<'_>,
+) -> Option<UpdateError> {
+    if catalog.available(app, setup, platform) {
+        return None;
+    }
+    Some(
+        if catalog.available(app, setup, Platform::new(platform.arch, Unfree::Allowed)) {
+            UpdateError::Unfree { id: app.id.clone() }
+        } else {
+            UpdateError::Unavailable {
+                id: app.id.clone(),
+                arch: platform.arch.to_owned(),
+            }
+        },
+    )
 }

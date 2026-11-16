@@ -19,6 +19,7 @@ use crate::apps::host::Host;
 use crate::apps::host::fake::FakeHost;
 use crate::apps::journal::Adoption;
 use crate::apps::journal::Journal;
+use crate::sandbox;
 use crate::update::UpdateError;
 use crate::update::event::AppChanges;
 use crate::update::event::Phase;
@@ -160,8 +161,8 @@ fn lock_down(dir: &Path) {
 }
 
 fn script(path: &Path, body: &str) {
-    put(path, &format!("#!/bin/sh\n{body}\n"));
-    fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    sandbox::program(path, &format!("#!/bin/sh\n{body}\n"));
 }
 
 fn put(path: &Path, text: &str) {
@@ -438,6 +439,37 @@ fn an_update_without_picks_runs_nothing_for_the_apps() {
 
     assert!(root_helpers(&m).is_empty());
     assert!(!phases(&events).contains(&Phase::Apps));
+}
+
+#[test]
+fn a_picked_app_unfree_while_the_user_refuses_unfree_warns_why_and_the_update_goes_on() {
+    let w = world();
+    let chat = w.sys.catalog().join("chat");
+    put(
+        &chat.join("app.toml"),
+        &format!(
+            "{ABOUT}name = \"Chat\"\nsummary = \"Talk\"\n\n[[action]]\nname = \"Install Chat\"\nkind = \"nix\"\n\
+             packages = [\"discord\"]\nunfree = true\n"
+        ),
+    );
+    lock_down(&chat);
+    put(
+        &w.user.state_dir().root().join("nixpkgs.toml"),
+        "allow_unfree = false\n",
+    );
+    let mut picks = Picks::default();
+    picks.add("chat");
+    picks.add("desk");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = fake(&w, &[]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    let about_chat: Vec<_> = warnings(&events).into_iter().filter(|w| w.contains("chat")).collect();
+    assert_eq!(about_chat.len(), 1, "{about_chat:?}");
+    assert!(about_chat[0].contains("kubaos package unfree on"), "{about_chat:?}");
+    assert!(has(&m, "desk"));
 }
 
 #[test]
