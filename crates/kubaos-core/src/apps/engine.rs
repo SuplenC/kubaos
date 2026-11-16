@@ -936,6 +936,10 @@ impl<'a> Engine<'a> {
         let words = self.user.words();
         let done = |actions: &[&Action], user: &mut Keeper<'_>| -> Result<bool, EngineError> {
             for action in actions {
+                // An app with nothing for this machine's architecture isn't on it.
+                if !action.available(&words.arch) {
+                    return Ok(false);
+                }
                 let resolved = action.resolve(&words, &folder.dir).map_err(|e| EngineError::Step {
                     name: action.name.clone(),
                     source: Box::new(StepError::Folder(FolderError::Action {

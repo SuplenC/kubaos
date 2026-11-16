@@ -11,9 +11,8 @@
 # Light/dark for web pages follows the system (portal color-scheme,
 # home/theme.nix).
 #
-# Root-owned helper, installed to /usr/local/libexec by the Apps catalog's
-# Google Chrome (apps/google-chrome/app.toml), and started by
-# dot-chrome-theme.path. It takes nothing from the user's file but
+# Root-owned helper, installed to /usr/local/libexec by system/40-apps.sh and
+# started by dot-chrome-theme.path. It takes nothing from the user's file but
 # a value that matches #rrggbb, so the policy directory stays root's: the user
 # can't use it to set any other policy. No color found -> the file is removed
 # and Chrome goes back to its default theme.
