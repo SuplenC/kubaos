@@ -2,8 +2,8 @@
 # bitwarden-autostart: Bitwarden desktop's system-wide autostart entry, on a
 # machine installed before 70-bitwarden.sh shipped it. The session starts
 # every XDG autostart entry, and Hyprland's config doesn't name Bitwarden, so
-# without the entry its SSH agent would be down after login. The entry is the
-# Apps catalog's Bitwarden's now (apps/bitwarden/), whose journal takes it in
+# without the entry its SSH agent would be down after login. The entry belongs
+# to the Apps catalog's Bitwarden (apps/bitwarden/), whose journal takes it in
 # as KubaOS's when the app is picked; base-apps-setup takes it away again
 # where Bitwarden isn't installed.
 # kubaos update runs it once, as root, after apt and before the home-manager switch,
