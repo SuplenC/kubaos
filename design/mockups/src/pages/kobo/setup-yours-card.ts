@@ -324,8 +324,12 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
       { current: 0, onTake: (at) => jumpTo(at, true) },
     );
     index.box.classList.add("setup-yours-index");
-    const { box: scroller, view } = scroll(padded(splitColumns([2, 5], "s24", [index.box, list.box])), { height: "100%", above: "s24", below: "s16", noGutter: true, fade: "s24", footFade: true });
-    scroller.classList.add("kobo-scrolls", "setup-yours-scroll");
+    // The index and the apps each scroll on their own, so turning the apps never moves the index.
+    const scrolling = { height: "100%", above: "s24", below: "s16", noGutter: true, fade: "s24", footFade: true } as const;
+    const beside = scroll(index.box, scrolling);
+    const { box: apps, view } = scroll(padded(list.box), scrolling);
+    apps.classList.add("kobo-scrolls");
+    const scroller = splitColumns([2, 5], "s24", [filling(beside.box), filling(apps)], { fillHeight: true });
     const behaviour = (): ScrollBehavior => (settings().reduced ? "auto" : "smooth");
     /** To category `at`: the apps scroll to its label; from the keys, the keys go to its first app. */
     const jumpTo = (at: number, keys: boolean) => {
@@ -363,7 +367,12 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
         if (at === lit || !index) return;
         lit = at;
         const target = index.box.querySelectorAll<HTMLElement>(".k-list-row")[at];
-        if (target) index.rows.put(target);
+        if (!target) return;
+        index.rows.put(target);
+        // A short screen's index scrolls too: the lit category is kept in its view.
+        const over = target.offsetTop + target.offsetHeight - beside.view.clientHeight;
+        if (target.offsetTop < beside.view.scrollTop) beside.view.scrollTo({ top: target.offsetTop, behavior: behaviour() });
+        else if (over > beside.view.scrollTop) beside.view.scrollTo({ top: over, behavior: behaviour() });
       },
       { passive: true },
     );

@@ -130,13 +130,6 @@
   height: 100%;
 }
 
-/* Your apps' index stays in view as the apps scroll beside it. */
-.setup-yours-index {
-  position: sticky;
-  top: 0;
-  align-self: start;
-}
-
 /* Go's figure burns as the lit cards do at night. */
 .setup-yours-figure {
   text-shadow: 0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * (1 - var(--day))));
