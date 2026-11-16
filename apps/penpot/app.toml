@@ -20,6 +20,9 @@ description_from = "https://github.com/penpot/penpot/blob/2.19.2/README.md"
 name = "Penpot"
 summary = "penpot.app in a window of its own"
 requires = ["google-chrome"]
+keeps = """\
+Your sign-in to penpot.app stays in ~/.local/share/kubaos/web-apps/penpot: install Penpot again \
+and you're still signed in."""
 
 [[setup.web.ready]]
 check = ["./closed", "penpot"]
@@ -38,8 +41,9 @@ name = "Penpot on this machine"
 summary = "Penpot's own stack in Docker; your designs stay on your disk"
 requires = ["docker", "google-chrome"]
 keeps = """\
-Your designs stay in Docker's volumes penpot_penpot_postgres_v15 and penpot_penpot_assets: \
-install Penpot on this machine again and they're back."""
+Your designs stay in Docker's volumes penpot_penpot_postgres_v15 and penpot_penpot_assets, and \
+the window's sign-in in ~/.local/share/kubaos/web-apps/penpot-local: install Penpot on this \
+machine again and they're back."""
 
 [[setup.local.ready]]
 check = ["./closed", "penpot-local"]

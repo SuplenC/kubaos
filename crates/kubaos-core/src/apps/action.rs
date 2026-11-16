@@ -236,9 +236,11 @@ pub enum Kind {
     /// The user's services kept running without a session.
     Linger {},
     /// A web app in a window of its own: a desktop entry and an icon that open `url` as a Chrome
-    /// app window with a window class of its own.
+    /// app window, in a browser folder and a profile of its own, which give the window an app id
+    /// of its own.
     WebApp {
-        /// What names its desktop entry, its icon and its window class, `kubaos-web-<id>`.
+        /// What names its desktop entry and its icon, `kubaos-web-<id>`, its browser folder, and
+        /// its profile, `kubaos-web-<id>`, which ends the app id Chrome gives its window.
         id: String,
         /// The name its desktop entry shows.
         title: String,
