@@ -1063,6 +1063,85 @@ fn an_update_after_a_reboot_leaves_chromes_colouring_service_alone() {
     assert_eq!(root_starts(&m), starts, "root was asked to colour Chrome again");
 }
 
+#[test]
+fn a_browser_from_its_vendors_repository_sets_the_repository_up_and_goes_whole() {
+    let w = world();
+    let browsers = [
+        ("firefox", "mozilla", "firefox"),
+        ("microsoft-edge", "microsoft-edge", "microsoft-edge-stable"),
+        ("vivaldi", "vivaldi", "vivaldi-stable"),
+        ("librewolf", "librewolf", "librewolf"),
+    ];
+    for (id, _, _) in browsers {
+        with_app(&w, id);
+    }
+    let mut m = fake(&w, &[]);
+    let pin = host(&m).place(Path::new("/etc/apt/preferences.d/kubaos-firefox"));
+
+    for (id, repo, package) in browsers {
+        w.updater(&mut m).add_apps(&names(&[id]), None).unwrap();
+
+        assert!(host(&m).state.borrow().repos.contains(repo), "{id}");
+        assert!(has(&m, package), "{id}");
+    }
+    assert_eq!(
+        fs::read_to_string(&pin).unwrap(),
+        fs::read_to_string(w.sys.catalog().join("firefox/kubaos-firefox.pref")).unwrap()
+    );
+
+    for (id, _, package) in browsers {
+        w.updater(&mut m).remove_apps(&names(&[id])).unwrap();
+
+        assert!(!has(&m, package), "{id}");
+        assert!(user_journal(&w, id).is_none(), "{id}");
+    }
+    assert!(!pin.exists(), "the pin goes with Firefox");
+}
+
+#[test]
+fn zen_is_its_pinned_appimage_with_an_entry_that_runs_it_and_its_profile_stays() {
+    let w = world();
+    let folder = with_app(&w, "zen-browser");
+    let app: toml::Table = toml::from_str(&fs::read_to_string(folder.join("app.toml")).unwrap()).unwrap();
+    let download = app["action"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["kind"].as_str() == Some("download"))
+        .unwrap();
+    let pin = |key: &str| download["amd64"][key].as_str().unwrap().to_owned();
+    let mut m = fake(&w, &[]);
+    host(&m)
+        .state
+        .borrow_mut()
+        .downloads
+        .insert(pin("url"), (pin("sha256"), b"an AppImage".to_vec()));
+    let home = host(&m).home().to_path_buf();
+    let appimage = home.join(".local/opt/zen-browser/zen.AppImage");
+    let entry = home.join(".local/share/applications/zen.desktop");
+
+    w.updater(&mut m).add_apps(&names(&["zen-browser"]), None).unwrap();
+
+    assert!(has(&m, "fuse3"));
+    assert_eq!(fs::read(&appimage).unwrap(), b"an AppImage");
+    assert_eq!(fs::metadata(&appimage).unwrap().permissions().mode() & 0o111, 0o111);
+    let desktop = fs::read_to_string(&entry).unwrap();
+    assert!(
+        desktop.contains(&format!("\nExec=\"{}\" %u\n", appimage.display())),
+        "{desktop}"
+    );
+    assert!(!desktop.contains('@'), "{desktop}");
+    let profile = home.join(".config/zen/profiles.ini");
+    put(&profile, "[General]\n");
+
+    w.updater(&mut m).remove_apps(&names(&["zen-browser"])).unwrap();
+
+    assert!(!appimage.exists() && !entry.exists());
+    assert!(!home.join(".local/opt/zen-browser").exists());
+    assert!(!has(&m, "fuse3"), "FUSE goes with the app that brought it");
+    assert!(profile.exists(), "the profile is the user's");
+}
+
 /// Agent's kit: it requires Agent, and writes KubaOS's defaults for it in a configure step.
 const KIT: &str = r#"
 name = "Kit"

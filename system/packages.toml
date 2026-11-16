@@ -56,6 +56,37 @@ key_url = "https://downloads.claude.ai/keys/claude-code.asc"
 fingerprint = "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
 keyring = "/etc/apt/keyrings/claude-code.gpg"
 
+# Mozilla's repository of Firefox, for the app of the catalog (apps/firefox/).
+# Mozilla's own instructions write mozilla.list; repo setup turns that line off.
+[repo.mozilla]
+key_url = "https://packages.mozilla.org/apt/repo-signing-key.gpg"
+fingerprint = "35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3"
+keyring = "/etc/apt/keyrings/mozilla.gpg"
+
+# Microsoft's repository of Edge, for the app of the catalog
+# (apps/microsoft-edge/). Edge's own postinst rewrites microsoft-edge.sources on
+# every upgrade with this text, key path and URI, its doubled Architectures line
+# included, so the two never fight over the file. Built for amd64 only.
+[repo.microsoft-edge]
+key_url = "https://packages.microsoft.com/keys/microsoft.asc"
+fingerprint = "BC528686B50D79E339D3721CEB3E94ADBE1229CF"
+keyring = "/usr/share/keyrings/microsoft-edge.gpg"
+
+# Vivaldi's repository, for the app of the catalog (apps/vivaldi/). Vivaldi's own
+# postinst writes vivaldi.sources with this text, key path and URI. Its key
+# expires in February 2027; Vivaldi's next one (5220E3E9) replaces this pin then.
+# Built for amd64 only.
+[repo.vivaldi]
+key_url = "https://repo.vivaldi.com/archive/linux_signing_key.pub"
+fingerprint = "8D1FA52AEF58A09D889DD4221256C34716BD9233"
+keyring = "/usr/share/keyrings/vivaldi-16BD9233.gpg"
+
+# LibreWolf's repository, for the app of the catalog (apps/librewolf/).
+[repo.librewolf]
+key_url = "https://repo.librewolf.net/pubkey.gpg"
+fingerprint = "662E3CDD6FE329002D0CA5BB40339DD82B12EF16"
+keyring = "/etc/apt/keyrings/librewolf.gpg"
+
 # ppa:cppiber/hyprland, the Launchpad PPA of Constantin Piber.
 [repo.cppiber-hyprland]
 key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xA54D23B62FF3FCC76EFF71E8FDBAAA1CF0CCF48E"

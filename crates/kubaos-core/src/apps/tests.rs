@@ -362,11 +362,19 @@ fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
         ids,
         [
             "bitwarden",
+            "brave",
+            "chromium",
             "claude-code",
             "docker",
+            "firefox",
             "google-chrome",
+            "librewolf",
+            "microsoft-edge",
             "penpot",
-            "t3-code"
+            "t3-code",
+            "tor-browser",
+            "vivaldi",
+            "zen-browser"
         ]
     );
     for app in catalog.apps() {
@@ -377,6 +385,41 @@ fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
             }
         }
     }
+}
+
+#[test]
+fn every_repositorys_sources_file_is_signed_by_the_key_the_manifest_pins() {
+    let root = repo_root();
+    let manifest = Manifest::read(&root.join(MANIFEST)).unwrap().unwrap();
+
+    for (name, repo) in manifest.repos() {
+        let sources = fs::read_to_string(root.join(format!("system/files/apt/sources.list.d/{name}.sources"))).unwrap();
+        let signed_by: Vec<&str> = sources
+            .lines()
+            .filter_map(|l| l.strip_prefix("Signed-By:"))
+            .map(str::trim)
+            .collect();
+        assert_eq!(signed_by, [repo.keyring.as_str()], "{name}");
+    }
+}
+
+#[test]
+fn firefoxs_pin_is_there_before_apt_picks_a_firefox() {
+    // Ubuntu's firefox, which installs the snap, has an epoch, so without the pin apt takes it.
+    let catalog = shipped();
+    let firefox = catalog.get("firefox").unwrap();
+
+    let kinds: Vec<&Kind> = firefox.all_actions().map(|a| &a.kind).collect();
+
+    assert!(
+        matches!(kinds[..], [Kind::File { to, .. }, Kind::Apt { repo: Some(repo), .. }]
+            if to == "/etc/apt/preferences.d/kubaos-firefox" && repo == "mozilla"),
+        "{kinds:?}"
+    );
+    let pin = fs::read_to_string(firefox.dir.join("kubaos-firefox.pref")).unwrap();
+    assert!(
+        pin.contains("Package: firefox ") && pin.contains("Pin: origin packages.mozilla.org\nPin-Priority: 1000\n")
+    );
 }
 
 #[test]
