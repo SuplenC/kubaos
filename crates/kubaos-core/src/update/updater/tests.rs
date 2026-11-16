@@ -349,6 +349,9 @@ impl Machine for Fake {
     fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError> {
         self.ran.push("switch".to_owned());
         self.switches += 1;
+        if self.failing.contains(&"switch") {
+            return Err(MachineError::Switch("failing (test)".to_owned()));
+        }
         if let Some((root, after)) = &self.generation {
             let _ = fs::remove_file(root);
             std::os::unix::fs::symlink(after, root).unwrap();
