@@ -32,7 +32,8 @@ name = "Let you run docker without sudo"
 kind = "group"
 group = "docker"
 
-# The same file system/lib.sh's docker_on_demand puts beside a Docker engine of the user's own.
+# The same file system/lib.sh's docker_on_demand puts beside a Docker engine of the user's own,
+# with the text an older KubaOS installed, so taking an updated machine's Docker in changes nothing.
 [[action]]
 name = "Give containers time to stop at shutdown"
 kind = "file"

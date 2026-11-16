@@ -24,6 +24,8 @@ repo = "google-chrome"
 arch = "amd64"
 packages = ["google-chrome-stable"]
 
+# The helper and its units keep the text an older KubaOS's base install wrote, word for word, so
+# taking an updated machine's Chrome in finds them done and changes nothing.
 [[action]]
 name = "Install the helper that colours Chrome from the wallpaper"
 kind = "file"

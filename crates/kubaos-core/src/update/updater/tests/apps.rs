@@ -105,11 +105,23 @@ undo = ["./unpair"]
 window = "Open Lab and run `lab pair`"
 "#;
 
-/// The checkout's catalog: agent, desk and lab, with lab's scripts, and the repository setup
+/// An app for another architecture than the fake machine's.
+const ARM: &str = r#"
+name = "Arm"
+summary = "Only for arm64"
+
+[[action]]
+name = "Install Arm"
+kind = "apt"
+arch = "arm64"
+packages = ["arm-tool"]
+"#;
+
+/// The checkout's catalog: agent, desk, lab and arm, with lab's scripts, and the repository setup
 /// root runs; all of it the test user's alone, as the root helper wants it.
 fn world() -> World {
     let w = World::new(Channel::Edge, true);
-    for (id, text) in [("agent", AGENT), ("desk", DESK), ("lab", LAB)] {
+    for (id, text) in [("agent", AGENT), ("desk", DESK), ("lab", LAB), ("arm", ARM)] {
         put(&w.sys.catalog().join(id).join("app.toml"), &format!("{ABOUT}{text}"));
     }
     let lab = w.sys.catalog().join("lab");
@@ -121,7 +133,7 @@ fn world() -> World {
     for dir in [w.sys.checkout(), w.sys.catalog(), w.sys.checkout().join("system")] {
         fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
     }
-    for id in ["agent", "desk", "lab"] {
+    for id in ["agent", "desk", "lab", "arm"] {
         lock_down(&w.sys.catalog().join(id));
     }
     w
@@ -681,4 +693,33 @@ fn a_service_kubaos_set_up_takes_lingering_only_when_its_mark_says_it_was_off() 
     w.updater(&mut m).remove_apps(&names(&["lab"])).unwrap();
     assert!(!host(&m).state.borrow().linger, "lingering was off before KubaOS");
     assert!(!home.join(".config/systemd/user/lab.service").exists());
+}
+
+#[test]
+fn an_app_for_another_architecture_is_not_taken_in_and_stops_nothing() {
+    let w = world();
+    let mut m = desk_from_before(&w);
+
+    let taken = w.updater(&mut m).adopt_apps().unwrap();
+
+    assert_eq!(taken, ["Desk"]);
+    assert_eq!(user_journal(&w, "arm"), None);
+}
+
+#[test]
+fn a_file_kubaos_put_there_with_an_older_releases_text_is_owned_and_brought_to_this_ones() {
+    let w = world();
+    let mut picks = Picks::default();
+    picks.add("desk");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = desk_from_before(&w);
+    let entry = host(&m).place(Path::new("/etc/xdg/autostart/desk.desktop"));
+    fs::write(&entry, "[Desktop Entry]\nExec=desk --old\n").unwrap();
+    w.updater(&mut m).adopt_apps().unwrap();
+
+    w.updater(&mut m).update(yes()).unwrap();
+
+    assert_eq!(fs::read_to_string(&entry).unwrap(), "[Desktop Entry]\nExec=desk\n");
+    w.updater(&mut m).remove_apps(&names(&["desk"])).unwrap();
+    assert!(!entry.exists(), "the file an older release wrote was KubaOS's");
 }
