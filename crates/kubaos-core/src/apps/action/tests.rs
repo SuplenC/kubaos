@@ -207,6 +207,9 @@ fn a_web_app_opens_https_or_http_on_this_machine_with_its_port() {
         "ftp://localhost:9001/",
     ] {
         let result = web_app("Penpot", url);
-        assert!(matches!(result, Err(ActionError::InvalidUrl { .. })), "{url}: {result:?}");
+        assert!(
+            matches!(result, Err(ActionError::InvalidUrl { .. })),
+            "{url}: {result:?}"
+        );
     }
 }

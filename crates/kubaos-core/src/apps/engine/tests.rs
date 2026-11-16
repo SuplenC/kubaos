@@ -836,7 +836,10 @@ fn a_json_setting_changes_only_its_key_and_keeps_the_files_indentation_and_numbe
             "\"mode\": \"dark\",\n        \"enabled\": true\n"
         )
     );
-    assert_eq!(fs::read_to_string(world.settings()).unwrap(), mine.replace("dark", "light"));
+    assert_eq!(
+        fs::read_to_string(world.settings()).unwrap(),
+        mine.replace("dark", "light")
+    );
 }
 
 #[test]
@@ -1528,8 +1531,12 @@ icon = "penpot.svg"
 
     world.install("penpot", true).0.unwrap();
 
-    let entry =
-        fs::read_to_string(world.host_home().join(".local/share/applications/kubaos-web-penpot.desktop")).unwrap();
+    let entry = fs::read_to_string(
+        world
+            .host_home()
+            .join(".local/share/applications/kubaos-web-penpot.desktop"),
+    )
+    .unwrap();
     assert!(
         entry.contains(
             "\nExec=google-chrome \"--app=https://design.example/view?team=a&file=b#page%%20one\" \
@@ -1603,10 +1610,9 @@ fn a_release_that_bumps_a_download_at_the_same_path_downloads_it_again() {
         assert_eq!(fs::read_to_string(&tool).unwrap(), "tool 1.3", "{unpack}");
         let journal = world.journals("tool").0.unwrap();
         assert!(
-            journal
-                .entries
-                .iter()
-                .any(|e| matches!(&e.action.kind, crate::apps::action::Kind::Download { version, .. } if version == "1.3")),
+            journal.entries.iter().any(
+                |e| matches!(&e.action.kind, crate::apps::action::Kind::Download { version, .. } if version == "1.3")
+            ),
             "{unpack}"
         );
         world.remove("tool").0.unwrap();

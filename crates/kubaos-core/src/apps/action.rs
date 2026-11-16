@@ -95,7 +95,9 @@ pub enum ActionError {
     InvalidArgv { key: &'static str },
     #[error("{value:?} is not a web app's id: lowercase letters, digits and dashes")]
     InvalidWebApp { value: String },
-    #[error("{value:?} is not an https:// URL, or an http:// one on this machine (localhost, 127.0.0.1 or [::1]) with its port")]
+    #[error(
+        "{value:?} is not an https:// URL, or an http:// one on this machine (localhost, 127.0.0.1 or [::1]) with its port"
+    )]
     InvalidUrl { value: String },
     #[error("a web app's title is one line, with no control characters")]
     InvalidTitle,

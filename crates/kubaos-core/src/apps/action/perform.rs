@@ -382,7 +382,9 @@ pub fn apply(
             if missing.is_empty() {
                 return Ok(());
             }
-            let simulated = host.apt_simulate(AptPlan::Install(&missing)).map_err(PerformError::Host)?;
+            let simulated = host
+                .apt_simulate(AptPlan::Install(&missing))
+                .map_err(PerformError::Host)?;
             record_dependencies(simulated, packages, record)?;
             host.apt_install(&missing).map_err(PerformError::Host)
         }
@@ -593,7 +595,11 @@ fn undo_packages(host: &mut dyn Host, mine: &[String], dependencies: &[String]) 
     let all: Vec<String> = mine.iter().chain(dependencies).cloned().collect();
     let installed = host.installed(&all).map_err(PerformError::Host)?;
     let there: Vec<String> = mine.iter().filter(|p| installed.contains(*p)).cloned().collect();
-    let pulled: Vec<String> = dependencies.iter().filter(|p| installed.contains(*p)).cloned().collect();
+    let pulled: Vec<String> = dependencies
+        .iter()
+        .filter(|p| installed.contains(*p))
+        .cloned()
+        .collect();
     if !there.is_empty() {
         let taken = host.apt_simulate(AptPlan::Remove(&there)).map_err(PerformError::Host)?;
         let others: Vec<String> = taken.removes.into_iter().filter(|p| !there.contains(p)).collect();
@@ -611,12 +617,13 @@ fn undo_packages(host: &mut dyn Host, mine: &[String], dependencies: &[String]) 
 
 /// The packages of `dependencies` that go with `packages` taking nothing else with them. One that
 /// a package outside them depends on stays, and so does what it needs in turn.
-fn unneeded(host: &mut dyn Host, packages: &[String], mut dependencies: Vec<String>) -> Result<Vec<String>, PerformError> {
+fn unneeded(
+    host: &mut dyn Host,
+    packages: &[String],
+    mut dependencies: Vec<String>,
+) -> Result<Vec<String>, PerformError> {
     let outside = |taken: AptSimulation, kept: &[String]| -> bool {
-        taken
-            .removes
-            .iter()
-            .any(|p| !packages.contains(p) && !kept.contains(p))
+        taken.removes.iter().any(|p| !packages.contains(p) && !kept.contains(p))
     };
     while !dependencies.is_empty() {
         let all: Vec<String> = packages.iter().chain(&dependencies).cloned().collect();

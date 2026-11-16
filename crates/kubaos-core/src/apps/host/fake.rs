@@ -157,10 +157,7 @@ impl FakeHost {
             .units
             .iter()
             .map(|(key, unit)| {
-                let unit = Unit {
-                    exited: false,
-                    ..*unit
-                };
+                let unit = Unit { exited: false, ..*unit };
                 (key.clone(), unit)
             })
             .collect();
