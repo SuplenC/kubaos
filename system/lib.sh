@@ -254,9 +254,9 @@ key_lasts() {
     END { exit !(primary && signs) }'
 }
 
-# key_expiry FILE: the date the key in FILE stops working, the earlier of its primary key's and
-# its longest-lasting signing key's; nothing when it never does.
-key_expiry() {
+# key_end FILE: when the key in FILE stops working, in seconds since the epoch, the earlier of
+# its primary key's expiry and its longest-lasting signing key's; nothing when it never does.
+key_end() {
   gpg --show-keys --with-colons "$1" 2>/dev/null | awk -F: '
     $1 == "pub" { primary = $7 }
     ($1 == "pub" || $1 == "sub") && $12 ~ /s/ && $2 != "r" {
@@ -265,8 +265,20 @@ key_expiry() {
     END {
       end = forever ? "" : signs
       if (primary != "" && (end == "" || primary + 0 < end)) end = primary
-      if (end != "") print strftime("%Y-%m-%d", end, 1)
+      if (end != "") print end
     }'
+}
+
+# key_expiry FILE: the date key_end gives, or "never".
+key_expiry() {
+  key_end "$1" | awk '{ print strftime("%Y-%m-%d", $1, 1); dated = 1 } END { if (!dated) print "never" }'
+}
+
+# key_outlasts NEW OLD: the key in NEW works at least as long as the one in OLD.
+key_outlasts() {
+  local new old
+  new="$(key_end "$1")" old="$(key_end "$2")"
+  [[ -z $new ]] || { [[ -n $old ]] && ((new >= old)); }
 }
 
 # fetch_key URL DEST FINGERPRINT: download an OpenPGP key, check its
@@ -274,6 +286,8 @@ key_expiry() {
 # there already is kept while it is the fingerprint's and lasts (key_lasts);
 # one about to expire is fetched again, as the vendor's newer copy of it has
 # the new expiry or subkey, and the pinned fingerprint is required all the same.
+# A refetch that fails, isn't the fingerprint's, or expires sooner than the stored
+# copy keeps the stored one with a warning: it may still work for weeks.
 fetch_key() {
   local url="$1" dest="$2" fpr="$3" tmp stored=0
   if [[ -f "$dest" ]] && key_is "$dest" "$fpr"; then
@@ -300,7 +314,16 @@ fetch_key() {
   fi
   if ! key_is "$tmp/key" "$fpr"; then
     rm -rf "$tmp"
+    if ((stored)); then
+      warn "the key from $url is not (only) $fpr, refusing to trust it: keeping the key at $dest, which expires $(key_expiry "$dest")"
+      return 0
+    fi
     die "key from $url is not (only) $fpr, refusing to trust it"
+  fi
+  if ((stored)) && ! key_outlasts "$tmp/key" "$dest"; then
+    warn "the key $fpr from $url expires $(key_expiry "$tmp/key"), before the one at $dest: keeping that, which expires $(key_expiry "$dest")"
+    rm -rf "$tmp"
+    return 0
   fi
   key_lasts "$tmp/key" || warn "the key $fpr from $url expires $(key_expiry "$tmp/key"): apt refuses its repository once it has"
   gpg --dearmor <"$tmp/key" >"$tmp/key.gpg" 2>/dev/null || cp "$tmp/key" "$tmp/key.gpg"

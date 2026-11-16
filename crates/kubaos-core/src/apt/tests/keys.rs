@@ -28,6 +28,8 @@ const EARLY: u64 = 1_795_132_800;
 const NEAR: u64 = 1_804_204_800;
 /// 2027-04-01, past the vendor's subkey's expiry.
 const PAST: u64 = 1_806_537_600;
+/// 2029-03-01, two weeks before the vendor's extended subkey expires.
+const LATE: u64 = 1_867_017_600;
 
 /// The expiry of the vendor's extended subkey, as `gpg --with-colons` gives it.
 const EXTENDED: &str = "1868266800";
@@ -182,15 +184,31 @@ fn a_refetched_key_that_still_expires_is_installed_with_a_warning() {
 }
 
 #[test]
-fn a_refetched_key_of_another_fingerprint_is_refused_and_the_stored_one_kept() {
+fn a_refetched_key_of_another_fingerprint_is_refused_with_a_warning_and_the_stored_one_kept() {
     let m = Machine::new(NEAR, Some("vendor-2027.asc"));
     m.serves("other.asc");
     let before = fs::read(m.keyring()).unwrap();
 
     let out = m.fetch(VENDOR);
 
-    assert!(!out.status.success(), "{}", text(&out));
+    assert!(out.status.success(), "{}", text(&out));
     assert!(text(&out).contains("refusing to trust it"), "{}", text(&out));
+    assert!(text(&out).contains("keeping the key"), "{}", text(&out));
+    assert!(text(&out).contains("2027-03-15"), "{}", text(&out));
+    assert_eq!(fs::read(m.keyring()).unwrap(), before);
+}
+
+#[test]
+fn a_refetched_copy_expiring_before_the_stored_one_is_not_installed() {
+    let m = Machine::new(LATE, Some("vendor-2029.asc"));
+    m.serves("vendor-2027.asc");
+    let before = fs::read(m.keyring()).unwrap();
+
+    let out = m.fetch(VENDOR);
+
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(m.fetched());
+    assert!(text(&out).contains("keeping that"), "{}", text(&out));
     assert_eq!(fs::read(m.keyring()).unwrap(), before);
 }
 
