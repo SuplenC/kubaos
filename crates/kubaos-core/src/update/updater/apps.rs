@@ -6,11 +6,13 @@
 //! which the update holds already. Its nixpkgs half is the User flake's `packages.toml`, as
 //! `kubaos package add` writes it, and a switch: `kubaos app` switches itself, an update's own
 //! switch comes after the phase. An add or a remove that fails puts the picks back, so a
-//! declined prompt changes nothing.
+//! declined prompt changes nothing; the record of the nixpkgs names each app added
+//! (`apps::added`) keeps what was written to `packages.toml`, which is the apps' still.
 //!
 //! # Owns
 //!
-//! - Writing the picks as a run goes, running the helper, and the Apps phase.
+//! - Writing the picks and the record of added names as a run goes, running the helper, and the
+//!   Apps phase.
 //!
 //! # Not here
 //!
@@ -23,6 +25,7 @@ use super::UpdateError;
 use super::Updater;
 use super::release_of;
 use crate::apps;
+use crate::apps::Added;
 use crate::apps::App;
 use crate::apps::Catalog;
 use crate::apps::Picks;
@@ -167,9 +170,7 @@ impl<M: Machine> Updater<'_, M> {
                 Change::Remove => u.uninstall_apps(&state, &plan::removals(&state.facts(), ids)),
             };
             if done.is_err() && changed {
-                let mut back = Picks::read(&path).map_err(UpdateError::Picks)?;
-                back.restore_apps(&before);
-                back.write(&path).map_err(UpdateError::Picks)?;
+                before.write(&path).map_err(UpdateError::Picks)?;
             }
             done
         })?;
@@ -245,8 +246,8 @@ impl<M: Machine> Updater<'_, M> {
     }
 
     /// Installs `wanted`: the root half in one run of the helper, the nixpkgs half into
-    /// `packages.toml`, switched to at once when `root` is polkit, recording in the picks the names
-    /// each app added. The names installed are those the machine then has.
+    /// `packages.toml`, switched to at once when `root` is polkit, recording the names each app
+    /// added. The names installed are those the machine then has.
     fn install_apps(&mut self, state: &AppsState, wanted: &[&App], root: Root) -> Result<AppChanges, UpdateError> {
         if wanted.is_empty() {
             self.j.detail("already installed");
@@ -263,23 +264,25 @@ impl<M: Machine> Updater<'_, M> {
             let helper = self.helper(root).arg("install").args(&as_root);
             self.run(&helper).map_err(UpdateError::step("installing the apps"))?;
         }
-        let mut picks = state.picks.clone();
         let nix = nix_packages(wanted);
         if !nix.is_empty() {
-            let added = self.edit_nix(&nix, Change::Add)?;
+            let changed = self.edit_nix(&nix, Change::Add)?;
+            let path = self.user.apps_added();
+            let mut added = Added::read(&path).map_err(UpdateError::AppsAdded)?;
+            let before = added.clone();
             for app in wanted {
                 if let Source::Nix { packages } = &app.source {
-                    picks.record_added(&app.id, packages.iter().filter(|p| added.contains(*p)).cloned());
+                    added.record(&app.id, packages.iter().filter(|p| changed.contains(*p)).cloned());
                 }
             }
-            if picks != state.picks {
-                picks.write(&self.user.app_picks()).map_err(UpdateError::Picks)?;
+            if added != before {
+                added.write(&path).map_err(UpdateError::AppsAdded)?;
             }
             if root == Root::Polkit {
                 self.switch()?;
             }
         }
-        let after = self.apps_state(state.catalog.clone(), picks)?;
+        let after = self.apps_state(state.catalog.clone(), state.picks.clone())?;
         let mut changes = AppChanges::default();
         for app in wanted {
             if after.facts().state(app) == apps::AppState::Installed {
@@ -311,15 +314,17 @@ impl<M: Machine> Updater<'_, M> {
             let helper = self.helper(Root::Polkit).arg("remove").args(&as_root);
             self.run(&helper).map_err(UpdateError::step("removing the apps"))?;
         }
-        let mut picks = state.picks.clone();
-        let nix: Vec<String> = plan::nix_released(&state.catalog, &mut picks, apps)
+        let path = self.user.apps_added();
+        let mut added = Added::read(&path).map_err(UpdateError::AppsAdded)?;
+        let before = added.clone();
+        let nix: Vec<String> = plan::nix_released(&state.catalog, &state.picks, &mut added, apps)
             .into_iter()
             .collect();
         if !nix.is_empty() {
             self.edit_nix(&nix, Change::Remove)?;
         }
-        if picks != state.picks {
-            picks.write(&self.user.app_picks()).map_err(UpdateError::Picks)?;
+        if added != before {
+            added.write(&path).map_err(UpdateError::AppsAdded)?;
         }
         if !nix.is_empty() {
             self.switch()?;

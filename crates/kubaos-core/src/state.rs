@@ -167,6 +167,12 @@ impl Paths {
         self.user_layer().join(crate::apps::picks::PICKS)
     }
 
+    /// Which nixpkgs names each app of the catalog added to the User flake's `packages.toml`,
+    /// `~/.local/state/kubaos/apps-added.toml`: this machine's, so not in the user layer.
+    pub fn apps_added(&self) -> PathBuf {
+        self.state.join(crate::apps::added::ADDED)
+    }
+
     /// The Projects root, where scaffolded projects go: `~/Projects` unless [`PROJECTS_VAR`]
     /// moved it.
     pub fn projects_root(&self) -> PathBuf {

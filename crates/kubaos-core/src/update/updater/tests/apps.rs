@@ -8,6 +8,7 @@ use super::phases;
 use super::summary;
 use super::warnings;
 use super::yes;
+use crate::apps::Added;
 use crate::apps::AppState;
 use crate::apps::Picks;
 use crate::update::UpdateError;
@@ -339,6 +340,19 @@ fn an_add_that_fails_after_its_packages_are_written_keeps_the_record_of_them() {
 
     assert!(added.is_err());
     assert!(picked(&w).is_empty());
-    let picks = Picks::read(&w.user.app_picks()).unwrap();
-    assert_eq!(picks.added("editor"), ["editor"]);
+    let added = Added::read(&w.user.apps_added()).unwrap();
+    assert_eq!(added.of("editor"), ["editor"]);
+}
+
+#[test]
+fn the_record_of_added_packages_is_state_and_the_picks_stay_a_list() {
+    let w = world();
+    let mut m = fake(&[]);
+
+    w.updater(&mut m).add_apps(&names(&["editor"])).unwrap();
+
+    let picks = fs::read_to_string(w.user.app_picks()).unwrap();
+    assert!(!picks.contains("[nix_added]"), "{picks}");
+    assert_eq!(Added::read(&w.user.apps_added()).unwrap().of("editor"), ["editor"]);
+    assert!(!w.user.apps_added().starts_with(w.user.config_home()));
 }

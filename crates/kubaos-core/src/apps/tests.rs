@@ -3,6 +3,7 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::process::Command;
 
+use super::Added;
 use super::App;
 use super::AppState;
 use super::Catalog;
@@ -361,6 +362,33 @@ fn the_picks_round_trip_sorted_with_their_header() {
     assert!(text.starts_with("# The apps of KubaOS's catalog"));
     assert!(text.ends_with("apps = [\"claude-code\", \"t3-code\"]\n"), "{text}");
     assert_eq!(Picks::read(&path).unwrap(), picks);
+}
+
+#[test]
+fn the_picks_are_only_a_list_of_apps() {
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("apps.toml");
+    std::fs::write(&path, "apps = [\"editor\"]\n\n[nix_added]\neditor = [\"editor\"]\n").unwrap();
+
+    assert!(Picks::read(&path).is_err());
+}
+
+#[test]
+fn the_record_of_added_packages_round_trips_with_its_header() {
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("kubaos/apps-added.toml");
+    let mut added = Added::read(&path).unwrap();
+    added.record("studio", ["studio", "editor"]);
+    added.record("empty", Vec::<String>::new());
+
+    added.write(&path).unwrap();
+
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.starts_with("# The nixpkgs packages each app"), "{text}");
+    assert!(!text.contains("empty"), "{text}");
+    let back = Added::read(&path).unwrap();
+    assert_eq!(back, added);
+    assert_eq!(back.of("studio"), ["editor", "studio"]);
 }
 
 #[test]
