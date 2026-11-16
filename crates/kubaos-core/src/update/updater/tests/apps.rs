@@ -766,45 +766,25 @@ fn with_app(w: &World, id: &str) -> PathBuf {
     to
 }
 
-/// The release's T3 Code folder in the checkout's catalog, its scripts that reach this machine's
-/// systemd and processes (the service's check, its undo, the ready check) replaced by ones that
-/// read the fake home.
-fn with_t3_code(w: &World) {
-    let to = with_app(w, "t3-code");
-    let toml = to.join("app.toml");
-    let text = fs::read_to_string(&toml).unwrap();
-    let systemctl = r#"check = ["systemctl", "--user", "is-enabled", "--quiet", "t3code.service"]"#;
-    assert!(text.contains(systemctl), "the service's check moved");
-    fs::write(&toml, text.replace(systemctl, r#"check = ["./service-enabled"]"#)).unwrap();
-    script(
-        &to.join("service-enabled"),
-        r#"[ -e "$HOME/.config/systemd/user/t3code.service" ]"#,
-    );
-    // HAZARD: the real undo runs `systemctl --user`, which stops this machine's T3 Code service.
-    script(
-        &to.join("service-away"),
-        r#"rm -f "$HOME/.config/systemd/user/t3code.service""#,
-    );
-    script(&to.join("closed"), "true");
-    for name in ["closed", "service-away", "service-enabled"] {
-        let text = fs::read_to_string(to.join(name)).unwrap();
-        assert!(
-            !text.contains("systemctl") && !text.contains("pgrep"),
-            "{name} reaches the machine"
-        );
-    }
-    lock_down(&to);
-}
-
 /// T3 Code's service as KubaOS set it up, after `t3 update` moved the runtime from the pinned
 /// 0.1.9 on to 0.2.0 and removed 0.1.9; lingering on, which the older mark says was off.
+/// Its `t3` answers that nothing paired and uninstalls itself, and the sandbox's `systemctl` says
+/// the service is enabled while its unit is there.
 fn t3_service_after_t3_update(w: &World) -> Fake {
     let m = fake(w, &["t3code"]);
     let home = host(&m).home().to_path_buf();
     let runtime = home.join(".t3/runtime/versions/0.2.0");
     script(
         &runtime.join("t3"),
-        r#"[ "$1 $2 $3" = "auth session list" ] && echo "[]""#,
+        r#"case "$*" in
+  "auth session list"*) echo "[]" ;;
+  "uninstall --yes") rm -rf "$HOME/.local/bin/t3" "$HOME/.t3/runtime" ;;
+  *) exit 1 ;;
+esac"#,
+    );
+    host(&m).sandbox().stub(
+        "systemctl",
+        r#"[ "$*" != "--user is-enabled --quiet t3code.service" ] || [ -e "$HOME/.config/systemd/user/t3code.service" ]"#,
     );
     put(&runtime.join(".install-complete"), "0.2.0\n");
     fs::create_dir_all(home.join(".local/bin")).unwrap();
@@ -820,10 +800,10 @@ fn t3_service_after_t3_update(w: &World) -> Fake {
 }
 
 #[test]
-fn a_picked_t3_service_whose_pinned_runtime_t3_removed_is_taken_in_as_the_service() {
+fn a_picked_t3_service_whose_pinned_runtime_t3_removed_is_taken_in_as_the_service_and_removed() {
     // Regression: the service was taken in as the desktop app, and the linger mark lost.
     let w = world();
-    with_t3_code(&w);
+    with_app(&w, "t3-code");
     let mut picks = Picks::default();
     picks.add_setup("t3-code", "service");
     picks.write(&w.user.app_picks()).unwrap();
@@ -849,6 +829,21 @@ fn a_picked_t3_service_whose_pinned_runtime_t3_removed_is_taken_in_as_the_servic
     let log = host(&m).state.borrow().log[from..].to_vec();
     assert!(!log.iter().any(|l| l.starts_with("fetch")), "{log:?}");
     assert_eq!(host(&m).snapshot(), before);
+
+    w.updater(&mut m).remove_apps(&names(&["t3-code"])).unwrap();
+
+    let home = host(&m).home().to_path_buf();
+    assert!(!home.join(".config/systemd/user/t3code.service").exists());
+    assert!(!home.join(".local/bin/t3").exists());
+    assert!(!has(&m, "t3code"));
+    assert!(!host(&m).state.borrow().linger, "lingering is off again, as it was");
+    let calls = host(&m).sandbox().calls();
+    for call in [
+        "systemctl --user disable --now t3code.service",
+        "systemctl --user daemon-reload",
+    ] {
+        assert!(calls.iter().any(|c| c == call), "{calls:?}");
+    }
 }
 
 #[test]
