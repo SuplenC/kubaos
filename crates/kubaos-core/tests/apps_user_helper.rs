@@ -1,8 +1,9 @@
 //! The Apps catalog's user helper, `apps/user-helper`, and the setups' user hooks,
 //! `apps/user-hooks.sh`, copied into a checkout of their own with `system/manifest.sh` and run as
-//! this user on a home in a temporary folder. curl, dpkg, pgrep, setsid, systemctl, the desktop
-//! app (`t3code`) and T3's `t3` are stand-ins that write down how they were called; tar, jq and
-//! sha256sum are the real ones.
+//! this user on a home in a temporary folder. curl, dpkg, loginctl, pgrep, setsid, systemctl, the
+//! desktop app (`t3code`) and T3's `t3` are stand-ins that write down how they were called; tar,
+//! jq and sha256sum are the real ones. The user lingers while the folder's `linger` file is there,
+//! which T3's `t3 service install` makes, and T3's pairing fails while `pairing-fails` is.
 
 use std::fs;
 use std::os::unix::fs::PermissionsExt as _;
@@ -153,14 +154,17 @@ impl Machine {
                  --version) echo 't3 v9.9.9' ;;\n\
                  install) mkdir -p \"$HOME/.local/bin\" && echo \"exec $0\" >\"$HOME/.local/bin/t3\" ;;\n\
                  'service install') mkdir -p \"$HOME/.config/systemd/user\" \"$home/userdata\"\n\
-                   touch \"$HOME/.config/systemd/user/t3code.service\"\n\
+                   touch \"$HOME/.config/systemd/user/t3code.service\" '{linger}'\n\
                    echo '{{\"version\":1,\"pid\":{pid},\"port\":3773,\"origin\":\"http://127.0.0.1:3773\",\"serviceManaged\":true}}' \
                    >\"$home/userdata/server-runtime.json\" ;;\n\
-                 'auth pairing create'*) echo '{{\"id\":\"1\",\"credential\":\"abc\",\"pairUrl\":\"http://127.0.0.1:3773/pair#token=abc\"}}' ;;\n\
+                 'service uninstall') rm -f \"$HOME/.config/systemd/user/t3code.service\" ;;\n\
+                 'auth pairing create'*) [[ ! -e '{pairing_fails}' ]] || exit 1; echo '{{\"id\":\"1\",\"credential\":\"abc\",\"pairUrl\":\"http://127.0.0.1:3773/pair#token=abc\"}}' ;;\n\
                  'uninstall --yes') rm -rf \"$HOME/.config/systemd/user/t3code.service\" \"$HOME/.local/bin/t3\" \"$home/runtime\" ;;\n\
                  esac",
                 line("t3"),
-                pid = std::process::id()
+                pid = std::process::id(),
+                linger = root.join("linger").display(),
+                pairing_fails = root.join("pairing-fails").display(),
             ),
         );
         let archive = root.join("archive.tar.gz");
@@ -193,6 +197,18 @@ impl Machine {
         executable(&root.join("bin/t3code"), &line("t3code"));
         executable(&root.join("bin/setsid"), "[[ $1 == -f ]] && shift\nexec \"$@\"");
         executable(&root.join("bin/systemctl"), &line("systemctl"));
+        let linger = root.join("linger");
+        let linger = linger.display();
+        executable(
+            &root.join("bin/loginctl"),
+            &format!(
+                "case \"$1\" in\n\
+                 show-user) [[ -e '{linger}' ]] && echo yes || echo no ;;\n\
+                 disable-linger) {} && rm -f '{linger}' ;;\n\
+                 esac",
+                line("loginctl")
+            ),
+        );
         fs::write(m.log_path(), "").expect("start the log");
         m
     }
@@ -228,7 +244,8 @@ impl Machine {
             .env("HOME", self.home())
             .env("TMPDIR", self.dir.path())
             .env_remove("T3CODE_HOME")
-            .env_remove("XDG_CONFIG_HOME");
+            .env_remove("XDG_CONFIG_HOME")
+            .env_remove("XDG_STATE_HOME");
         if wayland {
             cmd.env("WAYLAND_DISPLAY", "wayland-1");
         } else {
@@ -247,6 +264,12 @@ impl Machine {
             fs::read_to_string(self.home().join(".t3/userdata/desktop-settings.json")).expect("read the settings");
         serde_json::from_str(&text).expect("the settings are JSON")
     }
+}
+
+/// This user's name, as the hooks hand it to loginctl.
+fn user() -> String {
+    let out = Command::new("id").arg("-un").output().expect("run id");
+    String::from_utf8_lossy(&out.stdout).trim().to_owned()
 }
 
 fn sha256(path: &Path) -> String {
@@ -333,7 +356,7 @@ fn t3_codes_service_is_t3s_runtime_its_service_and_the_desktop_app_paired_to_it(
     fs::create_dir_all(settings.parent().unwrap()).unwrap();
     fs::write(&settings, "{\"mainWindowMaximized\": true}").unwrap();
 
-    let run = m.run(&["install", "t3-code", "service"], true);
+    let run = m.run(&["install", "--window", "t3-code", "service"], true);
 
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let runtime = m.home().join(".t3/runtime/versions/9.9.9");
@@ -364,7 +387,8 @@ fn t3_codes_service_is_t3s_runtime_its_service_and_the_desktop_app_paired_to_it(
         m.log()
     );
     assert!(
-        run.stdout.contains("asks to add the backend on this machine"),
+        run.stdout
+            .contains("user-helper: next: T3 Code opens and asks to add the backend on this machine"),
         "{}",
         run.stdout
     );
@@ -378,7 +402,11 @@ fn without_a_graphical_session_the_service_is_set_up_and_the_pairing_is_left_to_
 
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(!m.log().iter().any(|l| l.starts_with("t3code ")), "{:?}", m.log());
-    assert!(run.stdout.contains("run `t3 pair`"), "{}", run.stdout);
+    assert!(
+        run.stdout.contains("user-helper: next: Open T3 Code and run `t3 pair`"),
+        "{}",
+        run.stdout
+    );
     assert_eq!(
         m.desktop_settings(),
         serde_json::json!({"localEnvironmentEnabled": false})
@@ -390,12 +418,16 @@ fn t3_codes_service_waits_for_the_desktop_app_to_quit() {
     let m = Machine::new(None);
     fs::write(m.dir.path().join("t3code-runs"), "").unwrap();
 
-    let run = m.run(&["install", "t3-code", "service"], true);
+    let run = m.run(&["install", "--window", "t3-code", "service"], true);
 
     assert_eq!(run.code, Some(1));
     assert!(run.stderr.contains("T3 Code is open: quit it"), "{}", run.stderr);
     assert!(!m.home().join(".t3/runtime").exists());
-    assert!(!m.log().iter().any(|l| l.starts_with("t3 ")), "{:?}", m.log());
+    assert!(
+        m.log().iter().all(|l| l.starts_with("pgrep ")),
+        "nothing downloaded or run: {:?}",
+        m.log()
+    );
 }
 
 #[test]
@@ -413,7 +445,14 @@ fn removing_t3_codes_service_is_t3s_uninstall_and_gives_the_desktop_app_its_serv
     let run = m.run(&["remove", "t3-code", "service"], false);
 
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert_eq!(m.log(), ["t3 uninstall --yes"]);
+    let ran: Vec<String> = m.log().into_iter().filter(|l| !l.starts_with("pgrep ")).collect();
+    assert_eq!(
+        ran,
+        [
+            "t3 uninstall --yes".to_owned(),
+            format!("loginctl disable-linger {}", user())
+        ]
+    );
     assert!(!m.home().join(".config/systemd/user/t3code.service").exists());
     assert_eq!(m.desktop_settings(), serde_json::json!({"mainWindowMaximized": true}));
 }
@@ -429,11 +468,120 @@ fn removing_a_service_whose_runtime_is_gone_stops_and_removes_its_unit() {
 
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(!unit.exists());
+    let ran: Vec<String> = m.log().into_iter().filter(|l| !l.starts_with("pgrep ")).collect();
     assert_eq!(
-        m.log(),
+        ran,
         [
             "systemctl --user disable --now t3code.service",
             "systemctl --user daemon-reload"
         ]
     );
+}
+
+#[test]
+fn a_pairing_that_fails_takes_the_service_away_again_so_a_retry_sets_it_up() {
+    let m = Machine::new(None);
+    fs::write(m.dir.path().join("pairing-fails"), "").unwrap();
+
+    let failed = m.run(&["install", "--window", "t3-code", "service"], true);
+
+    assert_eq!(failed.code, Some(1), "{}", failed.stdout);
+    let unit = m.home().join(".config/systemd/user/t3code.service");
+    assert!(!unit.exists(), "the marker went with the service");
+    assert!(m.log().contains(&"t3 service uninstall".to_owned()), "{:?}", m.log());
+    assert_eq!(m.desktop_settings(), serde_json::json!({}));
+    assert!(!m.dir.path().join("linger").exists(), "lingering is off again");
+
+    fs::remove_file(m.dir.path().join("pairing-fails")).unwrap();
+    let retried = m.run(&["install", "--window", "t3-code", "service"], true);
+
+    assert_eq!(retried.code, Some(0), "{}", retried.stderr);
+    assert!(unit.exists());
+}
+
+#[test]
+fn settings_that_arent_json_count_as_t3s_defaults() {
+    let m = Machine::new(None);
+    let settings = m.home().join(".t3/userdata/desktop-settings.json");
+    fs::create_dir_all(settings.parent().unwrap()).unwrap();
+    fs::write(&settings, "{\"mainWindow").unwrap();
+
+    let run = m.run(&["install", "t3-code", "service"], false);
+
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert_eq!(
+        m.desktop_settings(),
+        serde_json::json!({"localEnvironmentEnabled": false})
+    );
+
+    fs::write(&settings, "[]").unwrap();
+    let removed = m.run(&["remove", "t3-code", "service"], false);
+
+    assert_eq!(removed.code, Some(0), "{}", removed.stderr);
+    assert_eq!(fs::read_to_string(&settings).unwrap(), "[]");
+}
+
+#[test]
+fn removing_t3_codes_service_waits_for_the_desktop_app_to_quit() {
+    let m = Machine::new(None);
+    assert_eq!(m.run(&["install", "t3-code", "service"], false).code, Some(0));
+    fs::write(m.dir.path().join("t3code-runs"), "").unwrap();
+    fs::write(m.log_path(), "").unwrap();
+
+    let run = m.run(&["remove", "t3-code", "service"], false);
+
+    assert_eq!(run.code, Some(1));
+    assert!(run.stderr.contains("T3 Code is open: quit it"), "{}", run.stderr);
+    assert!(m.home().join(".config/systemd/user/t3code.service").exists());
+    assert!(m.log().iter().all(|l| l.starts_with("pgrep ")), "{:?}", m.log());
+}
+
+#[test]
+fn ready_says_whether_the_setup_can_go_now_and_changes_nothing() {
+    let m = Machine::new(None);
+
+    let closed = m.run(&["ready", "remove", "t3-code", "service"], false);
+    fs::write(m.dir.path().join("t3code-runs"), "").unwrap();
+    let open = m.run(&["ready", "remove", "t3-code", "service"], false);
+    let without_hook = m.run(&["ready", "remove", "lab", "service"], false);
+
+    assert_eq!(closed.code, Some(0), "{}", closed.stderr);
+    assert_eq!(open.code, Some(1));
+    assert!(open.stderr.contains("T3 Code is open: quit it"), "{}", open.stderr);
+    assert_eq!(without_hook.code, Some(0), "{}", without_hook.stderr);
+    assert!(m.log().iter().all(|l| l.starts_with("pgrep ")), "{:?}", m.log());
+}
+
+#[test]
+fn without_window_an_install_in_a_graphical_session_opens_nothing_and_leaves_pairing_to_the_user() {
+    let m = Machine::new(None);
+
+    let run = m.run(&["install", "t3-code", "service"], true);
+
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(
+        !m.log()
+            .iter()
+            .any(|l| l.starts_with("t3code ") || l.starts_with("t3 auth")),
+        "{:?}",
+        m.log()
+    );
+    assert!(
+        run.stdout.contains("user-helper: next: Open T3 Code and run `t3 pair`"),
+        "{}",
+        run.stdout
+    );
+}
+
+#[test]
+fn removing_the_service_leaves_lingering_on_when_it_was_on_before() {
+    let m = Machine::new(None);
+    fs::write(m.dir.path().join("linger"), "").unwrap();
+    assert_eq!(m.run(&["install", "t3-code", "service"], false).code, Some(0));
+
+    let run = m.run(&["remove", "t3-code", "service"], false);
+
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(m.dir.path().join("linger").exists());
+    assert!(!m.log().iter().any(|l| l.starts_with("loginctl ")), "{:?}", m.log());
 }

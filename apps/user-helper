@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # user-helper: sets up an app's setup of KubaOS's catalog in your home, and takes it away again.
 #
-#   user-helper install ID SETUP
+#   user-helper install [--window] ID SETUP
 #   user-helper remove ID SETUP
+#   user-helper ready install|remove ID SETUP
 #   user-helper --help
 #
 # It takes an app id and one of its setups from the catalog it sits in, the release's checkout
 # (/usr/share/kubaos/apps/), and runs the setup's user hooks from apps/user-hooks.sh beside it
-# (docs/CONTRACTS.md, "The Apps catalog"): install_<hooks> once the setup's download for this
-# architecture is fetched over https and its sha256 is the manifest's, remove_<hooks> as it is.
+# (docs/CONTRACTS.md, "The Apps catalog"): ready_<hooks>, when the setup has one, before anything
+# else, then install_<hooks> once the setup's download for this architecture is fetched over https
+# and its sha256 is the manifest's, or remove_<hooks> as it is. `ready` runs only that check, which
+# changes nothing. An install opens a window, such as a pairing prompt, only with --window. A step
+# a hook leaves to the user is a line `user-helper: next: <step>` on stdout, which kubaos repeats.
 # A setup's own parts are the user's: it runs as the user, never as root, and takes no package
 # name, URL or path from its caller. `kubaos app` and kubaos update run it; the app's source,
 # which every setup shares, is the root helper's (kubaos-apps).
@@ -17,7 +21,7 @@
 set -euo pipefail
 
 usage() {
-  sed -n '2,6p' "$0" | cut -c3-
+  sed -n '2,7p' "$0" | cut -c3-
 }
 
 refuse() {
@@ -31,11 +35,23 @@ fail() {
 }
 
 verb="${1:-}"
+check=""
+setup_window=0
 case "$verb" in
   install | remove) shift ;;
+  ready)
+    shift
+    check="${1:-}"
+    [[ $check == install || $check == remove ]] || { usage >&2; exit 2; }
+    shift
+    ;;
   -h | --help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac
+if [[ $verb == install && ${1:-} == --window ]]; then
+  setup_window=1
+  shift
+fi
 (($# == 2)) || { usage >&2; exit 2; }
 ((EUID != 0)) || refuse "a setup's parts are in your home: run this as yourself, never as root"
 id="$1"
@@ -64,6 +80,16 @@ for f in "install_$hooks" "remove_$hooks"; do
   [[ $(type -t "$f") == function ]] || refuse "$id's setup $setup needs $f, which apps/user-hooks.sh doesn't define"
 done
 
+# next STEP: tells the user a step the setup leaves to them.
+next() {
+  printf 'user-helper: next: %s\n' "$*"
+}
+
+# ready VERB: the setup's check that it can be installed or taken away now, when it has one.
+ready() {
+  [[ $(type -t "ready_$hooks") != function ]] || "ready_$hooks" "$1"
+}
+
 # install_parts: the setup's install hook, given its checked download and version when it has one.
 install_parts() {
   local version arch url sha dir
@@ -86,6 +112,7 @@ install_parts() {
 }
 
 case "$verb" in
-  install) install_parts && printf "user-helper: %s's setup %s is set up\n" "$id" "$setup" ;;
-  remove) "remove_$hooks" && printf "user-helper: %s's setup %s is taken away\n" "$id" "$setup" ;;
+  ready) ready "$check" || exit 1 ;;
+  install) ready install && install_parts && printf "user-helper: %s's setup %s is set up\n" "$id" "$setup" ;;
+  remove) ready remove && "remove_$hooks" && printf "user-helper: %s's setup %s is taken away\n" "$id" "$setup" ;;
 esac
