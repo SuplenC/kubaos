@@ -2089,4 +2089,5 @@ fn a_removal_shows_each_step_it_undoes_by_name() {
     assert!(events.0.contains(&UpdateEvent::Progress { done: 4, total: 4 }));
 }
 
+mod ai;
 mod requires;

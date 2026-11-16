@@ -1,0 +1,22 @@
+# GitHub Copilot CLI from nixpkgs, through the User flake, which marks it unfree. GitHub keeps no
+# apt repository for it and Ubuntu doesn't package it.
+# https://github.com/github/copilot-cli
+name = "GitHub Copilot CLI"
+category = "ai"
+tags = ["coding agent", "github", "copilot", "microsoft", "terminal"]
+summary = "GitHub's Copilot loose in your terminal. Microsoft owns GitHub, so guess who's typing."
+# GitHub's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+GitHub Copilot CLI brings GitHub's Copilot coding agent to the terminal. It works on the \
+project it is started in, editing files and running commands once you allow it, and reaches \
+your repositories, issues and pull requests on GitHub. It needs a GitHub Copilot subscription."""
+description_from = "kubaos"
+keeps = """\
+Your sign-in, settings and past sessions stay in ~/.copilot: install Copilot CLI again and \
+you're still signed in."""
+
+[[action]]
+name = "Install GitHub Copilot CLI"
+kind = "nix"
+packages = ["github-copilot-cli"]
+unfree = true

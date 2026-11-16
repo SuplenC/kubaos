@@ -1532,3 +1532,5 @@ fn an_update_lists_the_app_a_picked_setup_change_left_behind_as_removed() {
     assert_eq!(user_journal(&w, "rig").unwrap().setup.as_deref(), Some("bare"));
     assert_eq!(changes.removed, names(&["Agent"]));
 }
+
+mod ai;

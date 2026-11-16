@@ -1,0 +1,22 @@
+# Aider from nixpkgs (aider-chat), through the User flake. Its project keeps no apt repository
+# and Ubuntu doesn't package it.
+# https://aider.chat/
+name = "Aider"
+category = "ai"
+tags = ["coding agent", "pair programming", "terminal", "git", "models"]
+summary = "AI pair programming in the terminal. Commits every change, so blame it in git."
+# Its README is under the Apache-2.0 licence, which asks for its notice with every copy, so this
+# is ours.
+description = """\
+Aider is AI pair programming in the terminal. Started in a git repository, it edits the files \
+you add to the chat and commits each change with a message of its own, so every edit can be \
+reviewed and undone. It works with the models of many providers, or one on this machine."""
+description_from = "kubaos"
+keeps = """\
+Your settings in ~/.aider.conf.yml and the chat history Aider keeps in each project \
+(.aider.chat.history.md) stay: install Aider again and they're all there."""
+
+[[action]]
+name = "Install Aider"
+kind = "nix"
+packages = ["aider-chat"]

@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/apt
+Suites: stable
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/windsurf.gpg

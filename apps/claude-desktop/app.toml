@@ -1,0 +1,28 @@
+# Claude Desktop from Anthropic's signed apt repository, the stable channel, whose key
+# system/packages.toml pins ([repo.claude-desktop]). Claude Desktop for Linux is in beta. Cowork's
+# virtual machine needs QEMU, its UEFI firmware and virtiofsd, which its package only recommends,
+# and the kvm group; without them the rest of the app works and Cowork says what it lacks.
+# https://code.claude.com/docs/en/desktop-linux
+name = "Claude"
+category = "ai"
+tags = ["chat", "assistant", "claude", "anthropic", "cowork", "coding agent"]
+summary = "Claude's desktop app: chat, Cowork and Claude Code in one. Beta, so mind the wet fucking paint."
+# Anthropic's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Claude Desktop is Anthropic's app for Claude. It holds your chats with Claude, Cowork for longer \
+tasks Claude carries out on its own, and Claude Code with parallel sessions, diff review, a \
+terminal and an editor. It signs in with a Claude subscription or through your organization's \
+single sign-on."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "claude"
+keeps = """\
+Your sign-in and Claude's settings stay in ~/.config/Claude: install Claude again and you're \
+still signed in. Your chats live on Anthropic's servers anyway."""
+
+[[action]]
+name = "Install Claude"
+kind = "apt"
+repo = "claude-desktop"
+packages = ["claude-desktop"]
