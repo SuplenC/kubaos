@@ -1,11 +1,11 @@
 # Docker Engine from Docker's signed apt repository, whose key system/packages.toml pins
 # ([repo.docker]). Docker's own packages, not Ubuntu's docker.io, which trails them.
 # https://docs.docker.com/engine/install/ubuntu/
-# Its setup (install_docker_access in system/lib.sh) puts the user in the docker group and starts
+# Its system hooks (install_docker_access in system/lib.sh) put the user in the docker group and start
 # Docker on its first use rather than at boot.
 name = "Docker"
 summary = "Containers and Compose"
-setup = "docker_access"
+system_hooks = "docker_access"
 
 [apt]
 repo = "docker"

@@ -31,11 +31,11 @@ summary = "An editor"
 packages = ["editor"]
 "#;
 
-/// An app with a setup, from Ubuntu's archive.
+/// An app with system hooks, from Ubuntu's archive.
 const TOOL: &str = r#"
 name = "Tool"
 summary = "A tool with a group"
-setup = "tool_access"
+system_hooks = "tool_access"
 
 [apt]
 packages = ["tool"]
@@ -51,9 +51,9 @@ arch = "arm64"
 packages = ["pane"]
 "#;
 
-/// What the copied `system/lib.sh` gets for `tool`'s setup: functions that write down that they
-/// ran, and for whom.
-fn setup_functions(log: &str) -> String {
+/// What the copied `system/lib.sh` gets for `tool`'s system hooks: functions that write down that
+/// they ran, and for whom.
+fn hook_functions(log: &str) -> String {
     format!(
         "\ninstall_tool_access() {{ echo \"install_tool_access $TARGET_USER\" >>'{log}'; }}\n\
          remove_tool_access() {{ echo \"remove_tool_access $TARGET_USER\" >>'{log}'; }}\n"
@@ -99,8 +99,8 @@ struct Run {
 
 impl Machine {
     /// The catalog of agent (apt, from a vendor repo), desk (a pinned .deb, its sha `desk_sha`),
-    /// editor (nixpkgs), tool (apt, with a setup), pane (apt, for arm64 only) and odd (a setup
-    /// `system/lib.sh` lacks), and a machine with `installed` (`name version` each).
+    /// editor (nixpkgs), tool (apt, with system hooks), pane (apt, for arm64 only) and odd
+    /// (system hooks `system/lib.sh` lacks), and a machine with `installed` (`name version` each).
     fn new(desk_sha: &str, installed: &[&str]) -> Self {
         let m = Self {
             dir: tempfile::tempdir().expect("a temp dir"),
@@ -132,7 +132,7 @@ impl Machine {
         let log = log.display();
         let lib = root.join("checkout/system/lib.sh");
         let text = fs::read_to_string(&lib).expect("read the copied lib.sh");
-        fs::write(&lib, text + &setup_functions(&log.to_string())).expect("add the setup's stand-ins");
+        fs::write(&lib, text + &hook_functions(&log.to_string())).expect("add the hooks' stand-ins");
         let state = root.join("dpkg");
         let state = state.display();
         let line = |name: &str| format!("echo \"{name} $*\" >>'{log}'");
@@ -156,6 +156,7 @@ impl Machine {
             &root.join("bin/apt-get"),
             &format!(
                 "{}\n\
+                 [[ $1 == remove && -e '{fail}' ]] && exit 100\n\
                  for a in \"$@\"; do\n\
                  case \"$a\" in\n\
                  -* | install | remove | Dpkg::*) ;;\n\
@@ -164,7 +165,8 @@ impl Machine {
                  else sed -i \"/^$a /d\" '{state}'; fi ;;\n\
                  esac\n\
                  done",
-                line("apt-get")
+                line("apt-get"),
+                fail = root.join("apt-refuses-removals").display()
             ),
         );
         executable(
@@ -391,7 +393,7 @@ fn remove_takes_the_apps_installed_packages_and_nothing_else() {
 }
 
 #[test]
-fn an_apps_setup_runs_after_its_install_and_before_its_removal_for_the_caller() {
+fn an_apps_system_hooks_run_after_its_install_and_after_its_removal_for_the_caller() {
     let m = Machine::new(DESK_SHA, &[]);
     let me = String::from_utf8(Command::new("id").arg("-un").output().expect("id").stdout).expect("a name");
     let me = me.trim();
@@ -410,20 +412,33 @@ fn an_apps_setup_runs_after_its_install_and_before_its_removal_for_the_caller() 
 
     assert_eq!(removed.code, Some(0), "{}", removed.stderr);
     let log = m.log();
-    assert_eq!(log[2], format!("remove_tool_access {me}"));
-    assert!(log[3].starts_with("apt-get remove -y"), "{log:?}");
+    assert!(log[2].starts_with("apt-get remove -y"), "{log:?}");
+    assert_eq!(log[3], format!("remove_tool_access {me}"));
     assert_eq!(log.len(), 4, "{log:?}");
 }
 
 #[test]
-fn an_app_for_another_architecture_or_with_a_setup_lib_sh_lacks_is_refused() {
+fn a_removal_apt_refuses_leaves_the_system_hooks_in_place() {
+    let m = Machine::new(DESK_SHA, &["tool 1.0"]);
+    fs::write(m.dir.path().join("apt-refuses-removals"), "").expect("make apt refuse");
+
+    let run = m.run(&["remove", "tool"]);
+
+    assert_eq!(run.code, Some(100), "{}", run.stderr);
+    let log = m.log();
+    assert!(log[0].starts_with("apt-get remove -y"), "{log:?}");
+    assert_eq!(log.len(), 1, "the remove hook ran: {log:?}");
+}
+
+#[test]
+fn an_app_for_another_architecture_or_with_system_hooks_lib_sh_lacks_is_refused() {
     let m = Machine::new(DESK_SHA, &[]);
 
     for (args, why) in [
         (["install", "pane"], "pane is for arm64 only, and this machine is amd64"),
         (
             ["install", "odd"],
-            "odd's setup needs install_nowhere, which system/lib.sh doesn't define",
+            "odd's system hooks need install_nowhere, which system/lib.sh doesn't define",
         ),
     ] {
         let run = m.run(&args);

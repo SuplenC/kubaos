@@ -239,11 +239,18 @@ fn an_apt_app_for_another_architecture_is_unavailable_unless_it_is_there() {
 }
 
 #[test]
-fn an_app_names_the_setup_it_needs_beyond_its_packages() {
-    let app = App::parse("agent", &format!("setup = \"agent_socket\"\n{AGENT}")).unwrap();
+fn an_app_names_the_system_hooks_it_needs_beyond_its_packages() {
+    let app = App::parse("agent", &format!("system_hooks = \"agent_socket\"\n{AGENT}")).unwrap();
 
-    assert_eq!(app.setup.as_deref(), Some("agent_socket"));
-    assert_eq!(App::parse("agent", AGENT).unwrap().setup, None);
+    assert_eq!(app.system_hooks.as_deref(), Some("agent_socket"));
+    assert_eq!(App::parse("agent", AGENT).unwrap().system_hooks, None);
+}
+
+#[test]
+fn a_nixpkgs_app_has_no_system_hooks_as_nothing_would_run_them() {
+    let error = App::parse("editor", &format!("system_hooks = \"editor_socket\"\n{EDITOR}")).unwrap_err();
+
+    assert!(matches!(error, ManifestError::SystemHooksOnNix), "{error}");
 }
 
 #[test]
@@ -331,11 +338,15 @@ fn a_manifest_that_cant_be_installed_safely_is_refused() {
             format!("{AGENT}arch = \"x86_64\"\n"),
         ),
         (
-            "a setup that isn't a function name",
-            format!("setup = \"x; reboot\"\n{AGENT}"),
+            "system hooks that aren't a function name",
+            format!("system_hooks = \"x; reboot\"\n{AGENT}"),
         ),
-        ("a setup that is a path", format!("setup = \"../lib\"\n{AGENT}")),
-        ("an uppercase setup", format!("setup = \"Agent\"\n{AGENT}")),
+        (
+            "system hooks that are a path",
+            format!("system_hooks = \"../lib\"\n{AGENT}"),
+        ),
+        ("uppercase system hooks", format!("system_hooks = \"Agent\"\n{AGENT}")),
+        ("the old setup key", format!("setup = \"agent_socket\"\n{AGENT}")),
         (
             "a multi-line string",
             AGENT.replace("\"A coding agent\"", "\"\"\"A coding agent\"\"\""),
@@ -468,12 +479,12 @@ fn every_shipped_manifest_validates_and_its_repo_has_a_sources_file() {
             let sources = root.join(format!("system/files/apt/sources.list.d/{repo}.sources"));
             assert!(sources.is_file(), "{}: no {}", app.id, sources.display());
         }
-        if let Some(setup) = &app.setup {
+        if let Some(hooks) = &app.system_hooks {
             for verb in ["install", "remove"] {
-                let function = format!("\n{verb}_{setup}() {{\n");
+                let function = format!("\n{verb}_{hooks}() {{\n");
                 assert!(
                     lib.contains(&function),
-                    "{}: system/lib.sh has no {verb}_{setup}",
+                    "{}: system/lib.sh has no {verb}_{hooks}",
                     app.id
                 );
             }
@@ -491,8 +502,8 @@ fn rust_dump(app: &App) -> BTreeSet<String> {
     if let Some(icon) = &app.icon {
         add("", "icon", icon);
     }
-    if let Some(setup) = &app.setup {
-        add("", "setup", setup);
+    if let Some(hooks) = &app.system_hooks {
+        add("", "system_hooks", hooks);
     }
     match &app.source {
         Source::Apt { repo, arch, packages } => {

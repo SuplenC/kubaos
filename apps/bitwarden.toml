@@ -6,11 +6,11 @@
 # starts and an update never puts it back. `system/70-bitwarden.sh --check-updates` names a new
 # release and its sha256.
 # https://github.com/bitwarden/clients/releases
-# Its setup (install_bitwarden_autostart in system/lib.sh) starts it at login, so its SSH agent
+# Its system hooks (install_bitwarden_autostart in system/lib.sh) start it at login, so its SSH agent
 # serves the vault's keys.
 name = "Bitwarden"
 summary = "Passwords and SSH keys"
-setup = "bitwarden_autostart"
+system_hooks = "bitwarden_autostart"
 
 [deb]
 package = "bitwarden"
