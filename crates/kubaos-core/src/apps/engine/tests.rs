@@ -1378,12 +1378,16 @@ start = true
 fn a_removal_runs_the_recorded_undo_script_after_the_app_left_the_catalog() {
     let tool = app(r#"
 [[action]]
+name = "Install its runtime"
+kind = "apt"
+packages = ["tool-runtime"]
+
+[[action]]
 name = "Install the tool"
 kind = "run"
 do = ["./install"]
 check = ["./installed"]
 undo = ["./uninstall"]
-source = "container_images"
 "#);
     let world = World::new(&[("tool", &tool)]);
     world.script("tool", "install", "touch \"$HOME/.tool-installed\"");

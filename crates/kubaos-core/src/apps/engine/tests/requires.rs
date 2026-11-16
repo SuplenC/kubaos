@@ -56,12 +56,16 @@ to = "~/.config/kubaos/lazyvim/defaults.lua"
 text = "vim.o.number = true\n"
 
 [[action]]
+name = "Install what its plugins build with"
+kind = "apt"
+packages = ["ripgrep"]
+
+[[action]]
 name = "Sync its plugins"
 kind = "run"
 do = ["./sync"]
 check = ["./synced"]
 undo = ["./unsync"]
-source = "container_images"
 "#
     )
 }
@@ -337,6 +341,7 @@ fn the_configure_stage_runs_after_the_install_and_alone_again_on_its_own() {
             "Install Neovim",
             "Write its system-wide defaults",
             "Write its config",
+            "Install what its plugins build with",
             "Sync its plugins",
             "Write KubaOS's defaults",
         ]
@@ -354,7 +359,7 @@ fn the_configure_stage_runs_after_the_install_and_alone_again_on_its_own() {
             _ => None,
         })
         .collect();
-    assert_eq!(ran, [(3, 3)]);
+    assert_eq!(ran, [(4, 4)]);
 }
 
 #[test]
