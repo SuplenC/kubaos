@@ -44,6 +44,8 @@ pub enum ManifestError {
     InvalidAttribute { name: String },
     #[error("{value:?} is not a Debian version")]
     InvalidVersion { value: String },
+    #[error("{value:?} is not an icon name: letters, digits, `-`, `_` and `.`, as the icon theme names them")]
+    InvalidIcon { value: String },
     #[error("{value:?} is not an https:// URL")]
     InvalidUrl { value: String },
     #[error("{value:?} is not a sha256: 64 lowercase hex digits")]
@@ -63,6 +65,9 @@ pub struct App {
     pub name: String,
     /// One line on what it is.
     pub summary: String,
+    /// The icon theme's name for it, which the Command menu shows; a generic one without.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
     pub source: Source,
 }
 
@@ -133,6 +138,7 @@ impl Source {
 struct File {
     name: String,
     summary: String,
+    icon: Option<String>,
     apt: Option<AptTable>,
     nix: Option<NixTable>,
     deb: Option<DebTable>,
@@ -201,6 +207,7 @@ impl App {
             id: id.to_owned(),
             name: file.name,
             summary: file.summary,
+            icon: file.icon,
             source,
         };
         app.check()?;
@@ -210,6 +217,11 @@ impl App {
     fn check(&self) -> Result<(), ManifestError> {
         non_empty("name", &self.name)?;
         non_empty("summary", &self.summary)?;
+        if let Some(icon) = &self.icon
+            && !is_icon_name(icon)
+        {
+            return Err(ManifestError::InvalidIcon { value: icon.clone() });
+        }
         let mut values = vec![&self.name, &self.summary];
         match &self.source {
             Source::Apt { repo, packages } => {
@@ -283,6 +295,16 @@ pub fn is_app_id(id: &str) -> bool {
         && id
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// Whether `value` can be an icon theme's name for an icon: no path, no extension needed.
+/// <https://specifications.freedesktop.org/icon-naming-spec/latest/>
+fn is_icon_name(value: &str) -> bool {
+    value.len() <= 128
+        && value.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 /// Whether `value` can be a Debian version: letters, digits and `.+~:-`, starting with a digit.

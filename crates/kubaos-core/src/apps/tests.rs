@@ -108,6 +108,16 @@ fn a_manifest_names_its_app_and_its_one_source() {
     assert!(deb.self_updates);
     assert_eq!(deb.download("amd64").unwrap().sha256, SHA);
     assert!(deb.download("arm64").is_none());
+    assert_eq!(app.icon, None);
+}
+
+#[test]
+fn a_manifest_may_name_its_icon_from_the_icon_theme() {
+    let text = AGENT.replace("summary = \"A coding agent\"", "summary = \"A coding agent\"\nicon = \"agent-cli\"");
+
+    let app = App::parse("agent", &text).unwrap();
+
+    assert_eq!(app.icon.as_deref(), Some("agent-cli"));
 }
 
 #[test]
@@ -260,7 +270,10 @@ fn a_manifest_that_cant_be_installed_safely_is_refused() {
     let cases: Vec<(&str, String)> = vec![
         ("no source", "name = \"X\"\nsummary = \"Y\"\n".to_owned()),
         ("two sources", format!("{AGENT}\n[nix]\npackages = [\"x\"]\n")),
-        ("unknown key", format!("{AGENT}\nicon = \"x\"\n")),
+        ("unknown key", format!("homepage = \"x\"\n{AGENT}")),
+        ("unknown key of a source", format!("{AGENT}\nicon = \"x\"\n")),
+        ("an icon that is a path", format!("icon = \"/usr/share/icons/x.png\"\n{AGENT}")),
+        ("an empty icon", format!("icon = \"\"\n{AGENT}")),
         ("empty name", AGENT.replace("\"Agent\"", "\"\"")),
         ("no packages", AGENT.replace("[\"agent\", \"agent-data\"]", "[]")),
         ("bad apt name", AGENT.replace("\"agent-data\"", "\"Agent Data\"")),
@@ -417,6 +430,9 @@ fn rust_dump(app: &App) -> BTreeSet<String> {
     let mut add = |table: &str, key: &str, value: &str| lines.insert(format!("{table}\t{key}\t{value}"));
     add("", "name", &app.name);
     add("", "summary", &app.summary);
+    if let Some(icon) = &app.icon {
+        add("", "icon", icon);
+    }
     match &app.source {
         Source::Apt { repo, packages } => {
             if let Some(repo) = repo {
