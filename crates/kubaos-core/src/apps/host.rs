@@ -154,6 +154,13 @@ pub trait Host {
     /// When dpkg can't be asked.
     fn installed(&mut self, packages: &[String]) -> Result<BTreeSet<String>, HostError>;
 
+    /// Which of `packages` apt marks installed by hand rather than pulled in for another.
+    ///
+    /// # Errors
+    ///
+    /// When apt can't be asked.
+    fn manual(&mut self, packages: &[String]) -> Result<BTreeSet<String>, HostError>;
+
     /// The version dpkg has of `package`, when it is installed.
     ///
     /// # Errors

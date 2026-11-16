@@ -41,6 +41,8 @@ pub struct State {
     /// Package to the packages it depends on: installing it installs those that aren't there, and
     /// removing one of those removes it.
     pub depends: BTreeMap<String, BTreeSet<String>>,
+    /// Packages apt marks installed by hand, as `apt install` on one makes it.
+    pub manual: BTreeSet<String>,
     /// Operations that fail: `enable:<unit>`, `apt:<package>`, `fetch:<url>`, `groupdel:<group>`.
     pub fail: BTreeSet<String>,
     /// Every change made, in order.
@@ -233,6 +235,15 @@ impl Host for FakeHost {
         Ok(packages
             .iter()
             .filter(|p| state.dpkg.contains_key(*p))
+            .cloned()
+            .collect())
+    }
+
+    fn manual(&mut self, packages: &[String]) -> Result<BTreeSet<String>, HostError> {
+        let state = self.state.borrow();
+        Ok(packages
+            .iter()
+            .filter(|p| state.dpkg.contains_key(*p) && state.manual.contains(*p))
             .cloned()
             .collect())
     }

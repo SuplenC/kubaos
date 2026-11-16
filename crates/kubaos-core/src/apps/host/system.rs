@@ -158,7 +158,7 @@ impl Host for SystemHost {
         // dpkg-query exits 1 when it knows none of them, which is an answer, not a failure.
         let output = self
             .command("dpkg-query")
-            .args(["-W", "-f=${db:Status-Abbrev}\t${Package}\n"])
+            .args(["-W", "-f=${db:Status-Abbrev}\t${Package}\t${Architecture}\n"])
             .args(packages)
             .output()
             .map_err(|source| HostError::Spawn {
@@ -169,7 +169,20 @@ impl Host for SystemHost {
             .lines()
             .filter_map(|line| line.split_once('\t'))
             .filter(|(status, _)| status.starts_with("ii"))
-            .map(|(_, name)| name.split(':').next().unwrap_or(name).to_owned())
+            .filter_map(|(_, rest)| rest.split_once('\t'))
+            .map(|(name, arch)| package_name(name, arch, &self.arch))
+            .collect())
+    }
+
+    fn manual(&mut self, packages: &[String]) -> Result<BTreeSet<String>, HostError> {
+        if packages.is_empty() {
+            return Ok(BTreeSet::new());
+        }
+        let shown = Self::out(self.command("apt-mark").arg("showmanual").args(packages))?;
+        Ok(shown
+            .lines()
+            .map(|line| qualified(line.trim(), &self.arch))
+            .filter(|name| packages.contains(name))
             .collect())
     }
 
@@ -192,7 +205,7 @@ impl Host for SystemHost {
             AptPlan::Deb(deb) => command.args(["install", "--no-install-recommends"]).arg(deb),
             AptPlan::Remove(packages) => command.arg("remove").args(packages),
         };
-        Ok(simulation(&Self::out(&mut command)?))
+        Ok(simulation(&Self::out(&mut command)?, &self.arch))
     }
 
     fn apt_install(&mut self, packages: &[String]) -> Result<(), HostError> {
@@ -353,12 +366,10 @@ impl Host for SystemHost {
 
 /// What `apt-get -s` printed: `Remv <package> [<version>]` for each package it would remove, and
 /// `Inst <package> (<version> …)` for each it would newly install; an upgrade is
-/// `Inst <package> [<old version>] (…)`, of a package that is there already.
-fn simulation(shown: &str) -> AptSimulation {
-    let name = |rest: &str| {
-        let word = rest.split_whitespace().next()?;
-        Some(word.split(':').next().unwrap_or(word).to_owned())
-    };
+/// `Inst <package> [<old version>] (…)`, of a package that is there already. A package of
+/// another architecture than `arch`, the machine's, keeps its `:<arch>`, as it is another package.
+fn simulation(shown: &str, arch: &str) -> AptSimulation {
+    let name = |rest: &str| rest.split_whitespace().next().map(|word| qualified(word, arch));
     let mut simulation = AptSimulation::default();
     for line in shown.lines() {
         if let Some(rest) = line.strip_prefix("Remv ") {
@@ -370,6 +381,24 @@ fn simulation(shown: &str) -> AptSimulation {
         }
     }
     simulation
+}
+
+/// `word`, a package apt named, as the engine names it: `<package>` for one of `arch`, the
+/// machine's, or of every architecture, `<package>:<arch>` for one of another.
+fn qualified(word: &str, arch: &str) -> String {
+    match word.split_once(':') {
+        Some((name, of)) => package_name(name, of, arch),
+        None => word.to_owned(),
+    }
+}
+
+/// Package `name` of architecture `of` as the engine names it, on a machine of `arch`.
+fn package_name(name: &str, of: &str, arch: &str) -> String {
+    if of == arch || of == "all" {
+        name.to_owned()
+    } else {
+        format!("{name}:{of}")
+    }
 }
 
 #[cfg(test)]
