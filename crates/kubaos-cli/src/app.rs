@@ -40,6 +40,7 @@ use kubaos_core::apps::Folder;
 use kubaos_core::apps::Picks;
 use kubaos_core::apps::Status;
 use kubaos_core::apps::folder::FolderError;
+use kubaos_core::apps::folder::WRITTEN_BY_KUBAOS;
 use kubaos_core::apps::journal::Journal;
 use kubaos_core::apps::journal::JournalError;
 use kubaos_core::apps::status::listing;
@@ -350,13 +351,18 @@ fn show(id: &str, json: bool) -> ExitCode {
 /// An app as `kubaos app show` prints it.
 fn show_text(shown: &Showing) -> String {
     let about = &shown.about;
+    let source = if about.description_from == WRITTEN_BY_KUBAOS {
+        "  in KubaOS's words".to_owned()
+    } else {
+        format!("  from {}", about.description_from)
+    };
     let mut out = format!(
         "{} ({}): {}
 {}
-  from {}
+{source}
 
 ",
-        about.name, about.category, about.summary, about.description, about.description_from
+        about.name, about.category, about.summary, about.description
     );
     if shown.steps.is_empty() {
         out.push_str(

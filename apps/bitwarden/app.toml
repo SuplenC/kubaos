@@ -10,13 +10,14 @@ name = "Bitwarden"
 category = "security"
 tags = ["passwords", "password manager", "ssh", "vault"]
 summary = "Your passwords and SSH keys, locked up. Your dog's name was never a password."
-# Its AppStream metainfo, CC0-1.0 (flathub/com.bitwarden.desktop).
+# From its AppStream metainfo, CC0-1.0 (flathub/com.bitwarden.desktop), without the lines that
+# speak as Bitwarden's team.
 description = """\
 Bitwarden is the easiest and safest way to store all of your logins and passwords while \
 conveniently keeping them synced between all of your devices. Bitwarden stores all of your \
 logins in an encrypted vault that syncs across all of your devices. Since it's fully encrypted \
-before it ever leaves your device, only you have access to your data. Not even the team at \
-Bitwarden can read your data, even if we wanted to. Bitwarden is 100% open source software."""
+before it ever leaves your device, only you have access to your data. Bitwarden is 100% open \
+source software."""
 description_from = "https://github.com/flathub/com.bitwarden.desktop/blob/master/com.bitwarden.desktop.metainfo.xml"
 # Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
 # package is installed.

@@ -42,6 +42,15 @@ fn an_app_missing_any_of_what_it_is_is_refused() {
 }
 
 #[test]
+fn a_description_is_copied_from_an_https_url_or_written_by_kubaos() {
+    let ours = parse(&ABOUT.replace("\"https://sketch.example/about\"", "\"kubaos\"")).unwrap();
+    let elsewhere = parse(&ABOUT.replace("\"https://sketch.example/about\"", "\"kuba\""));
+
+    assert!(!ours.description_copied());
+    assert!(matches!(elsewhere, Err(FolderError::InvalidSource(_))), "{elsewhere:?}");
+}
+
+#[test]
 fn a_category_off_the_list_is_refused() {
     let result = parse(&ABOUT.replace("\"graphics\"", "\"drawing\""));
 

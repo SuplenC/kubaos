@@ -29,6 +29,10 @@ use super::action::is_argv;
 pub const APP_FILE: &str = "app.toml";
 
 /// A folder that isn't an app's.
+/// The `description_from` of a description KubaOS wrote, as the app's own words aren't under a
+/// licence that allows copying them.
+pub const WRITTEN_BY_KUBAOS: &str = "kubaos";
+
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum FolderError {
@@ -71,7 +75,7 @@ pub enum FolderError {
     SetupWithout { id: String },
     #[error("{0:?} is not a tag: lowercase words people search by, each once")]
     InvalidTag(String),
-    #[error("{0:?} is not where the description came from: an https:// URL")]
+    #[error("{0:?} is not where the description came from: an https:// URL, or \"kubaos\" for one KubaOS wrote")]
     InvalidSource(String),
     #[error("{0:?} is not an icon name: letters, digits, `-`, `_` and `.`, as the icon theme names them")]
     InvalidIcon(String),
@@ -134,9 +138,10 @@ pub struct Folder {
     pub tags: Vec<String>,
     /// One line of KubaOS's own about it.
     pub summary: String,
-    /// The app's own words about itself, copied from its upstream.
+    /// The app's own words about itself, copied from its upstream, or KubaOS's plain factual
+    /// ones where the upstream's licence doesn't allow copying.
     pub description: String,
-    /// Where `description` came from: an https:// URL.
+    /// Where `description` came from: an https:// URL, or [`WRITTEN_BY_KUBAOS`] for KubaOS's own.
     pub description_from: String,
     pub icon: Option<String>,
     pub ready: Vec<Ready>,
@@ -270,7 +275,7 @@ impl Folder {
         {
             return Err(FolderError::InvalidIcon(icon.clone()));
         }
-        if !super::action::is_https(&self.description_from) {
+        if self.description_from != WRITTEN_BY_KUBAOS && !super::action::is_https(&self.description_from) {
             return Err(FolderError::InvalidSource(self.description_from.clone()));
         }
         if self.setups.len() == 1 {
@@ -381,6 +386,11 @@ impl Folder {
             }
         }
         packages
+    }
+
+    /// Whether the description is the upstream's own words, copied, not KubaOS's.
+    pub fn description_copied(&self) -> bool {
+        self.description_from != WRITTEN_BY_KUBAOS
     }
 
     /// The ready checks of an install or a removal in `setup`.
