@@ -259,15 +259,67 @@ fetch_key() {
   rm -rf "$tmp"
 }
 
-# add_apt_source NAME CONTENT: write /etc/apt/sources.list.d/NAME.sources.
+# Where apt reads its sources; the tests point it at a folder of their own after sourcing this.
+APT_SOURCES_D=/etc/apt/sources.list.d
+
+# add_apt_source NAME CONTENT: write $APT_SOURCES_D/NAME.sources, then turn off every other
+# source of its URIs (disable_other_sources).
 add_apt_source() {
-  local name="$1" dest="/etc/apt/sources.list.d/$1.sources"
+  local name="$1" dest="$APT_SOURCES_D/$1.sources" uri
   if [[ -f "$dest" ]] && [[ "$(<"$dest")" == "$2" ]]; then
     ok "apt source $name configured"
-    return 0
+  else
+    printf '%s\n' "$2" | write_root_file "$dest" 0644
+    APT_DIRTY=1
   fi
-  printf '%s\n' "$2" | write_root_file "$dest" 0644
-  APT_DIRTY=1
+  for uri in $(awk '$1 == "URIs:" { for (i = 2; i <= NF; i++) print $i }' <<<"$2"); do
+    disable_other_sources "$dest" "$uri"
+  done
+}
+
+# disable_other_sources OURS URI: comment out the lines of the other .list files, and turn off
+# with "Enabled: no" the stanzas of the other .sources files, that name URI. A vendor's own
+# instructions or package may have set the repository up already, under another file and key
+# path, and apt refuses one repository with two Signed-By values, failing every apt run. Ours
+# names the key the manifest checks, so it is the one kept. A .sources stanza with more URIs
+# than this one is turned off whole, as deb822 can't turn off one of them.
+disable_other_sources() {
+  local ours="$1" uri="${2%/}" f new
+  for f in "$APT_SOURCES_D"/*.list "$APT_SOURCES_D"/*.sources; do
+    [[ -f $f && $f != "$ours" ]] || continue
+    if [[ $f == *.list ]]; then
+      new="$(awk -v uri="$uri" -v ours="${ours##*/}" '
+        /^[[:space:]]*deb(-src)?[[:space:]]/ {
+          line = $0
+          gsub(/\[[^]]*\]/, "", line)
+          split(line, field)
+          u = field[2]
+          sub(/\/$/, "", u)
+          if (u == uri) { print "# " ours " has this repository: " $0; hit = 1; next }
+        }
+        { print }
+        END { exit !hit }' "$f")" || continue
+    else
+      new="$(awk -v uri="$uri" '
+        function flush(   i, off_now) {
+          off_now = found && !off
+          for (i = 1; i <= n; i++) if (!(off_now && tolower(stanza[i]) ~ /^enabled:/)) print stanza[i]
+          if (off_now) { print "Enabled: no"; hit = 1 }
+          n = 0; found = 0; off = 0
+        }
+        /^[[:space:]]*$/ { flush(); print; next }
+        {
+          stanza[++n] = $0
+          key = tolower($1)
+          if (key == "enabled:" && tolower($2) == "no") off = 1
+          if (key == "uris:") for (i = 2; i <= NF; i++) { u = $i; sub(/\/$/, "", u); if (u == uri) found = 1 }
+        }
+        END { flush(); exit !hit }' "$f")" || continue
+    fi
+    info "$f also has $uri; turning it off there, ${ours##*/} has it"
+    printf '%s\n' "$new" | write_root_file "$f" 0644
+    APT_DIRTY=1
+  done
 }
 
 snapper_ready() {

@@ -46,7 +46,9 @@ fingerprint = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
 keyring = "/usr/share/keyrings/google-chrome.gpg"
 
 # Anthropic's repository of Claude Code, the stable channel, for the app of the
-# catalog (apps/claude-code.toml).
+# catalog (apps/claude-code.toml). Anthropic's own instructions write
+# claude-code.list, signed by claude-code.asc; repo setup turns that line off
+# for this source (disable_other_sources in system/lib.sh).
 [repo.claude-code]
 key_url = "https://downloads.claude.ai/keys/claude-code.asc"
 fingerprint = "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
