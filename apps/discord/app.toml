@@ -1,0 +1,28 @@
+# Discord from nixpkgs, through the User flake. Discord keeps no apt repository; its own .deb
+# carries no published checksum and nags to be replaced by the next one, which nixpkgs' build
+# turns off. nixpkgs builds it for amd64 alone on Linux, and marks it unfree.
+# https://search.nixos.org/packages?show=discord
+name = "Discord"
+category = "communication"
+tags = ["chat", "voice", "video calls", "gaming", "servers", "communities"]
+summary = "Voice, video and chat for your crew. Half the internet's group chats, and all of its memes."
+# From its AppStream metainfo, CC0-1.0 (flathub/com.discordapp.Discord), its first two paragraphs.
+description = """\
+Discord is a free all in one messaging, voice, and video client thats available on your computer \
+and phone. Whether you’re part of a school club, gaming group, worldwide art community, or just a \
+handful of friends that want to spend time together, Discord makes it easy to talk every day and \
+hang out more often."""
+description_from = "https://github.com/flathub/com.discordapp.Discord/blob/master/com.discordapp.Discord.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "discord"
+keeps = """\
+Your sign-in and Discord's settings stay in ~/.config/discord: install Discord again and you're \
+still signed in. Your servers and messages live on Discord's side anyway."""
+
+[[action]]
+name = "Install Discord"
+kind = "nix"
+arch = "amd64"
+unfree = true
+packages = ["discord"]
