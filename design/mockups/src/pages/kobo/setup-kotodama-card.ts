@@ -20,6 +20,7 @@ import { icon } from "../../lib/icon.ts";
 import { type KeyHint, keycap, keyHints, keys } from "../../lib/keycap.ts";
 import { fill, filling, fillingHeight, flow, gap, row, splitColumns, stack } from "../../lib/layout.ts";
 import { commandMenu, type MenuMeasures } from "../../lib/list-detail.ts";
+import { scroll } from "../../lib/scroll.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { RECHECK, type RailPage, type RailStatus } from "../../lib/step-rail.ts";
 import { setStep, stepper } from "../../lib/stepper.ts";
@@ -505,6 +506,12 @@ const EXAMPLES = [
   { typed: "12*7", is: "a sum", icon: "calculate" },
 ] as const;
 
+/**
+ * The room Yours needs for its settings and the menu beside them, each reading whole: the key
+ * cards three across and a menu wide enough for a web row's words.
+ */
+const WIDE_YOURS = 1130;
+
 /** A label over a part of Yours, `subheading`. */
 const heading = (words: string) => text(words, "subheading");
 
@@ -676,14 +683,36 @@ export function kotodamaCard(view: string): KotodamaCard {
   // ---------------------------------------------------------------- Yours --
 
   const yours = (): HTMLElement => {
-    const preview = standIn(prefs, { live: true, query: "3/2", hints: [["↑↓", "Select"], ["Enter", "Run"]] });
-    const show = (words: string) => preview.set(words);
+    // The preview beside the settings is the menu itself, still: it follows the settings, not the
+    // pointer, so its answer row stays the one selected.
+    let asked = "3/2";
+    const preview = standIn(prefs, { live: false, query: asked, hints: [["↑↓", "Select"], ["Enter", "Run"]] });
+    preview.box.inert = true;
+    // Draft part, to be promoted: the compact preview, where the room has no column for the menu:
+    // what is asked and the first Result, on one row.
+    const compact = document.createElement("span");
+    compact.className = "setup-kotodama-compact";
+    const drawCompact = () => {
+      const first = search(asked, prefs, 3)[0];
+      const asks = row("s8", "centre", icon("search", "var(--type-body-icon)", "var(--color-on_surface_variant)"), text(asked, "mono_large"));
+      const answer = first
+        ? row("s12", "centre", icon(first.result.row.icon ?? "search", "var(--type-body-icon)", "var(--color-primary)"), text(first.result.row.title, "body_strong"), text(first.result.kind, "small", "on_surface_variant"))
+        : text("Nothing here. Web search is off, so that's that.", "small", "on_surface_variant");
+      compact.replaceChildren(text("As it will look", "label", "on_surface_variant"), asks, icon("arrow_forward", "var(--type-body-icon)", "var(--color-on_surface_variant)"), answer);
+    };
+    const show = (words: string) => {
+      asked = words;
+      preview.set(words);
+      drawCompact();
+    };
+    drawCompact();
     const cards = OPENS_WITH.map((each) => {
       const card = choiceCard({ title: each.title, subtitle: each.line, picks: "one", picked: prefs.key === each.id });
       card.querySelector(".k-card-header, .k-card-title-line")?.parentElement?.prepend(caps(each.keys));
       return card;
     });
     const keysGroup = choiceGroup("one", 3, cards);
+    keysGroup.classList.add("setup-kotodama-keycards");
     keysGroup.addEventListener("click", () =>
       queueMicrotask(() => {
         const at = cards.findIndex((each) => each.getAttribute("aria-checked") === "true");
@@ -716,19 +745,25 @@ export function kotodamaCard(view: string): KotodamaCard {
     const engine = tabs({ choices: ENGINES.map((label) => ({ label })), picked: prefs.engine, onPick: (at) => ((prefs.engine = at), show("zzz")) });
     const motion = tabs({ choices: [{ label: "Full" }, { label: "Fades" }], picked: prefs.slides ? 0 : 1, onPick: (at) => ((prefs.slides = at === 0), preview.box.animate(prefs.slides ? [{ opacity: 0, translate: "0 calc(-1 * var(--space-s8))" }, { opacity: 1, translate: "0 0" }] : [{ opacity: 0 }, { opacity: 1 }], { duration: ms("medium"), easing: curve("emphasized_decel") })) });
     const mark = tabs({ choices: [{ label: "1.5" }, { label: "1,5" }], picked: prefs.comma ? 1 : 0, onPick: (at) => ((prefs.comma = at === 1), show(prefs.comma ? "3/2*1" : "3/2")) });
+    /** A setting's words and its choice: side by side, the choice going under them when short. */
+    const choiceRow = (words: HTMLElement, choice: HTMLElement) => {
+      const line = row("s12", "centre", words, choice);
+      line.classList.add("setup-kotodama-choice");
+      return line;
+    };
     const web = stack(
       "s12",
       "start",
       heading("When nothing here matches"),
       filling(switchRow("Offer a web search", "Rows at the bottom, never a guess", prefs.web, (on) => ((prefs.web = on), show("zzz")))),
-      filling(row("s12", "centre", filling(text("First with", "body")), engine)),
+      filling(choiceRow(text("First with", "body"), engine)),
     );
     const typing = stack(
       "s12",
       "start",
       heading("Typing and motion"),
       filling(switchRow("Forgive typos", "“fierfox” finds Firefox", prefs.typos, (on) => ((prefs.typos = on), show("fierfox")))),
-      filling(row("s12", "centre", filling(text("Motion", "body")), motion)),
+      filling(choiceRow(text("Motion", "body"), motion)),
     );
     const files = button({ label: "Open in Files", kind: "Text", size: "Sm" });
     const more = collapsible({
@@ -736,27 +771,39 @@ export function kotodamaCard(view: string): KotodamaCard {
       summary: "Decimal mark, aliases, the file",
       open: state.more,
       content: splitColumns([1, 1], "s24", [
-        filling(row("s12", "centre", filling(stack(0, "start", text("Decimal mark", "body"), filling(wrapped("How sums write a half", "small", "on_surface_variant")))), mark)),
+        filling(choiceRow(stack(0, "start", text("Decimal mark", "body"), filling(wrapped("How sums write a half", "small", "on_surface_variant"))), mark)),
         filling(stack("s4", "start", text("Aliases, quicklinks, your own actions", "body"), filling(wrapped("All in one file: user.toml", "small", "on_surface_variant")), files)),
       ]),
     });
+    const section = (title: string, ...content: HTMLElement[]) => stack("s8", "start", heading(title), ...content.map(filling));
+    // One rhythm: a section's title, its controls, then `space.s16` to the next.
     const left = stack(
-      0,
+      "s16",
       "start",
-      heading("Opens with"),
-      gap("s8"),
-      filling(keysGroup),
-      gap("s16"),
-      heading("It finds"),
-      gap("s8"),
-      filling(flow("s8", ...finds)),
-      gap("s16"),
+      filling(section("Opens with", keysGroup)),
+      filling(section("It finds", flow("s8", ...finds))),
       filling(splitColumns([3, 2], "s24", [filling(web), filling(typing)])),
-      gap("s4"),
       filling(more),
+      filling(compact),
     );
+    // Where the room is short, the settings scroll, kept `space.s24` clear of the band as every
+    // Kōbō page's body is (`kobo.css`).
+    const padded = stack(0, "start", filling(left));
+    padded.classList.add("kobo-scrolled");
+    const { box: settingsScroll } = scroll(padded, { height: "100%", below: "s24", noGutter: true, fade: "s24", footFade: true });
+    settingsScroll.classList.add("kobo-scrolls");
     const right = stack("s8", "start", text("As it will look", "label", "on_surface_variant"), fillingHeight(filling(preview.box)));
-    return splitColumns([5, 2], "s24", [filling(left), filling(fillingHeight(right))], { fillHeight: true });
+    right.classList.add("setup-kotodama-preview");
+    // Draft part, to be promoted: the settings beside their preview where both read whole; else the
+    // settings alone, their preview compact under them.
+    const room = document.createElement("span");
+    room.className = "setup-kotodama-yours";
+    room.append(settingsScroll, right);
+    new ResizeObserver(() => {
+      const scale = Number.parseFloat(getComputedStyle(room).getPropertyValue("--scale")) || settings().scale;
+      room.toggleAttribute("data-beside", room.clientWidth / scale >= WIDE_YOURS);
+    }).observe(room);
+    return room;
   };
 
   // --------------------------------------------------------------- Try it --

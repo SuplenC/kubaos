@@ -494,3 +494,62 @@
   translate: -50% -50%;
   text-shadow: 0 0 var(--focus-far) rgb(from var(--color-primary) r g b / var(--focus-near_opacity));
 }
+
+/* Yours (draft): the settings beside their preview where both read whole, else alone with the
+   compact preview under them. */
+.setup-kotodama-yours {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+}
+
+.setup-kotodama-yours[data-beside] {
+  grid-template-columns: minmax(0, 1fr) calc(2 * var(--size-rail) - var(--space-s48));
+  gap: var(--space-s24);
+}
+
+.setup-kotodama-yours:not([data-beside]) > .setup-kotodama-preview,
+.setup-kotodama-yours[data-beside] .setup-kotodama-compact {
+  display: none;
+}
+
+.setup-kotodama-preview {
+  min-height: 0;
+}
+
+/* The compact preview: what is asked and the first Result, on one row. */
+.setup-kotodama-compact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s12);
+  box-sizing: border-box;
+  min-height: var(--size-row);
+  padding: var(--space-s8) var(--space-s16);
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+}
+
+/* Key cards: each title on one line; three across while they fit, fewer under it. */
+.setup-kotodama-keycards {
+  --tracks: repeat(auto-fit, minmax(calc(var(--size-rail) - var(--space-s20)), 1fr));
+}
+
+.setup-kotodama-keycards .k-card-title {
+  white-space: nowrap;
+}
+
+/* A setting's words and its choice: side by side, the choice wrapping under them when short. */
+.setup-kotodama-choice {
+  flex-wrap: wrap;
+  row-gap: var(--space-s8);
+}
+
+.setup-kotodama-choice > :first-child {
+  flex: 1 0 auto;
+}
+
+.setup-kotodama-choice > :last-child {
+  flex: none;
+}
