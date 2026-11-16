@@ -3,16 +3,17 @@
 //!
 //! # Owns
 //!
-//! - [`Folder`], [`FolderSetup`], [`Ready`], [`Category`], [`Requirement`], and what a valid folder
-//!   is: what the app is (its category, tags, summary and description), the apps it requires, and
-//!   an install's list of steps: the install stage's actions, the app's then its setup's, then the
-//!   configure stage's, in the same order.
+//! - [`Folder`], [`FolderSetup`], [`Ready`], [`Category`], [`Requirement`], [`Source`], and what a
+//!   valid folder is: what the app is (its category, tags, summary and description), the apps it
+//!   requires, where its install takes it from, and an install's list of steps: the install stage's
+//!   actions, the app's then its setup's, then the configure stage's, in the same order.
 //!
 //! # Not here
 //!
 //! - One action: `action.rs`. Running an install: `engine.rs`.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -92,7 +93,7 @@ pub enum FolderError {
     ConfigureOutside { id: String, name: String },
 }
 
-/// What kind of app it is, which groups it with others in lists.
+/// What kind of app it is, which groups it with others in lists, in this order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -123,6 +124,56 @@ impl Category {
             Self::Security => "security",
             Self::System => "system",
             Self::Games => "games",
+        }
+    }
+
+    /// Its heading in a list.
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::Browsers => "Browsers",
+            Self::Development => "Development",
+            Self::Ai => "AI",
+            Self::Communication => "Communication",
+            Self::Media => "Media",
+            Self::Graphics => "Graphics",
+            Self::Office => "Office",
+            Self::Security => "Security",
+            Self::System => "System",
+            Self::Games => "Games",
+        }
+    }
+}
+
+/// Where an install takes an app from, in the order the catalog prefers its sources. Exhaustive,
+/// so a new source breaks every list that names them until it says the new one too.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Source {
+    /// A vendor's apt repository, by its name in the package manifest.
+    AptRepo { repo: String },
+    /// Ubuntu's archive.
+    Archive,
+    /// The user's nixpkgs, through the User flake.
+    Nixpkgs,
+    /// A vendor's `.deb`, pinned by its sha256.
+    Deb,
+    /// A vendor's download, an `AppImage` or an archive, pinned by its sha256.
+    Download,
+    /// A website in a window of its own.
+    WebApp,
+}
+
+impl Source {
+    /// The source of `kind`, for the kinds that put the app itself on the machine.
+    fn of(kind: &Kind) -> Option<Self> {
+        match kind {
+            Kind::Apt { repo: Some(repo), .. } => Some(Self::AptRepo { repo: repo.clone() }),
+            Kind::Apt { repo: None, .. } => Some(Self::Archive),
+            Kind::Nix { .. } => Some(Self::Nixpkgs),
+            Kind::Deb { .. } => Some(Self::Deb),
+            Kind::Download { .. } => Some(Self::Download),
+            Kind::WebApp { .. } => Some(Self::WebApp),
+            _ => None,
         }
     }
 }
@@ -503,6 +554,12 @@ impl Folder {
             .iter()
             .chain(setup.into_iter().flat_map(|s| &s.actions))
             .all(|action| action.available(arch))
+    }
+
+    /// Where its installs take it from, in any setup, each once, in the catalog's order of sources.
+    pub fn sources(&self) -> Vec<Source> {
+        let sources: BTreeSet<Source> = self.all_actions().filter_map(|a| Source::of(&a.kind)).collect();
+        sources.into_iter().collect()
     }
 
     /// The dpkg packages its `apt` and `deb` actions install, in any setup.

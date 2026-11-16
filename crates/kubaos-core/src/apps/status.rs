@@ -26,6 +26,8 @@ use super::catalog::Catalog;
 use super::folder::Category;
 use super::folder::Folder;
 use super::folder::FolderSetup;
+use super::folder::Requirement;
+use super::folder::Source;
 use super::journal::Journal;
 use super::journal::JournalError;
 use super::picks::Picks;
@@ -76,6 +78,9 @@ pub struct SetupInfo {
     pub id: String,
     pub name: String,
     pub summary: String,
+    /// The apps it requires besides the app's own, by id.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<String>,
 }
 
 impl From<&FolderSetup> for SetupInfo {
@@ -84,6 +89,7 @@ impl From<&FolderSetup> for SetupInfo {
             id: setup.id.clone(),
             name: setup.name.clone(),
             summary: setup.summary.clone(),
+            requires: setup.requires.iter().map(|r| r.id().to_owned()).collect(),
         }
     }
 }
@@ -255,13 +261,21 @@ pub struct Listed<'a> {
     /// The setups it offers, by id; none for an app with one way only.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub setups: Vec<SetupInfo>,
+    /// The apps it requires in every setup, by id; a setup's own are its [`SetupInfo`]'s.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<&'a str>,
+    /// Where its installs take it from, in the catalog's order of sources.
+    pub sources: Vec<Source>,
+    /// The architectures it installs on, in one setup at least.
+    pub arches: Vec<&'static str>,
 }
 
-/// Every app of `catalog`, by id, and whether it is picked.
+/// Every app of `catalog` by category, in [`Category`]'s order, then by id, and whether it is
+/// picked.
 pub fn listing<'a>(catalog: &'a Catalog, picks: &'a Picks) -> Vec<Listed<'a>> {
-    catalog
-        .apps()
-        .iter()
+    let mut apps: Vec<&Folder> = catalog.apps().iter().collect();
+    apps.sort_by_key(|app| app.category);
+    apps.into_iter()
         .map(|app| Listed {
             id: &app.id,
             name: &app.name,
@@ -271,6 +285,9 @@ pub fn listing<'a>(catalog: &'a Catalog, picks: &'a Picks) -> Vec<Listed<'a>> {
             picked: picks.has(&app.id),
             setup: picks.setup(&app.id),
             setups: app.setups.iter().map(SetupInfo::from).collect(),
+            requires: app.requires.iter().map(Requirement::id).collect(),
+            sources: app.sources(),
+            arches: catalog.arches(app),
         })
         .collect()
 }
