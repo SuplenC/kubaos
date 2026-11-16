@@ -1,6 +1,6 @@
 # 8. The Apps catalog: a few apps KubaOS installs well, from pinned sources
 
-Status: accepted (2026-11-16). Kuba's decisions in #93; the engine is #425, setups #431.
+Status: accepted (2026-11-16). Kuba's decisions in #93; the engine is #425, setups #431. Amended by ADR 0009: an app is a folder of typed actions, journaled, which replaces the source plus hooks and the reading of installed from the machine.
 
 ## Context
 
