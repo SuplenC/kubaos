@@ -430,10 +430,11 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     );
     const failure = state.failed ? [filling(errorBlock({ message: `Fuck. ${state.failed.error}.`, hint: state.failed.hint }))] : [];
     // What skipping costs and Under the hood stand under the count, in the room the apps leave
-    // beside them, not at the foot of a long list of them.
+    // beside them, not at the foot of a long list of them. With nothing picked, the count already
+    // says what skipping gives.
     const later = wrapped(spec.skip, "small", "on_surface_variant");
     later.classList.add("setup-later");
-    const under = [...(state.phase === "choosing" ? [filling(later)] : []), ...(count > 0 ? [filling(hood())] : [])];
+    const under = count > 0 ? [...(state.phase === "choosing" ? [filling(later)] : []), filling(hood())] : [];
     if (under.length > 0) left.append(gap("s16"), stack("s24", "start", ...under));
     const columns = count === 0 ? filling(left) : filling(splitColumns([1, 2], "s40", [left, stack("s16", "start", ...groups.map((each) => filling(each)))]));
     const content = stack("s24", "start", ...failure, columns);
