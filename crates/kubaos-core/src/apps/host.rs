@@ -6,8 +6,8 @@
 //!
 //! # Owns
 //!
-//! - [`Host`], [`HostError`], [`UnitState`], [`AptPlan`] and [`AptSimulation`]. The real machine:
-//!   [`SystemHost`].
+//! - [`Host`], [`HostError`], [`UnitState`], [`AptPlan`], [`AptSimulation`] and [`Downgrade`]. The
+//!   real machine: [`SystemHost`].
 //!
 //! # Not here
 //!
@@ -125,6 +125,14 @@ pub struct AptSimulation {
     pub installs: BTreeSet<String>,
 }
 
+/// Whether an install may move a package dpkg has to a lower version: only to replace another
+/// build of the name, never as apt's default.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Downgrade {
+    Refuse,
+    Allow,
+}
+
 /// A change apt is asked to simulate, to learn what else it would install or remove.
 #[derive(Clone, Copy, Debug)]
 pub enum AptPlan<'a> {
@@ -190,12 +198,13 @@ pub trait Host {
     /// When apt can't simulate it.
     fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError>;
 
-    /// `packages` installed.
+    /// `packages` installed. apt moves a package it has at a higher version than the one it picks
+    /// down only under [`Downgrade::Allow`].
     ///
     /// # Errors
     ///
-    /// When apt fails.
-    fn apt_install(&mut self, packages: &[String]) -> Result<(), HostError>;
+    /// When apt fails, or would move a package down under [`Downgrade::Refuse`].
+    fn apt_install(&mut self, packages: &[String], downgrade: Downgrade) -> Result<(), HostError>;
 
     /// A downloaded `.deb` installed.
     ///

@@ -32,6 +32,7 @@ use super::settings::SettingsError;
 use super::version_matches;
 use crate::apps::host::AptPlan;
 use crate::apps::host::AptSimulation;
+use crate::apps::host::Downgrade;
 use crate::apps::host::Host;
 use crate::apps::host::HostError;
 use crate::apps::host::UnitState;
@@ -499,20 +500,19 @@ pub fn apply(
 ) -> Result<(), PerformError> {
     let owned = |prefix: &str| owned_names(&look.claims, prefix);
     match &action.kind {
-        Kind::Apt { repo, packages, .. } => {
-            if let Some(repo) = repo {
-                host.apt_repo(repo).map_err(PerformError::Host)?;
-            }
-            let missing = owned("package:");
-            if missing.is_empty() {
-                return Ok(());
-            }
-            let simulated = host
-                .apt_simulate(AptPlan::Install(&missing))
-                .map_err(PerformError::Host)?;
-            record_dependencies(simulated, packages, record)?;
-            host.apt_install(&missing).map_err(PerformError::Host)
-        }
+        Kind::Apt {
+            repo,
+            packages,
+            versions,
+            ..
+        } => apply_apt(
+            host,
+            repo.as_deref(),
+            packages,
+            versions.as_deref(),
+            &owned("package:"),
+            record,
+        ),
         Kind::Deb { package, .. } => {
             let download = action.download(host.arch()).ok_or_else(|| PerformError::Unavailable {
                 arch: host.arch().to_owned(),
@@ -595,6 +595,33 @@ pub fn apply(
         Kind::Linger {} => host.set_linger(true).map_err(PerformError::Host),
         Kind::Run { run, .. } => run_recorded(host, action, run)?.map_err(PerformError::Host),
     }
+}
+
+/// An `apt` action's install of `missing`, its packages `look` found not there, from `repo`
+/// when it names one. A package of `missing` that dpkg has is, under `versions`, another build of
+/// the name (Ubuntu's `1:1snap1` firefox), which may sort above the app's own: only then may apt
+/// move it down.
+fn apply_apt(
+    host: &mut dyn Host,
+    repo: Option<&str>,
+    packages: &[String],
+    versions: Option<&str>,
+    missing: &[String],
+    record: &mut dyn FnMut(&[Claim]) -> Result<(), JournalError>,
+) -> Result<(), PerformError> {
+    if let Some(repo) = repo {
+        host.apt_repo(repo).map_err(PerformError::Host)?;
+    }
+    if missing.is_empty() {
+        return Ok(());
+    }
+    let simulated = host
+        .apt_simulate(AptPlan::Install(missing))
+        .map_err(PerformError::Host)?;
+    record_dependencies(simulated, packages, record)?;
+    let replaces = versions.is_some() && !host.installed(missing).map_err(PerformError::Host)?.is_empty();
+    let downgrade = if replaces { Downgrade::Allow } else { Downgrade::Refuse };
+    host.apt_install(missing, downgrade).map_err(PerformError::Host)
 }
 
 /// Refuses a change apt would make by removing other packages; else hands `record` the claims of
