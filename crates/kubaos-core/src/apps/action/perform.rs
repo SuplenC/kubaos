@@ -13,6 +13,7 @@
 //!
 //! - The journal and who owns what: `journal.rs`. The order of a run: `engine.rs`.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
@@ -28,6 +29,7 @@ use super::parse_mode;
 use super::settings;
 use super::settings::Settings;
 use super::settings::SettingsError;
+use super::version_matches;
 use crate::apps::host::AptPlan;
 use crate::apps::host::AptSimulation;
 use crate::apps::host::Host;
@@ -354,7 +356,12 @@ fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look
 pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Result<Look, PerformError> {
     let user = host.user().to_owned();
     match &action.kind {
-        Kind::Apt { packages, arch, .. } => {
+        Kind::Apt {
+            packages,
+            arch,
+            versions,
+            ..
+        } => {
             if let Some(only) = arch
                 && only != host.arch()
             {
@@ -362,8 +369,8 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
                     arch: host.arch().to_owned(),
                 });
             }
-            let installed = host.installed(packages).map_err(PerformError::Host)?;
-            Ok(parts("package", packages, |p| installed.contains(p)))
+            let ours = installed_as(host, packages, versions.as_deref())?;
+            Ok(parts("package", packages, |p| ours.contains(p)))
         }
         Kind::Deb {
             package,
@@ -445,6 +452,27 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             })
         }
     }
+}
+
+/// Which of `packages` dpkg has, at a version of `versions` when it is given: a package of
+/// another version is another build of the name, not the one the action installs.
+fn installed_as(
+    host: &mut dyn Host,
+    packages: &[String],
+    versions: Option<&str>,
+) -> Result<BTreeSet<String>, PerformError> {
+    let mut installed = host.installed(packages).map_err(PerformError::Host)?;
+    if let Some(versions) = versions {
+        let mut other = Vec::new();
+        for package in &installed {
+            let version = host.version(package).map_err(PerformError::Host)?;
+            if !version.is_some_and(|v| version_matches(versions, &v)) {
+                other.push(package.clone());
+            }
+        }
+        installed.retain(|p| !other.contains(p));
+    }
+    Ok(installed)
 }
 
 /// Whether `path` is a file holding `text` with `mode`.

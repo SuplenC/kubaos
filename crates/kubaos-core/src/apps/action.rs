@@ -68,6 +68,8 @@ pub enum ActionError {
     InvalidAttribute { name: String },
     #[error("{name:?} is not a repository name: lowercase letters, digits and dashes")]
     InvalidRepo { name: String },
+    #[error("{value:?} is not a pattern of versions: a version, where `*` stands for any run of characters")]
+    InvalidVersions { value: String },
     #[error("{value:?} is not an architecture dpkg names: amd64 or arm64")]
     InvalidArch { value: String },
     #[error("{value:?} is not a path an action writes: `~/…` in the home, or under /etc/, /opt/ or /usr/local/")]
@@ -166,6 +168,12 @@ pub enum Kind {
         repo: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         arch: Option<String>,
+        /// The versions that are the app's, as a pattern where `*` stands for any run of
+        /// characters: a package dpkg has at another version is another build of that name (a
+        /// distribution's stand-in for a snap), which doesn't count and which the install
+        /// replaces.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        versions: Option<String>,
     },
     /// A vendor's `.deb`, pinned to its sha256 for each architecture.
     Deb {
@@ -612,8 +620,20 @@ impl Action {
             return Err(ActionError::NoName);
         }
         match &self.kind {
-            Kind::Apt { packages, repo, arch } => {
+            Kind::Apt {
+                packages,
+                repo,
+                arch,
+                versions,
+            } => {
                 non_empty("packages", packages)?;
+                if let Some(versions) = versions
+                    && (versions.is_empty() || versions.contains(char::is_whitespace))
+                {
+                    return Err(ActionError::InvalidVersions {
+                        value: versions.clone(),
+                    });
+                }
                 if let Some(name) = packages.iter().find(|p| !is_package_name(p)) {
                     return Err(ActionError::InvalidPackage { name: name.clone() });
                 }
@@ -792,6 +812,27 @@ fn non_empty(key: &'static str, values: &[String]) -> Result<(), ActionError> {
     } else {
         Ok(())
     }
+}
+
+/// Whether `version` is one of `pattern`'s, where `*` stands for any run of characters and every
+/// other character for itself.
+pub fn version_matches(pattern: &str, version: &str) -> bool {
+    let mut parts = pattern.split('*');
+    let first = parts.next().unwrap_or_default();
+    let Some(mut rest) = version.strip_prefix(first) else {
+        return false;
+    };
+    let mut parts: Vec<&str> = parts.collect();
+    let Some(last) = parts.pop() else {
+        return rest.is_empty();
+    };
+    for part in parts {
+        let Some(at) = rest.find(part) else {
+            return false;
+        };
+        rest = &rest[at + part.len()..];
+    }
+    rest.len() >= last.len() && rest.ends_with(last)
 }
 
 fn check_arch(arch: &str) -> Result<(), ActionError> {
