@@ -233,7 +233,8 @@ function large(options: ChoiceCardOptions, picks: Picks): HTMLElement[] {
   const lines = options.foot.map((line) => row("s8", "centre", icon(line.glyph, "var(--type-small-icon)", "var(--foot-ink)"), text(line.label, "small", "on_surface_variant")));
   const foot = stack("s8", "start", ...lines);
   foot.classList.add("k-choice-foot");
-  return [filling(lead), filling(named), filling(foot)];
+  // The foot stands at the card's bottom: the room between is the layout's fill, which a check reads.
+  return [filling(lead), filling(named), fill(), filling(foot)];
 }
 
 /** A key's step through a set of `columns` across: back or on by one, or by a row. */

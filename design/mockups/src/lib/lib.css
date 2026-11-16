@@ -863,9 +863,8 @@
   height: 100%;
 }
 
-.k-choice-foot {
-  margin-top: auto;
-  padding-top: var(--space-s16);
+.k-choice-card[data-size="Lg"] > .k-card-content > .k-fill {
+  flex: 1 1 0;
 }
 
 .k-choice-card .k-card-title-line > :not(.k-choice-mark),
