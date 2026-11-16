@@ -764,6 +764,10 @@ c_lua() {
   # launch's rule, when it is on, and the windows it places.
   as_user lua5.5 "$REPO/test/lua/launches_test.lua" "$REPO" ||
     { echo "FAIL test/lua/launches_test.lua"; bad=1; }
+  # The browser binds (config/hypr/keybinds.lua): Chrome when it is
+  # installed, else a notification saying how to install it.
+  as_user lua5.5 "$REPO/test/lua/keybinds_test.lua" "$REPO" ||
+    { echo "FAIL test/lua/keybinds_test.lua"; bad=1; }
   return "$bad"
 }
 

@@ -22,7 +22,16 @@ end
 local locked = { locked = true }
 local locked_repeat = { locked = true, repeating = true }
 
-local browser = "google-chrome-stable"
+-- Chrome, or a notification saying how to install it: it's an Apps catalog
+-- app, not part of the base. `command -v` is the shell's builtin, so a bind
+-- with Chrome installed starts no process beyond it.
+local function browser(args)
+  local cmd = "google-chrome-stable" .. (args and " " .. args or "")
+  return "command -v google-chrome-stable >/dev/null && exec " .. cmd
+    .. " || exec notify-send -a 'Browser' -i web-browser 'Google Chrome isn'\\''t installed'"
+    .. " 'Install it from the Command menu (Install Google Chrome) or with kubaos app add google-chrome.'"
+end
+
 -- A window of Ghostty's background instance running cmd (home/terminal.nix),
 -- or a Ghostty of its own when the instance can't be reached. $HOME, as in
 -- fallback.lua's SUPER + Return.
@@ -34,9 +43,9 @@ end
 -- Applications
 ---------------------------------------------------------------------------
 
-bind("SUPER + SHIFT + Return", "Browser", browser)
-bind("SUPER + SHIFT + B", "Browser", browser)
-bind("SUPER + SHIFT + ALT + B", "Browser (incognito)", browser .. " --incognito")
+bind("SUPER + SHIFT + Return", "Browser", browser())
+bind("SUPER + SHIFT + B", "Browser", browser())
+bind("SUPER + SHIFT + ALT + B", "Browser (incognito)", browser("--incognito"))
 bind("SUPER + SHIFT + F", "File manager (Files)", "nautilus --new-window")
 bind("SUPER + CTRL + F", "File manager (yazi)", "kubaos-files open")
 bind("SUPER + SHIFT + N", "Editor (nvim)", tui("nvim"))
