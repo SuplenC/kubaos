@@ -3,13 +3,14 @@
 //!
 //! # Owns
 //!
-//! - [`Catalog`]: loading the folder, finding an app, and checking each app's vendor repository
-//!   against the package manifest.
+//! - [`Catalog`]: loading the folder, finding an app, the packages its apps install, and checking
+//!   each app's vendor repository against the package manifest.
 //!
 //! # Not here
 //!
 //! - One manifest's format: `manifest.rs`.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -121,5 +122,27 @@ impl Catalog {
     /// The app `id`.
     pub fn get(&self, id: &str) -> Option<&App> {
         self.apps.iter().find(|a| a.id == id)
+    }
+
+    /// The dpkg packages its apt and `.deb` apps install: the catalog's, which the package
+    /// manifest leaves alone.
+    pub fn packages(&self) -> BTreeSet<String> {
+        self.apps
+            .iter()
+            .flat_map(|app| match &app.source {
+                Source::Apt { packages, .. } => packages.clone(),
+                Source::Deb(deb) => vec![deb.package.clone()],
+                Source::Nix { .. } => Vec::new(),
+            })
+            .collect()
+    }
+
+    /// The apps that install any of `packages`, in id order.
+    pub fn installing<'a>(&'a self, packages: &'a [String]) -> impl Iterator<Item = &'a App> {
+        self.apps.iter().filter(|app| match &app.source {
+            Source::Apt { packages: own, .. } => own.iter().any(|p| packages.contains(p)),
+            Source::Deb(deb) => packages.contains(&deb.package),
+            Source::Nix { .. } => false,
+        })
     }
 }

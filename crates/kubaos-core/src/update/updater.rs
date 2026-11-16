@@ -202,6 +202,9 @@ pub enum UpdateError {
     /// The group isn't one the user may turn on or off.
     #[error("{name} is part of KubaOS: it can't be turned on or off")]
     NotOptional { name: String },
+    /// The group's packages are apps of the catalog, which `kubaos app` adds and removes.
+    #[error("the {name} group's packages come from the Apps catalog: kubaos app {verb} {ids}")]
+    InCatalog { name: String, verb: &'static str, ids: String },
     /// The release's Apps catalog can't be read.
     #[error("reading the Apps catalog")]
     Catalog(#[source] CatalogError),

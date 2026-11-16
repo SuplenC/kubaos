@@ -467,3 +467,52 @@ fn a_packages_only_preview_lists_the_installed_releases_manifest() {
         "jq is in the next release, not this one"
     );
 }
+
+/// The Apps catalog's Docker, whose packages the manifest's docker group lists.
+const DOCKER_APP: &str = r#"
+name = "Docker"
+summary = "Containers"
+
+[apt]
+repo = "docker"
+packages = ["docker-ce"]
+"#;
+
+#[test]
+fn an_update_leaves_the_packages_of_a_catalog_app_to_the_catalog() {
+    let w = World::new(Channel::Edge, true);
+    let without_docker = manifest(&["curl"]).replace("[group.docker]", "[group.gone]").replace(
+        "packages = [\"docker-ce\"]",
+        "packages = [\"x-gone\"]",
+    );
+    w.push(&[(MANIFEST, &without_docker), ("apps/docker.toml", DOCKER_APP)], true);
+    put(&w.sys.apt_record(), "docker-ce\tdocker\ncurl\ttools\n");
+    let mut m = fake(&["curl", "docker-ce", "libpam-u2f", "x-gone"]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert!(ran(&m, "sudo apt-get remove").is_empty(), "{:?}", m.ran);
+    assert!(m.dpkg.as_ref().unwrap().installed.contains_key("docker-ce"));
+    assert!(summary(&events).apt.is_empty());
+}
+
+#[test]
+fn a_group_of_the_catalogs_packages_points_to_kubaos_app() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[(MANIFEST, &manifest(&["curl"])), ("apps/docker.toml", DOCKER_APP)], true);
+    w.updater(&mut fake(&["curl", "libpam-u2f"])).update(yes()).unwrap();
+
+    let on = w.updater(&mut fake(&[])).set_group("docker", Switch::On).unwrap_err();
+    let off = w.updater(&mut fake(&["docker-ce"])).set_group("docker", Switch::Off).unwrap_err();
+
+    assert_eq!(
+        on.to_string(),
+        "the docker group's packages come from the Apps catalog: kubaos app add docker"
+    );
+    assert_eq!(
+        off.to_string(),
+        "the docker group's packages come from the Apps catalog: kubaos app remove docker"
+    );
+    assert_eq!(fs::read_to_string(w.sys.apt_choices()).unwrap_or_default(), "");
+}
