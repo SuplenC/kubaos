@@ -17,6 +17,7 @@
 #   record_drop PKG...          take packages out of the record, which hands
 #                               them to whatever owns them now
 #   repo_setup REPO...          the vendor repo's key and sources file
+#   repo_refresh REPO...        the same, where a repo that fails is a warning
 #
 # Install and record go through lib.sh's run and sudo_run, so --dry-run
 # changes nothing. A group that isn't wanted is skipped with a line saying why.
@@ -129,16 +130,45 @@ choice_set() {
 }
 
 repo_setup() {
-  local repo sources
-  for repo in "$@"; do
-    sources="$MANIFEST_SYSTEM_DIR/files/apt/sources.list.d/$repo.sources"
-    [[ -f "$sources" ]] || die "no $sources for repo $repo"
-    [[ -d /etc/apt/keyrings ]] || sudo_run install -d -m 0755 /etc/apt/keyrings
-    fetch_key "$(manifest_value "repo.$repo" key_url)" "$(manifest_value "repo.$repo" keyring)" \
-      "$(manifest_value "repo.$repo" fingerprint)"
-    add_apt_source "$repo" "$(render_template "$sources" "ARCH=$(arch)")"
-  done
+  local repo
+  for repo in "$@"; do repo_files "$repo"; done
   apt_update_if_dirty
+}
+
+# repo_files REPO: the repo's key, its next key when the manifest pins one, and its sources file,
+# without refreshing apt's lists.
+repo_files() {
+  local repo="$1" sources next
+  sources="$MANIFEST_SYSTEM_DIR/files/apt/sources.list.d/$repo.sources"
+  [[ -f "$sources" ]] || die "no $sources for repo $repo"
+  [[ -d /etc/apt/keyrings ]] || sudo_run install -d -m 0755 /etc/apt/keyrings
+  fetch_key "$(manifest_value "repo.$repo" key_url)" "$(manifest_value "repo.$repo" keyring)" \
+    "$(manifest_value "repo.$repo" fingerprint)"
+  next="$(manifest_value "repo.$repo" next_fingerprint)"
+  if [[ -n "$next" ]]; then
+    fetch_key "$(manifest_value "repo.$repo" next_key_url)" "$(manifest_value "repo.$repo" next_keyring)" "$next"
+  fi
+  add_apt_source "$repo" "$(render_template "$sources" "ARCH=$(arch)")"
+}
+
+# repo_refresh REPO...: repo_files for each repo, each in a shell of its own, so one that fails
+# (a key server that doesn't answer, a key that isn't the pinned one) is a warning and the rest
+# are still set up; then one apt update, when a sources file changed, whose failure is a warning
+# too. For `kubaos update`'s migrations, which a vendor's repository must never stop.
+repo_refresh() {
+  local repo dirty=0 out
+  for repo in "$@"; do
+    # shellcheck disable=SC2016 # The child expands its own arguments.
+    if out="$(bash -euo pipefail -c 'source "$1/lib.sh"; DRY_RUN=$2; repo_files "$3" >&2; echo "$APT_DIRTY"' \
+      _ "$MANIFEST_SYSTEM_DIR" "$DRY_RUN" "$repo")"; then
+      [[ "$out" != 1 ]] || dirty=1
+    else
+      warn "apt repository $repo not refreshed; its source stays as it was"
+    fi
+  done
+  if ((dirty)) && ! sudo_run apt-get update; then
+    warn "apt update failed; the next one reads the changed sources"
+  fi
 }
 
 # record_installed GROUP PKG...: add the packages that are installed now to

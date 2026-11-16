@@ -22,7 +22,7 @@ apt/apt.conf.d/99kubaos-no-periodic                     retire_ubuntu_updaters
 apt/preferences.d/no-snapd                              system/10-strip.sh
 # kubaos update sets up a vendor repo only for a group with packages to
 # install, so a changed sources file still needs a migration.
-apt/sources.list.d/*.sources                            repo_setup
+apt/sources.list.d/*.sources                            repo_files
 
 fonts/Geist-Regular.ttf                                 install_plymouth_theme install_grub_theme
 fonts/GeistMono-Regular.ttf                             install_plymouth_theme install_grub_theme

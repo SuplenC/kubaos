@@ -259,8 +259,8 @@ fetch_key() {
   rm -rf "$tmp"
 }
 
-# Where apt reads its sources; the tests point it at a folder of their own after sourcing this.
-APT_SOURCES_D=/etc/apt/sources.list.d
+# Where apt reads its sources; the tests point it at a folder of their own.
+APT_SOURCES_D="${APT_SOURCES_D:-/etc/apt/sources.list.d}"
 
 # add_apt_source NAME CONTENT: write $APT_SOURCES_D/NAME.sources, then turn off every other
 # source of its URIs (disable_other_sources).
