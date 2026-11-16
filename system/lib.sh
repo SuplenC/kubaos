@@ -449,6 +449,15 @@ install_proxy_helper() {
   install_root_file "$FILES_DIR/polkit/50-kubaos-proxy.rules" /etc/polkit-1/rules.d/50-kubaos-proxy.rules 0644
 }
 
+# install_apps_helper: the Apps catalog's root helper (`kubaos app add|remove`,
+# kubaos update), which installs and removes only apps of the root-owned
+# catalog, and the polkit action pkexec runs it under, which asks once a run.
+# 20-base.sh runs it, and a migration on machines installed before it.
+install_apps_helper() {
+  install_root_file "$FILES_DIR/apps/kubaos-apps" /usr/local/libexec/kubaos-apps 0755
+  install_root_file "$FILES_DIR/polkit/org.kubaos.apps.policy" /usr/share/polkit-1/actions/org.kubaos.apps.policy 0644
+}
+
 # install_scx: the CPU scheduler the power stops can run (crates/kubaos-power,
 # `scheduler = "lavd"` in power.toml). scx_lavd from KUBAOS_DIR's curated set
 # (`.#scx-lavd`, home/curated.nix), pinned with SCX_GCROOT and linked where

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!--
+  The Apps catalog's root half: what `pkexec` asks before it runs
+  /usr/local/libexec/kubaos-apps (system/files/apps/) for `kubaos app add`
+  and `kubaos app remove`. One run installs or removes every app it was
+  given, so it asks once a run; pam_u2f answers it with the security key
+  where it is set up. The helper takes only app ids of the root-owned
+  catalog, never a package, URL or path. auth_admin_keep: a second run
+  within a few minutes asks no more.
+
+  Installed in /usr/share/polkit-1/actions/ by install_apps_helper
+  (system/lib.sh).
+-->
+<policyconfig>
+  <vendor>KubaOS</vendor>
+  <action id="org.kubaos.apps">
+    <description>Install or remove apps of KubaOS's catalog</description>
+    <message>Authentication is required to install or remove apps.</message>
+    <icon_name>system-software-install</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/libexec/kubaos-apps</annotate>
+  </action>
+</policyconfig>

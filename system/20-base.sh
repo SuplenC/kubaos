@@ -111,6 +111,10 @@ step "Proxy: the work network's root helper (polkit, pkexec)"
 install_proxy_helper
 
 # --------------------------------------------------------------------------
+step "Apps: the catalog's root helper (polkit, pkexec)"
+install_apps_helper
+
+# --------------------------------------------------------------------------
 step "Audio: PipeWire user services (global enable for all users)"
 if command -v systemctl >/dev/null; then
   for unit in pipewire.socket pipewire-pulse.socket wireplumber.service; do

@@ -24,6 +24,8 @@ apt/preferences.d/no-snapd                              system/10-strip.sh
 # install, so a changed sources file still needs a migration.
 apt/sources.list.d/*.sources                            repo_setup
 
+apps/kubaos-apps                                        install_apps_helper
+
 chrome/dot-chrome-theme                                 system/40-apps.sh
 chrome/dot-chrome-theme.path.in                         system/40-apps.sh
 chrome/dot-chrome-theme.service.in                      system/40-apps.sh
@@ -60,6 +62,7 @@ pam.d/qs-lock-u2f                                       system/70-bitwarden.sh
 plymouth/conf/plymouthd.conf                            install_plymouth_theme
 plymouth/kubaos/*                                       install_plymouth_theme
 
+polkit/org.kubaos.apps.policy                           install_apps_helper
 polkit/50-kubaos-keyboard.rules                         install_keyboard_writer
 polkit/org.kubaos.keyboard.policy                       install_keyboard_writer
 polkit/50-kubaos-keyd.rules                             install_mac_accents
