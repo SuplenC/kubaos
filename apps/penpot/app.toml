@@ -1,0 +1,87 @@
+# Penpot, the open-source design tool, two ways: penpot.app in a window of its own, or Penpot's own
+# Docker Compose stack on this machine, opened in the same kind of window at its local address.
+# https://penpot.app/
+# https://help.penpot.app/technical-guide/getting-started/docker/
+name = "Penpot"
+category = "graphics"
+tags = ["design", "prototyping", "ui", "mockups", "vector graphics", "figma"]
+summary = "Design and prototyping, open source. Figma without the rent or the fucking seat count."
+# The opening of Penpot's README, MPL-2.0 (github.com/penpot/penpot).
+description = """\
+Penpot is the open-source design platform for teams that build digital products at scale. \
+Built on open source and designed for self-hosting, it puts teams in complete control of their \
+design environment. Whether used in the browser or deployed on your own servers, Penpot works \
+with open standards like SVG, CSS, HTML, and JSON. Real-time collaboration strengthens this \
+foundation, and developers feel at home using Penpot, because design is expressed as code, \
+enabling a direct translation and shipping products faster."""
+description_from = "https://github.com/penpot/penpot/blob/2.19.2/README.md"
+
+[setup.web]
+name = "Penpot"
+summary = "penpot.app in a window of its own"
+requires = ["google-chrome"]
+
+[[setup.web.action]]
+name = "Put Penpot in a window of its own"
+kind = "web_app"
+id = "penpot"
+title = "Penpot"
+url = "https://design.penpot.app/"
+icon = "penpot.svg"
+
+[setup.local]
+name = "Penpot on this machine"
+summary = "Penpot's own stack in Docker; your designs stay on your disk"
+requires = ["docker", "google-chrome"]
+keeps = """\
+Your designs stay in Docker's volumes penpot_penpot_postgres_v15 and penpot_penpot_assets: \
+install Penpot on this machine again and they're back."""
+
+# Root's, as compose runs as root: what it starts is root's to say, whoever could edit it.
+[[setup.local.action]]
+name = "Put Penpot's stack in place"
+kind = "file"
+to = "/etc/kubaos/penpot/docker-compose.yaml"
+from = "docker-compose.yaml"
+mode = "644"
+
+# As root, not as the user: the user joins the docker group in Docker's install, and a session
+# gets its groups at login, so a user's `docker compose` here would be refused until the next
+# one. Root needs no group, and compose talks to the daemon the same for either.
+[[setup.local.action]]
+name = "Start Penpot's containers"
+kind = "run"
+root = true
+do = ["./up"]
+check = ["./up-to-date"]
+undo = ["./down"]
+
+[[setup.local.action]]
+name = "Put the socket that starts Penpot in place"
+kind = "file"
+to = "/etc/systemd/system/kubaos-penpot.socket"
+from = "kubaos-penpot.socket"
+
+[[setup.local.action]]
+name = "Put the service that starts Penpot in place"
+kind = "file"
+to = "/etc/systemd/system/kubaos-penpot.service"
+from = "kubaos-penpot.service"
+
+# Docker starts on its first use, so after a reboot nothing runs Penpot's containers until
+# something asks: this socket is that first use, as the window opens.
+[[setup.local.action]]
+name = "Start Penpot when its window opens"
+kind = "unit"
+unit = "kubaos-penpot.socket"
+scope = "system"
+enable = true
+start = true
+
+[[setup.local.action]]
+name = "Put Penpot in a window of its own"
+kind = "web_app"
+id = "penpot-local"
+title = "Penpot"
+url = "http://localhost:9001/"
+icon = "penpot.svg"

@@ -496,7 +496,8 @@ impl Folder {
         self.actions.iter().chain(self.setups.iter().flat_map(|s| &s.actions))
     }
 
-    /// Whether every step of an install in `setup` has something for a machine of `arch`.
+    /// Whether every step of its own install in `setup` has something for a machine of `arch`; the
+    /// apps it requires are the catalog's to say ([`super::Catalog::available`]).
     pub fn available(&self, arch: &str, setup: Option<&FolderSetup>) -> bool {
         self.actions
             .iter()

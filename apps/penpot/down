@@ -1,0 +1,13 @@
+#!/bin/sh
+# Takes Penpot's stack down: its containers and network go, and its images, but its volumes, the
+# designs, stay. An image another container still uses stays too: it's that container's.
+# Usage: ./down
+set -eu
+dir=/etc/kubaos/penpot
+compose() { docker compose --project-name penpot --file "$dir/docker-compose.yaml" "$@"; }
+images=$(compose config --images)
+compose down --remove-orphans
+for image in $images; do
+	docker image rm "$image" >/dev/null 2>&1 || true
+done
+rm -f "$dir/secret.env"

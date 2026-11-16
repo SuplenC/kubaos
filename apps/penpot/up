@@ -1,0 +1,14 @@
+#!/bin/sh
+# Brings Penpot's stack up, pulling its pinned images, and waits until it is healthy. The secret
+# its sessions are signed with is made once, for this machine, readable by root alone, as compose
+# reads it as root.
+# Usage: ./up
+set -eu
+dir=/etc/kubaos/penpot
+if [ ! -s "$dir/secret.env" ]; then
+	umask 077
+	key=$(head -c 64 /dev/urandom | base64 -w0 | tr '+/' '-_' | tr -d '=')
+	printf 'PENPOT_SECRET_KEY=%s\n' "$key" >"$dir/secret.env.new"
+	mv "$dir/secret.env.new" "$dir/secret.env"
+fi
+exec docker compose --project-name penpot --file "$dir/docker-compose.yaml" up --detach --wait --quiet-pull

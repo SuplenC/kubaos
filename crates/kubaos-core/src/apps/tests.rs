@@ -272,7 +272,17 @@ fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
 
     catalog.check_repos(&manifest).unwrap();
     let ids: Vec<&str> = catalog.apps().iter().map(|a| a.id.as_str()).collect();
-    assert_eq!(ids, ["bitwarden", "claude-code", "docker", "google-chrome", "t3-code"]);
+    assert_eq!(
+        ids,
+        [
+            "bitwarden",
+            "claude-code",
+            "docker",
+            "google-chrome",
+            "penpot",
+            "t3-code"
+        ]
+    );
     for app in catalog.apps() {
         for action in app.all_actions() {
             if let Kind::Apt { repo: Some(repo), .. } = &action.kind {
@@ -373,4 +383,79 @@ fn every_shipped_app_says_what_it_is_in_kubaos_voice_and_upstreams() {
             app.summary
         );
     }
+}
+
+#[test]
+fn penpot_opens_in_a_window_and_requires_chrome_and_docker_for_its_local_stack() {
+    let catalog = shipped();
+    let penpot = catalog.get("penpot").unwrap();
+
+    let required = |setup: &str| -> Vec<&str> {
+        penpot
+            .requires(penpot.setup(setup))
+            .map(super::folder::Requirement::id)
+            .collect()
+    };
+    assert_eq!(required("web"), ["google-chrome"]);
+    assert_eq!(required("local"), ["docker", "google-chrome"]);
+    let local = penpot.setup("local").unwrap();
+    assert!(
+        local
+            .keeps
+            .as_deref()
+            .is_some_and(|k| k.contains("penpot_penpot_postgres_v15"))
+    );
+    let compose_run = local
+        .actions
+        .iter()
+        .find_map(|a| match &a.kind {
+            Kind::Run { run, root, undo, .. } => Some((run.clone(), *root, undo.clone())),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(compose_run, (vec!["./up".to_owned()], true, vec!["./down".to_owned()]));
+    for arch in ["amd64", "arm64"] {
+        assert_eq!(
+            catalog.available(penpot, penpot.setup("web"), arch),
+            arch == "amd64",
+            "{arch}: Chrome is built for amd64 alone"
+        );
+    }
+}
+
+#[test]
+fn penpots_stack_is_pinned_by_digest_bound_to_this_machine_and_keeps_its_volumes() {
+    let folder = repo_root().join("apps/penpot");
+    let compose = fs::read_to_string(folder.join("docker-compose.yaml")).unwrap();
+    let down = fs::read_to_string(folder.join("down")).unwrap();
+
+    let images: Vec<&str> = compose
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("image: "))
+        .collect();
+    assert_eq!(images.len(), 8, "{images:?}");
+    for image in images {
+        let digest = image.trim_matches('"').split_once("@sha256:").map(|(_, d)| d);
+        assert!(
+            digest.is_some_and(|d| d.len() == 64 && d.chars().all(|c| c.is_ascii_hexdigit())),
+            "{image} isn't pinned by its digest"
+        );
+    }
+    let mut in_ports = false;
+    for line in compose.lines() {
+        let item = line.trim();
+        if item.ends_with(':') {
+            in_ports = item == "ports:";
+        } else if in_ports && let Some(port) = item.strip_prefix("- ") {
+            assert!(port.starts_with("127.0.0.1:"), "{port} reaches past this machine");
+        }
+    }
+    assert!(
+        compose.contains("- 127.0.0.1:9002:8080"),
+        "the socket's service passes 9001 on to 9002"
+    );
+    assert!(compose.contains("PENPOT_PUBLIC_URI: http://localhost:9001"));
+    assert!(compose.contains("PENPOT_TELEMETRY_ENABLED: \"false\""));
+    assert!(down.contains("compose down --remove-orphans\n"), "{down}");
+    assert!(!down.contains("--volumes") && !down.contains(" -v"), "{down}");
 }

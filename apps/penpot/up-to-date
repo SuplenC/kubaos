@@ -1,0 +1,12 @@
+#!/bin/sh
+# Exits 0 when Penpot's containers exist, each from the image the stack pins: a release that
+# pins new images fails it, so the next run brings them up. Running or not doesn't matter: after
+# a reboot they wait for the socket.
+# Usage: ./up-to-date
+set -eu
+dir=/etc/kubaos/penpot
+compose() { docker compose --project-name penpot --file "$dir/docker-compose.yaml" "$@"; }
+[ -s "$dir/secret.env" ]
+want=$(compose config --images | sort)
+have=$(compose ps --all --format '{{.Image}}' | sort)
+[ -n "$have" ] && [ "$want" = "$have" ]

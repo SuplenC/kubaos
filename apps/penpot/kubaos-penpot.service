@@ -1,0 +1,14 @@
+# KubaOS: Penpot's app (apps/penpot) installs it with Penpot on this machine. Started by
+# kubaos-penpot.socket: brings Penpot's containers up (and Docker, through docker.socket),
+# waits for them, then passes the window's connections on to Penpot's frontend, which the stack
+# publishes on 127.0.0.1:9002 alone.
+[Unit]
+Description=Penpot on this machine
+Requires=kubaos-penpot.socket docker.socket
+After=kubaos-penpot.socket docker.socket
+
+[Service]
+ExecStartPre=/usr/bin/docker compose --project-name penpot --file /etc/kubaos/penpot/docker-compose.yaml up --detach --wait --quiet-pull
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:9002
+TimeoutStartSec=5min
+PrivateTmp=yes

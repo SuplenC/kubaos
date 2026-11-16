@@ -21,6 +21,7 @@ use super::action::Kind;
 use super::folder::APP_FILE;
 use super::folder::Folder;
 use super::folder::FolderError;
+use super::folder::FolderSetup;
 use super::folder::is_app_id;
 use crate::apt::Manifest;
 
@@ -189,6 +190,16 @@ impl Catalog {
         self.apps
             .iter()
             .filter(|app| app.packages().iter().any(|p| packages.iter().any(|q| q == p)))
+    }
+
+    /// Whether an install of `app` in `setup` has something for a machine of `arch`: every step
+    /// of its own, and of every app it requires, through what those require.
+    pub fn available(&self, app: &Folder, setup: Option<&FolderSetup>, arch: &str) -> bool {
+        app.available(arch, setup)
+            && app.requires(setup).all(|r| {
+                self.get(r.id())
+                    .is_some_and(|required| self.available(required, None, arch))
+            })
     }
 
     /// The apps that require `id` in any of their setups, in id order.
