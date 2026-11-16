@@ -1,7 +1,8 @@
 //! Google Chrome, Docker and Bitwarden desktop leaving the base for the Apps catalog, on a machine
 //! that had them: the release's migrations `apps-catalog-handover` and `base-apps-setup` (system)
-//! and `base-apps-picked` (user), run by bash against a copy of the release's scripts, manifest
-//! and catalog, with sudo, dpkg and dpkg-query stand-ins over a list of installed packages, and
+//! and `base-apps-picked` (user), run by bash in a sandbox (`kubaos_core::sandbox`) against a copy
+//! of the release's scripts, manifest and catalog, with sudo, dpkg and dpkg-query stand-ins over a
+//! list of installed packages, and
 //! the removal of what an older base install left standing in as lines in a log. Then the package
 //! manifest's plan of the next update reads the machine they left. Taking the apps in, the user
 //! migration apps-adopt, is `kubaos app adopt`, which the updater's tests cover. Last, the Apps
@@ -10,7 +11,6 @@
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::fs;
-use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -22,6 +22,7 @@ use kubaos_core::apt::Dpkg;
 use kubaos_core::apt::Manifest;
 use kubaos_core::apt::Record;
 use kubaos_core::apt::plan;
+use kubaos_core::sandbox::Sandbox;
 use tempfile::TempDir;
 
 /// Docker's packages, as the release's docker group and app list them.
@@ -33,13 +34,14 @@ const DOCKER: [&str; 5] = [
     "docker-compose-plugin",
 ];
 
-fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+/// The user running the tests, by name.
+fn me() -> String {
+    let out = Command::new("id").arg("-un").output().expect("id").stdout;
+    String::from_utf8(out).expect("a name").trim().to_owned()
 }
 
-fn executable(path: &Path, body: &str) {
-    fs::write(path, format!("#!/usr/bin/env bash\n{body}\n")).expect("write a stand-in");
-    fs::set_permissions(path, fs::Permissions::from_mode(0o755)).expect("make it run");
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
 /// The migration of `kind` whose name ends in `-<slug>.sh`.
@@ -59,27 +61,30 @@ const HOOKS: [&str; 2] = ["remove_chrome_theme", "remove_bitwarden_autostart"];
 struct Machine {
     dir: TempDir,
     installed: Vec<String>,
+    sandbox: Sandbox,
 }
 
 impl Machine {
     /// A machine with `installed`, the record listing `recorded` under `group`, and `choices`.
     fn new(installed: &[&str], recorded: &[(&str, &str)], choices: &str) -> Self {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let home = dir.path().join("home");
+        fs::create_dir_all(&home).expect("make the home");
+        let sandbox = Sandbox::new(&dir.path().join("sandbox"), &home, me());
         let m = Self {
-            dir: tempfile::tempdir().expect("a temp dir"),
+            dir,
             installed: installed.iter().map(|p| (*p).to_owned()).collect(),
+            sandbox,
         };
-        let bin = m.path("bin");
-        fs::create_dir_all(&bin).expect("make bin");
-        fs::create_dir_all(m.path("home")).expect("make the home");
         let mut packages = String::new();
         for p in installed {
             let _ = writeln!(packages, "{p}");
         }
         fs::write(m.path("installed"), packages).expect("write the installed packages");
-        executable(&bin.join("sudo"), "exec \"$@\"");
-        executable(&bin.join("dpkg"), "echo amd64");
-        executable(
-            &bin.join("dpkg-query"),
+        m.sandbox.stub("sudo", "exec \"$@\"");
+        m.sandbox.stub("dpkg", "echo amd64");
+        m.sandbox.stub(
+            "dpkg-query",
             "for last; do :; done; grep -qx \"$last\" \"$FAKE/installed\" && printf installed || exit 1",
         );
         let mut record = String::from("# The apt packages KubaOS installed\n");
@@ -118,11 +123,11 @@ impl Machine {
 
     /// The hooks the migrations ran, with `me` for the user running the tests.
     fn hooks(&self) -> Vec<String> {
-        let me = String::from_utf8(Command::new("id").arg("-un").output().expect("id").stdout).expect("a name");
+        let me = me();
         fs::read_to_string(self.path("hooks"))
             .expect("read the hooks' log")
             .lines()
-            .map(|line| line.replace(me.trim(), "me"))
+            .map(|line| line.replace(&me, "me"))
             .collect()
     }
 
@@ -132,18 +137,13 @@ impl Machine {
 
     /// Runs the release's migration `slug` of `kind`, as the update would.
     fn migrate(&self, kind: &str, slug: &str) {
-        let path = format!(
-            "{}:{}",
-            self.path("bin").display(),
-            std::env::var("PATH").unwrap_or_default()
-        );
-        let out = Command::new("bash")
+        let out = self
+            .sandbox
+            .command("bash")
             .args(["-euo", "pipefail"])
             .arg(migration(kind, slug))
-            .env("PATH", path)
             .env("KUBAOS_DIR", self.path("checkout"))
             .env("FAKE", self.dir.path())
-            .env("HOME", self.path("home"))
             .env_remove("XDG_CONFIG_HOME")
             .env("KUBAOS_BACKUPS", self.path("backups"))
             .env("APT_CHOICES", self.path("apt-groups"))
@@ -327,7 +327,9 @@ fn the_picks_the_user_had_stay_and_a_second_run_changes_nothing() {
 #[test]
 fn a_machine_without_nix_still_gets_the_apps_polkit_action() {
     // Regression: the action came only with the helper, which 60-nix.sh skips without nix.
-    let bin = tempfile::tempdir().expect("a temp dir");
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let sandbox = Sandbox::new(&dir.path().join("sandbox"), dir.path(), me());
+    sandbox.without("nix");
     let lib = repo_root().join("system/lib.sh");
     let script = format!(
         "source '{}'\n\
@@ -337,11 +339,9 @@ fn a_machine_without_nix_still_gets_the_apps_polkit_action() {
         lib.display()
     );
 
-    let out = Command::new("bash")
+    let out = sandbox
+        .command("bash")
         .args(["-euo", "pipefail", "-c", &script])
-        .env_clear()
-        .env("PATH", format!("{}:/usr/bin:/bin", bin.path().display()))
-        .env("HOME", bin.path())
         .output()
         .expect("run bash");
 

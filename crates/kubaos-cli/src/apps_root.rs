@@ -13,8 +13,10 @@
 //! changes the machine's apps.
 //!
 //! Run as anyone but root, it serves only the checkout `KUBAOS_APPS_CHECKOUT` names, owned by
-//! that user, with its journals and lock under `KUBAOS_APPS_STATE`: the tests' way in. Root never
-//! reads either: pkexec clears the environment and sudo resets it.
+//! that user, with its journals and lock under `KUBAOS_APPS_STATE`: the tests' way in. There it
+//! acts for the user its environment names (`USER`, `HOME`) and runs what it runs with that
+//! environment and `PATH`, which are the tests' sandbox (`kubaos_core::sandbox`). Root never reads
+//! any of them: pkexec clears the environment and sudo resets it.
 //!
 //! Exit codes: 0 done, 1 it couldn't serve, 2 a usage error.
 //!
@@ -59,7 +61,7 @@ struct Place {
     lock: PathBuf,
     /// Who must own the catalog.
     owner: u32,
-    /// The user it acts for, by uid.
+    /// The user it acts for, by uid, as root.
     for_uid: u32,
 }
 
@@ -97,13 +99,19 @@ fn say_usage(out: &mut dyn io::Write) {
 fn serve() -> Result<(), String> {
     let place = place()?;
     rustix::process::umask(rustix::fs::Mode::from_raw_mode(0o022));
-    let (user, home) = account(place.for_uid)?;
-    if place.owner == 0 {
+    let mut host = if place.owner == 0 {
         root_only_dir(Path::new(LOCK_DIR))?;
-    }
+        let (user, home) = account(place.for_uid)?;
+        SystemHost::new(user, home, &place.checkout).as_root()
+    } else {
+        let (user, home) = (std::env::var("USER"), std::env::var_os("HOME"));
+        let (Ok(user), Some(home)) = (user, home) else {
+            return Err("run as yourself, it needs USER and HOME".to_owned());
+        };
+        SystemHost::new(user, home, &place.checkout).with_path(std::env::var_os("PATH").unwrap_or_default())
+    };
     let _lock = journal::lock(&place.lock).map_err(|e| chain(&e))?;
     let catalog = place.checkout.join("apps");
-    let mut host = SystemHost::new(user, home, &place.checkout).as_root();
     let keeper = Keeper::new(&mut host, Side::Root, &catalog, &place.journals);
     let mut server = Server::new(keeper, &catalog, place.owner);
     server
@@ -158,16 +166,5 @@ fn place() -> Result<Place, String> {
 
 /// The name and home of the user `uid`, from the password database.
 fn account(uid: u32) -> Result<(String, PathBuf), String> {
-    if let Some(found) = system::account(uid) {
-        return Ok(found);
-    }
-    // A user the file doesn't list (a directory service's) is named by the environment only
-    // when it is the user running the helper: never as root.
-    if uid == rustix::process::geteuid().as_raw()
-        && uid != 0
-        && let (Ok(user), Some(home)) = (std::env::var("USER"), std::env::var_os("HOME"))
-    {
-        return Ok((user, PathBuf::from(home)));
-    }
-    Err(format!("no user {uid} in /etc/passwd"))
+    system::account(uid).ok_or_else(|| format!("no user {uid} in /etc/passwd"))
 }

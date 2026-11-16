@@ -153,6 +153,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 - **Unit tests in a sibling file**: `#[cfg(test)] mod tests;` at the bottom of `install.rs`, the tests in `install/tests.rs`. Behaviour across processes goes in the crate's `tests/` and the end-to-end suites (`install/test/`, `test/`).
 - **Tests may `unwrap()`.** A fallible step whose line doesn't say what failed is `.expect("the step")`: `.expect("write the user flake")`.
 - **Never weaken a test to make a change pass.** If an expectation must change, the PR says which one and why.
+- **A test that runs a script, an app's `run` action or a stand-in for a host command runs it in a sandbox** (`kubaos_core::sandbox`, the `sandbox` feature for other crates' tests): an environment with no route to the session's or the system's bus, a runtime folder of its own, the test's home, and a `PATH` of stand-ins that log their calls (systemd, logind, apt, pkexec, sudo, T3, Docker, …) and links to harmless tools, where any other command is not found. The apps engine's fake machine (`FakeHost`) runs everything in one. A test that changes only `HOME` reaches the live user manager: a test run once stopped the machine's T3 Code service.
 
 ### Logging
 
