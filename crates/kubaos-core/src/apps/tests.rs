@@ -477,7 +477,6 @@ fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
             "t3-code",
             "tor-browser",
             "vivaldi",
-            "voxtype",
             "zen-browser"
         ]
     );

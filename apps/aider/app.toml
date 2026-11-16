@@ -5,13 +5,11 @@ name = "Aider"
 category = "ai"
 tags = ["coding agent", "pair programming", "terminal", "git", "models"]
 summary = "AI pair programming in the terminal. Commits every change, so blame it in git."
-# Its README is under the Apache-2.0 licence, which asks for its notice with every copy, so this
-# is ours.
+# The opening of Aider's README, Apache-2.0 (github.com/Aider-AI/aider), whose licence names no
+# copyright holder of its own.
 description = """\
-Aider is AI pair programming in the terminal. Started in a git repository, it edits the files \
-you add to the chat and commits each change with a message of its own, so every edit can be \
-reviewed and undone. It works with the models of many providers, or one on this machine."""
-description_from = "kubaos"
+Aider lets you pair program with LLMs to start a new project or build on your existing codebase."""
+description_from = "https://github.com/Aider-AI/aider/blob/v0.86.0/README.md"
 keeps = """\
 Your settings in ~/.aider.conf.yml and the chat history Aider keeps in each project \
 (.aider.chat.history.md) stay: install Aider again and they're all there."""
