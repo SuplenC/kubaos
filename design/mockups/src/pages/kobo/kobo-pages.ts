@@ -32,22 +32,38 @@ export function live(panel: Panel, answers: (machine: Machine) => Partial<Answer
  * goes, `panel` slides in from the right and fades in over `long`, its footer band rising a `micro`
  * after it; the wire's light runs on to its step, whose symbol lights as it arrives.
  */
+/**
+ * The page turning in Kōbō: the page left slides off and fades over `short`; as it goes, the next
+ * slides in and fades in over `long`, its footer band, if it has one, rising a `micro` after it.
+ */
+export function turning(band: boolean): NonEmpty<Track<"emphasized_accel"> | Track<"emphasized_decel">> {
+  return [
+    { part: "the question left", on: "the page", target: ".k-step-room[data-leaving]", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
+    { part: "its slide off", on: "the page", target: ".k-step-room[data-leaving]", property: "--step-slide", from: 0, to: 1, duration: "short", curve: "emphasized_accel" },
+    { part: "the next question", on: "the page", target: ".k-step-room:not([data-kept])", property: "opacity", from: 0, to: 1, duration: "long", cue: "short", curve: "emphasized_decel" },
+    { part: "its slide in", on: "the page", target: ".k-step-room:not([data-kept])", property: "--step-slide", from: 1, to: 0, duration: "long", cue: "short", curve: "emphasized_decel" },
+    ...(band
+      ? ([
+          { part: "the band", on: "the page", target: ".k-step-room:not([data-kept]) .k-step-footer", property: "opacity", from: 0, to: 1, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
+          { part: "the band's rise", on: "the page", target: ".k-step-room:not([data-kept]) .k-step-footer", property: "--step-rise", from: 1, to: 0, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
+        ] as const)
+      : []),
+  ];
+}
+
+/** The page turning with reduced motion: the page left goes at once, the next fades in. */
+export const TURNING_REDUCED: NonEmpty<Track<"standard"> | Track<"emphasized_decel">> = [
+  { part: "the question left", on: "the page", target: ".k-step-room[data-leaving]", property: "opacity", from: 1, to: 0, duration: "instant", curve: "standard" },
+  { part: "the next question", on: "the page", target: ".k-step-room:not([data-kept])", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
+];
+
 export function onward(panel: Panel, answers: (machine: Machine) => Partial<Answers> = () => ({}), fresh = false): Move {
   const index = PLACE[panel];
   const before = (Object.keys(PLACE) as Panel[]).find((each) => PLACE[each] === index - 1);
   const symbol = `.k-rail-steps > .k-step:nth-child(${index + 1}) .k-step-bead`;
   const tracks: NonEmpty<Track<"emphasized_accel"> | Track<"emphasized_decel"> | Track<"standard">> = [
-    { part: "the question left", on: "the page", target: ".k-step-room[data-leaving]", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
-    { part: "its slide off", on: "the page", target: ".k-step-room[data-leaving]", property: "--step-slide", from: 0, to: 1, duration: "short", curve: "emphasized_accel" },
-    { part: "the next question", on: "the page", target: ".k-step-room:not([data-kept])", property: "opacity", from: 0, to: 1, duration: "long", cue: "short", curve: "emphasized_decel" },
-    { part: "its slide in", on: "the page", target: ".k-step-room:not([data-kept])", property: "--step-slide", from: 1, to: 0, duration: "long", cue: "short", curve: "emphasized_decel" },
     // Last look holds its action in its body: it has no band to follow it in.
-    ...(panel === "review"
-      ? []
-      : ([
-          { part: "the band", on: "the page", target: ".k-step-room:not([data-kept]) .k-step-footer", property: "opacity", from: 0, to: 1, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
-          { part: "the band's rise", on: "the page", target: ".k-step-room:not([data-kept]) .k-step-footer", property: "--step-rise", from: 1, to: 0, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
-        ] as const)),
+    ...turning(panel !== "review"),
     { part: "the wire", on: "the rail", target: ".k-rail-wire-lit", property: "--wire-lit", from: Math.max(0, index - 1), to: index, duration: "long", curve: "emphasized_decel" },
     { part: "the symbol lit", on: "the step arrived at", target: symbol, property: "--bead-lit", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
     { part: "the symbol's glow", on: "the step arrived at", target: symbol, property: "--bead-glow", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
@@ -56,10 +72,7 @@ export function onward(panel: Panel, answers: (machine: Machine) => Partial<Answ
     name: "Continue: the next question",
     what: "The question left slides off and fades; the next slides in from the right, its band after it; the wire runs on.",
     tracks,
-    reduced: [
-      { part: "the question left", on: "the page", target: ".k-step-room[data-leaving]", property: "opacity", from: 1, to: 0, duration: "instant", curve: "standard" },
-      { part: "the next question", on: "the page", target: ".k-step-room:not([data-kept])", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
-    ],
+    reduced: TURNING_REDUCED,
     back: "cuts",
     sample: at(panel, answers, before ? { stepFrom: before } : {}, fresh),
   };

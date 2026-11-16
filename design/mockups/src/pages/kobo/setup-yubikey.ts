@@ -22,7 +22,7 @@ export default page<Shown>({
   lede: "Plug the key in, touch its sensor, and it stands in for the password at sudo and the lock.",
   code: { unbuilt: "Kōbō draws the old checklist" },
   from: ["step-rail-page", "card", "banner", "collapsible", "error-block"],
-  stage: { live: liveCard("yubikey"), hint: "Enter checks for the key, then enrols it", daylight: true },
+  stage: { live: liveCard("yubikey"), hint: "Enter checks for the key, then enrols it", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
   variants: [
     { name: "No key yet", for: "waiting on the plug: it hums", sample: CELLS.empty },
     { name: "Plugged in", for: "Enroll this key", sample: CELLS.rest },
@@ -33,7 +33,7 @@ export default page<Shown>({
     { name: "Two keys in", for: "leave only the one", sample: atCard("yubikey", "two") },
     { name: "Didn't confirm", for: "wrong finger, or too slow", sample: CELLS.error },
   ],
-  sizes: doesntApply("the window's sizes are StepRailPage's; the card fills its page."),
+  sizes: doesntApply("the screen's sizes are StepRailPage's Kōbō host's; the card fills its page."),
   states: {
     shown: ["rest", "loading", "selected", "error", "empty"],
     absent: { lit: "its buttons light on their pages", pressed: "its buttons press on their pages", disabled: "every machine can take a key: always there" },
@@ -58,7 +58,7 @@ export default page<Shown>({
   },
   motion: {
     arrives: [arrivesAt("yubikey", "plug")],
-    leaves: doesntApply("Continue slides the next card in: Bitwarden's page shows it."),
+    leaves: doesntApply("Continue slides the next card in: Your phone's page shows it."),
     between: [HUM, finishesAt("yubikey", "done"), FAILS],
   },
   keyboard: {

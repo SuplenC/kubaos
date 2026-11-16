@@ -5,7 +5,7 @@
 import { button } from "../../lib/button.ts";
 import type { Words } from "../../lib/content.ts";
 import { row, stack, within } from "../../lib/layout.ts";
-import { type LiveRowSpec, liveList } from "../../lib/live-list.ts";
+import { type LiveItem, type LiveRowSpec, liveList } from "../../lib/live-list.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
@@ -184,6 +184,9 @@ const HOLDS: Move = {
   sample: heldSample,
 };
 
+/** The networks in two sections: a label is kept by its key and arrives and leaves as a row does. */
+const SECTIONS: readonly LiveItem[] = [{ key: "known", label: "Known" }, FOUND[0]!, FOUND[1]!, { key: "new", label: "New" }, FOUND[2]!, FOUND[3]!, FOUND[4]!];
+
 type MatrixState = "rest" | "lit";
 
 const MATRIX = [
@@ -211,8 +214,12 @@ export default page({
   variants: [
     { name: "A scan's networks", for: "the network you're on first, then by signal", sample: () => still(FOUND, FIVE) },
     { name: "The keyboard in it", for: "that row held still as the scan goes on", sample: () => cell(FOUND, "lit") },
+    { name: "In sections", for: "labels kept by key, as rows are", sample: () => within(WELL_ROOM, liveList(SECTIONS, { height: FIVE }).element) },
   ],
-  sizes: doesntApply("a `ScrollingList`, as tall as its place; its rows are a `List`'s."),
+  sizes: [
+    { name: "In its own well", for: "as tall as its place; it scrolls", sample: () => still(FOUND, FIVE) },
+    { name: "As tall as its rows", for: "the page scrolls instead", sample: () => within(WELL_ROOM, liveList(FOUND.slice(0, 3), {}).element) },
+  ],
   states: {
     shown: ["rest", "lit"],
     absent: {

@@ -1,7 +1,8 @@
-// Kōbō's first boot, card by card: every card the setup engine has (`kubaos_core::setup`), every
-// view a card can be in (the engine's state, a prompt while its work runs, a failure), and what
-// each view asks. The words are the engine's and the app's own (`crates/kubaos-core/src/setup/`,
-// `crates/kubaos-kobo/src/setup/`), so the mockup and the build say the same thing.
+// Kōbō's first boot, card by card: every card of first boot, every view a card can be in (the
+// engine's state, a prompt while its work runs, a failure), and what each view asks. The words of
+// the cards the setup engine has are its own and the app's (`crates/kubaos-core/src/setup/`,
+// `crates/kubaos-kobo/src/setup/`), so the mockup and the build say the same thing; Make it yours
+// and Drivers are ahead of the engine, their data stand-ins (`setup-data.ts`).
 //
 // The common path is upfront on every card: what it is for and what skipping it costs, where it
 // stands, and the one thing to press. What only an advanced user wants (the device, the command
@@ -10,11 +11,16 @@
 
 import type { LogLine } from "../../lib/log.ts";
 import type { Duration } from "../../site/page.ts";
+import { KNOWN, type Maker, MAKERS } from "./setup-data.ts";
 
-export type CardId = "tuxedo" | "fingerprint" | "yubikey" | "bitwarden" | "git" | "phone";
+export type CardId = "yours" | "drivers" | "fingerprint" | "yubikey" | "phone";
 
-/** The engine's order, which the rail keeps. */
-export const CARD_IDS: readonly CardId[] = ["tuxedo", "fingerprint", "yubikey", "bitwarden", "git", "phone"];
+/**
+ * The order the rail keeps. Make it yours leads: it is the one card every machine has, and its
+ * installs run in the background while the person goes through the rest. Drivers next, so a
+ * reboot it needs is known before the cards that only want a finger, a key or a phone.
+ */
+export const CARD_IDS: readonly CardId[] = ["yours", "drivers", "fingerprint", "yubikey", "phone"];
 
 /** `kubaos_core::setup::State`. */
 export type Engine = "done" | "needed" | "reboot" | "waiting" | "absent";
@@ -71,10 +77,8 @@ export type Ask =
   | { readonly is: "mok"; readonly mismatch: boolean }
   | { readonly is: "finger" }
   | { readonly is: "fingers"; readonly names: readonly string[] }
-  | { readonly is: "bitwarden"; readonly method: "totp" | "apikey"; readonly server: number; readonly missing?: "code" }
-  | { readonly is: "unlock" }
-  | { readonly is: "keys" }
-  | { readonly is: "git"; readonly email: string }
+  | { readonly is: "parts"; readonly maker: string; readonly ticked: readonly number[] | undefined }
+  | { readonly is: "works"; readonly maker: string; readonly fixed?: boolean }
   | { readonly is: "buttons"; readonly labels: readonly string[] };
 
 export interface Card {
@@ -107,7 +111,7 @@ export interface Card {
 }
 
 /** The sample: Mika's TUXEDO, Secure Boot on, a Goodix reader, a YubiKey Bio in a drawer. */
-export const USER = { name: "Mika Nowak", login: "mika", email: "mika@nowak.dev", host: "tuxedo", product: "TUXEDO InfinityBook Pro AMD Gen10" };
+export const USER = { name: "Mika Nowak", login: "mika", email: "mika@nowak.dev", host: "tuxedo" };
 
 const PASSWORD: Prompt = { kind: "password", text: "Your password, in the dialog that just opened." };
 const HELPER = "/usr/lib/kubaos/setup-helper";
@@ -128,11 +132,23 @@ const info = (text: string): LogLine => ({ level: "info", text });
 const warn = (text: string): LogLine => ({ level: "warn", text });
 const error = (text: string): LogLine => ({ level: "error", text });
 
-// ---------------------------------------------------------------- TUXEDO --
+// ---------------------------------------------------------------- Drivers --
 
-const TUXEDO_NEEDS = "Keyboard backlight, fans and power limits need TUXEDO's drivers.";
-const TUXEDO_LOG: readonly LogLine[] = [
-  info(`$ pkexec ${HELPER} tuxedo --mok-password-stdin`),
+/** The maker a Drivers view is about: the sample laptop's, unless the view names another. */
+function makerOf(view: string): Maker {
+  const named: Record<string, string> = { system76: "system76", works: "framework", unknown: "unknown" };
+  return MAKERS[named[view] ?? "tuxedo"]!;
+}
+
+/** What a maker's needs are, in a line: the parts its drivers bring, as the status says them. */
+function needs(maker: Maker): string {
+  return `${maker.machine}. Graphics, Wi-Fi and sound work; ${maker.parts[0]!.title.toLowerCase()} need ${maker.name}'s drivers.`;
+}
+
+const TUXEDO = MAKERS.tuxedo!;
+const TUXEDO_NEEDS = needs(TUXEDO);
+const DRIVERS_LOG: readonly LogLine[] = [
+  info(`$ pkexec ${HELPER} drivers tuxedo --mok-password-stdin`),
   step("Adding TUXEDO's apt repository"),
   info("ok  deb.tuxedocomputers.com/ubuntu resolute main"),
   step("Installing tuxedo-drivers and the kernel headers"),
@@ -150,98 +166,149 @@ const SECURE_BOOT: Ask = {
   lines: ["Pick a one-time password. You type it once, on a blue screen after the reboot, so the firmware trusts the drivers."],
 };
 
-/** The machine as detection found it, beside the state. */
-const MACHINE = (secureBoot: boolean, drivers: string) => `${USER.product}. Secure Boot ${secureBoot ? "on" : "off"}, ${drivers}.`;
-
-const tuxedo: Card = {
-  id: "tuxedo",
-  title: "TUXEDO drivers",
+const drivers: Card = {
+  id: "drivers",
+  title: "Drivers",
   icon: "developer_board",
   accent: "ドライバー",
-  why: "TUXEDO's own drivers run the keyboard backlight, the fans and the power limits.",
-  skip: "Skip it and those stay wherever the firmware left them.",
-  later: "Set up TUXEDO drivers",
+  why: "Some laptops need their maker's drivers before every key, light and fan works. I checked this one.",
+  skip: "Skip it and those parts stay as the firmware left them.",
+  later: "Set up drivers",
   first: "secure",
   views: {
-    install: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(false, "no drivers yet") },
-    secure: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(true, "no drivers yet") },
-    mismatch: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(true, "no drivers yet") },
-    password: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(true, "no drivers yet"), prompt: PASSWORD, log: TUXEDO_LOG.slice(0, 1) },
-    installing: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(true, "no drivers yet"), prompt: { kind: "wait", text: "Building the modules with DKMS…" }, log: TUXEDO_LOG.slice(0, 6) },
-    queued: { state: "reboot", summary: "Key queued. Reboot and enroll it on the blue MokManager screen.", log: TUXEDO_LOG },
-    load: { state: "reboot", summary: "Installed. The drivers load after a reboot." },
-    done: { state: "done", summary: "Drivers loaded: tuxedo_keyboard, tuxedo_io, clevo_wmi." },
-    offline: { state: "waiting", summary: `${TUXEDO_NEEDS} Needs the internet first.`, found: `${MACHINE(true, "no drivers yet")} Needs the internet first.` },
-    closed: { state: "needed", summary: TUXEDO_NEEDS, found: MACHINE(true, "no drivers yet"), failed: { error: "the password dialog was closed", hint: "Nothing changed. Run it again when you're ready." }, log: TUXEDO_LOG.slice(0, 1) },
+    secure: { state: "needed", summary: TUXEDO_NEEDS },
+    choose: { state: "needed", summary: TUXEDO_NEEDS },
+    install: { state: "needed", summary: TUXEDO_NEEDS },
+    mismatch: { state: "needed", summary: TUXEDO_NEEDS },
+    password: { state: "needed", summary: TUXEDO_NEEDS, prompt: PASSWORD, log: DRIVERS_LOG.slice(0, 1) },
+    installing: { state: "needed", summary: TUXEDO_NEEDS, prompt: { kind: "wait", text: "Building the modules with DKMS…" }, log: DRIVERS_LOG.slice(0, 6) },
+    queued: { state: "reboot", summary: "Installed. Reboot and enrol their key on the blue MokManager screen.", log: DRIVERS_LOG },
+    load: { state: "reboot", summary: "Installed. They load after a reboot." },
+    done: { state: "done", summary: `${TUXEDO.machine}. Everything works, the keyboard light and fans included.` },
+    system76: { state: "needed", summary: needs(MAKERS.system76!) },
+    works: { state: "done", summary: `${MAKERS.framework!.machine}. Everything works with what's already here.` },
+    unknown: { state: "done", summary: `${MAKERS.unknown!.machine}. I don't know its maker's drivers, so I've nothing to add.` },
+    offline: { state: "waiting", summary: `${TUXEDO_NEEDS} Needs the internet first.` },
+    closed: { state: "needed", summary: TUXEDO_NEEDS, failed: { error: "the password dialog was closed", hint: "Nothing changed. Run it again when you're ready." }, log: DRIVERS_LOG.slice(0, 1) },
     nokey: {
       state: "needed",
-      summary: "Drivers are in, but Secure Boot won't load them until you enroll their key.",
-      failed: { error: "the drivers are in, but DKMS made no signing key to enroll", hint: "Rebuild them so DKMS makes one (sudo dpkg-reconfigure tuxedo-drivers), then try again." },
-      log: [...TUXEDO_LOG.slice(0, 7), warn("SKIP: /var/lib/dkms/mok.pub doesn't exist"), error("no key to enroll")],
+      summary: "The drivers are in, but Secure Boot won't load them until you enrol their key.",
+      failed: { error: "the drivers are in, but DKMS made no signing key to enrol", hint: "Rebuild them so DKMS makes one (sudo dpkg-reconfigure tuxedo-drivers), then try again." },
+      log: [...DRIVERS_LOG.slice(0, 7), warn("SKIP: /var/lib/dkms/mok.pub doesn't exist"), error("no key to enrol")],
     },
-    absent: { state: "absent", summary: "Not on this machine: Dell Inc. isn't a TUXEDO." },
   },
   asks: (view) => {
+    const parts: Ask = { is: "parts", maker: makerOf(view).id, ticked: view === "choose" ? [0, 1] : undefined };
     switch (view) {
-      case "install":
-        return [{ is: "para", words: "Secure Boot is off, so the drivers load as they are. No key to enroll." }];
       case "secure":
+      case "choose":
       case "closed":
-        return [SECURE_BOOT, { is: "mok", mismatch: false }];
+        return [parts, SECURE_BOOT, { is: "mok", mismatch: false }];
       case "mismatch":
-        return [SECURE_BOOT, { is: "mok", mismatch: true }];
+        return [parts, SECURE_BOOT, { is: "mok", mismatch: true }];
       case "nokey":
         return [SECURE_BOOT, { is: "mok", mismatch: false }];
+      case "install":
+        return [parts, { is: "para", words: "Secure Boot is off, so they load as they are. No key to enrol." }];
+      case "system76":
+        return [parts];
       case "queued":
         return [
           {
             is: "banner",
             tone: "Warning",
             icon: "restart_alt",
-            title: "Reboot, then enroll the key on the blue screen",
+            title: "Reboot, then enrol the key on the blue screen",
             lines: [
               "Before KubaOS starts, a blue screen called MokManager appears. It waits about 10 seconds; press a key to stop it.",
               "Enroll MOK → Continue → Yes → type the password → Reboot.",
-              "Type the one-time password you picked here. If you miss the screen, the drivers won't load: open setup again and enroll the key again.",
+              "Type the one-time password you picked here. If you miss the screen, the drivers won't load: open setup again and enrol the key again.",
             ],
           },
         ];
       case "load":
         return [{ is: "para", words: "They load on the next boot. Reboot when it suits you." }];
+      case "done":
+        return [{ is: "works", maker: "tuxedo", fixed: true }];
+      case "works":
+        return [{ is: "works", maker: "framework" }, { is: "para", words: "Nothing to install. Firmware updates come through fwupd, which is on already." }];
+      case "unknown":
+        return [
+          { is: "works", maker: "unknown" },
+          { is: "para", words: "Most hardware runs on the kernel's own drivers, and what I checked here does. Something not working? Updates bring new drivers, and Set up drivers in the Command menu checks again." },
+        ];
       case "offline":
-        return [{ is: "para", words: "Connect to a network from the bar, then Check again." }];
-      case "absent":
-        return [{ is: "para", words: "Nothing to install. The TUXEDO drivers only make sense on a TUXEDO." }];
+        return [parts, { is: "para", words: "Connect to a network from the bar, then Check again." }];
       default:
         return [];
     }
   },
-  facts: (view) =>
-    view === "absent"
-      ? [
-          { label: "Machine", value: "Dell Inc. XPS 13 9340" },
-          { label: "Architecture", value: "amd64" },
-        ]
-      : [
-          { label: "Machine", value: USER.product },
-          { label: "Installs", value: "tuxedo-drivers from TUXEDO's repository; no Control Center, power profiles do that job" },
-          { label: "Secure Boot", value: view === "install" ? "Off" : "On" },
-          { label: "Drivers", value: ["done", "queued", "load", "nokey"].includes(view) ? "tuxedo-drivers 4.12.1" : "Not installed" },
-          { label: "Signing key", value: view === "queued" ? "Queued for MokManager" : view === "done" ? "Enrolled" : view === "install" ? "Not needed" : "Not enrolled" },
-          { label: "Modules", value: view === "done" ? "tuxedo_keyboard, tuxedo_io, clevo_wmi" : "None loaded" },
-        ],
-  command: `pkexec ${HELPER} tuxedo --mok-password-stdin`,
+  facts: (view) => {
+    const maker = makerOf(view);
+    if (maker.parts.length === 0) return [
+      { label: "Machine", value: maker.machine },
+      { label: "Makers I know", value: KNOWN.join(", ") },
+      { label: "Installs", value: "Nothing" },
+    ];
+    const installed = ["done", "queued", "load", "nokey"].includes(view);
+    return [
+      { label: "Machine", value: maker.machine },
+      { label: "From", value: maker.source },
+      { label: "Installs", value: maker.parts.filter((part, index) => part.offered || (view === "choose" && index === 1)).map((part) => part.package).join(", ") },
+      { label: "Secure Boot", value: view === "install" || maker.id === "system76" ? "Off" : "On" },
+      { label: "Signing key", value: view === "queued" ? "Queued for MokManager" : view === "done" ? "Enrolled" : view === "install" || maker.id === "system76" ? "Not needed" : "Not enrolled" },
+      { label: "Modules", value: view === "done" ? "tuxedo_keyboard, tuxedo_io, clevo_wmi" : installed ? "Built, not loaded" : "None loaded" },
+    ];
+  },
+  command: `pkexec ${HELPER} drivers tuxedo --mok-password-stdin`,
   action: (view) => {
-    if (["install", "secure", "mismatch", "password", "installing"].includes(view)) return { label: "Install the drivers", icon: "download" };
+    if (["install", "secure", "choose", "mismatch", "password", "installing", "system76"].includes(view)) return { label: "Install the drivers", icon: "download" };
     if (view === "closed") return { label: "Try again", icon: "restart_alt" };
-    if (view === "nokey") return { label: "Enroll the key", icon: "key" };
+    if (view === "nokey") return { label: "Enrol the key", icon: "key" };
     if (view === "queued" || view === "load") return { label: "Reboot now", icon: "restart_alt" };
     if (view === "offline") return { label: "Check again", icon: "restart_alt" };
     return undefined;
   },
   blocker: (view) => (view === "mismatch" ? "The two passwords don't match." : undefined),
-  act: { secure: "password", install: "password", closed: "password", offline: "secure" },
+  act: { secure: "password", choose: "password", install: "password", closed: "password", offline: "secure", system76: "password" },
   auto: { password: ["installing", "scene"], installing: ["queued", "scene"] },
+};
+
+// ----------------------------------------------------------- Make it yours --
+
+/**
+ * Make it yours draws its own body, live (`setup-yours-card.ts`): what it asks is the profiles, the
+ * apps they bring and the settings that come with them, so it asks nothing through `asks`. Its
+ * views are where it starts; its summary here is what the arrival and the ending read.
+ */
+const yours: Card = {
+  id: "yours",
+  title: "Make it yours",
+  icon: "palette",
+  accent: "好み",
+  why: "Say what you use it for and I'll install the apps for it. Pick any, all or none.",
+  skip: "Skip it and you get KubaOS as it comes: a terminal, a browser, the basics.",
+  later: "Make it yours",
+  first: "none",
+  views: {
+    none: { state: "needed", summary: "Nothing picked yet." },
+    developer: { state: "needed", summary: "Developer picked." },
+    filled: { state: "needed", summary: "Developer picked." },
+    invalid: { state: "needed", summary: "Developer picked." },
+    two: { state: "needed", summary: "Developer and Designer picked." },
+    all: { state: "needed", summary: "All three picked." },
+    dropped: { state: "needed", summary: "Developer and Everyday picked." },
+    menu: { state: "needed", summary: "Developer picked." },
+    installing: { state: "needed", summary: "Installing your apps." },
+    done: { state: "done", summary: "Your apps are in." },
+    failed: { state: "needed", summary: "One app didn't install.", failed: { error: "Steam didn't install: Valve's server timed out", hint: "The rest are in. Try it again, or drop it." } },
+  },
+  asks: () => [],
+  facts: () => [],
+  command: "kubaos apps install",
+  action: (view) => (["none", "installing", "done"].includes(view) ? undefined : view === "failed" ? { label: "Try again", icon: "restart_alt" } : { label: "Install", icon: "download" }),
+  act: {},
+  auto: {},
 };
 
 // ------------------------------------------------------------- Fingerprint --
@@ -382,132 +449,6 @@ const yubikey: Card = {
   auto: { touch: ["password", "scene"], password: ["done", "scene"] },
 };
 
-// --------------------------------------------------------------- Bitwarden --
-
-const BW_LOG: readonly LogLine[] = [
-  step("Logging in to bitwarden.eu"),
-  info("ok  logged in as mika@nowak.dev"),
-  step("Writing SSH keys"),
-  info("ok  ~/.ssh/github.pub, ~/.ssh/hetzner.pub"),
-  info("ok  Host blocks in ~/.ssh/config.d/bitwarden"),
-  step("Setting up commit signing"),
-  info("ok  git signs with github"),
-  step("Logging gh in"),
-  info("ok  gh as mikanowak"),
-  step("Writing project env"),
-  info("ok  3 projects"),
-];
-
-const bitwarden: Card = {
-  id: "bitwarden",
-  title: "Bitwarden",
-  icon: "lock",
-  accent: "金庫",
-  why: "Log in once and your SSH keys, commit signing, the gh token and your projects' env come from the vault.",
-  skip: "Skip it and none of that is here: no SSH keys, unsigned commits, gh logged out.",
-  later: "Set up Bitwarden",
-  first: "login",
-  views: {
-    login: { state: "needed", summary: "Not logged in." },
-    code: { state: "needed", summary: "Not logged in." },
-    apikey: { state: "needed", summary: "Not logged in." },
-    unlock: { state: "needed", summary: `Logged in as ${USER.email}, but nothing's pulled from the vault yet.` },
-    pulling: { state: "needed", summary: "Not logged in.", prompt: { kind: "wait", text: "Writing SSH keys…" }, log: BW_LOG.slice(0, 4) },
-    done: { state: "done", summary: `Logged in as ${USER.email}. SSH keys, commit signing and project env come from the vault.`, log: BW_LOG },
-    offline: { state: "waiting", summary: "Not logged in. Needs the internet first." },
-    wrong: { state: "needed", summary: "Not logged in.", failed: { error: "wrong email or master password", hint: "Check both and try again, slower this time." }, log: [BW_LOG[0]!, error("Username or password is incorrect. Try again.")] },
-    absent: { state: "absent", summary: "Not on this machine: bw isn't installed (system/70-bitwarden.sh does it)." },
-  },
-  asks: (view) => {
-    switch (view) {
-      case "login":
-      case "wrong":
-        return [{ is: "bitwarden", method: "totp", server: 0 }];
-      case "code":
-        return [{ is: "bitwarden", method: "totp", server: 0, missing: "code" }];
-      case "apikey":
-        return [{ is: "bitwarden", method: "apikey", server: 2 }];
-      case "unlock":
-        return [{ is: "unlock" }];
-      case "offline":
-        return [{ is: "para", words: "Connect to a network from the bar, then Check again." }];
-      case "done":
-        return [
-          { is: "keys" },
-          { is: "para", words: "Bitwarden desktop starts when you close setup. Last bit by hand: log in there, Settings, turn on “Enable SSH agent”. It has no config file for that." },
-          { is: "buttons", labels: ["Pull again", "Log out"] },
-        ];
-      case "absent":
-        return [{ is: "para", words: "Nothing to do here." }];
-      default:
-        return [];
-    }
-  },
-  facts: (view) => [
-    { label: "Server", value: view === "apikey" ? "https://vault.nowak.dev" : "bitwarden.eu" },
-    { label: "Account", value: view === "unlock" || view === "done" ? USER.email : "None yet" },
-    { label: "bw", value: view === "absent" ? "Not installed" : view === "done" ? "Unlocked" : view === "unlock" ? "Locked" : "Logged out" },
-    { label: "Desktop app", value: "Installed, starts after setup" },
-  ],
-  command: "kubaos bitwarden setup",
-  action: (view) => {
-    if (view === "done" || view === "absent") return undefined;
-    if (view === "offline") return { label: "Check again", icon: "restart_alt" };
-    if (view === "wrong") return { label: "Try again", icon: "restart_alt" };
-    if (view === "unlock") return { label: "Unlock and pull", icon: "lock_open" };
-    return { label: "Log in and pull", icon: "lock_open" };
-  },
-  blocker: (view) => (view === "code" ? "The two-step code." : undefined),
-  act: { login: "pulling", wrong: "pulling", unlock: "pulling", apikey: "pulling", offline: "login" },
-  auto: { pulling: ["done", "slow"] },
-};
-
-// --------------------------------------------------------------------- Git --
-
-const IDENTITY = "~/.config/git-identity/identity.gitconfig";
-
-const git: Card = {
-  id: "git",
-  title: "Git",
-  icon: "code",
-  accent: "名前",
-  why: "The name and email git puts on every commit.",
-  skip: "Skip it and git refuses to commit until it has them.",
-  later: "Git name and email",
-  first: "fill",
-  views: {
-    fill: { state: "needed", summary: "No name and email for commits yet." },
-    invalid: { state: "needed", summary: "No name and email for commits yet." },
-    done: { state: "done", summary: `Commits as ${USER.name} <${USER.email}>.` },
-    wins: {
-      state: "needed",
-      summary: "No name and email for commits yet.",
-      failed: { error: "git still says user.email = mika@old-job.example", hint: "~/.gitconfig sets it and wins over the include. Delete the [user] lines there, or change them there." },
-      log: [info(`ok  ${IDENTITY}: ${USER.name} <${USER.email}>`)],
-    },
-  },
-  asks: (view) => {
-    switch (view) {
-      case "invalid":
-        return [{ is: "git", email: "mika@nowak" }];
-      case "done":
-        return [{ is: "git", email: USER.email }, { is: "buttons", labels: ["Save changes"] }];
-      default:
-        return [{ is: "git", email: USER.email }];
-    }
-  },
-  facts: (view) => [
-    { label: "Saved to", value: IDENTITY },
-    { label: "Included by", value: "~/.config/git/config" },
-    { label: "git says", value: view === "done" ? `${USER.name} <${USER.email}>` : view === "wins" ? "user.email = mika@old-job.example" : "Nothing yet" },
-  ],
-  command: `git config --file ${IDENTITY} user.email ${USER.email}`,
-  action: (view) => (view === "done" ? undefined : view === "wins" ? { label: "Try again", icon: "restart_alt" } : { label: "Save", icon: "save" }),
-  blocker: (view) => (view === "invalid" ? "That doesn't look like an email." : undefined),
-  act: { fill: "done", wins: "done" },
-  auto: {},
-};
-
 // ------------------------------------------------------------------ Phone --
 
 const PHONE_KEY = "5A1C 9E07 33B2";
@@ -582,20 +523,20 @@ const phone: Card = {
   auto: { starting: ["waiting", "scene"], waiting: ["request", "slow"], pairing: ["done", "scene"] },
 };
 
-export const CARDS: Readonly<Record<CardId, Card>> = { tuxedo, fingerprint, yubikey, bitwarden, git, phone };
+export const CARDS: Readonly<Record<CardId, Card>> = { yours, drivers, fingerprint, yubikey, phone };
 
 /** The views a card is at: the sample laptop's first boot, with `more` on top. */
 export type Views = Readonly<Record<CardId, string>>;
 
 export function firstViews(more: Partial<Views> = {}): Views {
-  return { tuxedo: tuxedo.first, fingerprint: fingerprint.first, yubikey: yubikey.first, bitwarden: bitwarden.first, git: git.first, phone: phone.first, ...more };
+  return { yours: yours.first, drivers: drivers.first, fingerprint: fingerprint.first, yubikey: yubikey.first, phone: phone.first, ...more };
 }
 
-/** A desktop that isn't a TUXEDO and has no reader: two cards not there. */
-export const TOWER: Partial<Views> = { tuxedo: "absent", fingerprint: "absent" };
+/** A desktop of a maker the Drivers card doesn't know, with no reader: one card not there. */
+export const TOWER: Partial<Views> = { drivers: "unknown", fingerprint: "absent" };
 
 /** What every card ends at once it was done, for the ending. */
-export const ALL_DONE: Views = { tuxedo: "done", fingerprint: "done", yubikey: "done", bitwarden: "done", git: "done", phone: "done" };
+export const ALL_DONE: Views = { yours: "done", drivers: "done", fingerprint: "done", yubikey: "done", phone: "done" };
 
 /** Whether the card wants attention: `State::open`. */
 export function open(view: View): boolean {

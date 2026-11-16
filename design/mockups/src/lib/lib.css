@@ -819,7 +819,8 @@
   transition: none;
 }
 
-.k-choice-card .k-card-title-line > :not(.k-choice-mark) {
+.k-choice-card .k-card-title-line > :not(.k-choice-mark),
+.k-choice-card .k-choice-words > .k-card-title {
   filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--picked) * var(--signs))));
 }
 
@@ -866,9 +867,11 @@
 
 /* A set of choice cards: `--columns` across, `space.s16` apart, each column as wide as the room
    split in device pixels, the cards of a row one height. */
+/* A set of choice cards: its columns' whole-pixel widths are worked out as it resizes (`--tracks`),
+   equal shares until then. */
 .k-choice-group {
   display: grid;
-  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
+  grid-template-columns: var(--tracks, repeat(var(--columns), minmax(0, 1fr)));
   gap: var(--space-s16);
   align-self: stretch;
 }

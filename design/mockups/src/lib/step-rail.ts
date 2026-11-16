@@ -69,6 +69,11 @@ export interface RailPage {
   readonly blocker?: Live<string | undefined>;
   /** What the footer says before Continue when nothing blocks it: 12 of 40 picked. */
   readonly note?: Live<string | undefined>;
+  /**
+   * Back closes its host: the one page of a flow opened on it alone (a first-boot card from the
+   * Command menu), where there is no page before it to go back to. Back then reads Close.
+   */
+  readonly closes?: boolean;
   /** A page with no footer: the review, whose action is in its body, and the running steps. */
   readonly footless?: boolean;
   /** Its body reads the whole flow (the review), so it is drawn again each time it shows. */
@@ -418,7 +423,7 @@ export interface FooterPins {
  * breaks between words, so it is read whole and pushes neither button.
  */
 export function footer(spec: RailPage, onBack: () => void = () => {}, onNext: () => void = () => {}, pinned: FooterPins = {}, onSkip: () => void = () => {}): { band: HTMLElement; nudge: HTMLElement | null; next: HTMLElement } {
-  const back = button({ label: "Back", kind: "Text", icon: "arrow_back", ...(pinned.back ? { pinned: pinned.back } : {}) });
+  const back = button({ label: spec.closes ? "Close" : "Back", kind: "Text", icon: spec.closes ? "close" : "arrow_back", ...(pinned.back ? { pinned: pinned.back } : {}) });
   back.addEventListener("click", onBack);
   const parts: Element[] = [back, fill()];
   let nudge: HTMLElement | null = null;

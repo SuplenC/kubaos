@@ -824,7 +824,8 @@ power_restart_held = 0.65
 # desktop under the bar, which cuts a window's top border off in steps beside an open panel.
 frame_blur = 0.85
 # A surface over the blurred wallpaper it lies on, so the photo shows through as glass: Kōbō's
-# questions, the whole screen, and first boot's window.
+# questions and first boot's cards, the whole screen, and a first-boot card opened alone in a
+# window.
 glass = 0.80
 # The furthest the wallpaper is turned toward the surface behind full-screen text, so the words
 # read over any photo: at 0.90 every text role keeps 4.5:1 over pure black in light and pure

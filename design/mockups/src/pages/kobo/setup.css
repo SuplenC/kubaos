@@ -1,9 +1,8 @@
-/* Kōbō's first boot (`setup-room.ts`): the window on the desktop, the layers it hands over between,
-   its scenes and the card pages' own parts. */
+/* Kōbō's first boot (`setup-room.ts`): what its room adds to the installer's (`kobo.css`), the
+   window a card opened alone is, and the card pages' own parts. */
 
-/* The window: Kōbō's glass panel at the window's size and corner, its active tube round it (outside
-   the glass, which cuts what lies on it to its corner); its scenes and its rail lie on the glass,
-   one over another as they hand over. */
+/* A card opened alone: Kōbō's glass panel at the window's size and corner, its active tube round it
+   (outside the glass, which cuts what lies on it to its corner), its rail on the glass. */
 .setup-window {
   position: relative;
   display: block;
@@ -29,36 +28,9 @@
   border-radius: inherit;
 }
 
-/* Gone to the desktop: what the move leaves, held. */
-.setup-window[data-left] {
-  opacity: 0;
-  scale: var(--scale-behind);
-}
-
-/* A scene: one column in the middle of the window, on the glass. It hands over to the rail and
-   back one after the other, never both on the glass at once. */
-.setup-scene {
-  display: flex;
-  box-sizing: border-box;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-s32);
-}
-
-.setup-column {
-  width: var(--size-column);
-  max-width: 100%;
-}
-
-/* A window is no thing in the Backdrop's middle: its words read from the left, as a window's do,
-   and only a scene's column is centred. */
-.setup-room .setup-window .k-text[data-wrapped]:not(.setup-column > *) {
+/* A window is no thing in the Backdrop's middle: its words read from the left, as a window's do. */
+.setup-room .setup-window .k-text[data-wrapped] {
   text-align: start;
-}
-
-.setup-column > :is(.setup-hero, .setup-lede, .setup-accent) {
-  text-align: center;
-  text-wrap: balance;
 }
 
 /* A card's body, drawn again in place as its work moves on: it fills the page above the band. */
@@ -102,8 +74,15 @@
   }
 }
 
-/* The desktop round the window is the wallpaper as it is: there are no words on the picture for a
-   Backdrop's band to stand behind. */
-.setup-room.k-backdrop .k-backdrop-scrim {
+/* Make it yours (`setup-yours-card.ts`): what it shows only while it has something to show. */
+.setup-yours-progress[hidden],
+.setup-yours-failure[hidden],
+.setup-yours-columns[hidden] {
+  display: none;
+}
+
+/* The desktop as it is, round a card opened alone and once first boot has handed it over: there are
+   no words on the picture for a Backdrop's band to stand behind. */
+.setup-room > .kobo-scene:is(.setup-desk, [data-scene="desktop"]) .k-backdrop-scrim {
   display: none;
 }

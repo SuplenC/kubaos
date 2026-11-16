@@ -14,10 +14,12 @@
 import { pin, type Pinned } from "./control.ts";
 import { focusRing } from "./focus.ts";
 import { icon } from "./icon.ts";
-import { filling, row, stack } from "./layout.ts";
+import { iconTile } from "./icon-tile.ts";
+import { fill, filling, row, split, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { wrapped } from "./text.ts";
 import { length } from "./tokens.ts";
+import { settings } from "../site/settings.ts";
 
 export interface HeaderOptions {
   /** A symbol before the title, `subheading`'s 24. */
@@ -103,8 +105,13 @@ export function card(options: CardOptions): HTMLElement {
 /** How a set of choice cards is picked: exactly one, as radios; or any of them, as checkboxes. */
 export type Picks = "one" | "many";
 
+/** A choice card's size: md, its symbol before its title; lg, on an lg icon tile above it. */
+export type ChoiceCardSize = "Md" | "Lg";
+
 export interface ChoiceCardOptions {
   readonly glyph?: string;
+  /** Lg for a few choices that are a page's whole question: Make it yours's profiles. */
+  readonly size?: ChoiceCardSize;
   readonly title: string;
   readonly subtitle?: string;
   readonly picked?: boolean;
@@ -154,16 +161,42 @@ export function choiceCard(options: ChoiceCardOptions): HTMLElement {
   if (disabled) element.setAttribute("aria-disabled", "true");
   element.tabIndex = -1;
   pin(element, options.pinned);
-  const header = cardHeader({
-    title: options.title,
-    end: mark(picks),
-    ...(options.glyph ? { glyph: options.glyph } : {}),
-    ...(options.subtitle === undefined ? {} : { subtitle: options.subtitle }),
-  });
-  element.append(held([header]));
+  const size = options.size ?? "Md";
+  element.dataset.size = size;
+  if (size === "Lg") element.append(held(large(options, picks)));
+  else {
+    const header = cardHeader({
+      title: options.title,
+      end: mark(picks),
+      ...(options.glyph ? { glyph: options.glyph } : {}),
+      ...(options.subtitle === undefined ? {} : { subtitle: options.subtitle }),
+    });
+    element.append(held([header]));
+  }
   focusRing(element, "content", "cold", false).dataset.pressable = "";
   setPicked(element, options.picked ?? false);
-  return probe(element, { role: "component", name: "ChoiceCard", variant: "", fixed: { width: false, height: false, holds: true } });
+  return probe(element, { role: "component", name: "ChoiceCard", variant: size === "Lg" ? "Lg" : "", fixed: { width: false, height: false, holds: true } });
+}
+
+/**
+ * An lg choice card's parts: its symbol on an lg icon tile with the mark at the line's end, then,
+ * `space.s16` under them, the title in `heading` over the subtitle in `body`, `space.s4` apart.
+ */
+function large(options: ChoiceCardOptions, picks: Picks): HTMLElement[] {
+  const lead = row(0, "start", iconTile({ glyph: options.glyph ?? "check", size: "Lg" }), fill(), mark(picks));
+  const title = wrapped(options.title, "heading");
+  title.classList.add("k-card-title");
+  title.style.color = "var(--title-colour, var(--color-on_surface))";
+  const words: HTMLElement[] = [filling(title)];
+  if (options.subtitle !== undefined) {
+    const subtitle = wrapped(options.subtitle, "body", "on_surface_variant");
+    subtitle.classList.add("k-card-subtitle");
+    subtitle.style.color = "var(--subtitle-colour, var(--color-on_surface_variant))";
+    words.push(filling(subtitle));
+  }
+  const named = stack("s4", "start", ...words);
+  named.classList.add("k-choice-words");
+  return [filling(lead), filling(named)];
 }
 
 /** A key's step through a set of `columns` across: back or on by one, or by a row. */
@@ -211,6 +244,14 @@ export function choiceGroup(picks: Picks, columns: number, cells: readonly HTMLE
   grid.style.setProperty("--columns", String(columns));
   grid.setAttribute("role", picks === "one" ? "radiogroup" : "group");
   grid.append(...cells);
+  // Equal shares in whole device pixels, the spare ones to the first columns, as the layout's
+  // grid lays them: a fraction of the room each would put the cards' edges between pixels.
+  new ResizeObserver(() => {
+    const scale = Number.parseFloat(getComputedStyle(grid).getPropertyValue("--scale")) || settings().scale;
+    const apart = Math.round(length("space-s16") * scale);
+    const widths = split(Math.floor(grid.clientWidth + 1e-3), apart, Array.from({ length: columns }, () => 1));
+    grid.style.setProperty("--tracks", widths.map((each) => `${each}px`).join(" "));
+  }).observe(grid);
   const targets = cells.map(target);
   const usable = (at: number) => targets[at]!.getAttribute("aria-disabled") !== "true";
   const isPicked = (at: number) => cells[at]!.getAttribute("aria-checked") === "true";

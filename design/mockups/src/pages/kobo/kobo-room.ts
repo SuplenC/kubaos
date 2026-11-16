@@ -146,13 +146,13 @@ export function play(root: HTMLElement, tracks: readonly Track[]): Promise<void>
 // ----------------------------------------------------------------- Scenes --
 
 /** A scene's part: it fades and rises into place as the scene's recipe says. */
-function part<E extends HTMLElement>(element: E, name: string): E {
+export function part<E extends HTMLElement>(element: E, name: string): E {
   element.classList.add("kobo-part", `kobo-${name}`);
   return element;
 }
 
 /** A column of a scene's parts, `size.column` wide, centred under one another. */
-function column(name: string, ...parts: Element[]): HTMLElement {
+export function column(name: string, ...parts: Element[]): HTMLElement {
   const box = stack(0, "centre", ...parts);
   box.classList.add("kobo-column", `kobo-${name}`);
   return box;
@@ -330,14 +330,38 @@ function restarting(): HTMLElement {
   return line;
 }
 
-export function doneColumn(going = false, headline = DONE_HEADLINE.short): HTMLElement {
-  const words = headline.split(" ").map((word, index) => {
+/** What an ending says and offers: Kōbō's done screen's, and first boot's. */
+export interface Ending {
+  readonly headline: string;
+  readonly lede: string;
+  /** The actions' line, already laid out: buttons, or what a press set going. */
+  readonly actions: HTMLElement;
+  readonly hints: readonly KeyHint[];
+  /** A line under the keys, where something waits on the next screen. */
+  readonly promise?: HTMLElement;
+}
+
+/**
+ * An ending's column, as both of Kōbō's endings are laid out and moved: クバ alone, the headline
+ * word by word, the lede, the actions with their keys.
+ */
+export function endingColumn(ending: Ending): HTMLElement {
+  const words = ending.headline.split(" ").map((word, index) => {
     const shown = part(text(index === 0 ? word : ` ${word}`, "hero"), `word-${index}`);
     shown.classList.add("kobo-word");
     return shown;
   });
   const line = row(0, "end", ...words);
   line.classList.add("kobo-headline");
+  ending.actions.classList.add("kobo-status");
+  const sign = document.createElement("span");
+  sign.append(neonMark());
+  const pressed = stack("s12", "centre", ending.actions, keys(ending.hints));
+  const act = ending.promise ? stack(0, "centre", pressed, gap("s24"), ending.promise) : pressed;
+  return column("done", part(sign, "sign-on"), gap("s24"), line, gap("s16"), part(wrapped(ending.lede, "body_large", "on_surface_variant"), "lede"), gap("s40"), part(act, "act"));
+}
+
+export function doneColumn(going = false, headline = DONE_HEADLINE.short): HTMLElement {
   const reboot = button({ label: "Reboot", size: "Lg", icon: "power_settings_new" });
   reboot.classList.add("kobo-reboot");
   const stay = button({ label: "Stay in the live system", kind: "Text", size: "Lg" });
@@ -345,23 +369,11 @@ export function doneColumn(going = false, headline = DONE_HEADLINE.short): HTMLE
   // Stay's padding hangs past the row's end, so the pair centred is what you see: Reboot's fill to
   // Stay's last letter, not to its unseen padding.
   if (!going) actions.dataset.hangs = "";
-  actions.classList.add("kobo-status");
-  const sign = document.createElement("span");
-  sign.append(neonMark());
-  return column(
-    "done",
-    part(sign, "sign-on"),
-    gap("s24"),
-    line,
-    gap("s16"),
-    part(wrapped(doneLine(), "body_large", "on_surface_variant"), "lede"),
-    gap("s40"),
-    part(stack("s12", "centre", actions, keys(going ? [] : [["Enter", "reboot"], ["Tab", "move"]])), "act"),
-  );
+  return endingColumn({ headline, lede: doneLine(), actions, hints: going ? [] : [["Enter", "reboot"], ["Tab", "move"]] });
 }
 
 /** Key hints that keep a keycap's line of room with none to show, so nothing under them moves. */
-function keys(hints: readonly KeyHint[]): HTMLElement {
+export function keys(hints: readonly KeyHint[]): HTMLElement {
   const line = keyHints(hints);
   line.classList.add("kobo-keys");
   return line;
@@ -1017,9 +1029,9 @@ export const FAILING: Move = {
 
 const DONE = "the done screen";
 
-/** Every word of the headline rising in, a `micro` after the last. */
-function words(cue: readonly Duration[]): Track<"emphasized_decel">[] {
-  return DONE_HEADLINE.short.split(" ").flatMap((_, index) => rising(`.kobo-word-${index}`, `word ${index + 1}`, DONE, [...cue, ...Array<Duration>(index).fill("micro")] as unknown as NonEmpty<Duration>));
+/** Every word of `headline` rising in, a `micro` after the last. */
+function words(headline: string, cue: readonly Duration[]): Track<"emphasized_decel">[] {
+  return headline.split(" ").flatMap((_, index) => rising(`.kobo-word-${index}`, `word ${index + 1}`, DONE, [...cue, ...Array<Duration>(index).fill("micro")] as unknown as NonEmpty<Duration>));
 }
 
 /** The mark written in, a stroke every `short`, each along its length over `short`. */
@@ -1041,13 +1053,13 @@ export function writing(): Track<"standard">[] {
  * The arrival: the street goes dark as クバ is written in as unlit glass, then it strikes, and as it
  * comes on the street lights up again round it and comes toward you: the machine is on, and yours.
  */
-const DONE_TRACKS = (strike: "neon.strike" | "standard"): Track[] => [
+export const arrival = (strike: "neon.strike" | "standard", headline = DONE_HEADLINE.short): Track[] => [
   { part: "the street going dark", on: DONE, target: ".kobo-scene .k-backdrop-dark", property: "opacity", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
   ...writing(),
   { part: "the mark, struck", on: DONE, target: ".kobo-mark", property: "--kobo-burn", from: 0, to: 1, duration: "medium", cue: "scene", curve: strike },
   { part: "the street lighting up", on: DONE, target: ".kobo-scene .k-backdrop-dark", property: "opacity", from: 1, to: 0, duration: "slow", cue: ["scene", "short"], curve: "emphasized_decel" },
   { part: "the street coming close", on: DONE, target: ".kobo-scene .k-backdrop-picture", property: "scale", from: 1, to: { scale: "push" }, duration: "scene", cue: ["scene", "short"], curve: "emphasized_decel" },
-  ...words(["scene", "medium"]),
+  ...words(headline, ["scene", "medium"]),
   ...rising(".kobo-done > .kobo-lede", "the lede", DONE, ["scene", "medium", "short"]),
   ...rising(".kobo-done > .kobo-act", "the actions", DONE, ["scene", "medium", "medium"]),
 ];
@@ -1056,8 +1068,8 @@ const DONE_TRACKS = (strike: "neon.strike" | "standard"): Track[] => [
 export const ARRIVING: Move = {
   name: "Done: the arrival",
   what: "The street goes dark as クバ writes itself in, unlit; it strikes, the street lights up and comes close; the headline rises.",
-  tracks: DONE_TRACKS("neon.strike") as unknown as NonEmpty<Track>,
-  unflickered: DONE_TRACKS("standard") as unknown as NonEmpty<Track<Easing>>,
+  tracks: arrival("neon.strike") as unknown as NonEmpty<Track>,
+  unflickered: arrival("standard") as unknown as NonEmpty<Track<Easing>>,
   reduced: [
     fading(".kobo-done", "the done screen", DONE),
   ],
@@ -1090,7 +1102,7 @@ export const GOING: Move = {
 };
 
 /** `tracks` played `by` later: its phase put before each track's own cue. */
-function after(by: Duration, tracks: readonly Track[]): Track[] {
+export function after(by: Duration, tracks: readonly Track[]): Track[] {
   return tracks.map((track) => ({ ...track, cue: [by, ...(track.cue === undefined ? [] : typeof track.cue === "string" ? [track.cue] : track.cue)] as unknown as NonEmpty<Duration> }));
 }
 
@@ -1105,8 +1117,8 @@ const ENDING = (arrival: readonly Track[]): Track[] => [
 export const FINISHING: Move = {
   name: "The install ends",
   what: "At 100%: the figure and its bar rise off over `medium`; then the done screen's arrival plays.",
-  tracks: ENDING(DONE_TRACKS("neon.strike")) as unknown as NonEmpty<Track>,
-  unflickered: ENDING(DONE_TRACKS("standard")) as unknown as NonEmpty<Track<Easing>>,
+  tracks: ENDING(arrival("neon.strike")) as unknown as NonEmpty<Track>,
+  unflickered: ENDING(arrival("standard")) as unknown as NonEmpty<Track<Easing>>,
   reduced: [
     { part: "the install's words", on: INSTALL, target: ".kobo-scene[data-scene='installing'] > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the done screen", on: DONE, target: ".kobo-scene[data-scene='done']", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
