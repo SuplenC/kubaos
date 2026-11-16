@@ -61,6 +61,7 @@ kind = "run"
 do = ["./sync"]
 check = ["./synced"]
 undo = ["./unsync"]
+source = "container_images"
 "#
     )
 }

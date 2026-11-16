@@ -75,7 +75,13 @@ pub enum AppCmd {
         #[arg(long)]
         markdown: bool,
         /// Read the catalog in DIR, as a checkout's apps/, instead of this release's.
-        #[arg(long, value_name = "DIR", hide = true)]
+        #[arg(
+            long,
+            value_name = "DIR",
+            hide = true,
+            requires = "markdown",
+            conflicts_with = "json"
+        )]
         catalog: Option<PathBuf>,
     },
     /// One app: what it is, and what it owns on this machine.
@@ -144,8 +150,11 @@ pub fn main(cmd: AppCmd) -> ExitCode {
     reason = "The list is the command's output, written whole as it ends its own lines."
 )]
 fn list(json: bool, markdown: bool, catalog: Option<&Path>) -> ExitCode {
-    let installed = SystemPaths::machine().catalog();
-    let catalog = match Catalog::load(catalog.unwrap_or(&installed)) {
+    let read = match catalog {
+        Some(dir) => Catalog::load_existing(dir),
+        None => Catalog::load(&SystemPaths::machine().catalog()),
+    };
+    let catalog = match read {
         Ok(catalog) => catalog,
         Err(e) => return job::report(e),
     };
@@ -226,7 +235,16 @@ fn list_markdown(listed: &[Listed]) -> String {
                 ids(setup.requires.iter().map(String::as_str))
             ));
         }
-        let sources: Vec<String> = app.sources.iter().map(source).collect();
+        let sources = if app.setups.is_empty() {
+            sources(&app.sources)
+        } else {
+            let each: Vec<String> = app
+                .setups
+                .iter()
+                .map(|s| format!("{}: {}", s.id, sources(&s.sources)))
+                .collect();
+            each.join("; ")
+        };
         let _ = writeln!(
             text,
             "| {} (`{}`) | {} | {} | {} | {} | {} | {} |",
@@ -236,7 +254,7 @@ fn list_markdown(listed: &[Listed]) -> String {
             or_none(&setups.join(", ")),
             or_none(&requires.join("; ")),
             cell(app.summary),
-            or_none(&sources.join(", ")),
+            or_none(&sources),
             or_none(&app.arches.join(", ")),
         );
     }
@@ -248,7 +266,12 @@ fn ids<'a>(ids: impl Iterator<Item = &'a str>) -> String {
     ids.map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ")
 }
 
-/// Where an app comes from, as the table says it.
+/// Where an install takes an app from, as the table says it.
+fn sources(sources: &[Source]) -> String {
+    sources.iter().map(source).collect::<Vec<_>>().join(", ")
+}
+
+/// One source, as the table says it.
 fn source(source: &Source) -> String {
     match source {
         Source::AptRepo { repo } => format!("apt repo (`{repo}`)"),
@@ -256,6 +279,7 @@ fn source(source: &Source) -> String {
         Source::Nixpkgs => "nixpkgs".to_owned(),
         Source::Deb => "pinned .deb".to_owned(),
         Source::Download => "pinned download".to_owned(),
+        Source::ContainerImages => "pinned container images".to_owned(),
         Source::WebApp => "web app".to_owned(),
     }
 }

@@ -81,15 +81,19 @@ pub struct SetupInfo {
     /// The apps it requires besides the app's own, by id.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub requires: Vec<String>,
+    /// Where an install in it takes the app from, the app's own actions included.
+    pub sources: Vec<Source>,
 }
 
-impl From<&FolderSetup> for SetupInfo {
-    fn from(setup: &FolderSetup) -> Self {
+impl SetupInfo {
+    /// `setup` of `app`.
+    pub fn of(app: &Folder, setup: &FolderSetup) -> Self {
         Self {
             id: setup.id.clone(),
             name: setup.name.clone(),
             summary: setup.summary.clone(),
             requires: setup.requires.iter().map(|r| r.id().to_owned()).collect(),
+            sources: app.sources(Some(setup)),
         }
     }
 }
@@ -221,7 +225,7 @@ impl Status {
                 state,
                 version: version.filter(|_| state.is_installed()),
                 setup: installed.and_then(|j| j.setup.clone()),
-                setups: app.setups.iter().map(SetupInfo::from).collect(),
+                setups: app.setups.iter().map(|s| SetupInfo::of(app, s)).collect(),
                 configurable,
                 available,
             });
@@ -264,7 +268,9 @@ pub struct Listed<'a> {
     /// The apps it requires in every setup, by id; a setup's own are its [`SetupInfo`]'s.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub requires: Vec<&'a str>,
-    /// Where its installs take it from, in the catalog's order of sources.
+    /// Where its install takes it from, in the catalog's order of sources; an app with setups
+    /// says it in each [`SetupInfo`] instead.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub sources: Vec<Source>,
     /// The architectures it installs on, in one setup at least.
     pub arches: Vec<&'static str>,
@@ -284,9 +290,13 @@ pub fn listing<'a>(catalog: &'a Catalog, picks: &'a Picks) -> Vec<Listed<'a>> {
             tags: &app.tags,
             picked: picks.has(&app.id),
             setup: picks.setup(&app.id),
-            setups: app.setups.iter().map(SetupInfo::from).collect(),
+            setups: app.setups.iter().map(|s| SetupInfo::of(app, s)).collect(),
             requires: app.requires.iter().map(Requirement::id).collect(),
-            sources: app.sources(),
+            sources: if app.has_setups() {
+                Vec::new()
+            } else {
+                app.sources(None)
+            },
             arches: catalog.arches(app),
         })
         .collect()

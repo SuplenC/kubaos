@@ -10,6 +10,7 @@ use super::action::Kind;
 use super::action::Words;
 use super::catalog::CATALOG;
 use super::catalog::CatalogError;
+use super::folder::FolderError;
 use super::journal::Journal;
 use super::status::AppState;
 use super::status::listing;
@@ -300,9 +301,11 @@ fn the_list_groups_the_apps_by_category_and_says_where_each_comes_from_and_runs(
     );
     assert_eq!(list[0]["arches"], serde_json::json!(["amd64"]));
     assert!(list[0].get("requires").is_none(), "{}", list[0]);
+    assert!(list[1].get("sources").is_none(), "{}", list[1]);
+    assert_eq!(list[1]["setups"][0]["sources"], serde_json::json!([{ "kind": "deb" }]));
     assert_eq!(
-        list[1]["sources"],
-        serde_json::json!([{ "kind": "deb" }, { "kind": "web_app" }])
+        list[1]["setups"][1]["sources"],
+        serde_json::json!([{ "kind": "web_app" }])
     );
     assert_eq!(list[1]["arches"], serde_json::json!(["amd64", "arm64"]));
     assert_eq!(list[1]["setups"][0]["id"], "local");
@@ -642,4 +645,113 @@ exit 1"#,
     assert!(!pulled.exists(), "the image the install pulled stayed");
     assert!(had.exists(), "the image the machine had went");
     assert!(!dir.join("pulled-images").exists() && !dir.join("secret.env").exists());
+}
+
+#[test]
+fn a_catalog_named_by_hand_must_be_there() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let err = Catalog::load_existing(&dir.path().join("typo")).unwrap_err();
+
+    assert!(matches!(err, CatalogError::Read { .. }), "{err:?}");
+    assert_eq!(Catalog::load_existing(dir.path()).unwrap(), Catalog::default());
+}
+
+/// A setup `local` whose install runs `./up`, with `rest` after `kind = "run"`, beside a web setup.
+fn stack_app(rest: &str) -> String {
+    app_in(
+        "Stack",
+        "graphics",
+        &format!(
+            "[setup.web]\nname = \"Stack\"\nsummary = \"in a window\"\n\
+             [[setup.web.action]]\nname = \"Window\"\nkind = \"web_app\"\nid = \"stack\"\ntitle = \"Stack\"\n\
+             url = \"https://stack.example/\"\nicon = \"stack.svg\"\n\
+             [setup.local]\nname = \"Stack here\"\nsummary = \"on this machine\"\n\
+             [[setup.local.action]]\nname = \"Start it\"\nkind = \"run\"\nroot = true\ndo = [\"./up\"]\n\
+             check = [\"./up-to-date\"]\nundo = [\"./down\"]\n{rest}\
+             [[setup.local.action]]\nname = \"Window\"\nkind = \"web_app\"\nid = \"stack-local\"\n\
+             title = \"Stack\"\nurl = \"http://localhost:9001/\"\nicon = \"stack.svg\"\n"
+        ),
+    )
+}
+
+#[test]
+fn a_run_that_installs_the_app_is_its_setups_source() {
+    let (_dir, catalog) = catalog_of(&[("stack", stack_app("source = \"container_images\"\n"))]);
+
+    let list = serde_json::to_value(listing(&catalog, &Picks::default())).unwrap();
+
+    assert!(list[0].get("sources").is_none(), "{}", list[0]);
+    assert_eq!(list[0]["setups"][0]["id"], "local");
+    assert_eq!(
+        list[0]["setups"][0]["sources"],
+        serde_json::json!([{ "kind": "container_images" }])
+    );
+    assert_eq!(
+        list[0]["setups"][1]["sources"],
+        serde_json::json!([{ "kind": "web_app" }])
+    );
+}
+
+#[test]
+fn an_install_whose_source_nothing_names_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("stack")).unwrap();
+    fs::write(dir.path().join("stack/app.toml"), stack_app("")).unwrap();
+
+    let err = Catalog::load(dir.path()).unwrap_err();
+
+    let CatalogError::App { source, .. } = &err else {
+        panic!("{err:?}");
+    };
+    assert!(matches!(**source, FolderError::NoSource(_)), "{source:?}");
+}
+
+#[test]
+fn a_run_names_only_a_source_the_catalog_knows() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("stack")).unwrap();
+    fs::write(dir.path().join("stack/app.toml"), stack_app("source = \"floppies\"\n")).unwrap();
+
+    assert!(Catalog::load(dir.path()).is_err());
+}
+
+#[test]
+fn a_configure_step_is_no_source() {
+    let (_dir, catalog) = catalog_of(&[(
+        "notes",
+        app_in(
+            "Notes",
+            "office",
+            &format!(
+                "[[action]]\nname = \"Install it\"\nkind = \"apt\"\npackages = [\"notes\"]\n\
+                 [[action]]\nname = \"Its theme\"\nstage = \"configure\"\nkind = \"download\"\n\
+                 to = \"~/.config/kubaos/notes/theme\"\nversion = \"1\"\nunpack = \"file\"\n\
+                 amd64 = {{ url = \"https://notes.example/theme\", sha256 = \"{}\" }}\n",
+                "0".repeat(64)
+            ),
+        ),
+    )]);
+
+    let list = serde_json::to_value(listing(&catalog, &Picks::default())).unwrap();
+
+    assert_eq!(list[0]["sources"], serde_json::json!([{ "kind": "archive" }]));
+}
+
+#[test]
+fn penpots_local_stack_comes_from_pinned_images_and_its_web_setup_from_the_website() {
+    let catalog = shipped();
+
+    let list = serde_json::to_value(listing(&catalog, &Picks::default())).unwrap();
+
+    let penpot = list.as_array().unwrap().iter().find(|a| a["id"] == "penpot").unwrap();
+    assert_eq!(penpot["setups"][0]["id"], "local");
+    assert_eq!(
+        penpot["setups"][0]["sources"],
+        serde_json::json!([{ "kind": "container_images" }])
+    );
+    assert_eq!(
+        penpot["setups"][1]["sources"],
+        serde_json::json!([{ "kind": "web_app" }])
+    );
 }

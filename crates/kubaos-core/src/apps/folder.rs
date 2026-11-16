@@ -25,6 +25,7 @@ use serde::Serialize;
 use super::action::Action;
 use super::action::ActionError;
 use super::action::Kind;
+use super::action::RunSource;
 use super::action::Side;
 use super::action::Stage;
 use super::action::is_argv;
@@ -65,6 +66,10 @@ pub enum FolderError {
     Empty { key: &'static str },
     #[error("an install does something: {0} has no actions")]
     NoActions(String),
+    #[error(
+        "{0} installs through a `run` and names no source: the `run` that installs the app says what from, `source = \"container_images\"`"
+    )]
+    NoSource(String),
     #[error("a ready check is an argv, a program on PATH or ./<script> in the app's folder, and what it says")]
     InvalidReady,
     #[error("{id} can be set up more than one way: name one of {}", setups.join(", "))]
@@ -159,12 +164,16 @@ pub enum Source {
     Deb,
     /// A vendor's download, an `AppImage` or an archive, pinned by its sha256.
     Download,
+    /// Container images, each pinned by its digest, which a `run` declaring them installs.
+    ContainerImages,
     /// A website in a window of its own.
     WebApp,
 }
 
 impl Source {
-    /// The source of `kind`, for the kinds that put the app itself on the machine.
+    /// The source of `kind`, for the kinds that put the app itself on the machine: a `run` that
+    /// declares one, and a web app on a website, not one of this machine's, which is a window on
+    /// what another action installs.
     fn of(kind: &Kind) -> Option<Self> {
         match kind {
             Kind::Apt { repo: Some(repo), .. } => Some(Self::AptRepo { repo: repo.clone() }),
@@ -172,7 +181,11 @@ impl Source {
             Kind::Nix { .. } => Some(Self::Nixpkgs),
             Kind::Deb { .. } => Some(Self::Deb),
             Kind::Download { .. } => Some(Self::Download),
-            Kind::WebApp { .. } => Some(Self::WebApp),
+            Kind::Run {
+                source: Some(RunSource::ContainerImages),
+                ..
+            } => Some(Self::ContainerImages),
+            Kind::WebApp { url, .. } if super::action::is_https(url) => Some(Self::WebApp),
             _ => None,
         }
     }
@@ -399,12 +412,18 @@ impl Folder {
         if self.setups.is_empty() && self.actions.is_empty() {
             return Err(FolderError::NoActions(self.id.clone()));
         }
+        if self.setups.is_empty() && self.installs_unnamed(None) {
+            return Err(FolderError::NoSource(self.id.clone()));
+        }
         for setup in &self.setups {
             if setup.name.trim().is_empty() || setup.summary.trim().is_empty() {
                 return Err(FolderError::Empty { key: "setup.name" });
             }
             if self.actions.is_empty() && setup.actions.is_empty() {
                 return Err(FolderError::NoActions(format!("{}'s setup {}", self.id, setup.id)));
+            }
+            if self.installs_unnamed(Some(setup)) {
+                return Err(FolderError::NoSource(format!("{}'s setup {}", self.id, setup.id)));
             }
         }
         let readies = self.ready.iter().chain(self.setups.iter().flat_map(|s| &s.ready));
@@ -556,9 +575,27 @@ impl Folder {
             .all(|action| action.available(arch))
     }
 
-    /// Where its installs take it from, in any setup, each once, in the catalog's order of sources.
-    pub fn sources(&self) -> Vec<Source> {
-        let sources: BTreeSet<Source> = self.all_actions().filter_map(|a| Source::of(&a.kind)).collect();
+    /// Whether an install in `setup` runs a program in its install stage and names no source:
+    /// that `run` installs the app, so it says what from.
+    fn installs_unnamed(&self, setup: Option<&FolderSetup>) -> bool {
+        let runs = self
+            .actions
+            .iter()
+            .chain(setup.into_iter().flat_map(|s| &s.actions))
+            .any(|a| a.stage == Stage::Install && matches!(a.kind, Kind::Run { .. }));
+        runs && self.sources(setup).is_empty()
+    }
+
+    /// Where an install in `setup` takes it from, its install stage's actions, the app's then
+    /// the setup's, each source once, in the catalog's order of sources.
+    pub fn sources(&self, setup: Option<&FolderSetup>) -> Vec<Source> {
+        let sources: BTreeSet<Source> = self
+            .actions
+            .iter()
+            .chain(setup.into_iter().flat_map(|s| &s.actions))
+            .filter(|a| a.stage == Stage::Install)
+            .filter_map(|a| Source::of(&a.kind))
+            .collect();
         sources.into_iter().collect()
     }
 
