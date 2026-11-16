@@ -223,7 +223,7 @@ impl Status {
                 summary: app.summary.clone(),
                 category: app.category,
                 tags: app.tags.clone(),
-                icon: app.icon.clone(),
+                icon: app.icon_shown(),
                 picked,
                 state,
                 version: version.filter(|_| state.is_installed()),

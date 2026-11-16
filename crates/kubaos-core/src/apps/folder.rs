@@ -30,11 +30,17 @@ use super::action::Side;
 use super::action::Stage;
 use super::action::is_argv;
 use super::action::is_icon_name;
+use super::action::is_svg_icon;
+use super::action::is_theme_icon;
 use crate::apps::Platform;
 use crate::unfree::Unfree;
 
 /// The file of an app's folder.
 pub const APP_FILE: &str = "app.toml";
+
+/// Where an app's `.svg` icon goes: the user's `hicolor` theme, which every icon theme falls back
+/// to, as a scalable app icon.
+pub const ICON_FOLDER: &str = "~/.local/share/icons/hicolor/scalable/apps/";
 
 /// A folder that isn't an app's.
 /// The `description_from` of a description KubaOS wrote, as the app's own words aren't under a
@@ -93,7 +99,9 @@ pub enum FolderError {
     InvalidTag(String),
     #[error("{0:?} is not where the description came from: an https:// URL, or \"kubaos\" for one KubaOS wrote")]
     InvalidSource(String),
-    #[error("{0:?} is not an icon name: letters, digits, `-`, `_` and `.`, as the icon theme names them")]
+    #[error(
+        "{0:?} is not an icon: an .svg of the app's folder, or the icon theme's name for one (letters, digits, `-`, `_` and `.`)"
+    )]
     InvalidIcon(String),
     #[error("{0:?} is not an app this one can require: an app id, other than its own, named once")]
     InvalidRequirement(String),
@@ -380,7 +388,41 @@ impl Folder {
             setups,
         };
         folder.check()?;
+        let mut folder = folder;
+        if let Some(step) = folder.icon_step() {
+            folder.actions.push(step);
+        }
         Ok(folder)
+    }
+
+    /// The step that puts the app's icon in the icon theme, for an `icon` that is an `.svg` of
+    /// the folder: in the user's `hicolor`, the theme every theme falls back to, by its file's
+    /// name, so a desktop entry naming that icon finds it whatever theme is on.
+    fn icon_step(&self) -> Option<Action> {
+        let icon = self.icon.as_deref().filter(|icon| is_svg_icon(icon))?;
+        Some(Action {
+            name: format!("Put {}'s icon in place", self.name),
+            stage: Stage::Install,
+            kind: Kind::File {
+                to: format!("{ICON_FOLDER}{icon}"),
+                from: Some(icon.to_owned()),
+                text: None,
+                template: false,
+                mode: Some("644".to_owned()),
+                vendor_keys: false,
+            },
+        })
+    }
+
+    /// The icon as a menu shows it: an `.svg` of the folder by its path, which is there whether
+    /// or not the app is, else the icon theme's name.
+    pub fn icon_shown(&self) -> Option<String> {
+        let icon = self.icon.as_deref()?;
+        Some(if is_svg_icon(icon) {
+            self.dir.join(icon).to_string_lossy().into_owned()
+        } else {
+            icon.to_owned()
+        })
     }
 
     fn check(&self) -> Result<(), FolderError> {
@@ -406,7 +448,8 @@ impl Folder {
             }
         }
         if let Some(icon) = &self.icon
-            && !is_icon_name(icon)
+            && !is_theme_icon(icon)
+            && !is_svg_file_icon(icon)
         {
             return Err(FolderError::InvalidIcon(icon.clone()));
         }
@@ -695,6 +738,12 @@ pub fn is_app_id(id: &str) -> bool {
         && id
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// Whether an app's `icon` is an `.svg` of its folder, by a name the icon theme can look its
+/// copy up by: `<icon name>.svg`.
+fn is_svg_file_icon(icon: &str) -> bool {
+    is_icon_name(icon) && icon.strip_suffix(".svg").is_some_and(is_theme_icon)
 }
 
 /// Whether `tag` is lowercase words, one space between them.

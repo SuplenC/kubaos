@@ -51,6 +51,45 @@ fn a_description_is_copied_from_an_https_url_or_written_by_kubaos() {
 }
 
 #[test]
+fn an_svg_icon_of_the_folder_is_put_in_the_icon_theme_after_the_apps_own_install_steps() {
+    let folder = parse(&format!("{ABOUT}icon = \"sketch.svg\"\n")).unwrap();
+
+    let steps = folder.steps(None).unwrap();
+    assert_eq!(steps.len(), 2);
+    assert_eq!(folder.shared_steps(), 2);
+    assert_eq!(steps[1].name, "Put Sketch's icon in place");
+    assert_eq!(
+        steps[1].kind,
+        super::Kind::File {
+            to: "~/.local/share/icons/hicolor/scalable/apps/sketch.svg".to_owned(),
+            from: Some("sketch.svg".to_owned()),
+            text: None,
+            template: false,
+            mode: Some("644".to_owned()),
+            vendor_keys: false,
+        }
+    );
+    assert_eq!(folder.icon_shown().as_deref(), Some("/catalog/sketch/sketch.svg"));
+}
+
+#[test]
+fn a_theme_icon_is_named_as_it_is_and_installs_nothing() {
+    let folder = parse(&format!("{ABOUT}icon = \"sketch\"\n")).unwrap();
+
+    assert_eq!(folder.steps(None).unwrap().len(), 1);
+    assert_eq!(folder.icon_shown().as_deref(), Some("sketch"));
+}
+
+#[test]
+fn an_icon_that_is_neither_an_svg_of_the_folder_nor_a_theme_name_is_refused() {
+    for icon in ["sketch.png", "../sketch.svg", "art/sketch.svg", "-sketch"] {
+        let result = parse(&format!("{ABOUT}icon = \"{icon}\"\n"));
+
+        assert!(matches!(result, Err(FolderError::InvalidIcon(_))), "{icon}: {result:?}");
+    }
+}
+
+#[test]
 fn a_category_off_the_list_is_refused() {
     let result = parse(&ABOUT.replace("\"graphics\"", "\"drawing\""));
 
