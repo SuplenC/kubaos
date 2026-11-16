@@ -56,15 +56,16 @@ fail() {
   exit 1
 }
 
-# root_only FILE: owned by root, and nobody else may write it or its folder.
+# root_only FILE: owned by whoever runs this, root but for the tests' own checkout, and nobody
+# else may write it or its folder. The tests hold their checkout to the same rule, so a check
+# that stopped refusing fails them.
 root_only() {
   local f owner mode
-  ((EUID == 0)) || return 0
   for f in "$1" "$(dirname "$1")"; do
     [[ -e $f ]] || fail "$f is missing"
     read -r owner mode < <(stat -L -c '%u %a' "$f")
-    [[ $owner == 0 ]] || fail "$f isn't owned by root; refusing to run it as root"
-    (((8#$mode & 8#022) == 0)) || fail "$f is writable by others; refusing to run it as root"
+    [[ $owner == "$EUID" ]] || fail "$f isn't owned by uid $EUID; refusing to run it"
+    (((8#$mode & 8#022) == 0)) || fail "$f is writable by others; refusing to run it"
   done
 }
 
@@ -103,7 +104,14 @@ for id in "${ids[@]}"; do
   root_only "$CATALOG/$id.toml"
   kind[$id]="$(source_of "$id")"
   case "${kind[$id]}" in
-    apt | deb) ;;
+    apt)
+      # A repo is a name of the package manifest, held to an id's pattern so it is never an
+      # option to apt-repo.sh.
+      while read -r repo; do
+        [[ $repo =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || refuse "$id names $repo, which is not a repository name"
+      done < <(app_value "$id" apt repo)
+      ;;
+    deb) ;;
     nix) refuse "$id comes from nixpkgs, into your home: kubaos app installs it without root" ;;
     *) refuse "$id has no source the helper knows" ;;
   esac

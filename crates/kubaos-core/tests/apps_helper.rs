@@ -135,6 +135,18 @@ impl Machine {
                 line("curl")
             ),
         );
+        // The helper refuses a catalog or a script others may write, whatever the umask made.
+        for dir in ["checkout", "checkout/apps", "checkout/system"] {
+            for entry in fs::read_dir(root.join(dir)).expect("list the checkout") {
+                let path = entry.expect("an entry").path();
+                let mode = if path.is_dir() || path.ends_with("apt-repo.sh") {
+                    0o755
+                } else {
+                    0o644
+                };
+                fs::set_permissions(&path, fs::Permissions::from_mode(mode)).expect("set its mode");
+            }
+        }
         let packages: String = installed.iter().flat_map(|p| [*p, "\n"]).collect();
         fs::write(root.join("dpkg"), packages).expect("write the machine's packages");
         fs::write(m.log_path(), "").expect("start the log");
@@ -203,6 +215,43 @@ fn it_refuses_anything_but_an_id_of_the_catalog_and_changes_nothing() {
     assert!(m.log().is_empty(), "something ran: {:?}", m.log());
     assert_eq!(m.run(&["upgrade", "agent"]).code, Some(2));
     assert_eq!(m.run(&["install"]).code, Some(2));
+}
+
+#[test]
+fn an_apt_app_whose_repo_isnt_a_name_is_refused_before_anything_runs() {
+    let m = Machine::new(DESK_SHA, &[]);
+    fs::write(
+        m.dir.path().join("checkout/apps/agent.toml"),
+        AGENT.replace("repo = \"vendor\"", "repo = \"--dry-run\""),
+    )
+    .expect("write a manifest");
+
+    let run = m.run(&["install", "agent"]);
+
+    assert_eq!(run.code, Some(2), "{}", run.stderr);
+    assert!(run.stderr.contains("not a repository name"), "{}", run.stderr);
+    assert!(m.log().is_empty(), "something ran: {:?}", m.log());
+}
+
+#[test]
+fn a_catalog_or_a_script_others_may_write_is_never_run() {
+    for path in [
+        "checkout/system/lib.sh",
+        "checkout/system",
+        "checkout/apps/agent.toml",
+        "checkout/apps",
+    ] {
+        let m = Machine::new(DESK_SHA, &[]);
+        let path = m.dir.path().join(path);
+        let mode = fs::metadata(&path).expect("read its mode").permissions().mode();
+        fs::set_permissions(&path, fs::Permissions::from_mode(mode | 0o020)).expect("let the group write it");
+
+        let run = m.run(&["install", "agent"]);
+
+        assert_eq!(run.code, Some(1), "{}: {}", path.display(), run.stderr);
+        assert!(run.stderr.contains("is writable by others"), "{}", run.stderr);
+        assert!(m.log().is_empty(), "something ran: {:?}", m.log());
+    }
 }
 
 #[test]
