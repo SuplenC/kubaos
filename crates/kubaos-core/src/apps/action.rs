@@ -189,6 +189,13 @@ pub enum Kind {
     /// Names of the user's nixpkgs, in the User flake's `packages.toml`.
     Nix {
         packages: Vec<String>,
+        /// The one architecture nixpkgs builds them for, when it builds them for one alone.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        arch: Option<String>,
+        /// nixpkgs marks one of them unfree (`meta.unfree`): only a user whose nixpkgs takes unfree
+        /// packages can have them, as an unfree name fails the home's switch for everyone else.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        unfree: bool,
     },
     /// A pinned download, unpacked to a path.
     Download {
@@ -505,10 +512,16 @@ impl Action {
     /// Whether it has something for a machine of `arch`.
     pub fn available(&self, arch: &str) -> bool {
         match &self.kind {
-            Kind::Apt { arch: Some(only), .. } => only == arch,
+            Kind::Apt { arch: Some(only), .. } | Kind::Nix { arch: Some(only), .. } => only == arch,
             Kind::Deb { .. } | Kind::Download { .. } => self.download(arch).is_some(),
             _ => true,
         }
+    }
+
+    /// Whether it installs a package nixpkgs marks unfree, which a user whose nixpkgs refuses unfree
+    /// packages can't have.
+    pub fn needs_unfree(&self) -> bool {
+        matches!(self.kind, Kind::Nix { unfree: true, .. })
     }
 
     /// The action as it runs on this machine and as a journal records it: its words filled in,
@@ -656,10 +669,13 @@ impl Action {
                 }
                 self.check_downloads()?;
             }
-            Kind::Nix { packages } => {
+            Kind::Nix { packages, arch, .. } => {
                 non_empty("packages", packages)?;
                 for name in packages {
                     validate_name(name).map_err(|_| ActionError::InvalidAttribute { name: name.clone() })?;
+                }
+                if let Some(arch) = arch {
+                    check_arch(arch)?;
                 }
             }
             Kind::Download { to, .. } => {

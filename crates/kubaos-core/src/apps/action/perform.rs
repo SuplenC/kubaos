@@ -40,6 +40,7 @@ use crate::apps::journal::Claim;
 use crate::apps::journal::JournalError;
 use crate::apps::journal::Prior;
 use crate::apps::journal::write_new;
+use crate::unfree::Unfree;
 
 /// The mode a file gets without a `mode`.
 const DEFAULT_FILE_MODE: u32 = 0o644;
@@ -67,6 +68,8 @@ pub enum PerformError {
     },
     #[error("there is nothing to install for {arch}")]
     Unavailable { arch: String },
+    #[error("nixpkgs marks it unfree, and your nixpkgs refuses unfree packages: `kubaos package unfree on` lets them in")]
+    Unfree,
     #[error(transparent)]
     Settings(SettingsError),
     #[error("installing it would remove {}, which this app didn't install; nothing was changed", packages.join(", "))]
@@ -398,9 +401,22 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
                 prior: Prior::default(),
             })
         }
-        Kind::Nix { packages } => {
+        Kind::Nix { packages, arch, unfree } => {
+            if let Some(only) = arch
+                && only != host.arch()
+            {
+                return Err(PerformError::Unavailable {
+                    arch: host.arch().to_owned(),
+                });
+            }
             let listed = host.nix_list().map_err(PerformError::Host)?;
-            Ok(parts("nix", packages, |p| listed.contains(p)))
+            let look = parts("nix", packages, |p| listed.contains(p));
+            // A name the user's nixpkgs refuses would fail the switch after the run, for the
+            // whole home; one already listed is in a home that built.
+            if *unfree && !look.done && host.unfree().map_err(PerformError::Host)? == Unfree::Refused {
+                return Err(PerformError::Unfree);
+            }
+            Ok(look)
         }
         Kind::Download {
             to,

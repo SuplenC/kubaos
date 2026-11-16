@@ -32,6 +32,7 @@ use super::folder::Source;
 use super::journal::Journal;
 use super::journal::JournalError;
 use super::picks::Picks;
+use crate::apps::Platform;
 use crate::apt::Dpkg;
 
 /// Where one app stands.
@@ -163,7 +164,7 @@ pub struct Status {
 
 impl Status {
     /// The status of the apps of `catalog` with `picks`, installed as the user journals in
-    /// `journals` and root's in `root_journals` say, on a machine of `arch`, with the packages
+    /// `journals` and root's in `root_journals` say, on `platform`, with the packages
     /// and versions `dpkg` has when given.
     ///
     /// # Errors
@@ -174,9 +175,10 @@ impl Status {
         picks: &Picks,
         journals: &Path,
         root_journals: &Path,
-        arch: &str,
+        platform: Platform<'_>,
         dpkg: Option<&Dpkg>,
     ) -> Result<Self, JournalError> {
+        let arch = platform.arch;
         let mut apps = Vec::new();
         for app in catalog.apps() {
             let journal = Journal::read(journals, &app.id)?;
@@ -184,10 +186,10 @@ impl Status {
             let available: Vec<bool> = if app.has_setups() {
                 app.setups
                     .iter()
-                    .map(|s| catalog.available(app, Some(s), arch))
+                    .map(|s| catalog.available(app, Some(s), platform))
                     .collect()
             } else {
-                vec![catalog.available(app, None, arch)]
+                vec![catalog.available(app, None, platform)]
             };
             let picked = picks.has(&app.id);
             let owns = match installed {

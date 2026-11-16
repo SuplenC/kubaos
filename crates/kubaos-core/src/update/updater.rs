@@ -229,6 +229,9 @@ pub enum UpdateError {
     /// The app has nothing for this machine's architecture.
     #[error("{id} has nothing for {arch}")]
     Unavailable { id: String, arch: String },
+    /// The app installs a package nixpkgs marks unfree, and the user's nixpkgs refuses them.
+    #[error("{id} needs packages nixpkgs marks unfree, and your nixpkgs refuses them: `kubaos package unfree on` lets them in")]
+    Unfree { id: String },
     /// The app has setups and none was named: there is no default.
     #[error(
         "{id} can be set up more than one way, and none is the default: {}",

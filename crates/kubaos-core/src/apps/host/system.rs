@@ -28,6 +28,8 @@ use super::UnitState;
 use crate::apps::action::RUN_PATH;
 use crate::apps::action::Scope;
 use crate::packages::Packages;
+use crate::unfree::Setting;
+use crate::unfree::Unfree;
 
 /// Root's home, the `HOME` of what root runs.
 const ROOT_HOME: &str = "/root";
@@ -292,6 +294,10 @@ impl Host for SystemHost {
     fn nix_list(&mut self) -> Result<BTreeSet<String>, HostError> {
         let names = self.nix()?.list().map_err(|e| HostError::Nix(Box::new(e)))?;
         Ok(names.into_iter().collect())
+    }
+
+    fn unfree(&mut self) -> Result<Unfree, HostError> {
+        Setting::read(self.nix()?.state().root()).map_err(|e| HostError::Nix(Box::new(e)))
     }
 
     fn nix_add(&mut self, names: &[String]) -> Result<(), HostError> {

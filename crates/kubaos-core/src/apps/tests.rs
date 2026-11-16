@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use super::Catalog;
 use super::Picks;
+use super::Platform;
 use super::Status;
 use super::action::Kind;
 use super::action::Words;
@@ -17,6 +18,7 @@ use super::status::listing;
 use crate::apt::Dpkg;
 use crate::apt::Manifest;
 use crate::apt::manifest::MANIFEST;
+use crate::unfree::Unfree;
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -157,7 +159,7 @@ fn an_installed_app_is_one_whose_user_journal_is_complete() {
         &picks,
         journals.path(),
         &journals.path().join("root"),
-        "amd64",
+        Platform::new("amd64", Unfree::Allowed),
         Some(&dpkg),
     )
     .unwrap();
@@ -168,6 +170,68 @@ fn an_installed_app_is_one_whose_user_journal_is_complete() {
     assert_eq!(state("tool"), AppState::Unavailable);
     assert_eq!(status.get("agent").unwrap().version.as_deref(), Some("1.2"));
     assert_eq!(status.get("half").unwrap().version, None);
+}
+
+#[test]
+fn an_unfree_nix_app_is_unavailable_while_the_users_nixpkgs_refuses_unfree_and_so_is_one_requiring_it() {
+    let chat = "[[action]]\nname = \"Install Chat\"\nkind = \"nix\"\npackages = [\"discord\"]\nunfree = true\n";
+    let free = "[[action]]\nname = \"Install Free\"\nkind = \"nix\"\npackages = [\"element-desktop\"]\n";
+    let (_dir, catalog) = catalog_of(&[
+        ("chat", app("Chat", chat)),
+        ("free", app("Free", free)),
+        ("bot", app("Bot", &format!("requires = [\"chat\"]\n{AGENT}"))),
+    ]);
+    let journals = tempfile::tempdir().unwrap();
+    let read = |unfree| {
+        Status::read(
+            &catalog,
+            &Picks::default(),
+            journals.path(),
+            &journals.path().join("root"),
+            Platform::new("amd64", unfree),
+            None,
+        )
+        .unwrap()
+    };
+
+    let allowed = read(Unfree::Allowed);
+    let refused = read(Unfree::Refused);
+
+    for id in ["chat", "free", "bot"] {
+        assert_eq!(allowed.get(id).unwrap().state, AppState::Available, "{id}");
+    }
+    assert_eq!(refused.get("chat").unwrap().state, AppState::Unavailable);
+    assert_eq!(refused.get("bot").unwrap().state, AppState::Unavailable);
+    assert_eq!(refused.get("free").unwrap().state, AppState::Available);
+}
+
+#[test]
+fn a_nix_step_for_one_architecture_has_nothing_for_another() {
+    let zoom = "[[action]]\nname = \"Install Zoom\"\nkind = \"nix\"\narch = \"amd64\"\npackages = [\"zoom-us\"]\n";
+    let (_dir, catalog) = catalog_of(&[("zoom", app("Zoom", zoom))]);
+    let zoom = catalog.get("zoom").unwrap();
+
+    assert!(catalog.available(zoom, None, Platform::new("amd64", Unfree::Allowed)));
+    assert!(!catalog.available(zoom, None, Platform::new("arm64", Unfree::Allowed)));
+    let wrong = app("Zoom", &zoom_with_arch("riscv64"));
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("zoom")).unwrap();
+    fs::write(dir.path().join("zoom/app.toml"), wrong).unwrap();
+    assert!(Catalog::load(dir.path()).is_err());
+}
+
+#[test]
+fn an_unfree_nix_app_lists_the_architectures_it_installs_on_whatever_the_user_lets_in() {
+    let zoom = "[[action]]\nname = \"Install Zoom\"\nkind = \"nix\"\narch = \"amd64\"\npackages = [\"zoom-us\"]\nunfree = true\n";
+    let (_dir, catalog) = catalog_of(&[("zoom", app("Zoom", zoom))]);
+
+    let list = serde_json::to_value(listing(&catalog, &Picks::default())).unwrap();
+
+    assert_eq!(list[0]["arches"], serde_json::json!(["amd64"]));
+}
+
+fn zoom_with_arch(arch: &str) -> String {
+    format!("[[action]]\nname = \"Install Zoom\"\nkind = \"nix\"\narch = \"{arch}\"\npackages = [\"zoom-us\"]\n")
 }
 
 #[test]
@@ -192,7 +256,7 @@ fn an_app_kubaos_owns_nothing_of_is_found_and_one_with_no_journal_is_read_from_d
         &picks,
         journals.path(),
         &journals.path().join("root"),
-        "amd64",
+        Platform::new("amd64", Unfree::Allowed),
         Some(&dpkg),
     )
     .unwrap();
@@ -250,7 +314,7 @@ fn the_list_and_the_status_say_what_each_app_is_in_json() {
             &picks,
             journals.path(),
             &journals.path().join("root"),
-            "amd64",
+            Platform::new("amd64", Unfree::Allowed),
             None,
         )
         .unwrap(),
@@ -574,7 +638,7 @@ fn penpot_opens_in_a_window_and_requires_chrome_and_docker_for_its_local_stack()
     assert_eq!(compose_run, (vec!["./up".to_owned()], true, vec!["./down".to_owned()]));
     for arch in ["amd64", "arm64"] {
         assert_eq!(
-            catalog.available(penpot, penpot.setup("web"), arch),
+            catalog.available(penpot, penpot.setup("web"), Platform::new(arch, Unfree::Allowed)),
             arch == "amd64",
             "{arch}: Chrome is built for amd64 alone"
         );
