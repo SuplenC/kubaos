@@ -385,14 +385,26 @@
   box-shadow: 0 var(--space-s8) var(--space-s24) rgb(from var(--color-surface_container_lowest) r g b / var(--opacity-scrim));
 }
 
-/* The fine print's unknown word asks to be asked about: marked as a term is, and its answer shows
-   while the pointer is on it. */
+/* The fine print's unknown word asks to be asked about: marked as a term is (a dotted underline,
+   the help pointer), its answer shown while the pointer is on it. The anchor stays a run of the
+   sentence, so the words around it keep their spacing and the line wraps as text does. */
+.setup-kotodama-ad-term {
+  display: inline;
+}
+
 .setup-kotodama-ad-asked {
   cursor: help;
   text-decoration: underline dotted;
+  text-underline-offset: var(--stroke-thin);
 }
 
-.k-tip-anchor:has(> .setup-kotodama-ad-asked:hover) > .k-tooltip {
+/* Its card stands on top of the lane's other answers and keeps to one line. */
+.setup-kotodama-ad-term > .k-tooltip {
+  z-index: 4;
+  white-space: nowrap;
+}
+
+.setup-kotodama-ad-term:has(> .setup-kotodama-ad-asked:hover) > .k-tooltip {
   opacity: 1;
 }
 

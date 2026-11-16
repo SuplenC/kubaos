@@ -65,6 +65,8 @@ export interface Kotodama {
   gag: boolean;
   /** The race held this many milliseconds after the key: a sample of it mid-way. */
   readonly raceAt?: number;
+  /** The ad's asked word with its answer shown, as under the pointer: a sample of the tip. */
+  readonly tip?: boolean;
   passed: boolean;
 }
 
@@ -88,6 +90,8 @@ export function kotodamaAt(view: string): Kotodama {
       return base(1);
     case "why-mid":
       return base(1, { raceAt: 3300 });
+    case "why-tip":
+      return base(1, { raceAt: 5800, tip: true });
     case "yours":
       return base(2);
     case "yours-more":
@@ -412,7 +416,7 @@ function startGroups(q: string): Group[] {
  * Draft part, to be promoted: the ad Start raises over its answers, loud in the warning and error
  * tones, an invented cleaner for a PC that is fine.
  */
-function fakeAd(): HTMLElement {
+function fakeAd(tipShown = false): HTMLElement {
   const tag = document.createElement("span");
   tag.className = "setup-kotodama-ad-tag";
   tag.append(text(AD.tag, "label", "burn_warning"));
@@ -424,9 +428,16 @@ function fakeAd(): HTMLElement {
   const product = row("s12", "start", tile, filling(stack(0, "start", filling(wrapped(AD.product, "subheading", "on_burn_warning")), filling(wrapped(AD.maker, "caption", "on_burn_warning")))));
   const stars = row("s4", "centre", ...Array.from({ length: 5 }, () => icon("star_filled", "var(--type-small-icon)", "var(--color-burn_error)")), filling(wrapped(AD.rating, "caption", "on_burn_warning")));
   const go = button({ label: AD.action, kind: "Danger", size: "Sm", icon: "arrow_forward", trailing: true });
-  const asked = text(AD.fine[1], "caption", "on_burn_warning");
-  asked.classList.add("setup-kotodama-ad-asked");
-  const fine = row("s4", "centre", text(AD.fine[0], "caption", "on_burn_warning"), floatingTooltip(asked, tooltip(AD.fineAnswer, ""), { side: "above" }), text(AD.fine[2], "caption", "on_burn_warning"));
+  // Draft part, to be promoted: a term in running text with its answer on a floating card. The
+  // sentence is one paragraph that wraps as any does; the term is an inline run inside it, its
+  // card hanging above it while the pointer is on the word.
+  const fine = wrapped(AD.fine.join(" "), "caption", "on_burn_warning");
+  const asked = document.createElement("span");
+  asked.className = "setup-kotodama-ad-asked";
+  asked.textContent = AD.fine[1];
+  const term = floatingTooltip(asked, tooltip(AD.fineAnswer, ""), { side: "above", shown: tipShown });
+  term.classList.add("setup-kotodama-ad-term");
+  fine.replaceChildren(`${AD.fine[0]} `, term, ` ${AD.fine[2]}`);
   const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "subheading", "on_burn_warning")), filling(product), filling(stars), filling(go), filling(fine));
   ad.classList.add("setup-kotodama-ad");
   return ad;
@@ -581,7 +592,7 @@ export function kotodamaCard(view: string): KotodamaCard {
     const race = () => {
       stop();
       const reduced = settings().reduced;
-      const ad = fakeAd();
+      const ad = fakeAd(state.tip ?? false);
       const start = otherMenu(QUESTION, startGroups(QUESTION), OTHERS.start.searching, { over: ad, covers: 4 });
       // Kotodama's lane fills its rows with what is on the machine: no web rows under it here.
       const ours = standIn({ ...prefs, web: false }, { live: false, query: QUESTION, hints: [["↑↓", "Select"], ["Enter", "Run"]], took: OTHERS.kotodama.stopped });

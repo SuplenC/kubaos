@@ -113,6 +113,7 @@ export default page<Shown>({
     { name: "What", for: "the key; the menu playing by itself", sample: CELLS.rest },
     { name: "Why", for: "the race run out; the clocks", sample: CELLS.loading },
     { name: "Why: mid-race", for: "3.3 s in: the ad up", sample: atCard("kotodama", "why-mid") },
+    { name: "Why: the term asked", for: "Bofa's answer, shown", sample: atCard("kotodama", "why-tip") },
     { name: "Yours", for: "the keys, what it finds, the web, typing", sample: atCard("kotodama", "yours") },
     { name: "Yours: more", for: "what it finds, the engine, the mark", sample: atCard("kotodama", "yours-more") },
     { name: "Yours: changed", for: "Alt + Space, no web search", sample: atCard("kotodama", "yours-changed") },

@@ -383,6 +383,7 @@ const kotodama: Card = {
     gag: { state: "needed", summary: "Not seen yet." },
     why: { state: "needed", summary: "Not seen yet." },
     "why-mid": { state: "needed", summary: "Not seen yet." },
+    "why-tip": { state: "needed", summary: "Not seen yet." },
     yours: { state: "needed", summary: "Not seen yet." },
     "yours-more": { state: "needed", summary: "Not seen yet." },
     "yours-changed": { state: "needed", summary: "Alt + Space, no web search." },
