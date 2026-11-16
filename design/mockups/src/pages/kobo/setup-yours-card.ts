@@ -310,9 +310,8 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
         changed(fresh.querySelector(".k-list-check"));
         if (each.id === "vscode") changed(fresh.querySelector(".k-list-title")?.nextElementSibling ?? null);
         const category = CATEGORIES.find((c) => c.id === each.category)!;
-        const label = categoryLabel(state, category);
-        labels.get(category.id)?.replaceWith(label);
-        labels.set(category.id, label);
+        // The label stays where it is, its words drawn again: the list keeps its place among the rows.
+        labels.get(category.id)?.replaceChildren(...categoryLabel(state, category).childNodes);
         index?.replaceRow(CATEGORIES.indexOf(category), indexSpec(state, category));
         recheck();
       },
