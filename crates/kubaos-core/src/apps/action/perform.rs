@@ -596,7 +596,7 @@ pub fn apply(
             make_parents(&path)?;
             let mode = mode.as_deref().and_then(parse_mode).unwrap_or(DEFAULT_FILE_MODE);
             write_file(&path, text.as_deref().unwrap_or_default(), mode)?;
-            reload_if_unit(host, &logical_path)
+            reload_unit_file(host, &logical_path)
         }
         Kind::WebApp { .. } => {
             for (path, text) in web_app_files(host, action) {
@@ -1150,14 +1150,44 @@ fn remove_path(path: &Path) -> Result<(), PerformError> {
 
 /// `daemon-reload` of the manager whose unit folder `path` is in, as a unit file changed.
 fn reload_if_unit(host: &mut dyn Host, path: &Path) -> Result<(), PerformError> {
-    let scope = if path.starts_with("/etc/systemd/system") {
-        Scope::System
-    } else if path.starts_with(host.home().join(".config/systemd/user")) {
-        Scope::User
-    } else {
+    let Some(scope) = unit_scope(host, path) else {
         return Ok(());
     };
     host.daemon_reload(scope).map_err(PerformError::Host)
+}
+
+/// The manager whose unit folder `path` is in.
+fn unit_scope(host: &dyn Host, path: &Path) -> Option<Scope> {
+    if path.starts_with("/etc/systemd/system") {
+        Some(Scope::System)
+    } else if path.starts_with(host.home().join(".config/systemd/user")) {
+        Some(Scope::User)
+    } else {
+        None
+    }
+}
+
+/// A unit file `path` a step just wrote: its manager reloaded, and its unit, when it runs,
+/// restarted, so it runs what the file now says (a program in a new version's folder, the old
+/// one's gone). A drop-in, in a folder of the unit's, only reloads.
+fn reload_unit_file(host: &mut dyn Host, path: &Path) -> Result<(), PerformError> {
+    let Some(scope) = unit_scope(host, path) else {
+        return Ok(());
+    };
+    host.daemon_reload(scope).map_err(PerformError::Host)?;
+    let in_unit_folder = path
+        .parent()
+        .is_some_and(|dir| dir == Path::new("/etc/systemd/system") || dir == host.home().join(".config/systemd/user"));
+    let Some(unit) = path.file_name().map(|n| n.to_string_lossy().into_owned()) else {
+        return Ok(());
+    };
+    if !in_unit_folder || !super::is_unit_name(&unit) {
+        return Ok(());
+    }
+    if host.unit_state(scope, &unit).map_err(PerformError::Host)?.active {
+        host.restart(scope, &unit).map_err(PerformError::Host)?;
+    }
+    Ok(())
 }
 
 /// A settings file's settings and its text; none when it isn't there.

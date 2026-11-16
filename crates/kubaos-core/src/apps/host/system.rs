@@ -385,6 +385,10 @@ impl Host for SystemHost {
         Self::out(self.systemctl(scope).args([verb, unit])).map(drop)
     }
 
+    fn restart(&mut self, scope: Scope, unit: &str) -> Result<(), HostError> {
+        Self::out(self.systemctl(scope).args(["try-restart", unit])).map(drop)
+    }
+
     fn lingers(&mut self) -> Result<bool, HostError> {
         let shown =
             Self::out(

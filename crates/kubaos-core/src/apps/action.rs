@@ -124,6 +124,8 @@ pub enum ActionError {
     JournalOnly { key: &'static str },
     #[error("{value:?} is not a stage: \"install\" or \"configure\"")]
     InvalidStage { value: String },
+    #[error("it names @VERSION@, and the app has no download whose version it would be")]
+    NoVersion,
 }
 
 /// One step of an install: its name and what it does.
@@ -346,26 +348,36 @@ pub enum Side {
     Root,
 }
 
-/// The words an action's strings take: `@USER@`, `@HOME@`, `@ARCH@`, and `@VERSION@` in an action
-/// with a version.
+/// The words an action's strings take: `@USER@`, `@HOME@`, `@ARCH@`, and `@VERSION@`, the version
+/// of a download, or of the app's downloads in the app's other actions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Words {
     pub user: String,
     pub home: PathBuf,
     pub arch: String,
+    /// The version of the app's downloads, which every download of an app shares; none for an
+    /// app without one.
+    pub version: Option<String>,
 }
 
 impl Words {
-    /// `text` with its words filled in, `@VERSION@` only with a `version`.
+    /// `text` with its words filled in, `@VERSION@` with `version`, else the app's.
     pub fn fill(&self, text: &str, version: Option<&str>) -> String {
         let mut out = text
             .replace("@USER@", &self.user)
             .replace("@HOME@", &self.home.to_string_lossy())
             .replace("@ARCH@", &self.arch);
-        if let Some(version) = version {
+        if let Some(version) = version.or(self.version.as_deref()) {
             out = out.replace("@VERSION@", version);
         }
         out
+    }
+
+    /// The same, for an app whose downloads are of `version`.
+    #[must_use]
+    pub fn with_version(mut self, version: Option<&str>) -> Self {
+        self.version = version.map(str::to_owned);
+        self
     }
 
     /// Where `path`, as an action names it, is: `~/…` under the home, else itself.
@@ -557,29 +569,24 @@ impl Action {
                 template,
                 mode,
                 vendor_keys,
-            } => {
-                let raw = match (from, text) {
-                    (Some(from), _) => {
-                        let path = folder.join(from);
-                        fs::read_to_string(&path).map_err(|source| ActionError::ReadFrom { path, source })?
-                    }
-                    (None, Some(text)) => text.clone(),
-                    (None, None) => return Err(ActionError::FileSource),
-                };
-                let text = if *template { fill(&raw, None) } else { raw };
-                Kind::File {
+            } => Kind::File {
+                to: fill(to, None),
+                from: None,
+                text: Some(file_text(words, folder, from.as_deref(), text.as_deref(), *template)?),
+                template: false,
+                mode: mode.clone(),
+                vendor_keys: *vendor_keys,
+            },
+            Kind::Symlink { to, target } => {
+                let target = fill(target, None);
+                if target.contains("@VERSION@") {
+                    return Err(ActionError::NoVersion);
+                }
+                Kind::Symlink {
                     to: fill(to, None),
-                    from: None,
-                    text: Some(text),
-                    template: false,
-                    mode: mode.clone(),
-                    vendor_keys: *vendor_keys,
+                    target,
                 }
             }
-            Kind::Symlink { to, target } => Kind::Symlink {
-                to: fill(to, None),
-                target: fill(target, None),
-            },
             Kind::Setting { file, key, value } => Kind::Setting {
                 file: fill(file, None),
                 key: key.clone(),
@@ -747,6 +754,30 @@ impl Action {
         }
         Ok(())
     }
+}
+
+/// A `file`'s text as it is written: its `from` read, filled in for a template, which may name
+/// the app's version only in an app that has one.
+fn file_text(
+    words: &Words,
+    folder: &Path,
+    from: Option<&str>,
+    text: Option<&str>,
+    template: bool,
+) -> Result<String, ActionError> {
+    let raw = match (from, text) {
+        (Some(from), _) => {
+            let path = folder.join(from);
+            fs::read_to_string(&path).map_err(|source| ActionError::ReadFrom { path, source })?
+        }
+        (None, Some(text)) => text.to_owned(),
+        (None, None) => return Err(ActionError::FileSource),
+    };
+    let text = if template { words.fill(&raw, None) } else { raw };
+    if template && text.contains("@VERSION@") {
+        return Err(ActionError::NoVersion);
+    }
+    Ok(text)
 }
 
 fn check_setting(file: &str, key: &str, value: &toml::Value) -> Result<(), ActionError> {
@@ -964,7 +995,7 @@ fn is_folder_path(value: &str) -> bool {
             .any(|part| part.is_empty() || part == "." || part == "..")
 }
 
-fn is_unit_name(value: &str) -> bool {
+pub(crate) fn is_unit_name(value: &str) -> bool {
     let types = [".service", ".socket", ".path", ".timer", ".target", ".mount"];
     value.len() <= 255
         && types.iter().any(|t| value.ends_with(t))

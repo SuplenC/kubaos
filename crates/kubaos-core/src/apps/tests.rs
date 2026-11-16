@@ -581,6 +581,7 @@ fn every_shipped_step_resolves_on_both_architectures_with_its_files_there() {
                 user: "kuba".to_owned(),
                 home: PathBuf::from("/home/kuba"),
                 arch: arch.to_owned(),
+                version: app.version().map(str::to_owned),
             };
             for action in app.all_actions() {
                 action
