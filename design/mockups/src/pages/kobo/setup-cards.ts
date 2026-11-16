@@ -343,7 +343,6 @@ const yours: Card = {
   views: {
     none: { state: "needed", summary: "Nothing picked yet." },
     developer: { state: "needed", summary: "Developer picked." },
-    filled: { state: "needed", summary: "Developer picked." },
     two: { state: "needed", summary: "Developer and Designer picked." },
     all: { state: "needed", summary: "All three picked." },
     dropped: { state: "needed", summary: "Developer and Everyday picked." },

@@ -77,7 +77,7 @@
 /* Make it yours (`setup-yours-card.ts`): what it shows only while it has something to show. */
 .setup-yours-progress[hidden],
 .setup-yours-failure[hidden],
-.setup-yours-columns[hidden] {
+.setup-yours-list[hidden] {
   display: none;
 }
 

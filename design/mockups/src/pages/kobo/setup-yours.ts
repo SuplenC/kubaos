@@ -1,8 +1,7 @@
 // First boot's Make it yours card: what the person uses the machine for (Developer, Designer,
 // Everyday: any of them, all three or none), the apps that brings as a live list grouped by the
-// profile that brought each, any of them untick-able and more addable, and beside the list the
-// Bitwarden login, which comes with the Bitwarden app. Install runs in the background while first
-// boot goes on.
+// profile that brought each, any of them untick-able and more addable. Install runs in the
+// background while first boot goes on.
 
 import type { Move, NonEmpty, Track } from "../../site/page.ts";
 import { doesntApply, nonEmpty, page, screen } from "../../site/page.ts";
@@ -27,33 +26,20 @@ const DESIGNER_ONLY = `.k-live-row:is([data-key="group-designer"], ${APPS.filter
   .map((each) => `[data-key="${each.id}"]`)
   .join(", ")})`;
 
-/** The first pick on the empty card: the list and the settings rise in under the choices, the rows opening in the list. */
+/** The first pick on the empty card: the list rises in under the choices, its rows opening in it. */
 const PICKED: Move = {
   name: "The first pick",
-  what: "The list and its settings rise in as one over `long`; the rows open their room over `medium` and fade in over `slow`.",
+  what: "The list rises in over `long`; its rows open their room over `medium` and fade in over `slow`.",
   tracks: [
-    { part: "the columns' fade", on: CARD, target: ".setup-yours-columns", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "the columns' rise", on: CARD, target: ".setup-yours-columns", property: "--kobo-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: "the list's fade", on: CARD, target: ".setup-yours-list", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: "the list's rise", on: CARD, target: ".setup-yours-list", property: "--kobo-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
     { part: "the rows' room", on: CARD, target: ".setup-yours-apps .k-live-row", property: "--grow", from: 0, to: 1, duration: "medium", curve: "standard_decel" },
     { part: "the rows' fade", on: CARD, target: ".setup-yours-apps .k-live-row", property: "opacity", from: 0, to: 1, duration: "slow", curve: "standard_decel" },
   ] as unknown as NonEmpty<Track<"standard_decel">>,
   reduced: [
-    { part: "the columns' fade", on: CARD, target: ".setup-yours-columns", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the list's fade", on: CARD, target: ".setup-yours-list", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "the rows' fade", on: CARD, target: ".setup-yours-apps .k-live-row", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
-  back: "cuts",
-  sample: () => setupRoom({ place: { at: "card", card: "yours" }, views: { yours: "developer" } }),
-};
-
-/** Bitwarden ticked again: its login rises in beside the list, where the line saying it was unticked was. */
-const BITWARDEN: Move = {
-  name: "Bitwarden ticked: its login",
-  what: "The login rises in over `long` where it lands, in the line's place.",
-  tracks: [
-    { part: "the login's fade", on: CARD, target: ".setup-yours-bitwarden", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "the login's rise", on: CARD, target: ".setup-yours-bitwarden", property: "--kobo-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
-  ],
-  reduced: [{ part: "the login's fade", on: CARD, target: ".setup-yours-bitwarden", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
   back: "cuts",
   sample: () => setupRoom({ place: { at: "card", card: "yours" }, views: { yours: "developer" } }),
 };
@@ -78,14 +64,13 @@ export default page<Shown>({
   level: "kobo",
   slug: "setup-yours",
   title: "First boot: Make it yours",
-  lede: "What you use it for, the apps that brings, and the settings that come with them.",
+  lede: "What you use it for, and the apps that brings, grouped by what brought each.",
   code: { unbuilt: "Kōbō has no such card" },
   from: ["step-rail-page", "choice-card", "live-list", "field", "select", "progress-bar", "error-block"],
   stage: { live: liveCard("yours"), hint: "Pick any; untick an app; Enter installs in the background", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
   variants: [
     { name: "Nothing picked", for: "the three choices; the well waits", sample: CELLS.empty },
-    { name: "Developer", for: "its apps; Bitwarden empty", sample: CELLS.rest },
-    { name: "Bitwarden filled", for: "its login typed in", sample: atCard("yours", "filled") },
+    { name: "Developer", for: "its eight apps", sample: CELLS.rest },
     { name: "All three", for: "grouped; shared apps once", sample: CELLS.selected },
     { name: "Unticked and added", for: "two dropped; More apps open", sample: atCard("yours", "dropped") },
     { name: "Installing", for: "7 of 20 in; carry on", sample: CELLS.loading },
@@ -126,7 +111,7 @@ export default page<Shown>({
   motion: {
     arrives: [PICKED],
     leaves: [UNPICKED],
-    between: [BITWARDEN, finishesAt("yours", "done"), FAILS],
+    between: [finishesAt("yours", "done"), FAILS],
   },
   keyboard: {
     keys: [
@@ -134,18 +119,15 @@ export default page<Shown>({
       { keys: ["←", "→"], does: "between the three choices" },
       { keys: ["Space"], does: "picks a choice, or ticks an app" },
     ],
-    order: "The rail, the choices, More apps, the apps, Bitwarden, Under the hood, the band.",
+    order: "The rail, the choices, More apps, the apps, Under the hood, the band.",
     lands: "On the first choice: nothing is picked for you.",
   },
   measures: {
-    samples: nonEmpty([{ name: "All three", for: "the choices, the list and the settings", sample: CELLS.selected }]),
+    samples: nonEmpty([{ name: "All three", for: "the choices and the list", sample: CELLS.selected }]),
     measures: nonEmpty([
       ...CARD_MEASURES,
       { part: "Choices apart", token: "space-s16" },
-      { part: "List ↔ settings", token: "space-s24" },
-      { part: "Settings apart", token: "space-s32" },
-      { part: "Fields apart", token: "space-s16" },
     ]),
-    reflow: { note: "Two columns under the choices; the page scrolls under its header.", sample: CELLS.selected },
+    reflow: { note: "The list under the choices, as tall as its apps; the page scrolls under its header.", sample: CELLS.selected },
   },
 });
