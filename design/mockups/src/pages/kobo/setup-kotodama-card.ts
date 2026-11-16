@@ -2,7 +2,7 @@
 // yours's are. What: the one key, what to type and Enter, beside the Command menu playing three asks
 // by itself. Why: one question asked of Start and Kotodama at the same moment, raced, each clock
 // running until its answer lands. Yours: the keys that open it, what it finds, the web's
-// place, beside a preview that follows each change. Try it: three tries that tick off, beside the
+// place, each applied to the menu as it is made. Try it: three tries that tick off, beside the
 // menu itself, the real Command menu's parts (`lib/list-detail.ts`).
 //
 // Wherever it is, Super tapped alone, as for Start, brings up the other menu for a moment, stamped
@@ -497,7 +497,7 @@ export interface KotodamaCard {
 const WORDS: Record<StepIndex, string> = {
   0: "The Command menu. One key, wherever you are: type what you want, Enter does it.",
   1: "One key for everything on this machine, and nothing off it. No ads, no news, no weather nobody asked for.",
-  2: "It works as it is. Change what you like; the menu's “Settings: Menu” has the rest.",
+  2: "Changes apply as you make them. Super + Space tries them, here or on the next step.",
   3: "Your turn. Three tries, or none: Next works either way.",
 };
 
@@ -507,12 +507,6 @@ const EXAMPLES = [
   { typed: "wifi", is: "a setting", icon: "wifi" },
   { typed: "12*7", is: "a sum", icon: "calculate" },
 ] as const;
-
-/**
- * The room Yours needs for its settings and the menu beside them, each reading whole: the key
- * cards three across and a menu wide enough for a web row's words.
- */
-const WIDE_YOURS = 1130;
 
 /** A label over a part of Yours, `subheading`. */
 const heading = (words: string) => text(words, "subheading");
@@ -685,29 +679,8 @@ export function kotodamaCard(view: string): KotodamaCard {
   // ---------------------------------------------------------------- Yours --
 
   const yours = (): HTMLElement => {
-    // The preview beside the settings is the menu itself, still: it follows the settings, not the
-    // pointer, so its answer row stays the one selected.
-    let asked = "3/2";
-    const preview = standIn(prefs, { live: false, query: asked, hints: [["↑↓", "Select"], ["Enter", "Run"]] });
-    preview.box.inert = true;
-    // Draft part, to be promoted: the compact preview, where the room has no column for the menu:
-    // what is asked and the first Result, on one row.
-    const compact = document.createElement("span");
-    compact.className = "setup-kotodama-compact";
-    const drawCompact = () => {
-      const first = search(asked, prefs, 3)[0];
-      const asks = row("s8", "centre", icon("search", "var(--type-body-icon)", "var(--color-on_surface_variant)"), text(asked, "mono_large"));
-      const answer = first
-        ? row("s12", "centre", icon(first.result.row.icon ?? "search", "var(--type-body-icon)", "var(--color-primary)"), text(first.result.row.title, "body_strong"), text(first.result.kind, "small", "on_surface_variant"))
-        : text("Nothing here. Web search is off, so that's that.", "small", "on_surface_variant");
-      compact.replaceChildren(text("As it will look", "label", "on_surface_variant"), asks, icon("arrow_forward", "var(--type-body-icon)", "var(--color-on_surface_variant)"), answer);
-    };
-    const show = (words: string) => {
-      asked = words;
-      preview.set(words);
-      drawCompact();
-    };
-    drawCompact();
+    // Each setting applies to the menu at once; it is tried in the menu itself, on Try it or with
+    // its keys from here, so this step shows no preview of its own.
     const cards = OPENS_WITH.map((each) => {
       const card = choiceCard({ title: each.title, subtitle: each.line, picks: "one", picked: prefs.key === each.id });
       card.querySelector(".k-card-header, .k-card-title-line")?.parentElement?.prepend(caps(each.keys));
@@ -719,19 +692,20 @@ export function kotodamaCard(view: string): KotodamaCard {
       queueMicrotask(() => {
         const at = cards.findIndex((each) => each.getAttribute("aria-checked") === "true");
         if (at >= 0) prefs.key = OPENS_WITH[at]!.id;
+        recheck();
       }),
     );
     const finds = (
       [
-        ["apps", "Apps", "fi"],
-        ["actions", "Settings and actions", "wifi"],
-        ["projects", "Projects and scripts", "kubaos"],
-        ["windows", "Windows and key binds", "move"],
-        ["clipboard", "Clipboard history", "clip"],
-        ["emoji", "Emoji", "emoji"],
-        ["calculator", "Sums", "3/2"],
+        ["apps", "Apps"],
+        ["actions", "Settings and actions"],
+        ["projects", "Projects and scripts"],
+        ["windows", "Windows and key binds"],
+        ["clipboard", "Clipboard history"],
+        ["emoji", "Emoji"],
+        ["calculator", "Sums"],
       ] as const
-    ).map(([id, label, shows]) => {
+    ).map(([id, label]) => {
       const on = id === "apps" ? prefs.apps : prefs.finds[id];
       const each = chip({ label, press: "toggle", on, kind: "Accent", icon: "check" });
       each.addEventListener("click", () =>
@@ -739,14 +713,13 @@ export function kotodamaCard(view: string): KotodamaCard {
           const now = each.getAttribute("aria-pressed") === "true";
           if (id === "apps") prefs.apps = now;
           else prefs.finds[id] = now;
-          show(shows);
         }),
       );
       return each;
     });
-    const engine = tabs({ choices: ENGINES.map((label) => ({ label })), picked: prefs.engine, onPick: (at) => ((prefs.engine = at), show("zzz")) });
-    const motion = tabs({ choices: [{ label: "Full" }, { label: "Fades" }], picked: prefs.slides ? 0 : 1, onPick: (at) => ((prefs.slides = at === 0), preview.box.animate(prefs.slides ? [{ opacity: 0, translate: "0 calc(-1 * var(--space-s8))" }, { opacity: 1, translate: "0 0" }] : [{ opacity: 0 }, { opacity: 1 }], { duration: ms("medium"), easing: curve("emphasized_decel") })) });
-    const mark = tabs({ choices: [{ label: "1.5" }, { label: "1,5" }], picked: prefs.comma ? 1 : 0, onPick: (at) => ((prefs.comma = at === 1), show(prefs.comma ? "3/2*1" : "3/2")) });
+    const engine = tabs({ choices: ENGINES.map((label) => ({ label })), picked: prefs.engine, onPick: (at) => (prefs.engine = at) });
+    const motion = tabs({ choices: [{ label: "Full" }, { label: "Fades" }], picked: prefs.slides ? 0 : 1, onPick: (at) => (prefs.slides = at === 0) });
+    const mark = tabs({ choices: [{ label: "1.5" }, { label: "1,5" }], picked: prefs.comma ? 1 : 0, onPick: (at) => (prefs.comma = at === 1) });
     /** A setting's words and its choice: side by side, the choice going under them when short. */
     const choiceRow = (words: HTMLElement, choice: HTMLElement) => {
       const line = row("s12", "centre", words, choice);
@@ -757,14 +730,14 @@ export function kotodamaCard(view: string): KotodamaCard {
       "s12",
       "start",
       heading("When nothing here matches"),
-      filling(switchRow("Offer a web search", "Rows at the bottom, never a guess", prefs.web, (on) => ((prefs.web = on), show("zzz")))),
+      filling(switchRow("Offer a web search", "Rows at the bottom, never a guess", prefs.web, (on) => (prefs.web = on))),
       filling(choiceRow(text("First with", "body"), engine)),
     );
     const typing = stack(
       "s12",
       "start",
       heading("Typing and motion"),
-      filling(switchRow("Forgive typos", "“fierfox” finds Firefox", prefs.typos, (on) => ((prefs.typos = on), show("fierfox")))),
+      filling(switchRow("Forgive typos", "“fierfox” finds Firefox", prefs.typos, (on) => (prefs.typos = on))),
       filling(choiceRow(text("Motion", "body"), motion)),
     );
     const files = button({ label: "Open in Files", kind: "Text", size: "Sm" });
@@ -778,34 +751,23 @@ export function kotodamaCard(view: string): KotodamaCard {
       ]),
     });
     const section = (title: string, ...content: HTMLElement[]) => stack("s8", "start", heading(title), ...content.map(filling));
-    // One rhythm: a section's title, its controls, then `space.s16` to the next.
-    const left = stack(
-      "s16",
+    // One rhythm and one left edge across the whole body: a section's title, its controls, then
+    // `space.s20` to the next.
+    const settingsColumn = stack(
+      "s20",
       "start",
       filling(section("Opens with", keysGroup)),
       filling(section("It finds", flow("s8", ...finds))),
-      filling(splitColumns([3, 2], "s24", [filling(web), filling(typing)])),
+      filling(splitColumns([1, 1], "s40", [filling(web), filling(typing)])),
       filling(more),
-      filling(compact),
     );
     // Where the room is short, the settings scroll, kept `space.s24` clear of the band as every
     // Kōbō page's body is (`kobo.css`).
-    const padded = stack(0, "start", filling(left));
+    const padded = stack(0, "start", filling(settingsColumn));
     padded.classList.add("kobo-scrolled");
-    const { box: settingsScroll } = scroll(padded, { height: "100%", below: "s24", noGutter: true, fade: "s24", footFade: true });
-    settingsScroll.classList.add("kobo-scrolls");
-    const right = stack("s8", "start", text("As it will look", "label", "on_surface_variant"), fillingHeight(filling(preview.box)));
-    right.classList.add("setup-kotodama-preview");
-    // Draft part, to be promoted: the settings beside their preview where both read whole; else the
-    // settings alone, their preview compact under them.
-    const room = document.createElement("span");
-    room.className = "setup-kotodama-yours";
-    room.append(settingsScroll, right);
-    new ResizeObserver(() => {
-      const scale = Number.parseFloat(getComputedStyle(room).getPropertyValue("--scale")) || settings().scale;
-      room.toggleAttribute("data-beside", room.clientWidth / scale >= WIDE_YOURS);
-    }).observe(room);
-    return room;
+    const { box } = scroll(padded, { height: "100%", below: "s24", noGutter: true, fade: "s24", footFade: true });
+    box.classList.add("kobo-scrolls");
+    return box;
   };
 
   // --------------------------------------------------------------- Try it --
@@ -927,16 +889,18 @@ export function kotodamaCard(view: string): KotodamaCard {
       alone = false;
       const space = event.code === "Space";
       const opens = (prefs.key === "super-space" && space && event.metaKey) || (prefs.key === "alt-space" && space && event.altKey);
-      if (opens && state.step === 3) {
-        event.preventDefault();
-        openMenu();
-      }
+      if (!opens) return;
+      event.preventDefault();
+      // The menu is the one on Try it: the keys bring it there from any step, open.
+      if (state.step !== 3) show(3);
+      openMenu();
     });
     window.addEventListener("keyup", (event) => {
       if (!here() || (event.key !== "Meta" && event.key !== "OS") || !alone) return;
       alone = false;
-      if (prefs.key === "super" && state.step === 3) openMenu();
-      else habit();
+      if (prefs.key !== "super") return habit();
+      if (state.step !== 3) show(3);
+      openMenu();
     });
   };
 

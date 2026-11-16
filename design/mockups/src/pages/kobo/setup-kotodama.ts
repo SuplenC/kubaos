@@ -1,7 +1,7 @@
 // First boot's Kotodama card, in four steps of its own. What: the one key, what to type and Enter,
 // beside the Command menu playing by itself. Why: one question raced through Start and
 // Kotodama, each clock running until its answer lands. Yours: the keys that open it and what it
-// finds, beside a preview. Try it: the menu itself, three things to try ticking off. Super tapped
+// finds, applied as they are made. Try it: the menu itself, three things to try ticking off. Super tapped
 // alone, on any step, brings up the other menu, stamped "Nope.".
 
 import type { Easing, Move, NonEmpty, Track } from "../../site/page.ts";
@@ -43,7 +43,7 @@ function turning(name: string, what: string, view: string, forward = true): Move
 }
 
 const TO_WHY = turning("What → Why", "What slides off; Why slides in and the race starts.", "why<0");
-const TO_YOURS = turning("Why → Yours", "Why slides off; Yours slides in, the preview on “fi”.", "yours<1");
+const TO_YOURS = turning("Why → Yours", "Why slides off; Yours slides in, its settings.", "yours<1");
 const TO_TRY = turning("Yours → Try it", "Yours slides off; Try it slides in, the menu shut until its keys.", "try<2");
 const BACK_STEP = turning("Back a step", "Back or Esc: Yours slides off to the right; Why slides back in.", "why<2", false);
 
@@ -113,7 +113,7 @@ export default page<Shown>({
     { name: "What", for: "the key; the menu playing by itself", sample: CELLS.rest },
     { name: "Why", for: "the race run out; the clocks", sample: CELLS.loading },
     { name: "Why: mid-race", for: "3.3 s in: the ad up", sample: atCard("kotodama", "why-mid") },
-    { name: "Yours", for: "the keys, three switches, the preview", sample: atCard("kotodama", "yours") },
+    { name: "Yours", for: "the keys, what it finds, the web, typing", sample: atCard("kotodama", "yours") },
     { name: "Yours: more", for: "what it finds, the engine, the mark", sample: atCard("kotodama", "yours-more") },
     { name: "Yours: changed", for: "Alt + Space, no web search", sample: atCard("kotodama", "yours-changed") },
     { name: "Try it: shut", for: "its keys; Open it", sample: CELLS.empty },
@@ -179,7 +179,7 @@ export default page<Shown>({
       { part: "Stepper → step", token: "space-s24" },
       { part: "Tries ↔ menu", token: "space-s24" },
       { part: "Lanes apart", token: "space-s16" },
-      { part: "Settings ↔ preview", token: "space-s24" },
+      { part: "Between Yours's sections", token: "space-s20" },
     ]),
     reflow: { note: "The menu takes its room's width and the rows its height holds; its pane shows once it is wide enough.", sample: CELLS.selected },
   },
