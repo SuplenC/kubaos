@@ -12,7 +12,7 @@ description = """\
 Google Chrome is Google's web browser, built on the open-source Chromium project. It signs in \
 to a Google account to sync bookmarks, passwords, history and open tabs between devices, and \
 runs Chrome Web Store extensions. Google keeps it current through its apt repository."""
-description_from = "https://www.google.com/chrome/"
+description_from = "kubaos"
 # Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
 # package is installed.
 icon = "google-chrome"
