@@ -213,18 +213,19 @@ fn next_update(m: &Machine) -> (Vec<String>, Vec<String>, Vec<String>) {
         catalog,
     };
     let picks = m.picks();
-    let nix = BTreeSet::new();
+    let (nix, markers) = (BTreeSet::new(), BTreeSet::new());
     let apps = apps::plan::Facts {
         catalog: &catalog,
         picks: &picks,
         arch: "amd64",
         dpkg: &dpkg,
         nix: &nix,
+        markers: &markers,
     };
     (
         plan::removable(&apt(&owned), None),
         plan::removable(&apt(&before_the_catalog), None),
-        apps::plan::installs(&apps).iter().map(|a| a.id.clone()).collect(),
+        apps::plan::installs(&apps).iter().map(|i| i.app.id.clone()).collect(),
     )
 }
 

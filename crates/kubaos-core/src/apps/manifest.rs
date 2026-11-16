@@ -1,5 +1,6 @@
 //! One app's manifest, `apps/<id>.toml`: its name, a line on what it is, the one source it comes
-//! from, and the system hooks it needs beyond its packages.
+//! from, the system hooks it needs beyond its packages, and the setups it offers, if more than
+//! one way of setting it up is worth having.
 //!
 //! The file keeps to the TOML the system scripts' awk reader understands (tables, one-line
 //! strings without escapes, booleans, arrays of strings), as the package manifest does: the root
@@ -8,12 +9,14 @@
 //!
 //! # Owns
 //!
-//! - [`App`], [`Source`] and what a valid manifest is.
+//! - [`App`], [`Source`], [`Setup`] and what a valid manifest is.
 //!
 //! # Not here
 //!
 //! - The catalog of every manifest: `catalog.rs`. A vendor repository: `apt::manifest`'s
 //!   [`Repo`](crate::apt::manifest::Repo).
+
+use std::collections::BTreeMap;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -54,12 +57,29 @@ pub enum ManifestError {
     InvalidSystemHooks { value: String },
     #[error("an app from nixpkgs goes into the user's home, without root, so nothing would run its system hooks")]
     SystemHooksOnNix,
+    #[error("{value:?} can't name user hooks: lowercase letters, digits and _, starting with a letter")]
+    InvalidUserHooks { value: String },
     #[error("{value:?} is not a sha256: 64 lowercase hex digits")]
     InvalidSha256 { value: String },
     #[error("{value:?} has a quote or a control character, which the scripts' reader can't take")]
     Unreadable { value: String },
     #[error("the manifest has an escape or a multi-line string, which the scripts' reader can't take")]
     Escaped,
+    #[error("an app with setups offers at least two, so there is a choice; this offers one")]
+    OneSetup,
+    #[error("{value:?} is not a setup id: lowercase letters, digits and dashes, starting with a letter or digit")]
+    InvalidSetup { value: String },
+    #[error("setup {setup} names some of its own parts: user_hooks and marker go together")]
+    SetupParts { setup: String },
+    #[error("setups {first} and {second} both have no parts of their own, so they would be one setup")]
+    BareSetups { first: String, second: String },
+    #[error("{value:?} is not a path under the home: relative, with no `.` or `..` part")]
+    InvalidMarker { value: String },
+    #[error(
+        "setup {setup}'s download needs user_hooks to install it, a version and self_updates = true: \
+         KubaOS reads only the setup's marker back, never the version installed"
+    )]
+    SetupDownload { setup: String },
 }
 
 /// One app of the catalog.
@@ -81,6 +101,73 @@ pub struct App {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system_hooks: Option<String>,
     pub source: Source,
+    /// The ways it can be set up, sorted by id; none for an app with one way only. The source is
+    /// every setup's; a setup adds its own parts on top.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub setups: Vec<Setup>,
+}
+
+/// One way an app can be set up, of the several its manifest offers.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Setup {
+    /// The table's name, `[setup.<id>]`, which `kubaos app add --setup` takes.
+    pub id: String,
+    /// The app as people read it in this setup: "T3 Code as a service".
+    pub name: String,
+    /// One line on what this setup is.
+    pub summary: String,
+    /// What it adds to the app's source; none for the setup the source alone installs.
+    #[serde(skip)]
+    pub parts: Option<Parts>,
+}
+
+/// A setup's own parts, which are the user's: run as the user, kept in the home.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Parts {
+    /// The pair of `apps/user-hooks.sh` functions `install_<hooks>` and `remove_<hooks>`, which
+    /// the user helper runs as the user.
+    pub user_hooks: String,
+    /// A path under the home that is there exactly while the parts are: how KubaOS reads them back.
+    pub marker: String,
+    /// What the install hook installs, when it needs a download.
+    pub download: Option<Pinned>,
+}
+
+/// A download pinned to its sha256 for each architecture, at one version.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Pinned {
+    pub version: String,
+    /// By [`ARCHES`]' names.
+    pub downloads: Vec<(String, Download)>,
+}
+
+impl Pinned {
+    /// The download for `arch`, when there is one.
+    pub fn download(&self, arch: &str) -> Option<&Download> {
+        self.downloads.iter().find(|(a, _)| a == arch).map(|(_, d)| d)
+    }
+}
+
+impl App {
+    /// Its setup `id`.
+    pub fn setup(&self, id: &str) -> Option<&Setup> {
+        self.setups.iter().find(|s| s.id == id)
+    }
+
+    /// Whether everything that installs it has to name a setup.
+    pub fn has_setups(&self) -> bool {
+        !self.setups.is_empty()
+    }
+
+    /// Whether it has something for a machine of `arch`: its source does, and for a setup with a
+    /// download, that download.
+    pub fn available(&self, arch: &str, setup: Option<&Setup>) -> bool {
+        self.source.available(arch)
+            && setup
+                .and_then(|s| s.parts.as_ref())
+                .and_then(|p| p.download.as_ref())
+                .is_none_or(|pinned| pinned.download(arch).is_some())
+    }
 }
 
 /// Where an app comes from.
@@ -169,6 +256,21 @@ struct File {
     apt: Option<AptTable>,
     nix: Option<NixTable>,
     deb: Option<DebTable>,
+    setup: Option<BTreeMap<String, SetupTable>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SetupTable {
+    name: String,
+    summary: String,
+    user_hooks: Option<String>,
+    marker: Option<String>,
+    version: Option<String>,
+    #[serde(default)]
+    self_updates: bool,
+    amd64: Option<Download>,
+    arm64: Option<Download>,
 }
 
 #[derive(Deserialize)]
@@ -232,6 +334,12 @@ impl App {
             }),
             _ => return Err(ManifestError::Sources(sources)),
         };
+        let setups = file
+            .setup
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(id, table)| setup(id, table))
+            .collect::<Result<Vec<_>, _>>()?;
         let app = Self {
             id: id.to_owned(),
             name: file.name,
@@ -239,6 +347,7 @@ impl App {
             icon: file.icon,
             system_hooks: file.system_hooks,
             source,
+            setups,
         };
         app.check()?;
         Ok(app)
@@ -303,20 +412,12 @@ impl App {
                     });
                 }
                 for (_, download) in &deb.downloads {
-                    if !is_url(&download.url) {
-                        return Err(ManifestError::InvalidUrl {
-                            value: download.url.clone(),
-                        });
-                    }
-                    if !is_sha256(&download.sha256) {
-                        return Err(ManifestError::InvalidSha256 {
-                            value: download.sha256.clone(),
-                        });
-                    }
+                    check_download(download)?;
                     values.push(&download.url);
                 }
             }
         }
+        self.check_setups(&mut values)?;
         for value in values {
             if value.chars().any(|c| c == '"' || c.is_control()) {
                 return Err(ManifestError::Unreadable { value: value.clone() });
@@ -324,6 +425,113 @@ impl App {
         }
         Ok(())
     }
+
+    fn check_setups<'a>(&'a self, values: &mut Vec<&'a String>) -> Result<(), ManifestError> {
+        if self.setups.len() == 1 {
+            return Err(ManifestError::OneSetup);
+        }
+        let mut bare: Option<&Setup> = None;
+        for setup in &self.setups {
+            if !is_app_id(&setup.id) {
+                return Err(ManifestError::InvalidSetup {
+                    value: setup.id.clone(),
+                });
+            }
+            non_empty("setup.name", &setup.name)?;
+            non_empty("setup.summary", &setup.summary)?;
+            values.extend([&setup.name, &setup.summary]);
+            let Some(parts) = &setup.parts else {
+                if let Some(first) = bare {
+                    return Err(ManifestError::BareSetups {
+                        first: first.id.clone(),
+                        second: setup.id.clone(),
+                    });
+                }
+                bare = Some(setup);
+                continue;
+            };
+            if !is_hooks_name(&parts.user_hooks) {
+                return Err(ManifestError::InvalidUserHooks {
+                    value: parts.user_hooks.clone(),
+                });
+            }
+            if !is_marker(&parts.marker) {
+                return Err(ManifestError::InvalidMarker {
+                    value: parts.marker.clone(),
+                });
+            }
+            values.push(&parts.marker);
+            if let Some(pinned) = &parts.download {
+                if !is_version(&pinned.version) {
+                    return Err(ManifestError::InvalidVersion {
+                        value: pinned.version.clone(),
+                    });
+                }
+                for (_, download) in &pinned.downloads {
+                    check_download(download)?;
+                    values.push(&download.url);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The setup `id` of the table `table`, its parts all there or none.
+fn setup(id: String, table: SetupTable) -> Result<Setup, ManifestError> {
+    let downloads: Vec<(String, Download)> = ARCHES
+        .into_iter()
+        .zip([table.amd64, table.arm64])
+        .filter_map(|(arch, d)| Some((arch.to_owned(), d?)))
+        .collect();
+    let download = match (downloads.is_empty(), table.version, table.self_updates) {
+        (true, None, false) => None,
+        (false, Some(version), true) if table.user_hooks.is_some() => Some(Pinned { version, downloads }),
+        _ => return Err(ManifestError::SetupDownload { setup: id }),
+    };
+    let parts = match (table.user_hooks, table.marker) {
+        (Some(user_hooks), Some(marker)) => Some(Parts {
+            user_hooks,
+            marker,
+            download,
+        }),
+        (None, None) => None,
+        _ => return Err(ManifestError::SetupParts { setup: id }),
+    };
+    Ok(Setup {
+        id,
+        name: table.name,
+        summary: table.summary,
+        parts,
+    })
+}
+
+fn check_download(download: &Download) -> Result<(), ManifestError> {
+    if !is_url(&download.url) {
+        return Err(ManifestError::InvalidUrl {
+            value: download.url.clone(),
+        });
+    }
+    if !is_sha256(&download.sha256) {
+        return Err(ManifestError::InvalidSha256 {
+            value: download.sha256.clone(),
+        });
+    }
+    Ok(())
+}
+
+/// Whether `value` can be a setup's marker: a relative path under the home, every part a name
+/// of letters, digits and `-_.` that isn't `.` or `..`.
+fn is_marker(value: &str) -> bool {
+    value.len() <= 255
+        && value.split('/').all(|part| {
+            !part.is_empty()
+                && part != "."
+                && part != ".."
+                && part
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        })
 }
 
 /// Whether `id` can be an app's: lowercase ASCII letters, digits and `-`, starting with a letter

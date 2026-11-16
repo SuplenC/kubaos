@@ -444,6 +444,7 @@ fn with_claude_code(text: &str) -> Extension<FakeBus, FakeRunner> {
         arch: "amd64",
         dpkg: &Dpkg::default(),
         nix: &std::collections::BTreeSet::new(),
+        markers: &std::collections::BTreeSet::new(),
     };
     let mut extension = Extension::new(FakeBus::default(), FakeRunner::default());
     extension.set_apps(Apps::new(&catalog, &Status::new(&facts)));

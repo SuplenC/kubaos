@@ -224,6 +224,19 @@ pub enum UpdateError {
     /// The app has nothing for this machine's architecture.
     #[error("{id} has nothing for {arch}")]
     Unavailable { id: String, arch: String },
+    /// The app has setups and none was named: there is no default.
+    #[error("{id} can be set up more than one way, and none is the default: {}", setup_choices(id, setups))]
+    NoSetup { id: String, setups: Vec<String> },
+    /// The app has no setup of that id.
+    #[error("{id} has no setup {setup}: {}", setup_choices(id, setups))]
+    UnknownSetup {
+        id: String,
+        setup: String,
+        setups: Vec<String>,
+    },
+    /// A setup was named for apps none of which has setups.
+    #[error("--setup {setup} names a setup, and none of these apps has setups")]
+    SetupWithout { setup: String },
     /// `home.nix` couldn't be wired to the state directory for an app from nixpkgs.
     #[error("wiring home.nix to kubaos.d/")]
     Wire(#[source] MigrateError),
@@ -233,6 +246,15 @@ pub enum UpdateError {
     /// An app's nixpkgs packages couldn't be added to or removed from `packages.toml`.
     #[error("changing kubaos.d/packages.toml")]
     NixPackages(#[source] EditError),
+}
+
+/// How to pick each of `setups` of the app `id`, as the error that asks for one says it.
+fn setup_choices(id: &str, setups: &[String]) -> String {
+    let commands: Vec<String> = setups
+        .iter()
+        .map(|setup| format!("kubaos app add {id} --setup {setup}"))
+        .collect();
+    format!("pick one with {}", commands.join(", or "))
 }
 
 impl UpdateError {

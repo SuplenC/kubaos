@@ -1,11 +1,13 @@
 //! The Apps catalog in the menu: an "Install <Name>" Item for each app of the catalog that isn't on
 //! the machine, a "Remove <Name>" Item for each one that is, never both, so a manifest added to
-//! the catalog brings its Items with it. Running one starts `kubaos app add|remove <id> --json` in
-//! the background, as a Job the menu shows with each step and how far it got; the Daemon announces
+//! the catalog brings its Items with it. An app with setups has an Install Item for each setup
+//! instead, named for it, as none is the default: all of them while the app isn't on the machine,
+//! and beside its Remove Item those of the setups it isn't in, which switch. Running one starts
+//! `kubaos app add|remove <id> --json` (`add <id> --setup <setup>`) in the background, as a Job the menu shows with each step and how far it got; the Daemon announces
 //! its end on the desktop, named for the app, with why it failed and where its log is.
 //!
 //! Which apps are on the machine is the engine's status (`kubaos app status`): the catalog, the
-//! picks, one `dpkg-query` and the User flake's `packages.toml`, read on a thread of its own at
+//! picks, one `dpkg-query`, the User flake's `packages.toml` and the setups' markers, read on a thread of its own at
 //! the start, at each config and when one of the files it comes from changes, never as the menu
 //! searches.
 //!
@@ -43,6 +45,7 @@ use kubaos_core::apps::Catalog;
 use kubaos_core::apps::CatalogError;
 use kubaos_core::apps::Picks;
 use kubaos_core::apps::PicksError;
+use kubaos_core::apps::Setup;
 use kubaos_core::apps::Status;
 use kubaos_core::apps::plan::Facts;
 use kubaos_core::apt::Dpkg;
@@ -65,7 +68,8 @@ pub const REMOVE: &str = "remove";
 /// dpkg's database, which every install and removal of a package rewrites.
 pub const DPKG_STATUS: &str = "/var/lib/dpkg/status";
 
-/// An app's Install Item is this and its id, `app-install:google-chrome`.
+/// An app's Install Item is this and its id, `app-install:google-chrome`; a setup's adds `:` and
+/// the setup's id, `app-install:t3-code:service`.
 const INSTALL_PREFIX: &str = "app-install:";
 /// An app's Remove Item is this and its id, `app-remove:google-chrome`.
 const REMOVE_PREFIX: &str = "app-remove:";
@@ -81,6 +85,8 @@ pub struct AppFiles {
     picks: PathBuf,
     packages: Packages,
     packages_file: PathBuf,
+    /// Where the setups' markers are.
+    home: PathBuf,
 }
 
 impl AppFiles {
@@ -93,6 +99,7 @@ impl AppFiles {
             picks: paths.app_picks(),
             packages: Packages::new(&state, paths.edit_lock()),
             packages_file: state.packages_file(),
+            home: paths.home().to_path_buf(),
         }
     }
 
@@ -103,14 +110,19 @@ impl AppFiles {
     }
 
     /// The files whose change can change which apps are on the machine or picked: dpkg's
-    /// database, the picks and the User flake's `packages.toml`. The catalog moves only with the
-    /// release, whose update rewrites dpkg's database too.
+    /// database, the picks, the User flake's `packages.toml` and the catalog's setups' markers.
+    /// The catalog moves only with the release, whose update rewrites dpkg's database too; one
+    /// that can't be read has no markers.
     pub fn watched(&self) -> Vec<PathBuf> {
-        vec![
+        let catalog = Catalog::load(&self.catalog).unwrap_or_default();
+        [
             PathBuf::from(DPKG_STATUS),
             self.picks.clone(),
             self.packages_file.clone(),
         ]
+        .into_iter()
+        .chain(catalog.markers().map(|marker| self.home.join(marker)))
+        .collect()
     }
 }
 
@@ -131,7 +143,37 @@ pub enum ReadError {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Apps {
     /// Sorted by id, as the catalog is.
-    apps: Vec<(App, AppState, Option<String>)>,
+    apps: Vec<Standing>,
+    /// The machine's architecture, as dpkg names it.
+    arch: String,
+}
+
+/// Where one app stands.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Standing {
+    app: App,
+    state: AppState,
+    /// Its apt or `.deb` package's version.
+    version: Option<String>,
+    /// The setup the machine has it in, while it is installed.
+    setup: Option<String>,
+}
+
+impl Standing {
+    /// The setup it is installed in.
+    fn installed_setup(&self) -> Option<&Setup> {
+        self.app.setup(self.setup.as_deref()?)
+    }
+
+    /// Whether the Install Item of `setup`, or of the app without setups, applies on a machine
+    /// of `arch`: the app isn't on the machine and has something for it, or it is there in
+    /// another setup.
+    fn offers_install(&self, setup: Option<&Setup>, arch: &str) -> bool {
+        if self.state.is_installed() {
+            return setup.is_some_and(|setup| self.setup.as_deref() != Some(setup.id.as_str()) && self.app.available(arch, Some(setup)));
+        }
+        self.app.available(arch, setup)
+    }
 }
 
 impl Apps {
@@ -143,14 +185,22 @@ impl Apps {
             .iter()
             .filter_map(|app| {
                 let stands = status.apps.iter().find(|s| s.id == app.id)?;
-                Some((app.clone(), stands.state, stands.version.clone()))
+                Some(Standing {
+                    app: app.clone(),
+                    state: stands.state,
+                    version: stands.version.clone(),
+                    setup: stands.setup.clone(),
+                })
             })
             .collect();
-        Apps { apps }
+        Apps {
+            apps,
+            arch: status.arch.clone(),
+        }
     }
 
-    /// Reads the catalog, the picks, dpkg's packages with one `dpkg-query`, and `packages.toml`;
-    /// only the catalog when it has no app.
+    /// Reads the catalog, the picks, dpkg's packages with one `dpkg-query`, `packages.toml` and
+    /// the setups' markers; only the catalog when it has no app.
     ///
     /// # Errors
     ///
@@ -167,56 +217,86 @@ impl Apps {
             .collect();
         let dpkg = Dpkg::parse(&runner.output(&query).map_err(ReadError::Dpkg)?);
         let nix: BTreeSet<String> = files.packages.list().map_err(ReadError::Nix)?.into_iter().collect();
+        let markers = catalog.markers_there(&files.home);
         let facts = Facts {
             catalog: &catalog,
             picks: &picks,
             arch: apps::arch(),
             dpkg: &dpkg,
             nix: &nix,
+            markers: &markers,
         };
         Ok(Self::new(&catalog, &Status::new(&facts)))
     }
 
-    /// One Item an app: Remove while it is on the machine, Install while it isn't. An app with
-    /// nothing for this machine's architecture has none.
+    /// The Items of each app: Remove while it is on the machine, Install while it isn't, or for
+    /// an app with setups one Install a setup it isn't in. An app with nothing for this machine's
+    /// architecture has none, and a setup with nothing for it neither.
     pub fn items(&self) -> Vec<Item> {
-        self.apps
-            .iter()
-            .filter_map(|(app, state, version)| match state {
-                AppState::Unavailable => None,
-                state if state.is_installed() => Some(remove_item(app, version.as_deref())),
-                _ => Some(install_item(app)),
-            })
-            .collect()
+        let mut items = Vec::new();
+        for standing in &self.apps {
+            if standing.state.is_installed() {
+                items.push(remove_item(standing));
+            }
+            if standing.app.has_setups() {
+                for setup in &standing.app.setups {
+                    if standing.offers_install(Some(setup), &self.arch) {
+                        items.push(setup_item(standing, setup));
+                    }
+                }
+            } else if standing.offers_install(None, &self.arch) {
+                items.push(install_item(&standing.app));
+            }
+        }
+        items
     }
 
     /// The id of every Item an app of the catalog may have, either half, which `hide` may name.
     pub fn ids(&self) -> Vec<String> {
         self.apps
             .iter()
-            .flat_map(|(app, ..)| {
-                [
-                    format!("{INSTALL_PREFIX}{}", app.id),
-                    format!("{REMOVE_PREFIX}{}", app.id),
-                ]
+            .flat_map(|standing| {
+                let app = &standing.app;
+                let installs: Vec<String> = if app.has_setups() {
+                    app.setups
+                        .iter()
+                        .map(|setup| format!("{INSTALL_PREFIX}{}:{}", app.id, setup.id))
+                        .collect()
+                } else {
+                    vec![format!("{INSTALL_PREFIX}{}", app.id)]
+                };
+                installs.into_iter().chain([format!("{REMOVE_PREFIX}{}", app.id)])
             })
             .collect()
     }
 
-    /// The app of the Item `id`, and whether the Item installs it, while that is the half that
+    /// The app of the Item `id`, what the Item does, and the setup it installs, while the Item
     /// applies.
-    fn offered(&self, id: &str) -> Option<(&App, Change)> {
-        let (change, app_id) = match (id.strip_prefix(INSTALL_PREFIX), id.strip_prefix(REMOVE_PREFIX)) {
-            (Some(app_id), _) => (Change::Add, app_id),
-            (_, Some(app_id)) => (Change::Remove, app_id),
+    fn offered(&self, id: &str) -> Option<(&App, Change, Option<&Setup>)> {
+        let (change, rest) = match (id.strip_prefix(INSTALL_PREFIX), id.strip_prefix(REMOVE_PREFIX)) {
+            (Some(rest), _) => (Change::Add, rest),
+            (_, Some(rest)) => (Change::Remove, rest),
             _ => return None,
         };
-        let (app, state, _) = self.apps.iter().find(|(app, ..)| app.id == app_id)?;
-        let applies = match change {
-            Change::Add => !state.is_installed() && *state != AppState::Unavailable,
-            Change::Remove => state.is_installed(),
+        let (app_id, setup_id) = match (change, rest.split_once(':')) {
+            (Change::Add, Some((app_id, setup_id))) => (app_id, Some(setup_id)),
+            (_, None) => (rest, None),
+            (Change::Remove, Some(_)) => return None,
         };
-        applies.then_some((app, change))
+        let standing = self.apps.iter().find(|standing| standing.app.id == app_id)?;
+        let app = &standing.app;
+        if change == Change::Add && app.has_setups() != setup_id.is_some() {
+            return None;
+        }
+        let setup = match setup_id {
+            Some(setup_id) => Some(app.setup(setup_id)?),
+            None => None,
+        };
+        let applies = match change {
+            Change::Add => standing.offers_install(setup, &self.arch),
+            Change::Remove => standing.state.is_installed(),
+        };
+        applies.then_some((app, change, setup))
     }
 }
 
@@ -372,14 +452,17 @@ impl AppJobs {
     /// When the Item isn't the half that applies, another app is changing, or `kubaos` can't
     /// start.
     pub fn start(&mut self, apps: &Apps, id: &str, action: &str, runner: &impl Runner) -> Result<Job, String> {
-        let (app, change) = apps
+        let (app, change, setup) = apps
             .offered(id)
-            .filter(|(_, change)| change.action() == action)
+            .filter(|(_, change, _)| change.action() == action)
             .ok_or_else(|| format!("`{id}` has no Action `{action}`"))?;
         if let Some(running) = &self.running {
             return Err(format!("{} is still going: one app at a time", running.title));
         }
-        let command = format!("kubaos app {} {}", change.word(), app.id);
+        let command = match setup {
+            Some(setup) => format!("kubaos app {} {} --setup {}", change.word(), app.id, setup.id),
+            None => format!("kubaos app {} {}", change.word(), app.id),
+        };
         let argv: Vec<String> = command.split(' ').chain(["--json"]).map(str::to_owned).collect();
         let job = format!("{JOB_PREFIX}{}", self.started + 1);
         let (lines, ended) = (self.reporter.clone(), self.reporter.clone());
@@ -392,7 +475,8 @@ impl AppJobs {
             )
             .map_err(|err| Chain(&err).to_string())?;
         self.started += 1;
-        let running = Running::new(job, app, change, command);
+        let name = setup.map_or(&app.name, |setup| &setup.name);
+        let running = Running::new(job, name, change, command);
         let shown = running.job();
         self.running = Some(running);
         Ok(shown)
@@ -415,6 +499,7 @@ struct Running {
     id: String,
     /// "Installing Google Chrome".
     title: String,
+    /// The app's name, or its setup's for a setup's install, as the summary lists it.
     name: String,
     change: Change,
     /// `kubaos app add google-chrome`, which a failure names when the program said nothing.
@@ -435,15 +520,15 @@ struct Running {
 }
 
 impl Running {
-    fn new(id: String, app: &App, change: Change, command: String) -> Self {
-        let verb = match change {
-            Change::Add => "Installing",
-            Change::Remove => "Removing",
+    fn new(id: String, name: &str, change: Change, command: String) -> Self {
+        let title = match change {
+            Change::Add => format!("Installing {name}"),
+            Change::Remove => format!("Removing {name}"),
         };
         Running {
             id,
-            title: format!("{verb} {}", app.name),
-            name: app.name.clone(),
+            title,
+            name: name.to_owned(),
             change,
             command,
             step: None,
@@ -556,13 +641,37 @@ fn install_item(app: &App) -> Item {
     )
 }
 
-/// "Remove Google Chrome", for an app that is, at `version` when dpkg has one.
-fn remove_item(app: &App, version: Option<&str>) -> Item {
+/// "Install T3 Code as a service", for a setup of an app the machine doesn't have in it: the
+/// setup's summary, and which setup it replaces while the app is there in another.
+fn setup_item(standing: &Standing, setup: &Setup) -> Item {
+    let app = &standing.app;
+    let title = format!("Install {}", setup.name);
+    let subtitle = match standing.installed_setup() {
+        Some(installed) => format!("Replaces {}: {}", installed.name, setup.summary),
+        None => setup.summary.clone(),
+    };
+    item(
+        format!("{INSTALL_PREFIX}{}:{}", app.id, setup.id),
+        title.clone(),
+        subtitle,
+        app,
+        &["install", "add", "get"],
+        Action::new(INSTALL, title),
+    )
+}
+
+/// "Remove Google Chrome", for an app that is, at its version when dpkg has one, in its setup
+/// when it has setups.
+fn remove_item(standing: &Standing) -> Item {
+    let app = &standing.app;
     let title = format!("Remove {}", app.name);
-    let subtitle = version.map_or_else(
-        || "Installed".to_owned(),
-        |version| format!("Installed, version {version}"),
-    );
+    let version = standing.version.as_deref();
+    let subtitle = match (standing.installed_setup(), version) {
+        (Some(setup), Some(version)) => format!("Installed: {}, version {version}", setup.name),
+        (Some(setup), None) => format!("Installed: {}", setup.name),
+        (None, Some(version)) => format!("Installed, version {version}"),
+        (None, None) => "Installed".to_owned(),
+    };
     item(
         format!("{REMOVE_PREFIX}{}", app.id),
         title.clone(),

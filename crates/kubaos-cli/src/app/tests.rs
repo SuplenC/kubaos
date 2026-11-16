@@ -1,4 +1,5 @@
 use kubaos_core::apps::AppState;
+use kubaos_core::apps::Setup;
 use kubaos_core::apps::Status;
 use kubaos_core::apps::plan::AppStatus;
 
@@ -13,6 +14,8 @@ fn app(id: &str, name: &str, picked: bool, state: AppState, version: Option<&str
         picked,
         state,
         version: version.map(str::to_owned),
+        setup: None,
+        setups: Vec::new(),
     }
 }
 
@@ -35,5 +38,35 @@ fn the_table_lines_up_each_app_and_says_what_the_next_update_installs() {
          \n  gone: picked, but this release's catalog has no such app\
          \n\
          \n1 picked app missing: kubaos update installs it.\n"
+    );
+}
+
+#[test]
+fn an_app_in_a_setup_is_named_for_it() {
+    let mut t3 = app("t3-code", "T3 Code", true, AppState::Installed, Some("0.1.9"));
+    t3.setups = vec![
+        Setup {
+            id: "desktop".into(),
+            name: "T3 Code".into(),
+            summary: String::new(),
+            parts: None,
+        },
+        Setup {
+            id: "service".into(),
+            name: "T3 Code as a service".into(),
+            summary: String::new(),
+            parts: None,
+        },
+    ];
+    t3.setup = Some("service".into());
+    let status = Status {
+        arch: "amd64".into(),
+        apps: vec![t3],
+        unknown: Vec::new(),
+    };
+
+    assert_eq!(
+        table(&status),
+        "KubaOS's apps (amd64)\n\n  installed   picked  t3-code  T3 Code as a service  0.1.9\n"
     );
 }

@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# user-helper: sets up an app's setup of KubaOS's catalog in your home, and takes it away again.
+#
+#   user-helper install ID SETUP
+#   user-helper remove ID SETUP
+#   user-helper --help
+#
+# It takes an app id and one of its setups from the catalog it sits in, the release's checkout
+# (/usr/share/kubaos/apps/), and runs the setup's user hooks from apps/user-hooks.sh beside it
+# (docs/CONTRACTS.md, "The Apps catalog"): install_<hooks> once the setup's download for this
+# architecture is fetched over https and its sha256 is the manifest's, remove_<hooks> as it is.
+# A setup's own parts are the user's: it runs as the user, never as root, and takes no package
+# name, URL or path from its caller. `kubaos app` and kubaos update run it; the app's source,
+# which every setup shares, is the root helper's (kubaos-apps).
+#
+# Exit codes: 0 done, 1 a step failed, 2 a usage error or an id or setup it refuses (nothing ran).
+set -euo pipefail
+
+usage() {
+  sed -n '2,6p' "$0" | cut -c3-
+}
+
+refuse() {
+  printf 'user-helper: %s\n' "$*" >&2
+  exit 2
+}
+
+fail() {
+  printf 'user-helper: %s\n' "$*" >&2
+  exit 1
+}
+
+verb="${1:-}"
+case "$verb" in
+  install | remove) shift ;;
+  -h | --help) usage; exit 0 ;;
+  *) usage >&2; exit 2 ;;
+esac
+(($# == 2)) || { usage >&2; exit 2; }
+((EUID != 0)) || refuse "a setup's parts are in your home: run this as yourself, never as root"
+id="$1"
+setup="$2"
+[[ $id =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || refuse "$id is not an app id"
+[[ $setup =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || refuse "$setup is not a setup id"
+
+CATALOG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+manifest="$CATALOG/$id.toml"
+[[ -f $manifest ]] || refuse "the catalog has no app $id"
+# shellcheck source=system/manifest.sh
+source "$CATALOG/../system/manifest.sh"
+# shellcheck source=apps/user-hooks.sh
+source "$CATALOG/user-hooks.sh"
+
+# value TABLE KEY: the value of KEY in the manifest's [TABLE].
+value() {
+  manifest_dump "$manifest" | awk -F'\t' -v t="$1" -v k="$2" '$1 == t && $2 == k { print $3; exit }'
+}
+
+[[ -n "$(value "setup.$setup" name)" ]] || refuse "$id has no setup $setup"
+hooks="$(value "setup.$setup" user_hooks)"
+[[ -n $hooks ]] || refuse "$id's setup $setup has no parts of its own: the app alone is that setup"
+[[ $hooks =~ ^[a-z][a-z0-9_]{0,63}$ ]] || refuse "$id's setup $setup names user hooks that can't be: $hooks"
+for f in "install_$hooks" "remove_$hooks"; do
+  [[ $(type -t "$f") == function ]] || refuse "$id's setup $setup needs $f, which apps/user-hooks.sh doesn't define"
+done
+
+# install_parts: the setup's install hook, given its checked download and version when it has one.
+install_parts() {
+  local version arch url sha dir
+  version="$(value "setup.$setup" version)"
+  if [[ -z $version ]]; then
+    "install_$hooks"
+    return
+  fi
+  arch="$(dpkg --print-architecture)"
+  url="$(value "setup.$setup.$arch" url)"
+  sha="$(value "setup.$setup.$arch" sha256)"
+  [[ $url == https://* && $sha =~ ^[0-9a-f]{64}$ ]] || fail "$id's setup $setup has no download for $arch"
+  dir="$(mktemp -d)"
+  # shellcheck disable=SC2064 # The folder is this run's, known now.
+  trap "rm -rf '$dir'" EXIT
+  curl -fsSL --proto '=https' --tlsv1.2 --retry 2 -o "$dir/download" "$url" || fail "$id: downloading $url failed"
+  sha256sum --quiet -c - <<<"$sha  $dir/download" >/dev/null 2>&1 ||
+    fail "$id: $url is not the download its manifest pins (sha256 $sha); nothing set up"
+  "install_$hooks" "$dir/download" "$version"
+}
+
+case "$verb" in
+  install) install_parts && printf "user-helper: %s's setup %s is set up\n" "$id" "$setup" ;;
+  remove) "remove_$hooks" && printf "user-helper: %s's setup %s is taken away\n" "$id" "$setup" ;;
+esac
