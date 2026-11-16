@@ -817,6 +817,47 @@ fn a_json_setting_keeps_the_files_key_order() {
 }
 
 #[test]
+fn a_json_setting_changes_only_its_key_and_keeps_the_files_indentation_and_numbers() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    fs::create_dir_all(world.settings().parent().unwrap()).unwrap();
+    let mine = "{\n    \"zoom\": 1.50,\n    \"limit\": 1e3,\n    \"big\": 123456789012345678901234567890,\n    \
+                \"list\": [1, 2.0],\n    \"fixture\": {\n        \"mode\": \"dark\"\n    }\n}\n";
+    fs::write(world.settings(), mine).unwrap();
+
+    world.install("fixture", true).0.unwrap();
+    let set = fs::read_to_string(world.settings()).unwrap();
+    fs::write(world.settings(), set.replace("dark", "light")).unwrap();
+    world.remove("fixture").0.unwrap();
+
+    assert_eq!(
+        set,
+        mine.replace(
+            "\"mode\": \"dark\"\n",
+            "\"mode\": \"dark\",\n        \"enabled\": true\n"
+        )
+    );
+    assert_eq!(fs::read_to_string(world.settings()).unwrap(), mine.replace("dark", "light"));
+}
+
+#[test]
+fn a_json_setting_in_a_new_table_is_laid_out_as_the_file_is() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    fs::create_dir_all(world.settings().parent().unwrap()).unwrap();
+    fs::write(world.settings(), "{\n\t\"zoom\": 1.50\n}").unwrap();
+
+    world.install("fixture", true).0.unwrap();
+    let set = fs::read_to_string(world.settings()).unwrap();
+    fs::write(world.settings(), set.replace("1.50", "2.50")).unwrap();
+    world.remove("fixture").0.unwrap();
+
+    assert_eq!(
+        set,
+        "{\n\t\"zoom\": 1.50,\n\t\"fixture\": {\n\t\t\"enabled\": true\n\t}\n}"
+    );
+    assert_eq!(fs::read_to_string(world.settings()).unwrap(), "{\n\t\"zoom\": 2.50\n}");
+}
+
+#[test]
 fn a_toml_setting_keeps_the_files_comments_and_types_and_its_undo_takes_only_the_key() {
     let settings = app(r#"
 [[action]]
