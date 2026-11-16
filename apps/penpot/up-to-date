@@ -1,12 +1,20 @@
 #!/bin/sh
-# Exits 0 when Penpot's containers exist, each from the image the stack pins: a release that
-# pins new images fails it, so the next run brings them up. Running or not doesn't matter: after
-# a reboot they wait for the socket.
+# Exits 0 when each of Penpot's containers exists, made from an image the stack pins: a release
+# that pins new images fails it, so the next run brings them up. It compares the images' ids, as
+# the daemon may name a digest-pinned image differently than the file does. Running or not
+# doesn't matter: after a reboot the containers wait for the socket.
 # Usage: ./up-to-date
 set -eu
 dir=/etc/kubaos/penpot
 compose() { docker compose --project-name penpot --file "$dir/docker-compose.yaml" "$@"; }
 [ -s "$dir/secret.env" ]
-want=$(compose config --images | sort)
-have=$(compose ps --all --format '{{.Image}}' | sort)
-[ -n "$have" ] && [ "$want" = "$have" ]
+images=$(compose config --images)
+containers=$(compose ps --all --quiet)
+[ -n "$containers" ]
+# Unquoted: each is a list of words, image references and container ids, none with a space.
+# shellcheck disable=SC2086
+want=$(docker image inspect --format '{{.Id}}' $images)
+# shellcheck disable=SC2086
+have=$(docker container inspect --format '{{.Image}}' $containers)
+[ "$(printf '%s\n' "$want" | sort -u)" = "$(printf '%s\n' "$have" | sort -u)" ]
+[ "$(printf '%s\n' "$images" | wc -l)" = "$(printf '%s\n' "$containers" | wc -l)" ]

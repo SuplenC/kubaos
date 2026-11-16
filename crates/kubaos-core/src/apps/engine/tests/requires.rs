@@ -417,3 +417,51 @@ fn a_required_app_left_by_a_journal_that_isnt_installed_goes_with_the_next_remov
 
     assert_eq!(names(&result.unwrap()), ["LazyVim", "Neovim"]);
 }
+
+#[test]
+fn a_brought_app_that_cant_be_removed_is_a_warning_once_the_app_asked_for_is_gone() {
+    let world = world("\"neovim\"");
+    world.add("lazyvim", &["lazyvim"]).0.unwrap();
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.dpkg.insert("plugin-host".to_owned(), "1.0".to_owned());
+        state
+            .depends
+            .insert("plugin-host".to_owned(), ["neovim".to_owned()].into());
+    }
+
+    let (result, events) = world.remove_with("lazyvim", &[]);
+
+    assert_eq!(names(&result.unwrap()), ["LazyVim"]);
+    assert_eq!(world.journals("lazyvim"), (None, None));
+    let neovim_root = world.journals("neovim").1.unwrap();
+    assert_eq!(neovim_root.entries.len(), 1, "the removal stopped at the package: {neovim_root:?}");
+    let warned = events.0.iter().any(|e| {
+        matches!(e, UpdateEvent::Warning { text }
+            if text.starts_with("Neovim was there only for LazyVim, and couldn't be removed: ")
+                && text.ends_with("; kubaos app remove neovim tries again"))
+    });
+    assert!(warned, "{:?}", events.0);
+}
+
+#[test]
+fn configuring_an_app_a_release_changed_waits_for_the_update_that_brings_it_up_to_date() {
+    let world = world("\"neovim\"");
+    world.add("lazyvim", &["lazyvim"]).0.unwrap();
+    let changed = lazyvim("\"neovim\"").replacen(
+        "[[action]]",
+        "[[action]]\nname = \"Write its options\"\nkind = \"file\"\nto = \"~/.config/nvim/options.lua\"\ntext = \"\"\n\n[[action]]",
+        1,
+    );
+    world.write_app("lazyvim", &changed);
+    let before = world.host.snapshot();
+    let mut events = Events::default();
+
+    let (result, _) = world.with(&mut events, |e| e.configure("lazyvim"));
+
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "LazyVim changed with this release: kubaos update brings it up to date, then configure it"
+    );
+    assert_eq!(world.host.snapshot(), before);
+}

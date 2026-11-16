@@ -29,6 +29,7 @@ use crate::apps::folder::FolderError;
 use crate::apps::host::HostError;
 use crate::apps::journal;
 use crate::apps::journal::Journal;
+use crate::apps::journal::JournalError;
 use crate::apps::picks::Picks;
 use crate::apps::version;
 use crate::update::event::ActionState;
@@ -193,9 +194,9 @@ impl Engine<'_> {
     /// Installs the app `id` in `setup` with every app it requires, those first, in the plan's
     /// order, each through [`Engine::install`] and reported by an [`AppEvent`]. A required app the
     /// machine has with no journal is taken in first, owned when `picks` has it. Once all of them
-    /// stand, each required app the user hasn't picked records the apps that brought it. A failure
-    /// takes back the required apps this run installed, newest first, as well as the app's own
-    /// steps.
+    /// stand, each required app the user hasn't picked records the apps that brought it; a record
+    /// that can't be written is a warning, as every app stands. A failure takes back the required
+    /// apps this run installed, newest first, as well as the app's own steps.
     ///
     /// # Errors
     ///
@@ -213,13 +214,14 @@ impl Engine<'_> {
                 of,
             }));
             let dependency = planned.id != id;
-            let mut done = Ok(());
-            if dependency {
-                done = self
-                    .adopt(&planned.id, picks.has(&planned.id), picks.setup(&planned.id))
-                    .map(drop);
-            }
-            let there = dependency && self.complete(&planned.id)?;
+            let mut there = false;
+            let done = if dependency {
+                self.adopt(&planned.id, picks.has(&planned.id), picks.setup(&planned.id))
+                    .and_then(|_| self.complete(&planned.id))
+                    .map(|complete| there = complete)
+            } else {
+                Ok(())
+            };
             let done = done.and_then(|()| self.install(&planned.id, planned.setup.as_deref()));
             match done {
                 Ok(finished) => {
@@ -239,21 +241,32 @@ impl Engine<'_> {
             }
         }
         for planned in plan.iter().filter(|p| p.id != id && !picks.has(&p.id)) {
-            let Some(mut journal) = Journal::read(self.user.journals(), &planned.id).map_err(EngineError::Journal)?
-            else {
-                continue;
-            };
-            let before = journal.brought_by.len();
-            for by in &planned.required_by {
-                if !journal.brought_by.contains(by) {
-                    journal.brought_by.push(by.clone());
-                }
-            }
-            if journal.brought_by.len() != before {
-                journal.save(self.user.journals()).map_err(EngineError::Journal)?;
+            if let Err(e) = self.bring(&planned.id, &planned.required_by) {
+                self.warn(format!(
+                    "{} stays when the apps that need it go: {}",
+                    planned.name,
+                    crate::update::event::chain(&e)
+                ));
             }
         }
         Ok(ran)
+    }
+
+    /// Records in the app `id`'s journal that `by` brought it.
+    fn bring(&self, id: &str, by: &[String]) -> Result<(), JournalError> {
+        let Some(mut journal) = Journal::read(self.user.journals(), id)? else {
+            return Ok(());
+        };
+        let before = journal.brought_by.len();
+        for app in by {
+            if !journal.brought_by.contains(app) {
+                journal.brought_by.push(app.clone());
+            }
+        }
+        if journal.brought_by.len() == before {
+            return Ok(());
+        }
+        journal.save(self.user.journals())
     }
 
     /// Removes the required apps of a failed install that the install put there, newest first;
@@ -280,10 +293,13 @@ impl Engine<'_> {
     /// and `picks` (the user's picks without `id`) doesn't have, after the apps that brought it,
     /// each reported by an [`AppEvent`].
     ///
+    /// Once `id` is gone, an app it brought that can't be removed is a warning naming how to
+    /// remove it, and the apps that app brought stay: the removal asked for is done.
+    ///
     /// # Errors
     ///
     /// [`EngineError::Needed`] while an installed app requires `id`, before anything runs; else as
-    /// [`Engine::remove`], which stops the run at the app it failed on.
+    /// [`Engine::remove`] of `id`.
     pub fn remove_with(&mut self, id: &str, picks: &Picks) -> Result<Vec<Ran>, EngineError> {
         let needing = self.needing(id, &[])?;
         if !needing.is_empty() {
@@ -295,21 +311,41 @@ impl Engine<'_> {
         let going = self.going(id, picks)?;
         let of = going.len();
         let mut ran = Vec::new();
+        let mut stayed: Vec<String> = Vec::new();
         for (n, gone) in going.iter().enumerate() {
             let name = self.name_of(gone);
+            let brought_by_stayed = Journal::read(self.user.journals(), gone)
+                .ok()
+                .flatten()
+                .is_some_and(|j| j.brought_by.iter().any(|by| stayed.contains(by)));
+            if brought_by_stayed {
+                stayed.push(gone.clone());
+                continue;
+            }
             self.sink.event(&UpdateEvent::App(AppEvent {
                 app: gone.clone(),
                 name: name.clone(),
                 n: n + 1,
                 of,
             }));
-            let finished = self.remove(gone)?;
-            for mut journal in Journal::all(self.user.journals()).map_err(EngineError::Journal)? {
-                if going.contains(&journal.app) || !journal.brought_by.contains(gone) {
+            let finished = match self.remove(gone) {
+                Ok(finished) => finished,
+                Err(e) if gone == id => return Err(e),
+                Err(e) => {
+                    self.warn(format!(
+                        "{name} was there only for {}, and couldn't be removed: {}; kubaos app remove {gone} tries again",
+                        self.name_of(id),
+                        crate::update::event::chain(&e)
+                    ));
+                    stayed.push(gone.clone());
                     continue;
                 }
-                journal.brought_by.retain(|by| by != gone);
-                journal.save(self.user.journals()).map_err(EngineError::Journal)?;
+            };
+            if let Err(e) = self.forget_bringer(gone, &going) {
+                self.warn(format!(
+                    "the apps {name} brought couldn't forget it: {}",
+                    crate::update::event::chain(&e)
+                ));
             }
             ran.push(Ran {
                 id: gone.clone(),
@@ -318,6 +354,18 @@ impl Engine<'_> {
             });
         }
         Ok(ran)
+    }
+
+    /// Takes the app `gone` out of the `brought_by` of every app staying, those not in `going`.
+    fn forget_bringer(&self, gone: &str, going: &[String]) -> Result<(), JournalError> {
+        for mut journal in Journal::all(self.user.journals())? {
+            if going.contains(&journal.app) || !journal.brought_by.iter().any(|by| by == gone) {
+                continue;
+            }
+            journal.brought_by.retain(|by| by != gone);
+            journal.save(self.user.journals())?;
+        }
+        Ok(())
     }
 
     /// The apps a removal of `id` takes, in order: `id`, then each app that only apps going
@@ -373,8 +421,10 @@ impl Engine<'_> {
     /// # Errors
     ///
     /// [`EngineError::NotInstalled`] for an app whose install isn't complete,
-    /// [`EngineError::NothingToConfigure`] for one with no configure stage, else the step that
-    /// failed.
+    /// [`EngineError::NothingToConfigure`] for one with no configure stage,
+    /// [`EngineError::Outdated`] for one whose journals record a step the folder has changed
+    /// since (a release moved its steps: an install brings it up to date first), else the step
+    /// that failed.
     pub fn configure(&mut self, id: &str) -> Result<Ran, EngineError> {
         let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
         let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
@@ -388,6 +438,18 @@ impl Engine<'_> {
         let name = folder.name.clone();
         let steps = folder.steps(setup).map_err(EngineError::Folder)?;
         let of = steps.len();
+        let root = Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?;
+        let words = self.user.words();
+        let outdated = std::iter::once(&journal)
+            .chain(root.as_ref())
+            .flat_map(|j| &j.entries)
+            .any(|entry| {
+                let now = entry.step.checked_sub(1).and_then(|i| steps.get(i));
+                now.is_none_or(|action| !action.resolve(&words, &folder.dir).is_ok_and(|a| a == entry.action))
+            });
+        if outdated {
+            return Err(EngineError::Outdated { app: name });
+        }
         let stage: Vec<(usize, Action)> = steps
             .into_iter()
             .enumerate()

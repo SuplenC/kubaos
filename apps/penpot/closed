@@ -1,0 +1,5 @@
+#!/bin/sh
+# Exits 0 while no window of the web app $1 is open: its browser runs with a folder of its own,
+# which an install or a removal replaces or deletes under it.
+# Usage: ./closed <web app id>
+! pgrep -u "$(id -u)" -f -- "--user-data-dir=$HOME/.local/share/kubaos/web-apps/$1( |\$)" >/dev/null
