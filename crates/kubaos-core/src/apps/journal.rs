@@ -27,16 +27,16 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use super::action::Action;
-use super::manifest::is_app_id;
+use super::folder::is_app_id;
 
 /// The journal's file in an app's folder of a journals' folder.
 pub const JOURNAL: &str = "journal.toml";
 
-/// Where a user's journals are, under the home.
-pub const USER_JOURNALS: &str = ".local/state/kubaos/apps";
+/// The folder of a user's journals, in KubaOS's state folder (`~/.local/state/kubaos`).
+pub const JOURNALS: &str = "apps";
 
-/// The lock the user's side of a run holds, under the home.
-pub const USER_LOCK: &str = ".local/state/kubaos/apps/.lock";
+/// The lock the user's side of a run holds, in the user's journals' folder.
+pub const LOCK: &str = ".lock";
 
 /// Where root's journals are.
 pub const ROOT_JOURNALS: &str = "/var/lib/kubaos/apps";
@@ -82,8 +82,30 @@ pub struct Journal {
     /// Every step of the install is done. The user's journal says it for both sides.
     #[serde(default)]
     pub complete: bool,
+    /// An app the machine had before it had a journal, taken in on the user's side, whose root
+    /// steps root still has to record: whether KubaOS put it there. Only the user's journal has
+    /// it, and only until root's half is recorded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root_adoption: Option<Adoption>,
     #[serde(default, rename = "entry")]
     pub entries: Vec<Entry>,
+}
+
+/// Whose an adopted app is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Adoption {
+    /// KubaOS put it there: what its steps find is owned, and a removal undoes it.
+    Owned,
+    /// It was there by other means: its steps own nothing.
+    Found,
+}
+
+impl Adoption {
+    /// Whether its steps own what they find.
+    pub fn owned(self) -> bool {
+        self == Self::Owned
+    }
 }
 
 /// One step, as it was done.
@@ -230,6 +252,7 @@ impl Journal {
             app: app.to_owned(),
             setup: setup.map(str::to_owned),
             complete: false,
+            root_adoption: None,
             entries: Vec::new(),
         }
     }
@@ -348,6 +371,10 @@ impl Owners {
                 let Some(id) = entry.file_name().to_str().filter(|id| is_app_id(id)).map(str::to_owned) else {
                     continue;
                 };
+                // A file beside the journals, such as an older setup's mark, is no app's journal.
+                if !entry.file_type().is_ok_and(|t| t.is_dir()) {
+                    continue;
+                }
                 if let Some(journal) = Journal::read(dir, &id)? {
                     claims
                         .entry(id)

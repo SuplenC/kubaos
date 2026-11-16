@@ -27,15 +27,24 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 
-use super::manifest::ARCHES;
-use super::manifest::Download;
-use super::manifest::is_app_id;
+use super::folder::is_app_id;
 use crate::apt::manifest::is_package_name;
 use crate::packages::validate_name;
 
 /// The folders under which an action may write as root. Everything else on the system is the
 /// base's or a package's.
 pub const SYSTEM_PREFIXES: [&str; 3] = ["/etc/", "/opt/", "/usr/local/"];
+
+/// The architectures a pinned download may be for, as `dpkg --print-architecture` names them.
+pub const ARCHES: [&str; 2] = ["amd64", "arm64"];
+
+/// One pinned download: an https URL and the sha256 of what it serves.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Download {
+    pub url: String,
+    pub sha256: String,
+}
 
 /// The browser a `web_app` opens in: its `--app` windows are the app windows.
 pub const WEB_APP_BROWSER: &str = "google-chrome";

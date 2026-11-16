@@ -10,7 +10,7 @@
 #
 # Bitwarden desktop, whose SSH agent serves the vault's SSH keys on
 # ~/.bitwarden-ssh-agent.sock, is an app of the Apps catalog
-# (apps/bitwarden.toml): kubaos app add bitwarden.
+# (apps/bitwarden/): kubaos app add bitwarden.
 #
 # Then, as yourself: kubaos bitwarden setup (vault -> ssh, git, gh, env) and
 # dot-u2f-enroll (security keys). docs/SECRETS.md has the whole flow.
@@ -20,7 +20,7 @@
 # and arm64, starts as fast, and 2026.10 can unlock through the desktop app.
 #
 # Updating: the bw CLI waits for a bump here, and Bitwarden desktop's new
-# series for one in apps/bitwarden.toml (kubaos update moves the app within
+# series for one in apps/bitwarden/app.toml (kubaos update moves the app within
 # its series itself). kubaos update lists both (this script's
 # --check-updates), with the new versions and sha256s to paste.
 set -euo pipefail
@@ -119,14 +119,14 @@ if ((CHECK_ONLY)); then
     info "BW_CLI_SHA256_AMD64=\"$(asset_sha256 "cli-v$cli" "bw-linux-$cli.zip")\""
     info "BW_CLI_SHA256_ARM64=\"$(asset_sha256 "cli-v$cli" "bw-linux-arm64-$cli.zip")\""
   fi
-  pinned="$(manifest_dump "$DOTFILES_DIR/apps/bitwarden.toml" | awk -F'\t' '$1 == "deb" && $2 == "version" { print $3 }')"
+  # The deb action's version: the one `version = "…"` line of the app's folder.
+  pinned="$(sed -n 's/^version = "\(.*\)"$/\1/p' "$DOTFILES_DIR/apps/bitwarden/app.toml" | head -n 1)"
   if [[ "$desk" == "$pinned" ]]; then
     ok "Bitwarden desktop $pinned is the latest"
   else
-    warn "Bitwarden desktop $desk is out (pinned: $pinned). New pins for apps/bitwarden.toml:"
+    warn "Bitwarden desktop $desk is out (pinned: $pinned). New pins for apps/bitwarden/app.toml:"
     info "version = \"$desk\""
-    info "url = \"$RELEASES/desktop-v$desk/Bitwarden-$desk-amd64.deb\""
-    info "sha256 = \"$(asset_sha256 "desktop-v$desk" "Bitwarden-$desk-amd64.deb")\""
+    info "amd64 = { url = \"$RELEASES/desktop-v$desk/Bitwarden-$desk-amd64.deb\", sha256 = \"$(asset_sha256 "desktop-v$desk" "Bitwarden-$desk-amd64.deb")\" }"
   fi
   info "Release notes: https://github.com/bitwarden/clients/releases"
   exit 0

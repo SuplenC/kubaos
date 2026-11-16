@@ -1,0 +1,3 @@
+#!/bin/sh
+# Ready: T3 Code's desktop app isn't running for this user.
+! pgrep -u "$(id -u)" -x t3code >/dev/null

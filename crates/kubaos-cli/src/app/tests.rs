@@ -1,7 +1,8 @@
 use kubaos_core::apps::AppState;
-use kubaos_core::apps::Setup;
 use kubaos_core::apps::Status;
-use kubaos_core::apps::plan::AppStatus;
+use kubaos_core::apps::folder::Category;
+use kubaos_core::apps::status::AppStatus;
+use kubaos_core::apps::status::SetupInfo;
 
 use super::table;
 
@@ -10,12 +11,15 @@ fn app(id: &str, name: &str, picked: bool, state: AppState, version: Option<&str
         id: id.into(),
         name: name.into(),
         summary: String::new(),
-        source: "apt",
+        category: Category::Development,
+        tags: vec!["code".into()],
+        icon: None,
         picked,
         state,
         version: version.map(str::to_owned),
         setup: None,
         setups: Vec::new(),
+        available: vec![true],
     }
 }
 
@@ -45,19 +49,18 @@ fn the_table_lines_up_each_app_and_says_what_the_next_update_installs() {
 fn an_app_in_a_setup_is_named_for_it() {
     let mut t3 = app("t3-code", "T3 Code", true, AppState::Installed, Some("0.1.9"));
     t3.setups = vec![
-        Setup {
+        SetupInfo {
             id: "desktop".into(),
             name: "T3 Code".into(),
             summary: String::new(),
-            parts: None,
         },
-        Setup {
+        SetupInfo {
             id: "service".into(),
             name: "T3 Code as a service".into(),
             summary: String::new(),
-            parts: None,
         },
     ];
+    t3.available = vec![true, true];
     t3.setup = Some("service".into());
     let status = Status {
         arch: "amd64".into(),

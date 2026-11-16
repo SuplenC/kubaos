@@ -1,0 +1,8 @@
+#!/bin/sh
+# install-t3 DIR: the t3 runtime unpacked in DIR marked whole, as T3's installer marks it, so the
+# service and `t3 update` take it as their own, then T3's launchers pointed at it.
+set -eu
+dir="${1:?usage: install-t3 DIR}"
+"$dir/t3" --version >/dev/null
+printf '%s\n' "$(basename "$dir")" >"$dir/.install-complete"
+exec "$dir/t3" install

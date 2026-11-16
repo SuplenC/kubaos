@@ -75,6 +75,13 @@ pub struct Journal<'a> {
     pub inputs: Vec<String>,
 }
 
+/// The Apps catalog's engine reports through the journal, as the updater does.
+impl Sink for Journal<'_> {
+    fn event(&mut self, event: &UpdateEvent) {
+        self.emit(event);
+    }
+}
+
 impl fmt::Debug for Journal<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Journal")

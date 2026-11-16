@@ -1,6 +1,7 @@
 //! The Apps catalog in the menu: an "Install <Name>" Item for each app of the catalog that isn't on
-//! the machine, a "Remove <Name>" Item for each one that is, never both, so a manifest added to
-//! the catalog brings its Items with it. An app with setups has an Install Item for each setup
+//! the machine, a "Remove <Name>" Item for each one that is, never both, so a folder added to the
+//! catalog brings its Items with it. An Install Item's subtitle is the app's summary, and its tags
+//! are keywords of it alone: a word that finds an app to install never ranks its removal. An app with setups has an Install Item for each setup
 //! instead, named for it, as none is the default: all of them while the app isn't on the machine,
 //! and beside its Remove Item those of the setups it isn't in, which switch. Running one starts
 //! `kubaos app add|remove <id> --json` (`add <id> --setup <setup>`) in the background, as a Job the
@@ -8,9 +9,9 @@
 //! for the app, with why it failed and where its log is.
 //!
 //! Which apps are on the machine is the engine's status (`kubaos app status`): the catalog, the
-//! picks, one `dpkg-query`, the User flake's `packages.toml` and the setups' markers, read on a
-//! thread of its own at the start, at each config and when one of the files it comes from changes,
-//! never as the menu searches.
+//! picks, each app's user journal and one `dpkg-query` for the versions, read on a thread of its
+//! own at the start, at each config, when one of the files it comes from changes and at a Job's
+//! end, never as the menu searches.
 //!
 //! # Owns
 //!
@@ -23,7 +24,6 @@
 //!   app` (`crates/kubaos-cli/src/app.rs`).
 //! - Watching the files and sending the Job: `main.rs`.
 
-use std::collections::BTreeSet;
 use std::fmt;
 use std::io;
 use std::path::PathBuf;
@@ -40,20 +40,17 @@ use kotodama_protocol::Job;
 use kotodama_protocol::JobState;
 use kotodama_protocol::NamespacedKind;
 use kubaos_core::apps;
-use kubaos_core::apps::App;
-use kubaos_core::apps::AppState;
 use kubaos_core::apps::Catalog;
 use kubaos_core::apps::CatalogError;
 use kubaos_core::apps::Picks;
 use kubaos_core::apps::PicksError;
-use kubaos_core::apps::Setup;
 use kubaos_core::apps::Status;
-use kubaos_core::apps::plan::Facts;
+use kubaos_core::apps::journal::JournalError;
+use kubaos_core::apps::status::AppStatus;
+use kubaos_core::apps::status::SetupInfo;
 use kubaos_core::apt::Dpkg;
 use kubaos_core::apt::dpkg;
-use kubaos_core::packages::Packages;
 use kubaos_core::state::Paths;
-use kubaos_core::state::ReadError as PackagesError;
 use kubaos_core::update::event::UpdateEvent;
 use kubaos_core::update::record::SystemPaths;
 
@@ -76,7 +73,7 @@ const INSTALL_PREFIX: &str = "app-install:";
 const REMOVE_PREFIX: &str = "app-remove:";
 /// A Job is this and a count, `app-1`.
 const JOB_PREFIX: &str = "app-";
-/// The icon of an app whose manifest names none.
+/// The icon of an app whose folder names none.
 const ICON: &str = "system-software-install";
 
 /// Where the apps' status is read from.
@@ -84,23 +81,18 @@ const ICON: &str = "system-software-install";
 pub struct AppFiles {
     catalog: PathBuf,
     picks: PathBuf,
-    packages: Packages,
-    packages_file: PathBuf,
-    /// Where the setups' markers are.
-    home: PathBuf,
+    /// The apps' user journals.
+    journals: PathBuf,
 }
 
 impl AppFiles {
-    /// The installed release's catalog, and the picks and `packages.toml` of `paths`.
+    /// The installed release's catalog, and the picks and the apps' journals of `paths`.
     #[must_use]
     pub fn new(catalog: PathBuf, paths: &Paths) -> Self {
-        let state = paths.state_dir();
         AppFiles {
             catalog,
             picks: paths.app_picks(),
-            packages: Packages::new(&state, paths.edit_lock()),
-            packages_file: state.packages_file(),
-            home: paths.home().to_path_buf(),
+            journals: paths.app_journals(),
         }
     }
 
@@ -111,19 +103,21 @@ impl AppFiles {
     }
 
     /// The files whose change can change which apps are on the machine or picked: dpkg's
-    /// database, the picks, the User flake's `packages.toml` and the catalog's setups' markers.
-    /// The catalog moves only with the release, whose update rewrites dpkg's database too; one
-    /// that can't be read has no markers.
+    /// database, which has the versions, the picks, and each app's user journal, which its
+    /// install and removal rename into place. The catalog moves only with the release, whose
+    /// update rewrites dpkg's database too; one that can't be read has no journals to watch. A
+    /// journal's folder that isn't there yet can't be watched: a Job's end reads the apps again.
     pub fn watched(&self) -> Vec<PathBuf> {
         let catalog = Catalog::load(&self.catalog).unwrap_or_default();
-        [
-            PathBuf::from(DPKG_STATUS),
-            self.picks.clone(),
-            self.packages_file.clone(),
-        ]
-        .into_iter()
-        .chain(catalog.markers().map(|marker| self.home.join(marker)))
-        .collect()
+        [PathBuf::from(DPKG_STATUS), self.picks.clone()]
+            .into_iter()
+            .chain(
+                catalog
+                    .apps()
+                    .iter()
+                    .map(|app| kubaos_core::apps::journal::Journal::file(&self.journals, &app.id)),
+            )
+            .collect()
     }
 }
 
@@ -136,8 +130,8 @@ pub enum ReadError {
     Picks(#[source] PicksError),
     #[error("asking dpkg which packages are installed")]
     Dpkg(#[source] RunError),
-    #[error("reading your Nix packages")]
-    Nix(#[source] PackagesError),
+    #[error("reading the apps' journals")]
+    Journal(#[source] JournalError),
 }
 
 /// The apps of the catalog, each with where it stands on the machine.
@@ -152,58 +146,42 @@ pub struct Apps {
 /// Where one app stands.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Standing {
-    app: App,
-    state: AppState,
-    /// Its apt or `.deb` package's version.
-    version: Option<String>,
-    /// The setup the machine has it in, while it is installed.
-    setup: Option<String>,
+    app: AppStatus,
 }
 
 impl Standing {
     /// The setup it is installed in.
-    fn installed_setup(&self) -> Option<&Setup> {
-        self.app.setup(self.setup.as_deref()?)
+    fn installed_setup(&self) -> Option<&SetupInfo> {
+        self.app.setup_info(self.app.setup.as_deref()?)
     }
 
-    /// Whether the Install Item of `setup`, or of the app without setups, applies on a machine
-    /// of `arch`: the app isn't on the machine and has something for it, or it is there in
-    /// another setup.
-    fn offers_install(&self, setup: Option<&Setup>, arch: &str) -> bool {
-        if self.state.is_installed() {
-            return setup.is_some_and(|setup| {
-                self.setup.as_deref() != Some(setup.id.as_str()) && self.app.available(arch, Some(setup))
-            });
+    /// Whether the Install Item of `setup`, or of the app without setups, applies: the app isn't
+    /// on the machine and has something for it, or it is there in another setup.
+    fn offers_install(&self, setup: Option<&SetupInfo>) -> bool {
+        let id = setup.map(|s| s.id.as_str());
+        if self.app.state.is_installed() {
+            return setup.is_some_and(|setup| self.app.setup.as_deref() != Some(setup.id.as_str()) && self.app.offers(id));
         }
-        self.app.available(arch, setup)
+        self.app.offers(id)
+    }
+
+    fn has_setups(&self) -> bool {
+        !self.app.setups.is_empty()
     }
 }
 
 impl Apps {
-    /// The apps of `catalog` as `status` has them; an app the status lacks is left out.
+    /// The apps as `status` has them.
     #[must_use]
-    pub fn new(catalog: &Catalog, status: &Status) -> Self {
-        let apps = catalog
-            .apps()
-            .iter()
-            .filter_map(|app| {
-                let stands = status.apps.iter().find(|s| s.id == app.id)?;
-                Some(Standing {
-                    app: app.clone(),
-                    state: stands.state,
-                    version: stands.version.clone(),
-                    setup: stands.setup.clone(),
-                })
-            })
-            .collect();
+    pub fn new(status: &Status) -> Self {
         Apps {
-            apps,
+            apps: status.apps.iter().map(|app| Standing { app: app.clone() }).collect(),
             arch: status.arch.clone(),
         }
     }
 
-    /// Reads the catalog, the picks, dpkg's packages with one `dpkg-query`, `packages.toml` and
-    /// the setups' markers; only the catalog when it has no app.
+    /// Reads the catalog, the picks, each app's user journal and dpkg's packages with one
+    /// `dpkg-query`; only the catalog when it has no app.
     ///
     /// # Errors
     ///
@@ -219,17 +197,9 @@ impl Apps {
             .map(str::to_owned)
             .collect();
         let dpkg = Dpkg::parse(&runner.output(&query).map_err(ReadError::Dpkg)?);
-        let nix: BTreeSet<String> = files.packages.list().map_err(ReadError::Nix)?.into_iter().collect();
-        let markers = catalog.markers_there(&files.home);
-        let facts = Facts {
-            catalog: &catalog,
-            picks: &picks,
-            arch: apps::arch(),
-            dpkg: &dpkg,
-            nix: &nix,
-            markers: &markers,
-        };
-        Ok(Self::new(&catalog, &Status::new(&facts)))
+        let status = Status::read(&catalog, &picks, &files.journals, apps::arch(), Some(&dpkg))
+            .map_err(ReadError::Journal)?;
+        Ok(Self::new(&status))
     }
 
     /// The Items of each app: Remove while it is on the machine, Install while it isn't, or for
@@ -238,16 +208,16 @@ impl Apps {
     pub fn items(&self) -> Vec<Item> {
         let mut items = Vec::new();
         for standing in &self.apps {
-            if standing.state.is_installed() {
+            if standing.app.state.is_installed() {
                 items.push(remove_item(standing));
             }
-            if standing.app.has_setups() {
+            if standing.has_setups() {
                 for setup in &standing.app.setups {
-                    if standing.offers_install(Some(setup), &self.arch) {
+                    if standing.offers_install(Some(setup)) {
                         items.push(setup_item(standing, setup));
                     }
                 }
-            } else if standing.offers_install(None, &self.arch) {
+            } else if standing.offers_install(None) {
                 items.push(install_item(&standing.app));
             }
         }
@@ -260,7 +230,7 @@ impl Apps {
             .iter()
             .flat_map(|standing| {
                 let app = &standing.app;
-                let installs: Vec<String> = if app.has_setups() {
+                let installs: Vec<String> = if standing.has_setups() {
                     app.setups
                         .iter()
                         .map(|setup| format!("{INSTALL_PREFIX}{}:{}", app.id, setup.id))
@@ -275,7 +245,7 @@ impl Apps {
 
     /// The app of the Item `id`, what the Item does, and the setup it installs, while the Item
     /// applies.
-    fn offered(&self, id: &str) -> Option<(&App, Change, Option<&Setup>)> {
+    fn offered(&self, id: &str) -> Option<(&AppStatus, Change, Option<&SetupInfo>)> {
         let (change, rest) = match (id.strip_prefix(INSTALL_PREFIX), id.strip_prefix(REMOVE_PREFIX)) {
             (Some(rest), _) => (Change::Add, rest),
             (_, Some(rest)) => (Change::Remove, rest),
@@ -288,16 +258,16 @@ impl Apps {
         };
         let standing = self.apps.iter().find(|standing| standing.app.id == app_id)?;
         let app = &standing.app;
-        if change == Change::Add && app.has_setups() != setup_id.is_some() {
+        if change == Change::Add && standing.has_setups() != setup_id.is_some() {
             return None;
         }
         let setup = match setup_id {
-            Some(setup_id) => Some(app.setup(setup_id)?),
+            Some(setup_id) => Some(app.setup_info(setup_id)?),
             None => None,
         };
         let applies = match change {
-            Change::Add => standing.offers_install(setup, &self.arch),
-            Change::Remove => standing.state.is_installed(),
+            Change::Add => standing.offers_install(setup),
+            Change::Remove => app.state.is_installed(),
         };
         applies.then_some((app, change, setup))
     }
@@ -631,22 +601,31 @@ impl Running {
     }
 }
 
-/// "Install Google Chrome", for an app that isn't on the machine.
-fn install_item(app: &App) -> Item {
+/// "Install Google Chrome", for an app that isn't on the machine: its summary, and its tags among
+/// its keywords.
+fn install_item(app: &AppStatus) -> Item {
     let title = format!("Install {}", app.name);
     item(
         format!("{INSTALL_PREFIX}{}", app.id),
         title.clone(),
         app.summary.clone(),
         app,
-        &["install", "add", "get"],
+        &install_words(app),
         Action::new(INSTALL, title),
     )
 }
 
+/// The words an Install Item is found by beyond the app's id: the verbs, then its tags.
+fn install_words(app: &AppStatus) -> Vec<&str> {
+    ["install", "add", "get"]
+        .into_iter()
+        .chain(app.tags.iter().map(String::as_str))
+        .collect()
+}
+
 /// "Install T3 Code as a service", for a setup of an app the machine doesn't have in it: the
 /// setup's summary, and which setup it replaces while the app is there in another.
-fn setup_item(standing: &Standing, setup: &Setup) -> Item {
+fn setup_item(standing: &Standing, setup: &SetupInfo) -> Item {
     let app = &standing.app;
     let title = format!("Install {}", setup.name);
     let subtitle = match standing.installed_setup() {
@@ -658,7 +637,7 @@ fn setup_item(standing: &Standing, setup: &Setup) -> Item {
         title.clone(),
         subtitle,
         app,
-        &["install", "add", "get"],
+        &install_words(app),
         Action::new(INSTALL, title),
     )
 }
@@ -668,7 +647,7 @@ fn setup_item(standing: &Standing, setup: &Setup) -> Item {
 fn remove_item(standing: &Standing) -> Item {
     let app = &standing.app;
     let title = format!("Remove {}", app.name);
-    let version = standing.version.as_deref();
+    let version = app.version.as_deref();
     let subtitle = match (standing.installed_setup(), version) {
         (Some(setup), Some(version)) => format!("Installed: {}, version {version}", setup.name),
         (Some(setup), None) => format!("Installed: {}", setup.name),
@@ -685,12 +664,12 @@ fn remove_item(standing: &Standing) -> Item {
     )
 }
 
-/// An app's Item, found by its id and each word of it as well as its name, "app" and `verbs`.
-fn item(id: String, title: String, subtitle: String, app: &App, verbs: &[&str], action: Action) -> Item {
+/// An app's Item, found by its id and each word of it as well as its name, "app" and `words`.
+fn item(id: String, title: String, subtitle: String, app: &AppStatus, words: &[&str], action: Action) -> Item {
     let keywords = std::iter::once(app.id.as_str())
         .chain(app.id.split('-'))
         .chain(["app", "apps"])
-        .chain(verbs.iter().copied())
+        .chain(words.iter().copied())
         .map(str::to_owned)
         .collect();
     Item {

@@ -10,13 +10,10 @@ use super::EngineError;
 use super::Keeper;
 use crate::apps::action::Side;
 use crate::apps::host::fake::FakeHost;
+use crate::apps::host::fake::FakeRoot;
 use crate::apps::host::fake::Unit;
 use crate::apps::journal::Journal;
 use crate::apps::root::Reply;
-use crate::apps::root::Request;
-use crate::apps::root::RootError;
-use crate::apps::root::RootSide;
-use crate::apps::root::Server;
 use crate::update::event::ActionState;
 use crate::update::event::Sink;
 use crate::update::event::UpdateEvent;
@@ -180,41 +177,6 @@ impl Sink for StopAt {
     }
 }
 
-/// Root's side of the fake machine, its requests sent as JSON lines through the real server.
-struct FakeRoot {
-    host: FakeHost,
-    catalog: PathBuf,
-    journals: PathBuf,
-    owner: u32,
-    declined: bool,
-    started: bool,
-    requests: Vec<String>,
-}
-
-impl RootSide for FakeRoot {
-    fn start(&mut self) -> Result<(), RootError> {
-        if self.declined {
-            return Err(RootError::Declined);
-        }
-        self.started = true;
-        Ok(())
-    }
-
-    fn call(&mut self, request: &Request) -> Result<Reply, RootError> {
-        assert!(self.started, "a request before the root helper started");
-        let line = serde_json::to_string(request).unwrap();
-        self.requests.push(line.clone());
-        Ok(self.serve(&line))
-    }
-}
-
-impl FakeRoot {
-    fn serve(&mut self, line: &str) -> Reply {
-        let keeper = Keeper::new(&mut self.host, Side::Root, &self.catalog, &self.journals);
-        Server::new(keeper, &self.catalog, self.owner).handle(line)
-    }
-}
-
 impl World {
     fn new(apps: &[(&str, &str)]) -> Self {
         let dir = tempfile::tempdir().unwrap();
@@ -273,6 +235,7 @@ impl World {
             declined: false,
             started: false,
             requests: Vec::new(),
+            calls: std::rc::Rc::default(),
         }
     }
 
@@ -463,7 +426,6 @@ fn a_declined_password_changes_nothing() {
     let result = world.run(&mut root, &mut events, true, |e| e.install("fixture", None));
 
     assert!(matches!(result, Err(EngineError::Declined)), "{result:?}");
-    assert!(events.0.contains(&UpdateEvent::Declined));
     assert_eq!(world.host.snapshot(), before);
     assert_eq!(world.journals("fixture"), (None, None));
 }

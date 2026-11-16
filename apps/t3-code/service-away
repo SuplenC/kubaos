@@ -1,0 +1,12 @@
+#!/bin/sh
+# Undo: the service stopped and its user unit gone, by T3 when its launcher is there, else by
+# hand.
+t3="$HOME/.local/bin/t3"
+if [ -x "$t3" ]; then
+  "$t3" service uninstall || true
+fi
+unit="$HOME/.config/systemd/user/t3code.service"
+[ -e "$unit" ] || exit 0
+systemctl --user disable --now t3code.service || true
+rm -f "$unit"
+systemctl --user daemon-reload

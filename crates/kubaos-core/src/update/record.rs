@@ -46,7 +46,8 @@ pub const RELEASE: &str = "var/lib/kubaos/release";
 pub const HISTORY: &str = "var/lib/kubaos/update-history";
 /// A marker per system migration that ran.
 pub const MARKERS: &str = "var/lib/kubaos/migrations";
-/// The Apps catalog's root helper, which `install_apps_helper` (`system/lib.sh`) installs.
+/// The Apps catalog's root helper, `kubaos-apps` from the release's build, which
+/// `install_apps_helper` (`system/lib.sh`) links there.
 pub const APPS_HELPER: &str = "usr/local/libexec/kubaos-apps";
 /// The Hyprland pin apt reads, installed from the release's copy.
 pub const APT_PIN: &str = "etc/apt/preferences.d/kubaos-hyprland";
@@ -147,15 +148,14 @@ impl SystemPaths {
         self.checkout().join(crate::apps::catalog::CATALOG)
     }
 
-    /// The Apps catalog's user helper, which sets up a setup's own parts as the user,
-    /// `/usr/share/kubaos/apps/user-helper`.
-    pub fn apps_user_helper(&self) -> PathBuf {
-        self.catalog().join(crate::apps::catalog::USER_HELPER)
-    }
-
     /// The Apps catalog's root helper, `/usr/local/libexec/kubaos-apps`.
     pub fn apps_helper(&self) -> PathBuf {
         self.join(APPS_HELPER)
+    }
+
+    /// Root's journals of the apps' steps, `/var/lib/kubaos/apps/`.
+    pub fn app_journals(&self) -> PathBuf {
+        self.join(crate::apps::journal::ROOT_JOURNALS.trim_start_matches('/'))
     }
 
     /// `/var/lib/kubaos/apt-installed`, the packages KubaOS installed.

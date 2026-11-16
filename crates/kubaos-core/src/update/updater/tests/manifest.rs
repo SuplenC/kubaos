@@ -471,9 +471,15 @@ fn a_packages_only_preview_lists_the_installed_releases_manifest() {
 /// The Apps catalog's Docker, whose packages the manifest's docker group lists.
 const DOCKER_APP: &str = r#"
 name = "Docker"
+category = "development"
+tags = ["containers"]
 summary = "Containers"
+description = "Docker Engine."
+description_from = "https://docs.docker.com/engine/"
 
-[apt]
+[[action]]
+name = "Install Docker"
+kind = "apt"
 repo = "docker"
 packages = ["docker-ce"]
 "#;
@@ -484,7 +490,7 @@ fn an_update_leaves_the_packages_of_a_catalog_app_to_the_catalog() {
     let without_docker = manifest(&["curl"])
         .replace("[group.docker]", "[group.gone]")
         .replace("packages = [\"docker-ce\"]", "packages = [\"x-gone\"]");
-    w.push(&[(MANIFEST, &without_docker), ("apps/docker.toml", DOCKER_APP)], true);
+    w.push(&[(MANIFEST, &without_docker), ("apps/docker/app.toml", DOCKER_APP)], true);
     put(&w.sys.apt_record(), "docker-ce\tdocker\ncurl\ttools\n");
     let mut m = fake(&["curl", "docker-ce", "libpam-u2f", "x-gone"]);
     let mut events = Vec::new();
@@ -500,7 +506,7 @@ fn an_update_leaves_the_packages_of_a_catalog_app_to_the_catalog() {
 fn a_group_of_the_catalogs_packages_points_to_kubaos_app() {
     let w = World::new(Channel::Edge, true);
     w.push(
-        &[(MANIFEST, &manifest(&["curl"])), ("apps/docker.toml", DOCKER_APP)],
+        &[(MANIFEST, &manifest(&["curl"])), ("apps/docker/app.toml", DOCKER_APP)],
         true,
     );
     w.updater(&mut fake(&["curl", "libpam-u2f"])).update(yes()).unwrap();
@@ -525,10 +531,16 @@ fn a_group_of_the_catalogs_packages_points_to_kubaos_app() {
 /// A newer release's Docker, with a key this `kubaos` doesn't know.
 const NEWER_DOCKER_APP: &str = r#"
 name = "Docker"
+category = "development"
+tags = ["containers"]
 summary = "Containers"
+description = "Docker Engine."
+description_from = "https://docs.docker.com/engine/"
 a_newer_key = "x"
 
-[apt]
+[[action]]
+name = "Install Docker"
+kind = "apt"
 repo = "docker"
 packages = ["docker-ce"]
 "#;
@@ -540,7 +552,7 @@ fn a_catalog_it_cant_read_leaves_the_sync_going_and_the_catalogs_packages_alone(
         "optional = \"on\"\npackages = [\"docker-ce\"]",
         "optional = \"off\"\npackages = [\"docker-ce\"]",
     );
-    w.push(&[(MANIFEST, &docker_off), ("apps/docker.toml", NEWER_DOCKER_APP)], true);
+    w.push(&[(MANIFEST, &docker_off), ("apps/docker/app.toml", NEWER_DOCKER_APP)], true);
     // Before the handover migration, the record still has Docker's packages.
     put(&w.sys.apt_record(), "docker-ce\tdocker\ncurl\ttools\n");
     let mut m = fake(&["curl", "docker-ce", "libpam-u2f"]);

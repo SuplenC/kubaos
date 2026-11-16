@@ -1,46 +1,40 @@
-//! The updater's side of the Apps catalog: `kubaos app add|remove|status`, and the phase of every
-//! update that installs the picked apps the machine lacks.
+//! The updater's side of the Apps catalog: `kubaos app add|remove|status|adopt`, and the phase of
+//! every update that installs the picked apps.
 //!
-//! An app's root half (apt, a pinned `.deb`) goes through the root helper, given only app ids:
-//! `kubaos app` runs it through pkexec, one polkit prompt a run, and an update through sudo,
-//! which the update holds already. Its nixpkgs half is the User flake's `packages.toml`, as
-//! `kubaos package add` writes it, and a switch: `kubaos app` switches itself, an update's own
-//! switch comes after the phase. A setup's own parts are the user's: the user helper sets them up
-//! and takes them away as the user, never as root, and an update has it open no window, so a
-//! step such as pairing is a note for the user. An add or a remove that fails puts the picks
-//! back, so a declined prompt changes nothing: a removal asks for root before it takes a setup's
-//! parts away. The record of the nixpkgs names each app added (`apps::added`) keeps what was
-//! written to `packages.toml`, which is the apps' still.
+//! Each app goes through the engine (`apps::engine`): the user's steps in this process, root's
+//! through the root helper, `kubaos-apps serve`, started once a run before its first step:
+//! `kubaos app` starts it through pkexec, one polkit prompt a run, and an update through sudo,
+//! which the update holds already. An update opens no window, so a step such as pairing is a
+//! note for the user. An add or a remove that fails puts the picks back. An app the machine has
+//! with no journal, installed before KubaOS kept journals, is taken in first, owned when it is
+//! picked: KubaOS put it there.
 //!
 //! # Owns
 //!
-//! - Writing the picks and the record of added names as a run goes, running the root helper and the
-//!   user helper, switching an app's setup, and the Apps phase.
+//! - Writing the picks as a run goes, running the engine with the root helper, and the Apps
+//!   phase.
 //!
 //! # Not here
 //!
-//! - What to install and remove: `apps::plan`. The formats: `apps`. The helpers:
-//!   `system/files/apps/kubaos-apps` and `apps/user-helper`.
+//! - Installing, removing and taking in: `apps::engine`. Where each app stands: `apps::status`.
 
-use std::collections::BTreeSet;
+use std::ffi::OsString;
 
 use super::UpdateError;
 use super::Updater;
 use super::release_of;
 use crate::apps;
-use crate::apps::Added;
-use crate::apps::App;
 use crate::apps::Catalog;
+use crate::apps::Folder;
 use crate::apps::Picks;
-use crate::apps::Setup;
-use crate::apps::Source;
 use crate::apps::Status;
-use crate::apps::plan;
-use crate::apps::plan::Facts;
-use crate::apps::plan::Install;
-use crate::apt::Dpkg;
+use crate::apps::action::Side;
+use crate::apps::engine::Engine;
+use crate::apps::engine::EngineError;
+use crate::apps::engine::Keeper;
+use crate::apps::journal::Journal;
+use crate::apps::status;
 use crate::packages::Packages;
-use crate::state::migrate::wire_home_nix;
 use crate::update::changelog::Changelog;
 use crate::update::event::AppChanges;
 use crate::update::event::Command;
@@ -51,33 +45,9 @@ use crate::update::event::Summary;
 use crate::update::event::UpdateEvent;
 use crate::update::event::chain;
 use crate::update::firmware::Firmware;
+use crate::update::machine::AppsHost;
 use crate::update::machine::Cmd;
 use crate::update::machine::Machine;
-
-/// How the user helper starts a line naming a step a setup leaves to the user.
-const USER_HELPER_NEXT: &str = "user-helper: next: ";
-
-/// What the apps' plan reads.
-struct AppsState {
-    catalog: Catalog,
-    picks: Picks,
-    dpkg: Dpkg,
-    nix: BTreeSet<String>,
-    markers: BTreeSet<String>,
-}
-
-impl AppsState {
-    fn facts(&self) -> Facts<'_> {
-        Facts {
-            catalog: &self.catalog,
-            picks: &self.picks,
-            arch: apps::arch(),
-            dpkg: &self.dpkg,
-            nix: &self.nix,
-            markers: &self.markers,
-        }
-    }
-}
 
 /// How the root helper gets root.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -96,23 +66,23 @@ enum Change {
 }
 
 impl<M: Machine> Updater<'_, M> {
-    /// How the machine compares with the user's picks: every app of the checked-out release's
-    /// catalog, picked or not, installed or not.
+    /// Where each app of the checked-out release's catalog stands: picked or not, installed or
+    /// not, from the picks and the journals, and its version from one dpkg query.
     ///
     /// # Errors
     ///
-    /// [`UpdateError::Catalog`] or [`UpdateError::Picks`] when the catalog or the picks can't be
-    /// read, else the dpkg query or the read of `packages.toml` that failed.
+    /// [`UpdateError::Catalog`], [`UpdateError::Picks`] or [`UpdateError::AppJournal`] when the
+    /// catalog, the picks or a journal can't be read, else the dpkg query that failed.
     pub fn app_status(&mut self) -> Result<Status, UpdateError> {
         let catalog = Catalog::load(&self.sys.catalog()).map_err(UpdateError::Catalog)?;
         let picks = Picks::read(&self.user.app_picks()).map_err(UpdateError::Picks)?;
-        let state = self.apps_state(catalog, picks)?;
-        Ok(Status::new(&state.facts()))
+        let dpkg = self.dpkg()?;
+        Status::read(&catalog, &picks, &self.user.app_journals(), apps::arch(), Some(&dpkg))
+            .map_err(UpdateError::AppJournal)
     }
 
-    /// Picks the apps `ids`, an app with setups in its setup `setup`, and installs what the
-    /// machine lacks of them: `kubaos app add`. An app the machine has in another setup switches:
-    /// that setup's own parts go first.
+    /// Picks the apps `ids`, an app with setups in its setup `setup`, and installs them: every
+    /// step checked, those not done done. An app the machine has in another setup switches.
     ///
     /// # Errors
     ///
@@ -127,7 +97,7 @@ impl<M: Machine> Updater<'_, M> {
         self.end(result)
     }
 
-    /// Drops the apps `ids` from the picks and removes those on the machine: `kubaos app remove`.
+    /// Drops the apps `ids` from the picks and removes them: their journals undone.
     ///
     /// # Errors
     ///
@@ -137,6 +107,33 @@ impl<M: Machine> Updater<'_, M> {
         self.begin(Command::App);
         let result = self.try_change_apps(ids, Change::Remove, None);
         self.end(result)
+    }
+
+    /// Takes in every app of the catalog the machine has with no journal, running nothing but
+    /// checks and asking for no password: owned when it is picked, as KubaOS put a picked app
+    /// there. Root's steps are recorded on the first run that starts root. Returns the apps taken
+    /// in, by name. A user migration runs it once, so an updated machine counts what it has.
+    ///
+    /// # Errors
+    ///
+    /// [`UpdateError::Catalog`] or [`UpdateError::Picks`] when they can't be read, else the app
+    /// that couldn't be taken in.
+    pub fn adopt_apps(&mut self) -> Result<Vec<String>, UpdateError> {
+        let catalog = Catalog::load(&self.sys.catalog()).map_err(UpdateError::Catalog)?;
+        let picks = Picks::read(&self.user.app_picks()).map_err(UpdateError::Picks)?;
+        let mut taken = Vec::new();
+        self.with_engine(Root::Polkit, false, |engine| {
+            for app in catalog.apps() {
+                if let Some(adopted) = engine
+                    .adopt(&app.id, picks.has(&app.id))
+                    .map_err(|source| app_error(format!("taking in {}", app.name), source))?
+                {
+                    taken.push(name_in(app, adopted.setup.as_deref()).to_owned());
+                }
+            }
+            Ok(())
+        })?;
+        Ok(taken)
     }
 
     fn try_change_apps(&mut self, ids: &[String], change: Change, setup: Option<&str>) -> Result<(), UpdateError> {
@@ -167,39 +164,11 @@ impl<M: Machine> Updater<'_, M> {
         }
 
         let apps = self.phase(Phase::Apps, |u| {
-            let state = u.apps_state(catalog, picks)?;
-            let done = match change {
-                Change::Add => u.add_in_setups(state, ids),
-                Change::Remove => u
-                    .uninstall_apps(&state, &plan::removals(&state.facts(), ids))
-                    .map(|done| (done, state)),
-            };
+            let done = u.run_changes(&catalog, &before, ids, &chosen, change);
             if done.is_err() && changed {
                 before.write(&path).map_err(UpdateError::Picks)?;
             }
-            let (mut done, state) = done?;
-            // An app asked for that is already as asked is listed too: the summary says what
-            // the machine has after the run, so a caller acting on a stale reading still learns
-            // the app is there or gone.
-            let facts = state.facts();
-            for app in state.catalog.apps().iter().filter(|app| ids.contains(&app.id)) {
-                let (already, list, name) = match change {
-                    Change::Add => (
-                        facts.state(app) == apps::AppState::Installed,
-                        &mut done.installed,
-                        facts.picked_setup(app).map_or(&app.name, |setup| &setup.name),
-                    ),
-                    Change::Remove => (
-                        !facts.state(app).is_installed() && plan::parts_there(&facts, app).is_empty(),
-                        &mut done.removed,
-                        &app.name,
-                    ),
-                };
-                if already && !list.contains(name) {
-                    list.push(name.clone());
-                }
-            }
-            Ok(done)
+            done
         })?;
         let summary = Summary {
             command: Command::App,
@@ -227,9 +196,64 @@ impl<M: Machine> Updater<'_, M> {
         Ok(())
     }
 
-    /// Installs the picked apps the machine lacks, as an update's phase, before the switch that
-    /// installs an app's nixpkgs packages. No picks, or nothing missing, starts no phase and runs
-    /// nothing as root. A failure is a warning: the next update tries again.
+    /// Installs or removes each app of `ids`, in its `chosen` setup, through pkexec, taking in
+    /// first an app the machine has with no journal (owned when `before` picks it). An app
+    /// already as asked is listed too: the summary says what the machine has after the run, so a
+    /// caller acting on a stale reading still learns the app is there or gone.
+    fn run_changes(
+        &mut self,
+        catalog: &Catalog,
+        before: &Picks,
+        ids: &[String],
+        chosen: &[Option<String>],
+        change: Change,
+    ) -> Result<AppChanges, UpdateError> {
+        let mut changes = AppChanges::default();
+        let switch = self.with_engine(Root::Polkit, true, |engine| {
+            let mut switch = false;
+            for (id, setup) in ids.iter().zip(chosen) {
+                let Some(app) = catalog.get(id) else {
+                    continue;
+                };
+                let name = name_in(app, setup.as_deref());
+                engine
+                    .adopt(id, before.has(id))
+                    .map_err(|source| app_error(format!("taking in {}", app.name), source))?;
+                let finished = match change {
+                    Change::Add => engine
+                        .install(id, setup.as_deref())
+                        .map_err(|source| app_error(format!("installing {name}"), source))?,
+                    Change::Remove => engine
+                        .remove(id)
+                        .map_err(|source| app_error(format!("removing {}", app.name), source))?,
+                };
+                switch |= finished.switch;
+                match change {
+                    Change::Add => changes.installed.push(name.to_owned()),
+                    Change::Remove => changes.removed.push(app.name.clone()),
+                }
+            }
+            Ok(switch)
+        })?;
+        if switch {
+            self.switch()?;
+        }
+        let names = match change {
+            Change::Add => &changes.installed,
+            Change::Remove => &changes.removed,
+        };
+        let verb = match change {
+            Change::Add => "installed",
+            Change::Remove => "removed",
+        };
+        self.j.detail(format!("{} {verb}", names.join(", ")));
+        Ok(changes)
+    }
+
+    /// Installs the picked apps, as an update's phase, before the switch that installs an app's
+    /// nixpkgs packages: each step of each checked, a step not done (a picked app the machine
+    /// lacks, a step a release added or changed, one the user undid) done, through sudo, with no
+    /// window. No picks start no phase. A failure is a warning: the next update tries again.
     pub(super) fn reconcile_apps(&mut self) -> AppChanges {
         let picks = match Picks::read(&self.user.app_picks()) {
             Ok(picks) => picks,
@@ -241,282 +265,127 @@ impl<M: Machine> Updater<'_, M> {
         if picks.iter().next().is_none() {
             return AppChanges::default();
         }
-        let found = Catalog::load(&self.sys.catalog())
-            .map_err(UpdateError::Catalog)
-            .and_then(|catalog| self.apps_state(catalog, picks));
-        let state = match found {
-            Ok(state) => state,
+        let catalog = match Catalog::load(&self.sys.catalog()) {
+            Ok(catalog) => catalog,
             Err(e) => {
                 self.j.warn(format!("no apps installed: {}", chain(&e)));
                 return AppChanges::default();
             }
         };
-        for id in plan::unknown(&state.catalog, &state.picks) {
+        for id in status::unknown(&catalog, &picks) {
             self.j.warn(format!(
                 "{id} is picked in apps.toml, but this release's catalog has no such app"
             ));
         }
-        for app in plan::unsettled(&state.facts()) {
-            let setups: Vec<&str> = app.setups.iter().map(|setup| setup.id.as_str()).collect();
-            self.j.warn(format!(
-                "{id} is picked with no setup, so nothing installs it: kubaos app add {id} --setup <{setups}>",
-                id = app.id,
-                setups = setups.join("|"),
-            ));
+        let journals = self.user.app_journals();
+        let mut wanted: Vec<(&Folder, Option<String>, bool)> = Vec::new();
+        for app in catalog.apps().iter().filter(|app| picks.has(&app.id)) {
+            let journal = Journal::read(&journals, &app.id).ok().flatten();
+            let setup = status::picked_setup(app, &picks, journal.as_ref());
+            if app.has_setups() && setup.is_none() {
+                let setups: Vec<&str> = app.setups.iter().map(|s| s.id.as_str()).collect();
+                self.j.warn(format!(
+                    "{id} is picked with no setup, so nothing installs it: kubaos app add {id} --setup <{setups}>",
+                    id = app.id,
+                    setups = setups.join("|"),
+                ));
+                continue;
+            }
+            if !app.available(apps::arch(), setup) {
+                continue;
+            }
+            let complete = journal.is_some_and(|j| j.complete);
+            wanted.push((app, setup.map(|s| s.id.clone()), complete));
         }
-        let wanted = plan::installs(&state.facts());
         if wanted.is_empty() {
             return AppChanges::default();
         }
         self.j.phase_start(Phase::Apps);
-        let done = self.install_apps(&state, &wanted, Root::Sudo);
-        self.j.phase_end_optional(done.is_ok());
-        done.unwrap_or_else(|e| {
-            self.j.warn(format!(
-                "apps not installed, the next update tries again: {}",
-                chain(&e)
-            ));
-            AppChanges::default()
-        })
-    }
-
-    /// Installs what the machine lacks of the apps `ids` as the picks in `state` have them, after
-    /// taking away the parts of the setups an app leaves. Returns what it installed, and the state
-    /// the machine is then in.
-    fn add_in_setups(&mut self, state: AppsState, ids: &[String]) -> Result<(AppChanges, AppsState), UpdateError> {
-        let facts = state.facts();
-        let leaving: Vec<(&App, &Setup)> = state
-            .catalog
-            .apps()
-            .iter()
-            .filter(|app| ids.contains(&app.id))
-            .filter_map(|app| Some((app, facts.picked_setup(app)?)))
-            .flat_map(|(app, setup)| {
-                plan::leaving(&facts, app, setup)
-                    .into_iter()
-                    .map(move |other| (app, other))
-            })
-            .collect();
-        let state = if leaving.is_empty() {
-            state
-        } else {
-            self.remove_parts(&leaving)?;
-            self.apps_state(state.catalog.clone(), state.picks.clone())?
-        };
-        let wanted: Vec<Install> = plan::installs(&state.facts())
-            .into_iter()
-            .filter(|install| ids.contains(&install.app.id))
-            .collect();
-        let done = self.install_apps(&state, &wanted, Root::Polkit)?;
-        let after = self.apps_state(state.catalog.clone(), state.picks.clone())?;
-        Ok((done, after))
-    }
-
-    /// Takes away the own parts of each setup of `leaving`, through the user helper.
-    fn remove_parts(&mut self, leaving: &[(&App, &Setup)]) -> Result<(), UpdateError> {
-        for (app, setup) in leaving {
-            self.j.step(format!("Removing {}", setup.name));
-            let helper = self.user_helper(&["remove"], app, setup);
-            self.run_user_helper(&helper, format!("removing {}", setup.name))?;
-        }
-        Ok(())
-    }
-
-    /// Checks that each setup of `parts` can be taken away now, through the user helper, which
-    /// changes nothing.
-    fn ready_to_remove(&mut self, parts: &[(&App, &Setup)]) -> Result<(), UpdateError> {
-        for (app, setup) in parts {
-            let helper = self.user_helper(&["ready", "remove"], app, setup);
-            self.run_user_helper(&helper, format!("removing {}", setup.name))?;
-        }
-        Ok(())
-    }
-
-    /// Runs the user helper's `helper`, and repeats each step it leaves to the user as a note.
-    fn run_user_helper(&mut self, helper: &Cmd, what: String) -> Result<(), UpdateError> {
-        let mut next = Vec::new();
-        let ran = self.run_with(helper, |line| {
-            if let Some(step) = line.strip_prefix(USER_HELPER_NEXT) {
-                next.push(step.trim_end().to_owned());
-            }
-        });
-        for step in next {
-            self.j.note(step);
-        }
-        ran.map_err(UpdateError::step(what))
-    }
-
-    /// Installs `wanted`: the root half in one run of the helper, the nixpkgs half into
-    /// `packages.toml`, switched to at once when `root` is polkit, recording the names each app
-    /// added, then each setup's own parts through the user helper. The names installed are those
-    /// the machine then has.
-    fn install_apps(&mut self, state: &AppsState, wanted: &[Install], root: Root) -> Result<AppChanges, UpdateError> {
-        if wanted.is_empty() {
-            self.j.detail("already installed");
-            return Ok(AppChanges::default());
-        }
-        let names: Vec<&str> = wanted.iter().map(Install::name).collect();
-        self.j.step(format!("Installing {}", names.join(", ")));
-        let as_root: Vec<&str> = wanted
-            .iter()
-            .filter(|i| i.source && i.app.source.needs_root())
-            .map(|i| i.app.id.as_str())
-            .collect();
-        if !as_root.is_empty() {
-            let helper = self.helper(root).arg("install").args(&as_root);
-            self.run(&helper).map_err(UpdateError::step("installing the apps"))?;
-        }
-        let sources: Vec<&App> = wanted.iter().filter(|i| i.source).map(|i| i.app).collect();
-        let nix = nix_packages(&sources);
-        if !nix.is_empty() {
-            let changed = self.edit_nix(&nix, Change::Add)?;
-            let path = self.user.apps_added();
-            let mut added = Added::read(&path).map_err(UpdateError::AppsAdded)?;
-            let before = added.clone();
-            for app in &sources {
-                if let Source::Nix { packages } = &app.source {
-                    added.record(&app.id, packages.iter().filter(|p| changed.contains(*p)).cloned());
+        let mut changes = AppChanges::default();
+        let mut ok = true;
+        let ran = self.with_engine(Root::Sudo, false, |engine| {
+            for (app, setup, complete) in &wanted {
+                let name = name_in(app, setup.as_deref()).to_owned();
+                let done = engine
+                    .adopt(&app.id, true)
+                    .and_then(|adopted| {
+                        let was = *complete || adopted.is_some();
+                        engine.install(&app.id, setup.as_deref()).map(|f| (f, was))
+                    })
+                    .map_err(|source| app_error(format!("installing {name}"), source));
+                match done {
+                    Ok((_, was)) if !was => changes.installed.push(name),
+                    Ok(_) => {}
+                    Err(e) => {
+                        ok = false;
+                        engine_warning(engine, &e);
+                    }
                 }
             }
-            if added != before {
-                added.write(&path).map_err(UpdateError::AppsAdded)?;
-            }
-            if root == Root::Polkit {
-                self.switch()?;
-            }
+            Ok::<_, UpdateError>(())
+        });
+        if let Err(e) = ran {
+            ok = false;
+            self.j.warn(format!("apps not installed, the next update tries again: {}", chain(&e)));
         }
-        // An update runs unattended: a setup opens no window in one, and leaves its steps, such as
-        // pairing, to the notes.
-        let verb: &[&str] = match root {
-            Root::Polkit => &["install", "--window"],
-            Root::Sudo => &["install"],
-        };
-        for install in wanted {
-            if let (true, Some(setup)) = (install.parts, install.setup) {
-                self.j.step(format!("Setting up {}", setup.name));
-                let helper = self.user_helper(verb, install.app, setup);
-                self.run_user_helper(&helper, format!("setting up {}", setup.name))?;
-            }
+        if !changes.installed.is_empty() {
+            self.j.detail(format!("{} installed", changes.installed.join(", ")));
         }
-        let after = self.apps_state(state.catalog.clone(), state.picks.clone())?;
-        let mut changes = AppChanges::default();
-        for install in wanted {
-            if after.facts().state(install.app) == apps::AppState::Installed {
-                changes.installed.push(install.name().to_owned());
-            } else {
-                self.j
-                    .warn(format!("{} isn't on the machine after its install", install.name()));
-            }
-        }
-        self.j.detail(format!("{} installed", changes.installed.join(", ")));
-        Ok(changes)
+        self.j.phase_end_optional(ok);
+        changes
     }
 
-    /// Removes `apps`: the root half in one run of the helper, once the user helper says each
-    /// setup's own parts that are there can go, then those parts, and from `packages.toml` the
-    /// nixpkgs names they added that no other picked app needs, then a switch. Root comes before
-    /// the parts, so a declined prompt leaves every setup as it was.
-    fn uninstall_apps(&mut self, state: &AppsState, apps: &[&App]) -> Result<AppChanges, UpdateError> {
-        if apps.is_empty() {
-            self.j.detail("not installed");
-            return Ok(AppChanges::default());
-        }
-        let names: Vec<&str> = apps.iter().map(|a| a.name.as_str()).collect();
-        let facts = state.facts();
-        let parts: Vec<(&App, &Setup)> = apps
-            .iter()
-            .flat_map(|app| {
-                plan::parts_there(&facts, app)
-                    .into_iter()
-                    .map(move |setup| (*app, setup))
-            })
-            .collect();
-        self.ready_to_remove(&parts)?;
-        self.j.step(format!("Removing {}", names.join(", ")));
-        let as_root: Vec<&str> = apps
-            .iter()
-            .filter(|a| a.source.needs_root() && facts.source_there(a))
-            .map(|a| a.id.as_str())
-            .collect();
-        if !as_root.is_empty() {
-            let helper = self.helper(Root::Polkit).arg("remove").args(&as_root);
-            self.run(&helper).map_err(UpdateError::step("removing the apps"))?;
-        }
-        self.remove_parts(&parts)?;
-        let path = self.user.apps_added();
-        let mut added = Added::read(&path).map_err(UpdateError::AppsAdded)?;
-        let before = added.clone();
-        let nix: Vec<String> = plan::nix_released(&state.catalog, &state.picks, &mut added, apps)
-            .into_iter()
-            .collect();
-        if !nix.is_empty() {
-            self.edit_nix(&nix, Change::Remove)?;
-        }
-        if added != before {
-            added.write(&path).map_err(UpdateError::AppsAdded)?;
-        }
-        if !nix.is_empty() {
-            self.switch()?;
-        }
-        self.j.detail(format!("{} removed", names.join(", ")));
-        Ok(AppChanges {
-            installed: Vec::new(),
-            removed: names.into_iter().map(str::to_owned).collect(),
-        })
-    }
-
-    /// The user helper's `verb` of `app`'s setup `setup`, run as the user, for the home the
-    /// updater works on.
-    fn user_helper(&self, verb: &[&str], app: &App, setup: &Setup) -> Cmd {
-        Cmd::user("bash")
-            .arg(self.sys.apps_user_helper())
-            .args(verb)
-            .args([app.id.as_str(), setup.id.as_str()])
-            .env("HOME", self.user.home())
-    }
-
-    /// The helper, run as root the way `root` says.
-    fn helper(&self, root: Root) -> Cmd {
+    /// Runs `work` with the engine: this user's side in this process, root's through the helper
+    /// started the way `root` says, which may open a window when `windows` says so.
+    fn with_engine<T>(
+        &mut self,
+        root: Root,
+        windows: bool,
+        work: impl FnOnce(&mut Engine<'_>) -> Result<T, UpdateError>,
+    ) -> Result<T, UpdateError> {
         let helper = self.sys.apps_helper();
-        match root {
-            Root::Polkit => Cmd::user("pkexec").arg(helper),
-            Root::Sudo => Cmd::root(helper),
-        }
+        let argv: Vec<OsString> = match root {
+            Root::Polkit => vec!["pkexec".into(), helper.into_os_string(), "serve".into()],
+            Root::Sudo => {
+                let cmd = Cmd::root(&helper);
+                self.authorise(&cmd).map_err(UpdateError::step("asking for the password"))?;
+                vec!["sudo".into(), helper.into_os_string(), "serve".into()]
+            }
+        };
+        let host = AppsHost {
+            home: self.user.home().to_path_buf(),
+            checkout: self.sys.checkout(),
+            packages: Packages::new(&self.user.state_dir(), self.user.edit_lock()),
+        };
+        let (catalog, user_journals, root_journals, lock) = (
+            self.sys.catalog(),
+            self.user.app_journals(),
+            self.sys.app_journals(),
+            self.user.app_lock(),
+        );
+        let (mut host, mut root_side) = self.m.apps(&host, argv);
+        let keeper = Keeper::new(&mut *host, Side::User, catalog, user_journals);
+        let mut engine = Engine::new(keeper, &mut *root_side, root_journals, lock, &mut self.j, windows);
+        work(&mut engine)
     }
+}
 
-    /// Adds `names` to the User flake's `packages.toml`, or removes them, wiring `home.nix` to it
-    /// first as `kubaos package add` does. Returns the names it changed: on an add, those that
-    /// weren't there yet.
-    fn edit_nix(&mut self, names: &[String], change: Change) -> Result<BTreeSet<String>, UpdateError> {
-        let home_nix = self.user.home_nix();
-        wire_home_nix(&home_nix, &self.user.backups()).map_err(UpdateError::Wire)?;
-        let packages = Packages::new(&self.user.state_dir(), self.user.edit_lock());
-        match change {
-            Change::Add => packages.add(names),
-            Change::Remove => packages.remove(names),
-        }
-        .map(|done| done.changed.into_iter().collect())
-        .map_err(UpdateError::NixPackages)
-    }
+/// The name `app` is installed under in `setup`: the setup's, else its own.
+fn name_in<'a>(app: &'a Folder, setup: Option<&str>) -> &'a str {
+    setup.and_then(|id| app.setup(id)).map_or(&app.name, |s| &s.name)
+}
 
-    /// The facts the plan reads: dpkg's packages, the names in `packages.toml`, and the setups'
-    /// markers in the home.
-    fn apps_state(&mut self, catalog: Catalog, picks: Picks) -> Result<AppsState, UpdateError> {
-        let dpkg = self.dpkg()?;
-        let nix = Packages::new(&self.user.state_dir(), self.user.edit_lock())
-            .list()
-            .map_err(UpdateError::NixList)?
-            .into_iter()
-            .collect();
-        let markers = catalog.markers_there(self.user.home());
-        Ok(AppsState {
-            catalog,
-            picks,
-            dpkg,
-            nix,
-            markers,
-        })
+/// What a run of the engine that failed says: a declined password is the user's no.
+fn app_error(what: String, source: EngineError) -> UpdateError {
+    match source {
+        EngineError::Declined => UpdateError::Declined,
+        source => UpdateError::App { what, source },
     }
+}
+
+/// Reports an app the update couldn't install as a warning, through the engine's sink.
+fn engine_warning(engine: &mut Engine<'_>, e: &UpdateError) {
+    engine.warn(format!("{}; the next update tries again", chain(e)));
 }
 
 /// The setup each of `ids` is added in, by position: none for an app without setups. Checks
@@ -565,17 +434,4 @@ fn chosen_setups(
         });
     }
     Ok(chosen)
-}
-
-/// The nixpkgs names of `apps`, each once.
-fn nix_packages(apps: &[&App]) -> Vec<String> {
-    let names: BTreeSet<&String> = apps
-        .iter()
-        .filter_map(|a| match &a.source {
-            Source::Nix { packages } => Some(packages),
-            _ => None,
-        })
-        .flatten()
-        .collect();
-    names.into_iter().cloned().collect()
 }

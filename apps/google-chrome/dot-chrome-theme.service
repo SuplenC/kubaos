@@ -1,5 +1,5 @@
 # One-shot: copy the wallpaper's surface color into Chrome's managed policy.
-# See /usr/local/libexec/dot-chrome-theme (system/files/chrome/).
+# See /usr/local/libexec/dot-chrome-theme (apps/google-chrome/).
 [Unit]
 Description=Write Chrome's BrowserThemeColor from @USER@'s wallpaper colors
 

@@ -38,6 +38,16 @@ const APT_OPTIONS: [&str; 4] = [
     "Dpkg::Options::=--force-confold",
 ];
 
+/// The name and home of the user `uid`, as the password database (`/etc/passwd`) has them.
+pub fn account(uid: u32) -> Option<(String, PathBuf)> {
+    let passwd = fs::read_to_string("/etc/passwd").ok()?;
+    passwd.lines().find_map(|line| {
+        let fields: Vec<&str> = line.split(':').collect();
+        (fields.len() >= 6 && fields[2].parse::<u32>().ok() == Some(uid))
+            .then(|| (fields[0].to_owned(), PathBuf::from(fields[5])))
+    })
+}
+
 /// The machine itself, for `user`.
 #[derive(Debug)]
 pub struct SystemHost {
