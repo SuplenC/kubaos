@@ -1498,14 +1498,24 @@ icon = "sketch.svg"
         PathBuf::from("/opt/sketch/config")
     );
     let entry = fs::read_to_string(home.join(".local/share/applications/kubaos-web-sketch.desktop")).unwrap();
+    let profile = home.join(".local/share/kubaos/web-apps/sketch");
     assert!(
-        entry.contains("Exec=google-chrome --app=https://sketch.example/ --class=kubaos-web-sketch\n"),
+        entry.contains(&format!(
+            "Exec=google-chrome --user-data-dir={} --profile-directory=kubaos-web-sketch --no-first-run \
+             --no-default-browser-check --app=https://sketch.example/\n",
+            profile.display()
+        )),
         "{entry}"
     );
-    assert!(entry.contains("StartupWMClass=kubaos-web-sketch\n"), "{entry}");
+    assert!(
+        entry.contains("StartupWMClass=chrome-sketch.example__-kubaos-web-sketch\n"),
+        "{entry}"
+    );
     let icon = home.join(".local/share/icons/hicolor/scalable/apps/kubaos-web-sketch.svg");
     assert!(entry.contains(&format!("Icon={}\n", icon.display())), "{entry}");
     assert_eq!(fs::read_to_string(icon).unwrap(), "<svg/>\n");
+    fs::create_dir_all(profile.join("kubaos-web-sketch")).unwrap();
+    fs::write(profile.join("kubaos-web-sketch/Cookies"), "signed in").unwrap();
 
     world.remove("sketch").0.unwrap();
 
@@ -1536,12 +1546,35 @@ icon = "penpot.svg"
     )
     .unwrap();
     assert!(
-        entry.contains(
-            "\nExec=google-chrome \"--app=https://design.example/view?team=a&file=b#page%%20one\" \
-             --class=kubaos-web-penpot\n"
-        ),
+        entry.contains("--no-default-browser-check \"--app=https://design.example/view?team=a&file=b#page%%20one\"\n"),
         "{entry}"
     );
+    assert!(
+        entry.contains("\nStartupWMClass=chrome-design.example__view-kubaos-web-penpot\n"),
+        "{entry}"
+    );
+}
+
+#[test]
+fn a_web_apps_window_is_named_as_chrome_names_an_app_window_on_wayland() {
+    use crate::apps::action::perform::web_app_window;
+
+    for (url, window) in [
+        ("https://penpot.app/", "chrome-penpot.app__-kubaos-web-penpot"),
+        ("https://penpot.app", "chrome-penpot.app__-kubaos-web-penpot"),
+        ("http://localhost:9001/", "chrome-localhost__-kubaos-web-penpot"),
+        (
+            "http://127.0.0.1:9001/#/dashboard",
+            "chrome-127.0.0.1__-kubaos-web-penpot",
+        ),
+        ("http://[::1]:9001/", "chrome-[__1]__-kubaos-web-penpot"),
+        (
+            "https://Design.Example/a/b?x=1",
+            "chrome-design.example__a_b-kubaos-web-penpot",
+        ),
+    ] {
+        assert_eq!(web_app_window(url, "kubaos-web-penpot"), window, "{url}");
+    }
 }
 
 /// A download to a path without its version, `unpack` as given, pinned to `version`.
@@ -1897,3 +1930,5 @@ fn a_removal_shows_each_step_it_undoes_by_name() {
     );
     assert!(events.0.contains(&UpdateEvent::Progress { done: 4, total: 4 }));
 }
+
+mod requires;

@@ -2,6 +2,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 
 use super::SystemHost;
+use super::candidate;
 use super::simulation;
 use crate::apps::host::Host;
 
@@ -64,4 +65,14 @@ fn a_package_of_another_architecture_keeps_its_architecture_in_its_name() {
         ["libfoo1".to_owned(), "libfoo1:i386".to_owned()].into()
     );
     assert_eq!(simulation.removes, ["libbar1:i386".to_owned()].into());
+}
+
+#[test]
+fn the_candidate_is_what_apt_cache_policy_would_install() {
+    let policy =
+        "neovim:\n  Installed: (none)\n  Candidate: 0.9.5-6ubuntu2\n  Version table:\n     0.9.5-6ubuntu2 500\n";
+
+    assert_eq!(candidate(policy).as_deref(), Some("0.9.5-6ubuntu2"));
+    assert_eq!(candidate("neovim:\n  Installed: (none)\n  Candidate: (none)\n"), None);
+    assert_eq!(candidate(""), None);
 }

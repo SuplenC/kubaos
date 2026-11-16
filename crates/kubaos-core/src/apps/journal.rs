@@ -87,6 +87,11 @@ pub struct Journal {
     /// it, and only until root's half is recorded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root_adoption: Option<Adoption>,
+    /// The apps whose install brought this one, as they require it and the user hadn't picked
+    /// it: it goes with the last of them, unless the user picks it meanwhile. Only the user's
+    /// journal has it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub brought_by: Vec<String>,
     #[serde(default, rename = "entry")]
     pub entries: Vec<Entry>,
 }
@@ -265,6 +270,7 @@ impl Journal {
             setup: setup.map(str::to_owned),
             complete: false,
             root_adoption: None,
+            brought_by: Vec::new(),
             entries: Vec::new(),
         }
     }
@@ -289,6 +295,39 @@ impl Journal {
         toml::from_str(&text)
             .map(Some)
             .map_err(|source| JournalError::Parse { path, source })
+    }
+
+    /// Every journal in `dir`, by app id; none when the folder isn't there.
+    ///
+    /// # Errors
+    ///
+    /// [`JournalError`] when the folder or a journal in it can't be read.
+    pub fn all(dir: &Path) -> Result<Vec<Self>, JournalError> {
+        let read_err = |source| JournalError::Read {
+            path: dir.to_path_buf(),
+            source,
+        };
+        let entries = match fs::read_dir(dir) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(source) => return Err(read_err(source)),
+        };
+        let mut journals = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(read_err)?;
+            let Some(id) = entry.file_name().to_str().filter(|id| is_app_id(id)).map(str::to_owned) else {
+                continue;
+            };
+            // A file beside the journals, such as an older setup's mark, is no app's journal.
+            if !entry.file_type().is_ok_and(|t| t.is_dir()) {
+                continue;
+            }
+            if let Some(journal) = Self::read(dir, &id)? {
+                journals.push(journal);
+            }
+        }
+        journals.sort_by(|a, b| a.app.cmp(&b.app));
+        Ok(journals)
     }
 
     /// Writes it whole, through a file renamed into place; with no entries and not complete, takes
@@ -365,34 +404,11 @@ impl Owners {
     pub fn load(dirs: &[&Path]) -> Result<Self, JournalError> {
         let mut claims: BTreeMap<String, Vec<Claim>> = BTreeMap::new();
         for dir in dirs {
-            let entries = match fs::read_dir(dir) {
-                Ok(entries) => entries,
-                Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
-                Err(source) => {
-                    return Err(JournalError::Read {
-                        path: dir.to_path_buf(),
-                        source,
-                    });
-                }
-            };
-            for entry in entries {
-                let entry = entry.map_err(|source| JournalError::Read {
-                    path: dir.to_path_buf(),
-                    source,
-                })?;
-                let Some(id) = entry.file_name().to_str().filter(|id| is_app_id(id)).map(str::to_owned) else {
-                    continue;
-                };
-                // A file beside the journals, such as an older setup's mark, is no app's journal.
-                if !entry.file_type().is_ok_and(|t| t.is_dir()) {
-                    continue;
-                }
-                if let Some(journal) = Journal::read(dir, &id)? {
-                    claims
-                        .entry(id)
-                        .or_default()
-                        .extend(journal.entries.into_iter().flat_map(|e| e.claims));
-                }
+            for journal in Journal::all(dir)? {
+                claims
+                    .entry(journal.app)
+                    .or_default()
+                    .extend(journal.entries.into_iter().flat_map(|e| e.claims));
             }
         }
         Ok(Self { claims })

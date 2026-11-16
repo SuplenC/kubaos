@@ -262,12 +262,15 @@ pub struct AppChanges {
     /// Apps a removal left as they are: KubaOS didn't install them, so it owns nothing of them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub left: Vec<String>,
+    /// Apps whose configure stage ran again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub configured: Vec<String>,
 }
 
 impl AppChanges {
-    /// Whether no app came or went, or was left.
+    /// Whether no app came or went, was left or configured.
     pub fn is_empty(&self) -> bool {
-        self.installed.is_empty() && self.removed.is_empty() && self.left.is_empty()
+        self.installed.is_empty() && self.removed.is_empty() && self.left.is_empty() && self.configured.is_empty()
     }
 }
 
@@ -367,6 +370,20 @@ impl SuiteChanges {
     pub fn is_empty(&self) -> bool {
         self.updated.is_empty() && self.restored.is_empty() && self.upgrades.is_empty() && self.error.is_none()
     }
+}
+
+/// The app a run goes on to: an install's required apps come first, each through its own steps,
+/// and a removal's dependencies no app needs any more come after it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppEvent {
+    /// The app's id.
+    pub app: String,
+    /// The app as the user reads it: "Neovim".
+    pub name: String,
+    /// Its place in the run, from 1.
+    pub n: usize,
+    /// How many apps the run has.
+    pub of: usize,
 }
 
 /// Where one step of an app's install or removal is.
@@ -488,6 +505,8 @@ pub enum UpdateEvent {
     Warning {
         text: String,
     },
+    /// The app a run goes on to, of those it installs, removes or configures.
+    App(AppEvent),
     /// One step of an app's install or removal.
     Action(ActionEvent),
     Preview(Preview),

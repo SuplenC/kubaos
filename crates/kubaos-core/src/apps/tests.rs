@@ -62,6 +62,48 @@ fn the_catalog_loads_every_apps_folder_and_nothing_else() {
 }
 
 #[test]
+fn an_app_requiring_one_the_catalog_lacks_or_one_with_setups_is_refused() {
+    let lab = format!(
+        "{}[setup.a]\nname = \"A\"\nsummary = \"A\"\n[setup.b]\nname = \"B\"\nsummary = \"B\"\n",
+        app("Lab", AGENT)
+    );
+    for (requires, expected) in [
+        ("missing", "requires missing, which the catalog doesn't have"),
+        ("lab", "can be set up more than one way"),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        for (id, text) in [
+            ("agent", app("Agent", &format!("requires = [\"{requires}\"]\n{AGENT}"))),
+            ("lab", lab.clone()),
+        ] {
+            fs::create_dir_all(dir.path().join(id)).unwrap();
+            fs::write(dir.path().join(id).join("app.toml"), text).unwrap();
+        }
+
+        let err = Catalog::load(dir.path()).unwrap_err();
+
+        assert!(err.to_string().contains(expected), "{err}");
+    }
+}
+
+#[test]
+fn apps_requiring_each_other_in_a_circle_are_refused_naming_it() {
+    let dir = tempfile::tempdir().unwrap();
+    for (id, requires) in [("agent", "desk"), ("desk", "editor"), ("editor", "agent")] {
+        fs::create_dir_all(dir.path().join(id)).unwrap();
+        let text = app(id, &format!("requires = [\"{requires}\"]\n{AGENT}"));
+        fs::write(dir.path().join(id).join("app.toml"), text).unwrap();
+    }
+
+    let err = Catalog::load(dir.path()).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "apps require each other in a circle: agent → desk → editor → agent"
+    );
+}
+
+#[test]
 fn an_app_that_isnt_valid_is_named() {
     let (dir, _) = catalog_of(&[]);
     fs::create_dir_all(dir.path().join("bad")).unwrap();

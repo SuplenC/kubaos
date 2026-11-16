@@ -1,11 +1,13 @@
-//! The updater's side of the Apps catalog: `kubaos app add|remove|status|adopt`, and the phase of
-//! every update that installs the picked apps.
+//! The updater's side of the Apps catalog: `kubaos app add|remove|configure|status|adopt`, and the
+//! phase of every update that installs the picked apps.
 //!
 //! Each app goes through the engine (`apps::engine`): the user's steps in this process, root's
 //! through the root helper, `kubaos-apps serve`, started once a run before its first step:
 //! `kubaos app` starts it through pkexec, one polkit prompt a run, and an update through sudo,
 //! which the update holds already. An update opens no window, so a step such as pairing is a
-//! note for the user. An add or a remove that fails puts the picks back. An app the machine has
+//! note for the user. An app is installed with the apps it requires, first, and removed with
+//! those it brought that nothing needs any more; neither is in the picks. An add or a remove that
+//! fails puts the picks back. An app the machine has
 //! with no journal, installed before KubaOS kept journals, is taken in first, owned when it is
 //! picked: KubaOS put it there.
 //!
@@ -57,11 +59,12 @@ enum Root {
     Sudo,
 }
 
-/// Adding or removing.
+/// Adding, removing or configuring.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Change {
     Add,
     Remove,
+    Configure,
 }
 
 impl<M: Machine> Updater<'_, M> {
@@ -115,6 +118,19 @@ impl<M: Machine> Updater<'_, M> {
         self.end(result)
     }
 
+    /// Runs the configure stage of the installed apps `ids` alone again: each configure step
+    /// checked, one not done done. The picks don't change.
+    ///
+    /// # Errors
+    ///
+    /// [`UpdateError::NoApp`] for an id the catalog doesn't have, else the app that isn't
+    /// installed, has nothing to configure, or the step that failed.
+    pub fn configure_apps(&mut self, ids: &[String]) -> Result<(), UpdateError> {
+        self.begin(Command::App);
+        let result = self.try_change_apps(ids, Change::Configure, None);
+        self.end(result)
+    }
+
     /// Takes in every app of the catalog the machine has with no journal, running nothing but
     /// checks and asking for no password: owned when it is picked, as KubaOS put a picked app
     /// there. Root's steps are recorded on the first run that starts root. Returns the apps taken
@@ -162,6 +178,7 @@ impl<M: Machine> Updater<'_, M> {
                 (Change::Remove, _) => {
                     picks.remove(id);
                 }
+                (Change::Configure, _) => {}
             }
         }
         let changed = picks != before;
@@ -170,7 +187,7 @@ impl<M: Machine> Updater<'_, M> {
         }
 
         let apps = self.phase(Phase::Apps, |u| {
-            let done = u.run_changes(&catalog, &before, ids, &chosen, change);
+            let done = u.run_changes(&catalog, (&before, &picks), ids, &chosen, change);
             if done.is_err() && changed {
                 before.write(&path).map_err(UpdateError::Picks)?;
             }
@@ -202,14 +219,16 @@ impl<M: Machine> Updater<'_, M> {
         Ok(())
     }
 
-    /// Installs or removes each app of `ids`, in its `chosen` setup, through pkexec, taking in
-    /// first an app the machine has with no journal (owned when `before` picks it). An app
-    /// already as asked is listed too: the summary says what the machine has after the run, so a
-    /// caller acting on a stale reading still learns the app is there or gone.
+    /// Installs, removes or configures each app of `ids`, in its `chosen` setup, through pkexec,
+    /// taking in first an app the machine has with no journal (owned when the picks `before` the
+    /// run have it). An install brings the apps it requires and a removal takes those it brought,
+    /// each listed with it: `after` is the picks the run leaves, which say which apps the user
+    /// picked. An app already as asked is listed too: the summary says what the machine has after
+    /// the run, so a caller acting on a stale reading still learns the app is there or gone.
     fn run_changes(
         &mut self,
         catalog: &Catalog,
-        before: &Picks,
+        (before, after): (&Picks, &Picks),
         ids: &[String],
         chosen: &[Option<String>],
         change: Change,
@@ -228,19 +247,30 @@ impl<M: Machine> Updater<'_, M> {
                 engine
                     .adopt(id, before.has(id), before.setup(id))
                     .map_err(|source| app_error(format!("taking in {}", app.name), source))?;
-                let finished = match change {
+                let ran = match change {
                     Change::Add => engine
-                        .install(id, setup.as_deref())
+                        .add(id, setup.as_deref(), after)
                         .map_err(|source| app_error(format!("installing {name}"), source))?,
                     Change::Remove => engine
-                        .remove(id)
+                        .remove_with(id, after)
                         .map_err(|source| app_error(format!("removing {}", app.name), source))?,
+                    Change::Configure => vec![
+                        engine
+                            .configure(id)
+                            .map_err(|source| app_error(format!("configuring {}", app.name), source))?,
+                    ],
                 };
-                switch |= finished.switch;
-                match change {
-                    Change::Add => changes.installed.push(name.to_owned()),
-                    Change::Remove if finished.left => changes.left.push(app.name.clone()),
-                    Change::Remove => changes.removed.push(app.name.clone()),
+                for ran in ran {
+                    switch |= ran.finished.switch;
+                    let list = match change {
+                        Change::Add => &mut changes.installed,
+                        Change::Remove if ran.finished.left => &mut changes.left,
+                        Change::Remove => &mut changes.removed,
+                        Change::Configure => &mut changes.configured,
+                    };
+                    if !list.contains(&ran.name) {
+                        list.push(ran.name);
+                    }
                 }
             }
             Ok(switch)
@@ -248,13 +278,10 @@ impl<M: Machine> Updater<'_, M> {
         if switch {
             self.switch()?;
         }
-        let names = match change {
-            Change::Add => &changes.installed,
-            Change::Remove => &changes.removed,
-        };
-        let verb = match change {
-            Change::Add => "installed",
-            Change::Remove => "removed",
+        let (names, verb) = match change {
+            Change::Add => (&changes.installed, "installed"),
+            Change::Remove => (&changes.removed, "removed"),
+            Change::Configure => (&changes.configured, "configured"),
         };
         if !names.is_empty() {
             self.j.detail(format!("{} {verb}", names.join(", ")));
@@ -325,7 +352,7 @@ impl<M: Machine> Updater<'_, M> {
                     .adopt(&app.id, true, setup.as_deref())
                     .and_then(|adopted| {
                         let was = *complete || adopted.is_some();
-                        engine.install(&app.id, setup.as_deref()).map(|f| (f, was))
+                        engine.add(&app.id, setup.as_deref(), &picks).map(|f| (f, was))
                     })
                     .map_err(|source| app_error(format!("installing {name}"), source));
                 match done {
@@ -421,7 +448,7 @@ fn chosen_setups(
     let mut chosen = Vec::with_capacity(ids.len());
     for id in ids {
         let app = catalog.get(id).ok_or_else(|| UpdateError::NoApp { id: id.clone() })?;
-        if change == Change::Remove {
+        if change != Change::Add {
             chosen.push(None);
             continue;
         }

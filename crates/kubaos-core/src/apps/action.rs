@@ -118,6 +118,8 @@ pub enum ActionError {
     InvalidIcon { value: String },
     #[error("{key} is the journal's own; an app's folder doesn't set it")]
     JournalOnly { key: &'static str },
+    #[error("{value:?} is not a stage: \"install\" or \"configure\"")]
+    InvalidStage { value: String },
 }
 
 /// One step of an install: its name and what it does.
@@ -126,8 +128,30 @@ pub enum ActionError {
 pub struct Action {
     /// The step as the user reads it: "Start the service".
     pub name: String,
+    /// The stage it is part of: the install, or the configure stage after it.
+    #[serde(default, skip_serializing_if = "Stage::is_install")]
+    pub stage: Stage,
     #[serde(flatten)]
     pub kind: Kind,
+}
+
+/// The part of an install an action is in.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Stage {
+    /// Putting the app on the machine.
+    #[default]
+    Install,
+    /// Setting the app up the KubaOS way, its defaults in the user layer, after the install;
+    /// `kubaos app configure` runs it alone again.
+    Configure,
+}
+
+impl Stage {
+    /// Whether it is the install stage, which `app.toml` and a journal leave unsaid.
+    pub fn is_install(&self) -> bool {
+        *self == Self::Install
+    }
 }
 
 /// What an action does.
@@ -364,8 +388,18 @@ impl TryFrom<toml::Table> for Action {
         let Some(toml::Value::String(name)) = table.remove("name") else {
             return Err(ActionError::NoName);
         };
+        let stage = match table.remove("stage") {
+            None => Stage::Install,
+            Some(toml::Value::String(word)) if word == "install" => Stage::Install,
+            Some(toml::Value::String(word)) if word == "configure" => Stage::Configure,
+            Some(other) => {
+                return Err(ActionError::InvalidStage {
+                    value: other.to_string(),
+                });
+            }
+        };
         let kind = Kind::deserialize(toml::Value::Table(table)).map_err(ActionError::Parse)?;
-        let action = Self { name, kind };
+        let action = Self { name, stage, kind };
         action.check()?;
         Ok(action)
     }
@@ -551,6 +585,7 @@ impl Action {
         };
         Ok(Self {
             name: self.name.clone(),
+            stage: self.stage,
             kind,
         })
     }

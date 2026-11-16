@@ -331,6 +331,7 @@ fn log_text(event: &UpdateEvent) -> Option<String> {
         UpdateEvent::Output { line } => format!("   {line}"),
         UpdateEvent::Note { text } => text.clone(),
         UpdateEvent::Warning { text } => format!("warning: {text}"),
+        UpdateEvent::App(app) => format!("== {} ({}/{})", app.name, app.n, app.of),
         UpdateEvent::Action(action) => format!(
             "   {} {}/{} {}: {:?}",
             action.app, action.step, action.of, action.name, action.state

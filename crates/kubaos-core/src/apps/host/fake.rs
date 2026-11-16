@@ -72,6 +72,8 @@ impl FakeRoot {
 pub struct State {
     /// Package to version.
     pub dpkg: BTreeMap<String, String>,
+    /// Package to the version apt would install.
+    pub candidates: BTreeMap<String, String>,
     pub repos: BTreeSet<String>,
     /// A download's URL to its sha256 and its bytes. A `.deb`'s bytes are `deb <package>
     /// <version>`.
@@ -306,6 +308,10 @@ impl Host for FakeHost {
 
     fn version(&mut self, package: &str) -> Result<Option<String>, HostError> {
         Ok(self.state.borrow().dpkg.get(package).cloned())
+    }
+
+    fn candidate(&mut self, package: &str) -> Result<Option<String>, HostError> {
+        Ok(self.state.borrow().candidates.get(package).cloned())
     }
 
     fn apt_repo(&mut self, repo: &str) -> Result<(), HostError> {

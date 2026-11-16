@@ -168,6 +168,13 @@ pub trait Host {
     /// When dpkg can't be asked.
     fn version(&mut self, package: &str) -> Result<Option<String>, HostError>;
 
+    /// The version of `package` apt would install, from the repositories it knows now.
+    ///
+    /// # Errors
+    ///
+    /// When apt can't be asked.
+    fn candidate(&mut self, package: &str) -> Result<Option<String>, HostError>;
+
     /// The vendor repository `repo` of the package manifest set up.
     ///
     /// # Errors

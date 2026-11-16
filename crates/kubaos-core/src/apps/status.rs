@@ -109,6 +109,10 @@ pub struct AppStatus {
     /// The setups it offers, by id; none for an app with one way only.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub setups: Vec<SetupInfo>,
+    /// It is installed, KubaOS's, with a configure stage in its setup, which `kubaos app
+    /// configure` runs alone again.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub configurable: bool,
     /// Whether each setup, or the app without setups, has something for this machine: by
     /// `setups`' order, or one value for an app without setups.
     #[serde(skip)]
@@ -195,6 +199,8 @@ impl Status {
                 let package = app.packages().into_iter().next()?;
                 dpkg.get(package).map(|i| i.version.clone())
             });
+            let configurable = state == AppState::Installed
+                && app.configurable(installed.and_then(|j| j.setup.as_deref()).and_then(|s| app.setup(s)));
             apps.push(AppStatus {
                 id: app.id.clone(),
                 name: app.name.clone(),
@@ -207,6 +213,7 @@ impl Status {
                 version: version.filter(|_| state.is_installed()),
                 setup: installed.and_then(|j| j.setup.clone()),
                 setups: app.setups.iter().map(SetupInfo::from).collect(),
+                configurable,
                 available,
             });
         }

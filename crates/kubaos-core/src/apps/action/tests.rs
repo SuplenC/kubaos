@@ -3,6 +3,7 @@ use std::path::Path;
 use super::Action;
 use super::ActionError;
 use super::Side;
+use super::Stage;
 use super::Words;
 
 fn action(text: &str) -> Result<Action, ActionError> {
@@ -143,16 +144,14 @@ fn root_never_runs_a_program_from_the_home() {
 }
 
 #[test]
-fn dependencies_and_the_configure_stage_are_refused_until_they_exist() {
-    let stage = action("name = \"X\"\nkind = \"linger\"\nstage = \"configure\"\n");
-    let requires = crate::apps::folder::Folder::parse(
-        "x",
-        Path::new("/x"),
-        "name = \"X\"\nsummary = \"Y\"\ncategory = \"system\"\ntags = [\"x\"]\ndescription = \"Z\"\ndescription_from = \"https://example.com\"\nrequires = [\"neovim\"]\n[[action]]\nname = \"Z\"\nkind = \"linger\"\n",
-    );
+fn an_action_is_in_the_install_stage_unless_it_says_configure() {
+    let install = action("name = \"X\"\nkind = \"linger\"\n").unwrap();
+    let configure = action("name = \"X\"\nkind = \"linger\"\nstage = \"configure\"\n").unwrap();
+    let other = action("name = \"X\"\nkind = \"linger\"\nstage = \"later\"\n");
 
-    assert!(stage.is_err());
-    assert!(requires.is_err());
+    assert_eq!(install.stage, Stage::Install);
+    assert_eq!(configure.stage, Stage::Configure);
+    assert!(matches!(other, Err(ActionError::InvalidStage { .. })), "{other:?}");
 }
 
 #[test]
