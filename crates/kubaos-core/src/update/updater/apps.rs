@@ -215,7 +215,10 @@ impl<M: Machine> Updater<'_, M> {
         change: Change,
     ) -> Result<AppChanges, UpdateError> {
         let mut changes = AppChanges::default();
-        let switch = self.with_engine(Root::Polkit, true, |engine| {
+        // A step that opens a window, pairing, waits for a session that has a display: over SSH
+        // it is a note, and stays to do.
+        let windows = self.m.has_display();
+        let switch = self.with_engine(Root::Polkit, windows, |engine| {
             let mut switch = false;
             for (id, setup) in ids.iter().zip(chosen) {
                 let Some(app) = catalog.get(id) else {

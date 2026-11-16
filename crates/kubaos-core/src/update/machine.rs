@@ -291,6 +291,10 @@ pub trait Machine {
     /// whose home is `host.home`, and the root helper `root` starts (`pkexec <helper> serve`, or
     /// the same through sudo), not yet started.
     fn apps(&mut self, host: &AppsHost, root: Vec<OsString>) -> (Box<dyn Host + '_>, Box<dyn RootSide + '_>);
+
+    /// Whether the run has a display a step can open a window on: a Wayland session's, not an SSH
+    /// login's.
+    fn has_display(&self) -> bool;
 }
 
 /// What the user's side of the Apps catalog's engine acts with.

@@ -239,6 +239,10 @@ impl Machine for System {
         Ok(stat.f_bavail.saturating_mul(stat.f_frsize))
     }
 
+    fn has_display(&self) -> bool {
+        std::env::var_os("WAYLAND_DISPLAY").is_some_and(|display| !display.is_empty())
+    }
+
     fn apps(&mut self, host: &AppsHost, root: Vec<OsString>) -> (Box<dyn Host + '_>, Box<dyn RootSide + '_>) {
         let uid = rustix::process::getuid().as_raw();
         let user = account(uid)
