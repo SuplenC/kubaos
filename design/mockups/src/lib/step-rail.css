@@ -57,9 +57,15 @@
 }
 
 /* In Kōbō the screen is the glass: the rail has no well of its own, only its steps on their wire,
-   so nothing draws a box on the screen. */
+   so nothing draws a box on the screen. Its lockup stands level with the page's title, the page's
+   kicker in the room above them: the rail starts `space.s24` in, the page at the glass's top. */
 .k-step-rail-page[data-host="kobo"] .k-rail {
+  padding-top: var(--space-s24);
   background: none;
+}
+
+.k-step-rail-page[data-host="kobo"] .k-step-room > .k-page {
+  padding-top: 0;
 }
 
 .k-rail > .k-stack {
