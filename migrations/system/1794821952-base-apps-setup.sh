@@ -4,7 +4,8 @@
 # `setup`, run by its root helper), not the install's. On a machine with the
 # app it is put in place again, from this release's files; on one without
 # it, what the install put there for it goes: Chrome's theme helper and its
-# units, Bitwarden's autostart entry, the docker group membership.
+# units, Bitwarden's autostart entry, the docker group membership. Docker's
+# shutdown drop-in (kubaos-stop.conf, from docker_on_demand) comes with it.
 # kubaos update runs it once, as root, after apt and before the home-manager switch,
 # under bash -euo pipefail from the new release's checkout (KUBAOS_DIR). Exiting
 # non-zero stops the update; it runs again on the next one, so make it safe to rerun.

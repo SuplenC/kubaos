@@ -16,10 +16,10 @@
 //! arguments = [{ name = "name", placeholder = "github" }]
 //! terminal = true
 //!
-//! [extensions.kubaos.actions.packages-chrome-off]
-//! title = "Remove Google Chrome"
-//! run = ["kubaos", "packages", "disable", "chrome"]
-//! shown_when = { state = "packages.chrome", is = true }
+//! [extensions.kubaos.actions.packages-piv-off]
+//! title = "Remove PIV smart card support"
+//! run = ["kubaos", "packages", "disable", "piv"]
+//! shown_when = { state = "packages.piv", is = true }
 //! ```
 //!
 //! `shown_when` sends an action only while the state it names reads as `is`, or as anything but

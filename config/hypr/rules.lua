@@ -57,8 +57,8 @@ tag({ title = "^((Open|Save|Select|Choose) (a )?(File|Files|Folder|Directory|Ima
 tag({ class = "^(hyprpolkitagent|org\\.hyprland\\.hyprpolkitagent|polkit-gnome-authentication-agent-1|org\\.kde\\.polkit-kde-authentication-agent-1|gcr-prompter)$" }, "float-small")
 
 -- Bitwarden desktop: open it, copy a password, close it. A centred window,
--- not half the screen. It is a startup app, from first-boot setup's close on
--- (amd64 only, system/files/xdg/autostart/bitwarden.desktop).
+-- not half the screen. Once the Apps catalog installs it (amd64 only), it is
+-- a startup app (system/files/xdg/autostart/bitwarden.desktop).
 hl.window_rule({ match = { class = "^([Bb]itwarden)$" }, float = true, center = true, size = { 1100, 750 } })
 
 -- ripdrag, the drag source yazi opens (user-layer/tools/yazi/keymap.toml): a small

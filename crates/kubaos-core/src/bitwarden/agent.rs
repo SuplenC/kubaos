@@ -1,6 +1,8 @@
 //! Bitwarden desktop's SSH agent: it serves the vault's keys once the app is unlocked, and the
 //! session's `SSH_AUTH_SOCK` points at it (`home/secrets.nix`).
 
+use std::path::Path;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -8,6 +10,9 @@ use super::Cmd;
 use super::Host;
 use super::Paths;
 use super::Progress;
+
+/// Where Bitwarden desktop's `.deb` installs it: there when the Apps catalog's Bitwarden is.
+pub const DESKTOP: &str = "/opt/Bitwarden";
 
 /// What the agent's socket answered.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -49,6 +54,11 @@ pub fn probe(host: &mut dyn Host, paths: &Paths) -> Agent {
 pub fn check(host: &mut dyn Host, paths: &Paths, fingerprints: &[String], scope: &str, p: &mut Progress) {
     p.step(format!("Bitwarden desktop SSH agent ({})", paths.show(&paths.agent)));
     match probe(host, paths) {
+        Agent::Off if !host.exists(Path::new(DESKTOP)) => {
+            p.warn("Bitwarden desktop isn't installed, so no agent serves the vault's keys: kubaos app add bitwarden");
+            p.summary("agent  none: Bitwarden desktop isn't installed (kubaos app add bitwarden)");
+            return;
+        }
         Agent::Off => {
             p.warn(
                 "no agent socket. Start Bitwarden desktop, log in, then Settings -> SSH agent -> turn on \"Enable SSH agent\" (off by default; the app has no config-file switch for it).",

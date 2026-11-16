@@ -5,7 +5,9 @@
 #   - project env: a project's mise.toml sources ~/.local/share/kubaos/bwenv.sh,
 #     which reads the GNOME keyring cache that `kubaos bitwarden env pull`
 #     fills.
-# The desktop app, bw and pam_u2f come from system/70-bitwarden.sh, not Nix.
+# bw and pam_u2f come from system/70-bitwarden.sh, not Nix; the desktop app
+# from the Apps catalog (kubaos app add bitwarden). Without it the agent's
+# socket isn't there, and ssh goes on without the vault's keys.
 # `kubaos bitwarden setup` writes the per-vault parts (~/.ssh/config.d/bitwarden,
 # git signing, gh token, keyring entries).
 { config, lib, ... }:
