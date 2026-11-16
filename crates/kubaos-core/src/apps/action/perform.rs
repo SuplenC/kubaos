@@ -172,7 +172,8 @@ pub fn web_app_paths(id: &str) -> [String; 2] {
 }
 
 /// The browser's folder of a web app, its own `--user-data-dir`: its window's sign-ins, cookies
-/// and cache, apart from the user's browser.
+/// and cache, apart from the user's browser. The user's data, which the browser makes: no step
+/// claims it, so a removal keeps it and a reinstall opens it again.
 pub fn web_app_profile(id: &str) -> String {
     format!("~/.local/share/kubaos/web-apps/{id}")
 }
@@ -189,8 +190,8 @@ fn web_app_profile_name(id: &str) -> String {
 /// which sets only X11's class: `chrome-<host>_<path>-<profile>`, as the file name of the
 /// desktop entry it would write for the app. Its own `--user-data-dir` makes it a browser of its
 /// own, so the flags reach it whether or not the user's Chrome is open, and its own
-/// `--profile-directory` makes the name the web app's alone. `StartupWMClass` is that name, so the
-/// launcher and the compositor match the window to the entry.
+/// `--profile-directory` makes the name the web app's alone. `StartupWMClass` is that name, so a
+/// launcher or a dock matches the window to the entry.
 /// <https://github.com/chromium/chromium/blob/157.0.8103.78/chrome/browser/ui/views/frame/browser_native_widget_aura_linux.cc>
 /// <https://github.com/chromium/chromium/blob/157.0.8103.78/chrome/browser/web_applications/os_integration/web_app_shortcut_linux.cc>
 fn web_app_entry(id: &str, title: &str, url: &str, icon: &Path, profile: &Path) -> String {
@@ -413,13 +414,8 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
                 done,
                 ..Look::default()
             };
-            let Kind::WebApp { id, .. } = &action.kind else {
-                return Ok(look);
-            };
-            // The browser makes its folder as the window first opens; the app owns it all the same.
-            let profile = logical(host, &web_app_profile(id));
-            let paths = files.iter().map(|(path, _)| path).chain([&profile]);
-            for path in paths {
+            // The browser folder is left out: it holds the user's sign-ins, which outlast the app.
+            for (path, _) in &files {
                 for claim in at_path(host, path, done).claims {
                     if !look.claims.contains(&claim) {
                         look.claims.push(claim);

@@ -1514,13 +1514,50 @@ icon = "sketch.svg"
     let icon = home.join(".local/share/icons/hicolor/scalable/apps/kubaos-web-sketch.svg");
     assert!(entry.contains(&format!("Icon={}\n", icon.display())), "{entry}");
     assert_eq!(fs::read_to_string(icon).unwrap(), "<svg/>\n");
-    fs::create_dir_all(profile.join("kubaos-web-sketch")).unwrap();
-    fs::write(profile.join("kubaos-web-sketch/Cookies"), "signed in").unwrap();
 
     world.remove("sketch").0.unwrap();
 
     assert_eq!(world.host.snapshot(), before);
     assert!(world.host.state.borrow().nix.contains("fd"));
+}
+
+#[test]
+fn a_web_apps_browser_folder_is_the_users_and_outlasts_a_removal_and_a_reinstall() {
+    let web = app(r#"
+[[action]]
+name = "Open it in a window of its own"
+kind = "web_app"
+id = "sketch"
+title = "Sketch"
+url = "https://sketch.example/"
+icon = "sketch.svg"
+"#);
+    let world = World::new(&[("sketch", &web)]);
+    world.folder_file("sketch", "sketch.svg", "<svg/>\n");
+    world.install("sketch", true).0.unwrap();
+    let profile = world.host_home().join(".local/share/kubaos/web-apps/sketch");
+    fs::create_dir_all(profile.join("kubaos-web-sketch")).unwrap();
+    fs::write(profile.join("kubaos-web-sketch/Cookies"), "signed in").unwrap();
+
+    world.remove("sketch").0.unwrap();
+
+    assert_eq!(
+        fs::read_to_string(profile.join("kubaos-web-sketch/Cookies")).unwrap(),
+        "signed in"
+    );
+    assert!(
+        !world
+            .host_home()
+            .join(".local/share/applications/kubaos-web-sketch.desktop")
+            .exists()
+    );
+    world.install("sketch", true).0.unwrap();
+    assert_eq!(
+        fs::read_to_string(profile.join("kubaos-web-sketch/Cookies")).unwrap(),
+        "signed in"
+    );
+    world.remove("sketch").0.unwrap();
+    assert!(profile.join("kubaos-web-sketch/Cookies").is_file());
 }
 
 #[test]
