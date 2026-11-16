@@ -32,19 +32,53 @@ pub struct State {
     /// Group to its members.
     pub groups: BTreeMap<String, BTreeSet<String>>,
     /// `<scope>:<unit>` to its state.
-    pub units: BTreeMap<String, UnitState>,
+    pub units: BTreeMap<String, Unit>,
     pub linger: bool,
     /// Package to the installed packages installing it removes, as Docker's `docker-ce` removes
     /// Ubuntu's `docker.io`.
     pub conflicts: BTreeMap<String, BTreeSet<String>>,
     /// Package to the packages it depends on: removing one of those removes it.
     pub depends: BTreeMap<String, BTreeSet<String>>,
-    /// `<scope>:<unit>`s that are oneshots: started, they run and exit, never staying active.
-    pub oneshots: BTreeSet<String>,
     /// Operations that fail: `enable:<unit>`, `apt:<package>`, `fetch:<url>`, `groupdel:<group>`.
     pub fail: BTreeSet<String>,
     /// Every change made, in order.
     pub log: Vec<String>,
+}
+
+/// A unit as systemd keeps it, which the fake shows as `systemctl show` does.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Each is a property systemd shows on its own."
+)]
+pub struct Unit {
+    pub exists: bool,
+    pub enabled: bool,
+    pub active: bool,
+    /// `Type=oneshot`: started, it runs and exits, never staying active, unless it remains after
+    /// exit.
+    pub oneshot: bool,
+    pub remain_after_exit: bool,
+    /// Its main process exited cleanly since the machine started: a oneshot that ran, or any
+    /// service that was stopped.
+    pub exited: bool,
+}
+
+impl Unit {
+    /// What `systemctl show` says of it.
+    fn show(self) -> String {
+        let yes = |b: bool| if b { "yes" } else { "no" };
+        format!(
+            "LoadState={}\nUnitFileState={}\nActiveState={}\nResult=success\n\
+             ExecMainExitTimestampMonotonic={}\nType={}\nRemainAfterExit={}\n",
+            if self.exists { "loaded" } else { "not-found" },
+            if self.enabled { "enabled" } else { "disabled" },
+            if self.active { "active" } else { "inactive" },
+            if self.exited { 1_000_000 } else { 0 },
+            if self.oneshot { "oneshot" } else { "simple" },
+            yes(self.remain_after_exit),
+        )
+    }
 }
 
 /// One machine, as the user or as root; clones share it.
@@ -73,8 +107,9 @@ impl FakeHost {
         }
     }
 
-    /// Everything on the machine as text: its files, then its state but the log and the vendor
-    /// repositories, which an `apt` action sets up and leaves, as they are the package manifest's.
+    /// Everything on the machine as text: its files, then its state but the log, the vendor
+    /// repositories, which an `apt` action sets up and leaves, as they are the package manifest's,
+    /// and whether a unit's main process exited since boot, which systemd keeps and no stop undoes.
     ///
     /// # Panics
     ///
@@ -99,13 +134,26 @@ impl FakeHost {
                 }
             }
         }
+        let units = self
+            .state
+            .borrow()
+            .units
+            .iter()
+            .map(|(key, unit)| {
+                let unit = Unit {
+                    exited: false,
+                    ..*unit
+                };
+                (key.clone(), unit)
+            })
+            .collect();
         let state = State {
+            units,
             log: Vec::new(),
             repos: BTreeSet::new(),
             fail: BTreeSet::new(),
             conflicts: BTreeMap::new(),
             depends: BTreeMap::new(),
-            oneshots: BTreeSet::new(),
             ..self.state.borrow().clone()
         };
         let _ = write!(out, "{state:#?}");
@@ -347,7 +395,8 @@ impl Host for FakeHost {
 
     fn unit_state(&mut self, scope: Scope, unit: &str) -> Result<UnitState, HostError> {
         let key = Self::unit(scope, unit);
-        Ok(self.state.borrow().units.get(&key).copied().unwrap_or_default())
+        let unit = self.state.borrow().units.get(&key).copied().unwrap_or_default();
+        Ok(UnitState::from_show(&unit.show()))
     }
 
     fn daemon_reload(&mut self, _scope: Scope) -> Result<(), HostError> {
@@ -367,12 +416,12 @@ impl Host for FakeHost {
     fn set_active(&mut self, scope: Scope, unit: &str, active: bool) -> Result<(), HostError> {
         let key = Self::unit(scope, unit);
         let mut state = self.state.borrow_mut();
-        let oneshot = state.oneshots.contains(&key);
-        let unit_state = state.units.entry(key).or_default();
-        if oneshot {
-            unit_state.ran = active;
+        let unit = state.units.entry(key).or_default();
+        if active && unit.oneshot && !unit.remain_after_exit {
+            unit.exited = true;
         } else {
-            unit_state.active = active;
+            unit.exited = unit.exited || unit.active;
+            unit.active = active;
         }
         Ok(())
     }

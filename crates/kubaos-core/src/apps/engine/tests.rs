@@ -9,8 +9,8 @@ use super::Engine;
 use super::EngineError;
 use super::Keeper;
 use crate::apps::action::Side;
-use crate::apps::host::UnitState;
 use crate::apps::host::fake::FakeHost;
+use crate::apps::host::fake::Unit;
 use crate::apps::journal::Journal;
 use crate::apps::root::Reply;
 use crate::apps::root::Request;
@@ -239,9 +239,9 @@ impl World {
         let host = FakeHost::new(dir.path());
         host.state.borrow_mut().units.insert(
             "system:fixture.service".to_owned(),
-            UnitState {
+            Unit {
                 exists: true,
-                ..UnitState::default()
+                ..Unit::default()
             },
         );
         host.state.borrow_mut().downloads.insert(
@@ -893,10 +893,10 @@ fn a_release_that_bumps_a_deb_pin_upgrades_it_in_place_and_checks_the_steps_afte
                 .downloads
                 .insert(format!("https://example.com/vendor-app-{version}.deb"), (sha, deb));
         }
-        let unit = UnitState {
+        let unit = Unit {
             exists: true,
             enabled: true,
-            ..UnitState::default()
+            ..Unit::default()
         };
         state.units.insert("system:vendor-app.service".to_owned(), unit);
     }
@@ -1182,9 +1182,9 @@ fn a_unit_two_apps_enable_goes_back_to_how_it_was_whichever_goes_first() {
         let world = World::new(&[("a", &unit_app("A")), ("b", &unit_app("B"))]);
         world.host.state.borrow_mut().units.insert(
             "system:shared.service".to_owned(),
-            UnitState {
+            Unit {
                 exists: true,
-                ..UnitState::default()
+                ..Unit::default()
             },
         );
         world.install("a", true).0.unwrap();
@@ -1235,6 +1235,40 @@ fn an_output_the_app_made_room_for_goes_with_it_and_one_found_stays() {
 }
 
 #[test]
+fn a_stopped_long_running_service_is_started_and_stopped_again_on_removal() {
+    let service = app(r#"
+[[action]]
+name = "Start the service"
+kind = "unit"
+unit = "daemon.service"
+scope = "system"
+start = true
+"#);
+    let world = World::new(&[("daemon", &service)]);
+    // It ran earlier in this boot and was stopped: systemd keeps a clean exit for it.
+    let stopped = Unit {
+        exists: true,
+        exited: true,
+        ..Unit::default()
+    };
+    world
+        .host
+        .state
+        .borrow_mut()
+        .units
+        .insert("system:daemon.service".to_owned(), stopped);
+
+    let (installed, events) = world.install("daemon", true);
+    installed.unwrap();
+    assert_eq!(events.steps(), [(1, ActionState::Done)]);
+    assert!(world.host.state.borrow().units["system:daemon.service"].active);
+
+    world.remove("daemon").0.unwrap();
+
+    assert!(!world.host.state.borrow().units["system:daemon.service"].active);
+}
+
+#[test]
 fn a_started_oneshot_that_ran_is_done_and_needs_no_root_again() {
     let theme = app(r#"
 [[action]]
@@ -1247,15 +1281,15 @@ start = true
     let world = World::new(&[("theme", &theme)]);
     {
         let mut state = world.host.state.borrow_mut();
-        state.oneshots.insert("system:theme.service".to_owned());
-        let unit = UnitState {
+        let unit = Unit {
             exists: true,
-            ..UnitState::default()
+            oneshot: true,
+            ..Unit::default()
         };
         state.units.insert("system:theme.service".to_owned(), unit);
     }
     world.install("theme", true).0.unwrap();
-    assert!(world.host.state.borrow().units["system:theme.service"].ran);
+    assert!(world.host.state.borrow().units["system:theme.service"].exited);
 
     let result = world.declined(|e| e.install("theme", None));
 
@@ -1380,9 +1414,9 @@ icon = "sketch.svg"
             ("5".repeat(64), b"deb sketch 1.0".to_vec()),
         );
         state.nix.insert("fd".to_owned());
-        let unit = UnitState {
+        let unit = Unit {
             exists: true,
-            ..UnitState::default()
+            ..Unit::default()
         };
         state.units.insert("user:sketch.service".to_owned(), unit);
     }
