@@ -1,7 +1,7 @@
 // First boot's Kotodama card, in four steps of its own on a Stepper under its title, as Make it
 // yours's are. What: the one key, what to type and Enter, beside the Command menu playing three asks
-// by itself. Why: one question asked of Start, Spotlight and Kotodama at the same moment, raced,
-// each clock running until its answer lands. Yours: the keys that open it, what it finds, the web's
+// by itself. Why: one question asked of Start and Kotodama at the same moment, raced, each clock
+// running until its answer lands. Yours: the keys that open it, what it finds, the web's
 // place, beside a preview that follows each change. Try it: three tries that tick off, beside the
 // menu itself, the real Command menu's parts (`lib/list-detail.ts`).
 //
@@ -20,7 +20,6 @@ import { icon } from "../../lib/icon.ts";
 import { type KeyHint, keycap, keyHints, keys } from "../../lib/keycap.ts";
 import { fill, filling, fillingHeight, flow, gap, row, splitColumns, stack } from "../../lib/layout.ts";
 import { commandMenu, type MenuMeasures } from "../../lib/list-detail.ts";
-import { list, type ListRowSpec, listLabel } from "../../lib/list.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { RECHECK, type RailPage, type RailStatus } from "../../lib/step-rail.ts";
 import { setStep, stepper } from "../../lib/stepper.ts";
@@ -62,6 +61,8 @@ export interface Kotodama {
   more: boolean;
   /** The other menu over the page, stamped: a sample of the gag, held. */
   gag: boolean;
+  /** The race held this many milliseconds after the key: a sample of it mid-way. */
+  readonly raceAt?: number;
   passed: boolean;
 }
 
@@ -83,6 +84,8 @@ export function kotodamaAt(view: string): Kotodama {
   switch (name) {
     case "why":
       return base(1);
+    case "why-mid":
+      return base(1, { raceAt: 3300 });
     case "yours":
       return base(2);
     case "yours-more":
@@ -295,26 +298,47 @@ function bigKeys(combination: string): HTMLElement {
 
 interface Answer {
   readonly title: string;
-  readonly subtitle?: string;
+  /** A second thing it says, after the title in the quieter colour. */
+  readonly aside?: string;
   readonly icon: string;
   readonly ad?: boolean;
+  /** The row the other menu calls its best match, filled. */
+  readonly best?: boolean;
 }
 
-/** A row of the others': a symbol and its words, nothing to take. */
-function answer(each: Answer): ListRowSpec {
-  return { title: each.title, ...(each.subtitle ? { subtitle: each.subtitle } : {}), icon: each.icon, ...(each.ad ? { chips: [{ kind: "Neutral" as const, label: "Ad" }] } : {}) };
+/**
+ * Draft part, to be promoted: a row of the other menu, `size.control_sm` tall at the least: its
+ * symbol, its words whole (they wrap rather than end in an ellipsis), an aside, an Ad chip.
+ */
+function parodyRow(each: Answer): HTMLElement {
+  const line = row(
+    "s8",
+    "centre",
+    icon(each.icon, "var(--type-body-icon)", "var(--color-on_surface_variant)"),
+    filling(wrapped(each.title, "body")),
+    ...(each.aside ? [text(each.aside, "small", "on_surface_variant")] : []),
+    ...(each.ad ? [chip({ label: "Ad", kind: "Neutral" })] : []),
+  );
+  line.classList.add("setup-kotodama-prow");
+  line.toggleAttribute("data-best", each.best ?? false);
+  return line;
 }
 
 /**
  * Draft part, to be promoted: the other menu, drained of colour: its field with a search's bar
- * crawling under it, its answers in groups as they land, and the line at its foot that never ends.
+ * crawling under it, its answers in one flat list, a label over each group, landing group by
+ * group, and the line at its foot that never ends.
  */
-function otherMenu(q: string, groups: readonly (readonly [string, readonly Answer[]])[], foot: string): { box: HTMLElement; groups: HTMLElement[]; answers: HTMLElement } {
+function otherMenu(q: string, groups: readonly (readonly [string, readonly Answer[]])[], foot: string): { box: HTMLElement; groups: HTMLElement[] } {
   const words = field({ value: q, icon: "search", pointer: false });
   const bar = document.createElement("span");
   bar.className = "setup-kotodama-crawl";
-  const lists = groups.map(([label, rows]) => list([listLabel(label, false), ...rows.map(answer)]));
-  const answers = stack("s4", "start", ...lists.map(filling));
+  const parts = groups.map(([label, rows]) => {
+    const head = text(label, "caption", "on_surface_variant");
+    head.classList.add("setup-kotodama-plabel");
+    return stack(0, "start", filling(head), ...rows.map((each) => filling(parodyRow(each))));
+  });
+  const answers = stack("s4", "start", ...parts.map(filling));
   answers.classList.add("setup-kotodama-answers");
   const status = row("s8", "centre", spinner("s16", "on_surface_variant"), filling(wrapped(foot, "small", "on_surface_variant")));
   status.classList.add("setup-kotodama-status");
@@ -323,24 +347,18 @@ function otherMenu(q: string, groups: readonly (readonly [string, readonly Answe
   const box = document.createElement("span");
   box.className = "setup-kotodama-other";
   box.append(inner);
-  return { box, groups: lists, answers };
+  return { box, groups: parts };
 }
 
-/** Start's answers, by group, in the order they land. */
+/** Start's answers for `q`, by group, in the order they land: what you wanted comes last. */
 function startGroups(q: string): (readonly [string, readonly Answer[]])[] {
   return [
-    ["Best match", [{ title: q, subtitle: "See web results", icon: "world" }]],
+    ["Best match", [{ title: q, aside: "See web results", icon: "world", best: true }]],
     ["Search the web", [{ title: `${q} not working`, icon: "search" }, { title: `${q} near me`, icon: "search" }]],
-    ["Recommended", [{ title: "A game you never installed", subtitle: "Installing anyway", icon: "gamepad", ad: true }]],
-    ["Settings (1)", [{ title: "Show 1 more", subtitle: "What you came for is in here", icon: "expand_more" }]],
-    ["Weather", [{ title: "14° and cloudy", subtitle: "In a town you left in 2019", icon: "thermostat" }]],
-  ];
-}
-
-function spotlightGroups(q: string): (readonly [string, readonly Answer[]])[] {
-  return [
-    ["Suggested website", [{ title: `${q}.com`, subtitle: "You didn't ask, it suggested", icon: "public" }]],
-    ["Definition", [{ title: `${q} (noun)`, subtitle: "A thing you were trying to switch on", icon: "books" }, { title: `Search the web for “${q}”`, icon: "search" }]],
+    ["Top stories", [{ title: `11 ${q} secrets your router doesn't want you to know`, icon: "notes" }]],
+    ["Recommended", [{ title: "A game you never installed", aside: "Installing anyway", icon: "gamepad", ad: true }]],
+    ["Weather", [{ title: "14° and cloudy", aside: "In a town you left in 2019", icon: "thermostat" }]],
+    ["Settings (1)", [{ title: "Show 1 more", aside: "What you wanted is in here", icon: "expand_more" }]],
   ];
 }
 
@@ -353,12 +371,12 @@ function fakeAd(): HTMLElement {
   tag.className = "setup-kotodama-ad-tag";
   tag.append(text(AD.tag, "label", "burn_warning"));
   const close = icon("close", "var(--type-small-icon)", "var(--color-on_burn_warning)");
-  const top = row("s8", "centre", tag, filling(text(AD.sponsor, "caption", "on_burn_warning")), close);
+  const top = row("s8", "centre", tag, filling(wrapped(AD.sponsor, "caption", "on_burn_warning")), close);
   const tile = document.createElement("span");
   tile.className = "setup-kotodama-ad-tile";
   tile.append(icon("rocket_launch", "var(--type-heading-icon)", "var(--color-on_error)"));
-  const product = row("s12", "start", tile, filling(stack(0, "start", text(AD.product, "subheading", "on_burn_warning"), filling(wrapped(AD.maker, "caption", "on_burn_warning")))));
-  const stars = row("s4", "centre", ...Array.from({ length: 5 }, () => icon("star_filled", "var(--type-small-icon)", "var(--color-error)")), text(AD.rating, "caption", "on_burn_warning"));
+  const product = row("s12", "start", tile, filling(stack(0, "start", filling(wrapped(AD.product, "subheading", "on_burn_warning")), filling(wrapped(AD.maker, "caption", "on_burn_warning")))));
+  const stars = row("s4", "centre", ...Array.from({ length: 5 }, () => icon("star_filled", "var(--type-small-icon)", "var(--color-burn_error)")), filling(wrapped(AD.rating, "caption", "on_burn_warning")));
   const go = button({ label: AD.action, kind: "Danger", size: "Sm", icon: "arrow_forward", trailing: true });
   const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "subheading", "on_burn_warning")), filling(product), filling(stars), filling(go), filling(wrapped(AD.fine, "caption", "on_burn_warning")));
   ad.classList.add("setup-kotodama-ad");
@@ -506,22 +524,26 @@ export function kotodamaCard(view: string): KotodamaCard {
       cancelAnimationFrame(frame);
     };
 
-    /** The three, asked the question at the same moment, each answering in its own time. */
+    /**
+     * The two, asked the question at the same moment: Kotodama answers with the key, Start in its
+     * own time. Held at `state.raceAt`, it is drawn as it stands then; reduced, as it ends.
+     */
     const race = () => {
       stop();
       const reduced = settings().reduced;
       const start = otherMenu(QUESTION, startGroups(QUESTION), OTHERS.start.searching);
       const ad = fakeAd();
       start.box.append(ad);
-      const spotlight = otherMenu(QUESTION, spotlightGroups(QUESTION), OTHERS.spotlight.indexing);
       // Kotodama's lane fills its rows with what is on the machine: no web rows under it here.
-      const ours = standIn({ ...prefs, web: false }, { live: false, query: QUESTION, hints: [["↑↓", "Select"], ["Enter", "Run"]], took: "3 ms" });
+      const ours = standIn({ ...prefs, web: false }, { live: false, query: QUESTION, hints: [["↑↓", "Select"], ["Enter", "Run"]], took: OTHERS.kotodama.stopped });
       ours.box.inert = true;
-      const clocks = { start: document.createElement("span"), spotlight: document.createElement("span"), kotodama: document.createElement("span") };
-      const read = (who: keyof typeof clocks, words: string) => clocks[who].replaceChildren(clockChip(words, who === "kotodama"));
-      const roasts = { start: wrapped(OTHERS.start.still, "small", "on_surface_variant"), spotlight: wrapped(OTHERS.spotlight.still, "small", "on_surface_variant") };
-      const lane = (who: keyof typeof clocks, box: HTMLElement, roast: HTMLElement) => {
-        const each = stack("s12", "start", filling(row("s8", "centre", text(OTHERS[who].name, "heading"), fill(), clocks[who])), filling(fillingHeight(box)), filling(roast));
+      const startClock = document.createElement("span");
+      const oursClock = document.createElement("span");
+      oursClock.append(clockChip(OTHERS.kotodama.stopped, true));
+      const read = (words: string) => startClock.replaceChildren(clockChip(words, false));
+      let roast = wrapped(OTHERS.start.still, "small", "on_surface_variant");
+      const lane = (name: string, clock: HTMLElement, box: HTMLElement, line: HTMLElement, who: string) => {
+        const each = stack("s12", "start", filling(row("s8", "centre", text(name, "heading"), fill(), clock)), filling(fillingHeight(box)), filling(line));
         each.classList.add("setup-kotodama-lane");
         each.dataset.lane = who;
         return filling(fillingHeight(each));
@@ -529,50 +551,41 @@ export function kotodamaCard(view: string): KotodamaCard {
       const oursBox = document.createElement("span");
       oursBox.className = "setup-kotodama-ours";
       oursBox.append(ours.box);
-      lanes.replaceChildren(
-        splitColumns([1, 1, 1], "s16", [lane("start", start.box, roasts.start), lane("spotlight", spotlight.box, roasts.spotlight), lane("kotodama", oursBox, wrapped(OTHERS.kotodama.roast, "small", "on_surface_variant"))], { fillHeight: true }),
-      );
-      read("kotodama", OTHERS.kotodama.stopped);
-      const settle = () => {
-        read("start", OTHERS.start.stopped(seconds(LANDS.start.done)));
-        read("spotlight", OTHERS.spotlight.stopped(seconds(LANDS.spotlight.done)));
-        roasts.start.replaceWith((roasts.start = wrapped(OTHERS.start.roast(QUESTION), "small", "on_surface_variant")));
-        roasts.spotlight.replaceWith((roasts.spotlight = wrapped(OTHERS.spotlight.roast, "small", "on_surface_variant")));
+      lanes.replaceChildren(splitColumns([1, 1], "s24", [lane(OTHERS.start.name, startClock, start.box, roast, "start"), lane(OTHERS.kotodama.name, oursClock, oursBox, wrapped(OTHERS.kotodama.roast, "small", "on_surface_variant"), "kotodama")], { fillHeight: true }));
+      const [web, search, news, recommended, weather, answerGroup] = start.groups;
+      const parts: readonly (readonly [HTMLElement | undefined, number, string?])[] = [
+        [web, LANDS.start.web],
+        [search, LANDS.start.web],
+        [news, LANDS.start.news],
+        [recommended, LANDS.start.recommended],
+        [ad, LANDS.start.ad, "0 var(--space-s48)"],
+        [weather, LANDS.start.weather],
+        [answerGroup, LANDS.start.answer],
+      ];
+      /** Start as it stands `spent` milliseconds after the key: what has landed, and its clock. */
+      const at = (spent: number) => {
+        for (const [part, lands] of parts) if (part) part.style.opacity = spent >= lands ? "" : "0";
+        read(spent >= LANDS.start.done ? OTHERS.start.stopped(seconds(LANDS.start.done)) : seconds(spent));
+        if (spent >= LANDS.start.done && roast.textContent === OTHERS.start.still) roast.replaceWith((roast = wrapped(OTHERS.start.roast(QUESTION), "small", "on_surface_variant")));
       };
-      if (reduced) {
-        settle();
-        return;
-      }
-      read("start", seconds(0));
-      read("spotlight", seconds(0));
-      const [web, search, recommended, settingsGroup, weather] = start.groups;
-      const [site, definition] = spotlight.groups;
-      for (const part of [web, search, recommended, settingsGroup, weather, ad, site, definition]) if (part) part.style.opacity = "0";
+      if (reduced || state.raceAt !== undefined) return at(reduced ? LANDS.start.done : (state.raceAt ?? 0));
+      at(0);
       const speed = settings().speed;
-      const land = (parts: readonly (HTMLElement | undefined)[], after: number, from = "0 var(--space-s16)") =>
+      for (const [part, lands, from] of parts) {
+        if (!part) continue;
         timers.push(
           window.setTimeout(() => {
-            for (const part of parts) {
-              if (!part) continue;
-              part.style.opacity = "";
-              part.animate([{ opacity: 0, translate: from }, { opacity: 1, translate: "0 0" }], { duration: ms("long"), easing: curve("emphasized_decel") });
-            }
-          }, after / speed),
+            part.style.opacity = "";
+            part.animate([{ opacity: 0, translate: from ?? "0 var(--space-s16)" }, { opacity: 1, translate: "0 0" }], { duration: ms("long"), easing: curve("emphasized_decel") });
+          }, lands / speed),
         );
-      land([web, search], LANDS.start.web);
-      land([recommended, settingsGroup], LANDS.start.recommended);
-      land([ad], LANDS.start.ad, "0 var(--space-s48)");
-      land([weather], LANDS.start.weather);
-      land([site], LANDS.spotlight.site);
-      land([definition], LANDS.spotlight.web);
+      }
       const from = performance.now();
       const tick = () => {
         const spent = (performance.now() - from) * speed;
-        read("start", spent >= LANDS.start.done ? OTHERS.start.stopped(seconds(LANDS.start.done)) : seconds(spent));
-        read("spotlight", spent >= LANDS.spotlight.done ? OTHERS.spotlight.stopped(seconds(LANDS.spotlight.done)) : seconds(spent));
-        if (spent >= LANDS.spotlight.done && roasts.spotlight.textContent === OTHERS.spotlight.still) roasts.spotlight.replaceWith((roasts.spotlight = wrapped(OTHERS.spotlight.roast, "small", "on_surface_variant")));
+        read(spent >= LANDS.start.done ? OTHERS.start.stopped(seconds(LANDS.start.done)) : seconds(spent));
         if (spent < LANDS.start.done) frame = requestAnimationFrame(tick);
-        else settle();
+        else at(LANDS.start.done);
       };
       frame = requestAnimationFrame(tick);
     };

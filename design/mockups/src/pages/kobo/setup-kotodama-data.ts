@@ -214,7 +214,7 @@ export function search(typed: string, settings: MenuSettings, rows: number): Fou
   for (const { item, hit } of matches) out.push(found(row(item.title, hit.tier === 4 ? `${item.subtitle} · a typo away` : item.subtitle, item.icon, hit.runs), item.kind, item.verb, item.said, { item }));
   if (settings.web && out.length < rows) {
     const order = [ENGINES[settings.engine]!, ...ENGINES.filter((_, at) => at !== settings.engine)];
-    for (const engine of order.slice(0, rows - out.length)) out.push(found(row(`Search ${engine} for “${typed.trim()}”`, "Below what is here, never instead of it", "travel_explore"), "Web search", "Open", `${engine} opens in Firefox. Your call, not mine.`));
+    for (const engine of order.slice(0, Math.min(2, rows - out.length))) out.push(found(row(`Search ${engine} for “${typed.trim()}”`, "Below what is here, never instead of it", "travel_explore"), "Web search", "Open", `${engine} opens in Firefox. Your call, not mine.`));
   }
   return out;
 }
@@ -224,29 +224,20 @@ export function search(typed: string, settings: MenuSettings, rows: number): Fou
 /** The question the race asks all three at the same moment. */
 export const QUESTION = "wifi";
 
-/** When each of the others' answers lands, from the moment the key is let go, at speed 1. */
+/** When each of Start's answers lands, from the moment the key is let go, at speed 1. */
 export const LANDS = {
-  /** Start: the web's rows, its recommendations, the ad rising over them, the weather; then it stops. */
-  start: { web: 1000, recommended: 2000, ad: 3000, weather: 3600, done: 5800 },
-  /** Spotlight: a website and a definition, then a web search; its indexing never ends. */
-  spotlight: { site: 1000, web: 2000, done: 2400 },
+  /** The web's rows, the news, a game, the ad over them, the weather, then what you wanted, last. */
+  start: { web: 1000, news: 1600, recommended: 2200, ad: 3000, weather: 3600, answer: 4400, done: 5800 },
 } as const;
 
-/** The others' words, the question's where it goes. */
+/** The other menu's words and the lanes' lines, the question's where it goes. */
 export const OTHERS = {
   start: {
     name: "Start",
     searching: "Searching the web for something on your computer",
     still: "Still searching the web for something on your computer…",
     stopped: (seconds: string) => `${seconds} · an ad`,
-    roast: (q: string) => `Start, asked for “${q}”: the web, a game, an ad, the weather. What you wanted is under “Show 1 more”.`,
-  },
-  spotlight: {
-    name: "Spotlight",
-    indexing: "Indexing. About 2 hours left. It said that yesterday",
-    still: "Still thinking…",
-    stopped: (seconds: string) => `${seconds} · a website`,
-    roast: "Spotlight found a website and a definition, and it's still indexing.",
+    roast: (q: string) => `Start, asked for “${q}”: the web, the news, a game, an ad, the weather. What you wanted is under “Show 1 more”.`,
   },
   kotodama: {
     name: "Kotodama",

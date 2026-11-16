@@ -1,5 +1,5 @@
 // First boot's Kotodama card, in four steps of its own. What: the one key, what to type and Enter,
-// beside the Command menu playing by itself. Why: one question raced through Start, Spotlight and
+// beside the Command menu playing by itself. Why: one question raced through Start and
 // Kotodama, each clock running until its answer lands. Yours: the keys that open it and what it
 // finds, beside a preview. Try it: the menu itself, three things to try ticking off. Super tapped
 // alone, on any step, brings up the other menu, stamped "Nope.".
@@ -56,11 +56,10 @@ const lane = (name: string) => `.setup-kotodama-lane[data-lane="${name}"]`;
  */
 const RACE: Move = {
   name: "The race",
-  what: "After the last key: Start's web at 0.9 s, its ad at 1.7 s, weather at 2.3 s; Spotlight's website at 1.1 s.",
+  what: "After the key: Start's web at 1 s, the ad at 3 s, the weather at 3.6 s, what you wanted at 4.4 s.",
   tracks: [
     { part: "Start's web rows", on: "Start", target: `${lane("start")} .setup-kotodama-answers > :first-child`, property: "opacity", from: 0, to: 1, duration: "long", cue: ["slow", "micro"] as unknown as NonEmpty<"slow">, curve: "emphasized_decel" },
     { part: "Start's ad", on: "Start", target: `${lane("start")} .setup-kotodama-ad`, property: "opacity", from: 0, to: 1, duration: "long", cue: ["scene", "long"] as unknown as NonEmpty<"scene">, curve: "emphasized_decel" },
-    { part: "Spotlight's website", on: "Spotlight", target: `${lane("spotlight")} .setup-kotodama-answers > :first-child`, property: "opacity", from: 0, to: 1, duration: "long", cue: ["slow", "medium"] as unknown as NonEmpty<"slow">, curve: "emphasized_decel" },
   ] as unknown as NonEmpty<Track<Easing>>,
   reduced: [{ part: "the lanes", on: "the race", target: ".setup-kotodama-lane", property: "opacity", from: 1, to: 1, duration: "instant", curve: "standard" }],
   back: "cuts",
@@ -112,7 +111,8 @@ export default page<Shown>({
   stage: { live: liveCard("kotodama"), hint: "Enter goes on: What, Why, Yours, Try it; Super alone anywhere", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
   variants: [
     { name: "What", for: "the key; the menu playing by itself", sample: CELLS.rest },
-    { name: "Why", for: "the race; the clocks", sample: CELLS.loading },
+    { name: "Why", for: "the race run out; the clocks", sample: CELLS.loading },
+    { name: "Why: mid-race", for: "3.3 s in: the ad up", sample: atCard("kotodama", "why-mid") },
     { name: "Yours", for: "the keys, three switches, the preview", sample: atCard("kotodama", "yours") },
     { name: "Yours: more", for: "what it finds, the engine, the mark", sample: atCard("kotodama", "yours-more") },
     { name: "Yours: changed", for: "Alt + Space, no web search", sample: atCard("kotodama", "yours-changed") },
@@ -125,6 +125,7 @@ export default page<Shown>({
   ],
   sizes: [
     { name: "Laptop", for: "1280 × 800, the race", sample: atCard("kotodama", "why") },
+    { name: "Between", for: "1520 × 1020, the race", sample: atCard("kotodama", "why", { width: "calc(1520 * var(--px))", height: "calc(1020 * var(--px))" }) },
     { name: "Full HD", for: "1920 × 1080, the race", sample: fullHd("kotodama", "why") },
     { name: "Full HD: Try it", for: "the menu with its pane", sample: fullHd("kotodama", "try-typed") },
   ],
