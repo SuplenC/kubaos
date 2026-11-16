@@ -309,6 +309,21 @@ fn an_id_is_never_a_path_or_an_option() {
 }
 
 #[test]
+fn a_repo_is_a_name_never_an_option_or_a_path() {
+    for bad in ["--dry-run", "-n", "../vendor", "a b", "Vendor", "", &"a".repeat(65)] {
+        let text = AGENT.replace("repo = \"vendor\"", &format!("repo = \"{bad}\""));
+        assert!(
+            matches!(App::parse("agent", &text), Err(ManifestError::InvalidRepo { .. })),
+            "{bad:?}"
+        );
+    }
+    for good in ["vendor", "google-chrome", "cppiber-hyprland"] {
+        let text = AGENT.replace("repo = \"vendor\"", &format!("repo = \"{good}\""));
+        assert!(App::parse("agent", &text).is_ok(), "{good}");
+    }
+}
+
+#[test]
 fn an_apt_app_from_a_repo_the_package_manifest_lacks_is_refused() {
     let manifest =
         Manifest::parse("[repo.other]\nkey_url = \"https://x\"\nfingerprint = \"AB\"\nkeyring = \"/k\"\n").unwrap();

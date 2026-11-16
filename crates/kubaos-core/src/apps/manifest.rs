@@ -36,6 +36,8 @@ pub enum ManifestError {
     Sources(usize),
     #[error("{key} is empty")]
     Empty { key: &'static str },
+    #[error("{name:?} is not a repository name: lowercase letters, digits and dashes, starting with a letter or digit")]
+    InvalidRepo { name: String },
     #[error("{name:?} is not an apt package name")]
     InvalidPackage { name: String },
     #[error("{name:?} is not a nixpkgs attribute name")]
@@ -217,7 +219,11 @@ impl App {
                         return Err(ManifestError::InvalidPackage { name: name.clone() });
                     }
                 }
-                values.extend(repo);
+                if let Some(repo) = repo
+                    && !is_app_id(repo)
+                {
+                    return Err(ManifestError::InvalidRepo { name: repo.clone() });
+                }
             }
             Source::Nix { packages } => {
                 non_empty_list("nix.packages", packages)?;
@@ -267,7 +273,7 @@ impl App {
 
 /// Whether `id` can be an app's: lowercase ASCII letters, digits and `-`, starting with a letter
 /// or a digit, at most 64. The root helper holds ids to the same pattern, so an id is never a
-/// path.
+/// path. A repository's name keeps to it too, so the helper never passes `apt-repo.sh` an option.
 pub fn is_app_id(id: &str) -> bool {
     id.len() <= 64
         && id
