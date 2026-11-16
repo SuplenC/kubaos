@@ -649,6 +649,30 @@ impl std::fmt::Debug for Engine<'_> {
     }
 }
 
+/// The engine while a run holds the lock: dropping it, as the run ends or unwinds from a panic,
+/// says the lock is no longer held, so a later run takes it again.
+struct Held<'e, 'a>(&'e mut Engine<'a>);
+
+impl<'a> std::ops::Deref for Held<'_, 'a> {
+    type Target = Engine<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+impl std::ops::DerefMut for Held<'_, '_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0
+    }
+}
+
+impl Drop for Held<'_, '_> {
+    fn drop(&mut self) {
+        self.0.locked = false;
+    }
+}
+
 /// What a finished install or removal leaves for its caller to do.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Finished {
@@ -716,9 +740,8 @@ impl<'a> Engine<'a> {
         }
         let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
         self.locked = true;
-        let result = go(self);
-        self.locked = false;
-        result
+        let mut held = Held(self);
+        go(&mut held)
     }
 
     /// Installs the app `id` in `setup`, from where its journals left it: every step is checked,

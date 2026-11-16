@@ -387,6 +387,23 @@ fn a_setting_the_user_changed_after_the_install_stays_as_they_set_it() {
 }
 
 #[test]
+fn a_panic_during_a_run_leaves_the_engine_holding_no_lock() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    let mut root = world.root();
+    let mut events = Events::default();
+    let mut user_host = world.host.clone();
+    let keeper = Keeper::new(&mut user_host, Side::User, &world.catalog, &world.user_journals);
+    let mut engine = Engine::new(keeper, &mut root, &world.root_journals, &world.lock, &mut events, true);
+
+    let stopped = panic::catch_unwind(AssertUnwindSafe(|| {
+        engine.locked(|_| -> Result<(), EngineError> { panic!("a step stopped the run") })
+    }));
+
+    assert!(stopped.is_err());
+    assert!(!engine.locked, "the engine thinks it still holds the lock");
+}
+
+#[test]
 fn a_run_stopped_after_step_2_of_4_goes_on_from_step_3() {
     let world = World::new(&[("fixture", FIXTURE)]);
     let mut root = world.root();
