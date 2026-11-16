@@ -26,9 +26,9 @@ apt/sources.list.d/*.sources                            repo_setup
 
 apps/kubaos-apps                                        install_apps_helper
 
-chrome/dot-chrome-theme                                 system/40-apps.sh
-chrome/dot-chrome-theme.path.in                         system/40-apps.sh
-chrome/dot-chrome-theme.service.in                      system/40-apps.sh
+chrome/dot-chrome-theme                                 install_chrome_theme
+chrome/dot-chrome-theme.path.in                         install_chrome_theme
+chrome/dot-chrome-theme.service.in                      install_chrome_theme
 
 fonts/Geist-Regular.ttf                                 install_plymouth_theme install_grub_theme
 fonts/GeistMono-Regular.ttf                             install_plymouth_theme install_grub_theme

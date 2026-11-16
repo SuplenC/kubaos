@@ -186,8 +186,8 @@ say "system/60-nix.sh --no-switch (pam_fprintd link)"
 as_user "$REPO/system/60-nix.sh" --host "$HOST" --user "$PAYLOAD_USER" --no-switch --no-gpu --no-chsh
 say "system/65-recorder.sh (gsr-kms-server, cap_sys_admin)"
 as_user "$REPO/system/65-recorder.sh"
-say "system/70-bitwarden.sh --no-desktop --no-cli (pam_u2f link)"
-as_user "$REPO/system/70-bitwarden.sh" --no-desktop --no-cli
+say "system/70-bitwarden.sh --no-cli (pam_u2f link)"
+as_user "$REPO/system/70-bitwarden.sh" --no-cli
 
 # 60-nix.sh's GPU step, which looks for the setup tool in ~/.nix-profile:
 # there is no profile yet, so run the generation's copy directly.
