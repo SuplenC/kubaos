@@ -1,0 +1,19 @@
+# T3 Code from the .deb of its GitHub release, pinned to its sha256. nixpkgs' t3code lags far
+# behind the releases. The app keeps itself current from the same releases (electron-updater,
+# resources/app-update.yml in the package), so an update never puts it back to this pin.
+# https://github.com/pingdotgg/t3code/releases
+name = "T3 Code"
+summary = "A desktop app for coding agents"
+
+[deb]
+package = "t3code"
+version = "0.1.9"
+self_updates = true
+
+[deb.amd64]
+url = "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/T3-Code-0.1.9-amd64.deb"
+sha256 = "418c7825f73107b7b5ba3babae5e3b485801dc22d9dc0d518af632f7906cbdd1"
+
+[deb.arm64]
+url = "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/T3-Code-0.1.9-arm64.deb"
+sha256 = "7959976b4d7fc4443c9fb770128774d4e86f14db01044be36901e488908f3bb4"

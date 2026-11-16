@@ -21,7 +21,8 @@
 #             down what the group needs beyond its packages, when the user
 #             turns it on or off
 #
-# A [repo.<name>] is a vendor's apt repository. Its sources file is
+# A [repo.<name>] is a vendor's apt repository, for a group's packages or an
+# app of the catalog's (apps/<id>.toml). Its sources file is
 # `system/files/apt/sources.list.d/<name>.sources` (`@ARCH@` becomes the
 # machine's architecture), signed by the key at `key_url`, which must have
 # exactly the primary key `fingerprint`, stored in `keyring`.
@@ -43,6 +44,13 @@ keyring = "/etc/apt/keyrings/docker.gpg"
 key_url = "https://dl.google.com/linux/linux_signing_key.pub"
 fingerprint = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
 keyring = "/usr/share/keyrings/google-chrome.gpg"
+
+# Anthropic's repository of Claude Code, the stable channel, for the app of the
+# catalog (apps/claude-code.toml).
+[repo.claude-code]
+key_url = "https://downloads.claude.ai/keys/claude-code.asc"
+fingerprint = "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
+keyring = "/etc/apt/keyrings/claude-code.gpg"
 
 # ppa:cppiber/hyprland, the Launchpad PPA of Constantin Piber.
 [repo.cppiber-hyprland]

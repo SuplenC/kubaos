@@ -1,0 +1,9 @@
+# Claude Code from Anthropic's signed apt repository, the stable channel, whose key
+# system/packages.toml pins ([repo.claude-code]).
+# https://code.claude.com/docs/en/setup#install-with-linux-package-managers
+name = "Claude Code"
+summary = "Anthropic's coding agent, in the terminal"
+
+[apt]
+repo = "claude-code"
+packages = ["claude-code"]
