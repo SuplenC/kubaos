@@ -1,0 +1,67 @@
+# Google Chrome from Google's signed apt repository, whose key system/packages.toml pins
+# ([repo.google-chrome]). Google builds it for amd64 only. Its theme colour follows the
+# wallpaper: a root-owned helper copies one validated colour from the user's colors.json into
+# Chrome's managed policy whenever dot-theme rewrites it, started by a path unit.
+# https://www.google.com/linux/linux_signing_key.pub
+name = "Google Chrome"
+category = "browsers"
+tags = ["browser", "web", "internet", "chromium"]
+summary = "Google's web browser. Fast as fuck, and Google watches you use it."
+# Google's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Google Chrome is Google's web browser, built on the open-source Chromium project. It signs in \
+to a Google account to sync bookmarks, passwords, history and open tabs between devices, and \
+runs Chrome Web Store extensions. Google keeps it current through its apt repository."""
+description_from = "https://www.google.com/chrome/"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "google-chrome"
+
+[[action]]
+name = "Install Google Chrome"
+kind = "apt"
+repo = "google-chrome"
+arch = "amd64"
+packages = ["google-chrome-stable"]
+
+[[action]]
+name = "Install the helper that colours Chrome from the wallpaper"
+kind = "file"
+to = "/usr/local/libexec/dot-chrome-theme"
+from = "dot-chrome-theme"
+mode = "755"
+
+[[action]]
+name = "Watch the wallpaper's colours"
+kind = "file"
+to = "/etc/systemd/system/dot-chrome-theme.path"
+from = "dot-chrome-theme.path"
+template = true
+
+[[action]]
+name = "Set up the colouring service"
+kind = "file"
+to = "/etc/systemd/system/dot-chrome-theme.service"
+from = "dot-chrome-theme.service"
+template = true
+
+# Before the service first runs, so the policy it writes is Chrome's to take away.
+[[action]]
+name = "Make room for Chrome's theme policy"
+kind = "output"
+path = "/etc/opt/chrome/policies/managed/dot-theme.json"
+
+[[action]]
+name = "Follow the wallpaper from now on"
+kind = "unit"
+unit = "dot-chrome-theme.path"
+scope = "system"
+enable = true
+start = true
+
+[[action]]
+name = "Colour Chrome now"
+kind = "unit"
+unit = "dot-chrome-theme.service"
+scope = "system"
+start = true

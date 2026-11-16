@@ -3,14 +3,15 @@
  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
 <!--
   The Apps catalog's root half: what `pkexec` asks before it runs
-  /usr/local/libexec/kubaos-apps (system/files/apps/) for `kubaos app add`
-  and `kubaos app remove`. One run installs or removes every app it was
-  given, so it asks once a run; pam_u2f answers it with the security key
-  where it is set up. The helper takes only app ids of the root-owned
-  catalog, never a package, URL or path. auth_admin_keep: a second run
-  within a few minutes asks no more.
+  /usr/local/libexec/kubaos-apps serve (kubaos-cli's second binary, linked
+  from the Nix store) for `kubaos app add` and `kubaos app remove`. One run
+  starts it once, before its first step, so it asks once a run; pam_u2f
+  answers it with the security key where it is set up. The helper runs only
+  the typed actions of the root-owned catalog's apps, by app, setup and step,
+  never a package, URL, path or command it is given. auth_admin_keep: a
+  second run within a few minutes asks no more.
 
-  Installed in /usr/share/polkit-1/actions/ by install_apps_helper
+  Installed in /usr/share/polkit-1/actions/ by install_apps_policy
   (system/lib.sh).
 -->
 <policyconfig>

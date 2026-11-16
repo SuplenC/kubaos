@@ -37,6 +37,7 @@ use std::process::ExitCode;
 use kubaos_core::apps::action::Side;
 use kubaos_core::apps::engine::Keeper;
 use kubaos_core::apps::host::SystemHost;
+use kubaos_core::apps::host::system;
 use kubaos_core::apps::journal;
 use kubaos_core::apps::root::Server;
 use kubaos_core::update::event::chain;
@@ -157,13 +158,7 @@ fn place() -> Result<Place, String> {
 
 /// The name and home of the user `uid`, from the password database.
 fn account(uid: u32) -> Result<(String, PathBuf), String> {
-    let passwd = fs::read_to_string("/etc/passwd").map_err(|e| format!("reading /etc/passwd: {e}"))?;
-    let found = passwd.lines().find_map(|line| {
-        let fields: Vec<&str> = line.split(':').collect();
-        (fields.len() >= 6 && fields[2].parse::<u32>().ok() == Some(uid))
-            .then(|| (fields[0].to_owned(), PathBuf::from(fields[5])))
-    });
-    if let Some(found) = found {
+    if let Some(found) = system::account(uid) {
         return Ok(found);
     }
     // A user the file doesn't list (a directory service's) is named by the environment only

@@ -35,6 +35,7 @@ use super::folder::Folder;
 use super::folder::FolderError;
 use super::host::Host;
 use super::journal;
+use super::journal::Adoption;
 use super::journal::Claim;
 use super::journal::Entry;
 use super::journal::Journal;
@@ -361,6 +362,75 @@ impl<'h> Keeper<'h> {
         Ok(Outcome::Done)
     }
 
+    /// Records the steps of this side of the app `id` in `setup` that check done, without
+    /// running anything else, for an app the machine had before it had a journal. With `owned`
+    /// (KubaOS put the app there), a step owns what its undo can take back as a machine without
+    /// the app had it: its packages, paths, units (neither enabled nor running), settings keys
+    /// (absent), group membership and `run`s, never a group itself, which a package makes;
+    /// lingering only when KubaOS's older mark, `<id>-linger-was-off`, says it was off; and a
+    /// path that is there and holds an older release's content, which the next run brings to
+    /// this one's. Without `owned`, every step is found and owns nothing. A step with an entry
+    /// already, and one not done (but for such a path), is left to the next run. Returns how many
+    /// steps it recorded.
+    ///
+    /// # Errors
+    ///
+    /// The step that couldn't be resolved or checked, or the journal that couldn't be written.
+    pub fn adopt(&mut self, id: &str, setup: Option<&str>, owned: bool) -> Result<usize, StepError> {
+        let (_, steps) = self.steps(id, setup)?;
+        let mut journal = Journal::read(&self.journals, id)
+            .map_err(StepError::Journal)?
+            .unwrap_or_else(|| Journal::new(id, setup));
+        journal.setup = setup.map(str::to_owned);
+        let mark = self.journals.join(format!("{id}{LINGER_MARK}"));
+        let lingered_off = owned && mark.is_file();
+        let mut recorded = 0;
+        for (step, action) in steps {
+            if journal.entry(step).is_some() {
+                continue;
+            }
+            let look = perform::look(&action, &mut *self.host, Recorded::Nothing).map_err(StepError::Perform)?;
+            let stale = owned
+                && !look.done
+                && action.path().is_some()
+                && look.claims.iter().any(|c| {
+                    c.owned && c.path().is_some_and(|p| self.host.place(p).symlink_metadata().is_ok())
+                });
+            if !look.done && !stale {
+                continue;
+            }
+            let (claims, prior) = if owned {
+                adopted(&action, look, lingered_off)
+            } else {
+                (look.claims.into_iter().map(|c| Claim::new(c.claim, false)).collect(), look.prior)
+            };
+            let state = if claims.iter().any(|c| c.owned) {
+                State::Done
+            } else {
+                State::Found
+            };
+            journal.put(Entry {
+                step,
+                state,
+                claims,
+                prior,
+                action,
+                replaced: None,
+            });
+            recorded += 1;
+        }
+        journal.save(&self.journals).map_err(StepError::Journal)?;
+        if mark.is_file() {
+            std::fs::remove_file(&mark).map_err(|e| {
+                StepError::Journal(JournalError::Write {
+                    path: mark.clone(),
+                    source: e,
+                })
+            })?;
+        }
+        Ok(recorded)
+    }
+
     /// Undoes what the step `step` replaced, once its changed action stands, and forgets it.
     fn finish_replaced(&mut self, journal: &mut Journal, id: &str, step: usize) -> Result<(), StepError> {
         let Some(mut entry) = journal.entry(step).cloned() else {
@@ -437,10 +507,48 @@ impl<'h> Keeper<'h> {
     }
 }
 
-/// The claims of a step about to be recorded from `look`, keeping what its `old` entry owned:
-/// a claim both have stays owned, as does a folder the old one made that the new one's path is
-/// in. What the old entry owned and the new look doesn't claim is what it replaces, undone once
-/// the new action stands.
+/// The file KubaOS's older setups left beside the journals, `<id>-linger-was-off`, while
+/// lingering was off before the app's service turned it on.
+pub const LINGER_MARK: &str = "-linger-was-off";
+
+/// The claims and prior state of a step of an app KubaOS put on the machine, adopted: owned as
+/// [`Keeper::adopt`] says, with the prior state of a machine without the app.
+fn adopted(action: &Action, look: perform::Look, lingered_off: bool) -> (Vec<Claim>, journal::Prior) {
+    let claims = look
+        .claims
+        .into_iter()
+        .map(|c| {
+            let owned = if c.claim.starts_with("group:") || c.claim.starts_with("dep:") {
+                false
+            } else if c.claim.starts_with("linger:") {
+                lingered_off
+            } else {
+                true
+            };
+            Claim::new(c.claim, owned)
+        })
+        .collect();
+    let prior = match &action.kind {
+        Kind::Unit { .. } => journal::Prior {
+            enabled: Some(false),
+            active: Some(false),
+            ..journal::Prior::default()
+        },
+        Kind::Setting { .. } => journal::Prior {
+            value: None,
+            text: None,
+            file: Some(true),
+            ..look.prior
+        },
+        Kind::Linger {} => journal::Prior {
+            lingered: Some(!lingered_off),
+            ..journal::Prior::default()
+        },
+        _ => look.prior,
+    };
+    (claims, prior)
+}
+
 /// What the step's entry `old` says its path holds: what its action put there, when the app owns
 /// the path and the step is done; unknown, when a run stopped during it.
 fn recorded(old: Option<&Entry>) -> Recorded<'_> {
@@ -457,6 +565,10 @@ fn recorded(old: Option<&Entry>) -> Recorded<'_> {
     }
 }
 
+/// The claims of a step about to be recorded from `look`, keeping what its `old` entry owned:
+/// a claim both have stays owned, as does a folder the old one made that the new one's path is
+/// in. What the old entry owned and the new look doesn't claim is what it replaces, undone once
+/// the new action stands.
 fn carry(old: Option<&Entry>, look: &perform::Look) -> (Vec<Claim>, Option<Box<Entry>>) {
     let mut claims = look.claims.clone();
     let Some(old) = old else {
@@ -524,6 +636,13 @@ pub struct Finished {
     pub switch: bool,
 }
 
+/// An app taken in by [`Engine::adopt`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Adopted {
+    /// The setup the machine has it in.
+    pub setup: Option<String>,
+}
+
 /// One step of either side's journal, for an undo across both.
 #[derive(Clone, Debug)]
 struct Undoable {
@@ -576,12 +695,21 @@ impl<'a> Engine<'a> {
             .into_iter()
             .cloned()
             .collect();
-        self.ready(&folder, picked.map(|s| s.id.as_str()))?;
         let user_journal = Journal::read(self.user.journals(), id).map_err(EngineError::Journal)?;
         let root_journal = Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?;
         let had = user_journal.as_ref().or(root_journal.as_ref()).map(|j| j.setup.clone());
         let switching = had.as_ref().is_some_and(|had| had.as_deref() != setup);
         let was_complete = !switching && user_journal.as_ref().is_some_and(|j| j.complete);
+        let root_unsettled = self.unsettled(&folder, setup, root_journal.as_ref(), Side::Root);
+        // An installed app whose every step stands changes nothing, so it needn't be ready: an
+        // update checks it while the app is open.
+        let stands = was_complete
+            && user_journal.as_ref().is_some_and(|j| j.root_adoption.is_none())
+            && !root_unsettled
+            && !self.unsettled(&folder, setup, user_journal.as_ref(), Side::User);
+        if !stands {
+            self.ready(&folder, picked.map(|s| s.id.as_str()))?;
+        }
         let journaled: BTreeSet<(Side, usize)> = [(Side::User, &user_journal), (Side::Root, &root_journal)]
             .into_iter()
             .flat_map(|(side, j)| {
@@ -590,11 +718,16 @@ impl<'a> Engine<'a> {
             })
             .collect();
         let root_entries = root_journal.as_ref().is_some_and(|j| !j.entries.is_empty());
+        let adopting = user_journal.as_ref().is_some_and(|j| j.root_adoption.is_some());
         // An app that isn't complete is rolled back whole on a failure, root's steps included.
         let needs_root = ((switching || !was_complete) && root_entries)
-            || self.root_steps_unsettled(&folder, setup, root_journal.as_ref());
+            || adopting
+            || root_unsettled;
         if needs_root {
             self.start_root()?;
+        }
+        if adopting {
+            self.adopt_root(id)?;
         }
         self.preflight(id, setup, needs_root)?;
         let mut finished = Finished::default();
@@ -669,28 +802,32 @@ impl<'a> Engine<'a> {
         Ok(finished)
     }
 
-    /// Whether a root step of the install needs root: one root's journal doesn't record as
-    /// settled with the same action, word for word, or whose check, run from the user's side,
-    /// doesn't say done. A root `run`'s check runs only as root, so such a step always does.
-    fn root_steps_unsettled(&mut self, folder: &Folder, setup: Option<&str>, root_journal: Option<&Journal>) -> bool {
+    /// Whether a step of `side` of the install isn't settled: its journal doesn't record it as
+    /// settled with the same action, word for word, or its check, run from the user's side,
+    /// doesn't say done. A root `run`'s check runs only as root, so such a step never is.
+    fn unsettled(&mut self, folder: &Folder, setup: Option<&str>, journal: Option<&Journal>, side: Side) -> bool {
         let Ok(steps) = folder.steps(setup) else {
             return true;
         };
         let words = self.user.words();
         for (i, action) in steps.into_iter().enumerate() {
-            if action.side() != Side::Root {
+            if action.side() != side {
                 continue;
             }
             let Ok(resolved) = action.resolve(&words, &folder.dir) else {
                 return true;
             };
-            let settled = root_journal
-                .and_then(|j| j.entry(i + 1))
+            let entry = journal.and_then(|j| j.entry(i + 1));
+            let settled = entry
                 .is_some_and(|e| e.action == resolved && e.state.settled(self.windows) && e.replaced.is_none());
-            if !settled || matches!(resolved.kind, Kind::Run { .. }) {
+            if !settled || (side == Side::Root && matches!(resolved.kind, Kind::Run { .. })) {
                 return true;
             }
-            if !perform::look(&resolved, self.user.host(), Recorded::Nothing).is_ok_and(|look| look.done) {
+            // A step that opens a window, skipped in a run that may not, stays skipped.
+            if entry.is_some_and(|e| e.state == State::Skipped) {
+                continue;
+            }
+            if !perform::look(&resolved, self.user.host(), recorded(entry)).is_ok_and(|look| look.done) {
                 return true;
             }
         }
@@ -718,9 +855,13 @@ impl<'a> Engine<'a> {
         if let Ok(folder) = Folder::load(&self.user.catalog, id) {
             self.ready(&folder, setup.as_deref())?;
         }
+        if user_journal.as_ref().is_some_and(|j| j.root_adoption.is_some()) {
+            self.adopt_root(id)?;
+        }
         if root_journal.as_ref().is_some_and(|j| !j.entries.is_empty()) {
             self.start_root()?;
         }
+        let user_journal = Journal::read(self.user.journals(), id).map_err(EngineError::Journal)?;
         if let Some(mut journal) = user_journal {
             journal.complete = false;
             journal.save(self.user.journals()).map_err(EngineError::Journal)?;
@@ -739,6 +880,134 @@ impl<'a> Engine<'a> {
         }
         Journal::forget(self.user.journals(), id).map_err(EngineError::Journal)?;
         Ok(finished)
+    }
+
+    /// Takes in the app `id` when the machine has it and no journal does: an app installed before
+    /// KubaOS kept journals, by an older release of it or by hand. Nothing runs but checks. The
+    /// app is there when every package step of its own actions (`apt`, `deb`, `nix`; every step,
+    /// for an app with none) checks done; it is there in the first setup, by id, whose own steps
+    /// that open no window all check done, else in the one with no steps of its own. Its user
+    /// journal is then complete in that setup, its user steps recorded as [`Keeper::adopt`]
+    /// says, `owned` when KubaOS put it there; root's steps are recorded by root on the first run
+    /// that starts it, so taking an app in asks for no password. Returns the setup it was taken
+    /// in, or none when it isn't there or has a journal already.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError`] when the folder or the journals can't be read, or a check can't run.
+    pub fn adopt(&mut self, id: &str, owned: bool) -> Result<Option<Adopted>, EngineError> {
+        let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
+        if Journal::read(self.user.journals(), id).map_err(EngineError::Journal)?.is_some()
+            || Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?.is_some()
+        {
+            return Ok(None);
+        }
+        let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
+        let words = self.user.words();
+        let done = |actions: &[&Action], user: &mut Keeper<'_>| -> Result<bool, EngineError> {
+            for action in actions {
+                let resolved = action.resolve(&words, &folder.dir).map_err(|e| EngineError::Step {
+                    name: action.name.clone(),
+                    source: Box::new(StepError::Folder(FolderError::Action {
+                        setup: None,
+                        position: 0,
+                        source: e,
+                    })),
+                })?;
+                // A root `run`'s check runs only as root: from here it can't say done.
+                let checkable = !(resolved.side() == Side::Root && matches!(resolved.kind, Kind::Run { .. }));
+                let look = checkable
+                    && perform::look(&resolved, user.host(), Recorded::Nothing)
+                        .map_err(|e| EngineError::Step {
+                            name: action.name.clone(),
+                            source: Box::new(StepError::Perform(e)),
+                        })?
+                        .done;
+                if !look {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        };
+        let shared: Vec<&Action> = folder.actions.iter().collect();
+        let packages: Vec<&Action> = shared
+            .iter()
+            .copied()
+            .filter(|a| matches!(a.kind, Kind::Apt { .. } | Kind::Deb { .. } | Kind::Nix { .. }))
+            .collect();
+        let anchor = if packages.is_empty() { &shared } else { &packages };
+        if !done(anchor, &mut self.user)? {
+            return Ok(None);
+        }
+        let setup = if folder.has_setups() {
+            let mut found = None;
+            for setup in folder.setups.iter().filter(|s| !s.actions.is_empty()) {
+                let own: Vec<&Action> = setup
+                    .actions
+                    .iter()
+                    .filter(|a| !matches!(a.kind, Kind::Run { window: Some(_), .. }))
+                    .collect();
+                if done(&own, &mut self.user)? {
+                    found = Some(setup.id.clone());
+                    break;
+                }
+            }
+            match found.or_else(|| folder.setups.iter().find(|s| s.actions.is_empty()).map(|s| s.id.clone())) {
+                Some(setup) => Some(setup),
+                None => return Ok(None),
+            }
+        } else {
+            None
+        };
+        self.user
+            .adopt(id, setup.as_deref(), owned)
+            .map_err(|source| EngineError::Step {
+                name: format!("Taking in {}", folder.name),
+                source: Box::new(source),
+            })?;
+        let has_root = folder
+            .steps(setup.as_deref())
+            .map_err(EngineError::Folder)?
+            .iter()
+            .any(|a| a.side() == Side::Root);
+        let mut journal = Journal::read(self.user.journals(), id)
+            .map_err(EngineError::Journal)?
+            .unwrap_or_else(|| Journal::new(id, setup.as_deref()));
+        journal.setup.clone_from(&setup);
+        journal.complete = true;
+        journal.root_adoption = has_root.then_some(if owned { Adoption::Owned } else { Adoption::Found });
+        journal.save(self.user.journals()).map_err(EngineError::Journal)?;
+        Ok(Some(Adopted { setup }))
+    }
+
+    /// Has root record its steps of the app `id`, taken in on the user's side only so far,
+    /// starting root when it isn't yet. Nothing to do for an app whose root half is recorded.
+    fn adopt_root(&mut self, id: &str) -> Result<(), EngineError> {
+        let Some(mut journal) = Journal::read(self.user.journals(), id).map_err(EngineError::Journal)? else {
+            return Ok(());
+        };
+        let Some(adoption) = journal.root_adoption else {
+            return Ok(());
+        };
+        self.start_root()?;
+        let request = Request::Adopt {
+            app: id.to_owned(),
+            setup: journal.setup.clone(),
+            owned: adoption.owned(),
+        };
+        let failed = |why: String| EngineError::Step {
+            name: "Taking in what root has of the app".to_owned(),
+            source: Box::new(StepError::RootFailed { why }),
+        };
+        match self.root.call(&request) {
+            Ok(Reply::Ready) => {}
+            Ok(Reply::Failed { why }) => return Err(failed(why)),
+            Ok(Reply::Refused { why }) => return Err(failed(why.join("; "))),
+            Ok(Reply::Step { .. }) => return Err(failed("the root helper answered out of turn".to_owned())),
+            Err(e) => return Err(EngineError::Root(e)),
+        }
+        journal.root_adoption = None;
+        journal.save(self.user.journals()).map_err(EngineError::Journal)
     }
 
     fn ready(&mut self, folder: &Folder, setup: Option<&str>) -> Result<(), EngineError> {
@@ -762,10 +1031,7 @@ impl<'a> Engine<'a> {
                 self.root_started = true;
                 Ok(())
             }
-            Err(RootError::Declined) => {
-                self.sink.event(&UpdateEvent::Declined);
-                Err(EngineError::Declined)
-            }
+            Err(RootError::Declined) => Err(EngineError::Declined),
             Err(e) => Err(EngineError::Root(e)),
         }
     }
@@ -897,6 +1163,11 @@ impl<'a> Engine<'a> {
             journal.save(self.user.journals()).map_err(EngineError::Journal)?;
         }
         Ok(switch)
+    }
+
+    /// Reports `text` as a warning of the run.
+    pub fn warn(&mut self, text: String) {
+        self.sink.event(&UpdateEvent::Warning { text });
     }
 
     fn report(&mut self, app: &str, step: usize, of: usize, name: &str, state: ActionState) {

@@ -18,11 +18,12 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use serde::Deserialize;
+use serde::Serialize;
 
 use super::action::Action;
 use super::action::ActionError;
+use super::action::Kind;
 use super::action::is_argv;
-use super::manifest::is_app_id;
 
 /// The file of an app's folder.
 pub const APP_FILE: &str = "app.toml";
@@ -72,10 +73,12 @@ pub enum FolderError {
     InvalidTag(String),
     #[error("{0:?} is not where the description came from: an https:// URL")]
     InvalidSource(String),
+    #[error("{0:?} is not an icon name: letters, digits, `-`, `_` and `.`, as the icon theme names them")]
+    InvalidIcon(String),
 }
 
 /// What kind of app it is, which groups it with others in lists.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Category {
@@ -89,6 +92,24 @@ pub enum Category {
     Security,
     System,
     Games,
+}
+
+impl Category {
+    /// Its word in `app.toml`.
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Browsers => "browsers",
+            Self::Development => "development",
+            Self::Ai => "ai",
+            Self::Communication => "communication",
+            Self::Media => "media",
+            Self::Graphics => "graphics",
+            Self::Office => "office",
+            Self::Security => "security",
+            Self::System => "system",
+            Self::Games => "games",
+        }
+    }
 }
 
 /// A check that must pass before an install or a removal changes anything.
@@ -244,6 +265,11 @@ impl Folder {
                 return Err(FolderError::InvalidTag(tag.clone()));
             }
         }
+        if let Some(icon) = &self.icon
+            && !is_icon_name(icon)
+        {
+            return Err(FolderError::InvalidIcon(icon.clone()));
+        }
         if !super::action::is_https(&self.description_from) {
             return Err(FolderError::InvalidSource(self.description_from.clone()));
         }
@@ -313,6 +339,35 @@ impl Folder {
             .collect())
     }
 
+    /// Whether it can be set up more than one way.
+    pub fn has_setups(&self) -> bool {
+        !self.setups.is_empty()
+    }
+
+    /// Every action of it, the app's then each setup's.
+    pub fn all_actions(&self) -> impl Iterator<Item = &Action> {
+        self.actions.iter().chain(self.setups.iter().flat_map(|s| &s.actions))
+    }
+
+    /// Whether every step of an install in `setup` has something for a machine of `arch`.
+    pub fn available(&self, arch: &str, setup: Option<&FolderSetup>) -> bool {
+        self.actions
+            .iter()
+            .chain(setup.into_iter().flat_map(|s| &s.actions))
+            .all(|action| action.available(arch))
+    }
+
+    /// The dpkg packages its `apt` and `deb` actions install, in any setup.
+    pub fn packages(&self) -> Vec<&str> {
+        self.all_actions()
+            .flat_map(|action| match &action.kind {
+                Kind::Apt { packages, .. } => packages.iter().map(String::as_str).collect(),
+                Kind::Deb { package, .. } => vec![package.as_str()],
+                _ => Vec::new(),
+            })
+            .collect()
+    }
+
     /// The ready checks of an install or a removal in `setup`.
     pub fn readies<'a>(&'a self, setup: Option<&'a FolderSetup>) -> impl Iterator<Item = &'a Ready> {
         self.ready.iter().chain(setup.into_iter().flat_map(|s| &s.ready))
@@ -331,6 +386,30 @@ fn actions(setup: Option<&str>, tables: Vec<toml::Table>) -> Result<Vec<Action>,
             })
         })
         .collect()
+}
+
+/// Whether `id` can be an app's: lowercase ASCII letters, digits and `-`, starting with a letter
+/// or a digit, at most 64, so an id is never a path or an option. A repository's name, a setup's
+/// and a web app's keep to it too.
+pub fn is_app_id(id: &str) -> bool {
+    id.len() <= 64
+        && id
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// Whether `value` can be an icon theme's name for an icon: no path, no extension.
+/// <https://specifications.freedesktop.org/icon-naming-spec/latest/>
+fn is_icon_name(value: &str) -> bool {
+    value.len() <= 128
+        && value.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 /// Whether `tag` is lowercase words, one space between them.

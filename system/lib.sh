@@ -501,13 +501,41 @@ install_proxy_helper() {
   install_root_file "$FILES_DIR/polkit/50-kubaos-proxy.rules" /etc/polkit-1/rules.d/50-kubaos-proxy.rules 0644
 }
 
-# install_apps_helper: the Apps catalog's root helper (`kubaos app add|remove`,
-# kubaos update), which installs and removes only apps of the root-owned
-# catalog, and the polkit action pkexec runs it under, which asks once a run.
-# 20-base.sh runs it, and a migration on machines installed before it.
-install_apps_helper() {
-  install_root_file "$FILES_DIR/apps/kubaos-apps" /usr/local/libexec/kubaos-apps 0755
+# install_apps_policy: the polkit action pkexec runs the Apps catalog's root
+# helper under (`kubaos app add|remove`), which asks once a run.
+install_apps_policy() {
   install_root_file "$FILES_DIR/polkit/org.kubaos.apps.policy" /usr/share/polkit-1/actions/org.kubaos.apps.policy 0644
+}
+
+# install_apps_helper: the Apps catalog's root helper, `kubaos-apps` from
+# KUBAOS_DIR's build of the kubaos command (`.#kubaos`, home/curated.nix),
+# pinned with APPS_GCROOT and linked where pkexec and sudo run it, so neither
+# the user nor their profile can change what runs as root, and its polkit
+# action. It runs only the typed actions of the root-owned catalog
+# (docs/adr/0009-apps-are-journaled-actions.md). 60-nix.sh and relink.sh
+# (every update and rollback) run it.
+APPS_LINK=/usr/local/libexec/kubaos-apps
+APPS_GCROOT=/nix/var/nix/gcroots/kubaos-apps
+install_apps_helper() {
+  local out bin
+  install_apps_policy
+  if ((DRY_RUN)); then
+    run nix build --no-link --print-out-paths "$KUBAOS_DIR#kubaos"
+    sudo_run ln -sfn "<kubaos store path>" "$APPS_GCROOT"
+    sudo_run ln -sfn "<kubaos store path>/bin/kubaos-apps" "$APPS_LINK"
+    return 0
+  fi
+  out="$(nix build --no-link --print-out-paths "$KUBAOS_DIR#kubaos")" || die "nix build .#kubaos failed"
+  bin="$out/bin/kubaos-apps"
+  [[ -x "$bin" ]] || die "no kubaos-apps in $out"
+  if [[ "$(readlink "$APPS_GCROOT" 2>/dev/null)" == "$out" && "$(readlink "$APPS_LINK" 2>/dev/null)" == "$bin" ]]; then
+    ok "$APPS_LINK -> $bin"
+    return 0
+  fi
+  # GC root first, so the store path can't be collected while the link points at it.
+  sudo_run ln -sfn "$out" "$APPS_GCROOT"
+  sudo_run install -d -m 0755 "$(dirname "$APPS_LINK")"
+  sudo_run ln -sfn "$bin" "$APPS_LINK"
 }
 
 # install_scx: the CPU scheduler the power stops can run (crates/kubaos-power,
@@ -576,49 +604,12 @@ install_mac_accents() {
   fi
 }
 
-# The system hooks of the Apps catalog's apps (apps/<id>.toml's
-# `system_hooks`): what an app needs on the system beyond its packages. The
-# root helper (system/files/apps/kubaos-apps) runs install_<hooks> as root
-# after the app's install and remove_<hooks> once its packages are gone, with
-# TARGET_USER the user who asked. Each one is safe to run again.
+# What an older KubaOS's base install put on the system for Google Chrome and
+# Bitwarden desktop, which base-apps-setup takes away from a machine without
+# the app. On a machine with it, the Apps catalog's app has them as steps
+# (apps/google-chrome/, apps/bitwarden/).
 
-# install_bitwarden_autostart: Bitwarden desktop starts on login, as a
-# system-wide XDG autostart entry the session's xdg-desktop-autostart.target
-# starts (config/hypr/autostart.lua) and the user can turn off. Its SSH agent
-# only answers while the app runs. TryExec skips the entry while the app
-# isn't there.
-install_bitwarden_autostart() {
-  install_root_file "$FILES_DIR/xdg/autostart/bitwarden.desktop" /etc/xdg/autostart/bitwarden.desktop 0644
-}
-
-remove_bitwarden_autostart() {
-  [[ ! -e /etc/xdg/autostart/bitwarden.desktop ]] || sudo_run rm -f /etc/xdg/autostart/bitwarden.desktop
-}
-
-# Where Chrome reads the policies an administrator sets.
-CHROME_POLICY_DIR=/etc/opt/chrome/policies/managed
-
-# install_chrome_theme: Chrome's theme colour follows the wallpaper. A
-# root-owned helper (system/files/chrome/dot-chrome-theme) copies one
-# validated colour from TARGET_USER's colors.json into Chrome's managed policy
-# whenever dot-theme rewrites it, started by a path unit.
-install_chrome_theme() {
-  local home unit
-  home="$(user_home "$TARGET_USER")"
-  [[ -n $home ]] || die "no home for $TARGET_USER"
-  [[ ! -f /etc/apt/sources.list.d/google-chrome.list ]] || sudo_run rm -f /etc/apt/sources.list.d/google-chrome.list
-  [[ -d $CHROME_POLICY_DIR ]] || sudo_run install -d -m 0755 "$CHROME_POLICY_DIR"
-  install_root_file "$FILES_DIR/chrome/dot-chrome-theme" /usr/local/libexec/dot-chrome-theme 0755
-  for unit in dot-chrome-theme.path dot-chrome-theme.service; do
-    render_template "$FILES_DIR/chrome/$unit.in" "USER=$TARGET_USER" "HOME=$home" |
-      write_root_file "/etc/systemd/system/$unit" 0644
-  done
-  sctl daemon-reload
-  sctl enable --now dot-chrome-theme.path
-  sctl start dot-chrome-theme.service
-}
-
-# chrome_installed: whether any Chrome build that reads CHROME_POLICY_DIR's
+# chrome_installed: whether any Chrome build that reads Chrome's managed
 # policies, and so the theme's, is installed.
 chrome_installed() {
   local build
@@ -628,9 +619,9 @@ chrome_installed() {
   return 1
 }
 
-# remove_chrome_theme: the units, the helper and the policy it wrote, unless a
-# Chrome build that reads them is still installed. Chrome's policy folder
-# stays, as its package leaves it.
+# remove_chrome_theme: the theme helper, its units and the policy it wrote,
+# unless a Chrome build that reads them is still installed. Chrome's policy
+# folder stays, as its package leaves it.
 remove_chrome_theme() {
   local f found=0
   if chrome_installed; then
@@ -642,49 +633,16 @@ remove_chrome_theme() {
   done
   ((found)) && sctl disable --now dot-chrome-theme.path
   for f in /etc/systemd/system/dot-chrome-theme.path /etc/systemd/system/dot-chrome-theme.service \
-    /usr/local/libexec/dot-chrome-theme "$CHROME_POLICY_DIR/dot-theme.json"; do
+    /usr/local/libexec/dot-chrome-theme /etc/opt/chrome/policies/managed/dot-theme.json; do
     [[ ! -e $f ]] || sudo_run rm -f "$f"
   done
   ((found)) && sctl daemon-reload
   return 0
 }
 
-# install_docker_access: TARGET_USER in the docker group, so docker runs
-# without sudo from their next login, and Docker started on demand
-# (docker_on_demand).
-install_docker_access() {
-  if id -nG "$TARGET_USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
-    ok "$TARGET_USER is in the docker group"
-  else
-    getent group docker >/dev/null || sudo_run groupadd docker
-    sudo_run usermod -aG docker "$TARGET_USER"
-    info "log out and back in (or reboot) for the docker group to apply"
-  fi
-  docker_on_demand
-  if findmnt -n /var/lib/docker >/dev/null 2>&1; then
-    ok "/var/lib/docker is its own mount (kept out of root snapshots)"
-  else
-    info "/var/lib/docker lives inside @ and will be in every root snapshot (see 00-btrfs-subvolumes.md, @docker)"
-  fi
-}
-
-# remove_docker_access: TARGET_USER out of the docker group, and the shutdown
-# drop-in docker_on_demand put beside Docker's units, once no Docker engine is
-# left: while docker.service is there (Ubuntu's docker.io, say), both are its
-# too. The group itself, and /var/lib/docker with the images and volumes,
-# stay, as Docker's packages leave them.
-remove_docker_access() {
-  if unit_exists docker.service; then
-    ok "a Docker engine is still installed: $TARGET_USER keeps the docker group"
-    return 0
-  fi
-  if id -nG "$TARGET_USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
-    sudo_run gpasswd -d "$TARGET_USER" docker
-  fi
-  if [[ -e /etc/systemd/system/docker.service.d/kubaos-stop.conf ]]; then
-    sudo_run rm -f /etc/systemd/system/docker.service.d/kubaos-stop.conf
-    sctl daemon-reload
-  fi
+# remove_bitwarden_autostart: Bitwarden desktop's system-wide autostart entry.
+remove_bitwarden_autostart() {
+  [[ ! -e /etc/xdg/autostart/bitwarden.desktop ]] || sudo_run rm -f /etc/xdg/autostart/bitwarden.desktop
 }
 
 # boot_unit UNIT enable|disable|mask: whether UNIT starts at boot, when it

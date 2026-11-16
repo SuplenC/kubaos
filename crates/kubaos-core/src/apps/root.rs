@@ -1,7 +1,8 @@
 //! The root half of an app's install: the requests the user's side sends the root helper
 //! (`kubaos-apps serve`), and the helper's answers.
 //!
-//! A request names an app id, a setup id and a step number, nothing else. The helper reads the
+//! A request names an app id, a setup id and a step number (or, for an adoption, whether KubaOS
+//! put the app there), nothing else. The helper reads the
 //! action from the root-owned catalog, refuses one that isn't root's, and undoes only what root's
 //! journal, which only root writes, recorded. One JSON line a request, one a reply; the helper
 //! says `ready` once it runs, which is how the user's side knows the password was taken.
@@ -36,7 +37,7 @@ use serde::Serialize;
 use super::engine::Keeper;
 use super::engine::Outcome;
 use super::engine::StepError;
-use super::manifest::is_app_id;
+use super::folder::is_app_id;
 use crate::update::event::chain;
 
 /// What the user's side asks root to do.
@@ -59,6 +60,14 @@ pub enum Request {
     },
     /// One step of root's journal of the app, undone.
     Undo { app: String, step: usize },
+    /// Root's steps of an app the machine had before it had a journal, recorded from what their
+    /// checks find, nothing run: owned when KubaOS put the app there.
+    Adopt {
+        app: String,
+        #[serde(default)]
+        setup: Option<String>,
+        owned: bool,
+    },
 }
 
 /// Root's answer.
@@ -222,7 +231,9 @@ impl<'h> Server<'h> {
             Err(e) => return refuse(format!("not a request: {e}")),
         };
         let (app, setup) = match &request {
-            Request::Preflight { app, setup, .. } | Request::Step { app, setup, .. } => (app, setup.as_deref()),
+            Request::Preflight { app, setup, .. }
+            | Request::Step { app, setup, .. }
+            | Request::Adopt { app, setup, .. } => (app, setup.as_deref()),
             Request::Undo { app, .. } => (app, None),
         };
         if !is_app_id(app) {
@@ -255,6 +266,10 @@ impl<'h> Server<'h> {
             },
             Request::Undo { app, step } => match self.keeper.undo(&app, step) {
                 Ok(outcome) => Reply::Step { outcome },
+                Err(e) => answer(&e),
+            },
+            Request::Adopt { app, setup, owned } => match self.keeper.adopt(&app, setup.as_deref(), owned) {
+                Ok(_) => Reply::Ready,
                 Err(e) => answer(&e),
             },
         }

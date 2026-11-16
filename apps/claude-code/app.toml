@@ -1,0 +1,23 @@
+# Claude Code from Anthropic's signed apt repository, the stable channel, whose key
+# system/packages.toml pins ([repo.claude-code]).
+# https://code.claude.com/docs/en/setup#install-with-linux-package-managers
+name = "Claude Code"
+category = "ai"
+tags = ["coding agent", "claude", "anthropic", "terminal"]
+summary = "Anthropic's coding agent, in the terminal. It writes the code; you take the credit."
+# Anthropic's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Claude Code is Anthropic's agentic coding tool. It runs in the terminal, reads the project it \
+is started in, and edits files, runs commands and makes commits on request, asking before it \
+changes anything it hasn't been allowed to. It works with a Claude subscription or an \
+Anthropic API key."""
+description_from = "https://code.claude.com/docs/en/overview"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "claude"
+
+[[action]]
+name = "Install Claude Code"
+kind = "apt"
+repo = "claude-code"
+packages = ["claude-code"]

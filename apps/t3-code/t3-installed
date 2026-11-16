@@ -1,0 +1,9 @@
+#!/bin/sh
+# Done: the `t3` launcher points at a whole runtime under the T3 home, whichever version
+# `t3 update` has moved it to.
+target="$(readlink "$HOME/.local/bin/t3" 2>/dev/null)" || exit 1
+case "$target" in
+  "$HOME"/.t3/runtime/versions/*/t3) ;;
+  *) exit 1 ;;
+esac
+[ -x "$target" ] && [ -f "$(dirname "$target")/.install-complete" ]

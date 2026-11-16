@@ -104,7 +104,7 @@ Nix to the newest patch release of its minor by itself (`docs/USING.md`,
 "Updating"). It reports a newer bw CLI and a new Bitwarden desktop series
 (`system/70-bitwarden.sh --check-updates`) with the new version and sha256
 lines: paste the CLI's into `70-bitwarden.sh` and the desktop app's into
-`apps/bitwarden.toml` on the dev machine, and release them. A new Nix minor
+`apps/bitwarden/app.toml` on the dev machine, and release them. A new Nix minor
 is a bump of `system/60-nix.sh`'s pin.
 
 ## Troubleshooting

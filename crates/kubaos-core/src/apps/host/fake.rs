@@ -14,11 +14,58 @@ use std::process::Command;
 use std::rc::Rc;
 
 use super::AptPlan;
+use crate::apps::action::Side;
+use crate::apps::engine::Keeper;
+use crate::apps::root::Reply;
+use crate::apps::root::Request;
+use crate::apps::root::RootError;
+use crate::apps::root::RootSide;
+use crate::apps::root::Server;
 use super::AptSimulation;
 use super::Host;
 use super::HostError;
 use super::UnitState;
 use crate::apps::action::Scope;
+
+/// Root's side of the fake machine, its requests sent as JSON lines through the real server.
+#[derive(Debug)]
+pub struct FakeRoot {
+    pub host: FakeHost,
+    pub catalog: PathBuf,
+    pub journals: PathBuf,
+    pub owner: u32,
+    pub declined: bool,
+    pub started: bool,
+    pub requests: Vec<String>,
+    /// `start` and each request's line, shared with whoever made it, which outlives it.
+    pub calls: Rc<RefCell<Vec<String>>>,
+}
+
+impl RootSide for FakeRoot {
+    fn start(&mut self) -> Result<(), RootError> {
+        self.calls.borrow_mut().push("start".to_owned());
+        if self.declined {
+            return Err(RootError::Declined);
+        }
+        self.started = true;
+        Ok(())
+    }
+
+    fn call(&mut self, request: &Request) -> Result<Reply, RootError> {
+        assert!(self.started, "a request before the root helper started");
+        let line = serde_json::to_string(request).unwrap();
+        self.requests.push(line.clone());
+        self.calls.borrow_mut().push(line.clone());
+        Ok(self.serve(&line))
+    }
+}
+
+impl FakeRoot {
+    pub fn serve(&mut self, line: &str) -> Reply {
+        let keeper = Keeper::new(&mut self.host, Side::Root, &self.catalog, &self.journals);
+        Server::new(keeper, &self.catalog, self.owner).handle(line)
+    }
+}
 
 /// What the fake machine has besides its files.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

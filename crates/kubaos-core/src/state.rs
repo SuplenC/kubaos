@@ -167,10 +167,15 @@ impl Paths {
         self.user_layer().join(crate::apps::picks::PICKS)
     }
 
-    /// Which nixpkgs names each app of the catalog added to the User flake's `packages.toml`,
-    /// `~/.local/state/kubaos/apps-added.toml`: this machine's, so not in the user layer.
-    pub fn apps_added(&self) -> PathBuf {
-        self.state.join(crate::apps::added::ADDED)
+    /// The journals of the apps' user steps, `~/.local/state/kubaos/apps/`: this machine's, so
+    /// not in the user layer.
+    pub fn app_journals(&self) -> PathBuf {
+        self.state.join(crate::apps::journal::JOURNALS)
+    }
+
+    /// The lock the user's side of an app's install or removal holds, in [`Paths::app_journals`].
+    pub fn app_lock(&self) -> PathBuf {
+        self.app_journals().join(crate::apps::journal::LOCK)
     }
 
     /// The Projects root, where scaffolded projects go: `~/Projects` unless [`PROJECTS_VAR`]

@@ -22,7 +22,7 @@
 #             turns it on or off
 #
 # A [repo.<name>] is a vendor's apt repository, for a group's packages or an
-# app of the catalog's (apps/<id>.toml). Its sources file is
+# app of the catalog's (apps/<id>/app.toml). Its sources file is
 # `system/files/apt/sources.list.d/<name>.sources` (`@ARCH@` becomes the
 # machine's architecture), signed by the key at `key_url`, which must have
 # exactly the primary key `fingerprint`, stored in `keyring`.
@@ -33,13 +33,13 @@
 # ---------------------------------------------------------------------------
 # Vendor repositories
 
-# Docker's repository, for the app of the catalog (apps/docker.toml).
+# Docker's repository, for the app of the catalog (apps/docker/).
 [repo.docker]
 key_url = "https://download.docker.com/linux/ubuntu/gpg"
 fingerprint = "9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
 keyring = "/etc/apt/keyrings/docker.gpg"
 
-# Google's repository, for the app of the catalog (apps/google-chrome.toml).
+# Google's repository, for the app of the catalog (apps/google-chrome/).
 # Chrome's own postinst writes google-chrome.sources with exactly this key
 # path and URI; the same values mean it won't fight the file.
 [repo.google-chrome]
@@ -48,7 +48,7 @@ fingerprint = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
 keyring = "/usr/share/keyrings/google-chrome.gpg"
 
 # Anthropic's repository of Claude Code, the stable channel, for the app of the
-# catalog (apps/claude-code.toml). Anthropic's own instructions write
+# catalog (apps/claude-code/). Anthropic's own instructions write
 # claude-code.list, signed by claude-code.asc; repo setup turns that line off
 # for this source (disable_other_sources in system/lib.sh).
 [repo.claude-code]
@@ -277,7 +277,7 @@ packages = ["pcscd", "pcsc-tools"]
 # The Apps catalog's
 
 # Docker's and Google Chrome's packages are apps of the catalog
-# (apps/docker.toml, apps/google-chrome.toml), which `kubaos app` adds and
+# (apps/docker/, apps/google-chrome/), which `kubaos app` adds and
 # removes. kubaos leaves a package of the catalog's to it, so these groups
 # install and remove nothing, whatever their switch. They are listed, off,
 # because an update runs the kubaos it started with, and one from before the

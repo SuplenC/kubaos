@@ -90,19 +90,17 @@ use super::record::short;
 use super::security;
 use super::security::CountError;
 use super::version::Version;
-use crate::apps::AddedError;
 use crate::apps::CatalogError;
 use crate::apps::PicksError;
+use crate::apps::engine::EngineError;
+use crate::apps::journal::JournalError;
 use crate::apt::Manifest;
 use crate::apt::ManifestError;
 use crate::apt::manifest::MANIFEST;
 use crate::engine::files::utc_datetime;
 use crate::mise;
 use crate::mise::Mise;
-use crate::packages::EditError;
 use crate::state::Paths;
-use crate::state::ReadError;
-use crate::state::migrate::MigrateError;
 use crate::state::write_atomic;
 
 /// The space an update needs free on `/` and `/nix`: a new home-manager generation, a kernel and
@@ -215,9 +213,16 @@ pub enum UpdateError {
     /// The user's picks of apps can't be read or written.
     #[error("using your picks of apps")]
     Picks(#[source] PicksError),
-    /// The record of the nixpkgs names each app added can't be read or written.
-    #[error("using the record of the packages apps added")]
-    AppsAdded(#[source] AddedError),
+    /// An app's journal can't be read.
+    #[error("reading the apps' journals")]
+    AppJournal(#[source] JournalError),
+    /// An app's install, removal or taking in didn't go through.
+    #[error("{what}")]
+    App {
+        what: String,
+        #[source]
+        source: EngineError,
+    },
     /// The catalog has no app of that id.
     #[error("the Apps catalog has no app {id} (kubaos app list)")]
     NoApp { id: String },
@@ -240,15 +245,6 @@ pub enum UpdateError {
     /// A setup was named for apps none of which has setups.
     #[error("--setup {setup} names a setup, and none of these apps has setups")]
     SetupWithout { setup: String },
-    /// `home.nix` couldn't be wired to the state directory for an app from nixpkgs.
-    #[error("wiring home.nix to kubaos.d/")]
-    Wire(#[source] MigrateError),
-    /// The User flake's `packages.toml` can't be read.
-    #[error("reading kubaos.d/packages.toml")]
-    NixList(#[source] ReadError),
-    /// An app's nixpkgs packages couldn't be added to or removed from `packages.toml`.
-    #[error("changing kubaos.d/packages.toml")]
-    NixPackages(#[source] EditError),
 }
 
 /// How to pick each of `setups` of the app `id`, as the error that asks for one says it.

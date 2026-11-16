@@ -2,8 +2,9 @@
 //! that had them: the release's migrations `apps-catalog-handover` and `base-apps-setup` (system)
 //! and `base-apps-picked` (user), run by bash against a copy of the release's scripts, manifest
 //! and catalog, with sudo, dpkg and dpkg-query stand-ins over a list of installed packages, and
-//! the apps' system hooks standing in as lines in a log. Then the plans of the next update, the
-//! package manifest's and the catalog's, read the machine they left.
+//! the removal of what an older base install left standing in as lines in a log. Then the package
+//! manifest's plan of the next update reads the machine they left. Taking the apps in, the user
+//! migration apps-adopt, is `kubaos app adopt`, which the updater's tests cover.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -13,7 +14,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
-use kubaos_core::apps;
 use kubaos_core::apps::Catalog;
 use kubaos_core::apps::Picks;
 use kubaos_core::apt::Choices;
@@ -50,15 +50,8 @@ fn migration(kind: &str, slug: &str) -> PathBuf {
         .unwrap_or_else(|| panic!("no {kind} migration {slug}"))
 }
 
-/// The apps' system hooks of `system/lib.sh`, which the copy's stand-ins replace.
-const HOOKS: [&str; 6] = [
-    "install_chrome_theme",
-    "remove_chrome_theme",
-    "install_docker_access",
-    "remove_docker_access",
-    "install_bitwarden_autostart",
-    "remove_bitwarden_autostart",
-];
+/// What `system/lib.sh` takes away of an older base install, which the copy's stand-ins replace.
+const HOOKS: [&str; 2] = ["remove_chrome_theme", "remove_bitwarden_autostart"];
 
 /// A machine: its installed packages, the package manifest's record and choices, a home, and a
 /// copy of the release's checkout.
@@ -113,14 +106,7 @@ impl Machine {
         ] {
             fs::copy(root.join(file), self.path("checkout").join(file)).expect("copy the release's file");
         }
-        for entry in fs::read_dir(root.join("apps")).expect("read the catalog") {
-            let path = entry.expect("an entry").path();
-            fs::copy(
-                &path,
-                self.path("checkout/apps").join(path.file_name().expect("a name")),
-            )
-            .expect("copy the catalog");
-        }
+        copy_dir(&root.join("apps"), &self.path("checkout/apps"));
         let mut lib = fs::read_to_string(self.path("checkout/system/lib.sh")).expect("read lib.sh");
         for hook in HOOKS {
             let _ = writeln!(lib, "{hook}() {{ echo \"{hook} $TARGET_USER\" >>\"$FAKE/hooks\"; }}");
@@ -191,9 +177,23 @@ impl Machine {
     }
 }
 
+/// Copies the folder `from` to `to`, everything in it.
+fn copy_dir(from: &Path, to: &Path) {
+    fs::create_dir_all(to).expect("make the copy");
+    for entry in fs::read_dir(from).expect("read the folder") {
+        let path = entry.expect("an entry").path();
+        let target = to.join(path.file_name().expect("a name"));
+        if path.is_dir() {
+            copy_dir(&path, &target);
+        } else {
+            fs::copy(&path, &target).expect("copy a file");
+        }
+    }
+}
+
 /// The next update's plans on `m`: what the package manifest's sync would remove, by a kubaos that
-/// knows the catalog and by one from before it, and what the Apps phase would install.
-fn next_update(m: &Machine) -> (Vec<String>, Vec<String>, Vec<String>) {
+/// knows the catalog and by one from before it.
+fn next_update(m: &Machine) -> (Vec<String>, Vec<String>) {
     let root = m.path("checkout");
     let manifest = Manifest::read(&root.join("system/packages.toml"))
         .expect("read the manifest")
@@ -212,20 +212,9 @@ fn next_update(m: &Machine) -> (Vec<String>, Vec<String>, Vec<String>) {
         dpkg: &dpkg,
         catalog,
     };
-    let picks = m.picks();
-    let (nix, markers) = (BTreeSet::new(), BTreeSet::new());
-    let apps = apps::plan::Facts {
-        catalog: &catalog,
-        picks: &picks,
-        arch: "amd64",
-        dpkg: &dpkg,
-        nix: &nix,
-        markers: &markers,
-    };
     (
         plan::removable(&apt(&owned), None),
         plan::removable(&apt(&before_the_catalog), None),
-        apps::plan::installs(&apps).iter().map(|i| i.app.id.clone()).collect(),
     )
 }
 
@@ -238,15 +227,14 @@ fn a_machine_with_all_three_keeps_them_and_has_them_picked() {
     let m = Machine::new(&installed, &recorded, "");
     // The update that brings the catalog runs the kubaos it started with, from before the
     // catalog, and its sync comes before the migrations.
-    let (_, removed_on_the_way, _) = next_update(&m);
+    let (_, removed_on_the_way) = next_update(&m);
     assert!(removed_on_the_way.is_empty(), "{removed_on_the_way:?}");
 
     m.update();
 
-    let (removed, removed_by_an_older_kubaos, installs) = next_update(&m);
+    let (removed, removed_by_an_older_kubaos) = next_update(&m);
     assert!(removed.is_empty(), "{removed:?}");
     assert!(removed_by_an_older_kubaos.is_empty(), "{removed_by_an_older_kubaos:?}");
-    assert!(installs.is_empty(), "{installs:?}");
     let picks: Vec<String> = m.picks().iter().map(str::to_owned).collect();
     assert_eq!(picks, ["bitwarden", "docker", "google-chrome"]);
     let record = Record::parse(&fs::read_to_string(m.path("apt-installed")).expect("read the record"));
@@ -255,14 +243,7 @@ fn a_machine_with_all_three_keeps_them_and_has_them_picked() {
         !record.has("google-chrome-stable") && DOCKER.iter().all(|p| !record.has(p)),
         "the catalog's left the record"
     );
-    assert_eq!(
-        m.hooks(),
-        [
-            "install_chrome_theme me",
-            "install_docker_access me",
-            "install_bitwarden_autostart me"
-        ]
-    );
+    assert!(m.hooks().is_empty(), "{:?}", m.hooks());
 }
 
 #[test]
@@ -273,13 +254,11 @@ fn a_group_the_user_turned_off_is_not_picked_and_nothing_is_installed_or_removed
 
     m.update();
 
-    let (removed, removed_by_an_older_kubaos, installs) = next_update(&m);
+    let (removed, removed_by_an_older_kubaos) = next_update(&m);
     assert!(removed.is_empty() && removed_by_an_older_kubaos.is_empty());
-    assert!(installs.is_empty(), "{installs:?}");
     assert!(!m.picks().has("docker"));
     assert!(m.picks().has("google-chrome") && !m.picks().has("bitwarden"));
-    // Docker the user set up by hand keeps whatever access they gave it.
-    assert_eq!(m.hooks(), ["install_chrome_theme me", "remove_bitwarden_autostart me"]);
+    assert_eq!(m.hooks(), ["remove_bitwarden_autostart me"]);
 }
 
 #[test]
