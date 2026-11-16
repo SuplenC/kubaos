@@ -3553,9 +3553,9 @@
 }
 
 .k-stepper-bead {
-  display: grid;
+  position: relative;
+  display: block;
   flex: none;
-  place-items: center;
   box-sizing: border-box;
   width: var(--type-body-icon);
   height: var(--type-body-icon);
@@ -3567,7 +3567,18 @@
   transition: background var(--motion-short) var(--easing-standard), box-shadow var(--motion-short) var(--easing-standard);
 }
 
-.k-stepper-bead > .k-text {
+/* The number's ink centred in the bead (`number` in `lib/stepper.ts`): a line with no height, its
+   start and top set off the bead's middle by its ink's centre, rounded to whole device pixels. */
+.k-stepper-number {
+  position: absolute;
+  left: round(nearest, calc(50% - var(--ink-x) * var(--t-size)), 1px);
+  top: round(nearest, calc(50% - var(--ink-y) * var(--t-size)), 1px);
+  font-family: var(--t-family);
+  font-size: var(--t-size);
+  font-weight: var(--t-weight);
+  line-height: 0;
+  font-kerning: none;
+  white-space: pre;
   color: var(--number);
   transition: color var(--motion-short) var(--easing-standard);
 }
@@ -3588,6 +3599,6 @@
 
 [data-reduced] .k-stepper-step,
 [data-reduced] .k-stepper-bead,
-[data-reduced] .k-stepper-bead > .k-text {
+[data-reduced] .k-stepper-number {
   transition-duration: 0s;
 }

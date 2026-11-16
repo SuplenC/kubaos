@@ -10,7 +10,7 @@
 // flow are a StepRailPage's rail, never a Stepper.
 
 import { probe, variant } from "./probe.ts";
-import { text } from "./text.ts";
+import { inkCentre, text, typeset } from "./text.ts";
 
 export interface StepperOptions {
   readonly steps: readonly string[];
@@ -32,6 +32,23 @@ function setState(step: HTMLButtonElement, state: State, onBack?: (index: number
   if (state === "current") step.setAttribute("aria-current", "step");
 }
 
+/**
+ * A bead's number, its ink centred in the bead on whole device pixels: a figure's advance and its
+ * line sit its ink off the middle (a 1's stem is left of its advance's centre, a line's room above
+ * its figures more than below), and the eye judges the ink. One figure in a fixed bead needs no
+ * tabular advance, so it is set in `label`, whose figures the measure reads as drawn.
+ */
+function number(words: string): HTMLElement {
+  const figure = document.createElement("span");
+  figure.className = "k-stepper-number";
+  typeset(figure, "label");
+  figure.textContent = words;
+  const ink = inkCentre("label", words);
+  figure.style.setProperty("--ink-x", String(ink.x));
+  figure.style.setProperty("--ink-y", String(ink.y));
+  return figure;
+}
+
 /** One step: its bead with its number, then its label, a button only while it is done. */
 function bead(label: string, index: number, state: State, onBack?: (index: number) => void): HTMLButtonElement {
   const step = document.createElement("button");
@@ -44,7 +61,7 @@ function bead(label: string, index: number, state: State, onBack?: (index: numbe
   });
   const disc = document.createElement("span");
   disc.className = "k-stepper-bead";
-  disc.append(text(String(index + 1), "label_number"));
+  disc.append(number(String(index + 1)));
   step.append(disc, text(label, "label"));
   setState(step, state, onBack);
   return step;
