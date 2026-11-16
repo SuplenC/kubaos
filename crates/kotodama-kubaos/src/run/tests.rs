@@ -56,3 +56,46 @@ fn a_delayed_launch_starts_the_program_after_the_delay() {
     }
     panic!("the program never ran");
 }
+
+/// Runs `script` in the background and gives each line it wrote, then whether it succeeded.
+fn background(script: &str) -> (Vec<String>, bool) {
+    let (sender, received) = std::sync::mpsc::channel();
+    let ended = sender.clone();
+    Programs
+        .background(
+            &argv(&["sh", "-c", script]),
+            Box::new(move |line| sender.send(Ok(line)).unwrap()),
+            Box::new(move |succeeded| ended.send(Err(succeeded)).unwrap()),
+        )
+        .unwrap();
+    let mut lines = Vec::new();
+    loop {
+        match received.recv_timeout(Duration::from_secs(5)).expect("the program ends") {
+            Ok(line) => lines.push(line),
+            Err(succeeded) => return (lines, succeeded),
+        }
+    }
+}
+
+#[test]
+fn a_background_program_reports_each_line_of_stdout_and_stderr_then_its_end() {
+    let (lines, succeeded) = background("echo one; echo two >&2; echo three");
+
+    assert_eq!(lines, ["one", "two", "three"]);
+    assert!(succeeded);
+}
+
+#[test]
+fn a_background_program_that_fails_ends_so() {
+    let (lines, succeeded) = background("echo 'no root'; exit 126");
+
+    assert_eq!(lines, ["no root"]);
+    assert!(!succeeded);
+}
+
+#[test]
+fn a_background_program_that_cant_start_is_an_error() {
+    let started = Programs.background(&argv(&["kubaos-no-such-program"]), Box::new(|_| {}), Box::new(|_| {}));
+
+    assert!(matches!(started, Err(RunError::Start { .. })), "{started:?}");
+}

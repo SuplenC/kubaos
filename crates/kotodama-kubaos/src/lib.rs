@@ -7,8 +7,8 @@
 //!
 //! - The registry, the toggles, the keyboard layouts, the wallpaper sets, the user folders, the
 //!   mounted drives, the workspace groups by desk position, the Suites of the catalog (install,
-//!   configure, remove, and a "New <Suite> project…" a scaffolder of an installed one), and what
-//!   each of their Actions runs.
+//!   configure, remove, and a "New <Suite> project…" a scaffolder of an installed one), the apps of
+//!   the Apps catalog (install or remove, as a Job), and what each of their Actions runs.
 //! - "Start on login" and "Don't start on login" on the apps' Results: `startup`.
 //! - The states the registry's actions are shown in, read from their files: `states`.
 //! - The idle settings' Items and their choice lists, and the typed Keep awakes.
@@ -26,6 +26,7 @@
 //! - Power and session: Kotodama's Bundled `system` Extension.
 //! - Hyprland's binds, which reach the search through the Bundled `hyprland` Extension.
 
+pub mod apps;
 pub mod audio;
 pub mod bus;
 pub mod clock;
