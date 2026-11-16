@@ -151,14 +151,14 @@ impl JsonText {
         let Some(object) = found.objects.last() else {
             return Ok(());
         };
-        self.take_out(object, last);
+        self.take_out(object.open, last);
         for depth in (keep..above.len()).rev() {
             let found = self.find(&above[..=depth])?;
             let empty = found.objects.last().is_some_and(|o| o.members.is_empty());
             if !empty || found.objects.len() <= depth + 1 {
                 break;
             }
-            self.take_out(&found.objects[depth], above[depth]);
+            self.take_out(found.objects[depth].open, above[depth]);
         }
         Ok(())
     }
@@ -202,12 +202,13 @@ impl JsonText {
             inner.contains('\n')
         };
         let unit = self.indent_unit();
+        let newline = self.newline();
         let base = line_indent(&self.text, object.open);
         let Some(last) = object.members.last() else {
             let indent = format!("{base}{unit}");
-            let member = render(parts, value, &colon, multiline.then_some((&indent, &unit)));
+            let member = render(parts, value, &colon, multiline.then_some((&indent, &unit, newline)));
             let interior = if multiline {
-                format!("\n{indent}{member}\n{base}")
+                format!("{newline}{indent}{member}{newline}{base}")
             } else {
                 member
             };
@@ -228,24 +229,32 @@ impl JsonText {
             gap
         };
         let indent = gap.rsplit('\n').next().unwrap_or_default().to_owned();
-        let member = render(parts, value, &colon, multiline.then_some((&indent, &unit)));
+        let member = render(parts, value, &colon, multiline.then_some((&indent, &unit, newline)));
         self.text.insert_str(last.value.end, &format!(",{gap}{member}"));
     }
 
-    /// Takes the member `key` out of `object`, with the comma that joined it to the others.
-    fn take_out(&mut self, object: &Object, key: &str) {
-        let Some(at) = object.members.iter().rposition(|m| m.key == key) else {
-            return;
-        };
-        let members = &object.members;
-        let range = if members.len() == 1 {
-            object.open + 1..object.close
-        } else if at > 0 {
-            members[at - 1].value.end..members[at].value.end
-        } else {
-            members[0].start..members[1].start
-        };
-        self.text.replace_range(range, "");
+    /// Takes every member `key` out of the object whose opening brace is at `open`, each with the
+    /// comma that joined it to the others: a key there twice is gone only when both are.
+    fn take_out(&mut self, open: usize, key: &str) {
+        while let Some(object) = object(&self.text, open) {
+            let Some(at) = object.members.iter().rposition(|m| m.key == key) else {
+                return;
+            };
+            let members = &object.members;
+            let range = if members.len() == 1 {
+                object.open + 1..object.close
+            } else if at > 0 {
+                members[at - 1].value.end..members[at].value.end
+            } else {
+                members[0].start..members[1].start
+            };
+            self.text.replace_range(range, "");
+        }
+    }
+
+    /// The file's line ending: `\r\n` when its lines end so, else `\n`.
+    fn newline(&self) -> &'static str {
+        if self.text.contains("\r\n") { "\r\n" } else { "\n" }
     }
 
     /// What the file puts between a key and its value, from its first key.
@@ -288,8 +297,9 @@ impl Object {
 }
 
 /// The member `parts[0]` holding, through objects for the rest of `parts`, `value`; on lines of
-/// their own at `indent`, one `unit` deeper each, when `lines` gives them, else on one line.
-fn render(parts: &[&str], value: &str, colon: &str, lines: Option<(&String, &String)>) -> String {
+/// their own at `indent`, one `unit` deeper each and ended by `newline`, when `lines` gives them,
+/// else on one line.
+fn render(parts: &[&str], value: &str, colon: &str, lines: Option<(&String, &String, &str)>) -> String {
     let Some((first, rest)) = parts.split_first() else {
         return value.to_owned();
     };
@@ -298,10 +308,10 @@ fn render(parts: &[&str], value: &str, colon: &str, lines: Option<(&String, &Str
         return format!("{key}{colon}{value}");
     }
     match lines {
-        Some((indent, unit)) => {
+        Some((indent, unit, newline)) => {
             let deeper = format!("{indent}{unit}");
-            let inner = render(rest, value, colon, Some((&deeper, unit)));
-            format!("{key}{colon}{{\n{deeper}{inner}\n{indent}}}")
+            let inner = render(rest, value, colon, Some((&deeper, unit, newline)));
+            format!("{key}{colon}{{{newline}{deeper}{inner}{newline}{indent}}}")
         }
         None => format!("{key}{colon}{{{}}}", render(rest, value, colon, None)),
     }
