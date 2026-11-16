@@ -42,16 +42,21 @@
 name: Check
 
 on:
+  # `edited` is for a pull request retargeted onto main, which fires nothing
+  # else; the jobs skip an edit that left the base alone.
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
 permissions:
   contents: read
 
+# An edit that skips every job takes a group of its own, so it never cancels
+# a real run of the same pull request.
 concurrency:
-  group: check-${{ github.event.pull_request.number || github.ref }}
+  group: check-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'edited' && !github.event.changes.base && '-edit' || '' }}
   cancel-in-progress: true
 
 env:
@@ -68,6 +73,7 @@ env:
 jobs:
   changes:
     name: changes
+    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -82,8 +88,10 @@ jobs:
 
       # The mockups' inputs: the site and the tokens (design/), the shell
       # whose surfaces it mocks, the crates its check builds and compares
-      # with, the recipes, the flake that pins Node and Chromium, and this
-      # workflow. A path names a folder with its slash, a file whole.
+      # with, the pictures it reads (branding/, Kōbō's assets, the boot
+      # splash and GRUB theme), the workspace's manifests and toolchain, the
+      # recipes, the flake that pins Node and Chromium, the setup action and
+      # this workflow. A path names a folder with its slash, a file whole.
       - name: Changed paths
         id: paths
         env:
@@ -98,13 +106,14 @@ jobs:
           printf '%s\n' "$changed"
           any() { grep -qE "$1" <<<"$changed" && echo true || echo false; }
           {
-            echo "mockups=$(any '^(design/|config/quickshell/|crates/kubaos-(ui|tokens|specimen|geometry)/|justfile$|flake\.(nix|lock)$|\.github/workflows/check\.yml$)')"
+            echo "mockups=$(any '^(design/|config/quickshell/|crates/kubaos-(ui|tokens|specimen|geometry)/|crates/kubaos-kobo/assets/|branding/|system/files/(plymouth|grub)/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|justfile$|flake\.(nix|lock)$|\.github/actions/|\.github/workflows/check\.yml$)')"
             echo "apps=$(any '^(apps/|system/packages\.toml$|system/files/apt/sources\.list\.d/)')"
             echo "apps-all=$(any '^crates/kubaos-apps-verify/')"
           } >>"$GITHUB_OUTPUT"
 
   flake:
     name: flake
+    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -121,6 +130,7 @@ jobs:
 
   lint:
     name: fmt and lint
+    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -161,6 +171,7 @@ jobs:
 
   nextest:
     name: nextest
+    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -198,6 +209,7 @@ jobs:
 
   nextest-slow:
     name: nextest (slow)
+    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -236,6 +248,7 @@ jobs:
 
   qml:
     name: qml
+    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -255,6 +268,7 @@ jobs:
 
   design:
     name: design
+    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -294,6 +308,7 @@ jobs:
 
   mockups:
     name: mockups
+    if: github.event.action != 'edited' || github.event.changes.base
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -323,6 +338,7 @@ jobs:
 
   apps-verify:
     name: apps verify
+    if: github.event.action != 'edited' || github.event.changes.base
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -331,14 +347,17 @@ jobs:
       ALL: ${{ needs.changes.outputs.apps-all }}
       BASE: ${{ github.event.pull_request.base.ref }}
     steps:
+      # A push to main checks no app, but builds the verifier and saves its
+      # compile cache, so a pull request's run starts from its own.
       - name: Check out
-        if: env.NEEDED == 'true'
+        if: env.NEEDED == 'true' || github.event_name == 'push'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up
-        if: env.NEEDED == 'true'
+        id: setup
+        if: env.NEEDED == 'true' || github.event_name == 'push'
         uses: ./.github/actions/setup
         with:
           name: apps-verify
@@ -358,12 +377,28 @@ jobs:
             nix develop --command just apps-verify --changed "origin/$BASE"
           fi
 
+      - name: Build the verifier
+        if: github.event_name == 'push'
+        run: nix develop --command cargo build -q -p kubaos-apps-verify
+
+      - name: Save the compile cache
+        if: ${{ github.event_name == 'push' && !cancelled() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/kubaos/sccache
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ steps.setup.outputs.cargo-key }}
+
       - name: Not needed
-        if: env.NEEDED != 'true'
+        if: env.NEEDED != 'true' && github.event_name != 'push'
         run: echo "No app or vendor repository changed."
 
   shellcheck:
     name: shellcheck
+    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -381,6 +416,7 @@ jobs:
 
   system-files:
     name: system files
+    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -400,7 +436,7 @@ jobs:
   check:
     name: check (x86_64-linux)
     needs: [changes, flake, lint, nextest, nextest-slow, qml, design, mockups, apps-verify, shellcheck, system-files]
-    if: always()
+    if: always() && (github.event.action != 'edited' || github.event.changes.base)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

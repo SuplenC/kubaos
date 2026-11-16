@@ -272,9 +272,16 @@
             # models (docs/TESTING.md) and a `cargo run` find it here.
             ORT_DYLIB_PATH = "${pkgs.lib.getLib pkgs.onnxruntime}/lib/libonnxruntime.so";
             RUSTC_WRAPPER = pkgs.lib.getExe pkgs.sccache;
-            SCCACHE_SERVER_PORT = "4227";
+            # One server per sccache release: a worktree on an older flake.lock
+            # runs its own version's server and never talks to another's.
+            # 0.15.0 listens on 21500, 0.19.2 on 21902.
+            SCCACHE_SERVER_PORT =
+              let
+                v = map pkgs.lib.toInt (pkgs.lib.take 3 (pkgs.lib.splitVersion pkgs.sccache.version));
+              in
+              toString (20000 + (builtins.elemAt v 0) * 10000 + (builtins.elemAt v 1) * 100 + (builtins.elemAt v 2));
             shellHook = ''
-              export SCCACHE_DIR=''${XDG_CACHE_HOME:-$HOME/.cache}/kubaos/sccache
+              export SCCACHE_DIR=''${SCCACHE_DIR:-''${XDG_CACHE_HOME:-$HOME/.cache}/kubaos/sccache}
             '';
           };
           # The logo's tools, for `just branding` (branding/README.md, "Regenerating").

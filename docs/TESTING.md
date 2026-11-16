@@ -215,7 +215,7 @@ A `WorktreeCreate` hook replaces Claude Code's own `git worktree add`, so the ho
 
 **When it does nothing.** On a filesystem without reflinks (ext4, tmpfs), when the worktree has a `target/` already, when main has none, when `CARGO_TARGET_DIR` is set, or when a cargo build holds main's `target/` lock for longer than `WARM_TARGET_LOCK_WAIT` (300 s), it copies nothing and cargo builds cold. It holds main's lock for the copy, so worktrees made together copy one after the other. It never fails the worktree.
 
-**The compile cache.** Inside `nix develop`, cargo compiles through the dev shell's sccache (`RUSTC_WRAPPER`), on a server of its own: port 4227 (`SCCACHE_SERVER_PORT`) and the cache `~/.cache/kubaos/sccache`. An sccache client talks only to a server of its own release, and every sccache defaults to port 4226, so the dev shell's (nixpkgs' 0.15) and the machine's own (the Rust Suite's, 0.19 from mise) took turns owning that port: whichever started second failed every compile, and agents turned the cache off (`RUSTC_WRAPPER=`). On their own ports both work side by side. Their caches would share no entry anyway: each compiler's hash is in its keys.
+**The compile cache.** Inside `nix develop`, cargo compiles through the dev shell's sccache (`RUSTC_WRAPPER`), on a server of its own release's: its port (`SCCACHE_SERVER_PORT`) is derived from the version, 0.15.0 listening on 21500, and its cache is `$SCCACHE_DIR` when set, else `~/.cache/kubaos/sccache`. An sccache client talks only to a server of its own release, and every sccache defaults to port 4226, so the machine's own (the Rust Suite's, from mise) keeps that port, and a worktree on another `flake.lock` runs its own version's server beside both. Their caches share no entry: each compiler's hash is in its keys.
 
 sccache hashes every `CARGO_*` variable, so a hit needs the same `CARGO_MANIFEST_DIR`: the crates.io dependencies hit from any worktree, the workspace's own crates never do, and a `CARGO_TARGET_DIR` set by hand misses everything. Measured 2026-11-16, a fresh worktree of main, empty `target/`, `cargo nextest run --workspace --no-run` in `nix develop`, back to back at a load of 21 to 26: with the cache off, 94 s; through the dev shell's server, warm from another worktree, 98 s, with 313 of 377 compiles from the cache. On this machine the build's long pole is the workspace's crates and linking 177 test binaries, which no compile cache serves, so the reflink copy below is what makes a worktree's build fast; the cache keeps the dependencies' compiles off the CPU for the builds running beside it.
 
@@ -237,15 +237,15 @@ On a quieter machine the cold test build takes about 70 s. Running the tests tak
 
 | Job | Runs |
 |---|---|
-| `changes` | which gated jobs a pull request needs, from the files it changes since its merge base with `main`; a push to `main` needs `mockups` and no `apps verify` |
+| `changes` | which gated jobs a pull request needs, from the files it changes since its merge base with `main`; a push to `main` needs `mockups` and no `apps verify`. A pull request runs on its pushes and when retargeted onto `main`; an edit that leaves the base alone skips every job |
 | `flake` | `nix flake check --no-build`, which evaluates the flake and builds nothing |
 | `fmt and lint` | `just fmt-check`, `just lint` |
 | `nextest` | `just nextest`, every test but Kōbō's `every_screen_keeps_to_the_grid` |
 | `nextest (slow)` | that one test, `cargo nextest run -p kubaos-kobo`: two to three minutes alone, longer than all the others together |
 | `qml` | `just qml-test` |
 | `design` | `just shots-test`, then `just design-check-ui`: the design lint, the contrast check, the specimen's geometry and QML's parity, on every pull request |
-| `mockups` | gated: `just mockups-checked`, when a pull request changes `design/`, `config/quickshell/`, `crates/kubaos-ui`, `-tokens`, `-specimen` or `-geometry`, the `justfile`, `flake.nix`, `flake.lock` or `check.yml` |
-| `apps verify` | gated: `just apps-verify --changed origin/main`, when a pull request changes `apps/`, `system/packages.toml` or a sources file of `system/files/apt/sources.list.d/`; `just apps-verify`, every app, when it changes `crates/kubaos-apps-verify`. Not on a push to `main` |
+| `mockups` | gated: `just mockups-checked`, when a pull request changes `design/`, `config/quickshell/`, `crates/kubaos-ui`, `-tokens`, `-specimen` or `-geometry`, `crates/kubaos-kobo/assets/`, `branding/`, `system/files/plymouth/` or `system/files/grub/`, `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, the `justfile`, `flake.nix`, `flake.lock`, `.github/actions/` or `check.yml` |
+| `apps verify` | gated: `just apps-verify --changed origin/main`, when a pull request changes `apps/`, `system/packages.toml` or a sources file of `system/files/apt/sources.list.d/`; `just apps-verify`, every app, when it changes `crates/kubaos-apps-verify`. A push to `main` only builds the verifier and saves its compile cache |
 | `shellcheck` | `just shellcheck` |
 | `system files` | `just system-files-check`'s two scripts, straight on the runner with no Nix (they need only bash and git), on the whole history for the merge base with main |
 | `check (x86_64-linux)` | after all of them: fails unless every one passed, cancelled and skipped included |
@@ -254,7 +254,7 @@ On a quieter machine the cold test build takes about 70 s. Running the tests tak
 
 `.github/actions/setup` sets up every job: Nix, the kuba-os Cachix read-only, the Nix store from the Actions cache, and for the jobs that compile, sccache's directory and cargo's downloads. Each compiling job keeps its own compile cache, as each builds different crates (`mockups` reads `design`'s); the jobs that need only the devshell share one Nix store cache. Only the run on a push to main saves them, and every PR starts from them. A job with no cache of its own yet starts from another job's, and a change to `Cargo.lock` or `flake.lock` from the last one saved.
 
-**The mockups' player test** (`design/mockups/scripts/player-test.ts`) seeks every motion player of the checked pages in five settings and holds each ball to its recipe. Its time goes to round trips, not to work: every other player on the page keeps playing, so each call into the page waits 30 to 70 ms for the renderer while the CPU idles. A seek is one call to find where to click, the click and one call to read what it held, and the five settings run side by side in pages of their own. Measured 2026-11-16 on the development machine at a load of 20 to 30, the same balls checked: `button` 5 min 2 s before, 1 min 23 s after; `popup-stack` past 10 min before, 1 min 42 s after.
+**The mockups' player test** (`design/mockups/scripts/player-test.ts`) seeks every motion player of the checked pages in five settings and holds each ball to its recipe. Its time goes to round trips, not to work: every other player on the page keeps playing, so each call into the page waits 30 to 70 ms for the renderer while the CPU idles. A seek is one call to find where to click, the click and one call to read what it held, and the five settings run side by side in pages of their own. On the development machine at a load of 20 to 30, `button` takes about 1 min 23 s and `popup-stack` about 1 min 42 s.
 
 Measured 2026-10-28, wall time from the push to `check (x86_64-linux)`:
 

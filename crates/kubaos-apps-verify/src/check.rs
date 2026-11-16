@@ -423,15 +423,23 @@ fn nix(root: &Path, packages: &[String], row: &mut Report<'_>) {
     }
 }
 
-/// A web app's URL answers with a success after its redirects. One of this machine's isn't
-/// reachable from here.
+/// A web app's URL answers with a success after its redirects. One of this machine's, plain HTTP
+/// on a loopback host, isn't reachable from here; any other URL that isn't HTTPS is a mismatch.
 fn web_app(url: &str, row: &mut Report<'_>) {
-    if url.starts_with("http://") {
+    if let Some(rest) = url.strip_prefix("http://") {
+        let (outcome, detail) = if loopback(rest) {
+            (Outcome::Note, "this machine's own, not checked")
+        } else {
+            (Outcome::Mismatch, "plain HTTP off this machine")
+        };
+        return row("web_app", url.to_owned(), outcome, detail.to_owned());
+    }
+    if !url.starts_with("https://") {
         return row(
             "web_app",
             url.to_owned(),
-            Outcome::Note,
-            "this machine's own, not checked".to_owned(),
+            Outcome::Mismatch,
+            "not an HTTPS URL".to_owned(),
         );
     }
     match fetch::status(url) {
@@ -462,6 +470,20 @@ pub fn chain(error: &dyn std::error::Error) -> String {
         source = cause.source();
     }
     text
+}
+
+/// Whether the URL after its scheme names a loopback host: `localhost`, 127.0.0.0/8 or `[::1]`.
+fn loopback(rest: &str) -> bool {
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let host = authority.rsplit_once('@').map_or(authority, |(_, host)| host);
+    let host = if host.starts_with('[') {
+        host.split_once(']').map_or(host, |(ip, _)| &host[..=ip.len()])
+    } else {
+        host.split(':').next().unwrap_or_default()
+    };
+    host.eq_ignore_ascii_case("localhost")
+        || host == "[::1]"
+        || host.parse::<std::net::Ipv4Addr>().is_ok_and(|ip| ip.is_loopback())
 }
 
 #[cfg(test)]

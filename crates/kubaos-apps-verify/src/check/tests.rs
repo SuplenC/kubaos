@@ -31,3 +31,26 @@ fn only_a_mismatch_or_an_error_fails() {
     assert!(Outcome::Mismatch.fails());
     assert!(Outcome::Error.fails());
 }
+
+#[test]
+fn only_a_loopback_host_counts_as_this_machine() {
+    for url in [
+        "localhost:9001/",
+        "127.0.0.1",
+        "127.8.0.1:80/x",
+        "[::1]:3000/",
+        "LOCALHOST",
+        "u@localhost:1",
+    ] {
+        assert!(loopback(url), "{url}");
+    }
+    for url in [
+        "example.com/",
+        "localhost.example.com",
+        "10.0.0.1:80",
+        "[::2]/",
+        "127.0.0.1.nip.io",
+    ] {
+        assert!(!loopback(url), "{url}");
+    }
+}

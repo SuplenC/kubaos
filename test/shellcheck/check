@@ -22,8 +22,19 @@ while IFS= read -r f; do
   esac
 done < <(git -c safe.directory="$repo" ls-files "${FOLDERS[@]}" | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp|svg|yaml|ts|css)$')
 
+if ((${#files[@]} == 0)); then
+  echo "FAIL shellcheck: no shell scripts found under ${FOLDERS[*]}" >&2
+  exit 1
+fi
 echo "     ${#files[@]} files"
-out="$(shellcheck -x -f gcc "${files[@]}" 2>&1 || true)"
+# Exit 1 is shellcheck reporting something, 2 or more is shellcheck failing to check.
+status=0
+out="$(shellcheck -x -f gcc "${files[@]}" 2>&1)" || status=$?
+if ((status >= 2)); then
+  printf '%s\n' "$out"
+  echo "FAIL shellcheck: exited $status" >&2
+  exit 1
+fi
 notes="$(grep -c . <<<"$out" || true)"
 if grep -qE ': (warning|error):' <<<"$out"; then
   printf '%s\n' "$out"

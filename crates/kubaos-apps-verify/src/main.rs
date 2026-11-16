@@ -178,7 +178,12 @@ fn changed<'a>(root: &Path, base: &str, catalog: &'a Catalog) -> Result<Vec<&'a 
             String::from_utf8_lossy(&output.stderr).trim()
         )));
     }
-    let paths = String::from_utf8_lossy(&output.stdout);
+    Ok(touched(&String::from_utf8_lossy(&output.stdout), catalog))
+}
+
+/// The apps the changed `paths`, one a line, reach: an app's own folder, or the pin or sources
+/// file of a vendor repository it takes packages from.
+fn touched<'a>(paths: &str, catalog: &'a Catalog) -> Vec<&'a Folder> {
     let mut ids = BTreeSet::new();
     let mut repos = BTreeSet::new();
     let mut every_repo = false;
@@ -196,7 +201,7 @@ fn changed<'a>(root: &Path, base: &str, catalog: &'a Catalog) -> Result<Vec<&'a 
             repos.insert(name.to_owned());
         }
     }
-    Ok(catalog
+    catalog
         .apps()
         .iter()
         .filter(|app| {
@@ -205,7 +210,7 @@ fn changed<'a>(root: &Path, base: &str, catalog: &'a Catalog) -> Result<Vec<&'a 
                     |action| matches!(&action.kind, Kind::Apt { repo: Some(repo), .. } if every_repo || repos.contains(repo)),
                 )
         })
-        .collect())
+        .collect()
 }
 
 /// The rows as a table, its columns as wide as their widest cell, each cell of the last column

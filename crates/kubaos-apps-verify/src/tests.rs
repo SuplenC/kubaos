@@ -49,3 +49,29 @@ fn the_table_pads_every_column_but_the_last() {
         "APP     CHECK  WHAT    RESULT  DETAIL\ndocker  key    docker  ok      9DC8\n"
     );
 }
+
+fn ids(apps: &[&Folder]) -> Vec<String> {
+    apps.iter().map(|app| app.id.clone()).collect()
+}
+
+#[test]
+fn a_change_reaches_the_apps_whose_folder_or_vendor_repository_it_touches() {
+    let catalog = Catalog::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps")).unwrap();
+
+    assert_eq!(ids(&touched("apps/penpot/app.toml\nREADME.md\n", &catalog)), ["penpot"]);
+    assert_eq!(
+        ids(&touched("system/files/apt/sources.list.d/docker.sources\n", &catalog)),
+        ["docker"]
+    );
+    assert_eq!(
+        ids(&touched("system/packages.toml\n", &catalog)),
+        ["claude-code", "docker", "google-chrome"]
+    );
+    assert!(
+        touched(
+            "apps/README.md\nsystem/files/apt/sources.list.d/tuxedo.sources\n",
+            &catalog
+        )
+        .is_empty()
+    );
+}
