@@ -14,6 +14,7 @@ use std::process::Command;
 use std::rc::Rc;
 
 use super::AptPlan;
+use super::AptSimulation;
 use super::Host;
 use super::HostError;
 use super::UnitState;
@@ -37,12 +38,28 @@ pub struct State {
     /// Package to the installed packages installing it removes, as Docker's `docker-ce` removes
     /// Ubuntu's `docker.io`.
     pub conflicts: BTreeMap<String, BTreeSet<String>>,
-    /// Package to the packages it depends on: removing one of those removes it.
+    /// Package to the packages it depends on: installing it installs those that aren't there, and
+    /// removing one of those removes it.
     pub depends: BTreeMap<String, BTreeSet<String>>,
     /// Operations that fail: `enable:<unit>`, `apt:<package>`, `fetch:<url>`, `groupdel:<group>`.
     pub fail: BTreeSet<String>,
     /// Every change made, in order.
     pub log: Vec<String>,
+}
+
+impl State {
+    /// `packages` and what they depend on, through what that depends on, that dpkg hasn't.
+    fn missing(&self, packages: &[String]) -> BTreeSet<String> {
+        let mut needed: BTreeSet<String> = BTreeSet::new();
+        let mut next: Vec<String> = packages.to_vec();
+        while let Some(package) = next.pop() {
+            if self.dpkg.contains_key(&package) || !needed.insert(package.clone()) {
+                continue;
+            }
+            next.extend(self.depends.get(&package).into_iter().flatten().cloned());
+        }
+        needed
+    }
 }
 
 /// A unit as systemd keeps it, which the fake shows as `systemctl show` does.
@@ -232,7 +249,7 @@ impl Host for FakeHost {
         Ok(())
     }
 
-    fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<BTreeSet<String>, HostError> {
+    fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError> {
         let state = self.state.borrow();
         let installing: Vec<String> = match plan {
             AptPlan::Install(packages) => packages.to_vec(),
@@ -260,16 +277,22 @@ impl Host for FakeHost {
                     }
                     gone.extend(more);
                 }
-                return Ok(gone.into_iter().filter(|p| state.dpkg.contains_key(p)).collect());
+                return Ok(AptSimulation {
+                    removes: gone.into_iter().filter(|p| state.dpkg.contains_key(p)).collect(),
+                    installs: BTreeSet::new(),
+                });
             }
         };
-        Ok(installing
-            .iter()
-            .filter_map(|p| state.conflicts.get(p))
-            .flatten()
-            .filter(|p| state.dpkg.contains_key(*p))
-            .cloned()
-            .collect())
+        Ok(AptSimulation {
+            removes: installing
+                .iter()
+                .filter_map(|p| state.conflicts.get(p))
+                .flatten()
+                .filter(|p| state.dpkg.contains_key(*p))
+                .cloned()
+                .collect(),
+            installs: state.missing(&installing),
+        })
     }
 
     fn apt_install(&mut self, packages: &[String]) -> Result<(), HostError> {
@@ -282,7 +305,9 @@ impl Host for FakeHost {
             for gone in conflicts {
                 state.dpkg.remove(&gone);
             }
-            state.dpkg.insert(p.clone(), "1.0".to_owned());
+        }
+        for p in state.missing(packages) {
+            state.dpkg.insert(p, "1.0".to_owned());
         }
         state.log.push(format!("apt install {}", packages.join(" ")));
         Ok(())
@@ -298,16 +323,17 @@ impl Host for FakeHost {
                 stderr: "not a .deb".to_owned(),
             });
         };
-        self.state
-            .borrow_mut()
-            .dpkg
-            .insert(package.to_owned(), version.to_owned());
-        self.log(format!("deb install {package} {version}"));
+        let mut state = self.state.borrow_mut();
+        for dependency in state.missing(&[package.to_owned()]) {
+            state.dpkg.insert(dependency, "1.0".to_owned());
+        }
+        state.dpkg.insert(package.to_owned(), version.to_owned());
+        state.log.push(format!("deb install {package} {version}"));
         Ok(())
     }
 
     fn apt_remove(&mut self, packages: &[String]) -> Result<(), HostError> {
-        let gone = self.apt_simulate(AptPlan::Remove(packages))?;
+        let gone = self.apt_simulate(AptPlan::Remove(packages))?.removes;
         let mut state = self.state.borrow_mut();
         for p in &gone {
             state.dpkg.remove(p);

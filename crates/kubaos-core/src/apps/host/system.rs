@@ -18,6 +18,7 @@ use std::process::Command;
 use std::process::Stdio;
 
 use super::AptPlan;
+use super::AptSimulation;
 use super::Host;
 use super::HostError;
 use super::UNIT_PROPERTIES;
@@ -183,7 +184,7 @@ impl Host for SystemHost {
         Self::out(self.command(self.checkout.join("system/apt-repo.sh")).arg(repo)).map(drop)
     }
 
-    fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<BTreeSet<String>, HostError> {
+    fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError> {
         let mut command = self.command("apt-get");
         command.arg("-s");
         match plan {
@@ -191,14 +192,7 @@ impl Host for SystemHost {
             AptPlan::Deb(deb) => command.args(["install", "--no-install-recommends"]).arg(deb),
             AptPlan::Remove(packages) => command.arg("remove").args(packages),
         };
-        // A simulation prints `Remv <package> [<version>]` for each package it would remove.
-        let shown = Self::out(&mut command)?;
-        Ok(shown
-            .lines()
-            .filter_map(|line| line.strip_prefix("Remv "))
-            .filter_map(|rest| rest.split_whitespace().next())
-            .map(|name| name.split(':').next().unwrap_or(name).to_owned())
-            .collect())
+        Ok(simulation(&Self::out(&mut command)?))
     }
 
     fn apt_install(&mut self, packages: &[String]) -> Result<(), HostError> {
@@ -355,6 +349,27 @@ impl Host for SystemHost {
         }
         Self::out(&mut command).map(drop)
     }
+}
+
+/// What `apt-get -s` printed: `Remv <package> [<version>]` for each package it would remove, and
+/// `Inst <package> (<version> …)` for each it would newly install; an upgrade is
+/// `Inst <package> [<old version>] (…)`, of a package that is there already.
+fn simulation(shown: &str) -> AptSimulation {
+    let name = |rest: &str| {
+        let word = rest.split_whitespace().next()?;
+        Some(word.split(':').next().unwrap_or(word).to_owned())
+    };
+    let mut simulation = AptSimulation::default();
+    for line in shown.lines() {
+        if let Some(rest) = line.strip_prefix("Remv ") {
+            simulation.removes.extend(name(rest));
+        } else if let Some(rest) = line.strip_prefix("Inst ")
+            && !rest.split_whitespace().nth(1).is_some_and(|w| w.starts_with('['))
+        {
+            simulation.installs.extend(name(rest));
+        }
+    }
+    simulation
 }
 
 #[cfg(test)]

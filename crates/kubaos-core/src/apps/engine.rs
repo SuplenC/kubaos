@@ -342,7 +342,18 @@ impl<'h> Keeper<'h> {
         };
         journal.put(entry.clone());
         journal.save(&self.journals).map_err(StepError::Journal)?;
-        perform::apply(&entry.action, &mut *self.host, &look).map_err(StepError::Perform)?;
+        let journals = &self.journals;
+        let action = entry.action.clone();
+        perform::apply(&action, &mut *self.host, &look, &mut |claims| {
+            for claim in claims {
+                if !entry.claims.contains(claim) {
+                    entry.claims.push(claim.clone());
+                }
+            }
+            journal.put(entry.clone());
+            journal.save(journals)
+        })
+        .map_err(StepError::Perform)?;
         entry.state = State::Done;
         journal.put(entry);
         journal.save(&self.journals).map_err(StepError::Journal)?;
@@ -405,10 +416,14 @@ impl<'h> Keeper<'h> {
             let owners = Owners::load(&[&self.journals]).map_err(StepError::Journal)?;
             let mut mine = Vec::new();
             for claim in entry.claims.iter().filter(|c| c.owned) {
-                match owners.holder(&claim.claim, id) {
+                // A package one step pulled in, which another app's step found, passes to it.
+                let held = match claim.claim.strip_prefix("dep:") {
+                    Some(package) => format!("package:{package}"),
+                    None => claim.claim.clone(),
+                };
+                match owners.holder(&held, id) {
                     Some(holder) => {
-                        journal::hand_over(&self.journals, holder, &claim.claim, &entry.prior)
-                            .map_err(StepError::Journal)?;
+                        journal::hand_over(&self.journals, holder, &held, &entry.prior).map_err(StepError::Journal)?;
                     }
                     None => mine.push(claim.clone()),
                 }
@@ -451,6 +466,12 @@ fn carry(old: Option<&Entry>, look: &perform::Look) -> (Vec<Claim>, Option<Box<E
     for owned in old.claims.iter().filter(|c| c.owned) {
         if let Some(claim) = claims.iter_mut().find(|c| c.claim == owned.claim) {
             claim.owned = true;
+            continue;
+        }
+        // What apt pulled in for the step's packages stays the step's while it stands: a check
+        // never sees it, and only a removal can tell whether something else needs it.
+        if owned.claim.starts_with("dep:") {
+            claims.push(owned.clone());
             continue;
         }
         let dir = owned.claim.strip_prefix("dir:").map(Path::new);

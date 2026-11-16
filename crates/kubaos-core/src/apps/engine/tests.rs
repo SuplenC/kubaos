@@ -1648,3 +1648,83 @@ fn a_download_a_run_stopped_during_is_downloaded_again() {
         "tool 1.3"
     );
 }
+
+/// An app of one apt package, `packages`, named by `name`.
+fn apt_app(name: &str, packages: &str) -> String {
+    app(&format!(
+        r#"
+[[action]]
+name = "Install it"
+kind = "apt"
+packages = [{packages}]
+"#
+    ))
+    .replace("name = \"Test\"", &format!("name = \"{name}\""))
+}
+
+/// A machine where `tool` needs `libtool`, which isn't there, and `libc`, which is.
+fn world_with_dependencies(apps: &[(&str, &str)]) -> World {
+    let world = World::new(apps);
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.dpkg.insert("libc".to_owned(), "2.39".to_owned());
+        state
+            .depends
+            .insert("tool".to_owned(), ["libtool".to_owned(), "libc".to_owned()].into());
+    }
+    world
+}
+
+#[test]
+fn removing_an_app_removes_what_its_packages_pulled_in_and_keeps_what_was_there() {
+    let world = world_with_dependencies(&[("tool", &apt_app("Tool", "\"tool\""))]);
+    let before = world.host.snapshot();
+
+    world.install("tool", true).0.unwrap();
+    assert!(world.host.state.borrow().dpkg.contains_key("libtool"));
+    let (_, root) = world.journals("tool");
+    assert!(
+        root.unwrap().entries[0]
+            .claims
+            .iter()
+            .any(|c| c.claim == "dep:libtool" && c.owned)
+    );
+    world.remove("tool").0.unwrap();
+
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn a_pulled_in_package_something_else_needs_stays_when_the_app_goes() {
+    let world = world_with_dependencies(&[("tool", &apt_app("Tool", "\"tool\""))]);
+    world.install("tool", true).0.unwrap();
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.dpkg.insert("user-app".to_owned(), "1.0".to_owned());
+        state
+            .depends
+            .insert("user-app".to_owned(), ["libtool".to_owned()].into());
+    }
+
+    world.remove("tool").0.unwrap();
+
+    let state = world.host.state.borrow();
+    assert!(!state.dpkg.contains_key("tool"));
+    assert!(state.dpkg.contains_key("libtool") && state.dpkg.contains_key("user-app"));
+}
+
+#[test]
+fn a_pulled_in_package_another_app_installs_passes_to_it() {
+    let world = world_with_dependencies(&[
+        ("tool", &apt_app("Tool", "\"tool\"")),
+        ("lib", &apt_app("Lib", "\"libtool\"")),
+    ]);
+    world.install("tool", true).0.unwrap();
+    world.install("lib", true).0.unwrap();
+
+    world.remove("tool").0.unwrap();
+    assert!(world.host.state.borrow().dpkg.contains_key("libtool"));
+    world.remove("lib").0.unwrap();
+
+    assert!(!world.host.state.borrow().dpkg.contains_key("libtool"));
+}
