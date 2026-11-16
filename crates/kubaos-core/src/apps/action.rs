@@ -16,7 +16,9 @@
 //!   `journal.rs`. The order of a run: `engine.rs`.
 
 pub mod perform;
+pub mod settings;
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Component;
 use std::path::Path;
@@ -34,6 +36,9 @@ use crate::packages::validate_name;
 /// The folders under which an action may write as root. Everything else on the system is the
 /// base's or a package's.
 pub const SYSTEM_PREFIXES: [&str; 3] = ["/etc/", "/opt/", "/usr/local/"];
+
+/// The browser a `web_app` opens in: its `--app` windows are the app windows.
+pub const WEB_APP_BROWSER: &str = "google-chrome";
 
 /// The `PATH` a `run` runs with, as the user and as root alike.
 pub const RUN_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
@@ -88,6 +93,14 @@ pub enum ActionError {
     InvalidGroup { value: String },
     #[error("a run's {key} is an argv: a program on PATH or ./<script> in the app's folder, then its arguments")]
     InvalidArgv { key: &'static str },
+    #[error("{value:?} is not a web app's id: lowercase letters, digits and dashes")]
+    InvalidWebApp { value: String },
+    #[error("{value:?} is not an https:// URL")]
+    InvalidUrl { value: String },
+    #[error("a web app's icon is an .svg file in the app's folder; {value:?} isn't")]
+    InvalidIcon { value: String },
+    #[error("{key} is the journal's own; an app's folder doesn't set it")]
+    JournalOnly { key: &'static str },
 }
 
 /// One step of an install: its name and what it does.
@@ -177,6 +190,20 @@ pub enum Kind {
     },
     /// The user's services kept running without a session.
     Linger {},
+    /// A web app in a window of its own: a desktop entry and an icon that open `url` as a Chrome
+    /// app window with a window class of its own.
+    WebApp {
+        /// What names its desktop entry, its icon and its window class, `kubaos-web-<id>`.
+        id: String,
+        /// The name its desktop entry shows.
+        title: String,
+        url: String,
+        /// An `.svg` in the app's folder.
+        icon: String,
+        /// The icon, read from the folder as the action resolves: the journal's own.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        svg: Option<String>,
+    },
     /// A path a program of the app writes later, which the app owns all the same.
     Output {
         path: String,
@@ -191,6 +218,11 @@ pub enum Kind {
         root: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         window: Option<String>,
+        /// The `./<script>`s its argvs name, by name, read from the app's folder as it resolves:
+        /// what a journal runs, so an undo runs the script that matches what was done even after
+        /// the folder changed or left the catalog. A folder never sets it.
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        scripts: BTreeMap<String, String>,
     },
 }
 
@@ -200,7 +232,7 @@ pub enum Kind {
 pub enum Unpack {
     /// The download is the file.
     File,
-    /// A gzipped tarball, unpacked into the path as a folder.
+    /// A gzipped tarball, unpacked into the path as a folder: `tar-gz`.
     TarGz,
 }
 
@@ -222,7 +254,7 @@ impl Scope {
 }
 
 /// Who runs an action.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
     User,
@@ -239,7 +271,8 @@ pub struct Words {
 }
 
 impl Words {
-    fn fill(&self, text: &str, version: Option<&str>) -> String {
+    /// `text` with its words filled in, `@VERSION@` only with a `version`.
+    pub fn fill(&self, text: &str, version: Option<&str>) -> String {
         let mut out = text
             .replace("@USER@", &self.user)
             .replace("@HOME@", &self.home.to_string_lossy())
@@ -256,6 +289,22 @@ impl Words {
             Some(rest) => self.home.join(rest),
             None => PathBuf::from(path),
         }
+    }
+}
+
+impl Action {
+    /// An action as an app's folder declares it, refusing what only a journal records.
+    ///
+    /// # Errors
+    ///
+    /// [`ActionError`] for an action that isn't valid.
+    pub fn from_folder(table: toml::Table) -> Result<Self, ActionError> {
+        for key in ["scripts", "svg"] {
+            if table.contains_key(key) {
+                return Err(ActionError::JournalOnly { key });
+            }
+        }
+        Self::try_from(table)
     }
 }
 
@@ -281,7 +330,7 @@ impl Action {
         };
         match &self.kind {
             Kind::Apt { .. } | Kind::Deb { .. } | Kind::Group { .. } => Side::Root,
-            Kind::Nix { .. } | Kind::Setting { .. } | Kind::Linger {} => Side::User,
+            Kind::Nix { .. } | Kind::Setting { .. } | Kind::Linger {} | Kind::WebApp { .. } => Side::User,
             Kind::Download { to, .. } | Kind::File { to, .. } | Kind::Symlink { to, .. } => by_path(to),
             Kind::Output { path } => by_path(path),
             Kind::Unit { scope, .. } => match scope {
@@ -295,6 +344,34 @@ impl Action {
                     Side::User
                 }
             }
+        }
+    }
+
+    /// Whether `other` acts on the same thing, so that a release changing one into the other
+    /// changes the step, which is then updated in place: the same kind on the same side and, for
+    /// a kind whose thing has a name, the same name. That is a `deb`'s package, a `file`'s,
+    /// `symlink`'s or `output`'s path, a `setting`'s file and key, a `unit`'s unit and scope and a
+    /// `group`'s group; an `apt` or `nix` action (whose list may change), a `download` (whose path
+    /// may carry its version), `linger` and a `run` are the same thing as any of their kind.
+    pub fn same_thing(&self, other: &Self) -> bool {
+        if self.side() != other.side() {
+            return false;
+        }
+        match (&self.kind, &other.kind) {
+            (Kind::Apt { .. }, Kind::Apt { .. })
+            | (Kind::Nix { .. }, Kind::Nix { .. })
+            | (Kind::Download { .. }, Kind::Download { .. })
+            | (Kind::Linger {}, Kind::Linger {})
+            | (Kind::Run { .. }, Kind::Run { .. }) => true,
+            (Kind::Deb { package: a, .. }, Kind::Deb { package: b, .. })
+            | (Kind::Group { group: a }, Kind::Group { group: b })
+            | (Kind::WebApp { id: a, .. }, Kind::WebApp { id: b, .. })
+            | (Kind::File { to: a, .. }, Kind::File { to: b, .. })
+            | (Kind::Symlink { to: a, .. }, Kind::Symlink { to: b, .. })
+            | (Kind::Output { path: a }, Kind::Output { path: b }) => a == b,
+            (Kind::Setting { file: a, key: x, .. }, Kind::Setting { file: b, key: y, .. }) => a == b && x == y,
+            (Kind::Unit { unit: a, scope: x, .. }, Kind::Unit { unit: b, scope: y, .. }) => a == b && x == y,
+            _ => false,
         }
     }
 
@@ -329,11 +406,12 @@ impl Action {
     }
 
     /// The action as it runs on this machine and as a journal records it: its words filled in,
-    /// and a file's `from` read from `folder` into its `text`.
+    /// a file's `from` read from `folder` into its `text`, and a run's `./<script>`s into its
+    /// `scripts`.
     ///
     /// # Errors
     ///
-    /// [`ActionError::ReadFrom`] when a file's `from` can't be read.
+    /// [`ActionError::ReadFrom`] when a file's `from` or a run's script can't be read.
     pub fn resolve(&self, words: &Words, folder: &Path) -> Result<Self, ActionError> {
         let fill = |text: &str, version: Option<&str>| words.fill(text, version);
         let kind = match &self.kind {
@@ -386,20 +464,46 @@ impl Action {
                 value: value.clone(),
             },
             Kind::Output { path } => Kind::Output { path: fill(path, None) },
+            Kind::WebApp {
+                id, title, url, icon, ..
+            } => {
+                let path = folder.join(icon);
+                let svg = fs::read_to_string(&path).map_err(|source| ActionError::ReadFrom { path, source })?;
+                Kind::WebApp {
+                    id: id.clone(),
+                    title: title.clone(),
+                    url: fill(url, None),
+                    icon: icon.clone(),
+                    svg: Some(svg),
+                }
+            }
             Kind::Run {
                 run,
                 check,
                 undo,
                 root,
                 window,
+                ..
             } => {
                 let argv = |argv: &[String]| argv.iter().map(|a| fill(a, None)).collect();
+                let mut scripts = BTreeMap::new();
+                for program in [run, check, undo].into_iter().filter_map(|argv| argv.first()) {
+                    if let Some(name) = program.strip_prefix("./")
+                        && !scripts.contains_key(name)
+                    {
+                        let path = folder.join(name);
+                        let text =
+                            fs::read_to_string(&path).map_err(|source| ActionError::ReadFrom { path, source })?;
+                        scripts.insert(name.to_owned(), text);
+                    }
+                }
                 Kind::Run {
                     run: argv(run),
                     check: argv(check),
                     undo: argv(undo),
                     root: *root,
                     window: window.clone(),
+                    scripts,
                 }
             }
             other => other.clone(),
@@ -467,21 +571,7 @@ impl Action {
                     return Err(ActionError::Empty { key: "target" });
                 }
             }
-            Kind::Setting { file, key, value } => {
-                let home = file.starts_with("~/") && check_path(file).is_ok();
-                if !home || !Path::new(file).extension().is_some_and(|e| e == "json" || e == "toml") {
-                    return Err(ActionError::InvalidSettingFile { value: file.clone() });
-                }
-                if key.split('.').any(str::is_empty) {
-                    return Err(ActionError::InvalidKey { value: key.clone() });
-                }
-                if !matches!(
-                    value,
-                    toml::Value::String(_) | toml::Value::Integer(_) | toml::Value::Float(_) | toml::Value::Boolean(_)
-                ) {
-                    return Err(ActionError::InvalidValue);
-                }
-            }
+            Kind::Setting { file, key, value } => check_setting(file, key, value)?,
             Kind::Unit {
                 unit, enable, start, ..
             } => {
@@ -498,6 +588,9 @@ impl Action {
                 }
             }
             Kind::Linger {} => {}
+            Kind::WebApp {
+                id, title, url, icon, ..
+            } => check_web_app(id, title, url, icon)?,
             Kind::Output { path } => check_path(path)?,
             Kind::Run {
                 run, check, undo, root, ..
@@ -520,10 +613,7 @@ impl Action {
             return Err(ActionError::NoDownload);
         }
         for download in found {
-            let url = download
-                .url
-                .strip_prefix("https://")
-                .is_some_and(|rest| !rest.is_empty() && !rest.chars().any(|c| c.is_whitespace() || c.is_control()));
+            let url = is_https(&download.url);
             let sha = download.sha256.len() == 64
                 && download
                     .sha256
@@ -537,6 +627,45 @@ impl Action {
         }
         Ok(())
     }
+}
+
+fn check_setting(file: &str, key: &str, value: &toml::Value) -> Result<(), ActionError> {
+    let home = file.starts_with("~/") && check_path(file).is_ok();
+    if !home || !Path::new(file).extension().is_some_and(|e| e == "json" || e == "toml") {
+        return Err(ActionError::InvalidSettingFile { value: file.to_owned() });
+    }
+    if key.split('.').any(str::is_empty) {
+        return Err(ActionError::InvalidKey { value: key.to_owned() });
+    }
+    if !matches!(
+        value,
+        toml::Value::String(_) | toml::Value::Integer(_) | toml::Value::Float(_) | toml::Value::Boolean(_)
+    ) {
+        return Err(ActionError::InvalidValue);
+    }
+    Ok(())
+}
+
+fn check_web_app(id: &str, title: &str, url: &str, icon: &str) -> Result<(), ActionError> {
+    if !is_app_id(id) {
+        return Err(ActionError::InvalidWebApp { value: id.to_owned() });
+    }
+    if title.trim().is_empty() {
+        return Err(ActionError::Empty { key: "title" });
+    }
+    if !is_https(url) {
+        return Err(ActionError::InvalidUrl { value: url.to_owned() });
+    }
+    if !is_folder_file(icon) || Path::new(icon).extension().is_none_or(|e| e != "svg") {
+        return Err(ActionError::InvalidIcon { value: icon.to_owned() });
+    }
+    Ok(())
+}
+
+/// Whether `url` is an https:// URL with no space or control character in it.
+pub fn is_https(url: &str) -> bool {
+    url.strip_prefix("https://")
+        .is_some_and(|rest| !rest.is_empty() && !rest.chars().any(|c| c.is_whitespace() || c.is_control()))
 }
 
 /// The mode a file's `mode` names, three octal digits.

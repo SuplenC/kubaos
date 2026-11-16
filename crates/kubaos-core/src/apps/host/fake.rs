@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::rc::Rc;
 
+use super::AptPlan;
 use super::Host;
 use super::HostError;
 use super::UnitState;
@@ -33,7 +34,14 @@ pub struct State {
     /// `<scope>:<unit>` to its state.
     pub units: BTreeMap<String, UnitState>,
     pub linger: bool,
-    /// Operations that fail: `enable:<unit>`, `apt:<package>`, `fetch:<url>`.
+    /// Package to the installed packages installing it removes, as Docker's `docker-ce` removes
+    /// Ubuntu's `docker.io`.
+    pub conflicts: BTreeMap<String, BTreeSet<String>>,
+    /// Package to the packages it depends on: removing one of those removes it.
+    pub depends: BTreeMap<String, BTreeSet<String>>,
+    /// `<scope>:<unit>`s that are oneshots: started, they run and exit, never staying active.
+    pub oneshots: BTreeSet<String>,
+    /// Operations that fail: `enable:<unit>`, `apt:<package>`, `fetch:<url>`, `groupdel:<group>`.
     pub fail: BTreeSet<String>,
     /// Every change made, in order.
     pub log: Vec<String>,
@@ -95,6 +103,9 @@ impl FakeHost {
             log: Vec::new(),
             repos: BTreeSet::new(),
             fail: BTreeSet::new(),
+            conflicts: BTreeMap::new(),
+            depends: BTreeMap::new(),
+            oneshots: BTreeSet::new(),
             ..self.state.borrow().clone()
         };
         let _ = write!(out, "{state:#?}");
@@ -168,15 +179,61 @@ impl Host for FakeHost {
         Ok(self.state.borrow().dpkg.get(package).cloned())
     }
 
-    fn apt_install(&mut self, repo: Option<&str>, packages: &[String]) -> Result<(), HostError> {
+    fn apt_repo(&mut self, repo: &str) -> Result<(), HostError> {
+        self.state.borrow_mut().repos.insert(repo.to_owned());
+        Ok(())
+    }
+
+    fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<BTreeSet<String>, HostError> {
+        let state = self.state.borrow();
+        let installing: Vec<String> = match plan {
+            AptPlan::Install(packages) => packages.to_vec(),
+            AptPlan::Deb(deb) => {
+                let text = fs::read_to_string(deb).map_err(HostError::io(deb))?;
+                text.split_whitespace().nth(1).map(str::to_owned).into_iter().collect()
+            }
+            AptPlan::Remove(packages) => {
+                let mut gone: BTreeSet<String> = packages.iter().cloned().collect();
+                loop {
+                    let more: Vec<String> = state
+                        .dpkg
+                        .keys()
+                        .filter(|p| !gone.contains(*p))
+                        .filter(|p| {
+                            state
+                                .depends
+                                .get(*p)
+                                .is_some_and(|d| d.iter().any(|d| gone.contains(d)))
+                        })
+                        .cloned()
+                        .collect();
+                    if more.is_empty() {
+                        break;
+                    }
+                    gone.extend(more);
+                }
+                return Ok(gone.into_iter().filter(|p| state.dpkg.contains_key(p)).collect());
+            }
+        };
+        Ok(installing
+            .iter()
+            .filter_map(|p| state.conflicts.get(p))
+            .flatten()
+            .filter(|p| state.dpkg.contains_key(*p))
+            .cloned()
+            .collect())
+    }
+
+    fn apt_install(&mut self, packages: &[String]) -> Result<(), HostError> {
         for p in packages {
             self.fails(&format!("apt:{p}"))?;
         }
         let mut state = self.state.borrow_mut();
-        if let Some(repo) = repo {
-            state.repos.insert(repo.to_owned());
-        }
         for p in packages {
+            let conflicts = state.conflicts.get(p).cloned().unwrap_or_default();
+            for gone in conflicts {
+                state.dpkg.remove(&gone);
+            }
             state.dpkg.insert(p.clone(), "1.0".to_owned());
         }
         state.log.push(format!("apt install {}", packages.join(" ")));
@@ -197,13 +254,14 @@ impl Host for FakeHost {
             .borrow_mut()
             .dpkg
             .insert(package.to_owned(), version.to_owned());
-        self.log(format!("deb install {package}"));
+        self.log(format!("deb install {package} {version}"));
         Ok(())
     }
 
     fn apt_remove(&mut self, packages: &[String]) -> Result<(), HostError> {
+        let gone = self.apt_simulate(AptPlan::Remove(packages))?;
         let mut state = self.state.borrow_mut();
-        for p in packages {
+        for p in &gone {
             state.dpkg.remove(p);
         }
         state.log.push(format!("apt remove {}", packages.join(" ")));
@@ -271,6 +329,7 @@ impl Host for FakeHost {
     }
 
     fn group_delete(&mut self, group: &str) -> Result<(), HostError> {
+        self.fails(&format!("groupdel:{group}"))?;
         self.state.borrow_mut().groups.remove(group);
         Ok(())
     }
@@ -307,7 +366,14 @@ impl Host for FakeHost {
 
     fn set_active(&mut self, scope: Scope, unit: &str, active: bool) -> Result<(), HostError> {
         let key = Self::unit(scope, unit);
-        self.state.borrow_mut().units.entry(key).or_default().active = active;
+        let mut state = self.state.borrow_mut();
+        let oneshot = state.oneshots.contains(&key);
+        let unit_state = state.units.entry(key).or_default();
+        if oneshot {
+            unit_state.ran = active;
+        } else {
+            unit_state.active = active;
+        }
         Ok(())
     }
 

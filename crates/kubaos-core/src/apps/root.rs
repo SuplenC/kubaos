@@ -48,7 +48,6 @@ pub enum Request {
         app: String,
         #[serde(default)]
         setup: Option<String>,
-        windows: bool,
     },
     /// One root step of the install.
     Step {
@@ -98,6 +97,8 @@ pub enum RootError {
     Garbled(#[source] serde_json::Error),
     #[error("it isn't running")]
     NotStarted,
+    #[error("no program was named to start it")]
+    NoProgram,
 }
 
 /// The user's end of the root helper.
@@ -138,13 +139,12 @@ impl ProcessRoot {
 
 impl RootSide for ProcessRoot {
     fn start(&mut self) -> Result<(), RootError> {
-        let program = self
-            .argv
-            .first()
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        let mut child = Command::new(&self.argv[0])
-            .args(&self.argv[1..])
+        let Some((first, args)) = self.argv.split_first() else {
+            return Err(RootError::NoProgram);
+        };
+        let program = first.to_string_lossy().into_owned();
+        let mut child = Command::new(first)
+            .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
@@ -239,13 +239,11 @@ impl<'h> Server<'h> {
             return refuse(why);
         }
         match request {
-            Request::Preflight { app, setup, windows } => {
-                match self.keeper.preflight(&app, setup.as_deref(), windows) {
-                    Ok(why) if why.is_empty() => Reply::Ready,
-                    Ok(why) => Reply::Refused { why },
-                    Err(e) => answer(&e),
-                }
-            }
+            Request::Preflight { app, setup } => match self.keeper.preflight(&app, setup.as_deref()) {
+                Ok(why) if why.is_empty() => Reply::Ready,
+                Ok(why) => Reply::Refused { why },
+                Err(e) => answer(&e),
+            },
             Request::Step {
                 app,
                 setup,
@@ -281,23 +279,44 @@ impl<'h> Server<'h> {
         Ok(())
     }
 
-    /// Checks that the catalog, the app's folder and every file in it are the owner's and no one
-    /// else may write them, so what runs as root is what the release shipped.
+    /// Checks that the release's checkout, its catalog, the app's folder and everything in it,
+    /// and the repository setup root runs (`system/apt-repo.sh`) are the owner's and no one else
+    /// may write them, so what runs as root is what the release shipped.
     fn root_only(&self, app: &str) -> Result<(), String> {
         let folder = self.catalog.join(app);
         if !folder.join(super::folder::APP_FILE).is_file() {
             return Err(format!("the catalog has no app {app}"));
         }
-        let mut paths = vec![self.catalog.clone(), folder.clone()];
-        let entries = fs::read_dir(&folder).map_err(|e| format!("reading {}: {e}", folder.display()))?;
-        for entry in entries {
-            paths.push(entry.map_err(|e| format!("reading {}: {e}", folder.display()))?.path());
-        }
-        for path in paths {
+        let checkout = self.catalog.parent().unwrap_or(&self.catalog).to_path_buf();
+        let system = checkout.join("system");
+        for path in [
+            checkout.clone(),
+            self.catalog.clone(),
+            system.clone(),
+            system.join(APT_REPO),
+        ] {
             owned_by(&path, self.owner)?;
         }
-        Ok(())
+        under(&folder, self.owner)
     }
+}
+
+/// The script root runs to set up a vendor repository, in the checkout's `system/`.
+const APT_REPO: &str = "apt-repo.sh";
+
+/// Checks `dir` and everything in it, at any depth, as [`owned_by`] does.
+fn under(dir: &Path, owner: u32) -> Result<(), String> {
+    owned_by(dir, owner)?;
+    let entries = fs::read_dir(dir).map_err(|e| format!("reading {}: {e}", dir.display()))?;
+    for entry in entries {
+        let path = entry.map_err(|e| format!("reading {}: {e}", dir.display()))?.path();
+        if fs::symlink_metadata(&path).is_ok_and(|m| m.is_dir()) {
+            under(&path, owner)?;
+        } else {
+            owned_by(&path, owner)?;
+        }
+    }
+    Ok(())
 }
 
 fn owned_by(path: &Path, owner: u32) -> Result<(), String> {

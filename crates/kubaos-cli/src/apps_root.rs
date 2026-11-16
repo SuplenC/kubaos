@@ -9,7 +9,8 @@
 //! `/usr/share/kubaos/apps/<id>/app.toml`, refuses one that isn't root's, and undoes only what
 //! root's journal (`/var/lib/kubaos/apps/`) recorded (`kubaos_core::apps::root`). It acts for the
 //! user who asked, whom pkexec (`PKEXEC_UID`) or sudo (`SUDO_UID`) names, and holds
-//! `/run/lock/kubaos-apps.lock` while it serves, so one run at a time changes the machine's apps.
+//! `/run/kubaos/apps.lock` (a folder only root may write) while it serves, so one run at a time
+//! changes the machine's apps.
 //!
 //! Run as anyone but root, it serves only the checkout `KUBAOS_APPS_CHECKOUT` names, owned by
 //! that user, with its journals and lock under `KUBAOS_APPS_STATE`: the tests' way in. Root never
@@ -27,6 +28,9 @@
 
 use std::fs;
 use std::io;
+use std::os::unix::fs::DirBuilderExt;
+use std::os::unix::fs::MetadataExt;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -40,8 +44,12 @@ use kubaos_core::update::event::chain;
 /// The release's checkout on a machine.
 const CHECKOUT: &str = "/usr/share/kubaos";
 
-/// The lock one run holds while it changes the machine's apps.
-const LOCK: &str = "/run/lock/kubaos-apps.lock";
+/// The folder of root's lock, which only root may write, so no one else can put a file or a link
+/// where the lock is.
+const LOCK_DIR: &str = "/run/kubaos";
+
+/// The lock one run holds while it changes the machine's apps, in [`LOCK_DIR`].
+const LOCK: &str = "apps.lock";
 
 /// Where the helper reads and writes, and for whom.
 struct Place {
@@ -89,14 +97,31 @@ fn serve() -> Result<(), String> {
     let place = place()?;
     rustix::process::umask(rustix::fs::Mode::from_raw_mode(0o022));
     let (user, home) = account(place.for_uid)?;
+    if place.owner == 0 {
+        root_only_dir(Path::new(LOCK_DIR))?;
+    }
     let _lock = journal::lock(&place.lock).map_err(|e| chain(&e))?;
     let catalog = place.checkout.join("apps");
-    let mut host = SystemHost::new(user, home, &place.checkout);
+    let mut host = SystemHost::new(user, home, &place.checkout).as_root();
     let keeper = Keeper::new(&mut host, Side::Root, &catalog, &place.journals);
     let mut server = Server::new(keeper, &catalog, place.owner);
     server
         .serve(io::stdin().lock(), io::stdout().lock())
         .map_err(|e| format!("serving: {e}"))
+}
+
+/// Makes `dir` root's alone (`0700`), or checks that it is: a folder that is a link, someone
+/// else's, or writable by anyone else is refused.
+fn root_only_dir(dir: &Path) -> Result<(), String> {
+    match fs::DirBuilder::new().mode(0o700).create(dir) {
+        Err(e) if e.kind() != io::ErrorKind::AlreadyExists => return Err(format!("making {}: {e}", dir.display())),
+        _ => {}
+    }
+    let meta = fs::symlink_metadata(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    if !meta.is_dir() || meta.uid() != 0 || meta.mode() & 0o022 != 0 {
+        return Err(format!("{} isn't a folder only root may write", dir.display()));
+    }
+    Ok(())
 }
 
 fn place() -> Result<Place, String> {
@@ -109,7 +134,7 @@ fn place() -> Result<Place, String> {
         return Ok(Place {
             checkout: PathBuf::from(CHECKOUT),
             journals: PathBuf::from(journal::ROOT_JOURNALS),
-            lock: PathBuf::from(LOCK),
+            lock: Path::new(LOCK_DIR).join(LOCK),
             owner: 0,
             for_uid: asked,
         });

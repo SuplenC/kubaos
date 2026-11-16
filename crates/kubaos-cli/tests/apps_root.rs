@@ -12,6 +12,10 @@ use std::process::Stdio;
 const APP: &str = r#"
 name = "Fixture"
 summary = "An app for the tests"
+category = "system"
+tags = ["fixture"]
+description = "An app the tests install."
+description_from = "https://example.com/fixture"
 
 [[action]]
 name = "Install the tool"
@@ -29,9 +33,22 @@ text = "on\n"
 fn serve(requests: &[&str]) -> Vec<String> {
     let dir = tempfile::tempdir().unwrap();
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).unwrap();
-    let app = dir.path().join("checkout/apps/fixture");
+    let checkout = dir.path().join("checkout");
+    let app = checkout.join("apps/fixture");
     fs::create_dir_all(&app).unwrap();
+    fs::create_dir_all(checkout.join("system")).unwrap();
     fs::write(app.join("app.toml"), APP).unwrap();
+    fs::write(checkout.join("system/apt-repo.sh"), "#!/bin/sh\n").unwrap();
+    for (path, mode) in [
+        (checkout.clone(), 0o755),
+        (checkout.join("apps"), 0o755),
+        (app.clone(), 0o755),
+        (app.join("app.toml"), 0o644),
+        (checkout.join("system"), 0o755),
+        (checkout.join("system/apt-repo.sh"), 0o755),
+    ] {
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    }
     let mut child = Command::new(env!("CARGO_BIN_EXE_kubaos-apps"))
         .arg("serve")
         .env("KUBAOS_APPS_CHECKOUT", dir.path().join("checkout"))
