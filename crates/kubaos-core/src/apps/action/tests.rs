@@ -7,7 +7,45 @@ use super::Words;
 
 fn action(text: &str) -> Result<Action, ActionError> {
     let table: toml::Table = toml::from_str(text).unwrap();
-    Action::try_from(table)
+    Action::from_folder(table)
+}
+
+#[test]
+fn a_journaled_run_of_a_program_under_the_home_reads_back() {
+    // Regression: T3 Code's service journal, with `t3`'s path filled in, couldn't be read.
+    let words = Words {
+        user: "kuba".to_owned(),
+        home: "/home/kuba".into(),
+        arch: "amd64".to_owned(),
+    };
+    let run = action(
+        "name = \"Start\"\nkind = \"run\"\ndo = [\"@HOME@/.local/bin/t3\", \"service\", \"install\"]\ncheck = [\"true\"]\nundo = [\"true\"]\n",
+    )
+    .unwrap()
+    .resolve(&words, Path::new("/nowhere"))
+    .unwrap();
+    let text = toml::to_string(&run).unwrap();
+
+    let read: Action = toml::from_str(&text).unwrap();
+
+    assert_eq!(read, run);
+}
+
+#[test]
+fn a_self_updating_download_needs_a_folder_named_for_its_version() {
+    let download = |to: &str| {
+        action(&format!(
+            "name = \"Get\"\nkind = \"download\"\nto = \"{to}\"\nversion = \"1.0\"\nunpack = \"tar-gz\"\nself_updates = true\n\
+             amd64 = {{ url = \"https://example.com/t\", sha256 = \"{sha}\" }}\n",
+            sha = "a".repeat(64)
+        ))
+    };
+
+    assert!(download("~/.vendor/versions/@VERSION@").is_ok());
+    assert!(matches!(
+        download("~/.vendor/tool"),
+        Err(ActionError::SelfUpdatesUnversioned { .. })
+    ));
 }
 
 #[test]

@@ -124,7 +124,7 @@ impl<M: Machine> Updater<'_, M> {
         self.with_engine(Root::Polkit, false, |engine| {
             for app in catalog.apps() {
                 if let Some(adopted) = engine
-                    .adopt(&app.id, picks.has(&app.id))
+                    .adopt(&app.id, picks.has(&app.id), picks.setup(&app.id))
                     .map_err(|source| app_error(format!("taking in {}", app.name), source))?
                 {
                     taken.push(name_in(app, adopted.setup.as_deref()).to_owned());
@@ -216,7 +216,7 @@ impl<M: Machine> Updater<'_, M> {
                 };
                 let name = name_in(app, setup.as_deref());
                 engine
-                    .adopt(id, before.has(id))
+                    .adopt(id, before.has(id), before.setup(id))
                     .map_err(|source| app_error(format!("taking in {}", app.name), source))?;
                 let finished = match change {
                     Change::Add => engine
@@ -306,7 +306,7 @@ impl<M: Machine> Updater<'_, M> {
             for (app, setup, complete) in &wanted {
                 let name = name_in(app, setup.as_deref()).to_owned();
                 let done = engine
-                    .adopt(&app.id, true)
+                    .adopt(&app.id, true, setup.as_deref())
                     .and_then(|adopted| {
                         let was = *complete || adopted.is_some();
                         engine.install(&app.id, setup.as_deref()).map(|f| (f, was))

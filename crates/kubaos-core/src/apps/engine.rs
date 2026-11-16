@@ -370,8 +370,9 @@ impl<'h> Keeper<'h> {
     /// lingering only when KubaOS's older mark, `<id>-linger-was-off`, says it was off; and a
     /// path that is there and holds an older release's content, which the next run brings to
     /// this one's. Without `owned`, every step is found and owns nothing. A step with an entry
-    /// already, and one not done (but for such a path), is left to the next run. Returns how many
-    /// steps it recorded.
+    /// already, and one not done (but for such a path), is left to the next run. The mark goes
+    /// once a `linger` step is recorded, whose prior state replaces it. Returns how many steps it
+    /// recorded.
     ///
     /// # Errors
     ///
@@ -385,6 +386,7 @@ impl<'h> Keeper<'h> {
         let mark = self.journals.join(format!("{id}{LINGER_MARK}"));
         let lingered_off = owned && mark.is_file();
         let mut recorded = 0;
+        let mut lingering = false;
         for (step, action) in steps {
             if journal.entry(step).is_some() {
                 continue;
@@ -413,6 +415,7 @@ impl<'h> Keeper<'h> {
             } else {
                 State::Found
             };
+            lingering |= matches!(action.kind, Kind::Linger {});
             journal.put(Entry {
                 step,
                 state: settled,
@@ -424,7 +427,8 @@ impl<'h> Keeper<'h> {
             recorded += 1;
         }
         journal.save(&self.journals).map_err(StepError::Journal)?;
-        if mark.is_file() {
+        // The mark is the only word on whether lingering was off until a linger entry holds it.
+        if lingering && mark.is_file() {
             std::fs::remove_file(&mark).map_err(|e| {
                 StepError::Journal(JournalError::Write {
                     path: mark.clone(),
@@ -915,13 +919,15 @@ impl<'a> Engine<'a> {
     /// that open no window all check done, else in the one with no steps of its own. Its user
     /// journal is then complete in that setup, its user steps recorded as [`Keeper::adopt`]
     /// says, `owned` when KubaOS put it there; root's steps are recorded by root on the first run
-    /// that starts it, so taking an app in asks for no password. Returns the setup it was taken
-    /// in, or none when it isn't there or has a journal already.
+    /// that starts it, so taking an app in asks for no password. An `owned` app whose `picked`
+    /// setup the folder has is taken in that setup: the user picked it, and a step of it that
+    /// doesn't check done is the next run's to do. Returns the setup it was taken in, or none
+    /// when it isn't there or has a journal already.
     ///
     /// # Errors
     ///
     /// [`EngineError`] when the folder or the journals can't be read, or a check can't run.
-    pub fn adopt(&mut self, id: &str, owned: bool) -> Result<Option<Adopted>, EngineError> {
+    pub fn adopt(&mut self, id: &str, owned: bool, picked: Option<&str>) -> Result<Option<Adopted>, EngineError> {
         let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
         if Journal::read(self.user.journals(), id)
             .map_err(EngineError::Journal)?
@@ -973,7 +979,10 @@ impl<'a> Engine<'a> {
         if !done(anchor, &mut self.user)? {
             return Ok(None);
         }
-        let setup = if folder.has_setups() {
+        let picked = picked.filter(|setup| owned && folder.setup(setup).is_some());
+        let setup = if let Some(picked) = picked {
+            Some(picked.to_owned())
+        } else if folder.has_setups() {
             let mut found = None;
             for setup in folder.setups.iter().filter(|s| !s.actions.is_empty()) {
                 let own: Vec<&Action> = setup

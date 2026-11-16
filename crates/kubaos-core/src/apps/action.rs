@@ -74,6 +74,8 @@ pub enum ActionError {
     InvalidPath { value: String },
     #[error("{value:?} is not an https:// URL with a sha256 of 64 lowercase hex digits")]
     InvalidDownload { value: String },
+    #[error("a download that updates itself goes to a folder named for its version: {value:?} has no `@VERSION@` folder")]
+    SelfUpdatesUnversioned { value: String },
     #[error("a download needs a download for amd64 or arm64")]
     NoDownload,
     #[error("a file is `from` a file in the app's folder or `text`, one of them")]
@@ -161,6 +163,10 @@ pub enum Kind {
         unpack: Unpack,
         #[serde(default)]
         strip: u32,
+        /// A vendor's updater moves it on: the same path in a newer version's folder stands for
+        /// the pin, which the updater may have removed.
+        #[serde(default)]
+        self_updates: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         amd64: Option<Download>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -318,7 +324,34 @@ impl Action {
                 return Err(ActionError::JournalOnly { key });
             }
         }
-        Self::try_from(table)
+        let action = Self::try_from(table)?;
+        action.check_unresolved()?;
+        Ok(action)
+    }
+
+    /// What only the folder's form of an action can be checked for: a journal records it with
+    /// its words filled in.
+    fn check_unresolved(&self) -> Result<(), ActionError> {
+        match &self.kind {
+            Kind::Download {
+                to, self_updates: true, ..
+            } if !to.split('/').any(|part| part == "@VERSION@") => {
+                Err(ActionError::SelfUpdatesUnversioned { value: to.clone() })
+            }
+            Kind::Run {
+                run, check, undo, root, ..
+            } => {
+                for (key, argv) in [("do", run), ("check", check), ("undo", undo)] {
+                    // HAZARD: root never runs a program from the home: the user could change it.
+                    let from_home = argv.first().is_some_and(|p| p.starts_with("@HOME@/"));
+                    if !is_argv(argv) || (*root && from_home) {
+                        return Err(ActionError::InvalidArgv { key });
+                    }
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
     }
 }
 
@@ -434,6 +467,7 @@ impl Action {
                 version,
                 unpack,
                 strip,
+                self_updates,
                 amd64,
                 arm64,
             } => Kind::Download {
@@ -441,6 +475,7 @@ impl Action {
                 version: version.clone(),
                 unpack: *unpack,
                 strip: *strip,
+                self_updates: *self_updates,
                 amd64: amd64.clone(),
                 arm64: arm64.clone(),
             },
@@ -606,13 +641,9 @@ impl Action {
                 id, title, url, icon, ..
             } => check_web_app(id, title, url, icon)?,
             Kind::Output { path } => check_path(path)?,
-            Kind::Run {
-                run, check, undo, root, ..
-            } => {
+            Kind::Run { run, check, undo, .. } => {
                 for (key, argv) in [("do", run), ("check", check), ("undo", undo)] {
-                    // HAZARD: root never runs a program from the home: the user could change it.
-                    let from_home = argv.first().is_some_and(|p| p.starts_with("@HOME@/"));
-                    if !is_argv(argv) || (*root && from_home) {
+                    if !is_resolved_argv(argv) {
                         return Err(ActionError::InvalidArgv { key });
                     }
                 }
@@ -765,6 +796,12 @@ pub(crate) fn is_argv(argv: &[String]) -> bool {
     let script = program.strip_prefix("./").is_some_and(is_folder_file);
     let home = program.strip_prefix("@HOME@/").is_some_and(is_folder_path);
     bare || script || home
+}
+
+/// Whether `argv` is a `run`'s argv as a journal records it: as [`is_argv`] says, but for a
+/// program under the home, which is there by its path.
+fn is_resolved_argv(argv: &[String]) -> bool {
+    is_argv(argv) || argv.first().and_then(|p| p.strip_prefix('/')).is_some_and(is_folder_path)
 }
 
 fn is_folder_path(value: &str) -> bool {

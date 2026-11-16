@@ -1828,3 +1828,44 @@ fn a_json_setting_in_a_new_table_keeps_the_files_crlf_line_endings() {
         "{\r\n\t\"zoom\": 1.50,\r\n\t\"fixture\": {\r\n\t\t\"enabled\": true\r\n\t}\r\n}"
     );
 }
+
+/// A runtime its vendor's updater moves on, in a folder named for its version.
+fn self_updating_runtime(version: &str) -> String {
+    app(&format!(
+        r#"
+[[action]]
+name = "Download the runtime"
+kind = "download"
+to = "~/.vendor/versions/@VERSION@"
+version = "{version}"
+unpack = "tar-gz"
+self_updates = true
+amd64 = {{ url = "https://example.com/tool-{version}", sha256 = "{sha}" }}
+"#,
+        sha = version.replace('.', "").repeat(32),
+    ))
+}
+
+#[test]
+fn a_self_updating_download_its_vendor_moved_on_is_not_downloaded_again() {
+    let world = World::new(&[("runtime", &self_updating_runtime("1.1"))]);
+    world.host.state.borrow_mut().downloads.insert(
+        "https://example.com/tool-1.1".to_owned(),
+        ("11".repeat(32), tarball("tool 1.1")),
+    );
+    world.install("runtime", true).0.unwrap();
+    let versions = world.host_home().join(".vendor/versions");
+    fs::rename(versions.join("1.1"), versions.join("1.10")).unwrap();
+    let from = world.host.state.borrow().log.len();
+
+    let (result, events) = world.install("runtime", true);
+
+    result.unwrap();
+    assert!(
+        !world.log_since(from).iter().any(|l| l.starts_with("fetch")),
+        "{:?}",
+        world.log_since(from)
+    );
+    assert_eq!(events.steps(), [(1, ActionState::Done)]);
+    assert!(!versions.join("1.1").exists());
+}
