@@ -5,15 +5,16 @@
 // place, each applied to the menu as it is made. Try it: three tries that tick off, beside the
 // menu itself, the real Command menu's parts (`lib/list-detail.ts`).
 //
-// A draft: its own parts (the big keys, the examples, the lanes, the parody, the ad, the clock,
-// the tries) live here, each marked, until they are promoted to the library.
+// Its parts are the library's. What is its own is content: the examples' rows, the race's grid,
+// the other menu and its ad (a parody, drawn from library parts), and Yours's two columns.
 
 import { button } from "../../lib/button.ts";
 import { choiceCard, choiceGroup } from "../../lib/card.ts";
 import { chip } from "../../lib/chip.ts";
 import { field, setValue } from "../../lib/field.ts";
 import { icon } from "../../lib/icon.ts";
-import { type KeyHint, keycap, keyHints, keys } from "../../lib/keycap.ts";
+import { iconTile } from "../../lib/icon-tile.ts";
+import { type KeyHint, keycap, keyHints, keyPrompt, keys } from "../../lib/keycap.ts";
 import { fill, filling, fillingHeight, gap, row, splitColumns, stack } from "../../lib/layout.ts";
 import { type ListRowSpec, listWith } from "../../lib/list.ts";
 import { commandMenu, type MenuMeasures } from "../../lib/list-detail.ts";
@@ -21,11 +22,12 @@ import { scroll } from "../../lib/scroll.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { RECHECK, type RailPage, type RailStatus } from "../../lib/step-rail.ts";
 import { setStep, stepper } from "../../lib/stepper.ts";
-import { switchControl } from "../../lib/switch.ts";
+import { orderList } from "../../lib/order-list.ts";
 import { tabs } from "../../lib/tabs.ts";
+import { type Task, task } from "../../lib/task.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { toastRoom } from "../../lib/toast.ts";
-import { floatingTooltip, tooltip } from "../../lib/tooltip.ts";
+import { floatingTooltip, term, termed, tooltip } from "../../lib/tooltip.ts";
 import { length } from "../../lib/tokens.ts";
 import { bezier, milliseconds } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
@@ -276,22 +278,6 @@ function caps(combination: string): HTMLElement {
   return row("s4", "centre", ...keys(combination).map(keycap));
 }
 
-/**
- * Draft part, to be promoted: the big keys, a combination as large lit keycaps, `size.control_lg`
- * tall in `button_large`, each in the primary's tube, a plus between.
- */
-function bigKeys(combination: string): HTMLElement {
-  const parts = keys(combination).flatMap((key, at) => {
-    const cap = document.createElement("span");
-    cap.className = "setup-kotodama-key";
-    cap.append(text(key, "button_large"));
-    return at === 0 ? [cap] : [text("+", "subheading", "on_surface_variant"), cap];
-  });
-  const line = row("s12", "centre", ...parts);
-  line.classList.add("setup-kotodama-keys");
-  return line;
-}
-
 // ---------------------------------------------------------------- The others --
 
 interface Answer {
@@ -305,7 +291,7 @@ interface Answer {
 }
 
 /**
- * Draft part, to be promoted: a row of the other menu, `size.control_sm` tall at the least: its
+ * A row of the other menu, `size.control_sm` tall at the least: its
  * symbol, its words whole (they wrap rather than end in an ellipsis), an aside, an Ad chip.
  */
 function parodyRow(each: Answer): HTMLElement {
@@ -338,7 +324,7 @@ interface OtherParts {
 }
 
 /**
- * Draft part, to be promoted: the other menu, drained of colour: its field with a search's bar
+ * The other menu, a parody drawn from library parts, drained of colour: its field with a search's bar
  * crawling under it, its answers in one flat list, a label over each group, landing group by
  * group, and the line at its foot that never ends while it searches.
  */
@@ -404,7 +390,7 @@ function startGroups(q: string): Group[] {
 }
 
 /**
- * Draft part, to be promoted: the ad Start raises over its answers, loud in the warning and error
+ * The ad Start raises over its answers, loud in the warning and error
  * tones, an invented cleaner for a PC that is fine.
  */
 function fakeAd(tipShown = false, replyShown = false): HTMLElement {
@@ -419,37 +405,20 @@ function fakeAd(tipShown = false, replyShown = false): HTMLElement {
   const product = row("s12", "start", tile, filling(stack(0, "start", filling(wrapped(AD.product, "subheading", "on_burn_warning")), filling(wrapped(AD.maker, "caption", "on_burn_warning")))));
   const stars = row("s4", "centre", ...Array.from({ length: 5 }, () => icon("star_filled", "var(--type-small-icon)", "var(--color-burn_error)")), filling(wrapped(AD.rating, "caption", "on_burn_warning")));
   const go = button({ label: AD.action, kind: "Danger", size: "Sm", icon: "arrow_forward", trailing: true });
-  // Draft part, to be promoted: a term in running text with its answer on a floating card. The
-  // sentence is one paragraph that wraps as any does; the term is an inline run inside it, its
-  // card hanging above it while the pointer is on the word.
-  const fine = wrapped(AD.fine.join(" "), "caption", "on_burn_warning");
-  const asked = document.createElement("span");
-  asked.className = "setup-kotodama-ad-asked";
-  asked.textContent = AD.fine[1];
-  const term = floatingTooltip(asked, tooltip(AD.fineAnswer, ""), { side: "above", shown: tipShown });
-  term.classList.add("setup-kotodama-ad-term");
-  fine.replaceChildren(`${AD.fine[0]} `, term, ` ${AD.fine[2]}`);
-  // Draft part, to be promoted: the button answers back. A press shows its card above it for two
-  // holds, then it goes; the next press starts it again. Nothing else happens.
-  const reply = tooltip(AD.reply, "");
-  const answering = floatingTooltip(go, reply, { side: "above", shown: replyShown });
+  // The fine print is one paragraph that wraps as any does; its one term is explained on a card.
+  const asked = term(AD.fine[1]);
+  const words = wrapped(AD.fine.join(" "), "caption", "on_burn_warning");
+  words.replaceChildren(`${AD.fine[0]} `, asked, ` ${AD.fine[2]}`);
+  const fine = termed(words, asked, tooltip(AD.fineAnswer, ""), { shown: tipShown });
+  // The button answers back, and does nothing else.
+  const answering = floatingTooltip(go, tooltip(AD.reply, ""), { side: "above", shown: replyShown, shows: "pressed" });
   answering.classList.add("setup-kotodama-ad-reply");
-  let gone = 0;
-  go.addEventListener("click", () => {
-    window.clearTimeout(gone);
-    reply.removeAttribute("data-shown");
-    requestAnimationFrame(() => reply.setAttribute("data-shown", ""));
-    gone = window.setTimeout(() => reply.removeAttribute("data-shown"), ms("hold") * 2);
-  });
   const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "subheading", "on_burn_warning")), filling(product), filling(stars), filling(answering), filling(fine));
   ad.classList.add("setup-kotodama-ad");
   return ad;
 }
 
-/**
- * Draft part, to be promoted: a lane's clock, a chip with a timer, counting in tenths of a second
- * until its answer lands; Kotodama's in the cold.
- */
+/** A lane's clock: a Chip with a timer, counting until its answer lands; Kotodama's in the cold. */
 function clockChip(words: string, ours: boolean): HTMLElement {
   return chip({ label: words, icon: "timer", kind: ours ? "Cold" : "Neutral" });
 }
@@ -542,73 +511,6 @@ function scrolling(content: HTMLElement): HTMLElement {
   return box;
 }
 
-/**
- * Draft part, to be promoted: the engines, a list in the menu's order, each with a grab handle, its
- * name and a switch. A row is dragged by its handle, the others gliding out of its way over
- * `medium`; Alt + ↑ or ↓ moves the focused row a place. Disabled while the web search is off.
- */
-function engineList(prefs: MenuSettings): { box: HTMLElement; setDisabled: (off: boolean) => void } {
-  const box = document.createElement("span");
-  box.className = "setup-kotodama-engines";
-  const rows = new Map<string, HTMLElement>();
-  const order = () => prefs.engines.map((each) => rows.get(each.name)!);
-  /** Puts the rows in the settings' order, each gliding from where it was (reduced: at once). */
-  const place = (focus?: HTMLElement) => {
-    const before = new Map(order().map((each) => [each, each.getBoundingClientRect().top]));
-    box.replaceChildren(...order());
-    if (!settings().reduced)
-      for (const [each, top] of before) {
-        const by = top - each.getBoundingClientRect().top;
-        if (by !== 0) each.animate([{ translate: `0 ${by}px` }, { translate: "0 0" }], { duration: ms("medium"), easing: curve("standard_decel") });
-      }
-    focus?.focus({ preventScroll: true });
-  };
-  const move = (name: string, by: number) => {
-    const from = prefs.engines.findIndex((each) => each.name === name);
-    const to = Math.max(0, Math.min(prefs.engines.length - 1, from + by));
-    if (from === to) return;
-    const [taken] = prefs.engines.splice(from, 1);
-    prefs.engines.splice(to, 0, taken!);
-    place(rows.get(name));
-  };
-  for (const engine of prefs.engines) {
-    const handle = icon("swap_vert", "var(--type-body-icon)", "var(--color-on_surface_variant)");
-    handle.classList.add("setup-kotodama-grab");
-    const control = switchControl({ on: engine.on });
-    control.addEventListener("click", () => queueMicrotask(() => (engine.on = control.getAttribute("aria-checked") === "true")));
-    const line = row("s12", "centre", handle, filling(text(engine.name, "body")), control);
-    line.classList.add("setup-kotodama-engine");
-    line.tabIndex = 0;
-    line.addEventListener("keydown", (event) => {
-      if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
-      event.preventDefault();
-      move(engine.name, event.key === "ArrowUp" ? -1 : 1);
-    });
-    handle.addEventListener("pointerdown", (event) => {
-      event.preventDefault();
-      line.dataset.lifted = "";
-      const pitch = line.getBoundingClientRect().height;
-      let start = event.clientY;
-      const follow = (moved: PointerEvent) => {
-        const by = Math.round((moved.clientY - start) / pitch);
-        if (by === 0) return;
-        move(engine.name, by);
-        start += by * pitch;
-      };
-      const drop = () => {
-        delete line.dataset.lifted;
-        window.removeEventListener("pointermove", follow);
-        window.removeEventListener("pointerup", drop);
-      };
-      window.addEventListener("pointermove", follow);
-      window.addEventListener("pointerup", drop);
-    });
-    rows.set(engine.name, line);
-  }
-  box.append(...order());
-  return { box, setDisabled: (off) => box.toggleAttribute("data-disabled", off) };
-}
-
 export function kotodamaCard(view: string): KotodamaCard {
   const state = kotodamaAt(view);
   const prefs = state.settings;
@@ -627,10 +529,9 @@ export function kotodamaCard(view: string): KotodamaCard {
 
   const what = (): HTMLElement => {
     const examples = EXAMPLES.map((each) => {
-      // Draft part, to be promoted: an example, its symbol on a tile, what to type and what it is.
-      const tile = document.createElement("span");
-      tile.className = "setup-kotodama-tile";
-      tile.append(icon(each.icon, "var(--type-body-icon)", "currentColor"));
+      // An example: its symbol on a tile, what to type and what it is; the page's own row, lit in
+      // step with the menu beside it.
+      const tile = iconTile({ glyph: each.icon, size: "Sm" });
       const line = row("s12", "centre", tile, filling(text(each.typed, "mono_large")), text(each.is, "mono", "on_surface_variant"));
       line.classList.add("setup-kotodama-example");
       return line;
@@ -646,7 +547,13 @@ export function kotodamaCard(view: string): KotodamaCard {
       window.removeEventListener("keydown", quiet);
     };
     window.addEventListener("keydown", quiet, { once: true });
-    const lit = (at: number) => examples.forEach((each, index) => each.toggleAttribute("data-lit", index === at));
+    const lit = (at: number) =>
+      examples.forEach((each, index) => {
+        const on = index === at;
+        if (each.hasAttribute("data-lit") === on) return;
+        each.toggleAttribute("data-lit", on);
+        each.querySelector(".k-icon-tile")?.replaceWith(iconTile({ glyph: EXAMPLES[index]!.icon, size: "Sm", accent: on }));
+      });
     const play = async () => {
       if (settings().reduced) {
         lit(1);
@@ -665,7 +572,7 @@ export function kotodamaCard(view: string): KotodamaCard {
     const left = stack(
       0,
       "start",
-      bigKeys("Super+Space"),
+      keyPrompt("Super+Space"),
       gap("s32"),
       text("Type what you want. Enter.", "headline"),
       gap("s8"),
@@ -710,7 +617,7 @@ export function kotodamaCard(view: string): KotodamaCard {
       const oursBox = document.createElement("span");
       oursBox.className = "setup-kotodama-ours";
       oursBox.append(ours.box);
-      // Draft part, to be promoted: the race, one grid: the names and clocks on one line, the two
+      // The race, one grid: the names and clocks on one line, the two
       // menus one height, the lines under them starting on one line.
       const head = (name: string, clock: HTMLElement) => row("s8", "centre", text(name, "heading"), fill(), clock);
       const grid = document.createElement("span");
@@ -804,7 +711,7 @@ export function kotodamaCard(view: string): KotodamaCard {
 
     // Right: the options, each a row of the same list part as the left's: its title over its
     // note, its control at the row's end.
-    const engines = engineList(prefs);
+    const engines = orderList({ items: prefs.engines });
     const motion = tabs({ choices: [{ label: "Full" }, { label: "Fades" }], picked: prefs.slides ? 0 : 1, onPick: (at) => (prefs.slides = at === 0) });
     const mark = tabs({ choices: [{ label: "1.5" }, { label: "1,5" }], picked: prefs.comma ? 1 : 0, onPick: (at) => (prefs.comma = at === 1) });
     const files = button({ label: "Open in Files", kind: "Text", size: "Sm" });
@@ -821,7 +728,7 @@ export function kotodamaCard(view: string): KotodamaCard {
     const section = (title: string, ...content: HTMLElement[]) => stack("s8", "start", heading(title), ...content.map(filling));
     const left = section("It finds", findsList.box);
     const right = stack("s24", "start", filling(section("When nothing here matches", web)), filling(section("Typing and motion", typing)), filling(section("The config file", file)));
-    // Draft part, to be promoted: the two columns, side by side where both read whole, the list
+    // The two columns, side by side where both read whole, the list
     // first under it.
     const split = document.createElement("span");
     split.className = "setup-kotodama-yours";
@@ -840,29 +747,26 @@ export function kotodamaCard(view: string): KotodamaCard {
   let openMenu = () => undefined as void;
 
   const tryIt = (): HTMLElement => {
-    const cardsBy = new Map<TryId, HTMLElement>();
+    const tasks = new Map<TryId, Task>();
     const tryCard = (each: (typeof TRIES)[number]) => {
-      // Draft part, to be promoted: a try, its round tick lit once done, the words to type in mono.
-      const mark = document.createElement("span");
-      mark.className = "setup-kotodama-tick";
-      mark.append(icon("check", "var(--type-small-icon)", "currentColor"));
-      const title = row(0, "centre", text(each.before, "body_strong"), ...(each.typed ? [gap("s4"), text(each.typed, "mono_large", "primary")] : []), ...(each.after ? [text(each.after, "body_strong")] : []));
-      const card = row("s12", "centre", mark, filling(stack(0, "start", filling(title), text(each.line, "small", "on_surface_variant"))));
-      card.className += " setup-kotodama-try-card";
-      card.toggleAttribute("data-done", state.tried.has(each.id));
-      card.addEventListener("click", () => {
-        openMenu();
-        if (each.typed) void menu.type(each.typed);
+      const made = task({
+        before: each.before,
+        ...(each.typed ? { typed: each.typed } : {}),
+        ...(each.after ? { after: each.after } : {}),
+        line: each.line,
+        done: state.tried.has(each.id),
+        onPress: () => {
+          openMenu();
+          if (each.typed) void menu.type(each.typed);
+        },
       });
-      cardsBy.set(each.id, card);
-      return filling(card);
+      tasks.set(each.id, made);
+      return filling(made.element);
     };
     const tick = (id: TryId) => {
       if (state.tried.has(id)) return;
       state.tried.add(id);
-      const card = cardsBy.get(id);
-      card?.setAttribute("data-done", "");
-      if (card && !settings().reduced) card.querySelector(".setup-kotodama-tick")?.animate([{ scale: 0.4 }, { scale: 1 }], { duration: ms("medium"), easing: curve("pop") });
+      tasks.get(id)?.tick();
       recheck();
     };
     const menu = standIn(prefs, {
@@ -876,8 +780,8 @@ export function kotodamaCard(view: string): KotodamaCard {
     });
     const holder = document.createElement("span");
     holder.className = "setup-kotodama-try";
-    // Draft part, to be promoted: the shut menu's room, its keys big, a click opening it this once.
-    const invitation = stack("s16", "centre", bigKeys(KEY_OF[prefs.key]), text("Press it. Or click here, this once.", "small", "on_surface_variant"));
+    // The shut menu's room, its keys big, a click opening it this once.
+    const invitation = stack("s16", "centre", keyPrompt(KEY_OF[prefs.key]), text("Press it. Or click here, this once.", "small", "on_surface_variant"));
     invitation.classList.add("setup-kotodama-invitation");
     invitation.addEventListener("click", () => openMenu());
     const shut = () => {

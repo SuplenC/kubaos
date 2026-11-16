@@ -454,3 +454,47 @@
   width: var(--type-body_strong-icon);
   height: var(--type-body_strong-icon);
 }
+
+/* The Task (`lib/task.ts`): a card with a round tick and its words; done, it lights as a picked
+   card does and its tick fills. */
+.k-task {
+  box-sizing: border-box;
+  min-height: var(--size-row_two_line);
+  padding: var(--space-s12) var(--space-s16);
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+  transition: box-shadow var(--motion-medium) var(--easing-standard), background var(--motion-medium) var(--easing-standard);
+}
+
+.k-task[data-pressable] {
+  cursor: pointer;
+}
+
+.k-task[data-done] {
+  background: rgb(from var(--color-primary) r g b / var(--opacity-tint));
+  box-shadow:
+    inset 0 0 0 var(--focus-tube) var(--color-primary),
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day))));
+}
+
+.k-task-tick {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--size-check);
+  height: var(--size-check);
+  border-radius: var(--radius-full);
+  box-shadow: inset 0 0 0 var(--stroke-thin) var(--color-outline);
+  color: transparent;
+}
+
+.k-task[data-done] .k-task-tick {
+  background: var(--color-primary_fill);
+  box-shadow: none;
+  color: var(--color-on_primary_fill);
+}
+
+[data-reduced] .k-task {
+  transition-duration: 0s;
+}

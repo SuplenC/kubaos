@@ -2,12 +2,14 @@
 // while the pointer is over it or the keyboard is on it. It isn't neon: it has no line, no glow and
 // no states of its own, and fades in and out with its control's lit state, never flickering.
 
+import { button } from "../../lib/button.ts";
 import { chip } from "../../lib/chip.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { keyHints } from "../../lib/keycap.ts";
-import { row, stack } from "../../lib/layout.ts";
-import { keyTooltip, type TipOptions, tooltip, withTooltip } from "../../lib/tooltip.ts";
+import { inset, row, stack } from "../../lib/layout.ts";
+import { wrapped } from "../../lib/text.ts";
+import { floatingTooltip, keyTooltip, term, termed, type TipOptions, tooltip, withTooltip } from "../../lib/tooltip.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
@@ -37,6 +39,20 @@ function explained(options: TipOptions = {}, state: Shown = "rest"): HTMLElement
   return withTooltip(control(state), card(), options);
 }
 
+/** A sentence with a term in it, the term's card shown over it or not: room above for the card. */
+function inSentence(shownNow = true): HTMLElement {
+  const word = term("Flatpak");
+  const sentence = wrapped("Each app is a Flatpak, kept apart from the rest.", "body");
+  sentence.replaceChildren("Each app is a ", word, ", kept apart from the rest.");
+  return inset(stack(0, "start", termed(sentence, word, tooltip("Flatpak", "An app with all it needs, sandboxed from the system."), { shown: shownNow })), "s64");
+}
+
+/** A button whose card answers its press, shown as just after one: room above for the card. */
+function answering(shownNow = true): HTMLElement {
+  const copy = button({ label: "Copy", kind: "Tonal", size: "Sm", icon: "content_copy" });
+  return inset(stack(0, "start", floatingTooltip(copy, tooltip("Copied", ""), { side: "above", shown: shownNow, shows: "pressed" })), "s48");
+}
+
 /** A card shown over its lit chip: what a power change plays on, the card just recolouring. */
 function shownOver(): HTMLElement {
   return explained({ shown: true }, "lit");
@@ -57,6 +73,8 @@ export default page({
     { name: "A title alone", for: "when the title says it all", sample: () => tooltip(shown(TITLE), "") },
     { name: "A name and its key", for: "a button whose key isn't shown: one line", sample: () => keyTooltip("Desktop", "2") },
     { name: "A name and a combination", for: "each key a cap, `space.s4` apart", sample: () => keyTooltip("Full screen", "F") },
+    { name: "A term in a sentence", for: "a word dotted under, its card over it", sample: () => inSentence() },
+    { name: "Answering a press", for: "shown for two holds after a press", sample: () => answering() },
   ],
   sizes: doesntApply("one width, `size.menu`; as tall as what it holds."),
   states: {
@@ -121,6 +139,7 @@ export default page({
     keys: [
       { keys: ["Tab", "Shift+Tab"], does: "focus on its control shows it; moving on hides it" },
       { keys: ["Esc"], does: "nothing of the tooltip's" },
+      { keys: ["Tab"], does: "on a term, shows its card" },
     ],
     order: "No stop of its own: it is read out as its control's description.",
     lands: "Never: focus lands on its control.",

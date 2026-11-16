@@ -8,12 +8,21 @@
 // It isn't neon: no line, no glow and no states of its own. It floats `space.s8` above its control,
 // starting where the control starts, or below where there is no room above, and fades in and out
 // with its control's lit state. It never takes the pointer.
+//
+// A term in running text takes a card too (`termed`): the word stays in its sentence, dotted under,
+// and its card hangs over it while the pointer or the keyboard is on it. The card sits beside the
+// sentence, not in it, tied to the word by an anchor, so the sentence's words are only its own.
+//
+// A card can answer a press instead of a light (`floatingTooltip`'s `shows: "pressed"`): a press shows
+// it for two holds, then it goes, and the next press starts it again.
 
 import { raise, type Step } from "./elevation.ts";
 import { keycap, keys } from "./keycap.ts";
 import { row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { text, wrapped } from "./text.ts";
+import { milliseconds } from "../site/recipe.ts";
+import { settings } from "../site/settings.ts";
 
 /** Why a menu's popover is drawn ahead of `kubaos-ui`'s, which pads it 12 and draws its items' symbols 20, 12 from their words. */
 const MENU_AHEAD = "menu.md: a menu's popover is 4 inside, its items' symbols 16, 8 from their words";
@@ -82,11 +91,15 @@ export function withTooltip(control: HTMLElement, tip: HTMLElement, options: Tip
 /** Which of the control's ends a floating card lines up with: its start, or its end near a window's edge. */
 export type TipHeld = "start" | "end";
 
+/** When a floating card shows: while its control is lit, or for a while after it is pressed. */
+export type TipShows = "lit" | "pressed";
+
 export interface FloatOptions {
   readonly side?: TipSide;
   readonly held?: TipHeld;
   /** Shown whatever the pointer and the keyboard do: a sample of the card over its control. */
   readonly shown?: boolean;
+  readonly shows?: TipShows;
 }
 
 /**
@@ -103,5 +116,44 @@ export function floatingTooltip(control: HTMLElement, tip: HTMLElement, options:
   tip.dataset.held = options.held ?? "start";
   tip.toggleAttribute("data-shown", options.shown ?? false);
   anchor.append(control, tip);
+  if (options.shows === "pressed") {
+    anchor.dataset.shows = "pressed";
+    let gone = 0;
+    control.addEventListener("click", () => {
+      window.clearTimeout(gone);
+      tip.removeAttribute("data-shown");
+      requestAnimationFrame(() => tip.setAttribute("data-shown", ""));
+      gone = window.setTimeout(() => tip.removeAttribute("data-shown"), (milliseconds("hold") * 2) / settings().speed);
+    });
+  }
   return anchor;
+}
+
+/** How many terms are on the page: each one's anchor is named for its place. */
+let terms = 0;
+
+/**
+ * `sentence`, a text, with `term` (one of its words, as `term()` makes it) explained on `tip`: the
+ * card floats `space.s8` above the word, from its start, over whatever is there, and shows while the
+ * word is hovered or focused from the keyboard. Returns the room that holds both, which goes where
+ * the sentence would.
+ */
+export function termed(sentence: HTMLElement, term: HTMLElement, tip: HTMLElement, options: { readonly shown?: boolean } = {}): HTMLElement {
+  const name = `--k-term-${++terms}`;
+  term.style.setProperty("anchor-name", name);
+  tip.style.setProperty("position-anchor", name);
+  tip.toggleAttribute("data-shown", options.shown ?? false);
+  const room = document.createElement("span");
+  room.className = "k-term-room";
+  room.append(sentence, tip);
+  return room;
+}
+
+/** `words` as a term in a sentence: dotted under, and reached by Tab, so its card can be read from the keyboard. */
+export function term(words: string): HTMLElement {
+  const run = document.createElement("span");
+  run.className = "k-term";
+  run.tabIndex = 0;
+  run.textContent = words;
+  return run;
 }

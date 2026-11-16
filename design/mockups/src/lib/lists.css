@@ -723,3 +723,60 @@
 .k-list-box {
   cursor: inherit;
 }
+
+/* How far an OrderList row still has to glide to its place, in its own heights. */
+@property --order-glide {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* The OrderList (`lib/order-list.ts`): rows of a grab handle, a name and a switch, a hairline
+   between rows, each `size.control_md` tall on the list rows' inset, so its switches end where
+   theirs do. A lifted row stands out on the highest container with a shadow; disabled, the whole
+   list recedes and takes no pointer. */
+.k-order-list {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.k-order-list[data-disabled] {
+  opacity: var(--opacity-disabled_content);
+  pointer-events: none;
+}
+
+.k-order-row {
+  position: relative;
+  translate: 0 calc(var(--order-glide) * 100%);
+  align-self: stretch;
+  box-sizing: border-box;
+  min-height: var(--size-control_md);
+  padding: 0 var(--space-s16);
+  border-radius: var(--radius-small);
+  outline: none;
+}
+
+.k-order-row + .k-order-row {
+  border-top: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.k-order-row:focus-visible {
+  box-shadow: 0 0 0 var(--focus-tube) var(--color-cold), 0 0 var(--focus-near) rgb(from var(--color-cold) r g b / var(--focus-near_opacity));
+}
+
+.k-order-row[data-lifted] {
+  z-index: 1;
+  background: var(--color-surface_container_highest);
+  box-shadow: 0 var(--space-s8) var(--space-s24) rgb(from var(--color-surface_container_lowest) r g b / var(--opacity-scrim));
+}
+
+.k-order-grab {
+  cursor: grab;
+  touch-action: none;
+}
+
+.k-order-row[data-lifted] .k-order-grab {
+  cursor: grabbing;
+}

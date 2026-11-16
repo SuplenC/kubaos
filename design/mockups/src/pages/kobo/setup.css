@@ -191,50 +191,22 @@
   bottom: calc(var(--size-control_sm) + 3 * var(--space-s12));
 }
 
-/* Draft part: the big keys, each a large keycap in the primary's tube, glowing at night. */
-.setup-kotodama-key {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  height: var(--size-control_lg);
-  min-width: var(--size-control_lg);
-  padding: 0 var(--space-s20);
-  border-radius: var(--radius-control);
-  background: var(--color-surface_container_high);
-  box-shadow:
-    inset 0 0 0 var(--focus-tube) var(--color-primary),
-    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day)))),
-    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * (1 - var(--day))));
-}
-
 /* What's left column stands in the middle of its room's height, as the menu beside it is tall. */
 .setup-kotodama-what {
   justify-content: center;
   height: 100%;
 }
 
-/* Draft part: an example on What, lit while the menu beside it plays it; the others recede. */
+/* An example on What, lit while the menu beside it plays it (its tile takes the accent); the
+   others recede. */
 .setup-kotodama-example {
   height: var(--size-row);
   opacity: var(--opacity-subdued);
-  color: var(--color-on_surface_variant);
-  transition: opacity var(--motion-medium) var(--easing-standard), color var(--motion-medium) var(--easing-standard);
+  transition: opacity var(--motion-medium) var(--easing-standard);
 }
 
 .setup-kotodama-example[data-lit] {
   opacity: 1;
-  color: var(--color-primary);
-}
-
-.setup-kotodama-tile {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: var(--size-control_sm);
-  height: var(--size-control_sm);
-  border-radius: var(--radius-control);
-  background: var(--color-surface_container_high);
 }
 
 /* The race's room: the grid takes the height under the header. */
@@ -254,7 +226,7 @@
   gap: var(--space-s12) var(--space-s24);
 }
 
-/* Draft part: Kotodama's lane, the menu itself in the primary's lit tube, filling the lane. */
+/* Kotodama's lane, the menu itself in the primary's lit tube, filling the lane. */
 .setup-kotodama-ours {
   display: flex;
   min-height: 0;
@@ -269,7 +241,7 @@
   flex: 1 1 0;
 }
 
-/* Draft part: the other menus, drained of colour, their answers cut where the panel ends; Start's
+/* The other menus, drained of colour, their answers cut where the panel ends; Start's
    ad over them in every loud colour there is. */
 .setup-kotodama-other {
   position: relative;
@@ -321,7 +293,7 @@
   grid-area: 1 / 1;
 }
 
-/* Draft part: the other menu's flat rows and the labels over their groups. */
+/* The other menu's flat rows and the labels over their groups. */
 .setup-kotodama-prow {
   box-sizing: border-box;
   min-height: var(--size-control_sm);
@@ -388,26 +360,6 @@
 /* The fine print's unknown word asks to be asked about: marked as a term is (a dotted underline,
    the help pointer), its answer shown while the pointer is on it. The anchor stays a run of the
    sentence, so the words around it keep their spacing and the line wraps as text does. */
-.setup-kotodama-ad-term {
-  display: inline;
-}
-
-.setup-kotodama-ad-asked {
-  cursor: help;
-  text-decoration: underline dotted;
-  text-underline-offset: var(--stroke-thin);
-}
-
-/* Its card stands on top of the lane's other answers and keeps to one line. */
-.setup-kotodama-ad-term > .k-tooltip {
-  z-index: 4;
-  white-space: nowrap;
-}
-
-.setup-kotodama-ad-term:has(> .setup-kotodama-ad-asked:hover) > .k-tooltip {
-  opacity: 1;
-}
-
 .setup-kotodama-ad-tag {
   display: inline-flex;
   flex: none;
@@ -424,42 +376,6 @@
   height: var(--size-control_md);
   border-radius: var(--radius-control);
   background: var(--color-error);
-}
-
-/* Draft part: a try, a card whose round tick and tube light once it is done. */
-.setup-kotodama-try-card {
-  box-sizing: border-box;
-  min-height: var(--size-row_two_line);
-  padding: var(--space-s12) var(--space-s16);
-  border-radius: var(--radius-content);
-  background: var(--color-surface_container);
-  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
-  cursor: pointer;
-  transition: box-shadow var(--motion-medium) var(--easing-standard), background var(--motion-medium) var(--easing-standard);
-}
-
-.setup-kotodama-try-card[data-done] {
-  background: rgb(from var(--color-primary) r g b / var(--opacity-tint));
-  box-shadow:
-    inset 0 0 0 var(--focus-tube) var(--color-primary),
-    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day))));
-}
-
-.setup-kotodama-tick {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: var(--size-check);
-  height: var(--size-check);
-  border-radius: var(--radius-full);
-  box-shadow: inset 0 0 0 var(--stroke-thin) var(--color-outline);
-  color: transparent;
-}
-
-.setup-kotodama-try-card[data-done] .setup-kotodama-tick {
-  background: var(--color-primary_fill);
-  box-shadow: none;
-  color: var(--color-on_primary_fill);
 }
 
 /* Try it's room: the menu, or before it opens, its keys in an outlined room the menu's size. */
@@ -519,16 +435,7 @@
   flex: 1 1 0;
 }
 
-.setup-kotodama-ad-reply.k-tip-anchor:has(> .k-control:is(:hover, :focus-visible)) > .k-tooltip:not([data-shown]) {
-  opacity: 0;
-}
-
-.setup-kotodama-ad-reply > .k-tooltip {
-  z-index: 4;
-  white-space: nowrap;
-}
-
-/* Yours (draft): what it finds on the left, the options on the right, each column scrolling on its
+/* Yours: what it finds on the left, the options on the right, each column scrolling on its
    own where it is short; stacked, the list first, where the room is too narrow for both. */
 .setup-kotodama-yours {
   display: grid;
@@ -541,60 +448,9 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* The engines: rows of a grab handle, a name and a switch; a lifted one stands out; disabled, the
-   whole list recedes and takes no pointer. */
-.setup-kotodama-engines {
-  display: flex;
-  flex-direction: column;
-  align-self: stretch;
-  transition: opacity var(--motion-short) var(--easing-standard);
-}
-
-.setup-kotodama-engines[data-disabled] {
-  opacity: var(--opacity-disabled_content);
-  pointer-events: none;
-}
-
-/* An engine: a compact row in the web search's list, its handle and switch on the list rows'
-   inset, so its switch ends where theirs do; a hairline between rows. */
-.setup-kotodama-engine {
-  position: relative;
-  box-sizing: border-box;
-  min-height: var(--size-control_md);
-  padding: 0 var(--space-s16);
-  border-radius: var(--radius-small);
-  outline: none;
-}
-
-.setup-kotodama-engine {
-  align-self: stretch;
-}
-
-.setup-kotodama-engine + .setup-kotodama-engine {
-  border-top: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
-}
-
-.setup-kotodama-engine:focus-visible {
-  box-shadow: 0 0 0 var(--focus-tube) var(--color-cold), 0 0 var(--focus-near) rgb(from var(--color-cold) r g b / var(--focus-near_opacity));
-}
-
-.setup-kotodama-engine[data-lifted] {
-  z-index: 1;
-  background: var(--color-surface_container_highest);
-  box-shadow: 0 var(--space-s8) var(--space-s24) rgb(from var(--color-surface_container_lowest) r g b / var(--opacity-scrim));
-}
-
 /* An option row with a control of its own: its clicks are the control's, and it takes no
    pointer of its own. */
 .k-list-row[data-control] {
   cursor: default;
 }
 
-.setup-kotodama-grab {
-  cursor: grab;
-  touch-action: none;
-}
-
-.setup-kotodama-engine[data-lifted] .setup-kotodama-grab {
-  cursor: grabbing;
-}

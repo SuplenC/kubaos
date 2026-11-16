@@ -439,7 +439,7 @@ Each component has a page of its own under `design/components/`: its constructor
 
 **Keys**
 
-- [Keycap and KeyHints](design/components/keycap.md)
+- [Keycap, KeyHints and KeyPrompt](design/components/keycap.md)
 - [Shortcuts](design/components/shortcuts.md)
 - [RollingNumber](design/components/rolling-number.md)
 
@@ -466,6 +466,7 @@ Each component has a page of its own under `design/components/`: its constructor
 **Lists, chips and cards**
 
 - [List, ScrollingList, ListRows, ListRow, LiveList and EmptyList](design/components/list.md)
+- [OrderList](design/components/order-list.md)
 - [Chip](design/components/chip.md)
 - [IconTile](design/components/icon-tile.md)
 - [Badge and BadgedIcon](design/components/badge.md)
@@ -492,6 +493,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Banner](design/components/banner.md)
 - [Step](design/components/step.md)
 - [Stepper](design/components/stepper.md)
+- [Task](design/components/task.md)
 - [DescriptionList](design/components/description-list.md)
 - [FocusRing](design/components/focus-ring.md)
 
