@@ -33,7 +33,7 @@ import { bezier, milliseconds } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
 import { body } from "./kobo-parts.ts";
 import { CARDS } from "./setup-cards.ts";
-import { AD, SPAM, defaultSettings, ENGINES, type Found, LANDS, type MenuSettings, OPENS_WITH, OTHERS, QUESTION, search } from "./setup-kotodama-data.ts";
+import { AD, defaultSettings, ENGINES, type Found, LANDS, type MenuSettings, OPENS_WITH, OTHERS, QUESTION, search } from "./setup-kotodama-data.ts";
 
 /** The card's steps, by their index. */
 export const STEPS = ["What", "Why", "Yours", "Try it"] as const;
@@ -339,8 +339,6 @@ interface OtherParts {
   /** Laid over the first `covers` groups, which take its height at the least. */
   readonly over?: HTMLElement;
   readonly covers?: number;
-  /** Stands before the last group: what you wanted comes last. */
-  readonly before?: HTMLElement;
 }
 
 /**
@@ -369,7 +367,7 @@ function otherMenu(q: string, groups: readonly Group[], foot: string, more: Othe
     cell.append(under, more.over!);
     flowing.push(cell);
   }
-  flowing.push(...parts.slice(covers, -1), ...(more.before ? [more.before] : []), ...parts.slice(-1).filter(() => parts.length > covers));
+  flowing.push(...parts.slice(covers));
   const answers = stack("s4", "start", ...flowing.map(filling));
   answers.classList.add("setup-kotodama-answers");
   const waiting = spinner("s16", "on_surface_variant");
@@ -385,8 +383,8 @@ function otherMenu(q: string, groups: readonly Group[], foot: string, more: Othe
     bar.dataset.done = "";
     if (waiting.parentElement) waiting.replaceWith(icon("hourglass_top", "var(--icon-s16)", "var(--color-on_surface_variant)"));
   };
-  // The fullest the lane holds whole: every beat; then without the spam; then without the news,
-  // the game and the groups' labels. The main ad is whole at every size.
+  // The fullest the lane holds whole: every beat; then without the news; then without the game
+  // and the groups' labels too. The ad is whole at every size.
   const fits = ["tall", "medium", "short"] as const;
   new ResizeObserver(() => {
     for (const fit of fits) {
@@ -429,35 +427,6 @@ function fakeAd(): HTMLElement {
   const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "subheading", "on_burn_warning")), filling(product), filling(stars), filling(go), filling(fine));
   ad.classList.add("setup-kotodama-ad");
   return ad;
-}
-
-/**
- * Draft part, to be promoted: the second ad, a spam card drawn whole at its own width and set in a
- * slot narrower than it, its left edge on the rows' edge: the slot cuts the rest off cleanly at
- * the lane's content edge, mid-word, as a careless ad system places a banner too wide for it.
- */
-function spamAd(): HTMLElement {
-  const tag = document.createElement("span");
-  tag.className = "setup-kotodama-spam-tag";
-  tag.append(text(SPAM.tag, "label", "on_burn_success"));
-  const top = row("s8", "centre", tag, text(SPAM.advertiser, "caption", "on_surface"));
-  const go = button({ label: SPAM.action, kind: "Success", size: "Sm", icon: "arrow_forward", trailing: true });
-  const stars = row("s4", "centre", ...Array.from({ length: 5 }, () => icon("star_filled", "var(--type-small-icon)", "var(--color-burn_warning)")), text(SPAM.review, "small", "on_surface"));
-  const card = stack(
-    "s8",
-    "start",
-    top,
-    text(SPAM.headline, "display", "burn_success"),
-    text(SPAM.product, "subheading", "on_surface"),
-    row("s12", "centre", go, text(SPAM.line, "body_strong", "on_surface")),
-    stars,
-    text(SPAM.fine, "caption", "on_surface_variant"),
-  );
-  card.classList.add("setup-kotodama-spam-card");
-  const slot = document.createElement("span");
-  slot.className = "setup-kotodama-spam";
-  slot.append(card);
-  return slot;
 }
 
 /**
@@ -609,9 +578,8 @@ export function kotodamaCard(view: string): KotodamaCard {
     const race = () => {
       stop();
       const reduced = settings().reduced;
-      const spam = spamAd();
       const ad = fakeAd();
-      const start = otherMenu(QUESTION, startGroups(QUESTION), OTHERS.start.searching, { over: ad, covers: 4, before: spam });
+      const start = otherMenu(QUESTION, startGroups(QUESTION), OTHERS.start.searching, { over: ad, covers: 4 });
       // Kotodama's lane fills its rows with what is on the machine: no web rows under it here.
       const ours = standIn({ ...prefs, web: false }, { live: false, query: QUESTION, hints: [["↑↓", "Select"], ["Enter", "Run"]], took: OTHERS.kotodama.stopped });
       ours.box.inert = true;
@@ -642,7 +610,6 @@ export function kotodamaCard(view: string): KotodamaCard {
         [recommended, LANDS.start.recommended],
         [ad, LANDS.start.ad, "0 var(--space-s48)"],
         [weather, LANDS.start.weather],
-        [spam, LANDS.start.spam, "var(--space-s48) 0"],
         [answerGroup, LANDS.start.answer],
       ];
       /** Start as it stands `spent` milliseconds after the key: what has landed, and its clock. */

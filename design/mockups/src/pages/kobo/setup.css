@@ -288,9 +288,9 @@
   padding: var(--space-s12);
 }
 
-/* Everything but the spam is drained of colour; the spam keeps all of its. */
+/* Everything but the ad is drained of colour; the ad keeps all of its. */
 .setup-kotodama-sad > :not(.setup-kotodama-answers),
-.setup-kotodama-answers > :not(.setup-kotodama-spam, .setup-kotodama-under),
+.setup-kotodama-answers > :not(.setup-kotodama-under),
 .setup-kotodama-under > :not(.setup-kotodama-ad) {
   filter: grayscale(1);
 }
@@ -305,34 +305,9 @@
   flex-shrink: 0;
 }
 
-/* Draft part: the spam, a whole card wider than its slot, cut by the slot at the lane's content
-   edge; `space.s8` clear above and below, as the rows' groups are. */
-.setup-kotodama-spam {
-  display: flex;
-  padding: var(--space-s8) 0;
-  overflow: hidden;
-}
-
-.setup-kotodama-spam-card {
-  flex: none;
-  box-sizing: border-box;
-  padding: var(--space-s12) var(--space-s16);
-  border-radius: var(--radius-content);
-  background: var(--color-sharing_glass);
-  box-shadow: inset 0 0 0 var(--stroke-thin) var(--color-burn_success);
-  white-space: nowrap;
-}
-
-.setup-kotodama-spam-tag {
-  display: inline-flex;
-  padding: 0 var(--space-s4);
-  border-radius: var(--radius-small);
-  background: var(--color-burn_success);
-}
-
-/* A lane short of room leaves beats out, fullest first (`otherMenu`): the spam; then the news,
-   the game and the groups' labels. The main ad stays whole. */
-.setup-kotodama-other:not([data-fit="tall"]) .setup-kotodama-spam,
+/* A lane short of room leaves beats out, fullest first (`otherMenu`): the news; then the game and
+   the groups' labels. The ad stays whole. */
+.setup-kotodama-other:not([data-fit="tall"]) [data-extra="stories"],
 .setup-kotodama-other[data-fit="short"] :is([data-extra], .setup-kotodama-plabel) {
   display: none;
 }

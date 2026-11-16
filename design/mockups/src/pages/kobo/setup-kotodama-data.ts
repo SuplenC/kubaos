@@ -227,7 +227,7 @@ export const QUESTION = "wifi";
 /** When each of Start's answers lands, from the moment the key is let go, at speed 1. */
 export const LANDS = {
   /** The web's rows, the news, a game, the ad over them, the weather, then what you wanted, last. */
-  start: { web: 1000, news: 1600, recommended: 2200, ad: 3000, weather: 3600, spam: 4000, answer: 4600, done: 5800 },
+  start: { web: 1000, news: 1600, recommended: 2200, ad: 3000, weather: 3600, answer: 4400, done: 5800 },
 } as const;
 
 /** The other menu's words and the lanes' lines, the question's where it goes. */
@@ -246,29 +246,14 @@ export const OTHERS = {
   },
 } as const;
 
-/**
- * The second ad, a whole card too wide for its slot, sliding in under the weather: the slot shows
- * its left part, the rest cut off by the lane's edge, mid-word.
- */
-export const SPAM = {
-  tag: "Sponsored",
-  advertiser: "Recommended by Dr. Dee Znuts, MD",
-  headline: "ENLARGE YOUR PENSION FUND",
-  product: "Grow-Max XL · by Wang & Sons",
-  action: "GROW NOW · FREE*",
-  line: "+7 cm in 2 weeks. Doctors hate this one weird pill.",
-  review: "“It came in a huge package.” · B. Dover",
-  fine: "*Results may vary. Hers did. Ask your pharmacist about Ligma coverage.",
-} as const
-
 /** The ad Start slides over its answers: a cleaner nobody asked for, in every loud colour there is. */
 export const AD = {
   tag: "AD",
-  sponsor: "Sponsored · Recommended for you",
+  sponsor: "Sponsored · Recommended by Dr. Dee Znuts",
   headline: "Your PC is 97% SLOWER than your neighbour's!",
-  product: "QuickBoost Ultra 365",
-  maker: "by Hyperzap Labs · 2,000,000 PCs satisfied",
-  rating: "4.9 · “My hard drive has never been this hard.” · Hugh Jass",
-  action: "FIX MY PC NOW · FREE*",
-  fine: "*Then €49.99 a month. Forever. Cancel by fax. Bofa terms apply.",
+  product: "LongDrive Pro 365",
+  maker: "by Wang & Sons Software · 2,000,000 PCs satisfied",
+  rating: "4.9 · “Lasted way longer than my old one.” · Hugh Jass",
+  action: "ENLARGE MY C: DRIVE · FREE*",
+  fine: "*Then €49.99 a month, forever. Results may vary. Hers did. Bofa terms apply.",
 } as const;
