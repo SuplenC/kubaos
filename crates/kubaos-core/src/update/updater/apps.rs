@@ -263,6 +263,7 @@ impl<M: Machine> Updater<'_, M> {
                 for ran in ran {
                     switch |= ran.finished.switch;
                     let list = match change {
+                        Change::Add if ran.finished.removed => &mut changes.removed,
                         Change::Add => &mut changes.installed,
                         Change::Remove if ran.finished.left => &mut changes.left,
                         Change::Remove => &mut changes.removed,
@@ -285,6 +286,9 @@ impl<M: Machine> Updater<'_, M> {
         };
         if !names.is_empty() {
             self.j.detail(format!("{} {verb}", names.join(", ")));
+        }
+        if change == Change::Add && !changes.removed.is_empty() {
+            self.j.detail(format!("{} removed", changes.removed.join(", ")));
         }
         for name in &changes.left {
             self.j.detail(crate::update::event::left_line(name));

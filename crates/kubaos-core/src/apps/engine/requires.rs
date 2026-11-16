@@ -27,7 +27,6 @@ use crate::apps::action::perform::PerformError;
 use crate::apps::folder::Folder;
 use crate::apps::folder::FolderError;
 use crate::apps::host::HostError;
-use crate::apps::journal;
 use crate::apps::journal::Journal;
 use crate::apps::journal::JournalError;
 use crate::apps::picks::Picks;
@@ -192,17 +191,25 @@ impl Engine<'_> {
     }
 
     /// Installs the app `id` in `setup` with every app it requires, those first, in the plan's
-    /// order, each through [`Engine::install`] and reported by an [`AppEvent`]. A required app the
-    /// machine has with no journal is taken in first, owned when `picks` has it. Once all of them
-    /// stand, each required app the user hasn't picked records the apps that brought it; a record
-    /// that can't be written is a warning, as every app stands. A failure takes back the required
-    /// apps this run installed, newest first, as well as the app's own steps.
+    /// order, each through [`Engine::install`] and reported by an [`AppEvent`], holding the run
+    /// lock from the plan to the last of them. A required app the machine has with no journal is
+    /// taken in first, owned when `picks` has it. Once all of them stand, each required app the
+    /// user hasn't picked records the apps that brought it; a record that can't be written is a
+    /// warning, as every app stands. A failure takes back the required apps this run installed,
+    /// newest first, as well as the app's own steps. An app the machine has in another setup is
+    /// checked ready to leave it before anything runs, and once it stands in `setup`, the apps it
+    /// brought for the setup it left go, as [`Engine::leave`] says.
     ///
     /// # Errors
     ///
-    /// As [`Engine::plan`], before anything runs, and [`Engine::install`].
+    /// As [`Engine::plan`] and the ready checks, before anything runs, and [`Engine::install`].
     pub fn add(&mut self, id: &str, setup: Option<&str>, picks: &Picks) -> Result<Vec<Ran>, EngineError> {
+        self.locked(|engine| engine.add_locked(id, setup, picks))
+    }
+
+    fn add_locked(&mut self, id: &str, setup: Option<&str>, picks: &Picks) -> Result<Vec<Ran>, EngineError> {
         let plan = self.plan(id, setup)?;
+        let left = self.leaving(id, setup, &plan)?;
         let of = plan.len();
         let mut ran = Vec::new();
         let mut brought = Vec::new();
@@ -249,7 +256,84 @@ impl Engine<'_> {
                 ));
             }
         }
+        ran.extend(self.leave(id, &left, picks));
         Ok(ran)
+    }
+
+    /// The apps the setup the machine has the app `id` in requires and an install of it in
+    /// `setup`, planned as `plan`, doesn't: none when the machine hasn't it in another setup. The
+    /// app is checked ready in both setups, as the switch undoes the old one's steps.
+    fn leaving(&mut self, id: &str, setup: Option<&str>, plan: &[Planned]) -> Result<Vec<String>, EngineError> {
+        let Some(journal) = Journal::read(self.user.journals(), id).map_err(EngineError::Journal)? else {
+            return Ok(Vec::new());
+        };
+        if journal.setup.as_deref() == setup {
+            return Ok(Vec::new());
+        }
+        let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
+        self.ready(&folder, setup)?;
+        self.ready(&folder, journal.setup.as_deref())?;
+        let had = journal.setup.as_deref().and_then(|s| folder.setup(s));
+        Ok(folder
+            .requires(had)
+            .map(|r| r.id().to_owned())
+            .filter(|required| plan.iter().all(|p| &p.id != required))
+            .collect())
+    }
+
+    /// Lets go of the apps in `left`, which the setup the app `id` left required: each forgets
+    /// that `id` brought it, and one that nothing installed brought besides, no installed app
+    /// requires and `picks` hasn't goes, through [`Engine::remove_with`], each reported removed.
+    /// One that can't be removed is a warning, and keeps `id` as what brought it, so the app's
+    /// own removal takes it.
+    fn leave(&mut self, id: &str, left: &[String], picks: &Picks) -> Vec<Ran> {
+        let mut ran = Vec::new();
+        for gone in left {
+            let journals = match Journal::all(self.user.journals()) {
+                Ok(journals) => journals,
+                Err(e) => {
+                    self.warn(format!("the apps left aside stay: {}", crate::update::event::chain(&e)));
+                    return ran;
+                }
+            };
+            let Some(mut journal) = journals.iter().find(|j| &j.app == gone).cloned() else {
+                continue;
+            };
+            if !journal.brought_by.iter().any(|by| by == id) {
+                continue;
+            }
+            let installed = |app: &str| journals.iter().any(|j| j.app == app && j.complete);
+            let kept = picks.has(gone)
+                || journal.brought_by.iter().any(|by| by != id && installed(by))
+                || self.needing(gone, &[]).is_ok_and(|n| !n.is_empty());
+            if kept {
+                journal.brought_by.retain(|by| by != id);
+                if let Err(e) = journal.save(self.user.journals()) {
+                    self.warn(format!(
+                        "{} stays when the apps that need it go: {}",
+                        self.name_of(gone),
+                        crate::update::event::chain(&e)
+                    ));
+                }
+                continue;
+            }
+            match self.remove_with(gone, picks) {
+                Ok(removed) => ran.extend(removed.into_iter().map(|r| Ran {
+                    finished: Finished {
+                        removed: true,
+                        ..r.finished
+                    },
+                    ..r
+                })),
+                Err(e) => self.warn(format!(
+                    "{} was there only for {}, and couldn't be removed: {}; kubaos app remove {gone} tries again",
+                    self.name_of(gone),
+                    self.name_of(id),
+                    crate::update::event::chain(&e)
+                )),
+            }
+        }
+        ran
     }
 
     /// Records in the app `id`'s journal that `by` brought it.
@@ -301,6 +385,10 @@ impl Engine<'_> {
     /// [`EngineError::Needed`] while an installed app requires `id`, before anything runs; else as
     /// [`Engine::remove`] of `id`.
     pub fn remove_with(&mut self, id: &str, picks: &Picks) -> Result<Vec<Ran>, EngineError> {
+        self.locked(|engine| engine.remove_with_locked(id, picks))
+    }
+
+    fn remove_with_locked(&mut self, id: &str, picks: &Picks) -> Result<Vec<Ran>, EngineError> {
         let needing = self.needing(id, &[])?;
         if !needing.is_empty() {
             return Err(EngineError::Needed {
@@ -426,7 +514,10 @@ impl Engine<'_> {
     /// since (a release moved its steps: an install brings it up to date first), else the step
     /// that failed.
     pub fn configure(&mut self, id: &str) -> Result<Ran, EngineError> {
-        let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
+        self.locked(|engine| engine.configure_locked(id))
+    }
+
+    fn configure_locked(&mut self, id: &str) -> Result<Ran, EngineError> {
         let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
         let journal = Journal::read(self.user.journals(), id)
             .map_err(EngineError::Journal)?
