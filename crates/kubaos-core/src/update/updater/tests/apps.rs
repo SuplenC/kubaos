@@ -1343,6 +1343,83 @@ fn the_browser_repos_migration_refreshes_only_the_repositories_kubaos_set_up_and
 }
 
 #[test]
+fn the_communication_repos_migration_refreshes_only_what_kubaos_set_up_and_untrusts_slacks_keys() {
+    let w = world();
+    for id in ["signal", "slack", "element", "zulip"] {
+        with_app(&w, id);
+    }
+    let mut m = fake(&w, &[]);
+    w.updater(&mut m)
+        .add_apps(&names(&["signal", "slack", "element"]), None)
+        .unwrap();
+    let dir = w.tmp.path().join("migration");
+    let sources = dir.join("sources.list.d");
+    let zulips_own =
+        "Types: deb\nURIs: https://download.zulip.com/desktop/apt\nSigned-By: /usr/share/keyrings/zulip-desktop.asc\n";
+    put(&sources.join("zulip-desktop.sources"), zulips_own);
+    let trusted = dir.join("trusted.gpg.d");
+    let manifest =
+        crate::apt::Manifest::read(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../system/packages.toml"))
+            .unwrap()
+            .unwrap();
+    let slack = &manifest.repos()["slack"];
+    put(&trusted.join("slack-desktop.gpg"), &slack.key_url);
+    put(&trusted.join("packagecloud.gpg"), &slack.global_fingerprints[0]);
+    put(&trusted.join("someone.gpg"), "https://example.com/someone.asc");
+    let sandbox = key_sandbox(&dir, "element");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let migration = fs::read_dir(root.join("migrations/system"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.to_string_lossy().ends_with("-communication-repos.sh"))
+        .unwrap();
+
+    let out = sandbox
+        .command("bash")
+        .args(["-euo", "pipefail"])
+        .arg(&migration)
+        .env("KUBAOS_DIR", &root)
+        .env("APT_SOURCES_D", &sources)
+        .env("APT_TRUSTED_D", &trusted)
+        .env("KUBAOS_APP_JOURNALS", w.sys.app_journals())
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    let calls = sandbox.calls();
+    let wrote = |file: &str| {
+        calls
+            .iter()
+            .any(|c| c.starts_with("sudo install -D -m 0644 ") && c.ends_with(&format!(" {file}")))
+    };
+    let at = |name: &str| sources.join(name).display().to_string();
+    assert!(
+        wrote(&at("signal.sources")) && wrote(&at("slack.sources")),
+        "{calls:#?}"
+    );
+    assert!(
+        !wrote(&at("zulip-desktop.sources")),
+        "Zulip was installed by hand: {calls:#?}"
+    );
+    assert_eq!(
+        fs::read_to_string(sources.join("zulip-desktop.sources")).unwrap(),
+        zulips_own
+    );
+    assert!(!wrote(&at("element.sources")), "{calls:#?}");
+    assert!(stderr.contains("apt repository element not refreshed"), "{stderr}");
+    let removed: Vec<&str> = calls.iter().filter_map(|c| c.strip_prefix("sudo rm -f ")).collect();
+    let gone = |name: &str| trusted.join(name).display().to_string();
+    assert_eq!(
+        removed,
+        [gone("slack-desktop.gpg"), gone("packagecloud.gpg")],
+        "Slack's keys, trusted for every repository, go; another's stays"
+    );
+    let updates = calls.iter().filter(|c| *c == "sudo apt-get update").count();
+    assert_eq!(updates, 1, "one apt update for every repository: {calls:#?}");
+}
+
+#[test]
 fn zen_is_its_pinned_appimage_with_an_entry_that_runs_it_and_its_profile_stays() {
     let w = world();
     let folder = with_app(&w, "zen-browser");
