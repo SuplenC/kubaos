@@ -799,25 +799,6 @@ fn no_destructive_action_of_kubaos_toml_has_words_of_its_title_as_a_keyword() {
     }
 }
 
-#[test]
-fn no_word_of_the_chrome_app_is_a_keyword_of_installing_or_removing_it() {
-    let (registry, _) = Registry::from_config(&shipped(), &crate::toggles::ids());
-    let app = ["google", "chrome", "web", "browser", "google-chrome"];
-
-    for id in ["packages-chrome-off", "packages-chrome-on"] {
-        let item = registry
-            .items(&States::default())
-            .find(|item| item.id == id)
-            .expect("the Chrome action");
-        for keyword in &item.keywords {
-            assert!(
-                !app.contains(&keyword.to_lowercase().as_str()),
-                "`{id}` has `{keyword}`, a word of the Chrome app, as a keyword"
-            );
-        }
-    }
-}
-
 /// The `[extensions.kubaos]` table of the Defaults.
 fn shipped() -> Table {
     let defaults: Table = toml::from_str(include_str!("../../../../config/kotodama/kubaos.toml")).expect("kubaos.toml");

@@ -122,7 +122,7 @@ pub const UPDATE_BITWARDEN: &str = "update.bitwarden";
 /// Whether `kubaos update` moves Nix to the newest patch release of its minor.
 pub const UPDATE_NIX: &str = "update.nix";
 
-/// What starts the state of an optional package group, `packages.chrome`.
+/// What starts the state of an optional package group, `packages.piv`.
 const PACKAGES: &str = "packages.";
 /// What starts the state of a Suite of the catalog, `kubaos.suites.go`.
 const SUITES: &str = "kubaos.suites.";

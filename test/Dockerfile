@@ -126,7 +126,6 @@ COPY system/files/xkb/ /opt/dotfiles/system/files/xkb/
 COPY system/files/polkit/ /opt/dotfiles/system/files/polkit/
 COPY system/files/keyboard/ /opt/dotfiles/system/files/keyboard/
 COPY system/files/hyprland-autostart.zsh /opt/dotfiles/system/files/
-COPY system/files/xdg/ /opt/dotfiles/system/files/xdg/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update \

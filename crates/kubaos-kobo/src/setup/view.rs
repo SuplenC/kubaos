@@ -558,7 +558,7 @@ fn explain<'a>(s: &'a Setup, c: &'a CardStatus, look: &Look) -> Vec<El<'a>> {
                 ));
             }
             if *configured {
-                v.push(keys_overview(folders, overview, agent.as_ref(), look));
+                v.push(keys_overview(folders, overview, *desktop, agent.as_ref(), look));
             }
             if st != State::Done {
                 v.push(para(
@@ -695,10 +695,12 @@ fn phone_explain<'a>(s: &Setup, link: &kubaos_core::phone::Status, st: State, lo
     v
 }
 
-/// The SSH keys the last pull found, read-only: what each became, and what serves them.
+/// The SSH keys the last pull found, read-only: what each became, and what serves them, which
+/// is nothing without Bitwarden desktop.
 fn keys_overview<'a>(
     folders: &[String],
     overview: &kubaos_core::bitwarden::Overview,
+    desktop: bool,
     agent: Option<&kubaos_core::bitwarden::Agent>,
     look: &Look,
 ) -> El<'a> {
@@ -721,6 +723,9 @@ fn keys_overview<'a>(
         lines.push(format!("No SSH keys in {scope}."));
     }
     lines.push(match agent {
+        None | Some(Agent::Off) if !desktop => {
+            "Bitwarden desktop isn't installed, so nothing serves these keys: kubaos app add bitwarden.".into()
+        }
         None | Some(Agent::Off) => {
             "The desktop app's SSH agent is off. In Bitwarden desktop: Settings, Enable SSH agent.".into()
         }

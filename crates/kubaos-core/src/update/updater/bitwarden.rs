@@ -1,5 +1,5 @@
 //! The update's Bitwarden phase: Bitwarden desktop moved to the newest release of its series,
-//! installed as `system/70-bitwarden.sh` installs it, from the `.deb` GitHub publishes, checked
+//! installed as the Apps catalog installs it, from the `.deb` GitHub publishes, checked
 //! against the sha256 digest GitHub publishes for that asset.
 //!
 //! In order: the installed version from dpkg (no phase without one, as on arm64, which has no

@@ -1278,44 +1278,6 @@ keywords = ["apt", "packages", "manifest", "installed", "missing", "debian", "ub
 run = ["kubaos", "packages", "status"]
 terminal = true
 
-[extensions.kubaos.actions.packages-docker-on]
-title = "Install Docker"
-subtitle = "Docker CE from Docker's repo, kept by every update"
-icon = "list-add"
-keywords = ["docker", "containers", "apt", "packages", "enable"]
-run = ["kubaos", "packages", "enable", "docker"]
-terminal = true
-shown_when = { state = "packages.docker", is = false }
-
-[extensions.kubaos.actions.packages-docker-off]
-title = "Remove Docker"
-subtitle = "Docker CE goes, and no update brings it back"
-icon = "list-remove"
-keywords = ["containers", "apt", "packages", "disable", "uninstall"]
-run = ["kubaos", "packages", "disable", "docker"]
-terminal = true
-confirm = true
-shown_when = { state = "packages.docker", is = true }
-
-[extensions.kubaos.actions.packages-chrome-on]
-title = "Install Google Chrome"
-subtitle = "The web browser, from Google's repo, kept by every update (amd64)"
-icon = "list-add"
-keywords = ["apt", "packages", "enable"]
-run = ["kubaos", "packages", "enable", "chrome"]
-terminal = true
-shown_when = { state = "packages.chrome", is = false }
-
-[extensions.kubaos.actions.packages-chrome-off]
-title = "Remove Google Chrome"
-subtitle = "Chrome goes, and no update brings it back"
-icon = "list-remove"
-keywords = ["apt", "packages", "disable", "uninstall"]
-run = ["kubaos", "packages", "disable", "chrome"]
-terminal = true
-confirm = true
-shown_when = { state = "packages.chrome", is = true }
-
 [extensions.kubaos.actions.packages-u2f-on]
 title = "Use a security key for sudo"
 subtitle = "pam_u2f for sudo, polkit and the lock screen; the password stays"
