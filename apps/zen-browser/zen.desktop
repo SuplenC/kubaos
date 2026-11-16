@@ -1,30 +1,26 @@
 [Desktop Entry]
+Type=Application
 Name=Zen Browser
 GenericName=Web Browser
-Comment=A fast, private and secure web browser built to improve your day-to-day experience.
+Comment=Browse the web, with the tabs in a sidebar
 Exec="@HOME@/.local/opt/zen-browser/zen.AppImage" %u
 Icon=zen-browser
-Type=Application
-MimeType=application/json;application/pdf;application/rdf+xml;application/rss+xml;application/x-xpinstall;application/xhtml+xml;application/xml;audio/flac;audio/ogg;audio/webm;image/avif;image/gif;image/jpeg;image/png;image/svg+xml;image/webp;text/html;text/xml;video/ogg;video/webm;x-scheme-handler/chrome;x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/mailto;
+Terminal=false
+StartupNotify=true
 StartupWMClass=zen
 Categories=Network;WebBrowser;
-StartupNotify=true
-Terminal=false
-Keywords=Internet;WWW;Browser;Web;Explorer;
-Actions=new-window;new-blank-window;new-private-window;profilemanager;
+Keywords=browser;web;internet;firefox;
+MimeType=text/html;text/xml;application/xhtml+xml;application/xml;application/pdf;application/json;application/rss+xml;application/rdf+xml;application/x-xpinstall;image/avif;image/gif;image/jpeg;image/png;image/svg+xml;image/webp;audio/flac;audio/ogg;audio/webm;video/ogg;video/webm;x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/mailto;x-scheme-handler/chrome;
+Actions=new-window;private-window;profiles;
 
 [Desktop Action new-window]
 Name=New Window
-Exec="@HOME@/.local/opt/zen-browser/zen.AppImage" %u
+Exec="@HOME@/.local/opt/zen-browser/zen.AppImage" --new-window %u
 
-[Desktop Action new-blank-window]
-Name=New Blank Window
-Exec="@HOME@/.local/opt/zen-browser/zen.AppImage" --blank-window %u
-
-[Desktop Action new-private-window]
+[Desktop Action private-window]
 Name=New Private Window
 Exec="@HOME@/.local/opt/zen-browser/zen.AppImage" --private-window %u
 
-[Desktop Action profilemanager]
-Name=Open Profile Manager
-Exec="@HOME@/.local/opt/zen-browser/zen.AppImage" --ProfileManager %u
+[Desktop Action profiles]
+Name=Profiles
+Exec="@HOME@/.local/opt/zen-browser/zen.AppImage" --ProfileManager
