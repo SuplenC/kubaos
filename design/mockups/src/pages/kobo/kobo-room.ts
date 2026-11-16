@@ -115,23 +115,40 @@ function tracksNow(move: Move): readonly Track[] {
  * Plays `tracks` on `root` as the players do: each on its targets, from its cue for its duration,
  * on its curve or the neon's steps, holding its first value until its cue and its last after.
  * Returns when the last one ends.
+ *
+ * Where several tracks move one property of one element (the street going dark, then lighting up),
+ * only the first to start holds its starting value before its cue; a later one would hold its own
+ * over the earlier track the whole time it waits. They are started in the order they
+ * start, so each later one lies over the one before once it runs.
  */
 export function play(root: HTMLElement, tracks: readonly Track[]): Promise<void> {
   const speed = settings().speed;
   let longest = 0;
-  for (const track of tracks) {
+  const timed = tracks.map((track) => ({ track, delay: cueOf(track) / speed })).sort((a, b) => a.delay - b.delay);
+  const held = new Map<Element, Set<string>>();
+  for (const { track, delay } of timed) {
     const targets = root.matches(track.target) ? [root] : [...root.querySelectorAll<HTMLElement>(track.target)];
     const from = css(track.from);
     const to = css(track.to);
     const duration = ms(track.duration);
-    const delay = cueOf(track) / speed;
     longest = Math.max(longest, delay + duration);
     const frames: Keyframe[] = struck(track.curve)
       ? stepsOf(track.curve).map((part) => ({ [track.property]: typeof from === "number" && typeof to === "number" ? from + (to - from) * part : part < 0.5 ? from : to }))
       : [{ [track.property]: from }, { [track.property]: to }];
-    const easing = struck(track.curve) ? `steps(${frames.length}, jump-none)` : `cubic-bezier(${bezier(track.curve).join(", ")})`;
+    const easing = struck(track.curve) ? "linear" : `cubic-bezier(${bezier(track.curve).join(", ")})`;
     for (const target of targets) {
-      const run = target.animate(struck(track.curve) ? frames : frames, { duration, delay, easing: struck(track.curve) ? "linear" : easing, fill: "both" });
+      const moved = held.get(target) ?? new Set<string>();
+      held.set(target, moved);
+      const first = !moved.has(track.property);
+      moved.add(track.property);
+      // A strike's frames open on its first flicker, not on where it starts from: before its cue it
+      // holds its starting value as the element's own, not its first frame.
+      if (first && struck(track.curve)) {
+        if (track.property === "opacity") target.style.opacity = String(from);
+        else target.style.setProperty(track.property, String(from));
+      }
+      const fill: FillMode = first && !struck(track.curve) ? "both" : "forwards";
+      const run = target.animate(frames, { duration, delay, easing, fill });
       // The end state is the element's own once the move is over, so a later move starts from it.
       run.finished.then(() => {
         if (track.property === "opacity") target.style.opacity = String(to);
@@ -645,7 +662,10 @@ export function room(options: RoomOptions): HTMLElement {
   const arrive = (at: At): HTMLElement => {
     const arriving = layerOf(at);
     const shown = [...element.children].filter((child) => child.classList.contains("k-backdrop") && !child.hasAttribute("data-under"));
-    if ("scene" in at) (shown.at(-1) ?? element.firstChild)?.after(arriving) ?? element.prepend(arriving);
+    const top = shown.at(-1);
+    // HAZARD: `after` returns nothing, so an `after(…) ?? prepend(…)` chain always prepends too,
+    // burying an arriving scene under the one it should cover until the move ends.
+    if ("scene" in at && top) top.after(arriving);
     else element.prepend(arriving);
     if ("scene" in at && !element.querySelector(".kobo-foot")) arriving.after(foot(machine));
     return arriving;
@@ -1121,6 +1141,9 @@ export const FINISHING: Move = {
   unflickered: ENDING(arrival("standard")) as unknown as NonEmpty<Track<Easing>>,
   reduced: [
     { part: "the install's words", on: INSTALL, target: ".kobo-scene[data-scene='installing'] > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    // The street stays at its own size, as the install left it: the done screen's picture comes
+    // close only as a move, and two pictures at two sizes fading over each other double every sign.
+    { part: "the street, as it is", on: DONE, target: ".kobo-scene[data-scene='done'] .k-backdrop-picture", property: "scale", from: 1, to: 1, duration: "instant", curve: "standard" },
     { part: "the done screen", on: DONE, target: ".kobo-scene[data-scene='done']", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",

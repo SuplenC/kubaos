@@ -596,7 +596,9 @@ export const ENDS: Move = {
   what: "The cards rise off over `medium`; then the done screen's arrival: the desktop dark, クバ written and struck, the desktop lit and close.",
   tracks: [...LEAVE_CARDS(), ...after("medium", arrival("neon.strike", HEADLINE))] as unknown as NonEmpty<Track>,
   unflickered: [...LEAVE_CARDS(), ...after("medium", arrival("standard", HEADLINE))] as unknown as NonEmpty<Track<Easing>>,
-  reduced: [fading(".kobo-panel", "the cards", "the cards", 1, 0), { ...fading(".kobo-scene", "the ending", ENDING), cue: "short" }],
+  // The cards go, not the desktop under them, which stays until the ending lies over it: no frame
+  // between them is empty.
+  reduced: [fading(".kobo-panel > .k-backdrop-thing", "the cards", "the cards", 1, 0), { ...fading(".kobo-scene", "the ending", ENDING), cue: "short" }],
   back: "cuts",
   sample: () => setupRoom({ place: { at: "ending" }, views: SOME, skipped: ["yubikey", "phone"], leaving: { at: "card", card: "phone" } }),
 };
