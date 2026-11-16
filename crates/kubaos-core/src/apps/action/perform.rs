@@ -607,6 +607,9 @@ fn undo_packages(host: &mut dyn Host, mine: &[String], dependencies: &[String]) 
             return Err(PerformError::AptTakes { packages: others });
         }
     }
+    // One the user has since installed by name is theirs now, and stays.
+    let theirs = host.manual(&pulled).map_err(PerformError::Host)?;
+    let pulled: Vec<String> = pulled.into_iter().filter(|p| !theirs.contains(p)).collect();
     let mut gone = there;
     gone.extend(unneeded(host, &gone, pulled)?);
     if gone.is_empty() {
