@@ -65,8 +65,11 @@ impl Machine {
         let bin = m.path("bin");
         fs::create_dir_all(&bin).expect("make bin");
         fs::create_dir_all(m.path("home")).expect("make the home");
-        fs::write(m.path("installed"), installed.iter().map(|p| format!("{p}\n")).collect::<String>())
-            .expect("write the installed packages");
+        let mut packages = String::new();
+        for p in installed {
+            let _ = writeln!(packages, "{p}");
+        }
+        fs::write(m.path("installed"), packages).expect("write the installed packages");
         executable(&bin.join("sudo"), "exec \"$@\"");
         executable(&bin.join("dpkg"), "echo amd64");
         executable(
@@ -88,7 +91,11 @@ impl Machine {
 
     /// Runs the release's migration `slug` of `kind`, as the update would.
     fn migrate(&self, kind: &str, slug: &str) {
-        let path = format!("{}:{}", self.path("bin").display(), std::env::var("PATH").unwrap_or_default());
+        let path = format!(
+            "{}:{}",
+            self.path("bin").display(),
+            std::env::var("PATH").unwrap_or_default()
+        );
         let out = Command::new("bash")
             .args(["-euo", "pipefail"])
             .arg(migration(kind, slug))
@@ -121,11 +128,10 @@ impl Machine {
     }
 
     fn dpkg(&self) -> Dpkg {
-        let lines: String = self
-            .installed
-            .iter()
-            .map(|p| format!("installed install {p} 1.0\n"))
-            .collect();
+        let mut lines = String::new();
+        for p in &self.installed {
+            let _ = writeln!(lines, "installed install {p} 1.0");
+        }
         Dpkg::parse(&lines)
     }
 }
@@ -197,7 +203,11 @@ fn a_machine_with_all_three_keeps_them_and_has_them_picked() {
 
 #[test]
 fn a_group_the_user_turned_off_is_not_picked_and_nothing_is_installed() {
-    let m = Machine::new(&["google-chrome-stable"], &[("google-chrome-stable", "chrome")], "docker=off\n");
+    let m = Machine::new(
+        &["google-chrome-stable"],
+        &[("google-chrome-stable", "chrome")],
+        "docker=off\n",
+    );
 
     m.update();
 

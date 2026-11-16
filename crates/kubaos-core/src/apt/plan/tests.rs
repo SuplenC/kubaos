@@ -241,12 +241,17 @@ fn chrome_in_the_catalog(dpkg: &str) -> Machine {
 
 #[test]
 fn a_package_of_the_catalogs_apps_is_never_installed_or_removed_by_the_manifest() {
-    let mut m = chrome_in_the_catalog("installed install google-chrome-stable 1
-");
+    let mut m = chrome_in_the_catalog(
+        "installed install google-chrome-stable 1
+",
+    );
     m.record.add("google-chrome-stable", "chrome");
     m.manifest = Manifest::parse(&MANIFEST.replace("google-chrome-stable", "x-gone")).unwrap();
 
-    assert!(removable(&m.facts(), None).is_empty(), "listed by no group, and still the catalog's");
+    assert!(
+        removable(&m.facts(), None).is_empty(),
+        "listed by no group, and still the catalog's"
+    );
     assert!(Status::new(&m.facts(), &BTreeSet::new()).extra.is_empty());
 
     let fresh = chrome_in_the_catalog("");
@@ -256,18 +261,28 @@ fn a_package_of_the_catalogs_apps_is_never_installed_or_removed_by_the_manifest(
 
 #[test]
 fn a_group_of_only_the_catalogs_packages_is_inactive_whatever_its_switch() {
-    let mut m = chrome_in_the_catalog("installed install google-chrome-stable 1
-");
-    m.manifest =
-        Manifest::parse(&MANIFEST.replace("arch = \"amd64\"\npackages = [\"google", "optional = \"off\"\npackages = [\"google"))
-            .unwrap();
+    let mut m = chrome_in_the_catalog(
+        "installed install google-chrome-stable 1
+",
+    );
+    m.manifest = Manifest::parse(&MANIFEST.replace(
+        "arch = \"amd64\"\npackages = [\"google",
+        "optional = \"off\"\npackages = [\"google",
+    ))
+    .unwrap();
     m.choices.set("chrome", Switch::On);
     m.record.add("google-chrome-stable", "chrome");
 
     let status = Status::new(&m.facts(), &BTreeSet::new());
 
     let chrome = status.groups.iter().find(|g| g.name == "chrome").unwrap();
-    assert_eq!((chrome.active, chrome.inactive.as_deref()), (false, Some("apps catalog")));
+    assert_eq!(
+        (chrome.active, chrome.inactive.as_deref()),
+        (false, Some("apps catalog"))
+    );
     assert_eq!(chrome.packages[0].state, PackageState::Installed);
-    assert!(removable(&m.facts(), Some("chrome")).is_empty(), "turning it off takes nothing");
+    assert!(
+        removable(&m.facts(), Some("chrome")).is_empty(),
+        "turning it off takes nothing"
+    );
 }

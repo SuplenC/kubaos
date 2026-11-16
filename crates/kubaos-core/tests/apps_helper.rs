@@ -400,7 +400,10 @@ fn an_apps_setup_runs_after_its_install_and_before_its_removal_for_the_caller() 
 
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let log = m.log();
-    assert!(log[0].starts_with("apt-get install -y --no-install-recommends tool"), "{log:?}");
+    assert!(
+        log[0].starts_with("apt-get install -y --no-install-recommends tool"),
+        "{log:?}"
+    );
     assert_eq!(log[1..], [format!("install_tool_access {me}")]);
 
     let removed = m.run(&["remove", "tool"]);
@@ -418,7 +421,10 @@ fn an_app_for_another_architecture_or_with_a_setup_lib_sh_lacks_is_refused() {
 
     for (args, why) in [
         (["install", "pane"], "pane is for arm64 only, and this machine is amd64"),
-        (["install", "odd"], "odd's setup needs install_nowhere, which system/lib.sh doesn't define"),
+        (
+            ["install", "odd"],
+            "odd's setup needs install_nowhere, which system/lib.sh doesn't define",
+        ),
     ] {
         let run = m.run(&args);
 

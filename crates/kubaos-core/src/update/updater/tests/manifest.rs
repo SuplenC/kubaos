@@ -481,10 +481,9 @@ packages = ["docker-ce"]
 #[test]
 fn an_update_leaves_the_packages_of_a_catalog_app_to_the_catalog() {
     let w = World::new(Channel::Edge, true);
-    let without_docker = manifest(&["curl"]).replace("[group.docker]", "[group.gone]").replace(
-        "packages = [\"docker-ce\"]",
-        "packages = [\"x-gone\"]",
-    );
+    let without_docker = manifest(&["curl"])
+        .replace("[group.docker]", "[group.gone]")
+        .replace("packages = [\"docker-ce\"]", "packages = [\"x-gone\"]");
     w.push(&[(MANIFEST, &without_docker), ("apps/docker.toml", DOCKER_APP)], true);
     put(&w.sys.apt_record(), "docker-ce\tdocker\ncurl\ttools\n");
     let mut m = fake(&["curl", "docker-ce", "libpam-u2f", "x-gone"]);
@@ -500,11 +499,17 @@ fn an_update_leaves_the_packages_of_a_catalog_app_to_the_catalog() {
 #[test]
 fn a_group_of_the_catalogs_packages_points_to_kubaos_app() {
     let w = World::new(Channel::Edge, true);
-    w.push(&[(MANIFEST, &manifest(&["curl"])), ("apps/docker.toml", DOCKER_APP)], true);
+    w.push(
+        &[(MANIFEST, &manifest(&["curl"])), ("apps/docker.toml", DOCKER_APP)],
+        true,
+    );
     w.updater(&mut fake(&["curl", "libpam-u2f"])).update(yes()).unwrap();
 
     let on = w.updater(&mut fake(&[])).set_group("docker", Switch::On).unwrap_err();
-    let off = w.updater(&mut fake(&["docker-ce"])).set_group("docker", Switch::Off).unwrap_err();
+    let off = w
+        .updater(&mut fake(&["docker-ce"]))
+        .set_group("docker", Switch::Off)
+        .unwrap_err();
 
     assert_eq!(
         on.to_string(),

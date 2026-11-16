@@ -25,7 +25,7 @@ packages = ["curl", "git"]
 summary = "Docker"
 repo = "docker"
 optional = "on"
-when_on = ["system/40-apps.sh"]
+when_on = ["system/docker-on.sh"]
 packages = [
   "docker-ce",  # the engine
   "containerd.io",
@@ -53,7 +53,7 @@ fn groups_keep_the_files_order_and_their_keys() {
     assert_eq!(docker.packages, ["docker-ce", "containerd.io"]);
     assert_eq!(docker.repo.as_deref(), Some("docker"));
     assert_eq!(docker.optional, Some(Switch::On));
-    assert_eq!(docker.when_on, ["system/40-apps.sh"]);
+    assert_eq!(docker.when_on, ["system/docker-on.sh"]);
     assert_eq!(manifest.repos()["docker"].keyring, "/etc/apt/keyrings/docker.gpg");
     assert!(manifest.lists("git") && !manifest.lists("vim"));
 }
