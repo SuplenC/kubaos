@@ -3,7 +3,7 @@
 # https://search.nixos.org/packages?show=chromium
 name = "Chromium"
 category = "browsers"
-tags = ["browser", "web", "internet", "open source", "google"]
+tags = ["browser", "web", "internet", "open source"]
 summary = "Chrome without Google's logo and with a bit less Google. Only a bit, mind."
 # From its AppStream metainfo, CC0-1.0, without the line that speaks as the project.
 description = """\

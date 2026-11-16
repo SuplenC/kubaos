@@ -946,3 +946,105 @@ fn the_setup_an_app_is_in_is_its_journals() {
 
     assert_eq!(ids(&apps), ["app-remove:lab", "app-install:lab:desktop"]);
 }
+
+/// The Items of the shipped catalog on an amd64 machine: every app's Install Items with none
+/// installed, then every app's Remove Item with all of them installed by KubaOS.
+fn shipped_items() -> Vec<Item> {
+    let dir = tempfile::tempdir().unwrap();
+    let catalog = Catalog::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps")).unwrap();
+    let journals = dir.path().join("journals");
+    let read = |journals: &Path| {
+        let status = Status::read(
+            &catalog,
+            &Picks::default(),
+            journals,
+            &journals.join("root"),
+            "amd64",
+            Some(&Dpkg::default()),
+        )
+        .unwrap();
+        Apps::new(&status).items()
+    };
+    let mut items = read(&journals);
+    for app in catalog.apps() {
+        let setup = app.setups.first().map(|s| s.id.as_str());
+        installed_journal(&journals, &app.id, setup);
+    }
+    items.extend(read(&journals));
+    items
+}
+
+/// Google Chrome's own Item, as Kotodama's apps Extension makes it from Chrome's desktop entry:
+/// its name the title, its generic name a keyword and the subtitle, its desktop id a weak keyword.
+fn open_google_chrome() -> Item {
+    Item {
+        id: "google-chrome".to_owned(),
+        kind: ItemKind::App {
+            desktop_id: "google-chrome.desktop".to_owned(),
+        },
+        identity: Some("app:google-chrome.desktop".to_owned()),
+        title: "Google Chrome".to_owned(),
+        subtitle: Some("Web Browser".to_owned()),
+        icon: Some("google-chrome".to_owned()),
+        names: Vec::new(),
+        keywords: vec!["Web Browser".to_owned()],
+        hidden: false,
+        app_only: false,
+        weak_keywords: vec!["google-chrome".to_owned()],
+        yields: false,
+        actions: vec![Action::new("open", "Open")],
+    }
+}
+
+/// How well `item` matches `query` in the Daemon's ranking: `None` when it doesn't.
+fn tier(item: &Item, query: &str) -> Option<kotodamad::rank::Tier> {
+    let haystack = kotodamad::rank::Haystack::new(item);
+    kotodamad::rank::Tiers::default().texts(
+        haystack.texts(),
+        &kotodamad::rank::Query::new(query),
+        kotodamad::rank::Matched::ALL,
+    )
+}
+
+#[test]
+fn no_install_or_remove_item_of_the_catalog_ranks_above_opening_google_chrome() {
+    let items = shipped_items();
+    let chrome = open_google_chrome();
+
+    for query in ["browser", "chrome", "google", "web"] {
+        let open = tier(&chrome, query);
+        assert!(open.is_some(), "{query} finds Google Chrome");
+        for item in &items {
+            // On an equal match an app ranks before an action, so a tie leaves Chrome first.
+            assert!(
+                tier(item, query) <= open,
+                "{query}: {} ({:?}) above Google Chrome ({open:?})",
+                item.title,
+                tier(item, query)
+            );
+        }
+    }
+}
+
+#[test]
+fn typing_chrome_or_google_ranks_google_chromes_items_above_chromiums() {
+    let items = shipped_items();
+    let of = |id: &str| -> Vec<&Item> { items.iter().filter(|i| i.id.rsplit(':').next() == Some(id)).collect() };
+    let (chrome, chromium) = (of("google-chrome"), of("chromium"));
+    assert_eq!((chrome.len(), chromium.len()), (2, 2), "an Install and a Remove each");
+
+    for query in ["chrome", "google"] {
+        for theirs in &chromium {
+            for ours in &chrome {
+                assert!(
+                    tier(ours, query) > tier(theirs, query),
+                    "{query}: {} ({:?}) not above {} ({:?})",
+                    ours.title,
+                    tier(ours, query),
+                    theirs.title,
+                    tier(theirs, query)
+                );
+            }
+        }
+    }
+}
