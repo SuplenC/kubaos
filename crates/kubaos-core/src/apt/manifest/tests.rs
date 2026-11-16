@@ -123,6 +123,22 @@ fn a_script_on_a_group_that_cant_be_turned_off_is_refused() {
 }
 
 #[test]
+fn a_repos_next_key_is_all_three_of_its_keys_or_none() {
+    let repo = "[repo.v]\nkey_url = \"https://v/k\"\nfingerprint = \"AB\"\nkeyring = \"/etc/apt/keyrings/v.gpg\"\n";
+    let whole = format!(
+        "{repo}next_key_url = \"https://v/n\"\nnext_fingerprint = \"CD\"\nnext_keyring = \"/etc/apt/keyrings/v-next.gpg\"\n"
+    );
+    let half = format!("{repo}next_fingerprint = \"CD\"\n");
+
+    let manifest = Manifest::parse(&whole).unwrap();
+    let err = Manifest::parse(&half).unwrap_err();
+
+    let keyrings: Vec<&str> = manifest.repos()["v"].keyrings().collect();
+    assert_eq!(keyrings, ["/etc/apt/keyrings/v.gpg", "/etc/apt/keyrings/v-next.gpg"]);
+    assert!(matches!(err, ManifestError::HalfNextKey { ref repo } if repo == "v"));
+}
+
+#[test]
 fn an_unknown_key_is_refused() {
     let text = "[group.x]\nsummary = \"x\"\npakages = [\"curl\"]\npackages = []\n";
 
@@ -174,11 +190,21 @@ fn the_release_manifest_parses_and_each_repo_has_its_sources_file() {
 fn rust_dump(manifest: &Manifest) -> BTreeSet<String> {
     let mut lines = BTreeSet::new();
     for (name, repo) in manifest.repos() {
+        let next = [
+            ("next_key_url", &repo.next_key_url),
+            ("next_fingerprint", &repo.next_fingerprint),
+            ("next_keyring", &repo.next_keyring),
+        ]
+        .into_iter()
+        .filter_map(|(key, value)| Some((key, value.as_ref()?)));
         for (key, value) in [
             ("key_url", &repo.key_url),
             ("fingerprint", &repo.fingerprint),
             ("keyring", &repo.keyring),
-        ] {
+        ]
+        .into_iter()
+        .chain(next)
+        {
             lines.insert(format!("repo.{name}\t{key}\t{value}"));
         }
     }

@@ -7,4 +7,4 @@ URIs: https://repo.vivaldi.com/stable/deb/
 Suites: stable
 Components: main
 Architectures: amd64
-Signed-By: /usr/share/keyrings/vivaldi-16BD9233.gpg
+Signed-By: /usr/share/keyrings/vivaldi-16BD9233.gpg /usr/share/keyrings/vivaldi-5220E3E9.gpg
