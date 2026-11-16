@@ -496,9 +496,10 @@ kubaos app add google-chrome bitwarden docker
 ```
 
 Each comes from its pinned source (Google's and Docker's apt repositories,
-Bitwarden's `.deb` checked against its sha256) with its system hooks: Chrome's
-theme colour follows the wallpaper, Bitwarden desktop starts at login, and
-you join the `docker` group. Chrome and Bitwarden desktop are amd64 only.
+Bitwarden's `.deb` checked against its sha256) with the steps of its folder in
+`apps/`: Chrome's theme colour follows the wallpaper, Bitwarden desktop starts
+at login, and you join the `docker` group. `kubaos app show <id>` lists what
+each one put on the machine. Chrome and Bitwarden desktop are amd64 only.
 
 **Verify:** log out and in, then `docker run --rm hello-world`.
 `google-chrome --version`. `kubaos app status` lists the three as installed.
