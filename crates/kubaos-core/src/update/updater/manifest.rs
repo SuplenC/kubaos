@@ -5,7 +5,8 @@
 //! (`system/apt-repo.sh`, as root); `apt-get install` of the wanted packages that have an
 //! install candidate; holding the held groups; then the removals `apt::plan` allows, each one
 //! checked first with `apt-get -s remove`, so a package something else still depends on stays.
-//! What it installed and removed goes into the record, `/var/lib/kubaos/apt-installed`.
+//! What it installed and removed goes into the record, `/var/lib/kubaos/apt-installed`. The
+//! packages of the Apps catalog's apps are the catalog's, and no sync touches them.
 //!
 //! # Owns
 //!
@@ -23,6 +24,7 @@ use super::UpdateError;
 use super::Updater;
 use super::read_or_empty;
 use super::release_of;
+use crate::apps::Catalog;
 use crate::apt::Choices;
 use crate::apt::Dpkg;
 use crate::apt::Manifest;
@@ -53,6 +55,8 @@ struct AptState {
     record: Record,
     arch: String,
     dpkg: Dpkg,
+    /// The packages the Apps catalog's apps install.
+    catalog: BTreeSet<String>,
 }
 
 impl AptState {
@@ -63,6 +67,7 @@ impl AptState {
             record: &self.record,
             arch: &self.arch,
             dpkg: &self.dpkg,
+            catalog: &self.catalog,
         }
     }
 }
@@ -108,7 +113,8 @@ impl<M: Machine> Updater<'_, M> {
     /// # Errors
     ///
     /// [`UpdateError::NoGroup`] or [`UpdateError::NotOptional`] for a group that can't be turned
-    /// on or off, else the step that failed.
+    /// on or off, [`UpdateError::InCatalog`] for one of the Apps catalog's packages, which
+    /// `kubaos app` adds and removes, else the step that failed.
     pub fn set_group(&mut self, name: &str, switch: Switch) -> Result<(), UpdateError> {
         self.begin(Command::Packages);
         let result = self.try_set_group(name, switch);
@@ -130,6 +136,18 @@ impl<M: Machine> Updater<'_, M> {
             .ok_or_else(|| UpdateError::NoGroup { name: name.to_owned() })?;
         if group.optional.is_none() {
             return Err(UpdateError::NotOptional { name: name.to_owned() });
+        }
+        let catalog = Catalog::load(&self.sys.catalog()).map_err(UpdateError::Catalog)?;
+        if plan::of_catalog(group, &catalog.packages()) {
+            let ids: Vec<&str> = catalog.installing(&group.packages).map(|a| a.id.as_str()).collect();
+            return Err(UpdateError::InCatalog {
+                name: name.to_owned(),
+                verb: match switch {
+                    Switch::On => "add",
+                    Switch::Off => "remove",
+                },
+                ids: ids.join(" "),
+            });
         }
         let script = match switch {
             Switch::On => group.when_on.clone(),
@@ -252,12 +270,16 @@ impl<M: Machine> Updater<'_, M> {
             .trim()
             .to_owned();
         let dpkg = self.dpkg()?;
+        let catalog = Catalog::load(&self.sys.catalog())
+            .map_err(UpdateError::Catalog)?
+            .packages();
         Ok(AptState {
             manifest,
             choices,
             record,
             arch,
             dpkg,
+            catalog,
         })
     }
 

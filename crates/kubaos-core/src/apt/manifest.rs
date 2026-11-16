@@ -89,6 +89,8 @@ pub enum Inactive {
     Arch(String),
     /// It is optional and off.
     Off,
+    /// Its packages are the Apps catalog's (`kubaos app`), which the manifest leaves alone.
+    Catalog,
 }
 
 impl Group {

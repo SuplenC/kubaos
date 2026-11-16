@@ -54,6 +54,7 @@ struct Machine {
     record: Record,
     arch: &'static str,
     dpkg: Dpkg,
+    catalog: BTreeSet<String>,
 }
 
 impl Machine {
@@ -64,6 +65,7 @@ impl Machine {
             record: Record::default(),
             arch: "amd64",
             dpkg: Dpkg::parse(dpkg),
+            catalog: BTreeSet::new(),
         }
     }
 
@@ -74,6 +76,7 @@ impl Machine {
             record: &self.record,
             arch: self.arch,
             dpkg: &self.dpkg,
+            catalog: &self.catalog,
         }
     }
 }
@@ -227,4 +230,44 @@ fn the_status_serializes_as_the_menu_reads_it() {
     assert_eq!(json["groups"][0]["packages"][0]["state"], "installed");
     assert_eq!(json["groups"][2]["optional"], "on");
     assert!(json["groups"][0].get("inactive").is_none());
+}
+
+/// The machine with Chrome an app of the catalog, and the chrome group kept for it.
+fn chrome_in_the_catalog(dpkg: &str) -> Machine {
+    let mut m = Machine::new(dpkg);
+    m.catalog = ["google-chrome-stable".to_owned()].into();
+    m
+}
+
+#[test]
+fn a_package_of_the_catalogs_apps_is_never_installed_or_removed_by_the_manifest() {
+    let mut m = chrome_in_the_catalog("installed install google-chrome-stable 1
+");
+    m.record.add("google-chrome-stable", "chrome");
+    m.manifest = Manifest::parse(&MANIFEST.replace("google-chrome-stable", "x-gone")).unwrap();
+
+    assert!(removable(&m.facts(), None).is_empty(), "listed by no group, and still the catalog's");
+    assert!(Status::new(&m.facts(), &BTreeSet::new()).extra.is_empty());
+
+    let fresh = chrome_in_the_catalog("");
+    let packages: Vec<String> = missing(&fresh.facts()).into_iter().map(|w| w.package).collect();
+    assert!(!packages.contains(&"google-chrome-stable".to_owned()), "{packages:?}");
+}
+
+#[test]
+fn a_group_of_only_the_catalogs_packages_is_inactive_whatever_its_switch() {
+    let mut m = chrome_in_the_catalog("installed install google-chrome-stable 1
+");
+    m.manifest =
+        Manifest::parse(&MANIFEST.replace("arch = \"amd64\"\npackages = [\"google", "optional = \"off\"\npackages = [\"google"))
+            .unwrap();
+    m.choices.set("chrome", Switch::On);
+    m.record.add("google-chrome-stable", "chrome");
+
+    let status = Status::new(&m.facts(), &BTreeSet::new());
+
+    let chrome = status.groups.iter().find(|g| g.name == "chrome").unwrap();
+    assert_eq!((chrome.active, chrome.inactive.as_deref()), (false, Some("apps catalog")));
+    assert_eq!(chrome.packages[0].state, PackageState::Installed);
+    assert!(removable(&m.facts(), Some("chrome")).is_empty(), "turning it off takes nothing");
 }
