@@ -80,12 +80,14 @@ keyring = "/usr/share/keyrings/microsoft-edge.gpg"
 # Vivaldi's repository, for the app of the catalog (apps/vivaldi/). Built for
 # amd64 only. Its key (16BD9233) expires on 2027-02-07; Vivaldi's postinst
 # already puts its next one (5220E3E9, until 2028-02-15) at the next keyring's
-# path, and once the repository is signed by that one, rewrites vivaldi.sources
-# to name it alone. Ours names both keyrings, so the repository verifies on
-# either side of that move and a repo setup never writes back the expired key
-# alone; Vivaldi's own file and ours differ only in that line. Vivaldi publishes
-# the next key only inside its .deb: the fingerprint is the one its postinst
-# carries, fetched from Ubuntu's key server.
+# path. Our vivaldi.sources names both keyrings, and differs from Vivaldi's own
+# only in that line, until Vivaldi's postinst rewrites it: every install and
+# upgrade of vivaldi-stable writes the file again, naming the one key that build
+# signs with (16BD9233 today), and /etc/default/vivaldi's repo_add_once doesn't
+# stop it once the file exists. Once Vivaldi rotates, its postinst writes the
+# new key itself; KubaOS's repo setup always writes both, never the expired key
+# alone. Vivaldi publishes the next key only inside its .deb: the fingerprint is
+# the one its postinst carries, fetched from Ubuntu's key server.
 [repo.vivaldi]
 key_url = "https://repo.vivaldi.com/archive/linux_signing_key.pub"
 fingerprint = "8D1FA52AEF58A09D889DD4221256C34716BD9233"
