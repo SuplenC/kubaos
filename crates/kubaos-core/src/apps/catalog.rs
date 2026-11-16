@@ -5,7 +5,7 @@
 //!
 //! - [`Catalog`]: loading the folders, finding an app, the packages its apps install, checking each
 //!   app's requirements (apps of the catalog with one way to be set up, no cycle) and its vendor
-//!   repositories against the package manifest.
+//!   repositories against the package manifest, and the architectures an app installs on.
 //!
 //! # Not here
 //!
@@ -17,6 +17,7 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
+use super::action::ARCHES;
 use super::action::Kind;
 use super::folder::APP_FILE;
 use super::folder::Folder;
@@ -200,6 +201,20 @@ impl Catalog {
                 self.get(r.id())
                     .is_some_and(|required| self.available(required, None, arch))
             })
+    }
+
+    /// The architectures `app` installs on, in one setup at least, of the ones the catalog knows.
+    pub fn arches(&self, app: &Folder) -> Vec<&'static str> {
+        ARCHES
+            .into_iter()
+            .filter(|arch| {
+                if app.has_setups() {
+                    app.setups.iter().any(|s| self.available(app, Some(s), arch))
+                } else {
+                    self.available(app, None, arch)
+                }
+            })
+            .collect()
     }
 
     /// The apps that require `id` in any of their setups, in id order.

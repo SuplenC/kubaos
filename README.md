@@ -42,6 +42,7 @@ One payload build at a time, they eat the RAM. How it all fits together: [`insta
 ## More
 
 - [`docs/USING.md`](docs/USING.md): keys, updates and rollbacks, daily commands, the repo map, known limitations.
+- [`docs/APPS.md`](docs/APPS.md): the Apps catalog's list, and how to see it.
 - [`docs/BRAND.md`](docs/BRAND.md): name, look and voice.
 - [`docs/RELEASE-shinjuku.md`](docs/RELEASE-shinjuku.md): the Shinjuku release.
 - [`docs/TESTING.md`](docs/TESTING.md): the test harnesses.

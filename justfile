@@ -12,6 +12,10 @@ codename := trim(read(justfile_directory() / "CODENAME"))
 default:
     @just --list
 
+# The Apps catalog as a Markdown table, from this checkout's apps/ (docs/APPS.md says what each column means).
+apps-list:
+    @cargo run -q -p kubaos-cli --bin kubaos -- app list --markdown --catalog apps
+
 # Build the payload (the whole system as a squashfs) into install/out/payload-<arch>, then check it. One at a time.
 payload arch=host:
     install/image/build --arch {{arch}} {{dirty}}

@@ -337,10 +337,10 @@ The last phase of an update refreshes fwupd's list from the LVFS and installs th
 
 ### Apps
 
-KubaOS knows how to install a few essential apps well, each from one pinned, verified source: Google Chrome (Google's signed apt repository, amd64 only), Bitwarden desktop (its release's `.deb`, checked against its sha256, amd64 only), Docker (Docker's signed apt repository), Claude Code (Anthropic's), T3 Code (its release's `.deb`, and for its service its release's `t3` runtime, each checked against its sha256) and Penpot (in a window on penpot.app, or its own Docker stack, every image pinned by digest). None of them comes with the install: you pick the ones you want; `kubaos update` keeps them installed, and you remove one only by asking.
+KubaOS knows how to install a few essential apps well, each from one pinned, verified source: Google Chrome (Google's signed apt repository, amd64 only), Bitwarden desktop (its release's `.deb`, checked against its sha256, amd64 only), Docker (Docker's signed apt repository), Claude Code (Anthropic's), T3 Code (its release's `.deb`, and for its service its release's `t3` runtime, each checked against its sha256) and Penpot (in a window on penpot.app, or its own Docker stack, every image pinned by digest). None of them comes with the install: you pick the ones you want; `kubaos update` keeps them installed, and you remove one only by asking. The whole list, with each app's setups, the apps it needs, its source and the machines it runs on, is in [`docs/APPS.md`](APPS.md), which says how to see it.
 
 ```sh
-kubaos app list                  # the catalog, and which apps you picked
+kubaos app list                  # the catalog by category, each app's summary, and which you picked
 kubaos app add google-chrome bitwarden docker   # pick them and install them: asks for your password (or security key) once; a nixpkgs app asks for none
 kubaos app add t3-code --setup service   # an app with setups: say which (desktop or service)
 kubaos app remove t3-code        # drop it and remove it

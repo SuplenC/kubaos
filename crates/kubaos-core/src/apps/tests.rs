@@ -234,6 +234,89 @@ fn the_list_and_the_status_say_what_each_app_is_in_json() {
     assert_eq!(status["apps"][0]["state"], "available");
 }
 
+/// An app of `category` whose `about` follows its name.
+fn app_in(name: &str, category: &str, rest: &str) -> String {
+    format!(
+        "name = \"{name}\"\ncategory = \"{category}\"\ntags = [\"fixture\"]\nsummary = \"{name}, for the tests\"\n\
+         description = \"An app the tests list.\"\ndescription_from = \"kubaos\"\n{rest}"
+    )
+}
+
+#[test]
+fn the_list_groups_the_apps_by_category_and_says_where_each_comes_from_and_runs() {
+    let (_dir, catalog) = catalog_of(&[
+        (
+            "chat",
+            app_in(
+                "Chat",
+                "communication",
+                "requires = [\"browser\"]\n[[action]]\nname = \"Window\"\nkind = \"web_app\"\nid = \"chat\"\n\
+                 title = \"Chat\"\nurl = \"https://chat.example/\"\nicon = \"chat.svg\"\n",
+            ),
+        ),
+        (
+            "browser",
+            app_in(
+                "Browser",
+                "browsers",
+                "[[action]]\nname = \"Install it\"\nkind = \"apt\"\nrepo = \"vendor\"\narch = \"amd64\"\npackages = [\"browser\"]\n",
+            ),
+        ),
+        (
+            "editor",
+            app_in(
+                "Editor",
+                "development",
+                "[[action]]\nname = \"Install it\"\nkind = \"apt\"\npackages = [\"editor\"]\n\
+                 [[action]]\nname = \"Its plugins\"\nkind = \"nix\"\npackages = [\"editor-plugins\"]\n\
+                 [[action]]\nname = \"Again\"\nkind = \"apt\"\npackages = [\"editor-extra\"]\n",
+            ),
+        ),
+        (
+            "atlas",
+            app_in(
+                "Atlas",
+                "development",
+                "[setup.web]\nname = \"Atlas\"\nsummary = \"in a window\"\nrequires = [\"browser\"]\n\
+                 [[setup.web.action]]\nname = \"Window\"\nkind = \"web_app\"\nid = \"atlas\"\ntitle = \"Atlas\"\n\
+                 url = \"https://atlas.example/\"\nicon = \"atlas.svg\"\n\
+                 [setup.local]\nname = \"Atlas here\"\nsummary = \"on this machine\"\n\
+                 [[setup.local.action]]\nname = \"Install it\"\nkind = \"deb\"\npackage = \"atlas\"\nversion = \"1.0\"\n\
+                 arm64 = { url = \"https://atlas.example/atlas-arm64.deb\", sha256 = \"{}\" }\n",
+            )
+            .replace("{}", &"0".repeat(64)),
+        ),
+    ]);
+
+    let picks = Picks::default();
+    let listed = listing(&catalog, &picks);
+    let list = serde_json::to_value(&listed).unwrap();
+
+    let ids: Vec<&str> = listed.iter().map(|a| a.id).collect();
+    assert_eq!(ids, ["browser", "atlas", "editor", "chat"]);
+    assert_eq!(
+        list[0]["sources"],
+        serde_json::json!([{ "kind": "apt_repo", "repo": "vendor" }])
+    );
+    assert_eq!(list[0]["arches"], serde_json::json!(["amd64"]));
+    assert!(list[0].get("requires").is_none(), "{}", list[0]);
+    assert_eq!(
+        list[1]["sources"],
+        serde_json::json!([{ "kind": "deb" }, { "kind": "web_app" }])
+    );
+    assert_eq!(list[1]["arches"], serde_json::json!(["amd64", "arm64"]));
+    assert_eq!(list[1]["setups"][0]["id"], "local");
+    assert!(list[1]["setups"][0].get("requires").is_none(), "{}", list[1]);
+    assert_eq!(list[1]["setups"][1]["requires"], serde_json::json!(["browser"]));
+    assert_eq!(
+        list[2]["sources"],
+        serde_json::json!([{ "kind": "archive" }, { "kind": "nixpkgs" }])
+    );
+    assert_eq!(list[2]["arches"], serde_json::json!(["amd64", "arm64"]));
+    assert_eq!(list[3]["requires"], serde_json::json!(["browser"]));
+    assert_eq!(list[3]["arches"], serde_json::json!(["amd64"]));
+}
+
 #[test]
 fn the_picks_keep_the_setup_of_a_picked_app_only() {
     let tmp = tempfile::tempdir().unwrap();
