@@ -465,6 +465,7 @@ fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
             "codex",
             "cursor",
             "devin-desktop",
+            "discord",
             "docker",
             "element",
             "emacs",
@@ -497,6 +498,7 @@ fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
             "whatsapp",
             "zed",
             "zen-browser",
+            "zoom",
             "zulip",
         ]
     );

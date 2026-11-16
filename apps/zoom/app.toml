@@ -1,0 +1,27 @@
+# Zoom from nixpkgs, through the User flake. Zoom's own .deb is served unversioned and without a
+# published checksum, from no apt repository, so it can't be pinned. nixpkgs builds it for amd64
+# alone on Linux, and marks it unfree.
+# https://search.nixos.org/packages?show=zoom-us
+name = "Zoom"
+category = "communication"
+tags = ["meetings", "video calls", "conferencing", "webinars", "screen sharing", "work"]
+summary = "Video meetings. You're on mute, Dave. You've been on mute for ten minutes."
+# From its AppStream metainfo, CC0-1.0 (flathub/us.zoom.Zoom), its first line without the
+# "Award winning".
+description = """\
+Zoom brings video conferencing, online meetings, and group messaging into one easy-to-use \
+application."""
+description_from = "https://github.com/flathub/us.zoom.Zoom/blob/master/us.zoom.Zoom.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix), named as Zoom's own desktop entry names
+# it, so the Command menu shows it before the package is installed.
+icon = "Zoom"
+keeps = """\
+Your sign-in and Zoom's settings stay in ~/.zoom and ~/.config/zoomus.conf: install Zoom again \
+and you're still signed in."""
+
+[[action]]
+name = "Install Zoom"
+kind = "nix"
+arch = "amd64"
+unfree = true
+packages = ["zoom-us"]

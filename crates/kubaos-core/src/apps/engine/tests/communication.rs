@@ -20,7 +20,8 @@ use crate::apps::host::Host;
 use crate::apps::picks::Picks;
 use crate::unfree::Unfree;
 
-const APPS: [&str; 10] = [
+const APPS: [&str; 12] = [
+    "discord",
     "element",
     "mattermost",
     "microsoft-teams",
@@ -30,6 +31,7 @@ const APPS: [&str; 10] = [
     "telegram",
     "thunderbird",
     "whatsapp",
+    "zoom",
     "zulip",
 ];
 
@@ -224,7 +226,29 @@ fn the_apps_built_for_amd64_alone_are_unavailable_on_arm64() {
         })
         .collect();
 
-    // Signal, Slack and Zulip build for amd64 alone, Proton builds no arm64 .deb, and the web
-    // apps need Chrome, which Google builds for amd64 alone.
+    // Signal, Slack and Zulip build for amd64 alone, Proton builds no arm64 .deb, nixpkgs builds
+    // Discord and Zoom for amd64 alone, and the web apps need Chrome, which Google builds for
+    // amd64 alone.
     assert_eq!(on_arm, ["element", "mattermost", "telegram", "thunderbird"]);
+}
+
+#[test]
+fn discord_and_zoom_are_unavailable_while_the_users_nixpkgs_refuses_unfree() {
+    let catalog = Catalog::load(&shipped("discord").join("..")).unwrap();
+    let unfree: Vec<&str> = APPS
+        .into_iter()
+        .filter(|id| !catalog.available(catalog.get(id).unwrap(), None, Platform::new("amd64", Unfree::Refused)))
+        .collect();
+
+    assert_eq!(unfree, ["discord", "zoom"]);
+    for id in unfree {
+        let world = world(id);
+        world.host.state.borrow_mut().unfree = Unfree::Refused;
+        let before = world.host.snapshot();
+
+        assert!(add(&world, id).is_err(), "{id}");
+
+        assert!(world.host.state.borrow().nix.is_empty(), "{id}");
+        assert_eq!(world.host.snapshot(), before, "{id}");
+    }
 }
