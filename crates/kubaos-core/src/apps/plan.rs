@@ -119,7 +119,10 @@ impl Facts<'_> {
 
     /// Whether `setup`'s own parts are on the machine: its marker is there, or it has none.
     pub fn parts_there(&self, setup: &Setup) -> bool {
-        setup.parts.as_ref().is_none_or(|parts| self.markers.contains(&parts.marker))
+        setup
+            .parts
+            .as_ref()
+            .is_none_or(|parts| self.markers.contains(&parts.marker))
     }
 
     /// The setup the machine has `app` in: the first whose own parts are there, else the one

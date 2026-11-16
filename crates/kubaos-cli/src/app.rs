@@ -121,7 +121,11 @@ fn list(json: bool) -> ExitCode {
         let mark = if app.picked { "picked" } else { "" };
         let _ = writeln!(text, "{:<6}  {:<width$}  {}: {}", mark, app.id, app.name, app.summary);
         for setup in app.setups {
-            let mark = if app.setup == Some(setup.id.as_str()) { "picked" } else { "" };
+            let mark = if app.setup == Some(setup.id.as_str()) {
+                "picked"
+            } else {
+                ""
+            };
             let _ = writeln!(
                 text,
                 "{:<6}  {:<width$}    --setup {}: {}, {}",
@@ -194,13 +198,7 @@ fn table(status: &Status) -> String {
             .as_ref()
             .and_then(|id| app.setups.iter().find(|setup| setup.id == *id))
             .map_or(&app.name, |setup| &setup.name);
-        let mut line = format!(
-            "  {:<11} {:<6}  {:<width$}  {}",
-            app.state.word(),
-            picked,
-            app.id,
-            name
-        );
+        let mut line = format!("  {:<11} {:<6}  {:<width$}  {}", app.state.word(), picked, app.id, name);
         if let Some(version) = &app.version {
             let _ = write!(line, "  {version}");
         }

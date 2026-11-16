@@ -650,7 +650,10 @@ fn a_setup_install_ends_installed_when_the_summary_names_the_setup() {
 
     let ended = jobs.heard(Heard::ended(&id, true)).unwrap();
 
-    assert_eq!((ended.title.as_str(), ended.state), ("Lab as a service installed", JobState::Succeeded));
+    assert_eq!(
+        (ended.title.as_str(), ended.state),
+        ("Lab as a service installed", JobState::Succeeded)
+    );
 }
 
 #[test]
