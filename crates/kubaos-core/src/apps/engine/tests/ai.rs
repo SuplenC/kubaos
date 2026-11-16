@@ -47,7 +47,7 @@ arch = "amd64"
 packages = ["google-chrome-stable"]
 "#;
 
-fn shipped(id: &str) -> PathBuf {
+pub(super) fn shipped(id: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .join(CATALOG)
@@ -56,7 +56,7 @@ fn shipped(id: &str) -> PathBuf {
 
 /// A machine whose catalog is the shipped app `id`, every file of its folder copied with its mode
 /// as git keeps it, and the Chrome stand-in.
-fn world(id: &str) -> World {
+pub(super) fn world(id: &str) -> World {
     let text = fs::read_to_string(shipped(id).join("app.toml")).unwrap();
     let world = World::new(&[(id, &text), ("google-chrome", CHROME)]);
     for entry in fs::read_dir(shipped(id)).unwrap() {
@@ -74,7 +74,7 @@ fn world(id: &str) -> World {
     world
 }
 
-fn run(
+pub(super) fn run(
     world: &World,
     go: impl FnOnce(&mut Engine<'_>) -> Result<Vec<Ran>, EngineError>,
 ) -> Result<Vec<Ran>, EngineError> {

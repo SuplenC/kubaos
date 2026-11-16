@@ -129,6 +129,26 @@ key_url = "https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/windsurf.gpg
 fingerprint = "EE2C46CC44E1578C23135B0E9E608A1B9FD62A3F"
 keyring = "/etc/apt/keyrings/windsurf.gpg"
 
+# Microsoft's repository of Visual Studio Code, for the app of the catalog
+# (apps/vscode/). VS Code's postinst writes vscode.sources unless another source
+# has the repository, and its postrm deletes it and the key; ours is
+# byte-identical to what the postinst writes, at the same keyring path, so the
+# two never fight over the file.
+[repo.vscode]
+key_url = "https://packages.microsoft.com/keys/microsoft.asc"
+fingerprint = "BC528686B50D79E339D3721CEB3E94ADBE1229CF"
+keyring = "/usr/share/keyrings/microsoft.gpg"
+
+# Sublime HQ's repository of Sublime Text, for the app of the catalog
+# (apps/sublime-text/). Its sublimehq-pub.gpg holds three keys, and its
+# Release is signed by its 2017 key and by the 2025 one; this pins the 2025
+# key, from the key server, as a key file must hold the pinned key alone. Its
+# package writes no source of its own.
+[repo.sublime-text]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xEBC733B78AAB352DC773BF857FE2FA12CF6E38F2"
+fingerprint = "EBC733B78AAB352DC773BF857FE2FA12CF6E38F2"
+keyring = "/etc/apt/keyrings/sublime-text.gpg"
+
 # ppa:cppiber/hyprland, the Launchpad PPA of Constantin Piber.
 [repo.cppiber-hyprland]
 key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xA54D23B62FF3FCC76EFF71E8FDBAAA1CF0CCF48E"
