@@ -76,6 +76,11 @@ pub enum PerformError {
     Settings(SettingsError),
     #[error("installing it would remove {}, which this app didn't install; nothing was changed", packages.join(", "))]
     AptRemoves { packages: Vec<String> },
+    #[error(
+        "installing it would move {} down to a lower version, which this app didn't ask for; nothing was changed",
+        packages.join(", ")
+    )]
+    AptDowngrades { packages: Vec<String> },
     #[error("removing it would also remove {}, which this app didn't install; nothing was changed", packages.join(", "))]
     AptTakes { packages: Vec<String> },
     #[error("recording what it is about to install")]
@@ -668,8 +673,10 @@ fn apply_apt(
     host.apt_install(missing, downgrade).map_err(PerformError::Host)
 }
 
-/// Refuses a change apt would make by removing other packages; else hands `record` the claims of
-/// what it would newly install beyond `own`, the action's packages.
+/// Refuses a change apt would make by removing other packages, or by moving down a package other
+/// than `own`, the action's packages (one of which an `apt` action's `versions` lets apt move down,
+/// to replace another build of its name); else hands `record` the claims of what it would newly
+/// install beyond `own`.
 fn record_dependencies(
     simulated: AptSimulation,
     own: &[String],
@@ -679,6 +686,10 @@ fn record_dependencies(
         return Err(PerformError::AptRemoves {
             packages: simulated.removes.into_iter().collect(),
         });
+    }
+    let downgrades: Vec<String> = simulated.downgrades.into_iter().filter(|p| !own.contains(p)).collect();
+    if !downgrades.is_empty() {
+        return Err(PerformError::AptDowngrades { packages: downgrades });
     }
     let dependencies: Vec<Claim> = simulated
         .installs
@@ -703,6 +714,17 @@ fn record_dependencies(
 pub fn undo(action: &Action, host: &mut dyn Host, claims: &[Claim], prior: &Prior) -> Result<(), PerformError> {
     let owned = |prefix: &str| owned_names(claims, prefix);
     match &action.kind {
+        Kind::Apt {
+            versions: Some(versions),
+            ..
+        } => {
+            // A build of the name outside `versions` (one a refused install left in place) isn't
+            // the one the step installed.
+            let ours: Vec<String> = installed_as(host, &owned("package:"), Some(versions))?
+                .into_iter()
+                .collect();
+            undo_packages(host, &ours, &owned("dep:"))
+        }
         Kind::Apt { .. } | Kind::Deb { .. } => undo_packages(host, &owned("package:"), &owned("dep:")),
         Kind::Nix { .. } => {
             let mine = owned("nix:");

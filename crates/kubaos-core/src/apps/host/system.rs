@@ -9,6 +9,7 @@
 //!
 //! - The seam it implements: `host.rs`.
 
+use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::ffi::OsString;
@@ -27,6 +28,7 @@ use super::UNIT_PROPERTIES;
 use super::UnitState;
 use crate::apps::action::RUN_PATH;
 use crate::apps::action::Scope;
+use crate::apps::version::compare;
 use crate::apt::Manifest;
 use crate::apt::manifest::MANIFEST;
 use crate::packages::Packages;
@@ -409,19 +411,33 @@ impl Host for SystemHost {
 }
 
 /// What `apt-get -s` printed: `Remv <package> [<version>]` for each package it would remove, and
-/// `Inst <package> (<version> …)` for each it would newly install; an upgrade is
-/// `Inst <package> [<old version>] (…)`, of a package that is there already. A package of
-/// another architecture than `arch`, the machine's, keeps its `:<arch>`, as it is another package.
+/// `Inst <package> (<version> …)` for each it would newly install; a package that is there already
+/// is `Inst <package> [<old version>] (<new version> …)`, an upgrade or, when the new version sorts
+/// below the old one, a downgrade. A package of another architecture than `arch`, the machine's,
+/// keeps its `:<arch>`, as it is another package.
 fn simulation(shown: &str, arch: &str) -> AptSimulation {
-    let name = |rest: &str| rest.split_whitespace().next().map(|word| qualified(word, arch));
     let mut simulation = AptSimulation::default();
     for line in shown.lines() {
-        if let Some(rest) = line.strip_prefix("Remv ") {
-            simulation.removes.extend(name(rest));
-        } else if let Some(rest) = line.strip_prefix("Inst ")
-            && !rest.split_whitespace().nth(1).is_some_and(|w| w.starts_with('['))
-        {
-            simulation.installs.extend(name(rest));
+        let mut words = line.split_whitespace();
+        let (Some(verb), Some(package)) = (words.next(), words.next()) else {
+            continue;
+        };
+        let package = qualified(package, arch);
+        match (verb, words.next()) {
+            ("Remv", _) => {
+                simulation.removes.insert(package);
+            }
+            ("Inst", Some(old)) if old.starts_with('[') => {
+                let old = old.trim_start_matches('[').trim_end_matches(']');
+                let new = words.next().map(|w| w.trim_start_matches('('));
+                if new.is_some_and(|new| compare(new, old) == Ordering::Less) {
+                    simulation.downgrades.insert(package);
+                }
+            }
+            ("Inst", _) => {
+                simulation.installs.insert(package);
+            }
+            _ => {}
         }
     }
     simulation

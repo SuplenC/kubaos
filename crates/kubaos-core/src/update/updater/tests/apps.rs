@@ -1143,6 +1143,11 @@ fn a_browser_from_its_vendors_repository_sets_the_repository_up_and_goes_whole()
         with_app(&w, id);
     }
     let mut m = fake(&w, &[]);
+    host(&m)
+        .state
+        .borrow_mut()
+        .candidates
+        .insert("firefox".to_owned(), "160.0~build1".to_owned());
     let pin = host(&m).place(Path::new("/etc/apt/preferences.d/kubaos-firefox"));
 
     for (id, repo, package) in browsers {

@@ -126,6 +126,8 @@ pub struct AptSimulation {
     pub removes: BTreeSet<String>,
     /// The packages it would newly install: those asked for and what they need that isn't there.
     pub installs: BTreeSet<String>,
+    /// The installed packages it would move to a lower version.
+    pub downgrades: BTreeSet<String>,
 }
 
 /// Whether an install may move a package dpkg has to a lower version: only to replace another
