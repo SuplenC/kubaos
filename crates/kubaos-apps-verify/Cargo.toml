@@ -1,0 +1,21 @@
+[package]
+name = "kubaos-apps-verify"
+description = "Checks the Apps catalog's pins against their upstreams: keys, repositories, downloads, versions and web apps"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "kubaos-apps-verify"
+path = "src/main.rs"
+
+[dependencies]
+kubaos-core.workspace = true
+flate2 = "1"
+serde_json.workspace = true
+sha2 = "0.10"
+tempfile.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
