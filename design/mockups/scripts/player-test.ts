@@ -7,8 +7,13 @@
 //
 //   node scripts/player-test.ts [PAGE...]
 //
-// It fails on the first player that disagrees, naming it. The browser is nixpkgs' Playwright
-// Chromium (`PLAYWRIGHT_BROWSERS_PATH`, set by `nix develop`).
+// It names every player that disagrees and fails. The browser is nixpkgs' Playwright Chromium
+// (`PLAYWRIGHT_BROWSERS_PATH`, set by `nix develop`).
+//
+// The time goes to round trips, not to work: every other player on the page keeps playing, so
+// each call into the page waits 30 to 70 ms for the renderer while the CPU idles. A seek is one
+// call to find where to click, the click, and one call to read what it held, and the five
+// settings run side by side, each in a page of its own, so their waits overlap.
 
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -36,6 +41,8 @@ function check(ok: boolean, what: string): void {
 /** What one player shows held at a time: per ball, its progress, where it sits, and what plays. */
 interface Held {
   time: number;
+  /** The play control's words: "Play" once a seek has paused the player. */
+  control: string | null;
   balls: { part: string; progress: number; cy: number; want: number; onCurve: boolean; played: number[]; alone: number[]; followed: boolean }[];
   head: number;
   cx: number[];
@@ -84,23 +91,31 @@ async function held(page: Page, index: number): Promise<Held> {
       };
     });
     const head = Number(plot.querySelector(".page-plot-head")!.getAttribute("x1"));
-    return { time: time % Number(plot.dataset.total), balls, head, cx: balls.map((_, i) => Number(plot.querySelectorAll(".page-plot-ball")[i]!.getAttribute("cx"))) };
+    const control = player.querySelector(".page-player-controls .site-control")?.textContent ?? null;
+    return { time: time % Number(plot.dataset.total), control, balls, head, cx: balls.map((_, i) => Number(plot.querySelectorAll(".page-plot-ball")[i]!.getAttribute("cx"))) };
   }, index);
 }
 
 /** Clicks player `index`'s plot where time `t` is drawn. */
 async function seek(page: Page, index: number, t: number): Promise<void> {
-  const plot = page.locator(".page-plot").nth(index);
-  await plot.scrollIntoViewIfNeeded();
-  const { x0, x1, total } = await plot.evaluate((element) => ({
-    x0: Number(element.dataset.x0),
-    x1: Number(element.dataset.x1),
-    total: Number(element.dataset.total),
-  }));
-  const box = (await plot.boundingBox())!;
-  const zoom = box.width / (await plot.evaluate((element) => element.clientWidth));
-  const x = box.x + (x0 + (t / total) * (x1 - x0)) * zoom;
-  await page.mouse.click(x, box.y + box.height / 3);
+  const { x, y } = await page.evaluate(
+    ({ index, t }) => {
+      const plot = document.querySelectorAll<SVGSVGElement>(".page-plot")[index]!;
+      // As Playwright scrolls a locator into view: centred, and only when it isn't all in view,
+      // so the site's pinned toolbar never covers the click.
+      let box = plot.getBoundingClientRect();
+      if (box.top < 0 || box.bottom > innerHeight) {
+        plot.scrollIntoView({ block: "center" });
+        box = plot.getBoundingClientRect();
+      }
+      const zoom = box.width / plot.clientWidth;
+      const x0 = Number(plot.dataset.x0);
+      const x1 = Number(plot.dataset.x1);
+      return { x: box.x + (x0 + (t / Number(plot.dataset.total)) * (x1 - x0)) * zoom, y: box.y + box.height / 3 };
+    },
+    { index, t },
+  );
+  await page.mouse.click(x, y);
 }
 
 /** The times worth seeking a move to: inside each of its tracks' spans and each strike's steps. */
@@ -154,7 +169,7 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
     for (const t of await moments(page, index)) {
       await seek(page, index, t);
       const shown = await held(page, index);
-      check((await page.locator(".page-player").nth(index).locator(".page-player-controls .site-control").first().textContent()) === "Play", `${where}: seeking didn't pause`);
+      check(shown.control === "Play", `${where}: seeking didn't pause`);
       shown.balls.forEach((ball, i) => {
         const range = tracks[i]!;
         // A track that holds still (reduced motion's 0 to 0) has no way to go: it plays on its
@@ -286,26 +301,33 @@ async function main(): Promise<void> {
   const origin = await serve(dist);
   const browser = await chromium.launch({ executablePath: chromiumPath() });
   try {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, reducedMotion: "no-preference" });
-    const page = await context.newPage();
     const errors: string[] = [];
-    page.on("pageerror", (error) => errors.push(error.message));
+    const open = async () => {
+      // A context each, so a page's pointer, focus and hover are its own.
+      const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, reducedMotion: "no-preference" });
+      const page = await context.newPage();
+      page.on("pageerror", (error) => errors.push(error.message));
+      return page;
+    };
     // `all` draws every move in a player of its own, at its sample's own size.
     const base = "all&text=short&window=Default";
-    await page.goto(`${origin}/index.html?${base}&mode=dark&scale=1&speed=1&reduced=off&flicker=on`);
-    await page.evaluate(() => window.kubaos.ready);
-    const pages = (await page.evaluate(() => window.kubaos.pages)).filter((p) => named.length === 0 || named.includes(p.slug));
-    for (const { level, slug } of pages) {
-      for (const [settings, set] of [
-        ["mode=dark&scale=1&speed=1&reduced=off&flicker=on", "tracks"],
-        ["mode=light&scale=1.5&speed=1&reduced=off&flicker=on", "daylight"],
-        ["mode=dark&scale=1&speed=2&reduced=off&flicker=on", "tracks"],
-        ["mode=dark&scale=1&speed=1&reduced=on&flicker=on", "reduced"],
-        ["mode=dark&scale=1&speed=1&reduced=off&flicker=off", "unflickered"],
-      ] as const) {
-        await testPage(page, origin, level, slug, `${base}&${settings}`, set);
-      }
-    }
+    const first = await open();
+    await first.goto(`${origin}/index.html?${base}&mode=dark&scale=1&speed=1&reduced=off&flicker=on`);
+    await first.evaluate(() => window.kubaos.ready);
+    const pages = (await first.evaluate(() => window.kubaos.pages)).filter((p) => named.length === 0 || named.includes(p.slug));
+    const settings = [
+      ["mode=dark&scale=1&speed=1&reduced=off&flicker=on", "tracks"],
+      ["mode=light&scale=1.5&speed=1&reduced=off&flicker=on", "daylight"],
+      ["mode=dark&scale=1&speed=2&reduced=off&flicker=on", "tracks"],
+      ["mode=dark&scale=1&speed=1&reduced=on&flicker=on", "reduced"],
+      ["mode=dark&scale=1&speed=1&reduced=off&flicker=off", "unflickered"],
+    ] as const;
+    const tabs = [first, ...(await Promise.all(settings.slice(1).map(open)))];
+    await Promise.all(
+      settings.map(async ([query, set], i) => {
+        for (const { level, slug } of pages) await testPage(tabs[i]!, origin, level, slug, `${base}&${query}`, set);
+      }),
+    );
     check(errors.length === 0, `the page failed: ${errors.join("; ")}`);
   } finally {
     await browser.close();
