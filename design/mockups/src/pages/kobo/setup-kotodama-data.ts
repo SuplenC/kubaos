@@ -247,13 +247,16 @@ export const OTHERS = {
 } as const;
 
 /**
- * The second ad, a banner too wide for its slot, sliding in under the weather: only its left part
- * shows, the rest runs out past the panel's edge, cut mid-word.
+ * The second ad, a whole card too wide for its slot, sliding in under the weather: the slot shows
+ * its left part, the rest cut off by the lane's edge, mid-word.
  */
 export const SPAM = {
-  tag: "Sponsored · Vigorex Labs",
+  tag: "Sponsored",
+  advertiser: "Vigorex Labs · Clinically questionable",
   headline: "ENLARGE YOUR PERFORMANCE",
-  lines: ["Doctors hate this one weird pill", "+7 cm in 2 weeks or your money back", "Discreet shipping. Your neighbour won't know"],
+  action: "ORDER NOW · 70% OFF",
+  line: "+7 cm in 2 weeks or your money back. Doctors hate this one weird pill.",
+  fine: "Discreet shipping. Your neighbour will never know. Results not typical.",
 } as const;
 
 /** The ad Start slides over its answers: a cleaner nobody asked for, in every loud colour there is. */

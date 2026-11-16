@@ -385,7 +385,8 @@ function otherMenu(q: string, groups: readonly Group[], foot: string, more: Othe
     bar.dataset.done = "";
     if (waiting.parentElement) waiting.replaceWith(icon("hourglass_top", "var(--icon-s16)", "var(--color-on_surface_variant)"));
   };
-  // The fullest the lane holds whole: every beat, then without the news, then without the game.
+  // The fullest the lane holds whole: every beat; then without the spam; then without the news,
+  // the game and the groups' labels. The main ad is whole at every size.
   const fits = ["tall", "medium", "short"] as const;
   new ResizeObserver(() => {
     for (const fit of fits) {
@@ -425,33 +426,34 @@ function fakeAd(): HTMLElement {
   const stars = row("s4", "centre", ...Array.from({ length: 5 }, () => icon("star_filled", "var(--type-small-icon)", "var(--color-burn_error)")), filling(wrapped(AD.rating, "caption", "on_burn_warning")));
   const go = button({ label: AD.action, kind: "Danger", size: "Sm", icon: "arrow_forward", trailing: true });
   const fine = wrapped(AD.fine, "caption", "on_burn_warning");
-  // A shorter lane leaves out the stars and the small print, then the product.
-  stars.dataset.more = "";
-  fine.dataset.more = "";
-  product.dataset.less = "";
   const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "subheading", "on_burn_warning")), filling(product), filling(stars), filling(go), filling(fine));
   ad.classList.add("setup-kotodama-ad");
   return ad;
 }
 
 /**
- * Draft part, to be promoted: the second ad, a spam banner twice as wide as the room it shows in,
- * its left `size.rail` standing at the lane's right and the rest running out past the panel's
- * edge, cut there mid-word on purpose. Where the lane is short it keeps to its headline.
+ * Draft part, to be promoted: the second ad, a spam card drawn whole at its own width and set in a
+ * slot narrower than it, its left edge on the rows' edge: the slot cuts the rest off cleanly at
+ * the lane's content edge, mid-word, as a careless ad system places a banner too wide for it.
  */
 function spamAd(): HTMLElement {
-  const tagged = (element: HTMLElement) => ((element.dataset.more = ""), element);
-  const banner = stack(
-    "s4",
+  const tag = document.createElement("span");
+  tag.className = "setup-kotodama-spam-tag";
+  tag.append(text(SPAM.tag, "label", "on_burn_success"));
+  const top = row("s8", "centre", tag, text(SPAM.advertiser, "caption", "on_surface"));
+  const go = button({ label: SPAM.action, kind: "Success", size: "Sm", icon: "arrow_forward", trailing: true });
+  const card = stack(
+    "s8",
     "start",
-    tagged(text(SPAM.tag, "caption", "on_error_container")),
-    text(SPAM.headline, "headline", "burn_warning"),
-    ...SPAM.lines.map((line) => tagged(text(line, "small", "on_error_container"))),
+    top,
+    text(SPAM.headline, "display", "burn_success"),
+    row("s12", "centre", go, text(SPAM.line, "body_strong", "on_surface")),
+    text(SPAM.fine, "caption", "on_surface_variant"),
   );
-  banner.classList.add("setup-kotodama-spam-banner");
+  card.classList.add("setup-kotodama-spam-card");
   const slot = document.createElement("span");
   slot.className = "setup-kotodama-spam";
-  slot.append(banner);
+  slot.append(card);
   return slot;
 }
 
