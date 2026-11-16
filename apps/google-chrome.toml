@@ -1,0 +1,12 @@
+# Google Chrome from Google's signed apt repository, whose key system/packages.toml pins
+# ([repo.google-chrome]). Google builds it for amd64 only.
+# https://www.google.com/linux/linux_signing_key.pub
+# Its setup (install_chrome_theme in system/lib.sh) makes its theme colour follow the wallpaper.
+name = "Google Chrome"
+summary = "Google's web browser"
+setup = "chrome_theme"
+
+[apt]
+repo = "google-chrome"
+arch = "amd64"
+packages = ["google-chrome-stable"]

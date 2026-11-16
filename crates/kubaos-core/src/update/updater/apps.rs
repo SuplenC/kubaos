@@ -133,10 +133,7 @@ impl<M: Machine> Updater<'_, M> {
         let catalog = Catalog::load(&self.sys.catalog()).map_err(UpdateError::Catalog)?;
         for id in ids {
             let app = catalog.get(id).ok_or_else(|| UpdateError::NoApp { id: id.clone() })?;
-            if change == Change::Add
-                && let Source::Deb(deb) = &app.source
-                && deb.download(apps::arch()).is_none()
-            {
+            if change == Change::Add && !app.source.available(apps::arch()) {
                 return Err(UpdateError::Unavailable {
                     id: id.clone(),
                     arch: apps::arch().to_owned(),

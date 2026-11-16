@@ -1,5 +1,5 @@
-//! One app's manifest, `apps/<id>.toml`: its name, a line on what it is, and the one source it
-//! comes from.
+//! One app's manifest, `apps/<id>.toml`: its name, a line on what it is, the one source it comes
+//! from, and the setup it needs beyond its packages.
 //!
 //! The file keeps to the TOML the system scripts' awk reader understands (tables, one-line
 //! strings without escapes, booleans, arrays of strings), as the package manifest does: the root
@@ -48,6 +48,10 @@ pub enum ManifestError {
     InvalidIcon { value: String },
     #[error("{value:?} is not an https:// URL")]
     InvalidUrl { value: String },
+    #[error("{value:?} is not an architecture dpkg names: amd64 or arm64")]
+    InvalidArch { value: String },
+    #[error("{value:?} is not a setup: lowercase letters, digits and _, starting with a letter")]
+    InvalidSetup { value: String },
     #[error("{value:?} is not a sha256: 64 lowercase hex digits")]
     InvalidSha256 { value: String },
     #[error("{value:?} has a quote or a control character, which the scripts' reader can't take")]
@@ -68,6 +72,11 @@ pub struct App {
     /// The icon theme's name for it, which the Command menu shows; a generic one without.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// What it needs beyond its packages: the pair of `system/lib.sh` functions `install_<setup>`
+    /// and `remove_<setup>`, which the root helper runs after the app's install and before its
+    /// removal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub setup: Option<String>,
     pub source: Source,
 }
 
@@ -80,6 +89,9 @@ pub enum Source {
         /// The `[repo.<name>]` of `system/packages.toml` they come from.
         #[serde(skip_serializing_if = "Option::is_none")]
         repo: Option<String>,
+        /// The only architecture they are for, as `dpkg --print-architecture` names it.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        arch: Option<String>,
         packages: Vec<String>,
     },
     /// Packages of the user's nixpkgs, in the User flake's `packages.toml`, as `kubaos package
@@ -96,7 +108,8 @@ pub struct Deb {
     pub package: String,
     /// The version the downloads are, as dpkg reports it once installed.
     pub version: String,
-    /// Whether the app keeps itself current, so an installed one is never put back to the pin.
+    /// Whether the app is kept current past its pin, by itself or by an update phase of its own,
+    /// so an installed one is never put back to the pin.
     pub self_updates: bool,
     /// The download for each architecture it has one for, by [`ARCHES`]' names.
     pub downloads: Vec<(String, Download)>,
@@ -127,6 +140,16 @@ impl Source {
         }
     }
 
+    /// Whether it has something for a machine of `arch`: an apt app for every architecture or
+    /// this one, a `.deb` with a download for it, any nixpkgs app.
+    pub fn available(&self, arch: &str) -> bool {
+        match self {
+            Self::Apt { arch: Some(only), .. } => only == arch,
+            Self::Deb(deb) => deb.download(arch).is_some(),
+            Self::Apt { arch: None, .. } | Self::Nix { .. } => true,
+        }
+    }
+
     /// Whether installing or removing it needs root, through the helper.
     pub fn needs_root(&self) -> bool {
         !matches!(self, Self::Nix { .. })
@@ -139,6 +162,7 @@ struct File {
     name: String,
     summary: String,
     icon: Option<String>,
+    setup: Option<String>,
     apt: Option<AptTable>,
     nix: Option<NixTable>,
     deb: Option<DebTable>,
@@ -148,6 +172,7 @@ struct File {
 #[serde(deny_unknown_fields)]
 struct AptTable {
     repo: Option<String>,
+    arch: Option<String>,
     packages: Vec<String>,
 }
 
@@ -188,6 +213,7 @@ impl App {
         let source = match (file.apt, file.nix, file.deb) {
             (Some(apt), None, None) => Source::Apt {
                 repo: apt.repo,
+                arch: apt.arch,
                 packages: apt.packages,
             },
             (None, Some(nix), None) => Source::Nix { packages: nix.packages },
@@ -208,6 +234,7 @@ impl App {
             name: file.name,
             summary: file.summary,
             icon: file.icon,
+            setup: file.setup,
             source,
         };
         app.check()?;
@@ -223,8 +250,18 @@ impl App {
             return Err(ManifestError::InvalidIcon { value: icon.clone() });
         }
         let mut values = vec![&self.name, &self.summary];
+        if let Some(setup) = &self.setup
+            && !is_setup(setup)
+        {
+            return Err(ManifestError::InvalidSetup { value: setup.clone() });
+        }
         match &self.source {
-            Source::Apt { repo, packages } => {
+            Source::Apt { repo, arch, packages } => {
+                if let Some(arch) = arch
+                    && !ARCHES.contains(&arch.as_str())
+                {
+                    return Err(ManifestError::InvalidArch { value: arch.clone() });
+                }
                 non_empty_list("apt.packages", packages)?;
                 for name in packages {
                     if !is_package_name(name) {
@@ -305,6 +342,16 @@ fn is_icon_name(value: &str) -> bool {
         && value
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+}
+
+/// Whether `value` can name a setup: lowercase ASCII letters, digits and `_`, starting with a
+/// letter, at most 64, so `install_<setup>` is a shell function's name and never a command.
+fn is_setup(value: &str) -> bool {
+    value.len() <= 64
+        && value.chars().next().is_some_and(|c| c.is_ascii_lowercase())
+        && value
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
 /// Whether `value` can be a Debian version: letters, digits and `.+~:-`, starting with a digit.

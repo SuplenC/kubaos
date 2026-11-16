@@ -31,6 +31,35 @@ summary = "An editor"
 packages = ["editor"]
 "#;
 
+/// An app with a setup, from Ubuntu's archive.
+const TOOL: &str = r#"
+name = "Tool"
+summary = "A tool with a group"
+setup = "tool_access"
+
+[apt]
+packages = ["tool"]
+"#;
+
+/// An apt app for the other architecture than the stand-in dpkg's amd64.
+const PANE: &str = r#"
+name = "Pane"
+summary = "An arm64 app"
+
+[apt]
+arch = "arm64"
+packages = ["pane"]
+"#;
+
+/// What the copied `system/lib.sh` gets for `tool`'s setup: functions that write down that they
+/// ran, and for whom.
+fn setup_functions(log: &str) -> String {
+    format!(
+        "\ninstall_tool_access() {{ echo \"install_tool_access $TARGET_USER\" >>'{log}'; }}\n\
+         remove_tool_access() {{ echo \"remove_tool_access $TARGET_USER\" >>'{log}'; }}\n"
+    )
+}
+
 fn desk(sha: &str) -> String {
     format!(
         r#"
@@ -69,8 +98,9 @@ struct Run {
 }
 
 impl Machine {
-    /// The catalog of agent (apt, from a vendor repo), desk (a pinned .deb, its sha `desk_sha`)
-    /// and editor (nixpkgs), and a machine with `installed` (`name version` each).
+    /// The catalog of agent (apt, from a vendor repo), desk (a pinned .deb, its sha `desk_sha`),
+    /// editor (nixpkgs), tool (apt, with a setup), pane (apt, for arm64 only) and odd (a setup
+    /// `system/lib.sh` lacks), and a machine with `installed` (`name version` each).
     fn new(desk_sha: &str, installed: &[&str]) -> Self {
         let m = Self {
             dir: tempfile::tempdir().expect("a temp dir"),
@@ -79,7 +109,15 @@ impl Machine {
         for dir in ["checkout/apps", "checkout/system", "bin"] {
             fs::create_dir_all(root.join(dir)).expect("make the folders");
         }
-        for (id, text) in [("agent", AGENT), ("desk", &desk(desk_sha)), ("editor", EDITOR)] {
+        let odd = TOOL.replace("tool_access", "nowhere");
+        for (id, text) in [
+            ("agent", AGENT),
+            ("desk", &desk(desk_sha)),
+            ("editor", EDITOR),
+            ("tool", TOOL),
+            ("pane", PANE),
+            ("odd", &odd),
+        ] {
             fs::write(root.join(format!("checkout/apps/{id}.toml")), text).expect("write a manifest");
         }
         for script in ["lib.sh", "manifest.sh"] {
@@ -92,6 +130,9 @@ impl Machine {
         fs::write(root.join("checkout/system/packages.toml"), "").expect("write the package manifest");
         let log = m.log_path();
         let log = log.display();
+        let lib = root.join("checkout/system/lib.sh");
+        let text = fs::read_to_string(&lib).expect("read the copied lib.sh");
+        fs::write(&lib, text + &setup_functions(&log.to_string())).expect("add the setup's stand-ins");
         let state = root.join("dpkg");
         let state = state.display();
         let line = |name: &str| format!("echo \"{name} $*\" >>'{log}'");
@@ -347,4 +388,42 @@ fn remove_takes_the_apps_installed_packages_and_nothing_else() {
         ["apt-get remove -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold agent desk"]
     );
     assert_eq!(m.installed(), "vim 9.1\n");
+}
+
+#[test]
+fn an_apps_setup_runs_after_its_install_and_before_its_removal_for_the_caller() {
+    let m = Machine::new(DESK_SHA, &[]);
+    let me = String::from_utf8(Command::new("id").arg("-un").output().expect("id").stdout).expect("a name");
+    let me = me.trim();
+
+    let run = m.run(&["install", "tool"]);
+
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let log = m.log();
+    assert!(log[0].starts_with("apt-get install -y --no-install-recommends tool"), "{log:?}");
+    assert_eq!(log[1..], [format!("install_tool_access {me}")]);
+
+    let removed = m.run(&["remove", "tool"]);
+
+    assert_eq!(removed.code, Some(0), "{}", removed.stderr);
+    let log = m.log();
+    assert_eq!(log[2], format!("remove_tool_access {me}"));
+    assert!(log[3].starts_with("apt-get remove -y"), "{log:?}");
+    assert_eq!(log.len(), 4, "{log:?}");
+}
+
+#[test]
+fn an_app_for_another_architecture_or_with_a_setup_lib_sh_lacks_is_refused() {
+    let m = Machine::new(DESK_SHA, &[]);
+
+    for (args, why) in [
+        (["install", "pane"], "pane is for arm64 only, and this machine is amd64"),
+        (["install", "odd"], "odd's setup needs install_nowhere, which system/lib.sh doesn't define"),
+    ] {
+        let run = m.run(&args);
+
+        assert_eq!(run.code, Some(2), "{args:?}: {}", run.stderr);
+        assert!(run.stderr.contains(why), "{args:?}: {}", run.stderr);
+    }
+    assert!(m.log().is_empty(), "something ran: {:?}", m.log());
 }
