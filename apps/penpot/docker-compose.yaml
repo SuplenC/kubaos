@@ -3,9 +3,12 @@
 #
 # - every image pinned by the digest of its multi-architecture index, so what runs is what was
 #   reviewed, and a new release is a change to this file;
-# - every published port bound to 127.0.0.1, so nothing outside this machine reaches Penpot or
-#   its mail catcher; the frontend publishes 9002, which kubaos-penpot.socket's service passes
-#   9001 on to, so the stack starts as its window opens;
+# - every published port bound to 127.0.0.1, so nothing outside this machine reaches Penpot; the
+#   frontend publishes 9002, which kubaos-penpot.socket's service passes 9001 on to, so the
+#   stack starts as its window opens;
+# - the mail catcher's web page not published: it shows every mail Penpot sends, password resets
+#   included, with no sign-in, to anyone on the machine and to any page a browser opens that
+#   rebinds a name to 127.0.0.1; Penpot reaches its SMTP port on the stack's own network;
 # - the secret its sessions are signed with made once for the machine (`up`), in secret.env,
 #   instead of the file's shared placeholder;
 # - telemetry off.
@@ -157,7 +160,5 @@ services:
     restart: always
     expose:
       - '1025'
-    ports:
-      - 127.0.0.1:8025:8025
     networks:
       - penpot
