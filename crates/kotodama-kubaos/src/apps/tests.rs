@@ -402,8 +402,7 @@ fn the_job_names_the_step_it_is_on_and_its_place_among_the_apps_steps() {
     assert_eq!(
         shown,
         [
-            (None, Some(0.0)),
-            (Some("Install T3 Code".to_owned()), Some(0.0)),
+            (Some("Install T3 Code".to_owned()), None),
             (Some("Install T3 Code, 1 of 4".to_owned()), Some(0.0)),
             (Some("Start the service".to_owned()), Some(0.0)),
             (Some("Start the service, 2 of 4".to_owned()), Some(0.25)),
@@ -429,8 +428,8 @@ fn a_run_of_several_apps_names_the_app_it_is_on_and_its_place_in_the_run() {
     assert_eq!(
         shown,
         [
-            (Some("Neovim (1 of 2)".to_owned()), Some(0.0)),
-            (Some("Neovim (1 of 2): Install Neovim".to_owned()), Some(0.0)),
+            (Some("Neovim (1 of 2)".to_owned()), None),
+            (Some("Neovim (1 of 2): Install Neovim".to_owned()), None),
             (Some("Neovim (1 of 2): Install Neovim, 1 of 1".to_owned()), Some(0.0)),
             (Some("Neovim (1 of 2): Install Neovim, 1 of 1".to_owned()), Some(0.5)),
             (Some("LazyVim (2 of 2)".to_owned()), Some(0.5)),

@@ -622,7 +622,11 @@ impl Running {
             UpdateEvent::Started { log, .. } => self.log = log,
             UpdateEvent::PhaseStarted { .. } => self.progress = None,
             UpdateEvent::App(app) => {
-                self.progress = Fraction::new(share(app.n.saturating_sub(1), app.of)).ok();
+                // The bar stays indeterminate until the first step's progress, the password
+                // prompt included; from then on, a new app starts at its share of the run.
+                if self.progress.is_some() {
+                    self.progress = Fraction::new(share(app.n.saturating_sub(1), app.of)).ok();
+                }
                 (self.app, self.step, self.count) = (Some(app), None, None);
             }
             UpdateEvent::Step { text } => (self.step, self.count) = (Some(text), None),
