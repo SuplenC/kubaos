@@ -214,7 +214,8 @@ function strikeOn(element: HTMLElement): void {
 function large(options: ChoiceCardOptions, picks: Picks): HTMLElement[] {
   const tile = iconTile({ glyph: options.glyph ?? "check", size: "Lg" });
   tile.classList.add("k-choice-tile");
-  // The tile's symbol is lit with the card, so its colour is the card's to say.
+  // The tile and its symbol are lit with the card, so their colours are the card's to say.
+  tile.style.setProperty("--tint", "var(--tile-tint)");
   tile.querySelector<SVGElement>(".k-icon")?.style.setProperty("color", "var(--tile-ink)");
   const lead = row(0, "start", tile, fill(), mark(picks));
   const title = wrapped(options.title, "heading");
