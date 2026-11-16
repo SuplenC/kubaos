@@ -11,6 +11,8 @@ use super::Record;
 use super::Switch;
 use crate::sandbox::Sandbox;
 
+mod keys;
+
 const MANIFEST: &str = r#"
 [repo.docker]
 key_url = "https://example.com/gpg"
