@@ -15,7 +15,7 @@ import { field, setValue } from "../../lib/field.ts";
 import { icon } from "../../lib/icon.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { type KeyHint, keycap, keyHints, keyPrompt, keys } from "../../lib/keycap.ts";
-import { fill, filling, fillingHeight, gap, row, splitColumns, stack } from "../../lib/layout.ts";
+import { divider, fill, filling, fillingHeight, gap, grid, row, splitColumns, stack } from "../../lib/layout.ts";
 import { type ListRowSpec, listWith } from "../../lib/list.ts";
 import { commandMenu, type MenuMeasures } from "../../lib/list-detail.ts";
 import { scroll } from "../../lib/scroll.ts";
@@ -208,36 +208,44 @@ function standIn(prefs: MenuSettings, options: { readonly live: boolean; readonl
     icon: "search",
     ...(typed ? { value: typed } : {}),
     pinned: "lit",
-    ...(options.live
-      ? {
-          onInput: (value: string) => {
-            typed = value;
-            selected = 0;
-            draw();
-          },
-        }
-      : {}),
   });
+  // The field is drawn lit with the keyboard in it, as the open menu's always is, so it edits
+  // nothing itself: what is typed into it here goes to the search.
   if (options.live)
     head.addEventListener(
       "keydown",
       (event) => {
-        if (event.key !== "Escape") return;
-        event.preventDefault();
-        event.stopPropagation();
-        if (typed) set("");
-        else options.onEscape?.();
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          if (typed) set("");
+          else options.onEscape?.();
+        } else if (event.key === "Backspace") {
+          event.preventDefault();
+          set([...typed].slice(0, -1).join(""));
+        } else if ([...event.key].length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+          event.preventDefault();
+          set(typed + event.key);
+        }
       },
       true,
     );
+  /** Focus asked for before the panel was first drawn, given once it is. */
+  let focusWanted = false;
   const draw = () => {
     if (!measures) return;
+    // Each draw moves the field into a new panel, which takes the focus from it: it is given back.
+    const focused = document.activeElement === head;
     found = search(typed, prefs, measures.rows);
     const took = text(typed ? (options.took ?? "2 ms") : "", "mono", "cold");
     const foot = row("s8", "centre", keyHints(options.hints ?? [["↑↓", "Select"], ["Enter", "Run"], ["Esc", "Clear"]]), fill(), took);
     const panel = commandMenu({ results: found.map((each) => each.result), query: typed, head, current: Math.min(selected, Math.max(0, found.length - 1)), onTake: run, footer: filling(foot) }, measures);
     panel.querySelector(".k-list")?.addEventListener("click", () => queueMicrotask(() => head.focus({ preventScroll: true })));
     box.replaceChildren(panel, room);
+    if ((focused || focusWanted) && head.isConnected) {
+      focusWanted = false;
+      head.focus({ preventScroll: true });
+    }
   };
   new ResizeObserver(() => {
     const scale = scaleOf(box);
@@ -257,7 +265,10 @@ function standIn(prefs: MenuSettings, options: { readonly live: boolean; readonl
     set,
     redraw: draw,
     query: () => typed,
-    focus: () => head.focus({ preventScroll: true }),
+    focus: () => {
+      if (head.isConnected) head.focus({ preventScroll: true });
+      else focusWanted = true;
+    },
     run: () => {
       const current = [...box.querySelectorAll(".k-list-row")].findIndex((each) => each.hasAttribute("data-current"));
       run(Math.max(0, current));
@@ -354,8 +365,7 @@ function otherMenu(q: string, groups: readonly Group[], foot: string, more: Othe
   answers.classList.add("setup-kotodama-answers");
   const waiting = spinner("s16", "on_surface_variant");
   const status = row("s8", "centre", waiting, filling(wrapped(foot, "small", "on_surface_variant")));
-  status.classList.add("setup-kotodama-status");
-  const inner = stack("s8", "start", filling(stack(0, "start", filling(words), filling(bar))), fillingHeight(filling(answers)), filling(status));
+  const inner = stack("s8", "start", filling(stack(0, "start", filling(words), filling(bar))), fillingHeight(filling(answers)), divider(), filling(status));
   inner.classList.add("setup-kotodama-sad");
   const box = document.createElement("span");
   box.className = "setup-kotodama-other";
@@ -574,7 +584,7 @@ export function kotodamaCard(view: string): KotodamaCard {
       "start",
       keyPrompt("Super+Space"),
       gap("s32"),
-      text("Type what you want. Enter.", "headline"),
+      wrapped("Type what you want. Enter.", "headline"),
       gap("s8"),
       filling(wrapped("Apps, settings, projects, windows and sums, in one place. It opens over whatever you're doing, on the screen you're on.", "body", "on_surface_variant")),
       gap("s32"),
@@ -617,17 +627,22 @@ export function kotodamaCard(view: string): KotodamaCard {
       const oursBox = document.createElement("span");
       oursBox.className = "setup-kotodama-ours";
       oursBox.append(ours.box);
-      // The race, one grid: the names and clocks on one line, the two
-      // menus one height, the lines under them starting on one line.
+      // The race, three lines of two lanes: the names and clocks on one line, the two menus one
+      // height, the lines under them starting on one line.
       const head = (name: string, clock: HTMLElement) => row("s8", "centre", text(name, "heading"), fill(), clock);
-      const grid = document.createElement("span");
-      grid.className = "setup-kotodama-race";
       const roastHolder = document.createElement("span");
       roastHolder.append(roast);
       start.box.dataset.lane = "start";
       oursBox.dataset.lane = "kotodama";
-      grid.append(head(OTHERS.start.name, startClock), head(OTHERS.kotodama.name, oursClock), start.box, oursBox, roastHolder, wrapped(OTHERS.kotodama.roast, "small", "on_surface_variant"));
-      lanes.replaceChildren(grid);
+      const race = stack(
+        "s12",
+        "start",
+        filling(grid(2, "s24", [head(OTHERS.start.name, startClock), head(OTHERS.kotodama.name, oursClock)])),
+        fillingHeight(filling(grid(2, "s24", [filling(start.box), filling(oursBox)], { fillHeight: true }))),
+        filling(grid(2, "s24", [roastHolder, wrapped(OTHERS.kotodama.roast, "small", "on_surface_variant")])),
+      );
+      race.classList.add("setup-kotodama-race");
+      lanes.replaceChildren(race);
       const [web, search, news, recommended, weather, answerGroup] = start.groups;
       const parts: readonly (readonly [HTMLElement | undefined, number, string?])[] = [
         [web, LANDS.start.web],
@@ -799,7 +814,8 @@ export function kotodamaCard(view: string): KotodamaCard {
     };
     holder.append(state.open ? menu.box : invitation);
     const tip = row("s8", "start", icon("info", "var(--type-small-icon)", "var(--color-on_surface_variant)"), filling(wrapped("The menu shows up wherever you are: on top of any app, on the screen you're on.", "small", "on_surface_variant")));
-    const left = stack("s12", "start", ...TRIES.map(tryCard), fillingHeight(gap("s4")), filling(tip));
+    // The tries at the top, the note at the column's foot: the tries' stack takes the height between.
+    const left = stack("s12", "start", fillingHeight(filling(stack("s12", "start", ...TRIES.map(tryCard)))), filling(tip));
     return splitColumns([2, 3], "s24", [filling(left), filling(fillingHeight(holder))], { fillHeight: true });
   };
 

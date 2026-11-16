@@ -218,12 +218,8 @@
 }
 
 .setup-kotodama-race {
-  display: grid;
   flex: 1 1 0;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: var(--space-s12) var(--space-s24);
 }
 
 /* Kotodama's lane, the menu itself in the primary's lit tube, filling the lane. */
@@ -307,11 +303,6 @@
 
 .setup-kotodama-plabel {
   padding: var(--space-s4) var(--space-s8) 0;
-}
-
-.setup-kotodama-status {
-  padding-top: var(--space-s8);
-  border-top: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
 }
 
 /* A search's bar crawling under the field while the other menu thinks. */

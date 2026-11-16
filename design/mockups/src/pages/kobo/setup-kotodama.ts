@@ -64,6 +64,29 @@ const RACE: Move = {
   sample: at("why"),
 };
 
+/** What plays by itself: an example lights as the menu beside it types it; the one before recedes. */
+const DEMO: Move = {
+  name: "What plays",
+  what: "The next example lights over `medium` as the menu types it; the last recedes to `opacity.subdued`.",
+  tracks: [
+    { part: "the example typed", on: "the examples", target: ".setup-kotodama-example:nth-child(2)", property: "opacity", from: { opacity: "subdued" }, to: 1, duration: "medium", curve: "standard" },
+    { part: "the one before", on: "the examples", target: ".setup-kotodama-example:nth-child(1)", property: "opacity", from: 1, to: { opacity: "subdued" }, duration: "medium", curve: "standard" },
+  ],
+  reduced: [{ part: "the example typed", on: "the examples", target: ".setup-kotodama-example:nth-child(2)", property: "opacity", from: { opacity: "subdued" }, to: 1, duration: "instant", curve: "standard" }],
+  back: "cuts",
+  sample: at("what"),
+};
+
+/** The ad's button pressed: its reply fades in above it, holds, and goes. */
+const ANSWERS: Move = {
+  name: "The ad answers",
+  what: "Its reply fades in over `short` above the button, holds two `hold`s, then fades out.",
+  tracks: [{ part: "the reply", on: "the ad's button", target: ".setup-kotodama-ad-reply > .k-tooltip", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+  reduced: "same",
+  back: "cuts",
+  sample: at("why-reply"),
+};
+
 /** A thing tried: its row's tick comes on and the row lights, over `short`. */
 const TICKED: Move = {
   name: "A try ticks off",
@@ -143,7 +166,7 @@ export default page<Shown>({
   motion: {
     arrives: [TO_WHY, TO_YOURS, TO_TRY, OPENS],
     leaves: [BACK_STEP],
-    between: [RACE, TICKED],
+    between: [DEMO, RACE, ANSWERS, TICKED],
   },
   keyboard: {
     keys: [
@@ -162,7 +185,8 @@ export default page<Shown>({
       ...CARD_MEASURES,
       { part: "Stepper → step", token: "space-s24" },
       { part: "Tries ↔ menu", token: "space-s24" },
-      { part: "Lanes apart", token: "space-s16" },
+      { part: "Lanes apart", token: "space-s24" },
+      { part: "Name → menu → line", token: "space-s12" },
       { part: "Between Yours's sections", token: "space-s20" },
     ]),
     reflow: { note: "The menu takes its room's width and the rows its height holds; its pane shows once it is wide enough.", sample: CELLS.selected },
