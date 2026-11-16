@@ -37,7 +37,7 @@ export default page<Shown>({
   sizes: [{ name: "Full HD", for: "the column in the middle", sample: at("rest", { width: "calc(1920 * var(--px))", height: "calc(1080 * var(--px))" }) }],
   states: {
     shown: ["rest", "loading", "selected", "disabled"],
-    absent: { lit: "Let's go lights as a `Filled` button", pressed: "Let's go presses as a `Filled` button", empty: "there are always five cards", error: "detection never fails: a card it can't read is To do" },
+    absent: { lit: "Let's go lights as a `Filled` button", pressed: "Let's go presses as a `Filled` button", empty: "there are always six cards", error: "detection never fails: a card it can't read is To do" },
     rows: [{ name: "The arrival", cell: screen((state: Shown) => CELLS[state]()) }],
     looks: {
       rest: "the plan's chips; Let's go and Later",
@@ -51,8 +51,8 @@ export default page<Shown>({
     text: [{ name: "The hero line", words: HERO, sample: screen((words: string) => setupRoom({ place: { at: "arrival" }, hero: words })) }],
     missingPicture: doesntApply("the wallpaper is the desktop's own, on the disk since the install."),
     counts: [
-      { name: "Three of five", for: "a desktop with no reader", sample: CELLS.disabled },
-      { name: "Five", for: "the TUXEDO", sample: CELLS.rest },
+      { name: "Four of six", for: "a desktop with no reader", sample: CELLS.disabled },
+      { name: "Six", for: "the TUXEDO", sample: CELLS.rest },
     ],
   },
   motion: {

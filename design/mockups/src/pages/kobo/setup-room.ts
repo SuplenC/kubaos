@@ -120,7 +120,7 @@ function promise(glyph: string, words: string, tone = "on_surface_variant"): HTM
 /** How many cards want the person, said as a count. */
 function wanted(views: Views): string {
   const left = CARD_IDS.filter((id) => open(CARDS[id].views[views[id]]!)).length;
-  const words = ["None", "One", "Two", "Three", "Four", "Five"];
+  const words = ["None", "One", "Two", "Three", "Four", "Five", "Six"];
   return `${words[left] ?? left} ${left === 1 ? "thing" : "things"}`;
 }
 
@@ -134,7 +134,7 @@ function arrivalWords(moment: Moment, views: Views): { hero?: string; lede: stri
     case "detecting":
       return { lede: "KubaOS is on the disk and running. Checking what this machine has: the maker, the reader, the keys." };
     default:
-      return { lede: `KubaOS is on the disk and running. ${wanted(views)} to go: what you use it for, then what needs your hardware, your fingers or your phone. A minute each; skip any, it'll wait.` };
+      return { lede: `KubaOS is on the disk and running. ${wanted(views)} to go: what you use it for, your name for Git, then what needs your hardware, your fingers or your phone. A minute each; skip any, it'll wait.` };
   }
 }
 

@@ -7,7 +7,7 @@ import { type CardId, CARD_IDS, type Views } from "./setup-cards.ts";
 import { finishing, onward, setupRoom, type SetupOptions } from "./setup-room.ts";
 
 /** Where each card ends when it is gone through in order: the apps in, the drivers' key queued. */
-const WALKED: Views = { yours: "done", drivers: "queued", fingerprint: "done", yubikey: "done", phone: "done" };
+const WALKED: Views = { yours: "done", git: "done", drivers: "queued", fingerprint: "done", yubikey: "done", phone: "done" };
 
 /** The way to `card` taken in order: the cards before it gone through, the ones after it untouched. */
 function walk(card: CardId): Partial<Views> {

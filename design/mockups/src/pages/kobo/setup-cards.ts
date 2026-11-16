@@ -13,14 +13,15 @@ import type { LogLine } from "../../lib/log.ts";
 import type { Duration } from "../../site/page.ts";
 import { KNOWN, type Maker, MAKERS } from "./setup-data.ts";
 
-export type CardId = "yours" | "drivers" | "fingerprint" | "yubikey" | "phone";
+export type CardId = "yours" | "git" | "drivers" | "fingerprint" | "yubikey" | "phone";
 
 /**
  * The order the rail keeps. Make it yours leads: it is the one card every machine has, and its
- * installs run in the background while the person goes through the rest. Drivers next, so a
- * reboot it needs is known before the cards that only want a finger, a key or a phone.
+ * installs run in the background while the person goes through the rest. Git after it, while
+ * what the machine is for is in mind. Drivers next, so a reboot it needs is known before the
+ * cards that only want a finger, a key or a phone.
  */
-export const CARD_IDS: readonly CardId[] = ["yours", "drivers", "fingerprint", "yubikey", "phone"];
+export const CARD_IDS: readonly CardId[] = ["yours", "git", "drivers", "fingerprint", "yubikey", "phone"];
 
 /** `kubaos_core::setup::State`. */
 export type Engine = "done" | "needed" | "reboot" | "waiting" | "absent";
@@ -77,6 +78,7 @@ export type Ask =
   | { readonly is: "mok"; readonly mismatch: boolean }
   | { readonly is: "finger" }
   | { readonly is: "fingers"; readonly names: readonly string[] }
+  | { readonly is: "git"; readonly email: string }
   | { readonly is: "parts"; readonly maker: string; readonly ticked: readonly number[] | undefined }
   | { readonly is: "works"; readonly maker: string; readonly fixed?: boolean }
   | { readonly is: "buttons"; readonly labels: readonly string[] };
@@ -131,6 +133,54 @@ const step = (text: string): LogLine => ({ level: "step", text });
 const info = (text: string): LogLine => ({ level: "info", text });
 const warn = (text: string): LogLine => ({ level: "warn", text });
 const error = (text: string): LogLine => ({ level: "error", text });
+
+// --------------------------------------------------------------------- Git --
+
+const IDENTITY = "~/.config/git-identity/identity.gitconfig";
+
+/**
+ * Git's name and email: there for everyone, since the person who will want it is not always the
+ * one who picked Developer, and said plainly to be skippable by anyone who doesn't know what it is.
+ */
+const git: Card = {
+  id: "git",
+  title: "Git",
+  icon: "git_branch",
+  accent: "名前",
+  why: "The name and email on every commit you make.",
+  skip: "Skip it and git asks for them the first time you commit.",
+  later: "Git name and email",
+  first: "empty",
+  views: {
+    empty: { state: "needed", summary: "No name and email for commits yet." },
+    filled: { state: "needed", summary: "No name and email for commits yet." },
+    invalid: { state: "needed", summary: "No name and email for commits yet." },
+    done: { state: "done", summary: `Commits as ${USER.name} <${USER.email}>.` },
+  },
+  asks: (view) => {
+    const plain: Ask = { is: "para", words: "No idea what Git is? Then you don't need it: skip it. It's for writing code, and nothing else here cares." };
+    switch (view) {
+      case "filled":
+        return [plain, { is: "git", email: USER.email }];
+      case "invalid":
+        return [plain, { is: "git", email: "mika@nowak" }];
+      case "done":
+        return [{ is: "git", email: USER.email }, { is: "buttons", labels: ["Save changes"] }];
+      default:
+        return [plain, { is: "git", email: "" }];
+    }
+  },
+  facts: (view) => [
+    { label: "Saved to", value: IDENTITY },
+    { label: "Included by", value: "~/.config/git/config" },
+    { label: "git says", value: view === "done" ? `${USER.name} <${USER.email}>` : "Nothing yet" },
+  ],
+  command: `git config --file ${IDENTITY} user.email ${USER.email}`,
+  action: (view) => (view === "done" ? undefined : { label: "Save", icon: "save" }),
+  blocker: (view) => (view === "invalid" ? "That doesn't look like an email." : view === "empty" ? "Your email first, or Skip." : undefined),
+  act: { filled: "done" },
+  auto: {},
+};
 
 // ---------------------------------------------------------------- Drivers --
 
@@ -293,8 +343,6 @@ const yours: Card = {
   views: {
     none: { state: "needed", summary: "Nothing picked yet." },
     developer: { state: "needed", summary: "Developer picked." },
-    filled: { state: "needed", summary: "Developer picked." },
-    invalid: { state: "needed", summary: "Developer picked." },
     two: { state: "needed", summary: "Developer and Designer picked." },
     all: { state: "needed", summary: "All three picked." },
     dropped: { state: "needed", summary: "Developer and Everyday picked." },
@@ -523,20 +571,20 @@ const phone: Card = {
   auto: { starting: ["waiting", "scene"], waiting: ["request", "slow"], pairing: ["done", "scene"] },
 };
 
-export const CARDS: Readonly<Record<CardId, Card>> = { yours, drivers, fingerprint, yubikey, phone };
+export const CARDS: Readonly<Record<CardId, Card>> = { yours, git, drivers, fingerprint, yubikey, phone };
 
 /** The views a card is at: the sample laptop's first boot, with `more` on top. */
 export type Views = Readonly<Record<CardId, string>>;
 
 export function firstViews(more: Partial<Views> = {}): Views {
-  return { yours: yours.first, drivers: drivers.first, fingerprint: fingerprint.first, yubikey: yubikey.first, phone: phone.first, ...more };
+  return { yours: yours.first, git: git.first, drivers: drivers.first, fingerprint: fingerprint.first, yubikey: yubikey.first, phone: phone.first, ...more };
 }
 
 /** A desktop of a maker the Drivers card doesn't know, with no reader: one card not there. */
 export const TOWER: Partial<Views> = { drivers: "unknown", fingerprint: "absent" };
 
 /** What every card ends at once it was done, for the ending. */
-export const ALL_DONE: Views = { yours: "done", drivers: "done", fingerprint: "done", yubikey: "done", phone: "done" };
+export const ALL_DONE: Views = { yours: "done", git: "done", drivers: "done", fingerprint: "done", yubikey: "done", phone: "done" };
 
 /** Whether the card wants attention: `State::open`. */
 export function open(view: View): boolean {
