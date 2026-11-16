@@ -74,7 +74,9 @@ pub enum ActionError {
     InvalidPath { value: String },
     #[error("{value:?} is not an https:// URL with a sha256 of 64 lowercase hex digits")]
     InvalidDownload { value: String },
-    #[error("a download that updates itself goes to a folder named for its version: {value:?} has no `@VERSION@` folder")]
+    #[error(
+        "a download that updates itself goes to a folder named for its version: {value:?} has no `@VERSION@` folder"
+    )]
     SelfUpdatesUnversioned { value: String },
     #[error("a download needs a download for amd64 or arm64")]
     NoDownload,
@@ -462,23 +464,13 @@ impl Action {
     pub fn resolve(&self, words: &Words, folder: &Path) -> Result<Self, ActionError> {
         let fill = |text: &str, version: Option<&str>| words.fill(text, version);
         let kind = match &self.kind {
-            Kind::Download {
-                to,
-                version,
-                unpack,
-                strip,
-                self_updates,
-                amd64,
-                arm64,
-            } => Kind::Download {
-                to: fill(to, Some(version)),
-                version: version.clone(),
-                unpack: *unpack,
-                strip: *strip,
-                self_updates: *self_updates,
-                amd64: amd64.clone(),
-                arm64: arm64.clone(),
-            },
+            Kind::Download { to, version, .. } => {
+                let mut kind = self.kind.clone();
+                if let Kind::Download { to: filled, .. } = &mut kind {
+                    *filled = fill(to, Some(version));
+                }
+                kind
+            }
             Kind::File {
                 to,
                 from,
@@ -801,7 +793,11 @@ pub(crate) fn is_argv(argv: &[String]) -> bool {
 /// Whether `argv` is a `run`'s argv as a journal records it: as [`is_argv`] says, but for a
 /// program under the home, which is there by its path.
 fn is_resolved_argv(argv: &[String]) -> bool {
-    is_argv(argv) || argv.first().and_then(|p| p.strip_prefix('/')).is_some_and(is_folder_path)
+    is_argv(argv)
+        || argv
+            .first()
+            .and_then(|p| p.strip_prefix('/'))
+            .is_some_and(is_folder_path)
 }
 
 fn is_folder_path(value: &str) -> bool {

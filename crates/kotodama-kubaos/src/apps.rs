@@ -119,7 +119,9 @@ impl AppFiles {
     #[must_use]
     pub fn canonical(&self) -> Self {
         let real = |path: &Path| match (path.parent(), path.file_name()) {
-            (Some(dir), Some(name)) => dir.canonicalize().map_or_else(|_| path.to_path_buf(), |dir| dir.join(name)),
+            (Some(dir), Some(name)) => dir
+                .canonicalize()
+                .map_or_else(|_| path.to_path_buf(), |dir| dir.join(name)),
             _ => path.to_path_buf(),
         };
         AppFiles {
@@ -137,10 +139,14 @@ impl AppFiles {
     /// app's folder made since is watched.
     pub fn watched_dirs(&self) -> Vec<PathBuf> {
         let parent = |path: &Path| path.parent().map(Path::to_path_buf);
-        let mut dirs: Vec<PathBuf> = [parent(Path::new(DPKG_STATUS)), parent(&self.picks), Some(self.journals.clone())]
-            .into_iter()
-            .flatten()
-            .collect();
+        let mut dirs: Vec<PathBuf> = [
+            parent(Path::new(DPKG_STATUS)),
+            parent(&self.picks),
+            Some(self.journals.clone()),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
         if let Ok(entries) = std::fs::read_dir(&self.journals) {
             let mut apps: Vec<PathBuf> = entries
                 .flatten()
@@ -243,15 +249,15 @@ impl Apps {
             .map(str::to_owned)
             .collect();
         let dpkg = Dpkg::parse(&runner.output(&query).map_err(ReadError::Dpkg)?);
-        let status =
-            Status::read(
+        let status = Status::read(
             &catalog,
             &picks,
             &files.journals,
             &files.root_journals,
             apps::arch(),
             Some(&dpkg),
-        ).map_err(ReadError::Journal)?;
+        )
+        .map_err(ReadError::Journal)?;
         Ok(Self::new(&status))
     }
 

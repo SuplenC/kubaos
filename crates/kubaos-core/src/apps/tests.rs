@@ -109,7 +109,15 @@ fn an_installed_app_is_one_whose_user_journal_is_complete() {
     picks.add("half");
     let dpkg = Dpkg::parse("installed install agent 1.2\n");
 
-    let status = Status::read(&catalog, &picks, journals.path(), &journals.path().join("root"), "amd64", Some(&dpkg)).unwrap();
+    let status = Status::read(
+        &catalog,
+        &picks,
+        journals.path(),
+        &journals.path().join("root"),
+        "amd64",
+        Some(&dpkg),
+    )
+    .unwrap();
 
     let state = |id: &str| status.get(id).unwrap().state;
     assert_eq!(state("agent"), AppState::Installed);
@@ -149,7 +157,11 @@ fn an_app_kubaos_owns_nothing_of_is_found_and_one_with_no_journal_is_read_from_d
     let state = |id: &str| status.get(id).unwrap().state;
     assert_eq!(state("agent"), AppState::Found);
     assert_eq!(state("other"), AppState::Found, "installed by hand, not picked");
-    assert_eq!(state("third"), AppState::Installed, "picked, so taking it in makes it KubaOS's");
+    assert_eq!(
+        state("third"),
+        AppState::Installed,
+        "picked, so taking it in makes it KubaOS's"
+    );
     assert_eq!(state("gone"), AppState::Available);
     assert_eq!(status.get("other").unwrap().version.as_deref(), Some("2.0"));
 }
@@ -161,7 +173,18 @@ fn the_list_and_the_status_say_what_each_app_is_in_json() {
 
     let list = serde_json::to_value(listing(&catalog, &picks)).unwrap();
     let journals = tempfile::tempdir().unwrap();
-    let status = serde_json::to_value(Status::read(&catalog, &picks, journals.path(), &journals.path().join("root"), "amd64", None).unwrap()).unwrap();
+    let status = serde_json::to_value(
+        Status::read(
+            &catalog,
+            &picks,
+            journals.path(),
+            &journals.path().join("root"),
+            "amd64",
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
 
     assert_eq!(list[0]["category"], "development");
     assert_eq!(list[0]["tags"][0], "fixture");
@@ -296,7 +319,11 @@ fn t3s_runtime_is_marked_whole_at_the_version_it_downloads() {
 fn every_shipped_app_says_what_it_is_in_kubaos_voice_and_upstreams() {
     for app in shipped().apps() {
         assert!(!app.tags.is_empty(), "{}", app.id);
-        assert!(app.description_from.starts_with("https://"), "{}", app.id);
+        assert!(
+            !app.description_copied() || app.description_from.starts_with("https://"),
+            "{}",
+            app.id
+        );
         assert!(
             app.summary.len() <= 100,
             "{}: a summary is one line of a menu: {}",

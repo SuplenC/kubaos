@@ -121,7 +121,17 @@ fn apps_of(folders: &[(&str, &str)], arch: &str, installed: &[&str], setup: Opti
         }
     }
     let dpkg = Dpkg::parse(&dpkg_with(installed));
-    Apps::new(&Status::read(&catalog, &Picks::default(), &journals, &journals.join("root"), arch, Some(&dpkg)).unwrap())
+    Apps::new(
+        &Status::read(
+            &catalog,
+            &Picks::default(),
+            &journals,
+            &journals.join("root"),
+            arch,
+            Some(&dpkg),
+        )
+        .unwrap(),
+    )
 }
 
 fn ids(apps: &Apps) -> Vec<String> {
@@ -602,8 +612,14 @@ fn the_watch_covers_dpkg_the_picks_and_each_apps_journal() {
     let watched = files.watched_dirs();
 
     assert!(watched.contains(&PathBuf::from("/var/lib/dpkg")), "{watched:?}");
-    assert!(watched.contains(&paths.app_picks().parent().unwrap().to_path_buf()), "{watched:?}");
-    assert!(watched.contains(&paths.app_journals().join("google-chrome")), "{watched:?}");
+    assert!(
+        watched.contains(&paths.app_picks().parent().unwrap().to_path_buf()),
+        "{watched:?}"
+    );
+    assert!(
+        watched.contains(&paths.app_journals().join("google-chrome")),
+        "{watched:?}"
+    );
     assert!(files.changes(Path::new(DPKG_STATUS)));
     assert!(files.changes(&paths.app_picks()));
     assert!(files.changes(&Journal::file(&paths.app_journals(), "google-chrome")));
@@ -670,7 +686,15 @@ fn an_app_installed_by_other_means_has_no_remove_item() {
     let dpkg = Dpkg::parse(&dpkg_with(&["claude-code=2.1", "google-chrome-stable=140"]));
 
     let apps = Apps::new(
-        &Status::read(&catalog, &Picks::default(), &journals, &journals.join("root"), "amd64", Some(&dpkg)).unwrap(),
+        &Status::read(
+            &catalog,
+            &Picks::default(),
+            &journals,
+            &journals.join("root"),
+            "amd64",
+            Some(&dpkg),
+        )
+        .unwrap(),
     );
 
     assert!(ids(&apps).is_empty(), "{:?}", ids(&apps));
@@ -680,10 +704,7 @@ fn an_app_installed_by_other_means_has_no_remove_item() {
 fn removing_an_app_kubaos_didnt_install_ends_saying_it_left_it() {
     let (mut jobs, _, started) = start(&apps(&["claude-code=2.1"]), "app-remove:claude-code", REMOVE);
     let id = started.unwrap().id;
-    let summary = summary(&[]).replace(
-        r#""apps":{"installed":[]}"#,
-        r#""apps":{"left":["Claude Code"]}"#,
-    );
+    let summary = summary(&[]).replace(r#""apps":{"installed":[]}"#, r#""apps":{"left":["Claude Code"]}"#);
     jobs.heard(Heard::line(&id, &summary));
 
     let ended = jobs.heard(Heard::ended(&id, true)).unwrap();
