@@ -589,8 +589,8 @@ pub fn undo(action: &Action, host: &mut dyn Host, claims: &[Claim], prior: &Prio
 }
 
 /// Removes `mine`, the packages a step installed, and of `dependencies`, those it pulled in, the
-/// ones nothing else on the machine needs: apt simulates each removal first, and never takes a
-/// package that isn't the step's.
+/// ones nothing else on the machine needs and the user hasn't installed by name since: apt
+/// simulates each removal first, and never takes a package that isn't the step's.
 fn undo_packages(host: &mut dyn Host, mine: &[String], dependencies: &[String]) -> Result<(), PerformError> {
     let all: Vec<String> = mine.iter().chain(dependencies).cloned().collect();
     let installed = host.installed(&all).map_err(PerformError::Host)?;
@@ -782,7 +782,12 @@ fn download_to(
             Unpack::File => {
                 fs::set_permissions(&file, fs::Permissions::from_mode(DOWNLOAD_FILE_MODE))
                     .map_err(PerformError::io(&file))?;
-                fs::rename(&file, path).map_err(PerformError::io(path))
+                // An older pin may have unpacked a folder here, which a file can't be renamed over.
+                if path.symlink_metadata().is_ok_and(|m| m.is_dir()) {
+                    replace_with(&file, path)
+                } else {
+                    fs::rename(&file, path).map_err(PerformError::io(path))
+                }
             }
             Unpack::TarGz => {
                 fs::create_dir(&stage).map_err(PerformError::io(&stage))?;
@@ -820,12 +825,14 @@ fn download_to(
 }
 
 /// Moves `stage` to `path`. A folder can't be renamed over another, so one at `path` is moved
-/// aside first, and back if `stage` can't take its place, then removed.
+/// aside first, and back if `stage` can't take its place, then removed. One a stopped run left
+/// aside goes too.
 fn replace_with(stage: &Path, path: &Path) -> Result<(), PerformError> {
-    if path.symlink_metadata().is_err() {
-        return fs::rename(stage, path).map_err(PerformError::io(path));
-    }
     let aside = staging(path).with_extension("old");
+    if path.symlink_metadata().is_err() {
+        fs::rename(stage, path).map_err(PerformError::io(path))?;
+        return remove_path(&aside);
+    }
     remove_path(&aside)?;
     fs::rename(path, &aside).map_err(PerformError::io(path))?;
     if let Err(e) = fs::rename(stage, path) {
