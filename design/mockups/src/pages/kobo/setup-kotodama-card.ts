@@ -28,6 +28,7 @@ import { switchControl } from "../../lib/switch.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { toastRoom } from "../../lib/toast.ts";
+import { floatingTooltip, tooltip } from "../../lib/tooltip.ts";
 import { length } from "../../lib/tokens.ts";
 import { bezier, milliseconds } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
@@ -423,7 +424,9 @@ function fakeAd(): HTMLElement {
   const product = row("s12", "start", tile, filling(stack(0, "start", filling(wrapped(AD.product, "subheading", "on_burn_warning")), filling(wrapped(AD.maker, "caption", "on_burn_warning")))));
   const stars = row("s4", "centre", ...Array.from({ length: 5 }, () => icon("star_filled", "var(--type-small-icon)", "var(--color-burn_error)")), filling(wrapped(AD.rating, "caption", "on_burn_warning")));
   const go = button({ label: AD.action, kind: "Danger", size: "Sm", icon: "arrow_forward", trailing: true });
-  const fine = wrapped(AD.fine, "caption", "on_burn_warning");
+  const asked = text(AD.fine[1], "caption", "on_burn_warning");
+  asked.classList.add("setup-kotodama-ad-asked");
+  const fine = row("s4", "centre", text(AD.fine[0], "caption", "on_burn_warning"), floatingTooltip(asked, tooltip(AD.fineAnswer, ""), { side: "above" }), text(AD.fine[2], "caption", "on_burn_warning"));
   const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "subheading", "on_burn_warning")), filling(product), filling(stars), filling(go), filling(fine));
   ad.classList.add("setup-kotodama-ad");
   return ad;

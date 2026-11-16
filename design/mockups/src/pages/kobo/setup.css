@@ -385,6 +385,17 @@
   box-shadow: 0 var(--space-s8) var(--space-s24) rgb(from var(--color-surface_container_lowest) r g b / var(--opacity-scrim));
 }
 
+/* The fine print's unknown word asks to be asked about: marked as a term is, and its answer shows
+   while the pointer is on it. */
+.setup-kotodama-ad-asked {
+  cursor: help;
+  text-decoration: underline dotted;
+}
+
+.k-tip-anchor:has(> .setup-kotodama-ad-asked:hover) > .k-tooltip {
+  opacity: 1;
+}
+
 .setup-kotodama-ad-tag {
   display: inline-flex;
   flex: none;

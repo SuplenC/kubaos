@@ -255,5 +255,8 @@ export const AD = {
   maker: "by Wang & Sons Software · 2,000,000 PCs satisfied",
   rating: "4.9 · “My hard drive was never this hard.” · Hugh Jass",
   action: "ENLARGE MY C: DRIVE · FREE*",
-  fine: "*€49.99 a month. Bofa terms apply.",
+  // The fine print in three runs: the middle one is a word nobody knows, and asking what it is
+  // (the pointer on it) gets the answer.
+  fine: ["*€49.99 a month.", "Bofa", "terms apply."],
+  fineAnswer: "Bofa deez nuts",
 } as const;
