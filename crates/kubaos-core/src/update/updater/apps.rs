@@ -84,7 +84,7 @@ impl<M: Machine> Updater<'_, M> {
             apps::arch(),
             Some(&dpkg),
         )
-            .map_err(UpdateError::AppJournal)
+        .map_err(UpdateError::AppJournal)
     }
 
     /// Picks the apps `ids`, an app with setups in its setup `setup`, and installs them: every

@@ -181,7 +181,11 @@ impl Status {
                 Some(_) if owns => AppState::Installed,
                 Some(_) => AppState::Found,
                 None if journal.is_none() && dpkg.is_some_and(|dpkg| has_packages(app, arch, dpkg)) => {
-                    if picked { AppState::Installed } else { AppState::Found }
+                    if picked {
+                        AppState::Installed
+                    } else {
+                        AppState::Found
+                    }
                 }
                 None if !available.iter().any(|a| *a) => AppState::Unavailable,
                 None if picked => AppState::Missing,

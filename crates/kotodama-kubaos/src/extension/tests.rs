@@ -440,15 +440,15 @@ fn with_claude_code(text: &str) -> Extension<FakeBus, FakeRunner> {
     )
     .expect("write the app");
     let catalog = Catalog::load(&dir.path().join("apps")).expect("the catalog");
-    let status =
-        Status::read(
-            &catalog,
-            &Picks::default(),
-            &dir.path().join("journals"),
-            &dir.path().join("root-journals"),
-            "amd64",
-            None,
-        ).expect("the status");
+    let status = Status::read(
+        &catalog,
+        &Picks::default(),
+        &dir.path().join("journals"),
+        &dir.path().join("root-journals"),
+        "amd64",
+        None,
+    )
+    .expect("the status");
     let mut extension = Extension::new(FakeBus::default(), FakeRunner::default());
     extension.set_apps(Apps::new(&status));
     let problems = extension.configure(&toml::from_str(text).expect("the test's config"));

@@ -499,7 +499,9 @@ fn adding_the_service_without_a_display_leaves_pairing_to_a_note() {
     m.apps.as_mut().unwrap().display = false;
     let mut events = Vec::new();
 
-    w.reporting(&mut m, &mut events).add_apps(&names(&["lab"]), Some("service")).unwrap();
+    w.reporting(&mut m, &mut events)
+        .add_apps(&names(&["lab"]), Some("service"))
+        .unwrap();
 
     assert!(!host(&m).home().join("paired").exists(), "the pairing ran");
     assert!(
@@ -786,7 +788,10 @@ fn with_t3_code(w: &World) {
     script(&to.join("closed"), "true");
     for name in ["closed", "service-away", "service-enabled"] {
         let text = fs::read_to_string(to.join(name)).unwrap();
-        assert!(!text.contains("systemctl") && !text.contains("pgrep"), "{name} reaches the machine");
+        assert!(
+            !text.contains("systemctl") && !text.contains("pgrep"),
+            "{name} reaches the machine"
+        );
     }
     lock_down(&to);
 }
@@ -797,7 +802,10 @@ fn t3_service_after_t3_update(w: &World) -> Fake {
     let m = fake(w, &["t3code"]);
     let home = host(&m).home().to_path_buf();
     let runtime = home.join(".t3/runtime/versions/0.2.0");
-    script(&runtime.join("t3"), r#"[ "$1 $2 $3" = "auth session list" ] && echo "[]""#);
+    script(
+        &runtime.join("t3"),
+        r#"[ "$1 $2 $3" = "auth session list" ] && echo "[]""#,
+    );
     put(&runtime.join(".install-complete"), "0.2.0\n");
     fs::create_dir_all(home.join(".local/bin")).unwrap();
     std::os::unix::fs::symlink(runtime.join("t3"), home.join(".local/bin/t3")).unwrap();
@@ -856,7 +864,10 @@ fn a_linger_mark_stays_when_the_app_is_taken_in_without_a_linger_step() {
     w.updater(&mut m).adopt_apps().unwrap();
 
     assert_eq!(user_journal(&w, "lab").unwrap().setup.as_deref(), Some("desktop"));
-    assert!(mark.exists(), "the mark is the only word on lingering until a linger step holds it");
+    assert!(
+        mark.exists(),
+        "the mark is the only word on lingering until a linger step holds it"
+    );
 }
 
 #[test]
@@ -938,10 +949,19 @@ fn files_an_older_release_wrote_with_older_comments_are_taken_in_and_rewritten()
     );
     let home = host(&m).home().to_string_lossy().into_owned();
     let files = [
-        ("/etc/systemd/system/docker.service.d/kubaos-stop.conf", "docker/kubaos-stop.conf"),
+        (
+            "/etc/systemd/system/docker.service.d/kubaos-stop.conf",
+            "docker/kubaos-stop.conf",
+        ),
         ("/usr/local/libexec/dot-chrome-theme", "google-chrome/dot-chrome-theme"),
-        ("/etc/systemd/system/dot-chrome-theme.path", "google-chrome/dot-chrome-theme.path"),
-        ("/etc/systemd/system/dot-chrome-theme.service", "google-chrome/dot-chrome-theme.service"),
+        (
+            "/etc/systemd/system/dot-chrome-theme.path",
+            "google-chrome/dot-chrome-theme.path",
+        ),
+        (
+            "/etc/systemd/system/dot-chrome-theme.service",
+            "google-chrome/dot-chrome-theme.service",
+        ),
     ];
     let mut now = Vec::new();
     for ((path, from), (named, new, older)) in files.iter().zip(OLDER_COMMENTS) {
@@ -960,9 +980,18 @@ fn files_an_older_release_wrote_with_older_comments_are_taken_in_and_rewritten()
     let machine = host(&m);
     {
         let mut state = machine.state.borrow_mut();
-        state.groups.entry("docker".to_owned()).or_default().insert("kuba".to_owned());
-        for unit in ["docker.service", "containerd.service", "docker.socket", "dot-chrome-theme.path"] {
-            let on = unit.ends_with(".socket") || unit.ends_with(".path");
+        state
+            .groups
+            .entry("docker".to_owned())
+            .or_default()
+            .insert("kuba".to_owned());
+        for unit in [
+            "docker.service",
+            "containerd.service",
+            "docker.socket",
+            "dot-chrome-theme.path",
+        ] {
+            let on = matches!(unit, "docker.socket" | "dot-chrome-theme.path");
             state.units.insert(
                 format!("system:{unit}"),
                 crate::apps::host::fake::Unit {
@@ -990,7 +1019,10 @@ fn files_an_older_release_wrote_with_older_comments_are_taken_in_and_rewritten()
             .flat_map(|e| e.claims.iter())
             .filter(|c| c.claim.starts_with("path:"))
             .collect();
-        assert!(!file_paths.is_empty() && file_paths.iter().all(|c| c.owned), "{id}: {file_paths:?}");
+        assert!(
+            !file_paths.is_empty() && file_paths.iter().all(|c| c.owned),
+            "{id}: {file_paths:?}"
+        );
     }
 }
 
@@ -1017,7 +1049,7 @@ fn an_update_after_a_reboot_leaves_chromes_colouring_service_alone() {
             format!("system:{unit}"),
             crate::apps::host::fake::Unit {
                 exists: true,
-                oneshot: unit.ends_with(".service"),
+                oneshot: unit == "dot-chrome-theme.service",
                 ..crate::apps::host::fake::Unit::default()
             },
         );

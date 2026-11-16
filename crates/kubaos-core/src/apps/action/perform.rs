@@ -121,7 +121,10 @@ fn same_download(had: &Action, want: &Action, arch: &str) -> bool {
 /// newer version beside it: where a vendor's updater put the version it moved on to, after
 /// removing the one the pin downloaded.
 fn newer_version_there(host: &dyn Host, path: &Path, version: &str) -> bool {
-    let Some(folder) = path.ancestors().find(|dir| dir.file_name().is_some_and(|n| n == version)) else {
+    let Some(folder) = path
+        .ancestors()
+        .find(|dir| dir.file_name().is_some_and(|n| n == version))
+    else {
         return false;
     };
     let (Some(versions), Ok(rest)) = (folder.parent(), path.strip_prefix(folder)) else {
@@ -135,7 +138,10 @@ fn newer_version_there(host: &dyn Host, path: &Path, version: &str) -> bool {
             .file_name()
             .to_str()
             .is_some_and(|name| newer_version(name, version))
-            && host.place(&versions.join(entry.file_name()).join(rest)).symlink_metadata().is_ok()
+            && host
+                .place(&versions.join(entry.file_name()).join(rest))
+                .symlink_metadata()
+                .is_ok()
     })
 }
 
