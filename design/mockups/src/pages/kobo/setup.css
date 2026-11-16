@@ -96,9 +96,14 @@
   initial-value: 0;
 }
 
+/* The room is its column's width whatever a step holds: a step's own whole-pixel columns (the
+   cards') follow it rather than hold it open. */
 .setup-yours-room {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
   min-height: 0;
 }
 
@@ -106,6 +111,7 @@
   display: flex;
   flex-direction: column;
   grid-area: 1 / 1;
+  min-width: 0;
   min-height: 0;
   translate: round(nearest, calc(var(--yours-slide) * var(--space-s24)), 1px) 0;
 }

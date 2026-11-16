@@ -204,7 +204,8 @@ function indexSpec(state: Yours, category: Category): ListRowSpec {
  * padding so its thumb floats in it, as every Kōbō page's body does (`kobo.css`).
  */
 function padded(content: HTMLElement): HTMLElement {
-  const box = stack(0, "start", filling(content));
+  // Its end stands as far above the band as the step's top stands under the stepper.
+  const box = stack(0, "start", filling(content), gap("s24"));
   box.classList.add("kobo-scrolled");
   return box;
 }
@@ -277,7 +278,8 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     group.addEventListener("click", sync);
     group.addEventListener("keydown", sync);
     const newcomer = row("s8", "centre", icon("info", "var(--type-small-icon)", "var(--color-on_surface_variant)"), wrapped("Not sure? Everyday is a good start. Nothing here is final: the next step shows every app.", "small", "on_surface_variant"));
-    return stack("s16", "start", fillingHeight(filling(group)), filling(newcomer));
+    // As much room under the cards and their line as over them, so the set stands clear of the band.
+    return stack(0, "start", fillingHeight(filling(group)), gap("s24"), filling(newcomer), gap("s24"));
   };
 
   // ------------------------------------------------------------ Your apps --
