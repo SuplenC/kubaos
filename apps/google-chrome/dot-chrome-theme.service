@@ -15,3 +15,8 @@ PrivateNetwork=yes
 NoNewPrivileges=yes
 CapabilityBoundingSet=CAP_DAC_READ_SEARCH
 RestrictAddressFamilies=AF_UNIX
+
+# At boot too, for a wallpaper changed while the machine was off: the path unit sees only changes
+# while it runs.
+[Install]
+WantedBy=multi-user.target
