@@ -29,3 +29,20 @@ kubaos_suite_to_mise() {
   [[ -e "$KUBAOS_USER_FLAKE/kubaos.d/suites/$suite.toml" ]] || return 0
   kubaos suite configure "$suite" --no-switch
 }
+
+# kubaos_app_set_up_repo APP REPO: root's journal of the catalog's app APP has a step KubaOS did
+# that set up the vendor repository REPO (an `apt` action with `repo = "REPO"`), so the
+# repository's source is KubaOS's to put in place again. A step found done, as for an app the
+# user had installed, set nothing up. `KUBAOS_APP_JOURNALS` points the tests at their own
+# journals.
+kubaos_app_set_up_repo() {
+  local journal="${KUBAOS_APP_JOURNALS:-/var/lib/kubaos/apps}/$1/journal.toml"
+  [[ -f "$journal" ]] || return 1
+  awk -v repo="$2" '
+    function settle() { if (done && apt && ours) hit = 1; done = apt = ours = 0 }
+    /^\[\[entry\]\]/ { settle(); next }
+    /^state = "(done|doing)"$/ { done = 1 }
+    /^kind = "apt"$/ { apt = 1 }
+    $0 == "repo = \"" repo "\"" { ours = 1 }
+    END { settle(); exit !hit }' "$journal"
+}
