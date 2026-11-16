@@ -6,7 +6,8 @@
 //!
 //! # Owns
 //!
-//! - [`Host`], [`HostError`], [`UnitState`], [`AptPlan`] and [`AptSimulation`]. The real machine: [`SystemHost`].
+//! - [`Host`], [`HostError`], [`UnitState`], [`AptPlan`] and [`AptSimulation`]. The real machine:
+//!   [`SystemHost`].
 //!
 //! # Not here
 //!

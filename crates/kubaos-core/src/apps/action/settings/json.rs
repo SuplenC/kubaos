@@ -61,7 +61,9 @@ pub struct Through(pub String);
 impl JsonText {
     /// An empty object, the settings of a file that isn't there yet.
     pub fn empty() -> Self {
-        Self { text: "{}\n".to_owned() }
+        Self {
+            text: "{}\n".to_owned(),
+        }
     }
 
     /// `text`, when it is JSON whose top level is an object.
@@ -297,10 +299,7 @@ fn render(parts: &[&str], value: &str, colon: &str, lines: Option<(&String, &Str
 /// The whitespace that starts the line `at` is on.
 fn line_indent(text: &str, at: usize) -> String {
     let start = text[..at].rfind('\n').map_or(0, |i| i + 1);
-    text[start..]
-        .chars()
-        .take_while(|c| matches!(c, ' ' | '\t'))
-        .collect()
+    text[start..].chars().take_while(|c| matches!(c, ' ' | '\t')).collect()
 }
 
 fn skip_ws(text: &str, mut at: usize) -> usize {
