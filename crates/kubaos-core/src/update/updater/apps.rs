@@ -172,7 +172,21 @@ impl<M: Machine> Updater<'_, M> {
             if done.is_err() && changed {
                 before.write(&path).map_err(UpdateError::Picks)?;
             }
-            done
+            let mut done = done?;
+            // An app asked for that is already as asked is listed too: the summary says what
+            // the machine has after the run, so a caller acting on a stale reading still learns
+            // the app is there or gone.
+            let facts = state.facts();
+            for app in state.catalog.apps().iter().filter(|app| ids.contains(&app.id)) {
+                let (already, list) = match change {
+                    Change::Add => (facts.state(app) == apps::AppState::Installed, &mut done.installed),
+                    Change::Remove => (!facts.state(app).is_installed(), &mut done.removed),
+                };
+                if already && !list.contains(&app.name) {
+                    list.push(app.name.clone());
+                }
+            }
+            Ok(done)
         })?;
         let summary = Summary {
             command: Command::App,

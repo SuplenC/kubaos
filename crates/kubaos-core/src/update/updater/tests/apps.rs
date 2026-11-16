@@ -126,11 +126,29 @@ fn add_picks_the_apps_and_installs_them_in_one_run_of_the_helper_through_polkit(
 fn adding_an_app_that_is_there_only_picks_it() {
     let w = world();
     let mut m = fake(&["agent"]);
+    let mut events = Vec::new();
 
-    w.updater(&mut m).add_apps(&names(&["agent"])).unwrap();
+    w.reporting(&mut m, &mut events).add_apps(&names(&["agent"])).unwrap();
 
     assert_eq!(picked(&w), ["agent"]);
     assert!(helper_runs(&m).is_empty(), "{:?}", m.ran);
+    assert_eq!(summary(&events).apps.installed, ["Agent"]);
+}
+
+#[test]
+fn removing_an_app_that_is_gone_lists_it_as_removed() {
+    let w = world();
+    put(&w.user.app_picks(), "apps = [\"agent\"]\n");
+    let mut m = fake(&[]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events)
+        .remove_apps(&names(&["agent"]))
+        .unwrap();
+
+    assert!(picked(&w).is_empty());
+    assert!(helper_runs(&m).is_empty(), "{:?}", m.ran);
+    assert_eq!(summary(&events).apps.removed, ["Agent"]);
 }
 
 #[test]
