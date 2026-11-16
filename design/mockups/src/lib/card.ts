@@ -17,9 +17,10 @@ import { icon } from "./icon.ts";
 import { iconTile } from "./icon-tile.ts";
 import { fill, filling, row, split, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
-import { wrapped } from "./text.ts";
 import { length } from "./tokens.ts";
+import { milliseconds, strikeSteps } from "../site/recipe.ts";
 import { settings } from "../site/settings.ts";
+import { text, wrapped } from "./text.ts";
 
 export interface HeaderOptions {
   /** A symbol before the title, `subheading`'s 24. */
@@ -108,8 +109,19 @@ export type Picks = "one" | "many";
 /** A choice card's size: md, its symbol before its title; lg, on an lg icon tile above it. */
 export type ChoiceCardSize = "Md" | "Lg";
 
+/** A line at an lg card's foot: something the choice brings, by its symbol and name. */
+export interface ChoiceLine {
+  readonly glyph: string;
+  readonly label: string;
+}
+
 export interface ChoiceCardOptions {
   readonly glyph?: string;
+  /**
+   * An lg card's foot, the room under its words: what picking it brings, a line each, the last
+   * one's words alone (and 9 more). Lit with the card.
+   */
+  readonly foot?: readonly ChoiceLine[];
   /** Lg for a few choices that are a page's whole question: Make it yours's profiles. */
   readonly size?: ChoiceCardSize;
   readonly title: string;
@@ -147,6 +159,8 @@ function mark(picks: Picks): HTMLElement {
 
 /** Shows whether `element`, a choice card, is picked. */
 export function setPicked(element: HTMLElement, picked: boolean): void {
+  const was = element.getAttribute("aria-checked") === "true";
+  if (picked && !was && element.dataset.size === "Lg" && element.isConnected) strikeOn(element);
   element.setAttribute("aria-checked", String(picked));
   element.style.setProperty("--checked", picked ? "1" : "0");
   element.style.setProperty("--picked", picked ? "1" : "0");
@@ -179,11 +193,30 @@ export function choiceCard(options: ChoiceCardOptions): HTMLElement {
 }
 
 /**
+ * An lg card lit by a pick strikes on as the neon does: its light, `--choice-burn`, steps through
+ * `neon.strike` over `strike`; with reduced motion it simply comes on over `short`, as `--picked`
+ * moves. Going out is `--picked` fading over `short`.
+ */
+function strikeOn(element: HTMLElement): void {
+  const { reduced, speed, flicker } = settings();
+  if (reduced) return;
+  const steps = flicker ? strikeSteps() : [0, 1];
+  element.animate(
+    steps.map((value) => ({ "--choice-burn": value })),
+    { duration: milliseconds(flicker ? "strike" : "short") / speed, easing: flicker ? `steps(${steps.length}, jump-none)` : "linear" },
+  );
+}
+
+/**
  * An lg choice card's parts: its symbol on an lg icon tile with the mark at the line's end, then,
  * `space.s16` under them, the title in `heading` over the subtitle in `body`, `space.s4` apart.
  */
 function large(options: ChoiceCardOptions, picks: Picks): HTMLElement[] {
-  const lead = row(0, "start", iconTile({ glyph: options.glyph ?? "check", size: "Lg" }), fill(), mark(picks));
+  const tile = iconTile({ glyph: options.glyph ?? "check", size: "Lg" });
+  tile.classList.add("k-choice-tile");
+  // The tile's symbol is lit with the card, so its colour is the card's to say.
+  tile.querySelector<SVGElement>(".k-icon")?.style.setProperty("color", "var(--tile-ink)");
+  const lead = row(0, "start", tile, fill(), mark(picks));
   const title = wrapped(options.title, "heading");
   title.classList.add("k-card-title");
   title.style.color = "var(--title-colour, var(--color-on_surface))";
@@ -196,7 +229,11 @@ function large(options: ChoiceCardOptions, picks: Picks): HTMLElement[] {
   }
   const named = stack("s4", "start", ...words);
   named.classList.add("k-choice-words");
-  return [filling(lead), filling(named)];
+  if (!options.foot?.length) return [filling(lead), filling(named)];
+  const lines = options.foot.map((line) => row("s8", "centre", icon(line.glyph, "var(--type-small-icon)", "var(--foot-ink)"), text(line.label, "small", "on_surface_variant")));
+  const foot = stack("s8", "start", ...lines);
+  foot.classList.add("k-choice-foot");
+  return [filling(lead), filling(named), filling(foot)];
 }
 
 /** A key's step through a set of `columns` across: back or on by one, or by a row. */
