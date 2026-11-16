@@ -220,4 +220,4 @@ fi
 
 step "Done"
 info "Reboot now if tuxedo-drivers was just installed (and enroll the MOK if asked)."
-info "Next: system/40-apps.sh"
+info "Next: system/50-hyprland.sh"

@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Phase 7: Bitwarden and the security key.
-#   - Bitwarden desktop (official .deb, pinned + sha256-checked): its SSH agent
-#     serves the SSH keys from the vault on ~/.bitwarden-ssh-agent.sock
+# Phase 7: Bitwarden's CLI and the security key.
 #   - bw, the official CLI (standalone binary, pinned + sha256-checked) to
 #     /usr/local/bin/bw, for `kubaos bitwarden`
 #   - libsecret-tools (secret-tool) for `kubaos bitwarden env`'s keyring cache
@@ -10,35 +8,25 @@
 #     polkit and the Quickshell lock screen. The password always keeps working.
 #     system/75-yubikey.sh adds the key's tools (fido2-tools, optional pcscd).
 #
+# Bitwarden desktop, whose SSH agent serves the vault's SSH keys on
+# ~/.bitwarden-ssh-agent.sock, is an app of the Apps catalog
+# (apps/bitwarden.toml): kubaos app add bitwarden.
+#
 # Then, as yourself: kubaos bitwarden setup (vault -> ssh, git, gh, env) and
 # dot-u2f-enroll (security keys). docs/SECRETS.md has the whole flow.
 #
-# Why these builds (checked 2026-10):
-#   desktop  The .deb ships an AppArmor profile for Ubuntu 24.04+ (Electron's
-#            sandbox needs unprivileged user namespaces), installs to
-#            /opt/Bitwarden and is the build Bitwarden documents the SSH agent
-#            and "unlock with system authentication" (polkit) for. There's no
-#            apt repo and the app doesn't self-update on Linux, so the version
-#            is pinned here like everything else. nixpkgs 26.05 has 2026.8.0,
-#            but a Nix-built Electron on Ubuntu has no AppArmor profile for its
-#            /nix/store path and nobody tests it there. amd64 only: Bitwarden
-#            publishes no arm64 .deb (the arm64 VM skips the desktop app).
-#   bw       nixpkgs 26.05 is stuck at 2026.4.2, six months behind the server.
-#            The official standalone binary exists for amd64 and arm64,
-#            starts as fast, and 2026.10 can unlock through the desktop app.
+# Why this bw (checked 2026-10): nixpkgs 26.05 is stuck at 2026.4.2, six
+# months behind the server. The official standalone binary exists for amd64
+# and arm64, starts as fast, and 2026.10 can unlock through the desktop app.
 #
-# Updating: kubaos update moves the desktop app to the newest release of its
-# series (the year) itself, checked against GitHub's sha256 digest, so the
-# pin below is the oldest an install starts from; this script leaves a newer
-# one of the same series alone. A new series, and the bw CLI, wait for a bump
-# here: kubaos update lists them (this script's --check-updates); bump the
-# versions and sha256s below, re-run this script.
+# Updating: the bw CLI waits for a bump here, and Bitwarden desktop's new
+# series for one in apps/bitwarden.toml (kubaos update moves the app within
+# its series itself). kubaos update lists both (this script's
+# --check-updates), with the new versions and sha256s to paste.
 set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-BW_DESKTOP_VERSION="2026.10.1"
-BW_DESKTOP_SHA256="02cb6bc6a429d8d0da9fdf9d23739358165cf7b98a245783d6f641526f75b0a7"   # Bitwarden-2026.10.1-amd64.deb
 BW_CLI_VERSION="2026.10.0"
 BW_CLI_SHA256_AMD64="269b67559caab860d1737f7554b32bdb8be9285d5689fee55193c137a0df9973"   # bw-linux-2026.10.0.zip
 BW_CLI_SHA256_ARM64="2fe9d8a18dc4c35ea2f9e3e42a4021f14f129ef47e80b6cea1e3b34176f1583a"   # bw-linux-arm64-2026.10.0.zip
@@ -66,20 +54,19 @@ U2F_LINES=(
 )
 POLKIT_DROPIN=/etc/systemd/system/polkit-agent-helper@.service.d/u2f.conf
 
-DO_DESKTOP=1 DO_CLI=1 DO_U2F=1 NO_U2F=0 REMOVE_U2F=0 CHECK_ONLY=0
+DO_CLI=1 DO_U2F=1 NO_U2F=0 REMOVE_U2F=0 CHECK_ONLY=0
 
 usage() {
   cat <<EOF
-Usage: $0 [--dry-run] [--no-desktop] [--no-cli] [--no-u2f] [--remove-u2f] [--check-updates]
+Usage: $0 [--dry-run] [--no-cli] [--no-u2f] [--remove-u2f] [--check-updates]
 
-  --no-desktop      skip the Bitwarden desktop app
   --no-cli          skip the bw CLI
   --no-u2f          leave pam_u2f out (packages, PAM lines, lock screen service),
                     now and in every kubaos update
   --remove-u2f      take the security-key lines out of /etc/pam.d/{sudo,sudo-i,polkit-1}
                     and remove the polkit drop-in (keeps $U2F_MAPPINGS); leaves it
                     out from now on too
-  --check-updates   only report newer desktop/CLI releases on GitHub, change nothing
+  --check-updates   only report newer CLI and desktop releases on GitHub, change nothing
 
 kubaos packages enable u2f turns the security key back on.
 
@@ -90,7 +77,6 @@ EOF
 while (($#)); do
   case "$1" in
     -n | --dry-run) DRY_RUN=1 ;;
-    --no-desktop) DO_DESKTOP=0 ;;
     --no-cli) DO_CLI=0 ;;
     --no-u2f) NO_U2F=1 ;;
     --remove-u2f) REMOVE_U2F=1 ;;
@@ -133,12 +119,14 @@ if ((CHECK_ONLY)); then
     info "BW_CLI_SHA256_AMD64=\"$(asset_sha256 "cli-v$cli" "bw-linux-$cli.zip")\""
     info "BW_CLI_SHA256_ARM64=\"$(asset_sha256 "cli-v$cli" "bw-linux-arm64-$cli.zip")\""
   fi
-  if [[ "$desk" == "$BW_DESKTOP_VERSION" ]]; then
-    ok "Bitwarden desktop $BW_DESKTOP_VERSION is the latest"
+  pinned="$(manifest_dump "$DOTFILES_DIR/apps/bitwarden.toml" | awk -F'\t' '$1 == "deb" && $2 == "version" { print $3 }')"
+  if [[ "$desk" == "$pinned" ]]; then
+    ok "Bitwarden desktop $pinned is the latest"
   else
-    warn "Bitwarden desktop $desk is out (pinned: $BW_DESKTOP_VERSION). New pins:"
-    info "BW_DESKTOP_VERSION=\"$desk\""
-    info "BW_DESKTOP_SHA256=\"$(asset_sha256 "desktop-v$desk" "Bitwarden-$desk-amd64.deb")\""
+    warn "Bitwarden desktop $desk is out (pinned: $pinned). New pins for apps/bitwarden.toml:"
+    info "version = \"$desk\""
+    info "url = \"$RELEASES/desktop-v$desk/Bitwarden-$desk-amd64.deb\""
+    info "sha256 = \"$(asset_sha256 "desktop-v$desk" "Bitwarden-$desk-amd64.deb")\""
   fi
   info "Release notes: https://github.com/bitwarden/clients/releases"
   exit 0
@@ -165,29 +153,6 @@ groups=(bitwarden)
 ((DO_U2F && !REMOVE_U2F)) && groups+=(u2f)
 step "Packages"
 group_install "${groups[@]}"
-
-# --------------------------------------------------------------------------
-if ((DO_DESKTOP && !REMOVE_U2F)); then
-  step "Bitwarden desktop $BW_DESKTOP_VERSION (.deb from github.com/bitwarden/clients)"
-  have="$(dpkg-query -W -f='${Version}' bitwarden 2>/dev/null || true)"
-  if ! is_amd64; then
-    warn "$(arch): Bitwarden publishes no .deb for it; skipping the desktop app (no SSH agent here)"
-  elif [[ "$have" == "$BW_DESKTOP_VERSION" ]]; then
-    ok "bitwarden $have installed"
-  elif [[ "${have%%.*}" == "${BW_DESKTOP_VERSION%%.*}" ]] && dpkg --compare-versions "$have" gt "$BW_DESKTOP_VERSION"; then
-    ok "bitwarden $have installed (newer than the pin, of its series: kubaos update moved it)"
-  else
-    [[ -n "$have" ]] && info "installed: $have"
-    tmp="$(mktemp -d)"
-    fetch_verified "$RELEASES/desktop-v$BW_DESKTOP_VERSION/Bitwarden-$BW_DESKTOP_VERSION-amd64.deb" \
-      "$BW_DESKTOP_SHA256" "$tmp/bitwarden.deb"
-    # apt resolves the .deb's dependencies (libnss3, libnotify4, ...). _apt
-    # can't read a mktemp dir; that only costs a harmless warning.
-    sudo_run apt-get install -y --no-install-recommends "$tmp/bitwarden.deb"
-    rm -rf "$tmp"
-  fi
-  install_bitwarden_autostart
-fi
 
 # --------------------------------------------------------------------------
 if ((DO_CLI && !REMOVE_U2F)); then
@@ -326,7 +291,7 @@ step "Done"
 if ((!REMOVE_U2F)); then
   cat <<EOF
       As yourself (docs/SECRETS.md):
-        1. Start Bitwarden, log in, Settings -> enable "SSH agent".
+        1. kubaos app add bitwarden, start it, log in, Settings -> enable "SSH agent".
            Optional: "Unlock with system authentication" (polkit: your finger on the key).
         2. kubaos bitwarden setup  vault -> ~/.ssh, git signing, gh, project env
         3. system/75-yubikey.sh    the key's tools; then set its PIN and fingerprints
