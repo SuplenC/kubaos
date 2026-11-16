@@ -28,6 +28,14 @@ _Avoid_: Package list, base packages
 A named set of the **Package manifest**'s packages for one feature (Docker, the file manager, Hyprland); an optional one the user can turn off or on for good.
 _Avoid_: Feature flag, bundle
 
+**Catalog**:
+The few essential apps KubaOS knows how to install well, one manifest each in `apps/`, each from one pinned, verified source; everything else the user installs themselves.
+_Avoid_: App store, software center, repository
+
+**App**:
+One entry of the **Catalog**, picked by the user in `~/.config/kubaos/apps.toml` and installed, kept up to date and removed by KubaOS (`kubaos app`).
+_Avoid_: Package (an app may be several), program
+
 **Curated set**:
 The packages KubaOS builds and pins itself, which move only with a KubaOS release.
 _Avoid_: KubaOS packages, pinned packages
