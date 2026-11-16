@@ -230,16 +230,19 @@ fn removing_asks_first_and_installing_asks_only_for_root() {
 }
 
 #[test]
-fn hide_may_name_either_half_of_every_app() {
+fn hide_may_name_every_item_of_every_app() {
     assert_eq!(
         apps(&[]).ids(),
         [
             "app-install:claude-code",
             "app-remove:claude-code",
+            "app-configure:claude-code",
             "app-install:google-chrome",
             "app-remove:google-chrome",
+            "app-configure:google-chrome",
             "app-install:odd",
             "app-remove:odd",
+            "app-configure:odd",
         ]
     );
 }
@@ -370,8 +373,124 @@ fn the_job_shows_each_step_and_how_far_it_got() {
         shown,
         [
             (Some("Installing Google Chrome"), None),
-            (Some("Installing Google Chrome"), Some(0.25)),
+            (Some("Installing Google Chrome, 2 of 4"), Some(0.25)),
         ]
+    );
+}
+
+/// What a running Job shows after each of `lines` that changed it: its message and progress.
+fn shown(lines: &[&str]) -> Vec<(Option<String>, Option<f32>)> {
+    let (reported, _) = heard(lines, true);
+    reported
+        .iter()
+        .map(|job| (job.message.clone(), job.progress.map(Fraction::get)))
+        .collect()
+}
+
+#[test]
+fn the_job_names_the_step_it_is_on_and_its_place_among_the_apps_steps() {
+    let shown = shown(&[
+        STARTED,
+        r#"{"type":"app","app":"t3-code","name":"T3 Code","n":1,"of":1}"#,
+        r#"{"type":"step","text":"Install T3 Code"}"#,
+        r#"{"type":"progress","done":0,"total":4}"#,
+        r#"{"type":"step","text":"Start the service"}"#,
+        r#"{"type":"progress","done":1,"total":4}"#,
+        r#"{"type":"progress","done":4,"total":4}"#,
+    ]);
+
+    assert_eq!(
+        shown,
+        [
+            (None, Some(0.0)),
+            (Some("Install T3 Code".to_owned()), Some(0.0)),
+            (Some("Install T3 Code, 1 of 4".to_owned()), Some(0.0)),
+            (Some("Start the service".to_owned()), Some(0.0)),
+            (Some("Start the service, 2 of 4".to_owned()), Some(0.25)),
+            (Some("Start the service, 4 of 4".to_owned()), Some(1.0)),
+        ]
+    );
+}
+
+#[test]
+fn a_run_of_several_apps_names_the_app_it_is_on_and_its_place_in_the_run() {
+    let shown = shown(&[
+        STARTED,
+        r#"{"type":"app","app":"neovim","name":"Neovim","n":1,"of":2}"#,
+        r#"{"type":"step","text":"Install Neovim"}"#,
+        r#"{"type":"progress","done":0,"total":1}"#,
+        r#"{"type":"action","app":"neovim","step":1,"of":1,"name":"Install Neovim","state":"done"}"#,
+        r#"{"type":"progress","done":1,"total":1}"#,
+        r#"{"type":"app","app":"lazyvim","name":"LazyVim","n":2,"of":2}"#,
+        r#"{"type":"step","text":"Write its config"}"#,
+        r#"{"type":"progress","done":0,"total":2}"#,
+    ]);
+
+    assert_eq!(
+        shown,
+        [
+            (Some("Neovim (1 of 2)".to_owned()), Some(0.0)),
+            (Some("Neovim (1 of 2): Install Neovim".to_owned()), Some(0.0)),
+            (Some("Neovim (1 of 2): Install Neovim, 1 of 1".to_owned()), Some(0.0)),
+            (Some("Neovim (1 of 2): Install Neovim, 1 of 1".to_owned()), Some(0.5)),
+            (Some("LazyVim (2 of 2)".to_owned()), Some(0.5)),
+            (Some("LazyVim (2 of 2): Write its config".to_owned()), Some(0.5)),
+            (Some("LazyVim (2 of 2): Write its config, 1 of 2".to_owned()), Some(0.5)),
+        ]
+    );
+}
+
+/// An app on Neovim with a configure stage.
+const LAZYVIM: &str = r#"
+name = "LazyVim"
+summary = "Neovim, set up"
+tags = ["editor"]
+
+[[action]]
+name = "Install LazyVim"
+kind = "apt"
+packages = ["lazyvim"]
+
+[[action]]
+name = "Write KubaOS's defaults"
+kind = "file"
+stage = "configure"
+to = "~/.config/kubaos/lazyvim/defaults.lua"
+text = "vim.o.number = true\n"
+"#;
+
+#[test]
+fn an_installed_app_with_a_configure_stage_has_a_configure_item_and_others_none() {
+    let folders = [("lazyvim", LAZYVIM), ("claude-code", CLAUDE)];
+
+    let installed = apps_of(&folders, "amd64", &["lazyvim=1.0", "claude-code=2.1"], None);
+    let missing = apps_of(&folders, "amd64", &[], None);
+
+    let configure = item(&installed, "app-configure:lazyvim");
+    assert_eq!(configure.title, "Configure LazyVim");
+    assert_eq!(
+        configure.subtitle.as_deref(),
+        Some("Put KubaOS's defaults for LazyVim back")
+    );
+    assert!(!ids(&installed).contains(&"app-configure:claude-code".to_owned()));
+    assert!(!ids(&missing).iter().any(|id| id.starts_with("app-configure:")));
+}
+
+#[test]
+fn configuring_runs_kubaos_app_configure_and_ends_when_the_summary_names_the_app() {
+    let apps = apps_of(&[("lazyvim", LAZYVIM)], "amd64", &["lazyvim=1.0"], None);
+    let (mut jobs, runner, started) = start(&apps, "app-configure:lazyvim", CONFIGURE);
+    let job = started.unwrap();
+    let summary = summary(&[]).replace(r#""installed":[]"#, r#""configured":["LazyVim"]"#);
+
+    jobs.heard(Heard::line(&job.id, summary));
+    let ended = jobs.heard(Heard::ended(&job.id, true)).unwrap();
+
+    assert_eq!(runner.backgrounded(), ["kubaos app configure lazyvim --json"]);
+    assert_eq!(job.title, "Configuring LazyVim");
+    assert_eq!(
+        (ended.title.as_str(), ended.state),
+        ("LazyVim configured", JobState::Succeeded)
     );
 }
 
@@ -802,10 +921,15 @@ fn a_setup_item_that_doesnt_apply_runs_nothing() {
 }
 
 #[test]
-fn hide_may_name_each_setups_install_and_the_removal() {
+fn hide_may_name_each_setups_install_the_removal_and_the_configure() {
     assert_eq!(
         lab(&[], None).ids(),
-        ["app-install:lab:desktop", "app-install:lab:service", "app-remove:lab"]
+        [
+            "app-install:lab:desktop",
+            "app-install:lab:service",
+            "app-remove:lab",
+            "app-configure:lab",
+        ]
     );
 }
 
