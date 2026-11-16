@@ -86,3 +86,52 @@
 .setup-room > .kobo-scene:is(.setup-desk, [data-scene="desktop"]) .k-backdrop-scrim {
   display: none;
 }
+
+/* Make it yours's steps (`setup-yours-card.ts`) stand one over another in the card's room as they
+   turn: the step left is laid over the one arriving until it has gone. A step slides `space.s24` as
+   it turns, `--yours-slide` the share of it still to go, toward the start or the end. */
+@property --yours-slide {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.setup-yours-room {
+  position: relative;
+  display: grid;
+  min-height: 0;
+}
+
+.setup-yours-step {
+  display: flex;
+  flex-direction: column;
+  grid-area: 1 / 1;
+  min-height: 0;
+  translate: round(nearest, calc(var(--yours-slide) * var(--space-s24)), 1px) 0;
+}
+
+.setup-yours-step > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.setup-yours-step[data-leaving] {
+  pointer-events: none;
+}
+
+/* What for's three cards share the room above the newcomer's line. */
+.setup-yours-profiles {
+  height: 100%;
+}
+
+/* Your apps' index stays in view as the apps scroll beside it. */
+.setup-yours-index {
+  position: sticky;
+  top: 0;
+  align-self: start;
+}
+
+/* Go's figure burns as the lit cards do at night. */
+.setup-yours-figure {
+  text-shadow: 0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * (1 - var(--day))));
+}
