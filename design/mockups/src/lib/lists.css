@@ -718,3 +718,8 @@
   border-radius: var(--radius-full);
   background: var(--color-primary);
 }
+
+/* A row's checkbox (`box`): the library's box at its end, taking no press of its own. */
+.k-list-box {
+  cursor: inherit;
+}

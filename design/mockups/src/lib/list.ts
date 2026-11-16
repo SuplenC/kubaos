@@ -86,6 +86,11 @@ export type ListRowSpec = RowTaking & {
   readonly keys?: string;
   /** A switch at its end, on or off: a setting the row turns. */
   readonly toggle?: boolean;
+  /**
+   * A checkbox's box at its end, empty or ticked as `checked` says, the row the control: one of
+   * many things to tick, so even an unticked row says it is a choice (first boot's apps).
+   */
+  readonly box?: boolean;
   /** Its action can't be taken back: Shut down. */
   readonly danger?: boolean;
   readonly disabled?: boolean;
@@ -176,7 +181,8 @@ function ends(spec: ListRowSpec): Element[] {
     toggle.classList.add("k-list-switch");
     parts.push(toggle);
   }
-  if (spec.opens) parts.push(icon("chevron_right", "var(--type-body_strong-icon)", "var(--muted)"));
+  if (spec.box) parts.push(checkMark(spec.checked ?? false));
+  else if (spec.opens) parts.push(icon("chevron_right", "var(--type-body_strong-icon)", "var(--muted)"));
   else if (spec.checked !== undefined || spec.forget || spec.adds) {
     const room = document.createElement("span");
     room.className = "k-list-check";
@@ -189,6 +195,25 @@ function ends(spec: ListRowSpec): Element[] {
     parts.push(room);
   }
   return parts;
+}
+
+/** A checkbox's box as a row's mark: the row takes the press, the box shows what it is. */
+function checkMark(ticked: boolean): HTMLElement {
+  const slot = document.createElement("span");
+  slot.className = "k-check k-list-box";
+  slot.dataset.tick = ticked ? "Full" : "Empty";
+  slot.style.setProperty("--checked", ticked ? "1" : "0");
+  const box = document.createElement("span");
+  box.className = "k-check-box";
+  box.dataset.shape = "box";
+  const holder = document.createElement("span");
+  holder.className = "k-check-mark";
+  const tick = icon("check", "var(--icon-s16)", "var(--mark)");
+  tick.classList.add("k-check-tick");
+  holder.append(tick);
+  box.append(holder);
+  slot.append(box);
+  return slot;
 }
 
 /**
