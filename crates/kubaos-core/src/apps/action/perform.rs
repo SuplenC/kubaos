@@ -314,6 +314,25 @@ fn started_as(state: UnitState, start: bool) -> bool {
     if start { state.started() } else { !state.active }
 }
 
+/// What a `nix` action finds: the names `packages.toml` lists. One for another architecture, or
+/// an unfree one the user's nixpkgs refuses, is refused before anything changes: its name would
+/// fail the switch after the run, for the whole home. One already listed is in a home that built.
+fn look_nix(host: &mut dyn Host, packages: &[String], arch: Option<&str>, unfree: bool) -> Result<Look, PerformError> {
+    if let Some(only) = arch
+        && only != host.arch()
+    {
+        return Err(PerformError::Unavailable {
+            arch: host.arch().to_owned(),
+        });
+    }
+    let listed = host.nix_list().map_err(PerformError::Host)?;
+    let look = parts("nix", packages, |p| listed.contains(p));
+    if unfree && !look.done && host.unfree().map_err(PerformError::Host)? == Unfree::Refused {
+        return Err(PerformError::Unfree);
+    }
+    Ok(look)
+}
+
 /// What a unit, a group or lingering finds.
 fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look, PerformError> {
     match &action.kind {
@@ -403,23 +422,7 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
                 prior: Prior::default(),
             })
         }
-        Kind::Nix { packages, arch, unfree } => {
-            if let Some(only) = arch
-                && only != host.arch()
-            {
-                return Err(PerformError::Unavailable {
-                    arch: host.arch().to_owned(),
-                });
-            }
-            let listed = host.nix_list().map_err(PerformError::Host)?;
-            let look = parts("nix", packages, |p| listed.contains(p));
-            // A name the user's nixpkgs refuses would fail the switch after the run, for the
-            // whole home; one already listed is in a home that built.
-            if *unfree && !look.done && host.unfree().map_err(PerformError::Host)? == Unfree::Refused {
-                return Err(PerformError::Unfree);
-            }
-            Ok(look)
-        }
+        Kind::Nix { packages, arch, unfree } => look_nix(host, packages, arch.as_deref(), *unfree),
         Kind::Download {
             to,
             version,
