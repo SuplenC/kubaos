@@ -153,6 +153,7 @@ export default page({
     { name: "Two lines, ticks", for: "the networks, with a fact before the subtitle", sample: () => well(NETWORKS) },
     { name: "Two lines, chevrons", for: "rows that open a page; these never tick", sample: () => well(PAGES) },
     { name: "Actions, one line", for: "what can be done, danger last", sample: () => well(POWER) },
+    { name: "Flowing", for: "rows in as many columns as fit", sample: () => within("var(--size-column)", list(["Firefox", "Signal", "Spotify", "Steam", "Krita", "Zed"].map((title, i): ListRowSpec => ({ title, subtitle: "One line about it", icon: "check_circle", tile: true, checked: i % 2 === 0 })), { flow: true })) },
     { name: "Switches", for: "the row is the control", sample: () => well([{ title: "Bluetooth", subtitle: "2 connected", icon: "bluetooth", toggle: true }, { title: "Do not disturb", icon: "notifications_off", toggle: false }]) },
     { name: "Chips and a detail", for: "facts at a glance, then a machine's name", sample: () => well([{ title: "Samsung 990 Pro", subtitle: "2 TB · NVMe", icon: "hard_drive", chips: [{ kind: "Accent", label: "Default" }], detail: "nvme0n1" }, { title: "WD Blue", subtitle: "500 GB · SATA", icon: "hard_drive", chips: [{ kind: "Neutral", label: "Too small" }], detail: "sda" }]) },
     { name: "The Command menu's", for: "tall, clear, tight; one selection slides between rows", sample: () => well(RESULTS, { slides: true }) },

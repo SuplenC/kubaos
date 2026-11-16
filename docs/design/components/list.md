@@ -6,7 +6,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `list::list`; QML `List`. Its mockup page is the source of truth, with `ListRow` and `ListRows`: Molecules, List, ListRow and ListRows, in `design/mockups/`.
 
-Rows in a well: the content radius (16), padding 8, rows 4 apart, so the rows take 16 − 8 = 8, the row radius (concentric). A plain `List` keeps the 8 for those corners; only a list whose rows scroll (`ScrollingList`, `LiveList`) pads them 12, as its section says. The focus tube lights the well's edge; the row shows where the keyboard is.
+Rows in a well: the content radius (16), padding 8, rows 4 apart, so the rows take 16 − 8 = 8, the row radius (concentric). A plain `List` keeps the 8 for those corners. A list may **flow** (`flow`): its rows fill as many columns, each half a text column wide at least, as its width holds, 4 apart down and 16 across, a label or a note spanning them all; ↑ ↓ move to the row above or below, ← → to the one before or after, and Space takes a row as Enter does (first boot's apps, ticked). An index beside a list can put the list's keys on a row (`put`). only a list whose rows scroll (`ScrollingList`, `LiveList`) pads them 12, as its section says. The focus tube lights the well's edge; the row shows where the keyboard is.
 
 *Not built yet: both libraries draw the well at the surface radius (24), 12 inside, and its rows at 24 − 12 = 12 with 12 inside their sides; the mockup draws the rule.*
 

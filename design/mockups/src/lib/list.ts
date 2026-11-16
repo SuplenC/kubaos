@@ -43,6 +43,9 @@ import { settings } from "../site/settings.ts";
 export interface RowChip {
   readonly kind: ChipKind;
   readonly label: string;
+  readonly icon?: string;
+  /** Its symbol alone, its label its name: a chip whose words the symbol already says. */
+  readonly iconOnly?: boolean;
 }
 
 /**
@@ -154,7 +157,7 @@ function words(spec: ListRowSpec): HTMLElement {
 /** The parts at a row's end, in order: chips, the detail, keys, a switch, then a chevron or a tick. */
 function ends(spec: ListRowSpec): Element[] {
   const parts: Element[] = [];
-  for (const each of spec.chips ?? []) parts.push(chip({ label: each.label, kind: each.kind }));
+  for (const each of spec.chips ?? []) parts.push(chip({ label: each.label, kind: each.kind, ...(each.icon ? { icon: each.icon } : {}), ...(each.iconOnly ? { iconOnly: true } : {}) }));
   if (spec.detail !== undefined) {
     const detail = clamped(spec.detail, "mono");
     detail.classList.add("k-list-detail");
@@ -279,6 +282,12 @@ export interface ListOptions {
   readonly fieldKeys?: boolean;
   /** What taking a row does, by its index among the rows. */
   readonly onTake?: (index: number) => void;
+  /**
+   * Its rows flow into as many columns, half a text column wide at least, as its width holds; a
+   * label or a note spans them all. ↑ ↓ move to the row above or below, ← → to the one before or
+   * after, and Space takes a row as Enter does: a list of things to tick, as first boot's apps.
+   */
+  readonly flow?: boolean;
 }
 
 /** A list's well: the rows' room, with its hairline and focus tube drawn over what it holds. */
@@ -318,6 +327,8 @@ export interface Rows {
   readonly refresh: () => void;
   /** `fresh` takes `old`'s place, and the keyboard with it if it was there. */
   readonly swap: (old: HTMLElement, fresh: HTMLElement) => void;
+  /** Puts the keyboard on `item`, as the pointer moving onto it would: an index jumping to it. */
+  readonly put: (item: HTMLElement) => void;
 }
 
 /**
@@ -354,6 +365,20 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
     const bottom = offsetIn(item, pane) + item.offsetHeight + inset;
     if (top < pane.scrollTop) pane.scrollTop = top;
     else if (bottom > pane.scrollTop + pane.clientHeight) pane.scrollTop = bottom - pane.clientHeight;
+  }
+
+  /** To the nearest row on the line above or below, the one most nearly under the current one. */
+  function across(by: 1 | -1): void {
+    const here = at ?? rowsOf().find(takes);
+    if (!here) return;
+    const rows = rowsOf().filter(takes);
+    const lines = rows.filter((each) => (by > 0 ? each.offsetTop > here.offsetTop + 1 : each.offsetTop < here.offsetTop - 1));
+    if (lines.length === 0) return;
+    const line = by > 0 ? Math.min(...lines.map((each) => each.offsetTop)) : Math.max(...lines.map((each) => each.offsetTop));
+    const onLine = lines.filter((each) => Math.abs(each.offsetTop - line) <= 1);
+    const best = onLine.reduce((a, b) => (Math.abs(b.offsetLeft - here.offsetLeft) < Math.abs(a.offsetLeft - here.offsetLeft) ? b : a));
+    move(rowsOf().indexOf(best));
+    best.scrollIntoView({ block: "nearest" });
   }
 
   function step(by: 1 | -1): void {
@@ -417,7 +442,14 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
     const ctrl = event.ctrlKey;
     const key = event.key.toLowerCase();
     const plain = (options.vimKeys ?? true) && !ctrl;
-    if (event.key === "ArrowDown" || (plain && key === "j") || (ctrl && (key === "j" || key === "n"))) step(1);
+    if (options.flow && event.key === "ArrowDown") across(1);
+    else if (options.flow && event.key === "ArrowUp") across(-1);
+    else if (options.flow && (event.key === "ArrowRight" || event.key === "ArrowLeft")) {
+      step(event.key === "ArrowRight" ? 1 : -1);
+      at?.scrollIntoView({ block: "nearest" });
+    } else if (options.flow && event.key === " ") {
+      if (!event.repeat) take();
+    } else if (event.key === "ArrowDown" || (plain && key === "j") || (ctrl && (key === "j" || key === "n"))) step(1);
     else if (event.key === "ArrowUp" || (plain && key === "k") || (ctrl && (key === "k" || key === "p"))) step(-1);
     else if (!options.fieldKeys && event.key === "Home") jump(0);
     else if (!options.fieldKeys && event.key === "End") jump(rowsOf().length - 1);
@@ -441,7 +473,11 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
     if (at === old) at = fresh;
     show();
   };
-  return { current: () => at, pointed: () => pointer, refresh: show, swap };
+  const put = (item: HTMLElement) => {
+    const to = rowsOf().indexOf(item);
+    if (to >= 0) move(to);
+  };
+  return { current: () => at, pointed: () => pointer, refresh: show, swap, put };
 }
 
 /**
@@ -505,10 +541,28 @@ function itemsOf(items: readonly ListItem[], options: ListOptions): HTMLElement[
 }
 
 export function list(specs: readonly ListItem[], options: ListOptions = {}): HTMLElement {
-  const rows = itemsOf(specs, options);
-  const box = well("List", rowStack(rows));
-  listRows(box, null, () => rows, options);
-  return box;
+  return listWith(specs, options).box;
+}
+
+/**
+ * `list`, with what keeps it: its rows, which a row redrawn in place (`replaceRow`) keeps the
+ * keyboard on, for an owner whose rows change as they are taken.
+ */
+export function listWith(specs: readonly ListItem[], options: ListOptions = {}): { box: HTMLElement; rows: Rows; replaceRow: (index: number, spec: ListRowSpec) => HTMLElement } {
+  const items = itemsOf(specs, options);
+  const column = rowStack(items);
+  const box = well("List", column);
+  box.toggleAttribute("data-flow", options.flow ?? false);
+  const keys = listRows(box, null, () => items, options);
+  const replaceRow = (index: number, spec: ListRowSpec) => {
+    const old = items[index]!;
+    const fresh = listRow(spec);
+    old.replaceWith(fresh);
+    items[index] = fresh;
+    keys.swap(old, fresh);
+    return fresh;
+  };
+  return { box, rows: keys, replaceRow };
 }
 
 export interface ScrollingOptions extends ListOptions {
