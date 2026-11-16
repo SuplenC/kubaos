@@ -44,9 +44,9 @@ use kubaos_core::apps::journal::Journal;
 use kubaos_core::apps::journal::JournalError;
 use kubaos_core::apps::status::listing;
 use kubaos_core::state::Paths;
-use serde::Serialize;
 use kubaos_core::update::Updater;
 use kubaos_core::update::record::SystemPaths;
+use serde::Serialize;
 
 use crate::job;
 use crate::job::SwitchIn;
@@ -359,11 +359,17 @@ fn show_text(shown: &Showing) -> String {
         about.name, about.category, about.summary, about.description, about.description_from
     );
     if shown.steps.is_empty() {
-        out.push_str("Not installed: it owns nothing on this machine.
-");
+        out.push_str(
+            "Not installed: it owns nothing on this machine.
+",
+        );
         return out;
     }
-    let state = if shown.complete { "Installed" } else { "Partly installed" };
+    let state = if shown.complete {
+        "Installed"
+    } else {
+        "Partly installed"
+    };
     match &shown.setup {
         Some(setup) => {
             let _ = writeln!(out, "{state} ({setup}). What each step owns, which a removal undoes:");

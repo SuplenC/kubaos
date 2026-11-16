@@ -51,6 +51,5 @@ pub fn arch() -> &'static str {
     }
 }
 
-
 #[cfg(test)]
 mod tests;

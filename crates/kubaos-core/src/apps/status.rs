@@ -8,8 +8,8 @@
 //!
 //! # Owns
 //!
-//! - [`AppState`], [`Status`], [`AppStatus`], [`Listed`] and [`listing`], and the setup an app
-//!   is picked in ([`picked_setup`]).
+//! - [`AppState`], [`Status`], [`AppStatus`], [`Listed`] and [`listing`], and the setup an app is
+//!   picked in ([`picked_setup`]).
 //!
 //! # Not here
 //!

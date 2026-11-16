@@ -1,8 +1,8 @@
 //! Bitwarden desktop's releases on GitHub, as the update's Bitwarden phase reads them: which one
 //! to move to, and whether a download is the one GitHub published.
 //!
-//! The Apps catalog installs one pinned `.deb` (`apps/bitwarden/app.toml`); an update moves it on to
-//! the newest release of the same major series (the year, as Bitwarden numbers them:
+//! The Apps catalog installs one pinned `.deb` (`apps/bitwarden/app.toml`); an update moves it on
+//! to the newest release of the same major series (the year, as Bitwarden numbers them:
 //! `2026.10.1`). A new series waits for a KubaOS release that pins it.
 //!
 //! # Owns

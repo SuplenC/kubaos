@@ -430,7 +430,7 @@ impl Machine for Fake {
             declined: apps.declined,
             started: false,
             requests: Vec::new(),
-            calls: apps.root_calls.clone(),
+            calls: std::rc::Rc::clone(&apps.root_calls),
         };
         (Box::new(apps.host.clone()), Box::new(root))
     }

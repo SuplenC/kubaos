@@ -14,6 +14,11 @@ use std::process::Command;
 use std::rc::Rc;
 
 use super::AptPlan;
+use super::AptSimulation;
+use super::Host;
+use super::HostError;
+use super::UnitState;
+use crate::apps::action::Scope;
 use crate::apps::action::Side;
 use crate::apps::engine::Keeper;
 use crate::apps::root::Reply;
@@ -21,11 +26,6 @@ use crate::apps::root::Request;
 use crate::apps::root::RootError;
 use crate::apps::root::RootSide;
 use crate::apps::root::Server;
-use super::AptSimulation;
-use super::Host;
-use super::HostError;
-use super::UnitState;
-use crate::apps::action::Scope;
 
 /// Root's side of the fake machine, its requests sent as JSON lines through the real server.
 #[derive(Debug)]

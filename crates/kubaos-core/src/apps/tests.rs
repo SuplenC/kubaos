@@ -69,7 +69,10 @@ fn an_app_that_isnt_valid_is_named() {
 
     let err = Catalog::load(dir.path()).unwrap_err();
 
-    assert!(matches!(err, CatalogError::App { ref id, .. } if id == "bad"), "{err:?}");
+    assert!(
+        matches!(err, CatalogError::App { ref id, .. } if id == "bad"),
+        "{err:?}"
+    );
 }
 
 #[test]

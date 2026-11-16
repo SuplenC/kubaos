@@ -11,8 +11,7 @@
 //!
 //! # Owns
 //!
-//! - Writing the picks as a run goes, running the engine with the root helper, and the Apps
-//!   phase.
+//! - Writing the picks as a run goes, running the engine with the root helper, and the Apps phase.
 //!
 //! # Not here
 //!
@@ -326,7 +325,10 @@ impl<M: Machine> Updater<'_, M> {
         });
         if let Err(e) = ran {
             ok = false;
-            self.j.warn(format!("apps not installed, the next update tries again: {}", chain(&e)));
+            self.j.warn(format!(
+                "apps not installed, the next update tries again: {}",
+                chain(&e)
+            ));
         }
         if !changes.installed.is_empty() {
             self.j.detail(format!("{} installed", changes.installed.join(", ")));
@@ -348,7 +350,8 @@ impl<M: Machine> Updater<'_, M> {
             Root::Polkit => vec!["pkexec".into(), helper.into_os_string(), "serve".into()],
             Root::Sudo => {
                 let cmd = Cmd::root(&helper);
-                self.authorise(&cmd).map_err(UpdateError::step("asking for the password"))?;
+                self.authorise(&cmd)
+                    .map_err(UpdateError::step("asking for the password"))?;
                 vec!["sudo".into(), helper.into_os_string(), "serve".into()]
             }
         };
@@ -379,7 +382,10 @@ fn name_in<'a>(app: &'a Folder, setup: Option<&str>) -> &'a str {
 fn app_error(what: String, source: EngineError) -> UpdateError {
     match source {
         EngineError::Declined => UpdateError::Declined,
-        source => UpdateError::App { what, source },
+        source => UpdateError::App {
+            what,
+            source: Box::new(source),
+        },
     }
 }
 

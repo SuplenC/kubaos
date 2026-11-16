@@ -5,8 +5,8 @@
 //!
 //! # Owns
 //!
-//! - [`Machine`] and [`Cmd`], which says how a root command goes through `sudo`, and what the
-//!   Apps catalog's engine acts on ([`AppsHost`]).
+//! - [`Machine`] and [`Cmd`], which says how a root command goes through `sudo`, and what the Apps
+//!   catalog's engine acts on ([`AppsHost`]).
 //! - [`Lines`], which cuts a program's output into the lines the updater reports.
 //!
 //! # Not here
