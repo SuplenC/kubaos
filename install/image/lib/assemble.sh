@@ -288,7 +288,7 @@ for l in "${profile_links[@]}" /nix/var/nix/profiles/per-user/root/profile-*-lin
   if [[ -L "$l" ]]; then roots+=("$(readlink -f "$l")"); fi
 done
 
-# Groups the build user ended up in (sudo, docker, i2c, ...): the engine
+# Groups the build user ended up in (sudo, i2c, ...): the engine
 # gives the real user the same ones.
 mapfile -t user_groups < <(id -nG "$PAYLOAD_USER" | tr ' ' '\n' | grep -vx "$PAYLOAD_USER")
 

@@ -1345,8 +1345,15 @@ fn the_agent_states_each_have_their_hint() {
     let mut absent = machine();
     absent.sockets.clear();
     let out = pull_all(&mut absent);
-    assert!(out.warned("Bitwarden desktop isn't installed, so no agent serves the vault's keys: kubaos app add bitwarden"));
-    assert!(out.report.summary.iter().any(|l| l.contains("kubaos app add bitwarden")));
+    assert!(
+        out.warned("Bitwarden desktop isn't installed, so no agent serves the vault's keys: kubaos app add bitwarden")
+    );
+    assert!(
+        out.report
+            .summary
+            .iter()
+            .any(|l| l.contains("kubaos app add bitwarden"))
+    );
 
     let mut locked = machine().answer("timeout 20 ssh-add", 1, "");
     assert!(pull_all(&mut locked).warned("agent has no keys: unlock Bitwarden desktop"));

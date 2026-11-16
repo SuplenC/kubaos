@@ -70,11 +70,16 @@ system/30-hardware.sh   # second run: confirms modules + power profiles
 # 2. The languages you write, as Suites (`kubaos suite list`).
 kubaos suite add rust
 kubaos suite add go
+
+# 3. The apps you want, from the Apps catalog (`kubaos app list`).
+kubaos app add google-chrome bitwarden docker
 ```
 
-The MOK screen, the fingerprint enrollment and what to verify are in the hard way's sections 1, 7 and 8 below: same scripts, same steps.
+The MOK screen, the fingerprint enrollment and what to verify are in the hard way's sections 1, 7 and 11 below: same scripts, same steps.
 
-Then the secrets. Bitwarden desktop, `bw` and the security-key PAM lines are already installed. Open Bitwarden (it starts at login), log in, Settings -> enable "SSH agent", then run `kubaos bitwarden setup`. Set the YubiKey's PIN and fingerprints with `ykman` and run `dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md` has the order, and section 11 below says how to check it all works.
+Google Chrome, Bitwarden desktop and Docker aren't part of the install: they are apps of the Apps catalog, there once `kubaos app add` adds them, and every update keeps them (`docs/USING.md`, "Apps"). Docker's group applies from your next login.
+
+Then the secrets. `bw` and the security-key PAM lines are already installed, Bitwarden desktop once step 3 added it. Open Bitwarden (it starts at login), log in, Settings -> enable "SSH agent", then run `kubaos bitwarden setup`. Set the YubiKey's PIN and fingerprints with `ykman` and run `dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md` has the order, and section 10 below says how to check it all works.
 
 Kōbō will do this part itself one day (the first-boot setup screen, `docs/screenshots/setup/`). Today it's a stub.
 
@@ -98,8 +103,9 @@ Each update moves Bitwarden desktop to the newest release of its series and
 Nix to the newest patch release of its minor by itself (`docs/USING.md`,
 "Updating"). It reports a newer bw CLI and a new Bitwarden desktop series
 (`system/70-bitwarden.sh --check-updates`) with the new version and sha256
-lines: paste them into `70-bitwarden.sh` on the dev machine and release
-them. A new Nix minor is a bump of `system/60-nix.sh`'s pin.
+lines: paste the CLI's into `70-bitwarden.sh` and the desktop app's into
+`apps/bitwarden.toml` on the dev machine, and release them. A new Nix minor
+is a bump of `system/60-nix.sh`'s pin.
 
 ## Troubleshooting
 
@@ -133,7 +139,7 @@ path that exists (if not: `system/60-nix.sh --no-switch --no-gpu --no-chsh`).
 Test without locking: `nix run nixpkgs#pamtester -- qs-lock $USER authenticate`
 (and `qs-lock-u2f`, `qs-lock-fingerprint`). For the key, also
 `readlink /usr/local/lib/security/pam_u2f.so` (if missing:
-`system/70-bitwarden.sh --no-desktop --no-cli`). Don't switch the PAM files to Ubuntu's modules
+`system/70-bitwarden.sh --no-cli`). Don't switch the PAM files to Ubuntu's modules
 by absolute path; Nix's libpam can't load them. If it still fails, hyprlock
 stays the lock screen (hypridle's `lock_cmd` already falls back to it) and
 `hyprpolkitagent` stays the polkit agent (the in-shell agent is off by
@@ -188,9 +194,10 @@ Scripts live in `system/`, run in order, as your normal user (they call
 anything, and never reboots. `--dry-run` shows what it would do; `--help`
 lists its flags. Their apt packages come from one list, `system/packages.toml`,
 which `kubaos update` reads too. A flag that leaves a group out
-(`40-apps.sh --no-docker`, `--no-chrome`, `70-bitwarden.sh --no-u2f`) or
-adds one (`75-yubikey.sh --piv`) is kept in `/etc/kubaos/apt-groups`, so
-updates follow it; `kubaos packages enable|disable <group>` changes it later.
+(`70-bitwarden.sh --no-u2f`) or adds one (`75-yubikey.sh --piv`) is kept in
+`/etc/kubaos/apt-groups`, so updates follow it; `kubaos packages
+enable|disable <group>` changes it later. Google Chrome, Bitwarden desktop
+and Docker come after the scripts, from the Apps catalog (section 11).
 
 | Step | What | Reboot after? |
 |---|---|---|
@@ -199,11 +206,10 @@ updates follow it; `kubaos packages enable|disable <group>` changes it later.
 | `system/20-base.sh` | base packages, NetworkManager, PipeWire, lid policy, snapper, grub-btrfs | recommended |
 | `system/25-boot.sh` | boot splash (Plymouth, the passphrase prompt), GRUB theme, "KubaOS Shinjuku" entries, hidden menu | no (next boot shows it) |
 | `system/30-hardware.sh` | TUXEDO repo + `tuxedo-drivers`, MOK, power profiles, dock, fingerprint | **yes** |
-| `system/40-apps.sh` | Docker, Chrome | log out/in (docker group) |
 | `system/50-hyprland.sh` | Hyprland stack (held), tty1 autologin, lock-screen PAM, keyd for the Mac-style accents | no (wait for 60) |
 | `system/60-nix.sh` | Nix, flakes, home-manager switch, Nix GPU setup, zsh login shell | **yes** |
 | `system/65-recorder.sh` | gpu-screen-recorder's KMS helper: root-owned copy with `cap_sys_admin`, runnable only by you, linked into `/run/wrappers/bin` | no |
-| `system/70-bitwarden.sh` | Bitwarden desktop + `bw` CLI, security key (pam_u2f) for sudo, polkit, lock screen | no |
+| `system/70-bitwarden.sh` | `bw` CLI, security key (pam_u2f) for sudo, polkit, lock screen | no |
 | `system/75-yubikey.sh` | Security key tools (`fido2-tools`), udev check, `--piv`: pcscd for the Multi-protocol Edition | no |
 | `system/relink.sh` | points the wallpaper, PAM and recorder links at the installed release; `kubaos update` runs it | |
 
@@ -347,18 +353,7 @@ system/30-hardware.sh   # second run: confirms modules + power profiles
   already ran `pam-auth-update --enable fprintd`, so `sudo -k; sudo true`
   asks for the finger first (10 s, then password).
 
-### 8. `system/40-apps.sh`
-
-```sh
-system/40-apps.sh
-```
-
-**Verify:** log out and in, then `docker run --rm hello-world`.
-`google-chrome --version`. Snapshot "drivers + apps" is taken at the end.
-Without Docker or Chrome: `--no-docker`, `--no-chrome`, which updates keep
-to (`kubaos packages enable docker` brings it back).
-
-### 9. `system/50-hyprland.sh`
+### 8. `system/50-hyprland.sh`
 
 ```sh
 system/50-hyprland.sh
@@ -399,7 +394,7 @@ canonical snippet is `system/files/hyprland-autostart.zsh`.
 `systemctl cat getty@tty1` shows the `--autologin` line;
 `systemctl is-active keyd` says active.
 
-### 10. `system/60-nix.sh`, then reboot
+### 9. `system/60-nix.sh`, then reboot
 
 ```sh
 system/60-nix.sh                 # = --user kuba --host tuxedo
@@ -448,18 +443,16 @@ kubaos suite add rust
 kubaos suite add go
 ```
 
-### 11. `system/70-bitwarden.sh`, then `kubaos bitwarden setup`
+### 10. `system/70-bitwarden.sh`, then `kubaos bitwarden setup`
 
 ```sh
 system/70-bitwarden.sh
 ```
 
-Installs the official Bitwarden desktop `.deb` and the standalone `bw` CLI
-from github.com/bitwarden/clients, both pinned to a version and checked
-against a sha256 in the script (no apt repo exists, and the app doesn't
-self-update on Linux; `kubaos update` moves the desktop app on within its
-series). Then `libsecret-tools`, `libpam-u2f`, `pamu2fcfg`,
-`pamtester`, and the security key for sudo, polkit and the lock screen:
+Installs the standalone `bw` CLI from github.com/bitwarden/clients, pinned
+to a version and checked against a sha256 in the script. Then
+`libsecret-tools`, `libpam-u2f`, `pamu2fcfg`, `pamtester`, and the security
+key for sudo, polkit and the lock screen:
 
 - two lines above `@include common-auth` in `/etc/pam.d/sudo`, `sudo-i` and
   `polkit-1` (polkitd ships its file in `/usr/lib/pam.d`; the copy in `/etc`
@@ -478,8 +471,8 @@ series). Then `libsecret-tools`, `libpam-u2f`, `pamu2fcfg`,
   `/nix/var/nix/gcroots/dotfiles-pam-u2f`.
 
 Then `system/75-yubikey.sh` (add `--piv` for the Multi-protocol Edition's
-smart card; updates keep it). As yourself, in the Hyprland session: open Bitwarden, log in,
-Settings -> enable "SSH agent". Run `kubaos bitwarden setup` (SSH keys, git
+smart card; updates keep it). As yourself, in the Hyprland session: open
+Bitwarden desktop (section 11 adds it), log in, Settings -> enable "SSH agent". Run `kubaos bitwarden setup` (SSH keys, git
 signing, gh, project env). Set the key's PIN and fingerprints with `ykman`, then run
 `dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md`, "Security
 keys", has the order.
@@ -492,6 +485,23 @@ the fingerprint sensor" shows under the password field while the key is
 plugged in, "Or use your security key" while it isn't.
 
 Undo the PAM part: `system/70-bitwarden.sh --remove-u2f`.
+
+### 11. The apps
+
+Google Chrome, Bitwarden desktop and Docker are apps of the Apps catalog,
+added with `kubaos`, which section 9 installed:
+
+```sh
+kubaos app add google-chrome bitwarden docker
+```
+
+Each comes from its pinned source (Google's and Docker's apt repositories,
+Bitwarden's `.deb` checked against its sha256) with its setup: Chrome's
+theme colour follows the wallpaper, Bitwarden desktop starts at login, and
+you join the `docker` group. Chrome and Bitwarden desktop are amd64 only.
+
+**Verify:** log out and in, then `docker run --rm hello-world`.
+`google-chrome --version`. `kubaos app status` lists the three as installed.
 
 ### Removing Nix (if ever needed)
 

@@ -25,7 +25,7 @@ The one list of KubaOS's apt packages, `system/packages.toml`, which the install
 _Avoid_: Package list, base packages
 
 **Package group**:
-A named set of the **Package manifest**'s packages for one feature (Docker, the file manager, Hyprland); an optional one the user can turn off or on for good.
+A named set of the **Package manifest**'s packages for one feature (the file manager, Hyprland, the security key); an optional one the user can turn off or on for good.
 _Avoid_: Feature flag, bundle
 
 **Catalog**:

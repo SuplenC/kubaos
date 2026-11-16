@@ -326,8 +326,14 @@ fn a_manifest_that_cant_be_installed_safely_is_refused() {
         ("bad version", deb.replace("\"1.2.0\"", "\"latest version\"")),
         ("no download", deb.split("[deb.amd64]").next().unwrap().to_owned()),
         ("an escape", AGENT.replace("A coding agent", "A \\u0063oding agent")),
-        ("an architecture dpkg doesn't name", format!("{AGENT}arch = \"x86_64\"\n")),
-        ("a setup that isn't a function name", format!("setup = \"x; reboot\"\n{AGENT}")),
+        (
+            "an architecture dpkg doesn't name",
+            format!("{AGENT}arch = \"x86_64\"\n"),
+        ),
+        (
+            "a setup that isn't a function name",
+            format!("setup = \"x; reboot\"\n{AGENT}"),
+        ),
         ("a setup that is a path", format!("setup = \"../lib\"\n{AGENT}")),
         ("an uppercase setup", format!("setup = \"Agent\"\n{AGENT}")),
         (
@@ -465,7 +471,11 @@ fn every_shipped_manifest_validates_and_its_repo_has_a_sources_file() {
         if let Some(setup) = &app.setup {
             for verb in ["install", "remove"] {
                 let function = format!("\n{verb}_{setup}() {{\n");
-                assert!(lib.contains(&function), "{}: system/lib.sh has no {verb}_{setup}", app.id);
+                assert!(
+                    lib.contains(&function),
+                    "{}: system/lib.sh has no {verb}_{setup}",
+                    app.id
+                );
             }
         }
     }
