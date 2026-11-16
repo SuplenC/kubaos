@@ -621,6 +621,16 @@ impl Host for FakeHost {
         Ok(())
     }
 
+    fn restart(&mut self, scope: Scope, unit: &str) -> Result<(), HostError> {
+        let key = Self::unit(scope, unit);
+        let mut state = self.state.borrow_mut();
+        if let Some(unit) = state.units.get_mut(&key) {
+            unit.exited = true;
+        }
+        state.log.push(format!("restart {unit}"));
+        Ok(())
+    }
+
     fn lingers(&mut self) -> Result<bool, HostError> {
         Ok(self.state.borrow().linger)
     }

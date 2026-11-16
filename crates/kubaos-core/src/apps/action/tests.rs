@@ -19,6 +19,7 @@ fn a_journaled_run_of_a_program_under_the_home_reads_back() {
         user: "kuba".to_owned(),
         home: "/home/kuba".into(),
         arch: "amd64".to_owned(),
+        version: None,
     };
     let run = action(
         "name = \"Start\"\nkind = \"run\"\ndo = [\"@HOME@/.local/bin/t3\", \"service\", \"install\"]\ncheck = [\"true\"]\nundo = [\"true\"]\n",
@@ -117,6 +118,7 @@ fn resolving_fills_in_the_words_and_reads_a_template() {
         user: "kuba".to_owned(),
         home: Path::new("/home/kuba").to_path_buf(),
         arch: "amd64".to_owned(),
+        version: None,
     };
     let file = action(
         "name = \"X\"\nkind = \"file\"\nto = \"/etc/systemd/system/x.service\"\nfrom = \"unit.in\"\ntemplate = true\n",
@@ -201,6 +203,7 @@ fn resolving_a_run_records_the_scripts_it_names() {
         user: "kuba".to_owned(),
         home: Path::new("/home/kuba").to_path_buf(),
         arch: "amd64".to_owned(),
+        version: None,
     };
     let run =
         action("name = \"X\"\nkind = \"run\"\ndo = [\"./pair\"]\ncheck = [\"true\"]\nundo = [\"true\"]\n").unwrap();

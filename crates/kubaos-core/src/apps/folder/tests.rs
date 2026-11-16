@@ -232,3 +232,56 @@ fn a_configure_step_writes_only_the_apps_own_folder_of_the_user_layer_as_the_use
         );
     }
 }
+
+/// A download of `version` to `to`, as an action.
+fn download(to: &str, version: &str) -> String {
+    format!(
+        "[[action]]\nname = \"Download\"\nkind = \"download\"\nto = \"{to}\"\nversion = \"{version}\"\n\
+         unpack = \"tar-zst\"\namd64 = {{ url = \"https://x.example/a\", sha256 = \"{}\" }}\n",
+        "a".repeat(64)
+    )
+}
+
+#[test]
+fn an_apps_downloads_are_of_one_version_whatever_the_setup() {
+    let two = format!(
+        "{ABOUT}{}\n[setup.a]\nname = \"A\"\nsummary = \"a\"\n[[setup.a.action]]\n{}\n[setup.b]\nname = \"B\"\nsummary = \"b\"\n",
+        download("~/.v/@VERSION@", "1.0"),
+        download("~/.v/@VERSION@/gpu", "1.1").trim_start_matches("[[action]]\n"),
+    );
+
+    let result = Folder::parse("sketch", Path::new("/catalog/sketch"), &two);
+
+    assert!(
+        matches!(result, Err(FolderError::DownloadVersions { .. })),
+        "{result:?}"
+    );
+}
+
+#[test]
+fn a_step_inside_a_downloads_folder_comes_after_the_download() {
+    let before = format!(
+        "{ABOUT}[[action]]\nname = \"Link\"\nkind = \"symlink\"\nto = \"~/.v/@VERSION@/bin/x\"\ntarget = \"x\"\n{}",
+        download("~/.v/@VERSION@", "1.0")
+    );
+    let after = format!(
+        "{ABOUT}{}{}",
+        download("~/.v/@VERSION@", "1.0"),
+        download("~/.v/@VERSION@/gpu", "1.0")
+    );
+
+    let refused = Folder::parse("sketch", Path::new("/catalog/sketch"), &before);
+
+    assert!(
+        matches!(refused, Err(FolderError::InsideDownload { .. })),
+        "{refused:?}"
+    );
+    assert_eq!(folder_version(&after).as_deref(), Some("1.0"));
+}
+
+fn folder_version(text: &str) -> Option<String> {
+    Folder::parse("sketch", Path::new("/catalog/sketch"), text)
+        .unwrap()
+        .version()
+        .map(str::to_owned)
+}

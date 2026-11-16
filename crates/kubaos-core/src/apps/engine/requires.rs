@@ -532,7 +532,7 @@ impl Engine<'_> {
         let steps = folder.steps(setup).map_err(EngineError::Folder)?;
         let of = steps.len();
         let root = Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?;
-        let words = self.user.words();
+        let words = self.user.words().with_version(folder.version());
         let outdated = std::iter::once(&journal)
             .chain(root.as_ref())
             .flat_map(|j| &j.entries)

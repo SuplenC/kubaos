@@ -181,13 +181,14 @@ impl<'h> Keeper<'h> {
             user: self.host.user().to_owned(),
             home: self.host.home().to_path_buf(),
             arch: self.host.arch().to_owned(),
+            version: None,
         }
     }
 
     /// This side's steps of the app `id` in `setup`, by number, resolved for this machine.
     fn steps(&self, id: &str, setup: Option<&str>) -> Result<(Folder, Vec<(usize, Action)>), StepError> {
         let folder = Folder::load(&self.catalog, id).map_err(StepError::Folder)?;
-        let words = self.words();
+        let words = self.words().with_version(folder.version());
         let steps = folder
             .steps(setup)
             .map_err(StepError::Folder)?
@@ -903,7 +904,7 @@ impl<'a> Engine<'a> {
         let Ok(steps) = folder.steps(setup) else {
             return true;
         };
-        let words = self.user.words();
+        let words = self.user.words().with_version(folder.version());
         for (i, action) in steps.into_iter().enumerate() {
             if action.side() != side {
                 continue;
@@ -1044,7 +1045,7 @@ impl<'a> Engine<'a> {
             return Ok(None);
         }
         let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
-        let words = self.user.words();
+        let words = self.user.words().with_version(folder.version());
         let done = |actions: &[&Action], user: &mut Keeper<'_>| -> Result<bool, EngineError> {
             for action in actions {
                 // An app with nothing for this machine's architecture isn't on it.

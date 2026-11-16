@@ -372,6 +372,13 @@ pub trait Host {
     /// When systemctl fails.
     fn set_active(&mut self, scope: Scope, unit: &str, active: bool) -> Result<(), HostError>;
 
+    /// `unit`, which runs, restarted.
+    ///
+    /// # Errors
+    ///
+    /// When systemctl fails.
+    fn restart(&mut self, scope: Scope, unit: &str) -> Result<(), HostError>;
+
     /// Whether logind keeps the user's services running without a session.
     ///
     /// # Errors

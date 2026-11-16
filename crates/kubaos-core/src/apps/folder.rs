@@ -107,6 +107,12 @@ pub enum FolderError {
     InvalidRequirement(String),
     #[error("{0:?} is not a version: digits, letters and `.+~-:`, starting with a digit")]
     InvalidVersion(String),
+    #[error("an app's downloads are of one version, which a release moves together: {versions} aren't")]
+    DownloadVersions { versions: String },
+    #[error(
+        "{name}: a step whose path is in a download's folder comes after the download, which unpacks the folder whole"
+    )]
+    InsideDownload { name: String },
     #[error(
         "{name}: a configure step writes the app's KubaOS defaults as the user, in ~/.config/kubaos/{id}/, and nowhere else"
     )]
@@ -489,6 +495,7 @@ impl Folder {
             }
         }
         self.check_requires()?;
+        self.check_downloads()?;
         for action in self.all_actions().filter(|a| a.stage == Stage::Configure) {
             if !self.configures_inside(action) {
                 return Err(FolderError::ConfigureOutside {
@@ -519,6 +526,61 @@ impl Folder {
             }
         }
         Ok(())
+    }
+
+    /// Checks the downloads: every one of the app's, in any setup, of one version, which the other
+    /// actions' `@VERSION@` names; and, in each install, a step whose path is in a download's
+    /// folder after that download, as the download unpacks its folder whole, over whatever a step
+    /// before it put there.
+    fn check_downloads(&self) -> Result<(), FolderError> {
+        let mut versions: Vec<&str> = self
+            .all_actions()
+            .filter_map(|a| match &a.kind {
+                Kind::Download { version, .. } => Some(version.as_str()),
+                _ => None,
+            })
+            .collect();
+        versions.sort_unstable();
+        versions.dedup();
+        if versions.len() > 1 {
+            return Err(FolderError::DownloadVersions {
+                versions: versions.join(", "),
+            });
+        }
+        let setups: Vec<Option<&str>> = if self.setups.is_empty() {
+            vec![None]
+        } else {
+            self.setups.iter().map(|s| Some(s.id.as_str())).collect()
+        };
+        for setup in setups {
+            let steps = self.steps(setup)?;
+            for (i, step) in steps.iter().enumerate() {
+                let Some(path) = step.path() else {
+                    continue;
+                };
+                let inside_later = steps[i + 1..].iter().any(|later| {
+                    matches!(later.kind, Kind::Download { .. })
+                        && later
+                            .path()
+                            .is_some_and(|folder| path.starts_with(&format!("{folder}/")))
+                });
+                if inside_later {
+                    return Err(FolderError::InsideDownload {
+                        name: step.name.clone(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// The version of the app's downloads, which `@VERSION@` names in its other actions; none for
+    /// an app without one.
+    pub fn version(&self) -> Option<&str> {
+        self.all_actions().find_map(|a| match &a.kind {
+            Kind::Download { version, .. } => Some(version.as_str()),
+            _ => None,
+        })
     }
 
     /// Whether a configure step stays in the app's own folder of the user layer, as the user:
