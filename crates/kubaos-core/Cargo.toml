@@ -20,6 +20,7 @@ test-suite = []
 
 [dev-dependencies]
 kubaos-phone = { workspace = true, features = ["fake"] }
+rustix = { version = "1", features = ["process"] }
 
 [lints]
 workspace = true
