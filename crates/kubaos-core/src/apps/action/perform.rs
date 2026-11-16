@@ -110,12 +110,53 @@ pub fn web_app_paths(id: &str) -> [String; 2] {
 /// `kubaos-web-<id>`, and the icon at `icon`.
 fn web_app_entry(id: &str, title: &str, url: &str, icon: &Path) -> String {
     let class = format!("kubaos-web-{id}");
+    let exec = [
+        super::WEB_APP_BROWSER.to_owned(),
+        format!("--app={url}"),
+        format!("--class={class}"),
+    ]
+    .map(|arg| exec_arg(&arg))
+    .join(" ");
     format!(
-        "[Desktop Entry]\nType=Application\nName={title}\nExec={browser} --app={url} --class={class}\n\
-         Icon={icon}\nStartupWMClass={class}\nTerminal=false\n",
-        browser = super::WEB_APP_BROWSER,
-        icon = icon.display(),
+        "[Desktop Entry]\nType=Application\nName={title}\nExec={exec}\nIcon={icon}\nStartupWMClass={class}\n\
+         Terminal=false\n",
+        title = entry_value(title),
+        icon = entry_value(&icon.to_string_lossy()),
     )
+}
+
+/// The characters the Desktop Entry spec reserves in an `Exec` argument, which quote it.
+///
+/// <https://specifications.freedesktop.org/desktop-entry-spec/latest/exec-variables.html>
+const EXEC_RESERVED: &[char] = &[
+    ' ', '\t', '\n', '"', '\'', '\\', '>', '<', '~', '|', '&', ';', '$', '*', '?', '#', '(', ')', '`',
+];
+
+/// One argument of an `Exec` line, as the Desktop Entry spec has it: a `%` doubled, so no field
+/// code expands; an argument with a reserved character in double quotes, its `"`, `` ` ``, `$`
+/// and `\` escaped; then escaped once more as a string value, whose own escape for `\` is
+/// applied before the quoting is read.
+fn exec_arg(arg: &str) -> String {
+    let arg = arg.replace('%', "%%");
+    let quoted = if arg.contains(EXEC_RESERVED) {
+        let mut out = String::from("\"");
+        for c in arg.chars() {
+            if matches!(c, '"' | '`' | '$' | '\\') {
+                out.push('\\');
+            }
+            out.push(c);
+        }
+        out.push('"');
+        out
+    } else {
+        arg
+    };
+    entry_value(&quoted)
+}
+
+/// A string value of a desktop entry: its `\` escaped; a value is one line.
+fn entry_value(text: &str) -> String {
+    text.replace('\\', "\\\\")
 }
 
 /// A web app's two files, each with its path and its text.

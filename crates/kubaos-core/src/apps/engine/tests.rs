@@ -1470,3 +1470,30 @@ icon = "sketch.svg"
     assert_eq!(world.host.snapshot(), before);
     assert!(world.host.state.borrow().nix.contains("fd"));
 }
+
+#[test]
+fn a_web_apps_url_reaches_the_browser_whole_through_its_desktop_entry() {
+    let penpot = app(r#"
+[[action]]
+name = "Put Penpot in a window of its own"
+kind = "web_app"
+id = "penpot"
+title = "Penpot"
+url = "https://design.example/view?team=a&file=b#page%20one"
+icon = "penpot.svg"
+"#);
+    let world = World::new(&[("penpot", &penpot)]);
+    world.folder_file("penpot", "penpot.svg", "<svg/>\n");
+
+    world.install("penpot", true).0.unwrap();
+
+    let entry =
+        fs::read_to_string(world.host_home().join(".local/share/applications/kubaos-web-penpot.desktop")).unwrap();
+    assert!(
+        entry.contains(
+            "\nExec=google-chrome \"--app=https://design.example/view?team=a&file=b#page%%20one\" \
+             --class=kubaos-web-penpot\n"
+        ),
+        "{entry}"
+    );
+}
