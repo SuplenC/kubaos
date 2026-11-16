@@ -465,7 +465,7 @@ fn penpots_stack_is_pinned_by_digest_bound_to_this_machine_and_keeps_its_volumes
 }
 
 #[test]
-fn penpots_proxy_runs_walled_off_as_a_user_of_its_own_and_compose_as_root() {
+fn penpots_proxy_runs_walled_off_as_a_user_of_its_own_and_its_stack_starts_through_up_as_root() {
     let service = fs::read_to_string(repo_root().join("apps/penpot/kubaos-penpot.service")).unwrap();
     let lines: Vec<&str> = service.lines().collect();
 
@@ -482,11 +482,10 @@ fn penpots_proxy_runs_walled_off_as_a_user_of_its_own_and_compose_as_root() {
         assert!(lines.contains(&line), "{line} is missing");
     }
     assert!(
-        lines
-            .iter()
-            .any(|l| l.starts_with("ExecStartPre=+/usr/bin/docker compose ")),
-        "compose talks to Docker as root"
+        lines.contains(&"ExecStartPre=+/usr/share/kubaos/apps/penpot/up"),
+        "the stack starts as root through `up`, which records the images it pulls"
     );
+    assert!(repo_root().join("apps/penpot/up").is_file());
     assert!(lines.contains(&"ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:9002"));
 }
 
@@ -541,6 +540,9 @@ exit 1"#,
     let had = images.join(theirs.replace(['/', ':', '@'], "_"));
     fs::write(&had, "").unwrap();
     let pulled = images.join(ours.replace(['/', ':', '@'], "_"));
+    // The secret an earlier run made, so this run makes only the list of pulled images.
+    fs::write(dir.join("secret.env"), "PENPOT_SECRET_KEY=earlier\n").unwrap();
+    fs::set_permissions(dir.join("secret.env"), fs::Permissions::from_mode(0o600)).unwrap();
     let (up, down) = (
         penpot_script("up", tmp.path(), &dir),
         penpot_script("down", tmp.path(), &dir),
@@ -549,6 +551,8 @@ exit 1"#,
     let ran_up = sandbox.command(&up).output().unwrap();
     assert!(ran_up.status.success(), "{ran_up:?}");
     assert!(pulled.exists() && had.exists());
+    let mode = fs::metadata(dir.join("pulled-images")).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "pulled-images is readable by more than root");
     let ran_down = sandbox.command(&down).output().unwrap();
 
     assert!(ran_down.status.success(), "{ran_down:?}");

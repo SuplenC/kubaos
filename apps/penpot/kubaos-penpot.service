@@ -8,9 +8,10 @@ Requires=kubaos-penpot.socket docker.socket
 After=kubaos-penpot.socket docker.socket
 
 # The proxy runs as a user of its own, walled off: it only passes the socket's connections on.
-# The `+` runs compose with full privileges, outside that wall, as it talks to Docker's daemon.
+# The `+` runs the app's `up` with full privileges, outside that wall, as compose talks to Docker's
+# daemon. Going through `up` records each image it pulls, so the removal takes them.
 [Service]
-ExecStartPre=+/usr/bin/docker compose --project-name penpot --file /etc/kubaos/penpot/docker-compose.yaml up --detach --wait --quiet-pull
+ExecStartPre=+/usr/share/kubaos/apps/penpot/up
 ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:9002
 TimeoutStartSec=5min
 DynamicUser=yes
