@@ -132,6 +132,8 @@ pub enum EngineError {
     NotInstalled { app: String },
     #[error("{app} has nothing to configure")]
     NothingToConfigure { app: String },
+    #[error("{app} changed with this release: kubaos update brings it up to date, then configure it")]
+    Outdated { app: String },
 }
 
 /// One side's steps of the apps' installs: the user's in this process, root's in the root helper.

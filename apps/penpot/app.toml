@@ -21,6 +21,10 @@ name = "Penpot"
 summary = "penpot.app in a window of its own"
 requires = ["google-chrome"]
 
+[[setup.web.ready]]
+check = ["./closed", "penpot"]
+says = "Penpot's window is open: close it, then try again"
+
 [[setup.web.action]]
 name = "Put Penpot in a window of its own"
 kind = "web_app"
@@ -36,6 +40,10 @@ requires = ["docker", "google-chrome"]
 keeps = """\
 Your designs stay in Docker's volumes penpot_penpot_postgres_v15 and penpot_penpot_assets: \
 install Penpot on this machine again and they're back."""
+
+[[setup.local.ready]]
+check = ["./closed", "penpot-local"]
+says = "Penpot's window is open: close it, then try again"
 
 # Root's, as compose runs as root: what it starts is root's to say, whoever could edit it.
 [[setup.local.action]]
