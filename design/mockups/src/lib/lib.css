@@ -3510,3 +3510,79 @@
 .k-cal-year:focus-visible .k-cal-month[data-current] {
   --lit: 1;
 }
+
+/* A Stepper (`lib/stepper.ts`): its steps on one line, `space.s24` apart, each a bead `type.body`'s
+   symbol wide with its number, its label `space.s8` after it. Not reached: an `outline` ring, the
+   number and label in `on_surface_variant`. Current: the ring and number `primary`, glowing near
+   at night, the label `primary_lit`. Done: filled `primary_fill`, the number `on_primary_fill`.
+   Each look fades to the next over `short`. */
+.k-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s8) var(--space-s24);
+}
+
+.k-stepper-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s8);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--color-on_surface_variant);
+  --ring: var(--color-outline);
+  --bead: transparent;
+  --number: var(--color-on_surface_variant);
+  --bead-glow: 0;
+  transition: color var(--motion-short) var(--easing-standard);
+}
+
+.k-stepper-step:not(:disabled) {
+  cursor: pointer;
+}
+
+.k-stepper-step > .k-text {
+  color: inherit;
+}
+
+.k-stepper-bead {
+  display: grid;
+  flex: none;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--type-body-icon);
+  height: var(--type-body-icon);
+  border-radius: var(--radius-full);
+  background: var(--bead);
+  box-shadow:
+    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--ring),
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--bead-glow) * (1 - var(--day))));
+  transition: background var(--motion-short) var(--easing-standard), box-shadow var(--motion-short) var(--easing-standard);
+}
+
+.k-stepper-bead > .k-text {
+  color: var(--number);
+  transition: color var(--motion-short) var(--easing-standard);
+}
+
+.k-stepper-step[data-state="current"] {
+  color: var(--color-primary_lit);
+  --ring: var(--color-primary);
+  --number: var(--color-primary);
+  --bead-glow: 1;
+}
+
+.k-stepper-step[data-state="done"] {
+  color: var(--color-on_surface);
+  --ring: var(--color-primary_fill);
+  --bead: var(--color-primary_fill);
+  --number: var(--color-on_primary_fill);
+}
+
+[data-reduced] .k-stepper-step,
+[data-reduced] .k-stepper-bead,
+[data-reduced] .k-stepper-bead > .k-text {
+  transition-duration: 0s;
+}

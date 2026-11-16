@@ -100,6 +100,7 @@ mockups/icon-tile   design/mockups/src/pages/molecules/icon-tile.ts
 mockups/badged-icon design/mockups/src/pages/molecules/badged-icon.ts
 mockups/pill        design/mockups/src/pages/molecules/pill.ts
 mockups/progress-bar design/mockups/src/pages/molecules/progress-bar.ts
+mockups/stepper     design/mockups/src/pages/molecules/stepper.ts
 mockups/progress-panel design/mockups/src/pages/molecules/progress-panel.ts
 mockups/spinner-in-context design/mockups/src/pages/molecules/spinner-in-context.ts
 mockups/empty-state design/mockups/src/pages/molecules/empty-state.ts design/mockups/src/pages/molecules/list.ts

@@ -398,6 +398,7 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Dialog` | tone `Normal`, `Danger` | width | content |
 | `Banner` | tone `Info`, `Warning`, `Danger` | none | surface |
 | `Step` | `todo`, `current`, `done` or `action`; `icon`; `mark` | none | control, nested 12 in a surface |
+| `Stepper` | none | height | full, its beads |
 | `DescriptionList` | none | none | none |
 | `ErrorBlock` | `long` | none | surface |
 | `List` | `Flush` | none | content; none when flush |
@@ -491,6 +492,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Sparkline](design/components/sparkline.md)
 - [Banner](design/components/banner.md)
 - [Step](design/components/step.md)
+- [Stepper](design/components/stepper.md)
 - [DescriptionList](design/components/description-list.md)
 - [FocusRing](design/components/focus-ring.md)
 
