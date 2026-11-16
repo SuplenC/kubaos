@@ -8,6 +8,12 @@ license.workspace = true
 name = "kubaos"
 path = "src/main.rs"
 
+# The Apps catalog's root helper, which pkexec and sudo run: one small `main` over the action
+# engine of kubaos-core.
+[[bin]]
+name = "kubaos-apps"
+path = "src/apps_root.rs"
+
 [features]
 # The test Suite, for the test harness (test/run builds the CLI with it).
 test-suite = ["kubaos-core/test-suite"]

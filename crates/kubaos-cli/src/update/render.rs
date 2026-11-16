@@ -32,6 +32,7 @@ use std::time::Instant;
 use kubaos_core::update::changelog::Change;
 use kubaos_core::update::changelog::Changelog;
 use kubaos_core::update::changelog::Section;
+use kubaos_core::update::event::ActionState;
 use kubaos_core::update::event::AppChanges;
 use kubaos_core::update::event::Command;
 use kubaos_core::update::event::GroupChange;
@@ -242,7 +243,11 @@ impl Text {
             UpdateEvent::Summary(summary) => self.summary(summary),
             UpdateEvent::Declined => "\n  Nothing changed.\n".to_owned(),
             UpdateEvent::Failed { error, output, log, .. } => self.failed(error, output, log.as_deref()),
-            UpdateEvent::PhaseStarted { .. }
+            UpdateEvent::Action(action) if action.state == ActionState::Undone => {
+                format!("    {} {}\n", s.dim("undone:"), action.name)
+            }
+            UpdateEvent::Action(_)
+            | UpdateEvent::PhaseStarted { .. }
             | UpdateEvent::Step { .. }
             | UpdateEvent::Progress { .. }
             | UpdateEvent::Output { .. }

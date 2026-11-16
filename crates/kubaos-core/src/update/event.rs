@@ -361,6 +361,35 @@ impl SuiteChanges {
     }
 }
 
+/// Where one step of an app's install or removal is.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionEvent {
+    /// The app's id.
+    pub app: String,
+    /// The step's place in the install, from 1.
+    pub step: usize,
+    /// How many steps the install has.
+    pub of: usize,
+    /// The step as the user reads it: "Start the service".
+    pub name: String,
+    pub state: ActionState,
+}
+
+/// How far a step is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionState {
+    /// Done, by this run or one before it.
+    Done,
+    /// Done already when the step came, by something other than the app.
+    Found,
+    /// It opens a window, in a run that may not: its sentence is a note.
+    Skipped,
+    Undoing,
+    Undone,
+    Failed,
+}
+
 /// What a finished update, upgrade, rollback or `kubaos packages enable|disable` did.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Summary {
@@ -451,6 +480,8 @@ pub enum UpdateEvent {
     Warning {
         text: String,
     },
+    /// One step of an app's install or removal.
+    Action(ActionEvent),
     Preview(Preview),
     Prompt {
         prompt: Prompt,
