@@ -2,7 +2,8 @@
 # Sets up vendor apt repositories of the package manifest (system/packages.toml):
 # each one's signing key, refused unless it is exactly the manifest's
 # fingerprint, and its sources file from system/files/apt/sources.list.d/,
-# then refreshes apt's lists when one changed. Safe to re-run: a repo that is
+# turning off any other source of the same repository, then refreshes apt's
+# lists when one changed. Safe to re-run: a repo that is
 # set up is left alone, offline too.
 #
 #   system/apt-repo.sh [--dry-run] REPO...

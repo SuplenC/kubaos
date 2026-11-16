@@ -287,6 +287,75 @@ fn a_dry_run_records_nothing() {
     assert!(!Path::new(&m.path("apt-installed")).exists());
 }
 
+const CLAUDE_SOURCES: &str = "\
+Types: deb
+URIs: https://downloads.claude.ai/claude-code/apt/stable
+Suites: stable
+Components: main
+Signed-By: /etc/apt/keyrings/claude-code.gpg";
+
+#[test]
+fn a_vendors_own_source_of_the_same_repository_is_turned_off_for_ours() {
+    let m = Machine::new(&[]);
+    let d = m.path("sources.list.d");
+    fs::create_dir(&d).unwrap();
+    // As the vendor's own instructions write it, with its own key path, beside a line of another
+    // repository that stays.
+    fs::write(
+        d.join("claude-code.list"),
+        "deb [arch=amd64 signed-by=/etc/apt/keyrings/claude-code.asc] https://downloads.claude.ai/claude-code/apt/stable/ stable main\n\
+         deb https://example.com/other stable main\n",
+    )
+    .unwrap();
+    fs::write(
+        d.join("vendor.sources"),
+        "Types: deb\nURIs: https://downloads.claude.ai/claude-code/apt/stable\nSuites: stable\nComponents: main\nEnabled: yes\n\n\
+         Types: deb\nURIs: https://example.com/other\nSuites: stable\nComponents: main\n",
+    )
+    .unwrap();
+    fs::write(
+        d.join("ubuntu.sources"),
+        "Types: deb\nURIs: http://archive.ubuntu.com/ubuntu\nSuites: resolute\nComponents: main\n",
+    )
+    .unwrap();
+    let script = format!(
+        "APT_SOURCES_D=\"$FAKE/sources.list.d\"\nadd_apt_source claude-code \"$(cat <<'EOF'\n{CLAUDE_SOURCES}\nEOF\n)\"\necho \"dirty $APT_DIRTY\""
+    );
+
+    let out = m.bash("amd64", &script);
+
+    assert!(out.contains("dirty 1"), "{out}");
+    let read = |name: &str| fs::read_to_string(d.join(name)).unwrap();
+    assert_eq!(read("claude-code.sources"), format!("{CLAUDE_SOURCES}\n"));
+    assert_eq!(
+        lines(&read("claude-code.list")),
+        [
+            "# claude-code.sources has this repository: deb [arch=amd64 signed-by=/etc/apt/keyrings/claude-code.asc] https://downloads.claude.ai/claude-code/apt/stable/ stable main",
+            "deb https://example.com/other stable main",
+        ]
+    );
+    assert_eq!(
+        lines(&read("vendor.sources")),
+        [
+            "Types: deb",
+            "URIs: https://downloads.claude.ai/claude-code/apt/stable",
+            "Suites: stable",
+            "Components: main",
+            "Enabled: no",
+            "",
+            "Types: deb",
+            "URIs: https://example.com/other",
+            "Suites: stable",
+            "Components: main",
+        ]
+    );
+    assert!(!read("ubuntu.sources").contains("Enabled"));
+
+    let again = m.bash("amd64", &script);
+
+    assert!(again.contains("dirty 0"), "a second run changes nothing: {again}");
+}
+
 /// The lines of `system/*.sh` that install apt packages outside the manifest, each for a reason
 /// `docs/CONTRACTS.md` gives ("The package manifest", "Install"): the installers themselves, the
 /// running kernel's headers, and grub-btrfs with what builds it while Ubuntu doesn't package it.
