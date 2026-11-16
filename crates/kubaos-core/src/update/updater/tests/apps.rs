@@ -4,6 +4,7 @@ use std::path::Path;
 use super::Fake;
 use super::FakeDpkg;
 use super::World;
+use super::notes;
 use super::phases;
 use super::summary;
 use super::warnings;
@@ -78,13 +79,16 @@ marker = ".config/systemd/user/lab.service"
 /// Lab's service's marker, under the home.
 const LAB_MARKER: &str = ".config/systemd/user/lab.service";
 
-/// A stand-in for the user helper: it writes down how it was called, and sets lab's service's
-/// marker or takes it away, unless `$HOME/user-helper-fails` is there.
+/// A stand-in for the user helper: it writes down how it was called, sets lab's service's marker
+/// and leaves pairing to the user or takes the marker away, unless `$HOME/user-helper-fails` is
+/// there, and says the setup can't go now while `$HOME/lab-open` is.
 const USER_HELPER: &str = r#"
 echo "$*" >>"$HOME/user-helper.log"
 [[ ! -e $HOME/user-helper-fails ]] || exit 1
 case "$1" in
-  install) mkdir -p "$HOME/.config/systemd/user" && touch "$HOME/.config/systemd/user/lab.service" ;;
+  ready) [[ ! -e $HOME/lab-open ]] || { echo "Lab is open: quit it, then try again" >&2; exit 1; } ;;
+  install) mkdir -p "$HOME/.config/systemd/user" && touch "$HOME/.config/systemd/user/lab.service"
+    echo "user-helper: next: Run \`lab pair\`" ;;
   remove) rm -f "$HOME/.config/systemd/user/lab.service" ;;
 esac
 "#;
@@ -495,17 +499,21 @@ fn the_service_setup_installs_the_app_then_its_own_parts_as_the_user() {
 
     let runs = helper_runs(&m);
     assert!(runs.len() == 1 && runs[0].starts_with("pkexec "), "{runs:?}");
-    let helper = format!("bash {} install lab service", w.sys.apps_user_helper().display());
+    let helper = format!(
+        "bash {} install --window lab service",
+        w.sys.apps_user_helper().display()
+    );
     let at = |line: &str| m.ran.iter().position(|ran| ran.starts_with(line));
     assert!(
         at("pkexec").unwrap() < at(&helper).expect("the user helper ran, not as root"),
         "{:?}",
         m.ran
     );
-    assert_eq!(user_helper_runs(&w), ["install lab service"]);
+    assert_eq!(user_helper_runs(&w), ["install --window lab service"]);
     assert!(lab_service_there(&w));
     assert_eq!(Picks::read(&w.user.app_picks()).unwrap().setup("lab"), Some("service"));
     assert_eq!(summary(&events).apps.installed, ["Lab as a service"]);
+    assert_eq!(notes(&events), ["Run `lab pair`"]);
 }
 
 #[test]
@@ -535,7 +543,7 @@ fn switching_to_the_service_adds_only_its_parts() {
 
     w.updater(&mut m).add_apps(&names(&["lab"]), Some("service")).unwrap();
 
-    assert_eq!(user_helper_runs(&w), ["install lab service"]);
+    assert_eq!(user_helper_runs(&w), ["install --window lab service"]);
     assert!(helper_runs(&m).is_empty(), "{:?}", m.ran);
     assert!(lab_service_there(&w));
 }
@@ -566,7 +574,7 @@ fn a_service_set_up_by_hand_is_that_setup_and_nothing_installs_over_it() {
 }
 
 #[test]
-fn removing_takes_the_setups_parts_then_the_app_and_drops_the_setup() {
+fn removing_takes_the_app_then_the_setups_parts_and_drops_the_setup() {
     let w = world();
     put(&w.user.app_picks(), "apps = [\"lab\"]\n\n[setups]\nlab = \"service\"\n");
     put(&w.user.home().join(LAB_MARKER), "");
@@ -575,7 +583,7 @@ fn removing_takes_the_setups_parts_then_the_app_and_drops_the_setup() {
 
     w.reporting(&mut m, &mut events).remove_apps(&names(&["lab"])).unwrap();
 
-    assert_eq!(user_helper_runs(&w), ["remove lab service"]);
+    assert_eq!(user_helper_runs(&w), ["ready remove lab service", "remove lab service"]);
     let runs = helper_runs(&m);
     assert!(
         runs.len() == 1 && runs[0].ends_with("kubaos-apps remove lab"),
@@ -611,6 +619,7 @@ fn an_update_installs_a_picked_setups_missing_parts_and_warns_of_a_pick_without_
     assert_eq!(user_helper_runs(&w), ["install lab service"]);
     assert!(helper_runs(&m).is_empty(), "{:?}", m.ran);
     assert_eq!(summary(&events).apps.installed, ["Lab as a service"]);
+    assert!(notes(&events).contains(&"Run `lab pair`"), "{:?}", notes(&events));
 
     let unsettled = world();
     put(&unsettled.user.app_picks(), "apps = [\"lab\"]\n");
@@ -621,10 +630,42 @@ fn an_update_installs_a_picked_setups_missing_parts_and_warns_of_a_pick_without_
 
     let warned = warnings(&events);
     assert!(
-        warned
-            .iter()
-            .any(|w| w.starts_with("lab can be set up more than one way")),
+        warned.contains(
+            &"lab is picked with no setup, so nothing installs it: kubaos app add lab --setup <desktop|service>"
+        ),
         "{warned:?}"
     );
     assert!(helper_runs(&m).is_empty() && user_helper_runs(&unsettled).is_empty());
+}
+
+#[test]
+fn removing_the_root_half_first_leaves_the_setup_whole_when_polkit_is_declined() {
+    let w = world();
+    put(&w.user.app_picks(), "apps = [\"lab\"]\n\n[setups]\nlab = \"service\"\n");
+    put(&w.user.home().join(LAB_MARKER), "");
+    let mut m = fake(&["lab"]);
+    m.failing.push("pkexec");
+
+    let removed = w.updater(&mut m).remove_apps(&names(&["lab"]));
+
+    assert!(matches!(removed, Err(UpdateError::Step { .. })), "{removed:?}");
+    assert!(lab_service_there(&w));
+    assert_eq!(user_helper_runs(&w), ["ready remove lab service"]);
+    assert_eq!(picked(&w), ["lab"]);
+}
+
+#[test]
+fn a_setup_that_cant_go_now_refuses_the_removal_before_root_is_asked() {
+    let w = world();
+    put(&w.user.app_picks(), "apps = [\"lab\"]\n\n[setups]\nlab = \"service\"\n");
+    put(&w.user.home().join(LAB_MARKER), "");
+    put(&w.user.home().join("lab-open"), "");
+    let mut m = fake(&["lab"]);
+
+    let removed = w.updater(&mut m).remove_apps(&names(&["lab"]));
+
+    assert!(matches!(removed, Err(UpdateError::Step { .. })), "{removed:?}");
+    assert!(helper_runs(&m).is_empty(), "{:?}", m.ran);
+    assert!(lab_service_there(&w));
+    assert_eq!(picked(&w), ["lab"]);
 }
