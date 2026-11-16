@@ -6,10 +6,8 @@
 // The rail is `size.rail` wide, `space.s16` in above and below and `space.s12` at its sides, so its
 // steps' corners are concentric with its own: the brand or the title, `space.s20`, the steps back
 // to back across its width (`Step`, each a mark at its end), scrolling where they don't fit, then
-// `space.s16` and at its foot the key hints and, in Kōbō, the power button and the battery. In a
-// window a wire runs down the steps' symbols, lit down to the current one, and the symbols it
-// reaches are lit and glow with it, one neon sign; in Kōbō there is no wire, and a reached step's
-// symbol lights and glows on its own. The page
+// `space.s16` and at its foot the key hints and, in Kōbō, the power button and the battery. A reached
+// step's symbol lights and glows on its own; nothing joins the steps. The page
 // beside it is a clear `Page`: its body, then `space.s16` above the footer band, which has no
 // hairline: Back on the left, the one Filled button on the right, and a note just before it.
 
@@ -209,7 +207,7 @@ export function battery(percent: number, charging = false): HTMLElement {
   return line;
 }
 
-/** The rail: the brand, `space.s20`, the steps (on their wire in a window), then the hints and the foot. */
+/** The rail: the brand, `space.s20`, the steps, then the hints and the foot at its bottom. */
 /** The rail, drawn once and moved to each page in place. */
 interface Rail {
   readonly element: HTMLElement;
@@ -260,11 +258,7 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
     return element;
   };
   const steps = options.pages.map((_, index) => make(index, look(index, current, reached)));
-  const doneRuns = (at: number) => (options.free ? runs(options.pages.map((_, index) => look(index, at, 0).state.is === "done")) : null);
-  // Kōbō's rail has no wire: its steps' symbols light alone.
-  const wired = options.host !== "kobo";
-  let theWire = wired ? wire(steps.length, current, doneRuns(current)) : null;
-  const column = stack(0, "start", ...steps, ...(theWire ? [theWire] : []));
+  const column = stack(0, "start", ...steps);
   column.classList.add("k-rail-steps");
   arrows(column);
   // Cut at its own box: the brand's `space.s20` and the hints' `space.s16` stay clear of the steps
@@ -316,60 +310,10 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
           element.dataset.pressable = String(shown.pressable);
         }
       });
-      if (theWire && options.free) {
-        // In any order the wire's light joins what is done, wherever the reader stands.
-        const again = wire(steps.length, at, doneRuns(at));
-        if (again.dataset.runs !== theWire.dataset.runs) {
-          theWire.replaceWith(again);
-          theWire = again;
-        }
-      } else if (theWire) for (const light of column.querySelectorAll<HTMLElement>(".k-rail-wire-lit")) light.style.setProperty("--wire-lit", String(at));
       // Two pages taking the same keys keep the hints they share as they are.
       if (JSON.stringify(options.hints(at)) !== drawnHints) drawHints(at);
     },
   };
-}
-
-/** The runs of two or more steps in a row that are done, as their first and last index. */
-function runs(done: readonly boolean[]): [number, number][] {
-  const found: [number, number][] = [];
-  let start = -1;
-  done.forEach((is, index) => {
-    if (is && start < 0) start = index;
-    if ((!is || index === done.length - 1) && start >= 0) {
-      const end = is ? index : index - 1;
-      if (end > start) found.push([start, end]);
-      start = -1;
-    }
-  });
-  return found;
-}
-
-/**
- * The progress wire down the steps' symbols: a length of tube between each symbol and the next,
- * stopping `step_rail.bead` short of both, so the tube runs into each symbol and no line crosses a
- * glyph. Each length is unlit glass with its light over it, filled as far as the light has come:
- * down to `current`, or, in a free flow, along each of `lit`'s runs of done steps.
- */
-function wire(count: number, current: number, lit: readonly [number, number][] | null = null): HTMLElement {
-  const box = document.createElement("span");
-  box.className = "k-rail-wire";
-  const joined = (index: number) => lit?.some(([from, to]) => index >= from && index < to) ?? false;
-  for (let index = 0; index < count - 1; index++) {
-    const track = document.createElement("span");
-    track.className = "k-rail-wire-track";
-    track.style.setProperty("--i", String(index));
-    const light = document.createElement("span");
-    light.className = "k-rail-wire-lit";
-    light.style.setProperty("--i", String(index));
-    // A free flow's light is whole lengths, each lit where both its steps are done.
-    light.style.setProperty("--wire-lit", String(lit ? (joined(index) ? index + 1 : index) : current));
-    // The two steps it joins, so a move can pick out the light a step just joined.
-    light.dataset.steps = `${index} ${index + 1}`;
-    box.append(track, light);
-  }
-  box.dataset.runs = JSON.stringify(lit);
-  return box;
 }
 
 /** How far through a move on `token`'s curve it is when the curve has come `share` of the way. */
@@ -387,19 +331,14 @@ function reaching(token: string, share: number): number {
 }
 
 /**
- * The rail moving from step `from` to `to`: a wire's lit length grows (or retracts) to the new
- * current symbol over `long` on `emphasized_decel`, and each symbol it reaches lights over `short`
- * as the light gets there (one it leaves goes out as the light leaves it); the new current one
- * lights `medium` in, as the light arrives at its bead. With no wire (Kōbō) the symbols light in the
- * same time, the light passing down them unseen. With reduced motion it is the state change alone.
+ * The rail moving from step `from` to `to`: each symbol passed lights over `short` in turn, as
+ * though a light ran down them over `long` on `emphasized_decel` (one passed going back goes out
+ * the same way); the new current one lights `medium` in. With reduced motion it is the state
+ * change alone.
  */
 function travel(steps: HTMLElement, from: number, to: number, failed: boolean): void {
   if (settings().reduced || from === to) return;
   const long = timed("long");
-  // Only the lengths between the two steps change: each animated length is styled again every frame
-  // on the main thread, so the rest are left alone.
-  const lights = [...steps.querySelectorAll<HTMLElement>(".k-rail-wire-lit")].slice(Math.min(from, to), Math.max(from, to));
-  for (const light of lights) light.animate([{ "--wire-lit": from }, { "--wire-lit": to }], { duration: long, easing: curve("emphasized_decel") });
   const rows = [...steps.querySelectorAll<HTMLElement>(":scope > .k-step")];
   const look = (index: number, at: number, fails: boolean) => ({ "--bead-lit": index <= at ? 1 : 0, "--bead-glow": index < at || (index === at && !fails) ? 1 : 0 });
   rows.forEach((each, index) => {

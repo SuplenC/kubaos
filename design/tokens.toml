@@ -138,16 +138,6 @@ rail_day = 3
 rail = 4
 rail_day = 4
 
-# A step rail's progress: a wire down its steps' symbols, from the first to the
-# last, lit down to the current one. `wire` is its thickness in logical pixels,
-# rounded half up to whole device pixels (3, 4, 5, 6 at 1, 1.25, 1.5, 2), at
-# night and by day alike. `bead` is how far the disc each symbol sits on
-# reaches past the symbol on every side, in logical pixels: the wire stops
-# that far short of the symbol, so it reads as passing behind it.
-[step_rail]
-wire = 3
-bead = 3
-
 # An icon tile's app icon, measured once when it loads. The drawing's box is
 # its pixels more opaque than `ink`, so the margin an icon theme leaves round
 # it drops away. The drawing is a plate, filling the tile, when that box is

@@ -412,11 +412,9 @@
   --step-muted: var(--color-on_surface_variant);
 }
 
-/* A rail step's symbol, a bead on the rail's progress wire (`lib/step-rail.css`): the tube runs
-   into it, so it is lit as the tube is. Not reached, it is unlit, in the muted ink beside the unlit
-   tube; once its step is reached (done or current) it is `primary`, glowing at night with the
-   tube's glow, near and far, while the signs are on, and by day with none. A step that failed
-   keeps its `error` symbol, with no glow. */
+/* A rail step's symbol (`lib/step-rail.css`). Not reached, it is unlit, in the muted ink; once its
+   step is reached (done or current) it is `primary`, glowing at night near and far while the signs
+   are on, and by day with none. A step that failed keeps its `error` symbol, with no glow. */
 .k-step-bead {
   display: flex;
   flex: none;
