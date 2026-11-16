@@ -383,7 +383,7 @@ function otherMenu(q: string, groups: readonly Group[], foot: string, more: Othe
   /** The search over: its bar goes and its spinner gives way to a still symbol, nothing moving. */
   const settle = () => {
     bar.dataset.done = "";
-    if (waiting.isConnected) waiting.replaceWith(icon("hourglass_top", "var(--icon-s16)", "var(--color-on_surface_variant)"));
+    if (waiting.parentElement) waiting.replaceWith(icon("hourglass_top", "var(--icon-s16)", "var(--color-on_surface_variant)"));
   };
   // The fullest the lane holds whole: every beat, then without the news, then without the game.
   const fits = ["tall", "medium", "short"] as const;
