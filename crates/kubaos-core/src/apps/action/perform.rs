@@ -171,14 +171,37 @@ pub fn web_app_paths(id: &str) -> [String; 2] {
     ]
 }
 
-/// A web app's desktop entry: `url` in an app window of the browser, with the window class
-/// `kubaos-web-<id>`, and the icon at `icon`.
-fn web_app_entry(id: &str, title: &str, url: &str, icon: &Path) -> String {
-    let class = format!("kubaos-web-{id}");
+/// The browser's folder of a web app, its own `--user-data-dir`: its window's sign-ins, cookies
+/// and cache, apart from the user's browser.
+pub fn web_app_profile(id: &str) -> String {
+    format!("~/.local/share/kubaos/web-apps/{id}")
+}
+
+/// The profile a web app's window opens in, in its own browser folder: it names the window.
+fn web_app_profile_name(id: &str) -> String {
+    format!("kubaos-web-{id}")
+}
+
+/// A web app's desktop entry: `url` in an app window of the browser, in a browser folder of its
+/// own at `profile`, its window's app id what the browser names it, and the icon at `icon`.
+///
+/// Chrome names an `--app` window on Wayland after the URL and the profile, never `--class`,
+/// which sets only X11's class: `chrome-<host>_<path>-<profile>`, as the file name of the
+/// desktop entry it would write for the app. Its own `--user-data-dir` makes it a browser of its
+/// own, so the flags reach it whether or not the user's Chrome is open, and its own
+/// `--profile-directory` makes the name the web app's alone. `StartupWMClass` is that name, so the
+/// launcher and the compositor match the window to the entry.
+/// <https://github.com/chromium/chromium/blob/157.0.8103.78/chrome/browser/ui/views/frame/browser_native_widget_aura_linux.cc>
+/// <https://github.com/chromium/chromium/blob/157.0.8103.78/chrome/browser/web_applications/os_integration/web_app_shortcut_linux.cc>
+fn web_app_entry(id: &str, title: &str, url: &str, icon: &Path, profile: &Path) -> String {
+    let name = web_app_profile_name(id);
     let exec = [
         super::WEB_APP_BROWSER.to_owned(),
+        format!("--user-data-dir={}", profile.display()),
+        format!("--profile-directory={name}"),
+        "--no-first-run".to_owned(),
+        "--no-default-browser-check".to_owned(),
         format!("--app={url}"),
-        format!("--class={class}"),
     ]
     .map(|arg| exec_arg(&arg))
     .join(" ");
@@ -187,7 +210,34 @@ fn web_app_entry(id: &str, title: &str, url: &str, icon: &Path) -> String {
          Terminal=false\n",
         title = entry_value(title),
         icon = entry_value(&icon.to_string_lossy()),
+        class = entry_value(&web_app_window(url, &name)),
     )
+}
+
+/// The app id Chrome gives the `--app` window of `url` in the profile `profile`: `chrome-`, the
+/// URL's host, `_` and its path (`/` for none), `-` and the profile, with each character a file
+/// name can't have (`"*/:<>?\|`, a control character) and each space made `_`.
+pub fn web_app_window(url: &str, profile: &str) -> String {
+    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let (authority, tail) = rest.split_at(end);
+    let host = authority.rsplit_once('@').map_or(authority, |(_, host)| host);
+    let host = match host.strip_prefix('[') {
+        Some(v6) => format!("[{}", v6.split_once(']').map_or(v6, |(address, _)| address)) + "]",
+        None => host.split_once(':').map_or(host, |(name, _)| name).to_owned(),
+    };
+    let path = &tail[..tail.find(['?', '#']).unwrap_or(tail.len())];
+    let path = if path.is_empty() { "/" } else { path };
+    format!("chrome-{}_{path}-{profile}", host.to_ascii_lowercase())
+        .chars()
+        .map(|c| {
+            if c.is_control() || c == ' ' || matches!(c, '"' | '*' | '/' | ':' | '<' | '>' | '?' | '\\' | '|') {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 /// The characters the Desktop Entry spec reserves in an `Exec` argument, which quote it.
@@ -233,7 +283,8 @@ fn web_app_files(host: &dyn Host, action: &Action) -> Vec<(PathBuf, String)> {
         return Vec::new();
     };
     let [entry, icon] = web_app_paths(id).map(|p| logical(host, &p));
-    let text = web_app_entry(id, title, url, &icon);
+    let profile = logical(host, &web_app_profile(id));
+    let text = web_app_entry(id, title, url, &icon, &profile);
     vec![(entry, text), (icon, svg.clone().unwrap_or_default())]
 }
 
@@ -362,7 +413,13 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
                 done,
                 ..Look::default()
             };
-            for (path, _) in &files {
+            let Kind::WebApp { id, .. } = &action.kind else {
+                return Ok(look);
+            };
+            // The browser makes its folder as the window first opens; the app owns it all the same.
+            let profile = logical(host, &web_app_profile(id));
+            let paths = files.iter().map(|(path, _)| path).chain([&profile]);
+            for path in paths {
                 for claim in at_path(host, path, done).claims {
                     if !look.claims.contains(&claim) {
                         look.claims.push(claim);

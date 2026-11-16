@@ -19,6 +19,7 @@ fn app(id: &str, name: &str, picked: bool, state: AppState, version: Option<&str
         version: version.map(str::to_owned),
         setup: None,
         setups: Vec::new(),
+        configurable: false,
         available: vec![true],
     }
 }

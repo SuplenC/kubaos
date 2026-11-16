@@ -10,7 +10,8 @@
 //! # Owns
 //!
 //! - [`Keeper`] (one side's steps, undos and who-owns-what checks), [`Engine`] (the order of an
-//!   install and a removal, rollback, events), and their errors.
+//!   install and a removal, rollback, events), and their errors. Runs of more than one app, and the
+//!   configure stage alone: `engine/requires.rs`.
 //!
 //! # Not here
 //!
@@ -125,6 +126,12 @@ pub enum EngineError {
     },
     #[error("{app} can't be installed: {}", why.join("; "))]
     Refused { app: String, why: Vec<String> },
+    #[error("{app} is needed by {}: remove that first", by.join(", "))]
+    Needed { app: String, by: Vec<String> },
+    #[error("{app} isn't installed")]
+    NotInstalled { app: String },
+    #[error("{app} has nothing to configure")]
+    NothingToConfigure { app: String },
 }
 
 /// One side's steps of the apps' installs: the user's in this process, root's in the root helper.
@@ -721,7 +728,7 @@ impl<'a> Engine<'a> {
         } = self.begin(&folder, id, setup)?;
         let mut finished = Finished::default();
         if switching {
-            finished.switch |= self.switch_away(id, folder.actions.len())?;
+            finished.switch |= self.switch_away(id, folder.shared_steps())?;
         }
         let total = steps.len();
         let mut this_run = Vec::new();
@@ -902,8 +909,9 @@ impl<'a> Engine<'a> {
             .as_ref()
             .or(root_journal.as_ref())
             .and_then(|j| j.setup.clone());
-        if let Ok(folder) = Folder::load(&self.user.catalog, id) {
-            self.ready(&folder, setup.as_deref())?;
+        let folder = Folder::load(&self.user.catalog, id).ok();
+        if let Some(folder) = &folder {
+            self.ready(folder, setup.as_deref())?;
         }
         if user_journal.as_ref().is_some_and(|j| j.root_adoption.is_some()) {
             self.adopt_root(id)?;
@@ -939,6 +947,12 @@ impl<'a> Engine<'a> {
         });
         Journal::forget(self.user.journals(), id).map_err(EngineError::Journal)?;
         finished.left = !owns;
+        if let Some(folder) = &folder {
+            let picked = setup.as_deref().and_then(|s| folder.setup(s));
+            for keeps in folder.keeps(picked) {
+                self.sink.event(&UpdateEvent::Note { text: keeps.to_owned() });
+            }
+        }
         Ok(finished)
     }
 
@@ -1259,6 +1273,11 @@ impl<'a> Engine<'a> {
         }));
     }
 }
+
+mod requires;
+
+pub use self::requires::Planned;
+pub use self::requires::Ran;
 
 #[cfg(test)]
 mod tests;

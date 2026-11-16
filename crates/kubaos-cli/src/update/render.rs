@@ -247,6 +247,7 @@ impl Text {
                 format!("    {} {}\n", s.dim("undone:"), action.name)
             }
             UpdateEvent::Action(_)
+            | UpdateEvent::App(_)
             | UpdateEvent::PhaseStarted { .. }
             | UpdateEvent::Step { .. }
             | UpdateEvent::Progress { .. }
@@ -549,8 +550,8 @@ impl Text {
         self.rows("Apt", std::iter::once(first).chain(lines), n, n)
     }
 
-    /// The summary's `Apps` rows: one line an app installed or removed, or `none` when no app
-    /// came or went.
+    /// The summary's `Apps` rows: one line an app installed, removed or configured, or `none`
+    /// when no app came or went.
     fn app_rows(&self, apps: &AppChanges, none: &str) -> String {
         let lines: Vec<String> = apps
             .installed
@@ -558,6 +559,7 @@ impl Text {
             .map(|name| format!("{name} installed"))
             .chain(apps.removed.iter().map(|name| format!("{name} removed")))
             .chain(apps.left.iter().map(|name| kubaos_core::update::event::left_line(name)))
+            .chain(apps.configured.iter().map(|name| format!("{name} configured")))
             .collect();
         let n = lines.len().max(1);
         let lines = if lines.is_empty() { vec![none.to_owned()] } else { lines };

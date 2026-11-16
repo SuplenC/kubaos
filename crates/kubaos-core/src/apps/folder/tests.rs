@@ -101,3 +101,95 @@ fn a_folder_never_sets_what_only_a_journal_records() {
         assert!(matches!(result, Err(FolderError::Action { .. })), "{result:?}");
     }
 }
+
+#[test]
+fn an_app_requires_apps_by_id_or_with_a_min_and_a_setup_adds_its_own() {
+    let text = format!(
+        "{ABOUT}requires = [\"neovim\", {{ id = \"ripgrep\", min = \"14.0\" }}]\n{ACTION}\
+         [setup.web]\nname = \"Sketch\"\nsummary = \"In a window\"\nrequires = [\"google-chrome\"]\n\
+         [setup.local]\nname = \"Sketch here\"\nsummary = \"On this machine\"\nrequires = [\"docker\"]\n"
+    );
+
+    let folder = Folder::parse("sketch", Path::new("/catalog/sketch"), &text).unwrap();
+
+    let required = |setup: &str| -> Vec<(String, Option<String>)> {
+        folder
+            .requires(folder.setup(setup))
+            .map(|r| (r.id().to_owned(), r.min().map(str::to_owned)))
+            .collect()
+    };
+    assert_eq!(
+        required("web"),
+        [
+            ("neovim".to_owned(), None),
+            ("ripgrep".to_owned(), Some("14.0".to_owned())),
+            ("google-chrome".to_owned(), None),
+        ]
+    );
+    assert_eq!(required("local")[2].0, "docker");
+}
+
+#[test]
+fn a_requirement_that_isnt_another_app_once_or_whose_min_isnt_a_version_is_refused() {
+    for requires in [
+        "[\"sketch\"]",
+        "[\"neovim\", \"neovim\"]",
+        "[\"Neovim\"]",
+        "[{ id = \"neovim\", min = \"latest\" }]",
+    ] {
+        let result = parse(&format!("{ABOUT}requires = {requires}\n"));
+
+        assert!(result.is_err(), "{requires} was taken");
+    }
+}
+
+#[test]
+fn configure_steps_come_after_every_install_step_of_the_app_and_its_setup() {
+    let text = format!(
+        "{ABOUT}\
+         [[action]]\nname = \"Defaults\"\nkind = \"file\"\nstage = \"configure\"\n\
+         to = \"~/.config/kubaos/sketch/defaults.toml\"\ntext = \"a\"\n\
+         [[action]]\nname = \"Install\"\nkind = \"linger\"\n\
+         [setup.web]\nname = \"Sketch\"\nsummary = \"In a window\"\n\
+         [[setup.web.action]]\nname = \"Theme\"\nkind = \"setting\"\nstage = \"configure\"\n\
+         file = \"~/.config/kubaos/sketch/settings.toml\"\nkey = \"theme\"\nvalue = \"dark\"\n\
+         [[setup.web.action]]\nname = \"Window\"\nkind = \"web_app\"\nid = \"sketch\"\ntitle = \"Sketch\"\n\
+         url = \"https://sketch.example/\"\nicon = \"sketch.svg\"\n\
+         [setup.local]\nname = \"Sketch here\"\nsummary = \"On this machine\"\n\
+         [[setup.local.action]]\nname = \"Serve\"\nkind = \"linger\"\n"
+    );
+
+    let folder = Folder::parse("sketch", Path::new("/catalog/sketch"), &text).unwrap();
+
+    let names: Vec<&str> = folder
+        .steps(Some("web"))
+        .unwrap()
+        .iter()
+        .map(|a| a.name.as_str())
+        .collect();
+    assert_eq!(names, ["Install", "Window", "Defaults", "Theme"]);
+    assert_eq!(folder.shared_steps(), 1);
+    assert!(folder.configurable(folder.setup("web")));
+    assert!(folder.configurable(folder.setup("local")));
+}
+
+#[test]
+fn a_configure_step_writes_only_the_apps_own_folder_of_the_user_layer_as_the_user() {
+    for action in [
+        "kind = \"file\"\nto = \"~/.config/sketch/defaults.toml\"\ntext = \"a\"",
+        "kind = \"file\"\nto = \"~/.config/kubaos/other/defaults.toml\"\ntext = \"a\"",
+        "kind = \"file\"\nto = \"/etc/sketch.conf\"\ntext = \"a\"",
+        "kind = \"setting\"\nfile = \"~/.config/sketch/settings.json\"\nkey = \"a\"\nvalue = 1",
+        "kind = \"linger\"",
+        "kind = \"run\"\ndo = [\"true\"]\ncheck = [\"true\"]\nundo = [\"true\"]\nroot = true",
+    ] {
+        let text = format!("{ABOUT}{ACTION}[[action]]\nname = \"Defaults\"\nstage = \"configure\"\n{action}\n");
+
+        let result = Folder::parse("sketch", Path::new("/catalog/sketch"), &text);
+
+        assert!(
+            matches!(result, Err(FolderError::ConfigureOutside { .. })),
+            "{action}: {result:?}"
+        );
+    }
+}

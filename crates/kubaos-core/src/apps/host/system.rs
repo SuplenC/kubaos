@@ -215,6 +215,11 @@ impl Host for SystemHost {
         Self::out(self.command("dpkg-query").args(["-W", "-f=${Version}", package])).map(Some)
     }
 
+    fn candidate(&mut self, package: &str) -> Result<Option<String>, HostError> {
+        let shown = Self::out(self.command("apt-cache").args(["policy", "--", package]))?;
+        Ok(candidate(&shown))
+    }
+
     fn apt_repo(&mut self, repo: &str) -> Result<(), HostError> {
         Self::out(self.command(self.checkout.join("system/apt-repo.sh")).arg(repo)).map(drop)
     }
@@ -421,6 +426,16 @@ fn package_name(name: &str, of: &str, arch: &str) -> String {
     } else {
         format!("{name}:{of}")
     }
+}
+
+/// The candidate `apt-cache policy` shows, none when it shows `(none)` or no package.
+fn candidate(policy: &str) -> Option<String> {
+    policy
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("Candidate:"))
+        .map(str::trim)
+        .filter(|version| !version.is_empty() && *version != "(none)")
+        .map(str::to_owned)
 }
 
 #[cfg(test)]

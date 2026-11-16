@@ -5,6 +5,7 @@
 //!   kubaos app show ID [--json]
 //!   kubaos app add ID... [--setup SETUP] [--json]
 //!   kubaos app remove ID... [--json]
+//!   kubaos app configure ID... [--json]
 //!   kubaos app status [--json]
 //!   kubaos app adopt
 //!
@@ -12,13 +13,15 @@
 //! nothing else, for the Command menu. `show` is one app: what it is, and what it owns on this
 //! machine, step by step, from its journals. `status` adds where each app stands, from the
 //! journals and one dpkg query for the versions. `add` picks apps and installs them, every step
-//! checked and those not done done; an app with setups needs `--setup`, as none is the default,
-//! and one the machine has in another setup switches. `remove` drops apps and undoes their
-//! journals. Both ask for root once, through polkit, before their first step when a step needs
-//! it, show each step as `kubaos update` does, and with `--json` write its events; `kubaos update`
-//! keeps the picked apps installed. `adopt` takes in the apps the machine had before KubaOS kept
-//! journals, running nothing but checks; a user migration runs it. Exit codes: 0 ok, 1 the work
-//! failed, 2 usage.
+//! checked and those not done done, after the apps it requires, which aren't picked; an app with
+//! setups needs `--setup`, as none is the default, and one the machine has in another setup
+//! switches. `remove` drops apps and undoes their journals, and those of the apps they brought
+//! that nothing needs any more; an app another installed app requires isn't removed. `configure`
+//! runs an installed app's configure stage alone again. They ask for root once, through polkit,
+//! before their first step when a step needs it, show each step as `kubaos update` does, and with
+//! `--json` write its events; `kubaos update` keeps the picked apps installed. `adopt` takes in the
+//! apps the machine had before KubaOS kept journals, running nothing but checks; a user migration
+//! runs it. Exit codes: 0 ok, 1 the work failed, 2 usage.
 //!
 //! # Owns
 //!
@@ -90,6 +93,14 @@ pub enum AppCmd {
         #[arg(long)]
         json: bool,
     },
+    /// Set installed apps up the KubaOS way again: their configure stage alone.
+    Configure {
+        #[arg(required = true)]
+        ids: Vec<String>,
+        /// Write one JSON event per line on stdout, for a graphical front end.
+        #[arg(long)]
+        json: bool,
+    },
     /// Where each app of the catalog stands on this machine.
     Status {
         /// Write it as JSON, for the Command menu.
@@ -106,6 +117,7 @@ pub fn main(cmd: AppCmd) -> ExitCode {
         AppCmd::List { json } => list(json),
         AppCmd::Add { ids, setup, json } => change(&ids, Change::Add(setup.as_deref()), json),
         AppCmd::Remove { ids, json } => change(&ids, Change::Remove, json),
+        AppCmd::Configure { ids, json } => change(&ids, Change::Configure, json),
         AppCmd::Status { json } => status(json),
         AppCmd::Show { id, json } => show(&id, json),
         AppCmd::Adopt => adopt(),
@@ -164,6 +176,7 @@ enum Change<'a> {
     /// In the setup, for the apps that have setups.
     Add(Option<&'a str>),
     Remove,
+    Configure,
 }
 
 fn change(ids: &[String], change: Change, json: bool) -> ExitCode {
@@ -176,6 +189,7 @@ fn change(ids: &[String], change: Change, json: bool) -> ExitCode {
     let done = match change {
         Change::Add(setup) => updater.add_apps(ids, setup),
         Change::Remove => updater.remove_apps(ids),
+        Change::Configure => updater.configure_apps(ids),
     };
     match done {
         Ok(()) => ExitCode::SUCCESS,
@@ -251,6 +265,9 @@ struct Showing<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     setup: Option<String>,
     complete: bool,
+    /// The apps whose install brought it, which it goes with.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    brought_by: Vec<String>,
     /// Every step of both journals, by step.
     steps: Vec<Owned>,
 }
@@ -315,6 +332,7 @@ fn shown<'a>(folder: &'a Folder, paths: &Paths) -> Result<Showing<'a>, JournalEr
             description_from: &folder.description_from,
         },
         setup: user.as_ref().and_then(|j| j.setup.clone()),
+        brought_by: user.as_ref().map(|j| j.brought_by.clone()).unwrap_or_default(),
         complete: user.is_some_and(|j| j.complete),
         steps,
     })
@@ -383,6 +401,13 @@ fn show_text(shown: &Showing) -> String {
         None => {
             let _ = writeln!(out, "{state}. What each step owns, which a removal undoes:");
         }
+    }
+    if !shown.brought_by.is_empty() {
+        let _ = writeln!(
+            out,
+            "Installed for {}: it goes with the last of them, unless you add it yourself.",
+            shown.brought_by.join(", ")
+        );
     }
     for step in &shown.steps {
         let _ = writeln!(out, "  {}. {} ({}, {})", step.step, step.name, step.side, step.state);

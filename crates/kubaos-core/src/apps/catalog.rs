@@ -3,8 +3,9 @@
 //!
 //! # Owns
 //!
-//! - [`Catalog`]: loading the folders, finding an app, the packages its apps install, and checking
-//!   each app's vendor repositories against the package manifest.
+//! - [`Catalog`]: loading the folders, finding an app, the packages its apps install, checking each
+//!   app's requirements (apps of the catalog with one way to be set up, no cycle) and its vendor
+//!   repositories against the package manifest.
 //!
 //! # Not here
 //!
@@ -44,6 +45,12 @@ pub enum CatalogError {
     },
     #[error("app {id} takes its packages from repo {repo}, which the package manifest doesn't define")]
     UnknownRepo { id: String, repo: String },
+    #[error("app {id} requires {required}, which the catalog doesn't have")]
+    UnknownRequirement { id: String, required: String },
+    #[error("app {id} requires {required}, which can be set up more than one way: it can't tell which")]
+    RequiresSetups { id: String, required: String },
+    #[error("apps require each other in a circle: {}", circle.join(" → "))]
+    Cycle { circle: Vec<String> },
 }
 
 /// Every app KubaOS knows how to install, by id.
@@ -92,7 +99,58 @@ impl Catalog {
             })?;
             apps.push(app);
         }
-        Ok(Self::new(apps))
+        let catalog = Self::new(apps);
+        catalog.check_requires()?;
+        Ok(catalog)
+    }
+
+    /// Checks that every app an app requires, in any setup, is one of the catalog's with one way
+    /// to be set up, and that no app requires itself through others.
+    ///
+    /// # Errors
+    ///
+    /// [`CatalogError::UnknownRequirement`], [`CatalogError::RequiresSetups`] or
+    /// [`CatalogError::Cycle`], for the first app it finds.
+    pub fn check_requires(&self) -> Result<(), CatalogError> {
+        for app in &self.apps {
+            for required in all_requires(app) {
+                let Some(found) = self.get(required) else {
+                    return Err(CatalogError::UnknownRequirement {
+                        id: app.id.clone(),
+                        required: required.to_owned(),
+                    });
+                };
+                if found.has_setups() {
+                    return Err(CatalogError::RequiresSetups {
+                        id: app.id.clone(),
+                        required: required.to_owned(),
+                    });
+                }
+            }
+        }
+        for app in &self.apps {
+            let mut path = vec![app.id.as_str()];
+            self.walk(&mut path)?;
+        }
+        Ok(())
+    }
+
+    /// Follows every requirement from the last app of `path`, refusing one back to an app on it.
+    fn walk<'a>(&'a self, path: &mut Vec<&'a str>) -> Result<(), CatalogError> {
+        let Some(app) = path.last().and_then(|id| self.get(id)) else {
+            return Ok(());
+        };
+        for required in all_requires(app) {
+            if let Some(start) = path.iter().position(|id| *id == required) {
+                let mut circle: Vec<String> = path[start..].iter().map(|id| (*id).to_owned()).collect();
+                circle.push(required.to_owned());
+                return Err(CatalogError::Cycle { circle });
+            }
+            path.push(required);
+            self.walk(path)?;
+            path.pop();
+        }
+        Ok(())
     }
 
     /// Checks that every vendor repository an `apt` action names is one of `manifest`'s.
@@ -133,9 +191,22 @@ impl Catalog {
             .filter(|app| app.packages().iter().any(|p| packages.iter().any(|q| q == p)))
     }
 
+    /// The apps that require `id` in any of their setups, in id order.
+    pub fn requiring<'a>(&'a self, id: &'a str) -> impl Iterator<Item = &'a Folder> {
+        self.apps.iter().filter(move |app| all_requires(app).any(|r| r == id))
+    }
+
     /// The dpkg packages its apps' `apt` and `deb` actions install: the catalog's, which the
     /// package manifest leaves alone.
     pub fn packages(&self) -> BTreeSet<String> {
         self.apps.iter().flat_map(Folder::packages).map(str::to_owned).collect()
     }
+}
+
+/// The ids `app` requires in any setup.
+fn all_requires(app: &Folder) -> impl Iterator<Item = &str> {
+    app.requires
+        .iter()
+        .chain(app.setups.iter().flat_map(|s| &s.requires))
+        .map(super::folder::Requirement::id)
 }

@@ -3,9 +3,10 @@
 //!
 //! # Owns
 //!
-//! - [`Folder`], [`FolderSetup`], [`Ready`], [`Category`], and what a valid folder is: what the app
-//!   is (its category, tags, summary and description), and an install's list of steps, the app's
-//!   actions then its setup's.
+//! - [`Folder`], [`FolderSetup`], [`Ready`], [`Category`], [`Requirement`], and what a valid folder
+//!   is: what the app is (its category, tags, summary and description), the apps it requires, and
+//!   an install's list of steps: the install stage's actions, the app's then its setup's, then the
+//!   configure stage's, in the same order.
 //!
 //! # Not here
 //!
@@ -23,6 +24,8 @@ use serde::Serialize;
 use super::action::Action;
 use super::action::ActionError;
 use super::action::Kind;
+use super::action::Side;
+use super::action::Stage;
 use super::action::is_argv;
 
 /// The file of an app's folder.
@@ -79,6 +82,14 @@ pub enum FolderError {
     InvalidSource(String),
     #[error("{0:?} is not an icon name: letters, digits, `-`, `_` and `.`, as the icon theme names them")]
     InvalidIcon(String),
+    #[error("{0:?} is not an app this one can require: an app id, other than its own, named once")]
+    InvalidRequirement(String),
+    #[error("{0:?} is not a version: digits, letters and `.+~-:`, starting with a digit")]
+    InvalidVersion(String),
+    #[error(
+        "{name}: a configure step writes the app's KubaOS defaults as the user, in ~/.config/kubaos/{id}/, and nowhere else"
+    )]
+    ConfigureOutside { id: String, name: String },
 }
 
 /// What kind of app it is, which groups it with others in lists.
@@ -126,6 +137,37 @@ pub struct Ready {
     pub says: String,
 }
 
+/// An app installed before the one that requires it.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+pub enum Requirement {
+    /// `"neovim"`.
+    Id(String),
+    /// `{ id = "neovim", min = "0.10" }`: at least that version, as dpkg compares them.
+    Min {
+        id: String,
+        #[serde(default)]
+        min: Option<String>,
+    },
+}
+
+impl Requirement {
+    /// The required app's id.
+    pub fn id(&self) -> &str {
+        match self {
+            Self::Id(id) | Self::Min { id, .. } => id,
+        }
+    }
+
+    /// The lowest version of it that will do, when any won't.
+    pub fn min(&self) -> Option<&str> {
+        match self {
+            Self::Id(_) => None,
+            Self::Min { min, .. } => min.as_deref(),
+        }
+    }
+}
+
 /// One app's folder.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Folder {
@@ -145,7 +187,11 @@ pub struct Folder {
     pub description_from: String,
     pub icon: Option<String>,
     pub ready: Vec<Ready>,
-    /// What every setup's install does first.
+    /// The apps every setup's install installs first, in order.
+    pub requires: Vec<Requirement>,
+    /// What a removal leaves on purpose, said as it ends: the user's own data.
+    pub keeps: Option<String>,
+    /// What every setup's install does first, in each stage.
     pub actions: Vec<Action>,
     /// Sorted by id; none for an app with one way only.
     pub setups: Vec<FolderSetup>,
@@ -158,7 +204,11 @@ pub struct FolderSetup {
     pub name: String,
     pub summary: String,
     pub ready: Vec<Ready>,
-    /// What it does after the app's own actions.
+    /// The apps it installs first, after the app's own.
+    pub requires: Vec<Requirement>,
+    /// What a removal of it leaves on purpose, said as it ends, after the app's own.
+    pub keeps: Option<String>,
+    /// What it does after the app's own actions, in each stage.
     pub actions: Vec<Action>,
 }
 
@@ -175,6 +225,9 @@ struct File {
     #[serde(default)]
     ready: Vec<Ready>,
     #[serde(default)]
+    requires: Vec<Requirement>,
+    keeps: Option<String>,
+    #[serde(default)]
     action: Vec<toml::Table>,
     #[serde(default)]
     setup: BTreeMap<String, SetupFile>,
@@ -187,6 +240,9 @@ struct SetupFile {
     summary: String,
     #[serde(default)]
     ready: Vec<Ready>,
+    #[serde(default)]
+    requires: Vec<Requirement>,
+    keeps: Option<String>,
     #[serde(default)]
     action: Vec<toml::Table>,
 }
@@ -231,6 +287,8 @@ impl Folder {
                     name: setup.name,
                     summary: setup.summary,
                     ready: setup.ready,
+                    requires: setup.requires,
+                    keeps: setup.keeps,
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -245,6 +303,8 @@ impl Folder {
             description_from: file.description_from,
             icon: file.icon,
             ready: file.ready,
+            requires: file.requires,
+            keeps: file.keeps,
             actions: shared,
             setups,
         };
@@ -261,6 +321,10 @@ impl Folder {
             if value.trim().is_empty() {
                 return Err(FolderError::Empty { key });
             }
+        }
+        let keeps = self.keeps.iter().chain(self.setups.iter().flat_map(|s| &s.keeps));
+        if keeps.into_iter().any(|says| says.trim().is_empty()) {
+            return Err(FolderError::Empty { key: "keeps" });
         }
         if self.tags.is_empty() {
             return Err(FolderError::Empty { key: "tags" });
@@ -298,7 +362,58 @@ impl Folder {
                 return Err(FolderError::InvalidReady);
             }
         }
+        self.check_requires()?;
+        for action in self.all_actions().filter(|a| a.stage == Stage::Configure) {
+            if !self.configures_inside(action) {
+                return Err(FolderError::ConfigureOutside {
+                    id: self.id.clone(),
+                    name: action.name.clone(),
+                });
+            }
+        }
         Ok(())
+    }
+
+    /// Checks each list of requirements, the app's and each setup's with it: an app id other
+    /// than its own, each once, a `min` a version.
+    fn check_requires(&self) -> Result<(), FolderError> {
+        let lists = std::iter::once(None).chain(self.setups.iter().map(|s| Some(&s.requires)));
+        for extra in lists {
+            let all: Vec<&Requirement> = self.requires.iter().chain(extra.into_iter().flatten()).collect();
+            for (i, requirement) in all.iter().enumerate() {
+                let id = requirement.id();
+                if !is_app_id(id) || id == self.id || all[..i].iter().any(|r| r.id() == id) {
+                    return Err(FolderError::InvalidRequirement(id.to_owned()));
+                }
+                if let Some(min) = requirement.min()
+                    && !super::version::is_version(min)
+                {
+                    return Err(FolderError::InvalidVersion(min.to_owned()));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether a configure step stays in the app's own folder of the user layer, as the user:
+    /// what it writes is `~/.config/kubaos/<id>/…`, and it is a file, a link, a path a program
+    /// writes, a settings key or the user's own `run`.
+    fn configures_inside(&self, action: &Action) -> bool {
+        let inside = |path: &str| {
+            path.strip_prefix(&format!("~/.config/kubaos/{}/", self.id))
+                .is_some_and(|rest| !rest.is_empty())
+        };
+        if action.side() != Side::User {
+            return false;
+        }
+        match &action.kind {
+            Kind::Setting { file, .. } => inside(file),
+            Kind::Run { .. } => true,
+            Kind::File { .. } | Kind::Symlink { .. } | Kind::Output { .. } | Kind::Download { .. } => {
+                action.path().is_some_and(inside)
+            }
+            _ => false,
+        }
     }
 
     /// The setup `id`.
@@ -329,19 +444,46 @@ impl Folder {
         }
     }
 
-    /// The install's steps in `setup`, in order: the app's actions, then the setup's. Step `n` is
-    /// the `n - 1`th.
+    /// The install's steps in `setup`, in order: the install stage's, the app's actions then the
+    /// setup's, then the configure stage's in the same order. Step `n` is the `n - 1`th. The app's
+    /// own install-stage actions are the first steps in every setup.
     ///
     /// # Errors
     ///
     /// As [`Folder::pick`].
     pub fn steps(&self, setup: Option<&str>) -> Result<Vec<&Action>, FolderError> {
         let picked = self.pick(setup)?;
-        Ok(self
-            .actions
-            .iter()
-            .chain(picked.into_iter().flat_map(|s| &s.actions))
+        let all = || self.actions.iter().chain(picked.into_iter().flat_map(|s| &s.actions));
+        Ok(all()
+            .filter(|a| a.stage == Stage::Install)
+            .chain(all().filter(|a| a.stage == Stage::Configure))
             .collect())
+    }
+
+    /// How many steps every setup shares: the app's own install-stage actions, which come first.
+    pub fn shared_steps(&self) -> usize {
+        self.actions.iter().filter(|a| a.stage == Stage::Install).count()
+    }
+
+    /// The apps an install in `setup` requires, in order: the app's, then the setup's.
+    pub fn requires<'a>(&'a self, setup: Option<&'a FolderSetup>) -> impl Iterator<Item = &'a Requirement> {
+        self.requires.iter().chain(setup.into_iter().flat_map(|s| &s.requires))
+    }
+
+    /// What a removal of it in `setup` leaves on purpose, the app's then the setup's.
+    pub fn keeps<'a>(&'a self, setup: Option<&'a FolderSetup>) -> impl Iterator<Item = &'a str> {
+        self.keeps
+            .iter()
+            .chain(setup.into_iter().flat_map(|s| &s.keeps))
+            .map(String::as_str)
+    }
+
+    /// Whether an install in `setup` has a configure stage.
+    pub fn configurable(&self, setup: Option<&FolderSetup>) -> bool {
+        self.actions
+            .iter()
+            .chain(setup.into_iter().flat_map(|s| &s.actions))
+            .any(|a| a.stage == Stage::Configure)
     }
 
     /// Whether it can be set up more than one way.
