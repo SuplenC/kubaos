@@ -210,6 +210,34 @@ fn an_app_kubaos_owns_nothing_of_is_found_and_one_with_no_journal_is_read_from_d
 }
 
 #[test]
+fn ubuntus_snap_firefox_is_not_firefox_and_mozillas_is() {
+    let catalog = shipped();
+    let journals = tempfile::tempdir().unwrap();
+    let mut picks = Picks::default();
+    picks.add("firefox");
+    let state = |dpkg: &str, picks: &Picks| {
+        let dpkg = Dpkg::parse(dpkg);
+        let status = Status::read(
+            &catalog,
+            picks,
+            journals.path(),
+            &journals.path().join("root"),
+            "amd64",
+            Some(&dpkg),
+        )
+        .unwrap();
+        status.get("firefox").unwrap().state
+    };
+    let snap = "installed install firefox 1:1snap1-0ubuntu9.1\n";
+    let mozillas = "installed install firefox 160.0~build1\n";
+
+    assert_eq!(state(snap, &Picks::default()), AppState::Available);
+    assert_eq!(state(snap, &picks), AppState::Missing);
+    assert_eq!(state(mozillas, &Picks::default()), AppState::Found);
+    assert_eq!(state(mozillas, &picks), AppState::Installed);
+}
+
+#[test]
 fn the_list_and_the_status_say_what_each_app_is_in_json() {
     let (_dir, catalog) = catalog_of(&[("agent", app("Agent", AGENT))]);
     let picks = Picks::default();

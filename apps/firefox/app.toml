@@ -25,8 +25,11 @@ kind = "file"
 to = "/etc/apt/preferences.d/kubaos-firefox"
 from = "kubaos-firefox.pref"
 
+# Mozilla's builds are versioned `<version>~build<n>`; Ubuntu's firefox, which installs the snap,
+# is `1:1snap1-…`, and is not Firefox installed.
 [[action]]
 name = "Install Firefox"
 kind = "apt"
 repo = "mozilla"
 packages = ["firefox"]
+versions = "*~build*"

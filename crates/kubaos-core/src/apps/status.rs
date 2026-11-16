@@ -3,11 +3,11 @@
 //!
 //! An app is installed when its user journal says its install is complete, in the setup that
 //! journal names, and its journals own something; one they own nothing of is found: on the
-//! machine, KubaOS's to leave. An app with no journal whose own packages dpkg has (installed by
-//! hand, or before KubaOS kept journals) is installed when it is picked, as taking it in will
-//! make it KubaOS's, and found when not. That is two small files an app at most and the one dpkg
-//! query the caller made, with no check run, so a status read stays cheap; a version is its
-//! first package's.
+//! machine, KubaOS's to leave. An app with no journal whose own packages dpkg has, at a version
+//! its action takes as the app's (installed by hand, or before KubaOS kept journals), is
+//! installed when it is picked, as taking it in will make it KubaOS's, and found when not. That is
+//! two small files an app at most and the one dpkg query the caller made, with no check run, so a
+//! status read stays cheap; a version is its first package's.
 //!
 //! # Owns
 //!
@@ -22,6 +22,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
+use super::action::version_matches;
 use super::catalog::Catalog;
 use super::folder::Category;
 use super::folder::Folder;
@@ -243,10 +244,15 @@ impl Status {
     }
 }
 
-/// Whether dpkg has every package of `app`'s own actions for `arch`, and it has any.
+/// Whether dpkg has every package of `app`'s own actions for `arch`, at a version that is the
+/// app's, and it has any.
 fn has_packages(app: &Folder, arch: &str, dpkg: &Dpkg) -> bool {
     let packages = app.own_packages(arch);
-    !packages.is_empty() && packages.iter().all(|p| dpkg.has(p))
+    !packages.is_empty()
+        && packages.iter().all(|(package, versions)| {
+            dpkg.get(package)
+                .is_some_and(|i| versions.is_none_or(|v| version_matches(v, &i.version)))
+        })
 }
 
 /// One app of the catalog as `kubaos app list` shows it, with no fact of the machine, so the list

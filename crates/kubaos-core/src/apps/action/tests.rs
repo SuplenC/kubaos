@@ -5,6 +5,7 @@ use super::ActionError;
 use super::Side;
 use super::Stage;
 use super::Words;
+use super::version_matches;
 
 fn action(text: &str) -> Result<Action, ActionError> {
     let table: toml::Table = toml::from_str(text).unwrap();
@@ -249,4 +250,40 @@ fn a_web_app_opens_https_or_http_on_this_machine_with_its_port() {
             "{url}: {result:?}"
         );
     }
+}
+
+#[test]
+fn a_pattern_of_versions_takes_a_run_of_anything_for_each_star() {
+    for (pattern, version) in [
+        ("*~build*", "160.0~build1"),
+        ("*~build*", "~build"),
+        ("1.*", "1.2.3"),
+        ("1.2", "1.2"),
+        ("*", ""),
+        ("a*b*c", "abbc"),
+    ] {
+        assert!(version_matches(pattern, version), "{pattern} {version}");
+    }
+    for (pattern, version) in [
+        ("*~build*", "1:1snap1-0ubuntu9.1"),
+        ("1.*", "11.0"),
+        ("1.2", "1.2.3"),
+        ("a*b*c", "abcd"),
+        ("ab*ba", "aba"),
+    ] {
+        assert!(!version_matches(pattern, version), "{pattern} {version}");
+    }
+}
+
+#[test]
+fn an_apts_pattern_of_versions_is_a_version_with_stars() {
+    let apt = |versions: &str| {
+        action(&format!(
+            "name = \"Install\"\nkind = \"apt\"\npackages = [\"firefox\"]\nversions = \"{versions}\"\n"
+        ))
+    };
+
+    assert!(apt("*~build*").is_ok());
+    assert!(matches!(apt(""), Err(ActionError::InvalidVersions { .. })));
+    assert!(matches!(apt("1 2"), Err(ActionError::InvalidVersions { .. })));
 }

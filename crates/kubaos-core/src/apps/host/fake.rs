@@ -376,9 +376,17 @@ impl Host for FakeHost {
                 state.dpkg.remove(&gone);
             }
         }
+        // apt moves an installed package asked for by name to its candidate, as it does a
+        // distribution's build of a name a pinned repository also has.
+        let moving: Vec<(String, String)> = packages
+            .iter()
+            .filter(|p| state.dpkg.contains_key(*p))
+            .filter_map(|p| Some((p.clone(), state.candidates.get(p)?.clone())))
+            .collect();
         for p in state.missing(packages) {
             state.dpkg.insert(p, "1.0".to_owned());
         }
+        state.dpkg.extend(moving);
         state.log.push(format!("apt install {}", packages.join(" ")));
         Ok(())
     }
