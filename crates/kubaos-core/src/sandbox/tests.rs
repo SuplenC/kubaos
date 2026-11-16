@@ -180,3 +180,33 @@ fn a_program_beyond_the_tools_is_linked_in_for_a_one_off_command() {
     assert!(out.status.success());
     assert!(String::from_utf8_lossy(&out.stdout).starts_with("git version"));
 }
+
+#[test]
+fn a_settled_program_starts_while_a_process_holds_what_was_written_open_for_writing() {
+    // The moment `settle` is for, held open: another process with the program open for writing,
+    // as one forked while it was written is until its exec.
+    let (dir, sandbox) = sandbox();
+    let path = dir.path().join("hello");
+    fs::write(&path, "#!/bin/sh\necho hello\n").unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    let mut holder = sandbox
+        .command("sh")
+        .args(["-c", "exec 3>>\"$1\"; echo held; read _", "sh"])
+        .arg(&path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut held = String::new();
+    std::io::BufRead::read_line(&mut std::io::BufReader::new(holder.stdout.take().unwrap()), &mut held).unwrap();
+    assert_eq!(held, "held\n");
+    let busy = sandbox.command(&path).output().unwrap_err();
+    assert_eq!(busy.kind(), std::io::ErrorKind::ExecutableFileBusy);
+
+    settle(&path);
+    let started = sandbox.command(&path).output();
+
+    drop(holder.stdin.take());
+    holder.wait().unwrap();
+    assert_eq!(String::from_utf8_lossy(&started.unwrap().stdout), "hello\n");
+}

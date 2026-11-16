@@ -1,28 +1,24 @@
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 
 use super::SystemHost;
 use super::candidate;
 use super::simulation;
 use crate::apps::host::Downgrade;
 use crate::apps::host::Host;
+use crate::sandbox;
 use crate::sandbox::Sandbox;
 
-/// What a script run by `host` sees of its environment: its `HOME`, and whether it inherited
-/// a variable of the process that ran it (cargo sets `CARGO_PKG_NAME` for every test).
-///
-/// Outside the sandbox: what is checked is the environment the real host passes on, which a
-/// sandbox would replace. The script is the test's own, by its path, and runs only `printf`, a
-/// shell builtin, so it reaches nothing.
-fn environment(host: &mut SystemHost) -> String {
+/// What a script run by `host`, finding programs in a sandbox, sees of its environment: its
+/// `HOME`, and whether it inherited a variable of the process that ran it (cargo sets
+/// `CARGO_PKG_NAME` for every test).
+fn environment(host: SystemHost) -> String {
     let dir = tempfile::tempdir().unwrap();
-    let script = dir.path().join("env");
-    fs::write(
-        &script,
+    let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "kuba");
+    let mut host = host.with_path(sandbox.bin());
+    sandbox::program(
+        &dir.path().join("env"),
         "#!/bin/sh\nprintf '%s %s' \"$HOME\" \"${CARGO_PKG_NAME:-none}\" > seen\n",
-    )
-    .unwrap();
-    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    );
 
     host.run(&["./env".to_owned()], dir.path()).unwrap();
 
@@ -31,16 +27,16 @@ fn environment(host: &mut SystemHost) -> String {
 
 #[test]
 fn a_run_as_root_gets_roots_environment_and_none_of_the_users() {
-    let mut host = SystemHost::new("kuba", "/home/kuba", "/usr/share/kubaos").as_root();
+    let host = SystemHost::new("kuba", "/home/kuba", "/usr/share/kubaos").as_root();
 
-    assert_eq!(environment(&mut host), "/root none");
+    assert_eq!(environment(host), "/root none");
 }
 
 #[test]
 fn a_run_as_the_user_gets_their_home_and_environment() {
-    let mut host = SystemHost::new("kuba", "/home/kuba", "/usr/share/kubaos");
+    let host = SystemHost::new("kuba", "/home/kuba", "/usr/share/kubaos");
 
-    assert_eq!(environment(&mut host), "/home/kuba kubaos-core");
+    assert_eq!(environment(host), "/home/kuba kubaos-core");
 }
 
 #[test]

@@ -18,6 +18,7 @@ use super::status::listing;
 use crate::apt::Dpkg;
 use crate::apt::Manifest;
 use crate::apt::manifest::MANIFEST;
+use crate::sandbox;
 use crate::unfree::Unfree;
 
 fn repo_root() -> PathBuf {
@@ -717,8 +718,7 @@ fn penpot_script(name: &str, into: &Path, dir: &Path) -> PathBuf {
     let from = "dir=/etc/kubaos/penpot\n";
     assert!(text.contains(from), "{name} keeps the stack in /etc/kubaos/penpot");
     let path = into.join(name);
-    fs::write(&path, text.replace(from, &format!("dir={}\n", dir.display()))).unwrap();
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    sandbox::program(&path, &text.replace(from, &format!("dir={}\n", dir.display())));
     path
 }
 
