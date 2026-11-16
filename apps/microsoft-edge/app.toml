@@ -1,0 +1,28 @@
+# Microsoft Edge from Microsoft's signed apt repository, whose key system/packages.toml pins
+# ([repo.microsoft-edge]). Microsoft builds it for amd64 only.
+# https://www.microsoft.com/en-us/edge/download
+name = "Microsoft Edge"
+category = "browsers"
+tags = ["browser", "web", "internet", "chromium", "microsoft"]
+summary = "Microsoft's Chromium, on Linux. Yes, really. Bing comes free, like it or fucking not."
+# From its AppStream metainfo, CC0-1.0, without the paragraph of claims.
+description = """\
+Browse the web anywhere with one seamless experience from your phone to your computer and other \
+signed-in devices. Microsoft Edge gives you the tools to protect your privacy online with \
+features like tracking prevention, AdBlock Plus, InPrivate browsing and InPrivate search in \
+Microsoft Bing. Organize the web in a way that cuts through the clutter, making it easier to \
+find, view, and manage your content on the go."""
+description_from = "https://github.com/flathub/com.microsoft.Edge/blob/beta/com.microsoft.Edge.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "microsoft-edge"
+keeps = """\
+Your profile (bookmarks, passwords, history) stays in ~/.config/microsoft-edge: install Edge \
+again and it's all there."""
+
+[[action]]
+name = "Install Microsoft Edge"
+kind = "apt"
+repo = "microsoft-edge"
+arch = "amd64"
+packages = ["microsoft-edge-stable"]

@@ -1,0 +1,6 @@
+# Installed to /etc/apt/preferences.d/kubaos-firefox by Firefox's app (apps/firefox).
+# Ubuntu's firefox installs the snap and carries an epoch (1:1snap1), so apt
+# would take it over Mozilla's newer Firefox without this pin.
+Package: firefox firefox-l10n-*
+Pin: origin packages.mozilla.org
+Pin-Priority: 1000

@@ -1,0 +1,29 @@
+# Vivaldi from Vivaldi's signed apt repository, whose key system/packages.toml pins
+# ([repo.vivaldi]). Its repository has amd64 alone.
+# https://help.vivaldi.com/desktop/install-update/manual-setup-vivaldi-linux-repositories/
+name = "Vivaldi"
+category = "browsers"
+tags = ["browser", "web", "internet", "chromium", "mail", "calendar"]
+summary = "A browser with a setting for everything, and mail and a calendar too. Why the fuck not."
+# From its AppStream metainfo, CC0-1.0.
+description = """\
+The web browser for techies and people who need a browser that helps them get things done. The \
+user interface is fully customizable, including keyboard shortcuts, mouse gestures, and \
+programmable macros. Seize back control of your tabs with features like Workspaces, Tab Stacks, \
+and Tab Tiling. Stay on top of all your emails, appointments, to-dos, and news with Mail, \
+Calendar, Tasks, and Feed Reader. Jot down ideas and inspiration with the integrated Notes \
+manager."""
+description_from = "https://github.com/flathub/com.vivaldi.Vivaldi/blob/master/com.vivaldi.Vivaldi.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "vivaldi"
+keeps = """\
+Your profile (bookmarks, passwords, mail, notes) stays in ~/.config/vivaldi: install Vivaldi \
+again and it's all there."""
+
+[[action]]
+name = "Install Vivaldi"
+kind = "apt"
+repo = "vivaldi"
+arch = "amd64"
+packages = ["vivaldi-stable"]
