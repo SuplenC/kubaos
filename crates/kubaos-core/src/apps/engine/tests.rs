@@ -1149,8 +1149,12 @@ amd64 = { url = "https://example.com/runtime.tar.gz", sha256 = "4444444444444444
         ("4".repeat(64), fs::read(&archive).unwrap()),
     );
     let before = world.host.snapshot();
+    // tar gives what it unpacks the archive's modes less the umask: under a umask that lets the
+    // group write, as Ubuntu's 002 does, only the action itself keeps the files the owner's.
+    let umask = Umask::set(0o002);
 
     world.install("runtime", true).0.unwrap();
+    drop(umask);
 
     let runtime = world.host_home().join(".vendor/runtime");
     for path in [runtime.clone(), runtime.join("bin"), runtime.join("bin/tool")] {
@@ -1161,6 +1165,21 @@ amd64 = { url = "https://example.com/runtime.tar.gz", sha256 = "4444444444444444
     assert_eq!(fs::read_to_string(runtime.join("bin/tool")).unwrap(), "#!/bin/sh\n");
     world.remove("runtime").0.unwrap();
     assert_eq!(world.host.snapshot(), before);
+}
+
+/// The process's umask, set for a test and put back when it goes.
+struct Umask(rustix::fs::Mode);
+
+impl Umask {
+    fn set(mask: u32) -> Self {
+        Self(rustix::process::umask(rustix::fs::Mode::from_raw_mode(mask)))
+    }
+}
+
+impl Drop for Umask {
+    fn drop(&mut self) {
+        rustix::process::umask(self.0);
+    }
 }
 
 /// A system unit enabled, from an app named by `name`.
