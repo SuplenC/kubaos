@@ -557,6 +557,7 @@ impl Text {
             .iter()
             .map(|name| format!("{name} installed"))
             .chain(apps.removed.iter().map(|name| format!("{name} removed")))
+            .chain(apps.left.iter().map(|name| kubaos_core::update::event::left_line(name)))
             .collect();
         let n = lines.len().max(1);
         let lines = if lines.is_empty() { vec![none.to_owned()] } else { lines };

@@ -1,18 +1,19 @@
 //! The Apps catalog in the menu: an "Install <Name>" Item for each app of the catalog that isn't on
-//! the machine, a "Remove <Name>" Item for each one that is, never both, so a folder added to the
-//! catalog brings its Items with it. An Install Item's subtitle is the app's summary, and its tags
-//! are keywords of it alone: a word that finds an app to install never ranks its removal. An app
-//! with setups has an Install Item for each setup instead, named for it, as none is the default:
-//! all of them while the app isn't on the machine, and beside its Remove Item those of the setups
-//! it isn't in, which switch. Running one starts `kubaos app add|remove <id> --json` (`add <id>
-//! --setup <setup>`) in the background, as a Job the menu shows with each step and how far it got;
-//! the Daemon announces its end on the desktop, named for the app, with why it failed and where its
-//! log is.
+//! the machine, a "Remove <Name>" Item for each one KubaOS put there, never both, so a folder added
+//! to the catalog brings its Items with it. An app found there, put there by other means, has no
+//! Remove Item: KubaOS owns nothing of it, and a removal would leave it as it is. An Install Item's
+//! subtitle is the app's summary, and its tags are keywords of it alone: a word that finds an app
+//! to install never ranks its removal. An app with setups has an Install Item for each setup
+//! instead, named for it, as none is the default: all of them while the app isn't on the machine,
+//! and those of the setups it isn't in while it is, which switch. Running one starts `kubaos app
+//! add|remove <id> --json` (`add <id> --setup <setup>`) in the background, as a Job the menu shows
+//! with each step and how far it got; the Daemon announces its end on the desktop, named for the
+//! app, with why it failed and where its log is.
 //!
 //! Which apps are on the machine is the engine's status (`kubaos app status`): the catalog, the
-//! picks, each app's user journal and one `dpkg-query` for the versions, read on a thread of its
-//! own at the start, at each config, when one of the files it comes from changes and at a Job's
-//! end, never as the menu searches.
+//! picks, each app's journals and one `dpkg-query` for the versions and the apps on the machine
+//! with no journal, read on a thread of its own at the start, at each config, when one of the
+//! files it comes from changes and at a Job's end, never as the menu searches.
 //!
 //! # Owns
 //!
@@ -27,6 +28,7 @@
 
 use std::fmt;
 use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc;
@@ -84,43 +86,85 @@ pub struct AppFiles {
     picks: PathBuf,
     /// The apps' user journals.
     journals: PathBuf,
+    /// Root's journals of the apps, which say whether an app KubaOS took in owns anything.
+    root_journals: PathBuf,
 }
 
 impl AppFiles {
-    /// The installed release's catalog, and the picks and the apps' journals of `paths`.
+    /// The installed release's catalog `system` has, its root journals, and the picks and the
+    /// apps' journals of `paths`.
     #[must_use]
-    pub fn new(catalog: PathBuf, paths: &Paths) -> Self {
+    pub fn new(system: &SystemPaths, paths: &Paths) -> Self {
         AppFiles {
-            catalog,
+            catalog: system.catalog(),
             picks: paths.app_picks(),
             journals: paths.app_journals(),
+            root_journals: system.app_journals(),
         }
     }
 
     /// The files of this machine and user; none without a home.
     pub fn from_env() -> Option<Self> {
         let paths = Paths::from_env().ok()?;
-        Some(Self::new(SystemPaths::machine().catalog(), &paths))
+        Some(Self::new(&SystemPaths::machine(), &paths))
     }
 
-    /// The files whose change can change which apps are on the machine or picked: dpkg's
-    /// database, which has the versions, the picks, and each app's user journal, which its
-    /// install and removal rename into place. The catalog moves only with the release, whose
-    /// update rewrites dpkg's database too; one that can't be read has no journals to watch. A
-    /// journal's folder that isn't there yet can't be watched: a Job's end reads the apps again.
-    pub fn watched(&self) -> Vec<PathBuf> {
-        let catalog = Catalog::load(&self.catalog).unwrap_or_default();
-        [PathBuf::from(DPKG_STATUS), self.picks.clone()]
+    /// The apps' user journals' folder, which the watch needs to exist: an app's journal folder
+    /// appears in it with the app's first install, after the crossing update too.
+    pub fn journals(&self) -> &Path {
+        &self.journals
+    }
+
+    /// These files with their folders' symlinks followed, as the watch's events name them.
+    #[must_use]
+    pub fn canonical(&self) -> Self {
+        let real = |path: &Path| match (path.parent(), path.file_name()) {
+            (Some(dir), Some(name)) => dir.canonicalize().map_or_else(|_| path.to_path_buf(), |dir| dir.join(name)),
+            _ => path.to_path_buf(),
+        };
+        AppFiles {
+            catalog: self.catalog.clone(),
+            picks: real(&self.picks),
+            journals: self.journals.canonicalize().unwrap_or_else(|_| self.journals.clone()),
+            root_journals: self.root_journals.clone(),
+        }
+    }
+
+    /// The folders whose change can change which apps are on the machine or picked: dpkg's
+    /// database's, which has the versions, the picks', the journals' folder, where an app's
+    /// folder comes and goes with its install and removal, and each app's folder in it, whose
+    /// journal its install and removal rename into place. Read again after each change, so an
+    /// app's folder made since is watched.
+    pub fn watched_dirs(&self) -> Vec<PathBuf> {
+        let parent = |path: &Path| path.parent().map(Path::to_path_buf);
+        let mut dirs: Vec<PathBuf> = [parent(Path::new(DPKG_STATUS)), parent(&self.picks), Some(self.journals.clone())]
             .into_iter()
-            .chain(
-                catalog
-                    .apps()
-                    .iter()
-                    .map(|app| kubaos_core::apps::journal::Journal::file(&self.journals, &app.id)),
-            )
-            .collect()
+            .flatten()
+            .collect();
+        if let Ok(entries) = std::fs::read_dir(&self.journals) {
+            let mut apps: Vec<PathBuf> = entries
+                .flatten()
+                .map(|entry| entry.path())
+                .filter(|path| path.is_dir())
+                .collect();
+            apps.sort();
+            dirs.extend(apps);
+        }
+        dirs.dedup();
+        dirs
+    }
+
+    /// Whether a change to `path` can change which apps are on the machine or picked: dpkg's
+    /// database, the picks, or anything in the journals' folder but its lock.
+    pub fn changes(&self, path: &Path) -> bool {
+        path == Path::new(DPKG_STATUS)
+            || path == self.picks
+            || (path.starts_with(&self.journals) && path != self.journals.join(LOCK))
     }
 }
+
+/// The user side's lock in the journals' folder, which every `kubaos app` run takes.
+const LOCK: &str = ".lock";
 
 /// The apps' status could not be read.
 #[derive(Debug, thiserror::Error)]
@@ -200,7 +244,14 @@ impl Apps {
             .collect();
         let dpkg = Dpkg::parse(&runner.output(&query).map_err(ReadError::Dpkg)?);
         let status =
-            Status::read(&catalog, &picks, &files.journals, apps::arch(), Some(&dpkg)).map_err(ReadError::Journal)?;
+            Status::read(
+            &catalog,
+            &picks,
+            &files.journals,
+            &files.root_journals,
+            apps::arch(),
+            Some(&dpkg),
+        ).map_err(ReadError::Journal)?;
         Ok(Self::new(&status))
     }
 
@@ -210,7 +261,7 @@ impl Apps {
     pub fn items(&self) -> Vec<Item> {
         let mut items = Vec::new();
         for standing in &self.apps {
-            if standing.app.state.is_installed() {
+            if standing.app.state.is_removable() {
                 items.push(remove_item(standing));
             }
             if standing.has_setups() {
@@ -269,7 +320,7 @@ impl Apps {
         };
         let applies = match change {
             Change::Add => standing.offers_install(setup),
-            Change::Remove => app.state.is_installed(),
+            Change::Remove => app.state.is_removable(),
         };
         applies.then_some((app, change, setup))
     }
@@ -492,6 +543,8 @@ struct Running {
     /// Whether the summary has the app among those installed or removed, as asked; `None`
     /// before the summary.
     arrived: Option<bool>,
+    /// Whether the summary has the app among those a removal left, as KubaOS didn't install it.
+    left: bool,
 }
 
 impl Running {
@@ -513,6 +566,7 @@ impl Running {
             failure: None,
             said: None,
             arrived: None,
+            left: false,
         }
     }
 
@@ -545,6 +599,7 @@ impl Running {
                     Change::Remove => &summary.apps.removed,
                 };
                 self.arrived = Some(done.contains(&self.name));
+                self.left = self.change == Change::Remove && summary.apps.left.contains(&self.name);
                 self.log = summary.log.or(self.log.take());
             }
             UpdateEvent::Failed { error, log, .. } => {
@@ -573,8 +628,15 @@ impl Running {
     /// a log that couldn't be kept, leaves the app installed or removed.
     fn end(self, succeeded: bool) -> Job {
         let log = self.log.as_ref().map(|log| format!("The log: {}", log.display()));
-        let failed = !succeeded || self.failure.is_some() || self.arrived != Some(true);
-        let (title, state, why) = if failed {
+        let left = succeeded && self.failure.is_none() && self.left;
+        let failed = !succeeded || self.failure.is_some() || (self.arrived != Some(true) && !left);
+        let (title, state, why) = if left {
+            (
+                format!("{} left as it is", self.name),
+                JobState::Succeeded,
+                Some(kubaos_core::update::event::left_line(&self.name)),
+            )
+        } else if failed {
             let not = match self.change {
                 Change::Add => "wasn't installed",
                 Change::Remove => "wasn't removed",
@@ -626,13 +688,14 @@ fn install_words(app: &AppStatus) -> Vec<&str> {
 }
 
 /// "Install T3 Code as a service", for a setup of an app the machine doesn't have in it: the
-/// setup's summary, and which setup it replaces while the app is there in another.
+/// app's summary, as the title names the setup, and which setup it replaces while the app is there
+/// in another.
 fn setup_item(standing: &Standing, setup: &SetupInfo) -> Item {
     let app = &standing.app;
     let title = format!("Install {}", setup.name);
     let subtitle = match standing.installed_setup() {
-        Some(installed) => format!("Replaces {}: {}", installed.name, setup.summary),
-        None => setup.summary.clone(),
+        Some(installed) => format!("Replaces {}: {}", installed.name, app.summary),
+        None => app.summary.clone(),
     };
     item(
         format!("{INSTALL_PREFIX}{}:{}", app.id, setup.id),

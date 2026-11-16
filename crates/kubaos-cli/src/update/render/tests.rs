@@ -687,7 +687,7 @@ fn adding_apps_ends_on_the_apps_it_installed() {
     summary.command = Command::App;
     summary.apps = AppChanges {
         installed: vec!["Claude Code".into(), "T3 Code".into()],
-        removed: Vec::new(),
+        ..AppChanges::default()
     };
     let started = UpdateEvent::Started {
         command: Command::App,

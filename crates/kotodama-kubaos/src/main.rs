@@ -682,31 +682,26 @@ fn read_apps(files: AppFiles, events: Sender<Event<Own>>) -> Option<AppsReader> 
     Some(reader)
 }
 
-/// Watches the folders of dpkg's database, the picks and `packages.toml`, asking `apps` for a
-/// reading on each change to one of them. Without a watch the app Items keep what was read last,
-/// until the next config or app Job.
+/// Watches dpkg's database, the picks and the apps' journals, asking `apps` for a reading on each
+/// change to one of them, and the journals' folders again after it, for an app's folder made
+/// since. Without a watch the app Items keep what was read last, until the next config or app Job.
 fn watch_apps(files: &AppFiles, apps: AppsReader) -> Option<Watcher> {
-    let mut dirs: Vec<PathBuf> = Vec::new();
-    let mut changed = Vec::new();
-    for file in files.watched() {
-        let (Some(dir), Some(name)) = (file.parent(), file.file_name()) else {
-            continue;
-        };
-        // The events name the real path, behind any symlink on the way.
-        let dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
-        changed.push(dir.join(name));
-        if !dirs.contains(&dir) {
-            dirs.push(dir);
-        }
-    }
+    // The engine makes the folder with an app's first journal; made here, the watch waits in it.
+    let _ = std::fs::create_dir_all(files.journals());
+    let files = files.canonical();
+    let matters = files.clone();
+    let dirs = files.watched_dirs();
     let watcher = Watcher::start(
         "apps",
         RecursiveMode::NonRecursive,
         APPS_SETTLE,
         // dpkg writes `status-new` and renames it onto `status`; `kubaos app` and `kubaos package`
         // write theirs through a temporary file and a rename too.
-        move |event, _| changed.iter().any(|file| watched::changes(event, file)),
-        move |_| apps.read(),
+        move |event, _| !event.kind.is_access() && event.paths.iter().any(|path| matters.changes(path)),
+        move |watcher| {
+            watcher.watch(files.watched_dirs());
+            apps.read();
+        },
     )
     .map_err(|err| kotodama_extension::log!("not watching the apps: {}", watched::why(&err)))
     .ok()?;

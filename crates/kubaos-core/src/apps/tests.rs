@@ -85,6 +85,14 @@ fn an_installed_app_is_one_whose_user_journal_is_complete() {
     let journals = tempfile::tempdir().unwrap();
     let mut done = Journal::new("agent", None);
     done.complete = true;
+    done.entries.push(super::journal::Entry {
+        step: 1,
+        state: super::journal::State::Done,
+        claims: vec![super::journal::Claim::new("package:agent".to_owned(), true)],
+        prior: super::journal::Prior::default(),
+        action: catalog.get("agent").unwrap().actions[0].clone(),
+        replaced: None,
+    });
     done.save(journals.path()).unwrap();
     // A run that stopped: steps journaled, not complete.
     let mut half = Journal::new("half", None);
@@ -101,7 +109,7 @@ fn an_installed_app_is_one_whose_user_journal_is_complete() {
     picks.add("half");
     let dpkg = Dpkg::parse("installed install agent 1.2\n");
 
-    let status = Status::read(&catalog, &picks, journals.path(), "amd64", Some(&dpkg)).unwrap();
+    let status = Status::read(&catalog, &picks, journals.path(), &journals.path().join("root"), "amd64", Some(&dpkg)).unwrap();
 
     let state = |id: &str| status.get(id).unwrap().state;
     assert_eq!(state("agent"), AppState::Installed);
@@ -112,13 +120,48 @@ fn an_installed_app_is_one_whose_user_journal_is_complete() {
 }
 
 #[test]
+fn an_app_kubaos_owns_nothing_of_is_found_and_one_with_no_journal_is_read_from_dpkg() {
+    let (_dir, catalog) = catalog_of(&[
+        ("agent", app("Agent", AGENT)),
+        ("other", app("Other", &AGENT.replace("agent", "other"))),
+        ("third", app("Third", &AGENT.replace("agent", "third"))),
+        ("gone", app("Gone", &AGENT.replace("agent", "gone"))),
+    ]);
+    let journals = tempfile::tempdir().unwrap();
+    let mut found = Journal::new("agent", None);
+    found.complete = true;
+    found.root_adoption = Some(super::journal::Adoption::Found);
+    found.save(journals.path()).unwrap();
+    let mut picks = Picks::default();
+    picks.add("third");
+    let dpkg = Dpkg::parse("installed install agent 1.2\ninstalled install other 2.0\ninstalled install third 3.0\n");
+
+    let status = Status::read(
+        &catalog,
+        &picks,
+        journals.path(),
+        &journals.path().join("root"),
+        "amd64",
+        Some(&dpkg),
+    )
+    .unwrap();
+
+    let state = |id: &str| status.get(id).unwrap().state;
+    assert_eq!(state("agent"), AppState::Found);
+    assert_eq!(state("other"), AppState::Found, "installed by hand, not picked");
+    assert_eq!(state("third"), AppState::Installed, "picked, so taking it in makes it KubaOS's");
+    assert_eq!(state("gone"), AppState::Available);
+    assert_eq!(status.get("other").unwrap().version.as_deref(), Some("2.0"));
+}
+
+#[test]
 fn the_list_and_the_status_say_what_each_app_is_in_json() {
     let (_dir, catalog) = catalog_of(&[("agent", app("Agent", AGENT))]);
     let picks = Picks::default();
 
     let list = serde_json::to_value(listing(&catalog, &picks)).unwrap();
     let journals = tempfile::tempdir().unwrap();
-    let status = serde_json::to_value(Status::read(&catalog, &picks, journals.path(), "amd64", None).unwrap()).unwrap();
+    let status = serde_json::to_value(Status::read(&catalog, &picks, journals.path(), &journals.path().join("root"), "amd64", None).unwrap()).unwrap();
 
     assert_eq!(list[0]["category"], "development");
     assert_eq!(list[0]["tags"][0], "fixture");

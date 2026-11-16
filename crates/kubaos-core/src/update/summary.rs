@@ -83,6 +83,9 @@ impl Summary {
         for name in &self.apps.removed {
             lines.push(format!("{name} removed"));
         }
+        for name in &self.apps.left {
+            lines.push(crate::update::event::left_line(name));
+        }
         if let Some(nix) = self.nix_packages.as_ref().filter(|nix| !nix.is_empty()) {
             lines.push(counted(nix.len(), "1 Nix package changed", "{n} Nix packages changed"));
         }

@@ -259,13 +259,21 @@ pub struct AppChanges {
     pub installed: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub removed: Vec<String>,
+    /// Apps a removal left as they are: KubaOS didn't install them, so it owns nothing of them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub left: Vec<String>,
 }
 
 impl AppChanges {
-    /// Whether no app came or went.
+    /// Whether no app came or went, or was left.
     pub fn is_empty(&self) -> bool {
-        self.installed.is_empty() && self.removed.is_empty()
+        self.installed.is_empty() && self.removed.is_empty() && self.left.is_empty()
     }
+}
+
+/// What a removal says of an app it left as it is, named `name`.
+pub fn left_line(name: &str) -> String {
+    format!("I didn't install {name}, so it's not mine to bin: I left it. Remove it the way you put it there.")
 }
 
 /// A program an update keeps current outside apt and the user flake, in a phase of its own that

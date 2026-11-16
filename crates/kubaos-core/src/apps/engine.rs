@@ -642,6 +642,9 @@ impl std::fmt::Debug for Engine<'_> {
 pub struct Finished {
     /// The User flake's `packages.toml` changed: a switch installs or removes its names.
     pub switch: bool,
+    /// A removal found the app owning nothing, as it was there before KubaOS: it forgot the app
+    /// and left the machine as it is.
+    pub left: bool,
 }
 
 /// Where an install starts from.
@@ -865,7 +868,10 @@ impl<'a> Engine<'a> {
     }
 
     /// Removes the app `id`: its journals undone, newest step first, then gone. An app with no
-    /// journal is not installed, and nothing happens.
+    /// journal is not installed, and nothing happens. An app whose journals own nothing (it was
+    /// there by other means) is forgotten and the machine left as it is, which
+    /// [`Finished::left`] says; with nothing run and no root asked for, unless root has a record
+    /// of what it found, which only root can forget.
     ///
     /// # Errors
     ///
@@ -877,6 +883,20 @@ impl<'a> Engine<'a> {
         let root_journal = Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?;
         if user_journal.is_none() && root_journal.is_none() {
             return Ok(Finished::default());
+        }
+        let owns = [&user_journal, &root_journal]
+            .into_iter()
+            .flatten()
+            .any(Journal::owns_anything);
+        // Root's record of what it found takes part in other apps' hand-overs, so only root can
+        // forget it: an app with one goes through root, though nothing is undone.
+        let root_records = root_journal.as_ref().is_some_and(|j| !j.entries.is_empty());
+        if !owns && !root_records {
+            Journal::forget(self.user.journals(), id).map_err(EngineError::Journal)?;
+            return Ok(Finished {
+                left: true,
+                ..Finished::default()
+            });
         }
         let setup = user_journal
             .as_ref()
@@ -898,8 +918,13 @@ impl<'a> Engine<'a> {
         }
         let all = self.journaled(id)?;
         let total = all.iter().map(|u| u.step).max().unwrap_or(0);
+        let count = all.len();
         let mut finished = Finished::default();
-        for undoable in all {
+        for (done, undoable) in all.into_iter().enumerate() {
+            self.sink.event(&UpdateEvent::Step {
+                text: undoable.name.clone(),
+            });
+            self.sink.event(&UpdateEvent::Progress { done, total: count });
             self.report(id, undoable.step, total, &undoable.name, ActionState::Undoing);
             self.undo_one(id, &undoable).map_err(|source| EngineError::Undo {
                 name: undoable.name.clone(),
@@ -908,7 +933,12 @@ impl<'a> Engine<'a> {
             finished.switch |= undoable.kind_is_nix;
             self.report(id, undoable.step, total, &undoable.name, ActionState::Undone);
         }
+        self.sink.event(&UpdateEvent::Progress {
+            done: count,
+            total: count,
+        });
         Journal::forget(self.user.journals(), id).map_err(EngineError::Journal)?;
+        finished.left = !owns;
         Ok(finished)
     }
 

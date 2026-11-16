@@ -368,6 +368,21 @@ impl Folder {
             .collect()
     }
 
+    /// The packages of the app's own `apt` and `.deb` actions for `arch`, which every setup
+    /// installs; none when an `apt` action is for another architecture, or the app has none.
+    pub fn own_packages(&self, arch: &str) -> Vec<&str> {
+        let mut packages = Vec::new();
+        for action in &self.actions {
+            match &action.kind {
+                Kind::Apt { arch: Some(only), .. } if only != arch => return Vec::new(),
+                Kind::Apt { packages: own, .. } => packages.extend(own.iter().map(String::as_str)),
+                Kind::Deb { package, .. } => packages.push(package.as_str()),
+                _ => {}
+            }
+        }
+        packages
+    }
+
     /// The ready checks of an install or a removal in `setup`.
     pub fn readies<'a>(&'a self, setup: Option<&'a FolderSetup>) -> impl Iterator<Item = &'a Ready> {
         self.ready.iter().chain(setup.into_iter().flat_map(|s| &s.ready))

@@ -264,7 +264,7 @@ fn add_picks_the_apps_and_installs_them_through_polkit_once() {
         summary(&events).apps,
         AppChanges {
             installed: names(&["Agent", "Desk"]),
-            removed: Vec::new(),
+            ..AppChanges::default()
         }
     );
 }
@@ -599,11 +599,16 @@ fn an_adopted_app_the_user_put_there_owns_nothing_and_its_removal_leaves_it() {
     let before = host(&m).snapshot();
     w.updater(&mut m).adopt_apps().unwrap();
     assert_eq!(user_journal(&w, "desk").unwrap().root_adoption, Some(Adoption::Found));
+    let mut events = Vec::new();
 
-    w.updater(&mut m).remove_apps(&names(&["desk"])).unwrap();
+    w.reporting(&mut m, &mut events).remove_apps(&names(&["desk"])).unwrap();
 
     assert_eq!(host(&m).snapshot(), before);
     assert_eq!(user_journal(&w, "desk"), None);
+    assert_eq!(root_starts(&m), 0, "a removal that undoes nothing asked for a password");
+    let apps = &summary(&events).apps;
+    assert!(apps.removed.is_empty(), "{apps:?}");
+    assert_eq!(apps.left, names(&["Desk"]));
 }
 
 #[test]

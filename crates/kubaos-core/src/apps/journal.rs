@@ -91,6 +91,17 @@ pub struct Journal {
     pub entries: Vec<Entry>,
 }
 
+impl Journal {
+    /// Whether any step of it owns anything a removal would undo, or root still has to record
+    /// steps an adopted app owns.
+    pub fn owns_anything(&self) -> bool {
+        self.root_adoption == Some(Adoption::Owned)
+            || self.entries.iter().any(|e| {
+                e.claims.iter().any(|c| c.owned) || e.replaced.as_ref().is_some_and(|r| r.claims.iter().any(|c| c.owned))
+            })
+    }
+}
+
 /// Whose an adopted app is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
