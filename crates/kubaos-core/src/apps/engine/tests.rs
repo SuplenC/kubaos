@@ -25,6 +25,10 @@ use crate::update::event::UpdateEvent;
 const FIXTURE: &str = r#"
 name = "Fixture"
 summary = "An app for the tests"
+category = "system"
+tags = ["fixture"]
+description = "An app the tests install."
+description_from = "https://example.com/fixture"
 
 [[action]]
 name = "Install the tool"
@@ -58,6 +62,10 @@ value = true
 const GROUPED: &str = r#"
 name = "Grouped"
 summary = "An app with a group"
+category = "system"
+tags = ["fixture"]
+description = "An app the tests install."
+description_from = "https://example.com/fixture"
 
 [[action]]
 name = "Install the engine"
@@ -74,6 +82,10 @@ group = "grouped"
 const VENDOR: &str = r#"
 name = "Vendor"
 summary = "An app with a vendor's own tool"
+category = "system"
+tags = ["fixture"]
+description = "An app the tests install."
+description_from = "https://example.com/fixture"
 
 [[action]]
 name = "Download the tool"
@@ -107,6 +119,10 @@ window = "Open Vendor and pair it"
 const RIVAL: &str = r#"
 name = "Rival"
 summary = "An app that wants the fixture's config"
+category = "system"
+tags = ["fixture"]
+description = "An app the tests install."
+description_from = "https://example.com/fixture"
 
 [[action]]
 name = "Install the rival's tool"
@@ -202,12 +218,24 @@ impl FakeRoot {
 impl World {
     fn new(apps: &[(&str, &str)]) -> Self {
         let dir = tempfile::tempdir().unwrap();
-        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).unwrap();
-        let catalog = dir.path().join("catalog");
+        let checkout = dir.path().join("checkout");
+        let catalog = checkout.join("apps");
+        let system = checkout.join("system");
+        fs::create_dir_all(&system).unwrap();
+        fs::write(system.join("apt-repo.sh"), "#!/bin/sh\n").unwrap();
         for (id, text) in apps {
             fs::create_dir_all(catalog.join(id)).unwrap();
             fs::write(catalog.join(id).join("app.toml"), text).unwrap();
         }
+        // The root helper refuses a checkout others may write, whatever the umask made it.
+        let modes = [(checkout, 0o755), (catalog.clone(), 0o755), (system.clone(), 0o755)];
+        for (path, mode) in modes.into_iter().chain(
+            apps.iter()
+                .flat_map(|(id, _)| [(catalog.join(id), 0o755), (catalog.join(id).join("app.toml"), 0o644)]),
+        ) {
+            fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+        }
+        fs::set_permissions(system.join("apt-repo.sh"), fs::Permissions::from_mode(0o755)).unwrap();
         let host = FakeHost::new(dir.path());
         host.state.borrow_mut().units.insert(
             "system:fixture.service".to_owned(),
@@ -615,6 +643,15 @@ fn the_root_helper_refuses_anything_but_a_root_step_of_a_catalog_app() {
     assert!(refused(reply.clone()), "a folder others may write was run: {reply:?}");
     fs::set_permissions(world.catalog.join("fixture"), fs::Permissions::from_mode(0o755)).unwrap();
 
+    let repo = world.catalog.parent().unwrap().join("system/apt-repo.sh");
+    fs::set_permissions(&repo, fs::Permissions::from_mode(0o777)).unwrap();
+    let reply = root.serve(r#"{"op":"step","app":"fixture","step":1,"windows":false}"#);
+    assert!(
+        refused(reply.clone()),
+        "a repository setup others may write was run: {reply:?}"
+    );
+    fs::set_permissions(&repo, fs::Permissions::from_mode(0o755)).unwrap();
+
     let reply = root.serve(r#"{"op":"step","app":"fixture","step":1,"windows":false}"#);
     assert!(matches!(reply, Reply::Step { .. }), "{reply:?}");
 }
@@ -624,6 +661,10 @@ fn an_app_in_another_setup_loses_that_setups_own_steps_first() {
     let switching = r#"
 name = "Two ways"
 summary = "An app with setups"
+category = "system"
+tags = ["fixture"]
+description = "An app the tests install."
+description_from = "https://example.com/fixture"
 
 [[action]]
 name = "Install the app"
@@ -685,4 +726,694 @@ fn an_installed_app_whose_new_step_fails_keeps_what_it_had() {
     assert!(matches!(result, Err(EngineError::Step { .. })), "{result:?}");
     assert_eq!(world.host.snapshot(), installed);
     assert!(world.journals("grouped").0.unwrap().complete);
+}
+
+/// An app named `Test` whose actions are `actions`.
+fn app(actions: &str) -> String {
+    format!(
+        "name = \"Test\"\nsummary = \"An app for the tests\"\ncategory = \"system\"\ntags = [\"test\"]\n\
+         description = \"An app the tests install.\"\ndescription_from = \"https://example.com/test\"\n{actions}"
+    )
+}
+
+impl World {
+    /// The app `id`'s folder given `text`, as a release changes it.
+    fn write_app(&self, id: &str, text: &str) {
+        fs::write(self.catalog.join(id).join("app.toml"), text).unwrap();
+    }
+
+    /// A file of the app `id`'s folder.
+    fn folder_file(&self, id: &str, name: &str, text: &str) {
+        let path = self.catalog.join(id).join(name);
+        fs::write(&path, text).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+    }
+
+    fn declined(
+        &self,
+        go: impl FnOnce(&mut Engine<'_>) -> Result<super::Finished, EngineError>,
+    ) -> Result<super::Finished, EngineError> {
+        let mut root = self.root();
+        root.declined = true;
+        self.run(&mut root, &mut Events::default(), true, go)
+    }
+
+    fn system_path(&self, path: &str) -> PathBuf {
+        use crate::apps::host::Host;
+        self.host.place(std::path::Path::new(path))
+    }
+
+    fn log_since(&self, from: usize) -> Vec<String> {
+        self.host.state.borrow().log[from..].to_vec()
+    }
+}
+
+#[test]
+fn a_settings_file_the_setting_cant_read_is_refused_and_left_as_it_is() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    fs::create_dir_all(world.settings().parent().unwrap()).unwrap();
+    fs::write(world.settings(), "{ \"theme\": \"dark\", // the user's own\n").unwrap();
+    let before = world.host.snapshot();
+
+    let (result, _) = world.install("fixture", true);
+
+    let Err(EngineError::Refused { why, .. }) = result else {
+        panic!("the install went through: {result:?}");
+    };
+    assert!(
+        why.iter().any(|w| w.contains("isn't settings this action can read")),
+        "{why:?}"
+    );
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn a_settings_key_under_a_value_that_isnt_a_table_is_refused() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    fs::create_dir_all(world.settings().parent().unwrap()).unwrap();
+    fs::write(world.settings(), "{\"fixture\": \"on\"}").unwrap();
+    let before = world.host.snapshot();
+
+    let (result, _) = world.install("fixture", true);
+
+    let Err(EngineError::Refused { why, .. }) = result else {
+        panic!("the install went through: {result:?}");
+    };
+    assert!(why.iter().any(|w| w.contains("fixture isn't a table")), "{why:?}");
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn a_json_setting_keeps_the_files_key_order() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    fs::create_dir_all(world.settings().parent().unwrap()).unwrap();
+    fs::write(world.settings(), "{\"zeta\": 1, \"alpha\": 2}").unwrap();
+
+    world.install("fixture", true).0.unwrap();
+
+    let text = fs::read_to_string(world.settings()).unwrap();
+    let at = |key: &str| text.find(key).unwrap();
+    assert!(at("zeta") < at("alpha") && at("alpha") < at("fixture"), "{text}");
+}
+
+#[test]
+fn a_toml_setting_keeps_the_files_comments_and_types_and_its_undo_takes_only_the_key() {
+    let settings = app(r#"
+[[action]]
+name = "Turn it on"
+kind = "setting"
+file = "~/.config/tool/config.toml"
+key = "ui.enabled"
+value = true
+"#);
+    let world = World::new(&[("tool", &settings)]);
+    let config = world.host_home().join(".config/tool/config.toml");
+    fs::create_dir_all(config.parent().unwrap()).unwrap();
+    let mine = "# The user's own comment.\nupdated = 1979-05-27T07:32:00Z\n\n[ui]\ntheme = \"dark\"\n";
+    fs::write(&config, mine).unwrap();
+
+    world.install("tool", true).0.unwrap();
+    let set = fs::read_to_string(&config).unwrap();
+    fs::write(&config, set.replace("dark", "light")).unwrap();
+    world.remove("tool").0.unwrap();
+
+    assert_eq!(
+        set,
+        "# The user's own comment.\nupdated = 1979-05-27T07:32:00Z\n\n[ui]\ntheme = \"dark\"\nenabled = true\n"
+    );
+    assert_eq!(fs::read_to_string(&config).unwrap(), mine.replace("dark", "light"));
+}
+
+#[test]
+fn a_run_checks_a_settled_step_and_does_it_again_when_its_check_fails() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    world.install("fixture", true).0.unwrap();
+    world.host.state.borrow_mut().dpkg.remove("fixture-tool");
+    let from = world.host.state.borrow().log.len();
+
+    let (result, events) = world.install("fixture", true);
+
+    result.unwrap();
+    assert!(world.host.state.borrow().dpkg.contains_key("fixture-tool"));
+    assert_eq!(world.log_since(from), ["apt install fixture-tool"]);
+    assert!(events.steps().iter().all(|(_, state)| *state == ActionState::Done));
+}
+
+/// A vendor's `.deb` at `version`, then its service kept off, as Docker's are.
+fn deb_app(version: &str) -> String {
+    app(&format!(
+        r#"
+[[action]]
+name = "Install the app"
+kind = "deb"
+package = "vendor-app"
+version = "{version}"
+amd64 = {{ url = "https://example.com/vendor-app-{version}.deb", sha256 = "{sha}" }}
+
+[[action]]
+name = "Keep its service off"
+kind = "unit"
+unit = "vendor-app.service"
+scope = "system"
+enable = false
+"#,
+        sha = version.chars().next().unwrap().to_string().repeat(64),
+    ))
+}
+
+#[test]
+fn a_release_that_bumps_a_deb_pin_upgrades_it_in_place_and_checks_the_steps_after_it() {
+    let world = World::new(&[("vendor-app", &deb_app("1.0"))]);
+    {
+        let mut state = world.host.state.borrow_mut();
+        for version in ["1.0", "2.0"] {
+            let sha = version[..1].repeat(64);
+            let deb = format!("deb vendor-app {version}").into_bytes();
+            state
+                .downloads
+                .insert(format!("https://example.com/vendor-app-{version}.deb"), (sha, deb));
+        }
+        let unit = UnitState {
+            exists: true,
+            enabled: true,
+            ..UnitState::default()
+        };
+        state.units.insert("system:vendor-app.service".to_owned(), unit);
+    }
+    world.install("vendor-app", true).0.unwrap();
+    world.write_app("vendor-app", &deb_app("2.0"));
+    // The new version's package enables its service again, as Docker's does.
+    world
+        .host
+        .state
+        .borrow_mut()
+        .units
+        .get_mut("system:vendor-app.service")
+        .unwrap()
+        .enabled = true;
+    let from = world.host.state.borrow().log.len();
+
+    world.install("vendor-app", true).0.unwrap();
+
+    let state = world.host.state.borrow();
+    assert_eq!(state.dpkg["vendor-app"], "2.0");
+    assert!(!state.units["system:vendor-app.service"].enabled);
+    assert_eq!(
+        state.log[from..],
+        [
+            "fetch https://example.com/vendor-app-2.0.deb",
+            "deb install vendor-app 2.0",
+            "enable vendor-app.service false"
+        ]
+    );
+    drop(state);
+    let root = world.journals("vendor-app").1.unwrap();
+    assert!(root.entries[0].claims.iter().all(|c| c.owned), "{root:?}");
+}
+
+/// A download to a folder named for its version.
+fn runtime_app(version: &str) -> String {
+    app(&format!(
+        r#"
+[[action]]
+name = "Download the runtime"
+kind = "download"
+to = "~/.vendor/versions/@VERSION@/tool"
+version = "{version}"
+unpack = "file"
+amd64 = {{ url = "https://example.com/tool-{version}", sha256 = "{sha}" }}
+"#,
+        sha = version[2..3].repeat(64),
+    ))
+}
+
+#[test]
+fn a_new_download_version_replaces_the_old_one_and_goes_whole_with_the_app() {
+    let world = World::new(&[("runtime", &runtime_app("1.1"))]);
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.downloads.insert(
+            "https://example.com/tool-1.1".to_owned(),
+            ("1".repeat(64), b"one".to_vec()),
+        );
+        state.downloads.insert(
+            "https://example.com/tool-1.3".to_owned(),
+            ("3".repeat(64), b"three".to_vec()),
+        );
+    }
+    let before = world.host.snapshot();
+    let versions = world.host_home().join(".vendor/versions");
+    world.install("runtime", true).0.unwrap();
+    world.write_app("runtime", &runtime_app("1.3"));
+
+    world.install("runtime", true).0.unwrap();
+
+    assert_eq!(fs::read_to_string(versions.join("1.3/tool")).unwrap(), "three");
+    assert!(!versions.join("1.1").exists());
+    world.remove("runtime").0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn an_undo_that_stopped_partway_is_marked_and_done_again_by_the_next_install() {
+    let world = World::new(&[("grouped", GROUPED)]);
+    world.install("grouped", true).0.unwrap();
+    world.host.state.borrow_mut().fail.insert("groupdel:grouped".to_owned());
+
+    let (removed, _) = world.remove("grouped");
+
+    assert!(matches!(removed, Err(EngineError::Undo { .. })), "{removed:?}");
+    let root = world.journals("grouped").1.unwrap();
+    assert_eq!(root.entry(2).unwrap().state, crate::apps::journal::State::Undoing);
+    assert!(!world.host.state.borrow().groups["grouped"].contains("kuba"));
+
+    world.host.state.borrow_mut().fail.clear();
+    world.install("grouped", true).0.unwrap();
+
+    assert!(world.host.state.borrow().groups["grouped"].contains("kuba"));
+    let root = world.journals("grouped").1.unwrap();
+    assert_eq!(root.entry(2).unwrap().state, crate::apps::journal::State::Done);
+}
+
+#[test]
+fn a_root_step_changed_under_the_same_name_asks_for_root_before_anything_runs() {
+    let world = World::new(&[("grouped", GROUPED)]);
+    world.install("grouped", true).0.unwrap();
+    // Every package left on the list is there, so only the action's words say it changed.
+    world.write_app("grouped", &GROUPED.replace(", \"shared-tool\"]", "]"));
+    let before = world.host.snapshot();
+
+    let result = world.declined(|e| e.install("grouped", None));
+
+    assert!(matches!(result, Err(EngineError::Declined)), "{result:?}");
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn an_installed_app_whose_root_steps_check_done_needs_no_root() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    world.install("fixture", true).0.unwrap();
+
+    let result = world.declined(|e| e.install("fixture", None));
+
+    result.unwrap();
+}
+
+#[test]
+fn an_install_that_would_remove_a_package_the_app_didnt_install_is_refused() {
+    let docker = app(r#"
+[[action]]
+name = "Install Docker"
+kind = "apt"
+packages = ["docker-ce"]
+"#);
+    let world = World::new(&[("docker", &docker)]);
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.dpkg.insert("docker.io".to_owned(), "24.0".to_owned());
+        state
+            .conflicts
+            .insert("docker-ce".to_owned(), ["docker.io".to_owned()].into());
+    }
+    let before = world.host.snapshot();
+
+    let (result, _) = world.install("docker", true);
+
+    let Err(EngineError::Step { source, .. }) = result else {
+        panic!("the install went through: {result:?}");
+    };
+    assert!(source.to_string().contains("would remove docker.io"), "{source}");
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn a_removal_that_would_take_a_package_the_user_installed_since_is_refused() {
+    let world = World::new(&[("grouped", GROUPED)]);
+    world.install("grouped", true).0.unwrap();
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.dpkg.insert("user-app".to_owned(), "1.0".to_owned());
+        state
+            .depends
+            .insert("user-app".to_owned(), ["shared-tool".to_owned()].into());
+    }
+
+    let (result, _) = world.remove("grouped");
+
+    let Err(EngineError::Undo { source, .. }) = result else {
+        panic!("the removal went through: {result:?}");
+    };
+    assert!(source.to_string().contains("also remove user-app"), "{source}");
+    let state = world.host.state.borrow();
+    assert!(state.dpkg.contains_key("user-app") && state.dpkg.contains_key("shared-tool"));
+}
+
+#[test]
+fn a_setup_switch_refused_by_its_preflight_keeps_the_setup_the_machine_has() {
+    let two_ways = app(r#"
+[[action]]
+name = "Install the app"
+kind = "apt"
+packages = ["two-ways"]
+
+[setup.plain]
+name = "Two ways"
+summary = "The app alone"
+
+[[setup.plain.action]]
+name = "Write its config"
+kind = "file"
+to = "~/.config/two-ways/config"
+text = "plain\n"
+
+[setup.service]
+name = "Two ways as a service"
+summary = "With a service"
+
+[[setup.service.action]]
+name = "Keep its service running"
+kind = "linger"
+"#);
+    let world = World::new(&[("two-ways", &two_ways)]);
+    let mut root = world.root();
+    world
+        .run(&mut root, &mut Events::default(), true, |e| {
+            e.install("two-ways", Some("service"))
+        })
+        .unwrap();
+    let config = world.host_home().join(".config/two-ways/config");
+    fs::create_dir_all(config.parent().unwrap()).unwrap();
+    fs::write(&config, "mine\n").unwrap();
+
+    let mut root = world.root();
+    let result = world.run(&mut root, &mut Events::default(), true, |e| {
+        e.install("two-ways", Some("plain"))
+    });
+
+    assert!(matches!(result, Err(EngineError::Refused { .. })), "{result:?}");
+    assert!(world.host.state.borrow().linger);
+    assert_eq!(world.journals("two-ways").0.unwrap().setup.as_deref(), Some("service"));
+}
+
+#[test]
+fn a_tarball_unpacks_owned_by_whoever_unpacks_it_and_writable_by_no_one_else() {
+    let tarball = app(r#"
+[[action]]
+name = "Download the runtime"
+kind = "download"
+to = "~/.vendor/runtime"
+version = "1.0"
+unpack = "tar-gz"
+strip = 1
+amd64 = { url = "https://example.com/runtime.tar.gz", sha256 = "4444444444444444444444444444444444444444444444444444444444444444" }
+"#);
+    let world = World::new(&[("runtime", &tarball)]);
+    let src = tempfile::tempdir().unwrap();
+    fs::create_dir_all(src.path().join("pkg/bin")).unwrap();
+    fs::write(src.path().join("pkg/bin/tool"), "#!/bin/sh\n").unwrap();
+    for (path, mode) in [("pkg", 0o777), ("pkg/bin", 0o777), ("pkg/bin/tool", 0o777)] {
+        fs::set_permissions(src.path().join(path), fs::Permissions::from_mode(mode)).unwrap();
+    }
+    let archive = src.path().join("runtime.tar.gz");
+    let made = std::process::Command::new("tar")
+        .arg("-czf")
+        .arg(&archive)
+        .arg("-C")
+        .arg(src.path())
+        .arg("pkg")
+        .status()
+        .unwrap();
+    assert!(made.success());
+    world.host.state.borrow_mut().downloads.insert(
+        "https://example.com/runtime.tar.gz".to_owned(),
+        ("4".repeat(64), fs::read(&archive).unwrap()),
+    );
+    let before = world.host.snapshot();
+
+    world.install("runtime", true).0.unwrap();
+
+    let runtime = world.host_home().join(".vendor/runtime");
+    for path in [runtime.clone(), runtime.join("bin"), runtime.join("bin/tool")] {
+        let meta = fs::metadata(&path).unwrap();
+        assert_eq!(meta.mode() & 0o022, 0, "{} is writable by others", path.display());
+        assert_eq!(meta.uid(), fs::metadata(world.host_home()).unwrap().uid());
+    }
+    assert_eq!(fs::read_to_string(runtime.join("bin/tool")).unwrap(), "#!/bin/sh\n");
+    world.remove("runtime").0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+/// A system unit enabled, from an app named by `name`.
+fn unit_app(name: &str) -> String {
+    app(r#"
+[[action]]
+name = "Enable the shared service"
+kind = "unit"
+unit = "shared.service"
+scope = "system"
+enable = true
+"#)
+    .replace("name = \"Test\"", &format!("name = \"{name}\""))
+}
+
+#[test]
+fn a_unit_two_apps_enable_goes_back_to_how_it_was_whichever_goes_first() {
+    for first in ["a", "b"] {
+        let world = World::new(&[("a", &unit_app("A")), ("b", &unit_app("B"))]);
+        world.host.state.borrow_mut().units.insert(
+            "system:shared.service".to_owned(),
+            UnitState {
+                exists: true,
+                ..UnitState::default()
+            },
+        );
+        world.install("a", true).0.unwrap();
+        world.install("b", true).0.unwrap();
+        let second = if first == "a" { "b" } else { "a" };
+
+        world.remove(first).0.unwrap();
+        assert!(
+            world.host.state.borrow().units["system:shared.service"].enabled,
+            "{first} first"
+        );
+        world.remove(second).0.unwrap();
+
+        assert!(
+            !world.host.state.borrow().units["system:shared.service"].enabled,
+            "{first} first"
+        );
+    }
+}
+
+const OUTPUT: &str = r#"
+[[action]]
+name = "Let the helper write the policy"
+kind = "output"
+path = "/etc/opt/fixture/policies/managed/theme.json"
+"#;
+
+#[test]
+fn an_output_the_app_made_room_for_goes_with_it_and_one_found_stays() {
+    let world = World::new(&[("helper", &app(OUTPUT))]);
+    let policy = world.system_path("/etc/opt/fixture/policies/managed/theme.json");
+    let before = world.host.snapshot();
+
+    world.install("helper", true).0.unwrap();
+    assert!(policy.parent().unwrap().is_dir());
+    fs::write(&policy, "{}").unwrap();
+    world.install("helper", true).0.unwrap();
+    world.remove("helper").0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+
+    fs::create_dir_all(policy.parent().unwrap()).unwrap();
+    fs::write(&policy, "{\"left\": \"by an older install\"}").unwrap();
+    let (found, events) = world.install("helper", true);
+    found.unwrap();
+    assert_eq!(events.steps(), [(1, ActionState::Found)]);
+    world.remove("helper").0.unwrap();
+    assert!(policy.exists());
+}
+
+#[test]
+fn a_started_oneshot_that_ran_is_done_and_needs_no_root_again() {
+    let theme = app(r#"
+[[action]]
+name = "Theme it once"
+kind = "unit"
+unit = "theme.service"
+scope = "system"
+start = true
+"#);
+    let world = World::new(&[("theme", &theme)]);
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.oneshots.insert("system:theme.service".to_owned());
+        let unit = UnitState {
+            exists: true,
+            ..UnitState::default()
+        };
+        state.units.insert("system:theme.service".to_owned(), unit);
+    }
+    world.install("theme", true).0.unwrap();
+    assert!(world.host.state.borrow().units["system:theme.service"].ran);
+
+    let result = world.declined(|e| e.install("theme", None));
+
+    result.unwrap();
+}
+
+#[test]
+fn a_removal_runs_the_recorded_undo_script_after_the_app_left_the_catalog() {
+    let tool = app(r#"
+[[action]]
+name = "Install the tool"
+kind = "run"
+do = ["./install"]
+check = ["./installed"]
+undo = ["./uninstall"]
+"#);
+    let world = World::new(&[("tool", &tool)]);
+    world.script("tool", "install", "touch \"$HOME/.tool-installed\"");
+    world.script("tool", "installed", "test -e \"$HOME/.tool-installed\"");
+    world.script("tool", "uninstall", "rm -f \"$HOME/.tool-installed\"");
+    world.install("tool", true).0.unwrap();
+    assert!(world.host_home().join(".tool-installed").exists());
+    world.script("tool", "uninstall", "exit 1");
+    fs::remove_dir_all(world.catalog.join("tool")).unwrap();
+
+    world.remove("tool").0.unwrap();
+
+    assert!(!world.host_home().join(".tool-installed").exists());
+}
+
+#[test]
+fn a_ready_check_gets_its_words_filled_in() {
+    let ready = app(r#"
+[[ready]]
+check = ["test", "-d", "@HOME@"]
+says = "The home isn't there"
+
+[[action]]
+name = "Keep its service running"
+kind = "linger"
+"#);
+    let world = World::new(&[("ready", &ready)]);
+
+    world.install("ready", true).0.unwrap();
+}
+
+#[test]
+fn a_step_left_doing_is_finished_by_the_next_run_and_the_rest_is_kept() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    world.install("fixture", true).0.unwrap();
+    let mut journal = world.journals("fixture").0.unwrap();
+    journal.complete = false;
+    let config = journal.entries.iter_mut().find(|e| e.step == 2).unwrap();
+    config.state = crate::apps::journal::State::Doing;
+    journal.save(&world.user_journals).unwrap();
+    let config = world.host_home().join(".config/fixture/config.toml");
+    fs::remove_file(&config).unwrap();
+    let from = world.host.state.borrow().log.len();
+
+    let (result, events) = world.install("fixture", true);
+
+    result.unwrap();
+    assert_eq!(fs::read_to_string(&config).unwrap(), "user = '@USER@'\n");
+    assert!(world.log_since(from).is_empty(), "{:?}", world.log_since(from));
+    assert!(events.steps().iter().all(|(_, state)| *state == ActionState::Done));
+    let journal = world.journals("fixture").0.unwrap();
+    assert!(journal.complete);
+    assert_eq!(journal.entry(2).unwrap().state, crate::apps::journal::State::Done);
+    assert!(
+        journal
+            .entry(2)
+            .unwrap()
+            .claims
+            .iter()
+            .any(|c| c.owned && c.path().is_some())
+    );
+}
+
+#[test]
+fn every_kind_of_the_user_side_and_a_deb_go_whole_with_the_app() {
+    let kinds = app(r#"
+[[action]]
+name = "Install the app"
+kind = "deb"
+package = "sketch"
+version = "1.0"
+amd64 = { url = "https://example.com/sketch.deb", sha256 = "5555555555555555555555555555555555555555555555555555555555555555" }
+
+[[action]]
+name = "Add its tools"
+kind = "nix"
+packages = ["ripgrep", "fd"]
+
+[[action]]
+name = "Link its config"
+kind = "symlink"
+to = "~/.config/sketch/current"
+target = "/opt/sketch/config"
+
+[[action]]
+name = "Start its user service"
+kind = "unit"
+unit = "sketch.service"
+scope = "user"
+enable = true
+start = true
+
+[[action]]
+name = "Open it in a window of its own"
+kind = "web_app"
+id = "sketch"
+title = "Sketch"
+url = "https://sketch.example/"
+icon = "sketch.svg"
+"#);
+    let world = World::new(&[("sketch", &kinds)]);
+    world.folder_file("sketch", "sketch.svg", "<svg/>\n");
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.downloads.insert(
+            "https://example.com/sketch.deb".to_owned(),
+            ("5".repeat(64), b"deb sketch 1.0".to_vec()),
+        );
+        state.nix.insert("fd".to_owned());
+        let unit = UnitState {
+            exists: true,
+            ..UnitState::default()
+        };
+        state.units.insert("user:sketch.service".to_owned(), unit);
+    }
+    let before = world.host.snapshot();
+
+    world.install("sketch", true).0.unwrap();
+
+    let home = world.host_home();
+    {
+        let state = world.host.state.borrow();
+        assert_eq!(state.dpkg["sketch"], "1.0");
+        assert!(state.nix.contains("ripgrep"));
+        let unit = state.units["user:sketch.service"];
+        assert!(unit.enabled && unit.active);
+    }
+    assert_eq!(
+        fs::read_link(home.join(".config/sketch/current")).unwrap(),
+        PathBuf::from("/opt/sketch/config")
+    );
+    let entry = fs::read_to_string(home.join(".local/share/applications/kubaos-web-sketch.desktop")).unwrap();
+    assert!(
+        entry.contains("Exec=google-chrome --app=https://sketch.example/ --class=kubaos-web-sketch\n"),
+        "{entry}"
+    );
+    assert!(entry.contains("StartupWMClass=kubaos-web-sketch\n"), "{entry}");
+    let icon = home.join(".local/share/icons/hicolor/scalable/apps/kubaos-web-sketch.svg");
+    assert!(entry.contains(&format!("Icon={}\n", icon.display())), "{entry}");
+    assert_eq!(fs::read_to_string(icon).unwrap(), "<svg/>\n");
+
+    world.remove("sketch").0.unwrap();
+
+    assert_eq!(world.host.snapshot(), before);
+    assert!(world.host.state.borrow().nix.contains("fd"));
 }

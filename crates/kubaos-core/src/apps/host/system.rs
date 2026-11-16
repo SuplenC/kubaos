@@ -17,12 +17,24 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 
+use super::AptPlan;
 use super::Host;
 use super::HostError;
 use super::UnitState;
 use crate::apps::action::RUN_PATH;
 use crate::apps::action::Scope;
 use crate::packages::Packages;
+
+/// Root's home, the `HOME` of what root runs.
+const ROOT_HOME: &str = "/root";
+
+/// The options every apt-get install and remove takes: unattended, keeping changed configuration.
+const APT_OPTIONS: [&str; 4] = [
+    "-o",
+    "Dpkg::Options::=--force-confdef",
+    "-o",
+    "Dpkg::Options::=--force-confold",
+];
 
 /// The machine itself, for `user`.
 #[derive(Debug)]
@@ -34,6 +46,8 @@ pub struct SystemHost {
     checkout: PathBuf,
     /// The User flake's `packages.toml`, on the user's side.
     packages: Option<Packages>,
+    /// It is root's side: what it runs gets root's own environment, none of the user's.
+    root: bool,
 }
 
 impl SystemHost {
@@ -46,7 +60,16 @@ impl SystemHost {
             arch: crate::apps::arch().to_owned(),
             checkout: checkout.into(),
             packages: None,
+            root: false,
         }
+    }
+
+    /// The same, as root's side: every program it runs gets a clean environment, root's
+    /// (`HOME=/root`), never the one of the user it acts for.
+    #[must_use]
+    pub fn as_root(mut self) -> Self {
+        self.root = true;
+        self
     }
 
     /// The same, editing the User flake's `packages.toml` through `packages`.
@@ -56,8 +79,15 @@ impl SystemHost {
         self
     }
 
-    fn command(program: impl AsRef<OsStr>) -> Command {
+    fn command(&self, program: impl AsRef<OsStr>) -> Command {
         let mut command = Command::new(program);
+        if self.root {
+            command
+                .env_clear()
+                .env("HOME", ROOT_HOME)
+                .env("USER", "root")
+                .env("LOGNAME", "root");
+        }
         command
             .env("PATH", RUN_PATH)
             .env("LANG", "C.UTF-8")
@@ -87,8 +117,8 @@ impl SystemHost {
         }
     }
 
-    fn systemctl(scope: Scope) -> Command {
-        let mut command = Self::command("systemctl");
+    fn systemctl(&self, scope: Scope) -> Command {
+        let mut command = self.command("systemctl");
         if scope == Scope::User {
             command.arg("--user");
         }
@@ -124,7 +154,8 @@ impl Host for SystemHost {
             return Ok(BTreeSet::new());
         }
         // dpkg-query exits 1 when it knows none of them, which is an answer, not a failure.
-        let output = Self::command("dpkg-query")
+        let output = self
+            .command("dpkg-query")
             .args(["-W", "-f=${db:Status-Abbrev}\t${Package}\n"])
             .args(packages)
             .output()
@@ -144,25 +175,39 @@ impl Host for SystemHost {
         if self.installed(&[package.to_owned()])?.is_empty() {
             return Ok(None);
         }
-        Self::out(Self::command("dpkg-query").args(["-W", "-f=${Version}", package])).map(Some)
+        Self::out(self.command("dpkg-query").args(["-W", "-f=${Version}", package])).map(Some)
     }
 
-    fn apt_install(&mut self, repo: Option<&str>, packages: &[String]) -> Result<(), HostError> {
-        if let Some(repo) = repo {
-            Self::out(Self::command(self.checkout.join("system/apt-repo.sh")).arg(repo))?;
-        }
+    fn apt_repo(&mut self, repo: &str) -> Result<(), HostError> {
+        Self::out(self.command(self.checkout.join("system/apt-repo.sh")).arg(repo)).map(drop)
+    }
+
+    fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<BTreeSet<String>, HostError> {
+        let mut command = self.command("apt-get");
+        command.arg("-s");
+        match plan {
+            AptPlan::Install(packages) => command.args(["install", "--no-install-recommends"]).args(packages),
+            AptPlan::Deb(deb) => command.args(["install", "--no-install-recommends"]).arg(deb),
+            AptPlan::Remove(packages) => command.arg("remove").args(packages),
+        };
+        // A simulation prints `Remv <package> [<version>]` for each package it would remove.
+        let shown = Self::out(&mut command)?;
+        Ok(shown
+            .lines()
+            .filter_map(|line| line.strip_prefix("Remv "))
+            .filter_map(|rest| rest.split_whitespace().next())
+            .map(|name| name.split(':').next().unwrap_or(name).to_owned())
+            .collect())
+    }
+
+    fn apt_install(&mut self, packages: &[String]) -> Result<(), HostError> {
         if packages.is_empty() {
             return Ok(());
         }
         Self::out(
-            Self::command("apt-get")
+            self.command("apt-get")
                 .args(["install", "-y", "--no-install-recommends"])
-                .args([
-                    "-o",
-                    "Dpkg::Options::=--force-confdef",
-                    "-o",
-                    "Dpkg::Options::=--force-confold",
-                ])
+                .args(APT_OPTIONS)
                 .args(packages),
         )
         .map(drop)
@@ -170,14 +215,9 @@ impl Host for SystemHost {
 
     fn deb_install(&mut self, deb: &Path) -> Result<(), HostError> {
         Self::out(
-            Self::command("apt-get")
+            self.command("apt-get")
                 .args(["install", "-y", "--no-install-recommends"])
-                .args([
-                    "-o",
-                    "Dpkg::Options::=--force-confdef",
-                    "-o",
-                    "Dpkg::Options::=--force-confold",
-                ])
+                .args(APT_OPTIONS)
                 .arg(deb),
         )
         .map(drop)
@@ -185,14 +225,9 @@ impl Host for SystemHost {
 
     fn apt_remove(&mut self, packages: &[String]) -> Result<(), HostError> {
         Self::out(
-            Self::command("apt-get")
+            self.command("apt-get")
                 .args(["remove", "-y"])
-                .args([
-                    "-o",
-                    "Dpkg::Options::=--force-confdef",
-                    "-o",
-                    "Dpkg::Options::=--force-confold",
-                ])
+                .args(APT_OPTIONS)
                 .args(packages),
         )
         .map(drop)
@@ -200,12 +235,12 @@ impl Host for SystemHost {
 
     fn fetch(&mut self, url: &str, sha256: &str, to: &Path) -> Result<(), HostError> {
         Self::out(
-            Self::command("curl")
+            self.command("curl")
                 .args(["-fsSL", "--proto", "=https", "--tlsv1.2", "--retry", "2", "-o"])
                 .arg(to)
                 .arg(url),
         )?;
-        let sum = Self::out(Self::command("sha256sum").arg(to))?;
+        let sum = Self::out(self.command("sha256sum").arg(to))?;
         if sum.split_whitespace().next() == Some(sha256) {
             Ok(())
         } else {
@@ -237,7 +272,7 @@ impl Host for SystemHost {
     }
 
     fn group_exists(&mut self, group: &str) -> Result<bool, HostError> {
-        match Self::out(Self::command("getent").args(["group", group])) {
+        match Self::out(self.command("getent").args(["group", group])) {
             Ok(_) => Ok(true),
             Err(HostError::Failed { code: Some(2), .. }) => Ok(false),
             Err(e) => Err(e),
@@ -245,25 +280,25 @@ impl Host for SystemHost {
     }
 
     fn member(&mut self, group: &str) -> Result<bool, HostError> {
-        let groups = Self::out(Self::command("id").args(["-nG", &self.user]))?;
+        let groups = Self::out(self.command("id").args(["-nG", &self.user]))?;
         Ok(groups.split_whitespace().any(|g| g == group))
     }
 
     fn group_create(&mut self, group: &str) -> Result<(), HostError> {
-        Self::out(Self::command("groupadd").arg(group)).map(drop)
+        Self::out(self.command("groupadd").arg(group)).map(drop)
     }
 
     fn group_delete(&mut self, group: &str) -> Result<(), HostError> {
-        Self::out(Self::command("groupdel").arg(group)).map(drop)
+        Self::out(self.command("groupdel").arg(group)).map(drop)
     }
 
     fn set_member(&mut self, group: &str, member: bool) -> Result<(), HostError> {
         let mut command = if member {
-            let mut c = Self::command("usermod");
+            let mut c = self.command("usermod");
             c.args(["-aG", group, &self.user]);
             c
         } else {
-            let mut c = Self::command("gpasswd");
+            let mut c = self.command("gpasswd");
             c.args(["-d", &self.user, group]);
             c
         };
@@ -271,8 +306,11 @@ impl Host for SystemHost {
     }
 
     fn unit_state(&mut self, scope: Scope, unit: &str) -> Result<UnitState, HostError> {
-        let shown =
-            Self::out(Self::systemctl(scope).args(["show", "--property=LoadState,UnitFileState,ActiveState", unit]))?;
+        let shown = Self::out(self.systemctl(scope).args([
+            "show",
+            "--property=LoadState,UnitFileState,ActiveState,Result,ExecMainExitTimestampMonotonic",
+            unit,
+        ]))?;
         let value = |key: &str| {
             shown
                 .lines()
@@ -284,32 +322,40 @@ impl Host for SystemHost {
             exists: value("LoadState") == "loaded",
             enabled: matches!(value("UnitFileState").as_str(), "enabled" | "enabled-runtime"),
             active: matches!(value("ActiveState").as_str(), "active" | "activating" | "reloading"),
+            ran: value("ActiveState") == "inactive"
+                && value("Result") == "success"
+                && value("ExecMainExitTimestampMonotonic")
+                    .parse::<u64>()
+                    .is_ok_and(|t| t > 0),
         })
     }
 
     fn daemon_reload(&mut self, scope: Scope) -> Result<(), HostError> {
-        Self::out(Self::systemctl(scope).arg("daemon-reload")).map(drop)
+        Self::out(self.systemctl(scope).arg("daemon-reload")).map(drop)
     }
 
     fn set_enabled(&mut self, scope: Scope, unit: &str, enabled: bool) -> Result<(), HostError> {
         let verb = if enabled { "enable" } else { "disable" };
-        Self::out(Self::systemctl(scope).args([verb, unit])).map(drop)
+        Self::out(self.systemctl(scope).args([verb, unit])).map(drop)
     }
 
     fn set_active(&mut self, scope: Scope, unit: &str, active: bool) -> Result<(), HostError> {
         let verb = if active { "start" } else { "stop" };
-        Self::out(Self::systemctl(scope).args([verb, unit])).map(drop)
+        Self::out(self.systemctl(scope).args([verb, unit])).map(drop)
     }
 
     fn lingers(&mut self) -> Result<bool, HostError> {
         let shown =
-            Self::out(Self::command("loginctl").args(["show-user", &self.user, "--property=Linger", "--value"]))?;
+            Self::out(
+                self.command("loginctl")
+                    .args(["show-user", &self.user, "--property=Linger", "--value"]),
+            )?;
         Ok(shown.trim() == "yes")
     }
 
     fn set_linger(&mut self, on: bool) -> Result<(), HostError> {
         let verb = if on { "enable-linger" } else { "disable-linger" };
-        Self::out(Self::command("loginctl").args([verb, &self.user])).map(drop)
+        Self::out(self.command("loginctl").args([verb, &self.user])).map(drop)
     }
 
     fn run(&mut self, argv: &[String], dir: &Path) -> Result<(), HostError> {
@@ -320,12 +366,14 @@ impl Host for SystemHost {
             Some(script) => dir.join(script),
             None => PathBuf::from(program),
         };
-        let mut command = Self::command(&program);
-        command
-            .args(rest)
-            .current_dir(dir)
-            .env("HOME", &self.home)
-            .env("USER", &self.user);
+        let mut command = self.command(&program);
+        command.args(rest).current_dir(dir);
+        if !self.root {
+            command.env("HOME", &self.home).env("USER", &self.user);
+        }
         Self::out(&mut command).map(drop)
     }
 }
+
+#[cfg(test)]
+mod tests;

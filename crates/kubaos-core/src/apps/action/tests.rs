@@ -110,9 +110,56 @@ fn dependencies_and_the_configure_stage_are_refused_until_they_exist() {
     let requires = crate::apps::folder::Folder::parse(
         "x",
         Path::new("/x"),
-        "name = \"X\"\nsummary = \"Y\"\nrequires = [\"neovim\"]\n[[action]]\nname = \"Z\"\nkind = \"linger\"\n",
+        "name = \"X\"\nsummary = \"Y\"\ncategory = \"system\"\ntags = [\"x\"]\ndescription = \"Z\"\ndescription_from = \"https://example.com\"\nrequires = [\"neovim\"]\n[[action]]\nname = \"Z\"\nkind = \"linger\"\n",
     );
 
     assert!(stage.is_err());
     assert!(requires.is_err());
+}
+
+#[test]
+fn a_web_app_is_the_users_and_takes_an_https_url_and_an_svg_of_the_folder() {
+    let web_app = |url: &str, icon: &str| {
+        action(&format!(
+            "name = \"X\"\nkind = \"web_app\"\nid = \"sketch\"\ntitle = \"Sketch\"\nurl = \"{url}\"\nicon = \"{icon}\"\n"
+        ))
+    };
+
+    assert_eq!(
+        web_app("https://sketch.example/", "sketch.svg").unwrap().side(),
+        Side::User
+    );
+    assert!(matches!(
+        web_app("http://sketch.example/", "sketch.svg"),
+        Err(ActionError::InvalidUrl { .. })
+    ));
+    for icon in ["sketch.png", "../sketch.svg", "/etc/sketch.svg"] {
+        assert!(
+            matches!(
+                web_app("https://sketch.example/", icon),
+                Err(ActionError::InvalidIcon { .. })
+            ),
+            "{icon}"
+        );
+    }
+}
+
+#[test]
+fn resolving_a_run_records_the_scripts_it_names() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("pair"), "#!/bin/sh\nt3 pair\n").unwrap();
+    let words = Words {
+        user: "kuba".to_owned(),
+        home: Path::new("/home/kuba").to_path_buf(),
+        arch: "amd64".to_owned(),
+    };
+    let run =
+        action("name = \"X\"\nkind = \"run\"\ndo = [\"./pair\"]\ncheck = [\"true\"]\nundo = [\"true\"]\n").unwrap();
+
+    let resolved = run.resolve(&words, dir.path()).unwrap();
+
+    let super::Kind::Run { scripts, .. } = resolved.kind else {
+        panic!("not a run");
+    };
+    assert_eq!(scripts.get("pair").map(String::as_str), Some("#!/bin/sh\nt3 pair\n"));
 }

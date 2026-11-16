@@ -13,6 +13,7 @@
 //!
 //! - The journal and who owns what: `journal.rs`. The order of a run: `engine.rs`.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
@@ -25,16 +26,28 @@ use super::Kind;
 use super::Scope;
 use super::Unpack;
 use super::parse_mode;
+use super::settings;
+use super::settings::Settings;
+use super::settings::SettingsError;
+use crate::apps::host::AptPlan;
 use crate::apps::host::Host;
 use crate::apps::host::HostError;
+use crate::apps::host::UnitState;
 use crate::apps::journal::Claim;
 use crate::apps::journal::Prior;
+use crate::apps::journal::write_new;
 
 /// The mode a file gets without a `mode`.
 const DEFAULT_FILE_MODE: u32 = 0o644;
 
 /// The mode a single-file download gets: such a download is a program.
 const DOWNLOAD_FILE_MODE: u32 = 0o755;
+
+/// The mode a `run`'s script gets in the folder it runs from, which only its runner reads.
+const SCRIPT_MODE: u32 = 0o700;
+
+/// The permission bits no unpacked file keeps: no one but its owner may write it.
+const WRITABLE_BY_OTHERS: u32 = 0o022;
 
 /// An action the machine didn't take.
 #[derive(Debug, thiserror::Error)]
@@ -50,12 +63,12 @@ pub enum PerformError {
     },
     #[error("there is nothing to install for {arch}")]
     Unavailable { arch: String },
-    #[error("{} isn't settings this action can read", path.display())]
-    Settings {
-        path: PathBuf,
-        #[source]
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
+    #[error(transparent)]
+    Settings(SettingsError),
+    #[error("installing it would remove {}, which this app didn't install; nothing was changed", packages.join(", "))]
+    AptRemoves { packages: Vec<String> },
+    #[error("removing it would also remove {}, which this app didn't install; nothing was changed", packages.join(", "))]
+    AptTakes { packages: Vec<String> },
 }
 
 impl PerformError {
@@ -85,6 +98,45 @@ pub fn logical(host: &dyn Host, named: &str) -> PathBuf {
     }
 }
 
+/// A web app's desktop entry and icon, as an action names paths.
+pub fn web_app_paths(id: &str) -> [String; 2] {
+    [
+        format!("~/.local/share/applications/kubaos-web-{id}.desktop"),
+        format!("~/.local/share/icons/hicolor/scalable/apps/kubaos-web-{id}.svg"),
+    ]
+}
+
+/// A web app's desktop entry: `url` in an app window of the browser, with the window class
+/// `kubaos-web-<id>`, and the icon at `icon`.
+fn web_app_entry(id: &str, title: &str, url: &str, icon: &Path) -> String {
+    let class = format!("kubaos-web-{id}");
+    format!(
+        "[Desktop Entry]\nType=Application\nName={title}\nExec={browser} --app={url} --class={class}\n\
+         Icon={icon}\nStartupWMClass={class}\nTerminal=false\n",
+        browser = super::WEB_APP_BROWSER,
+        icon = icon.display(),
+    )
+}
+
+/// A web app's two files, each with its path and its text.
+fn web_app_files(host: &dyn Host, action: &Action) -> Vec<(PathBuf, String)> {
+    let Kind::WebApp {
+        id, title, url, svg, ..
+    } = &action.kind
+    else {
+        return Vec::new();
+    };
+    let [entry, icon] = web_app_paths(id).map(|p| logical(host, &p));
+    let text = web_app_entry(id, title, url, &icon);
+    vec![(entry, text), (icon, svg.clone().unwrap_or_default())]
+}
+
+/// Whether a unit stands as `start` asks: started (running, or run and exited cleanly, as a
+/// oneshot does), or not running.
+fn started_as(state: UnitState, start: bool) -> bool {
+    if start { state.started() } else { !state.active }
+}
+
 /// What a unit, a group or lingering finds.
 fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look, PerformError> {
     match &action.kind {
@@ -95,13 +147,13 @@ fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look
             start,
         } => {
             let state = host.unit_state(*scope, unit).map_err(PerformError::Host)?;
-            let done = enable.is_none_or(|e| state.enabled == e) && start.is_none_or(|s| state.active == s);
+            let done = enable.is_none_or(|e| state.enabled == e) && start.is_none_or(|s| started_as(state, s));
             Ok(Look {
                 done,
                 claims: vec![Claim::new(format!("unit:{}:{unit}", scope.word()), !done)],
                 prior: Prior {
                     enabled: Some(state.enabled),
-                    active: Some(state.active),
+                    active: Some(state.started()),
                     ..Prior::default()
                 },
             })
@@ -133,12 +185,13 @@ fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look
     }
 }
 
-/// What `action` finds on the machine, a `run` checked in its app's `folder`.
+/// What `action` finds on the machine.
 ///
 /// # Errors
 ///
-/// [`PerformError`] when the machine can't be read, or a `run`'s check can't be started.
-pub fn look(action: &Action, host: &mut dyn Host, folder: &Path) -> Result<Look, PerformError> {
+/// [`PerformError`] when the machine can't be read, a setting's file isn't settings it can
+/// change, or a `run`'s check can't be started.
+pub fn look(action: &Action, host: &mut dyn Host) -> Result<Look, PerformError> {
     let user = host.user().to_owned();
     match &action.kind {
         Kind::Apt { packages, arch, .. } => {
@@ -177,12 +230,27 @@ pub fn look(action: &Action, host: &mut dyn Host, folder: &Path) -> Result<Look,
         }
         Kind::File { to, text, mode, .. } => {
             let path = logical(host, to);
-            let placed = host.place(&path);
             let want_mode = mode.as_deref().and_then(parse_mode).unwrap_or(DEFAULT_FILE_MODE);
-            let done = placed.symlink_metadata().is_ok_and(|m| m.is_file())
-                && fs::read_to_string(&placed).ok().as_deref() == text.as_deref()
-                && fs::metadata(&placed).is_ok_and(|m| m.permissions().mode() & 0o777 == want_mode);
+            let done = has_file(host, &path, text.as_deref().unwrap_or_default(), want_mode);
             Ok(at_path(host, &path, done))
+        }
+        Kind::WebApp { .. } => {
+            let files = web_app_files(host, action);
+            let done = files
+                .iter()
+                .all(|(path, text)| has_file(host, path, text, DEFAULT_FILE_MODE));
+            let mut look = Look {
+                done,
+                ..Look::default()
+            };
+            for (path, _) in &files {
+                for claim in at_path(host, path, done).claims {
+                    if !look.claims.contains(&claim) {
+                        look.claims.push(claim);
+                    }
+                }
+            }
+            Ok(look)
         }
         Kind::Symlink { to, target } => {
             let path = logical(host, to);
@@ -191,16 +259,13 @@ pub fn look(action: &Action, host: &mut dyn Host, folder: &Path) -> Result<Look,
         }
         Kind::Output { path } => {
             let path = logical(host, path);
-            Ok(Look {
-                done: false,
-                claims: vec![Claim::new(format!("path:{}", path.display()), true)],
-                prior: Prior::default(),
-            })
+            let there = host.place(&path).symlink_metadata().is_ok();
+            Ok(at_path(host, &path, there))
         }
         Kind::Setting { file, key, value } => look_setting(host, file, key, value),
         Kind::Unit { .. } | Kind::Group { .. } | Kind::Linger {} => look_machine(action, host, &user),
         Kind::Run { check, .. } => {
-            let done = ran(host.run(check, folder))?;
+            let done = ran(run_recorded(host, action, check)?)?;
             Ok(Look {
                 done,
                 claims: vec![Claim::new("run", !done)],
@@ -210,17 +275,34 @@ pub fn look(action: &Action, host: &mut dyn Host, folder: &Path) -> Result<Look,
     }
 }
 
-/// Does `action`, which `look` found not done; `folder` is its app's.
+/// Whether `path` is a file holding `text` with `mode`.
+fn has_file(host: &dyn Host, path: &Path, text: &str, mode: u32) -> bool {
+    let placed = host.place(path);
+    placed.symlink_metadata().is_ok_and(|m| m.is_file())
+        && fs::read_to_string(&placed).is_ok_and(|t| t == text)
+        && fs::metadata(&placed).is_ok_and(|m| m.permissions().mode() & 0o777 == mode)
+}
+
+/// Does `action`, which `look`, just taken, found not done.
 ///
 /// # Errors
 ///
-/// [`PerformError`] for the change the machine refused.
-pub fn apply(action: &Action, host: &mut dyn Host, look: &Look, folder: &Path) -> Result<(), PerformError> {
+/// [`PerformError`] for the change the machine refused, or one apt would make beyond the
+/// action's own packages.
+pub fn apply(action: &Action, host: &mut dyn Host, look: &Look) -> Result<(), PerformError> {
     let owned = |prefix: &str| owned_names(&look.claims, prefix);
     match &action.kind {
-        Kind::Apt { repo, .. } => host
-            .apt_install(repo.as_deref(), &owned("package:"))
-            .map_err(PerformError::Host),
+        Kind::Apt { repo, .. } => {
+            if let Some(repo) = repo {
+                host.apt_repo(repo).map_err(PerformError::Host)?;
+            }
+            let missing = owned("package:");
+            if missing.is_empty() {
+                return Ok(());
+            }
+            refuse_removals(host.apt_simulate(AptPlan::Install(&missing)))?;
+            host.apt_install(&missing).map_err(PerformError::Host)
+        }
         Kind::Deb { .. } => {
             let download = action.download(host.arch()).ok_or_else(|| PerformError::Unavailable {
                 arch: host.arch().to_owned(),
@@ -235,6 +317,7 @@ pub fn apply(action: &Action, host: &mut dyn Host, look: &Look, folder: &Path) -
             host.fetch(&download.url, &download.sha256, &deb)
                 .map_err(PerformError::Host)?;
             fs::set_permissions(&deb, fs::Permissions::from_mode(0o644)).map_err(PerformError::io(&deb))?;
+            refuse_removals(host.apt_simulate(AptPlan::Deb(&deb)))?;
             host.deb_install(&deb).map_err(PerformError::Host)
         }
         Kind::Nix { .. } => host.nix_add(&owned("nix:")).map_err(PerformError::Host),
@@ -254,6 +337,14 @@ pub fn apply(action: &Action, host: &mut dyn Host, look: &Look, folder: &Path) -
             write_file(&path, text.as_deref().unwrap_or_default(), mode)?;
             reload_if_unit(host, &logical_path)
         }
+        Kind::WebApp { .. } => {
+            for (path, text) in web_app_files(host, action) {
+                let path = host.place(&path);
+                make_parents(&path)?;
+                write_file(&path, &text, DEFAULT_FILE_MODE)?;
+            }
+            Ok(())
+        }
         Kind::Symlink { to, target } => {
             let path = host.place(&logical(host, to));
             make_parents(&path)?;
@@ -262,7 +353,7 @@ pub fn apply(action: &Action, host: &mut dyn Host, look: &Look, folder: &Path) -
             }
             symlink(target, &path).map_err(PerformError::io(&path))
         }
-        Kind::Output { .. } => Ok(()),
+        Kind::Output { path } => make_parents(&host.place(&logical(host, path))),
         Kind::Setting { file, key, value } => apply_setting(host, file, key, value),
         Kind::Unit {
             unit,
@@ -278,7 +369,7 @@ pub fn apply(action: &Action, host: &mut dyn Host, look: &Look, folder: &Path) -
                 host.set_enabled(*scope, unit, enable).map_err(PerformError::Host)?;
             }
             if let Some(start) = *start
-                && state.active != start
+                && !started_as(state, start)
             {
                 host.set_active(*scope, unit, start).map_err(PerformError::Host)?;
             }
@@ -291,17 +382,20 @@ pub fn apply(action: &Action, host: &mut dyn Host, look: &Look, folder: &Path) -
             host.set_member(group, true).map_err(PerformError::Host)
         }
         Kind::Linger {} => host.set_linger(true).map_err(PerformError::Host),
-        Kind::Run { run, .. } => host.run(run, folder).map_err(PerformError::Host),
+        Kind::Run { run, .. } => run_recorded(host, action, run)?.map_err(PerformError::Host),
     }
 }
 
-/// Whether `action` is done: its check, a `run`'s in its app's `folder`.
-///
-/// # Errors
-///
-/// [`PerformError`] when the machine can't be read.
-pub fn check(action: &Action, host: &mut dyn Host, folder: &Path) -> Result<bool, PerformError> {
-    look(action, host, folder).map(|look| look.done)
+/// Refuses a change apt would make by removing other packages.
+fn refuse_removals(simulated: Result<BTreeSet<String>, HostError>) -> Result<(), PerformError> {
+    let removed = simulated.map_err(PerformError::Host)?;
+    if removed.is_empty() {
+        Ok(())
+    } else {
+        Err(PerformError::AptRemoves {
+            packages: removed.into_iter().collect(),
+        })
+    }
 }
 
 /// Takes back what `claims`, the owned claims of a done step that pass to no other app, changed,
@@ -310,14 +404,9 @@ pub fn check(action: &Action, host: &mut dyn Host, folder: &Path) -> Result<bool
 ///
 /// # Errors
 ///
-/// [`PerformError`] for the change the machine refused.
-pub fn undo(
-    action: &Action,
-    host: &mut dyn Host,
-    claims: &[Claim],
-    prior: &Prior,
-    folder: &Path,
-) -> Result<(), PerformError> {
+/// [`PerformError`] for the change the machine refused, or a removal apt would take further
+/// than the action's own packages.
+pub fn undo(action: &Action, host: &mut dyn Host, claims: &[Claim], prior: &Prior) -> Result<(), PerformError> {
     let owned = |prefix: &str| owned_names(claims, prefix);
     match &action.kind {
         Kind::Apt { .. } | Kind::Deb { .. } => {
@@ -326,6 +415,11 @@ pub fn undo(
             let there: Vec<String> = mine.into_iter().filter(|p| installed.contains(p)).collect();
             if there.is_empty() {
                 return Ok(());
+            }
+            let taken = host.apt_simulate(AptPlan::Remove(&there)).map_err(PerformError::Host)?;
+            let others: Vec<String> = taken.into_iter().filter(|p| !there.contains(p)).collect();
+            if !others.is_empty() {
+                return Err(PerformError::AptTakes { packages: others });
             }
             host.apt_remove(&there).map_err(PerformError::Host)
         }
@@ -336,7 +430,11 @@ pub fn undo(
             }
             host.nix_remove(&mine).map_err(PerformError::Host)
         }
-        Kind::Download { .. } | Kind::File { .. } | Kind::Symlink { .. } | Kind::Output { .. } => {
+        Kind::Download { .. }
+        | Kind::File { .. }
+        | Kind::Symlink { .. }
+        | Kind::Output { .. }
+        | Kind::WebApp { .. } => {
             for path in owned("path:") {
                 let logical_path = PathBuf::from(&path);
                 remove_path(&host.place(&logical_path))?;
@@ -365,7 +463,7 @@ pub fn undo(
                 return Ok(());
             }
             let state = host.unit_state(*scope, unit).map_err(PerformError::Host)?;
-            let as_left = enable.is_none_or(|e| state.enabled == e) && start.is_none_or(|s| state.active == s);
+            let as_left = enable.is_none_or(|e| state.enabled == e) && start.is_none_or(|s| started_as(state, s));
             if !state.exists || !as_left {
                 return Ok(());
             }
@@ -375,7 +473,7 @@ pub fn undo(
                 host.set_enabled(*scope, unit, was).map_err(PerformError::Host)?;
             }
             if let (Some(_), Some(was)) = (start, prior.active)
-                && state.active != was
+                && !started_as(state, was)
             {
                 host.set_active(*scope, unit, was).map_err(PerformError::Host)?;
             }
@@ -400,9 +498,28 @@ pub fn undo(
             if owned("run").is_empty() {
                 return Ok(());
             }
-            host.run(undo, folder).map_err(PerformError::Host)
+            run_recorded(host, action, undo)?.map_err(PerformError::Host)
         }
     }
+}
+
+/// Runs `argv` of the `run` `action` in a fresh folder holding the scripts it recorded, so what
+/// runs is what the journal says, whatever the app's folder holds now. The outer error is the
+/// folder that couldn't be made; the inner one is the run's.
+fn run_recorded(host: &mut dyn Host, action: &Action, argv: &[String]) -> Result<Result<(), HostError>, PerformError> {
+    let Kind::Run { scripts, .. } = &action.kind else {
+        return Ok(Ok(()));
+    };
+    let dir = tempfile::Builder::new()
+        .prefix("kubaos-run-")
+        .tempdir()
+        .map_err(PerformError::io(Path::new("a temporary folder")))?;
+    for (name, text) in scripts {
+        let path = dir.path().join(name);
+        make_parents(&path)?;
+        write_file(&path, text, SCRIPT_MODE)?;
+    }
+    Ok(host.run(argv, dir.path()))
 }
 
 /// The folders `dirs` an action created, deepest first, each only while it is empty: a folder
@@ -477,10 +594,11 @@ fn make_parents(path: &Path) -> Result<(), PerformError> {
     }
 }
 
-/// Writes `text` to `path` through a file renamed into place, so a reader never sees half of it.
+/// Writes `text` to `path` through a new file renamed into place, so a reader never sees half of
+/// it and a link left at the staging path is never followed.
 fn write_file(path: &Path, text: &str, mode: u32) -> Result<(), PerformError> {
     let tmp = staging(path);
-    fs::write(&tmp, text).map_err(PerformError::io(&tmp))?;
+    write_new(&tmp, text.as_bytes()).map_err(PerformError::io(&tmp))?;
     fs::set_permissions(&tmp, fs::Permissions::from_mode(mode)).map_err(PerformError::io(&tmp))?;
     fs::rename(&tmp, path).map_err(PerformError::io(path))
 }
@@ -495,7 +613,8 @@ fn staging(path: &Path) -> PathBuf {
 }
 
 /// Downloads into a staging path beside `path`, checks it and moves it into place, so `path` is
-/// there whole or not at all.
+/// there whole or not at all. What a tarball holds is unpacked as the one who unpacks it owns
+/// it, and no one else may write it, whatever the archive or the umask says.
 fn download_to(
     host: &mut dyn Host,
     url: &str,
@@ -508,6 +627,7 @@ fn download_to(
     let file = stage.with_extension("download");
     remove_path(&stage)?;
     let result = (|| {
+        write_new(&file, b"").map_err(PerformError::io(&file))?;
         host.fetch(url, sha256, &file).map_err(PerformError::Host)?;
         match unpack {
             Unpack::File => {
@@ -516,13 +636,14 @@ fn download_to(
                 fs::rename(&file, path).map_err(PerformError::io(path))
             }
             Unpack::TarGz => {
-                fs::create_dir_all(&stage).map_err(PerformError::io(&stage))?;
+                fs::create_dir(&stage).map_err(PerformError::io(&stage))?;
                 let out = std::process::Command::new("tar")
                     .arg("-xzf")
                     .arg(&file)
                     .arg("-C")
                     .arg(&stage)
                     .arg(format!("--strip-components={strip}"))
+                    .args(["--no-same-owner", "--no-same-permissions"])
                     .output()
                     .map_err(|source| {
                         PerformError::Host(HostError::Spawn {
@@ -537,6 +658,7 @@ fn download_to(
                         stderr: String::from_utf8_lossy(&out.stderr).trim().to_owned(),
                     }));
                 }
+                only_owner_writes(&stage)?;
                 fs::rename(&stage, path).map_err(PerformError::io(path))
             }
         }
@@ -546,6 +668,25 @@ fn download_to(
         let _ = remove_path(&stage);
     }
     result
+}
+
+/// Takes the write bits for the group and others off `path` and everything in it; links stay.
+fn only_owner_writes(path: &Path) -> Result<(), PerformError> {
+    let meta = path.symlink_metadata().map_err(PerformError::io(path))?;
+    if meta.file_type().is_symlink() {
+        return Ok(());
+    }
+    let mode = meta.permissions().mode();
+    if mode & WRITABLE_BY_OTHERS != 0 {
+        fs::set_permissions(path, fs::Permissions::from_mode(mode & !WRITABLE_BY_OTHERS & 0o7777))
+            .map_err(PerformError::io(path))?;
+    }
+    if meta.is_dir() {
+        for entry in fs::read_dir(path).map_err(PerformError::io(path))? {
+            only_owner_writes(&entry.map_err(PerformError::io(path))?.path())?;
+        }
+    }
+    Ok(())
 }
 
 /// `path` gone, a file, a link or a folder with what is in it; nothing when it isn't there.
@@ -571,93 +712,27 @@ fn reload_if_unit(host: &mut dyn Host, path: &Path) -> Result<(), PerformError> 
     host.daemon_reload(scope).map_err(PerformError::Host)
 }
 
-/// A settings file, as JSON, whichever its format.
-struct Settings {
-    /// The file is there.
-    exists: bool,
-    /// Its settings; empty when it isn't there or can't be read as settings.
-    value: serde_json::Map<String, serde_json::Value>,
-    /// The file as it was, when it is there.
-    text: Option<String>,
-}
-
-fn is_toml(path: &Path) -> bool {
-    path.extension().is_some_and(|e| e == "toml")
-}
-
-fn read_settings(path: &Path) -> Result<Settings, PerformError> {
-    let text = match fs::read_to_string(path) {
+/// A settings file's settings and its text; none when it isn't there.
+fn read_settings(path: &Path, placed: &Path) -> Result<Option<(Settings, String)>, PerformError> {
+    let text = match fs::read_to_string(placed) {
         Ok(text) => text,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            return Ok(Settings {
-                exists: false,
-                value: serde_json::Map::new(),
-                text: None,
-            });
-        }
-        Err(e) => return Err(PerformError::io(path)(e)),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(PerformError::io(placed)(e)),
     };
-    let value = match read_text_settings(path, &text) {
-        Some(serde_json::Value::Object(value)) => value,
-        _ => serde_json::Map::new(),
-    };
-    Ok(Settings {
-        exists: true,
-        value,
-        text: Some(text),
-    })
-}
-
-/// The value at the dotted `key`.
-fn get_key<'a>(map: &'a serde_json::Map<String, serde_json::Value>, key: &str) -> Option<&'a serde_json::Value> {
-    let mut parts = key.split('.');
-    let mut here = map.get(parts.next()?)?;
-    for part in parts {
-        here = here.as_object()?.get(part)?;
-    }
-    Some(here)
-}
-
-/// Sets the dotted `key`, creating the tables above it; `None` takes it out.
-fn set_key(map: &mut serde_json::Map<String, serde_json::Value>, key: &str, value: Option<serde_json::Value>) {
-    let parts: Vec<&str> = key.split('.').collect();
-    let Some((last, above)) = parts.split_last() else {
-        return;
-    };
-    let mut here = map;
-    for part in above {
-        let next = here
-            .entry((*part).to_owned())
-            .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
-        if !next.is_object() {
-            *next = serde_json::Value::Object(serde_json::Map::new());
-        }
-        let serde_json::Value::Object(next) = next else {
-            return;
-        };
-        here = next;
-    }
-    match value {
-        Some(value) => {
-            here.insert((*last).to_owned(), value);
-        }
-        None => {
-            here.remove(*last);
-        }
-    }
-}
-
-fn want(value: &toml::Value) -> serde_json::Value {
-    serde_json::to_value(value).unwrap_or(serde_json::Value::Null)
+    let settings = Settings::parse(path, &text).map_err(PerformError::Settings)?;
+    Ok(Some((settings, text)))
 }
 
 fn look_setting(host: &dyn Host, file: &str, key: &str, value: &toml::Value) -> Result<Look, PerformError> {
     let path = logical(host, file);
-    let settings = read_settings(&host.place(&path))?;
-    let current = get_key(&settings.value, key);
-    let done = current == Some(&want(value));
+    let found = read_settings(&path, &host.place(&path))?;
+    let exists = found.is_some();
+    let (settings, text) = found.unwrap_or_else(|| (Settings::empty(&path), String::new()));
+    let done = settings.has(&path, key, value).map_err(PerformError::Settings)?;
+    let old = settings.get(&path, key).map_err(PerformError::Settings)?;
+    let tables = settings.tables(&path, key).map_err(PerformError::Settings)?;
     let mut claims = Vec::new();
-    if !settings.exists {
+    if !exists {
         claims = at_path(host, &path, false).claims;
         claims.retain(|c| c.claim.starts_with("dir:"));
     }
@@ -666,46 +741,36 @@ fn look_setting(host: &dyn Host, file: &str, key: &str, value: &toml::Value) -> 
         done,
         claims,
         prior: Prior {
-            value: current.map(serde_json::Value::to_string),
-            text: settings.text,
-            file: Some(settings.exists),
+            value: old,
+            text: exists.then_some(text),
+            file: Some(exists),
+            tables: Some(tables),
             ..Prior::default()
         },
     })
 }
 
-/// The settings as the file's text.
-fn render(path: &Path, value: &serde_json::Map<String, serde_json::Value>) -> Result<String, PerformError> {
-    let settings = |source: Box<dyn std::error::Error + Send + Sync>| PerformError::Settings {
-        path: path.to_path_buf(),
-        source,
-    };
-    if is_toml(path) {
-        toml::to_string(value).map_err(|e| settings(Box::new(e)))
-    } else {
-        let mut text = serde_json::to_string_pretty(value).map_err(|e| settings(Box::new(e)))?;
-        text.push('\n');
-        Ok(text)
-    }
-}
-
-fn write_settings(path: &Path, value: &serde_json::Map<String, serde_json::Value>) -> Result<(), PerformError> {
-    let text = render(path, value)?;
-    make_parents(path)?;
-    let mode = fs::metadata(path).map_or(DEFAULT_FILE_MODE, |m| m.permissions().mode() & 0o777);
-    write_file(path, &text, mode)
+fn write_settings(placed: &Path, settings: &Settings) -> Result<(), PerformError> {
+    make_parents(placed)?;
+    let mode = fs::metadata(placed).map_or(DEFAULT_FILE_MODE, |m| m.permissions().mode() & 0o777);
+    write_file(placed, &settings.render(), mode)
 }
 
 fn apply_setting(host: &dyn Host, file: &str, key: &str, value: &toml::Value) -> Result<(), PerformError> {
-    let path = host.place(&logical(host, file));
-    let mut settings = read_settings(&path)?;
-    set_key(&mut settings.value, key, Some(want(value)));
-    write_settings(&path, &settings.value)
+    let path = logical(host, file);
+    let placed = host.place(&path);
+    let (mut settings, _) = read_settings(&path, &placed)?.unwrap_or_else(|| (Settings::empty(&path), String::new()));
+    let written = settings::written(&settings, value);
+    settings
+        .set(&path, key, Some(&written), usize::MAX)
+        .map_err(PerformError::Settings)?;
+    write_settings(&placed, &settings)
 }
 
 /// Puts a setting back. While the file is exactly as the step left it, it gets its old text back
 /// whole, so its layout and key order are the user's again; once something else changed it, only
-/// the key goes back, and a key changed since stays.
+/// the key goes back. A key changed since, or a file that is no longer settings this action can
+/// read, stays as it is.
 fn undo_setting(
     host: &dyn Host,
     file: &str,
@@ -713,37 +778,29 @@ fn undo_setting(
     value: &toml::Value,
     prior: &Prior,
 ) -> Result<(), PerformError> {
-    let path = host.place(&logical(host, file));
-    let mut settings = read_settings(&path)?;
-    if get_key(&settings.value, key) != Some(&want(value)) {
+    let path = logical(host, file);
+    let placed = host.place(&path);
+    let Ok(Some((mut settings, text))) = read_settings(&path, &placed) else {
+        return Ok(());
+    };
+    if !settings.has(&path, key, value).unwrap_or(false) {
         return Ok(());
     }
-    if let Some(old) = &prior.text {
-        let mut left = match read_text_settings(&path, old) {
-            Some(serde_json::Value::Object(map)) => map,
-            _ => serde_json::Map::new(),
-        };
-        set_key(&mut left, key, Some(want(value)));
-        if settings.text.as_deref() == Some(render(&path, &left)?.as_str()) {
-            let mode = fs::metadata(&path).map_or(DEFAULT_FILE_MODE, |m| m.permissions().mode() & 0o777);
-            return write_file(&path, old, mode);
-        }
+    let written = settings::written(&settings, value);
+    if let Some(old) = &prior.text
+        && let Ok(mut left) = Settings::parse(&path, old)
+        && left.set(&path, key, Some(&written), usize::MAX).is_ok()
+        && left.render() == text
+    {
+        let mode = fs::metadata(&placed).map_or(DEFAULT_FILE_MODE, |m| m.permissions().mode() & 0o777);
+        return write_file(&placed, old, mode);
     }
-    let old = prior.value.as_deref().and_then(|v| serde_json::from_str(v).ok());
-    set_key(&mut settings.value, key, old);
-    if prior.file == Some(false) && settings.value.is_empty() {
-        return remove_path(&path);
+    let keep = prior.tables.unwrap_or(usize::MAX);
+    settings
+        .set(&path, key, prior.value.as_deref(), keep)
+        .map_err(PerformError::Settings)?;
+    if prior.file == Some(false) && settings.is_empty() {
+        return remove_path(&placed);
     }
-    write_settings(&path, &settings.value)
-}
-
-/// `text` read as the settings of the file `path`.
-fn read_text_settings(path: &Path, text: &str) -> Option<serde_json::Value> {
-    if is_toml(path) {
-        toml::from_str::<toml::Table>(text)
-            .ok()
-            .and_then(|t| serde_json::to_value(t).ok())
-    } else {
-        serde_json::from_str(text).ok()
-    }
+    write_settings(&placed, &settings)
 }

@@ -6,7 +6,7 @@
 //!
 //! # Owns
 //!
-//! - [`Host`], [`HostError`] and [`UnitState`]. The real machine: [`SystemHost`].
+//! - [`Host`], [`HostError`], [`UnitState`] and [`AptPlan`]. The real machine: [`SystemHost`].
 //!
 //! # Not here
 //!
@@ -65,10 +65,31 @@ impl HostError {
 
 /// Whether a unit is there, enabled and running.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Each is a yes or no systemd answers on its own."
+)]
 pub struct UnitState {
     pub exists: bool,
     pub enabled: bool,
     pub active: bool,
+    /// It ran since the machine started and exited cleanly: a oneshot that did its work.
+    pub ran: bool,
+}
+
+impl UnitState {
+    /// Whether it is started as a unit action means it: running, or run and exited cleanly.
+    pub fn started(self) -> bool {
+        self.active || self.ran
+    }
+}
+
+/// A change apt is asked to simulate, to learn what else it would remove.
+#[derive(Clone, Copy, Debug)]
+pub enum AptPlan<'a> {
+    Install(&'a [String]),
+    Deb(&'a Path),
+    Remove(&'a [String]),
 }
 
 /// One machine, as the user who asked or as root acting for them.
@@ -99,12 +120,27 @@ pub trait Host {
     /// When dpkg can't be asked.
     fn version(&mut self, package: &str) -> Result<Option<String>, HostError>;
 
-    /// The vendor repository `repo` set up, when there is one, then `packages` installed.
+    /// The vendor repository `repo` of the package manifest set up.
+    ///
+    /// # Errors
+    ///
+    /// When its setup fails.
+    fn apt_repo(&mut self, repo: &str) -> Result<(), HostError>;
+
+    /// The installed packages apt would remove to carry out `plan`, from a simulation that
+    /// changes nothing.
+    ///
+    /// # Errors
+    ///
+    /// When apt can't simulate it.
+    fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<BTreeSet<String>, HostError>;
+
+    /// `packages` installed.
     ///
     /// # Errors
     ///
     /// When apt fails.
-    fn apt_install(&mut self, repo: Option<&str>, packages: &[String]) -> Result<(), HostError>;
+    fn apt_install(&mut self, packages: &[String]) -> Result<(), HostError>;
 
     /// A downloaded `.deb` installed.
     ///
@@ -225,8 +261,9 @@ pub trait Host {
     /// When loginctl fails.
     fn set_linger(&mut self, on: bool) -> Result<(), HostError>;
 
-    /// Runs `argv` in `dir`, with the home and [`RUN_PATH`](super::action::RUN_PATH). `./<script>`
-    /// is a script in `dir`.
+    /// Runs `argv` in `dir` with [`RUN_PATH`](super::action::RUN_PATH): as the user, with their
+    /// environment and home; as root, with root's own environment and none of the user's.
+    /// `./<script>` is a script in `dir`.
     ///
     /// # Errors
     ///

@@ -3,8 +3,9 @@
 //!
 //! # Owns
 //!
-//! - [`Folder`], [`FolderSetup`], [`Ready`], and what a valid folder is: an install's list of
-//!   steps, the app's actions then its setup's.
+//! - [`Folder`], [`FolderSetup`], [`Ready`], [`Category`], and what a valid folder is: what the app
+//!   is (its category, tags, summary and description), and an install's list of steps, the app's
+//!   actions then its setup's.
 //!
 //! # Not here
 //!
@@ -67,6 +68,27 @@ pub enum FolderError {
     },
     #[error("{id} can be set up one way only, so it takes no setup")]
     SetupWithout { id: String },
+    #[error("{0:?} is not a tag: lowercase words people search by, each once")]
+    InvalidTag(String),
+    #[error("{0:?} is not where the description came from: an https:// URL")]
+    InvalidSource(String),
+}
+
+/// What kind of app it is, which groups it with others in lists.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Category {
+    Browsers,
+    Development,
+    Ai,
+    Communication,
+    Media,
+    Graphics,
+    Office,
+    Security,
+    System,
+    Games,
 }
 
 /// A check that must pass before an install or a removal changes anything.
@@ -86,7 +108,15 @@ pub struct Folder {
     /// The folder, where a `file`'s `from` and a `run`'s `./<script>` are.
     pub dir: PathBuf,
     pub name: String,
+    pub category: Category,
+    /// Words people search by ("browser", "containers"), each lowercase.
+    pub tags: Vec<String>,
+    /// One line of KubaOS's own about it.
     pub summary: String,
+    /// The app's own words about itself, copied from its upstream.
+    pub description: String,
+    /// Where `description` came from: an https:// URL.
+    pub description_from: String,
     pub icon: Option<String>,
     pub ready: Vec<Ready>,
     /// What every setup's install does first.
@@ -110,7 +140,11 @@ pub struct FolderSetup {
 #[serde(deny_unknown_fields)]
 struct File {
     name: String,
+    category: Category,
+    tags: Vec<String>,
     summary: String,
+    description: String,
+    description_from: String,
     icon: Option<String>,
     #[serde(default)]
     ready: Vec<Ready>,
@@ -178,7 +212,11 @@ impl Folder {
             id: id.to_owned(),
             dir: dir.to_path_buf(),
             name: file.name,
+            category: file.category,
+            tags: file.tags,
             summary: file.summary,
+            description: file.description,
+            description_from: file.description_from,
             icon: file.icon,
             ready: file.ready,
             actions: shared,
@@ -189,10 +227,25 @@ impl Folder {
     }
 
     fn check(&self) -> Result<(), FolderError> {
-        for (key, value) in [("name", &self.name), ("summary", &self.summary)] {
+        for (key, value) in [
+            ("name", &self.name),
+            ("summary", &self.summary),
+            ("description", &self.description),
+        ] {
             if value.trim().is_empty() {
                 return Err(FolderError::Empty { key });
             }
+        }
+        if self.tags.is_empty() {
+            return Err(FolderError::Empty { key: "tags" });
+        }
+        for (i, tag) in self.tags.iter().enumerate() {
+            if !is_tag(tag) || self.tags[..i].contains(tag) {
+                return Err(FolderError::InvalidTag(tag.clone()));
+            }
+        }
+        if !super::action::is_https(&self.description_from) {
+            return Err(FolderError::InvalidSource(self.description_from.clone()));
         }
         if self.setups.len() == 1 {
             return Err(FolderError::OneSetup);
@@ -271,7 +324,7 @@ fn actions(setup: Option<&str>, tables: Vec<toml::Table>) -> Result<Vec<Action>,
         .into_iter()
         .enumerate()
         .map(|(i, table)| {
-            Action::try_from(table).map_err(|source| FolderError::Action {
+            Action::from_folder(table).map_err(|source| FolderError::Action {
                 setup: setup.map(str::to_owned),
                 position: i + 1,
                 source,
@@ -279,3 +332,14 @@ fn actions(setup: Option<&str>, tables: Vec<toml::Table>) -> Result<Vec<Action>,
         })
         .collect()
 }
+
+/// Whether `tag` is lowercase words, one space between them.
+fn is_tag(tag: &str) -> bool {
+    !tag.is_empty()
+        && tag
+            .split(' ')
+            .all(|word| !word.is_empty() && word.chars().all(|c| c.is_lowercase() || c.is_ascii_digit() || c == '-'))
+}
+
+#[cfg(test)]
+mod tests;

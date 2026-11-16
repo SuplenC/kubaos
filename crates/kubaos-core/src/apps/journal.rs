@@ -101,6 +101,11 @@ pub struct Entry {
     pub prior: Prior,
     /// The action as it was done, its words filled in.
     pub action: Action,
+    /// The step as it was before a release changed it, with the claims of it the changed action
+    /// doesn't keep: undone once the changed action is done, so an update in place takes away
+    /// what only the old one had (a package dropped from the list, the old version's download).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replaced: Option<Box<Entry>>,
 }
 
 /// How far a step got.
@@ -115,20 +120,30 @@ pub enum State {
     Found,
     /// A step that opens a window, in a run that may not open one: its sentence was a note.
     Skipped,
+    /// Being undone: the run stopped during its undo, or is in it.
+    Undoing,
 }
 
 impl State {
-    /// Whether the step needs nothing more, in a run that may open a window or not.
+    /// Whether the journal says the step needs nothing more, in a run that may open a window or
+    /// not. A run checks a settled step all the same.
     pub fn settled(self, windows: bool) -> bool {
         match self {
             Self::Done | Self::Found => true,
             Self::Skipped => !windows,
-            Self::Doing => false,
+            Self::Doing | Self::Undoing => false,
         }
+    }
+
+    /// Whether the app changed what the step claims: its prior state is what was there before
+    /// the app came, kept as long as the entry is.
+    pub fn ours(self) -> bool {
+        matches!(self, Self::Doing | Self::Done | Self::Undoing)
     }
 }
 
-/// One thing a step changed or found: `path:/…`, `dir:/…`, `key:<file>#<key>`, `package:<name>`,
+/// One thing a step changed or found: `path:/…`, `dir:/…` (a folder it made for a path),
+/// `key:<file>#<key>`, `package:<name>`,
 /// `nix:<name>`, `member:<group>:<user>`, `group:<name>`, `unit:<scope>:<name>`, `linger:<user>`
 /// or `run`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -157,7 +172,8 @@ impl Claim {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Prior {
-    /// A setting's old value, as JSON; none when the key wasn't there.
+    /// A setting's old value, in its file's own format (a TOML or JSON value); none when the key
+    /// wasn't there.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
     /// A setting's file as it was, which its undo puts back whole while the file is as the step
@@ -167,6 +183,10 @@ pub struct Prior {
     /// Whether a setting's file was there.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file: Option<bool>,
+    /// How many of the tables above a setting's key were there: the undo takes away the deeper
+    /// ones the step made, once they are empty.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tables: Option<usize>,
     /// Whether a unit was enabled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
@@ -176,6 +196,31 @@ pub struct Prior {
     /// Whether the user lingered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lingered: Option<bool>,
+}
+
+impl Prior {
+    /// Takes what `other` recorded in place of this one's: the state before the app that hands
+    /// a claim over is the state the claim goes back to.
+    pub fn take_from(&mut self, other: &Self) {
+        let Self {
+            value,
+            text,
+            file,
+            tables,
+            enabled,
+            active,
+            lingered,
+        } = other.clone();
+        if file.is_some() {
+            self.value = value;
+            self.text = text;
+            self.file = file;
+            self.tables = tables;
+        }
+        self.enabled = enabled.or(self.enabled);
+        self.active = active.or(self.active);
+        self.lingered = lingered.or(self.lingered);
+    }
 }
 
 impl Journal {
@@ -230,7 +275,7 @@ impl Journal {
         fs::create_dir_all(&folder).map_err(write)?;
         let text = toml::to_string(self).map_err(|e| write(io::Error::other(e)))?;
         let tmp = folder.join(format!(".{JOURNAL}.new"));
-        fs::write(&tmp, text).map_err(write)?;
+        write_new(&tmp, text.as_bytes()).map_err(write)?;
         fs::rename(&tmp, &path).map_err(write)
     }
 
@@ -363,20 +408,37 @@ impl Owners {
     }
 }
 
+/// Writes `bytes` to the new file `path`: whatever was at `path` (a link someone left there
+/// included) is taken away first, and the file is created only if nothing took its place.
+///
+/// # Errors
+///
+/// When it can't be removed or written.
+pub fn write_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    match fs::remove_file(path) {
+        Err(e) if e.kind() != io::ErrorKind::NotFound => return Err(e),
+        _ => {}
+    }
+    let mut file = File::options().write(true).create_new(true).open(path)?;
+    io::Write::write_all(&mut file, bytes)
+}
+
 /// Hands `claim` from the app going over to `holder`, which held it without owning it, in
-/// `holder`'s journal in `dir`: `holder` now owns it, and takes it back when it goes.
+/// `holder`'s journal in `dir`, with `prior`, what the going app found before it changed it:
+/// `holder` now owns it, and takes it back to that when it goes.
 ///
 /// # Errors
 ///
 /// [`JournalError`] when that journal can't be read or written.
-pub fn hand_over(dir: &Path, holder: &str, claim: &str) -> Result<bool, JournalError> {
+pub fn hand_over(dir: &Path, holder: &str, claim: &str, prior: &Prior) -> Result<bool, JournalError> {
     let Some(mut journal) = Journal::read(dir, holder)? else {
         return Ok(false);
     };
     let mut found = false;
-    for c in journal.entries.iter_mut().flat_map(|e| e.claims.iter_mut()) {
-        if c.claim == claim && !c.owned {
+    for entry in &mut journal.entries {
+        if let Some(c) = entry.claims.iter_mut().find(|c| c.claim == claim && !c.owned) {
             c.owned = true;
+            entry.prior.take_from(prior);
             found = true;
             break;
         }

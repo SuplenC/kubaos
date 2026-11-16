@@ -1,5 +1,6 @@
-//! Installing and removing an app of folders: its steps in order, each journaled before it runs,
-//! a failure rolled back, a removal undone from the journal, a stopped run resumed.
+//! Installing and removing an app of folders: its steps in order, each checked and journaled
+//! before it runs, a failure rolled back, a removal undone from the journal, a stopped run
+//! resumed, a step a release changed updated in place.
 //!
 //! A run has two sides. The user's [`Keeper`] runs in this process; root's runs in the root
 //! helper (`kubaos-apps serve`), reached through a [`RootSide`], started once before the first
@@ -16,6 +17,7 @@
 //! - The actions: `action.rs`. The journal's format: `journal.rs`. The root helper's requests:
 //!   `root.rs`.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -51,7 +53,7 @@ use crate::update::event::UpdateEvent;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "outcome", rename_all = "snake_case")]
 pub enum Outcome {
-    /// Its journal says it is done: nothing ran.
+    /// Its journal says it is done and its check agrees: nothing changed.
     Settled,
     /// Done already, by something other than the app.
     Found,
@@ -83,8 +85,12 @@ pub enum StepError {
     WrongSide { app: String, step: usize },
     #[error("{app} has no step {step}")]
     NoStep { app: String, step: usize },
-    #[error("{0}")]
-    Root(String),
+    #[error("{why}")]
+    RootFailed { why: String },
+    #[error("the root helper refused it: {}", why.join("; "))]
+    RootRefused { why: Vec<String> },
+    #[error("the root helper answered out of turn")]
+    RootOutOfTurn,
     #[error("the root helper")]
     RootLost(#[source] RootError),
 }
@@ -158,7 +164,8 @@ impl<'h> Keeper<'h> {
         &mut *self.host
     }
 
-    fn words(&self) -> Words {
+    /// The words its actions take on its host.
+    pub(crate) fn words(&self) -> Words {
         Words {
             user: self.host.user().to_owned(),
             home: self.host.home().to_path_buf(),
@@ -190,36 +197,34 @@ impl<'h> Keeper<'h> {
     }
 
     /// Checks, before anything runs, that no step of this side writes a path or a key another
-    /// app's journal owns, or a path that is the user's own.
+    /// app's journal owns, or a path that is the user's own, and that every settings file a step
+    /// changes is one it can read.
     ///
     /// # Errors
     ///
-    /// [`StepError::Owned`], [`StepError::KeyOwned`] or [`StepError::Yours`] for the first such
-    /// step's path, or the step that couldn't be looked at.
-    pub fn preflight(&mut self, id: &str, setup: Option<&str>, windows: bool) -> Result<Vec<String>, StepError> {
-        let (folder, steps) = self.steps(id, setup)?;
+    /// The step that couldn't be resolved or the journals that couldn't be read; the refusals
+    /// are the answer, one a step.
+    pub fn preflight(&mut self, id: &str, setup: Option<&str>) -> Result<Vec<String>, StepError> {
+        let (_, steps) = self.steps(id, setup)?;
         let owners = Owners::load(&[&self.journals]).map_err(StepError::Journal)?;
-        let journal = Journal::read(&self.journals, id).map_err(StepError::Journal)?;
         let mut refused = Vec::new();
-        for (step, action) in steps {
-            let settled = journal
-                .as_ref()
-                .and_then(|j| j.entry(step))
-                .is_some_and(|e| e.action == action && e.state.settled(windows));
-            let writes = action.path().is_some() || matches!(action.kind, Kind::Setting { .. });
-            if settled || !writes {
+        for (_, action) in steps {
+            let writes = action.path().is_some() || matches!(action.kind, Kind::Setting { .. } | Kind::WebApp { .. });
+            if !writes {
                 continue;
             }
-            let look = perform::look(&action, &mut *self.host, &folder.dir).map_err(StepError::Perform)?;
-            if let Err(e) = self.may_write(&owners, id, &look) {
-                refused.push(format!("{}: {e}", action.name));
+            let checked = perform::look(&action, &mut *self.host)
+                .map_err(StepError::Perform)
+                .and_then(|look| self.may_write(&owners, id, &look.claims));
+            if let Err(e) = checked {
+                refused.push(format!("{}: {}", action.name, crate::update::event::chain(&e)));
             }
         }
         Ok(refused)
     }
 
-    fn may_write(&self, owners: &Owners, id: &str, look: &perform::Look) -> Result<(), StepError> {
-        for claim in &look.claims {
+    fn may_write(&self, owners: &Owners, id: &str, claims: &[Claim]) -> Result<(), StepError> {
+        for claim in claims {
             if let Some(path) = claim.path() {
                 if let Some(owner) = owners.path_owner(path, id) {
                     return Err(StepError::Owned {
@@ -245,15 +250,17 @@ impl<'h> Keeper<'h> {
         Ok(())
     }
 
-    /// Step `step` of the app `id`'s install in `setup`: settled when its journal says so, else
-    /// looked at, journaled, done and journaled again. A run that may not open a window skips a
-    /// step that opens one.
+    /// Step `step` of the app `id`'s install in `setup`, checked whatever its journal says: done
+    /// already is settled (or found, when the app never did it), not done is journaled, done and
+    /// journaled again. A step a release changed is updated in place, or, when it now acts on
+    /// another thing, undone first. A run that may not open a window skips a step that opens one
+    /// and isn't done.
     ///
     /// # Errors
     ///
     /// [`StepError::WrongSide`] for a step of the other side, [`StepError::NoStep`] for one the
     /// install hasn't, the ownership refusals of [`Keeper::preflight`], else what failed. A step
-    /// that failed stays in the journal as started, for the rollback to undo.
+    /// that failed stays in the journal as started, for the rollback or the next run.
     pub fn step(&mut self, id: &str, setup: Option<&str>, step: usize, windows: bool) -> Result<Outcome, StepError> {
         let (folder, steps) = self.steps(id, setup)?;
         let Some((_, action)) = steps.into_iter().find(|(n, _)| *n == step) else {
@@ -274,79 +281,85 @@ impl<'h> Keeper<'h> {
             .map_err(StepError::Journal)?
             .unwrap_or_else(|| Journal::new(id, setup));
         journal.setup = setup.map(str::to_owned);
-        if let Some(entry) = journal.entry(step).cloned() {
-            if entry.action == action && entry.state.settled(windows) {
-                return Ok(Outcome::Settled);
-            }
-            if entry.action == action && entry.state == State::Doing {
-                return self.finish(&mut journal, entry, &folder.dir);
-            }
-            self.undo_entry(id, &entry, &folder.dir)?;
-            journal.drop_step(step);
-            journal.save(&self.journals).map_err(StepError::Journal)?;
+        let mut old = journal.entry(step).cloned();
+        if let Some(entry) = old.take_if(|e| !e.action.same_thing(&action)) {
+            self.undo_journaled(&mut journal, id, &entry)?;
         }
+        let look = perform::look(&action, &mut *self.host).map_err(StepError::Perform)?;
         if let Kind::Run { window: Some(says), .. } = &action.kind
             && !windows
+            && !look.done
         {
-            journal.put(Entry {
-                step,
-                state: State::Skipped,
-                claims: Vec::new(),
-                prior: journal::Prior::default(),
-                action: action.clone(),
-            });
-            journal.save(&self.journals).map_err(StepError::Journal)?;
+            if old.as_ref().is_none_or(|e| e.state == State::Skipped) {
+                journal.put(Entry {
+                    step,
+                    state: State::Skipped,
+                    claims: Vec::new(),
+                    prior: journal::Prior::default(),
+                    action: action.clone(),
+                    replaced: None,
+                });
+                journal.save(&self.journals).map_err(StepError::Journal)?;
+            }
             return Ok(Outcome::Skipped { says: says.clone() });
         }
-        let look = perform::look(&action, &mut *self.host, &folder.dir).map_err(StepError::Perform)?;
+        let (claims, replaced) = carry(old.as_ref(), &look);
+        let prior = match &old {
+            Some(e) if e.state.ours() => e.prior.clone(),
+            _ => look.prior.clone(),
+        };
         if look.done {
-            journal.put(Entry {
+            let owns = claims.iter().any(|c| c.owned);
+            let entry = Entry {
                 step,
-                state: State::Found,
-                claims: look.claims.into_iter().map(|c| Claim::new(c.claim, false)).collect(),
-                prior: look.prior,
+                state: if owns { State::Done } else { State::Found },
+                claims,
+                prior,
                 action,
+                replaced,
+            };
+            if old.as_ref() != Some(&entry) {
+                journal.put(entry);
+                journal.save(&self.journals).map_err(StepError::Journal)?;
+            }
+            self.finish_replaced(&mut journal, id, step)?;
+            return Ok(if old.is_some() {
+                Outcome::Settled
+            } else {
+                Outcome::Found
             });
-            journal.save(&self.journals).map_err(StepError::Journal)?;
-            return Ok(Outcome::Found);
         }
         let owners = Owners::load(&[&self.journals]).map_err(StepError::Journal)?;
-        self.may_write(&owners, id, &look)?;
-        let entry = Entry {
+        self.may_write(&owners, id, &claims)?;
+        let mut entry = Entry {
             step,
             state: State::Doing,
-            claims: look.claims.clone(),
-            prior: look.prior.clone(),
+            claims,
+            prior,
             action,
+            replaced,
         };
         journal.put(entry.clone());
         journal.save(&self.journals).map_err(StepError::Journal)?;
-        perform::apply(&entry.action, &mut *self.host, &look, &folder.dir).map_err(StepError::Perform)?;
-        journal.put(Entry {
-            state: State::Done,
-            ..entry
-        });
+        perform::apply(&entry.action, &mut *self.host, &look).map_err(StepError::Perform)?;
+        entry.state = State::Done;
+        journal.put(entry);
         journal.save(&self.journals).map_err(StepError::Journal)?;
+        self.finish_replaced(&mut journal, id, step)?;
         Ok(Outcome::Done)
     }
 
-    /// A step a run stopped during: done when its check says so, else done again from the look
-    /// recorded before it first ran.
-    fn finish(&mut self, journal: &mut Journal, entry: Entry, folder: &Path) -> Result<Outcome, StepError> {
-        if !perform::check(&entry.action, &mut *self.host, folder).map_err(StepError::Perform)? {
-            let look = perform::Look {
-                done: false,
-                claims: entry.claims.clone(),
-                prior: entry.prior.clone(),
-            };
-            perform::apply(&entry.action, &mut *self.host, &look, folder).map_err(StepError::Perform)?;
-        }
-        journal.put(Entry {
-            state: State::Done,
-            ..entry
-        });
-        journal.save(&self.journals).map_err(StepError::Journal)?;
-        Ok(Outcome::Done)
+    /// Undoes what the step `step` replaced, once its changed action stands, and forgets it.
+    fn finish_replaced(&mut self, journal: &mut Journal, id: &str, step: usize) -> Result<(), StepError> {
+        let Some(mut entry) = journal.entry(step).cloned() else {
+            return Ok(());
+        };
+        let Some(replaced) = entry.replaced.take() else {
+            return Ok(());
+        };
+        self.undo_entry(id, &replaced)?;
+        journal.put(entry);
+        journal.save(&self.journals).map_err(StepError::Journal)
     }
 
     /// Undoes step `step` of the app `id`'s journal and takes it out; what another app holds
@@ -354,8 +367,8 @@ impl<'h> Keeper<'h> {
     ///
     /// # Errors
     ///
-    /// What failed; the step stays in the journal then. A step the journal hasn't is undone
-    /// already.
+    /// What failed; the step stays in the journal then, as being undone. A step the journal
+    /// hasn't is undone already.
     pub fn undo(&mut self, id: &str, step: usize) -> Result<Outcome, StepError> {
         let Some(mut journal) = Journal::read(&self.journals, id).map_err(StepError::Journal)? else {
             return Ok(Outcome::Undone);
@@ -363,29 +376,86 @@ impl<'h> Keeper<'h> {
         let Some(entry) = journal.entry(step).cloned() else {
             return Ok(Outcome::Undone);
         };
-        self.undo_entry(id, &entry, &self.catalog.join(id))?;
-        journal.drop_step(step);
-        journal.save(&self.journals).map_err(StepError::Journal)?;
+        self.undo_journaled(&mut journal, id, &entry)?;
         Ok(Outcome::Undone)
     }
 
-    fn undo_entry(&mut self, id: &str, entry: &Entry, folder: &Path) -> Result<(), StepError> {
-        // A found step owns nothing, unless another app's removal has handed it a claim since.
-        if entry.state == State::Skipped {
-            return Ok(());
-        }
-        let owners = Owners::load(&[&self.journals]).map_err(StepError::Journal)?;
-        let mut mine = Vec::new();
-        for claim in entry.claims.iter().filter(|c| c.owned) {
-            match owners.holder(&claim.claim, id) {
-                Some(holder) => {
-                    journal::hand_over(&self.journals, holder, &claim.claim).map_err(StepError::Journal)?;
-                }
-                None => mine.push(claim.clone()),
-            }
-        }
-        perform::undo(&entry.action, &mut *self.host, &mine, &entry.prior, folder).map_err(StepError::Perform)
+    /// Marks `entry` as being undone, undoes it, and takes it out of `journal`; a run stopped
+    /// during the undo leaves it marked, never looking settled.
+    fn undo_journaled(&mut self, journal: &mut Journal, id: &str, entry: &Entry) -> Result<(), StepError> {
+        let step = entry.step;
+        journal.put(Entry {
+            state: if entry.state == State::Skipped {
+                State::Skipped
+            } else {
+                State::Undoing
+            },
+            ..entry.clone()
+        });
+        journal.save(&self.journals).map_err(StepError::Journal)?;
+        self.undo_entry(id, entry)?;
+        journal.drop_step(step);
+        journal.save(&self.journals).map_err(StepError::Journal)
     }
+
+    fn undo_entry(&mut self, id: &str, entry: &Entry) -> Result<(), StepError> {
+        // A found step owns nothing, unless another app's removal has handed it a claim since.
+        if entry.state != State::Skipped {
+            let owners = Owners::load(&[&self.journals]).map_err(StepError::Journal)?;
+            let mut mine = Vec::new();
+            for claim in entry.claims.iter().filter(|c| c.owned) {
+                match owners.holder(&claim.claim, id) {
+                    Some(holder) => {
+                        journal::hand_over(&self.journals, holder, &claim.claim, &entry.prior)
+                            .map_err(StepError::Journal)?;
+                    }
+                    None => mine.push(claim.clone()),
+                }
+            }
+            perform::undo(&entry.action, &mut *self.host, &mine, &entry.prior).map_err(StepError::Perform)?;
+        }
+        match &entry.replaced {
+            Some(replaced) => self.undo_entry(id, replaced),
+            None => Ok(()),
+        }
+    }
+}
+
+/// The claims of a step about to be recorded from `look`, keeping what its `old` entry owned:
+/// a claim both have stays owned, as does a folder the old one made that the new one's path is
+/// in. What the old entry owned and the new look doesn't claim is what it replaces, undone once
+/// the new action stands.
+fn carry(old: Option<&Entry>, look: &perform::Look) -> (Vec<Claim>, Option<Box<Entry>>) {
+    let mut claims = look.claims.clone();
+    let Some(old) = old else {
+        return (claims, None);
+    };
+    let mut stale = Vec::new();
+    for owned in old.claims.iter().filter(|c| c.owned) {
+        if let Some(claim) = claims.iter_mut().find(|c| c.claim == owned.claim) {
+            claim.owned = true;
+            continue;
+        }
+        let dir = owned.claim.strip_prefix("dir:").map(Path::new);
+        let holds = |c: &Claim| {
+            let path = c.path().or_else(|| c.claim.strip_prefix("dir:").map(Path::new));
+            dir.is_some_and(|dir| path.is_some_and(|p| p.starts_with(dir)))
+        };
+        if claims.iter().any(holds) {
+            claims.insert(0, owned.clone());
+        } else {
+            stale.push(owned.clone());
+        }
+    }
+    let replaced = if stale.is_empty() {
+        old.replaced.clone()
+    } else {
+        Some(Box::new(Entry {
+            claims: stale,
+            ..old.clone()
+        }))
+    };
+    (claims, replaced)
 }
 
 /// Installs and removes apps of folders, reporting each step.
@@ -448,14 +518,16 @@ impl<'a> Engine<'a> {
         }
     }
 
-    /// Installs the app `id` in `setup`, from where its journals left it: a step done before is
-    /// reported done, a step stopped during is finished, a failure undoes what the install did.
-    /// An app the machine has in another setup first loses that setup's own steps.
+    /// Installs the app `id` in `setup`, from where its journals left it: every step is checked,
+    /// a step done before is reported done, a step not done (stopped during, or undone since) is
+    /// done, a step a release changed is updated in place, and a failure undoes what the install
+    /// did. An app the machine has in another setup first loses that setup's own steps.
     ///
     /// # Errors
     ///
     /// [`EngineError`]; after a failure that wasn't a refusal before the first step, the machine
-    /// is as it was before the install began.
+    /// is as it was before the install began, but for the steps of an installed app this run
+    /// updated, which stay updated.
     pub fn install(&mut self, id: &str, setup: Option<&str>) -> Result<Finished, EngineError> {
         let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
         let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
@@ -472,25 +544,25 @@ impl<'a> Engine<'a> {
         let had = user_journal.as_ref().or(root_journal.as_ref()).map(|j| j.setup.clone());
         let switching = had.as_ref().is_some_and(|had| had.as_deref() != setup);
         let was_complete = !switching && user_journal.as_ref().is_some_and(|j| j.complete);
-        let root_settled = |n: usize, action: &Action| {
-            root_journal
-                .as_ref()
-                .and_then(|j| j.entry(n))
-                .is_some_and(|e| e.state.settled(self.windows) && e.action.name == action.name)
-        };
-        let needs_root = steps
-            .iter()
-            .enumerate()
-            .any(|(i, a)| a.side() == Side::Root && !root_settled(i + 1, a))
-            || (switching && root_journal.as_ref().is_some_and(|j| !j.entries.is_empty()));
+        let journaled: BTreeSet<(Side, usize)> = [(Side::User, &user_journal), (Side::Root, &root_journal)]
+            .into_iter()
+            .flat_map(|(side, j)| {
+                j.iter()
+                    .flat_map(move |j| j.entries.iter().map(move |e| (side, e.step)))
+            })
+            .collect();
+        let root_entries = root_journal.as_ref().is_some_and(|j| !j.entries.is_empty());
+        // An app that isn't complete is rolled back whole on a failure, root's steps included.
+        let needs_root = ((switching || !was_complete) && root_entries)
+            || self.root_steps_unsettled(&folder, setup, root_journal.as_ref());
         if needs_root {
             self.start_root()?;
         }
+        self.preflight(id, setup, needs_root)?;
         let mut finished = Finished::default();
         if switching {
             finished.switch |= self.switch_away(id, folder.actions.len())?;
         }
-        self.preflight(id, setup, needs_root)?;
         let total = steps.len();
         let mut this_run = Vec::new();
         for (i, action) in steps.iter().enumerate() {
@@ -501,6 +573,8 @@ impl<'a> Engine<'a> {
             self.sink.event(&UpdateEvent::Progress { done: i, total });
             let outcome = match action.side() {
                 Side::User => self.user.step(id, setup, step, self.windows),
+                // Root's steps were checked as settled before the run, as no root was asked for.
+                Side::Root if !self.root_started => Ok(Outcome::Settled),
                 Side::Root => self.root_step(&Request::Step {
                     app: id.to_owned(),
                     setup: setup.map(str::to_owned),
@@ -514,6 +588,7 @@ impl<'a> Engine<'a> {
                 name: action.name.clone(),
                 kind_is_nix: matches!(action.kind, Kind::Nix { .. }),
             };
+            let new = !journaled.contains(&(undoable.side, step));
             match outcome {
                 Ok(Outcome::Settled) => self.report(id, step, total, &action.name, ActionState::Done),
                 Ok(Outcome::Found) => self.report(id, step, total, &action.name, ActionState::Found),
@@ -523,11 +598,15 @@ impl<'a> Engine<'a> {
                 }
                 Ok(Outcome::Done | Outcome::Undone) => {
                     finished.switch |= undoable.kind_is_nix;
-                    this_run.push(undoable);
+                    if new {
+                        this_run.push(undoable);
+                    }
                     self.report(id, step, total, &action.name, ActionState::Done);
                 }
                 Err(source) => {
-                    this_run.push(undoable);
+                    if new {
+                        this_run.push(undoable);
+                    }
                     self.report(id, step, total, &action.name, ActionState::Failed);
                     let rollback = if was_complete {
                         this_run
@@ -550,6 +629,34 @@ impl<'a> Engine<'a> {
         journal.complete = true;
         journal.save(self.user.journals()).map_err(EngineError::Journal)?;
         Ok(finished)
+    }
+
+    /// Whether a root step of the install needs root: one root's journal doesn't record as
+    /// settled with the same action, word for word, or whose check, run from the user's side,
+    /// doesn't say done. A root `run`'s check runs only as root, so such a step always does.
+    fn root_steps_unsettled(&mut self, folder: &Folder, setup: Option<&str>, root_journal: Option<&Journal>) -> bool {
+        let Ok(steps) = folder.steps(setup) else {
+            return true;
+        };
+        let words = self.user.words();
+        for (i, action) in steps.into_iter().enumerate() {
+            if action.side() != Side::Root {
+                continue;
+            }
+            let Ok(resolved) = action.resolve(&words, &folder.dir) else {
+                return true;
+            };
+            let settled = root_journal
+                .and_then(|j| j.entry(i + 1))
+                .is_some_and(|e| e.action == resolved && e.state.settled(self.windows) && e.replaced.is_none());
+            if !settled || matches!(resolved.kind, Kind::Run { .. }) {
+                return true;
+            }
+            if !perform::look(&resolved, self.user.host()).is_ok_and(|look| look.done) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Removes the app `id`: its journals undone, newest step first, then gone. An app with no
@@ -598,8 +705,10 @@ impl<'a> Engine<'a> {
 
     fn ready(&mut self, folder: &Folder, setup: Option<&str>) -> Result<(), EngineError> {
         let picked = setup.and_then(|s| folder.setup(s));
+        let words = self.user.words();
         for ready in folder.readies(picked) {
-            if self.user.host().run(&ready.check, &folder.dir).is_err() {
+            let check: Vec<String> = ready.check.iter().map(|a| words.fill(a, None)).collect();
+            if self.user.host().run(&check, &folder.dir).is_err() {
                 return Err(EngineError::NotReady(ready.says.clone()));
             }
         }
@@ -628,18 +737,14 @@ impl<'a> Engine<'a> {
             app: id.to_owned(),
             why,
         };
-        let mut why = self
-            .user
-            .preflight(id, setup, self.windows)
-            .map_err(|source| EngineError::Step {
-                name: "Checking what the app would change".to_owned(),
-                source: Box::new(source),
-            })?;
+        let mut why = self.user.preflight(id, setup).map_err(|source| EngineError::Step {
+            name: "Checking what the app would change".to_owned(),
+            source: Box::new(source),
+        })?;
         if root {
             match self.root.call(&Request::Preflight {
                 app: id.to_owned(),
                 setup: setup.map(str::to_owned),
-                windows: self.windows,
             }) {
                 Ok(Reply::Refused { why: root_why }) => why.extend(root_why),
                 Ok(Reply::Failed { why: e }) => return Err(refuse(vec![e])),
@@ -651,16 +756,16 @@ impl<'a> Engine<'a> {
     }
 
     fn root_step(&mut self, request: &Request) -> Result<Outcome, StepError> {
-        // A root step the journals' reading said was settled, and isn't, starts root here.
+        // Root is started here only for an undo of a root step the install found settled.
         if !self.root_started {
             self.root.start().map_err(StepError::RootLost)?;
             self.root_started = true;
         }
         match self.root.call(request) {
             Ok(Reply::Step { outcome }) => Ok(outcome),
-            Ok(Reply::Failed { why }) => Err(StepError::Root(why)),
-            Ok(Reply::Refused { why }) => Err(StepError::Root(why.join("; "))),
-            Ok(Reply::Ready) => Err(StepError::Root("the root helper answered out of turn".to_owned())),
+            Ok(Reply::Failed { why }) => Err(StepError::RootFailed { why }),
+            Ok(Reply::Refused { why }) => Err(StepError::RootRefused { why }),
+            Ok(Reply::Ready) => Err(StepError::RootOutOfTurn),
             Err(e) => Err(StepError::RootLost(e)),
         }
     }
