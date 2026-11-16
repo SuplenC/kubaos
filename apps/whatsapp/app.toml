@@ -1,0 +1,30 @@
+# WhatsApp Web in a window of its own: WhatsApp has no Linux app, only its web client.
+# https://web.whatsapp.com/
+name = "WhatsApp"
+category = "communication"
+tags = ["messenger", "chat", "meta", "web app"]
+summary = "WhatsApp Web in a window of its own. Meta still reads your metadata, cheers."
+# WhatsApp's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+WhatsApp is Meta's messenger. Its web client, here in a window of its own, links to the WhatsApp \
+account on your phone by scanning a QR code, then sends and receives your chats, voice messages, \
+photos and files from the computer. Messages are end-to-end encrypted."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), for the Command menu and the window alike.
+icon = "whatsapp"
+requires = ["google-chrome"]
+keeps = """\
+Your linked session stays in ~/.local/share/kubaos/web-apps/whatsapp: install WhatsApp again and \
+it's still linked to your phone."""
+
+[[ready]]
+check = ["./closed", "whatsapp"]
+says = "WhatsApp's window is open: close it, then try again"
+
+[[action]]
+name = "Put WhatsApp in a window of its own"
+kind = "web_app"
+id = "whatsapp"
+title = "WhatsApp"
+url = "https://web.whatsapp.com/"
+icon = "whatsapp"
