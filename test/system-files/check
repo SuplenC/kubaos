@@ -8,17 +8,19 @@
 #
 # Also holds system/files.map to the tree: every file under system/files/ has
 # a line, every line matches a file, and every installer it names exists and
-# mentions the file. The branch's changes are REPO's working tree, untracked
-# files too, against its merge base with REV (origin/main); a migration counts
-# when it is new since then and names one of the file's installers, its path
-# under system/files/ or its name. Needs bash and git.
+# installs the file: its code, not a comment, names the file or its folder, or
+# calls a function of system/*.sh that does. The branch's changes are REPO's
+# working tree, untracked files too, against its merge base with REV
+# (origin/main); a migration counts when it is new since then and names one of
+# the file's installers, its path under system/files/ or its name. Needs bash
+# and git.
 set -euo pipefail
 
 base_ref=origin/main
 while (($#)); do
   case "$1" in
     --base) base_ref="${2:?--base takes a revision}"; shift ;;
-    -h | --help) sed -n '2,14p' "$0" | cut -c3-; exit 0 ;;
+    -h | --help) sed -n '2,16p' "$0" | cut -c3-; exit 0 ;;
     -*) echo "test/system-files/check: unknown option $1" >&2; exit 2 ;;
     *) break ;;
   esac
@@ -55,6 +57,29 @@ function_text() {
   awk -v f="$1" '$0 ~ "^" f "\\(\\) *\\{" { on = 1 } on { print } on && /^}/ { exit }' "$REPO"/system/*.sh
 }
 
+# TEXT without its comment lines: a path a comment names installs nothing.
+code_of() {
+  grep -v '^[[:space:]]*#' <<<"$1" || true
+}
+
+# The functions system/*.sh defines.
+mapfile -t defined < <(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)() *{.*/\1/p' "$REPO"/system/*.sh | sort -u)
+
+# installs CODE PATH [SEEN...]: CODE names PATH, or calls a function of
+# system/*.sh whose code does, through the functions that one calls; SEEN are
+# those already followed.
+installs() {
+  local code="$1" path="$2" f
+  shift 2
+  installer_mentions "$code" "$path" && return 0
+  for f in "${defined[@]}"; do
+    [[ " $* " == *" $f "* ]] && continue
+    [[ $code =~ (^|[^A-Za-z0-9_])$f([^A-Za-z0-9_]|$) ]] || continue
+    installs "$(code_of "$(function_text "$f")")" "$path" "$@" "$f" && return 0
+  done
+  return 1
+}
+
 is_keyword() { [[ $1 == update || $1 == in-place || $1 == source || $1 == image ]]; }
 
 # installer_mentions TEXT PATH: TEXT names PATH under system/files/, or the
@@ -87,7 +112,7 @@ for f in "${present[@]}"; do
       text="$(function_text "$w")"
       [[ -n $text ]] || { fail "system/files.map: no system/*.sh defines $w, which installs system/files/$f"; continue; }
     fi
-    installer_mentions "$text" "$f" || fail "system/files.map: $w doesn't install system/files/$f"
+    installs "$(code_of "$text")" "$f" "$w" || fail "system/files.map: $w doesn't install system/files/$f"
   done
 done
 for e in "${entries[@]}"; do

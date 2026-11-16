@@ -170,6 +170,25 @@ test_an_installer_no_script_defines_fails() {
   expect_fail "no system/*.sh defines install_nothing"
 }
 
+test_an_installer_naming_the_file_only_in_a_comment_fails() {
+  new_repo
+  printf '%s\n' '' '# install_note: puts udev/91-noted.rules in place.' 'install_note() {' \
+    '  # udev/91-noted.rules goes to /etc/udev/rules.d/.' '  true' '}' >>"$M/system/lib.sh"
+  printf 'x\n' >"$M/system/files/udev/91-noted.rules"
+  printf 'udev/91-noted.rules install_note\n' >>"$M/system/files.map"
+  expect_fail "install_note doesn't install system/files/udev/91-noted.rules"
+}
+
+test_an_installer_that_calls_the_one_naming_the_file_installs_it() {
+  new_repo
+  printf '%s\n' '' 'install_noted() {' '  install_root_file "$FILES_DIR/udev/91-noted.rules" /etc/udev/rules.d/91-noted.rules 0644' '}' \
+    'install_both() {' '  bash -c '"'"'install_noted'"'"'' '}' >>"$M/system/lib.sh"
+  printf 'x\n' >"$M/system/files/udev/91-noted.rules"
+  printf 'udev/91-noted.rules install_both\n' >>"$M/system/files.map"
+  migration noted install_both
+  expect_pass
+}
+
 for t in $(declare -F | awk '$3 ~ /^test_/ { print $3 }'); do
   # Not in a condition, so a test stops at its first failed command.
   set +e
