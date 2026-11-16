@@ -13,6 +13,15 @@ source "$KUBAOS_DIR/migrations/lib.sh"
 # shellcheck source=system/lib.sh
 source "$KUBAOS_DIR/system/lib.sh"
 
-mapfile -t packages < <(manifest_value group.docker packages; manifest_value group.chrome packages)
-((${#packages[@]})) || { echo "no docker or chrome group in $APT_MANIFEST" >&2; exit 1; }
-record_drop "${packages[@]}"
+# The packages the docker and chrome groups list, and the catalog's apps
+# install: either may be gone from a later release, and the record loses
+# whatever of them it has.
+mapfile -t packages < <(
+  manifest_value group.docker packages
+  manifest_value group.chrome packages
+  for app in docker google-chrome; do
+    [[ ! -f $KUBAOS_DIR/apps/$app.toml ]] ||
+      manifest_dump "$KUBAOS_DIR/apps/$app.toml" | awk -F'\t' '$1 == "apt" && $2 == "packages" { print $3 }'
+  done
+)
+((${#packages[@]} == 0)) || record_drop "${packages[@]}"
