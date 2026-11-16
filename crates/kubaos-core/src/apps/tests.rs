@@ -917,7 +917,19 @@ const OURS: [&str; 2] = ["MIT", "Apache-2.0"];
 
 /// The beginnings of the SPDX identifiers a header comment names a licence by.
 const SPDX_PREFIXES: [&str; 13] = [
-    "MPL-", "GPL-", "LGPL-", "AGPL-", "CC-BY", "CC0-", "OFL-", "BSD-", "EPL-", "Apache-", "MIT", "ISC", "Unlicense",
+    "MPL-",
+    "GPL-",
+    "LGPL-",
+    "AGPL-",
+    "CC-BY",
+    "CC0-",
+    "OFL-",
+    "BSD-",
+    "EPL-",
+    "Apache-",
+    "MIT",
+    "ISC",
+    "Unlicense",
 ];
 
 /// The comment a file starts with: an SVG's or an XML file's first `<!-- … -->`, else its first
@@ -976,7 +988,9 @@ fn licence_problems(root: &Path) -> Vec<String> {
             .and_then(|e| e.to_str())
             .is_some_and(|e| matches!(e, "svg" | "png" | "jpg" | "jpeg" | "webp" | "ico"));
         let Ok(text) = fs::read_to_string(&file) else {
-            problems.push(format!("{shown}: not text, so it can't name its licence; an icon is an .svg"));
+            problems.push(format!(
+                "{shown}: not text, so it can't name its licence; an icon is an .svg"
+            ));
             continue;
         };
         let licences = licences_named(&header_comment(&text));
@@ -985,7 +999,9 @@ fn licence_problems(root: &Path) -> Vec<String> {
         }
         for licence in licences.iter().filter(|l| !OURS.contains(&l.as_str())) {
             if !root.join("LICENSES").join(format!("{licence}.txt")).is_file() {
-                problems.push(format!("{shown}: {licence}, whose text isn't in LICENSES/{licence}.txt"));
+                problems.push(format!(
+                    "{shown}: {licence}, whose text isn't in LICENSES/{licence}.txt"
+                ));
             }
         }
     }
@@ -1022,9 +1038,21 @@ fn the_licence_check_finds_a_picture_naming_no_licence_and_a_licence_without_its
     fs::write(app.join("app.toml"), "name = \"Chat\"\n").unwrap();
     fs::write(app.join("bare.svg"), "<svg/>\n").unwrap();
     fs::write(app.join("ours.svg"), "<!-- KubaOS's, MIT OR Apache-2.0. -->\n<svg/>\n").unwrap();
-    fs::write(app.join("theirs.svg"), "<!-- Chat's logo, MPL-2.0, unmodified. -->\n<svg/>\n").unwrap();
-    fs::write(app.join("gpl.svg"), "<!-- From a theme, GPL-3.0-or-later. -->\n<svg/>\n").unwrap();
-    fs::write(app.join("stack.yaml"), "# Chat's stack, CC-BY-4.0, as KubaOS runs it.\nservices: {}\n").unwrap();
+    fs::write(
+        app.join("theirs.svg"),
+        "<!-- Chat's logo, MPL-2.0, unmodified. -->\n<svg/>\n",
+    )
+    .unwrap();
+    fs::write(
+        app.join("gpl.svg"),
+        "<!-- From a theme, GPL-3.0-or-later. -->\n<svg/>\n",
+    )
+    .unwrap();
+    fs::write(
+        app.join("stack.yaml"),
+        "# Chat's stack, CC-BY-4.0, as KubaOS runs it.\nservices: {}\n",
+    )
+    .unwrap();
     fs::write(app.join("up"), "#!/bin/sh\n# up: start it.\nexit 0\n").unwrap();
 
     let problems = licence_problems(root.path());

@@ -116,7 +116,9 @@ pub enum ActionError {
     InvalidUrl { value: String },
     #[error("a web app's title is one line, with no control characters")]
     InvalidTitle,
-    #[error("a web app's icon is an .svg file in the app's folder or an icon theme's name for an icon; {value:?} is neither")]
+    #[error(
+        "a web app's icon is an .svg file in the app's folder or an icon theme's name for an icon; {value:?} is neither"
+    )]
     InvalidIcon { value: String },
     #[error("{key} is the journal's own; an app's folder doesn't set it")]
     JournalOnly { key: &'static str },
@@ -518,8 +520,8 @@ impl Action {
         }
     }
 
-    /// Whether it installs a package nixpkgs marks unfree, which a user whose nixpkgs refuses unfree
-    /// packages can't have.
+    /// Whether it installs a package nixpkgs marks unfree, which a user whose nixpkgs refuses
+    /// unfree packages can't have.
     pub fn needs_unfree(&self) -> bool {
         matches!(self.kind, Kind::Nix { unfree: true, .. })
     }

@@ -337,7 +337,10 @@ fn an_app_with_unfree_nixpkgs_is_refused_while_the_user_refuses_unfree_and_nothi
         ),
     );
     lock_down(&chat);
-    put(&w.user.state_dir().root().join("nixpkgs.toml"), "allow_unfree = false\n");
+    put(
+        &w.user.state_dir().root().join("nixpkgs.toml"),
+        "allow_unfree = false\n",
+    );
     let mut m = fake(&w, &[]);
     let before = host(&m).snapshot();
 
