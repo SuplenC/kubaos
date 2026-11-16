@@ -14,10 +14,10 @@ use crate::apps::host::fake::FakeRoot;
 use crate::apps::host::fake::Unit;
 use crate::apps::journal::Journal;
 use crate::apps::root::Reply;
+use crate::unfree::Unfree;
 use crate::update::event::ActionState;
 use crate::update::event::Sink;
 use crate::update::event::UpdateEvent;
-use crate::unfree::Unfree;
 
 /// Four steps, root and user in turn: a package, a file, a service, a setting.
 const FIXTURE: &str = r#"

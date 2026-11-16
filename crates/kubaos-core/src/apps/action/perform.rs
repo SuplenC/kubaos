@@ -68,7 +68,9 @@ pub enum PerformError {
     },
     #[error("there is nothing to install for {arch}")]
     Unavailable { arch: String },
-    #[error("nixpkgs marks it unfree, and your nixpkgs refuses unfree packages: `kubaos package unfree on` lets them in")]
+    #[error(
+        "nixpkgs marks it unfree, and your nixpkgs refuses unfree packages: `kubaos package unfree on` lets them in"
+    )]
     Unfree,
     #[error(transparent)]
     Settings(SettingsError),
