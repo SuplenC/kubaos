@@ -1,13 +1,17 @@
-//! The root helper binary, run as the tests' own user on a checkout of their own: it answers
-//! only the requests the action engine takes, and refuses the rest before anything runs.
+//! The root helper binary, run as the tests' own user on a checkout of their own, in a sandbox:
+//! it answers only the requests the action engine takes, and refuses the rest before anything
+//! runs.
 
 use std::fs;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::process::Command;
 use std::process::Stdio;
+
+use kubaos_core::sandbox::Sandbox;
 
 const APP: &str = r#"
 name = "Fixture"
@@ -29,6 +33,15 @@ to = "~/.config/fixture/config.toml"
 text = "on\n"
 "#;
 
+/// A sandbox in `dir`, its home `dir/home`, and the helper to run in it.
+fn helper(dir: &Path) -> (Sandbox, Command) {
+    let home = dir.join("home");
+    fs::create_dir_all(&home).unwrap();
+    let sandbox = Sandbox::new(&dir.join("sandbox"), &home, "kuba");
+    let command = sandbox.command(env!("CARGO_BIN_EXE_kubaos-apps"));
+    (sandbox, command)
+}
+
 /// The helper's replies to `requests`, one a line, after its `ready`.
 fn serve(requests: &[&str]) -> Vec<String> {
     let dir = tempfile::tempdir().unwrap();
@@ -49,7 +62,8 @@ fn serve(requests: &[&str]) -> Vec<String> {
     ] {
         fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
     }
-    let mut child = Command::new(env!("CARGO_BIN_EXE_kubaos-apps"))
+    let (sandbox, mut helper) = helper(dir.path());
+    let mut child = helper
         .arg("serve")
         .env("KUBAOS_APPS_CHECKOUT", dir.path().join("checkout"))
         .env("KUBAOS_APPS_STATE", dir.path().join("state"))
@@ -71,6 +85,7 @@ fn serve(requests: &[&str]) -> Vec<String> {
         !dir.path().join("state/journals").exists(),
         "a refused request wrote a journal"
     );
+    assert!(sandbox.calls().is_empty(), "a refused request ran a command");
     lines
 }
 
@@ -94,7 +109,9 @@ fn the_helper_says_ready_then_refuses_what_isnt_a_root_step_of_a_catalog_app() {
 
 #[test]
 fn the_helper_takes_only_serve() {
-    let status = Command::new(env!("CARGO_BIN_EXE_kubaos-apps"))
+    let dir = tempfile::tempdir().unwrap();
+    let status = helper(dir.path())
+        .1
         .args(["install", "fixture"])
         .stderr(Stdio::null())
         .status()

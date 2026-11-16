@@ -32,6 +32,7 @@ signal-hook = "0.3"
 thiserror.workspace = true
 
 [dev-dependencies]
+kubaos-core = { workspace = true, features = ["sandbox"] }
 tempfile.workspace = true
 
 [lints]

@@ -15,6 +15,8 @@ pub mod packages;
 pub mod pins;
 pub mod preview;
 pub mod probe;
+#[cfg(any(test, feature = "sandbox"))]
+pub mod sandbox;
 pub mod setup;
 pub mod state;
 pub mod step;

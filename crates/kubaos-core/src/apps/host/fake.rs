@@ -1,6 +1,6 @@
 //! A fake machine for the tests: a folder for its files, the rest (dpkg, the groups, the units,
 //! logind, the User flake) in memory, shared by the user's side and root's, and a snapshot of it
-//! all to compare.
+//! all to compare. What a `run` starts runs in the machine's [`Sandbox`], never on the real one.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -10,7 +10,6 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::rc::Rc;
 
 use super::AptPlan;
@@ -26,6 +25,7 @@ use crate::apps::root::Request;
 use crate::apps::root::RootError;
 use crate::apps::root::RootSide;
 use crate::apps::root::Server;
+use crate::sandbox::Sandbox;
 
 /// Root's side of the fake machine, its requests sent as JSON lines through the real server.
 #[derive(Debug)]
@@ -153,10 +153,12 @@ pub struct FakeHost {
     pub state: Rc<RefCell<State>>,
     home: PathBuf,
     system: PathBuf,
+    sandbox: Sandbox,
 }
 
 impl FakeHost {
-    /// A machine whose home is `<dir>/home/kuba` and whose system is under `<dir>/system`.
+    /// A machine whose home is `<dir>/home/kuba`, whose system is under `<dir>/system`, and whose
+    /// programs run in a sandbox in `<dir>/sandbox`.
     ///
     /// # Panics
     ///
@@ -166,11 +168,18 @@ impl FakeHost {
         let system = dir.join("system");
         fs::create_dir_all(&home).unwrap();
         fs::create_dir_all(system.join("etc")).unwrap();
+        let sandbox = Sandbox::new(&dir.join("sandbox"), &home, "kuba");
         Self {
             state: Rc::new(RefCell::new(State::default())),
             home,
             system,
+            sandbox,
         }
+    }
+
+    /// Where what it runs runs: its stand-ins for the machine's commands, and their log.
+    pub fn sandbox(&self) -> &Sandbox {
+        &self.sandbox
     }
 
     /// Everything on the machine as text: its files, then its state but the log, the vendor
@@ -523,10 +532,11 @@ impl Host for FakeHost {
             Some(script) => dir.join(script),
             None => PathBuf::from(program),
         };
-        let output = Command::new(&program)
+        let output = self
+            .sandbox
+            .command(&program)
             .args(rest)
             .current_dir(dir)
-            .env("HOME", &self.home)
             .output()
             .map_err(|source| HostError::Spawn {
                 program: program.display().to_string(),
@@ -544,3 +554,6 @@ impl Host for FakeHost {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

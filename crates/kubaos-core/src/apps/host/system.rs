@@ -11,6 +11,7 @@
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -60,6 +61,8 @@ pub struct SystemHost {
     packages: Option<Packages>,
     /// It is root's side: what it runs gets root's own environment, none of the user's.
     root: bool,
+    /// The `PATH` of what it runs: [`RUN_PATH`], but for the root helper the tests run.
+    path: OsString,
 }
 
 impl SystemHost {
@@ -73,6 +76,7 @@ impl SystemHost {
             checkout: checkout.into(),
             packages: None,
             root: false,
+            path: OsString::from(RUN_PATH),
         }
     }
 
@@ -81,6 +85,14 @@ impl SystemHost {
     #[must_use]
     pub fn as_root(mut self) -> Self {
         self.root = true;
+        self
+    }
+
+    /// The same, finding programs on `path` instead of [`RUN_PATH`]: the root helper the tests run
+    /// as themselves, whose `PATH` is their sandbox's.
+    #[must_use]
+    pub fn with_path(mut self, path: impl Into<OsString>) -> Self {
+        self.path = path.into();
         self
     }
 
@@ -101,7 +113,7 @@ impl SystemHost {
                 .env("LOGNAME", "root");
         }
         command
-            .env("PATH", RUN_PATH)
+            .env("PATH", &self.path)
             .env("LANG", "C.UTF-8")
             .env("DEBIAN_FRONTEND", "noninteractive")
             .stdin(Stdio::null());
