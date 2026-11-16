@@ -634,6 +634,9 @@ pub struct Engine<'a> {
     lock: PathBuf,
     windows: bool,
     root_started: bool,
+    /// Whether this run holds the lock already: a run of more than one app holds it from its plan
+    /// to its last app, and each app's install or removal in it goes on under it.
+    locked: bool,
 }
 
 impl std::fmt::Debug for Engine<'_> {
@@ -654,6 +657,8 @@ pub struct Finished {
     /// A removal found the app owning nothing, as it was there before KubaOS: it forgot the app
     /// and left the machine as it is.
     pub left: bool,
+    /// An install removed it: it was there only for the setup the app the run installed left.
+    pub removed: bool,
 }
 
 /// Where an install starts from.
@@ -700,7 +705,20 @@ impl<'a> Engine<'a> {
             lock: lock.into(),
             windows,
             root_started: false,
+            locked: false,
         }
+    }
+
+    /// Runs `go` holding the run lock, or under the lock this run holds already.
+    fn locked<T>(&mut self, go: impl FnOnce(&mut Self) -> Result<T, EngineError>) -> Result<T, EngineError> {
+        if self.locked {
+            return go(self);
+        }
+        let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
+        self.locked = true;
+        let result = go(self);
+        self.locked = false;
+        result
     }
 
     /// Installs the app `id` in `setup`, from where its journals left it: every step is checked,
@@ -714,7 +732,10 @@ impl<'a> Engine<'a> {
     /// is as it was before the install began, but for the steps of an installed app this run
     /// updated, which stay updated.
     pub fn install(&mut self, id: &str, setup: Option<&str>) -> Result<Finished, EngineError> {
-        let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
+        self.locked(|engine| engine.install_locked(id, setup))
+    }
+
+    fn install_locked(&mut self, id: &str, setup: Option<&str>) -> Result<Finished, EngineError> {
         let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
         folder.pick(setup).map_err(EngineError::Folder)?;
         let steps: Vec<Action> = folder
@@ -808,6 +829,10 @@ impl<'a> Engine<'a> {
         let root_journal = Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?;
         let had = user_journal.as_ref().or(root_journal.as_ref()).map(|j| j.setup.clone());
         let switching = had.as_ref().is_some_and(|had| had.as_deref() != setup);
+        // A switch undoes the old setup's own steps, so that setup has to be ready to go too.
+        if switching {
+            self.ready(folder, had.as_ref().and_then(Option::as_deref))?;
+        }
         let was_complete = !switching && user_journal.as_ref().is_some_and(|j| j.complete);
         let root_unsettled = self.unsettled(folder, setup, root_journal.as_ref(), Side::Root);
         // An installed app whose every step stands changes nothing, so it needn't be ready: an
@@ -887,7 +912,10 @@ impl<'a> Engine<'a> {
     /// [`EngineError`]. A step that couldn't be undone stops the removal; the journal keeps the
     /// steps left, and the next removal goes on from them.
     pub fn remove(&mut self, id: &str) -> Result<Finished, EngineError> {
-        let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
+        self.locked(|engine| engine.remove_locked(id))
+    }
+
+    fn remove_locked(&mut self, id: &str) -> Result<Finished, EngineError> {
         let user_journal = Journal::read(self.user.journals(), id).map_err(EngineError::Journal)?;
         let root_journal = Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?;
         if user_journal.is_none() && root_journal.is_none() {
@@ -974,7 +1002,10 @@ impl<'a> Engine<'a> {
     ///
     /// [`EngineError`] when the folder or the journals can't be read, or a check can't run.
     pub fn adopt(&mut self, id: &str, owned: bool, picked: Option<&str>) -> Result<Option<Adopted>, EngineError> {
-        let _lock = journal::lock(&self.lock).map_err(EngineError::Journal)?;
+        self.locked(|engine| engine.adopt_locked(id, owned, picked))
+    }
+
+    fn adopt_locked(&mut self, id: &str, owned: bool, picked: Option<&str>) -> Result<Option<Adopted>, EngineError> {
         if Journal::read(self.user.journals(), id)
             .map_err(EngineError::Journal)?
             .is_some()

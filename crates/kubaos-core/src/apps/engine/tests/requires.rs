@@ -469,3 +469,147 @@ fn configuring_an_app_a_release_changed_waits_for_the_update_that_brings_it_up_t
     );
     assert_eq!(world.host.snapshot(), before);
 }
+
+/// An app in two setups, as Penpot is: on the web in a browser, or on an engine of this machine
+/// in the same browser; each ready while its window, `$HOME/open-<setup>`, is closed.
+fn designer() -> String {
+    let setup = |id: &str, name: &str, requires: &str| {
+        format!(
+            r#"
+[setup.{id}]
+name = "{name}"
+summary = "The designer, {id}"
+requires = [{requires}]
+
+[[setup.{id}.ready]]
+check = ["./closed", "{id}"]
+says = "{name}'s window is open: close it, then try again"
+
+[[setup.{id}.action]]
+name = "Put {name} in a window of its own"
+kind = "file"
+to = "~/.config/designer/{id}"
+text = "{id}\n"
+"#
+        )
+    };
+    format!(
+        "name = \"Designer\"\n{ABOUT}{}{}",
+        setup("local", "Designer on this machine", "\"engine\", \"browser\""),
+        setup("web", "Designer", "\"browser\""),
+    )
+}
+
+/// An app of one package from apt.
+fn package_app(name: &str, package: &str) -> String {
+    format!(
+        "name = \"{name}\"\n{ABOUT}\n[[action]]\nname = \"Install {name}\"\nkind = \"apt\"\npackages = [\"{package}\"]\n"
+    )
+}
+
+fn designer_world() -> World {
+    let (designer, browser, engine) = (
+        designer(),
+        package_app("Browser", "browser"),
+        package_app("Engine", "engine"),
+    );
+    let world = World::new(&[("designer", &designer), ("browser", &browser), ("engine", &engine)]);
+    world.script("designer", "closed", r#"[ ! -e "$HOME/open-$1" ]"#);
+    world
+}
+
+impl World {
+    fn add_in(&self, id: &str, setup: &str, picked: &[&str]) -> (Result<Vec<Ran>, EngineError>, Events, usize) {
+        let mut events = Events::default();
+        let (result, root) = self.with(&mut events, |e| e.add(id, Some(setup), &picks(picked)));
+        let calls = root.calls.borrow().len();
+        (result, events, calls)
+    }
+}
+
+#[test]
+fn switching_setups_while_the_old_setups_window_is_open_is_refused_and_changes_nothing() {
+    let world = designer_world();
+    world.add_in("designer", "web", &["designer"]).0.unwrap();
+    fs::write(world.home_file("open-web"), "").unwrap();
+    let before = world.host.snapshot();
+
+    let (result, events, calls) = world.add_in("designer", "local", &["designer"]);
+
+    let Err(EngineError::NotReady(says)) = result else {
+        panic!("the switch went on: {result:?}");
+    };
+    assert_eq!(says, "Designer's window is open: close it, then try again");
+    assert!(events.0.is_empty(), "{:?}", events.0);
+    assert_eq!(calls, 0, "root was asked for");
+    assert_eq!(world.host.snapshot(), before);
+    assert_eq!(world.journals("designer").0.unwrap().setup.as_deref(), Some("web"));
+    assert_eq!(world.journals("engine"), (None, None));
+}
+
+#[test]
+fn switching_setups_takes_the_app_the_old_setup_alone_brought_and_keeps_the_rest() {
+    let world = designer_world();
+    let before = world.host.snapshot();
+    world.add_in("designer", "local", &["designer"]).0.unwrap();
+    assert_eq!(world.journals("engine").0.unwrap().brought_by, ["designer"]);
+
+    let (result, _, _) = world.add_in("designer", "web", &["designer"]);
+
+    let ran = result.unwrap();
+    assert_eq!(names(&ran), ["Browser", "Designer", "Engine"]);
+    assert!(ran[2].finished.removed && !ran[1].finished.removed);
+    assert_eq!(world.journals("engine"), (None, None));
+    assert!(!world.host.state.borrow().dpkg.contains_key("engine"));
+    assert_eq!(world.journals("browser").0.unwrap().brought_by, ["designer"]);
+    world.remove_with("designer", &[]).0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn switching_setups_keeps_an_app_the_old_setup_brought_that_the_user_picked_since() {
+    let world = designer_world();
+    world.add_in("designer", "local", &["designer"]).0.unwrap();
+
+    let (result, _, _) = world.add_in("designer", "web", &["designer", "engine"]);
+
+    assert_eq!(names(&result.unwrap()), ["Browser", "Designer"]);
+    let engine = world.journals("engine").0.unwrap();
+    assert!(engine.complete && engine.brought_by.is_empty(), "{engine:?}");
+}
+
+/// A sink that tries to take the run lock as each app of the run begins, as another run would.
+struct Interloper {
+    lock: PathBuf,
+    took: Vec<bool>,
+}
+
+impl crate::update::event::Sink for Interloper {
+    fn event(&mut self, event: &UpdateEvent) {
+        if matches!(event, UpdateEvent::App(_)) {
+            self.took.push(crate::apps::journal::lock(&self.lock).is_ok());
+        }
+    }
+}
+
+#[test]
+fn another_run_cant_take_the_lock_between_the_apps_of_an_install() {
+    let world = world("\"neovim\"");
+    let mut sink = Interloper {
+        lock: world.lock.clone(),
+        took: Vec::new(),
+    };
+    let mut root = world.root();
+    let mut user_host = world.host.clone();
+    let keeper = Keeper::new(&mut user_host, Side::User, &world.catalog, &world.user_journals);
+    let mut engine = Engine::new(keeper, &mut root, &world.root_journals, &world.lock, &mut sink, true);
+
+    engine.add("lazyvim", None, &picks(&["lazyvim"])).unwrap();
+
+    drop(engine);
+    assert_eq!(sink.took, [false, false]);
+    assert!(
+        crate::apps::journal::lock(&world.lock).is_ok(),
+        "the lock outlived the run"
+    );
+}
