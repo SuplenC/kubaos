@@ -90,6 +90,7 @@ use super::record::short;
 use super::security;
 use super::security::CountError;
 use super::version::Version;
+use crate::apps::AddedError;
 use crate::apps::CatalogError;
 use crate::apps::PicksError;
 use crate::apt::Manifest;
@@ -207,6 +208,9 @@ pub enum UpdateError {
     /// The user's picks of apps can't be read or written.
     #[error("using your picks of apps")]
     Picks(#[source] PicksError),
+    /// The record of the nixpkgs names each app added can't be read or written.
+    #[error("using the record of the packages apps added")]
+    AppsAdded(#[source] AddedError),
     /// The catalog has no app of that id.
     #[error("the Apps catalog has no app {id} (kubaos app list)")]
     NoApp { id: String },

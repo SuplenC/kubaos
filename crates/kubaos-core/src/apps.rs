@@ -9,8 +9,9 @@
 //!
 //! # Owns
 //!
-//! - The manifest's format ([`App`]), the catalog ([`Catalog`]), the picks ([`Picks`]) and how the
-//!   machine compares with them ([`plan`]).
+//! - The manifest's format ([`App`]), the catalog ([`Catalog`]), the picks ([`Picks`]), the record
+//!   of the nixpkgs names each app added ([`Added`]) and how the machine compares with them
+//!   ([`plan`]).
 //!
 //! # Not here
 //!
@@ -18,11 +19,14 @@
 //!   `apps.rs`. The root helper itself: `system/files/apps/kubaos-apps`.
 //! - Vendor repositories: the package manifest, `apt::manifest`.
 
+pub mod added;
 pub mod catalog;
 pub mod manifest;
 pub mod picks;
 pub mod plan;
 
+pub use self::added::Added;
+pub use self::added::AddedError;
 pub use self::catalog::Catalog;
 pub use self::catalog::CatalogError;
 pub use self::manifest::App;
