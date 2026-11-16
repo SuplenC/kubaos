@@ -531,11 +531,10 @@ export function onward(sample: () => HTMLElement): Move {
 export function finishing(index: number, sample: () => HTMLElement = () => setupRoom({ place: { at: "card", card: CARD_IDS[index]! }, views: { [CARD_IDS[index]!]: "done", [CARD_IDS[index === 0 ? 1 : index - 1]!]: "done" } })): Move {
   return {
     name: "Done: the card settles",
-    what: "The prompt gives way at once; the status, the rail's check and the wire it joins fade in over `short`.",
+    what: "The prompt gives way at once; the status and the rail's check fade in over `short`.",
     tracks: [
       fading(".k-step-room:not([data-kept]) .setup-status", "the status", "the card"),
       fading(`.k-rail-steps > .k-step:nth-child(${index + 1}) > * > :last-child`, "the check", "the rail"),
-      fading(`.k-rail-wire-lit[data-steps~="${index}"]`, "the wire's light", "the rail"),
     ],
     reduced: "same",
     back: "cuts",

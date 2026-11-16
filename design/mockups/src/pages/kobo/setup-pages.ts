@@ -40,7 +40,7 @@ export function fullHd(card: CardId, view: string): () => HTMLElement {
   return atCard(card, view, { width: "calc(1920 * var(--px))", height: "calc(1080 * var(--px))" });
 }
 
-/** `card`'s work finishing at `view`, beside a card done already, so the wire has a run to light. */
+/** `card`'s work finishing at `view`, beside a card done already. */
 export function finishesAt(card: CardId, view: string): Move {
   const index = CARD_IDS.indexOf(card);
   const neighbour = CARD_IDS[index === 0 ? 1 : index - 1]!;

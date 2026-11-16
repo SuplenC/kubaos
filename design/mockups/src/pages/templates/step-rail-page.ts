@@ -179,7 +179,7 @@ const SHOWN = ".k-step-room:not([data-kept])";
 
 const KOBO_ON: Move = {
   name: "In Kōbō: the next question",
-  what: "The page left slides off and fades over `short`; the next slides in from the right, its band a `micro` after it.",
+  what: "The page left slides off; the next slides in from the right, its band a `micro` after; its step lights.",
   tracks: [
     { part: "the page left", on: "the page", target: ".k-step-room[data-leaving]", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
     { part: "its slide off", on: "the page", target: ".k-step-room[data-leaving]", property: "--step-slide", from: 0, to: 1, duration: "short", curve: "emphasized_accel" },
@@ -187,7 +187,7 @@ const KOBO_ON: Move = {
     { part: "its slide in", on: "the page", target: SHOWN, property: "--step-slide", from: 1, to: 0, duration: "long", cue: "short", curve: "emphasized_decel" },
     { part: "the band", on: "the page", target: `${SHOWN} .k-step-footer`, property: "opacity", from: 0, to: 1, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
     { part: "the band's rise", on: "the page", target: `${SHOWN} .k-step-footer`, property: "--step-rise", from: 1, to: 0, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
-    ...travelling(1, 2),
+    { part: "symbol", on: "the step arrived at", target: ".k-rail-steps > .k-step:nth-child(3) .k-step-bead", property: "--bead-glow", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
   ],
   reduced: [
     { part: "the page left", on: "the page", target: ".k-step-room[data-leaving]", property: "opacity", from: 1, to: 0, duration: "instant", curve: "standard" },

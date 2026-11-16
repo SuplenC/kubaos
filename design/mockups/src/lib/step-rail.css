@@ -56,7 +56,7 @@
   background: rgb(from var(--color-surface_container_low) r g b / var(--opacity-well));
 }
 
-/* In Kōbō the screen is the glass: the rail has no well of its own, only its steps on their wire,
+/* In Kōbō the screen is the glass: the rail has no well of its own and no wire, only its steps,
    so nothing draws a box on the screen. Its lockup stands level with the page's title, the page's
    kicker in the room above them: the rail starts `space.s24` in, the page at the glass's top. */
 .k-step-rail-page[data-host="kobo"] .k-rail {
@@ -83,11 +83,12 @@
   isolation: isolate;
 }
 
-/* The progress wire: a length of tube `step_rail.wire` thick between each symbol and the next,
-   centred on them on whole device pixels, stopping `step_rail.bead` short of both with round ends,
-   so the tube runs into the symbols and none of it crosses a glyph. Unlit it is `outline_variant`;
-   its light, `primary`, fills each length as far as the light has come, with a lit control's glow
-   round it, near and far, at night while the signs are on, and none by day. The symbols it reaches
+/* The progress wire, in a window's rail (Kōbō's has none): a length of tube `step_rail.wire` thick
+   between each symbol and the next, centred on them on whole device pixels, stopping
+   `step_rail.bead` short of both with round ends, so the tube runs into the symbols and none of it
+   crosses a glyph. Unlit it is `outline_variant`; its light, `primary`, fills each length as far as
+   the light has come, with a lit control's glow round it, near and far, at night while the signs
+   are on, and none by day. The symbols it reaches
    are lit and glow as it does (`Step`), so tube and symbols read as one sign. It lies over the rows
    and takes no pointer. */
 .k-rail-wire {

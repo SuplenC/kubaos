@@ -887,7 +887,7 @@ export const OPENING: Move = {
 /** Let's go: the welcome lifts off, the street goes out of focus, the questions rise in. */
 export const ENTERING: Move = {
   name: "Let's go: into the questions",
-  what: "The welcome's words rise off; the street goes out of focus behind glass; the questions rise in; the wire strikes on.",
+  what: "The welcome's words rise off; the street goes out of focus behind glass; the questions rise in.",
   tracks: [
     { part: "the welcome's words", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the words' rise", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "--backdrop-rise", from: 0, to: -1, duration: "medium", curve: "emphasized_accel" },
@@ -895,7 +895,6 @@ export const ENTERING: Move = {
     { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
     { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
     { part: "their rise", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
-    { part: "the wire", on: "the rail", target: ".k-rail-wire", property: "opacity", from: 0, to: 1, duration: "medium", cue: ["micro", "long"], curve: "neon.strike" },
   ],
   unflickered: [
     { part: "the welcome's words", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
@@ -904,7 +903,6 @@ export const ENTERING: Move = {
     { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
     { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
     { part: "their rise", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
-    { part: "the wire", on: "the rail", target: ".k-rail-wire", property: "opacity", from: 0, to: 1, duration: "medium", cue: ["micro", "long"], curve: "standard" },
   ],
   reduced: [
     { part: "the welcome", on: WELCOME, target: ".kobo-scene", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
