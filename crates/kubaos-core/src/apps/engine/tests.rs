@@ -1877,6 +1877,59 @@ fn world_with_dependencies(apps: &[(&str, &str)]) -> World {
     world
 }
 
+/// A machine with Ubuntu's snap `firefox` (`1:1snap1`), which sorts above the vendor's 160.0, and
+/// `libnss3`, which the vendor's firefox needs, at 3.110 from the user's own pin, where apt would
+/// take it down to 3.98.
+fn world_with_a_pinned_dependency() -> World {
+    let firefox = app(r#"
+[[action]]
+name = "Install Firefox"
+kind = "apt"
+packages = ["firefox"]
+versions = "*~build*"
+"#);
+    let world = World::new(&[("firefox", &firefox)]);
+    {
+        let mut state = world.host.state.borrow_mut();
+        state
+            .dpkg
+            .insert("firefox".to_owned(), "1:1snap1-0ubuntu9.1".to_owned());
+        state.candidates.insert("firefox".to_owned(), "160.0~build1".to_owned());
+        state.dpkg.insert("libnss3".to_owned(), "2:3.110-1".to_owned());
+        state.candidates.insert("libnss3".to_owned(), "2:3.98-1".to_owned());
+        state
+            .depends
+            .insert("firefox".to_owned(), ["libnss3".to_owned()].into());
+    }
+    world
+}
+
+#[test]
+fn an_install_that_would_move_down_a_package_other_than_its_own_is_refused_naming_it() {
+    let world = world_with_a_pinned_dependency();
+    let before = world.host.snapshot();
+
+    let error = world.install("firefox", true).0.unwrap_err();
+
+    let shown = crate::update::event::chain(&error);
+    assert!(shown.contains("would move libnss3 down"), "{shown}");
+    assert!(!shown.contains("firefox down"), "{shown}");
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn an_install_moves_its_own_package_down_to_replace_another_build_of_it() {
+    let world = world_with_a_pinned_dependency();
+    world.host.state.borrow_mut().depends.clear();
+
+    world.install("firefox", true).0.unwrap();
+
+    assert_eq!(
+        world.host.state.borrow().dpkg.get("firefox").map(String::as_str),
+        Some("160.0~build1")
+    );
+}
+
 #[test]
 fn removing_an_app_removes_what_its_packages_pulled_in_and_keeps_what_was_there() {
     let world = world_with_dependencies(&[("tool", &apt_app("Tool", "\"tool\""))]);

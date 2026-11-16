@@ -165,7 +165,7 @@ fn installing_lazyvim_installs_neovim_first_through_its_own_folder_and_journal()
 
     assert_eq!(names(&result.unwrap()), ["Neovim", "LazyVim"]);
     assert_eq!(events.apps(), ["Neovim 1/2", "LazyVim 2/2"]);
-    assert_eq!(world.host.state.borrow().dpkg["neovim"], "1.0");
+    assert_eq!(world.host.state.borrow().dpkg["neovim"], "0.10.2-1");
     assert!(world.home_file(".config/nvim/init.lua").is_file());
     let (neovim, neovim_root) = world.journals("neovim");
     let neovim = neovim.unwrap();

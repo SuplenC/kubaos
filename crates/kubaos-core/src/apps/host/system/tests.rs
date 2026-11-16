@@ -55,6 +55,21 @@ fn a_simulation_names_what_apt_would_newly_install_and_remove_but_not_upgrades()
 }
 
 #[test]
+fn a_simulation_names_what_apt_would_move_down() {
+    let shown = "Inst firefox [1:1snap1-0ubuntu9.1] (160.0~build1 mozilla:all [amd64])\n\
+                 Inst libnss3 [2:3.110-1] (2:3.98-1build1 Ubuntu:24.04/noble [amd64])\n\
+                 Inst libc6 [2.39-0ubuntu8] (2.39-0ubuntu8.4 Ubuntu:24.04/noble-updates [amd64])\n";
+
+    let simulation = simulation(shown, "amd64");
+
+    assert_eq!(
+        simulation.downgrades,
+        ["firefox".to_owned(), "libnss3".to_owned()].into()
+    );
+    assert!(simulation.installs.is_empty());
+}
+
+#[test]
 fn a_package_of_another_architecture_keeps_its_architecture_in_its_name() {
     let shown = "Inst libfoo1:i386 (1.2-3 Ubuntu:24.04/noble [i386])\n\
                  Inst libfoo1 (1.2-3 Ubuntu:24.04/noble [amd64])\n\

@@ -111,6 +111,27 @@ pub struct State {
 }
 
 impl State {
+    /// The installed packages among `packages` and what they depend on, through what that
+    /// depends on, whose candidate sorts below the version dpkg has: what apt would move down.
+    fn downgraded(&self, packages: &[String]) -> BTreeSet<String> {
+        let mut seen: BTreeSet<String> = BTreeSet::new();
+        let mut next: Vec<String> = packages.to_vec();
+        while let Some(package) = next.pop() {
+            if !seen.insert(package.clone()) {
+                continue;
+            }
+            next.extend(self.depends.get(&package).into_iter().flatten().cloned());
+        }
+        seen.into_iter()
+            .filter(|p| {
+                let (Some(installed), Some(candidate)) = (self.dpkg.get(p), self.candidates.get(p)) else {
+                    return false;
+                };
+                compare(candidate, installed) == Ordering::Less
+            })
+            .collect()
+    }
+
     /// `packages` and what they depend on, through what that depends on, that dpkg hasn't.
     fn missing(&self, packages: &[String]) -> BTreeSet<String> {
         let mut needed: BTreeSet<String> = BTreeSet::new();
@@ -379,7 +400,7 @@ impl Host for FakeHost {
                 }
                 return Ok(AptSimulation {
                     removes: gone.into_iter().filter(|p| state.dpkg.contains_key(p)).collect(),
-                    installs: BTreeSet::new(),
+                    ..AptSimulation::default()
                 });
             }
         };
@@ -392,6 +413,7 @@ impl Host for FakeHost {
                 .cloned()
                 .collect(),
             installs: state.missing(&installing),
+            downgrades: state.downgraded(&installing),
         })
     }
 
@@ -425,7 +447,8 @@ impl Host for FakeHost {
             }
         }
         for p in state.missing(packages) {
-            state.dpkg.insert(p, "1.0".to_owned());
+            let version = state.candidates.get(&p).cloned().unwrap_or_else(|| "1.0".to_owned());
+            state.dpkg.insert(p, version);
         }
         state.dpkg.extend(moving);
         state.log.push(format!("apt install {}", packages.join(" ")));
