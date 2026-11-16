@@ -8,6 +8,7 @@ use std::time::Instant;
 
 use kubaos_core::update::changelog::Change;
 use kubaos_core::update::changelog::Changelog;
+use kubaos_core::update::event::AppChanges;
 use kubaos_core::update::event::Command;
 use kubaos_core::update::event::GroupChange;
 use kubaos_core::update::event::Outcome;
@@ -309,6 +310,7 @@ fn edge_update() -> Vec<UpdateEvent> {
                     removed: vec!["old-tool".into()],
                 },
             ],
+            apps: AppChanges::default(),
             inputs: vec!["nixpkgs".into()],
             nix_packages: Some(vec![
                 package("btop", Some("1.4.7"), Some("1.4.8")),

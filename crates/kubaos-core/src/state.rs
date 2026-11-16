@@ -162,6 +162,11 @@ impl Paths {
         kubaos_user_layer::root(&self.config)
     }
 
+    /// The user's picks of the Apps catalog, `~/.config/kubaos/apps.toml`.
+    pub fn app_picks(&self) -> PathBuf {
+        self.user_layer().join(crate::apps::picks::PICKS)
+    }
+
     /// The Projects root, where scaffolded projects go: `~/Projects` unless [`PROJECTS_VAR`]
     /// moved it.
     pub fn projects_root(&self) -> PathBuf {

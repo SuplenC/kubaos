@@ -1,4 +1,5 @@
 use crate::update::changelog::Changelog;
+use crate::update::event::AppChanges;
 use crate::update::event::Command;
 use crate::update::event::PackageChange;
 use crate::update::event::Program;
@@ -33,6 +34,7 @@ fn quiet() -> Summary {
         packages: 0,
         upgraded: Vec::new(),
         apt: Vec::new(),
+        apps: AppChanges::default(),
         inputs: Vec::new(),
         nix_packages: Some(Vec::new()),
         migrations: Vec::new(),

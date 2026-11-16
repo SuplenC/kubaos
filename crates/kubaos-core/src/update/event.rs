@@ -47,6 +47,8 @@ pub enum Command {
     /// `kubaos packages enable|disable`: an optional group of the package manifest turned on or
     /// off.
     Packages,
+    /// `kubaos app add|remove`: apps of the catalog installed or removed.
+    App,
 }
 
 impl Command {
@@ -58,6 +60,7 @@ impl Command {
             Self::Rollback => "rollback",
             Self::Check => "check",
             Self::Packages => "packages",
+            Self::App => "app",
         }
     }
 }
@@ -88,6 +91,9 @@ pub enum Phase {
     Manifest,
     /// The release's new system migrations, as root.
     SystemMigrations,
+    /// The picked apps of the catalog the machine lacks, installed; or the apps `kubaos app`
+    /// adds or removes.
+    Apps,
     /// `nix flake update` of the user flake.
     Inputs,
     /// The relink and the home-manager switch, and the running session following it.
@@ -119,6 +125,7 @@ impl Phase {
             Self::Hyprland => "Hyprland pin",
             Self::Manifest => "Package manifest",
             Self::SystemMigrations => "System migrations",
+            Self::Apps => "Apps",
             Self::Inputs => "Nix inputs",
             Self::Home => "Home",
             Self::Suites => "Suites",
@@ -245,6 +252,22 @@ pub struct GroupChange {
     pub removed: Vec<String>,
 }
 
+/// The apps of the catalog a run installed and removed, by name, in the catalog's order.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppChanges {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub installed: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub removed: Vec<String>,
+}
+
+impl AppChanges {
+    /// Whether no app came or went.
+    pub fn is_empty(&self) -> bool {
+        self.installed.is_empty() && self.removed.is_empty()
+    }
+}
+
 /// A program an update keeps current outside apt and the user flake, in a phase of its own that
 /// the user can turn off.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -357,6 +380,9 @@ pub struct Summary {
     /// What the package manifest's phase installed and removed, by group.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub apt: Vec<GroupChange>,
+    /// The apps of the catalog the run installed and removed.
+    #[serde(default, skip_serializing_if = "AppChanges::is_empty")]
+    pub apps: AppChanges,
     /// The user flake's inputs `nix flake update` moved.
     pub inputs: Vec<String>,
     /// The Nix packages of the home that moved, came in or went away, from `nix store
