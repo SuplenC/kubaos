@@ -97,9 +97,9 @@ impl Engine<'_> {
         }
         let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
         let picked = folder.pick(setup).map_err(EngineError::Folder)?;
-        let requires: Vec<_> = folder.requires(picked).cloned().collect();
+        let requirements: Vec<_> = folder.requires(picked).cloned().collect();
         visiting.push(id.to_owned());
-        for requirement in requires {
+        for requirement in requirements {
             let required = match Folder::load(&self.user.catalog, requirement.id()) {
                 Ok(required) => required,
                 Err(FolderError::Read { .. }) => {

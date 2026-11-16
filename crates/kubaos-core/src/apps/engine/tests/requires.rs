@@ -65,7 +65,7 @@ undo = ["./unsync"]
     )
 }
 
-/// Another app on Neovim, to share it with LazyVim.
+/// Another app on Neovim, so two apps share it.
 fn notes() -> String {
     format!(
         r#"name = "Notes"
