@@ -185,7 +185,7 @@ interface StandIn {
  * room and its footer. Live, the field takes typing and the list ↑ ↓ and Enter; still, it shows
  * what it is told. `ran` hears each Result run; the Toast it says rises from the panel's foot.
  */
-function standIn(prefs: MenuSettings, options: { readonly live: boolean; readonly query?: string; readonly ran?: (found: Found, typed: string) => void; readonly onEscape?: () => void }): StandIn {
+function standIn(prefs: MenuSettings, options: { readonly live: boolean; readonly query?: string; readonly ran?: (found: Found, typed: string) => void; readonly onEscape?: () => void; readonly hints?: readonly KeyHint[]; readonly took?: string }): StandIn {
   const box = document.createElement("span");
   box.className = "setup-kotodama-menu";
   const { room, say } = toastRoom();
@@ -230,8 +230,8 @@ function standIn(prefs: MenuSettings, options: { readonly live: boolean; readonl
   const draw = () => {
     if (!measures) return;
     found = search(typed, prefs, measures.rows);
-    const took = text(typed ? "2 ms" : "", "mono", "cold");
-    const foot = row("s8", "centre", keyHints([["↑↓", "Select"], ["Enter", "Run"], ["Esc", "Clear"]]), fill(), took);
+    const took = text(typed ? (options.took ?? "2 ms") : "", "mono", "cold");
+    const foot = row("s8", "centre", keyHints(options.hints ?? [["↑↓", "Select"], ["Enter", "Run"], ["Esc", "Clear"]]), fill(), took);
     const panel = commandMenu({ results: found.map((each) => each.result), query: typed, head, current: Math.min(selected, Math.max(0, found.length - 1)), onTake: run, footer: filling(foot) }, measures);
     panel.querySelector(".k-list")?.addEventListener("click", () => queueMicrotask(() => head.focus({ preventScroll: true })));
     box.replaceChildren(panel, room);
@@ -349,8 +349,9 @@ function spotlightGroups(q: string): (readonly [string, readonly Answer[]])[] {
  * tones, an invented cleaner for a PC that is fine.
  */
 function fakeAd(): HTMLElement {
-  const tag = text(AD.tag, "label", "on_burn_warning");
-  tag.classList.add("setup-kotodama-ad-tag");
+  const tag = document.createElement("span");
+  tag.className = "setup-kotodama-ad-tag";
+  tag.append(text(AD.tag, "label", "burn_warning"));
   const close = icon("close", "var(--type-small-icon)", "var(--color-on_burn_warning)");
   const top = row("s8", "centre", tag, filling(text(AD.sponsor, "caption", "on_burn_warning")), close);
   const tile = document.createElement("span");
@@ -358,8 +359,8 @@ function fakeAd(): HTMLElement {
   tile.append(icon("rocket_launch", "var(--type-heading-icon)", "var(--color-on_error)"));
   const product = row("s12", "start", tile, filling(stack(0, "start", text(AD.product, "subheading", "on_burn_warning"), filling(wrapped(AD.maker, "caption", "on_burn_warning")))));
   const stars = row("s4", "centre", ...Array.from({ length: 5 }, () => icon("star_filled", "var(--type-small-icon)", "var(--color-error)")), text(AD.rating, "caption", "on_burn_warning"));
-  const go = button({ label: AD.action, kind: "Danger", icon: "arrow_forward", trailing: true });
-  const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "heading", "on_burn_warning")), filling(product), filling(stars), filling(go), filling(wrapped(AD.fine, "caption", "on_burn_warning")));
+  const go = button({ label: AD.action, kind: "Danger", size: "Sm", icon: "arrow_forward", trailing: true });
+  const ad = stack("s8", "start", filling(top), filling(wrapped(AD.headline, "subheading", "on_burn_warning")), filling(product), filling(stars), filling(go), filling(wrapped(AD.fine, "caption", "on_burn_warning")));
   ad.classList.add("setup-kotodama-ad");
   return ad;
 }
@@ -489,7 +490,7 @@ export function kotodamaCard(view: string): KotodamaCard {
       filling(stack("s8", "start", ...examples.map(filling))),
     );
     left.classList.add("setup-kotodama-what");
-    return splitColumns([1, 1], "s40", [filling(left), filling(fillingHeight(menu.box))], { fillHeight: true });
+    return splitColumns([2, 3], "s40", [filling(left), filling(fillingHeight(menu.box))], { fillHeight: true });
   };
 
   // ------------------------------------------------------------------ Why --
@@ -513,7 +514,8 @@ export function kotodamaCard(view: string): KotodamaCard {
       const ad = fakeAd();
       start.box.append(ad);
       const spotlight = otherMenu(QUESTION, spotlightGroups(QUESTION), OTHERS.spotlight.indexing);
-      const ours = standIn(prefs, { live: false, query: QUESTION });
+      // Kotodama's lane fills its rows with what is on the machine: no web rows under it here.
+      const ours = standIn({ ...prefs, web: false }, { live: false, query: QUESTION, hints: [["↑↓", "Select"], ["Enter", "Run"]], took: "3 ms" });
       ours.box.inert = true;
       const clocks = { start: document.createElement("span"), spotlight: document.createElement("span"), kotodama: document.createElement("span") };
       const read = (who: keyof typeof clocks, words: string) => clocks[who].replaceChildren(clockChip(words, who === "kotodama"));
