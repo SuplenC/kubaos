@@ -521,3 +521,49 @@ fn a_group_of_the_catalogs_packages_points_to_kubaos_app() {
     );
     assert_eq!(fs::read_to_string(w.sys.apt_choices()).unwrap_or_default(), "");
 }
+
+/// A newer release's Docker, with a key this `kubaos` doesn't know.
+const NEWER_DOCKER_APP: &str = r#"
+name = "Docker"
+summary = "Containers"
+a_newer_key = "x"
+
+[apt]
+repo = "docker"
+packages = ["docker-ce"]
+"#;
+
+#[test]
+fn a_catalog_it_cant_read_leaves_the_sync_going_and_the_catalogs_packages_alone() {
+    let w = World::new(Channel::Edge, true);
+    let docker_off = manifest(&["curl", "git"]).replace(
+        "optional = \"on\"\npackages = [\"docker-ce\"]",
+        "optional = \"off\"\npackages = [\"docker-ce\"]",
+    );
+    w.push(&[(MANIFEST, &docker_off), ("apps/docker.toml", NEWER_DOCKER_APP)], true);
+    // Before the handover migration, the record still has Docker's packages.
+    put(&w.sys.apt_record(), "docker-ce\tdocker\ncurl\ttools\n");
+    let mut m = fake(&["curl", "docker-ce", "libpam-u2f"]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert!(ran(&m, "sudo apt-get remove").is_empty(), "{:?}", m.ran);
+    assert!(m.dpkg.as_ref().unwrap().installed.contains_key("git"));
+    assert!(m.dpkg.as_ref().unwrap().installed.contains_key("docker-ce"));
+    assert!(
+        warnings(&events)
+            .iter()
+            .any(|w| w.starts_with("the Apps catalog can't be read")),
+        "{:?}",
+        warnings(&events)
+    );
+
+    let status = w
+        .updater(&mut fake(&["curl", "docker-ce", "git", "libpam-u2f"]))
+        .package_status();
+    assert!(status.is_ok(), "{status:?}");
+    w.updater(&mut fake(&["curl", "docker-ce", "git", "libpam-u2f"]))
+        .set_group("u2f", Switch::Off)
+        .unwrap();
+}

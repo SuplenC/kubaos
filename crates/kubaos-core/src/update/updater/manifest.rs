@@ -6,7 +6,11 @@
 //! install candidate; holding the held groups; then the removals `apt::plan` allows, each one
 //! checked first with `apt-get -s remove`, so a package something else still depends on stays.
 //! What it installed and removed goes into the record, `/var/lib/kubaos/apt-installed`. The
-//! packages of the Apps catalog's apps are the catalog's, and no sync touches them.
+//! packages of the Apps catalog's apps are the catalog's, and no sync touches them. A catalog
+//! that can't be read is warned about and taken as empty, so a `kubaos` meeting a newer release's
+//! manifest it doesn't know still syncs the packages and reaches the switch that brings the new
+//! one: the catalog's packages are then safe as they always were, out of the record once the
+//! `apps-catalog-handover` migration has run, listed by groups that are off before it.
 //!
 //! # Owns
 //!
@@ -44,6 +48,7 @@ use crate::update::event::Restart;
 use crate::update::event::SuiteChanges;
 use crate::update::event::Summary;
 use crate::update::event::UpdateEvent;
+use crate::update::event::chain;
 use crate::update::firmware::Firmware;
 use crate::update::machine::Cmd;
 use crate::update::machine::Machine;
@@ -137,7 +142,7 @@ impl<M: Machine> Updater<'_, M> {
         if group.optional.is_none() {
             return Err(UpdateError::NotOptional { name: name.to_owned() });
         }
-        let catalog = Catalog::load(&self.sys.catalog()).map_err(UpdateError::Catalog)?;
+        let catalog = self.catalog_or_warn();
         if plan::of_catalog(group, &catalog.packages()) {
             let ids: Vec<&str> = catalog.installing(&group.packages).map(|a| a.id.as_str()).collect();
             return Err(UpdateError::InCatalog {
@@ -270,9 +275,7 @@ impl<M: Machine> Updater<'_, M> {
             .trim()
             .to_owned();
         let dpkg = self.dpkg()?;
-        let catalog = Catalog::load(&self.sys.catalog())
-            .map_err(UpdateError::Catalog)?
-            .packages();
+        let catalog = self.catalog_or_warn().packages();
         Ok(AptState {
             manifest,
             choices,
@@ -280,6 +283,18 @@ impl<M: Machine> Updater<'_, M> {
             arch,
             dpkg,
             catalog,
+        })
+    }
+
+    /// The checked-out release's Apps catalog, or an empty one, with a warning, when it can't be
+    /// read: the module's header says why that is safe.
+    fn catalog_or_warn(&mut self) -> Catalog {
+        Catalog::load(&self.sys.catalog()).unwrap_or_else(|e| {
+            self.j.warn(format!(
+                "the Apps catalog can't be read, so the packages go on without it: {}",
+                chain(&e)
+            ));
+            Catalog::default()
         })
     }
 
