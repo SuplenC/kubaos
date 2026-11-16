@@ -175,7 +175,8 @@ impl App {
             return Err(ManifestError::Escaped);
         }
         let file: File = toml::from_str(text).map_err(ManifestError::Parse)?;
-        let sources = usize::from(file.apt.is_some()) + usize::from(file.nix.is_some()) + usize::from(file.deb.is_some());
+        let sources =
+            usize::from(file.apt.is_some()) + usize::from(file.nix.is_some()) + usize::from(file.deb.is_some());
         let source = match (file.apt, file.nix, file.deb) {
             (Some(apt), None, None) => Source::Apt {
                 repo: apt.repo,
@@ -269,8 +270,13 @@ impl App {
 /// path.
 pub fn is_app_id(id: &str) -> bool {
     id.len() <= 64
-        && id.chars().next().is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
-        && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && id
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 /// Whether `value` can be a Debian version: letters, digits and `.+~:-`, starting with a digit.

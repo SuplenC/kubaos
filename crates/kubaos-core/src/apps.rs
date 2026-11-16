@@ -9,8 +9,8 @@
 //!
 //! # Owns
 //!
-//! - The manifest's format ([`App`]), the catalog ([`Catalog`]), the picks ([`Picks`]) and how
-//!   the machine compares with them ([`plan`]).
+//! - The manifest's format ([`App`]), the catalog ([`Catalog`]), the picks ([`Picks`]) and how the
+//!   machine compares with them ([`plan`]).
 //!
 //! # Not here
 //!

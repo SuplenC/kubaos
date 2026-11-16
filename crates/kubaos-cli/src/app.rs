@@ -103,7 +103,10 @@ fn list(json: bool) -> ExitCode {
     };
     let listed = listing(&catalog, &picks);
     if json {
-        out!("{}", serde_json::to_string(&listed).expect("the list always serializes"));
+        out!(
+            "{}",
+            serde_json::to_string(&listed).expect("the list always serializes")
+        );
         return ExitCode::SUCCESS;
     }
     let width = listed.iter().map(|a| a.id.len()).max().unwrap_or(0);
@@ -171,7 +174,13 @@ fn table(status: &Status) -> String {
     let mut out = format!("KubaOS's apps ({})\n\n", status.arch);
     for app in &status.apps {
         let picked = if app.picked { "picked" } else { "" };
-        let mut line = format!("  {:<11} {:<6}  {:<width$}  {}", app.state.word(), picked, app.id, app.name);
+        let mut line = format!(
+            "  {:<11} {:<6}  {:<width$}  {}",
+            app.state.word(),
+            picked,
+            app.id,
+            app.name
+        );
         if let Some(version) = &app.version {
             let _ = write!(line, "  {version}");
         }

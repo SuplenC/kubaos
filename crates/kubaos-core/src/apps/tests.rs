@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -74,13 +75,11 @@ fn picks(ids: &[&str]) -> Picks {
 
 /// dpkg with `installed`, each `name` or `name=version`.
 fn dpkg(installed: &[&str]) -> Dpkg {
-    let lines: String = installed
-        .iter()
-        .map(|p| {
-            let (name, version) = p.split_once('=').unwrap_or((p, "1.0"));
-            format!("installed install {name} {version}\n")
-        })
-        .collect();
+    let mut lines = String::new();
+    for p in installed {
+        let (name, version) = p.split_once('=').unwrap_or((p, "1.0"));
+        let _ = writeln!(lines, "installed install {name} {version}");
+    }
     Dpkg::parse(&lines)
 }
 
@@ -160,7 +159,10 @@ fn an_app_on_the_machine_but_not_picked_is_left_alone() {
     assert!(installs(&facts).is_empty());
     let status = Status::new(&facts);
     let agent = &status.apps[0];
-    assert_eq!((agent.id.as_str(), agent.picked, agent.state), ("agent", false, AppState::Installed));
+    assert_eq!(
+        (agent.id.as_str(), agent.picked, agent.state),
+        ("agent", false, AppState::Installed)
+    );
 }
 
 #[test]
@@ -261,7 +263,10 @@ fn a_manifest_that_cant_be_installed_safely_is_refused() {
         ("empty name", AGENT.replace("\"Agent\"", "\"\"")),
         ("no packages", AGENT.replace("[\"agent\", \"agent-data\"]", "[]")),
         ("bad apt name", AGENT.replace("\"agent-data\"", "\"Agent Data\"")),
-        ("an option as a package", AGENT.replace("\"agent-data\"", "\"--force-yes\"")),
+        (
+            "an option as a package",
+            AGENT.replace("\"agent-data\"", "\"--force-yes\""),
+        ),
         ("bad nix name", EDITOR.replace("\"editor\"", "\"../editor\"")),
         ("http", deb.replace("https://", "http://")),
         ("url with a space", deb.replace("desk-1.2.0", "desk 1.2.0")),
@@ -270,7 +275,10 @@ fn a_manifest_that_cant_be_installed_safely_is_refused() {
         ("bad version", deb.replace("\"1.2.0\"", "\"latest version\"")),
         ("no download", deb.split("[deb.amd64]").next().unwrap().to_owned()),
         ("an escape", AGENT.replace("A coding agent", "A \\u0063oding agent")),
-        ("a multi-line string", AGENT.replace("\"A coding agent\"", "\"\"\"A coding agent\"\"\"")),
+        (
+            "a multi-line string",
+            AGENT.replace("\"A coding agent\"", "\"\"\"A coding agent\"\"\""),
+        ),
     ];
     for (what, text) in cases {
         assert!(App::parse("x", &text).is_err(), "{what} was accepted:\n{text}");
@@ -279,7 +287,17 @@ fn a_manifest_that_cant_be_installed_safely_is_refused() {
 
 #[test]
 fn an_id_is_never_a_path_or_an_option() {
-    for bad in ["", "../etc", "a/b", "-x", "Claude", "a b", "a.toml", "a_b", &"a".repeat(65)] {
+    for bad in [
+        "",
+        "../etc",
+        "a/b",
+        "-x",
+        "Claude",
+        "a b",
+        "a.toml",
+        "a_b",
+        &"a".repeat(65),
+    ] {
         assert!(
             matches!(App::parse(bad, AGENT), Err(ManifestError::InvalidId(_))),
             "{bad:?}"
@@ -292,7 +310,8 @@ fn an_id_is_never_a_path_or_an_option() {
 
 #[test]
 fn an_apt_app_from_a_repo_the_package_manifest_lacks_is_refused() {
-    let manifest = Manifest::parse("[repo.other]\nkey_url = \"https://x\"\nfingerprint = \"AB\"\nkeyring = \"/k\"\n").unwrap();
+    let manifest =
+        Manifest::parse("[repo.other]\nkey_url = \"https://x\"\nfingerprint = \"AB\"\nkeyring = \"/k\"\n").unwrap();
 
     let checked = catalog(false).check_repos(&manifest);
 

@@ -48,6 +48,7 @@ use super::changelog::Changelog;
 use super::closure;
 use super::event::AppChanges;
 use super::event::Command;
+use super::event::GroupChange;
 use super::event::PackageChange;
 use super::event::Phase;
 use super::event::Preview;
@@ -233,6 +234,16 @@ impl UpdateError {
         let what = what.into();
         move |source| Self::Step { what, source }
     }
+}
+
+/// What an update's system side did: whether the Hyprland pin moved, what the package manifest's
+/// phase changed, the system migrations that ran and the apps installed.
+#[derive(Default)]
+struct SystemSide {
+    relogin: bool,
+    apt: Vec<GroupChange>,
+    migrations: Vec<String>,
+    apps: AppChanges,
 }
 
 /// Whether a command asks before it changes anything.
@@ -1029,20 +1040,12 @@ impl<'a, M: Machine> Updater<'a, M> {
         if let Some(target) = target {
             self.phase(Phase::Release, |u| u.move_release(&target.commit))?;
         }
-        let mut migrations = Vec::new();
-        let mut relogin = false;
-        if !opts.packages_only {
-            relogin = self.apply_hyprland_pin()?;
-        }
-        let apt = if self.sys.manifest().is_file() {
-            self.phase(Phase::Manifest, |u| u.sync_manifest(None))?
-        } else {
-            Vec::new()
-        };
-        if !opts.packages_only {
-            migrations.extend(self.run_system_migrations()?);
-        }
-        let apps = self.reconcile_apps();
+        let SystemSide {
+            relogin,
+            apt,
+            mut migrations,
+            apps,
+        } = self.system_side(opts)?;
         self.phase(Phase::Inputs, |u| u.update_inputs(&flake))?;
         let nix_packages = self.phase(Phase::Home, |u| {
             u.relink()?;
@@ -1094,6 +1097,23 @@ impl<'a, M: Machine> Updater<'a, M> {
         };
         self.j.emit(&UpdateEvent::Summary(summary));
         Ok(())
+    }
+
+    /// The steps of an update between moving `release` and the user flake: the Hyprland pin, the
+    /// package manifest, the system migrations and the picked apps, in that order.
+    fn system_side(&mut self, opts: UpdateOptions) -> Result<SystemSide, UpdateError> {
+        let mut side = SystemSide::default();
+        if !opts.packages_only {
+            side.relogin = self.apply_hyprland_pin()?;
+        }
+        if self.sys.manifest().is_file() {
+            side.apt = self.phase(Phase::Manifest, |u| u.sync_manifest(None))?;
+        }
+        if !opts.packages_only {
+            side.migrations = self.run_system_migrations()?;
+        }
+        side.apps = self.reconcile_apps();
+        Ok(side)
     }
 
     /// What the user has to do for the update to apply in full, and why: a reboot when a package

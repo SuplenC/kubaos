@@ -36,12 +36,12 @@ use crate::state::migrate::wire_home_nix;
 use crate::update::changelog::Changelog;
 use crate::update::event::AppChanges;
 use crate::update::event::Command;
-use crate::update::event::chain;
 use crate::update::event::Phase;
 use crate::update::event::Restart;
 use crate::update::event::SuiteChanges;
 use crate::update::event::Summary;
 use crate::update::event::UpdateEvent;
+use crate::update::event::chain;
 use crate::update::firmware::Firmware;
 use crate::update::machine::Cmd;
 use crate::update::machine::Machine;
@@ -222,8 +222,9 @@ impl<M: Machine> Updater<'_, M> {
             }
         };
         for id in plan::unknown(&state.catalog, &state.picks) {
-            self.j
-                .warn(format!("{id} is picked in apps.toml, but this release's catalog has no such app"));
+            self.j.warn(format!(
+                "{id} is picked in apps.toml, but this release's catalog has no such app"
+            ));
         }
         let wanted = plan::installs(&state.facts());
         if wanted.is_empty() {
@@ -233,8 +234,10 @@ impl<M: Machine> Updater<'_, M> {
         let done = self.install_apps(&state, &wanted, Root::Sudo);
         self.j.phase_end_optional(done.is_ok());
         done.unwrap_or_else(|e| {
-            self.j
-                .warn(format!("apps not installed, the next update tries again: {}", chain(&e)));
+            self.j.warn(format!(
+                "apps not installed, the next update tries again: {}",
+                chain(&e)
+            ));
             AppChanges::default()
         })
     }
@@ -271,7 +274,8 @@ impl<M: Machine> Updater<'_, M> {
             if after.facts().state(app) == apps::AppState::Installed {
                 changes.installed.push(app.name.clone());
             } else {
-                self.j.warn(format!("{} isn't on the machine after its install", app.name));
+                self.j
+                    .warn(format!("{} isn't on the machine after its install", app.name));
             }
         }
         self.j.detail(format!("{} installed", changes.installed.join(", ")));
