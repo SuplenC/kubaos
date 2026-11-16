@@ -972,7 +972,7 @@ fn shipped_items() -> Vec<Item> {
             &Picks::default(),
             journals,
             &journals.join("root"),
-            "amd64",
+            Platform::new("amd64", Unfree::Allowed),
             Some(&Dpkg::default()),
         )
         .unwrap();

@@ -9,8 +9,8 @@ use std::process::Command;
 use super::Choices;
 use super::Record;
 use super::Switch;
-use crate::sandbox::Sandbox;
 use crate::sandbox;
+use crate::sandbox::Sandbox;
 
 mod keys;
 

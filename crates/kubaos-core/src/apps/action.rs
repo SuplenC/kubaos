@@ -644,27 +644,7 @@ impl Action {
                 repo,
                 arch,
                 versions,
-            } => {
-                non_empty("packages", packages)?;
-                if let Some(versions) = versions
-                    && (versions.is_empty() || versions.contains(char::is_whitespace))
-                {
-                    return Err(ActionError::InvalidVersions {
-                        value: versions.clone(),
-                    });
-                }
-                if let Some(name) = packages.iter().find(|p| !is_package_name(p)) {
-                    return Err(ActionError::InvalidPackage { name: name.clone() });
-                }
-                if let Some(repo) = repo
-                    && !is_app_id(repo)
-                {
-                    return Err(ActionError::InvalidRepo { name: repo.clone() });
-                }
-                if let Some(arch) = arch {
-                    check_arch(arch)?;
-                }
-            }
+            } => check_apt(packages, repo.as_deref(), arch.as_deref(), versions.as_deref())?,
             Kind::Deb { package, .. } => {
                 if !is_package_name(package) {
                     return Err(ActionError::InvalidPackage { name: package.clone() });
@@ -773,6 +753,35 @@ fn check_setting(file: &str, key: &str, value: &toml::Value) -> Result<(), Actio
         toml::Value::String(_) | toml::Value::Integer(_) | toml::Value::Float(_) | toml::Value::Boolean(_)
     ) {
         return Err(ActionError::InvalidValue);
+    }
+    Ok(())
+}
+
+/// Whether an `apt` step's packages, repository, architecture and versions are well formed.
+fn check_apt(
+    packages: &[String],
+    repo: Option<&str>,
+    arch: Option<&str>,
+    versions: Option<&str>,
+) -> Result<(), ActionError> {
+    non_empty("packages", packages)?;
+    if let Some(versions) = versions
+        && (versions.is_empty() || versions.contains(char::is_whitespace))
+    {
+        return Err(ActionError::InvalidVersions {
+            value: versions.to_owned(),
+        });
+    }
+    if let Some(name) = packages.iter().find(|p| !is_package_name(p)) {
+        return Err(ActionError::InvalidPackage { name: name.clone() });
+    }
+    if let Some(repo) = repo
+        && !is_app_id(repo)
+    {
+        return Err(ActionError::InvalidRepo { name: repo.to_owned() });
+    }
+    if let Some(arch) = arch {
+        check_arch(arch)?;
     }
     Ok(())
 }
