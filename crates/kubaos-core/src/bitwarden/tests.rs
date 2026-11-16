@@ -989,6 +989,34 @@ fn without_a_signing_key_commits_stay_unsigned_and_the_old_file_goes() {
     assert!(out.warned("no SSH key in your vault has the field signing=true: commits stay unsigned"));
 }
 
+#[test]
+fn without_bitwarden_desktop_or_an_agent_commits_stay_unsigned_rather_than_refused() {
+    let mut m = machine().file(SIGNING, "[commit]\n\tgpgSign = true\n");
+    m.sockets.clear();
+
+    let out = pull_all(&mut m);
+
+    assert!(m.text(SIGNING).is_none(), "git would refuse every commit it can't sign");
+    assert!(
+        out.warned(
+            "GitHub (Personal) has signing=true, but Bitwarden desktop isn't installed, so no agent can sign: commits \
+             stay unsigned. Add it with `kubaos app add bitwarden`, then run `kubaos bitwarden refresh --only git`"
+        ),
+        "{:?}",
+        out.report.warnings
+    );
+    assert!(out.report.summary.contains(
+        &"git    commits unsigned: Bitwarden desktop isn't installed (kubaos app add bitwarden)".to_string()
+    ));
+
+    // Installed but not running yet: signing is set, and the agent's check says to start it.
+    let mut installed = machine();
+    installed.sockets.clear();
+    installed.dirs.insert(agent::DESKTOP.into(), 0o755);
+    pull_all(&mut installed);
+    assert!(installed.text(SIGNING).is_some());
+}
+
 // -------------------------------------------------------------------- gh
 
 #[test]

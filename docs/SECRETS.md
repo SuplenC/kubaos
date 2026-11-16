@@ -75,7 +75,7 @@ Keep your vault the way it is. `kubaos bitwarden` reads the whole vault: folders
   | `` the field `user` holds `a b`, with characters ssh_config can't take safely `` | no Host block | fix the value |
   | `` kubaos bitwarden reads no field `host`; … rename it to `hosts` `` | the field is ignored | rename the field |
 
-  When the signing key's `.pub` on disk isn't the vault's key, git signing is left as it was and the warning says why and what fixes it: the file is missing or from an older pull (`kubaos bitwarden refresh --only ssh,git` writes it), it belongs to a private key of the same name in `~/.ssh` (a `file` field on the item gives the vault's key a name of its own), or the item's public key can't be used (fix it in Bitwarden).
+  When the signing key's `.pub` on disk isn't the vault's key, git signing is left as it was and the warning says why and what fixes it: the file is missing or from an older pull (`kubaos bitwarden refresh --only ssh,git` writes it), it belongs to a private key of the same name in `~/.ssh` (a `file` field on the item gives the vault's key a name of its own), or the item's public key can't be used (fix it in Bitwarden). With neither Bitwarden desktop installed nor an agent on its socket, commits stay unsigned (the signing file goes, as git refuses a commit it can't sign) and the warning says to add the app (`kubaos app add bitwarden`), then run `kubaos bitwarden refresh --only git`.
 
   The block for an alias without `hostname` is still written: a name your resolver knows (a LAN name, an `/etc/hosts` entry) works as it is. The warning only fires for a `hosts` entry with no dot, colon or wildcard.
 
