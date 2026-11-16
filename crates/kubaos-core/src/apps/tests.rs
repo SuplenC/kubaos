@@ -456,6 +456,103 @@ fn penpots_stack_is_pinned_by_digest_bound_to_this_machine_and_keeps_its_volumes
     );
     assert!(compose.contains("PENPOT_PUBLIC_URI: http://localhost:9001"));
     assert!(compose.contains("PENPOT_TELEMETRY_ENABLED: \"false\""));
-    assert!(down.contains("compose down --remove-orphans\n"), "{down}");
+    assert!(
+        !compose.contains("8025"),
+        "the mail catcher's page shows password resets to anyone on the machine"
+    );
+    assert!(down.contains("docker-compose.yaml\" down --remove-orphans\n"), "{down}");
     assert!(!down.contains("--volumes") && !down.contains(" -v"), "{down}");
+}
+
+#[test]
+fn penpots_proxy_runs_walled_off_as_a_user_of_its_own_and_compose_as_root() {
+    let service = fs::read_to_string(repo_root().join("apps/penpot/kubaos-penpot.service")).unwrap();
+    let lines: Vec<&str> = service.lines().collect();
+
+    for line in [
+        "DynamicUser=yes",
+        "ProtectSystem=strict",
+        "ProtectHome=yes",
+        "NoNewPrivileges=yes",
+        "PrivateDevices=yes",
+        "PrivateTmp=yes",
+        "RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX",
+        "CapabilityBoundingSet=",
+    ] {
+        assert!(lines.contains(&line), "{line} is missing");
+    }
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("ExecStartPre=+/usr/bin/docker compose ")),
+        "compose talks to Docker as root"
+    );
+    assert!(lines.contains(&"ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:9002"));
+}
+
+/// Penpot's script `name`, with the stack's folder moved to `dir`.
+fn penpot_script(name: &str, into: &Path, dir: &Path) -> PathBuf {
+    let text = fs::read_to_string(repo_root().join("apps/penpot").join(name)).unwrap();
+    let from = "dir=/etc/kubaos/penpot\n";
+    assert!(text.contains(from), "{name} keeps the stack in /etc/kubaos/penpot");
+    let path = into.join(name);
+    fs::write(&path, text.replace(from, &format!("dir={}\n", dir.display()))).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    path
+}
+
+#[test]
+fn penpots_removal_takes_the_images_its_install_pulled_and_keeps_the_ones_the_machine_had() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (home, dir, images) = (
+        tmp.path().join("home"),
+        tmp.path().join("penpot"),
+        tmp.path().join("images"),
+    );
+    for folder in [&home, &dir, &images] {
+        fs::create_dir_all(folder).unwrap();
+    }
+    let sandbox = crate::sandbox::Sandbox::new(&tmp.path().join("sandbox"), &home, "tester");
+    let (theirs, ours) = (
+        "postgres:15@sha256:2663a9f0fde52de94f5dad3603a1942359f49472f1017c1a6d64f66bfedacb40",
+        "penpotapp/frontend:2.19.2@sha256:27af83e128712c6e621afcbc4dbae5a607204f7acc89a9ae1245b5601b4a66a8",
+    );
+    // A daemon whose images are files named for their references.
+    sandbox.stub(
+        "docker",
+        &format!(
+            r#"images='{images}'
+file() {{ printf '%s/%s' "$images" "$(printf %s "$1" | tr '/:@' '___')"; }}
+case "$1 $2" in
+"image inspect") [ -e "$(file "$3")" ]; exit ;;
+"image rm") rm "$(file "$3")"; exit ;;
+esac
+for arg; do
+	case $arg in
+	config) printf '%s\n' '{theirs}' '{ours}'; exit 0 ;;
+	up) touch "$(file '{theirs}')" "$(file '{ours}')"; exit 0 ;;
+	down) exit 0 ;;
+	esac
+done
+exit 1"#,
+            images = images.display()
+        ),
+    );
+    let had = images.join(theirs.replace(['/', ':', '@'], "_"));
+    fs::write(&had, "").unwrap();
+    let pulled = images.join(ours.replace(['/', ':', '@'], "_"));
+    let (up, down) = (
+        penpot_script("up", tmp.path(), &dir),
+        penpot_script("down", tmp.path(), &dir),
+    );
+
+    let ran_up = sandbox.command(&up).output().unwrap();
+    assert!(ran_up.status.success(), "{ran_up:?}");
+    assert!(pulled.exists() && had.exists());
+    let ran_down = sandbox.command(&down).output().unwrap();
+
+    assert!(ran_down.status.success(), "{ran_down:?}");
+    assert!(!pulled.exists(), "the image the install pulled stayed");
+    assert!(had.exists(), "the image the machine had went");
+    assert!(!dir.join("pulled-images").exists() && !dir.join("secret.env").exists());
 }
