@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::fs::PermissionsExt;
@@ -1096,6 +1097,180 @@ fn a_browser_from_its_vendors_repository_sets_the_repository_up_and_goes_whole()
         assert!(user_journal(&w, id).is_none(), "{id}");
     }
     assert!(!pin.exists(), "the pin goes with Firefox");
+}
+
+#[test]
+fn firefox_takes_the_place_of_ubuntus_snap_firefox_and_goes_whole() {
+    let w = world();
+    with_app(&w, "firefox");
+    let mut m = fake(&w, &[]);
+    {
+        let host = host(&m);
+        let mut state = host.state.borrow_mut();
+        state
+            .dpkg
+            .insert("firefox".to_owned(), "1:1snap1-0ubuntu9.1".to_owned());
+        state.candidates.insert("firefox".to_owned(), "160.0~build1".to_owned());
+    }
+
+    w.updater(&mut m).add_apps(&names(&["firefox"]), None).unwrap();
+
+    let version = host(&m).state.borrow().dpkg.get("firefox").cloned();
+    assert_eq!(version.as_deref(), Some("160.0~build1"));
+    let journal = root_journal(&w, "firefox").unwrap();
+    assert!(
+        journal
+            .entries
+            .iter()
+            .flat_map(|e| &e.claims)
+            .any(|c| c.claim == "package:firefox" && c.owned),
+        "{journal:?}"
+    );
+
+    w.updater(&mut m).remove_apps(&names(&["firefox"])).unwrap();
+
+    assert!(!has(&m, "firefox"));
+}
+
+#[test]
+fn tor_browser_brave_and_chromium_install_and_go_whole() {
+    let w = world();
+    let browsers = [
+        ("tor-browser", "torbrowser-launcher"),
+        ("brave", "brave"),
+        ("chromium", "chromium"),
+    ];
+    for (id, _) in browsers {
+        with_app(&w, id);
+    }
+    let mut m = fake(&w, &[]);
+    let there = |m: &Fake, package: &str| has(m, package) || host(m).state.borrow().nix.contains(package);
+
+    for (id, package) in browsers {
+        w.updater(&mut m).add_apps(&names(&[id]), None).unwrap();
+
+        assert!(there(&m, package), "{id}");
+        assert!(user_journal(&w, id).is_some_and(|j| j.complete), "{id}");
+    }
+    assert!(has(&m, "torbrowser-launcher"), "the launcher is apt's");
+    assert!(
+        host(&m)
+            .state
+            .borrow()
+            .nix
+            .is_superset(&names(&["brave", "chromium"]).into_iter().collect())
+    );
+
+    for (id, package) in browsers {
+        w.updater(&mut m).remove_apps(&names(&[id])).unwrap();
+
+        assert!(!there(&m, package), "{id}");
+        assert!(user_journal(&w, id).is_none() && root_journal(&w, id).is_none(), "{id}");
+    }
+}
+
+/// A sandbox where `curl` saves the URL it is given as the key it downloads, failing for a URL
+/// with `fails` in it, and `gpg` answers for such a key with the fingerprint the package manifest
+/// pins for its URL: a key fetch that works, without the network or the machine's keyrings.
+fn key_sandbox(dir: &Path, fails: &str) -> crate::sandbox::Sandbox {
+    let manifest =
+        crate::apt::Manifest::read(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../system/packages.toml"))
+            .unwrap()
+            .unwrap();
+    let mut answers = String::new();
+    for repo in manifest.repos().values() {
+        let keys = [
+            (Some(&repo.key_url), Some(&repo.fingerprint)),
+            (repo.next_key_url.as_ref(), repo.next_fingerprint.as_ref()),
+        ];
+        for (url, fingerprint) in keys {
+            if let (Some(url), Some(fingerprint)) = (url, fingerprint) {
+                let _ = writeln!(answers, "[ \"$url\" != '{url}' ] || f={fingerprint}");
+            }
+        }
+    }
+    let home = dir.join("home");
+    fs::create_dir_all(&home).unwrap();
+    let sandbox = crate::sandbox::Sandbox::new(&dir.join("sandbox"), &home, "kuba");
+    sandbox.stub("dpkg", "echo amd64");
+    sandbox.stub(
+        "curl",
+        &format!(
+            "out=; url=\nwhile [ $# -gt 0 ]; do case \"$1\" in -o) out=$2; shift ;; -*) ;; *) url=$1 ;; esac; shift; done\n\
+             case \"$url\" in *{fails}*) exit 22 ;; esac\nprintf '%s' \"$url\" >\"$out\""
+        ),
+    );
+    sandbox.stub(
+        "gpg",
+        &format!(
+            "case \"$*\" in *--dearmor*) cat; exit 0 ;; esac\nfor last; do :; done\nurl=$(cat \"$last\") || exit 2\nf=\n\
+             {answers}[ -n \"$f\" ] || exit 2\necho 'pub:-:4096:1:0000000000000000:::::::'\necho \"fpr:::::::::$f:\""
+        ),
+    );
+    sandbox
+}
+
+#[test]
+fn the_browser_repos_migration_refreshes_only_the_repositories_kubaos_set_up_and_never_fails() {
+    let w = world();
+    for id in ["firefox", "vivaldi", "librewolf"] {
+        with_app(&w, id);
+    }
+    let mut m = fake(&w, &[]);
+    w.updater(&mut m)
+        .add_apps(&names(&["firefox", "vivaldi", "librewolf"]), None)
+        .unwrap();
+    let dir = w.tmp.path().join("migration");
+    let sources = dir.join("sources.list.d");
+    let edge = "Types: deb\nURIs: https://packages.microsoft.com/repos/edge-stable\nSigned-By: /usr/share/keyrings/microsoft-edge.gpg\n";
+    put(&sources.join("microsoft-edge.sources"), edge);
+    let sandbox = key_sandbox(&dir, "librewolf");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let migration = fs::read_dir(root.join("migrations/system"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.to_string_lossy().ends_with("-browser-repos.sh"))
+        .unwrap();
+
+    let out = sandbox
+        .command("bash")
+        .args(["-euo", "pipefail"])
+        .arg(&migration)
+        .env("KUBAOS_DIR", &root)
+        .env("APT_SOURCES_D", &sources)
+        .env("KUBAOS_APP_JOURNALS", w.sys.app_journals())
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    let calls = sandbox.calls();
+    let wrote = |file: &str| {
+        calls
+            .iter()
+            .any(|c| c.starts_with("sudo install -D -m 0644 ") && c.ends_with(&format!(" {file}")))
+    };
+    let at = |name: &str| sources.join(name).display().to_string();
+    assert!(
+        wrote(&at("mozilla.sources")) && wrote(&at("vivaldi.sources")),
+        "{calls:#?}"
+    );
+    assert!(
+        wrote("/usr/share/keyrings/vivaldi-16BD9233.gpg") && wrote("/usr/share/keyrings/vivaldi-5220E3E9.gpg"),
+        "both of Vivaldi's keys: {calls:#?}"
+    );
+    assert!(
+        !calls.iter().any(|c| c.contains("microsoft")),
+        "Edge was installed by hand, so its source is Microsoft's: {calls:#?}"
+    );
+    assert_eq!(
+        fs::read_to_string(sources.join("microsoft-edge.sources")).unwrap(),
+        edge
+    );
+    assert!(!wrote(&at("librewolf.sources")), "{calls:#?}");
+    assert!(stderr.contains("apt repository librewolf not refreshed"), "{stderr}");
+    let updates = calls.iter().filter(|c| *c == "sudo apt-get update").count();
+    assert_eq!(updates, 1, "one apt update for every repository: {calls:#?}");
 }
 
 #[test]
