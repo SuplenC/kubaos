@@ -8,7 +8,7 @@ import { figure, tick } from "../../lib/figure.ts";
 import { icon } from "../../lib/icon.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { filling, row, stack, within } from "../../lib/layout.ts";
-import { progressBar, setProgress } from "../../lib/progress.ts";
+import { captionedBar, progressBar, setProgress } from "../../lib/progress.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
@@ -16,6 +16,13 @@ import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 const ROOM = "var(--size-column)";
 
 const DOING: Words = { short: "Downloading", long: "Downloading the system image from the mirror closest to you" };
+
+const LEFT: Words = { short: "About 3 minutes left", long: "Noch ungefähr vier Minuten, bis die Installation auf dieser Festplatte fertig ist" };
+
+/** A bar with how long is left over its end. */
+function captioned(words: string | null, fraction = 0.41): HTMLElement {
+  return within(ROOM, captionedBar(progressBar({ fraction }), words === null ? null : { words, icon: "timer" }));
+}
 
 /** A bar with its label above it: what is going on at the start, how far at the end. */
 function labelled(words: string, fraction: number, danger = false, room = ROOM): HTMLElement {
@@ -93,6 +100,8 @@ export default page<"empty" | "loading">({
     { name: "Timed", for: "a fraction the app times itself: a held button", sample: () => within(ROOM, progressBar({ fraction: 0.6, timed: true })) },
     { name: "Danger", for: "a Danger banner: the hold that erases a disk", sample: () => labelled("Erasing the disk", 0.42, true) },
     { name: "With a count", for: "steps of a whole, `space.s4` over its `small` count", sample: () => counted(3, 5) },
+    { name: "With a caption", for: "how long is left over its end, `space.s8` above", sample: () => captioned(LEFT.short) },
+    { name: "Caption to come", for: "its line held empty: the bar stays put", sample: () => captioned(null, 0.01) },
     { name: "In a row", for: "a job in the Command menu: the row's last quarter", sample: () => jobRow(0.62) },
     { name: "Can't tell yet", for: "a spinner and its words where the bar will be", sample: cantTell },
   ],
@@ -118,7 +127,10 @@ export default page<"empty" | "loading">({
   },
   focus: doesntApply("a bar isn't a control: it takes no focus; its glow is a light."),
   content: {
-    text: [{ name: "Its label", words: DOING, sample: (words: string) => labelled(words, 0.42) }],
+    text: [
+      { name: "Its label", words: DOING, sample: (words: string) => labelled(words, 0.42) },
+      { name: "Its caption", words: LEFT, sample: (words: string) => captioned(words) },
+    ],
     missingPicture: doesntApply("a bar is drawn."),
     counts: [
       { name: "Nothing", for: "the track alone", sample: () => within(ROOM, progressBar({ fraction: 0 })) },
@@ -137,6 +149,7 @@ export default page<"empty" | "loading">({
       { name: "A bar", for: "height and fill", sample: () => within(ROOM, progressBar({ fraction: 0.42 })) },
       { name: "Labelled", for: "the label above it and its gap", sample: () => labelled("Downloading the system image", 0.42) },
       { name: "With a count", for: "the count under it and its gap", sample: () => counted(3, 5) },
+      { name: "With a caption", for: "the caption over its end and its gap", sample: () => captioned(LEFT.short) },
     ]),
     measures: [
       { part: "Height", token: "size-progress" },
@@ -145,6 +158,9 @@ export default page<"empty" | "loading">({
       { part: "Bar → count", token: "space-s4" },
       { part: "Label → percent", token: "space-s12" },
       { part: "Label line", token: "type-label-line" },
+      { part: "Caption → bar", token: "space-s8" },
+      { part: "Caption's line", token: "type-small-line" },
+      { part: "Caption's symbol → words", token: "space-s8" },
     ],
     reflow: {
       note: "It fills its room, the fill the same fraction; its label ends in an ellipsis before the percent.",

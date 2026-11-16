@@ -31,9 +31,10 @@ export default page<Shown>({
     daylight: doesntApply("the live ISO is always dark: the installer has no day."),
   },
   variants: [
-    { name: "Just started", for: "0%, the room at a scrim's dark", sample: CELLS.loading },
+    { name: "Just started", for: "0%, a scrim's dark; no time yet, its line held", sample: CELLS.loading },
     { name: "Copying the system", for: "41%: its figures in `primary`", sample: CELLS.rest },
     { name: "Nearly there", for: "93%: the street almost lit", sample: scene(0.93, 2) },
+    { name: "The last of it", for: "Under a minute left", sample: scene(0.99, 3) },
     { name: "Another tip", for: "Super+Q, in the same place", sample: scene(0.62, 2) },
     { name: "The steps and the log", for: "on glass, on Install, the rail locked", sample: screen(() => room({ at: { panel: "details" } })) },
     { name: "Failed, next to Windows", for: "what broke, Windows untouched, the log", sample: CELLS.error },
@@ -77,8 +78,9 @@ export default page<Shown>({
     measures: [
       { part: "The column", token: "size-column" },
       { part: "Accent → figure → lede", token: "space-s8" },
-      { part: "Lede → bar", token: "space-s32" },
-      { part: "Bar → the step", token: "space-s12" },
+      { part: "Lede → time left", token: "space-s32" },
+      { part: "Time → bar → step", token: "space-s8" },
+      { part: "Figures under a long step", token: "space-s4" },
       { part: "Bar → tips → action", token: "space-s40" },
       { part: "Tip's label → tip", token: "space-s8" },
       { part: "Keys → what they do", token: "space-s12" },

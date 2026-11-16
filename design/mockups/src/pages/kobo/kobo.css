@@ -440,3 +440,22 @@
   --kobo-past: calc(-1 * var(--focus-far));
   clip-path: inset(var(--kobo-past) var(--kobo-past) calc(var(--kobo-past) * round(down, var(--kobo-open), 1)) var(--kobo-past));
 }
+
+/* The step's name under the install's bar reads from the bar's start however it breaks, though the
+   Backdrop centres the words in its middle. */
+.kobo-column .kobo-install-progress .kobo-status > .k-text[data-wrapped] {
+  text-align: start;
+}
+
+/* Figures that go under the name sit as a line under a title does, `space.s4` below it. */
+.kobo-install-progress .kobo-status {
+  row-gap: var(--space-s4);
+}
+
+/* The figures beside the step's name under the install's bar: in a line as tall as the name's, so
+   the two share a centre, on one line or when the figures go under the name. */
+.kobo-figures {
+  display: flex;
+  align-items: center;
+  min-height: var(--type-body_strong-line);
+}

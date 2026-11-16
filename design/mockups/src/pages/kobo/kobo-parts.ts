@@ -14,14 +14,13 @@ import { descriptionList } from "../../lib/description.ts";
 import { emptyState } from "../../lib/empty-state.ts";
 import { errorBlock } from "../../lib/error-block.ts";
 import { field, labelled, setInvalid } from "../../lib/field.ts";
-import { icon } from "../../lib/icon.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { keycap } from "../../lib/keycap.ts";
-import { fill, filling, fillingHeight, gap, grid, header, row, stack } from "../../lib/layout.ts";
+import { fill, filling, fillingHeight, flow, gap, grid, header, row, stack } from "../../lib/layout.ts";
 import { type ListRowSpec, list, scrollingList } from "../../lib/list.ts";
 import { log } from "../../lib/log.ts";
 import { meter } from "../../lib/meter.ts";
-import { progressBar } from "../../lib/progress.ts";
+import { type Caption, captionedBar, progressBar } from "../../lib/progress.ts";
 import { scroll } from "../../lib/scroll.ts";
 import { select } from "../../lib/select.ts";
 import { spinner } from "../../lib/spinner.ts";
@@ -846,9 +845,51 @@ export function installLog(share: number, failed: boolean, height = "var(--size-
   return log(lines, { height }).box;
 }
 
+/**
+ * How long the install has left `share` of the way through, as its bar's caption says it: nothing
+ * while the first step reads the machine, which is what the estimate is made from; About 4 minutes
+ * left; Under a minute left for the last of it. The caption's line keeps its height with nothing on
+ * it, so its words coming in move nothing.
+ */
+export function timeCaption(share: number): Caption | null {
+  if (stepAt(share).index === 0) return null;
+  const seconds = TOTAL * (1 - share);
+  if (seconds < 60) return { words: "Under a minute left", icon: "timer" };
+  const minutes = new Intl.NumberFormat("en-GB", { style: "unit", unit: "minute", unitDisplay: "long", maximumFractionDigits: 0 }).format(Math.ceil(seconds / 60));
+  return { words: `About ${minutes} left`, icon: "timer" };
+}
+
+/**
+ * The line under the install's bar: the step running, then how much of it is done, the whole width
+ * of the bar to themselves. Where the two don't fit on one line the figures go under the name, and
+ * a name longer than the line breaks between words, so nothing runs over anything.
+ */
+export function stepLine(share: number): HTMLElement {
+  const step = STEPS[stepAt(share).index]!;
+  const name = wrapped(step.title, "body_strong");
+  const parts: Element[] = [name];
+  if (step.detail) {
+    // The figures sit in a line as tall as the name's, so their centre is the name's.
+    const figures = document.createElement("span");
+    figures.className = "kobo-figures";
+    figures.append(text(step.detail, "mono", "primary"));
+    parts.push(figures);
+  }
+  const line = flow("s12", ...parts);
+  line.classList.add("kobo-status");
+  line.dataset.says = `${step.title}|${step.detail ?? ""}`;
+  return line;
+}
+
+/** The install's bar with how long is left over its end, and the step under it. */
+export function installProgress(share: number): HTMLElement {
+  const box = stack("s8", "start", filling(captionedBar(progressBar({ fraction: share, timed: true }), timeCaption(share))), filling(stepLine(share)));
+  box.classList.add("kobo-install-progress");
+  return box;
+}
+
 /** The install's details on glass: the figure, the bar, the steps, the log, a way back. */
 export function detailsBody(share: number, back: () => void): HTMLElement {
-  const { index } = stepAt(share);
   const percent = new Intl.NumberFormat("en-GB", { style: "percent" }).format(share);
   const scene = button({ label: "Back to the view", kind: "Text", icon: "arrow_back" });
   scene.addEventListener("click", back);
@@ -857,7 +898,7 @@ export function detailsBody(share: number, back: () => void): HTMLElement {
     "s20",
     "start",
     filling(top),
-    filling(stack("s12", "start", filling(progressBar({ fraction: share, timed: true })), filling(row("s12", "centre", text(STEPS[index]!.title, "body_strong"), text(STEPS[index]!.detail ?? "", "mono", "primary"), fill(), icon("timer", "var(--icon-s16)", "var(--color-on_surface_variant)"), text(duration(share * TOTAL), "mono", "on_surface_variant"))))),
+    filling(installProgress(share)),
     filling(stepList(share)),
     fillingHeight(filling(installLog(share, false, "100%"))),
     filling(hangs(row("s16", "centre", scene))),

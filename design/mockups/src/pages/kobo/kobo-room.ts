@@ -20,8 +20,8 @@ import { shown, type Words } from "../../lib/content.ts";
 import { dialog } from "../../lib/dialog.ts";
 import { icon } from "../../lib/icon.ts";
 import { type KeyHint, keyHints } from "../../lib/keycap.ts";
-import { fill, filling, gap, row, stack } from "../../lib/layout.ts";
-import { progressBar, setProgress } from "../../lib/progress.ts";
+import { gap, row, stack } from "../../lib/layout.ts";
+import { setCaption, setProgress } from "../../lib/progress.ts";
 import { rollingNumber } from "../../lib/rolling-number.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { battery, koboBrand, type RailPage, stepRailPage } from "../../lib/step-rail.ts";
@@ -31,7 +31,7 @@ import { bezier, css, cueOf, milliseconds, stepsOf, struck } from "../../site/re
 import type { Duration, Easing, Move, NonEmpty, Track } from "../../site/page.ts";
 import { paint, palette } from "../../site/recolour.ts";
 import { settings } from "../../site/settings.ts";
-import { DONE_HEADLINE, HERO, LAPTOP_DISK, LEDE, NETWORKS, RELEASE, STEPS, STICK, stepAt, TIPS, TOTAL, duration } from "./kobo-data.ts";
+import { DONE_HEADLINE, HERO, LAPTOP_DISK, LEDE, NETWORKS, RELEASE, STICK, TIPS, TOTAL, duration } from "./kobo-data.ts";
 import {
   accountProblem,
   type Answers,
@@ -41,12 +41,15 @@ import {
   failedBody,
   filledAnswers,
   freshAnswers,
+  installProgress,
   languageBody,
   type LanguageView,
   type Machine,
   networkBody,
   networkProblem,
   reviewBody,
+  stepLine,
+  timeCaption,
   type ReviewView,
   youBody,
 } from "./kobo-parts.ts";
@@ -115,23 +118,40 @@ function tracksNow(move: Move): readonly Track[] {
  * Plays `tracks` on `root` as the players do: each on its targets, from its cue for its duration,
  * on its curve or the neon's steps, holding its first value until its cue and its last after.
  * Returns when the last one ends.
+ *
+ * Where several tracks move one property of one element (the street going dark, then lighting up),
+ * only the first to start holds its starting value before its cue; a later one would hold its own
+ * over the earlier track the whole time it waits. They are started in the order they
+ * start, so each later one lies over the one before once it runs.
  */
 export function play(root: HTMLElement, tracks: readonly Track[]): Promise<void> {
   const speed = settings().speed;
   let longest = 0;
-  for (const track of tracks) {
+  const timed = tracks.map((track) => ({ track, delay: cueOf(track) / speed })).sort((a, b) => a.delay - b.delay);
+  const held = new Map<Element, Set<string>>();
+  for (const { track, delay } of timed) {
     const targets = root.matches(track.target) ? [root] : [...root.querySelectorAll<HTMLElement>(track.target)];
     const from = css(track.from);
     const to = css(track.to);
     const duration = ms(track.duration);
-    const delay = cueOf(track) / speed;
     longest = Math.max(longest, delay + duration);
     const frames: Keyframe[] = struck(track.curve)
       ? stepsOf(track.curve).map((part) => ({ [track.property]: typeof from === "number" && typeof to === "number" ? from + (to - from) * part : part < 0.5 ? from : to }))
       : [{ [track.property]: from }, { [track.property]: to }];
-    const easing = struck(track.curve) ? `steps(${frames.length}, jump-none)` : `cubic-bezier(${bezier(track.curve).join(", ")})`;
+    const easing = struck(track.curve) ? "linear" : `cubic-bezier(${bezier(track.curve).join(", ")})`;
     for (const target of targets) {
-      const run = target.animate(struck(track.curve) ? frames : frames, { duration, delay, easing: struck(track.curve) ? "linear" : easing, fill: "both" });
+      const moved = held.get(target) ?? new Set<string>();
+      held.set(target, moved);
+      const first = !moved.has(track.property);
+      moved.add(track.property);
+      // A strike's frames open on its first flicker, not on where it starts from: before its cue it
+      // holds its starting value as the element's own, not its first frame.
+      if (first && struck(track.curve)) {
+        if (track.property === "opacity") target.style.opacity = String(from);
+        else target.style.setProperty(track.property, String(from));
+      }
+      const fill: FillMode = first && !struck(track.curve) ? "both" : "forwards";
+      const run = target.animate(frames, { duration, delay, easing, fill });
       // The end state is the element's own once the move is over, so a later move starts from it.
       run.finished.then(() => {
         if (track.property === "opacity") target.style.opacity = String(to);
@@ -217,34 +237,12 @@ function tipLine(index: number): HTMLElement {
   return row("s12", "centre", keyHints([[tip.keys, ""]]), text(tip.does, "body", "on_surface_variant"));
 }
 
-/** How long is left `share` of the way through, as the status line says it. */
-function timeLeft(share: number): string {
-  const minutes = Math.max(1, Math.ceil((TOTAL * (1 - share)) / 60));
-  return new Intl.NumberFormat("en-GB", { style: "unit", unit: "minute", unitDisplay: "long", maximumFractionDigits: 0 }).format(minutes);
-}
-
-/**
- * The line under the install's bar: the step running and how much of it is done, then how long is
- * left at its end. Drawn whole each time either changes: a text's box is as wide as the words it
- * was made with, so words written into an old one run over what is beside it.
- */
-function installStatus(share: number): HTMLElement {
-  const step = STEPS[stepAt(share).index]!;
-  const doing = row("s12", "centre", text(step.title, "body_strong"), ...(step.detail ? [text(step.detail, "mono", "primary")] : []));
-  doing.classList.add("kobo-doing");
-  const now = row("s12", "centre", doing, fill(), icon("timer", "var(--icon-s16)", "var(--color-on_surface_variant)"), text(`About ${timeLeft(share)} left`, "small", "on_surface_variant"));
-  now.classList.add("kobo-status");
-  now.dataset.says = `${step.title}|${step.detail ?? ""}|${timeLeft(share)}`;
-  return now;
-}
-
 /** The install as its scene shows it, `share` of the way through. */
 export function installingColumn(share: number, tip = 0): HTMLElement {
   // Two figures' room: at 100 the install hands over to the done screen.
   const percent = rollingNumber({ value: Math.min(99, Math.round(share * 100)), widest: "00", style: "hero_number" });
   const figure = row(0, "end", percent.element, text("%", "hero_number"));
   figure.classList.add("kobo-percent");
-  const now = installStatus(share);
   const tips = document.createElement("span");
   tips.className = "kobo-tip";
   const shownTip = tipLine(tip);
@@ -259,7 +257,7 @@ export function installingColumn(share: number, tip = 0): HTMLElement {
     gap("s8"),
     part(wrapped("Go stare at a wall, it'll be done before you get bored.", "body_large", "on_surface_variant"), "lede"),
     gap("s32"),
-    part(stack("s12", "start", filling(progressBar({ fraction: share, timed: true })), filling(now)), "progress"),
+    part(installProgress(share), "progress"),
     gap("s40"),
     part(stack("s8", "centre", text("While you wait", "label", "on_surface_variant"), tips), "tips"),
     gap("s40"),
@@ -645,7 +643,10 @@ export function room(options: RoomOptions): HTMLElement {
   const arrive = (at: At): HTMLElement => {
     const arriving = layerOf(at);
     const shown = [...element.children].filter((child) => child.classList.contains("k-backdrop") && !child.hasAttribute("data-under"));
-    if ("scene" in at) (shown.at(-1) ?? element.firstChild)?.after(arriving) ?? element.prepend(arriving);
+    const top = shown.at(-1);
+    // HAZARD: `after` returns nothing, so an `after(…) ?? prepend(…)` chain always prepends too,
+    // burying an arriving scene under the one it should cover until the move ends.
+    if ("scene" in at && top) top.after(arriving);
     else element.prepend(arriving);
     if ("scene" in at && !element.querySelector(".kobo-foot")) arriving.after(foot(machine));
     return arriving;
@@ -795,9 +796,15 @@ function simulate(element: HTMLElement, from: number, done: () => void): { stop:
         if (bar) setProgress(bar, share);
         const dark = scene.querySelector<HTMLElement>(".k-backdrop-dark");
         if (dark) dark.style.opacity = String(dusk() * (1 - share));
-        const status = column.querySelector<HTMLElement>(".kobo-status");
-        const next = installStatus(share);
+        const status = column.querySelector<HTMLElement>(".kobo-install-progress .kobo-status");
+        const next = stepLine(share);
         if (status && status.dataset.says !== next.dataset.says) status.replaceWith(next);
+        const captioned = column.querySelector<HTMLElement>(".k-progress-captioned");
+        const caption = timeCaption(share);
+        if (captioned && captioned.dataset.says !== (caption?.words ?? "")) {
+          captioned.dataset.says = caption?.words ?? "";
+          setCaption(captioned, caption);
+        }
       }
       const now = Math.floor(((performance.now() - start) / milliseconds("scene")) / 3);
       if (now !== tip) {
@@ -1121,6 +1128,9 @@ export const FINISHING: Move = {
   unflickered: ENDING(arrival("standard")) as unknown as NonEmpty<Track<Easing>>,
   reduced: [
     { part: "the install's words", on: INSTALL, target: ".kobo-scene[data-scene='installing'] > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    // The street stays at its own size, as the install left it: the done screen's picture comes
+    // close only as a move, and two pictures at two sizes fading over each other double every sign.
+    { part: "the street, as it is", on: DONE, target: ".kobo-scene[data-scene='done'] .k-backdrop-picture", property: "scale", from: 1, to: 1, duration: "instant", curve: "standard" },
     { part: "the done screen", on: DONE, target: ".kobo-scene[data-scene='done']", property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
   ],
   back: "cuts",

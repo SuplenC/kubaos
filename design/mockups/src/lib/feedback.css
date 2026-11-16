@@ -76,6 +76,30 @@
   transition: none;
 }
 
+/* A bar's caption over its end (`captionedBar`): a line of `small` as wide as the bar, its words
+   at the line's end, a line tall with nothing on it. */
+.k-progress-caption {
+  display: flex;
+  justify-content: flex-end;
+  min-height: var(--type-small-line);
+}
+
+/* Its words end on the bar's end however they break, in a Backdrop's middle too, which centres
+   the words in it: hence the selector as specific as the Backdrop's. */
+.k-progress-captioned > .k-progress-caption :is(.k-row > .k-text, .k-text)[data-wrapped] {
+  text-align: end;
+}
+
+/* A caption longer than the line breaks between words before it pushes past the bar's end. */
+.k-progress-caption > .k-row {
+  min-width: 0;
+}
+
+.k-progress-caption > .k-row > .k-text {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .k-progress-row {
   position: absolute;
   inset: 0;
