@@ -3,6 +3,7 @@
 //! all to compare. What a `run` starts runs in the machine's [`Sandbox`], never on the real one.
 
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -14,6 +15,7 @@ use std::rc::Rc;
 
 use super::AptPlan;
 use super::AptSimulation;
+use super::Downgrade;
 use super::Host;
 use super::HostError;
 use super::UnitState;
@@ -25,6 +27,7 @@ use crate::apps::root::Request;
 use crate::apps::root::RootError;
 use crate::apps::root::RootSide;
 use crate::apps::root::Server;
+use crate::apps::version::compare;
 use crate::sandbox::Sandbox;
 
 /// Root's side of the fake machine, its requests sent as JSON lines through the real server.
@@ -365,24 +368,35 @@ impl Host for FakeHost {
         })
     }
 
-    fn apt_install(&mut self, packages: &[String]) -> Result<(), HostError> {
+    fn apt_install(&mut self, packages: &[String], downgrade: Downgrade) -> Result<(), HostError> {
         for p in packages {
             self.fails(&format!("apt:{p}"))?;
         }
         let mut state = self.state.borrow_mut();
+        // apt moves an installed package asked for by name to its candidate, as it does a
+        // distribution's build of a name a pinned repository also has; `-y` refuses to move one
+        // down unless allowed, before it changes anything.
+        let moving: Vec<(String, String)> = packages
+            .iter()
+            .filter_map(|p| Some((p.clone(), state.dpkg.get(p)?.clone(), state.candidates.get(p)?.clone())))
+            .map(|(p, installed, candidate)| {
+                if downgrade == Downgrade::Refuse && compare(&candidate, &installed) == Ordering::Less {
+                    Err(HostError::Failed {
+                        command: "apt-get install".to_owned(),
+                        code: Some(100),
+                        stderr: "E: Packages were downgraded and -y was used without --allow-downgrades.".to_owned(),
+                    })
+                } else {
+                    Ok((p, candidate))
+                }
+            })
+            .collect::<Result<_, _>>()?;
         for p in packages {
             let conflicts = state.conflicts.get(p).cloned().unwrap_or_default();
             for gone in conflicts {
                 state.dpkg.remove(&gone);
             }
         }
-        // apt moves an installed package asked for by name to its candidate, as it does a
-        // distribution's build of a name a pinned repository also has.
-        let moving: Vec<(String, String)> = packages
-            .iter()
-            .filter(|p| state.dpkg.contains_key(*p))
-            .filter_map(|p| Some((p.clone(), state.candidates.get(p)?.clone())))
-            .collect();
         for p in state.missing(packages) {
             state.dpkg.insert(p, "1.0".to_owned());
         }

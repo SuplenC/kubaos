@@ -4,7 +4,9 @@ use std::os::unix::fs::PermissionsExt;
 use super::SystemHost;
 use super::candidate;
 use super::simulation;
+use crate::apps::host::Downgrade;
 use crate::apps::host::Host;
+use crate::sandbox::Sandbox;
 
 /// What a script run by `host` sees of its environment: its `HOME`, and whether it inherited
 /// a variable of the process that ran it (cargo sets `CARGO_PKG_NAME` for every test).
@@ -75,4 +77,21 @@ fn the_candidate_is_what_apt_cache_policy_would_install() {
     assert_eq!(candidate(policy).as_deref(), Some("0.9.5-6ubuntu2"));
     assert_eq!(candidate("neovim:\n  Installed: (none)\n  Candidate: (none)\n"), None);
     assert_eq!(candidate(""), None);
+}
+
+#[test]
+fn apt_moves_a_package_down_only_when_the_install_allows_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let sandbox = Sandbox::new(&dir.path().join("sandbox"), dir.path(), "kuba");
+    let mut host = SystemHost::new("kuba", dir.path(), "/usr/share/kubaos")
+        .as_root()
+        .with_path(sandbox.bin());
+
+    host.apt_install(&["firefox".to_owned()], Downgrade::Refuse).unwrap();
+    host.apt_install(&["firefox".to_owned()], Downgrade::Allow).unwrap();
+
+    let calls = sandbox.calls();
+    assert_eq!(calls.len(), 2, "{calls:?}");
+    assert!(!calls[0].contains("--allow-downgrades"), "{}", calls[0]);
+    assert!(calls[1].contains("--allow-downgrades"), "{}", calls[1]);
 }

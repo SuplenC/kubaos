@@ -20,6 +20,7 @@ use std::process::Stdio;
 
 use super::AptPlan;
 use super::AptSimulation;
+use super::Downgrade;
 use super::Host;
 use super::HostError;
 use super::UNIT_PROPERTIES;
@@ -235,17 +236,16 @@ impl Host for SystemHost {
         Ok(simulation(&Self::out(&mut command)?, &self.arch))
     }
 
-    fn apt_install(&mut self, packages: &[String]) -> Result<(), HostError> {
+    fn apt_install(&mut self, packages: &[String], downgrade: Downgrade) -> Result<(), HostError> {
         if packages.is_empty() {
             return Ok(());
         }
-        Self::out(
-            self.command("apt-get")
-                .args(["install", "-y", "--no-install-recommends"])
-                .args(APT_OPTIONS)
-                .args(packages),
-        )
-        .map(drop)
+        let mut command = self.command("apt-get");
+        command.args(["install", "-y", "--no-install-recommends"]);
+        if downgrade == Downgrade::Allow {
+            command.arg("--allow-downgrades");
+        }
+        Self::out(command.args(APT_OPTIONS).args(packages)).map(drop)
     }
 
     fn deb_install(&mut self, deb: &Path) -> Result<(), HostError> {
