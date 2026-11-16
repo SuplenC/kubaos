@@ -39,7 +39,7 @@ export const CATEGORIES: readonly Category[] = [
   { id: "design", title: "Design", icon: "palette" },
   { id: "media", title: "Media", icon: "movie" },
   { id: "chat", title: "Chat", icon: "message_circle" },
-  { id: "office", title: "Office and notes", icon: "file_text" },
+  { id: "office", title: "Office", icon: "file_text" },
   { id: "games", title: "Games", icon: "gamepad" },
   { id: "passwords", title: "Passwords", icon: "lock" },
 ];
@@ -57,7 +57,7 @@ export interface App {
 }
 
 /** VS Code's line, and what it says once ticked anyway. */
-export const VSCODE = { line: "Microsoft's editor. Phones home, works anyway.", ticked: "Bold. LazyVim is right there." };
+export const VSCODE = { line: "Phones home to Microsoft. Works anyway.", ticked: "Bold. LazyVim is right there." };
 
 const D = "developer";
 const G = "designer";
