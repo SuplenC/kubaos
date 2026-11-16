@@ -25,7 +25,7 @@ import type { RailPage, RailStatus } from "../../lib/step-rail.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { body, showToggle } from "./kobo-parts.ts";
 import { type Maker, MAKERS } from "./setup-data.ts";
-import { type Ask, type Card, type CardId, CARDS, open, type Prompt, PROMPT_WHERE, running, type View, type Views } from "./setup-cards.ts";
+import { type Ask, type Card, type CardId, CARDS, open, type Prompt, PROMPT_WHERE, running, USER, type View, type Views } from "./setup-cards.ts";
 
 /** The symbol a prompt shows big, beside its words. */
 const PROMPT_GLYPH: Record<Prompt["kind"], string> = { password: "lock", finger: "fingerprint", key: "key", wait: "schedule", plug: "key", phone: "smartphone", pair: "smartphone" };
@@ -142,6 +142,13 @@ function drawAsk(ask: Ask): HTMLElement {
       return partsList(MAKERS[ask.maker]!, ask.ticked);
     case "works":
       return worksList(MAKERS[ask.maker]!, ask.fixed ?? false);
+    case "git": {
+      const invalid = ask.email !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ask.email);
+      return grid(2, "s20", [
+        input("Your name", "From your account; the way commits show it.", { value: USER.name, icon: "person" }),
+        input("Email", invalid ? "That doesn't look like an email." : "Public on every commit. GitHub's noreply address works too.", { value: ask.email, placeholder: "you@example.com", icon: "mail", ...(invalid ? { state: "Invalid" as const } : {}) }, invalid),
+      ]);
+    }
     case "buttons":
       return buttons(ask.labels);
   }

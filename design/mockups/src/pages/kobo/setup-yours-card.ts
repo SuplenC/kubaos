@@ -1,7 +1,7 @@
 // First boot's Make it yours card, as an organism of library parts: what the person uses the machine
 // for (any of three profiles, none included), the apps those bring as a live list grouped by the
-// profile that brought each, and beside it the settings that come with them: Git's name and email
-// with Developer, the Bitwarden login with Bitwarden. It is drawn once and kept: picking a profile,
+// profile that brought each, and beside it the Bitwarden login, which comes with the Bitwarden app;
+// Git's name and email are a card of their own. It is drawn once and kept: picking a profile,
 // dropping or adding an app and the install moving on change it in place, so the list's rows
 // arrive, leave and glide as LiveList moves them.
 
@@ -39,8 +39,6 @@ export interface Yours {
   readonly added: Set<string>;
   /** More apps shown at the list's end. */
   more: boolean;
-  gitName: string;
-  gitEmail: string;
   readonly bitwarden: { server: number; email: string; password: string; code: string };
   phase: Phase;
   readonly installed: Set<string>;
@@ -59,8 +57,6 @@ export function yoursAt(view: string): Yours {
     dropped: new Set(),
     added: new Set(),
     more: false,
-    gitName: USER.name,
-    gitEmail: "",
     bitwarden: { ...EMPTY_BITWARDEN },
     phase: "choosing",
     installed: new Set(),
@@ -71,27 +67,25 @@ export function yoursAt(view: string): Yours {
     case "developer":
       return base(["developer"]);
     case "two":
-      return base(["developer", "designer"], { gitEmail: USER.email });
+      return base(["developer", "designer"]);
     case "filled":
-      return base(["developer"], { gitEmail: USER.email, bitwarden: { ...FILLED_BITWARDEN } });
-    case "invalid":
-      return base(["developer"], { gitEmail: "mika@nowak" });
+      return base(["developer"], { bitwarden: { ...FILLED_BITWARDEN } });
     case "all":
-      return base(everything(), { gitEmail: USER.email, bitwarden: { ...FILLED_BITWARDEN } });
+      return base(everything(), { bitwarden: { ...FILLED_BITWARDEN } });
     case "dropped":
-      return base(["developer", "casual"], { dropped: new Set(["docker", "steam"]), added: new Set(["kdenlive"]), more: true, gitEmail: USER.email });
+      return base(["developer", "casual"], { dropped: new Set(["docker", "steam"]), added: new Set(["kdenlive"]), more: true });
     case "installing": {
-      const state = base(everything(), { gitEmail: USER.email, bitwarden: { ...FILLED_BITWARDEN }, phase: "installing" });
+      const state = base(everything(), { bitwarden: { ...FILLED_BITWARDEN }, phase: "installing" });
       for (const each of kept(state).slice(0, 7)) state.installed.add(each.id);
       return state;
     }
     case "done": {
-      const state = base(everything(), { gitEmail: USER.email, bitwarden: { ...FILLED_BITWARDEN }, phase: "done" });
+      const state = base(everything(), { bitwarden: { ...FILLED_BITWARDEN }, phase: "done" });
       for (const each of kept(state)) state.installed.add(each.id);
       return state;
     }
     case "failed": {
-      const state = base(everything(), { gitEmail: USER.email, bitwarden: { ...FILLED_BITWARDEN }, phase: "done", failed: { app: "steam", error: "Steam didn't install: Valve's server timed out", hint: "The rest are in. Try it again, or untick it and carry on." } });
+      const state = base(everything(), { bitwarden: { ...FILLED_BITWARDEN }, phase: "done", failed: { app: "steam", error: "Steam didn't install: Valve's server timed out", hint: "The rest are in. Try it again, or untick it and carry on." } });
       for (const each of kept(state)) if (each.id !== "steam") state.installed.add(each.id);
       return state;
     }
@@ -123,17 +117,6 @@ function others(state: Yours): readonly App[] {
 /** A count of apps, its word chosen by the count. */
 export function apps(count: number): string {
   return count === 1 ? "1 app" : `${count} apps`;
-}
-
-/** Something before an @, something after it with a dot inside: what an email looks like. */
-function looksLikeEmail(words: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(words.trim());
-}
-
-/** The Git email typed and not an email: what keeps the install waiting. */
-function gitProblem(state: Yours): string | undefined {
-  if (!state.picked.has("developer") || state.gitEmail === "" || looksLikeEmail(state.gitEmail)) return undefined;
-  return "The Git email doesn't look like one.";
 }
 
 const GROUP_LABEL: Record<string, string> = { developer: "Developer", designer: "Designer", casual: "Everyday", added: "Added by you", more: "More apps" };
@@ -245,7 +228,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
 
   const recheck = () => element?.dispatchEvent(new Event(RECHECK, { bubbles: true }));
   // Which settings show, so only one that arrives moves.
-  const shown = { git: false, bitwarden: false };
+  const shown = { bitwarden: false };
   let drawn = false;
   // The list and the settings beside it show once something is picked: arriving, they rise in as
   // one, the settings in them with them.
@@ -290,18 +273,16 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
       parts.progress.querySelector(".setup-yours-count")?.replaceChildren(text(`${state.installed.size} of ${total}`, "small", "on_surface_variant"));
     }
     if (parts.more) parts.more.style.visibility = state.phase === "choosing" ? "" : "hidden";
-    const wanted = { git: state.picked.has("developer"), bitwarden: kept(state).some((each) => each.id === "bitwarden") };
-    if (parts.settings && (!drawn || wanted.git !== shown.git || wanted.bitwarden !== shown.bitwarden)) {
+    const wanted = { bitwarden: kept(state).some((each) => each.id === "bitwarden") };
+    if (parts.settings && (!drawn || wanted.bitwarden !== shown.bitwarden)) {
       const blocks = settingsColumn();
       parts.settings.replaceChildren(...blocks);
       // A setting that comes with what was just picked rises in where it lands; one that goes
       // simply goes, and what is under it closes up.
       if (drawn && !arriving)
         for (const block of blocks) {
-          const fresh = (block.classList.contains("setup-yours-git") && !shown.git) || (block.classList.contains("setup-yours-bitwarden") && !shown.bitwarden);
-          if (fresh) rise(block);
+          if (wanted.bitwarden && block.classList.contains("setup-yours-bitwarden")) rise(block);
         }
-      shown.git = wanted.git;
       shown.bitwarden = wanted.bitwarden;
     }
     drawn = true;
@@ -313,30 +294,22 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     recheck();
   };
 
-  /** Settings arrive with what needs them: Git with Developer, the login with Bitwarden ticked. */
+  /**
+   * Bitwarden's login, beside the list: its fields while Bitwarden is ticked, and while it isn't, a
+   * line saying so, so the list beside it keeps its width as rows are ticked and unticked.
+   */
   const settingsColumn = (): HTMLElement[] => {
     const blocks: HTMLElement[] = [];
-    if (state.picked.has("developer")) {
-      const invalid = gitProblem(state) !== undefined;
-      const name = labelled("Your name", typed({ value: state.gitName, icon: "person" }, (value) => (state.gitName = value)));
-      const email = labelled(
-        "Email",
-        typed({ value: state.gitEmail, placeholder: "you@example.com", icon: "mail", ...(invalid ? { state: "Invalid" as const } : {}) }, (value) => {
-          state.gitEmail = value;
-          recheck();
-        }),
-        { note: invalid ? "That doesn't look like an email." : "Public on every commit. Empty: set it later.", ...(invalid ? { invalid: true } : {}) },
-      );
-      const block = stack("s16", "start", filling(heading("Git", "The name and email on every commit you make.")), filling(grid(2, "s16", [name, email])));
-      block.classList.add("setup-yours-git", "kobo-part");
-      blocks.push(filling(block));
-    }
     if (kept(state).some((each) => each.id === "bitwarden")) {
       const server = labelled("Server", select({ options: ["bitwarden.com", "bitwarden.eu", "Self-hosted"], picked: state.bitwarden.server }));
       const email = labelled("Email", typed({ value: state.bitwarden.email, placeholder: "you@example.com", icon: "mail" }, (value) => (state.bitwarden.email = value)));
       const password = labelled("Master password", typed({ value: state.bitwarden.password, secret: true, icon: "key" }, (value) => (state.bitwarden.password = value)), { action: showToggle(() => [password]), note: "In memory, never on disk." });
       const code = labelled("Two-step code", typed({ value: state.bitwarden.code, placeholder: "123 456" }, (value) => (state.bitwarden.code = value)));
       const block = stack("s16", "start", filling(heading("Bitwarden", "Log in once: passwords, SSH keys and commit signing come from the vault. Empty: log in later, in the app.")), filling(grid(2, "s16", [email, password, server, code])));
+      block.classList.add("setup-yours-bitwarden", "kobo-part");
+      blocks.push(filling(block));
+    } else {
+      const block = stack("s16", "start", filling(heading("Bitwarden", "Unticked in the list. Tick it to log in to your vault here.")));
       block.classList.add("setup-yours-bitwarden", "kobo-part");
       blocks.push(filling(block));
     }
@@ -347,7 +320,6 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     const facts = [
       { label: "Picked", value: state.picked.size === 0 ? "Nothing" : PROFILES.filter((each) => state.picked.has(each.id)).map((each) => each.title).join(", ") },
       { label: "Installs", value: kept(state).length === 0 ? "Nothing" : kept(state).map((each) => each.id).join(", ") },
-      { label: "Git writes", value: "~/.config/git-identity/identity.gitconfig" },
     ];
     const lines = state.phase === "choosing" ? null : installLog(state);
     const content = stack("s16", "start", filling(descriptionList(facts)), filling(stack("s8", "start", text("The same in a terminal", "label", "on_surface_variant"), wrapped(spec.command, "mono"))), ...(lines ? [filling(log(lines).box)] : []));
@@ -454,7 +426,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
   const install = (): boolean => {
     if (state.phase === "installing") return false;
     const count = kept(state).filter((each) => !state.installed.has(each.id)).length;
-    if (count === 0 || gitProblem(state)) return false;
+    if (count === 0) return false;
     delete state.failed;
     state.phase = "installing";
     refresh();
@@ -482,7 +454,6 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
       next: () => action(state)?.label ?? "Continue",
       nextIcon: () => action(state)?.icon,
       skip: () => (action(state) ? (skipped() ? "Later" : "Skip") : undefined),
-      blocker: () => (state.phase === "choosing" ? gitProblem(state) : undefined),
       note: () => (state.phase === "installing" ? "Installing in the background: carry on." : undefined),
       act,
     }),

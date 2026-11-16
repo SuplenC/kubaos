@@ -1,12 +1,11 @@
 // First boot's Make it yours card: what the person uses the machine for (Developer, Designer,
 // Everyday: any of them, all three or none), the apps that brings as a live list grouped by the
 // profile that brought each, any of them untick-able and more addable, and beside the list the
-// settings that come with them: Git's name and email with Developer, the Bitwarden login with
-// Bitwarden. Install runs in the background while first boot goes on.
+// Bitwarden login, which comes with the Bitwarden app. Install runs in the background while first
+// boot goes on.
 
 import type { Move, NonEmpty, Track } from "../../site/page.ts";
 import { doesntApply, nonEmpty, page, screen } from "../../site/page.ts";
-import { refused } from "./kobo-pages.ts";
 import { APPS } from "./setup-data.ts";
 import { aloneAt, atCard, fullHd, CARD_KEYS, CARD_MEASURES, finishesAt, liveCard } from "./setup-pages.ts";
 import { FAILS, setupRoom } from "./setup-room.ts";
@@ -46,17 +45,17 @@ const PICKED: Move = {
   sample: () => setupRoom({ place: { at: "card", card: "yours" }, views: { yours: "developer" } }),
 };
 
-/** Developer picked beside another: Git rises in beside the list as Developer's apps arrive in it. */
-const GIT: Move = {
-  name: "Developer picked: Git",
-  what: "Git rises in over `long` where it lands, Bitwarden under it moving down as its rows open.",
+/** Bitwarden ticked again: its login rises in beside the list, where the line saying it was unticked was. */
+const BITWARDEN: Move = {
+  name: "Bitwarden ticked: its login",
+  what: "The login rises in over `long` where it lands, in the line's place.",
   tracks: [
-    { part: "Git's fade", on: CARD, target: ".setup-yours-git", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "Git's rise", on: CARD, target: ".setup-yours-git", property: "--kobo-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: "the login's fade", on: CARD, target: ".setup-yours-bitwarden", property: "opacity", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: "the login's rise", on: CARD, target: ".setup-yours-bitwarden", property: "--kobo-rise", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
   ],
-  reduced: [{ part: "Git's fade", on: CARD, target: ".setup-yours-git", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+  reduced: [{ part: "the login's fade", on: CARD, target: ".setup-yours-bitwarden", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
   back: "cuts",
-  sample: () => setupRoom({ place: { at: "card", card: "yours" }, views: { yours: "two" } }),
+  sample: () => setupRoom({ place: { at: "card", card: "yours" }, views: { yours: "developer" } }),
 };
 
 /** Designer unpicked beside Developer: what only it brought closes up; what both bring stays. */
@@ -85,9 +84,8 @@ export default page<Shown>({
   stage: { live: liveCard("yours"), hint: "Pick any; untick an app; Enter installs in the background", daylight: doesntApply("first boot is a night place, as Kōbō is; a card opened alone is a window in the desktop's mode.") },
   variants: [
     { name: "Nothing picked", for: "the three choices; the well waits", sample: CELLS.empty },
-    { name: "Developer", for: "its apps; Git, email empty", sample: CELLS.rest },
-    { name: "Git filled", for: "and Bitwarden's login", sample: atCard("yours", "filled") },
-    { name: "Not an email", for: "the field Invalid; Install waits", sample: atCard("yours", "invalid") },
+    { name: "Developer", for: "its apps; Bitwarden empty", sample: CELLS.rest },
+    { name: "Bitwarden filled", for: "its login typed in", sample: atCard("yours", "filled") },
     { name: "All three", for: "grouped; shared apps once", sample: CELLS.selected },
     { name: "Unticked and added", for: "two dropped; More apps open", sample: atCard("yours", "dropped") },
     { name: "Installing", for: "7 of 20 in; carry on", sample: CELLS.loading },
@@ -128,7 +126,7 @@ export default page<Shown>({
   motion: {
     arrives: [PICKED],
     leaves: [UNPICKED],
-    between: [GIT, refused(atCard("yours", "invalid")), finishesAt("yours", "done"), FAILS],
+    between: [BITWARDEN, finishesAt("yours", "done"), FAILS],
   },
   keyboard: {
     keys: [
@@ -136,7 +134,7 @@ export default page<Shown>({
       { keys: ["←", "→"], does: "between the three choices" },
       { keys: ["Space"], does: "picks a choice, or ticks an app" },
     ],
-    order: "The rail, the choices, More apps, the apps, Git, Bitwarden, Under the hood, the band.",
+    order: "The rail, the choices, More apps, the apps, Bitwarden, Under the hood, the band.",
     lands: "On the first choice: nothing is picked for you.",
   },
   measures: {

@@ -43,7 +43,7 @@ export default page<Shown>({
   sizes: [{ name: "Full HD", for: "the column in the middle", sample: at(SOME, LATER, false, { width: "calc(1920 * var(--px))", height: "calc(1080 * var(--px))" }) }],
   states: {
     shown: ["rest", "selected", "loading"],
-    absent: { lit: "its buttons light as buttons do", pressed: "its buttons press as buttons do", disabled: "the way out always works", empty: "there are always five cards", error: "a card's failure stays on its card" },
+    absent: { lit: "its buttons light as buttons do", pressed: "its buttons press as buttons do", disabled: "the way out always works", empty: "there are always six cards", error: "a card's failure stays on its card" },
     rows: [{ name: "The ending", cell: screen((state: Shown) => CELLS[state]()) }],
     looks: { rest: "Go to the desktop", selected: "Reboot now, then the desktop", loading: "a spinner and Restarting…" },
   },
