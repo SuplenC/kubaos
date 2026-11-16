@@ -576,11 +576,11 @@ install_mac_accents() {
   fi
 }
 
-# The setups of the Apps catalog's apps (apps/<id>.toml's `setup`): what an
-# app needs beyond its packages. The root helper (system/files/apps/kubaos-apps)
-# runs install_<setup> as root after the app's install and remove_<setup>
-# before its removal, with TARGET_USER the user who asked. Each one is safe to
-# run again.
+# The system hooks of the Apps catalog's apps (apps/<id>.toml's
+# `system_hooks`): what an app needs on the system beyond its packages. The
+# root helper (system/files/apps/kubaos-apps) runs install_<hooks> as root
+# after the app's install and remove_<hooks> once its packages are gone, with
+# TARGET_USER the user who asked. Each one is safe to run again.
 
 # install_bitwarden_autostart: Bitwarden desktop starts on login, as a
 # system-wide XDG autostart entry the session's xdg-desktop-autostart.target
@@ -618,10 +618,25 @@ install_chrome_theme() {
   sctl start dot-chrome-theme.service
 }
 
-# remove_chrome_theme: the units, the helper and the policy it wrote. Chrome's
-# policy folder stays, as its package leaves it.
+# chrome_installed: whether any Chrome build that reads CHROME_POLICY_DIR's
+# policies, and so the theme's, is installed.
+chrome_installed() {
+  local build
+  for build in google-chrome-stable google-chrome-beta google-chrome-unstable; do
+    pkg_installed "$build" && return 0
+  done
+  return 1
+}
+
+# remove_chrome_theme: the units, the helper and the policy it wrote, unless a
+# Chrome build that reads them is still installed. Chrome's policy folder
+# stays, as its package leaves it.
 remove_chrome_theme() {
   local f found=0
+  if chrome_installed; then
+    ok "a Chrome build is installed: its theme follows the wallpaper still"
+    return 0
+  fi
   for f in /etc/systemd/system/dot-chrome-theme.path /etc/systemd/system/dot-chrome-theme.service; do
     [[ -e $f ]] && found=1
   done
@@ -654,10 +669,15 @@ install_docker_access() {
 }
 
 # remove_docker_access: TARGET_USER out of the docker group, and the shutdown
-# drop-in docker_on_demand put beside Docker's units. The group itself, and
-# /var/lib/docker with the images and volumes, stay, as Docker's packages
-# leave them.
+# drop-in docker_on_demand put beside Docker's units, once no Docker engine is
+# left: while docker.service is there (Ubuntu's docker.io, say), both are its
+# too. The group itself, and /var/lib/docker with the images and volumes,
+# stay, as Docker's packages leave them.
 remove_docker_access() {
+  if unit_exists docker.service; then
+    ok "a Docker engine is still installed: $TARGET_USER keeps the docker group"
+    return 0
+  fi
   if id -nG "$TARGET_USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
     sudo_run gpasswd -d "$TARGET_USER" docker
   fi

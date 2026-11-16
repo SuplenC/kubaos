@@ -1,8 +1,9 @@
 //! Google Chrome, Docker and Bitwarden desktop leaving the base for the Apps catalog, on a machine
-//! that had them: the release's migrations `apps-catalog-handover` (system) and
-//! `base-apps-picked` (user), run by bash against the release's own manifest and catalog, with
-//! sudo, dpkg and dpkg-query stand-ins over a list of installed packages. Then the plans of the
-//! next update, the package manifest's and the catalog's, read the machine they left.
+//! that had them: the release's migrations `apps-catalog-handover` and `base-apps-setup` (system)
+//! and `base-apps-picked` (user), run by bash against a copy of the release's scripts, manifest
+//! and catalog, with sudo, dpkg and dpkg-query stand-ins over a list of installed packages, and
+//! the apps' system hooks standing in as lines in a log. Then the plans of the next update, the
+//! package manifest's and the catalog's, read the machine they left.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -49,7 +50,18 @@ fn migration(kind: &str, slug: &str) -> PathBuf {
         .unwrap_or_else(|| panic!("no {kind} migration {slug}"))
 }
 
-/// A machine: its installed packages, the package manifest's record and choices, and a home.
+/// The apps' system hooks of `system/lib.sh`, which the copy's stand-ins replace.
+const HOOKS: [&str; 6] = [
+    "install_chrome_theme",
+    "remove_chrome_theme",
+    "install_docker_access",
+    "remove_docker_access",
+    "install_bitwarden_autostart",
+    "remove_bitwarden_autostart",
+];
+
+/// A machine: its installed packages, the package manifest's record and choices, a home, and a
+/// copy of the release's checkout.
 struct Machine {
     dir: TempDir,
     installed: Vec<String>,
@@ -82,7 +94,49 @@ impl Machine {
         }
         fs::write(m.path("apt-installed"), record).expect("write the record");
         fs::write(m.path("apt-groups"), choices).expect("write the choices");
+        m.checkout();
         m
+    }
+
+    /// The release's migration helpers, system scripts, manifest and catalog, the hooks stand-ins
+    /// that log their name and user.
+    fn checkout(&self) {
+        let root = repo_root();
+        for dir in ["checkout/migrations", "checkout/system", "checkout/apps"] {
+            fs::create_dir_all(self.path(dir)).expect("make the checkout");
+        }
+        for file in [
+            "migrations/lib.sh",
+            "system/lib.sh",
+            "system/manifest.sh",
+            "system/packages.toml",
+        ] {
+            fs::copy(root.join(file), self.path("checkout").join(file)).expect("copy the release's file");
+        }
+        for entry in fs::read_dir(root.join("apps")).expect("read the catalog") {
+            let path = entry.expect("an entry").path();
+            fs::copy(
+                &path,
+                self.path("checkout/apps").join(path.file_name().expect("a name")),
+            )
+            .expect("copy the catalog");
+        }
+        let mut lib = fs::read_to_string(self.path("checkout/system/lib.sh")).expect("read lib.sh");
+        for hook in HOOKS {
+            let _ = writeln!(lib, "{hook}() {{ echo \"{hook} $TARGET_USER\" >>\"$FAKE/hooks\"; }}");
+        }
+        fs::write(self.path("checkout/system/lib.sh"), lib).expect("write the stand-ins");
+        fs::write(self.path("hooks"), "").expect("start the hooks' log");
+    }
+
+    /// The hooks the migrations ran, with `me` for the user running the tests.
+    fn hooks(&self) -> Vec<String> {
+        let me = String::from_utf8(Command::new("id").arg("-un").output().expect("id").stdout).expect("a name");
+        fs::read_to_string(self.path("hooks"))
+            .expect("read the hooks' log")
+            .lines()
+            .map(|line| line.replace(me.trim(), "me"))
+            .collect()
     }
 
     fn path(&self, name: &str) -> PathBuf {
@@ -100,7 +154,7 @@ impl Machine {
             .args(["-euo", "pipefail"])
             .arg(migration(kind, slug))
             .env("PATH", path)
-            .env("KUBAOS_DIR", repo_root())
+            .env("KUBAOS_DIR", self.path("checkout"))
             .env("FAKE", self.dir.path())
             .env("HOME", self.path("home"))
             .env_remove("XDG_CONFIG_HOME")
@@ -117,9 +171,10 @@ impl Machine {
         );
     }
 
-    /// The update both migrations are part of.
+    /// The update the migrations are part of.
     fn update(&self) {
         self.migrate("system", "apps-catalog-handover");
+        self.migrate("system", "base-apps-setup");
         self.migrate("user", "base-apps-picked");
     }
 
@@ -139,7 +194,7 @@ impl Machine {
 /// The next update's plans on `m`: what the package manifest's sync would remove, by a kubaos that
 /// knows the catalog and by one from before it, and what the Apps phase would install.
 fn next_update(m: &Machine) -> (Vec<String>, Vec<String>, Vec<String>) {
-    let root = repo_root();
+    let root = m.path("checkout");
     let manifest = Manifest::read(&root.join("system/packages.toml"))
         .expect("read the manifest")
         .expect("a manifest");
@@ -199,15 +254,21 @@ fn a_machine_with_all_three_keeps_them_and_has_them_picked() {
         !record.has("google-chrome-stable") && DOCKER.iter().all(|p| !record.has(p)),
         "the catalog's left the record"
     );
+    assert_eq!(
+        m.hooks(),
+        [
+            "install_chrome_theme me",
+            "install_docker_access me",
+            "install_bitwarden_autostart me"
+        ]
+    );
 }
 
 #[test]
-fn a_group_the_user_turned_off_is_not_picked_and_nothing_is_installed() {
-    let m = Machine::new(
-        &["google-chrome-stable"],
-        &[("google-chrome-stable", "chrome")],
-        "docker=off\n",
-    );
+fn a_group_the_user_turned_off_is_not_picked_and_nothing_is_installed_or_removed() {
+    let mut installed = vec!["google-chrome-stable"];
+    installed.extend(DOCKER);
+    let m = Machine::new(&installed, &[("google-chrome-stable", "chrome")], "docker=off\n");
 
     m.update();
 
@@ -216,6 +277,49 @@ fn a_group_the_user_turned_off_is_not_picked_and_nothing_is_installed() {
     assert!(installs.is_empty(), "{installs:?}");
     assert!(!m.picks().has("docker"));
     assert!(m.picks().has("google-chrome") && !m.picks().has("bitwarden"));
+    // Docker the user set up by hand keeps whatever access they gave it.
+    assert_eq!(m.hooks(), ["install_chrome_theme me", "remove_bitwarden_autostart me"]);
+}
+
+#[test]
+fn without_the_apps_only_what_kubaos_alone_put_there_goes() {
+    // Another Chrome build reads the theme's policy, and Ubuntu's Docker has the docker group
+    // and the shutdown drop-in too.
+    let m = Machine::new(&["google-chrome-beta", "docker.io"], &[], "");
+
+    m.update();
+
+    assert_eq!(m.hooks(), ["remove_bitwarden_autostart me"]);
+    let bare = Machine::new(&[], &[], "");
+    bare.update();
+    assert_eq!(
+        bare.hooks(),
+        ["remove_chrome_theme me", "remove_bitwarden_autostart me"]
+    );
+}
+
+#[test]
+fn the_handover_goes_on_once_the_groups_are_gone_from_the_manifest() {
+    let mut installed = vec!["google-chrome-stable", "curl"];
+    installed.extend(DOCKER);
+    let mut recorded = vec![("google-chrome-stable", "chrome"), ("curl", "tools")];
+    recorded.extend(DOCKER.map(|p| (p, "docker")));
+    let m = Machine::new(&installed, &recorded, "");
+    let manifest = m.path("checkout/system/packages.toml");
+    let text = fs::read_to_string(&manifest).expect("read the manifest");
+    let without: String = text
+        .split("\n[")
+        .filter(|table| !table.starts_with("group.docker]") && !table.starts_with("group.chrome]"))
+        .collect::<Vec<_>>()
+        .join("\n[");
+    assert!(!without.contains("[group.docker]") && !without.contains("[group.chrome]"));
+    fs::write(&manifest, without).expect("write the manifest without them");
+
+    m.migrate("system", "apps-catalog-handover");
+
+    let record = Record::parse(&fs::read_to_string(m.path("apt-installed")).expect("read the record"));
+    assert!(record.has("curl"));
+    assert!(!record.has("google-chrome-stable") && DOCKER.iter().all(|p| !record.has(p)));
 }
 
 #[test]
