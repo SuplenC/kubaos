@@ -309,7 +309,8 @@
 .setup-kotodama-crawl {
   display: block;
   transition: opacity var(--motion-medium) var(--easing-standard);
-  height: var(--stroke-thin);
+  /* A thin stroke on whole device pixels, so what is under it is on them too. */
+  height: max(1px, round(nearest, var(--stroke-thin), 1px));
   border-radius: var(--radius-full);
   background: linear-gradient(90deg, transparent, var(--color-cold), transparent) no-repeat;
   background-size: 40% 100%;
@@ -425,11 +426,12 @@
   flex: 1 1 0;
 }
 
-/* Yours: what it finds on the left, the options on the right, each column scrolling on its
-   own where it is short; stacked, the list first, where the room is too narrow for both. */
+/* Yours: what it finds on the left, the options on the right, in the step's one scroll; stacked,
+   the list first, where the room is too narrow for both. The columns split the room in whole
+   device pixels, an odd spare one to the first, as the library's grid does. */
 .setup-kotodama-yours {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: round(up, calc((100% - var(--space-s24)) / 2), 1px) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-s24);
 }

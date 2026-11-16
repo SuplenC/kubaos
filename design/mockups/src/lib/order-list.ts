@@ -13,7 +13,7 @@ import { icon } from "./icon.ts";
 import { filling, row } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { switchControl } from "./switch.ts";
-import { text } from "./text.ts";
+import { wrapped } from "./text.ts";
 import { cubic } from "./tokens.ts";
 import { milliseconds } from "../site/recipe.ts";
 import { settings } from "../site/settings.ts";
@@ -86,7 +86,7 @@ export function orderList(options: OrderListOptions): OrderList {
         options.changed?.();
       }),
     );
-    const line = row("s12", "centre", handle, filling(text(item.name, "body")), control);
+    const line = row("s12", "centre", handle, filling(wrapped(item.name, "body")), control);
     line.classList.add("k-order-row");
     line.setAttribute("role", "listitem");
     line.tabIndex = 0;
@@ -120,6 +120,6 @@ export function orderList(options: OrderListOptions): OrderList {
   box.append(...order());
   const setDisabled = (off: boolean) => box.toggleAttribute("data-disabled", off);
   setDisabled(options.disabled ?? false);
-  probe(box, { role: "component", name: "OrderList", variant: "", fixed: { width: false, height: false } });
+  probe(box, { role: "component", name: "OrderList", variant: "", fixed: { width: false, height: false, holds: true } });
   return { box, setDisabled };
 }

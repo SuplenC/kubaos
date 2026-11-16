@@ -159,7 +159,7 @@ function scaleOf(element: HTMLElement): number {
  * is as wide as a dialog beside a rail, as the menu has on a screen (`menuMeasures`). The body
  * takes all the height the rows leave, so the panel ends where its room does.
  */
-function measuresIn(width: number, height: number): MenuMeasures {
+function measuresIn(width: number, height: number, scale: number): MenuMeasures {
   const space = length("space-s12");
   const pitch = length("size-row_two_line") + length("space-s4");
   const chrome = space * 5 + length("size-control_md") + length("size-control_sm");
@@ -167,7 +167,8 @@ function measuresIn(width: number, height: number): MenuMeasures {
   const panel = Math.floor(width / grid) * grid;
   const rows = Math.max(1, Math.floor((height - chrome + length("space-s4")) / pitch));
   const pane = panel >= length("size-dialog") + length("size-rail") ? Math.max(length("size-rail"), Math.floor(((panel - space * 3) * 0.4) / grid) * grid) : 0;
-  const body = Math.max(rows * pitch - length("space-s4"), Math.floor(height - chrome));
+  // The body takes the height left, down to a whole device pixel, so the panel's foot is on one.
+  const body = Math.max(rows * pitch - length("space-s4"), Math.floor((height - chrome) * scale) / scale);
   return { width: panel, height: chrome + body, rows, body, pane, top: 0 };
 }
 
@@ -249,7 +250,7 @@ function standIn(prefs: MenuSettings, options: { readonly live: boolean; readonl
   };
   new ResizeObserver(() => {
     const scale = scaleOf(box);
-    const next = measuresIn(box.clientWidth / scale, box.clientHeight / scale);
+    const next = measuresIn(box.clientWidth / scale, box.clientHeight / scale, scale);
     if (measures && next.width === measures.width && next.body === measures.body) return;
     measures = next;
     draw();

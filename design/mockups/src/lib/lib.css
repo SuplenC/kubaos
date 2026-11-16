@@ -1235,6 +1235,10 @@
   left: 0;
 }
 
+.k-field-placeholder {
+  right: 0;
+}
+
 .k-field-line {
   left: var(--shift);
   height: 100%;
@@ -1579,8 +1583,8 @@
 .k-term-room > .k-tooltip {
   position: absolute;
   z-index: 3;
-  bottom: calc(anchor(top) + var(--space-s8));
-  left: anchor(left);
+  bottom: round(nearest, calc(anchor(top) + var(--space-s8)), 1px);
+  left: round(nearest, anchor(left), 1px);
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--motion-short) var(--easing-standard);

@@ -479,14 +479,21 @@
 }
 
 .k-task-tick {
-  display: grid;
-  place-items: center;
+  position: relative;
+  display: block;
   flex: none;
   width: var(--size-check);
   height: var(--size-check);
   border-radius: var(--radius-full);
   box-shadow: inset 0 0 0 var(--stroke-thin) var(--color-outline);
   color: transparent;
+}
+
+/* The tick: `icon.s16` centred in the disc on a whole device pixel, as a checkbox's is. */
+.k-task-tick > .k-icon {
+  position: absolute;
+  left: round(nearest, calc((var(--size-check) - var(--icon-s16)) / 2), 1px);
+  top: round(nearest, calc((var(--size-check) - var(--icon-s16)) / 2), 1px);
 }
 
 .k-task[data-done] .k-task-tick {

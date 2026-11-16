@@ -13,7 +13,7 @@ import "./feedback.css";
 import { icon } from "./icon.ts";
 import { filling, gap, row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
-import { text } from "./text.ts";
+import { text, wrapped } from "./text.ts";
 import { settings } from "../site/settings.ts";
 import { cubic } from "./tokens.ts";
 import { milliseconds } from "../site/recipe.ts";
@@ -39,9 +39,9 @@ export interface Task {
 export function task(options: TaskOptions): Task {
   const mark = document.createElement("span");
   mark.className = "k-task-tick";
-  mark.append(icon("check", "var(--type-small-icon)", "currentColor"));
+  mark.append(icon("check", "var(--icon-s16)", "currentColor"));
   const title = row(0, "centre", text(options.before, "body_strong"), ...(options.typed ? [gap("s4"), text(options.typed, "mono_large", "primary")] : []), ...(options.after ? [text(options.after, "body_strong")] : []));
-  const element = row("s12", "centre", mark, filling(stack(0, "start", filling(title), text(options.line, "small", "on_surface_variant"))));
+  const element = row("s12", "centre", mark, filling(stack(0, "start", filling(title), filling(wrapped(options.line, "small", "on_surface_variant")))));
   element.classList.add("k-task");
   element.toggleAttribute("data-done", options.done ?? false);
   if (options.onPress) {
