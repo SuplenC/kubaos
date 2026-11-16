@@ -337,7 +337,7 @@ The last phase of an update refreshes fwupd's list from the LVFS and installs th
 
 ### Apps
 
-KubaOS knows how to install a few essential apps well, each from one pinned, verified source: Google Chrome (Google's signed apt repository, amd64 only), Bitwarden desktop (its release's `.deb`, checked against its sha256, amd64 only), Docker (Docker's signed apt repository), Claude Code (Anthropic's), T3 Code (its release's `.deb`, and for its service its release's `t3` runtime, each checked against its sha256) and Penpot (in a window on penpot.app, or its own Docker stack, every image pinned by digest). None of them comes with the install: you pick the ones you want; `kubaos update` keeps them installed, and you remove one only by asking. The whole list, with each app's setups, the apps it needs, its source and the machines it runs on, is in [`docs/APPS.md`](APPS.md), which says how to see it.
+KubaOS knows how to install the apps of its catalog well, each from one pinned, verified source: Ubuntu's archive, the vendor's signed apt repository with its key pinned, the vendor's release checked against its sha256, nixpkgs, or a stack of containers whose images are pinned by digest. `kubaos app list` lists them, by category (`kubaos app list --markdown` as a page). None of them comes with the install: you pick the ones you want; `kubaos update` keeps them installed, and you remove one only by asking. The whole list, with each app's setups, the apps it needs, its source and the machines it runs on, is in [`docs/APPS.md`](APPS.md), which says how to see it.
 
 ```sh
 kubaos app list                  # the catalog by category, each app's summary, and which you picked
@@ -576,7 +576,7 @@ Your Neovim settings for Go go in `~/.config/kubaos/editor/nvim/plugins/go.lua`,
 
 For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the interfaces between the parts in [`docs/CONTRACTS.md`](CONTRACTS.md).
 
-- **Base:** Ubuntu Server 26.04 LTS ("resolute"), minimal, with snapd, cloud-init and the Ubuntu Pro adverts ripped out. apt owns the system: kernel, firmware, drivers, Hyprland, PAM, and the Apps catalog's Docker and Chrome. `/etc/os-release` says KubaOS where a person reads it and stays Ubuntu where apt and install scripts look.
+- **Base:** Ubuntu Server 26.04 LTS ("resolute"), minimal, with snapd, cloud-init and the Ubuntu Pro adverts ripped out. apt owns the system (kernel, firmware, drivers, Hyprland, PAM) and the packages of the Apps catalog's apps that come from apt repositories. `/etc/os-release` says KubaOS where a person reads it and stays Ubuntu where apt and install scripts look.
 - **Disk:** LUKS2, then btrfs with flat subvolumes (`@ @home @snapshots @log @cache @nix @docker @swap`), an 8 GiB swap file behind zswap, a memory reserve for the desktop and systemd-oomd, so a build that fills RAM slows or ends before the compositor, the shell and audio do, snapper with timeline and apt pre/post snapshots, grub-btrfs so snapshots are bootable from GRUB.
 - **Session:** autologin on tty1 after the LUKS unlock, zsh, `start-hyprland`. No display manager.
 - **Compositor:** Hyprland 0.56 from `ppa:cppiber/hyprland`, held in apt, with a Lua config split into files (`config/hypr/`). Dwindle layout, Omarchy 4 keybinds moved to hjkl. hypridle locks after 5 min, turns screens off after 10, and suspends after 30 on battery only, unless you change them (`kubaos-idle`). Every toolkit is asked for Wayland first; an app that still runs through XWayland has a warning before its title in the bar, whose hint says so.
