@@ -1,5 +1,5 @@
 # Rewrites Chrome's theme color policy whenever dot-theme regenerates the
-# wallpaper colors. Rendered and installed by system/40-apps.sh.
+# wallpaper colors. Rendered and installed by Chrome's app (apps/google-chrome).
 [Unit]
 Description=Chrome theme color follows @USER@'s wallpaper
 

@@ -751,17 +751,24 @@ fn a_file_kubaos_put_there_with_an_older_releases_text_is_owned_and_brought_to_t
     assert!(!entry.exists(), "the file an older release wrote was KubaOS's");
 }
 
-/// The release's T3 Code folder in the checkout's catalog, its scripts that reach this machine's
-/// systemd and processes (the service's check, its undo, the ready check) replaced by ones that
-/// read the fake home.
-fn with_t3_code(w: &World) {
-    let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/t3-code");
-    let to = w.sys.catalog().join("t3-code");
+/// The release's folder of the app `id` in the checkout's catalog, where it is.
+fn with_app(w: &World, id: &str) -> PathBuf {
+    let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps").join(id);
+    let to = w.sys.catalog().join(id);
     fs::create_dir_all(&to).unwrap();
     for entry in fs::read_dir(&from).unwrap() {
         let entry = entry.unwrap();
         fs::copy(entry.path(), to.join(entry.file_name())).unwrap();
     }
+    lock_down(&to);
+    to
+}
+
+/// The release's T3 Code folder in the checkout's catalog, its scripts that reach this machine's
+/// systemd and processes (the service's check, its undo, the ready check) replaced by ones that
+/// read the fake home.
+fn with_t3_code(w: &World) {
+    let to = with_app(w, "t3-code");
     let toml = to.join("app.toml");
     let text = fs::read_to_string(&toml).unwrap();
     let systemctl = r#"check = ["systemctl", "--user", "is-enabled", "--quiet", "t3code.service"]"#;
@@ -866,4 +873,123 @@ fn a_picked_app_is_taken_in_its_picked_setup_and_the_next_update_does_what_it_la
     w.updater(&mut m).update(yes()).unwrap();
     let unit = host(&m).home().join(".config/systemd/user/lab.service");
     assert!(unit.exists(), "the service step an older setup lacked is done");
+}
+
+/// The comments the files of Docker's and Chrome's folders had in the release before, which
+/// named the script that installed them then: by file, this release's lines and those.
+const OLDER_COMMENTS: [(&str, &str, &str); 4] = [
+    (
+        "/etc/systemd/system/docker.service.d/kubaos-stop.conf",
+        "# KubaOS: Docker's app (apps/docker) installs it beside the Docker it\n\
+         # installs, and docker_on_demand (system/lib.sh) beside a Docker of your own.\n\
+         # On SIGTERM dockerd gives each running container 10 s to stop and waits up\n\
+         # to 15 s in all (its shutdown-timeout). The 10 s default from\n\
+         # system.conf.d/kubaos-timeouts.conf would kill it first, and a database\n\
+         # container with it, mid-write.\n",
+        "# KubaOS: installed by system/40-apps.sh. On SIGTERM dockerd gives each\n\
+         # running container 10 s to stop and waits up to 15 s in all (its\n\
+         # shutdown-timeout). The 10 s default from system.conf.d/kubaos-timeouts.conf\n\
+         # would kill it first, and a database container with it, mid-write.\n",
+    ),
+    (
+        "/usr/local/libexec/dot-chrome-theme",
+        "# Root-owned helper, installed to /usr/local/libexec by Chrome's app\n\
+         # (apps/google-chrome) and started by dot-chrome-theme.path. It takes nothing\n\
+         # from the user's file but a value that matches #rrggbb, so the policy\n\
+         # directory stays root's: the user can't use it to set any other policy.",
+        "# Root-owned helper, installed to /usr/local/libexec by system/40-apps.sh and\n\
+         # started by dot-chrome-theme.path. It takes nothing from the user's file but\n\
+         # a value that matches #rrggbb, so the policy directory stays root's: the user\n\
+         # can't use it to set any other policy.",
+    ),
+    (
+        "/etc/systemd/system/dot-chrome-theme.path",
+        "Rendered and installed by Chrome's app (apps/google-chrome).",
+        "Rendered and installed by system/40-apps.sh.",
+    ),
+    (
+        "/etc/systemd/system/dot-chrome-theme.service",
+        "(apps/google-chrome)",
+        "(system/files/chrome/)",
+    ),
+];
+
+#[test]
+fn files_an_older_release_wrote_with_older_comments_are_taken_in_and_rewritten() {
+    let w = world();
+    let catalog = w.sys.catalog();
+    for id in ["docker", "google-chrome"] {
+        with_app(&w, id);
+    }
+    let mut picks = Picks::default();
+    picks.add("docker");
+    picks.add("google-chrome");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = fake(
+        &w,
+        &[
+            "docker-ce",
+            "docker-ce-cli",
+            "containerd.io",
+            "docker-buildx-plugin",
+            "docker-compose-plugin",
+            "google-chrome-stable",
+        ],
+    );
+    let home = host(&m).home().to_string_lossy().into_owned();
+    let files = [
+        ("/etc/systemd/system/docker.service.d/kubaos-stop.conf", "docker/kubaos-stop.conf"),
+        ("/usr/local/libexec/dot-chrome-theme", "google-chrome/dot-chrome-theme"),
+        ("/etc/systemd/system/dot-chrome-theme.path", "google-chrome/dot-chrome-theme.path"),
+        ("/etc/systemd/system/dot-chrome-theme.service", "google-chrome/dot-chrome-theme.service"),
+    ];
+    let mut now = Vec::new();
+    for ((path, from), (named, new, older)) in files.iter().zip(OLDER_COMMENTS) {
+        assert_eq!(*path, named);
+        let text = fs::read_to_string(catalog.join(from))
+            .unwrap()
+            .replace("@USER@", "kuba")
+            .replace("@HOME@", &home);
+        assert!(text.contains(new), "{from} no longer has the comment the test replaces");
+        let place = host(&m).place(Path::new(path));
+        put(&place, &text.replace(new, older));
+        let mode = if path.contains("libexec") { 0o755 } else { 0o644 };
+        fs::set_permissions(&place, fs::Permissions::from_mode(mode)).unwrap();
+        now.push((place, text));
+    }
+    let machine = host(&m);
+    {
+        let mut state = machine.state.borrow_mut();
+        state.groups.entry("docker".to_owned()).or_default().insert("kuba".to_owned());
+        for unit in ["docker.service", "containerd.service", "docker.socket", "dot-chrome-theme.path"] {
+            let on = unit.ends_with(".socket") || unit.ends_with(".path");
+            state.units.insert(
+                format!("system:{unit}"),
+                crate::apps::host::fake::Unit {
+                    exists: true,
+                    enabled: on,
+                    active: on,
+                    ..crate::apps::host::fake::Unit::default()
+                },
+            );
+        }
+    }
+
+    w.updater(&mut m).adopt_apps().unwrap();
+    w.updater(&mut m).update(yes()).unwrap();
+
+    for (place, text) in &now {
+        assert_eq!(&fs::read_to_string(place).unwrap(), text, "{}", place.display());
+    }
+    for id in ["docker", "google-chrome"] {
+        let root = root_journal(&w, id).unwrap();
+        let file_paths: Vec<_> = root
+            .entries
+            .iter()
+            .filter(|e| matches!(e.action.kind, crate::apps::action::Kind::File { .. }))
+            .flat_map(|e| e.claims.iter())
+            .filter(|c| c.claim.starts_with("path:"))
+            .collect();
+        assert!(!file_paths.is_empty() && file_paths.iter().all(|c| c.owned), "{id}: {file_paths:?}");
+    }
 }
