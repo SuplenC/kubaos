@@ -389,14 +389,20 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     return chip({ label: each.name, kind: yours ? "Cold" : "Neutral", icon: each.icon });
   };
 
+  /**
+   * Under the hood, for whoever wants it: the exact packages and where they come from, the command
+   * that does the same, and the log once the install runs. Nothing the count above already says.
+   */
   const hood = (): HTMLElement => {
+    const ids = kept(state).map((each) => each.id);
     const facts = [
-      { label: "Picked", value: state.picked.size === 0 ? "Nothing" : PROFILES.filter((each) => state.picked.has(each.id)).map((each) => each.title).join(", ") },
-      { label: "Installs", value: kept(state).length === 0 ? "Nothing" : kept(state).map((each) => each.id).join(", ") },
+      { label: "Packages", value: ids.join(" ") },
+      { label: "From", value: "Flathub, and Ubuntu's archive for the command-line tools" },
     ];
     const lines = state.phase === "choosing" ? null : installLog(state);
-    const content = stack("s16", "start", filling(descriptionList(facts)), filling(stack("s8", "start", text("The same in a terminal", "label", "on_surface_variant"), wrapped(spec.command, "mono"))), ...(lines ? [filling(log(lines).box)] : []));
-    const summary = lines ? `${lines.length} lines of log` : kept(state).length === 0 ? "Installs nothing" : `Installs ${apps(kept(state).length)}`;
+    const command = `${spec.command} ${ids.join(" ")}`;
+    const content = stack("s16", "start", filling(descriptionList(facts)), filling(stack("s8", "start", text("The same in a terminal", "label", "on_surface_variant"), wrapped(command, "mono"))), ...(lines ? [filling(log(lines).box)] : []));
+    const summary = lines ? `${lines.length} lines of log` : "Packages, command";
     return hangs(collapsible({ title: "Under the hood", summary, content, open: (options.hood ?? false) || state.failed !== undefined }));
   };
 
@@ -423,10 +429,14 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
       stack("s8", "start", row("s8", "centre", icon(category.icon, "var(--type-label-icon)", "var(--color-on_surface_variant)"), text(category.title, "label", "on_surface_variant")), filling(flow("s8", ...all.filter((each) => each.category === category.id).map(appChip)))),
     );
     const failure = state.failed ? [filling(errorBlock({ message: `Fuck. ${state.failed.error}.`, hint: state.failed.hint }))] : [];
-    const columns = count === 0 ? filling(left) : filling(splitColumns([1, 2], "s40", [left, stack("s16", "start", ...groups.map((each) => filling(each)))]));
+    // What skipping costs and Under the hood stand under the count, in the room the apps leave
+    // beside them, not at the foot of a long list of them.
     const later = wrapped(spec.skip, "small", "on_surface_variant");
     later.classList.add("setup-later");
-    const content = stack("s24", "start", ...failure, columns, ...(state.phase === "choosing" ? [filling(later)] : []), filling(hood()));
+    const under = [...(state.phase === "choosing" ? [filling(later)] : []), ...(count > 0 ? [filling(hood())] : [])];
+    if (under.length > 0) left.append(gap("s16"), stack("s24", "start", ...under));
+    const columns = count === 0 ? filling(left) : filling(splitColumns([1, 2], "s40", [left, stack("s16", "start", ...groups.map((each) => filling(each)))]));
+    const content = stack("s24", "start", ...failure, columns);
     const { box } = scroll(padded(content), { height: "100%", above: "s24", below: "s16", noGutter: true, fade: "s24", footFade: true });
     box.classList.add("kobo-scrolls");
     return box;
