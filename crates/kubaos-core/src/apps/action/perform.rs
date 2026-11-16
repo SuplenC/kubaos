@@ -90,6 +90,30 @@ pub struct Look {
     pub prior: Prior,
 }
 
+/// What a step's journal entry says its path holds, which a download's check can't read from
+/// the path itself: a folder or a program unpacked from a tarball carries no sha256.
+#[derive(Clone, Copy, Debug)]
+pub enum Recorded<'a> {
+    /// No entry of the app owns the path: the machine alone says whether the step is done.
+    Nothing,
+    /// The app's step put its path there, as this action did it.
+    Done(&'a Action),
+    /// The app's step was stopped while this action changed its path: what it holds is unknown.
+    Unsettled(&'a Action),
+}
+
+/// Whether the download `had` put there is the one `want` pins for `arch`: the same bytes,
+/// unpacked the same way.
+fn same_download(had: &Action, want: &Action, arch: &str) -> bool {
+    let pin = |action: &Action| match &action.kind {
+        Kind::Download { unpack, strip, .. } => {
+            Some((action.download(arch).map(|d| d.sha256.clone()), *unpack, *strip))
+        }
+        _ => None,
+    };
+    pin(had).is_some() && pin(had) == pin(want)
+}
+
 /// Where the path `named` (`~/…` or absolute) is, as the actions name it.
 pub fn logical(host: &dyn Host, named: &str) -> PathBuf {
     match named.strip_prefix("~/") {
@@ -226,13 +250,15 @@ fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look
     }
 }
 
-/// What `action` finds on the machine.
+/// What `action` finds on the machine, whose step's journal entry says `recorded` of its path.
+/// A download is done when its path is there and holds what the action pins: a release that
+/// changes the pin of a download at the same path downloads it again.
 ///
 /// # Errors
 ///
 /// [`PerformError`] when the machine can't be read, a setting's file isn't settings it can
 /// change, or a `run`'s check can't be started.
-pub fn look(action: &Action, host: &mut dyn Host) -> Result<Look, PerformError> {
+pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Result<Look, PerformError> {
     let user = host.user().to_owned();
     match &action.kind {
         Kind::Apt { packages, arch, .. } => {
@@ -266,8 +292,13 @@ pub fn look(action: &Action, host: &mut dyn Host) -> Result<Look, PerformError> 
         }
         Kind::Download { to, .. } => {
             let path = logical(host, to);
-            let done = host.place(&path).symlink_metadata().is_ok();
-            Ok(at_path(host, &path, done))
+            let there = host.place(&path).symlink_metadata().is_ok();
+            let holds = match recorded {
+                Recorded::Done(had) if had.path() == action.path() => same_download(had, action, host.arch()),
+                Recorded::Unsettled(had) => had.path() != action.path(),
+                Recorded::Done(_) | Recorded::Nothing => true,
+            };
+            Ok(at_path(host, &path, there && holds))
         }
         Kind::File { to, text, mode, .. } => {
             let path = logical(host, to);
@@ -654,8 +685,9 @@ fn staging(path: &Path) -> PathBuf {
 }
 
 /// Downloads into a staging path beside `path`, checks it and moves it into place, so `path` is
-/// there whole or not at all. What a tarball holds is unpacked as the one who unpacks it owns
-/// it, and no one else may write it, whatever the archive or the umask says.
+/// there whole or not at all; one already there (an older pin's) is replaced. What a tarball
+/// holds is unpacked as the one who unpacks it owns it, and no one else may write it, whatever
+/// the archive or the umask says.
 fn download_to(
     host: &mut dyn Host,
     url: &str,
@@ -700,7 +732,7 @@ fn download_to(
                     }));
                 }
                 only_owner_writes(&stage)?;
-                fs::rename(&stage, path).map_err(PerformError::io(path))
+                replace_with(&stage, path)
             }
         }
     })();
@@ -709,6 +741,22 @@ fn download_to(
         let _ = remove_path(&stage);
     }
     result
+}
+
+/// Moves `stage` to `path`. A folder can't be renamed over another, so one at `path` is moved
+/// aside first, and back if `stage` can't take its place, then removed.
+fn replace_with(stage: &Path, path: &Path) -> Result<(), PerformError> {
+    if path.symlink_metadata().is_err() {
+        return fs::rename(stage, path).map_err(PerformError::io(path));
+    }
+    let aside = staging(path).with_extension("old");
+    remove_path(&aside)?;
+    fs::rename(path, &aside).map_err(PerformError::io(path))?;
+    if let Err(e) = fs::rename(stage, path) {
+        let _ = fs::rename(&aside, path);
+        return Err(PerformError::io(path)(e));
+    }
+    remove_path(&aside)
 }
 
 /// Takes the write bits for the group and others off `path` and everything in it; links stay.

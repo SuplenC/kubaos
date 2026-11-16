@@ -30,6 +30,7 @@ use super::action::Side;
 use super::action::Words;
 use super::action::perform;
 use super::action::perform::PerformError;
+use super::action::perform::Recorded;
 use super::folder::Folder;
 use super::folder::FolderError;
 use super::host::Host;
@@ -213,7 +214,7 @@ impl<'h> Keeper<'h> {
             if !writes {
                 continue;
             }
-            let checked = perform::look(&action, &mut *self.host)
+            let checked = perform::look(&action, &mut *self.host, Recorded::Nothing)
                 .map_err(StepError::Perform)
                 .and_then(|look| self.may_write(&owners, id, &look.claims));
             if let Err(e) = checked {
@@ -285,7 +286,7 @@ impl<'h> Keeper<'h> {
         if let Some(entry) = old.take_if(|e| !e.action.same_thing(&action)) {
             self.undo_journaled(&mut journal, id, &entry)?;
         }
-        let look = perform::look(&action, &mut *self.host).map_err(StepError::Perform)?;
+        let look = perform::look(&action, &mut *self.host, recorded(old.as_ref())).map_err(StepError::Perform)?;
         if let Kind::Run { window: Some(says), .. } = &action.kind
             && !windows
             && !look.done
@@ -425,6 +426,22 @@ impl<'h> Keeper<'h> {
 /// a claim both have stays owned, as does a folder the old one made that the new one's path is
 /// in. What the old entry owned and the new look doesn't claim is what it replaces, undone once
 /// the new action stands.
+/// What the step's entry `old` says its path holds: what its action put there, when the app owns
+/// the path and the step is done; unknown, when a run stopped during it.
+fn recorded(old: Option<&Entry>) -> Recorded<'_> {
+    let Some(old) = old else {
+        return Recorded::Nothing;
+    };
+    if !old.claims.iter().any(|c| c.owned && c.claim.starts_with("path:")) {
+        return Recorded::Nothing;
+    }
+    match old.state {
+        State::Done => Recorded::Done(&old.action),
+        State::Doing | State::Undoing => Recorded::Unsettled(&old.action),
+        State::Found | State::Skipped => Recorded::Nothing,
+    }
+}
+
 fn carry(old: Option<&Entry>, look: &perform::Look) -> (Vec<Claim>, Option<Box<Entry>>) {
     let mut claims = look.claims.clone();
     let Some(old) = old else {
@@ -652,7 +669,7 @@ impl<'a> Engine<'a> {
             if !settled || matches!(resolved.kind, Kind::Run { .. }) {
                 return true;
             }
-            if !perform::look(&resolved, self.user.host()).is_ok_and(|look| look.done) {
+            if !perform::look(&resolved, self.user.host(), Recorded::Nothing).is_ok_and(|look| look.done) {
                 return true;
             }
         }

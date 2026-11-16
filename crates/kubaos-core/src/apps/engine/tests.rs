@@ -1538,3 +1538,113 @@ icon = "penpot.svg"
         "{entry}"
     );
 }
+
+/// A download to a path without its version, `unpack` as given, pinned to `version`.
+fn fixed_download(version: &str, unpack: &str) -> String {
+    let sha = version.replace('.', "").repeat(32);
+    app(&format!(
+        r#"
+[[action]]
+name = "Download the tool"
+kind = "download"
+to = "~/.vendor/tool"
+version = "{version}"
+unpack = "{unpack}"
+amd64 = {{ url = "https://example.com/tool-{version}", sha256 = "{sha}" }}
+"#
+    ))
+}
+
+/// A gzipped tarball holding `bin/tool` with `text`.
+fn tarball(text: &str) -> Vec<u8> {
+    let src = tempfile::tempdir().unwrap();
+    fs::create_dir_all(src.path().join("bin")).unwrap();
+    fs::write(src.path().join("bin/tool"), text).unwrap();
+    let archive = src.path().join("tool.tar.gz");
+    let made = std::process::Command::new("tar")
+        .arg("-czf")
+        .arg(&archive)
+        .arg("-C")
+        .arg(src.path())
+        .arg("bin")
+        .status()
+        .unwrap();
+    assert!(made.success());
+    fs::read(archive).unwrap()
+}
+
+#[test]
+fn a_release_that_bumps_a_download_at_the_same_path_downloads_it_again() {
+    for unpack in ["file", "tar-gz"] {
+        let world = World::new(&[("tool", &fixed_download("1.1", unpack))]);
+        for version in ["1.1", "1.3"] {
+            let bytes = match unpack {
+                "file" => format!("tool {version}").into_bytes(),
+                _ => tarball(&format!("tool {version}")),
+            };
+            let sha = version.replace('.', "").repeat(32);
+            world
+                .host
+                .state
+                .borrow_mut()
+                .downloads
+                .insert(format!("https://example.com/tool-{version}"), (sha, bytes));
+        }
+        let tool = match unpack {
+            "file" => world.host_home().join(".vendor/tool"),
+            _ => world.host_home().join(".vendor/tool/bin/tool"),
+        };
+        let before = world.host.snapshot();
+        world.install("tool", true).0.unwrap();
+        world.write_app("tool", &fixed_download("1.3", unpack));
+
+        world.install("tool", true).0.unwrap();
+
+        assert_eq!(fs::read_to_string(&tool).unwrap(), "tool 1.3", "{unpack}");
+        let journal = world.journals("tool").0.unwrap();
+        assert!(
+            journal
+                .entries
+                .iter()
+                .any(|e| matches!(&e.action.kind, crate::apps::action::Kind::Download { version, .. } if version == "1.3")),
+            "{unpack}"
+        );
+        world.remove("tool").0.unwrap();
+        assert_eq!(world.host.snapshot(), before, "{unpack}");
+    }
+}
+
+#[test]
+fn a_download_a_run_stopped_during_is_downloaded_again() {
+    let world = World::new(&[("tool", &fixed_download("1.1", "file"))]);
+    for version in ["1.1", "1.3"] {
+        let sha = version.replace('.', "").repeat(32);
+        world.host.state.borrow_mut().downloads.insert(
+            format!("https://example.com/tool-{version}"),
+            (sha, format!("tool {version}").into_bytes()),
+        );
+    }
+    world.install("tool", true).0.unwrap();
+    world.write_app("tool", &fixed_download("1.3", "file"));
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("fetch:https://example.com/tool-1.3".to_owned());
+    world.install("tool", true).0.unwrap_err();
+    world.host.state.borrow_mut().fail.clear();
+    let journal = world.journals("tool").0.unwrap();
+    assert_eq!(journal.entry(1).unwrap().state, crate::apps::journal::State::Doing);
+    assert_eq!(
+        fs::read_to_string(world.host_home().join(".vendor/tool")).unwrap(),
+        "tool 1.1"
+    );
+
+    world.install("tool", true).0.unwrap();
+
+    assert_eq!(
+        fs::read_to_string(world.host_home().join(".vendor/tool")).unwrap(),
+        "tool 1.3"
+    );
+}
