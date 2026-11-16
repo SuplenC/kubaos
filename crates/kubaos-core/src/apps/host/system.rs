@@ -20,6 +20,7 @@ use std::process::Stdio;
 use super::AptPlan;
 use super::Host;
 use super::HostError;
+use super::UNIT_PROPERTIES;
 use super::UnitState;
 use crate::apps::action::RUN_PATH;
 use crate::apps::action::Scope;
@@ -306,28 +307,9 @@ impl Host for SystemHost {
     }
 
     fn unit_state(&mut self, scope: Scope, unit: &str) -> Result<UnitState, HostError> {
-        let shown = Self::out(self.systemctl(scope).args([
-            "show",
-            "--property=LoadState,UnitFileState,ActiveState,Result,ExecMainExitTimestampMonotonic",
-            unit,
-        ]))?;
-        let value = |key: &str| {
-            shown
-                .lines()
-                .find_map(|line| line.strip_prefix(key)?.strip_prefix('='))
-                .unwrap_or_default()
-                .to_owned()
-        };
-        Ok(UnitState {
-            exists: value("LoadState") == "loaded",
-            enabled: matches!(value("UnitFileState").as_str(), "enabled" | "enabled-runtime"),
-            active: matches!(value("ActiveState").as_str(), "active" | "activating" | "reloading"),
-            ran: value("ActiveState") == "inactive"
-                && value("Result") == "success"
-                && value("ExecMainExitTimestampMonotonic")
-                    .parse::<u64>()
-                    .is_ok_and(|t| t > 0),
-        })
+        let property = format!("--property={UNIT_PROPERTIES}");
+        let shown = Self::out(self.systemctl(scope).args(["show", &property, unit]))?;
+        Ok(UnitState::from_show(&shown))
     }
 
     fn daemon_reload(&mut self, scope: Scope) -> Result<(), HostError> {

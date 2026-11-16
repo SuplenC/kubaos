@@ -73,11 +73,42 @@ pub struct UnitState {
     pub exists: bool,
     pub enabled: bool,
     pub active: bool,
-    /// It ran since the machine started and exited cleanly: a oneshot that did its work.
+    /// A oneshot that ran since the machine started and exited cleanly: one that did its work.
     pub ran: bool,
 }
 
+/// The properties of `systemctl show` that [`UnitState::from_show`] reads.
+pub const UNIT_PROPERTIES: &str =
+    "LoadState,UnitFileState,ActiveState,Result,ExecMainExitTimestampMonotonic,Type,RemainAfterExit";
+
 impl UnitState {
+    /// How a unit stands from what `systemctl show --property=`[`UNIT_PROPERTIES`] says of it.
+    ///
+    /// Only a oneshot without `RemainAfterExit` counts as run when it is inactive after a clean
+    /// exit: a long-running service that was stopped also exits cleanly, with `Result` success
+    /// and an exit timestamp, and is not started.
+    #[must_use]
+    pub fn from_show(shown: &str) -> Self {
+        let value = |key: &str| {
+            shown
+                .lines()
+                .find_map(|line| line.strip_prefix(key)?.strip_prefix('='))
+                .unwrap_or_default()
+        };
+        let oneshot = value("Type") == "oneshot" && value("RemainAfterExit") != "yes";
+        Self {
+            exists: value("LoadState") == "loaded",
+            enabled: matches!(value("UnitFileState"), "enabled" | "enabled-runtime"),
+            active: matches!(value("ActiveState"), "active" | "activating" | "reloading"),
+            ran: oneshot
+                && value("ActiveState") == "inactive"
+                && value("Result") == "success"
+                && value("ExecMainExitTimestampMonotonic")
+                    .parse::<u64>()
+                    .is_ok_and(|t| t > 0),
+        }
+    }
+
     /// Whether it is started as a unit action means it: running, or run and exited cleanly.
     pub fn started(self) -> bool {
         self.active || self.ran
