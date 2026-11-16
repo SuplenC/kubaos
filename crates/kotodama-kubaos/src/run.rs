@@ -11,8 +11,12 @@
 //! - Which programs run: [`crate::registry`], [`crate::toggles`].
 
 use std::io;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::process::Stdio;
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
@@ -20,8 +24,17 @@ use kotodama_extension::Chain;
 use kotodama_extension::launch;
 use kotodama_extension::log;
 
-/// The delaying thread only sleeps, then starts a program.
+/// The delaying thread only sleeps, then starts a program; a background program's threads only
+/// wait for it, or read its lines.
 const DELAY_STACK: usize = 64 * 1024;
+/// How long a background program's output may stay open after it exits: something it started
+/// and left running may hold it for ever.
+const OUTPUT_GRACE: Duration = Duration::from_millis(500);
+
+/// What a background program's lines go to, one at a time.
+pub type OnLine = Box<dyn FnMut(String) + Send>;
+/// What a background program's end goes to: whether it exited with success.
+pub type OnEnd = Box<dyn FnOnce(bool) + Send>;
 
 /// What starts the programs.
 pub trait Runner {
@@ -38,6 +51,14 @@ pub trait Runner {
     ///
     /// When it can't start. After a delay, that is only logged.
     fn launch(&self, argv: &[String], delay: Duration) -> Result<(), RunError>;
+
+    /// Starts `argv` and leaves it running, giving `line` each line it writes to stdout or
+    /// stderr, then `ended` whether it exited with success.
+    ///
+    /// # Errors
+    ///
+    /// When it, or a thread to follow it, can't start.
+    fn background(&self, argv: &[String], line: OnLine, ended: OnEnd) -> Result<(), RunError>;
 }
 
 /// Why a program didn't do its job.
@@ -109,6 +130,47 @@ impl Runner for Programs {
             })
             .map(drop)
             .map_err(RunError::start(&program))
+    }
+
+    fn background(&self, argv: &[String], mut line: OnLine, ended: OnEnd) -> Result<(), RunError> {
+        let Some((program, rest)) = argv.split_first() else {
+            return Err(RunError::start("")(io::Error::from(io::ErrorKind::InvalidInput)));
+        };
+        let start = RunError::start(program);
+        let (reader, writer) = io::pipe().map_err(RunError::start(program))?;
+        let stderr = writer.try_clone().map_err(RunError::start(program))?;
+        // A group of its own, so a signal to the Extension's group, as the Daemon stopping it
+        // sends, doesn't stop an install halfway.
+        let mut child = Command::new(program)
+            .args(rest)
+            .stdin(Stdio::null())
+            .stdout(writer)
+            .stderr(stderr)
+            .process_group(0)
+            .spawn()
+            .map_err(start)?;
+        let (closed, output_closed) = mpsc::channel();
+        thread::Builder::new()
+            .name("background-output".into())
+            .stack_size(DELAY_STACK)
+            .spawn(move || {
+                for read in BufReader::new(reader).lines() {
+                    let Ok(read) = read else { break };
+                    line(read);
+                }
+                let _ = closed.send(());
+            })
+            .map_err(RunError::start(program))?;
+        thread::Builder::new()
+            .name("background".into())
+            .stack_size(DELAY_STACK)
+            .spawn(move || {
+                let succeeded = child.wait().is_ok_and(|status| status.success());
+                let _ = output_closed.recv_timeout(OUTPUT_GRACE);
+                ended(succeeded);
+            })
+            .map(drop)
+            .map_err(RunError::start(program))
     }
 }
 

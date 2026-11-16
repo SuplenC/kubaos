@@ -113,7 +113,10 @@ fn a_manifest_names_its_app_and_its_one_source() {
 
 #[test]
 fn a_manifest_may_name_its_icon_from_the_icon_theme() {
-    let text = AGENT.replace("summary = \"A coding agent\"", "summary = \"A coding agent\"\nicon = \"agent-cli\"");
+    let text = AGENT.replace(
+        "summary = \"A coding agent\"",
+        "summary = \"A coding agent\"\nicon = \"agent-cli\"",
+    );
 
     let app = App::parse("agent", &text).unwrap();
 
@@ -272,7 +275,10 @@ fn a_manifest_that_cant_be_installed_safely_is_refused() {
         ("two sources", format!("{AGENT}\n[nix]\npackages = [\"x\"]\n")),
         ("unknown key", format!("homepage = \"x\"\n{AGENT}")),
         ("unknown key of a source", format!("{AGENT}\nicon = \"x\"\n")),
-        ("an icon that is a path", format!("icon = \"/usr/share/icons/x.png\"\n{AGENT}")),
+        (
+            "an icon that is a path",
+            format!("icon = \"/usr/share/icons/x.png\"\n{AGENT}"),
+        ),
         ("an empty icon", format!("icon = \"\"\n{AGENT}")),
         ("empty name", AGENT.replace("\"Agent\"", "\"\"")),
         ("no packages", AGENT.replace("[\"agent\", \"agent-data\"]", "[]")),

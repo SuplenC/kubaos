@@ -22,6 +22,7 @@ use kotodama_protocol::Action;
 use kotodama_protocol::Argument;
 use kotodama_protocol::Item;
 use kotodama_protocol::ItemKind;
+use kotodama_protocol::Job;
 use kotodama_protocol::NamespacedKind;
 use kotodama_protocol::View;
 use kotodama_protocol::ViewContent;
@@ -91,6 +92,8 @@ pub enum Ran {
     Push(View),
     /// Done from inside the View with this id, which closes with the menu.
     Pop(String),
+    /// Started this Job, which goes on in the background; the menu closes.
+    Job(Job),
 }
 
 impl Toggle {

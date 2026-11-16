@@ -7,14 +7,16 @@
 //! in a View that filters itself is answered with the View again, and each Live query at once, with
 //! a monitor answer, processes to stop, a date answer, or nothing. The apps the startup Actions are
 //! offered on are sent at the start, at each config and at each change to an autostart entry or an
-//! app's desktop file.
+//! app's desktop file. An app Job is sent as it starts, at each step and at its end, which reads
+//! the apps of the Apps catalog again, as each config and each change to their files does.
 //!
 //! # Owns
 //!
 //! - The loop, logging the config's problems, and turning what a run came to into messages.
 //! - Watching the update check's file, the counters' file, the keyboard settings and
 //!   `/etc/default/keyboard`, the wallpaper sets file, Hyprland's screens file, the drives file and
-//!   the states' files, the autostart folders and the apps' folders.
+//!   the states' files, the autostart folders and the apps' folders, and dpkg's database, the picks
+//!   and `packages.toml` for the Apps catalog.
 //!
 //! # Not here
 //!
@@ -27,6 +29,7 @@ use std::sync::mpsc::Sender;
 use std::time::Duration;
 
 use jiff::Zoned;
+use kotodama_extension::Chain;
 use kotodama_extension::Connection;
 use kotodama_extension::Event;
 use kotodama_extension::SentItems;
@@ -35,6 +38,10 @@ use kotodama_extension::Writer;
 use kotodama_extension::config;
 use kotodama_extension::watch::RecursiveMode;
 use kotodama_extension::watch::Watcher;
+use kotodama_kubaos::apps::AppFiles;
+use kotodama_kubaos::apps::Apps;
+use kotodama_kubaos::apps::Heard;
+use kotodama_kubaos::apps::Reporter;
 use kotodama_kubaos::bus::SystemBus;
 use kotodama_kubaos::clock;
 use kotodama_kubaos::clock::Dates;
@@ -63,6 +70,7 @@ use kotodama_kubaos::watched;
 use kotodama_protocol::Clipboard;
 use kotodama_protocol::Error;
 use kotodama_protocol::FromExtension;
+use kotodama_protocol::JobState;
 use kotodama_protocol::LiveResult;
 use kotodama_protocol::Outcome;
 use kotodama_protocol::ToExtension;
@@ -76,6 +84,9 @@ use kubaos_sysmon::serve;
 /// How long the update check's folder stays quiet before its file is read:
 /// the check writes it through a temporary file and a rename.
 const SETTLE: Duration = Duration::from_millis(200);
+/// How long the Apps catalog's files stay quiet before the apps are read: apt rewrites dpkg's
+/// database at each package, and the read runs `dpkg-query`, so it waits for the run's end.
+const APPS_SETTLE: Duration = Duration::from_secs(1);
 
 /// What the watches send the loop.
 enum Own {
@@ -95,6 +106,10 @@ enum Own {
     Counters(CounterList),
     /// An autostart entry or an app's desktop file changed.
     Startup(StartupApps),
+    /// dpkg's database, the picks or `packages.toml` changed: the apps of the Apps catalog.
+    Apps(Apps),
+    /// An app Job's program wrote a line, or ended.
+    AppJob(Heard),
 }
 
 /// What answers Live queries: the system monitor, then the dates.
@@ -203,9 +218,14 @@ fn run() -> Result<(), Error> {
     let mut sent = SentItems::default();
     // The toggles work on any machine, and the actions need only their programs.
     SentStatus::default().usable(&mut writer)?;
+    let reporting = events.clone();
+    extension.set_reporter(Reporter::new(move |heard| {
+        let _ = reporting.send(Event::Own(Own::AppJob(heard)));
+    }));
     let Sources {
         places,
         autostart,
+        apps,
         mut startup,
         _watchers,
     } = read_sources(&mut extension, &mut writer, events)?;
@@ -217,12 +237,17 @@ fn run() -> Result<(), Error> {
                 for problem in extension.configure(&table) {
                     config::warn(problem);
                 }
-                read_again(&mut extension, &places);
+                read_again(&mut extension, &places, apps.as_ref());
                 startup.read(&mut writer, autostart.as_ref())?;
                 configured = true;
                 sent.publish(&mut writer, extension.items())?;
             }
             Event::Own(Own::Startup(apps)) => startup.send(&mut writer, apps)?,
+            Event::Own(Own::AppJob(heard)) => {
+                if job_heard(&mut extension, &mut writer, heard, apps.as_ref())? && configured {
+                    sent.publish(&mut writer, extension.items())?;
+                }
+            }
             Event::Own(own) => {
                 match own {
                     Own::Pending(pending) => extension.set_pending(pending),
@@ -232,7 +257,8 @@ fn run() -> Result<(), Error> {
                     Own::Desk(desk) => extension.set_desk(desk),
                     Own::States(states) => extension.set_states(states),
                     Own::Counters(counters) => extension.set_counters(counters),
-                    Own::Startup(_) => {}
+                    Own::Apps(apps) => extension.set_apps(apps),
+                    Own::Startup(_) | Own::AppJob(_) => {}
                 }
                 if configured {
                     sent.publish(&mut writer, extension.items())?;
@@ -283,6 +309,7 @@ fn run() -> Result<(), Error> {
 struct Sources {
     places: Places,
     autostart: Option<AutostartDirs>,
+    apps: Option<AppFiles>,
     startup: SentStartup,
     _watchers: Vec<Watcher>,
 }
@@ -315,6 +342,9 @@ fn read_sources(
     let desk_watcher = read_desk(extension, events.clone());
     let (places, states_watcher) = read_states(extension, events.clone());
     extension.set_counters(CounterList::read());
+    let apps = AppFiles::from_env();
+    read_apps(extension, apps.as_ref());
+    let apps_watcher = apps.clone().and_then(|files| watch_apps(files, events.clone()));
     let autostart = AutostartDirs::from_env();
     let mut startup = SentStartup::default();
     startup.read(writer, autostart.as_ref())?;
@@ -327,14 +357,35 @@ fn read_sources(
         desk_watcher,
         states_watcher,
         startup_watcher,
+        apps_watcher,
         update_watcher,
     ];
     Ok(Sources {
         places,
         autostart,
+        apps,
         startup,
         _watchers: watchers.into_iter().flatten().collect(),
     })
+}
+
+/// Sends the app Job as `heard` leaves it, and once it has ended reads the apps again; whether it
+/// ended, so their Items go out again.
+fn job_heard(
+    extension: &mut Extension<SystemBus, Programs>,
+    writer: &mut Writer,
+    heard: Heard,
+    apps: Option<&AppFiles>,
+) -> Result<bool, Error> {
+    let Some(job) = extension.heard(heard) else {
+        return Ok(false);
+    };
+    let ended = job.state != JobState::Running;
+    writer.send(&FromExtension::JobProgress(job))?;
+    if ended {
+        read_apps(extension, apps);
+    }
+    Ok(ended)
 }
 
 /// What a run came to, sending the View it pushes or pops first.
@@ -348,6 +399,10 @@ fn outcome_of(ran: Ran, writer: &mut Writer) -> Result<Outcome, Error> {
         }
         Ran::Pop(view) => {
             writer.send(&FromExtension::PopView { view })?;
+            Outcome::Close
+        }
+        Ran::Job(job) => {
+            writer.send(&FromExtension::JobProgress(job))?;
             Outcome::Close
         }
     })
@@ -601,11 +656,61 @@ fn watch_desk(files: DeskFiles, events: Sender<Event<Own>>) -> Option<Watcher> {
 }
 
 /// Reads again what each config does: the user folders, which aren't watched, as they change
-/// rarely and a folder made since shows up at the next reload; and the states, so a reload brings
-/// them back in step when their watch couldn't start.
-fn read_again(extension: &mut Extension<SystemBus, Programs>, places: &Places) {
+/// rarely and a folder made since shows up at the next reload; and the states and the apps, so a
+/// reload brings them back in step when their watch couldn't start.
+fn read_again(extension: &mut Extension<SystemBus, Programs>, places: &Places, apps: Option<&AppFiles>) {
     extension.set_user_folders(UserFolders::from_env());
     extension.set_states(States::read(places));
+    read_apps(extension, apps);
+}
+
+/// Gives `extension` the apps of the Apps catalog as the machine has them. Apps that can't be read
+/// keep what was read last, and the problem is logged.
+fn read_apps(extension: &mut Extension<SystemBus, Programs>, files: Option<&AppFiles>) {
+    let Some(files) = files else {
+        return;
+    };
+    match Apps::read(files, &Programs) {
+        Ok(apps) => extension.set_apps(apps),
+        Err(err) => kotodama_extension::log!("not reading the apps: {}", Chain(&err)),
+    }
+}
+
+/// Watches the folders of dpkg's database, the picks and `packages.toml`, sending the apps on
+/// each change to one of them. Without a watch the app Items keep what was read last, until the
+/// next config or app Job.
+fn watch_apps(files: AppFiles, events: Sender<Event<Own>>) -> Option<Watcher> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    let mut changed = Vec::new();
+    for file in files.watched() {
+        let (Some(dir), Some(name)) = (file.parent(), file.file_name()) else {
+            continue;
+        };
+        // The events name the real path, behind any symlink on the way.
+        let dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+        changed.push(dir.join(name));
+        if !dirs.contains(&dir) {
+            dirs.push(dir);
+        }
+    }
+    let watcher = Watcher::start(
+        "apps",
+        RecursiveMode::NonRecursive,
+        APPS_SETTLE,
+        // dpkg writes `status-new` and renames it onto `status`; `kubaos app` and `kubaos package`
+        // write theirs through a temporary file and a rename too.
+        move |event, _| changed.iter().any(|file| watched::changes(event, file)),
+        move |_| match Apps::read(&files, &Programs) {
+            Ok(apps) => {
+                let _ = events.send(Event::Own(Own::Apps(apps)));
+            }
+            Err(err) => kotodama_extension::log!("not reading the apps: {}", Chain(&err)),
+        },
+    )
+    .map_err(|err| kotodama_extension::log!("not watching the apps: {}", watched::why(&err)))
+    .ok()?;
+    watcher.watch(dirs);
+    Some(watcher)
 }
 
 /// Gives `extension` the states of this machine and session, and watches their files.
