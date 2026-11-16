@@ -442,12 +442,15 @@ function spamAd(): HTMLElement {
   tag.append(text(SPAM.tag, "label", "on_burn_success"));
   const top = row("s8", "centre", tag, text(SPAM.advertiser, "caption", "on_surface"));
   const go = button({ label: SPAM.action, kind: "Success", size: "Sm", icon: "arrow_forward", trailing: true });
+  const stars = row("s4", "centre", ...Array.from({ length: 5 }, () => icon("star_filled", "var(--type-small-icon)", "var(--color-burn_warning)")), text(SPAM.review, "small", "on_surface"));
   const card = stack(
     "s8",
     "start",
     top,
     text(SPAM.headline, "display", "burn_success"),
+    text(SPAM.product, "subheading", "on_surface"),
     row("s12", "centre", go, text(SPAM.line, "body_strong", "on_surface")),
+    stars,
     text(SPAM.fine, "caption", "on_surface_variant"),
   );
   card.classList.add("setup-kotodama-spam-card");
