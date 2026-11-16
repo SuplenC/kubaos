@@ -141,6 +141,7 @@ pub const TOOLS: &[&str] = &[
     "xargs",
     "tar",
     "gzip",
+    "zstd",
     "jq",
     "mktemp",
     "date",
