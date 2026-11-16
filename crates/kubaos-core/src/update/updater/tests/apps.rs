@@ -1168,3 +1168,49 @@ fn an_update_installs_what_a_picked_app_requires() {
     assert!(user_journal(&w, "kit").unwrap().complete);
     assert_eq!(user_journal(&w, "agent").unwrap().brought_by, ["kit"]);
 }
+
+/// An app in two setups: with Agent, or on its own.
+const RIG: &str = r#"
+name = "Rig"
+summary = "A rig"
+
+[setup.full]
+name = "Rig with Agent"
+summary = "The rig and its agent"
+requires = ["agent"]
+
+[[setup.full.action]]
+name = "Write the full rig"
+kind = "file"
+to = "~/.config/rig/full.toml"
+text = "full = true\n"
+
+[setup.bare]
+name = "Rig"
+summary = "The rig alone"
+
+[[setup.bare.action]]
+name = "Write the bare rig"
+kind = "file"
+to = "~/.config/rig/bare.toml"
+text = "bare = true\n"
+"#;
+
+#[test]
+fn an_update_lists_the_app_a_picked_setup_change_left_behind_as_removed() {
+    let w = world();
+    put(&w.sys.catalog().join("rig/app.toml"), &format!("{ABOUT}{RIG}"));
+    lock_down(&w.sys.catalog().join("rig"));
+    let mut m = fake(&w, &[]);
+    w.updater(&mut m).add_apps(&names(&["rig"]), Some("full")).unwrap();
+    assert!(has(&m, "agent"));
+    let mut picks = Picks::read(&w.user.app_picks()).unwrap();
+    picks.add_setup("rig", "bare");
+    picks.write(&w.user.app_picks()).unwrap();
+
+    let changes = w.updater(&mut m).reconcile_apps();
+
+    assert!(!has(&m, "agent"));
+    assert_eq!(user_journal(&w, "rig").unwrap().setup.as_deref(), Some("bare"));
+    assert_eq!(changes.removed, names(&["Agent"]));
+}

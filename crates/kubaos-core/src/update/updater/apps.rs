@@ -299,7 +299,8 @@ impl<M: Machine> Updater<'_, M> {
     /// Installs the picked apps, as an update's phase, before the switch that installs an app's
     /// nixpkgs packages: each step of each checked, a step not done (a picked app the machine
     /// lacks, a step a release added or changed, one the user undid) done, through sudo, with no
-    /// window. No picks start no phase. A failure is a warning: the next update tries again.
+    /// window. An app a picked setup no longer requires, and nothing else needs, goes, listed
+    /// removed. No picks start no phase. A failure is a warning: the next update tries again.
     pub(super) fn reconcile_apps(&mut self) -> AppChanges {
         let picks = match Picks::read(&self.user.app_picks()) {
             Ok(picks) => picks,
@@ -360,8 +361,16 @@ impl<M: Machine> Updater<'_, M> {
                     })
                     .map_err(|source| app_error(format!("installing {name}"), source));
                 match done {
-                    Ok((_, was)) if !was => changes.installed.push(name),
-                    Ok(_) => {}
+                    Ok((ran, was)) => {
+                        if !was {
+                            changes.installed.push(name);
+                        }
+                        for gone in ran.into_iter().filter(|r| r.finished.removed) {
+                            if !changes.removed.contains(&gone.name) {
+                                changes.removed.push(gone.name);
+                            }
+                        }
+                    }
                     Err(e) => {
                         ok = false;
                         engine_warning(engine, &e);
@@ -379,6 +388,9 @@ impl<M: Machine> Updater<'_, M> {
         }
         if !changes.installed.is_empty() {
             self.j.detail(format!("{} installed", changes.installed.join(", ")));
+        }
+        if !changes.removed.is_empty() {
+            self.j.detail(format!("{} removed", changes.removed.join(", ")));
         }
         self.j.phase_end_optional(ok);
         changes
