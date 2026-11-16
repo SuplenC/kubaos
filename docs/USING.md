@@ -335,6 +335,20 @@ Piped or in a log, the output is plain lines with no colour; `NO_COLOR=1` drops 
 
 The last phase of an update refreshes fwupd's list from the LVFS and installs the firmware updates that need no reboot, a dock's or a receiver's. Firmware that installs only at the next boot (the system firmware, the Secure Boot lists) is named, and in a terminal the update asks "Stage it now?": yes hands it to fwupd, which installs it when you next reboot, and the summary says to reboot. Nothing reboots by itself. With `-y` or `--json` nobody is asked, so it only waits; the next `kubaos update` in a terminal offers it again, or run `sudo fwupdmgr update` yourself. A failure is a warning and the update goes on. "Firmware updates off" in the Command menu (or `kubaos update --turn-off firmware`) leaves firmware out of the update, "Firmware updates on" (`--turn-on firmware`) brings it back. The switch is the flag file `~/.config/kubaos/desktop/update/no-firmware`.
 
+### Apps
+
+KubaOS knows how to install a few essential apps well, each from one pinned, verified source: Claude Code (Anthropic's signed apt repository) and T3 Code (its release's `.deb`, checked against its sha256). You pick the ones you want; `kubaos update` keeps them installed, and you remove one only by asking.
+
+```sh
+kubaos app list                  # the catalog, and which apps you picked
+kubaos app add claude-code       # pick it and install it: asks for your password (or security key) once
+kubaos app remove t3-code        # drop it and remove it
+kubaos app status                # each app: installed, missing (the next update installs it), available
+kubaos app status --json         # the same for a program
+```
+
+Your picks are `~/.config/kubaos/apps.toml`; editing it by hand works too, and the next `kubaos update` installs what it lists and the machine lacks. An app you have but didn't pick is left alone. apt apps move with `kubaos update`'s apt upgrade; T3 Code updates itself. [`docs/CONTRACTS.md`](CONTRACTS.md), "The Apps catalog", has the manifest format, for adding an app.
+
 ### KubaOS's apt packages
 
 Every apt package KubaOS installs is listed in one file, `system/packages.toml` in the release, in groups: the base system, the file manager, Hyprland (held), Docker, Chrome, the security key and so on. The install reads it and so does every `kubaos update`, so a package a release adds reaches your machine with that update, as a Nix package does. `/var/lib/kubaos/apt-installed` records what KubaOS installed; a package you installed yourself is never removed, even when a release drops it from the list.
