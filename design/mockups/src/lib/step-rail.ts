@@ -533,7 +533,7 @@ function blocked(spec: RailPage): boolean {
   return spec.blocker !== undefined && Boolean(now(spec.blocker));
 }
 
-function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void, onSkip: () => void): { room: HTMLElement; nudge: () => HTMLElement | null; first: HTMLElement | null } {
+function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void, onSkip: () => void, host: RailHost): { room: HTMLElement; nudge: () => HTMLElement | null; first: HTMLElement | null } {
   const body = spec.body();
   const parts: Element[] = [fillingHeight(filling(body))];
   let nudge: HTMLElement | null = null;
@@ -546,7 +546,9 @@ function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void, onSkip
     made.nudge = nudge;
     first ??= blocked(spec) ? null : drawn.next;
     let band = filling(drawn.band);
-    parts.push(gap("s16"), band);
+    // In Kōbō the body's own faded foot is the room between it and the band: a gap under it would
+    // only take height from what the page asks.
+    parts.push(...(host === "kobo" ? [] : [gap("s16")]), band);
     // The answers changed: the band is drawn again where it was, the keyboard kept on Continue.
     room.addEventListener(RECHECK, () => {
       const had = band.contains(document.activeElement);
@@ -599,7 +601,7 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
       spec.skipped?.();
       go(along(current, 1));
     };
-    const made = pageRoom(spec, () => go(along(current, -1)), next, skip);
+    const made = pageRoom(spec, () => go(along(current, -1)), next, skip, options.host);
     rooms.set(index, made);
     side.append(made.room);
     return made;

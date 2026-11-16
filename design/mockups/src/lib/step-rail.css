@@ -152,6 +152,19 @@
   translate: 0 round(nearest, calc(var(--step-rise) * var(--space-s24)), 1px);
 }
 
+/* In Kōbō the band sits on the rail's foot line: its buttons centred on the last key hint at the
+   rail's foot, so the screen's bottom edge has one line along it, and the page's body takes the
+   height the band leaves. */
+.k-step-rail-page[data-host="kobo"] .k-step-room > .k-page {
+  padding-bottom: max(0px, round(down, calc(var(--space-s16) + (var(--size-keycap) - var(--size-control_md)) / 2), 1px));
+}
+
+/* The installer's rail ends on its power button and battery, a small control's line: the band sits
+   on that. */
+.k-step-rail-page[data-host="kobo"]:has(.k-rail [data-power]) .k-step-room > .k-page {
+  padding-bottom: max(0px, round(down, calc(var(--space-s16) + (var(--size-control_sm) - var(--size-control_md)) / 2), 1px));
+}
+
 .k-step-room {
   display: flex;
   flex: 1 1 0;
