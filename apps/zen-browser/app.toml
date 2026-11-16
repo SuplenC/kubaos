@@ -1,8 +1,8 @@
 # Zen from the AppImage of its GitHub release, pinned to the sha256 GitHub publishes for the
 # asset. Zen has no apt repository, Ubuntu doesn't package it and nixpkgs has no zen-browser.
 # The AppImage can't update itself, so a release of KubaOS moves the pin on. Its runtime mounts
-# it with FUSE 3's fusermount3. The desktop entry is the one inside the AppImage, its Exec the
-# AppImage and its Icon Colloid's.
+# it with FUSE 3's fusermount3. The desktop entry is ours, not the AppImage's: its Exec runs the
+# AppImage, its Icon is Colloid's and its actions are the options Zen's command line takes.
 # https://github.com/zen-browser/desktop/releases
 name = "Zen Browser"
 category = "browsers"
