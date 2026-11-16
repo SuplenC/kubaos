@@ -321,9 +321,12 @@ impl<'h> Keeper<'h> {
         };
         if look.done {
             let owns = claims.iter().any(|c| c.owned);
+            // A step KubaOS did stays done though it owns nothing (a repository it set up for
+            // packages that were there): the release's migrations read what it set up from it.
+            let ours = owns || old.as_ref().is_some_and(|e| e.state == State::Done);
             let entry = Entry {
                 step,
-                state: if owns { State::Done } else { State::Found },
+                state: if ours { State::Done } else { State::Found },
                 claims,
                 prior,
                 action,
@@ -378,8 +381,9 @@ impl<'h> Keeper<'h> {
     /// (absent), group membership and `run`s, never a group itself, which a package makes;
     /// lingering only when KubaOS's older mark, `<id>-linger-was-off`, says it was off; and a
     /// path that is there and holds an older release's content, which the next run brings to
-    /// this one's. Without `owned`, every step is found and owns nothing. A step with an entry
-    /// already, and one not done (but for such a path), is left to the next run. The mark goes
+    /// this one's, as it sets up the repository of an `apt` step whose packages are there without
+    /// it. Without `owned`, every step is found and owns nothing. A step with an entry already,
+    /// and one not done (but for those two), is left to the next run. The mark goes
     /// once a `linger` step is recorded, whose prior state replaces it. Returns how many steps it
     /// recorded.
     ///
@@ -408,7 +412,7 @@ impl<'h> Keeper<'h> {
                     .claims
                     .iter()
                     .any(|c| c.owned && c.path().is_some_and(|p| self.host.place(p).symlink_metadata().is_ok()));
-            if !look.done && !stale {
+            if !stale && !perform::there(&action, &look) {
                 continue;
             }
             let (claims, prior) = if owned {
@@ -1012,7 +1016,8 @@ impl<'a> Engine<'a> {
     /// Takes in the app `id` when the machine has it and no journal does: an app installed before
     /// KubaOS kept journals, by an older release of it or by hand. Nothing runs but checks. The
     /// app is there when every package step of its own actions (`apt`, `deb`, `nix`; every step,
-    /// for an app with none) checks done; it is there in the first setup, by id, whose own steps
+    /// for an app with none) checks done, an `apt` step's packages installed whether or not its
+    /// repository is set up yet; it is there in the first setup, by id, whose own steps
     /// that open no window all check done, else in the one with no steps of its own. Its user
     /// journal is then complete in that setup, its user steps recorded as [`Keeper::adopt`]
     /// says, `owned` when KubaOS put it there; root's steps are recorded by root on the first run
@@ -1056,13 +1061,14 @@ impl<'a> Engine<'a> {
                 })?;
                 // A root `run`'s check runs only as root: from here it can't say done.
                 let checkable = !(resolved.side() == Side::Root && matches!(resolved.kind, Kind::Run { .. }));
-                let look = checkable
-                    && perform::look(&resolved, user.host(), Recorded::Nothing)
-                        .map_err(|e| EngineError::Step {
+                let look = checkable && {
+                    let look =
+                        perform::look(&resolved, user.host(), Recorded::Nothing).map_err(|e| EngineError::Step {
                             name: action.name.clone(),
                             source: Box::new(StepError::Perform(e)),
-                        })?
-                        .done;
+                        })?;
+                    perform::there(&resolved, &look)
+                };
                 if !look {
                     return Ok(false);
                 }

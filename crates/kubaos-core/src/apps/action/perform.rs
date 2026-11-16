@@ -381,6 +381,14 @@ fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look
     }
 }
 
+/// Whether what `action` puts on the machine is there, by `look`, its look: when it is done, and
+/// for an `apt` action whose packages are all installed but whose repository isn't set up yet,
+/// which [`apply`] then sets up without installing anything.
+#[must_use]
+pub fn there(action: &Action, look: &Look) -> bool {
+    look.done || (matches!(action.kind, Kind::Apt { .. }) && look.claims.iter().all(|c| !c.owned))
+}
+
 /// What `action` finds on the machine, whose step's journal entry says `recorded` of its path.
 /// A download is done when its path is there and holds what the action pins: a release that
 /// changes the pin of a download at the same path downloads it again.
@@ -396,7 +404,7 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             packages,
             arch,
             versions,
-            ..
+            repo,
         } => {
             if let Some(only) = arch
                 && only != host.arch()
@@ -406,7 +414,16 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
                 });
             }
             let ours = installed_as(host, packages, versions.as_deref())?;
-            Ok(parts("package", packages, |p| ours.contains(p)))
+            let mut look = parts("package", packages, |p| ours.contains(p));
+            // Packages a vendor's own setup brought (a hand-installed Slack, its key trusted for
+            // every repository) aren't the app set up as KubaOS sets it up until its repository is.
+            if let Some(repo) = repo
+                && look.done
+                && !host.apt_repo_ready(repo).map_err(PerformError::Host)?
+            {
+                look.done = false;
+            }
+            Ok(look)
         }
         Kind::Deb {
             package,

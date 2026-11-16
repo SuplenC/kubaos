@@ -27,6 +27,8 @@ use super::UNIT_PROPERTIES;
 use super::UnitState;
 use crate::apps::action::RUN_PATH;
 use crate::apps::action::Scope;
+use crate::apt::Manifest;
+use crate::apt::manifest::MANIFEST;
 use crate::packages::Packages;
 use crate::unfree::Setting;
 use crate::unfree::Unfree;
@@ -225,6 +227,15 @@ impl Host for SystemHost {
 
     fn apt_repo(&mut self, repo: &str) -> Result<(), HostError> {
         Self::out(self.command(self.checkout.join("system/apt-repo.sh")).arg(repo)).map(drop)
+    }
+
+    fn apt_repo_ready(&mut self, repo: &str) -> Result<bool, HostError> {
+        let path = self.checkout.join(MANIFEST);
+        let manifest = Manifest::read(&path).map_err(HostError::Manifest)?.unwrap_or_default();
+        Ok(manifest
+            .repos()
+            .get(repo)
+            .is_some_and(|r| r.in_place(repo, Path::new("/"))))
     }
 
     fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError> {

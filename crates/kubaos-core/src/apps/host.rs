@@ -53,6 +53,8 @@ pub enum HostError {
     },
     #[error("the User flake's packages.toml")]
     Nix(#[source] Box<dyn std::error::Error + Send + Sync>),
+    #[error("the package manifest")]
+    Manifest(#[source] crate::apt::manifest::ManifestError),
 }
 
 impl HostError {
@@ -190,6 +192,16 @@ pub trait Host {
     ///
     /// When its setup fails.
     fn apt_repo(&mut self, repo: &str) -> Result<(), HostError>;
+
+    /// Whether the vendor repository `repo` of the package manifest is set up as KubaOS sets it
+    /// up: its sources file, `<repo>.sources`, signed by the manifest's keyrings, each of them
+    /// there. A vendor's own setup of the same repository (Slack's `slack.list`, the
+    /// `zulip-desktop.sources` Zulip's package ships, signed by its own keyring) isn't.
+    ///
+    /// # Errors
+    ///
+    /// When the package manifest can't be read.
+    fn apt_repo_ready(&mut self, repo: &str) -> Result<bool, HostError>;
 
     /// What apt would install and remove to carry out `plan`, from a simulation that changes
     /// nothing.

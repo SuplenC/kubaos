@@ -15,10 +15,12 @@ use super::warnings;
 use super::yes;
 use crate::apps::AppState;
 use crate::apps::Picks;
+use crate::apps::action::Kind;
 use crate::apps::host::Host;
 use crate::apps::host::fake::FakeHost;
 use crate::apps::journal::Adoption;
 use crate::apps::journal::Journal;
+use crate::apps::journal::State;
 use crate::sandbox;
 use crate::update::UpdateError;
 use crate::update::event::AppChanges;
@@ -1417,6 +1419,152 @@ fn the_communication_repos_migration_refreshes_only_what_kubaos_set_up_and_untru
     );
     let updates = calls.iter().filter(|c| *c == "sudo apt-get update").count();
     assert_eq!(updates, 1, "one apt update for every repository: {calls:#?}");
+}
+
+/// The root journal's entry of the app `id`'s `apt` step.
+fn apt_entry(w: &World, id: &str) -> crate::apps::journal::Entry {
+    root_journal(w, id)
+        .unwrap()
+        .entries
+        .into_iter()
+        .find(|e| matches!(e.action.kind, Kind::Apt { .. }))
+        .unwrap()
+}
+
+/// Agent, picked, on a machine an older release put it on, its repository set up or not.
+fn agent_from_before(w: &World, repo_set_up: bool) -> Fake {
+    let mut picks = Picks::default();
+    picks.add("agent");
+    picks.write(&w.user.app_picks()).unwrap();
+    let m = fake(w, &["agent"]);
+    if repo_set_up {
+        host(&m).state.borrow_mut().repos.insert("vendor".to_owned());
+    }
+    m
+}
+
+#[test]
+fn an_app_kubaos_put_there_from_its_set_up_repository_is_taken_in_owned_and_nothing_runs() {
+    let w = world();
+    let mut m = agent_from_before(&w, true);
+    w.updater(&mut m).adopt_apps().unwrap();
+    let before = host(&m).snapshot();
+
+    w.updater(&mut m).update(yes()).unwrap();
+
+    assert_eq!(host(&m).snapshot(), before);
+    assert_eq!(host(&m).state.borrow().repos, ["vendor".to_owned()].into());
+    let entry = apt_entry(&w, "agent");
+    assert_eq!(entry.state, State::Done);
+    assert!(entry.claims.iter().all(|c| c.owned), "{entry:?}");
+}
+
+#[test]
+fn an_app_kubaos_put_there_without_its_repository_set_up_has_it_set_up_and_its_packages_stay_owned() {
+    let w = world();
+    let mut m = agent_from_before(&w, false);
+    let taken = w.updater(&mut m).adopt_apps().unwrap();
+    assert_eq!(taken, ["Agent"]);
+
+    w.updater(&mut m).update(yes()).unwrap();
+
+    assert!(host(&m).state.borrow().repos.contains("vendor"));
+    let entry = apt_entry(&w, "agent");
+    assert_eq!(entry.state, State::Done);
+    assert!(entry.claims.iter().all(|c| c.owned), "{entry:?}");
+    w.updater(&mut m).remove_apps(&names(&["agent"])).unwrap();
+    assert!(!has(&m, "agent"), "KubaOS put it there, so its removal takes it");
+}
+
+/// Slack's daily job's `slack.list`, as a Slack installed by hand has it.
+const SLACKS_OWN_LIST: &str = "### THIS FILE IS AUTOMATICALLY CONFIGURED ###\n\
+     deb [arch=amd64] https://packagecloud.io/slacktechnologies/slack/debian/ jessie main\n";
+
+#[test]
+fn a_slack_installed_by_hand_is_set_up_from_kubaos_repository_and_its_global_keys_go() {
+    let w = world();
+    with_app(&w, "slack");
+    let mut m = fake(&w, &["slack-desktop"]);
+    put(
+        &host(&m).place(Path::new("/etc/default/slack")),
+        "repo_add_once=\"false\"\nrepo_reenable_on_distupgrade=\"true\"\n",
+    );
+
+    w.updater(&mut m).add_apps(&names(&["slack"]), None).unwrap();
+
+    assert!(
+        host(&m).state.borrow().repos.contains("slack"),
+        "its repository wasn't set up"
+    );
+    assert!(has(&m, "slack-desktop"));
+    let entry = apt_entry(&w, "slack");
+    assert_eq!(entry.state, State::Done, "KubaOS set its repository up");
+    assert!(
+        entry.claims.iter().all(|c| !c.owned),
+        "the package was the user's: {entry:?}"
+    );
+    assert_eq!(
+        w.updater(&mut m).app_status().unwrap().get("slack").unwrap().state,
+        AppState::Found
+    );
+    w.updater(&mut m).update(yes()).unwrap();
+    assert_eq!(
+        apt_entry(&w, "slack").state,
+        State::Done,
+        "an update that checks it keeps it KubaOS's"
+    );
+
+    // What the real machine runs to set the repository up, system/apt-repo.sh slack, on a
+    // machine where Slack's job ran.
+    let dir = w.tmp.path().join("setup");
+    let sources = dir.join("sources.list.d");
+    put(&sources.join("slack.list"), SLACKS_OWN_LIST);
+    let trusted = dir.join("trusted.gpg.d");
+    let manifest =
+        crate::apt::Manifest::read(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../system/packages.toml"))
+            .unwrap()
+            .unwrap();
+    let slack = &manifest.repos()["slack"];
+    put(&trusted.join("slack-desktop.gpg"), &slack.key_url);
+    put(&trusted.join("packagecloud.gpg"), &slack.global_fingerprints[0]);
+    let sandbox = key_sandbox(&dir, "nothing");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+
+    let out = sandbox
+        .command(root.join("system/apt-repo.sh"))
+        .arg("slack")
+        .env("APT_SOURCES_D", &sources)
+        .env("APT_TRUSTED_D", &trusted)
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    let calls = sandbox.calls();
+    let wrote = |path: &Path| {
+        calls
+            .iter()
+            .any(|c| c.starts_with("sudo install -D -m 0644 ") && c.ends_with(&format!(" {}", path.display())))
+    };
+    assert!(wrote(&sources.join("slack.sources")), "{calls:#?}");
+    assert!(wrote(&sources.join("slack.list")), "slack.list turned off: {calls:#?}");
+    let removed: Vec<&str> = calls.iter().filter_map(|c| c.strip_prefix("sudo rm -f ")).collect();
+    let gone = |name: &str| trusted.join(name).display().to_string();
+    assert_eq!(removed, [gone("slack-desktop.gpg"), gone("packagecloud.gpg")]);
+
+    // Its journal names the repository KubaOS set up, so a release's migration refreshes it.
+    let set_up = sandbox
+        .command("bash")
+        .args([
+            "-c",
+            "source \"$1/migrations/lib.sh\"; kubaos_app_set_up_repo slack slack",
+            "-",
+        ])
+        .arg(&root)
+        .env("KUBAOS_APP_JOURNALS", w.sys.app_journals())
+        .status()
+        .unwrap();
+    assert!(set_up.success());
 }
 
 #[test]

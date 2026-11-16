@@ -17,6 +17,8 @@ use crate::apps::action::Kind;
 use crate::apps::action::Side;
 use crate::apps::catalog::CATALOG;
 use crate::apps::host::Host;
+use crate::apps::journal::Journal;
+use crate::apps::journal::State;
 use crate::apps::picks::Picks;
 use crate::unfree::Unfree;
 
@@ -259,7 +261,7 @@ fn discord_and_zoom_are_unavailable_while_the_users_nixpkgs_refuses_unfree() {
 const SLACKS_OWN_DEFAULTS: &str = "repo_add_once=\"false\"\nrepo_reenable_on_distupgrade=\"true\"\n\n";
 
 #[test]
-fn a_slack_installed_by_hand_has_its_jobs_defaults_taken_over_and_left_on_removal() {
+fn a_slack_installed_by_hand_has_its_repository_set_up_its_jobs_defaults_taken_over_and_left_on_removal() {
     let world = world("slack");
     world
         .host
@@ -275,6 +277,26 @@ fn a_slack_installed_by_hand_has_its_jobs_defaults_taken_over_and_left_on_remova
 
     let ours = fs::read_to_string(shipped("slack").join("slack.default")).unwrap();
     assert_eq!(fs::read_to_string(&defaults).unwrap(), ours);
+    assert!(
+        world.host.state.borrow().repos.contains("slack"),
+        "taking it in sets its repository up"
+    );
+    // A run root takes part in, as one after Slack's job wrote its defaults again, checks every
+    // step.
+    fs::write(&defaults, SLACKS_OWN_DEFAULTS).unwrap();
+    add(&world, "slack").unwrap();
+    let apt = Journal::read(&world.root_journals, "slack")
+        .unwrap()
+        .unwrap()
+        .entries
+        .into_iter()
+        .find(|e| matches!(e.action.kind, Kind::Apt { .. }))
+        .unwrap();
+    assert_eq!(apt.state, State::Done, "KubaOS set its repository up, on every run");
+    assert!(
+        apt.claims.iter().all(|c| !c.owned),
+        "the package was the user's: {apt:?}"
+    );
 
     remove(&world, "slack").unwrap();
 
