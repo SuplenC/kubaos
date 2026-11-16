@@ -33,14 +33,15 @@ function setState(step: HTMLButtonElement, state: State, onBack?: (index: number
 }
 
 /**
- * A bead's number: a plain line of `label_number`, its line height one em, so its box is its font's
- * size, which the bead centres both ways as a flex box does. It is no probed text, so the site's
+ * A bead's number: a plain line of `label` (one figure in a fixed bead needs no tabular width, and
+ * the proportional figures sit nearer the middle), its line height one em and its box trimmed to the
+ * figures' height, which the bead centres both ways as a flex box does. It is no probed text, so the site's
  * centring pass (`lib/centre.ts`) leaves it where the browser puts it.
  */
 function number(words: string): HTMLElement {
   const figure = document.createElement("span");
   figure.className = "k-stepper-number";
-  typeset(figure, "label_number");
+  typeset(figure, "label");
   figure.textContent = words;
   return figure;
 }

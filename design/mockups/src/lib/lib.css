@@ -3568,11 +3568,13 @@
   transition: background var(--motion-short) var(--easing-standard), box-shadow var(--motion-short) var(--easing-standard);
 }
 
-/* The number: a plain line one em tall, the bead centring it both ways (`number` in
+/* The number: a plain line one em tall, its box trimmed to its figures' height (the cap height
+   down to the baseline), so the bead, centring it both ways, centres the ink (`number` in
    `lib/stepper.ts`). */
 .k-stepper-number {
   margin: 0;
   padding: 0;
+  text-box: trim-both cap alphabetic;
   font-family: var(--t-family);
   font-size: var(--t-size);
   font-weight: var(--t-weight);

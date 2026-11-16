@@ -154,7 +154,6 @@ export default page<Shown>({
     { name: "Installed", for: "every app in", sample: atCard("yours", "done") },
     { name: "An app failed", for: "the cause; Try Steam again", sample: CELLS.error },
     { name: "From the Command menu", for: "the card alone, in a window", sample: aloneAt("yours", "apps") },
-    { name: "Alone: What for", for: "Developer lit, in the desktop's mode", sample: aloneAt("yours", "developer") },
   ],
   sizes: [
     { name: "Laptop", for: "1280 × 800, Your apps", sample: atCard("yours", "apps") },
