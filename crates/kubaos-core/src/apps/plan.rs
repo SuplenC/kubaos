@@ -9,7 +9,8 @@
 //!
 //! # Owns
 //!
-//! - [`Facts`], [`AppState`], [`Status`], and the choices [`installs`] and [`removals`].
+//! - [`Facts`], [`AppState`], [`Status`], [`listing`], and the choices [`installs`] and
+//!   [`removals`].
 //!
 //! # Not here
 //!
@@ -177,6 +178,33 @@ impl Status {
             unknown: unknown(facts.catalog, facts.picks),
         }
     }
+}
+
+/// One app of the catalog as `kubaos app list` shows it, with no fact of the machine, so the list
+/// runs no program.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Listed<'a> {
+    pub id: &'a str,
+    pub name: &'a str,
+    pub summary: &'a str,
+    /// `apt`, `nix` or `deb`.
+    pub source: &'static str,
+    pub picked: bool,
+}
+
+/// Every app of `catalog`, by id, and whether it is picked.
+pub fn listing<'a>(catalog: &'a Catalog, picks: &Picks) -> Vec<Listed<'a>> {
+    catalog
+        .apps()
+        .iter()
+        .map(|app| Listed {
+            id: &app.id,
+            name: &app.name,
+            summary: &app.summary,
+            source: app.source.kind(),
+            picked: picks.has(&app.id),
+        })
+        .collect()
 }
 
 /// The picked ids `catalog` doesn't have, sorted.

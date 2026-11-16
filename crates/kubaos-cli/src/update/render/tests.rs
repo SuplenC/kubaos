@@ -679,6 +679,31 @@ fn turning_a_group_off_ends_on_what_it_changed_in_apt() {
 }
 
 #[test]
+fn adding_apps_ends_on_the_apps_it_installed() {
+    let (mut screen, out) = screen(Style::PLAIN, 100);
+    let Some(UpdateEvent::Summary(mut summary)) = edge_update().pop() else {
+        panic!("the update ends on its summary");
+    };
+    summary.command = Command::App;
+    summary.apps = AppChanges {
+        installed: vec!["Claude Code".into(), "T3 Code".into()],
+        removed: Vec::new(),
+    };
+    let started = UpdateEvent::Started {
+        command: Command::App,
+        log: None,
+    };
+
+    play(&mut screen, &out, &[started, UpdateEvent::Summary(summary)]);
+
+    assert_eq!(
+        terminal(&out.bytes()),
+        "KubaOS app\n\n\n  Apps          Claude Code installed\n                T3 Code installed\n  \
+         Log           ~/.local/state/kubaos/update/2026-10-23T09-14-03-update.log"
+    );
+}
+
+#[test]
 fn json_is_one_event_per_line() {
     let out = Shared::default();
     let mut json = Json::new(out.clone());

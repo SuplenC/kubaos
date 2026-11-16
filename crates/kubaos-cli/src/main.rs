@@ -20,6 +20,7 @@
 //! - Packages from nixpkgs (`package`, `try`): `package.rs`.
 //! - The power stops (`power`): `power.rs`, which runs `kubaos-power`.
 //! - The work network's switch (`proxy`): `proxy.rs`, which runs `kubaos-proxy`.
+//! - The Apps catalog (`app`): `app.rs`.
 //! - KubaOS's apt packages (`packages`): `apt.rs`.
 //! - Suites (`suite`): `suite.rs`.
 //! - Project pins (`pin`, `unpin`, `pins`): `pin.rs`.
@@ -36,6 +37,7 @@ use clap::ValueEnum;
 
 use crate::out::err;
 
+mod app;
 mod apt;
 mod autostart;
 mod bitwarden;
@@ -78,6 +80,11 @@ enum Cmd {
     Package {
         #[command(subcommand)]
         cmd: package::PackageCmd,
+    },
+    /// The Apps catalog: the few apps KubaOS installs well, and the ones you picked.
+    App {
+        #[command(subcommand)]
+        cmd: app::AppCmd,
     },
     /// KubaOS's apt packages: how they compare with the release, and the optional groups.
     Packages {
@@ -174,6 +181,7 @@ fn main() -> ExitCode {
         Cmd::Setup { cmd } => setup::main(&cmd),
         Cmd::Bitwarden { cmd } => bitwarden::main(cmd),
         Cmd::Package { cmd } => package::main(cmd),
+        Cmd::App { cmd } => app::main(cmd),
         Cmd::Packages { cmd } => apt::main(cmd),
         Cmd::Suite { cmd } => suite::main(cmd),
         Cmd::Pin(args) => pin::pin(&args),
