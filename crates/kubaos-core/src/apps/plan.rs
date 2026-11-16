@@ -52,7 +52,7 @@ pub enum AppState {
     Missing,
     /// Neither picked nor on the machine.
     Available,
-    /// Its source has nothing for this machine's architecture.
+    /// Its source has nothing for this machine's architecture, and it isn't there.
     Unavailable,
 }
 
@@ -86,12 +86,12 @@ impl Facts<'_> {
                     return AppState::Outdated;
                 }
                 Some(_) => true,
-                None if deb.download(self.arch).is_none() => return AppState::Unavailable,
                 None => false,
             },
         };
         match (installed, picked) {
             (true, _) => AppState::Installed,
+            (false, _) if !app.source.available(self.arch) => AppState::Unavailable,
             (false, true) => AppState::Missing,
             (false, false) => AppState::Available,
         }

@@ -215,7 +215,7 @@ pub enum UpdateError {
     #[error("the Apps catalog has no app {id} (kubaos app list)")]
     NoApp { id: String },
     /// The app has nothing for this machine's architecture.
-    #[error("{id} has no download for {arch}")]
+    #[error("{id} has nothing for {arch}")]
     Unavailable { id: String, arch: String },
     /// `home.nix` couldn't be wired to the state directory for an app from nixpkgs.
     #[error("wiring home.nix to kubaos.d/")]

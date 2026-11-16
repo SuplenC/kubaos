@@ -576,13 +576,95 @@ install_mac_accents() {
   fi
 }
 
+# The setups of the Apps catalog's apps (apps/<id>.toml's `setup`): what an
+# app needs beyond its packages. The root helper (system/files/apps/kubaos-apps)
+# runs install_<setup> as root after the app's install and remove_<setup>
+# before its removal, with TARGET_USER the user who asked. Each one is safe to
+# run again.
+
 # install_bitwarden_autostart: Bitwarden desktop starts on login, as a
 # system-wide XDG autostart entry the session's xdg-desktop-autostart.target
-# starts (config/hypr/autostart.lua) and the user can turn off. Without the
-# app (arm64), TryExec skips the entry. 70-bitwarden.sh runs it, and a
-# migration on machines installed before it.
+# starts (config/hypr/autostart.lua) and the user can turn off. Its SSH agent
+# only answers while the app runs. TryExec skips the entry while the app
+# isn't there.
 install_bitwarden_autostart() {
   install_root_file "$FILES_DIR/xdg/autostart/bitwarden.desktop" /etc/xdg/autostart/bitwarden.desktop 0644
+}
+
+remove_bitwarden_autostart() {
+  [[ ! -e /etc/xdg/autostart/bitwarden.desktop ]] || sudo_run rm -f /etc/xdg/autostart/bitwarden.desktop
+}
+
+# Where Chrome reads the policies an administrator sets.
+CHROME_POLICY_DIR=/etc/opt/chrome/policies/managed
+
+# install_chrome_theme: Chrome's theme colour follows the wallpaper. A
+# root-owned helper (system/files/chrome/dot-chrome-theme) copies one
+# validated colour from TARGET_USER's colors.json into Chrome's managed policy
+# whenever dot-theme rewrites it, started by a path unit.
+install_chrome_theme() {
+  local home unit
+  home="$(user_home "$TARGET_USER")"
+  [[ -n $home ]] || die "no home for $TARGET_USER"
+  [[ ! -f /etc/apt/sources.list.d/google-chrome.list ]] || sudo_run rm -f /etc/apt/sources.list.d/google-chrome.list
+  [[ -d $CHROME_POLICY_DIR ]] || sudo_run install -d -m 0755 "$CHROME_POLICY_DIR"
+  install_root_file "$FILES_DIR/chrome/dot-chrome-theme" /usr/local/libexec/dot-chrome-theme 0755
+  for unit in dot-chrome-theme.path dot-chrome-theme.service; do
+    render_template "$FILES_DIR/chrome/$unit.in" "USER=$TARGET_USER" "HOME=$home" |
+      write_root_file "/etc/systemd/system/$unit" 0644
+  done
+  sctl daemon-reload
+  sctl enable --now dot-chrome-theme.path
+  sctl start dot-chrome-theme.service
+}
+
+# remove_chrome_theme: the units, the helper and the policy it wrote. Chrome's
+# policy folder stays, as its package leaves it.
+remove_chrome_theme() {
+  local f found=0
+  for f in /etc/systemd/system/dot-chrome-theme.path /etc/systemd/system/dot-chrome-theme.service; do
+    [[ -e $f ]] && found=1
+  done
+  ((found)) && sctl disable --now dot-chrome-theme.path
+  for f in /etc/systemd/system/dot-chrome-theme.path /etc/systemd/system/dot-chrome-theme.service \
+    /usr/local/libexec/dot-chrome-theme "$CHROME_POLICY_DIR/dot-theme.json"; do
+    [[ ! -e $f ]] || sudo_run rm -f "$f"
+  done
+  ((found)) && sctl daemon-reload
+  return 0
+}
+
+# install_docker_access: TARGET_USER in the docker group, so docker runs
+# without sudo from their next login, and Docker started on demand
+# (docker_on_demand).
+install_docker_access() {
+  if id -nG "$TARGET_USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+    ok "$TARGET_USER is in the docker group"
+  else
+    getent group docker >/dev/null || sudo_run groupadd docker
+    sudo_run usermod -aG docker "$TARGET_USER"
+    info "log out and back in (or reboot) for the docker group to apply"
+  fi
+  docker_on_demand
+  if findmnt -n /var/lib/docker >/dev/null 2>&1; then
+    ok "/var/lib/docker is its own mount (kept out of root snapshots)"
+  else
+    info "/var/lib/docker lives inside @ and will be in every root snapshot (see 00-btrfs-subvolumes.md, @docker)"
+  fi
+}
+
+# remove_docker_access: TARGET_USER out of the docker group, and the shutdown
+# drop-in docker_on_demand put beside Docker's units. The group itself, and
+# /var/lib/docker with the images and volumes, stay, as Docker's packages
+# leave them.
+remove_docker_access() {
+  if id -nG "$TARGET_USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+    sudo_run gpasswd -d "$TARGET_USER" docker
+  fi
+  if [[ -e /etc/systemd/system/docker.service.d/kubaos-stop.conf ]]; then
+    sudo_run rm -f /etc/systemd/system/docker.service.d/kubaos-stop.conf
+    sctl daemon-reload
+  fi
 }
 
 # boot_unit UNIT enable|disable|mask: whether UNIT starts at boot, when it

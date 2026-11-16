@@ -216,6 +216,37 @@ fn a_deb_with_no_download_for_the_architecture_is_unavailable_and_never_installe
 }
 
 #[test]
+fn an_apt_app_for_another_architecture_is_unavailable_unless_it_is_there() {
+    let browser = App::parse("browser", &format!("{AGENT}arch = \"amd64\"\n")).unwrap();
+    let catalog = Catalog::new(vec![browser]);
+    let picks = picks(&["browser"]);
+    let nix = nix(&[]);
+    let facts = |arch, dpkg| Facts {
+        catalog: &catalog,
+        picks: &picks,
+        arch,
+        dpkg,
+        nix: &nix,
+    };
+    let (none, both) = (dpkg(&[]), dpkg(&["agent", "agent-data"]));
+    let browser = catalog.get("browser").unwrap();
+
+    assert_eq!(facts("arm64", &none).state(browser), AppState::Unavailable);
+    assert!(installs(&facts("arm64", &none)).is_empty());
+    assert_eq!(facts("amd64", &none).state(browser), AppState::Missing);
+    assert_eq!(facts("arm64", &both).state(browser), AppState::Installed);
+    assert!(browser.source.available("amd64") && !browser.source.available("arm64"));
+}
+
+#[test]
+fn an_app_names_the_setup_it_needs_beyond_its_packages() {
+    let app = App::parse("agent", &format!("setup = \"agent_socket\"\n{AGENT}")).unwrap();
+
+    assert_eq!(app.setup.as_deref(), Some("agent_socket"));
+    assert_eq!(App::parse("agent", AGENT).unwrap().setup, None);
+}
+
+#[test]
 fn a_removal_takes_only_the_named_apps_that_are_there() {
     let catalog = catalog(false);
     let picks = picks(&["agent", "desk"]);
@@ -295,6 +326,10 @@ fn a_manifest_that_cant_be_installed_safely_is_refused() {
         ("bad version", deb.replace("\"1.2.0\"", "\"latest version\"")),
         ("no download", deb.split("[deb.amd64]").next().unwrap().to_owned()),
         ("an escape", AGENT.replace("A coding agent", "A \\u0063oding agent")),
+        ("an architecture dpkg doesn't name", format!("{AGENT}arch = \"x86_64\"\n")),
+        ("a setup that isn't a function name", format!("setup = \"x; reboot\"\n{AGENT}")),
+        ("a setup that is a path", format!("setup = \"../lib\"\n{AGENT}")),
+        ("an uppercase setup", format!("setup = \"Agent\"\n{AGENT}")),
         (
             "a multi-line string",
             AGENT.replace("\"A coding agent\"", "\"\"\"A coding agent\"\"\""),
@@ -418,13 +453,20 @@ fn every_shipped_manifest_validates_and_its_repo_has_a_sources_file() {
     let catalog = Catalog::load(&root.join(CATALOG)).unwrap();
 
     catalog.check_repos(&manifest).unwrap();
-    for id in ["claude-code", "t3-code"] {
+    for id in ["bitwarden", "claude-code", "docker", "google-chrome", "t3-code"] {
         assert!(catalog.get(id).is_some(), "the catalog has no {id}");
     }
+    let lib = std::fs::read_to_string(root.join("system/lib.sh")).unwrap();
     for app in catalog.apps() {
         if let Source::Apt { repo: Some(repo), .. } = &app.source {
             let sources = root.join(format!("system/files/apt/sources.list.d/{repo}.sources"));
             assert!(sources.is_file(), "{}: no {}", app.id, sources.display());
+        }
+        if let Some(setup) = &app.setup {
+            for verb in ["install", "remove"] {
+                let function = format!("\n{verb}_{setup}() {{\n");
+                assert!(lib.contains(&function), "{}: system/lib.sh has no {verb}_{setup}", app.id);
+            }
         }
     }
 }
@@ -439,10 +481,16 @@ fn rust_dump(app: &App) -> BTreeSet<String> {
     if let Some(icon) = &app.icon {
         add("", "icon", icon);
     }
+    if let Some(setup) = &app.setup {
+        add("", "setup", setup);
+    }
     match &app.source {
-        Source::Apt { repo, packages } => {
+        Source::Apt { repo, arch, packages } => {
             if let Some(repo) = repo {
                 add("apt", "repo", repo);
+            }
+            if let Some(arch) = arch {
+                add("apt", "arch", arch);
             }
             for p in packages {
                 add("apt", "packages", p);
