@@ -76,7 +76,14 @@ impl<M: Machine> Updater<'_, M> {
         let catalog = Catalog::load(&self.sys.catalog()).map_err(UpdateError::Catalog)?;
         let picks = Picks::read(&self.user.app_picks()).map_err(UpdateError::Picks)?;
         let dpkg = self.dpkg()?;
-        Status::read(&catalog, &picks, &self.user.app_journals(), apps::arch(), Some(&dpkg))
+        Status::read(
+            &catalog,
+            &picks,
+            &self.user.app_journals(),
+            &self.sys.app_journals(),
+            apps::arch(),
+            Some(&dpkg),
+        )
             .map_err(UpdateError::AppJournal)
     }
 
@@ -229,6 +236,7 @@ impl<M: Machine> Updater<'_, M> {
                 switch |= finished.switch;
                 match change {
                     Change::Add => changes.installed.push(name.to_owned()),
+                    Change::Remove if finished.left => changes.left.push(app.name.clone()),
                     Change::Remove => changes.removed.push(app.name.clone()),
                 }
             }
@@ -245,7 +253,12 @@ impl<M: Machine> Updater<'_, M> {
             Change::Add => "installed",
             Change::Remove => "removed",
         };
-        self.j.detail(format!("{} {verb}", names.join(", ")));
+        if !names.is_empty() {
+            self.j.detail(format!("{} {verb}", names.join(", ")));
+        }
+        for name in &changes.left {
+            self.j.detail(crate::update::event::left_line(name));
+        }
         Ok(changes)
     }
 

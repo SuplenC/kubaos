@@ -1869,3 +1869,31 @@ fn a_self_updating_download_its_vendor_moved_on_is_not_downloaded_again() {
     assert_eq!(events.steps(), [(1, ActionState::Done)]);
     assert!(!versions.join("1.1").exists());
 }
+
+#[test]
+fn a_removal_shows_each_step_it_undoes_by_name() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    world.install("fixture", true).0.unwrap();
+
+    let (result, events) = world.remove("fixture");
+
+    result.unwrap();
+    let shown: Vec<&str> = events
+        .0
+        .iter()
+        .filter_map(|e| match e {
+            UpdateEvent::Step { text } => Some(text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            "Turn it on in the settings",
+            "Start the service",
+            "Write its config",
+            "Install the tool"
+        ]
+    );
+    assert!(events.0.contains(&UpdateEvent::Progress { done: 4, total: 4 }));
+}

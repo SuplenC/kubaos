@@ -2,9 +2,12 @@
 //! status` and the Command menu show, and which picked apps an update installs.
 //!
 //! An app is installed when its user journal says its install is complete, in the setup that
-//! journal names. That is two small files an app at most, with no dpkg query and no check run,
-//! so a status read stays cheap; a version, when the caller has dpkg's packages, is its first
-//! package's.
+//! journal names, and its journals own something; one they own nothing of is found: on the
+//! machine, KubaOS's to leave. An app with no journal whose own packages dpkg has (installed by
+//! hand, or before KubaOS kept journals) is installed when it is picked, as taking it in will
+//! make it KubaOS's, and found when not. That is two small files an app at most and the one dpkg
+//! query the caller made, with no check run, so a status read stays cheap; a version is its
+//! first package's.
 //!
 //! # Owns
 //!
@@ -32,8 +35,10 @@ use crate::apt::Dpkg;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AppState {
-    /// Its install is complete.
+    /// Its install is complete, and KubaOS put it there: a removal undoes it.
     Installed,
+    /// On the machine, put there by other means: KubaOS owns nothing of it and leaves it.
+    Found,
     /// Picked, and not installed: the next update installs it.
     Missing,
     /// Neither picked nor installed.
@@ -47,14 +52,20 @@ impl AppState {
     pub fn word(self) -> &'static str {
         match self {
             Self::Installed => "installed",
+            Self::Found => "found",
             Self::Missing => "missing",
             Self::Available => "available",
             Self::Unavailable => "unavailable",
         }
     }
 
-    /// Whether the app is on the machine.
+    /// Whether the app is on the machine, KubaOS's or found.
     pub fn is_installed(self) -> bool {
+        matches!(self, Self::Installed | Self::Found)
+    }
+
+    /// Whether a removal would undo something: the app is KubaOS's.
+    pub fn is_removable(self) -> bool {
         self == Self::Installed
     }
 }
@@ -137,7 +148,8 @@ pub struct Status {
 
 impl Status {
     /// The status of the apps of `catalog` with `picks`, installed as the user journals in
-    /// `journals` say, on a machine of `arch`, with the versions `dpkg` has when given.
+    /// `journals` and root's in `root_journals` say, on a machine of `arch`, with the packages
+    /// and versions `dpkg` has when given.
     ///
     /// # Errors
     ///
@@ -146,6 +158,7 @@ impl Status {
         catalog: &Catalog,
         picks: &Picks,
         journals: &Path,
+        root_journals: &Path,
         arch: &str,
         dpkg: Option<&Dpkg>,
     ) -> Result<Self, JournalError> {
@@ -159,8 +172,17 @@ impl Status {
                 vec![app.available(arch, None)]
             };
             let picked = picks.has(&app.id);
+            let owns = match installed {
+                Some(j) if j.owns_anything() => true,
+                Some(_) => Journal::read(root_journals, &app.id)?.is_some_and(|root| root.owns_anything()),
+                None => false,
+            };
             let state = match installed {
-                Some(_) => AppState::Installed,
+                Some(_) if owns => AppState::Installed,
+                Some(_) => AppState::Found,
+                None if journal.is_none() && dpkg.is_some_and(|dpkg| has_packages(app, arch, dpkg)) => {
+                    if picked { AppState::Installed } else { AppState::Found }
+                }
                 None if !available.iter().any(|a| *a) => AppState::Unavailable,
                 None if picked => AppState::Missing,
                 None => AppState::Available,
@@ -195,6 +217,12 @@ impl Status {
     pub fn get(&self, id: &str) -> Option<&AppStatus> {
         self.apps.iter().find(|a| a.id == id)
     }
+}
+
+/// Whether dpkg has every package of `app`'s own actions for `arch`, and it has any.
+fn has_packages(app: &Folder, arch: &str, dpkg: &Dpkg) -> bool {
+    let packages = app.own_packages(arch);
+    !packages.is_empty() && packages.iter().all(|p| dpkg.has(p))
 }
 
 /// One app of the catalog as `kubaos app list` shows it, with no fact of the machine, so the list

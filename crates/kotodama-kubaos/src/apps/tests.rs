@@ -9,6 +9,7 @@ use kotodama_protocol::JobState;
 use kubaos_core::apps::Catalog;
 use kubaos_core::apps::Picks;
 use kubaos_core::apps::Status;
+use kubaos_core::apps::journal::Adoption;
 use kubaos_core::apps::journal::Journal;
 use kubaos_core::apt::Dpkg;
 use kubaos_core::apt::dpkg;
@@ -90,6 +91,7 @@ fn write_catalog(dir: &Path, folders: &[(&str, &str)]) {
 fn installed_journal(journals: &Path, id: &str, setup: Option<&str>) {
     let mut journal = Journal::new(id, setup);
     journal.complete = true;
+    journal.root_adoption = Some(Adoption::Owned);
     journal.save(journals).unwrap();
 }
 
@@ -119,7 +121,7 @@ fn apps_of(folders: &[(&str, &str)], arch: &str, installed: &[&str], setup: Opti
         }
     }
     let dpkg = Dpkg::parse(&dpkg_with(installed));
-    Apps::new(&Status::read(&catalog, &Picks::default(), &journals, arch, Some(&dpkg)).unwrap())
+    Apps::new(&Status::read(&catalog, &Picks::default(), &journals, &journals.join("root"), arch, Some(&dpkg)).unwrap())
 }
 
 fn ids(apps: &Apps) -> Vec<String> {
@@ -481,10 +483,11 @@ fn another_jobs_lines_change_nothing_and_once_ended_the_next_app_may_start() {
 
 /// The files of a machine under `dir` whose catalog has `folders`, each `(id, app.toml)`.
 fn files(dir: &Path, folders: &[(&str, &str)]) -> AppFiles {
-    let catalog = dir.join("apps");
-    fs::create_dir(&catalog).unwrap();
+    let system = SystemPaths::under(dir);
+    let catalog = system.catalog();
+    fs::create_dir_all(&catalog).unwrap();
     write_catalog(&catalog, folders);
-    AppFiles::new(catalog, &paths(dir))
+    AppFiles::new(&system, &paths(dir))
 }
 
 /// The paths of the user whose home is `<dir>/home`.
@@ -594,15 +597,32 @@ fn the_watch_covers_dpkg_the_picks_and_each_apps_journal() {
     let dir = tempfile::tempdir().unwrap();
     let files = files(dir.path(), &[("google-chrome", CHROME)]);
     let paths = paths(dir.path());
+    std::fs::create_dir_all(paths.app_journals().join("google-chrome")).unwrap();
 
-    let watched = files.watched();
+    let watched = files.watched_dirs();
 
-    assert!(watched.contains(&PathBuf::from(DPKG_STATUS)), "{watched:?}");
-    assert!(watched.contains(&paths.app_picks()), "{watched:?}");
-    assert!(
-        watched.contains(&Journal::file(&paths.app_journals(), "google-chrome")),
-        "{watched:?}"
-    );
+    assert!(watched.contains(&PathBuf::from("/var/lib/dpkg")), "{watched:?}");
+    assert!(watched.contains(&paths.app_picks().parent().unwrap().to_path_buf()), "{watched:?}");
+    assert!(watched.contains(&paths.app_journals().join("google-chrome")), "{watched:?}");
+    assert!(files.changes(Path::new(DPKG_STATUS)));
+    assert!(files.changes(&paths.app_picks()));
+    assert!(files.changes(&Journal::file(&paths.app_journals(), "google-chrome")));
+    assert!(!files.changes(&paths.app_journals().join(".lock")));
+}
+
+#[test]
+fn the_journals_folder_is_watched_before_any_app_has_one() {
+    // Regression: right after the update that brought journals, their folder wasn't there, and
+    // the menu never heard of the first one.
+    let dir = tempfile::tempdir().unwrap();
+    let files = files(dir.path(), &[]);
+    let paths = paths(dir.path());
+    std::fs::create_dir_all(paths.app_journals()).unwrap();
+
+    let watched = files.watched_dirs();
+
+    assert!(watched.contains(&paths.app_journals()), "{watched:?}");
+    assert!(files.changes(&paths.app_journals().join("t3-code")));
 }
 
 /// An app with two setups: its desktop app alone, or a service beside it.
@@ -638,6 +658,50 @@ fn lab(installed: &[&str], setup: Option<&str>) -> Apps {
 }
 
 #[test]
+fn an_app_installed_by_other_means_has_no_remove_item() {
+    let dir = tempfile::tempdir().unwrap();
+    write_catalog(&dir.path().join("apps"), &FOLDERS);
+    let catalog = Catalog::load(&dir.path().join("apps")).unwrap();
+    let journals = dir.path().join("journals");
+    let mut found = Journal::new("claude-code", None);
+    found.complete = true;
+    found.root_adoption = Some(Adoption::Found);
+    found.save(&journals).unwrap();
+    let dpkg = Dpkg::parse(&dpkg_with(&["claude-code=2.1", "google-chrome-stable=140"]));
+
+    let apps = Apps::new(
+        &Status::read(&catalog, &Picks::default(), &journals, &journals.join("root"), "amd64", Some(&dpkg)).unwrap(),
+    );
+
+    assert!(ids(&apps).is_empty(), "{:?}", ids(&apps));
+}
+
+#[test]
+fn removing_an_app_kubaos_didnt_install_ends_saying_it_left_it() {
+    let (mut jobs, _, started) = start(&apps(&["claude-code=2.1"]), "app-remove:claude-code", REMOVE);
+    let id = started.unwrap().id;
+    let summary = summary(&[]).replace(
+        r#""apps":{"installed":[]}"#,
+        r#""apps":{"left":["Claude Code"]}"#,
+    );
+    jobs.heard(Heard::line(&id, &summary));
+
+    let ended = jobs.heard(Heard::ended(&id, true)).unwrap();
+
+    assert_eq!(
+        (ended.title.as_str(), ended.state),
+        ("Claude Code left as it is", JobState::Succeeded)
+    );
+    assert!(
+        ended
+            .message
+            .as_deref()
+            .is_some_and(|m| m.starts_with("I didn't install Claude Code, so it's not mine to bin")),
+        "{ended:?}"
+    );
+}
+
+#[test]
 fn an_app_with_setups_offers_an_install_for_each_and_none_for_the_app_alone() {
     let apps = lab(&[], None);
 
@@ -646,11 +710,11 @@ fn an_app_with_setups_offers_an_install_for_each_and_none_for_the_app_alone() {
     let service = item(&apps, "app-install:lab:service");
     assert_eq!(
         (desktop.title.as_str(), desktop.subtitle.as_deref()),
-        ("Install Lab", Some("The desktop app"))
+        ("Install Lab", Some("An app for agents"))
     );
     assert_eq!(
         (service.title.as_str(), service.subtitle.as_deref()),
-        ("Install Lab as a service", Some("Its agents in a service"))
+        ("Install Lab as a service", Some("An app for agents"))
     );
     assert_eq!(service.actions[0].title, "Install Lab as a service");
 }
@@ -667,7 +731,7 @@ fn an_app_in_one_setup_offers_its_removal_and_the_switch_to_each_other() {
     );
     assert_eq!(
         item(&desktop, "app-install:lab:service").subtitle.as_deref(),
-        Some("Replaces Lab: Its agents in a service")
+        Some("Replaces Lab: An app for agents")
     );
     assert_eq!(ids(&service), ["app-remove:lab", "app-install:lab:desktop"]);
     assert_eq!(
