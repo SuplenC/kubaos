@@ -594,6 +594,9 @@ fn the_root_helper_refuses_anything_but_a_root_step_of_a_catalog_app() {
         r#"{"op":"step","app":"fixture","step":9,"windows":false}"#,
         r#"{"op":"step","app":"fixture","setup":"other","step":1,"windows":false}"#,
         r#"{"op":"step","app":"fixture","step":1,"windows":false,"packages":["sl"]}"#,
+        r#"{"op":"adopt","app":"nothing","owned":true}"#,
+        r#"{"op":"adopt","app":"../etc","owned":true}"#,
+        r#"{"op":"adopt","app":"fixture","owned":true,"step":1}"#,
     ] {
         let reply = root.serve(line);
         assert!(refused(reply.clone()), "{line} was taken: {reply:?}");
@@ -616,6 +619,34 @@ fn the_root_helper_refuses_anything_but_a_root_step_of_a_catalog_app() {
 
     let reply = root.serve(r#"{"op":"step","app":"fixture","step":1,"windows":false}"#);
     assert!(matches!(reply, Reply::Step { .. }), "{reply:?}");
+}
+
+#[test]
+fn root_takes_in_its_steps_of_an_app_the_machine_had_running_nothing() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .dpkg
+        .insert("fixture-tool".to_owned(), "1.0".to_owned());
+    let before = world.host.snapshot();
+    let mut root = world.root();
+
+    let owned = root.serve(r#"{"op":"adopt","app":"fixture","owned":true}"#);
+
+    assert_eq!(owned, Reply::Ready);
+    assert_eq!(world.host.snapshot(), before);
+    let journal = Journal::read(&world.root_journals, "fixture").unwrap().unwrap();
+    // The package is there, and owned; the service isn't started, so it is the next run's.
+    assert_eq!(journal.entries.len(), 1);
+    assert_eq!(journal.entries[0].step, 1);
+    assert!(journal.entries[0].claims.iter().all(|c| c.owned));
+    assert!(
+        world.host.state.borrow().log.is_empty(),
+        "{:?}",
+        world.host.state.borrow().log
+    );
 }
 
 #[test]
