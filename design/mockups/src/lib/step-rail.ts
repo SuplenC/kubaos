@@ -560,9 +560,9 @@ function pageRoom(spec: RailPage, onBack: () => void, onNext: () => void, onSkip
     made.nudge = nudge;
     first ??= blocked(spec) ? null : drawn.next;
     let band = filling(drawn.band);
-    // In Kōbō the body's own faded foot is the room between it and the band: a gap under it would
-    // only take height from what the page asks.
-    parts.push(...(host === "kobo" ? [] : [gap("s16")]), band);
+    // In Kōbō what scrolls stays `space.s24` clear of the band's buttons: its view reaches through
+    // the gap, where its foot fade hides what runs on, and its end rests on the gap's top.
+    parts.push(gap(host === "kobo" ? "s24" : "s16"), band);
     // The answers changed: the band is drawn again where it was, the keyboard kept on Continue.
     room.addEventListener(RECHECK, () => {
       const had = band.contains(document.activeElement);

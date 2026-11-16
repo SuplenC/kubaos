@@ -204,8 +204,7 @@ function indexSpec(state: Yours, category: Category): ListRowSpec {
  * padding so its thumb floats in it, as every Kōbō page's body does (`kobo.css`).
  */
 function padded(content: HTMLElement): HTMLElement {
-  // Its end stands as far above the band as the step's top stands under the stepper.
-  const box = stack(0, "start", filling(content), gap("s24"));
+  const box = stack(0, "start", filling(content));
   box.classList.add("kobo-scrolled");
   return box;
 }
@@ -278,8 +277,8 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     group.addEventListener("click", sync);
     group.addEventListener("keydown", sync);
     const newcomer = row("s8", "centre", icon("info", "var(--type-small-icon)", "var(--color-on_surface_variant)"), wrapped("Not sure? Everyday is a good start. Nothing here is final: the next step shows every app.", "small", "on_surface_variant"));
-    // As much room under the cards and their line as over them, so the set stands clear of the band.
-    return stack(0, "start", fillingHeight(filling(group)), gap("s24"), filling(newcomer), gap("s24"));
+    // As much room between the cards and their line as the template leaves under it, over the band.
+    return stack(0, "start", fillingHeight(filling(group)), gap("s24"), filling(newcomer));
   };
 
   // ------------------------------------------------------------ Your apps --
@@ -325,7 +324,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     );
     index.box.classList.add("setup-yours-index");
     // The index and the apps each scroll on their own, so turning the apps never moves the index.
-    const scrolling = { height: "100%", above: "s24", below: "s16", noGutter: true, fade: "s24", footFade: true } as const;
+    const scrolling = { height: "100%", above: "s24", below: "s24", noGutter: true, fade: "s24", footFade: true } as const;
     const beside = scroll(index.box, scrolling);
     const { box: apps, view } = scroll(padded(list.box), scrolling);
     beside.box.classList.add("setup-yours-beside");
@@ -448,7 +447,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     if (under.length > 0) left.append(gap("s16"), stack("s24", "start", ...under));
     const columns = count === 0 ? filling(left) : filling(splitColumns([1, 2], "s40", [left, stack("s16", "start", ...groups.map((each) => filling(each)))]));
     const content = stack("s24", "start", ...failure, columns);
-    const { box } = scroll(padded(content), { height: "100%", above: "s24", below: "s16", noGutter: true, fade: "s24", footFade: true });
+    const { box } = scroll(padded(content), { height: "100%", above: "s24", below: "s24", noGutter: true, fade: "s24", footFade: true });
     box.classList.add("kobo-scrolls");
     return box;
   };
