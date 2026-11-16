@@ -12,7 +12,7 @@ codename := trim(read(justfile_directory() / "CODENAME"))
 default:
     @just --list
 
-# The Apps catalog as a Markdown table, from this checkout's apps/ (docs/APPS.md says what each column means).
+# The Apps catalog as a Markdown table, from this checkout's apps/ (docs/APPS.md says what each column means). Its first run builds kubaos-cli.
 apps-list:
     @cargo run -q -p kubaos-cli --bin kubaos -- app list --markdown --catalog apps
 

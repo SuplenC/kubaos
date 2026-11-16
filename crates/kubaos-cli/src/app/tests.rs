@@ -62,12 +62,14 @@ fn an_app_in_a_setup_is_named_for_it() {
             name: "T3 Code".into(),
             summary: String::new(),
             requires: Vec::new(),
+            sources: Vec::new(),
         },
         SetupInfo {
             id: "service".into(),
             name: "T3 Code as a service".into(),
             summary: String::new(),
             requires: Vec::new(),
+            sources: Vec::new(),
         },
     ];
     t3.available = vec![true, true];
@@ -196,7 +198,7 @@ fn the_markdown_table_has_a_row_an_app_in_category_order() {
          | --- | --- | --- | --- | --- | --- | --- |\n\
          | Browser (`browser`) | Browsers | — | — | Goes on the web \\| fast | apt repo (`vendor`) | amd64 |\n\
          | Board (`board`) | Development | `local`, `web` | local: `editor`; web: `browser` | Draws boxes \
-         | pinned download, web app | amd64, arm64 |\n\
+         | local: pinned download; web: web app | amd64, arm64 |\n\
          | Editor (`editor`) | Development | — | — | Edits text | Ubuntu archive, nixpkgs | amd64, arm64 |\n"
     );
 }
@@ -213,8 +215,27 @@ fn the_json_list_keeps_its_fields_and_adds_where_each_app_comes_from() {
     }
     assert_eq!(board["setup"], "web");
     assert_eq!(
-        board["sources"],
-        serde_json::json!([{ "kind": "download" }, { "kind": "web_app" }])
+        board["setups"][0]["sources"],
+        serde_json::json!([{ "kind": "download" }])
+    );
+    assert_eq!(
+        board["setups"][1]["sources"],
+        serde_json::json!([{ "kind": "web_app" }])
     );
     assert_eq!(board["arches"], serde_json::json!(["amd64", "arm64"]));
+}
+
+#[test]
+fn a_catalog_dir_is_only_for_the_markdown_table() {
+    #[derive(clap::Parser)]
+    struct Cli {
+        #[command(subcommand)]
+        cmd: super::AppCmd,
+    }
+
+    let parse = |args: &[&str]| <Cli as clap::Parser>::try_parse_from(args.iter().copied());
+
+    assert!(parse(&["app", "list", "--catalog", "apps"]).is_err());
+    assert!(parse(&["app", "list", "--json", "--catalog", "apps"]).is_err());
+    assert!(parse(&["app", "list", "--markdown", "--catalog", "apps"]).is_ok());
 }

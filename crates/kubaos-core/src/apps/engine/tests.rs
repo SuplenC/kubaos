@@ -1388,6 +1388,7 @@ kind = "run"
 do = ["./install"]
 check = ["./installed"]
 undo = ["./uninstall"]
+source = "container_images"
 "#);
     let world = World::new(&[("tool", &tool)]);
     world.script("tool", "install", "touch \"$HOME/.tool-installed\"");

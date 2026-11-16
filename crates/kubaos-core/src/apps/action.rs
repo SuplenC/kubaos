@@ -266,12 +266,25 @@ pub enum Kind {
         root: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         window: Option<String>,
+        /// What it puts on the machine, for a `run` that installs the app itself: the source the
+        /// catalog lists for it, as no other action of the install names one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source: Option<RunSource>,
         /// The `./<script>`s its argvs name, by name, read from the app's folder as it resolves:
         /// what a journal runs, so an undo runs the script that matches what was done even after
         /// the folder changed or left the catalog. A folder never sets it.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         scripts: BTreeMap<String, String>,
     },
+}
+
+/// What a `run` that installs the app takes it from: the sources no other kind of action installs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum RunSource {
+    /// Container images, each pinned by its digest: `container_images`.
+    ContainerImages,
 }
 
 /// How a download becomes its path.
@@ -560,6 +573,7 @@ impl Action {
                 undo,
                 root,
                 window,
+                source,
                 ..
             } => {
                 let argv = |argv: &[String]| argv.iter().map(|a| fill(a, None)).collect();
@@ -580,6 +594,7 @@ impl Action {
                     undo: argv(undo),
                     root: *root,
                     window: window.clone(),
+                    source: *source,
                     scripts,
                 }
             }

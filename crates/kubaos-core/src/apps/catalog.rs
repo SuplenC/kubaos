@@ -106,6 +106,20 @@ impl Catalog {
         Ok(catalog)
     }
 
+    /// Reads the catalog in `dir`, as [`Catalog::load`], from a folder that must be there: one
+    /// named by hand, where a missing folder is a typo, not a release without apps.
+    ///
+    /// # Errors
+    ///
+    /// As [`Catalog::load`], and [`CatalogError::Read`] when `dir` is missing.
+    pub fn load_existing(dir: &Path) -> Result<Self, CatalogError> {
+        fs::metadata(dir).map_err(|source| CatalogError::Read {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+        Self::load(dir)
+    }
+
     /// Checks that every app an app requires, in any setup, is one of the catalog's with one way
     /// to be set up, and that no app requires itself through others.
     ///
