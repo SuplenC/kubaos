@@ -287,7 +287,7 @@ fn ubuntus_snap_firefox_is_not_firefox_and_mozillas_is() {
             picks,
             journals.path(),
             &journals.path().join("root"),
-            "amd64",
+            Platform::new("amd64", Unfree::Allowed),
             Some(&dpkg),
         )
         .unwrap();
@@ -961,6 +961,7 @@ fn licences_named(comment: &str) -> Vec<String> {
         .filter(|word| SPDX_PREFIXES.iter().any(|prefix| word.starts_with(prefix)))
         .map(str::to_owned)
         .collect();
+    found.sort();
     found.dedup();
     found
 }
