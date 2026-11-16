@@ -506,7 +506,7 @@
 /* Key cards: each title on one line; three across while they fit, fewer under it. */
 /* Opens with's cards, one under another, closer than a group's cards stand. */
 .setup-kotodama-keycards {
-  gap: var(--space-s8);
+  gap: var(--space-s4);
 }
 
 .setup-kotodama-keycards .k-card-title {
@@ -578,7 +578,6 @@
 .setup-kotodama-engines {
   display: flex;
   flex-direction: column;
-  gap: var(--space-s4);
   transition: opacity var(--motion-short) var(--easing-standard);
 }
 
@@ -587,22 +586,38 @@
   pointer-events: none;
 }
 
+/* An engine: a compact row, its handle at the column's start and its switch at the column's end,
+   as every control of the column ends; a hairline between rows. */
 .setup-kotodama-engine {
+  position: relative;
   box-sizing: border-box;
-  min-height: var(--size-control_md);
-  padding: 0 var(--space-s12) 0 var(--space-s8);
-  border-radius: var(--radius-row);
-  background: var(--color-surface_container);
+  min-height: var(--size-control_sm);
+  border-radius: var(--radius-small);
   outline: none;
 }
 
+.setup-kotodama-engine + .setup-kotodama-engine {
+  border-top: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
 .setup-kotodama-engine:focus-visible {
-  box-shadow: inset 0 0 0 var(--focus-tube) var(--color-cold), 0 0 var(--focus-near) rgb(from var(--color-cold) r g b / var(--focus-near_opacity));
+  box-shadow: 0 0 0 var(--focus-tube) var(--color-cold), 0 0 var(--focus-near) rgb(from var(--color-cold) r g b / var(--focus-near_opacity));
 }
 
 .setup-kotodama-engine[data-lifted] {
+  z-index: 1;
   background: var(--color-surface_container_highest);
   box-shadow: 0 var(--space-s8) var(--space-s24) rgb(from var(--color-surface_container_lowest) r g b / var(--opacity-scrim));
+}
+
+/* A setting on one line, as tall as a small control. */
+.setup-kotodama-setting {
+  min-height: var(--size-control_sm);
+}
+
+/* Opens with's cards, compact: one line each. */
+.setup-kotodama-keycards .k-choice-card {
+  padding-block: var(--space-s4);
 }
 
 .setup-kotodama-grab {

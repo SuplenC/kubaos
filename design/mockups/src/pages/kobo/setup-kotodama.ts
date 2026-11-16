@@ -116,7 +116,6 @@ export default page<Shown>({
     { name: "Why: the term asked", for: "Bofa's answer, shown", sample: atCard("kotodama", "why-tip") },
     { name: "Why: the ad pressed", for: "its reply, shown", sample: atCard("kotodama", "why-reply") },
     { name: "Yours", for: "what it finds; the keys, the engines", sample: atCard("kotodama", "yours") },
-    { name: "Yours: more", for: "what it finds, the engine, the mark", sample: atCard("kotodama", "yours-more") },
     { name: "Yours: changed", for: "Alt + Space, no web search", sample: atCard("kotodama", "yours-changed") },
     { name: "Try it: shut", for: "its keys; Open it", sample: CELLS.empty },
     { name: "Try it: open", for: "the menu; one ticked", sample: atCard("kotodama", "try-open") },

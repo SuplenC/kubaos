@@ -386,7 +386,6 @@ const kotodama: Card = {
     "why-tip": { state: "needed", summary: "Not seen yet." },
     "why-reply": { state: "needed", summary: "Not seen yet." },
     yours: { state: "needed", summary: "Not seen yet." },
-    "yours-more": { state: "needed", summary: "Not seen yet." },
     "yours-changed": { state: "needed", summary: "Alt + Space, no web search." },
     try: { state: "needed", summary: "Not tried yet." },
     "try-open": { state: "needed", summary: "Opened." },

@@ -14,7 +14,6 @@
 import { button } from "../../lib/button.ts";
 import { choiceCard, choiceGroup } from "../../lib/card.ts";
 import { chip } from "../../lib/chip.ts";
-import { collapsible } from "../../lib/collapsible.ts";
 import { field, setValue } from "../../lib/field.ts";
 import { icon } from "../../lib/icon.ts";
 import { type KeyHint, keycap, keyHints, keys } from "../../lib/keycap.ts";
@@ -60,8 +59,6 @@ export interface Kotodama {
   open: boolean;
   /** What is typed in the menu on Try it. */
   query: string;
-  /** Yours's advanced options open. */
-  more: boolean;
   /** The other menu over the page, stamped: a sample of the gag, held. */
   gag: boolean;
   /** The race held this many milliseconds after the key: a sample of it mid-way. */
@@ -82,7 +79,6 @@ export function kotodamaAt(view: string): Kotodama {
     tried: new Set(),
     open: false,
     query: "",
-    more: false,
     gag: false,
     passed: false,
     ...(from === undefined ? {} : { from: Number(from) as StepIndex }),
@@ -99,8 +95,6 @@ export function kotodamaAt(view: string): Kotodama {
       return base(1, { raceAt: 5800, reply: true });
     case "yours":
       return base(2);
-    case "yours-more":
-      return base(2, { more: true });
     case "yours-changed": {
       const state = base(2);
       state.settings.key = "alt-space";
@@ -514,13 +508,6 @@ const EXAMPLES = [
 /** A label over a part of Yours, `subheading`. */
 const heading = (words: string) => text(words, "subheading");
 
-/** A switch with its words, the setting's name over what it does. */
-function switchRow(title: string, line: string, on: boolean, turned: (on: boolean) => void): HTMLElement {
-  const control = switchControl({ on });
-  control.addEventListener("click", () => queueMicrotask(() => turned(control.getAttribute("aria-checked") === "true")));
-  return row("s12", "centre", filling(stack(0, "start", text(title, "body"), filling(wrapped(line, "small", "on_surface_variant")))), control);
-}
-
 /** What the menu searches, a row each on Yours: the Extensions KubaOS turns on, as they are. */
 const SOURCES = [
   { id: "apps", title: "Apps", line: "Installed apps by name · firefox", icon: "desktop_windows" },
@@ -531,7 +518,6 @@ const SOURCES = [
   { id: "clipboard", title: "Clipboard history", line: "What you copied this week · clip", icon: "content_paste" },
   { id: "emoji", title: "Emoji", line: "By name or keyword · fire", icon: "mood" },
   { id: "calculator", title: "Sums", line: "Units, money, dates · 5 km in mi", icon: "calculate" },
-  { id: "web", title: "Web search", line: "Only when nothing here matches", icon: "travel_explore" },
 ] as const;
 
 /**
@@ -776,15 +762,14 @@ export function kotodamaCard(view: string): KotodamaCard {
     // its keys from here, so this step shows no preview of its own.
 
     // Left: what it finds, a row a source, each switched on or off.
-    const sources = SOURCES.map((each) => ({ ...each, on: () => (each.id === "web" ? prefs.web : each.id === "apps" ? prefs.apps : prefs.finds[each.id]) }));
+    const sources = SOURCES.map((each) => ({ ...each, on: () => (each.id === "apps" ? prefs.apps : prefs.finds[each.id]) }));
     const spec = (each: (typeof sources)[number]): ListRowSpec => ({ title: each.title, subtitle: each.line, icon: each.icon, tile: true, accent: each.on(), toggle: each.on() });
     const findsList = listWith(sources.map(spec), {
       onTake: (at) => {
         const each = sources[at];
         if (!each) return;
         const now = !each.on();
-        if (each.id === "web") setWeb(now);
-        else if (each.id === "apps") prefs.apps = now;
+        if (each.id === "apps") prefs.apps = now;
         else prefs.finds[each.id] = now;
         findsList.replaceRow(at, spec(each));
       },
@@ -814,42 +799,35 @@ export function kotodamaCard(view: string): KotodamaCard {
       }),
     );
     const engines = engineList(prefs);
-    const webSwitch = switchRow("Offer a web search", "Rows at the bottom, in this order, never a guess", prefs.web, (on) => setWeb(on));
-    /** The master switch and the Web search row say the same thing: either turns both. */
+    const webControl = switchControl({ on: prefs.web });
+    webControl.addEventListener("click", () => queueMicrotask(() => setWeb(webControl.getAttribute("aria-checked") === "true")));
+    /** The web search on or off: the engines' list follows, disabled while it is off. */
     const setWeb = (on: boolean) => {
       prefs.web = on;
       engines.setDisabled(!on);
-      const control = webSwitch.querySelector<HTMLElement>(".k-switch");
-      if (control && (control.getAttribute("aria-checked") === "true") !== on) control.click();
-      const at = sources.findIndex((each) => each.id === "web");
-      if (at >= 0 && findsList.box.isConnected) findsList.replaceRow(at, spec(sources[at]!));
     };
     engines.setDisabled(!prefs.web);
     const motion = tabs({ choices: [{ label: "Full" }, { label: "Fades" }], picked: prefs.slides ? 0 : 1, onPick: (at) => (prefs.slides = at === 0) });
     const mark = tabs({ choices: [{ label: "1.5" }, { label: "1,5" }], picked: prefs.comma ? 1 : 0, onPick: (at) => (prefs.comma = at === 1) });
-    /** A setting's words and its choice: side by side, the choice going under them when short. */
-    const choiceRow = (words: HTMLElement, choice: HTMLElement) => {
-      const line = row("s12", "centre", words, choice);
-      line.classList.add("setup-kotodama-choice");
+    const files = button({ label: "Open in Files", kind: "Text", size: "Sm" });
+    /** A setting on one line: its name, a short note after it, and its control at the end. */
+    const settingLine = (name: string, note: string, control: HTMLElement) => {
+      const line = row("s12", "centre", text(name, "body"), filling(text(note, "small", "on_surface_variant")), control);
+      line.classList.add("setup-kotodama-setting");
       return line;
     };
-    const files = button({ label: "Open in Files", kind: "Text", size: "Sm" });
-    // Typing and motion go into More with the rest: the engines' list takes their room.
-    const more = collapsible({
-      title: "More",
-      summary: "Typos, motion, the file",
-      open: state.more,
-      content: stack(
-        "s12",
-        "start",
-        filling(switchRow("Forgive typos", "“fierfox” finds Firefox", prefs.typos, (on) => (prefs.typos = on))),
-        filling(choiceRow(stack(0, "start", text("Motion", "body"), filling(wrapped("Fades alone: nothing slides", "small", "on_surface_variant"))), motion)),
-        filling(choiceRow(stack(0, "start", text("Decimal mark", "body"), filling(wrapped("How sums write a half", "small", "on_surface_variant"))), mark)),
-        filling(choiceRow(stack(0, "start", text("Aliases, quicklinks, your own actions", "body"), filling(wrapped("All in one file: user.toml", "small", "on_surface_variant"))), files)),
-      ),
-    });
+    const typos = switchControl({ on: prefs.typos });
+    typos.addEventListener("click", () => queueMicrotask(() => (prefs.typos = typos.getAttribute("aria-checked") === "true")));
     const section = (title: string, ...content: HTMLElement[]) => stack("s8", "start", heading(title), ...content.map(filling));
-    const options = stack("s20", "start", filling(section("Opens with", keysGroup)), filling(section("When nothing here matches", webSwitch, engines.box)), filling(more));
+    // One rhythm, the most used first: a section's title, its controls, `space.s12` to the next.
+    const options = stack(
+      "s12",
+      "start",
+      filling(section("Opens with", keysGroup)),
+      filling(section("When nothing here matches", settingLine("Offer a web search", "Rows at the bottom, in this order", webControl), engines.box)),
+      filling(section("Typing and motion", settingLine("Forgive typos", "“fierfox” finds Firefox", typos), settingLine("Motion", "Fades alone: nothing slides", motion), settingLine("Decimal mark", "How sums write a half", mark))),
+      filling(settingLine("Aliases and your own actions", "In user.toml", files)),
+    );
     const right = scrolling(options);
     right.classList.add("setup-kotodama-options");
 
