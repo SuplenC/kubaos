@@ -1,0 +1,12 @@
+# KubaOS: Penpot's app (apps/penpot) installs it with Penpot on this machine. Penpot's window
+# connects here; the first connection starts kubaos-penpot.service, which starts Penpot's
+# containers (and Docker with them) and hands the connection on.
+[Unit]
+Description=Penpot on this machine, started as its window opens
+
+[Socket]
+ListenStream=127.0.0.1:9001
+ListenStream=[::1]:9001
+
+[Install]
+WantedBy=sockets.target

@@ -333,7 +333,7 @@ impl<M: Machine> Updater<'_, M> {
                 ));
                 continue;
             }
-            if !app.available(apps::arch(), setup) {
+            if !catalog.available(app, setup, apps::arch()) {
                 continue;
             }
             let complete = journal.is_some_and(|j| j.complete);
@@ -467,7 +467,7 @@ fn chosen_setups(
                 setups: setups(),
             })?),
         };
-        if !app.available(apps::arch(), picked) {
+        if !catalog.available(app, picked, apps::arch()) {
             return Err(UpdateError::Unavailable {
                 id: id.clone(),
                 arch: apps::arch().to_owned(),

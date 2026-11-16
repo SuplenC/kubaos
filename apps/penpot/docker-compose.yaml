@@ -1,0 +1,163 @@
+# Penpot's official Docker Compose stack, release 2.19.2, MPL-2.0 (github.com/penpot/penpot,
+# docker/images/docker-compose.yaml), as KubaOS runs it on one machine for its user:
+#
+# - every image pinned by the digest of its multi-architecture index, so what runs is what was
+#   reviewed, and a new release is a change to this file;
+# - every published port bound to 127.0.0.1, so nothing outside this machine reaches Penpot or
+#   its mail catcher; the frontend publishes 9002, which kubaos-penpot.socket's service passes
+#   9001 on to, so the stack starts as its window opens;
+# - the secret its sessions are signed with made once for the machine (`up`), in secret.env,
+#   instead of the file's shared placeholder;
+# - telemetry off.
+#
+# The rest is upstream's: the services, their healthchecks, the volumes (the designs:
+# penpot_postgres_v15 and penpot_assets, which a removal keeps), and the flags for a setup with
+# no real mail server and no https.
+# https://raw.githubusercontent.com/penpot/penpot/2.19.2/docker/images/docker-compose.yaml
+
+x-flags: &penpot-flags
+  PENPOT_FLAGS: disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-mcp
+
+x-uri: &penpot-public-uri
+  PENPOT_PUBLIC_URI: http://localhost:9001
+
+x-body-size: &penpot-http-body-size
+  PENPOT_HTTP_SERVER_MAX_BODY_SIZE: 367001600
+  PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE: 367001600
+
+x-database: &penpot-database
+  PENPOT_DATABASE_URI: postgresql://penpot-postgres/penpot
+  PENPOT_DATABASE_USERNAME: penpot
+  PENPOT_DATABASE_PASSWORD: penpot
+
+networks:
+  penpot:
+
+volumes:
+  penpot_postgres_v15:
+  penpot_assets:
+
+services:
+  penpot-frontend:
+    image: "penpotapp/frontend:2.19.2@sha256:27af83e128712c6e621afcbc4dbae5a607204f7acc89a9ae1245b5601b4a66a8"
+    restart: always
+    ports:
+      - 127.0.0.1:9002:8080
+    volumes:
+      - penpot_assets:/opt/data/assets
+    depends_on:
+      - penpot-backend
+      - penpot-admin-console
+      - penpot-mcp
+      - penpot-exporter
+    networks:
+      - penpot
+    environment:
+      << : [*penpot-flags, *penpot-http-body-size, *penpot-public-uri]
+      PENPOT_ADMIN_CONSOLE_URI: http://penpot-admin-console:3000
+
+  penpot-backend:
+    image: "penpotapp/backend:2.19.2@sha256:b6c602504ca48ec99a25f6a5463c9aa4f4728ac9ed69e7d5d183fb4f779f5e4e"
+    restart: always
+    volumes:
+      - penpot_assets:/opt/data/assets
+    depends_on:
+      penpot-postgres:
+        condition: service_healthy
+      penpot-valkey:
+        condition: service_healthy
+    networks:
+      - penpot
+    env_file: /etc/kubaos/penpot/secret.env
+    environment:
+      << : [*penpot-flags, *penpot-public-uri, *penpot-http-body-size, *penpot-database]
+      PENPOT_ADMIN_CONSOLE_URI: http://penpot-admin-console:3000
+      PENPOT_REDIS_URI: redis://penpot-valkey/0
+      PENPOT_OBJECTS_STORAGE_BACKEND: fs
+      PENPOT_OBJECTS_STORAGE_FS_DIRECTORY: /opt/data/assets
+      PENPOT_TELEMETRY_ENABLED: "false"
+      PENPOT_SMTP_DEFAULT_FROM: no-reply@example.com
+      PENPOT_SMTP_DEFAULT_REPLY_TO: no-reply@example.com
+      PENPOT_SMTP_HOST: penpot-mailpit
+      PENPOT_SMTP_PORT: 1025
+      PENPOT_SMTP_USERNAME:
+      PENPOT_SMTP_PASSWORD:
+      PENPOT_SMTP_TLS: "false"
+      PENPOT_SMTP_SSL: "false"
+
+  penpot-admin-console:
+    image: "penpotapp/admin-console:2.19.2@sha256:27c7ae5d7c061f2e07ddbad393316fa50e3d1d6873f1c5c807740316f29f3715"
+    restart: always
+    depends_on:
+      penpot-postgres:
+        condition: service_healthy
+    networks:
+      - penpot
+    env_file: /etc/kubaos/penpot/secret.env
+    environment:
+      << : [*penpot-public-uri, *penpot-database]
+      PENPOT_INTERNAL_URI: http://penpot-frontend:8080
+
+  penpot-mcp:
+    image: "penpotapp/mcp:2.19.2@sha256:94c6672072a1fbbdb5ff577375e96d3f67b3a67ecdcd8f81498c5ec27eba36f3"
+    restart: always
+    networks:
+      - penpot
+
+  penpot-exporter:
+    image: "penpotapp/exporter:2.19.2@sha256:60fdaddd4de2492e5fc5d21419a268374af83b5501c09b167cd2513d2c3e29d7"
+    restart: always
+    depends_on:
+      penpot-valkey:
+        condition: service_healthy
+    networks:
+      - penpot
+    env_file: /etc/kubaos/penpot/secret.env
+    environment:
+      << : [*penpot-flags, *penpot-public-uri]
+      PENPOT_INTERNAL_URI: http://penpot-frontend:8080
+      PENPOT_REDIS_URI: redis://penpot-valkey/0
+
+  penpot-postgres:
+    image: "postgres:15@sha256:2663a9f0fde52de94f5dad3603a1942359f49472f1017c1a6d64f66bfedacb40"
+    restart: always
+    stop_signal: SIGINT
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U penpot"]
+      interval: 2s
+      timeout: 10s
+      retries: 5
+      start_period: 2s
+    volumes:
+      - penpot_postgres_v15:/var/lib/postgresql/data
+    networks:
+      - penpot
+    environment:
+      - POSTGRES_INITDB_ARGS=--data-checksums
+      - POSTGRES_DB=penpot
+      - POSTGRES_USER=penpot
+      - POSTGRES_PASSWORD=penpot
+
+  penpot-valkey:
+    image: "valkey/valkey:8.1@sha256:8f836008e0986c36adf50da714c7060cf689dbb335f61fe077939d90fa650809"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
+      interval: 1s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    networks:
+      - penpot
+    environment:
+      - VALKEY_EXTRA_FLAGS=--maxmemory 128mb --maxmemory-policy volatile-lfu
+
+  penpot-mailpit:
+    image: "axllent/mailpit:v1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce"
+    restart: always
+    expose:
+      - '1025'
+    ports:
+      - 127.0.0.1:8025:8025
+    networks:
+      - penpot

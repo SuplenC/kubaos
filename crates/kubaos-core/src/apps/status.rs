@@ -171,9 +171,12 @@ impl Status {
             let journal = Journal::read(journals, &app.id)?;
             let installed = journal.as_ref().filter(|j| j.complete);
             let available: Vec<bool> = if app.has_setups() {
-                app.setups.iter().map(|s| app.available(arch, Some(s))).collect()
+                app.setups
+                    .iter()
+                    .map(|s| catalog.available(app, Some(s), arch))
+                    .collect()
             } else {
-                vec![app.available(arch, None)]
+                vec![catalog.available(app, None, arch)]
             };
             let picked = picks.has(&app.id);
             let owns = match installed {

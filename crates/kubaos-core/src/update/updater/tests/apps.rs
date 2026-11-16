@@ -21,6 +21,7 @@ use crate::apps::journal::Journal;
 use crate::update::UpdateError;
 use crate::update::event::AppChanges;
 use crate::update::event::Phase;
+use crate::update::event::chain;
 use crate::update::record::Channel;
 
 const ABOUT: &str = r#"category = "development"
@@ -1060,4 +1061,110 @@ fn an_update_after_a_reboot_leaves_chromes_colouring_service_alone() {
     w.updater(&mut m).update(yes()).unwrap();
 
     assert_eq!(root_starts(&m), starts, "root was asked to colour Chrome again");
+}
+
+/// Agent's kit: it requires Agent, and writes KubaOS's defaults for it in a configure step.
+const KIT: &str = r#"
+name = "Kit"
+summary = "Agent's kit"
+requires = ["agent"]
+
+[[action]]
+name = "Write the kit"
+kind = "file"
+to = "~/.config/kit/kit.toml"
+text = "kit = true\n"
+
+[[action]]
+name = "Write KubaOS's defaults"
+kind = "file"
+stage = "configure"
+to = "~/.config/kubaos/kit/defaults.toml"
+text = "theme = \"night\"\n"
+"#;
+
+/// [`world`] with Kit beside the others.
+fn world_with_kit() -> World {
+    let w = world();
+    put(&w.sys.catalog().join("kit/app.toml"), &format!("{ABOUT}{KIT}"));
+    lock_down(&w.sys.catalog().join("kit"));
+    w
+}
+
+#[test]
+fn adding_an_app_installs_what_it_requires_first_without_picking_it() {
+    let w = world_with_kit();
+    let mut m = fake(&w, &[]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events)
+        .add_apps(&names(&["kit"]), None)
+        .unwrap();
+
+    assert_eq!(picked(&w), ["kit"]);
+    assert!(has(&m, "agent"));
+    assert_eq!(root_starts(&m), 1);
+    assert_eq!(user_journal(&w, "agent").unwrap().brought_by, ["kit"]);
+    assert_eq!(summary(&events).apps.installed, names(&["Agent", "Kit"]));
+}
+
+#[test]
+fn removing_an_app_another_needs_is_refused_and_the_picks_stay() {
+    let w = world_with_kit();
+    let mut m = fake(&w, &[]);
+    w.updater(&mut m).add_apps(&names(&["agent", "kit"]), None).unwrap();
+
+    let err = w.updater(&mut m).remove_apps(&names(&["agent"])).unwrap_err();
+
+    assert_eq!(chain(&err), "removing Agent: Agent is needed by Kit: remove that first");
+    assert_eq!(picked(&w), ["agent", "kit"]);
+    assert!(has(&m, "agent"));
+}
+
+#[test]
+fn removing_an_app_takes_what_it_brought_and_lists_it() {
+    let w = world_with_kit();
+    let mut m = fake(&w, &[]);
+    w.updater(&mut m).add_apps(&names(&["kit"]), None).unwrap();
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).remove_apps(&names(&["kit"])).unwrap();
+
+    assert!(picked(&w).is_empty());
+    assert!(!has(&m, "agent"));
+    assert_eq!(summary(&events).apps.removed, names(&["Kit", "Agent"]));
+}
+
+#[test]
+fn configure_runs_the_configure_stage_alone_and_changes_no_pick() {
+    let w = world_with_kit();
+    let mut m = fake(&w, &[]);
+    w.updater(&mut m).add_apps(&names(&["kit"]), None).unwrap();
+    let defaults = host(&m).home().join(".config/kubaos/kit/defaults.toml");
+    fs::write(&defaults, "theme = \"day\"\n").unwrap();
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events)
+        .configure_apps(&names(&["kit"]))
+        .unwrap();
+
+    assert_eq!(fs::read_to_string(&defaults).unwrap(), "theme = \"night\"\n");
+    assert_eq!(picked(&w), ["kit"]);
+    assert_eq!(root_starts(&m), 1, "only the add asked for root");
+    assert_eq!(summary(&events).apps.configured, names(&["Kit"]));
+}
+
+#[test]
+fn an_update_installs_what_a_picked_app_requires() {
+    let w = world_with_kit();
+    let mut m = fake(&w, &[]);
+    let mut picks = Picks::default();
+    picks.add("kit");
+    picks.write(&w.user.app_picks()).unwrap();
+
+    w.updater(&mut m).reconcile_apps();
+
+    assert!(has(&m, "agent"));
+    assert!(user_journal(&w, "kit").unwrap().complete);
+    assert_eq!(user_journal(&w, "agent").unwrap().brought_by, ["kit"]);
 }
