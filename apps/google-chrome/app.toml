@@ -61,9 +61,12 @@ scope = "system"
 enable = true
 start = true
 
+# Enabled, it runs at every boot as well, so after a reboot it has run since the machine started,
+# which is what its check asks, and an update doesn't run it again.
 [[action]]
-name = "Colour Chrome now"
+name = "Colour Chrome now and at every boot"
 kind = "unit"
 unit = "dot-chrome-theme.service"
 scope = "system"
+enable = true
 start = true

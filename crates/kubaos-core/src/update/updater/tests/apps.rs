@@ -993,3 +993,44 @@ fn files_an_older_release_wrote_with_older_comments_are_taken_in_and_rewritten()
         assert!(!file_paths.is_empty() && file_paths.iter().all(|c| c.owned), "{id}: {file_paths:?}");
     }
 }
+
+/// The fake machine restarted: what is enabled runs, a oneshot once, and nothing else.
+fn reboot(m: &Fake) {
+    for unit in host(m).state.borrow_mut().units.values_mut() {
+        let oneshot = unit.oneshot && !unit.remain_after_exit;
+        unit.active = unit.enabled && !oneshot;
+        unit.exited = unit.enabled && oneshot;
+    }
+}
+
+#[test]
+fn an_update_after_a_reboot_leaves_chromes_colouring_service_alone() {
+    // Regression: every update after a reboot ran the colouring service again, as root.
+    let w = world();
+    with_app(&w, "google-chrome");
+    let mut picks = Picks::default();
+    picks.add("google-chrome");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = fake(&w, &["google-chrome-stable"]);
+    for unit in ["dot-chrome-theme.path", "dot-chrome-theme.service"] {
+        host(&m).state.borrow_mut().units.insert(
+            format!("system:{unit}"),
+            crate::apps::host::fake::Unit {
+                exists: true,
+                oneshot: unit.ends_with(".service"),
+                ..crate::apps::host::fake::Unit::default()
+            },
+        );
+    }
+    w.updater(&mut m).update(yes()).unwrap();
+    assert!(root_journal(&w, "google-chrome").is_some());
+    // What the service writes from the wallpaper's colours, which the fake doesn't run.
+    let policy = host(&m).place(Path::new("/etc/opt/chrome/policies/managed/dot-theme.json"));
+    put(&policy, "{\n  \"BrowserThemeColor\": \"#202020\"\n}\n");
+    reboot(&m);
+    let starts = root_starts(&m);
+
+    w.updater(&mut m).update(yes()).unwrap();
+
+    assert_eq!(root_starts(&m), starts, "root was asked to colour Chrome again");
+}
