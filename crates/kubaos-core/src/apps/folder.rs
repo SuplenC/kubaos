@@ -29,6 +29,7 @@ use super::action::RunSource;
 use super::action::Side;
 use super::action::Stage;
 use super::action::is_argv;
+use super::action::is_icon_name;
 
 /// The file of an app's folder.
 pub const APP_FILE: &str = "app.toml";
@@ -689,16 +690,6 @@ pub fn is_app_id(id: &str) -> bool {
         && id
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-}
-
-/// Whether `value` can be an icon theme's name for an icon: no path, no extension.
-/// <https://specifications.freedesktop.org/icon-naming-spec/latest/>
-fn is_icon_name(value: &str) -> bool {
-    value.len() <= 128
-        && value.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
-        && value
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 /// Whether `tag` is lowercase words, one space between them.
