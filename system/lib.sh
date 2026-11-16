@@ -510,15 +510,15 @@ install_apps_policy() {
 # install_apps_helper: the Apps catalog's root helper, `kubaos-apps` from
 # KUBAOS_DIR's build of the kubaos command (`.#kubaos`, home/curated.nix),
 # pinned with APPS_GCROOT and linked where pkexec and sudo run it, so neither
-# the user nor their profile can change what runs as root, and its polkit
-# action. It runs only the typed actions of the root-owned catalog
+# the user nor their profile can change what runs as root. It runs only the
+# typed actions of the root-owned catalog
 # (docs/adr/0009-apps-are-journaled-actions.md). 60-nix.sh and relink.sh
-# (every update and rollback) run it.
+# (every update and rollback) run it, each after install_apps_policy, which
+# needs no nix.
 APPS_LINK=/usr/local/libexec/kubaos-apps
 APPS_GCROOT=/nix/var/nix/gcroots/kubaos-apps
 install_apps_helper() {
   local out bin
-  install_apps_policy
   if ((DRY_RUN)); then
     run nix build --no-link --print-out-paths "$KUBAOS_DIR#kubaos"
     sudo_run ln -sfn "<kubaos store path>" "$APPS_GCROOT"
@@ -536,6 +536,18 @@ install_apps_helper() {
   sudo_run ln -sfn "$out" "$APPS_GCROOT"
   sudo_run install -d -m 0755 "$(dirname "$APPS_LINK")"
   sudo_run ln -sfn "$bin" "$APPS_LINK"
+}
+
+# install_apps_root: the Apps catalog's polkit action, always, and its root
+# helper when nix is there to build it. A fresh install gets the action even
+# when 60-nix.sh finds no nix: the next update's relink.sh links the helper.
+install_apps_root() {
+  install_apps_policy
+  if ((DRY_RUN)) || command -v nix >/dev/null; then
+    install_apps_helper
+  else
+    warn "nix not found; the Apps catalog's root helper waits for the next update"
+  fi
 }
 
 # install_scx: the CPU scheduler the power stops can run (crates/kubaos-power,
