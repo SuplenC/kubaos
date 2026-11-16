@@ -708,6 +708,25 @@ fn an_install_whose_source_nothing_names_is_refused() {
 }
 
 #[test]
+fn a_run_names_its_source_only_as_the_installs_only_source() {
+    let configure = "source = \"container_images\"\nstage = \"configure\"\n";
+    let beside = "source = \"container_images\"\n\
+                  [[setup.local.action]]\nname = \"Engine\"\nkind = \"apt\"\npackages = [\"engine\"]\n";
+    for rest in [configure, beside] {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("stack")).unwrap();
+        fs::write(dir.path().join("stack/app.toml"), stack_app(rest)).unwrap();
+
+        let err = Catalog::load(dir.path()).unwrap_err();
+
+        let CatalogError::App { source, .. } = &err else {
+            panic!("{err:?}");
+        };
+        assert!(matches!(**source, FolderError::StraySource(_)), "{rest}: {source:?}");
+    }
+}
+
+#[test]
 fn a_run_names_only_a_source_the_catalog_knows() {
     let dir = tempfile::tempdir().unwrap();
     fs::create_dir_all(dir.path().join("stack")).unwrap();

@@ -70,6 +70,10 @@ pub enum FolderError {
         "{0} installs through a `run` and names no source: the `run` that installs the app says what from, `source = \"container_images\"`"
     )]
     NoSource(String),
+    #[error(
+        "{0} names a source on a `run` that installs nothing from it: a run's `source` is for the install-stage `run` that is the install's only source"
+    )]
+    StraySource(String),
     #[error("a ready check is an argv, a program on PATH or ./<script> in the app's folder, and what it says")]
     InvalidReady,
     #[error("{id} can be set up more than one way: name one of {}", setups.join(", "))]
@@ -415,6 +419,9 @@ impl Folder {
         if self.setups.is_empty() && self.installs_unnamed(None) {
             return Err(FolderError::NoSource(self.id.clone()));
         }
+        if self.setups.is_empty() && self.names_stray_source(None) {
+            return Err(FolderError::StraySource(self.id.clone()));
+        }
         for setup in &self.setups {
             if setup.name.trim().is_empty() || setup.summary.trim().is_empty() {
                 return Err(FolderError::Empty { key: "setup.name" });
@@ -424,6 +431,9 @@ impl Folder {
             }
             if self.installs_unnamed(Some(setup)) {
                 return Err(FolderError::NoSource(format!("{}'s setup {}", self.id, setup.id)));
+            }
+            if self.names_stray_source(Some(setup)) {
+                return Err(FolderError::StraySource(format!("{}'s setup {}", self.id, setup.id)));
             }
         }
         let readies = self.ready.iter().chain(self.setups.iter().flat_map(|s| &s.ready));
@@ -584,6 +594,18 @@ impl Folder {
             .chain(setup.into_iter().flat_map(|s| &s.actions))
             .any(|a| a.stage == Stage::Install && matches!(a.kind, Kind::Run { .. }));
         runs && self.sources(setup).is_empty()
+    }
+
+    /// Whether a `run` in an install in `setup` names a source the listing would never show:
+    /// one in the configure stage, or one beside another source, which it would hide.
+    fn names_stray_source(&self, setup: Option<&FolderSetup>) -> bool {
+        let actions = || self.actions.iter().chain(setup.into_iter().flat_map(|s| &s.actions));
+        let named = |a: &&super::action::Action| matches!(a.kind, Kind::Run { source: Some(_), .. });
+        let others = actions()
+            .filter(|a| a.stage == Stage::Install)
+            .filter(|a| !matches!(a.kind, Kind::Run { .. }))
+            .any(|a| Source::of(&a.kind).is_some());
+        actions().filter(named).any(|a| a.stage != Stage::Install || others)
     }
 
     /// Where an install in `setup` takes it from, its install stage's actions, the app's then
