@@ -163,3 +163,50 @@ fn resolving_a_run_records_the_scripts_it_names() {
     };
     assert_eq!(scripts.get("pair").map(String::as_str), Some("#!/bin/sh\nt3 pair\n"));
 }
+
+fn web_app(title: &str, url: &str) -> Result<Action, ActionError> {
+    let mut table = toml::Table::new();
+    for (key, value) in [
+        ("name", "Open it"),
+        ("kind", "web_app"),
+        ("id", "it"),
+        ("title", title),
+        ("url", url),
+        ("icon", "it.svg"),
+    ] {
+        table.insert(key.to_owned(), toml::Value::String(value.to_owned()));
+    }
+    Action::try_from(table)
+}
+
+#[test]
+fn a_web_apps_title_is_one_line() {
+    let result = web_app("Penpot\nExec=rm -rf ~", "https://penpot.app/");
+
+    assert!(matches!(result, Err(ActionError::InvalidTitle)), "{result:?}");
+}
+
+#[test]
+fn a_web_app_opens_https_or_http_on_this_machine_with_its_port() {
+    for url in [
+        "https://penpot.app/",
+        "http://localhost:9001",
+        "http://127.0.0.1:9001/#/dashboard",
+        "http://[::1]:9001/?a=1",
+    ] {
+        assert!(web_app("Penpot", url).is_ok(), "{url}");
+    }
+    for url in [
+        "http://penpot.app/",
+        "http://localhost/",
+        "http://localhost:/",
+        "http://localhost:99999/",
+        "http://localhost.evil.example:9001/",
+        "http://user@localhost:9001@evil.example/",
+        "http://127.0.0.2:9001/",
+        "ftp://localhost:9001/",
+    ] {
+        let result = web_app("Penpot", url);
+        assert!(matches!(result, Err(ActionError::InvalidUrl { .. })), "{url}: {result:?}");
+    }
+}

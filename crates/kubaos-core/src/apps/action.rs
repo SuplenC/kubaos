@@ -95,8 +95,10 @@ pub enum ActionError {
     InvalidArgv { key: &'static str },
     #[error("{value:?} is not a web app's id: lowercase letters, digits and dashes")]
     InvalidWebApp { value: String },
-    #[error("{value:?} is not an https:// URL")]
+    #[error("{value:?} is not an https:// URL, or an http:// one on this machine (localhost, 127.0.0.1 or [::1]) with its port")]
     InvalidUrl { value: String },
+    #[error("a web app's title is one line, with no control characters")]
+    InvalidTitle,
     #[error("a web app's icon is an .svg file in the app's folder; {value:?} isn't")]
     InvalidIcon { value: String },
     #[error("{key} is the journal's own; an app's folder doesn't set it")]
@@ -197,6 +199,7 @@ pub enum Kind {
         id: String,
         /// The name its desktop entry shows.
         title: String,
+        /// An `https://` URL, or an `http://` one of this machine with its port.
         url: String,
         /// An `.svg` in the app's folder.
         icon: String,
@@ -653,7 +656,10 @@ fn check_web_app(id: &str, title: &str, url: &str, icon: &str) -> Result<(), Act
     if title.trim().is_empty() {
         return Err(ActionError::Empty { key: "title" });
     }
-    if !is_https(url) {
+    if title.chars().any(char::is_control) {
+        return Err(ActionError::InvalidTitle);
+    }
+    if !is_https(url) && !is_loopback_http(url) {
         return Err(ActionError::InvalidUrl { value: url.to_owned() });
     }
     if !is_folder_file(icon) || Path::new(icon).extension().is_none_or(|e| e != "svg") {
@@ -666,6 +672,25 @@ fn check_web_app(id: &str, title: &str, url: &str, icon: &str) -> Result<(), Act
 pub fn is_https(url: &str) -> bool {
     url.strip_prefix("https://")
         .is_some_and(|rest| !rest.is_empty() && !rest.chars().any(|c| c.is_whitespace() || c.is_control()))
+}
+
+/// Whether `url` is an http:// URL of this machine: `localhost`, `127.0.0.1` or `[::1]` with an
+/// explicit port, as a service the user runs here (Penpot's local stack) listens on. Nothing but
+/// this machine answers it, so it needs no TLS.
+pub fn is_loopback_http(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("http://") else {
+        return false;
+    };
+    if rest.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return false;
+    }
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let authority = &rest[..end];
+    let Some((host, port)) = authority.rsplit_once(':') else {
+        return false;
+    };
+    let port = !port.is_empty() && port.chars().all(|c| c.is_ascii_digit()) && port.parse::<u16>().is_ok_and(|p| p > 0);
+    port && matches!(host, "localhost" | "127.0.0.1" | "[::1]")
 }
 
 /// The mode a file's `mode` names, three octal digits.
