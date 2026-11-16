@@ -70,6 +70,11 @@ export interface RailPage {
   /** What the footer says before Continue when nothing blocks it: 12 of 40 picked. */
   readonly note?: Live<string | undefined>;
   /**
+   * Back's own work: true keeps the page (it went back a step inside itself, as Make it yours's
+   * steps do); false, or none, goes back a page. Esc does the same.
+   */
+  readonly back?: () => boolean;
+  /**
    * Back closes its host: the one page of a flow opened on it alone (a first-boot card from the
    * Command menu), where there is no page before it to go back to. Back then reads Close.
    */
@@ -259,8 +264,12 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
   const { box: scroller } = scroll(column, { height: "100%", above: 0, below: 0, noGutter: true });
   const hintsRoom = document.createElement("span");
   hintsRoom.className = "k-rail-hints";
+  // What the hints say as drawn: a page whose keys change as it changes (Make it yours's steps)
+  // draws them again when they differ from these.
+  let drawnHints = "";
   const drawHints = (at: number) => {
     const hints = options.hints(at);
+    drawnHints = JSON.stringify(hints);
     hintsRoom.replaceChildren(...(hints.length > 0 ? [gap("s16"), inset(hintColumn(hints), 0, "s12")] : []));
   };
   drawHints(current);
@@ -280,7 +289,6 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
   box.className = "k-rail";
   box.append(fillingHeight(stack(0, "start", ...parts)));
   probe(box, { role: "component", name: "StepRail", variant: options.host, fixed: { width: true, height: false } });
-  let hintsAt = current;
   return {
     element: box,
     set(at, upTo) {
@@ -309,8 +317,7 @@ function rail(options: StepRailOptions, current: number, reached: number, go: (t
         }
       } else for (const light of column.querySelectorAll<HTMLElement>(".k-rail-wire-lit")) light.style.setProperty("--wire-lit", String(at));
       // Two pages taking the same keys keep the hints they share as they are.
-      if (JSON.stringify(options.hints(at)) !== JSON.stringify(options.hints(hintsAt))) drawHints(at);
-      hintsAt = at;
+      if (JSON.stringify(options.hints(at)) !== drawnHints) drawHints(at);
     },
   };
 }
@@ -601,7 +608,11 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
       spec.skipped?.();
       go(along(current, 1));
     };
-    const made = pageRoom(spec, () => go(along(current, -1)), next, skip, options.host);
+    const back = () => {
+      if (spec.back?.()) return;
+      go(along(current, -1));
+    };
+    const made = pageRoom(spec, back, next, skip, options.host);
     rooms.set(index, made);
     side.append(made.room);
     return made;
@@ -703,7 +714,9 @@ export function stepRailPage(options: StepRailOptions): HTMLElement {
   box.addEventListener("keydown", (event) => {
     if (event.defaultPrevented || event.repeat) return;
     if (event.key === "Enter") next();
-    else if (event.key === "Escape") go(along(current, -1));
+    else if (event.key === "Escape") {
+      if (!options.pages[current]?.back?.()) go(along(current, -1));
+    }
     else return;
     event.preventDefault();
   });
