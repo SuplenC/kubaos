@@ -1,0 +1,24 @@
+# Alacritty from nixpkgs, through the User flake. Ubuntu's package is a release behind (0.16.1, to
+# upstream's and nixpkgs' 0.17.0) and makes itself an x-terminal-emulator alternative; nixpkgs'
+# touches nothing outside the home. Ghostty stays KubaOS's terminal: its binds and the Command
+# menu name Ghostty, and nothing here changes them.
+# https://github.com/alacritty/alacritty/blob/master/INSTALL.md
+name = "Alacritty"
+category = "development"
+tags = ["terminal", "gpu", "opengl", "rust"]
+summary = "A GPU terminal with no tabs and no splits. Use tmux, it says, and it's fucking right."
+# From its AppStream metainfo, MIT (github.com/alacritty/alacritty).
+description = """\
+Alacritty is a modern terminal emulator that comes with sensible defaults, but allows for \
+extensive configuration. By integrating with other applications, rather than reimplementing \
+their functionality, it manages to provide a flexible set of features with high performance."""
+description_from = "https://github.com/alacritty/alacritty/blob/v0.17.0/extra/linux/org.alacritty.Alacritty.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "Alacritty"
+keeps = """\
+Your config stays in ~/.config/alacritty: install Alacritty again and it's there."""
+
+[[action]]
+name = "Install Alacritty"
+kind = "nix"
+packages = ["alacritty"]

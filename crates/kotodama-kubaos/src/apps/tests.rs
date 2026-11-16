@@ -1061,3 +1061,43 @@ fn typing_chrome_or_google_ranks_google_chromes_items_above_chromiums() {
         }
     }
 }
+
+/// Ghostty's own Item, as Kotodama's apps Extension makes it from its desktop entry: its name the
+/// title, its comment the subtitle, its keywords keywords, its desktop id a weak keyword.
+fn open_ghostty() -> Item {
+    Item {
+        id: "com.mitchellh.ghostty".to_owned(),
+        kind: ItemKind::App {
+            desktop_id: "com.mitchellh.ghostty.desktop".to_owned(),
+        },
+        identity: Some("app:com.mitchellh.ghostty.desktop".to_owned()),
+        title: "Ghostty".to_owned(),
+        subtitle: Some("A terminal emulator".to_owned()),
+        icon: Some("com.mitchellh.ghostty".to_owned()),
+        names: Vec::new(),
+        keywords: vec!["terminal".to_owned(), "tty".to_owned(), "pty".to_owned()],
+        hidden: false,
+        app_only: false,
+        weak_keywords: vec!["com.mitchellh.ghostty".to_owned()],
+        yields: false,
+        actions: vec![Action::new("open", "Open")],
+    }
+}
+
+#[test]
+fn no_install_or_remove_item_of_the_catalog_ranks_above_opening_ghostty() {
+    // Ghostty is KubaOS's terminal; a catalog terminal is one to install beside it.
+    let items = shipped_items();
+    let ghostty = open_ghostty();
+
+    let open = tier(&ghostty, "terminal");
+    assert!(open.is_some(), "terminal finds Ghostty");
+    for item in &items {
+        assert!(
+            tier(item, "terminal") <= open,
+            "terminal: {} ({:?}) above Ghostty ({open:?})",
+            item.title,
+            tier(item, "terminal")
+        );
+    }
+}

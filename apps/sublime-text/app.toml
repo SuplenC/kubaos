@@ -1,0 +1,27 @@
+# Sublime Text from Sublime HQ's signed apt repository, whose key system/packages.toml pins
+# ([repo.sublime-text]). Its package writes no source of its own. Sublime Text is paid software
+# with an unlimited evaluation: it asks for a licence now and then and keeps working.
+# https://www.sublimetext.com/docs/linux_repositories.html
+name = "Sublime Text"
+category = "development"
+tags = ["editor", "text", "code", "markdown", "prose"]
+summary = "The fast editor that's nagged you to buy a licence since 2008. It's earned the damn money."
+# Sublime HQ's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Sublime Text is a text editor for code, markup and prose. It opens large files quickly, edits \
+with multiple selections, jumps to any file, symbol or line with Goto Anything, and runs every \
+command from its palette. Packages in Python extend it, and it speaks the Language Server \
+Protocol through one. It is paid software with an unlimited evaluation."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "sublime-text"
+keeps = """\
+Your settings, packages and licence stay in ~/.config/sublime-text: install Sublime Text again \
+and they're all there."""
+
+[[action]]
+name = "Install Sublime Text"
+kind = "apt"
+repo = "sublime-text"
+packages = ["sublime-text"]

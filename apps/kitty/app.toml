@@ -1,0 +1,26 @@
+# kitty from nixpkgs, through the User flake. Ubuntu's package is five releases behind (0.45.0, to
+# nixpkgs' 0.49.1) and makes itself an x-terminal-emulator alternative; nixpkgs' touches nothing
+# outside the home. Ghostty stays KubaOS's terminal: its binds and the Command menu name Ghostty,
+# and nothing here changes them.
+# https://sw.kovidgoyal.net/kitty/binary/
+name = "kitty"
+category = "development"
+tags = ["terminal", "gpu", "tabs", "splits", "images"]
+summary = "A GPU terminal with tabs, splits and pictures inline. Ghostty stays the default, so play nice."
+# kitty's own words are under the GPL, which asks for its whole text with every copy, so this is
+# ours.
+description = """\
+kitty is a terminal emulator that draws on the graphics card. It has tabs and split windows of \
+its own, shows images in the terminal through its graphics protocol, and takes small Python \
+programs, kittens, that extend it. It is configured in a text file and controlled from scripts \
+or the shell."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "kitty"
+keeps = """\
+Your config stays in ~/.config/kitty: install kitty again and it's there."""
+
+[[action]]
+name = "Install kitty"
+kind = "nix"
+packages = ["kitty"]

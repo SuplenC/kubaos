@@ -1,0 +1,26 @@
+# WezTerm from nixpkgs, through the User flake. Its own apt repository (apt.fury.io/wez) has its
+# last release, 20240203, nearly three years behind its main branch, and otherwise a nightly build
+# every few days, built for Ubuntu 22.04 and released untested; Ubuntu doesn't package it. nixpkgs
+# builds a snapshot of the main branch and moves it on as the flake does. Ghostty stays KubaOS's
+# terminal: its binds and the Command menu name Ghostty, and nothing here changes them.
+# https://wezterm.org/install/linux.html
+name = "WezTerm"
+category = "development"
+tags = ["terminal", "multiplexer", "lua", "gpu", "ssh"]
+summary = "A terminal and multiplexer you configure in Lua. Because your terminal needed a scripting language."
+# From its AppStream metainfo, MIT, Copyright (c) 2018-Present Wez Furlong
+# (github.com/wezterm/wezterm).
+description = """\
+WezTerm is a terminal emulator with support for modern features such as fonts with ligatures, \
+hyperlinks, multiple windows, tabs and split panes. Configuration is expressed using Lua and many \
+powerful functions are provided to help you customize your terminal to your workflow."""
+description_from = "https://github.com/wezterm/wezterm/blob/e1eae81a56be8b5487dc77a29616afa568fb57b7/assets/wezterm.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "org.wezfurlong.wezterm"
+keeps = """\
+Your config stays in ~/.config/wezterm, or ~/.wezterm.lua: install WezTerm again and it's there."""
+
+[[action]]
+name = "Install WezTerm"
+kind = "nix"
+packages = ["wezterm"]
