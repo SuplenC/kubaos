@@ -19,6 +19,7 @@ mod json;
 use std::path::Path;
 use std::path::PathBuf;
 
+use self::json::Found;
 use self::json::JsonText;
 use self::json::Through;
 
@@ -151,8 +152,8 @@ impl Settings {
             }
             Self::Json(json) => match json.get(&above, last).map_err(through(path, key))? {
                 None => Ok(None),
-                Some(None) => Err(table()),
-                Some(Some(value)) => Ok(Some(value)),
+                Some(Found::Object) => Err(table()),
+                Some(Found::Value(value)) => Ok(Some(value)),
             },
         }
     }

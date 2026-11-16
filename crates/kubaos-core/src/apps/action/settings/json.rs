@@ -47,10 +47,18 @@ struct Member {
     value: Range<usize>,
 }
 
-/// What the text holds under a dotted key: the objects on the way, from the top level down, as
-/// far as they are there.
+/// What a key holds.
 #[derive(Debug)]
-struct Found {
+pub enum Found {
+    /// A value, as its text stands in the file.
+    Value(String),
+    /// An object of settings.
+    Object,
+}
+
+/// The objects on the way to a dotted key, from the top level down, as far as they are there.
+#[derive(Debug)]
+struct Path {
     objects: Vec<Object>,
 }
 
@@ -96,9 +104,8 @@ impl JsonText {
         Ok(self.find(above)?.objects.len().saturating_sub(1))
     }
 
-    /// The text of the value of `last` under `above`, when it is there; `Ok(Some(None))` when it
-    /// is an object.
-    pub fn get(&self, above: &[&str], last: &str) -> Result<Option<Option<String>>, Through> {
+    /// The value of `last` under `above`, when it is there.
+    pub fn get(&self, above: &[&str], last: &str) -> Result<Option<Found>, Through> {
         let found = self.find(above)?;
         if found.objects.len() <= above.len() {
             return Ok(None);
@@ -107,7 +114,11 @@ impl JsonText {
             return Ok(None);
         };
         let value = &self.text[member.value.clone()];
-        Ok(Some((!value.starts_with('{')).then(|| value.to_owned())))
+        Ok(Some(if value.starts_with('{') {
+            Found::Object
+        } else {
+            Found::Value(value.to_owned())
+        }))
     }
 
     /// `last` under `above` set to the JSON `value`, the objects above it made where they are
@@ -156,10 +167,10 @@ impl JsonText {
         object(&self.text, skip_ws(&self.text, 0))
     }
 
-    fn find(&self, above: &[&str]) -> Result<Found, Through> {
+    fn find(&self, above: &[&str]) -> Result<Path, Through> {
         let mut objects = Vec::new();
         let Some(mut here) = self.root() else {
-            return Ok(Found { objects });
+            return Ok(Path { objects });
         };
         for part in above {
             let Some(member) = here.member(part) else {
@@ -176,7 +187,7 @@ impl JsonText {
             here = next;
         }
         objects.push(here);
-        Ok(Found { objects })
+        Ok(Path { objects })
     }
 
     /// Adds the member `parts[0]`, with the objects for the rest of `parts` around `value`, at
