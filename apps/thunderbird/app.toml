@@ -1,0 +1,26 @@
+# Thunderbird from nixpkgs, through the User flake. Mozilla's apt repository carries Firefox
+# alone, and Ubuntu 26.04's thunderbird is the package that installs the snap.
+# https://www.thunderbird.net/
+name = "Thunderbird"
+category = "communication"
+tags = ["email", "mail", "calendar", "contacts", "imap"]
+summary = "Email, calendars and contacts, done old school. Twenty-odd years in and still kicking ass."
+# From its AppStream metainfo, CC0-1.0 (flathub/org.mozilla.Thunderbird), without the lines that
+# speak as Thunderbird's team.
+description = """\
+Thunderbird is a free and open source email, newsfeed, chat, and calendaring client, that's easy \
+to set up and customize. One of the core principles of Thunderbird is the use and promotion of \
+open standards. Thunderbird is an open source project, which means anyone can contribute ideas, \
+designs, code, and time helping fellow users."""
+description_from = "https://github.com/flathub/org.mozilla.Thunderbird/blob/master/org.mozilla.Thunderbird.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "thunderbird"
+keeps = """\
+Your mail, accounts and address book stay in Thunderbird's profile in your home: install \
+Thunderbird again and it opens them."""
+
+[[action]]
+name = "Install Thunderbird"
+kind = "nix"
+packages = ["thunderbird"]

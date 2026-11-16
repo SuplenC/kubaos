@@ -2090,5 +2090,6 @@ fn a_removal_shows_each_step_it_undoes_by_name() {
 }
 
 mod ai;
+mod communication;
 mod editors;
 mod requires;

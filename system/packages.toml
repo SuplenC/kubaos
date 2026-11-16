@@ -128,6 +128,41 @@ keyring = "/usr/share/keyrings/anysphere.gpg"
 key_url = "https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/windsurf.gpg"
 fingerprint = "EE2C46CC44E1578C23135B0E9E608A1B9FD62A3F"
 keyring = "/etc/apt/keyrings/windsurf.gpg"
+# Signal's repository, for the app of the catalog (apps/signal/). It has
+# amd64 only.
+[repo.signal]
+key_url = "https://updates.signal.org/desktop/apt/keys.asc"
+fingerprint = "DBA36B5181D0C816F630E889D980A17457F6FB06"
+keyring = "/etc/apt/keyrings/signal.gpg"
+
+# Slack's repository on packagecloud, for the app of the catalog
+# (apps/slack/), signed by Slack's own key there. It has amd64 only.
+[repo.slack]
+key_url = "https://packagecloud.io/slacktechnologies/slack/gpgkey"
+fingerprint = "DB085A08CA13B8ACB917E0F6D938EC0D038651BD"
+keyring = "/etc/apt/keyrings/slack.gpg"
+
+# Element's repository, for the app of the catalog (apps/element/).
+[repo.element]
+key_url = "https://packages.element.io/debian/element-io-archive-keyring.gpg"
+fingerprint = "12D4CD600C2240A9F4A82071D7B0B66941D01538"
+keyring = "/etc/apt/keyrings/element.gpg"
+
+# Mattermost's repository, for the app of the catalog (apps/mattermost/).
+[repo.mattermost]
+key_url = "https://deb.packages.mattermost.com/pubkey.gpg"
+fingerprint = "A1B31D46F0F3A10B02CF2D44F8F2C31744774B28"
+keyring = "/etc/apt/keyrings/mattermost.gpg"
+
+# Zulip's desktop repository, for the app of the catalog (apps/zulip/). It
+# has amd64 only. The zulip package ships zulip-desktop.sources as a
+# conffile, signed by a keyring at another path; named the same, this source
+# is that file, which dpkg keeps as it finds it, so apt never sees the
+# repository twice with two keys.
+[repo.zulip-desktop]
+key_url = "https://download.zulip.com/desktop/apt/zulip-desktop.asc"
+fingerprint = "69AD12704E71A4803DCA3A682424BE5AE9BD10D9"
+keyring = "/etc/apt/keyrings/zulip-desktop.gpg"
 
 # Microsoft's repository of Visual Studio Code, for the app of the catalog
 # (apps/vscode/). VS Code's postinst writes vscode.sources unless another source

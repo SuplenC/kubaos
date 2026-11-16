@@ -1,0 +1,39 @@
+# Slack from its signed apt repository on packagecloud, whose key system/packages.toml pins
+# ([repo.slack]). Slack builds it for amd64 only. Its package carries a daily job,
+# /etc/cron.daily/slack, which adds the repository a second time, as slack.list, and trusts its
+# keys for every repository on the machine (/etc/apt/trusted.gpg.d/); it reads /etc/default/slack
+# first, and the one here, written before the package, turns both off.
+# https://slack.com/help/articles/212924728-Download-Slack-for-Linux--beta-
+name = "Slack"
+category = "communication"
+tags = ["chat", "work", "team", "messaging", "huddles"]
+summary = "Work chat. Channels, threads, and a red dot that owns your fucking soul."
+# From its AppStream metainfo, CC0-1.0 (flathub/com.slack.Slack), without the lines that speak
+# as Slack.
+description = """\
+Slack brings team communication and collaboration into one place so you can get more work done, \
+whether you belong to a large enterprise or a small business. Check off your to-do list and move \
+your projects forward by bringing the right people, conversations, tools, and information you \
+need together. Slack is available on any device, so you can find and access your team and your \
+work, whether you're at your desk or on the go."""
+description_from = "https://github.com/flathub/com.slack.Slack/blob/master/com.slack.Slack.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "slack"
+keeps = """\
+Your workspaces' sign-ins and Slack's settings stay in ~/.config/Slack: install Slack again and \
+you're still signed in."""
+
+[[action]]
+name = "Keep Slack's daily job off the apt sources"
+kind = "file"
+to = "/etc/default/slack"
+from = "slack.default"
+mode = "644"
+
+[[action]]
+name = "Install Slack"
+kind = "apt"
+repo = "slack"
+arch = "amd64"
+packages = ["slack-desktop"]

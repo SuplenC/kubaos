@@ -1,0 +1,31 @@
+# Signal Desktop from Signal's signed apt repository, whose key system/packages.toml pins
+# ([repo.signal]). Signal builds it for amd64 only.
+# https://signal.org/download/linux/
+name = "Signal"
+category = "communication"
+tags = ["messenger", "chat", "encrypted", "private", "calls"]
+summary = "End-to-end encrypted chat and calls. The cops get fuck all, and so does everyone else."
+# From its AppStream metainfo, CC0-1.0 (flathub/org.signal.Signal), without the line about the
+# Flatpak.
+description = """\
+To use the Signal desktop app, Signal must first be installed on your phone. Millions of people \
+use Signal every day for free and instantaneous communication anywhere in the world. Send and \
+receive high-fidelity messages, participate in HD voice/video calls, and explore a growing set \
+of new features that help you stay connected. Signal's advanced privacy-preserving technology is \
+always enabled, so you can focus on sharing the moments that matter with the people who matter \
+to you. Signal is an independent 501c3 nonprofit. The complete source code for the Signal \
+clients and the Signal server is available on GitHub."""
+description_from = "https://github.com/flathub/org.signal.Signal/blob/master/org.signal.Signal.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "signal-desktop"
+keeps = """\
+Your messages, keys and linked-device pairing stay in ~/.config/Signal: install Signal again and \
+it picks up where it left off."""
+
+[[action]]
+name = "Install Signal"
+kind = "apt"
+repo = "signal"
+arch = "amd64"
+packages = ["signal-desktop"]

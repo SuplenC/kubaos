@@ -1,0 +1,27 @@
+# Telegram Desktop from nixpkgs, through the User flake. Ubuntu 26.04's archive has no
+# telegram-desktop, Telegram keeps no apt repository, and its own build is a self-updating
+# tarball with no published checksum.
+# https://desktop.telegram.org/
+name = "Telegram"
+category = "communication"
+tags = ["messenger", "chat", "cloud", "channels", "groups"]
+summary = "Fast cloud chat on every device. End-to-end encrypted only if you ask it nicely."
+# From its AppStream metainfo, CC0-1.0 (telegramdesktop/tdesktop), its first two paragraphs,
+# without the download count.
+description = """\
+Pure instant messaging — simple, fast, secure, and synced across all your devices. You can \
+access your messages from all your phones, tablets and computers at once. Telegram apps are \
+standalone, so you don't need to keep your phone connected. Start typing on one device and \
+finish the message from another. Never lose your data again."""
+description_from = "https://github.com/telegramdesktop/tdesktop/blob/dev/lib/xdg/org.telegram.desktop.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "telegram-desktop"
+keeps = """\
+Your sign-in and Telegram's settings stay in ~/.local/share/TelegramDesktop: install Telegram \
+again and you're still signed in. Your chats live on Telegram's servers anyway."""
+
+[[action]]
+name = "Install Telegram"
+kind = "nix"
+packages = ["telegram-desktop"]

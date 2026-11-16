@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://updates.signal.org/desktop/apt
+Suites: xenial
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/signal.gpg

@@ -1,0 +1,31 @@
+# Microsoft Teams on the web in a window of its own: Microsoft retired Teams for Linux, and its
+# web app is what it points Linux to.
+# https://teams.microsoft.com/
+name = "Microsoft Teams"
+category = "communication"
+tags = ["meetings", "chat", "work", "microsoft", "video calls", "web app"]
+summary = "Microsoft Teams in a window of its own. Still shit, but at least it's contained."
+# Microsoft's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Microsoft Teams is Microsoft's chat, meetings and calling app for work and school, part of \
+Microsoft 365. Its web app, here in a window of its own, signs in with a work, school or \
+personal Microsoft account and holds your chats, channels, shared files and video meetings."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), for the Command menu and the window alike.
+icon = "teams"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/microsoft-teams: install Teams again and \
+you're still signed in."""
+
+[[ready]]
+check = ["./closed", "microsoft-teams"]
+says = "Teams' window is open: close it, then try again"
+
+[[action]]
+name = "Put Teams in a window of its own"
+kind = "web_app"
+id = "microsoft-teams"
+title = "Microsoft Teams"
+url = "https://teams.microsoft.com/"
+icon = "teams"

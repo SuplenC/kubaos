@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://download.zulip.com/desktop/apt
+Suites: stable
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/zulip-desktop.gpg
