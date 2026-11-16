@@ -2,7 +2,9 @@
 # ([repo.slack]). Slack builds it for amd64 only. Its package carries a daily job,
 # /etc/cron.daily/slack, which adds the repository a second time, as slack.list, and trusts its
 # keys for every repository on the machine (/etc/apt/trusted.gpg.d/); it reads /etc/default/slack
-# first, and the one here, written before the package, turns both off.
+# first, and the one here, written before the package, turns both off. A Slack installed by hand
+# has run the job already: its /etc/default/slack, which sets the same two keys, is taken over,
+# and setting up the repository removes the keys it trusted (system/packages.toml).
 # https://slack.com/help/articles/212924728-Download-Slack-for-Linux--beta-
 name = "Slack"
 category = "communication"
@@ -30,6 +32,7 @@ kind = "file"
 to = "/etc/default/slack"
 from = "slack.default"
 mode = "644"
+vendor_keys = true
 
 [[action]]
 name = "Install Slack"

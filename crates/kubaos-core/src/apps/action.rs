@@ -226,6 +226,11 @@ pub enum Kind {
         template: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         mode: Option<String>,
+        /// The vendor's own package writes the file too, as `key=value` lines: one there already
+        /// that sets no key but the ones this text sets is the vendor's, not the user's. The step
+        /// writes this text over it and owns nothing, so a removal leaves it, with these values.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        vendor_keys: bool,
     },
     Symlink {
         to: String,
@@ -549,6 +554,7 @@ impl Action {
                 text,
                 template,
                 mode,
+                vendor_keys,
             } => {
                 let raw = match (from, text) {
                     (Some(from), _) => {
@@ -565,6 +571,7 @@ impl Action {
                     text: Some(text),
                     template: false,
                     mode: mode.clone(),
+                    vendor_keys: *vendor_keys,
                 }
             }
             Kind::Symlink { to, target } => Kind::Symlink {

@@ -439,12 +439,7 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             let moved_on = *self_updates && !there && newer_version_there(host, &path, version);
             Ok(at_path(host, &path, (there && holds) || moved_on))
         }
-        Kind::File { to, text, mode, .. } => {
-            let path = logical(host, to);
-            let want_mode = mode.as_deref().and_then(parse_mode).unwrap_or(DEFAULT_FILE_MODE);
-            let done = has_file(host, &path, text.as_deref().unwrap_or_default(), want_mode);
-            Ok(at_path(host, &path, done))
-        }
+        Kind::File { .. } => Ok(look_file(host, &action.kind)),
         Kind::WebApp { .. } => {
             let files = web_app_files(host, action);
             let done = files
@@ -874,6 +869,77 @@ fn parts(prefix: &str, names: &[String], there: impl Fn(&String) -> bool) -> Loo
         claims,
         prior: Prior::default(),
     }
+}
+
+/// A `file` step: done when the file holds `text` with its mode. A file there already that the
+/// vendor's package wrote (`vendor_keys`) is claimed but not owned, so the step writes over it and
+/// a removal leaves it.
+fn look_file(host: &dyn Host, kind: &Kind) -> Look {
+    let Kind::File {
+        to,
+        text,
+        mode,
+        vendor_keys,
+        ..
+    } = kind
+    else {
+        unreachable!("look_file looks at a file step");
+    };
+    let path = logical(host, to);
+    let text = text.as_deref().unwrap_or_default();
+    let want_mode = mode.as_deref().and_then(parse_mode).unwrap_or(DEFAULT_FILE_MODE);
+    let done = has_file(host, &path, text, want_mode);
+    if *vendor_keys && !done && vendor_wrote(host, &path, text) {
+        return Look {
+            done,
+            claims: vec![Claim::new(format!("path:{}", path.display()), false)],
+            prior: Prior::default(),
+        };
+    }
+    at_path(host, &path, done)
+}
+
+/// Whether the file at `path` is the vendor's: a regular file whose every line but a blank one or a
+/// comment sets, as `key=value`, a key `ours` sets too.
+fn vendor_wrote(host: &dyn Host, path: &Path, ours: &str) -> bool {
+    let place = host.place(path);
+    if !place.symlink_metadata().is_ok_and(|m| m.is_file()) {
+        return false;
+    }
+    let Ok(theirs) = fs::read_to_string(&place) else {
+        return false;
+    };
+    let keys: Vec<&str> = ours.lines().filter_map(shell_key).collect();
+    theirs.lines().all(|line| {
+        let line = line.trim();
+        line.is_empty() || line.starts_with('#') || shell_key(line).is_some_and(|k| keys.contains(&k))
+    })
+}
+
+/// The key a `key=value` line sets, as a shell reads it, when its value is one plain word: bare
+/// (letters, digits and `._-/:+,@%=`), or quoted whole in `"` with no `$`, backtick, `\` or `"`
+/// inside, or in `'` with no `'` inside. A line that would run or expand anything sets more than
+/// a value, so it isn't one.
+fn shell_key(line: &str) -> Option<&str> {
+    let (key, value) = line.trim().split_once('=')?;
+    let mut chars = key.chars();
+    let first = chars.next()?;
+    let key_ok = (first.is_ascii_alphabetic() || first == '_') && chars.all(|c| c.is_ascii_alphanumeric() || c == '_');
+    (key_ok && plain_word(value)).then_some(key)
+}
+
+/// Whether `value` is one word a shell reads as itself, as [`shell_key`] says.
+fn plain_word(value: &str) -> bool {
+    let quoted = |quote: char, refused: &[char]| {
+        value
+            .strip_prefix(quote)
+            .and_then(|v| v.strip_suffix(quote))
+            .is_some_and(|inner| !inner.contains(refused) && !inner.contains(|c: char| c.is_control()))
+    };
+    value
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || "._-/:+,@%=".contains(c))
+        || (value.len() >= 2 && (quoted('"', &['$', '`', '\\', '"']) || quoted('\'', &['\''])))
 }
 
 /// A look at a path: the folders above it the action would create, then the path itself.

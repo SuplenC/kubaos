@@ -139,6 +139,34 @@ fn a_repos_next_key_is_all_three_of_its_keys_or_none() {
 }
 
 #[test]
+fn a_repos_global_keyring_is_a_file_name_of_trusted_gpg_d() {
+    let repo = "[repo.v]\nkey_url = \"https://v/k\"\nfingerprint = \"AB\"\nkeyring = \"/etc/apt/keyrings/v.gpg\"\n";
+    let good = format!("{repo}global_keyrings = [\"v.gpg\", \"v-old.asc\"]\nglobal_fingerprints = [\"CD\"]\n");
+
+    let manifest = Manifest::parse(&good).unwrap();
+
+    assert_eq!(manifest.repos()["v"].global_keyrings, ["v.gpg", "v-old.asc"]);
+    for bad in [
+        "../sources.list",
+        "/etc/apt/trusted.gpg",
+        "v",
+        ".gpg",
+        "sub/v.gpg",
+        ".v.gpg",
+        "v w.gpg",
+        "*.gpg",
+        "v$x.gpg",
+        "v\tw.gpg",
+    ] {
+        let err = Manifest::parse(&format!("{repo}global_keyrings = [\"{bad}\"]\n")).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::InvalidGlobalKeyring { ref name, .. } if name == bad),
+            "{bad}: {err}"
+        );
+    }
+}
+
+#[test]
 fn an_unknown_key_is_refused() {
     let text = "[group.x]\nsummary = \"x\"\npakages = [\"curl\"]\npackages = []\n";
 
@@ -206,6 +234,14 @@ fn rust_dump(manifest: &Manifest) -> BTreeSet<String> {
         .chain(next)
         {
             lines.insert(format!("repo.{name}\t{key}\t{value}"));
+        }
+        for (key, values) in [
+            ("global_keyrings", &repo.global_keyrings),
+            ("global_fingerprints", &repo.global_fingerprints),
+        ] {
+            for value in values {
+                lines.insert(format!("repo.{name}\t{key}\t{value}"));
+            }
         }
     }
     for group in manifest.groups() {

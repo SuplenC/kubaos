@@ -136,7 +136,8 @@ repo_setup() {
 }
 
 # repo_files REPO: the repo's key, its next key when the manifest pins one, and its sources file,
-# without refreshing apt's lists.
+# without refreshing apt's lists; then the vendor's own keyrings of /etc/apt/trusted.gpg.d the
+# manifest names (global_keyrings) go, once the source names the key itself.
 repo_files() {
   local repo="$1" sources next
   sources="$MANIFEST_SYSTEM_DIR/files/apt/sources.list.d/$repo.sources"
@@ -149,6 +150,13 @@ repo_files() {
     fetch_key "$(manifest_value "repo.$repo" next_key_url)" "$(manifest_value "repo.$repo" next_keyring)" "$next"
   fi
   add_apt_source "$repo" "$(render_template "$sources" "ARCH=$(arch)")"
+  local keyring own keyrings
+  mapfile -t own < <(manifest_value "repo.$repo" fingerprint; manifest_value "repo.$repo" global_fingerprints)
+  mapfile -t keyrings < <(manifest_value "repo.$repo" global_keyrings)
+  for keyring in "${keyrings[@]}"; do
+    [[ -n "$keyring" ]] || continue
+    untrust_global_keyring "$APT_TRUSTED_D/$keyring" "${own[@]}"
+  done
 }
 
 # repo_refresh REPO...: repo_files for each repo, each in a shell of its own, so one that fails

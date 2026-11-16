@@ -252,3 +252,85 @@ fn discord_and_zoom_are_unavailable_while_the_users_nixpkgs_refuses_unfree() {
         assert_eq!(world.host.snapshot(), before, "{id}");
     }
 }
+
+/// `/etc/default/slack` as the daily job of a Slack installed by hand leaves it: it writes both
+/// keys `"true"` with dash's `echo`, then turns `repo_add_once` off once it has added the
+/// repository.
+const SLACKS_OWN_DEFAULTS: &str = "repo_add_once=\"false\"\nrepo_reenable_on_distupgrade=\"true\"\n\n";
+
+#[test]
+fn a_slack_installed_by_hand_has_its_jobs_defaults_taken_over_and_left_on_removal() {
+    let world = world("slack");
+    world
+        .host
+        .state
+        .borrow_mut()
+        .dpkg
+        .insert("slack-desktop".to_owned(), "4.53.287".to_owned());
+    let defaults = world.host.place(Path::new("/etc/default/slack"));
+    fs::create_dir_all(defaults.parent().unwrap()).unwrap();
+    fs::write(&defaults, SLACKS_OWN_DEFAULTS).unwrap();
+
+    add(&world, "slack").unwrap();
+
+    let ours = fs::read_to_string(shipped("slack").join("slack.default")).unwrap();
+    assert_eq!(fs::read_to_string(&defaults).unwrap(), ours);
+
+    remove(&world, "slack").unwrap();
+
+    assert_eq!(
+        fs::read_to_string(&defaults).unwrap(),
+        ours,
+        "the job's file stays, turned off"
+    );
+    assert!(
+        world.host.state.borrow().dpkg.contains_key("slack-desktop"),
+        "Slack was the user's"
+    );
+}
+
+#[test]
+fn a_slack_defaults_file_that_sets_anything_else_or_runs_anything_is_the_users_and_refused() {
+    let theirs = [
+        format!("{SLACKS_OWN_DEFAULTS}http_proxy=\"http://proxy:3128\"\n"),
+        "repo_add_once=\"$(touch /tmp/x)\"\n".to_owned(),
+        "repo_add_once=`touch /tmp/x`\n".to_owned(),
+        "repo_add_once=false; touch /tmp/x\n".to_owned(),
+        "repo_add_once=$PROXY\n".to_owned(),
+        "repo_add_once=false touch\n".to_owned(),
+        "repo_add_once=\"false\"x\"\n".to_owned(),
+    ];
+    for theirs in theirs {
+        let world = world("slack");
+        let defaults = world.host.place(Path::new("/etc/default/slack"));
+        fs::create_dir_all(defaults.parent().unwrap()).unwrap();
+        fs::write(&defaults, &theirs).unwrap();
+
+        let err = add(&world, "slack").unwrap_err();
+
+        assert!(err.to_string().contains("Slack"), "{theirs}: {err}");
+        assert_eq!(fs::read_to_string(&defaults).unwrap(), theirs);
+        assert!(
+            !world.host.state.borrow().dpkg.contains_key("slack-desktop"),
+            "{theirs}"
+        );
+    }
+}
+
+#[test]
+fn a_slack_defaults_file_of_plain_words_quoted_or_bare_is_the_vendors() {
+    for theirs in [
+        "repo_add_once=false\nrepo_reenable_on_distupgrade='true'\n",
+        "# Slack's\nrepo_add_once=\"false\"\n\n",
+    ] {
+        let world = world("slack");
+        let defaults = world.host.place(Path::new("/etc/default/slack"));
+        fs::create_dir_all(defaults.parent().unwrap()).unwrap();
+        fs::write(&defaults, theirs).unwrap();
+
+        add(&world, "slack").unwrap();
+
+        let ours = fs::read_to_string(shipped("slack").join("slack.default")).unwrap();
+        assert_eq!(fs::read_to_string(&defaults).unwrap(), ours, "{theirs}");
+    }
+}

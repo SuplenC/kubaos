@@ -234,3 +234,45 @@ fn a_key_not_yet_stored_is_fetched_and_stored_dearmored() {
     assert_eq!(m.expiries(), ["", EXTENDED]);
     assert!(!fs::read(m.keyring()).unwrap().starts_with(b"-----BEGIN"));
 }
+
+#[test]
+fn a_global_keyring_holding_only_the_vendors_keys_is_removed_and_one_with_another_key_stays() {
+    let m = Machine::new(EARLY, None);
+    let trusted = m.dir.path().join("trusted.gpg.d");
+    fs::create_dir_all(&trusted).unwrap();
+    fs::copy(fixture("vendor-2027.asc"), trusted.join("vendor.gpg")).unwrap();
+    fs::copy(fixture("primary-2027.asc"), trusted.join("vendor-old.gpg")).unwrap();
+    fs::copy(fixture("other.asc"), trusted.join("someone.gpg")).unwrap();
+    let both = [
+        fs::read(fixture("vendor-2027.asc")).unwrap(),
+        fs::read(fixture("other.asc")).unwrap(),
+    ]
+    .concat();
+    fs::write(trusted.join("shared.gpg"), both).unwrap();
+    let system = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../system");
+    let script = format!(
+        "source \"$SYSTEM/lib.sh\"\nsudo_run() {{ run \"$@\"; }}\n\
+         for k in vendor vendor-old someone shared absent; do\n\
+         untrust_global_keyring \"$TRUSTED/$k.gpg\" {VENDOR} {PRIMARY}\ndone\n"
+    );
+
+    let out = m
+        .sandbox
+        .command("bash")
+        .args(["-c", &script])
+        .env("SYSTEM", system)
+        .env("TRUSTED", &trusted)
+        .env("GNUPGHOME", m.dir.path().join("home/.gnupg"))
+        .env("SUDO_USER", "")
+        .output()
+        .unwrap();
+
+    assert!(out.status.success(), "{}", text(&out));
+    let mut left: Vec<String> = fs::read_dir(&trusted)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    left.sort();
+    assert_eq!(left, ["shared.gpg", "someone.gpg"], "{}", text(&out));
+    assert!(text(&out).contains("shared.gpg trusts"), "{}", text(&out));
+}
