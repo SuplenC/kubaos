@@ -25,7 +25,9 @@
 # app of the catalog's (apps/<id>/app.toml). Its sources file is
 # `system/files/apt/sources.list.d/<name>.sources` (`@ARCH@` becomes the
 # machine's architecture), signed by the key at `key_url`, which must have
-# exactly the primary key `fingerprint`, stored in `keyring`.
+# exactly the primary key `fingerprint`, stored in `keyring`. A repository whose
+# vendor is moving to a new key also pins that one, with `next_key_url`,
+# `next_fingerprint` and `next_keyring`, and its sources file names both keyrings.
 #
 # Keep to this much TOML: tables, strings without escapes, true and false,
 # and arrays of strings. The scripts read it with awk.
@@ -65,21 +67,32 @@ keyring = "/etc/apt/keyrings/mozilla.gpg"
 
 # Microsoft's repository of Edge, for the app of the catalog
 # (apps/microsoft-edge/). Edge's own postinst rewrites microsoft-edge.sources on
-# every upgrade with this text, key path and URI, its doubled Architectures line
-# included, so the two never fight over the file. Built for amd64 only.
+# every upgrade; ours is byte-identical to what it writes, its doubled
+# Architectures line included, so the two never fight over the file. The postinst
+# writes its own copy of the key at the same keyring path, which matches the
+# pinned one by fingerprint, not byte for byte, so repo setup keeps it. Built for
+# amd64 only.
 [repo.microsoft-edge]
 key_url = "https://packages.microsoft.com/keys/microsoft.asc"
 fingerprint = "BC528686B50D79E339D3721CEB3E94ADBE1229CF"
 keyring = "/usr/share/keyrings/microsoft-edge.gpg"
 
-# Vivaldi's repository, for the app of the catalog (apps/vivaldi/). Vivaldi's own
-# postinst writes vivaldi.sources with this text, key path and URI. Its key
-# expires in February 2027; Vivaldi's next one (5220E3E9) replaces this pin then.
-# Built for amd64 only.
+# Vivaldi's repository, for the app of the catalog (apps/vivaldi/). Built for
+# amd64 only. Its key (16BD9233) expires on 2027-02-07; Vivaldi's postinst
+# already puts its next one (5220E3E9, until 2028-02-15) at the next keyring's
+# path, and once the repository is signed by that one, rewrites vivaldi.sources
+# to name it alone. Ours names both keyrings, so the repository verifies on
+# either side of that move and a repo setup never writes back the expired key
+# alone; Vivaldi's own file and ours differ only in that line. Vivaldi publishes
+# the next key only inside its .deb: the fingerprint is the one its postinst
+# carries, fetched from Ubuntu's key server.
 [repo.vivaldi]
 key_url = "https://repo.vivaldi.com/archive/linux_signing_key.pub"
 fingerprint = "8D1FA52AEF58A09D889DD4221256C34716BD9233"
 keyring = "/usr/share/keyrings/vivaldi-16BD9233.gpg"
+next_key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x7C7CB2D56F7D2A950BCCAB4EBCE0DE545220E3E9"
+next_fingerprint = "7C7CB2D56F7D2A950BCCAB4EBCE0DE545220E3E9"
+next_keyring = "/usr/share/keyrings/vivaldi-5220E3E9.gpg"
 
 # LibreWolf's repository, for the app of the catalog (apps/librewolf/).
 [repo.librewolf]

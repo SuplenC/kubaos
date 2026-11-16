@@ -427,7 +427,8 @@ fn every_repositorys_sources_file_is_signed_by_the_key_the_manifest_pins() {
             .filter_map(|l| l.strip_prefix("Signed-By:"))
             .map(str::trim)
             .collect();
-        assert_eq!(signed_by, [repo.keyring.as_str()], "{name}");
+        let keyrings: Vec<&str> = repo.keyrings().collect();
+        assert_eq!(signed_by, [keyrings.join(" ")], "{name}");
     }
 }
 

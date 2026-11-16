@@ -45,6 +45,8 @@ pub enum ManifestError {
     InvalidPackage { group: String, name: String },
     #[error("{value:?} has a backslash or a quote, which the scripts' reader can't take")]
     Escaped { value: String },
+    #[error("repo {repo} names some of its next key's next_key_url, next_fingerprint and next_keyring, not all three")]
+    HalfNextKey { repo: String },
     #[error("group {group} has a when_on or when_off script but isn't optional")]
     ScriptNotOptional { group: String },
 }
@@ -124,6 +126,22 @@ pub struct Repo {
     pub fingerprint: String,
     /// Where the key is stored, as the sources file's `Signed-By` names it.
     pub keyring: String,
+    /// The key the vendor signs the repository with once `fingerprint`'s expires, its three keys
+    /// set together: the sources file's `Signed-By` names both keyrings, so the repository verifies
+    /// before and after the vendor moves to it.
+    #[serde(default)]
+    pub next_key_url: Option<String>,
+    #[serde(default)]
+    pub next_fingerprint: Option<String>,
+    #[serde(default)]
+    pub next_keyring: Option<String>,
+}
+
+impl Repo {
+    /// The keyrings its sources file is signed by: its key's, then its next key's.
+    pub fn keyrings(&self) -> impl Iterator<Item = &str> {
+        std::iter::once(self.keyring.as_str()).chain(self.next_keyring.as_deref())
+    }
 }
 
 #[derive(Deserialize)]
@@ -190,8 +208,15 @@ impl Manifest {
     }
 
     fn check(&self) -> Result<(), ManifestError> {
-        for repo in self.repos.values() {
-            for value in [&repo.key_url, &repo.fingerprint, &repo.keyring] {
+        for (name, repo) in &self.repos {
+            let next = [&repo.next_key_url, &repo.next_fingerprint, &repo.next_keyring];
+            if next.iter().any(|v| v.is_some()) && !next.iter().all(|v| v.is_some()) {
+                return Err(ManifestError::HalfNextKey { repo: name.clone() });
+            }
+            let values = [&repo.key_url, &repo.fingerprint, &repo.keyring]
+                .into_iter()
+                .chain(next.into_iter().flatten());
+            for value in values {
                 unescaped(value)?;
             }
         }
