@@ -156,19 +156,24 @@ repo_files() {
 # are still set up; then one apt update, when a sources file changed, whose failure is a warning
 # too. For `kubaos update`'s migrations, which a vendor's repository must never stop.
 repo_refresh() {
-  local repo dirty=0 out
+  local repo changed
+  changed="$(mktemp)"
   for repo in "$@"; do
+    # The child installs the repo's key and system/files/apt/sources.list.d/<repo>.sources, and
+    # marks a change on its way out, however it ends: a step after the sources file was written
+    # (turning off the vendor's own source) may fail, and the file still wants apt's lists
+    # refreshed.
     # shellcheck disable=SC2016 # The child expands its own arguments.
-    if out="$(bash -euo pipefail -c 'source "$1/lib.sh"; DRY_RUN=$2; repo_files "$3" >&2; echo "$APT_DIRTY"' \
-      _ "$MANIFEST_SYSTEM_DIR" "$DRY_RUN" "$repo")"; then
-      [[ "$out" != 1 ]] || dirty=1
-    else
+    if ! bash -euo pipefail -c 'source "$1/lib.sh"; DRY_RUN=$2 REPO_CHANGED=$4
+      trap '\''((APT_DIRTY == 0)) || echo 1 >"$REPO_CHANGED"'\'' EXIT
+      repo_files "$3"' _ "$MANIFEST_SYSTEM_DIR" "$DRY_RUN" "$repo" "$changed" >&2; then
       warn "apt repository $repo not refreshed; its source stays as it was"
     fi
   done
-  if ((dirty)) && ! sudo_run apt-get update; then
+  if [[ -s "$changed" ]] && ! sudo_run apt-get update; then
     warn "apt update failed; the next one reads the changed sources"
   fi
+  rm -f "$changed"
 }
 
 # record_installed GROUP PKG...: add the packages that are installed now to

@@ -363,6 +363,61 @@ fn a_vendors_own_source_of_the_same_repository_is_turned_off_for_ours() {
     assert!(again.contains("dirty 0"), "a second run changes nothing: {again}");
 }
 
+#[test]
+fn a_repository_whose_setup_fails_after_its_sources_file_changed_still_gets_apt_updated() {
+    let dir = tempfile::tempdir().unwrap();
+    let sandbox = Sandbox::new(&dir.path().join("sandbox"), dir.path(), "kuba");
+    let sources = dir.path().join("sources.list.d");
+    fs::create_dir(&sources).unwrap();
+    // The vendor's own source of the repository, which turning off fails.
+    fs::write(
+        sources.join("vivaldi.list"),
+        "deb [arch=amd64] https://repo.vivaldi.com/stable/deb/ stable main\n",
+    )
+    .unwrap();
+    let manifest = dir.path().join("packages.toml");
+    fs::write(
+        &manifest,
+        format!(
+            "[repo.vivaldi]\nkey_url = \"https://example.com/key\"\nfingerprint = \"AB\"\nkeyring = \"{}\"\n",
+            dir.path().join("vivaldi.gpg").display()
+        ),
+    )
+    .unwrap();
+    sandbox.stub("gpg", "printf 'pub:\\nfpr:::::::::AB:\\n'");
+    sandbox.stub(
+        "curl",
+        r#"while [ $# -gt 0 ]; do [ "$1" != -o ] || : >"$2"; shift; done"#,
+    );
+    sandbox.stub(
+        "sudo",
+        &format!(
+            r#"case "$*" in *vivaldi.list*) exit 1 ;; install\ *'{}'*) exec "$@" ;; esac"#,
+            dir.path().display()
+        ),
+    );
+    let system = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../system");
+
+    let out = sandbox
+        .command("bash")
+        .args(["-c", "source \"$SYSTEM/lib.sh\"; repo_refresh vivaldi"])
+        .env("SYSTEM", &system)
+        .env("APT_MANIFEST", &manifest)
+        .env("APT_SOURCES_D", &sources)
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(stderr.contains("apt repository vivaldi not refreshed"), "{stderr}");
+    assert!(sources.join("vivaldi.sources").is_file(), "{stderr}");
+    assert!(
+        sandbox.calls().contains(&"sudo apt-get update".to_owned()),
+        "{:?}",
+        sandbox.calls()
+    );
+}
+
 /// The lines of `system/*.sh` that install apt packages outside the manifest, each for a reason
 /// `docs/CONTRACTS.md` gives ("The package manifest", "Install"): the installers themselves, the
 /// running kernel's headers, and grub-btrfs with what builds it while Ubuntu doesn't package it.
