@@ -28,6 +28,7 @@ use crate::apps::root::RootError;
 use crate::apps::root::RootSide;
 use crate::apps::root::Server;
 use crate::apps::version::compare;
+use crate::sandbox;
 use crate::sandbox::Sandbox;
 use crate::unfree::Unfree;
 
@@ -564,7 +565,13 @@ impl Host for FakeHost {
     fn run(&mut self, argv: &[String], dir: &Path) -> Result<(), HostError> {
         let (program, rest) = argv.split_first().unwrap();
         let program = match program.strip_prefix("./") {
-            Some(script) => dir.join(script),
+            Some(script) => {
+                // The engine writes a run's scripts on this test's thread, while other tests'
+                // threads start processes.
+                let script = dir.join(script);
+                sandbox::settle(&script);
+                script
+            }
             None => PathBuf::from(program),
         };
         let output = self

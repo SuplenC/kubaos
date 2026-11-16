@@ -2,32 +2,26 @@
 //! user flake in a temporary home. Nothing here switches: every change runs with `--no-switch`.
 
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
 use std::sync::OnceLock;
 
+use kubaos_core::sandbox;
 use tempfile::TempDir;
 
 /// The one fake `nix` every test runs, made before the first `kubaos` starts. It answers with
-/// what the home it runs in (`HOME`) wrote for it, and records there that it ran.
-///
-/// HAZARD: one script for every test, written once. A script a test writes while another test
-/// forks is held open for writing by that child until it execs, and running it then fails with
-/// "Text file busy".
+/// what the home it runs in (`HOME`) wrote for it, and records there that it ran. Written as
+/// [`sandbox::program`] writes one, so a test forking meanwhile can't leave it busy.
 fn fake_nix() -> &'static Path {
     static BIN: OnceLock<TempDir> = OnceLock::new();
     BIN.get_or_init(|| {
         let bin = tempfile::tempdir().expect("a folder for the fake nix");
-        let nix = bin.path().join("nix");
-        fs::write(
-            &nix,
+        sandbox::program(
+            &bin.path().join("nix"),
             "#!/bin/sh\ntouch \"$HOME/nix-ran\"\ncat \"$HOME/nix-stdout\"\nexit \"$(cat \"$HOME/nix-code\")\"\n",
-        )
-        .expect("write the fake nix");
-        fs::set_permissions(&nix, fs::Permissions::from_mode(0o755)).expect("make nix executable");
+        );
         bin
     })
     .path()

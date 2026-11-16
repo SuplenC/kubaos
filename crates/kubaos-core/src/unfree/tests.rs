@@ -1,5 +1,4 @@
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -9,6 +8,7 @@ use super::LicenseCheck;
 use super::Licenses;
 use super::Setting;
 use super::Unfree;
+use crate::sandbox;
 use crate::state::StateDir;
 
 fn setting(dir: &Path) -> Setting {
@@ -20,15 +20,13 @@ fn setting(dir: &Path) -> Setting {
 fn fake_nix(dir: &Path, stdout: &str, stderr: &str, code: i32) -> PathBuf {
     let path = dir.join("nix");
     let args = dir.join("args");
-    fs::write(
+    sandbox::program(
         &path,
-        format!(
+        &format!(
             "#!/bin/sh\nprintf '%s\\n' \"$@\" >'{}'\nprintf '%s' '{stdout}'\nprintf '%b\\n' '{stderr}' >&2\nexit {code}\n",
             args.display()
         ),
-    )
-    .expect("write the fake nix");
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).expect("make the fake nix executable");
+    );
     path
 }
 

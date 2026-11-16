@@ -15,6 +15,7 @@
 //! # Owns
 //!
 //! - [`Sandbox`], the stand-ins ([`STUBBED`]) and the tools ([`TOOLS`]).
+//! - Writing a program a test starts so that it starts at once ([`program`], [`settle`]).
 //!
 //! # Not here
 //!
@@ -183,9 +184,8 @@ impl Sandbox {
         fs::set_permissions(sandbox.runtime(), fs::Permissions::from_mode(0o700))
             .expect("make the runtime folder its owner's");
         fs::write(sandbox.log(), "").expect("start the stand-ins' log");
-        let real = env::var_os("PATH").unwrap_or_default();
         for tool in TOOLS {
-            if let Some(found) = env::split_paths(&real).map(|dir| dir.join(tool)).find(|p| p.is_file()) {
+            if let Some(found) = real_tool(tool) {
                 symlink(found, sandbox.bin().join(tool)).expect("link a tool into the sandbox");
             }
         }
@@ -228,15 +228,13 @@ impl Sandbox {
         let path = self.bin().join(name);
         let _ = fs::remove_file(&path);
         let log = self.log();
-        fs::write(
+        program(
             &path,
-            format!(
+            &format!(
                 "#!/bin/sh\nprintf '%s\\n' \"${{0##*/}}${{*:+ $*}}\" >>'{}'\n{body}\n",
                 log.display()
             ),
-        )
-        .expect("write a stand-in");
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).expect("make a stand-in run");
+        );
     }
 
     /// `name` taken out of the sandbox, not found, as on a machine without it.
@@ -292,6 +290,61 @@ impl Sandbox {
             .env("DBUS_SYSTEM_BUS_ADDRESS", NOWHERE)
             .stdin(Stdio::null())
     }
+}
+
+/// `tool` as the real `PATH` finds it.
+fn real_tool(tool: &str) -> Option<PathBuf> {
+    let real = env::var_os("PATH").unwrap_or_default();
+    env::split_paths(&real).map(|dir| dir.join(tool)).find(|p| p.is_file())
+}
+
+/// Writes `text` to `path` as a program anyone may run and its owner alone write, and
+/// [`settle`]s it, so a test can start it at once.
+///
+/// # Panics
+///
+/// When it can't be written.
+pub fn program(path: &Path, text: &str) {
+    fs::write(path, text).expect("write a program");
+    fs::set_permissions(path, fs::Permissions::from_mode(0o755)).expect("make a program run");
+    settle(path);
+}
+
+/// `path`, a program this process wrote, replaced by a copy `cp` makes, of the same mode, which
+/// no process holds open for writing.
+///
+/// A process forked on another thread holds every file this process has open, from its fork
+/// until its own exec closes them (they are all close-on-exec). A program written on one thread
+/// while another starts a process is, for that moment, open for writing in the new process, and
+/// starting it then fails with "Text file busy" (`ETXTBSY`). `cargo test` runs a crate's tests
+/// as threads of one process, and they write scripts and start processes all the time. Writing
+/// under another name and renaming it into place doesn't help: the forked process holds the same
+/// file. A copy `cp` makes is a file only `cp` ever opened, and `cp` has exited.
+///
+/// # Panics
+///
+/// When it can't be copied.
+pub fn settle(path: &Path) {
+    let name = path.file_name().expect("a program's name").to_string_lossy();
+    let copy = path.with_file_name(format!(".{name}.settled"));
+    let cp = real_tool("cp").expect("cp on PATH");
+    let out = Command::new(cp)
+        .env_clear()
+        .arg("--")
+        .arg(path)
+        .arg(&copy)
+        .stdin(Stdio::null())
+        .output()
+        .expect("run cp");
+    assert!(
+        out.status.success(),
+        "cp {}: {}",
+        path.display(),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let mode = fs::metadata(path).expect("read a program's mode").permissions().mode();
+    fs::set_permissions(&copy, fs::Permissions::from_mode(mode)).expect("give the copy its mode");
+    fs::rename(&copy, path).expect("put the copy in place");
 }
 
 #[cfg(test)]

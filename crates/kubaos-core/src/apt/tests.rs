@@ -2,7 +2,6 @@
 //! manifest with apt, dpkg and sudo replaced by functions that keep their state in a folder.
 
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -11,6 +10,7 @@ use super::Choices;
 use super::Record;
 use super::Switch;
 use crate::sandbox::Sandbox;
+use crate::sandbox;
 
 mod keys;
 
@@ -246,8 +246,7 @@ fn the_bridge_migration_keeps_what_the_install_left_out_and_installs_the_rest() 
     fs::create_dir_all(&bin).unwrap();
     for (name, body) in FAKE_PROGRAMS {
         let path = bin.join(name);
-        fs::write(&path, format!("#!/usr/bin/env bash\n{body}\n")).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        sandbox::program(&path, &format!("#!/usr/bin/env bash\n{body}\n"));
     }
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let migration = fs::read_dir(root.join("migrations/system"))
