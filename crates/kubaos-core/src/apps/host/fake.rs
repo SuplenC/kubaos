@@ -255,6 +255,8 @@ impl FakeHost {
                 let unit = Unit { exited: false, ..*unit };
                 (key.clone(), unit)
             })
+            // A unit nothing has, neither loaded, enabled nor running, is no unit.
+            .filter(|(_, unit)| *unit != Unit::default())
             .collect();
         let state = State {
             units,
@@ -588,9 +590,15 @@ impl Host for FakeHost {
         Ok(())
     }
 
-    fn unit_state(&mut self, scope: Scope, unit: &str) -> Result<UnitState, HostError> {
-        let key = Self::unit(scope, unit);
-        let unit = self.state.borrow().units.get(&key).copied().unwrap_or_default();
+    fn unit_state(&mut self, scope: Scope, name: &str) -> Result<UnitState, HostError> {
+        let key = Self::unit(scope, name);
+        let mut unit = self.state.borrow().units.get(&key).copied().unwrap_or_default();
+        // systemd loads a unit whose file is in its unit folder.
+        let folder = match scope {
+            Scope::System => self.place(Path::new("/etc/systemd/system")),
+            Scope::User => self.home.join(".config/systemd/user"),
+        };
+        unit.exists = unit.exists || folder.join(name).is_file();
         Ok(UnitState::from_show(&unit.show()))
     }
 

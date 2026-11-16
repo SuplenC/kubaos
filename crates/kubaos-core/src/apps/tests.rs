@@ -507,6 +507,7 @@ fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
             "microsoft-edge",
             "microsoft-teams",
             "neovide",
+            "ollama",
             "opencode",
             "penpot",
             "proton-mail-bridge",
