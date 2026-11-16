@@ -9,8 +9,15 @@
 //! to the source they share. Whether an app is installed, and in which setup, is read from the
 //! machine each time, never recorded.
 //!
+//! An app may also be a folder, `apps/<id>/app.toml`: a list of typed actions, each with its
+//! inverse, recorded step by step in a journal that rolls a failed install back and makes a
+//! removal undo exactly what the install did.
+//!
 //! # Owns
 //!
+//! - An app's folder ([`folder`]), the action vocabulary ([`action`]), the machine it acts on
+//!   ([`host`]), the journal ([`journal`]), installing and removing ([`engine`]) and the root
+//!   helper's requests ([`root`]).
 //! - The manifest's format ([`App`]), the catalog ([`Catalog`]), the picks ([`Picks`]), the record
 //!   of the nixpkgs names each app added ([`Added`]) and how the machine compares with them
 //!   ([`plan`]).
@@ -21,11 +28,17 @@
 //!   `apps.rs`. The root helper itself: `system/files/apps/kubaos-apps`.
 //! - Vendor repositories: the package manifest, `apt::manifest`.
 
+pub mod action;
 pub mod added;
 pub mod catalog;
+pub mod engine;
+pub mod folder;
+pub mod host;
+pub mod journal;
 pub mod manifest;
 pub mod picks;
 pub mod plan;
+pub mod root;
 
 pub use self::added::Added;
 pub use self::added::AddedError;

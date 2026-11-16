@@ -49,14 +49,14 @@ Every action has a `name` ("Download the t3 tool"), the step the user sees. Each
 | `download` | `to`, `version`, `unpack` (`tar.gz` or `file`), `strip`, `[amd64]`/`[arm64]` | by `to` | download, check the sha256, unpack into a staging folder beside `to`, move it into place | `to` is there | `to` goes |
 | `file` | `to`, `from` (a file in the folder) or `text`, `template`, `mode` | by `to` | write it, creating missing folders | `to` has that content | `to` goes, and the folders this action created, if empty |
 | `symlink` | `to`, `target` | by `to` | the link | `to` links to `target` | the link goes |
-| `setting` | `file` (`.json` or `.toml`, under `~`), `key` (dotted), `value` | user | the key set, the file's other keys kept | the key has `value` | the key's old value back, or the key gone if it had none, or the file gone if this action created it; a key the user has changed since stays as they set it |
+| `setting` | `file` (`.json` or `.toml`, under `~`), `key` (dotted), `value` | user | the key set, the file's other keys kept | the key has `value` | while the file is exactly as the action left it, its old text back whole; else the key's old value back, or the key gone if it had none, or the file gone if this action created it and nothing else is in it; a key the user has changed since stays as they set it |
 | `unit` | `unit`, `scope` (`user` or `system`), `enable`?, `start`? | by scope | `systemctl enable`/`disable`, `start`/`stop`, after a `daemon-reload` | the unit is as asked | the unit back to how it was before, unless it was changed since |
 | `group` | `group` | root | the group created if missing, the user who asked added to it | the user is in it | the user leaves it if this action added them; the group goes if this action created it |
 | `linger` | | user | `loginctl enable-linger` | logind says the user lingers | `disable-linger`, if lingering was off before |
 | `output` | `path` | by `path` | nothing | always done | `path` goes: a file a program of the app writes later (Chrome's theme policy), which the app owns all the same |
 | `run` | `do`, `check`, `undo` (argvs), `root`, `window`? | `root`, default no | `do` | `check` exits 0 | `undo` |
 
-**`run` is the one escape hatch**, for vendor tools (`t3 service install`). Its `check` and `undo` are mandatory: the author says how to tell it is done and how to take it back, or there is no `run`. Its argvs are a program on the fixed `PATH` or `./<script>` in the app's folder; `@HOME@` and the rest are filled in, nothing else is. It runs as the user unless `root = true`, in the home, with the folder as its working directory. With `window` (the sentence of the step left to the person), it opens a window, so it runs only in a run that may open one (`kubaos app add`); in one that may not (`kubaos update`), it is skipped, its sentence becomes a note, and the install is complete all the same. It is the only place an author's command runs.
+**`run` is the one escape hatch**, for vendor tools (`t3 service install`). Its `check` and `undo` are mandatory: the author says how to tell it is done and how to take it back, or there is no `run`. Its argvs are a program on the fixed `PATH`, `./<script>` in the app's folder, or one under the home (`@HOME@/.local/bin/t3`); `@HOME@` and the rest are filled in, nothing else is. It runs as the user unless `root = true`, in the home, with the folder as its working directory. With `window` (the sentence of the step left to the person), it opens a window, so it runs only in a run that may open one (`kubaos app add`); in one that may not (`kubaos update`), it is skipped, its sentence becomes a note, and the install is complete all the same. It is the only place an author's command runs.
 
 The set is sized to the six apps and stays small: a new kind is a decision for its PR, with do, check and undo written down here.
 
@@ -104,7 +104,7 @@ An entry holds the action as it was done, its words filled in, so a removal undo
 
 ### Events
 
-Each step is an event of the run's `UpdateEvent`s: `action` with the app, the step, of how many, its name and its state (`running`, `done`, `found`, `skipped`, `undoing`, `undone`, `failed`). A `step` event carries the name and a `progress` event the count, so the Command menu's Job shows "Start the service" and how far along it is without knowing the new event.
+Each step is an event of the run's `UpdateEvent`s: `action` with the app, the step, of how many, its name and its state (`done`, `found`, `skipped`, `undoing`, `undone`, `failed`). A `step` event carries the name and a `progress` event the count, so the Command menu's Job shows "Start the service" and how far along it is without knowing the new event.
 
 ### Root
 
