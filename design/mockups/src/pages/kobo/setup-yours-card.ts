@@ -537,6 +537,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     if (state.phase === "installing") return "Installing in the background: carry on.";
     if (state.phase !== "choosing") return undefined;
     if (state.step === 0) return all.length ? `${apps(all.length)} picked for you` : undefined;
+    if (state.step === 1 && all.length === 0) return "Nothing ticked yet";
     if (state.step === 1) return yours ? `${apps(all.length)}: ${all.length - yours} from your picks, ${yours} yours` : `${apps(all.length)} from your picks`;
     return undefined;
   };
