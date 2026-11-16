@@ -326,6 +326,10 @@ impl Host for FakeHost {
         Ok(())
     }
 
+    fn apt_repo_ready(&mut self, repo: &str) -> Result<bool, HostError> {
+        Ok(self.state.borrow().repos.contains(repo))
+    }
+
     fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError> {
         let state = self.state.borrow();
         let installing: Vec<String> = match plan {

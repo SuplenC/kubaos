@@ -154,7 +154,32 @@ impl Repo {
     pub fn keyrings(&self) -> impl Iterator<Item = &str> {
         std::iter::once(self.keyring.as_str()).chain(self.next_keyring.as_deref())
     }
+
+    /// Whether the repository `name` is set up as repo setup leaves it on the machine whose `/` is
+    /// `root`: `/etc/apt/sources.list.d/<name>.sources` is there, each of its `Signed-By` fields
+    /// names every one of [`Repo::keyrings`], and each keyring is a file. A vendor's own source of
+    /// the repository is another file, or signed by another keyring, so it isn't this.
+    #[must_use]
+    pub fn in_place(&self, name: &str, root: &Path) -> bool {
+        let at = |path: &str| root.join(path.trim_start_matches('/'));
+        let Ok(text) = fs::read_to_string(at(&format!("{SOURCES_D}/{name}.sources"))) else {
+            return false;
+        };
+        let mut signed = text
+            .lines()
+            .filter_map(|line| line.strip_prefix("Signed-By:"))
+            .peekable();
+        signed.peek().is_some()
+            && signed.all(|value| {
+                let named: Vec<&str> = value.split_whitespace().collect();
+                self.keyrings().all(|k| named.contains(&k))
+            })
+            && self.keyrings().all(|k| at(k).is_file())
+    }
 }
+
+/// Where apt reads its sources files, and repo setup writes a repository's.
+const SOURCES_D: &str = "/etc/apt/sources.list.d";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
