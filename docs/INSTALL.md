@@ -496,7 +496,7 @@ kubaos app add google-chrome bitwarden docker
 ```
 
 Each comes from its pinned source (Google's and Docker's apt repositories,
-Bitwarden's `.deb` checked against its sha256) with its setup: Chrome's
+Bitwarden's `.deb` checked against its sha256) with its system hooks: Chrome's
 theme colour follows the wallpaper, Bitwarden desktop starts at login, and
 you join the `docker` group. Chrome and Bitwarden desktop are amd64 only.
 
@@ -537,6 +537,6 @@ conversion, run the scripts, try the home-manager config. The VM bench
 | Works in the VM | Doesn't |
 |---|---|
 | Subvolume conversion, snapper, grub-btrfs, rollback drill | `tuxedo-drivers`, power profiles, MOK on real firmware |
-| 10-strip, 20-base, NetworkManager, PipeWire, Docker, Chrome | Fingerprint reader, USB4 dock, two external monitors at 120 Hz |
+| 10-strip, 20-base, NetworkManager, PipeWire; Docker and Chrome from the Apps catalog (section 11) | Fingerprint reader, USB4 dock, two external monitors at 120 Hz |
 | Nix, home-manager, the PPA's Hyprland and the Lua config | GPU acceleration: the bench's display has no GL, so Hyprland and Quickshell render with llvmpipe, slowly |
 | tty1 autologin -> zsh -> `start-hyprland` | |
