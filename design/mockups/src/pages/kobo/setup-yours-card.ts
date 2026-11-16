@@ -328,6 +328,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     const scrolling = { height: "100%", above: "s24", below: "s16", noGutter: true, fade: "s24", footFade: true } as const;
     const beside = scroll(index.box, scrolling);
     const { box: apps, view } = scroll(padded(list.box), scrolling);
+    beside.box.classList.add("setup-yours-beside");
     apps.classList.add("kobo-scrolls");
     const scroller = splitColumns([2, 5], "s24", [filling(beside.box), filling(apps)], { fillHeight: true });
     const behaviour = (): ScrollBehavior => (settings().reduced ? "auto" : "smooth");

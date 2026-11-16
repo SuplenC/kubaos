@@ -130,6 +130,11 @@
   height: 100%;
 }
 
+/* The index's thumb floats in the middle of the gap between it and the apps, clear of both. */
+.setup-yours-beside > .k-scroll-thumb {
+  right: calc(-1 * (var(--space-s24) + var(--size-scrollbar)) / 2);
+}
+
 /* Go's figure burns as the lit cards do at night. */
 .setup-yours-figure {
   text-shadow: 0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * (1 - var(--day))));

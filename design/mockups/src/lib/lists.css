@@ -538,7 +538,7 @@
   position: absolute;
   z-index: 2;
   right: 0;
-  top: calc(var(--top) - var(--above));
+  top: var(--top);
   display: none;
   width: var(--size-scrollbar);
   height: var(--tall);

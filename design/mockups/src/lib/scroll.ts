@@ -7,7 +7,7 @@
 // its edge keeps its whole glow, content scrolled past its box shows in that room and stops at the
 // part beside it, and the panel's own edge cuts whatever passes it. Content that runs to its end
 // leaves `space.s16` there for the thumb: `size.scrollbar` wide on the box's end, a pill in
-// `outline_variant` (`outline` under the pointer and while dragged), along the whole room it shows,
+// `outline_variant` (`outline` under the pointer and while dragged), along its box from top to foot,
 // only while the content is taller than its room.
 //
 // A header fade fades out what scrolls under a panel's header: while the content is scrolled from its
@@ -118,14 +118,17 @@ export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTM
     const height = view.scrollHeight;
     const shown = view.clientHeight;
     const top = view.scrollTop;
+    // The thumb runs along the box, not the room the view reaches into: it starts and ends where
+    // the content at rest does, so it never touches the part above or the band below.
+    const track = box.clientHeight;
     return () => {
       const overflow = height - shown;
       thumb.toggleAttribute("data-shown", overflow > 1);
       box.toggleAttribute("data-scrolled", top >= 1);
       box.toggleAttribute("data-more", overflow - top >= 1);
       if (overflow <= 1) return;
-      const tall = Math.round((shown * shown) / height);
-      thumb.style.setProperty("--top", `${Math.round(((shown - tall) * top) / overflow)}px`);
+      const tall = Math.round((track * shown) / height);
+      thumb.style.setProperty("--top", `${Math.round(((track - tall) * top) / overflow)}px`);
       thumb.style.setProperty("--tall", `${tall}px`);
     };
   }
@@ -146,7 +149,7 @@ export function scroll(content: HTMLElement, options: ScrollOptions): { box: HTM
     const from = event.clientY;
     const start = view.scrollTop;
     const follow = (moved: PointerEvent) => {
-      const room = view.clientHeight - thumb.offsetHeight;
+      const room = box.clientHeight - thumb.offsetHeight;
       view.scrollTop = start + (((moved.clientY - from) * ratio) / Math.max(1, room)) * (view.scrollHeight - view.clientHeight);
     };
     const end = () => {
