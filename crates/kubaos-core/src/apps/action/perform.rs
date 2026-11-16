@@ -13,7 +13,6 @@
 //!
 //! - The journal and who owns what: `journal.rs`. The order of a run: `engine.rs`.
 
-use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
@@ -30,10 +29,12 @@ use super::settings;
 use super::settings::Settings;
 use super::settings::SettingsError;
 use crate::apps::host::AptPlan;
+use crate::apps::host::AptSimulation;
 use crate::apps::host::Host;
 use crate::apps::host::HostError;
 use crate::apps::host::UnitState;
 use crate::apps::journal::Claim;
+use crate::apps::journal::JournalError;
 use crate::apps::journal::Prior;
 use crate::apps::journal::write_new;
 
@@ -69,6 +70,8 @@ pub enum PerformError {
     AptRemoves { packages: Vec<String> },
     #[error("removing it would also remove {}, which this app didn't install; nothing was changed", packages.join(", "))]
     AptTakes { packages: Vec<String> },
+    #[error("recording what it is about to install")]
+    Record(#[source] JournalError),
 }
 
 impl PerformError {
@@ -355,16 +358,23 @@ fn has_file(host: &dyn Host, path: &Path, text: &str, mode: u32) -> bool {
         && fs::metadata(&placed).is_ok_and(|m| m.permissions().mode() & 0o777 == mode)
 }
 
-/// Does `action`, which `look`, just taken, found not done.
+/// Does `action`, which `look`, just taken, found not done. Before apt installs anything,
+/// `record` is given the claims of the packages it would newly install beyond the action's own,
+/// `dep:<name>`, so the journal holds them before they are there.
 ///
 /// # Errors
 ///
-/// [`PerformError`] for the change the machine refused, or one apt would make beyond the
-/// action's own packages.
-pub fn apply(action: &Action, host: &mut dyn Host, look: &Look) -> Result<(), PerformError> {
+/// [`PerformError`] for the change the machine refused, one apt would make beyond the action's
+/// own packages, or claims `record` couldn't keep.
+pub fn apply(
+    action: &Action,
+    host: &mut dyn Host,
+    look: &Look,
+    record: &mut dyn FnMut(&[Claim]) -> Result<(), JournalError>,
+) -> Result<(), PerformError> {
     let owned = |prefix: &str| owned_names(&look.claims, prefix);
     match &action.kind {
-        Kind::Apt { repo, .. } => {
+        Kind::Apt { repo, packages, .. } => {
             if let Some(repo) = repo {
                 host.apt_repo(repo).map_err(PerformError::Host)?;
             }
@@ -372,10 +382,11 @@ pub fn apply(action: &Action, host: &mut dyn Host, look: &Look) -> Result<(), Pe
             if missing.is_empty() {
                 return Ok(());
             }
-            refuse_removals(host.apt_simulate(AptPlan::Install(&missing)))?;
+            let simulated = host.apt_simulate(AptPlan::Install(&missing)).map_err(PerformError::Host)?;
+            record_dependencies(simulated, packages, record)?;
             host.apt_install(&missing).map_err(PerformError::Host)
         }
-        Kind::Deb { .. } => {
+        Kind::Deb { package, .. } => {
             let download = action.download(host.arch()).ok_or_else(|| PerformError::Unavailable {
                 arch: host.arch().to_owned(),
             })?;
@@ -389,7 +400,8 @@ pub fn apply(action: &Action, host: &mut dyn Host, look: &Look) -> Result<(), Pe
             host.fetch(&download.url, &download.sha256, &deb)
                 .map_err(PerformError::Host)?;
             fs::set_permissions(&deb, fs::Permissions::from_mode(0o644)).map_err(PerformError::io(&deb))?;
-            refuse_removals(host.apt_simulate(AptPlan::Deb(&deb)))?;
+            let simulated = host.apt_simulate(AptPlan::Deb(&deb)).map_err(PerformError::Host)?;
+            record_dependencies(simulated, std::slice::from_ref(package), record)?;
             host.deb_install(&deb).map_err(PerformError::Host)
         }
         Kind::Nix { .. } => host.nix_add(&owned("nix:")).map_err(PerformError::Host),
@@ -458,16 +470,28 @@ pub fn apply(action: &Action, host: &mut dyn Host, look: &Look) -> Result<(), Pe
     }
 }
 
-/// Refuses a change apt would make by removing other packages.
-fn refuse_removals(simulated: Result<BTreeSet<String>, HostError>) -> Result<(), PerformError> {
-    let removed = simulated.map_err(PerformError::Host)?;
-    if removed.is_empty() {
-        Ok(())
-    } else {
-        Err(PerformError::AptRemoves {
-            packages: removed.into_iter().collect(),
-        })
+/// Refuses a change apt would make by removing other packages; else hands `record` the claims of
+/// what it would newly install beyond `own`, the action's packages.
+fn record_dependencies(
+    simulated: AptSimulation,
+    own: &[String],
+    record: &mut dyn FnMut(&[Claim]) -> Result<(), JournalError>,
+) -> Result<(), PerformError> {
+    if !simulated.removes.is_empty() {
+        return Err(PerformError::AptRemoves {
+            packages: simulated.removes.into_iter().collect(),
+        });
     }
+    let dependencies: Vec<Claim> = simulated
+        .installs
+        .into_iter()
+        .filter(|p| !own.contains(p))
+        .map(|p| Claim::new(format!("dep:{p}"), true))
+        .collect();
+    if dependencies.is_empty() {
+        return Ok(());
+    }
+    record(&dependencies).map_err(PerformError::Record)
 }
 
 /// Takes back what `claims`, the owned claims of a done step that pass to no other app, changed,
@@ -481,20 +505,7 @@ fn refuse_removals(simulated: Result<BTreeSet<String>, HostError>) -> Result<(),
 pub fn undo(action: &Action, host: &mut dyn Host, claims: &[Claim], prior: &Prior) -> Result<(), PerformError> {
     let owned = |prefix: &str| owned_names(claims, prefix);
     match &action.kind {
-        Kind::Apt { .. } | Kind::Deb { .. } => {
-            let mine = owned("package:");
-            let installed = host.installed(&mine).map_err(PerformError::Host)?;
-            let there: Vec<String> = mine.into_iter().filter(|p| installed.contains(p)).collect();
-            if there.is_empty() {
-                return Ok(());
-            }
-            let taken = host.apt_simulate(AptPlan::Remove(&there)).map_err(PerformError::Host)?;
-            let others: Vec<String> = taken.into_iter().filter(|p| !there.contains(p)).collect();
-            if !others.is_empty() {
-                return Err(PerformError::AptTakes { packages: others });
-            }
-            host.apt_remove(&there).map_err(PerformError::Host)
-        }
+        Kind::Apt { .. } | Kind::Deb { .. } => undo_packages(host, &owned("package:"), &owned("dep:")),
         Kind::Nix { .. } => {
             let mine = owned("nix:");
             if mine.is_empty() {
@@ -573,6 +584,61 @@ pub fn undo(action: &Action, host: &mut dyn Host, claims: &[Claim], prior: &Prio
             run_recorded(host, action, undo)?.map_err(PerformError::Host)
         }
     }
+}
+
+/// Removes `mine`, the packages a step installed, and of `dependencies`, those it pulled in, the
+/// ones nothing else on the machine needs: apt simulates each removal first, and never takes a
+/// package that isn't the step's.
+fn undo_packages(host: &mut dyn Host, mine: &[String], dependencies: &[String]) -> Result<(), PerformError> {
+    let all: Vec<String> = mine.iter().chain(dependencies).cloned().collect();
+    let installed = host.installed(&all).map_err(PerformError::Host)?;
+    let there: Vec<String> = mine.iter().filter(|p| installed.contains(*p)).cloned().collect();
+    let pulled: Vec<String> = dependencies.iter().filter(|p| installed.contains(*p)).cloned().collect();
+    if !there.is_empty() {
+        let taken = host.apt_simulate(AptPlan::Remove(&there)).map_err(PerformError::Host)?;
+        let others: Vec<String> = taken.removes.into_iter().filter(|p| !there.contains(p)).collect();
+        if !others.is_empty() {
+            return Err(PerformError::AptTakes { packages: others });
+        }
+    }
+    let mut gone = there;
+    gone.extend(unneeded(host, &gone, pulled)?);
+    if gone.is_empty() {
+        return Ok(());
+    }
+    host.apt_remove(&gone).map_err(PerformError::Host)
+}
+
+/// The packages of `dependencies` that go with `packages` taking nothing else with them. One that
+/// a package outside them depends on stays, and so does what it needs in turn.
+fn unneeded(host: &mut dyn Host, packages: &[String], mut dependencies: Vec<String>) -> Result<Vec<String>, PerformError> {
+    let outside = |taken: AptSimulation, kept: &[String]| -> bool {
+        taken
+            .removes
+            .iter()
+            .any(|p| !packages.contains(p) && !kept.contains(p))
+    };
+    while !dependencies.is_empty() {
+        let all: Vec<String> = packages.iter().chain(&dependencies).cloned().collect();
+        let taken = host.apt_simulate(AptPlan::Remove(&all)).map_err(PerformError::Host)?;
+        if !outside(taken, &dependencies) {
+            return Ok(dependencies);
+        }
+        let mut free = Vec::new();
+        for dependency in &dependencies {
+            let mut one = packages.to_vec();
+            one.push(dependency.clone());
+            let taken = host.apt_simulate(AptPlan::Remove(&one)).map_err(PerformError::Host)?;
+            if !outside(taken, &dependencies) {
+                free.push(dependency.clone());
+            }
+        }
+        if free.len() == dependencies.len() {
+            return Ok(Vec::new());
+        }
+        dependencies = free;
+    }
+    Ok(dependencies)
 }
 
 /// Runs `argv` of the `run` `action` in a fresh folder holding the scripts it recorded, so what

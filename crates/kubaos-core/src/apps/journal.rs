@@ -143,7 +143,7 @@ impl State {
 }
 
 /// One thing a step changed or found: `path:/…`, `dir:/…` (a folder it made for a path),
-/// `key:<file>#<key>`, `package:<name>`,
+/// `key:<file>#<key>`, `package:<name>`, `dep:<name>` (a package apt pulled in for the step's),
 /// `nix:<name>`, `member:<group>:<user>`, `group:<name>`, `unit:<scope>:<name>`, `linger:<user>`
 /// or `run`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

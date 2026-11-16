@@ -6,7 +6,7 @@
 //!
 //! # Owns
 //!
-//! - [`Host`], [`HostError`], [`UnitState`] and [`AptPlan`]. The real machine: [`SystemHost`].
+//! - [`Host`], [`HostError`], [`UnitState`], [`AptPlan`] and [`AptSimulation`]. The real machine: [`SystemHost`].
 //!
 //! # Not here
 //!
@@ -115,7 +115,16 @@ impl UnitState {
     }
 }
 
-/// A change apt is asked to simulate, to learn what else it would remove.
+/// What apt says it would do to carry out a plan, from a simulation that changes nothing.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AptSimulation {
+    /// The installed packages it would remove.
+    pub removes: BTreeSet<String>,
+    /// The packages it would newly install: those asked for and what they need that isn't there.
+    pub installs: BTreeSet<String>,
+}
+
+/// A change apt is asked to simulate, to learn what else it would install or remove.
 #[derive(Clone, Copy, Debug)]
 pub enum AptPlan<'a> {
     Install(&'a [String]),
@@ -158,13 +167,13 @@ pub trait Host {
     /// When its setup fails.
     fn apt_repo(&mut self, repo: &str) -> Result<(), HostError>;
 
-    /// The installed packages apt would remove to carry out `plan`, from a simulation that
-    /// changes nothing.
+    /// What apt would install and remove to carry out `plan`, from a simulation that changes
+    /// nothing.
     ///
     /// # Errors
     ///
     /// When apt can't simulate it.
-    fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<BTreeSet<String>, HostError>;
+    fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError>;
 
     /// `packages` installed.
     ///
