@@ -139,3 +139,169 @@
 .setup-yours-figure {
   text-shadow: 0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * (1 - var(--day))));
 }
+
+/* Kotodama's steps (`setup-kotodama-card.ts`) turn as Make it yours's do: the step left laid over
+   the one arriving until it has gone, each sliding `space.s24`, `--kotodama-slide` the share of it
+   still to go. */
+@property --kotodama-slide {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.setup-kotodama-room {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.setup-kotodama-step {
+  display: flex;
+  flex-direction: column;
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+  translate: round(nearest, calc(var(--kotodama-slide) * var(--space-s24)), 1px) 0;
+}
+
+.setup-kotodama-step > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.setup-kotodama-step[data-leaving] {
+  pointer-events: none;
+}
+
+/* The stand-in menu fills its room; the panel keeps its own measures in it, at its top, and its
+   Toasts rise over the panel's footer as the menu's do. */
+.setup-kotodama-menu {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.setup-kotodama-toasts {
+  bottom: calc(var(--size-control_sm) + 3 * var(--space-s12));
+}
+
+/* What's beat lit while the menu beside it does it. */
+.setup-kotodama-beats .k-list-row {
+  transition: opacity var(--motion-medium) var(--easing-standard);
+}
+
+.setup-kotodama-beats:has([data-current]) .k-list-row:not([data-current]) {
+  opacity: var(--opacity-subdued);
+}
+
+/* Try it's room: the menu, or before it opens, what opens it, centred in the same room. */
+.setup-kotodama-try {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.setup-kotodama-try > .setup-kotodama-invitation {
+  flex: 1 1 0;
+  justify-content: center;
+  border-radius: var(--radius-surface);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+}
+
+/* The race's room: its three lanes take the height under the question. */
+.setup-kotodama-lanes {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.setup-kotodama-lanes > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* The race's lanes: one each, its clock at the end of its name. Kotodama's clock stopped burns in
+   the cold, as a lit tube does at night. */
+.setup-kotodama-lane {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.setup-kotodama-clock {
+  display: flex;
+  flex: none;
+}
+
+.setup-kotodama-clock[data-landed] {
+  text-shadow: 0 0 var(--focus-label_near) rgb(from var(--color-cold) r g b / calc(var(--focus-label_glow) * (1 - var(--day))));
+}
+
+/* The others: a card drained of colour, its answers cut where the card ends; Start's ad over them in
+   every colour it has. */
+.setup-kotodama-other {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+}
+
+.setup-kotodama-sad {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: var(--space-s12);
+  filter: grayscale(1);
+}
+
+.setup-kotodama-answers {
+  overflow: hidden;
+  mask-image: linear-gradient(#000 calc(100% - var(--space-s24)), transparent);
+}
+
+.setup-kotodama-ad {
+  position: absolute;
+  left: var(--space-s12);
+  right: var(--space-s12);
+  bottom: calc(var(--space-s12) * 2 + var(--size-control_sm));
+  padding: var(--space-s16);
+  border-radius: var(--radius-content);
+  background: linear-gradient(135deg, var(--color-error_container), var(--color-primary_fill) 55%, var(--color-tertiary_container));
+  box-shadow: 0 var(--space-s8) var(--space-s24) rgb(from var(--color-surface_container_lowest) r g b / var(--opacity-scrim));
+}
+
+/* The gag: the other menu risen in the screen's corner over everything, stamped. */
+.setup-kotodama-gag {
+  position: absolute;
+  z-index: 3;
+  left: var(--space-s16);
+  bottom: var(--space-s16);
+  display: flex;
+  width: var(--size-panel);
+  height: calc(var(--kobo-height) * 0.7);
+  pointer-events: none;
+}
+
+.setup-kotodama-gag > .setup-kotodama-other {
+  flex: 1 1 0;
+}
+
+.setup-kotodama-stamp {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  translate: -50% -50%;
+  text-shadow: 0 0 var(--focus-far) rgb(from var(--color-primary) r g b / var(--focus-near_opacity));
+}
