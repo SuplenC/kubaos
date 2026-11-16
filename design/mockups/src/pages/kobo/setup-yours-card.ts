@@ -160,9 +160,9 @@ function wave(rows: readonly HTMLElement[]): void {
     each.dataset.wave = String(Math.min(index, 6));
   });
   if (settings().reduced) return;
-  rows.forEach((each, index) => {
+  requestAnimationFrame(() => rows.forEach((each, index) => {
     each.animate([{ opacity: "var(--opacity-subdued)" }, { opacity: 1 }], { duration: ms("long"), delay: Math.min(index, 6) * ms("micro"), easing: curve("emphasized_decel"), fill: "backwards" });
-  });
+  }));
 }
 
 /** What a row says changing under the keys (a tick, VS Code's line): it fades in over `short`. */
@@ -366,7 +366,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
       },
       { passive: true },
     );
-    if (arriving) requestAnimationFrame(() => wave([...list.box.querySelectorAll<HTMLElement>(".k-list-row[data-picked]")].filter((each) => !each.querySelector(".k-chip[data-kind='Cold']"))));
+    if (arriving) wave([...list.box.querySelectorAll<HTMLElement>(".k-list-row[data-picked]")].filter((each) => !each.querySelector(".k-chip[data-kind='Cold']")));
     return scroller;
   };
 
