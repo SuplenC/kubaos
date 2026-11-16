@@ -3,14 +3,15 @@
 //!
 //! An app is installed when everything its source names is on the machine: its apt packages or
 //! its `.deb`'s package in dpkg, its nixpkgs names in the User flake's `packages.toml`. That is
-//! the only record of it; KubaOS keeps no list of its own. An update installs each picked app the
-//! machine lacks, and a pinned `.deb` at another version than its pin, unless the app updates
-//! itself. It removes nothing: an app goes only when the user removes it.
+//! the only record of it; KubaOS keeps no list of what is installed, only, in the picks, which
+//! nixpkgs names an app added, so a removal takes those and no name the user added. An update
+//! installs each picked app the machine lacks, and a pinned `.deb` at another version than its pin,
+//! unless the app updates itself. It removes nothing: an app goes only when the user removes it.
 //!
 //! # Owns
 //!
-//! - [`Facts`], [`AppState`], [`Status`], [`listing`], and the choices [`installs`] and
-//!   [`removals`].
+//! - [`Facts`], [`AppState`], [`Status`], [`listing`], and the choices [`installs`], [`removals`]
+//!   and [`nix_released`].
 //!
 //! # Not here
 //!
@@ -127,6 +128,29 @@ pub fn removals<'a>(facts: &Facts<'a>, ids: &[String]) -> Vec<&'a App> {
         .filter(|app| ids.contains(&app.id))
         .filter(|app| facts.state(app).is_installed())
         .collect()
+}
+
+/// The nixpkgs names that go with `removed`: what each of them added, less a name another picked
+/// app of the catalog needs, which then counts as that app's, so it goes with the last app that
+/// needs it. A name the user had before any app added it was never recorded, and stays.
+pub fn nix_released(catalog: &Catalog, picks: &mut Picks, removed: &[&App]) -> BTreeSet<String> {
+    let mut released = BTreeSet::new();
+    for app in removed {
+        for name in picks.take_added(&app.id) {
+            let heir = catalog.apps().iter().find(|other| {
+                picks.has(&other.id)
+                    && !removed.iter().any(|r| r.id == other.id)
+                    && matches!(&other.source, Source::Nix { packages } if packages.contains(&name))
+            });
+            match heir {
+                Some(other) => picks.record_added(&other.id, [name]),
+                None => {
+                    released.insert(name);
+                }
+            }
+        }
+    }
+    released
 }
 
 /// One app of the status.

@@ -164,10 +164,12 @@ impl<M: Machine> Updater<'_, M> {
                         .collect();
                     u.install_apps(&state, &wanted, Root::Polkit)
                 }
-                Change::Remove => u.uninstall_apps(&plan::removals(&state.facts(), ids)),
+                Change::Remove => u.uninstall_apps(&state, &plan::removals(&state.facts(), ids)),
             };
             if done.is_err() && changed {
-                before.write(&path).map_err(UpdateError::Picks)?;
+                let mut back = Picks::read(&path).map_err(UpdateError::Picks)?;
+                back.restore_apps(&before);
+                back.write(&path).map_err(UpdateError::Picks)?;
             }
             done
         })?;
@@ -243,8 +245,8 @@ impl<M: Machine> Updater<'_, M> {
     }
 
     /// Installs `wanted`: the root half in one run of the helper, the nixpkgs half into
-    /// `packages.toml`, switched to at once when `root` is polkit. The names installed are those
-    /// the machine then has.
+    /// `packages.toml`, switched to at once when `root` is polkit, recording in the picks the names
+    /// each app added. The names installed are those the machine then has.
     fn install_apps(&mut self, state: &AppsState, wanted: &[&App], root: Root) -> Result<AppChanges, UpdateError> {
         if wanted.is_empty() {
             self.j.detail("already installed");
@@ -261,14 +263,23 @@ impl<M: Machine> Updater<'_, M> {
             let helper = self.helper(root).arg("install").args(&as_root);
             self.run(&helper).map_err(UpdateError::step("installing the apps"))?;
         }
+        let mut picks = state.picks.clone();
         let nix = nix_packages(wanted);
         if !nix.is_empty() {
-            self.edit_nix(&nix, Change::Add)?;
+            let added = self.edit_nix(&nix, Change::Add)?;
+            for app in wanted {
+                if let Source::Nix { packages } = &app.source {
+                    picks.record_added(&app.id, packages.iter().filter(|p| added.contains(*p)).cloned());
+                }
+            }
+            if picks != state.picks {
+                picks.write(&self.user.app_picks()).map_err(UpdateError::Picks)?;
+            }
             if root == Root::Polkit {
                 self.switch()?;
             }
         }
-        let after = self.apps_state(state.catalog.clone(), state.picks.clone())?;
+        let after = self.apps_state(state.catalog.clone(), picks)?;
         let mut changes = AppChanges::default();
         for app in wanted {
             if after.facts().state(app) == apps::AppState::Installed {
@@ -282,9 +293,9 @@ impl<M: Machine> Updater<'_, M> {
         Ok(changes)
     }
 
-    /// Removes `apps`: the root half in one run of the helper, the nixpkgs half from
-    /// `packages.toml` and a switch.
-    fn uninstall_apps(&mut self, apps: &[&App]) -> Result<AppChanges, UpdateError> {
+    /// Removes `apps`: the root half in one run of the helper, and from `packages.toml` the
+    /// nixpkgs names they added that no other picked app needs, then a switch.
+    fn uninstall_apps(&mut self, state: &AppsState, apps: &[&App]) -> Result<AppChanges, UpdateError> {
         if apps.is_empty() {
             self.j.detail("not installed");
             return Ok(AppChanges::default());
@@ -300,9 +311,17 @@ impl<M: Machine> Updater<'_, M> {
             let helper = self.helper(Root::Polkit).arg("remove").args(&as_root);
             self.run(&helper).map_err(UpdateError::step("removing the apps"))?;
         }
-        let nix = nix_packages(apps);
+        let mut picks = state.picks.clone();
+        let nix: Vec<String> = plan::nix_released(&state.catalog, &mut picks, apps)
+            .into_iter()
+            .collect();
         if !nix.is_empty() {
             self.edit_nix(&nix, Change::Remove)?;
+        }
+        if picks != state.picks {
+            picks.write(&self.user.app_picks()).map_err(UpdateError::Picks)?;
+        }
+        if !nix.is_empty() {
             self.switch()?;
         }
         self.j.detail(format!("{} removed", names.join(", ")));
@@ -322,8 +341,9 @@ impl<M: Machine> Updater<'_, M> {
     }
 
     /// Adds `names` to the User flake's `packages.toml`, or removes them, wiring `home.nix` to it
-    /// first as `kubaos package add` does.
-    fn edit_nix(&mut self, names: &[String], change: Change) -> Result<(), UpdateError> {
+    /// first as `kubaos package add` does. Returns the names it changed: on an add, those that
+    /// weren't there yet.
+    fn edit_nix(&mut self, names: &[String], change: Change) -> Result<BTreeSet<String>, UpdateError> {
         let home_nix = self.user.home_nix();
         wire_home_nix(&home_nix, &self.user.backups()).map_err(UpdateError::Wire)?;
         let packages = Packages::new(&self.user.state_dir(), self.user.edit_lock());
@@ -331,7 +351,7 @@ impl<M: Machine> Updater<'_, M> {
             Change::Add => packages.add(names),
             Change::Remove => packages.remove(names),
         }
-        .map(drop)
+        .map(|done| done.changed.into_iter().collect())
         .map_err(UpdateError::NixPackages)
     }
 

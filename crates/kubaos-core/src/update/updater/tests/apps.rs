@@ -292,3 +292,53 @@ fn the_status_reads_the_catalog_the_picks_and_dpkg() {
     );
     assert_eq!(m.ran.len(), 1, "one dpkg query, nothing else: {:?}", m.ran);
 }
+
+#[test]
+fn removing_an_app_from_nixpkgs_leaves_a_package_the_user_had_added_themselves() {
+    let w = world();
+    put(&w.user.state_dir().packages_file(), "packages = [\"editor\"]\n");
+    let mut m = fake(&[]);
+
+    w.updater(&mut m).add_apps(&names(&["editor"])).unwrap();
+    w.updater(&mut m).remove_apps(&names(&["editor"])).unwrap();
+
+    let packages = fs::read_to_string(w.user.state_dir().packages_file()).unwrap();
+    assert!(packages.contains("\"editor\""), "{packages}");
+    assert!(picked(&w).is_empty());
+}
+
+#[test]
+fn a_package_two_apps_share_goes_only_with_the_last_of_them() {
+    let w = world();
+    put(
+        &w.sys.catalog().join("studio.toml"),
+        "name = \"Studio\"\nsummary = \"An editor's studio\"\n\n[nix]\npackages = [\"editor\", \"studio\"]\n",
+    );
+    let mut m = fake(&[]);
+    let packages = || fs::read_to_string(w.user.state_dir().packages_file()).unwrap();
+
+    w.updater(&mut m).add_apps(&names(&["editor"])).unwrap();
+    w.updater(&mut m).add_apps(&names(&["studio"])).unwrap();
+    w.updater(&mut m).remove_apps(&names(&["editor"])).unwrap();
+
+    assert!(packages().contains("\"editor\""), "{}", packages());
+
+    w.updater(&mut m).remove_apps(&names(&["studio"])).unwrap();
+
+    assert!(!packages().contains("\"editor\""), "{}", packages());
+    assert!(!packages().contains("\"studio\""), "{}", packages());
+}
+
+#[test]
+fn an_add_that_fails_after_its_packages_are_written_keeps_the_record_of_them() {
+    let w = world();
+    let mut m = fake(&[]);
+    m.failing.push("switch");
+
+    let added = w.updater(&mut m).add_apps(&names(&["editor"]));
+
+    assert!(added.is_err());
+    assert!(picked(&w).is_empty());
+    let picks = Picks::read(&w.user.app_picks()).unwrap();
+    assert_eq!(picks.added("editor"), ["editor"]);
+}
