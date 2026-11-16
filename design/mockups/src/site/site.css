@@ -200,6 +200,42 @@ body {
   background: var(--color-surface);
 }
 
+/* Solo mode (`site/solo.ts`): one state alone at its own size, with a stage pane's room round it
+   for a glow; a whole screen fills it edge to edge. */
+.page[data-solo] {
+  width: max-content;
+  padding: var(--space-s32);
+}
+
+.page[data-solo][data-screen] {
+  padding: 0;
+}
+
+/* A state pinned on several rows shows them one under another, as the state matrix does. */
+.solo-flow {
+  flex-direction: column;
+}
+
+.solo-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+}
+
+.solo-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  padding: 0;
+  list-style: none;
+}
+
+.solo-row {
+  display: flex;
+  gap: var(--space-s16);
+  align-items: baseline;
+}
+
 /* Its padding for the width it takes, picked by `site/settle.ts`. */
 .page-container {
   padding-inline: var(--container-0-padding);

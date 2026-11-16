@@ -1,8 +1,9 @@
 // The mockup site: the top bar, the navigation and the rail around the page picked by the address,
-// `#/LEVEL/PAGE`. `?chrome=off` shows the page alone, as the shots draw it.
+// `#/LEVEL/PAGE`. `?chrome=off` shows the page alone, as the shots draw it, and `?solo=STATE` one
+// state of it alone (`site/solo.ts`).
 //
-// `window.kubaos` lets a script that drives the site (`scripts/render.ts`) wait until the page is
-// drawn and read its geometry frame and its moves' recipes.
+// `window.kubaos` lets a script that drives the site (`scripts/render.ts`, `scripts/shot.ts`) wait
+// until the page is drawn, list its states, and read its geometry frame and its moves' recipes.
 
 import "./tokens.css";
 import "./fonts.css";
@@ -27,6 +28,7 @@ import { render } from "./site/render.ts";
 import { apply, CHROME, onChange, settings } from "./site/settings.ts";
 import { holdWheel, releaseWheel } from "./site/scroll.ts";
 import { settle } from "./site/settle.ts";
+import { drawSolo, SOLO, type SoloState, soloPage, soloStates } from "./site/solo.ts";
 import { type Toolbar, toolbar } from "./site/toolbar.ts";
 
 declare global {
@@ -36,6 +38,10 @@ declare global {
       frame(): Frame;
       motion(): Record<string, unknown> | null;
       pages: { level: string; slug: string }[];
+      /** The page's states, each drawn alone by `?solo=SLUG`. */
+      states(): SoloState[];
+      /** The state solo mode drew, or null: the full page, or a list to pick from. */
+      solo: SoloState | null;
     };
   }
 }
@@ -96,7 +102,22 @@ const toolbarHeight = new ResizeObserver(([entry]) => {
   chrome?.navigation.select(picked());
 });
 
+/** One state of the page the address names, alone, and nothing else (`site/solo.ts`). */
+function drawAlone(): void {
+  apply(pageBox);
+  if (pageBox.parentElement !== site || site.childElementCount !== 1) site.replaceChildren(pageBox);
+  const page = soloPage();
+  window.kubaos.solo = drawSolo(pageBox).shown;
+  document.title = page ? `${window.kubaos.solo?.name ?? "States"} · ${page.title} · KubaOS mockups` : "KubaOS mockups";
+  settle(pageBox);
+  pageBox.dataset.page = page?.slug ?? "";
+}
+
 function draw(): void {
+  if (SOLO !== null) {
+    drawAlone();
+    return;
+  }
   const page = picked();
   apply(pageBox);
   stopPlayers();
@@ -214,4 +235,6 @@ window.kubaos = {
     return page && applies(page.motion) ? recipes(page.motion) : null;
   },
   pages: PAGES.map((page) => ({ level: page.level, slug: page.slug })),
+  states: () => soloStates(SOLO === null ? picked() : soloPage()),
+  solo: null,
 };

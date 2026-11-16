@@ -15,7 +15,7 @@ import { painted } from "./swatches.ts";
 const MODE_NAMES: Record<Mode, string> = { dark: "Night", light: "Day" };
 
 /** One chip of the bar: what each pane draws for it, and the hint it shows. */
-interface Pick {
+export interface Pick {
   readonly name: string;
   readonly hint: string;
   readonly draw: (mode: Mode) => Element[];
@@ -76,9 +76,14 @@ function statePicks(states: States<State>, focus: Focus | DoesntApply): Pick[] {
   });
 }
 
+/** What the stage's chips pin, in the bar's order: Live, then each state `states` shows. */
+export function stagePicks(spec: Stage, states?: { readonly states: States<State>; readonly focus: Focus | DoesntApply }): Pick[] {
+  return [{ name: "Live", hint: `live · ${spec.hint}`, draw: () => [spec.live()] }, ...(states ? statePicks(states.states, states.focus) : [])];
+}
+
 /** The stage for `spec`; with `states`, the bar's chips pin each of them. */
 export function stage(spec: Stage, states?: { readonly states: States<State>; readonly focus: Focus | DoesntApply }): HTMLElement {
-  const picks: Pick[] = [{ name: "Live", hint: `live · ${spec.hint}`, draw: () => [spec.live()] }, ...(states ? statePicks(states.states, states.focus) : [])];
+  const picks = stagePicks(spec, states);
   const now = settings();
   const day = applies(spec.daylight);
   const modes: Mode[] = !day ? ["dark"] : ALL || now.both ? ["dark", "light"] : [now.mode];

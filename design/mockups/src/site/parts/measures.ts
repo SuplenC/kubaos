@@ -167,7 +167,7 @@ export function measures(spec: Measures): Drawn {
 }
 
 /** `sample` in a window of the toolbar's size. */
-function windowed(sample: Element): HTMLElement {
+export function windowed(sample: Element): HTMLElement {
   const size = windowSize();
   const frame = el("div", "page-window", sample);
   frame.style.width = size.width;
