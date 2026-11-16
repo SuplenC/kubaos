@@ -8,7 +8,11 @@
 //! and those of the setups it isn't in while it is, which switch. Running one starts `kubaos app
 //! add|remove <id> --json` (`add <id> --setup <setup>`) in the background, as a Job the menu shows
 //! with each step and how far it got; the Daemon announces its end on the desktop, named for the
-//! app, with why it failed and where its log is.
+//! app, with why it failed and where its log is. Its message is the step it is on, "Start the
+//! service, 2 of 4", after the app it is on for a run of several ("Neovim (1 of 2): …"), as an
+//! install brings the apps it requires and a removal takes those it brought. An installed app with
+//! a configure stage has a "Configure <Name>" Item, which runs `kubaos app configure <id>` the
+//! same way.
 //!
 //! Which apps are on the machine is the engine's status (`kubaos app status`): the catalog, the
 //! picks, each app's journals and one `dpkg-query` for the versions and the apps on the machine
@@ -54,6 +58,7 @@ use kubaos_core::apps::status::SetupInfo;
 use kubaos_core::apt::Dpkg;
 use kubaos_core::apt::dpkg;
 use kubaos_core::state::Paths;
+use kubaos_core::update::event::AppEvent;
 use kubaos_core::update::event::UpdateEvent;
 use kubaos_core::update::record::SystemPaths;
 
@@ -66,6 +71,8 @@ pub const KIND: &str = "kubaos.app";
 pub const INSTALL: &str = "install";
 /// Removes an app that is.
 pub const REMOVE: &str = "remove";
+/// Runs an installed app's configure stage again.
+pub const CONFIGURE: &str = "configure";
 /// dpkg's database, which every install and removal of a package rewrites.
 pub const DPKG_STATUS: &str = "/var/lib/dpkg/status";
 
@@ -74,6 +81,8 @@ pub const DPKG_STATUS: &str = "/var/lib/dpkg/status";
 const INSTALL_PREFIX: &str = "app-install:";
 /// An app's Remove Item is this and its id, `app-remove:google-chrome`.
 const REMOVE_PREFIX: &str = "app-remove:";
+/// An app's Configure Item is this and its id, `app-configure:lazyvim`.
+const CONFIGURE_PREFIX: &str = "app-configure:";
 /// A Job is this and a count, `app-1`.
 const JOB_PREFIX: &str = "app-";
 /// The icon of an app whose folder names none.
@@ -270,6 +279,9 @@ impl Apps {
             if standing.app.state.is_removable() {
                 items.push(remove_item(standing));
             }
+            if standing.app.configurable {
+                items.push(configure_item(&standing.app));
+            }
             if standing.has_setups() {
                 for setup in &standing.app.setups {
                     if standing.offers_install(Some(setup)) {
@@ -283,7 +295,8 @@ impl Apps {
         items
     }
 
-    /// The id of every Item an app of the catalog may have, either half, which `hide` may name.
+    /// The id of every Item an app of the catalog may have, its Install, Remove and Configure,
+    /// which `hide` may name.
     pub fn ids(&self) -> Vec<String> {
         self.apps
             .iter()
@@ -297,7 +310,10 @@ impl Apps {
                 } else {
                     vec![format!("{INSTALL_PREFIX}{}", app.id)]
                 };
-                installs.into_iter().chain([format!("{REMOVE_PREFIX}{}", app.id)])
+                installs.into_iter().chain([
+                    format!("{REMOVE_PREFIX}{}", app.id),
+                    format!("{CONFIGURE_PREFIX}{}", app.id),
+                ])
             })
             .collect()
     }
@@ -305,15 +321,19 @@ impl Apps {
     /// The app of the Item `id`, what the Item does, and the setup it installs, while the Item
     /// applies.
     fn offered(&self, id: &str) -> Option<(&AppStatus, Change, Option<&SetupInfo>)> {
-        let (change, rest) = match (id.strip_prefix(INSTALL_PREFIX), id.strip_prefix(REMOVE_PREFIX)) {
-            (Some(rest), _) => (Change::Add, rest),
-            (_, Some(rest)) => (Change::Remove, rest),
-            _ => return None,
+        let (change, rest) = if let Some(rest) = id.strip_prefix(INSTALL_PREFIX) {
+            (Change::Add, rest)
+        } else if let Some(rest) = id.strip_prefix(REMOVE_PREFIX) {
+            (Change::Remove, rest)
+        } else if let Some(rest) = id.strip_prefix(CONFIGURE_PREFIX) {
+            (Change::Configure, rest)
+        } else {
+            return None;
         };
         let (app_id, setup_id) = match (change, rest.split_once(':')) {
             (Change::Add, Some((app_id, setup_id))) => (app_id, Some(setup_id)),
             (_, None) => (rest, None),
-            (Change::Remove, Some(_)) => return None,
+            (Change::Remove | Change::Configure, Some(_)) => return None,
         };
         let standing = self.apps.iter().find(|standing| standing.app.id == app_id)?;
         let app = &standing.app;
@@ -327,6 +347,7 @@ impl Apps {
         let applies = match change {
             Change::Add => standing.offers_install(setup),
             Change::Remove => app.state.is_removable(),
+            Change::Configure => app.configurable,
         };
         applies.then_some((app, change, setup))
     }
@@ -371,11 +392,12 @@ impl AppsReader {
     }
 }
 
-/// Installing or removing.
+/// Installing, removing or configuring.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Change {
     Add,
     Remove,
+    Configure,
 }
 
 impl Change {
@@ -384,6 +406,7 @@ impl Change {
         match self {
             Change::Add => "add",
             Change::Remove => "remove",
+            Change::Configure => "configure",
         }
     }
 
@@ -391,6 +414,7 @@ impl Change {
         match self {
             Change::Add => INSTALL,
             Change::Remove => REMOVE,
+            Change::Configure => CONFIGURE,
         }
     }
 }
@@ -536,7 +560,12 @@ struct Running {
     change: Change,
     /// `kubaos app add google-chrome`, which a failure names when the program said nothing.
     command: String,
+    /// The app of the run it is on, for a run of more than one.
+    app: Option<AppEvent>,
+    /// The step it is on.
     step: Option<String>,
+    /// The step's place among the app's, from 1, and how many there are.
+    count: Option<(usize, usize)>,
     progress: Option<Fraction>,
     log: Option<PathBuf>,
     /// The run's warnings, each said at its end; one alone fails nothing.
@@ -558,6 +587,7 @@ impl Running {
         let title = match change {
             Change::Add => format!("Installing {name}"),
             Change::Remove => format!("Removing {name}"),
+            Change::Configure => format!("Configuring {name}"),
         };
         Running {
             id,
@@ -565,7 +595,9 @@ impl Running {
             name: name.to_owned(),
             change,
             command,
+            app: None,
             step: None,
+            count: None,
             progress: None,
             log: None,
             warnings: Vec::new(),
@@ -585,17 +617,22 @@ impl Running {
             }
             return false;
         };
-        let before = (self.step.clone(), self.progress);
+        let before = (self.message(), self.progress);
         match event {
             UpdateEvent::Started { log, .. } => self.log = log,
             UpdateEvent::PhaseStarted { .. } => self.progress = None,
-            UpdateEvent::Step { text } => self.step = Some(text),
+            UpdateEvent::App(app) => {
+                self.progress = Fraction::new(share(app.n.saturating_sub(1), app.of)).ok();
+                (self.app, self.step, self.count) = (Some(app), None, None);
+            }
+            UpdateEvent::Step { text } => (self.step, self.count) = (Some(text), None),
             UpdateEvent::Progress { done, total } if total > 0 => {
-                #[expect(
-                    clippy::cast_precision_loss,
-                    reason = "A count of packages is far below where f32 loses whole numbers."
-                )]
-                let fraction = done.min(total) as f32 / total as f32;
+                let done = done.min(total);
+                self.count = Some(((done + 1).min(total), total));
+                let fraction = match &self.app {
+                    Some(app) => share(app.n.saturating_sub(1), app.of) + share(done, total * app.of),
+                    _ => share(done, total),
+                };
                 self.progress = Fraction::new(fraction).ok();
             }
             UpdateEvent::Warning { text } => self.warnings.push(text),
@@ -603,6 +640,7 @@ impl Running {
                 let done = match self.change {
                     Change::Add => &summary.apps.installed,
                     Change::Remove => &summary.apps.removed,
+                    Change::Configure => &summary.apps.configured,
                 };
                 self.arrived = Some(done.contains(&self.name));
                 self.left = self.change == Change::Remove && summary.apps.left.contains(&self.name);
@@ -615,7 +653,23 @@ impl Running {
             UpdateEvent::Declined => self.failure = Some("You said no: nothing changed".to_owned()),
             _ => {}
         }
-        (self.step.clone(), self.progress) != before
+        (self.message(), self.progress) != before
+    }
+
+    /// What the Job says while it runs: the step and its place among the app's, "Start the
+    /// service, 2 of 4", after the app and its place in the run when the run has more than one,
+    /// "Neovim (1 of 2): Install Neovim, 1 of 3".
+    fn message(&self) -> Option<String> {
+        let step = match (&self.step, self.count) {
+            (Some(step), Some((n, of))) => Some(format!("{step}, {n} of {of}")),
+            (Some(step), None) => Some(step.clone()),
+            (None, _) => None,
+        };
+        match (self.app.as_ref().filter(|app| app.of > 1), step) {
+            (Some(app), Some(step)) => Some(format!("{} ({} of {}): {step}", app.name, app.n, app.of)),
+            (Some(app), None) => Some(format!("{} ({} of {})", app.name, app.n, app.of)),
+            (None, step) => step,
+        }
     }
 
     /// The Job while it runs.
@@ -625,7 +679,7 @@ impl Running {
             title: self.title.clone(),
             state: JobState::Running,
             progress: self.progress,
-            message: self.step.clone(),
+            message: self.message(),
         }
     }
 
@@ -646,6 +700,7 @@ impl Running {
             let not = match self.change {
                 Change::Add => "wasn't installed",
                 Change::Remove => "wasn't removed",
+                Change::Configure => "wasn't configured",
             };
             let why = self.failure.or_else(|| {
                 self.warnings
@@ -657,6 +712,7 @@ impl Running {
             let done = match self.change {
                 Change::Add => "installed",
                 Change::Remove => "removed",
+                Change::Configure => "configured",
             };
             (format!("{} {done}", self.name), JobState::Succeeded, None)
         };
@@ -733,6 +789,29 @@ fn remove_item(standing: &Standing) -> Item {
         &["remove", "uninstall", "delete"],
         Action::new(REMOVE, title).confirm(),
     )
+}
+
+/// "Configure LazyVim", for an installed app with a configure stage: KubaOS's defaults for it
+/// again.
+fn configure_item(app: &AppStatus) -> Item {
+    let title = format!("Configure {}", app.name);
+    item(
+        format!("{CONFIGURE_PREFIX}{}", app.id),
+        title.clone(),
+        format!("Put KubaOS's defaults for {} back", app.name),
+        app,
+        &["configure", "settings", "defaults", "reset"],
+        Action::new(CONFIGURE, title),
+    )
+}
+
+/// `n` over `of`, as a fraction of a Job's bar.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "A count of steps or apps is far below where f32 loses whole numbers."
+)]
+fn share(n: usize, of: usize) -> f32 {
+    if of == 0 { 0.0 } else { n as f32 / of as f32 }
 }
 
 /// An app's Item, found by its id and each word of it as well as its name, "app" and `words`.
