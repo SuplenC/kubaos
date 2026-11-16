@@ -121,7 +121,7 @@ export default page<Shown>({
     { name: "Try it: wifi", for: "the setting, first row", sample: atCard("kotodama", "try-typed") },
     { name: "Try it: all three", for: "the sum; Next: Git", sample: CELLS.selected },
     { name: "Super alone", for: "the other menu, stamped", sample: CELLS.error },
-    { name: "From the Command menu", for: "“Set up the Command menu”, in a window", sample: aloneAt("kotodama", "yours") },
+    { name: "From the Command menu", for: "“Set up the Command menu”, in a window", sample: aloneAt("kotodama", "try-open") },
   ],
   sizes: [
     { name: "Laptop", for: "1280 × 800, the race", sample: atCard("kotodama", "why") },

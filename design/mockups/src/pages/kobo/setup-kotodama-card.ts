@@ -584,7 +584,7 @@ export function kotodamaCard(view: string): KotodamaCard {
   // ---------------------------------------------------------------- Yours --
 
   const yours = (): HTMLElement => {
-    const preview = standIn(prefs, { live: true, query: "3/2" });
+    const preview = standIn(prefs, { live: true, query: "3/2", hints: [["↑↓", "Select"], ["Enter", "Run"]] });
     const show = (words: string) => preview.set(words);
     const cards = OPENS_WITH.map((each) => {
       const card = choiceCard({ title: each.title, subtitle: each.line, picks: "one", picked: prefs.key === each.id });
@@ -629,8 +629,7 @@ export function kotodamaCard(view: string): KotodamaCard {
       "start",
       heading("When nothing here matches"),
       filling(switchRow("Offer a web search", "Rows at the bottom, never a guess", prefs.web, (on) => ((prefs.web = on), show("zzz")))),
-      filling(stack(0, "start", text("First with", "body"), filling(wrapped("The engine on the first web row", "small", "on_surface_variant")))),
-      engine,
+      filling(row("s12", "centre", filling(text("First with", "body")), engine)),
     );
     const typing = stack(
       "s12",
@@ -660,12 +659,12 @@ export function kotodamaCard(view: string): KotodamaCard {
       gap("s8"),
       filling(flow("s8", ...finds)),
       gap("s16"),
-      filling(splitColumns([1, 1], "s24", [filling(web), filling(typing)])),
-      gap("s8"),
+      filling(splitColumns([3, 2], "s24", [filling(web), filling(typing)])),
+      gap("s4"),
       filling(more),
     );
     const right = stack("s8", "start", text("As it will look", "label", "on_surface_variant"), fillingHeight(filling(preview.box)));
-    return splitColumns([2, 1], "s24", [filling(left), filling(fillingHeight(right))], { fillHeight: true });
+    return splitColumns([5, 2], "s24", [filling(left), filling(fillingHeight(right))], { fillHeight: true });
   };
 
   // --------------------------------------------------------------- Try it --
@@ -821,7 +820,12 @@ export function kotodamaCard(view: string): KotodamaCard {
       event.preventDefault();
       raceAgain();
     });
-    if (state.gag) element.append(gag(true));
+    // The held sample of the gag lies over the whole room, as the live one does, once it is drawn.
+    if (state.gag) {
+      const held = gag(true);
+      element.append(held);
+      requestAnimationFrame(() => element?.closest(".kobo-room")?.append(held));
+    }
     listen();
     return element;
   };
