@@ -50,10 +50,12 @@ const GOES_OUT: Move = {
 };
 
 /**
- * A step turning, the step left sliding `space.s24` off and the next in from the other side, a
- * `short` after: with Your apps, its picks' apps coming up in a wave, a `micro` apart.
+ * A step turning, the step left sliding `space.s24` off toward where it is going and the next in
+ * from the other side, a `short` after: with Your apps, its picks' apps coming up in a wave, a
+ * `micro` apart. Going back, both slide the other way.
  */
-function turning(name: string, what: string, view: string, wave: boolean): Move {
+function turning(name: string, what: string, view: string, wave: boolean, forward = true): Move {
+  const toward = forward ? -1 : 1;
   const waveTracks: Track[] = wave
     ? [0, 1, 2, 3, 4, 5, 6].map((index) => ({
         part: index === 6 ? "the rest of the wave" : `app ${index + 1} of the wave`,
@@ -72,9 +74,9 @@ function turning(name: string, what: string, view: string, wave: boolean): Move 
     what,
     tracks: [
       { part: "the step left", on: "the step left", target: ".setup-yours-step[data-leaving]", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
-      { part: "its slide off", on: "the step left", target: ".setup-yours-step[data-leaving]", property: "--yours-slide", from: 0, to: -1, duration: "short", curve: "emphasized_accel" },
+      { part: "its slide off", on: "the step left", target: ".setup-yours-step[data-leaving]", property: "--yours-slide", from: 0, to: toward, duration: "short", curve: "emphasized_accel" },
       { part: "the next step", on: "the step shown", target: ".setup-yours-step:not([data-leaving])", property: "opacity", from: 0, to: 1, duration: "long", cue: "short", curve: "emphasized_decel" },
-      { part: "its slide in", on: "the step shown", target: ".setup-yours-step:not([data-leaving])", property: "--yours-slide", from: 1, to: 0, duration: "long", cue: "short", curve: "emphasized_decel" },
+      { part: "its slide in", on: "the step shown", target: ".setup-yours-step:not([data-leaving])", property: "--yours-slide", from: -toward, to: 0, duration: "long", cue: "short", curve: "emphasized_decel" },
       ...waveTracks,
     ] as unknown as NonEmpty<Track<Easing>>,
     reduced: [
@@ -88,7 +90,7 @@ function turning(name: string, what: string, view: string, wave: boolean): Move 
 
 const TO_APPS = turning("What for → Your apps", "What for slides off; Your apps slides in, its picks' apps lighting in a wave.", "apps<0", true);
 const TO_GO = turning("Your apps → Go", "Your apps slides off; Go slides in, the count and the chosen apps.", "go<1", false);
-const BACK_STEP = turning("Back a step", "Back or Esc: Your apps slides off; What for slides back in.", "none<1", false);
+const BACK_STEP = turning("Back a step", "Back or Esc: Your apps slides off to the right; What for slides back in from the left.", "none<1", false, false);
 
 const VSCODE_ROW = ".setup-yours-list .k-list-row:has(.k-chip[data-kind='Cold'])";
 
