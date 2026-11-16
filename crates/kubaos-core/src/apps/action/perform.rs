@@ -166,7 +166,7 @@ pub fn logical(host: &dyn Host, named: &str) -> PathBuf {
     }
 }
 
-/// A web app's desktop entry and icon, as an action names paths.
+/// A web app's desktop entry and copied icon, as an action names paths.
 pub fn web_app_paths(id: &str) -> [String; 2] {
     [
         format!("~/.local/share/applications/kubaos-web-{id}.desktop"),
@@ -187,7 +187,8 @@ fn web_app_profile_name(id: &str) -> String {
 }
 
 /// A web app's desktop entry: `url` in an app window of the browser, in a browser folder of its
-/// own at `profile`, its window's app id what the browser names it, and the icon at `icon`.
+/// own at `profile`, its window's app id what the browser names it, and `icon` its icon: a path, or
+/// the icon theme's name for one.
 ///
 /// Chrome names an `--app` window on Wayland after the URL and the profile, never `--class`,
 /// which sets only X11's class: `chrome-<host>_<path>-<profile>`, as the file name of the
@@ -197,7 +198,7 @@ fn web_app_profile_name(id: &str) -> String {
 /// launcher or a dock matches the window to the entry.
 /// <https://github.com/chromium/chromium/blob/157.0.8103.78/chrome/browser/ui/views/frame/browser_native_widget_aura_linux.cc>
 /// <https://github.com/chromium/chromium/blob/157.0.8103.78/chrome/browser/web_applications/os_integration/web_app_shortcut_linux.cc>
-fn web_app_entry(id: &str, title: &str, url: &str, icon: &Path, profile: &Path) -> String {
+fn web_app_entry(id: &str, title: &str, url: &str, icon: &str, profile: &Path) -> String {
     let name = web_app_profile_name(id);
     let exec = [
         super::WEB_APP_BROWSER.to_owned(),
@@ -213,7 +214,7 @@ fn web_app_entry(id: &str, title: &str, url: &str, icon: &Path, profile: &Path) 
         "[Desktop Entry]\nType=Application\nName={title}\nExec={exec}\nIcon={icon}\nStartupWMClass={class}\n\
          Terminal=false\n",
         title = entry_value(title),
-        icon = entry_value(&icon.to_string_lossy()),
+        icon = entry_value(icon),
         class = entry_value(&web_app_window(url, &name)),
     )
 }
@@ -278,18 +279,28 @@ fn entry_value(text: &str) -> String {
     text.replace('\\', "\\\\")
 }
 
-/// A web app's two files, each with its path and its text.
+/// A web app's files, each with its path and its text: its desktop entry, and the icon an `.svg`
+/// of its folder is copied to. A theme's icon, which the entry names, copies nothing.
 fn web_app_files(host: &dyn Host, action: &Action) -> Vec<(PathBuf, String)> {
     let Kind::WebApp {
-        id, title, url, svg, ..
+        id,
+        title,
+        url,
+        icon,
+        svg,
     } = &action.kind
     else {
         return Vec::new();
     };
-    let [entry, icon] = web_app_paths(id).map(|p| logical(host, &p));
+    let [entry, copied] = web_app_paths(id).map(|p| logical(host, &p));
     let profile = logical(host, &web_app_profile(id));
-    let text = web_app_entry(id, title, url, &icon, &profile);
-    vec![(entry, text), (icon, svg.clone().unwrap_or_default())]
+    match svg {
+        Some(svg) => {
+            let text = web_app_entry(id, title, url, &copied.to_string_lossy(), &profile);
+            vec![(entry, text), (copied, svg.clone())]
+        }
+        None => vec![(entry, web_app_entry(id, title, url, icon, &profile))],
+    }
 }
 
 /// Whether a unit stands as `start` asks: started (running, or run and exited cleanly, as a

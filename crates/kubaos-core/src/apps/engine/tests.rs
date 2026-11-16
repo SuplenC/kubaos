@@ -1549,6 +1549,64 @@ icon = "sketch.svg"
 }
 
 #[test]
+fn a_web_app_naming_a_theme_icon_points_its_entry_at_it_and_copies_nothing() {
+    let web = app(r#"
+[[action]]
+name = "Open it in a window of its own"
+kind = "web_app"
+id = "chat"
+title = "Chat"
+url = "https://chat.example/"
+icon = "whatsapp"
+"#);
+    let world = World::new(&[("chat", &web)]);
+    let before = world.host.snapshot();
+
+    world.install("chat", true).0.unwrap();
+
+    let home = world.host_home();
+    let entry = fs::read_to_string(home.join(".local/share/applications/kubaos-web-chat.desktop")).unwrap();
+    assert!(entry.contains("\nIcon=whatsapp\n"), "{entry}");
+    assert!(!home.join(".local/share/icons").exists());
+
+    world.remove("chat").0.unwrap();
+
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn a_web_app_moving_from_its_svg_to_a_theme_icon_takes_the_copied_icon_away() {
+    let svg = app(r#"
+[[action]]
+name = "Open it in a window of its own"
+kind = "web_app"
+id = "chat"
+title = "Chat"
+url = "https://chat.example/"
+icon = "chat.svg"
+"#);
+    let world = World::new(&[("chat", &svg)]);
+    world.folder_file("chat", "chat.svg", "<svg/>\n");
+    world.install("chat", true).0.unwrap();
+    let icon = world
+        .host_home()
+        .join(".local/share/icons/hicolor/scalable/apps/kubaos-web-chat.svg");
+    assert!(icon.is_file());
+
+    world.write_app("chat", &svg.replace("icon = \"chat.svg\"", "icon = \"whatsapp\""));
+    world.install("chat", true).0.unwrap();
+
+    assert!(!icon.exists());
+    let entry = fs::read_to_string(
+        world
+            .host_home()
+            .join(".local/share/applications/kubaos-web-chat.desktop"),
+    )
+    .unwrap();
+    assert!(entry.contains("\nIcon=whatsapp\n"), "{entry}");
+}
+
+#[test]
 fn a_web_apps_browser_folder_is_the_users_and_outlasts_a_removal_and_a_reinstall() {
     let web = app(r#"
 [[action]]

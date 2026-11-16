@@ -156,7 +156,7 @@ fn an_action_is_in_the_install_stage_unless_it_says_configure() {
 }
 
 #[test]
-fn a_web_app_is_the_users_and_takes_an_https_url_and_an_svg_of_the_folder() {
+fn a_web_app_is_the_users_and_takes_an_https_url_and_an_svg_of_the_folder_or_a_theme_icon() {
     let web_app = |url: &str, icon: &str| {
         action(&format!(
             "name = \"X\"\nkind = \"web_app\"\nid = \"sketch\"\ntitle = \"Sketch\"\nurl = \"{url}\"\nicon = \"{icon}\"\n"
@@ -171,7 +171,18 @@ fn a_web_app_is_the_users_and_takes_an_https_url_and_an_svg_of_the_folder() {
         web_app("http://sketch.example/", "sketch.svg"),
         Err(ActionError::InvalidUrl { .. })
     ));
-    for icon in ["sketch.png", "../sketch.svg", "/etc/sketch.svg"] {
+    assert!(web_app("https://sketch.example/", "whatsapp").is_ok());
+    assert!(web_app("https://sketch.example/", "org.gnome.Nautilus").is_ok());
+    for icon in [
+        "sketch.png",
+        "../sketch.svg",
+        "/etc/sketch.svg",
+        "",
+        "-whatsapp",
+        "what sapp",
+        "whats/app",
+        "../whatsapp",
+    ] {
         assert!(
             matches!(
                 web_app("https://sketch.example/", icon),

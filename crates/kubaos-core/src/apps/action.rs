@@ -116,7 +116,7 @@ pub enum ActionError {
     InvalidUrl { value: String },
     #[error("a web app's title is one line, with no control characters")]
     InvalidTitle,
-    #[error("a web app's icon is an .svg file in the app's folder; {value:?} isn't")]
+    #[error("a web app's icon is an .svg file in the app's folder or an icon theme's name for an icon; {value:?} is neither")]
     InvalidIcon { value: String },
     #[error("{key} is the journal's own; an app's folder doesn't set it")]
     JournalOnly { key: &'static str },
@@ -254,9 +254,9 @@ pub enum Kind {
         title: String,
         /// An `https://` URL, or an `http://` one of this machine with its port.
         url: String,
-        /// An `.svg` in the app's folder.
+        /// An `.svg` in the app's folder, or the icon theme's name for an icon.
         icon: String,
-        /// The icon, read from the folder as the action resolves: the journal's own.
+        /// An `.svg` icon, read from the folder as the action resolves: the journal's own.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         svg: Option<String>,
     },
@@ -565,14 +565,18 @@ impl Action {
             Kind::WebApp {
                 id, title, url, icon, ..
             } => {
-                let path = folder.join(icon);
-                let svg = fs::read_to_string(&path).map_err(|source| ActionError::ReadFrom { path, source })?;
+                let svg = if is_svg_icon(icon) {
+                    let path = folder.join(icon);
+                    Some(fs::read_to_string(&path).map_err(|source| ActionError::ReadFrom { path, source })?)
+                } else {
+                    None
+                };
                 Kind::WebApp {
                     id: id.clone(),
                     title: title.clone(),
                     url: fill(url, None),
                     icon: icon.clone(),
-                    svg: Some(svg),
+                    svg,
                 }
             }
             Kind::Run {
@@ -768,10 +772,34 @@ fn check_web_app(id: &str, title: &str, url: &str, icon: &str) -> Result<(), Act
     if !is_https(url) && !is_loopback_http(url) {
         return Err(ActionError::InvalidUrl { value: url.to_owned() });
     }
-    if !is_folder_file(icon) || Path::new(icon).extension().is_none_or(|e| e != "svg") {
+    if !is_svg_icon(icon) && !is_theme_icon(icon) {
         return Err(ActionError::InvalidIcon { value: icon.to_owned() });
     }
     Ok(())
+}
+
+/// Whether a web app's `icon` names an `.svg` in the app's folder, which its install copies.
+pub fn is_svg_icon(icon: &str) -> bool {
+    is_folder_file(icon) && Path::new(icon).extension().is_some_and(|e| e == "svg")
+}
+
+/// Whether a web app's `icon` is the icon theme's name for an icon, which its desktop entry names
+/// as it is: an icon name with no extension the theme's lookup would read as a file's.
+fn is_theme_icon(icon: &str) -> bool {
+    is_icon_name(icon)
+        && Path::new(icon)
+            .extension()
+            .is_none_or(|e| !matches!(e.to_str(), Some("svg" | "png" | "xpm")))
+}
+
+/// Whether `value` can be an icon theme's name for an icon: no path, as the theme names them.
+/// <https://specifications.freedesktop.org/icon-naming-spec/latest/>
+pub fn is_icon_name(value: &str) -> bool {
+    value.len() <= 128
+        && value.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 /// Whether `url` is an https:// URL with no space or control character in it.
