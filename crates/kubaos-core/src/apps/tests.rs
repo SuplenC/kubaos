@@ -910,3 +910,131 @@ fn penpots_local_stack_comes_from_pinned_images_and_its_web_setup_from_the_websi
         serde_json::json!([{ "kind": "web_app" }])
     );
 }
+
+/// The licences of the repository itself, whose texts are `LICENSE-MIT` and `LICENSE-APACHE` at
+/// its root: a file under one of them needs nothing in `LICENSES/`.
+const OURS: [&str; 2] = ["MIT", "Apache-2.0"];
+
+/// The beginnings of the SPDX identifiers a header comment names a licence by.
+const SPDX_PREFIXES: [&str; 13] = [
+    "MPL-", "GPL-", "LGPL-", "AGPL-", "CC-BY", "CC0-", "OFL-", "BSD-", "EPL-", "Apache-", "MIT", "ISC", "Unlicense",
+];
+
+/// The comment a file starts with: an SVG's or an XML file's first `<!-- … -->`, else its first
+/// run of `#` or `//` lines, a shebang skipped.
+fn header_comment(text: &str) -> String {
+    let rest = text.trim_start();
+    let rest = match rest.strip_prefix("<?xml") {
+        Some(after) => after.split_once("?>").map_or("", |(_, r)| r).trim_start(),
+        None => rest,
+    };
+    if let Some(after) = rest.strip_prefix("<!--") {
+        return after.split_once("-->").map_or("", |(c, _)| c).to_owned();
+    }
+    rest.lines()
+        .skip_while(|line| line.starts_with("#!"))
+        .map_while(|line| {
+            let line = line.trim_start();
+            line.strip_prefix('#').or_else(|| line.strip_prefix("//"))
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The SPDX licence identifiers `comment` names.
+fn licences_named(comment: &str) -> Vec<String> {
+    let mut found: Vec<String> = comment
+        .split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '+')))
+        .map(|word| word.trim_end_matches('.'))
+        .filter(|word| SPDX_PREFIXES.iter().any(|prefix| word.starts_with(prefix)))
+        .map(str::to_owned)
+        .collect();
+    found.dedup();
+    found
+}
+
+/// What is wrong with the licence notices of the apps' files under `root`: a picture that names
+/// no licence in its header comment, or a licence a header names whose text isn't in
+/// `LICENSES/`.
+fn licence_problems(root: &Path) -> Vec<String> {
+    let mut problems = Vec::new();
+    let mut files: Vec<PathBuf> = Vec::new();
+    for app in fs::read_dir(root.join("apps")).unwrap() {
+        let app = app.unwrap().path();
+        if app.is_dir() {
+            files.extend(walk(&app));
+        }
+    }
+    files.sort();
+    for file in files {
+        if file.file_name().is_some_and(|n| n == "app.toml") {
+            continue;
+        }
+        let shown = file.strip_prefix(root).unwrap_or(&file).display().to_string();
+        let picture = file
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| matches!(e, "svg" | "png" | "jpg" | "jpeg" | "webp" | "ico"));
+        let Ok(text) = fs::read_to_string(&file) else {
+            problems.push(format!("{shown}: not text, so it can't name its licence; an icon is an .svg"));
+            continue;
+        };
+        let licences = licences_named(&header_comment(&text));
+        if picture && licences.is_empty() {
+            problems.push(format!("{shown}: its header comment names no licence"));
+        }
+        for licence in licences.iter().filter(|l| !OURS.contains(&l.as_str())) {
+            if !root.join("LICENSES").join(format!("{licence}.txt")).is_file() {
+                problems.push(format!("{shown}: {licence}, whose text isn't in LICENSES/{licence}.txt"));
+            }
+        }
+    }
+    problems
+}
+
+fn walk(dir: &Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            found.extend(walk(&path));
+        } else {
+            found.push(path);
+        }
+    }
+    found
+}
+
+#[test]
+fn every_third_party_file_of_an_app_names_its_licence_and_the_repo_ships_its_text() {
+    let problems = licence_problems(&repo_root());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+#[test]
+fn the_licence_check_finds_a_picture_naming_no_licence_and_a_licence_without_its_text() {
+    let root = tempfile::tempdir().unwrap();
+    let app = root.path().join("apps/chat");
+    fs::create_dir_all(&app).unwrap();
+    fs::create_dir_all(root.path().join("LICENSES")).unwrap();
+    fs::write(root.path().join("LICENSES/MPL-2.0.txt"), "").unwrap();
+    fs::write(app.join("app.toml"), "name = \"Chat\"\n").unwrap();
+    fs::write(app.join("bare.svg"), "<svg/>\n").unwrap();
+    fs::write(app.join("ours.svg"), "<!-- KubaOS's, MIT OR Apache-2.0. -->\n<svg/>\n").unwrap();
+    fs::write(app.join("theirs.svg"), "<!-- Chat's logo, MPL-2.0, unmodified. -->\n<svg/>\n").unwrap();
+    fs::write(app.join("gpl.svg"), "<!-- From a theme, GPL-3.0-or-later. -->\n<svg/>\n").unwrap();
+    fs::write(app.join("stack.yaml"), "# Chat's stack, CC-BY-4.0, as KubaOS runs it.\nservices: {}\n").unwrap();
+    fs::write(app.join("up"), "#!/bin/sh\n# up: start it.\nexit 0\n").unwrap();
+
+    let problems = licence_problems(root.path());
+
+    assert_eq!(
+        problems,
+        [
+            "apps/chat/bare.svg: its header comment names no licence",
+            "apps/chat/gpl.svg: GPL-3.0-or-later, whose text isn't in LICENSES/GPL-3.0-or-later.txt",
+            "apps/chat/stack.yaml: CC-BY-4.0, whose text isn't in LICENSES/CC-BY-4.0.txt",
+        ]
+    );
+}

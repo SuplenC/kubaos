@@ -12,7 +12,7 @@ ADR 0008 made an app one source (apt, nixpkgs or a pinned `.deb`) plus an opaque
 
 ### The folder
 
-`apps/<id>/app.toml` is the app; files its actions use sit beside it (templates, scripts a `run` calls, a web app's icon). Adding an app is one folder. The file says what the app is, then its actions in order:
+`apps/<id>/app.toml` is the app; files its actions use sit beside it (templates, scripts a `run` calls, a web app's icon). Adding an app is one folder. A file another project wrote (Penpot's logo, its compose stack) names its licence in its header comment, and the repository ships that licence's text in `LICENSES/`. The file says what the app is, then its actions in order:
 
 ```toml
 name = "Docker"
