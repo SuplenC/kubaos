@@ -20,8 +20,8 @@ import { shown, type Words } from "../../lib/content.ts";
 import { dialog } from "../../lib/dialog.ts";
 import { icon } from "../../lib/icon.ts";
 import { type KeyHint, keyHints } from "../../lib/keycap.ts";
-import { fill, filling, gap, row, stack } from "../../lib/layout.ts";
-import { progressBar, setProgress } from "../../lib/progress.ts";
+import { gap, row, stack } from "../../lib/layout.ts";
+import { setCaption, setProgress } from "../../lib/progress.ts";
 import { rollingNumber } from "../../lib/rolling-number.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { battery, koboBrand, type RailPage, stepRailPage } from "../../lib/step-rail.ts";
@@ -31,7 +31,7 @@ import { bezier, css, cueOf, milliseconds, stepsOf, struck } from "../../site/re
 import type { Duration, Easing, Move, NonEmpty, Track } from "../../site/page.ts";
 import { paint, palette } from "../../site/recolour.ts";
 import { settings } from "../../site/settings.ts";
-import { DONE_HEADLINE, HERO, LAPTOP_DISK, LEDE, NETWORKS, RELEASE, STEPS, STICK, stepAt, TIPS, TOTAL, duration } from "./kobo-data.ts";
+import { DONE_HEADLINE, HERO, LAPTOP_DISK, LEDE, NETWORKS, RELEASE, STICK, TIPS, TOTAL, duration } from "./kobo-data.ts";
 import {
   accountProblem,
   type Answers,
@@ -41,12 +41,15 @@ import {
   failedBody,
   filledAnswers,
   freshAnswers,
+  installProgress,
   languageBody,
   type LanguageView,
   type Machine,
   networkBody,
   networkProblem,
   reviewBody,
+  stepLine,
+  timeCaption,
   type ReviewView,
   youBody,
 } from "./kobo-parts.ts";
@@ -234,34 +237,12 @@ function tipLine(index: number): HTMLElement {
   return row("s12", "centre", keyHints([[tip.keys, ""]]), text(tip.does, "body", "on_surface_variant"));
 }
 
-/** How long is left `share` of the way through, as the status line says it. */
-function timeLeft(share: number): string {
-  const minutes = Math.max(1, Math.ceil((TOTAL * (1 - share)) / 60));
-  return new Intl.NumberFormat("en-GB", { style: "unit", unit: "minute", unitDisplay: "long", maximumFractionDigits: 0 }).format(minutes);
-}
-
-/**
- * The line under the install's bar: the step running and how much of it is done, then how long is
- * left at its end. Drawn whole each time either changes: a text's box is as wide as the words it
- * was made with, so words written into an old one run over what is beside it.
- */
-function installStatus(share: number): HTMLElement {
-  const step = STEPS[stepAt(share).index]!;
-  const doing = row("s12", "centre", text(step.title, "body_strong"), ...(step.detail ? [text(step.detail, "mono", "primary")] : []));
-  doing.classList.add("kobo-doing");
-  const now = row("s12", "centre", doing, fill(), icon("timer", "var(--icon-s16)", "var(--color-on_surface_variant)"), text(`About ${timeLeft(share)} left`, "small", "on_surface_variant"));
-  now.classList.add("kobo-status");
-  now.dataset.says = `${step.title}|${step.detail ?? ""}|${timeLeft(share)}`;
-  return now;
-}
-
 /** The install as its scene shows it, `share` of the way through. */
 export function installingColumn(share: number, tip = 0): HTMLElement {
   // Two figures' room: at 100 the install hands over to the done screen.
   const percent = rollingNumber({ value: Math.min(99, Math.round(share * 100)), widest: "00", style: "hero_number" });
   const figure = row(0, "end", percent.element, text("%", "hero_number"));
   figure.classList.add("kobo-percent");
-  const now = installStatus(share);
   const tips = document.createElement("span");
   tips.className = "kobo-tip";
   const shownTip = tipLine(tip);
@@ -276,7 +257,7 @@ export function installingColumn(share: number, tip = 0): HTMLElement {
     gap("s8"),
     part(wrapped("Go stare at a wall, it'll be done before you get bored.", "body_large", "on_surface_variant"), "lede"),
     gap("s32"),
-    part(stack("s12", "start", filling(progressBar({ fraction: share, timed: true })), filling(now)), "progress"),
+    part(installProgress(share), "progress"),
     gap("s40"),
     part(stack("s8", "centre", text("While you wait", "label", "on_surface_variant"), tips), "tips"),
     gap("s40"),
@@ -815,9 +796,15 @@ function simulate(element: HTMLElement, from: number, done: () => void): { stop:
         if (bar) setProgress(bar, share);
         const dark = scene.querySelector<HTMLElement>(".k-backdrop-dark");
         if (dark) dark.style.opacity = String(dusk() * (1 - share));
-        const status = column.querySelector<HTMLElement>(".kobo-status");
-        const next = installStatus(share);
+        const status = column.querySelector<HTMLElement>(".kobo-install-progress .kobo-status");
+        const next = stepLine(share);
         if (status && status.dataset.says !== next.dataset.says) status.replaceWith(next);
+        const captioned = column.querySelector<HTMLElement>(".k-progress-captioned");
+        const caption = timeCaption(share);
+        if (captioned && captioned.dataset.says !== (caption?.words ?? "")) {
+          captioned.dataset.says = caption?.words ?? "";
+          setCaption(captioned, caption);
+        }
       }
       const now = Math.floor(((performance.now() - start) / milliseconds("scene")) / 3);
       if (now !== tip) {
