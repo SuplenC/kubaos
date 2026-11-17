@@ -145,7 +145,7 @@ export default page<Shown>({
     { name: "Refused by a full group", for: "ten in use: it dims, no room", sample: at({ view: "desk", fill: "full", pin: { kind: "space", space: "s1", to: { kind: "refused", group: "g-ext2" } } }) },
     { name: "The delete, lit", for: "under the keyboard's workspace", sample: at({ pin: { kind: "delete", space: "s7", held: 0 } }) },
     { name: "The delete, held halfway", for: "its ring half full", sample: at({ pin: { kind: "delete", space: "s7", held: 0.5 } }) },
-    { name: "A workspace collapsing", for: "its windows gone, folding back", sample: at({ pin: { kind: "collapsing", space: "s7", at: 600 } }) },
+    { name: "A workspace collapsing", for: "its windows gone, folding back", sample: at({ pin: { kind: "collapsing", space: "s7", at: 480 } }) },
     { name: "Closed", for: "the desktop it opens from", sample: at({ closed: true }) },
   ],
   sizes: doesntApply("one size: the screen's; the miniatures take what the screen has."),
