@@ -1,0 +1,37 @@
+# Voxtype from nixpkgs, through the User flake. Its project's .deb isn't in an apt repository and
+# Ubuntu doesn't package it. nixpkgs' wrapper brings the tools it types and pastes with (wtype,
+# dotool, wl-clipboard), and its x86-64 build targets x86-64-v3, so it needs AVX2 there.
+# The speech model, the service and the key are left to the user: `voxtype setup` makes the first
+# two, and the key is a bind of their own.
+# https://github.com/peteonrails/voxtype
+name = "Voxtype"
+category = "ai"
+tags = ["dictation", "speech to text", "voice", "whisper", "offline", "push to talk"]
+summary = "Hold a key, talk, and it types what you said. Runs on your machine, so your mumbling stays here."
+# The first paragraph is from Voxtype's README (its opening lines, without its benchmark and the
+# default key it no longer turns on), MIT, Copyright (c) 2025 Peter Jackson
+# (github.com/peteonrails/voxtype); the rest is KubaOS's.
+description = """\
+Voice-to-text for Linux. Local by default. Hold a hotkey while speaking, release to transcribe \
+and output the text at your cursor position. No cloud, no subscription, no telemetry.
+
+What's left is yours. `voxtype setup --download` fetches its speech model (base.en, 142 MB), and \
+`voxtype setup systemd` puts its service in place and starts it at every login. Then a key, in \
+~/.config/kubaos/desktop/hypr/hyprland.lua, which records while you hold it:
+
+hl.bind("SUPER + CTRL + D", hl.dsp.exec_cmd("voxtype record start"), { description = "Dictate" })
+hl.bind("SUPER + CTRL + D", hl.dsp.exec_cmd("voxtype record stop"), { release = true })
+
+and `hyprctl reload`. On an x86-64 machine it needs a CPU with AVX2 (x86-64-v3)."""
+description_from = "https://github.com/peteonrails/voxtype/blob/v0.7.2/README.md"
+icon = "voxtype.svg"
+keeps = """\
+What `voxtype setup` made is yours and stays: its service, \
+~/.config/systemd/user/voxtype.service (`voxtype setup systemd --uninstall` takes it away, \
+before you remove Voxtype), its models in ~/.local/share/voxtype/models and its settings in \
+~/.config/voxtype. Install Voxtype again and they're all there."""
+
+[[action]]
+name = "Install Voxtype"
+kind = "nix"
+packages = ["voxtype"]

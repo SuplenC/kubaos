@@ -15,21 +15,26 @@ use crate::apps::Catalog;
 use crate::apps::Platform;
 use crate::apps::action::Kind;
 use crate::apps::action::Side;
+use crate::apps::action::is_svg_icon;
 use crate::apps::catalog::CATALOG;
 use crate::apps::picks::Picks;
 use crate::unfree::Unfree;
 
-const APPS: [&str; 10] = [
+const APPS: [&str; 14] = [
     "aider",
     "chatgpt",
     "claude-desktop",
     "codex",
     "cursor",
     "devin-desktop",
+    "gemini",
     "gemini-cli",
     "github-copilot-cli",
+    "grok",
     "lm-studio",
     "opencode",
+    "perplexity",
+    "voxtype",
 ];
 
 /// Chrome as the web apps require it, without the theme helper the shipped one brings.
@@ -119,10 +124,26 @@ fn every_ai_app_installs_on_the_fake_machine_and_its_removal_leaves_it_as_before
                             .host_home()
                             .join(format!(".local/share/applications/kubaos-web-{web}.desktop"));
                         let text = fs::read_to_string(&entry).unwrap();
-                        assert!(text.contains(&format!("\nIcon={icon}\n")), "{id}: {text}");
+                        let shown = if is_svg_icon(icon) {
+                            let file = world
+                                .host_home()
+                                .join(format!(".local/share/icons/hicolor/scalable/apps/kubaos-web-{web}.svg"));
+                            assert!(file.is_file(), "{id}: {}", file.display());
+                            file.display().to_string()
+                        } else {
+                            icon.clone()
+                        };
+                        assert!(text.contains(&format!("\nIcon={shown}\n")), "{id}: {text}");
                         assert!(state.dpkg.contains_key("google-chrome-stable"), "{id}");
                     }
-                    other => panic!("{id}: an AI app is its package or its window, not {other:?}"),
+                    // The app's own icon, an .svg of its folder, put in the user's icon theme.
+                    Kind::File {
+                        to, from: Some(from), ..
+                    } if app.icon.as_deref() == Some(from) => {
+                        let to = to.replace("~/", "");
+                        assert!(world.host_home().join(to).is_file(), "{id}: {from} isn't in place");
+                    }
+                    other => panic!("{id}: an AI app is its package, its window or its icon, not {other:?}"),
                 }
             }
         }
@@ -145,8 +166,8 @@ fn which_ai_apps_a_machine_can_have_follows_its_architecture_and_the_unfree_sett
     };
 
     assert_eq!(on("amd64", Unfree::Allowed), APPS);
-    // Devin Desktop's repository has amd64 alone, and ChatGPT's window needs Chrome, which Google
-    // builds for amd64 alone.
+    // Devin Desktop's repository has amd64 alone, and the web apps' windows need Chrome, which
+    // Google builds for amd64 alone.
     assert_eq!(
         on("arm64", Unfree::Allowed),
         [
@@ -157,7 +178,8 @@ fn which_ai_apps_a_machine_can_have_follows_its_architecture_and_the_unfree_sett
             "gemini-cli",
             "github-copilot-cli",
             "lm-studio",
-            "opencode"
+            "opencode",
+            "voxtype"
         ]
     );
     // nixpkgs marks Copilot CLI and LM Studio unfree.

@@ -468,7 +468,7 @@ fn shipped() -> Catalog {
 }
 
 /// Every app of the shipped catalog, by id, in the catalog's order.
-const SHIPPED: [&str; 129] = [
+const SHIPPED: [&str; 133] = [
     "1password",
     "aider",
     "alacritty",
@@ -504,6 +504,7 @@ const SHIPPED: [&str; 129] = [
     "firefox",
     "gamescope",
     "geforce-now",
+    "gemini",
     "gemini-cli",
     "gimp",
     "github-copilot-cli",
@@ -511,6 +512,7 @@ const SHIPPED: [&str; 129] = [
     "gnome-boxes",
     "google-chrome",
     "gparted",
+    "grok",
     "handbrake",
     "helix",
     "heroic",
@@ -554,6 +556,7 @@ const SHIPPED: [&str; 129] = [
     "opencode",
     "openssh-server",
     "penpot",
+    "perplexity",
     "pinta",
     "podman-desktop",
     "postman",
@@ -583,6 +586,7 @@ const SHIPPED: [&str; 129] = [
     "virt-manager",
     "vivaldi",
     "vlc",
+    "voxtype",
     "vscode",
     "wezterm",
     "whatsapp",
