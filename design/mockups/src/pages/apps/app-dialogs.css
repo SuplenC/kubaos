@@ -45,3 +45,10 @@
 .app-dialog .k-icon-tile {
   --tint: var(--color-surface_container) !important;
 }
+
+/* Draft rule: the last action's box ends as far from the dialog's edge as a hung Text button's box
+   starts, `space.s12` (a regular Text button's own padding) into the dialog's `space.s24`, so the
+   row's two ends sit alike. Kept to one line; a stacked bar fills its width as it does. */
+.app-dialog .k-button-bar:not([data-stacked]) > [data-hangs] > .k-button:not([data-kind="Text"]):last-child {
+  margin-inline-end: calc(-1 * var(--space-s12));
+}

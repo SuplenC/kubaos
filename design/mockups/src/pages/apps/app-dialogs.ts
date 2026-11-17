@@ -140,6 +140,16 @@ function callerLine(app: string): HTMLElement {
   return line;
 }
 
+/**
+ * Whether `title` says no more than `app`: the same name, trimmed and in any case, or the name with
+ * nothing after it but punctuation. Then the title carries the name and the caller line goes.
+ */
+function namesApp(title: string, app: string): boolean {
+  const name = app.trim().toLowerCase();
+  const said = title.trim().toLowerCase();
+  return said.startsWith(name) && /^[\s\p{P}]*$/u.test(said.slice(name.length));
+}
+
 /** The library's Dialog for `call`, its draft parts put in. */
 function drawn(call: Call, identity: Identity, landed: boolean) {
   const kind = KINDS[call.kind];
@@ -173,7 +183,7 @@ function drawn(call: Call, identity: Identity, landed: boolean) {
   else if (call.hidden) symbol.replaceWith(iconInLine("lock", "heading", "var(--color-primary)"));
   else if (call.icon) symbol.replaceWith(iconInLine(call.icon, "heading", "var(--color-primary)"));
   else symbol.replaceWith(iconInLine(kind.icon, "heading", `var(--color-${kind.role})`));
-  if (identity === "line" && call.app) head.before(callerLine(call.app), gap("s12"));
+  if (identity === "line" && call.app && !namesApp(title, call.app)) head.before(callerLine(call.app), gap("s12"));
   const body = surface.querySelector<HTMLElement>(".k-dialog-scroll > .k-text")!;
   if (call.text !== plain(call.text)) markup(call.text, body);
   body.toggleAttribute("data-no-wrap", call.noWrap ?? false);
