@@ -132,6 +132,10 @@ impl Sources {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Release {
     pub sha256: BTreeMap<String, String>,
+    /// `Acquire-By-Hash: yes`: each index is also served under `by-hash/SHA256/<its sha256>` in
+    /// its folder, an address a mirror never rewrites, so a mirror caught between syncs serves
+    /// the index this release lists or nothing, never a newer one.
+    pub by_hash: bool,
 }
 
 impl Release {
@@ -143,10 +147,14 @@ impl Release {
     /// Parses a release file's `SHA256` section; the other fields are passed over.
     pub fn parse(text: &str) -> Self {
         let mut sha256 = BTreeMap::new();
+        let mut by_hash = false;
         let mut inside = false;
         for line in text.lines() {
             if !line.starts_with(' ') {
                 inside = line.trim_end() == "SHA256:";
+                if let Some(value) = line.strip_prefix("Acquire-By-Hash:") {
+                    by_hash = value.trim().eq_ignore_ascii_case("yes");
+                }
                 continue;
             }
             if !inside {
@@ -157,7 +165,24 @@ impl Release {
                 sha256.insert(path.to_owned(), hash.to_ascii_lowercase());
             }
         }
-        Self { sha256 }
+        Self { sha256, by_hash }
+    }
+
+    /// Where the index `path` is fetched from under `dists`: by its sha256 where the suite serves
+    /// indexes by hash, else by its name.
+    pub fn url(&self, dists: &str, path: &str) -> String {
+        match self.sha256.get(path).filter(|_| self.by_hash) {
+            Some(hash) => {
+                let folder = path.rsplit_once('/').map_or("", |(folder, _)| folder);
+                let folder = if folder.is_empty() {
+                    String::new()
+                } else {
+                    format!("{folder}/")
+                };
+                format!("{dists}/{folder}by-hash/SHA256/{hash}")
+            }
+            None => format!("{dists}/{path}"),
+        }
     }
 }
 
@@ -377,7 +402,7 @@ fn packages(dists: &str, release: &Release, base: &str, arch: &str) -> Result<BT
     } else {
         return Err(AptError::Invalid(format!("the suite lists no {base} index")));
     };
-    let url = format!("{dists}/{path}");
+    let url = release.url(dists, &path);
     let body = fetch::get(&url).map_err(AptError::fetch(&url))?;
     let got = fetch::hex(&Sha256::digest(&body));
     if release.sha256.get(&path) != Some(&got) {
