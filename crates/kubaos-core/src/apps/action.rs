@@ -99,9 +99,9 @@ pub enum ActionError {
     },
     #[error("{value:?} is not a file mode: three octal digits")]
     InvalidMode { value: String },
-    #[error("a setting's file is a .json or .toml file in the home; {value:?} isn't")]
+    #[error("a setting's file is a .json, .toml or .conf file in the home; {value:?} isn't")]
     InvalidSettingFile { value: String },
-    #[error("{value:?} is not a setting's key: dot-separated names")]
+    #[error("{value:?} is not a setting's key: dot-separated names, one bare name in a .conf")]
     InvalidKey { value: String },
     #[error("a setting's value is a string, a number or a boolean")]
     InvalidValue,
@@ -258,7 +258,8 @@ pub enum Kind {
         to: String,
         target: String,
     },
-    /// A key in an app's JSON or TOML settings, the file's other keys kept.
+    /// A key in an app's JSON, TOML or flat `key = value` `.conf` settings, the file's other keys
+    /// kept.
     Setting {
         file: String,
         key: String,
@@ -851,10 +852,16 @@ fn file_text(
 
 fn check_setting(file: &str, key: &str, value: &toml::Value) -> Result<(), ActionError> {
     let home = file.starts_with("~/") && check_path(file).is_ok();
-    if !home || !Path::new(file).extension().is_some_and(|e| e == "json" || e == "toml") {
+    let extension = Path::new(file).extension().and_then(|e| e.to_str());
+    if !home || !matches!(extension, Some("json" | "toml" | "conf")) {
         return Err(ActionError::InvalidSettingFile { value: file.to_owned() });
     }
-    if key.split('.').any(str::is_empty) {
+    // A `.conf`'s keys are flat, one name with no tables above it: a dot would read as one, and
+    // `=`, `#` or a line break would end the key.
+    let flat = extension == Some("conf");
+    if (flat && (key.is_empty() || key.contains(['.', '=', '#', '\n', '\r']) || key.trim() != key))
+        || (!flat && key.split('.').any(str::is_empty))
+    {
         return Err(ActionError::InvalidKey { value: key.to_owned() });
     }
     if !matches!(
