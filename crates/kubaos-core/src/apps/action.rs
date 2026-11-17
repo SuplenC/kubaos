@@ -24,6 +24,8 @@ use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -118,6 +120,8 @@ pub enum ActionError {
     InvalidKey { value: String },
     #[error("a setting's value is a string, a number or a boolean")]
     InvalidValue,
+    #[error("{path:?} isn't text, so it can't be a template")]
+    BinaryTemplate { path: PathBuf },
     #[error("{value:?} is not a systemd unit name")]
     InvalidUnit { value: String },
     #[error("a unit action enables or disables, starts or stops: at least one of `enable` and `start`")]
@@ -275,6 +279,10 @@ pub enum Kind {
         /// writes this text over it and owns nothing, so a removal leaves it, with these values.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         vendor_keys: bool,
+        /// A journal's: `text` is the base64 of the bytes of a `from` that isn't UTF-8 text, a
+        /// picture's, so the journal can hold them and the step write them back.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        binary: bool,
     },
     Symlink {
         to: String,
@@ -475,7 +483,7 @@ impl Action {
     ///
     /// [`ActionError`] for an action that isn't valid.
     pub fn from_folder(table: toml::Table) -> Result<Self, ActionError> {
-        for key in ["scripts", "svg", "in_place", "conf_text"] {
+        for key in ["scripts", "svg", "in_place", "conf_text", "binary"] {
             if table.contains_key(key) {
                 return Err(ActionError::JournalOnly { key });
             }
@@ -658,21 +666,7 @@ impl Action {
         let kind = match &self.kind {
             Kind::Apt { .. } => resolve_apt(&words.arch, &self.kind),
             Kind::Download { .. } => resolve_download(words, &self.kind),
-            Kind::File {
-                to,
-                from,
-                text,
-                template,
-                mode,
-                vendor_keys,
-            } => Kind::File {
-                to: fill(to, None),
-                from: None,
-                text: Some(file_text(words, folder, from.as_deref(), text.as_deref(), *template)?),
-                template: false,
-                mode: mode.clone(),
-                vendor_keys: *vendor_keys,
-            },
+            Kind::File { .. } => resolve_file(words, folder, &self.kind)?,
             Kind::Symlink { to, target } => {
                 let target = fill(target, None);
                 if target.contains("@VERSION@") {
@@ -972,19 +966,54 @@ fn resolve_download(words: &Words, kind: &Kind) -> Kind {
     kind
 }
 
+/// A `file` as its journal records it: its words filled in and its `from` read into its text.
+fn resolve_file(words: &Words, folder: &Path, kind: &Kind) -> Result<Kind, ActionError> {
+    let Kind::File {
+        to,
+        from,
+        text,
+        template,
+        mode,
+        vendor_keys,
+        ..
+    } = kind
+    else {
+        unreachable!("resolve_file resolves a file step");
+    };
+    let (text, binary) = file_text(words, folder, from.as_deref(), text.as_deref(), *template)?;
+    Ok(Kind::File {
+        to: words.fill(to, None),
+        from: None,
+        text: Some(text),
+        template: false,
+        mode: mode.clone(),
+        vendor_keys: *vendor_keys,
+        binary,
+    })
+}
+
 /// A `file`'s text as it is written: its `from` read, filled in for a template, which may name
-/// the app's version only in an app that has one.
+/// the app's version only in an app that has one; and whether it is a `from` that isn't UTF-8
+/// text, a picture's bytes, which the text holds as base64.
 fn file_text(
     words: &Words,
     folder: &Path,
     from: Option<&str>,
     text: Option<&str>,
     template: bool,
-) -> Result<String, ActionError> {
+) -> Result<(String, bool), ActionError> {
     let raw = match (from, text) {
         (Some(from), _) => {
             let path = folder.join(from);
-            fs::read_to_string(&path).map_err(|source| ActionError::ReadFrom { path, source })?
+            let bytes = fs::read(&path).map_err(|source| ActionError::ReadFrom {
+                path: path.clone(),
+                source,
+            })?;
+            match String::from_utf8(bytes) {
+                Ok(text) => text,
+                Err(_) if template => return Err(ActionError::BinaryTemplate { path }),
+                Err(not_text) => return Ok((BASE64.encode(not_text.as_bytes()), true)),
+            }
         }
         (None, Some(text)) => text.to_owned(),
         (None, None) => return Err(ActionError::FileSource),
@@ -993,7 +1022,7 @@ fn file_text(
     if template && text.contains("@VERSION@") {
         return Err(ActionError::NoVersion);
     }
-    Ok(text)
+    Ok((text, false))
 }
 
 fn check_setting(file: &str, key: &str, value: &toml::Value) -> Result<(), ActionError> {
@@ -1111,7 +1140,7 @@ pub fn is_theme_icon(icon: &str) -> bool {
     is_icon_name(icon)
         && Path::new(icon)
             .extension()
-            .is_none_or(|e| !matches!(e.to_str(), Some("svg" | "png" | "xpm")))
+            .is_none_or(|e| !matches!(e.to_str(), Some("svg" | "png" | "xpm" | "jpg" | "jpeg")))
 }
 
 /// Whether `value` can be an icon theme's name for an icon: no path, as the theme names them.

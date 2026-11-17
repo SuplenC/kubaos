@@ -22,6 +22,9 @@ use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::path::PathBuf;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
+
 use super::Action;
 use super::Kind;
 use super::Scope;
@@ -90,6 +93,8 @@ pub enum PerformError {
     AptDowngrades { packages: Vec<String> },
     #[error("removing it would also remove {}, which this app didn't install; nothing was changed", packages.join(", "))]
     AptTakes { packages: Vec<String> },
+    #[error("the journal's file isn't base64, so its bytes can't be written back")]
+    NotBase64,
     #[error("recording what it is about to install")]
     Record(#[source] JournalError),
     #[error("no kernel has its headers to build {module} against: install linux-headers-generic")]
@@ -502,7 +507,7 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             let files = web_app_files(host, action);
             let done = files
                 .iter()
-                .all(|(path, text)| has_file(host, path, text, DEFAULT_FILE_MODE));
+                .all(|(path, text)| has_file(host, path, text.as_bytes(), DEFAULT_FILE_MODE));
             let mut look = Look {
                 done,
                 ..Look::default()
@@ -875,10 +880,10 @@ fn installed_as(
 }
 
 /// Whether `path` is a file holding `text` with `mode`.
-fn has_file(host: &dyn Host, path: &Path, text: &str, mode: u32) -> bool {
+fn has_file(host: &dyn Host, path: &Path, contents: &[u8], mode: u32) -> bool {
     let placed = host.place(path);
     placed.symlink_metadata().is_ok_and(|m| m.is_file())
-        && fs::read_to_string(&placed).is_ok_and(|t| t == text)
+        && fs::read(&placed).is_ok_and(|t| t == contents)
         && fs::metadata(&placed).is_ok_and(|m| m.permissions().mode() & 0o777 == mode)
 }
 
@@ -925,12 +930,15 @@ pub fn apply(
             make_parents(&path)?;
             download_to(host, &download.url, &download.sha256, &path, *unpack, *strip)
         }
-        Kind::File { to, text, mode, .. } => {
+        Kind::File {
+            to, text, mode, binary, ..
+        } => {
             let logical_path = logical(host, to);
             let path = host.place(&logical_path);
             make_parents(&path)?;
             let mode = mode.as_deref().and_then(parse_mode).unwrap_or(DEFAULT_FILE_MODE);
-            write_file(&path, text.as_deref().unwrap_or_default(), mode)?;
+            let contents = file_contents(text.as_deref(), *binary).ok_or(PerformError::NotBase64)?;
+            write_bytes(&path, &contents, mode)?;
             reload_unit_file(host, &logical_path)
         }
         Kind::WebApp { .. } => {
@@ -1411,6 +1419,7 @@ fn look_file(host: &dyn Host, kind: &Kind) -> Look {
         text,
         mode,
         vendor_keys,
+        binary,
         ..
     } = kind
     else {
@@ -1419,7 +1428,9 @@ fn look_file(host: &dyn Host, kind: &Kind) -> Look {
     let path = logical(host, to);
     let text = text.as_deref().unwrap_or_default();
     let want_mode = mode.as_deref().and_then(parse_mode).unwrap_or(DEFAULT_FILE_MODE);
-    let done = has_file(host, &path, text, want_mode);
+    // A journal whose bytes don't decode can't be what is on disk: the step writes them again,
+    // and the write refuses them.
+    let done = file_contents(Some(text), *binary).is_some_and(|contents| has_file(host, &path, &contents, want_mode));
     if *vendor_keys && !done && vendor_wrote(host, &path, text) {
         return Look {
             done,
@@ -1525,9 +1536,24 @@ fn make_parents(path: &Path) -> Result<(), PerformError> {
 
 /// Writes `text` to `path` through a new file renamed into place, so a reader never sees half of
 /// it and a link left at the staging path is never followed.
+/// The bytes a `file` step writes: its text, or for a `binary` one the bytes its base64 text
+/// holds; none when that text isn't base64.
+fn file_contents(text: Option<&str>, binary: bool) -> Option<Vec<u8>> {
+    let text = text.unwrap_or_default();
+    if binary {
+        BASE64.decode(text).ok()
+    } else {
+        Some(text.as_bytes().to_vec())
+    }
+}
+
 fn write_file(path: &Path, text: &str, mode: u32) -> Result<(), PerformError> {
+    write_bytes(path, text.as_bytes(), mode)
+}
+
+fn write_bytes(path: &Path, contents: &[u8], mode: u32) -> Result<(), PerformError> {
     let tmp = staging(path);
-    write_new(&tmp, text.as_bytes()).map_err(PerformError::io(&tmp))?;
+    write_new(&tmp, contents).map_err(PerformError::io(&tmp))?;
     fs::set_permissions(&tmp, fs::Permissions::from_mode(mode)).map_err(PerformError::io(&tmp))?;
     fs::rename(&tmp, path).map_err(PerformError::io(path))
 }

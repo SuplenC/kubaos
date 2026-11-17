@@ -3,6 +3,7 @@ use std::path::Path;
 use super::Category;
 use super::Folder;
 use super::FolderError;
+use super::picture;
 
 const ABOUT: &str = r#"name = "Sketch"
 category = "graphics"
@@ -67,6 +68,7 @@ fn an_svg_icon_of_the_folder_is_put_in_the_icon_theme_after_the_apps_own_install
             template: false,
             mode: Some("644".to_owned()),
             vendor_keys: false,
+            binary: false,
         }
     );
     assert_eq!(folder.icon_shown().as_deref(), Some("/catalog/sketch/sketch.svg"));
@@ -81,8 +83,8 @@ fn a_theme_icon_is_named_as_it_is_and_installs_nothing() {
 }
 
 #[test]
-fn an_icon_that_is_neither_an_svg_of_the_folder_nor_a_theme_name_is_refused() {
-    for icon in ["sketch.png", "../sketch.svg", "art/sketch.svg", "-sketch"] {
+fn an_icon_that_is_neither_a_picture_of_the_folder_nor_a_theme_name_is_refused() {
+    for icon in ["sketch.xpm", "../sketch.svg", "art/sketch.svg", "-sketch"] {
         let result = parse(&format!("{ABOUT}icon = \"{icon}\"\n"));
 
         assert!(matches!(result, Err(FolderError::InvalidIcon(_))), "{icon}: {result:?}");
@@ -333,4 +335,84 @@ fn a_package_of_another_architecture_comes_after_the_step_that_adds_it() {
             "{refused:?}"
         );
     }
+}
+
+/// Sketch's folder in a temporary catalog, with `icon` as its picture `bytes`.
+fn with_picture(icon: &str, bytes: &[u8]) -> (tempfile::TempDir, Result<Folder, FolderError>) {
+    let catalog = tempfile::tempdir().unwrap();
+    let dir = catalog.path().join("sketch");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join(icon), bytes).unwrap();
+    let folder = Folder::parse("sketch", &dir, &format!("{ABOUT}icon = \"{icon}\"\n{ACTION}"));
+    (catalog, folder)
+}
+
+#[test]
+fn a_png_icon_is_put_in_the_icon_themes_folder_of_its_size() {
+    let (_catalog, folder) = with_picture("sketch.png", &picture::png(256, 256));
+    let folder = folder.unwrap();
+
+    let steps = folder.steps(None).unwrap();
+    assert_eq!(steps.len(), 2);
+    assert!(
+        matches!(&steps[1].kind, super::Kind::File { to, from: Some(from), .. }
+            if to == "~/.local/share/icons/hicolor/256x256/apps/sketch.png" && from == "sketch.png"),
+        "{:?}",
+        steps[1].kind
+    );
+    assert_eq!(
+        folder.icon_shown(),
+        Some(folder.dir.join("sketch.png").display().to_string())
+    );
+}
+
+#[test]
+fn a_jpeg_icon_is_shown_from_the_folder_and_installs_nothing() {
+    for icon in ["sketch.jpg", "sketch.jpeg"] {
+        let (_catalog, folder) = with_picture(icon, &picture::jpeg(512, 512));
+        let folder = folder.unwrap();
+
+        assert_eq!(
+            folder.steps(None).unwrap().len(),
+            1,
+            "{icon}: the icon theme reads no JPEG"
+        );
+        assert_eq!(folder.icon_shown(), Some(folder.dir.join(icon).display().to_string()));
+    }
+}
+
+#[test]
+fn a_picture_icon_that_isnt_square_or_a_png_of_a_size_the_theme_lacks_is_refused() {
+    let (_c, tall) = with_picture("sketch.png", &picture::png(128, 256));
+    let (_c2, wide) = with_picture("sketch.jpg", &picture::jpeg(512, 256));
+    let (_c3, odd) = with_picture("sketch.png", &picture::png(100, 100));
+    let (_c4, not_png) = with_picture("sketch.png", b"<svg/>");
+
+    assert!(
+        matches!(
+            tall,
+            Err(FolderError::IconNotSquare {
+                width: 128,
+                height: 256,
+                ..
+            })
+        ),
+        "{tall:?}"
+    );
+    assert!(
+        matches!(
+            wide,
+            Err(FolderError::IconNotSquare {
+                width: 512,
+                height: 256,
+                ..
+            })
+        ),
+        "{wide:?}"
+    );
+    assert!(matches!(odd, Err(FolderError::IconSize { size: 100, .. })), "{odd:?}");
+    assert!(
+        matches!(not_png, Err(FolderError::UnreadableIcon { .. })),
+        "{not_png:?}"
+    );
 }
