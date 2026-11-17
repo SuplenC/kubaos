@@ -242,7 +242,7 @@ Super Saver's 60 Hz needs amdgpu's FreeSync video modes, which the update turns 
 
 ## The work network (Proxy)
 
-The Proxy is one switch for the work network: IT's VPN, the work DNS, the company's HTTP proxy and its root certificate, all up together or none. It replaces the WireGuard and OpenVPN apps. Each part is optional, and nothing switches on by itself: a login starts with it off. A VPN app of the catalog (Mullvad VPN, Proton VPN, NordVPN) has a kill switch of its own, and each blocks the other's tunnel: run one of them or the Proxy, not both.
+The Proxy is one switch for the work network: IT's VPN, the work DNS, the company's HTTP proxy and its root certificate, all up together or none. It replaces the WireGuard and OpenVPN apps. Each part is optional, and nothing switches on by itself: a login starts with it off. A VPN app of the catalog (Mullvad VPN, Proton VPN, NordVPN) has a kill switch of its own, and each blocks the other's tunnel: run one of them or the Proxy, not both. Mullvad VPN blocks more than its kill switch: once it is installed, its early-boot blocker stops all traffic at every boot until Mullvad's daemon is up, the Proxy's included (the LAN's too, unless Mullvad's "Local network sharing" is on), and if the daemon fails to start the machine stays offline. `sudo "/opt/Mullvad VPN/resources/mullvad-setup" reset-firewall` lifts that block, and `sudo systemctl disable mullvad-early-boot-blocking.service` turns the blocker off until Mullvad's next update turns it on again.
 
 **Set it up.** Get the VPN config from IT (a WireGuard `.conf` or an OpenVPN `.ovpn` file), then run "Import VPN config…" in the Command menu, or in a terminal:
 
