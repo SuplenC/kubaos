@@ -29,6 +29,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
+use kubaos_core::held;
 use kubaos_core::update::changelog::Change;
 use kubaos_core::update::changelog::Changelog;
 use kubaos_core::update::changelog::Section;
@@ -467,6 +468,10 @@ impl Text {
                 let lines = nix.iter().map(PackageChange::describe);
                 out.push_str(&self.rows("Nix packages", lines, nix.len(), NIX_SHOWN));
             }
+        }
+        if !summary.held.is_empty() {
+            let lines = summary.held.iter().map(|name| held::message(name));
+            out.push_str(&self.rows("Held", lines, summary.held.len(), summary.held.len()));
         }
         if !summary.inputs.is_empty() {
             out.push_str(&row("Nix inputs", &summary.inputs.join(", ")));

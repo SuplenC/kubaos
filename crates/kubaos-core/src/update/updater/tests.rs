@@ -53,6 +53,8 @@ struct Fake {
     failing: Vec<&'static str>,
     switches: usize,
     switch_output: Vec<&'static str>,
+    /// The packages each switch holds.
+    held: Vec<&'static str>,
     answer: bool,
     asked: usize,
     password_stale: bool,
@@ -229,6 +231,7 @@ impl Fake {
             failing: Vec::new(),
             switches: 0,
             switch_output: Vec::new(),
+            held: Vec::new(),
             answer: true,
             asked: 0,
             password_stale: false,
@@ -373,7 +376,7 @@ impl Machine for Fake {
         }
     }
 
-    fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError> {
+    fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<Vec<String>, MachineError> {
         self.ran.push("switch".to_owned());
         self.switches += 1;
         if self.failing.contains(&"switch") {
@@ -386,7 +389,7 @@ impl Machine for Fake {
         for line in &self.switch_output {
             on_line(line);
         }
-        Ok(())
+        Ok(self.held.iter().map(|name| (*name).to_owned()).collect())
     }
 
     fn preview(&mut self) -> Option<String> {
@@ -805,6 +808,53 @@ fn the_summary_names_the_apt_packages_upgraded_and_the_nix_packages_the_switch_m
     assert_eq!(
         m.ran("nix store diff-closures /nix/store/aaa-home-manager-generation /nix/store/bbb-home-manager-generation"),
         1
+    );
+}
+
+#[test]
+fn a_package_the_switch_held_is_a_warning_of_the_home_phase_and_a_line_of_the_summary() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[("VERSION", "0.1.1\n")], true);
+    let mut m = Fake::new();
+    m.held = vec!["discord"];
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    let home = events
+        .iter()
+        .position(|e| *e == UpdateEvent::PhaseStarted { phase: Phase::Home })
+        .unwrap();
+    let warning = events
+        .iter()
+        .position(|e| {
+            *e == UpdateEvent::Warning {
+                text: "discord stays at its current version: it couldn't be built".into(),
+            }
+        })
+        .unwrap();
+    let home_ended = events
+        .iter()
+        .position(|e| matches!(e, UpdateEvent::PhaseFinished { phase: Phase::Home, .. }))
+        .unwrap();
+    assert!(home < warning && warning < home_ended);
+    assert_eq!(summary(&events).held, ["discord"]);
+}
+
+#[test]
+fn a_switch_that_holds_nothing_names_no_held_package() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[("VERSION", "0.1.1\n")], true);
+    let mut m = Fake::new();
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert!(summary(&events).held.is_empty());
+    assert!(
+        !warnings(&events)
+            .iter()
+            .any(|w| w.contains("stays at its current version"))
     );
 }
 

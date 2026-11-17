@@ -1,7 +1,7 @@
 //! `kubaos switch` and `kubaos job`: queueing a home-manager switch of the user flake and following
 //! it.
 //!
-//!   kubaos switch [--from PATH|BRANCH | --release] [--detach | --foreground]
+//!   kubaos switch [--from PATH|BRANCH | --release] [--retry-held] [--detach | --foreground]
 //!   kubaos job list [--json]
 //!   kubaos job follow ID
 //!   kubaos job work
@@ -34,6 +34,8 @@ use std::time::Duration;
 
 use clap::Args;
 use clap::Subcommand;
+use kubaos_core::held;
+use kubaos_core::held::HeldFile;
 use kubaos_core::preview;
 use kubaos_core::preview::Notice;
 use kubaos_core::preview::PlanError;
@@ -101,9 +103,20 @@ pub struct SwitchTo {
     release: bool,
 }
 
-/// The switch jobs' queue, keeping the preview file in step with them.
+/// How a switch treats the held packages.
+#[derive(Args, Clone, Copy, Debug)]
+pub struct HeldBuilds {
+    /// Build every held package again, even one whose build hasn't changed since it failed, as an
+    /// update does.
+    #[arg(long)]
+    retry_held: bool,
+}
+
+/// The switch jobs' queue, keeping the preview file and the held packages in step with them.
 fn queue(paths: &Paths) -> Queue {
-    Queue::new(paths.jobs()).previews(PreviewFile::new(paths.preview()))
+    Queue::new(paths.jobs())
+        .previews(PreviewFile::new(paths.preview()))
+        .holding(HeldFile::new(&paths.state_dir(), paths.edit_lock()))
 }
 
 pub fn main(cmd: JobCmd) -> ExitCode {
@@ -130,10 +143,14 @@ pub fn main(cmd: JobCmd) -> ExitCode {
 }
 
 /// `kubaos switch`: the switch `to` asks for, checked against the preview in effect, queued and
-/// waited for as `mode` says.
-pub fn switch_to(paths: &Paths, mode: SwitchMode, to: &SwitchTo) -> ExitCode {
+/// waited for as `mode` says. `--retry-held` alone switches the home as it stands, keeping a
+/// preview, as a package's switch does: it asks only for the held packages to be built again.
+pub fn switch_to(paths: &Paths, mode: SwitchMode, to: &SwitchTo, held: HeldBuilds) -> ExitCode {
     if rustix::process::geteuid().is_root() {
         return usage_error("run kubaos switch as yourself, not root: it switches your home");
+    }
+    if held.retry_held && to.from.is_none() && !to.release {
+        return switch_on(paths, mode, &queue(paths).retrying_held());
     }
     let host = match host(paths) {
         Ok(host) => host,
@@ -178,7 +195,12 @@ pub fn switch_to(paths: &Paths, mode: SwitchMode, to: &SwitchTo) -> ExitCode {
             path.display()
         );
     }
-    run(paths, &host, mode, plan.target)
+    let queue = if held.retry_held {
+        queue(paths).retrying_held()
+    } else {
+        queue(paths)
+    };
+    run(&queue, &host, mode, plan.target)
 }
 
 /// A switch of the home as it stands, for a command that changed what it declares (a package, a
@@ -187,6 +209,11 @@ pub fn switch(paths: &Paths, mode: SwitchMode) -> ExitCode {
     if rustix::process::geteuid().is_root() {
         return usage_error("run kubaos switch as yourself, not root: it switches your home");
     }
+    switch_on(paths, mode, &queue(paths))
+}
+
+/// [`switch`] on `queue`.
+fn switch_on(paths: &Paths, mode: SwitchMode, queue: &Queue) -> ExitCode {
     let host = match host(paths) {
         Ok(host) => host,
         Err(code) => return code,
@@ -199,7 +226,7 @@ pub fn switch(paths: &Paths, mode: SwitchMode) -> ExitCode {
         Ok(None) => {}
         Err(e) => return report(e),
     }
-    run(paths, &host, mode, Target::Current)
+    run(queue, &host, mode, Target::Current)
 }
 
 /// Whether a switch to the release is queued or running.
@@ -228,9 +255,8 @@ fn describe(preview: &Preview) -> String {
     )
 }
 
-/// Queues a switch to `target` and waits for it as `mode` says.
-fn run(paths: &Paths, host: &Systemd, mode: SwitchMode, target: Target) -> ExitCode {
-    let queue = queue(paths);
+/// Queues a switch to `target` on `queue` and waits for it as `mode` says.
+fn run(queue: &Queue, host: &Systemd, mode: SwitchMode, target: Target) -> ExitCode {
     if mode.foreground {
         let host = host.clone();
         let id = match queue.enqueue_to(target) {
@@ -241,7 +267,7 @@ fn run(paths: &Paths, host: &Systemd, mode: SwitchMode, target: Target) -> ExitC
             let queue = queue.clone();
             thread::spawn(move || queue.work(&host))
         };
-        let code = follow(&queue, &id, None);
+        let code = follow(queue, &id, None);
         return match worker.join().expect("the switch worker thread panicked") {
             Ok(_) => code,
             Err(e) => report(e),
@@ -256,12 +282,12 @@ fn run(paths: &Paths, host: &Systemd, mode: SwitchMode, target: Target) -> ExitC
         return ExitCode::SUCCESS;
     }
     out!("switch queued as job {id}; Ctrl-C stops following, not the switch");
-    follow(&queue, &id, Some(host))
+    follow(queue, &id, Some(host))
 }
 
 fn host(paths: &Paths) -> Result<Systemd, ExitCode> {
     match std::env::current_exe() {
-        Ok(exe) => Ok(Systemd::new(exe, paths.flake())),
+        Ok(exe) => Ok(Systemd::new(exe, paths.flake()).generation(paths.home_generation())),
         Err(e) => Err(report(e)),
     }
 }
@@ -274,7 +300,10 @@ fn follow(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> ExitCode {
         let _ = out.write_all(chunk.as_bytes()).and_then(|()| out.flush());
     };
     match wait(queue, id, host, print) {
-        Ok(()) => {
+        Ok(held) => {
+            for name in &held {
+                out!("{}", held::message(name));
+            }
             out!("switch {id} done");
             ExitCode::SUCCESS
         }
@@ -285,8 +314,9 @@ fn follow(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> ExitCode {
     }
 }
 
-/// Hands the job's output to `on_output` until it ends; why it failed, when it did.
-fn wait(queue: &Queue, id: &JobId, host: Option<&Systemd>, on_output: impl FnMut(&str)) -> Result<(), String> {
+/// Hands the job's output to `on_output` until it ends; the packages it held when it succeeded,
+/// why it failed when it didn't.
+fn wait(queue: &Queue, id: &JobId, host: Option<&Systemd>, on_output: impl FnMut(&str)) -> Result<Vec<String>, String> {
     let job = match host {
         Some(host) => queue.follow_worker(id, FOLLOW_POLL, host, on_output),
         None => queue.follow(id, FOLLOW_POLL, on_output),
@@ -294,8 +324,9 @@ fn wait(queue: &Queue, id: &JobId, host: Option<&Systemd>, on_output: impl FnMut
     match job {
         Ok(Job {
             state: JobState::Succeeded,
+            held,
             ..
-        }) => Ok(()),
+        }) => Ok(held),
         Ok(job) => Err(job.error.unwrap_or_else(|| "no reason recorded".to_owned())),
         Err(e) => Err(chain(&e)),
     }
@@ -312,23 +343,34 @@ pub enum SwitchIn {
 
 /// Runs one switch of the user flake as locked (the release, so it ends any preview) to its end,
 /// for a command that switches as one of its steps (an update), handing each chunk of its output
-/// to `on_output`.
+/// to `on_output`. It builds every held package again. Returns the packages it held at the version
+/// the home had.
 ///
 /// # Errors
 ///
 /// Why the switch failed.
-pub fn switch_step(paths: &Paths, place: SwitchIn, on_output: &mut dyn FnMut(&str)) -> Result<(), String> {
+pub fn switch_step(paths: &Paths, place: SwitchIn, on_output: &mut dyn FnMut(&str)) -> Result<Vec<String>, String> {
+    release_switch(&queue(paths).retrying_held(), paths, place, on_output)
+}
+
+/// Runs one switch to the release on `queue` to its end, handing each chunk of its output to
+/// `on_output`, and returns the packages it held.
+fn release_switch(
+    queue: &Queue,
+    paths: &Paths,
+    place: SwitchIn,
+    on_output: &mut dyn FnMut(&str),
+) -> Result<Vec<String>, String> {
     let host = std::env::current_exe()
-        .map(|exe| Systemd::new(exe, paths.flake()))
+        .map(|exe| Systemd::new(exe, paths.flake()).generation(paths.home_generation()))
         .map_err(|e| chain(&e))?;
-    let queue = queue(paths);
     if place == SwitchIn::Process {
         let id = queue.enqueue_to(Target::Release).map_err(|e| chain(&e))?;
         let worker = {
             let queue = queue.clone();
             thread::spawn(move || queue.work(&host))
         };
-        let waited = wait(&queue, &id, None, on_output);
+        let waited = wait(queue, &id, None, on_output);
         worker
             .join()
             .expect("the switch worker thread panicked")
@@ -336,7 +378,7 @@ pub fn switch_step(paths: &Paths, place: SwitchIn, on_output: &mut dyn FnMut(&st
         return waited;
     }
     let id = queue.submit_to(&host, Target::Release).map_err(|e| chain(&e))?;
-    wait(&queue, &id, Some(&host), on_output)
+    wait(queue, &id, Some(&host), on_output)
 }
 
 /// The live preview the home is on, as a line names it, for the updater. A preview file that
@@ -356,9 +398,12 @@ pub fn active_preview(paths: &Paths) -> Option<String> {
 /// Why the preview could not be left.
 pub fn leave_preview(paths: &Paths, place: SwitchIn, on_output: &mut dyn FnMut(&str)) -> Result<(), String> {
     let file = PreviewFile::new(paths.preview());
-    preview::leave(&file, || switch_step(paths, place, on_output))
-        .map(|_| ())
-        .map_err(|e| chain(&e))
+    // Leaving the preview doesn't build the held packages again: the update's own switch does.
+    preview::leave(&file, || {
+        release_switch(&queue(paths), paths, place, on_output).map(drop)
+    })
+    .map(|_| ())
+    .map_err(|e| chain(&e))
 }
 
 fn list(queue: &Queue, host: &Systemd, json: bool) -> ExitCode {

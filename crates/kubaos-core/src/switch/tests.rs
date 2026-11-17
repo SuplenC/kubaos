@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -17,8 +19,26 @@ use super::JobState;
 use super::Queue;
 use super::QueueError;
 use super::Target;
+use crate::held::CurrentHome;
+use crate::held::Evaluated;
+use crate::held::Found;
+use crate::held::HeldFile;
+use crate::held::Hold;
+use crate::held::Holds;
 use crate::preview::Checkout;
 use crate::preview::PreviewFile;
+
+/// How a fake build ends.
+#[derive(Clone, Copy, Debug, Default)]
+enum BuildEnd {
+    /// Nix names each derivation that failed.
+    #[default]
+    Reported,
+    /// Outputs are missing, and Nix names no derivation.
+    Silent,
+    /// A signal kills it.
+    Killed,
+}
 
 /// A host that records what the queue asks of it instead of running systemd and home-manager.
 #[derive(Default)]
@@ -41,6 +61,19 @@ struct FakeHost {
     commit: Mutex<String>,
     /// Paths git can't describe.
     not_checkouts: Vec<PathBuf>,
+    /// The listed packages each evaluation finds, or `None` when they don't evaluate.
+    listed: Option<Vec<Evaluated>>,
+    /// The checkout each evaluation of the listed packages took KubaOS from, `None` for the
+    /// release.
+    listed_from: Mutex<Vec<Option<PathBuf>>>,
+    /// The outputs that never build.
+    unbuildable: Vec<String>,
+    /// The installables of each build.
+    built: Mutex<Vec<Vec<String>>>,
+    /// How each build ends.
+    build_end: BuildEnd,
+    /// The listed packages the home has.
+    current: CurrentHome,
 }
 
 impl Host for FakeHost {
@@ -91,6 +124,44 @@ impl Host for FakeHost {
 
     fn evaluate(&self, _path: &Path) -> Result<(), HostError> {
         Ok(())
+    }
+
+    fn listed(&self, _log: &File, from: Option<&Path>) -> Result<Vec<Evaluated>, HostError> {
+        self.listed_from.lock().unwrap().push(from.map(Path::to_path_buf));
+        self.listed.clone().ok_or_else(|| HostError::exited("nix", Some(1)))
+    }
+
+    fn build(&self, mut log: &File, installables: &[String]) -> Result<BTreeSet<String>, HostError> {
+        self.built.lock().unwrap().push(installables.to_vec());
+        writeln!(log, "building the listed packages").unwrap();
+        match self.build_end {
+            BuildEnd::Reported => {}
+            BuildEnd::Silent => return Ok(BTreeSet::new()),
+            BuildEnd::Killed => return Err(HostError::exited("nix", None)),
+        }
+        Ok(installables
+            .iter()
+            .filter_map(|installable| installable.split_once('^').map(|(drv, _)| drv.to_owned()))
+            .filter(|drv| {
+                let name = drv
+                    .trim_start_matches("/nix/store/")
+                    .rsplit_once('-')
+                    .map(|(name, _)| name);
+                name.is_some_and(|name| self.unbuildable.contains(&output(name)))
+            })
+            .collect())
+    }
+
+    fn missing(&self, paths: &[String]) -> Result<BTreeSet<String>, HostError> {
+        Ok(paths
+            .iter()
+            .filter(|path| self.unbuildable.contains(path))
+            .cloned()
+            .collect())
+    }
+
+    fn current_home(&self) -> Result<CurrentHome, HostError> {
+        Ok(self.current.clone())
     }
 }
 
@@ -648,10 +719,10 @@ fn a_job_file_without_a_target_reads_as_the_home_as_it_stands() {
     .unwrap();
     let queue = Queue::new(tmp.path());
 
-    assert_eq!(
-        queue.job(&JobId::parse("1-2-3").unwrap()).unwrap().target,
-        Target::Current
-    );
+    let job = queue.job(&JobId::parse("1-2-3").unwrap()).unwrap();
+
+    assert_eq!(job.target, Target::Current);
+    assert!(job.held.is_empty());
 }
 
 #[test]
@@ -692,4 +763,385 @@ fn the_systemd_host_overrides_kubaos_without_writing_the_lock_file() {
         super::Systemd::worktrees_command(Path::new("/h/Projects/kubaos")),
         ["git", "-C", "/h/Projects/kubaos", "worktree", "list", "--porcelain"]
     );
+}
+
+const DISCORD_OLD: &str = "/nix/store/84k7g556fj4ib11413jna62l3hgfzyna-discord-1.0.159";
+
+/// The derivation the fake evaluates `name` to, at `version`.
+fn drv(name: &str, version: &str) -> String {
+    format!("/nix/store/{name}-{version}.drv")
+}
+
+/// The output the fake builds of `name`.
+fn output(name: &str) -> String {
+    format!("/nix/store/{name}-out")
+}
+
+fn listed(name: &str, version: &str) -> Evaluated {
+    Evaluated {
+        name: name.to_owned(),
+        found: Some(Found {
+            drv: drv(name, version),
+            outputs: BTreeMap::from([("out".to_owned(), output(name))]),
+            pname: name.to_owned(),
+        }),
+    }
+}
+
+/// A queue in `dir/jobs` that holds packages in `dir/home/kubaos.d`, whose `packages.toml` lists
+/// `packages`.
+fn holding(dir: &Path, packages: &[&str]) -> (Queue, HeldFile) {
+    let state = crate::state::StateDir::new(dir.join("home/kubaos.d"));
+    std::fs::create_dir_all(state.root()).unwrap();
+    let list: Vec<String> = packages.iter().map(|p| format!("\"{p}\"")).collect();
+    std::fs::write(state.packages_file(), format!("packages = [{}]\n", list.join(", "))).unwrap();
+    let file = HeldFile::new(&state, dir.join("kubaos.d.lock"));
+    (Queue::new(dir.join("jobs")).holding(file.clone()), file)
+}
+
+/// The home as a generation records Discord in it.
+fn discord_installed() -> CurrentHome {
+    CurrentHome::Recorded(BTreeMap::from([("discord".to_owned(), DISCORD_OLD.to_owned())]))
+}
+
+/// Discord held since its derivation at `version` failed.
+fn discord_held(version: &str) -> Holds {
+    let hold = Hold {
+        path: DISCORD_OLD.to_owned(),
+        failed: drv("discord", version),
+    };
+    Holds::from([("discord".to_owned(), hold)])
+}
+
+/// A host on which Discord's build fails, as it does while its download is out of reach.
+fn discord_unbuildable(version: &str) -> FakeHost {
+    FakeHost {
+        listed: Some(vec![listed("discord", version), listed("jq", "1.7")]),
+        unbuildable: vec![output("discord")],
+        current: discord_installed(),
+        ..FakeHost::default()
+    }
+}
+
+fn log_of(queue: &Queue, id: &JobId) -> String {
+    std::fs::read_to_string(queue.log_path(id)).unwrap()
+}
+
+#[test]
+fn a_listed_package_that_fails_to_build_keeps_the_version_the_home_has() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord", "jq"]);
+    let id = queue.enqueue().unwrap();
+    let host = discord_unbuildable("1");
+
+    queue.work(&host).unwrap();
+
+    let job = queue.job(&id).unwrap();
+    assert_eq!(job.state, JobState::Succeeded);
+    assert_eq!(job.held, ["discord"]);
+    assert_eq!(file.read().unwrap(), discord_held("1"));
+    let log = log_of(&queue, &id);
+    assert!(
+        log.contains(&format!(
+            "kubaos: discord stays at its current version: it couldn't be built (kept at {DISCORD_OLD})"
+        )),
+        "{log}"
+    );
+    assert!(
+        log.find("building the listed packages") < log.find("building switch 1"),
+        "the pre-build comes before the switch: {log}"
+    );
+}
+
+#[test]
+fn a_held_package_whose_build_is_unchanged_is_not_built_again_and_stays_held() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord", "jq"]);
+    file.write(&discord_held("1")).unwrap();
+    let id = queue.enqueue().unwrap();
+    let host = discord_unbuildable("1");
+
+    queue.work(&host).unwrap();
+
+    assert_eq!(*host.built.lock().unwrap(), [vec![format!("{}^out", drv("jq", "1.7"))]]);
+    let job = queue.job(&id).unwrap();
+    assert_eq!(job.held, ["discord"]);
+    assert_eq!(file.read().unwrap(), discord_held("1"));
+    let log = log_of(&queue, &id);
+    assert!(log.contains("kubaos: not building discord again"), "{log}");
+    assert!(
+        log.contains("kubaos: discord stays at its current version: it couldn't be built"),
+        "every switch it stays held names it: {log}"
+    );
+}
+
+#[test]
+fn a_held_package_whose_derivation_changed_is_built_again() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord", "jq"]);
+    file.write(&discord_held("1")).unwrap();
+    queue.enqueue().unwrap();
+    let host = discord_unbuildable("2");
+
+    queue.work(&host).unwrap();
+
+    let built = host.built.lock().unwrap();
+    assert!(built[0].contains(&format!("{}^out", drv("discord", "2"))), "{built:?}");
+    assert_eq!(file.read().unwrap(), discord_held("2"));
+}
+
+#[test]
+fn an_updates_switch_builds_every_held_package_again() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord", "jq"]);
+    let queue = queue.retrying_held();
+    file.write(&discord_held("1")).unwrap();
+    let id = queue.enqueue_to(Target::Release).unwrap();
+    let host = discord_unbuildable("1");
+
+    queue.work(&host).unwrap();
+
+    let built = host.built.lock().unwrap();
+    assert!(built[0].contains(&format!("{}^out", drv("discord", "1"))), "{built:?}");
+    assert_eq!(queue.job(&id).unwrap().retry_held, crate::held::Retry::All);
+    assert_eq!(file.read().unwrap(), discord_held("1"));
+}
+
+#[test]
+fn a_failed_package_the_home_does_not_have_fails_the_job_before_the_switch() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord"]);
+    let id = queue.enqueue().unwrap();
+    let host = FakeHost {
+        current: CurrentHome::Nothing,
+        ..discord_unbuildable("1")
+    };
+
+    queue.work(&host).unwrap();
+
+    let job = queue.job(&id).unwrap();
+    assert_eq!(job.state, JobState::Failed);
+    assert_eq!(
+        job.error.as_deref(),
+        Some("discord couldn't be built, and your home has no version of it to keep")
+    );
+    assert!(job.held.is_empty());
+    assert!(!file.state().held_file().exists());
+    assert_eq!(host.switches.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn a_build_killed_before_it_ends_changes_no_hold_and_the_switch_runs() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord", "jq"]);
+    let id = queue.enqueue().unwrap();
+    let host = FakeHost {
+        build_end: BuildEnd::Killed,
+        ..discord_unbuildable("1")
+    };
+
+    queue.work(&host).unwrap();
+
+    assert!(queue.job(&id).unwrap().held.is_empty());
+    assert!(!file.state().held_file().exists());
+    assert_eq!(host.switches.load(Ordering::SeqCst), 1);
+    assert!(log_of(&queue, &id).contains("kubaos: no hold changes"));
+}
+
+#[test]
+fn outputs_missing_that_nix_did_not_say_failed_hold_nothing_new() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord", "jq"]);
+    file.write(&discord_held("1")).unwrap();
+    let id = queue.enqueue_to(Target::Release).unwrap();
+    let queue = queue.retrying_held();
+    let host = FakeHost {
+        build_end: BuildEnd::Silent,
+        unbuildable: vec![output("discord"), output("jq")],
+        ..discord_unbuildable("1")
+    };
+
+    queue.work(&host).unwrap();
+
+    assert_eq!(queue.job(&id).unwrap().held, ["discord"]);
+    assert_eq!(file.read().unwrap(), discord_held("1"));
+    let log = log_of(&queue, &id);
+    assert!(log.contains("without saying why"), "{log}");
+}
+
+#[test]
+fn a_held_package_that_no_longer_evaluates_loses_its_hold_so_the_switch_says_why() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord"]);
+    file.write(&discord_held("1")).unwrap();
+    let id = queue.enqueue().unwrap();
+    let host = FakeHost {
+        listed: Some(vec![Evaluated {
+            name: "discord".to_owned(),
+            found: None,
+        }]),
+        ..discord_unbuildable("1")
+    };
+
+    queue.work(&host).unwrap();
+
+    assert!(queue.job(&id).unwrap().held.is_empty());
+    assert!(!file.state().held_file().exists());
+    assert_eq!(host.switches.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn an_unchanged_hold_whose_outputs_turned_up_loses_its_hold_without_a_build() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord"]);
+    file.write(&discord_held("1")).unwrap();
+    let id = queue.enqueue().unwrap();
+    let host = FakeHost {
+        listed: Some(vec![listed("discord", "1")]),
+        unbuildable: Vec::new(),
+        ..discord_unbuildable("1")
+    };
+
+    queue.work(&host).unwrap();
+
+    assert!(host.built.lock().unwrap().is_empty());
+    assert!(queue.job(&id).unwrap().held.is_empty());
+    assert!(!file.state().held_file().exists());
+}
+
+#[test]
+fn a_held_package_that_builds_again_loses_its_hold_and_the_file_goes_with_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord"]);
+    file.write(&discord_held("1")).unwrap();
+    let id = queue.enqueue().unwrap();
+    let host = FakeHost {
+        unbuildable: Vec::new(),
+        ..discord_unbuildable("2")
+    };
+
+    queue.work(&host).unwrap();
+
+    assert!(queue.job(&id).unwrap().held.is_empty());
+    assert!(!file.state().held_file().exists());
+    assert!(log_of(&queue, &id).contains("kubaos: discord builds again: it is no longer held"));
+}
+
+#[test]
+fn when_the_listed_packages_do_not_evaluate_the_holds_stay_and_the_switch_runs() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord"]);
+    file.write(&discord_held("1")).unwrap();
+    let id = queue.enqueue().unwrap();
+    let host = FakeHost::default();
+
+    queue.work(&host).unwrap();
+
+    let job = queue.job(&id).unwrap();
+    assert_eq!(job.state, JobState::Succeeded);
+    assert_eq!(job.held, ["discord"]);
+    assert_eq!(file.read().unwrap(), discord_held("1"));
+    assert_eq!(host.switches.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn a_home_that_lists_and_holds_nothing_builds_nothing_before_its_switch() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, _file) = holding(tmp.path(), &[]);
+    queue.enqueue().unwrap();
+    let host = FakeHost::default();
+
+    queue.work(&host).unwrap();
+
+    assert!(host.listed_from.lock().unwrap().is_empty());
+    assert_eq!(host.switches.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn the_pre_build_builds_kubaos_from_the_checkout_the_switch_does() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, _file) = holding(tmp.path(), &["jq"]);
+    let path = tmp.path().join("kubaos");
+    std::fs::create_dir_all(&path).unwrap();
+    queue.enqueue_to(Target::Checkout { path: path.clone() }).unwrap();
+    queue.enqueue_to(Target::Release).unwrap();
+    let host = FakeHost {
+        listed: Some(vec![listed("jq", "1.7")]),
+        ..FakeHost::default()
+    };
+
+    queue.work(&host).unwrap();
+
+    assert_eq!(*host.listed_from.lock().unwrap(), [Some(path), None]);
+}
+
+#[test]
+fn the_systemd_host_evaluates_builds_and_checks_the_listed_packages() {
+    let host = super::Systemd::new("/usr/bin/kubaos", "/h/.config/kubaos/home");
+
+    let names = ["kuba".to_owned(), "kuba@kuba-pc".to_owned(), "odd\"$name".to_owned()];
+    let listed = host.listed_command(Some(Path::new("/h/Projects/kubaos")), &names);
+
+    assert_eq!(
+        listed[..8],
+        [
+            "nix",
+            "eval",
+            "--json",
+            "/h/.config/kubaos/home#homeConfigurations",
+            "--override-input",
+            "kubaos",
+            "git+file:///h/Projects/kubaos",
+            "--no-write-lock-file",
+        ]
+    );
+    assert_eq!(listed[8], "--apply");
+    let apply = listed[9].to_string_lossy();
+    assert!(apply.contains("kubaos.listedPackages"), "{apply}");
+    assert!(apply.contains(r#"[ "kuba" "kuba@kuba-pc" "odd\"\$name" ]"#), "{apply}");
+    assert_eq!(host.listed_command(None, &names).len(), 6);
+    assert_eq!(
+        super::Systemd::build_command(&["/nix/store/b-discord.drv^out".to_owned()]),
+        [
+            "nix",
+            "build",
+            "--no-link",
+            "--keep-going",
+            "/nix/store/b-discord.drv^out"
+        ]
+    );
+    assert_eq!(
+        super::Systemd::missing_command(&["/nix/store/g-discord".to_owned()]),
+        [
+            "nix-store",
+            "--check-validity",
+            "--print-invalid",
+            "/nix/store/g-discord"
+        ]
+    );
+    assert_eq!(
+        super::Systemd::references_command(Path::new("/h/.local/state/home-manager/gcroots/current-home")),
+        [
+            "nix-store",
+            "--query",
+            "--references",
+            "/h/.local/state/home-manager/gcroots/current-home/home-path"
+        ]
+    );
+}
+
+#[test]
+fn the_systemd_host_reads_what_the_home_has_from_its_generations_record() {
+    let tmp = tempfile::tempdir().unwrap();
+    let generation = tmp.path().join("generation");
+    let record = generation.join(crate::state::GENERATION_RECORD);
+    std::fs::create_dir_all(record.parent().unwrap()).unwrap();
+    std::fs::write(&record, format!(r#"{{"discord":"{DISCORD_OLD}"}}"#)).unwrap();
+    let host = super::Systemd::new("/usr/bin/kubaos", "/h/.config/kubaos/home");
+
+    let without = host.current_home().unwrap();
+    let with = host.generation(&generation).current_home().unwrap();
+
+    assert_eq!(without, CurrentHome::Nothing);
+    assert_eq!(with, discord_installed());
 }

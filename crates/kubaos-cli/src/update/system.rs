@@ -26,8 +26,12 @@ use kubaos_core::update::machine::Machine;
 use kubaos_core::update::machine::MachineError;
 use kubaos_core::update::machine::NIX_BIN;
 
-/// The switch, handing each chunk of its output to the callback.
-type Switch = Box<dyn FnMut(&mut dyn FnMut(&str)) -> Result<(), String>>;
+/// The switch, handing each chunk of its output to the callback, and returning the packages it
+/// held.
+type Switch = Box<dyn FnMut(&mut dyn FnMut(&str)) -> Result<Vec<String>, String>>;
+
+/// The switch back from a live preview, handing each chunk of its output to the callback.
+type Leave = Box<dyn FnMut(&mut dyn FnMut(&str)) -> Result<(), String>>;
 
 /// The live preview the home is on, as a line names it.
 type ActivePreview = Box<dyn FnMut() -> Option<String>>;
@@ -36,7 +40,7 @@ type ActivePreview = Box<dyn FnMut() -> Option<String>>;
 pub struct System {
     switch: Switch,
     preview: Option<ActivePreview>,
-    leave_preview: Option<Switch>,
+    leave_preview: Option<Leave>,
     is_root: bool,
     /// `PATH` for user commands, with Nix's tools, when this process's lacks `nix`.
     path: Option<OsString>,
@@ -54,7 +58,7 @@ impl System {
     /// The machine, switching through `switch`. User commands get Nix's own tools on `PATH` when
     /// it lacks `nix`, as a shell that didn't source Nix's profile has.
     #[must_use]
-    pub fn new(switch: impl FnMut(&mut dyn FnMut(&str)) -> Result<(), String> + 'static) -> Self {
+    pub fn new(switch: impl FnMut(&mut dyn FnMut(&str)) -> Result<Vec<String>, String> + 'static) -> Self {
         let path = std::env::var_os("PATH").unwrap_or_default();
         let has_nix = std::env::split_paths(&path).any(|dir| dir.join("nix").is_file());
         let path = (!has_nix).then(|| {
@@ -175,7 +179,7 @@ impl Machine for System {
         }
     }
 
-    fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError> {
+    fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<Vec<String>, MachineError> {
         let mut cut = Lines::default();
         let switched = (self.switch)(&mut |chunk| cut.push(chunk.as_bytes(), &mut *on_line));
         cut.finish(&mut *on_line);

@@ -221,6 +221,7 @@ impl<M: Machine> Updater<'_, M> {
             programs: Vec::new(),
             suites: SuiteChanges::default(),
             reloaded: self.j.reloaded.clone(),
+            held: self.j.held.clone(),
             firmware: Firmware::default(),
             restart: Restart::None,
             restart_reason: None,

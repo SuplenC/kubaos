@@ -3,9 +3,11 @@
 //!
 //! `packages.toml` lists packages from the user's nixpkgs, `nixpkgs.toml` says whether it takes
 //! unfree ones, and each `suites/<name>.toml` holds one Suite's options and version, plus any
-//! packages it lists. KubaOS's home module (`home/state.nix`) reads the same files and installs
-//! the union of every `packages` list. Each home-manager
-//! generation carries a copy of the directory, so a rollback can bring it back.
+//! packages it lists. `held.toml`, which only the switch writes, names the listed packages that
+//! couldn't be built, each kept at the store path the home had (`held.rs`). KubaOS's home module
+//! (`home/state.nix`) reads the same files and installs the union of every `packages` list. Each
+//! home-manager generation carries a copy of the directory, so a rollback can bring it back, and a
+//! record of the store path it installed for each listed package.
 //!
 //! # Owns
 //!
@@ -22,6 +24,7 @@
 //! - Editing `packages.toml`: `packages.rs`.
 //! - Reading and writing `nixpkgs.toml`: `unfree.rs`.
 //! - Writing and deleting Suite files: `suites.rs`.
+//! - Reading and writing `held.toml`: `held.rs`.
 //! - Running the switch that applies the directory: `switch.rs`.
 //! - The Nix side: `home/state.nix`.
 
@@ -51,9 +54,16 @@ pub const PACKAGES_FILE: &str = "packages.toml";
 pub const NIXPKGS_FILE: &str = "nixpkgs.toml";
 /// The folder of Suite files, inside the state directory.
 pub const SUITES_DIR: &str = "suites";
+/// The packages a switch holds at the version the home had, inside the state directory
+/// (`held.rs`).
+pub const HELD_FILE: &str = "held.toml";
 /// Where a home-manager generation keeps its copy of the state directory, relative to the
 /// generation. `home/state.nix` links it as `~/.local/share/kubaos/kubaos.d`.
 pub const GENERATION_COPY: &str = "home-files/.local/share/kubaos/kubaos.d";
+/// Where a home-manager generation records the store path it installed for each package the state
+/// directory lists, as a JSON object, relative to the generation. `home/state.nix` links it as
+/// `~/.local/share/kubaos/installed.json`.
+pub const GENERATION_RECORD: &str = "home-files/.local/share/kubaos/installed.json";
 
 /// The Projects root, relative to the home, unless [`PROJECTS_VAR`] names another.
 pub const PROJECTS_ROOT: &str = "Projects";
@@ -447,6 +457,11 @@ impl StateDir {
     /// `nixpkgs.toml`, the settings of the user's nixpkgs.
     pub fn nixpkgs_file(&self) -> PathBuf {
         self.root.join(NIXPKGS_FILE)
+    }
+
+    /// `held.toml`, the packages a switch holds.
+    pub fn held_file(&self) -> PathBuf {
+        self.root.join(HELD_FILE)
     }
 
     /// `suites/`.

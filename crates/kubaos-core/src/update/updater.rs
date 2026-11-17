@@ -593,6 +593,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             programs: Vec::new(),
             suites,
             reloaded: self.j.reloaded.clone(),
+            held: self.j.held.clone(),
             firmware: Firmware::default(),
             restart: Restart::None,
             restart_reason: None,
@@ -918,15 +919,22 @@ impl<'a, M: Machine> Updater<'a, M> {
         })
     }
 
-    /// The home-manager switch, its output reported.
+    /// The home-manager switch, its output reported, and a warning for each package it held at the
+    /// version the home had.
     fn switch(&mut self) -> Result<(), UpdateError> {
         self.j.step("Switching your home");
         self.j.command_line("home-manager switch (kubaos switch)");
         let j = &mut self.j;
         let switched = self.m.switch(&mut |line| j.output(line));
         match switched {
-            Ok(()) => {
+            Ok(held) => {
                 self.j.succeeded();
+                for name in held {
+                    self.j.warn(crate::held::message(&name));
+                    if !self.j.held.contains(&name) {
+                        self.j.held.push(name);
+                    }
+                }
                 Ok(())
             }
             Err(e) => Err(UpdateError::step("switching your home")(e)),
@@ -1126,6 +1134,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             programs,
             suites,
             reloaded: self.j.reloaded.clone(),
+            held: self.j.held.clone(),
             firmware,
             restart,
             restart_reason,

@@ -109,6 +109,8 @@ enum Cmd {
         #[command(flatten)]
         to: job::SwitchTo,
         #[command(flatten)]
+        held: job::HeldBuilds,
+        #[command(flatten)]
         mode: job::SwitchMode,
     },
     /// Switch jobs: list them, follow one.
@@ -188,8 +190,8 @@ fn main() -> ExitCode {
         Cmd::Unpin(args) => pin::unpin(&args),
         Cmd::Pins(args) => pin::list(&args),
         Cmd::Try { name } => package::try_main(&name),
-        Cmd::Switch { to, mode } => match kubaos_core::state::Paths::from_env() {
-            Ok(paths) => job::switch_to(&paths, mode, &to),
+        Cmd::Switch { to, held, mode } => match kubaos_core::state::Paths::from_env() {
+            Ok(paths) => job::switch_to(&paths, mode, &to, held),
             Err(e) => usage_error(e),
         },
         Cmd::Job { cmd } => job::main(cmd),

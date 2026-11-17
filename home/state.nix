@@ -11,6 +11,15 @@
 # the user's pkgs takes unfree packages. Each generation also links its copy
 # of the directory to ~/.local/share/kubaos/kubaos.d, which is what a rollback
 # restores the directory from.
+#
+# held.toml, which only the switch writes (crates/kubaos-core/src/held.rs),
+# names the listed packages that couldn't be built, each with the store path
+# the home had (`path`, and the failed derivation the switch reads): a held
+# package installs that path instead of the attribute. Each generation
+# records the store path it installed for every listed package in
+# ~/.local/share/kubaos/installed.json, and exposes the attributes as nixpkgs
+# has them in kubaos.listedPackages, which the switch builds before it
+# switches.
 {
   config,
   lib,
@@ -62,17 +71,54 @@ let
   allowUnfree =
     !(present && builtins.pathExists settingsFile) || (readToml settingsFile).allow_unfree or true;
 
+  heldFile = dir + "/held.toml";
+  held = if present && builtins.pathExists heldFile then (readToml heldFile).held or { } else { };
+
+  # A store path as a package home.packages takes. Pure evaluation refuses
+  # builtins.storePath, but a string with the path in its context makes the
+  # generation depend on the path all the same.
+  storePackage =
+    name: path:
+    let
+      outPath = builtins.appendContext path {
+        ${path} = {
+          path = true;
+        };
+      };
+      package = {
+        type = "derivation";
+        name = builtins.substring 33 (-1) (baseNameOf path);
+        inherit outPath;
+        outputs = [ "out" ];
+        out = package;
+        outputName = "out";
+        meta = { };
+      };
+    in
+    if
+      builtins.isString path && builtins.match "${builtins.storeDir}/[a-z0-9]{32}-[^/]+" path != null
+    then
+      package
+    else
+      throw "kubaos.d/held.toml: ${name} is held at ${toString path}, which is no store path";
+
+  fresh = name: lib.attrByPath (lib.splitString "." name) null pkgs;
+
   package =
     name: from:
     let
-      found = lib.attrByPath (lib.splitString "." name) null pkgs;
+      found = fresh name;
     in
-    if found == null then
+    if held ? ${name} then
+      storePackage name (held.${name}.path or null)
+    else if found == null then
       throw "kubaos.d: ${name} is not a package in your nixpkgs (listed in ${
         lib.concatMapStringsSep ", " toString from
       })"
     else
       found;
+
+  installed = lib.mapAttrs package listed;
 in
 {
   options.kubaos.stateDir = lib.mkOption {
@@ -80,6 +126,13 @@ in
     default = null;
     example = lib.literalExpression "./kubaos.d";
     description = "The user flake's kubaos.d/ directory, whose TOML files list packages and Suites to install.";
+  };
+
+  options.kubaos.listedPackages = lib.mkOption {
+    type = lib.types.lazyAttrsOf (lib.types.nullOr lib.types.raw);
+    internal = true;
+    readOnly = true;
+    description = "Every package the state directory lists, by name, as the user's nixpkgs has it (null when it has none), held or not: what the switch builds before it switches.";
   };
 
   config = lib.mkMerge [
@@ -90,10 +143,16 @@ in
     # is set, so nixpkgs' default refuses unfree packages and the user's
     # `allowUnfreePredicate` or `allowUnfree` still decide.
     (lib.mkIf allowUnfree { nixpkgs.config.allowUnfree = true; })
+    { kubaos.listedPackages = lib.mapAttrs (name: _: fresh name) listed; }
     (lib.mkIf present {
-      home.packages = lib.mapAttrsToList package listed;
+      home.packages = lib.attrValues installed;
       kubaos.suites = suites;
       xdg.dataFile."kubaos/kubaos.d".source = dir;
+      # The interpolated paths keep their context, so the record holds each package in the
+      # generation's closure, as a hold needs it to stay.
+      xdg.dataFile."kubaos/installed.json".text = builtins.toJSON (
+        lib.mapAttrs (_: package: "${package}") installed
+      );
     })
   ];
 }

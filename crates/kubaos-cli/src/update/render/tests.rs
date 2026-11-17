@@ -336,6 +336,7 @@ fn edge_update() -> Vec<UpdateEvent> {
             ],
             suites: SuiteChanges::default(),
             reloaded: vec!["reloaded Hyprland".into(), "restarting Quickshell".into()],
+            held: Vec::new(),
             firmware: applied_firmware(),
             restart: Restart::None,
             restart_reason: None,
@@ -776,6 +777,23 @@ fn an_empty_list_says_none_and_an_unknown_one_is_left_out() {
         "{none}"
     );
     assert!(!unknown.contains("Nix packages"), "{unknown}");
+}
+
+#[test]
+fn each_held_package_is_a_line_of_the_held_row_after_the_nix_packages() {
+    let shown = summary_text(|s| {
+        unchanged(s);
+        s.held = vec!["discord".into(), "zoom-us".into()];
+    });
+
+    assert!(
+        shown.contains(
+            "  Nix packages  none\n\
+             \x20 Held          discord stays at its current version: it couldn't be built\n\
+             \x20               zoom-us stays at its current version: it couldn't be built\n"
+        ),
+        "{shown}"
+    );
 }
 
 #[test]

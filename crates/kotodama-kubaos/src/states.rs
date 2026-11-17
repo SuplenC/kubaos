@@ -22,6 +22,7 @@
 //! | `power.critical-warning` | on: the critical-battery warning | the same |
 //! | `nix.unfree` | on: the user's nixpkgs takes unfree packages | `U/home/kubaos.d/nixpkgs.toml` |
 //! | `kubaos.preview` | on: the home is a live preview of a KubaOS checkout | `S/kubaos/preview.json` names one |
+//! | `kubaos.held` | on: a package of the user's own list is held at the version the home had | `U/home/kubaos.d/held.toml` holds one |
 //! | `kubaos.suites.<name>` | on: the catalog's Suite `<name>` is installed | `U/home/kubaos.d/suites/<name>.toml` exists |
 //! | `bluetooth.unnamed` | on: Bluetooth lists the devices that send no name | `S/quickshell/kubaos.json` |
 //! | `wallpapers.depth` | on: the wallpaper-depth Suite cuts out the user's own pictures | `U/desktop/wallpapers/depth.toml` |
@@ -55,9 +56,11 @@ use std::path::PathBuf;
 use kubaos_core::apt::Choices;
 use kubaos_core::apt::Manifest;
 use kubaos_core::apt::Switch;
+use kubaos_core::held;
 use kubaos_core::keyboard::settings as keyboard_settings;
 use kubaos_core::preview::PreviewFile;
 use kubaos_core::state::DIR_NAME as STATE_DIR;
+use kubaos_core::state::HELD_FILE;
 use kubaos_core::state::NIXPKGS_FILE;
 use kubaos_core::state::Paths;
 use kubaos_core::state::StateDir;
@@ -109,6 +112,9 @@ pub const CRITICAL_WARNING: &str = "power.critical-warning";
 pub const UNFREE: &str = "nix.unfree";
 /// Whether the home is a live preview of a KubaOS checkout rather than the release.
 pub const PREVIEW: &str = "kubaos.preview";
+/// Whether a package the state directory lists is held at the version the home had, since it
+/// couldn't be built.
+pub const HELD: &str = "kubaos.held";
 /// Whether the control center's Bluetooth tab lists the devices in range that send no name.
 pub const BLUETOOTH_UNNAMED: &str = "bluetooth.unnamed";
 /// Whether the wallpaper-depth Suite cuts out the user's own pictures.
@@ -313,6 +319,9 @@ impl States {
         if let Ok(unfree) = UnfreeSetting::read(&files.state_dir) {
             self.set(UNFREE, Reading::Bool(unfree == Unfree::Allowed));
         }
+        if let Ok(holds) = held::read(&StateDir::new(&files.state_dir)) {
+            self.set(HELD, Reading::Bool(!holds.is_empty()));
+        }
         if let Ok(allowed) = kubaos_proxy::profile::local_network_allowed(&files.network) {
             self.set(PROXY_LOCAL_NETWORK, Reading::Bool(allowed));
         }
@@ -326,9 +335,8 @@ pub fn values(name: &str) -> Option<Values> {
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | OPEN_WHERE_LAUNCHED | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY
         | PROXY_LOCAL_NETWORK | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES | BACKGROUND_YIELDS
-        | UNFREE | PREVIEW | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN | UPDATE_NIX => {
-            Some(Values::Bool)
-        }
+        | UNFREE | PREVIEW | HELD | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN
+        | UPDATE_NIX => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,
@@ -394,6 +402,7 @@ impl Places {
                 user_layer.keyboard,
                 user_layer.power,
                 user_layer.state_dir.join(NIXPKGS_FILE),
+                user_layer.state_dir.join(HELD_FILE),
                 user_layer.network.join(kubaos_proxy::paths::PROFILE),
                 wallpaper_depth::path(config),
             ]);

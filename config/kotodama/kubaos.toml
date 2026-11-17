@@ -1158,6 +1158,19 @@ run = ["kubaos", "switch", "--release"]
 terminal = true
 shown_when = { state = "kubaos.preview", is = true }
 
+# Held packages (crates/kubaos-core/src/held.rs): a package of the user's own
+# list that couldn't be built stays at the version the home had, and a switch
+# tries it again only once its build changes. Listed only while one is held.
+# It runs in a terminal, where the switch shows what it builds.
+[extensions.kubaos.actions.retry-held]
+title = "Try held packages again"
+subtitle = "Build the packages that stay at their version because they couldn't be built, then switch"
+icon = "view-refresh"
+keywords = ["held packages", "retry", "rebuild", "kubaos switch", "couldn't be built", "nix"]
+run = ["kubaos", "switch", "--retry-held"]
+terminal = true
+shown_when = { state = "kubaos.held", is = true }
+
 [extensions.kubaos.actions.channel]
 title = "Switch channel"
 subtitle = "Stable: signed releases. Edge: origin/main as it lands, bugs included"

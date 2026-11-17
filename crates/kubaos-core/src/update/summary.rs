@@ -29,8 +29,8 @@ pub struct Notification {
 
 impl Summary {
     /// Whether the run changed nothing and has nothing to report: the release stayed, no package,
-    /// migration, program or firmware moved, and nothing waits or failed. What the session
-    /// reloaded doesn't count: a switch reloads it even when the home stays the same.
+    /// migration, program or firmware moved, none is held, and nothing waits or failed. What the
+    /// session reloaded doesn't count: a switch reloads it even when the home stays the same.
     pub fn changed_nothing(&self) -> bool {
         self.from.commit == self.to.commit
             && self.packages == 0
@@ -39,6 +39,7 @@ impl Summary {
             && self.apps.is_empty()
             && self.inputs.is_empty()
             && self.nix_packages.as_ref().is_none_or(Vec::is_empty)
+            && self.held.is_empty()
             && self.migrations.is_empty()
             && self.programs.iter().all(|p| {
                 p.waiting.is_none() && !matches!(p.result, ProgramResult::Updated { .. } | ProgramResult::Failed { .. })
@@ -88,6 +89,9 @@ impl Summary {
         }
         if let Some(nix) = self.nix_packages.as_ref().filter(|nix| !nix.is_empty()) {
             lines.push(counted(nix.len(), "1 Nix package changed", "{n} Nix packages changed"));
+        }
+        for name in &self.held {
+            lines.push(crate::held::message(name));
         }
         for program in &self.programs {
             let name = program.program.title();
