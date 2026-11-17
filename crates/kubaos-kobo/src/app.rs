@@ -13,6 +13,12 @@
 //! The battery is read on a thread of its own every `battery::POLL` (`battery_watch`), since a
 //! read can wait on the firmware.
 
+mod disk;
+mod language;
+mod network;
+mod power;
+mod wallpapers;
+
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -43,6 +49,9 @@ use kubaos_ui::motion::Motion;
 use kubaos_ui::tokens;
 use kubaos_ui::tokens::Easing;
 
+use self::wallpapers::Dir;
+pub use self::wallpapers::WALLPAPER_COLUMNS;
+pub use self::wallpapers::wallpaper_item;
 use crate::backend::Backend;
 use crate::backend::RunMsg;
 use crate::battery;
@@ -833,15 +842,6 @@ impl App {
         self.ensure_glass();
     }
 
-    /// Decodes the wallpaper thumbnails from `payload_dir` right away (the screenshots).
-    #[cfg(test)]
-    pub fn load_thumbs_now(&mut self) {
-        let sets = self.wallpaper_sets().to_vec();
-        for set in &sets {
-            self.thumbs.extend(decoded_thumbs(&self.payload_dir, set));
-        }
-    }
-
     /// Pretends the probe already answered (tests and the screenshots).
     #[cfg(test)]
     pub fn set_probe(&mut self, p: Result<Probe, String>) {
@@ -1252,98 +1252,6 @@ impl App {
         }
     }
 
-    fn open_power(&mut self) {
-        if self.power.is_some() || self.shutting_down.is_some() {
-            return;
-        }
-        self.hold = None;
-        self.power = Some(PowerMenu {
-            return_focus: self.focus,
-            stopping: None,
-        });
-        // The safe answer first: Enter twice in a row never takes the machine down.
-        self.set_focus(Some(F::PowerCancel));
-    }
-
-    /// Closes the power menu, unless it's already taking the machine down.
-    fn close_power(&mut self) {
-        let Some(menu) = self.power else {
-            return;
-        };
-        if menu.stopping.is_some() || self.shutting_down.is_some() {
-            return;
-        }
-        self.power = None;
-        self.set_focus(menu.return_focus);
-    }
-
-    /// The menu's Power off or Restart: at once, or once the running install has stopped.
-    fn confirm_power(&mut self, action: PowerAction) -> Task<Message> {
-        if self.shutting_down.is_some() {
-            return Task::none();
-        }
-        let running = self.install_running();
-        let Some(menu) = &mut self.power else {
-            return Task::none();
-        };
-        if menu.stopping.is_some() {
-            return Task::none();
-        }
-        if !running {
-            return self.shut_down(action);
-        }
-        self.now = Instant::now();
-        menu.stopping = Some((action, self.now));
-        self.backend.stop();
-        Task::none()
-    }
-
-    /// Asks systemd to power off or restart, on a thread of its own. systemctl returns once
-    /// systemd has the job and the machine takes a few seconds to go down, so the screen says so
-    /// meanwhile.
-    fn shut_down(&mut self, action: PowerAction) -> Task<Message> {
-        if self.shutting_down.is_some() {
-            return Task::none();
-        }
-        self.shutting_down = Some(action);
-        self.now = Instant::now();
-        let backend = Arc::clone(&self.backend);
-        let (tx, rx) = iced::futures::channel::oneshot::channel();
-        std::thread::spawn(move || {
-            let r = match action {
-                PowerAction::PowerOff => backend.poweroff(),
-                PowerAction::Restart => backend.reboot(),
-            };
-            let _ = tx.send(r);
-        });
-        Task::perform(
-            async move { rx.await.unwrap_or_else(|_| Err("it crashed".into())) },
-            move |r| Message::ShutDown(action, r),
-        )
-    }
-
-    /// Keys while the power menu is open: it keeps them all, so nothing behind it moves.
-    fn power_key(&mut self, k: &Key) -> Task<Message> {
-        let busy = self.shutting_down.is_some() || self.power.is_some_and(|m| m.stopping.is_some());
-        if busy {
-            return Task::none();
-        }
-        match *k {
-            Key::Esc => {
-                self.close_power();
-                Task::none()
-            }
-            Key::Tab { shift } => self.cycle_focus(shift),
-            Key::Left { .. } => self.cycle_focus(true),
-            Key::Right { .. } => self.cycle_focus(false),
-            Key::Enter | Key::Space => match self.focus {
-                Some(f) if f.in_power_menu() => self.activate(f),
-                _ => Task::none(),
-            },
-            _ => Task::none(),
-        }
-    }
-
     /// Tab and Shift+Tab: the next or previous focus target, round the end.
     fn cycle_focus(&mut self, back: bool) -> Task<Message> {
         let order = self.focus_order();
@@ -1640,34 +1548,6 @@ impl App {
         }
     }
 
-    fn pick_mode(&mut self, m: DiskMode) {
-        let ok = match m {
-            DiskMode::Whole => true,
-            DiskMode::FreeSpace => self
-                .ready_probe()
-                .and_then(|p| self.form.selected_disk(p).map(|d| d.fits_dual_boot(p)))
-                .unwrap_or(false),
-        };
-        if ok {
-            self.form.disk_mode = Some(m);
-        }
-    }
-
-    fn toggle_mode(&mut self) {
-        let m = match self.form.disk_mode {
-            Some(DiskMode::Whole) => DiskMode::FreeSpace,
-            _ => DiskMode::Whole,
-        };
-        self.pick_mode(m);
-    }
-
-    pub fn wifi_secured(&self, ssid: Option<&str>) -> bool {
-        let (Some(p), Some(ssid)) = (self.ready_probe(), ssid) else {
-            return false;
-        };
-        p.wifi.iter().any(|w| w.ssid == ssid && w.secured)
-    }
-
     /// The entries a list shows, after filtering by its search box.
     pub fn list_items(&self, list: List) -> Vec<String> {
         let Some(p) = self.ready_probe() else {
@@ -1754,25 +1634,6 @@ impl App {
         }
     }
 
-    /// The keymap row Space acts on: the cursor's, else the default layout's.
-    pub fn keymap_row(&self) -> String {
-        self.keymap_cursor
-            .clone()
-            .or_else(|| self.form.keymaps.first().cloned())
-            .unwrap_or_default()
-    }
-
-    /// Space and Shift+Space act on the keymap list while its search box has the focus with
-    /// nothing typed: a search never starts with a space.
-    fn keymap_list_keys(&self) -> bool {
-        self.focus == Some(F::KeymapQ) && self.keymap_q.is_empty()
-    }
-
-    fn toggle_keymap(&mut self, keymap: &str) {
-        let r = self.form.toggle_keymap(keymap);
-        self.refused(r);
-    }
-
     /// Shows why a change to the form was refused.
     fn refused(&mut self, r: Result<(), &'static str>) {
         if let Err(why) = r {
@@ -1827,68 +1688,6 @@ impl App {
         };
         iced::advanced::widget::operate(crate::reveal::Find::new(scroll, item))
             .map(move |found| Message::Reveal(scroll, found))
-    }
-
-    /// The arrow keys on the Wallpapers screen: through a set's grid of thumbnails, from its
-    /// header into it, and past its first or last row to the set above or below.
-    fn move_in_wallpapers(&mut self, from: F, dir: Dir) -> Task<Message> {
-        let Some(to) = self.wallpaper_neighbour(from, dir) else {
-            return Task::none();
-        };
-        self.set_focus(Some(to));
-        self.reveal()
-    }
-
-    /// Where an arrow key goes from a header or a thumbnail; `None` at the edge.
-    pub(crate) fn wallpaper_neighbour(&self, from: F, dir: Dir) -> Option<F> {
-        let sets = self.wallpaper_sets();
-        let files = |s: usize| sets.get(s).map_or(0, |set| set.files.len());
-        let cols = WALLPAPER_COLUMNS;
-        // The set above's last row, at its first thumbnail; its header when it has none.
-        let above = |s: usize| -> Option<F> {
-            let s = s.checked_sub(1)?;
-            Some(match files(s) {
-                0 => F::WallpaperSet(s),
-                n => F::Wallpaper(s, (n - 1) / cols * cols),
-            })
-        };
-        let below = |s: usize| (s + 1 < sets.len()).then_some(F::WallpaperSet(s + 1));
-        match (from, dir) {
-            (F::WallpaperSet(s), Dir::Up) => above(s),
-            (F::WallpaperSet(s), Dir::Down) => match files(s) {
-                0 => below(s),
-                _ => Some(F::Wallpaper(s, 0)),
-            },
-            (F::Wallpaper(s, i), Dir::Left) => i.checked_sub(1).map(|j| F::Wallpaper(s, j)),
-            (F::Wallpaper(s, i), Dir::Right) => (i + 1 < files(s)).then_some(F::Wallpaper(s, i + 1)),
-            (F::Wallpaper(s, i), Dir::Up) => Some(match i.checked_sub(cols) {
-                Some(j) => F::Wallpaper(s, j),
-                None => F::WallpaperSet(s),
-            }),
-            (F::Wallpaper(s, i), Dir::Down) => {
-                let n = files(s);
-                if i + cols < n {
-                    Some(F::Wallpaper(s, i + cols))
-                } else if i / cols < (n - 1) / cols {
-                    // The row below is short: its last thumbnail.
-                    Some(F::Wallpaper(s, n - 1))
-                } else {
-                    below(s)
-                }
-            }
-            _ => None,
-        }
-    }
-
-    /// Decodes every set's thumbnails, a thread per set, so the screen fills in as they come.
-    fn load_thumbs(&self) -> Task<Message> {
-        let dir = self.payload_dir.clone();
-        Task::batch(
-            self.wallpaper_sets()
-                .iter()
-                .cloned()
-                .map(|set| Task::perform(load_thumbs(dir.clone(), set), Message::Thumbs)),
-        )
     }
 
     /// Keeps the selected row of the active list in view, scrolling as
@@ -1979,27 +1778,6 @@ pub fn reveal_target(screen: Screen, f: F) -> Option<(&'static str, &'static str
 
 /// Rows Page Up and Page Down move in a list.
 const PAGE: i32 = 8;
-
-/// Thumbnails in a row on the Wallpapers screen (`view/wallpapers.rs`, `wallpapers`).
-pub const WALLPAPER_COLUMNS: usize = 4;
-
-/// An arrow key's direction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Dir {
-    Up,
-    Down,
-    Left,
-    Right,
-}
-
-/// The container id of a header or thumbnail on the Wallpapers screen, which `reveal` scrolls to.
-pub fn wallpaper_item(f: F) -> Option<String> {
-    match f {
-        F::WallpaperSet(s) => Some(format!("wallpaper-set-{s}")),
-        F::Wallpaper(s, i) => Some(format!("wallpaper-{s}-{i}")),
-        _ => None,
-    }
-}
 
 impl F {
     /// Focus targets the arrow keys move a list selection for.
@@ -2186,28 +1964,6 @@ async fn decode_wallpaper() -> image::Handle {
         let _ = tx.send(h);
     });
     rx.await.unwrap_or_else(|_| image::Handle::from_bytes(theme::WALLPAPER))
-}
-
-/// A set's thumbnails, decoded on a thread of their own (`thumbs::decode`), so a few dozen of them
-/// never hold up the UI thread's frames.
-async fn load_thumbs(payload: PathBuf, set: kubaos_core::probe::WallpaperSet) -> Vec<(String, image::Handle)> {
-    let (tx, rx) = iced::futures::channel::oneshot::channel();
-    std::thread::spawn(move || {
-        let _ = tx.send(decoded_thumbs(&payload, &set));
-    });
-    rx.await.unwrap_or_default()
-}
-
-fn decoded_thumbs(payload: &std::path::Path, set: &kubaos_core::probe::WallpaperSet) -> Vec<(String, image::Handle)> {
-    crate::thumbs::decode(payload, std::path::Path::new(crate::thumbs::ORIGINALS), set)
-        .into_iter()
-        .map(|(key, img)| {
-            // Every card's picture is the same shape, so the cards are all one height.
-            let img = crate::thumbs::cropped(&img);
-            let (w, h) = img.dimensions();
-            (key, image::Handle::from_rgba(w, h, img.into_raw()))
-        })
-        .collect()
 }
 
 fn decode_blur() -> Option<::image::RgbaImage> {
