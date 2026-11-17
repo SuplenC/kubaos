@@ -289,5 +289,12 @@ fn adding_a_package_stages_it_in_the_flakes_repository_and_not_in_one_the_enviro
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(git(&home.flake(), &["ls-files"]), "kubaos.d/packages.toml\n");
-    assert!(snapshot(&decoy) == before, "kubaos changed the decoy repository");
+    let after = snapshot(&decoy);
+    let changed: Vec<_> = after
+        .iter()
+        .filter(|file| !before.contains(file))
+        .chain(before.iter().filter(|file| !after.contains(file)))
+        .map(|(path, _)| path.display().to_string())
+        .collect();
+    assert!(changed.is_empty(), "kubaos changed the decoy repository: {changed:?}");
 }
