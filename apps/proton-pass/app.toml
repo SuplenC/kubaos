@@ -1,7 +1,10 @@
-# Proton Pass from nixpkgs, through the User flake: 1.36.1, where Proton's own .deb is at 1.43.1.
-# Proton keeps no apt repository for it and Ubuntu's archive has none, so nixpkgs comes before the
-# .deb, which doesn't update itself either. nixpkgs builds it for amd64 alone on Linux.
-# https://search.nixos.org/packages?show=proton-pass
+# Proton Pass from the .deb Proton publishes, pinned to its sha256, which matched the package
+# after its sha512 matched the one Proton lists for the release in its updater's manifest (over
+# HTTPS; Proton signs no .deb of Pass). Proton keeps no apt repository for it and builds no arm64
+# .deb; nixpkgs' Proton Pass is releases behind, and Proton refuses a client that's too old. The
+# package has no maintainer scripts, so it adds no source or key. Pass doesn't update itself on
+# Linux, where its updater stops as it starts, so a new pin brings each release.
+# https://proton.me/download/PassDesktop/linux/x64/version.json
 name = "Proton Pass"
 category = "security"
 tags = ["passwords", "password manager", "proton", "aliases", "passkeys", "totp"]
@@ -24,6 +27,7 @@ Your vaults live in your Proton account, and this machine's sign-in and settings
 
 [[action]]
 name = "Install Proton Pass"
-kind = "nix"
-arch = "amd64"
-packages = ["proton-pass"]
+kind = "deb"
+package = "proton-pass"
+version = "1.43.1"
+amd64 = { url = "https://proton.me/download/pass/linux/proton-pass_1.43.1_amd64.deb", sha256 = "f223898aa65d4dadef8db209fe8dbe03120960edd1402620aeb32aa3591d7062" }

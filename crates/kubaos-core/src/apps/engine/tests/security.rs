@@ -63,10 +63,11 @@ fn groups(world: &World) -> Vec<String> {
     groups
 }
 
-/// The shipped app `id`'s world: `getent`, `groupadd` and `groupdel` keep their groups in a file
-/// of the test's, so a script never reads the machine's `/etc/group`; each VPN's units are there
-/// as its package ships them, neither enabled nor running, as the fake's apt installs no files;
-/// and 1Password's cleanup works in the fake machine's `/` rather than the real one.
+/// The shipped app `id`'s world: its .debs served; `getent`, `groupadd` and `groupdel` keep their
+/// groups in a file of the test's, so a script never reads the machine's `/etc/group`; each VPN's
+/// units are there as its package ships them, neither enabled nor running, as the fake's apt
+/// installs no files; and 1Password's cleanup works in the fake machine's `/` rather than the real
+/// one.
 fn security_world(id: &str) -> World {
     let world = world(id);
     let file = group_file(&world);
@@ -94,6 +95,7 @@ fn security_world(id: &str) -> World {
             );
         }
     }
+    serve_the_debs(&world, id);
     if id == "1password" {
         let text = fs::read_to_string(world.catalog.join(id).join("app.toml")).unwrap();
         let root = world.system_path("/").display().to_string();
@@ -102,6 +104,20 @@ fn security_world(id: &str) -> World {
         world.write_app(id, &ours);
     }
     world
+}
+
+/// The app `id`'s .debs as the fake machine downloads them, at the pins the folder has.
+fn serve_the_debs(world: &World, id: &str) {
+    let catalog = Catalog::load(&world.catalog).unwrap();
+    for action in &catalog.get(id).unwrap().actions {
+        if let Kind::Deb { package, version, .. } = &action.kind {
+            let pin = action.download("amd64").unwrap();
+            world.host.state.borrow_mut().downloads.insert(
+                pin.url.clone(),
+                (pin.sha256.clone(), format!("deb {package} {version}").into_bytes()),
+            );
+        }
+    }
 }
 
 /// Each of the installed `id`'s steps there on the fake machine: its packages, units, group and
@@ -119,6 +135,7 @@ fn in_place(world: &World, id: &str) {
                 }
             }
             Kind::Nix { packages, .. } => assert!(packages.iter().all(|p| state.nix.contains(p)), "{id}"),
+            Kind::Deb { package, version, .. } => assert_eq!(&state.dpkg[package], version, "{id}"),
             Kind::Unit {
                 unit, enable, start, ..
             } => {
@@ -133,7 +150,7 @@ fn in_place(world: &World, id: &str) {
                 assert!(path.is_file(), "{id}: {}", path.display());
             }
             Kind::Run { .. } if id == "1password" => {}
-            other => panic!("{id}: a security app is its package, units, group or icon, not {other:?}"),
+            other => panic!("{id}: a security app is its package, .deb, units, group or icon, not {other:?}"),
         }
     }
 }
@@ -169,7 +186,7 @@ fn which_security_apps_a_machine_can_have_follows_its_architecture() {
     assert_eq!(on("amd64", Unfree::Allowed), APPS);
     // None of them is unfree in nixpkgs: 1Password comes from its own repository.
     assert_eq!(on("amd64", Unfree::Refused), APPS);
-    // 1Password builds its app for amd64 alone, and nixpkgs Proton Pass.
+    // 1Password builds its app for amd64 alone, and Proton its Pass's .deb.
     assert_eq!(
         on("arm64", Unfree::Allowed),
         [
