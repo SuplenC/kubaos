@@ -122,6 +122,8 @@ pub enum ActionError {
     InvalidStage { value: String },
     #[error("it names @VERSION@, and the app has no download whose version it would be")]
     NoVersion,
+    #[error("a download its updater rewrites in place names no version: {value:?} names its own without `@VERSION@`")]
+    SelfUpdatesNamesVersion { value: String },
 }
 
 /// One step of an install: its name and what it does.
@@ -546,13 +548,7 @@ impl Action {
     pub fn resolve(&self, words: &Words, folder: &Path) -> Result<Self, ActionError> {
         let fill = |text: &str, version: Option<&str>| words.fill(text, version);
         let kind = match &self.kind {
-            Kind::Download { to, version, .. } => {
-                let mut kind = self.kind.clone();
-                if let Kind::Download { to: filled, .. } = &mut kind {
-                    *filled = fill(to, Some(version));
-                }
-                kind
-            }
+            Kind::Download { .. } => resolve_download(words, &self.kind)?,
             Kind::File {
                 to,
                 from,
@@ -745,6 +741,27 @@ impl Action {
         }
         Ok(())
     }
+}
+
+/// A download as it runs: its `to` with its words and version filled in.
+fn resolve_download(words: &Words, kind: &Kind) -> Result<Kind, ActionError> {
+    let mut kind = kind.clone();
+    if let Kind::Download {
+        to,
+        version,
+        self_updates,
+        ..
+    } = &mut kind
+    {
+        let path = words.fill(to, Some(version));
+        // A look tells a `to` its updater rewrites in place from one of its version's folder by
+        // the version in the filled path, so one naming no `@VERSION@` names no version either.
+        if *self_updates && !to.contains("@VERSION@") && path.contains(version.as_str()) {
+            return Err(ActionError::SelfUpdatesNamesVersion { value: to.clone() });
+        }
+        *to = path;
+    }
+    Ok(kind)
 }
 
 /// A `file`'s text as it is written: its `from` read, filled in for a template, which may name

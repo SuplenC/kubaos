@@ -1851,6 +1851,41 @@ fn a_self_updating_download_its_updater_rewrites_in_place_is_never_downloaded_ov
 }
 
 #[test]
+fn a_self_updating_download_of_a_folder_its_version_is_part_of_is_downloaded_again_when_its_pin_changes() {
+    // `tool-@VERSION@` names the version in a folder of its own, not in place: a new build of
+    // the same version replaces the old one, as for any download.
+    let pinned = |url: &str, sha: &str| {
+        fixed_download("1.1", "file")
+            .replace(
+                "to = \"~/.vendor/tool\"",
+                "to = \"~/.vendor/tool-@VERSION@\"\nself_updates = true",
+            )
+            .replace("https://example.com/tool-1.1", url)
+            .replace(&"11".repeat(32), sha)
+    };
+    let (first, second) = ("a".repeat(64), "b".repeat(64));
+    let world = World::new(&[("tool", &pinned("https://example.com/tool-1.1", &first))]);
+    for (url, sha, text) in [
+        ("https://example.com/tool-1.1", &first, "tool 1.1"),
+        ("https://example.com/tool-1.1-rebuilt", &second, "tool 1.1, rebuilt"),
+    ] {
+        world
+            .host
+            .state
+            .borrow_mut()
+            .downloads
+            .insert(url.to_owned(), (sha.clone(), text.as_bytes().to_vec()));
+    }
+    world.install("tool", true).0.unwrap();
+    world.write_app("tool", &pinned("https://example.com/tool-1.1-rebuilt", &second));
+
+    world.install("tool", true).0.unwrap();
+
+    let tool = world.host_home().join(".vendor/tool-1.1");
+    assert_eq!(fs::read_to_string(tool).unwrap(), "tool 1.1, rebuilt");
+}
+
+#[test]
 fn a_download_a_run_stopped_during_is_downloaded_again() {
     let world = World::new(&[("tool", &fixed_download("1.1", "file"))]);
     for version in ["1.1", "1.3"] {
