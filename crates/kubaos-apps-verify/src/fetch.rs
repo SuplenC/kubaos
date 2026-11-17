@@ -39,6 +39,11 @@ impl FetchError {
     }
 }
 
+/// How often curl tries a failed fetch again, waiting 1, 2, 4, 8, 16 and 32 seconds between: a
+/// mirror such as Launchpad's answers 503 for a minute or so at a time, and a check that fails
+/// on that says nothing about the catalog.
+const RETRIES: &str = "6";
+
 fn curl() -> Command {
     let mut command = Command::new("curl");
     command.args([
@@ -47,7 +52,7 @@ fn curl() -> Command {
         "--fail",
         "--location",
         "--retry",
-        "3",
+        RETRIES,
         "--max-time",
         MAX_TIME,
     ]);
@@ -118,7 +123,7 @@ pub fn status(url: &str) -> Result<Answer, FetchError> {
             "--show-error",
             "--location",
             "--retry",
-            "3",
+            RETRIES,
             "--max-time",
             "60",
         ])
