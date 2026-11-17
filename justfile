@@ -43,8 +43,8 @@ release: test
     just iso x86_64
     ls -lh iso/kubaos-{{codename}}-{{ver}}-*.iso
 
-# What a pull request's CI runs (.github/workflows/check.yml), in `nix develop`: the formatting, both clippy passes, the workspace's tests, the shell's logic tests, the screenshot harness's tests, the design checks and the system files' check.
-check: fmt-check lint nextest qml-test shots-test design-check system-files-check
+# What a pull request's CI runs (.github/workflows/check.yml), in `nix develop`: the formatting, both clippy passes, the workspace's tests, the shell's logic tests, the screenshot harness's tests, the design checks, the system files' check and shellcheck. CI runs the mockups' part of the design checks only when their inputs change, and adds `apps-verify` for the apps a pull request changes.
+check: fmt-check lint nextest qml-test shots-test design-check system-files-check shellcheck
 
 # A changed file under system/files/ comes with a new system migration that installs it again, and system/files.map says what installs every file there (test/system-files/check, docs/agents/code-quality.md, "Shell"). Compares against the merge base with `base`; runs its own tests first.
 system-files-check base="origin/main":
@@ -55,10 +55,27 @@ system-files-check base="origin/main":
 qml-test:
     nix build --no-link -L .#checks.{{host}}-linux.qml-logic
 
-# The workspace's tests, with nextest; arguments go to `cargo nextest run`, as `just nextest -E 'package(kubaos-kobo)'`.
+# The workspace's tests, with nextest; arguments go to `cargo nextest run`, as `just nextest -E 'package(kubaos-kobo)'`. With a package named (`-p kubaos-core`, `--package=…`), only that package builds and runs; with none, the whole workspace.
 [positional-arguments]
 nextest *args:
-    cargo nextest run --workspace "$@"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    scope=(--workspace)
+    for arg in "$@"; do
+      case "$arg" in
+        -p | -p* | --package | --package=*) scope=() ;;
+      esac
+    done
+    cargo nextest run ${scope[@]+"${scope[@]}"} "$@"
+
+# Hold the Apps catalog's pins to their upstreams (crates/kubaos-apps-verify, docs/TESTING.md): each vendor key's fingerprint and the InRelease it signs, each package's candidate in its repository or Ubuntu's archive, each pinned download's sha256 as served and as published, each nixpkgs package at flake.lock for both systems, each web app's URL. Every app with no ID; `just apps-verify --changed origin/main` the apps a branch changed. Network only: it installs nothing and reads no apt state.
+[positional-arguments]
+apps-verify *args:
+    cargo run -q -p kubaos-apps-verify -- "$@"
+
+# shellcheck over the repo's shell scripts (test/shellcheck/check): the Apps catalog's, the system scripts, migrations, scripts/, the test harness, the hooks. A warning or an error fails it; info and style notes are listed.
+shellcheck:
+    test/shellcheck/check .
 
 # Start this worktree's cargo build from the main checkout's target/: a reflink copy, so the first build rebuilds only what differs from main (test/warm-target, docs/TESTING.md). Claude Code's agent worktrees get it from the WorktreeCreate hook; this is for a worktree made another way. Where reflinks aren't supported, it changes nothing.
 warm:
@@ -121,8 +138,11 @@ e2e *checks:
     (($#)) && only=(--only "$(IFS=,; echo "$*")")
     test/run e2e ${only[@]+"${only[@]}"}
 
-# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, every colour pair's WCAG contrast in both modes, every specimen page at every scale, light and dark, held to the geometry rules, then QML's parity with iced, then the mockup pages that must pass (`mockups-checked`). `just test` runs the first three as cargo tests; `nix flake check` runs them and parity.
-design-check: && design-parity mockups-checked
+# The design checks (docs/DESIGN.md, "Checks"): the libraries' (`design-check-ui`), then the mockup pages that must pass (`mockups-checked`).
+design-check: design-check-ui mockups-checked
+
+# The libraries' design checks: the lint for literal design values against design/lint-baseline.toml, every colour pair's WCAG contrast in both modes, every specimen page at every scale, light and dark, held to the geometry rules, then QML's parity with iced. `just test` runs the first three as cargo tests; `nix flake check` runs them and parity.
+design-check-ui: && design-parity
     cargo run -q -p kubaos-design -- lint
     cargo run -q -p kubaos-design -- contrast >/dev/null
     cargo run -q -p kubaos-specimen -- check
@@ -163,7 +183,7 @@ mockups-check *pages: _mockups-site
     cargo run -q -p kubaos-specimen -- mockup "$frames"
     node scripts/player-test.ts "$@"
 
-# The mockup pages every pull request holds to the mockups' check, by `design-check`: those listed in design/mockups/checked-pages, checked together. A page joins the list once `just mockups-check PAGE` passes it with no finding and no difference.
+# The mockup pages the mockups' check holds every change to their inputs to, by `design-check` (CI's `mockups` job, when a pull request changes them): those listed in design/mockups/checked-pages, checked together. A page joins the list once `just mockups-check PAGE` passes it with no finding and no difference.
 mockups-checked:
     #!/usr/bin/env bash
     set -euo pipefail

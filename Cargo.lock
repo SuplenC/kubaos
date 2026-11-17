@@ -2151,6 +2151,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "kubaos-apps-verify"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "kubaos-core",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "kubaos-automount"
 version = "0.1.0"
 dependencies = [

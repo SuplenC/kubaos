@@ -219,10 +219,17 @@
       # runs `rustfmt` itself; an editor started from `nix develop` gets it.
       # `just fmt` and `just fmt-check` refuse a rustfmt that isn't nightly.
       #
-      # Cargo compiles through sccache, its cache under ~/.cache/sccache, so a
-      # fresh worktree reuses the crates.io dependencies another checkout
-      # already built. Only the shell's cargo: crane and the flake's packages
-      # build in the sandbox, without it.
+      # Cargo compiles through sccache, so a fresh worktree reuses what another
+      # checkout already built. Only the shell's cargo: crane and the flake's
+      # packages build in the sandbox, without it.
+      #
+      # The shell's sccache runs a server of its own, on its own port and with
+      # its own cache (~/.cache/kubaos/sccache). A client only talks to a server
+      # of its own release, and every sccache defaults to port 4226: a machine's
+      # own sccache (from mise, rustup's toolchain) of another release holding
+      # that port fails every compile of the shell's, and the shell's server
+      # holding it fails the machine's. Their caches would never share an entry
+      # anyway, as each compiler's hash is in its keys.
       #
       # Node runs the mockups (design/mockups, `just mockups`): Vite and
       # TypeScript from its package-lock.json. Their pictures and frames are
@@ -246,6 +253,11 @@
               pkgs.nixfmt
               self.formatter.${pkgs.stdenv.hostPlatform.system}
               pkgs.sccache
+              pkgs.shellcheck
+              # `just apps-verify` (crates/kubaos-apps-verify): keys and signatures in a
+              # gpg home of its own, and its downloads.
+              pkgs.gnupg
+              pkgs.curl
               # The Apps catalog's user hooks read T3 Code's JSON with jq, as every KubaOS home
               # has it (home/cli.nix); their tests run them here.
               pkgs.jq
@@ -260,8 +272,16 @@
             # models (docs/TESTING.md) and a `cargo run` find it here.
             ORT_DYLIB_PATH = "${pkgs.lib.getLib pkgs.onnxruntime}/lib/libonnxruntime.so";
             RUSTC_WRAPPER = pkgs.lib.getExe pkgs.sccache;
+            # One server per sccache release: a worktree on an older flake.lock
+            # runs its own version's server and never talks to another's.
+            # 0.15.0 listens on 21500, 0.19.2 on 21902.
+            SCCACHE_SERVER_PORT =
+              let
+                v = map pkgs.lib.toInt (pkgs.lib.take 3 (pkgs.lib.splitVersion pkgs.sccache.version));
+              in
+              toString (20000 + (builtins.elemAt v 0) * 10000 + (builtins.elemAt v 1) * 100 + (builtins.elemAt v 2));
             shellHook = ''
-              export SCCACHE_DIR=''${SCCACHE_DIR:-''${XDG_CACHE_HOME:-$HOME/.cache}/sccache}
+              export SCCACHE_DIR=''${SCCACHE_DIR:-''${XDG_CACHE_HOME:-$HOME/.cache}/kubaos/sccache}
             '';
           };
           # The logo's tools, for `just branding` (branding/README.md, "Regenerating").

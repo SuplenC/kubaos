@@ -1,20 +1,32 @@
-# A pull request's checks on x86_64: `just check` in the flake's devshell, and
-# `nix flake check --no-build`, which only evaluates. `just shots` stays out:
-# its screenshots are for a person to look at, not a check.
+# The checks of a pull request into main, and of each push to main, on
+# x86_64: `just check` in the flake's devshell, and `nix flake check
+# --no-build`, which only evaluates. A pull request into another branch (a
+# piece of a feature landing on its parent branch) runs none: its checks run
+# when the parent's pull request into main does. `just shots` stays out: its
+# screenshots are for a person to look at, not a check.
 #
 # The checks run as parallel jobs, each on its own runner, one step per recipe
 # so a failure names what failed:
+# - changes: which of the gated jobs below a pull request needs, from the
+#   files it changes since its merge base with main. A push to main needs all.
 # - flake: `nix flake check --no-build`.
 # - fmt and lint: `just fmt-check`, `just lint`.
 # - nextest and nextest (slow): `just nextest`, split in two by `SLOW_TEST`.
 # - qml: `just qml-test`.
-# - design: `just design-check`, with QML's parity.
+# - design: `just shots-test`, `just design-check-ui` (the lint, contrast,
+#   the specimen's geometry and QML's parity).
+# - mockups, gated: `just mockups-checked`, when the mockups' inputs change.
+# - apps verify, gated: `just apps-verify` on the apps a pull request changes
+#   (their folders, or their vendor repositories' pins), against the vendors'
+#   servers; every app when the check itself changes. Not on a push to main.
+# - shellcheck: `just shellcheck`.
 # - system files: `just system-files-check`'s two scripts, run straight on the
 #   runner: they need only bash and git, so the job sets up no Nix. It checks
 #   out the whole history, for the merge base with main.
-# `check (x86_64-linux)` needs them all and fails unless every one passed. It
-# is the one check branch protection requires, so a job added here goes in its
-# `needs`.
+# A gated job a change doesn't need still runs, skipping its steps, so it
+# reports success under its own name. `check (x86_64-linux)` needs them all
+# and fails unless every one passed. It is the one check branch protection
+# requires, so a job added here goes in its `needs`.
 #
 # Fast through three caches, which .github/actions/setup restores:
 # - Cachix (kuba-os.cachix.org), read-only, for what the binary cache workflow
@@ -30,7 +42,12 @@
 name: Check
 
 on:
+  # No edit trigger: a title edit would record the checks as skipped on the
+  # same commit, and a skipped required check counts as passed. A pull request
+  # retargeted onto main gets its run from its next push, or from closing and
+  # reopening it.
   pull_request:
+    branches: [main]
   push:
     branches: [main]
 
@@ -53,6 +70,45 @@ env:
   SLOW_TEST: package(kubaos-kobo) & test(=shots::every_screen_keeps_to_the_grid)
 
 jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      mockups: ${{ steps.paths.outputs.mockups }}
+      apps: ${{ steps.paths.outputs.apps }}
+      apps-all: ${{ steps.paths.outputs.apps-all }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # The mockups' inputs: the site and the tokens (design/), the shell
+      # whose surfaces it mocks, the crates its check builds and compares
+      # with, the pictures it reads (branding/, Kōbō's assets, the boot
+      # splash and GRUB theme), the workspace's manifests and toolchain, the
+      # recipes, the flake that pins Node and Chromium, the setup action and
+      # this workflow. A path names a folder with its slash, a file whole.
+      - name: Changed paths
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [[ $EVENT != pull_request ]]; then
+            printf '%s\n' mockups=true apps=false apps-all=false >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "origin/$BASE...HEAD")"
+          printf '%s\n' "$changed"
+          any() { grep -qE "$1" <<<"$changed" && echo true || echo false; }
+          {
+            echo "mockups=$(any '^(design/|config/quickshell/|crates/kubaos-(ui|tokens|specimen|geometry)/|crates/kubaos-kobo/assets/|branding/|system/files/(plymouth|grub)/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|justfile$|flake\.(nix|lock)$|\.github/actions/|\.github/workflows/check\.yml$)')"
+            echo "apps=$(any '^(apps/|system/packages\.toml$|system/files/apt/sources\.list\.d/)')"
+            echo "apps-all=$(any '^crates/kubaos-apps-verify/')"
+          } >>"$GITHUB_OUTPUT"
+
   flake:
     name: flake
     runs-on: ubuntu-latest
@@ -103,7 +159,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            ~/.cache/sccache
+            ~/.cache/kubaos/sccache
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
@@ -140,7 +196,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            ~/.cache/sccache
+            ~/.cache/kubaos/sccache
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
@@ -178,7 +234,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            ~/.cache/sccache
+            ~/.cache/kubaos/sccache
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
@@ -225,7 +281,7 @@ jobs:
         run: nix develop --command just shots-test
 
       - name: Design checks
-        run: nix develop --command just design-check
+        run: nix develop --command just design-check-ui
 
       - name: Compile cache stats
         if: ${{ !cancelled() }}
@@ -236,11 +292,116 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            ~/.cache/sccache
+            ~/.cache/kubaos/sccache
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
           key: ${{ steps.setup.outputs.cargo-key }}
+
+  mockups:
+    name: mockups
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NEEDED: ${{ needs.changes.outputs.mockups }}
+    steps:
+      - name: Check out
+        if: env.NEEDED == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The design job's caches: the same devshell, and the crates the
+      # mockups' check builds are a part of the design job's.
+      - name: Set up
+        if: env.NEEDED == 'true'
+        uses: ./.github/actions/setup
+        with:
+          name: design
+          cargo: true
+
+      - name: Mockup pages
+        if: env.NEEDED == 'true'
+        run: nix develop --command just mockups-checked
+
+      - name: Not needed
+        if: env.NEEDED != 'true'
+        run: echo "No input of the mockups' check changed."
+
+  apps-verify:
+    name: apps verify
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEEDED: ${{ needs.changes.outputs.apps == 'true' || needs.changes.outputs.apps-all == 'true' }}
+      ALL: ${{ needs.changes.outputs.apps-all }}
+      BASE: ${{ github.event.pull_request.base.ref }}
+    steps:
+      # A push to main checks no app, but builds the verifier and saves its
+      # compile cache, so a pull request's run starts from its own.
+      - name: Check out
+        if: env.NEEDED == 'true' || github.event_name == 'push'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up
+        id: setup
+        if: env.NEEDED == 'true' || github.event_name == 'push'
+        uses: ./.github/actions/setup
+        with:
+          name: apps-verify
+          store: devshell
+          cargo: true
+
+      # The token lifts GitHub's limit on the release lookups to 1,000 an
+      # hour; it only reads public releases.
+      - name: Apps against their upstreams
+        if: env.NEEDED == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [[ $ALL == true ]]; then
+            nix develop --command just apps-verify
+          else
+            nix develop --command just apps-verify --changed "origin/$BASE"
+          fi
+
+      - name: Build the verifier
+        if: github.event_name == 'push'
+        run: nix develop --command cargo build -q -p kubaos-apps-verify
+
+      - name: Save the compile cache
+        if: ${{ github.event_name == 'push' && !cancelled() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/kubaos/sccache
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ steps.setup.outputs.cargo-key }}
+
+      - name: Not needed
+        if: env.NEEDED != 'true' && github.event_name != 'push'
+        run: echo "No app or vendor repository changed."
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up
+        uses: ./.github/actions/setup
+        with:
+          name: shellcheck
+          store: devshell
+
+      - name: Shellcheck
+        run: nix develop --command just shellcheck
 
   system-files:
     name: system files
@@ -262,7 +423,7 @@ jobs:
   # one runs on the others' failure or cancellation too, and fails.
   check:
     name: check (x86_64-linux)
-    needs: [flake, lint, nextest, nextest-slow, qml, design, system-files]
+    needs: [changes, flake, lint, nextest, nextest-slow, qml, design, mockups, apps-verify, shellcheck, system-files]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

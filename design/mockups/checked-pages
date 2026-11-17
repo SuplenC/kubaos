@@ -1,4 +1,5 @@
-# The mockup pages every pull request holds to the mockups' check (`just mockups-checked`, run by
+# The mockup pages CI holds a pull request that changes one of the mockups' inputs
+# (docs/TESTING.md, "CI") and every push to main to (`just mockups-checked`, run by
 # `just design-check`): each passes `just mockups-check` with no finding and no difference, checked
 # together, so the `identical` rule compares their components with each other's. One slug a line,
 # as in `#/atoms/button`. A page joins once `just mockups-check PAGE` passes it, and leaves only

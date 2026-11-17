@@ -17,7 +17,8 @@
 # components every Rust front end draws with (`kubaos-ui`), the specimen that
 # shows them (`kubaos-specimen`), and the design checks:
 # the geometry rules any toolkit's boxes are held to (`kubaos-geometry`) and the `kubaos-design`
-# command, which lints UI code for literal design values and checks geometry dumps.
+# command, which lints UI code for literal design values and checks geometry dumps, and
+# the check that holds the Apps catalog's pins to their upstreams (`kubaos-apps-verify`).
 [workspace]
 resolver = "3"
 members = [
@@ -44,6 +45,7 @@ members = [
     "crates/kubaos-specimen",
     "crates/kubaos-geometry",
     "crates/kubaos-design",
+    "crates/kubaos-apps-verify",
 ]
 # Patched copies of dependencies (`[patch.crates-io]` below): built with the workspace, never
 # members of it, so its lints don't apply to them.
