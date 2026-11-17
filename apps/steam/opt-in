@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Removes steam-stable.list when it is the one ./opt-out wrote, word for word, and the copy of
+# Valve's that dpkg wrote beside it as the package came, steam-stable.list.dpkg-dist; any other
+# file is left.
+# Usage: ./opt-in <path of steam-stable.list>
+set -euo pipefail
+ours='# KubaOS sets Steam'"'"'s repository up in steam.sources, with keys for it alone. This file
+# being here keeps Steam'"'"'s package from adding the repository a second time.'
+if [[ -f "$1" && "$(<"$1")" == "$ours" ]]; then
+  rm -f "$1"
+  valves="$1.dpkg-dist"
+  if [[ -f "$valves" ]] && grep -q 'https://repo\.steampowered\.com/steam/' "$valves"; then
+    rm -f "$valves"
+  fi
+fi
