@@ -83,7 +83,7 @@ fn device(scale: Scale, logical: f32) -> f32 {
 }
 
 /// Whether `letter` is a kana or a kanji, which M PLUS 1 draws and Geist doesn't: CJK's
-/// ideographs to Extension B and past, its compatibility ones, and full- and half-width kana.
+/// ideographs through Extension G (U+3134F), its compatibility ones, and full- and half-width kana.
 pub(super) fn japanese(letter: &str) -> bool {
     letter.chars().next().is_some_and(|c| {
         matches!(c,

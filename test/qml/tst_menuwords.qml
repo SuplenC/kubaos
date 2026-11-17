@@ -18,6 +18,7 @@ TestCase {
         compare(Words.tileGlyph(icon, "kubaos"), "");
         compare(Words.rowName(icon, "Install Claude Code"), "Claude Code");
         compare(Words.iconSource(icon, name => `theme:${name}`), "");
+        compare(Words.itemGlyph(icon, "kubaos"), "bolt", "the detail pane's big symbol: the menu's default, as the KubaOS Extension has no symbol of its own there");
     }
 
     function test_a_symbol_the_icon_names_is_drawn_and_an_empty_one_falls_back_to_the_extension_s() {

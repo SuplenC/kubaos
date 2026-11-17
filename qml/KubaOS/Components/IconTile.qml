@@ -51,11 +51,12 @@ Item {
     implicitWidth: root.side
     implicitHeight: root.side
 
-    // The first character of `name`, upper-cased, as a reader sees one: a base and the marks
-    // that combine with it (हि, ที่), a flag's two regional indicators, an emoji with its skin tone
-    // or its joined sequence (👨‍👩‍👧). iced segments by Unicode's extended graphemes; Qt's
-    // JavaScript has no segmenter and no `\p{M}`, so the rule is written out for the scripts an
-    // app's name is in, and its strings index UTF-16 units, so it walks code points.
+    // The first character of `name`, upper-cased, as a reader sees one: Unicode's extended
+    // grapheme, as iced's `unicode-segmentation` takes it. A base with the marks that combine with
+    // it (हि, ที่, คำ, ｶﾞ), a conjunct across a virama where the script links one (क्ष, ខ្មែ), a
+    // flag's two regional indicators, an emoji with its skin tone or its joined sequence (👨‍👩‍👧).
+    // Qt's JavaScript has no segmenter and no `\p{M}`, so the rule is written out for the scripts
+    // an app's name is in, and its strings index UTF-16 units, so it walks code points.
     function initial(name: string): string {
         const points = name.trim();
         const cps = [];
@@ -66,16 +67,24 @@ Item {
         }
         if (cps.length === 0)
             return "";
-        let end = 1;
         if (root.regional(cps[0]) && cps.length > 1 && root.regional(cps[1]))
-            end = 2;
+            return String.fromCodePoint(cps[0], cps[1]);
+        const pictured = root.pictographic(cps[0]);
+        let end = 1;
+        // A virama that links its script's next consonant into the cluster has been taken.
+        let linked = false;
         while (end < cps.length) {
-            if (cps[end] === 0x200d && end + 1 < cps.length)
-                end += 2;
-            else if (root.joins(cps[end]))
-                end += 1;
-            else
+            const cp = cps[end];
+            if (linked && root.consonant(cp)) {
+                linked = false;
+            } else if (pictured && cps[end - 1] === 0x200d && root.pictographic(cp)) {
+                // An emoji joined to the one before it.
+            } else if (root.joins(cp)) {
+                linked = linked || root.linker(cp);
+            } else {
                 break;
+            }
+            end += 1;
         }
         return String.fromCodePoint(...cps.slice(0, end)).toUpperCase();
     }
@@ -85,10 +94,32 @@ Item {
         return cp >= 0x1f1e6 && cp <= 0x1f1ff;
     }
 
-    // A code point that joins the one before it: a combining mark, a vowel sign or virama of the
-    // Indic scripts, a Thai or Lao mark, a variation selector, a skin tone or an emoji tag.
+    // An emoji's picture, the parts a zero width joiner joins.
+    function pictographic(cp: int): bool {
+        return (cp >= 0x1f000 && cp <= 0x1faff) || (cp >= 0x2600 && cp <= 0x27bf) || (cp >= 0x2300 && cp <= 0x23ff) || (cp >= 0x2b00 && cp <= 0x2bff);
+    }
+
+    // A virama that joins the consonant after it into one cluster: Devanagari's, Bengali's,
+    // Gujarati's, Oriya's, Telugu's and Malayalam's (Unicode's conjunct linkers), Myanmar's and
+    // Khmer's coeng.
+    function linker(cp: int): bool {
+        return [0x094d, 0x09cd, 0x0acd, 0x0b4d, 0x0c4d, 0x0d4d, 0x1039, 0x17d2].includes(cp);
+    }
+
+    // A consonant a linker joins: of those six Indic scripts, of Myanmar or of Khmer.
+    function consonant(cp: int): bool {
+        if ([0x0900, 0x0980, 0x0a80, 0x0b00, 0x0c00, 0x0d00].includes(cp & ~0x7f)) {
+            const offset = cp & 0x7f;
+            return (offset >= 0x15 && offset <= 0x39) || (offset >= 0x58 && offset <= 0x5f);
+        }
+        return (cp >= 0x1000 && cp <= 0x1021) || (cp >= 0x1780 && cp <= 0x17a2);
+    }
+
+    // A code point that joins the one before it: a combining mark or a spacing one (an Indic vowel
+    // sign or virama; Thai's, Lao's, Myanmar's, Sinhala's and Khmer's signs), the zero width
+    // joiner, a voiced sound mark, a variation selector, a skin tone or an emoji tag.
     function joins(cp: int): bool {
-        const ranges = [[0x0300, 0x036f], [0x0483, 0x0489], [0x0591, 0x05c7], [0x0610, 0x061a], [0x064b, 0x065f], [0x0670, 0x0670], [0x06d6, 0x06ed], [0x0e31, 0x0e31], [0x0e34, 0x0e3a], [0x0e47, 0x0e4e], [0x0eb1, 0x0eb1], [0x0eb4, 0x0ebc], [0x0ec8, 0x0ece], [0x1160, 0x11ff], [0x1ab0, 0x1aff], [0x1dc0, 0x1dff], [0x20d0, 0x20ff], [0x302a, 0x302f], [0x3099, 0x309a], [0xfe00, 0xfe0f], [0xfe20, 0xfe2f], [0x1f3fb, 0x1f3ff], [0xe0020, 0xe007f], [0xe0100, 0xe01ef]];
+        const ranges = [[0x0300, 0x036f], [0x0483, 0x0489], [0x0591, 0x05c7], [0x0610, 0x061a], [0x064b, 0x065f], [0x0670, 0x0670], [0x06d6, 0x06ed], [0x0d81, 0x0d83], [0x0dca, 0x0dca], [0x0dcf, 0x0ddf], [0x0df2, 0x0df3], [0x0e31, 0x0e31], [0x0e33, 0x0e3a], [0x0e47, 0x0e4e], [0x0eb1, 0x0eb1], [0x0eb3, 0x0ebc], [0x0ec8, 0x0ece], [0x102b, 0x103e], [0x1056, 0x1059], [0x105e, 0x1060], [0x1062, 0x1064], [0x1067, 0x106d], [0x1071, 0x1074], [0x1082, 0x108d], [0x108f, 0x108f], [0x109a, 0x109d], [0x1160, 0x11ff], [0x17b4, 0x17d3], [0x17dd, 0x17dd], [0x1ab0, 0x1aff], [0x1dc0, 0x1dff], [0x200d, 0x200d], [0x20d0, 0x20ff], [0x302a, 0x302f], [0x3099, 0x309a], [0xfe00, 0xfe0f], [0xfe20, 0xfe2f], [0xff9e, 0xff9f], [0x1f3fb, 0x1f3ff], [0xe0020, 0xe007f], [0xe0100, 0xe01ef]];
         if (ranges.some(([low, high]) => cp >= low && cp <= high))
             return true;
         // Devanagari to Malayalam share one layout: in each block of 128, the signs sit at these
@@ -100,7 +131,7 @@ Item {
     }
 
     // Whether `letter` is a kana or a kanji, which M PLUS 1 draws and Geist doesn't: CJK's
-    // ideographs to Extension B and past, its compatibility ones, and full- and half-width kana.
+    // ideographs through Extension G (U+3134F), its compatibility ones, and full- and half-width kana.
     function japanese(letter: string): bool {
         const cp = letter.codePointAt(0) ?? 0;
         return (cp >= 0x3040 && cp <= 0x30ff) || (cp >= 0x3400 && cp <= 0x4dbf) || (cp >= 0x4e00 && cp <= 0x9fff) || (cp >= 0xf900 && cp <= 0xfaff) || (cp >= 0xff66 && cp <= 0xff9f) || (cp >= 0x20000 && cp <= 0x3134f);
