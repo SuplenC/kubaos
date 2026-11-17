@@ -1,15 +1,18 @@
 # Navicat Premium Lite, the free edition, from Navicat's AppImage, pinned to its sha256. Navicat
-# keeps no apt repository, Ubuntu doesn't package it and nixpkgs has only the paid Premium. Its
-# address is an exception to the catalog's versioned ones, as Navicat publishes no versioned URL:
-# the address names the major version alone and serves each 18.x release in turn, with no
-# checksum, and the sha256 pin makes that fail safe. When Navicat replaces the file, the download
-# refuses it and the install stops, until a release of KubaOS moves the pin; it can never install
-# another file. Lite has no release notes of its own: it shares Premium's versions, whose notes
-# its product page links (18.0.3 is the latest for Linux there).
+# keeps no apt repository, Ubuntu doesn't package it and nixpkgs has only the paid Premium; the
+# Flatpak Navicat also offers isn't a source the catalog uses. Its address is an exception to the
+# catalog's versioned ones, as Navicat publishes no versioned URL: the address names the major
+# version alone and serves each 18.x release in turn, with no checksum, and the sha256 pin makes
+# that fail safe. When Navicat replaces the file, the download refuses it and the install stops,
+# until a release of KubaOS moves the pin; it can never install another file. Lite has no release
+# notes of its own: it shares Premium's versions, whose notes its product page links (18.0.3 is the
+# latest for Linux there).
 # The AppImage is unpacked, not run, and its bundled Qt 6.8, which has only the X11 backend, is
 # left out, so the program runs on the system's Qt 6 natively on Wayland through KubaOS's
-# wrapper; the Qt libraries it links come from Ubuntu's archive, with the Wayland plugin.
-# Navicat builds it for arm64 too; KubaOS installs the amd64 build, the one whose program was
+# wrapper. The first step installs every library the unpacked program and its own libraries link
+# from the system, as `ldd` resolves them under the wrapper's `LD_LIBRARY_PATH`: the Qt modules,
+# with the Wayland plugin, and the few others Navicat's AppImage expects the system to have.
+# Navicat builds it for arm64 too; KubaOS ships only the amd64 build, the one whose program was
 # checked against the system's Qt.
 # https://www.navicat.com/en/download/navicat-premium-lite
 name = "Navicat Premium Lite"
@@ -20,24 +23,31 @@ summary = "The free Navicat. Most of the polish, none of the invoice, and it kno
 description = """\
 Navicat Premium Lite is the free edition of Navicat Premium. It connects to MySQL, MariaDB, \
 PostgreSQL, Oracle, SQL Server, SQLite, MongoDB, Redis and Snowflake from one window, edits data \
-in grids, writes queries with code completion, designs tables, and imports and exports data. \
-The paid Premium \
-adds the rest: data transfer and synchronisation, schema comparison, modeling and automation. \
-KubaOS runs it natively on Wayland."""
+in grids, writes queries with code completion and designs tables. It imports and exports CSV, \
+JSON, XML and text files, and MongoDB's data through MongoImport and MongoExport. The paid \
+Premium adds, among others, importing and exporting Excel, Access, DBF, ODBC and Parquet, data \
+transfer and synchronisation, schema comparison, the query builder, charts, backup and restore, \
+data generation and the AI assistant. KubaOS runs it natively on Wayland."""
 description_from = "kubaos"
 # Navicat Premium Lite's icon, PremiumSoft CyberTech's trademark, used to identify the app, on
 # KubaOS's tile (navicat-premium-lite.png's comment names its source): Navicat publishes it only
 # as a raster, and no icon theme has Navicat.
 icon = "navicat-premium-lite.png"
 keeps = """\
-Your connections and settings stay in ~/.config/navicat: install Navicat Premium Lite again and \
-they're all there."""
+Your connections and settings stay in ~/.config/navicat, and what Navicat keeps in dconf under \
+/com/premiumsoft/ stays too: install Navicat Premium Lite again and they're all there."""
 
 [[action]]
-name = "Install the Qt 6 Navicat runs on, with its Wayland plugin"
+name = "Install the Qt 6 and the libraries Navicat runs on, with Qt's Wayland plugin"
 kind = "apt"
 arch = "amd64"
 packages = [
+  "desktop-file-utils",
+  "libcjson1",
+  "libgl1",
+  "libgpg-error0",
+  "libpango-1.0-0",
+  "libpangocairo-1.0-0",
   "libqt6concurrent6",
   "libqt6core6t64",
   "libqt6dbus6",
@@ -45,10 +55,19 @@ packages = [
   "libqt6network6",
   "libqt6pdf6",
   "libqt6pdfwidgets6",
+  "libqt6printsupport6",
+  "libqt6svg6",
+  "libqt6websockets6",
   "libqt6widgets6",
   "qt6-wayland",
   "squashfs-tools",
 ]
+
+# Before the menu entries, so a removal, newest step first, runs it once they are gone.
+[[action]]
+name = "Forget Navicat's link handlers once it goes"
+kind = "run"
+undo = ["./refresh-handlers"]
 
 [[action]]
 name = "Download Navicat Premium Lite"

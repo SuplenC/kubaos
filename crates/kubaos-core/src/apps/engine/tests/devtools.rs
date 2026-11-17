@@ -576,7 +576,8 @@ fn navicat_appimage() -> Vec<u8> {
 
 /// The shipped Navicat's world: its download served at the URL and sha256 its folder pins, and
 /// `unsquashfs` making Navicat's tree, its bundled Qt and Qt plugins included, from the image at
-/// the offset it is given, read-only as the image keeps it.
+/// the offset it is given, read-only as the image keeps it; and `update-desktop-database`, which
+/// fails while Navicat's menu entry is still in the folder it is given.
 fn navicat_world() -> World {
     let world = world(NAVICAT);
     let catalog = Catalog::load(&world.catalog).unwrap();
@@ -616,7 +617,22 @@ fn navicat_world() -> World {
              chmod 555 \"$dest/usr/lib/pq-g\""
         ),
     );
+    sandbox.stub(
+        "update-desktop-database",
+        "[ ! -e \"$1/Navicat.Premium.18.desktop\" ] && [ ! -e \"$1/Navicat.Premium.18.mime.desktop\" ]",
+    );
     world
+}
+
+/// Whether `update-desktop-database` was run on the menu's folder.
+fn refreshed_handlers(world: &World) -> bool {
+    let applications = world.host_home().join(".local/share/applications");
+    world
+        .host
+        .sandbox()
+        .calls()
+        .iter()
+        .any(|c| *c == format!("update-desktop-database {}", applications.display()))
 }
 
 #[test]
@@ -645,7 +661,16 @@ fn navicat_unpacks_without_its_qt_runs_on_wayland_and_its_removal_leaves_the_hom
         format!("{version}\n")
     );
     assert!(!opt.join("app.unpacking").exists());
-    for package in ["libqt6core6t64", "libqt6widgets6", "qt6-wayland", "squashfs-tools"] {
+    for package in [
+        "libqt6core6t64",
+        "libqt6printsupport6",
+        "libqt6svg6",
+        "libqt6websockets6",
+        "libqt6widgets6",
+        "qt6-wayland",
+        "squashfs-tools",
+        "desktop-file-utils",
+    ] {
         assert!(world.host.state.borrow().dpkg.contains_key(package), "{package}");
     }
     let wrapper = fs::read_to_string(opt.join("navicat")).unwrap();
@@ -673,9 +698,14 @@ fn navicat_unpacks_without_its_qt_runs_on_wayland_and_its_removal_leaves_the_hom
     let settings = home.join(".config/navicat/Premium/preferences.json");
     fs::create_dir_all(settings.parent().unwrap()).unwrap();
     fs::write(&settings, "{}").unwrap();
+    assert!(!refreshed_handlers(&world), "an install leaves the cache to Navicat");
 
     run(&world, |e| e.remove_with(NAVICAT, &Picks::default())).unwrap();
 
+    assert!(
+        refreshed_handlers(&world),
+        "the cache is rebuilt once the entries are gone"
+    );
     assert!(!opt.exists());
     assert!(settings.is_file(), "the settings stay");
     assert_eq!(world.journals(NAVICAT), (None, None));
