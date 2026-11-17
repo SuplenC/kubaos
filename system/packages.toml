@@ -274,6 +274,61 @@ key_url = "https://download.opensuse.org/repositories/graphics:/darktable/xUbunt
 fingerprint = "3247B7519EDBEAB422E900A3040524A84C70D8B5"
 keyring = "/etc/apt/keyrings/darktable.gpg"
 
+# AgileBits' repository of 1Password, for the app of the catalog
+# (apps/1password/). 1Password builds it for amd64 only. Its package's postinst
+# writes 1password.sources and fetches the key again on every install and
+# upgrade; ours is byte-identical to what it writes, at the same keyring path,
+# so the two never fight over the file.
+[repo.1password]
+key_url = "https://downloads.1password.com/linux/keys/1password.asc"
+fingerprint = "3FEF9748469ADBE15DA7CA80AC2D62742012EA22"
+keyring = "/usr/share/keyrings/1password-archive-keyring.gpg"
+
+# ppa:phoerious/keepassxc, the Launchpad PPA of KeePassXC's lead developer, for
+# the app of the catalog (apps/keepassxc/), a release ahead of Ubuntu's
+# archive. Its package writes no source of its own.
+[repo.keepassxc]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xD89C66D0E31FEA2874EBD20561922AB60068FCD6"
+fingerprint = "D89C66D0E31FEA2874EBD20561922AB60068FCD6"
+keyring = "/etc/apt/keyrings/keepassxc.gpg"
+
+# ppa:sebastian-stenzel/cryptomator, the Launchpad PPA of Cryptomator's lead
+# developer, for the app of the catalog (apps/cryptomator/). Ubuntu's archive
+# has no Cryptomator. Its package writes no source of its own.
+[repo.cryptomator]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xCD045438B0D383A4039EA86F892C15CD130FEB9A"
+fingerprint = "CD045438B0D383A4039EA86F892C15CD130FEB9A"
+keyring = "/etc/apt/keyrings/cryptomator.gpg"
+
+# Mullvad's repository, for the app of the catalog (apps/mullvad-vpn/). Its
+# package writes no source of its own.
+[repo.mullvad]
+key_url = "https://repository.mullvad.net/deb/mullvad-keyring.asc"
+fingerprint = "A1198702FC3E0A09A9AE5B75D5A1D4F266DE8DDF"
+keyring = "/etc/apt/keyrings/mullvad.gpg"
+
+# Proton's repository of Proton VPN, for the app of the catalog
+# (apps/proton-vpn/). Proton's own setup is its protonvpn-stable-release
+# package, whose conffile protonvpn-stable.sources and keyring this source is
+# byte for byte, at the same paths, so dpkg keeps it as it finds it and apt sees
+# the repository once. Its key expires on 2027-03-03. The app's packages write
+# no source of their own.
+[repo.protonvpn-stable]
+key_url = "https://repo.protonvpn.com/debian/public_key.asc"
+fingerprint = "84B0D3492C76C9C6F5873C18EDA3E22630349F1C"
+keyring = "/usr/share/keyrings/protonvpn-stable-archive-keyring.gpg"
+
+# NordVPN's repository, for the app of the catalog (apps/nordvpn/). Its
+# package writes no source of its own, but NordVPN's own setups trust its key
+# for every repository: its install script as
+# /etc/apt/trusted.gpg.d/nordvpn_public.asc, its nordvpn-release package as
+# nordvpn-keyring.gpg there. Repo setup removes the two.
+[repo.nordvpn]
+key_url = "https://repo.nordvpn.com/gpg/nordvpn_public.asc"
+fingerprint = "BC5480EFEC5C081CE5BCFBE26B219E535C964CA1"
+keyring = "/etc/apt/keyrings/nordvpn.gpg"
+global_keyrings = ["nordvpn_public.asc", "nordvpn-keyring.gpg"]
+
 # ppa:cppiber/hyprland, the Launchpad PPA of Constantin Piber.
 [repo.cppiber-hyprland]
 key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xA54D23B62FF3FCC76EFF71E8FDBAAA1CF0CCF48E"

@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://repository.mullvad.net/deb/stable
+Suites: stable
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/mullvad.gpg

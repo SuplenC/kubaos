@@ -1,0 +1,48 @@
+# Proton VPN from Proton's signed apt repository, whose key system/packages.toml pins
+# ([repo.protonvpn-stable]): proton-vpn-gnome-desktop, the package Proton's instructions install,
+# which brings the window (4.19), the protonvpn command and the daemon. The app's packages write no
+# source of their own; Proton's own setup, its protonvpn-stable-release package, ships the same
+# sources file and key, and the repository's is that file, word for word. Proton builds the core
+# library the window needs for amd64 alone; its arm64 build is a major version behind, which no
+# window of this release installs with. It connects through NetworkManager, WireGuard or OpenVPN
+# (network-manager-openvpn, on every machine), with a tunnel of its own (Proton's NetworkManager
+# plugin, nm-protun). Its kill switch is an nftables table of its own, put up through
+# me.proton.vpn.kill_switch, a D-Bus service of root's started only while it is asked for, and
+# kept at boot by proton-vpn-kill-switch-boot.service, which the window turns on and off as you set
+# the kill switch to permanent. Its daemon, me.proton.vpn.split_tunneling.service, which its
+# postinst enables and starts, keeps split tunnelling, and with it python3-bpfcc and LLVM come in.
+# KubaOS's Proxy and Proton VPN each block what leaves outside their own tunnel: with the Proxy's
+# kill switch up Proton VPN can't reach its servers, and with Proton's on the Proxy's VPN can't
+# reach IT's. Use one at a time.
+# https://protonvpn.com/support/linux-vpn-debian-ubuntu
+name = "Proton VPN"
+category = "security"
+tags = ["vpn", "wireguard", "openvpn", "privacy", "proton", "kill switch"]
+summary = "Proton's VPN, free plan included. Your ISP sees a tunnel, and Proton swears it sees nothing."
+# Proton's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Proton VPN sends your traffic through Proton's servers over WireGuard or OpenVPN, with a kill \
+switch, split tunnelling, NetShield's blocking of ads, trackers and malware, Secure Core's route \
+through a second country, and port forwarding. Its free plan has no data limit and no ads."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), the name Proton's package gives, so the
+# Command menu shows it before the package is installed.
+icon = "proton-vpn-logo"
+keeps = """\
+Your settings stay in ~/.config/Proton/VPN, and your sign-in in your keyring: install Proton \
+VPN again and it's still signed in."""
+
+[[action]]
+name = "Install Proton VPN"
+kind = "apt"
+repo = "protonvpn-stable"
+arch = "amd64"
+packages = ["proton-vpn-gnome-desktop"]
+
+[[action]]
+name = "Start Proton VPN's daemon"
+kind = "unit"
+unit = "me.proton.vpn.split_tunneling.service"
+scope = "system"
+enable = true
+start = true

@@ -1,0 +1,29 @@
+# Proton Pass from nixpkgs, through the User flake: 1.36.1, where Proton's own .deb is at 1.43.1.
+# Proton keeps no apt repository for it and Ubuntu's archive has none, so nixpkgs comes before the
+# .deb, which doesn't update itself either. nixpkgs builds it for amd64 alone on Linux.
+# https://search.nixos.org/packages?show=proton-pass
+name = "Proton Pass"
+category = "security"
+tags = ["passwords", "password manager", "proton", "aliases", "passkeys", "totp"]
+summary = "Proton's password manager, with a fresh email alias for every sketchy sign-up form."
+# From its AppStream metainfo, CC0-1.0 (flathub/me.proton.Pass), its first two paragraphs.
+description = """\
+Get the password manager created by the scientists who met at CERN behind Proton Mail, the \
+world’s largest encrypted email provider. Proton Pass is open source, end-to-end encrypted, and \
+protected by Swiss privacy laws. Pass offers more than other free password managers and has no \
+ads or data collection. You can use it for free forever on all your devices to create and store \
+unlimited passwords, autofill logins, generate 2FA codes, create email aliases, secure your \
+notes, and more."""
+description_from = "https://github.com/flathub/me.proton.Pass/blob/master/me.proton.Pass.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "protonpass-desktop"
+keeps = """\
+Your vaults live in your Proton account, and this machine's sign-in and settings stay in \
+~/.config/Proton Pass: install Proton Pass again and it's still signed in."""
+
+[[action]]
+name = "Install Proton Pass"
+kind = "nix"
+arch = "amd64"
+packages = ["proton-pass"]

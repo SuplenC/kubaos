@@ -1832,6 +1832,7 @@ mod editors;
 mod graphics;
 mod media;
 mod office;
+mod security;
 
 #[test]
 fn vivaldi_rewriting_its_sources_file_with_its_one_key_leaves_the_next_update_nothing_to_do() {

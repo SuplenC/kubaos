@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Takes away what 1Password's packages leave behind once they are gone, which their own removal
+# doesn't: the debsig policy and keyring its postinst writes, its example browser allowlist while
+# it is the example, word for word (one you edited is yours and stays), the polkit policy it fills
+# in beside the app, and the groups of its helpers. A group whose package is still installed
+# stays, as its program is setgid to it.
+# Usage: ./ungroup <root, / on a machine>
+set -euo pipefail
+root="${1%/}"
+# The example allowlist 1Password 8.12 ships, resources/custom_allowed_browsers.
+example=3ee1031b5b10f2e70b9d575660fb04bd8714fee662486a2814069b015c311f03
+
+installed() { dpkg-query -W -f '${db:Status-Abbrev}' "$1" 2>/dev/null | grep -q '^ii'; }
+drop_group() { if getent group "$1" >/dev/null; then groupdel "$1"; fi; }
+# Removes each folder that is empty, deepest first, and stops at the first that isn't.
+prune() {
+  local dir
+  for dir in "$@"; do
+    rmdir "$dir" 2>/dev/null || return 0
+  done
+}
+
+if ! installed 1password; then
+  rm -rf "$root/etc/debsig/policies/AC2D62742012EA22" "$root/usr/share/debsig/keyrings/AC2D62742012EA22"
+  # debsig-verify's own folders, when it is installed, are its.
+  if ! installed debsig-verify; then
+    prune "$root/etc/debsig/policies" "$root/etc/debsig"
+    prune "$root/usr/share/debsig/keyrings" "$root/usr/share/debsig"
+  fi
+  allowlist="$root/etc/1password/custom_allowed_browsers"
+  if [[ -f $allowlist ]] && sha256sum "$allowlist" | grep -q "^$example "; then
+    rm -f "$allowlist"
+  fi
+  prune "$root/etc/1password"
+  rm -f "$root/opt/1Password/com.1password.1Password.policy"
+  prune "$root/opt/1Password"
+  drop_group onepassword
+  drop_group onepassword-mcp
+fi
+if ! installed 1password-cli; then
+  drop_group onepassword-cli
+fi
