@@ -369,7 +369,8 @@
   background: var(--color-error);
 }
 
-/* Try it's closing page: its group two fifths of the way down the room, where the menu opens. */
+/* Try it's closing page: its group across the room's middle, two fifths of the room it leaves
+   above it (`setup-kotodama-card.ts`, on whole device pixels). */
 .setup-kotodama-closing {
   display: flex;
   flex-direction: column;
@@ -377,16 +378,6 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
-}
-
-.setup-kotodama-closing::before {
-  content: "";
-  flex: 2 1 0;
-}
-
-.setup-kotodama-closing::after {
-  content: "";
-  flex: 3 1 0;
 }
 
 /* How far each of Try it's keys has still to rise into place as it arrives, in `space.s8`s. */

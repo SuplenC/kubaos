@@ -806,6 +806,16 @@ export function kotodamaCard(view: string): KotodamaCard {
     const holder = document.createElement("span");
     holder.className = "setup-kotodama-closing";
     holder.append(group);
+    // Two fifths of the room the group leaves stand above it, rounded down to a whole device pixel
+    // as `menuMeasures` places the menu: the group lands where the menu opens, on the pixel grid.
+    // The room's height is the step's and the group's is its content's, so it is worked out here.
+    const placing = new ResizeObserver(() => {
+      const spare = holder.clientHeight - group.offsetHeight;
+      const above = `${Math.max(0, Math.floor((spare * 2) / 5))}px`;
+      if (group.style.marginTop !== above) group.style.marginTop = above;
+    });
+    placing.observe(holder);
+    placing.observe(group);
     return holder;
   };
 
