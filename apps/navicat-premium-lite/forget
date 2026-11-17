@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Takes away the unpacked Navicat, and the folder a stopped `./unpack` left beside it.
+#
+#   forget <folder>
+set -euo pipefail
+for folder in "$1" "$1.unpacking"; do
+  if [[ -e "$folder" ]]; then
+    chmod -R u+w "$folder"
+    rm -rf "$folder"
+  fi
+done

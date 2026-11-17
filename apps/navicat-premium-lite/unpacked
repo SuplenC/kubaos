@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Done: `<folder>` holds the version `./unpack` unpacked last, which it stamps once the program is
+# in place.
+#
+#   unpacked <folder> <version>
+set -euo pipefail
+[[ -x "$1/usr/bin/navicat" && "$(cat "$1/.kubaos-version" 2>/dev/null)" == "$2" ]]

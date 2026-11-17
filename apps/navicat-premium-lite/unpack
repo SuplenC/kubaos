@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Unpacks Navicat's AppImage into `<folder>` without running it, leaving out its bundled Qt, so the
+# program links the system's Qt 6, whose Wayland plugin the bundled Qt 6.8 lacks, and stamps it
+# with the AppImage's version, which `./unpacked` checks.
+#
+#   unpack <AppImage> <folder> <version>
+#
+# An AppImage is an ELF runtime with a SquashFS image after it, which unsquashfs reads from where
+# the ELF's section headers end. It unpacks through a folder beside `<folder>` and moves it into
+# place whole, over the version unpacked before, so a stopped run never leaves a half-unpacked one.
+set -euo pipefail
+image=$1
+target=$2
+version=$3
+staging="$target.unpacking"
+
+# The little-endian unsigned number of `$2` bytes at offset `$1` of the image.
+field() {
+  od -An -t "u$2" -j "$1" -N "$2" --endian=little "$image" | tr -d ' '
+}
+
+if [[ "$(head -c 4 "$image" | od -An -t x1 | tr -d ' ')" != "7f454c46" ]]; then
+  echo "$image isn't an AppImage: it doesn't start with an ELF header" >&2
+  exit 1
+fi
+offset=$(($(field 40 8) + $(field 58 2) * $(field 60 2)))
+
+# Takes away `$1`, whose unpacked folders may be read-only.
+remove() {
+  if [[ -e "$1" ]]; then
+    chmod -R u+w "$1"
+    rm -rf "$1"
+  fi
+}
+
+remove "$staging"
+unsquashfs -quiet -no-progress -no-xattrs -offset "$offset" -dest "$staging" "$image" >/dev/null
+rm -rf "$staging/usr/plugins"
+find "$staging/usr/lib" -maxdepth 1 -name 'libQt6*' -delete
+if [[ ! -x "$staging/usr/bin/navicat" ]]; then
+  echo "$image has no usr/bin/navicat: Navicat changed how its AppImage is laid out" >&2
+  exit 1
+fi
+printf '%s\n' "$version" >"$staging/.kubaos-version"
+remove "$target"
+mv "$staging" "$target"

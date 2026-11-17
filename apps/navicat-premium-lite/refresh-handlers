@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Rebuilds the menu folder's `mimeinfo.cache` once Navicat's entries are gone. Navicat can run
+# update-desktop-database there itself, so the cache would otherwise keep its `navicat*` link
+# handlers, naming an entry that is no longer there. Without the tool there is nothing to rebuild
+# with, and the removal goes on.
+set -euo pipefail
+applications="$HOME/.local/share/applications"
+if [[ -d "$applications" ]] && command -v update-desktop-database >/dev/null; then
+  update-desktop-database "$applications"
+fi

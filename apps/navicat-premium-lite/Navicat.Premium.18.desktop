@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Navicat Premium Lite 18
+GenericName=Database Development Tool
+Comment=Database Development Tool
+Exec="@HOME@/.local/opt/navicat-premium-lite/navicat"
+Icon=navicat-premium-lite
+Terminal=false
+StartupNotify=true
+StartupWMClass=navicat
+Categories=Development;Database;
+Keywords=database;sql;navicat;
