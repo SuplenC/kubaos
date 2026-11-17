@@ -1765,3 +1765,35 @@ fn an_update_lists_the_app_a_picked_setup_change_left_behind_as_removed() {
 
 mod ai;
 mod editors;
+
+#[test]
+fn vivaldi_rewriting_its_sources_file_with_its_one_key_leaves_the_next_update_nothing_to_do() {
+    let w = world();
+    with_app(&w, "vivaldi");
+    let mut m = fake(&w, &[]);
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let manifest = crate::apt::Manifest::read(&root.join("system/packages.toml"))
+        .unwrap()
+        .unwrap();
+    let ours = fs::read_to_string(root.join("system/files/apt/sources.list.d/vivaldi.sources")).unwrap();
+    host(&m).state.borrow_mut().repo_files.insert(
+        "vivaldi".to_owned(),
+        (manifest.repos()["vivaldi"].clone(), ours.clone()),
+    );
+    w.updater(&mut m).add_apps(&names(&["vivaldi"]), None).unwrap();
+    // Vivaldi's postinst and daily cron job write the file again, naming the one key that build
+    // signs with.
+    let sources = host(&m).place(Path::new("/etc/apt/sources.list.d/vivaldi.sources"));
+    let vivaldis_own = ours.replace(" /usr/share/keyrings/vivaldi-5220E3E9.gpg", "");
+    assert_ne!(vivaldis_own, ours);
+    put(&sources, &vivaldis_own);
+    let starts = root_starts(&m);
+    let before = host(&m).snapshot();
+    let log = host(&m).state.borrow().log.len();
+
+    w.updater(&mut m).update(yes()).unwrap();
+
+    assert_eq!(root_starts(&m), starts, "the update asked for root");
+    assert_eq!(host(&m).state.borrow().log[log..], [] as [String; 0]);
+    assert_eq!(host(&m).snapshot(), before);
+}

@@ -28,6 +28,7 @@ use crate::apps::root::RootError;
 use crate::apps::root::RootSide;
 use crate::apps::root::Server;
 use crate::apps::version::compare;
+use crate::apt::manifest::Repo;
 use crate::sandbox;
 use crate::sandbox::Sandbox;
 use crate::unfree::Unfree;
@@ -80,6 +81,10 @@ pub struct State {
     /// Package to the version apt would install.
     pub candidates: BTreeMap<String, String>,
     pub repos: BTreeSet<String>,
+    /// Repositories set up as files, as the real machine sets them up: to its manifest entry and
+    /// its sources file. Setting one up writes the file and its keyrings, and it is ready by
+    /// [`Repo::in_place`] on the machine's files; the rest are ready once in `repos`.
+    pub repo_files: BTreeMap<String, (Repo, String)>,
     /// A download's URL to its sha256 and its bytes. A `.deb`'s bytes are `deb <package>
     /// <version>`.
     pub downloads: BTreeMap<String, (String, Vec<u8>)>,
@@ -232,6 +237,7 @@ impl FakeHost {
             units,
             log: Vec::new(),
             repos: BTreeSet::new(),
+            repo_files: BTreeMap::new(),
             fail: BTreeSet::new(),
             conflicts: BTreeMap::new(),
             depends: BTreeMap::new(),
@@ -323,11 +329,24 @@ impl Host for FakeHost {
 
     fn apt_repo(&mut self, repo: &str) -> Result<(), HostError> {
         self.state.borrow_mut().repos.insert(repo.to_owned());
+        if let Some((manifest, text)) = self.state.borrow().repo_files.get(repo) {
+            let sources = self.place(Path::new(&format!("/etc/apt/sources.list.d/{repo}.sources")));
+            for (path, text) in std::iter::once((sources, text.as_str()))
+                .chain(manifest.keyrings().map(|k| (self.place(Path::new(k)), "key")))
+            {
+                fs::create_dir_all(path.parent().unwrap()).map_err(HostError::io(&path))?;
+                fs::write(&path, text).map_err(HostError::io(&path))?;
+            }
+        }
         Ok(())
     }
 
     fn apt_repo_ready(&mut self, repo: &str) -> Result<bool, HostError> {
-        Ok(self.state.borrow().repos.contains(repo))
+        let state = self.state.borrow();
+        Ok(match state.repo_files.get(repo) {
+            Some((manifest, _)) => manifest.in_place(repo, &self.system),
+            None => state.repos.contains(repo),
+        })
     }
 
     fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError> {
