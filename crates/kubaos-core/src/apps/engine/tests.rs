@@ -768,7 +768,7 @@ impl World {
     }
 
     /// A file of the app `id`'s folder.
-    fn folder_file(&self, id: &str, name: &str, text: &str) {
+    fn folder_file(&self, id: &str, name: &str, text: impl AsRef<[u8]>) {
         let path = self.catalog.join(id).join(name);
         fs::write(&path, text).unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
@@ -2119,6 +2119,83 @@ fn an_apps_svg_icon_is_installed_into_the_icon_theme_journaled_and_goes_with_it(
     );
     world.remove("tool").0.unwrap();
     assert_eq!(world.host.snapshot(), before);
+}
+
+/// A machine whose `tool` has the picture `bytes` as its icon `name`.
+fn world_with_icon(name: &str, bytes: &[u8]) -> World {
+    let tool = app(&format!(
+        "icon = \"{name}\"\n\n[[action]]\nname = \"Keep it running\"\nkind = \"linger\"\n"
+    ));
+    let world = World::new(&[("tool", &tool)]);
+    world.folder_file("tool", name, bytes);
+    world
+}
+
+#[test]
+fn an_apps_png_icon_is_installed_into_the_themes_folder_of_its_size_and_journaled_as_its_bytes() {
+    let png = crate::apps::folder::picture::png(128, 128);
+    let world = world_with_icon("tool.png", &png);
+
+    world.install("tool", true).0.unwrap();
+
+    let icon = world
+        .host_home()
+        .join(".local/share/icons/hicolor/128x128/apps/tool.png");
+    assert_eq!(fs::read(&icon).unwrap(), png);
+    assert_eq!(fs::metadata(&icon).unwrap().permissions().mode() & 0o777, 0o644);
+    let journal = world.journals("tool").0.unwrap();
+    let entry = journal.entries.iter().find(|e| e.step == 2).unwrap();
+    assert!(
+        matches!(
+            &entry.action.kind,
+            crate::apps::action::Kind::File {
+                binary: true,
+                text: Some(_),
+                ..
+            }
+        ),
+        "{entry:?}"
+    );
+    // Installed again, the icon is there as recorded, so nothing is done.
+    world.install("tool", true).0.unwrap();
+    assert_eq!(fs::read(&icon).unwrap(), png);
+}
+
+#[test]
+fn an_apps_png_icon_goes_with_it_and_leaves_the_machine_as_before() {
+    let world = world_with_icon("tool.png", &crate::apps::folder::picture::png(128, 128));
+    let before = world.host.snapshot();
+
+    world.install("tool", true).0.unwrap();
+    world.remove("tool").0.unwrap();
+
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn an_apps_jpeg_icon_puts_nothing_in_the_icon_theme_which_reads_no_jpeg() {
+    let world = world_with_icon("tool.jpg", &crate::apps::folder::picture::jpeg(256, 256));
+    let before = world.host.snapshot();
+
+    world.install("tool", true).0.unwrap();
+
+    let journal = world.journals("tool").0.unwrap();
+    assert_eq!(journal.entries.len(), 1, "{journal:?}");
+    assert!(!world.host_home().join(".local/share/icons").exists());
+    world.remove("tool").0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn an_apps_jpeg_icon_goes_with_it_and_leaves_the_machine_as_before() {
+    let world = world_with_icon("tool.jpeg", &crate::apps::folder::picture::jpeg(256, 256));
+    let before = world.host.snapshot();
+
+    world.install("tool", true).0.unwrap();
+    world.remove("tool").0.unwrap();
+
+    assert_eq!(world.host.snapshot(), before);
+    assert_eq!(world.journals("tool"), (None, None));
 }
 
 /// A machine with Ubuntu's snap `firefox` (`1:1snap1`), which sorts above the vendor's 160.0, and

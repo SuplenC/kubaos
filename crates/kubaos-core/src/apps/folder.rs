@@ -31,7 +31,6 @@ use super::action::Stage;
 use super::action::Unpack;
 use super::action::is_argv;
 use super::action::is_icon_name;
-use super::action::is_svg_icon;
 use super::action::is_theme_icon;
 use crate::apps::Platform;
 use crate::unfree::Unfree;
@@ -39,9 +38,14 @@ use crate::unfree::Unfree;
 /// The file of an app's folder.
 pub const APP_FILE: &str = "app.toml";
 
-/// Where an app's `.svg` icon goes: the user's `hicolor` theme, which every icon theme falls back
-/// to, as a scalable app icon.
-pub const ICON_FOLDER: &str = "~/.local/share/icons/hicolor/scalable/apps/";
+/// Where an app's `.svg` or `.png` icon goes: the user's `hicolor` theme, which every icon theme
+/// falls back to, in the folder of its size (`scalable` for an `.svg`), then `apps/`.
+pub const ICON_THEME: &str = "~/.local/share/icons/hicolor/";
+
+/// The sizes of `hicolor`'s app icon folders (`<N>x<N>/apps`), as its `index.theme` lists them:
+/// the theme's lookup reads no folder the index doesn't name.
+/// <https://specifications.freedesktop.org/icon-theme-spec/latest/#directory_layout>
+pub const ICON_SIZES: [u32; 13] = [16, 22, 24, 32, 36, 48, 64, 72, 96, 128, 192, 256, 512];
 
 /// A folder that isn't an app's.
 /// The `description_from` of a description KubaOS wrote, as the app's own words aren't under a
@@ -101,9 +105,17 @@ pub enum FolderError {
     #[error("{0:?} is not where the description came from: an https:// URL, or \"kubaos\" for one KubaOS wrote")]
     InvalidSource(String),
     #[error(
-        "{0:?} is not an icon: an .svg of the app's folder, or the icon theme's name for one (letters, digits, `-`, `_` and `.`)"
+        "{0:?} is not an icon: an .svg, .png, .jpg or .jpeg of the app's folder, or the icon theme's name for one (letters, digits, `-`, `_` and `.`)"
     )]
     InvalidIcon(String),
+    #[error("{icon:?} can't be read as a picture: a PNG or JPEG of the app's folder")]
+    UnreadableIcon { icon: String },
+    #[error("{icon:?} is {width}×{height}: an icon is square")]
+    IconNotSquare { icon: String, width: u32, height: u32 },
+    #[error(
+        "{icon:?} is {size}×{size}, which no folder of the icon theme holds: a PNG icon is 16, 22, 24, 32, 36, 48, 64, 72, 96, 128, 192, 256 or 512 pixels square"
+    )]
+    IconSize { icon: String, size: u32 },
     #[error("{0:?} is not an app this one can require: an app id, other than its own, named once")]
     InvalidRequirement(String),
     #[error("{0:?} is not a version: digits, letters and `.+~-:`, starting with a digit")]
@@ -417,30 +429,69 @@ impl Folder {
         Ok(folder)
     }
 
-    /// The step that puts the app's icon in the icon theme, for an `icon` that is an `.svg` of
-    /// the folder: in the user's `hicolor`, the theme every theme falls back to, by its file's
-    /// name, so a desktop entry naming that icon finds it whatever theme is on.
+    /// The step that puts the app's icon in the icon theme, for an `icon` that is an `.svg` or a
+    /// `.png` of the folder: in the user's `hicolor`, the theme every theme falls back to, by its
+    /// file's name, so a desktop entry naming that icon finds it whatever theme is on. An `.svg`
+    /// goes in `scalable`, a `.png` in the folder of its size; a JPEG has none, as the icon theme
+    /// reads only PNG, SVG and XPM, so the menu shows it from the app's folder alone.
     fn icon_step(&self) -> Option<Action> {
-        let icon = self.icon.as_deref().filter(|icon| is_svg_icon(icon))?;
+        let icon = self.icon.as_deref()?;
+        let size = match file_icon(icon)? {
+            IconFile::Svg => "scalable".to_owned(),
+            IconFile::Png => {
+                let (side, _) = self.icon_size(icon).ok()?;
+                format!("{side}x{side}")
+            }
+            IconFile::Jpeg => return None,
+        };
         Some(Action {
             name: format!("Put {}'s icon in place", self.name),
             stage: Stage::Install,
             kind: Kind::File {
-                to: format!("{ICON_FOLDER}{icon}"),
+                to: format!("{ICON_THEME}{size}/apps/{icon}"),
                 from: Some(icon.to_owned()),
                 text: None,
                 template: false,
                 mode: Some("644".to_owned()),
                 vendor_keys: false,
+                binary: false,
             },
         })
     }
 
-    /// The icon as a menu shows it: an `.svg` of the folder by its path, which is there whether
+    /// The width and height of the PNG or JPEG `icon` of the folder.
+    fn icon_size(&self, icon: &str) -> Result<(u32, u32), FolderError> {
+        fs::read(self.dir.join(icon))
+            .ok()
+            .and_then(|bytes| picture::size(&bytes))
+            .ok_or_else(|| FolderError::UnreadableIcon { icon: icon.to_owned() })
+    }
+
+    /// Whether the folder's PNG or JPEG `icon` is square, and a PNG one of a size the icon theme
+    /// has a folder for.
+    fn check_picture(&self, icon: &str, kind: IconFile) -> Result<(), FolderError> {
+        let (width, height) = self.icon_size(icon)?;
+        if width != height {
+            return Err(FolderError::IconNotSquare {
+                icon: icon.to_owned(),
+                width,
+                height,
+            });
+        }
+        if kind == IconFile::Png && !ICON_SIZES.contains(&width) {
+            return Err(FolderError::IconSize {
+                icon: icon.to_owned(),
+                size: width,
+            });
+        }
+        Ok(())
+    }
+
+    /// The icon as a menu shows it: a picture of the folder by its path, which is there whether
     /// or not the app is, else the icon theme's name.
     pub fn icon_shown(&self) -> Option<String> {
         let icon = self.icon.as_deref()?;
-        Some(if is_svg_icon(icon) {
+        Some(if file_icon(icon).is_some() {
             self.dir.join(icon).to_string_lossy().into_owned()
         } else {
             icon.to_owned()
@@ -471,9 +522,12 @@ impl Folder {
         }
         if let Some(icon) = &self.icon
             && !is_theme_icon(icon)
-            && !is_svg_file_icon(icon)
         {
-            return Err(FolderError::InvalidIcon(icon.clone()));
+            match file_icon(icon) {
+                None => return Err(FolderError::InvalidIcon(icon.clone())),
+                Some(IconFile::Svg) => {}
+                Some(kind) => self.check_picture(icon, kind)?,
+            }
         }
         if self.description_from != WRITTEN_BY_KUBAOS && !super::action::is_https(&self.description_from) {
             return Err(FolderError::InvalidSource(self.description_from.clone()));
@@ -890,10 +944,28 @@ pub fn is_app_id(id: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
-/// Whether an app's `icon` is an `.svg` of its folder, by a name the icon theme can look its
-/// copy up by: `<icon name>.svg`.
-fn is_svg_file_icon(icon: &str) -> bool {
-    is_icon_name(icon) && icon.strip_suffix(".svg").is_some_and(is_theme_icon)
+/// The formats an app's `icon` can be a file of its folder in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum IconFile {
+    Svg,
+    Png,
+    Jpeg,
+}
+
+/// The format of an app's `icon` that is a picture of its folder, by a name the icon theme can
+/// look its copy up by: `<icon name>.svg`, `.png`, `.jpg` or `.jpeg`.
+fn file_icon(icon: &str) -> Option<IconFile> {
+    if !is_icon_name(icon) {
+        return None;
+    }
+    let (stem, extension) = icon.rsplit_once('.')?;
+    let kind = match extension {
+        "svg" => IconFile::Svg,
+        "png" => IconFile::Png,
+        "jpg" | "jpeg" => IconFile::Jpeg,
+        _ => return None,
+    };
+    is_theme_icon(stem).then_some(kind)
 }
 
 /// Whether `tag` is lowercase words, one space between them.
@@ -904,5 +976,6 @@ fn is_tag(tag: &str) -> bool {
             .all(|word| !word.is_empty() && word.chars().all(|c| c.is_lowercase() || c.is_ascii_digit() || c == '-'))
 }
 
+pub(crate) mod picture;
 #[cfg(test)]
 mod tests;

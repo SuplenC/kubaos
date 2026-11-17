@@ -1211,13 +1211,19 @@ fn licence_problems(root: &Path) -> Vec<String> {
             .extension()
             .and_then(|e| e.to_str())
             .is_some_and(|e| matches!(e, "svg" | "png" | "jpg" | "jpeg" | "webp" | "ico"));
-        let Ok(text) = fs::read_to_string(&file) else {
-            problems.push(format!(
-                "{shown}: not text, so it can't name its licence; an icon is an .svg"
-            ));
-            continue;
+        let bytes = fs::read(&file).unwrap();
+        let header = match String::from_utf8(bytes) {
+            Ok(text) => header_comment(&text),
+            Err(binary) => match crate::apps::folder::picture::comment(binary.as_bytes()) {
+                Some(comment) if picture => comment,
+                _ => {
+                    problems.push(format!(
+                        "{shown}: not text, so it can't name its licence; a PNG or a JPEG names it in its comment"
+                    ));
+                    continue;
+                }
+            },
         };
-        let header = header_comment(&text);
         let licences = licences_named(&header);
         if picture && licences.is_empty() && !is_trademark_notice(&header) {
             problems.push(format!("{shown}: its header comment names no licence"));

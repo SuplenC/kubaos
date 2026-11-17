@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+base64 = "0.23"
 kubaos-phone.workspace = true
 kubaos-user-layer.workspace = true
 serde.workspace = true
