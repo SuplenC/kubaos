@@ -5,14 +5,21 @@
 # package's postinst gives /usr/bin/sunshine CAP_SYS_ADMIN and CAP_SYS_NICE as permitted
 # capabilities, for capturing the screen through KMS (Hyprland's own screencopy needs neither),
 # loads uhid, and its udev rules (/usr/lib/udev/rules.d/60-sunshine.rules) hand the logged-in user
-# /dev/uinput and /dev/uhid, for the mouse, keyboard and gamepads a stream sends. The .deb doesn't
-# update itself, so a release of KubaOS moves the pin on; it writes no source of its own.
-# Nothing starts it at login: its menu entry starts its user service,
-# app-dev.lizardbyte.app.Sunshine.service, which serves until you stop it or log out. While it
-# runs, it listens on every network the machine is on, with Sunshine's defaults: its web page
-# (https://localhost:47990) answers the LAN's addresses alone, a stream goes only to a client
-# paired with the PIN you type into that page, and UPnP, which would open its ports on the
-# router to the internet, stays off.
+# /dev/uinput and /dev/uhid, for the mouse, keyboard and gamepads a stream sends, for as long as the
+# package is installed, Sunshine running or not: any program of the user's can type, move the
+# pointer and act as a gamepad. The .deb doesn't update itself, so a release of KubaOS moves the pin
+# on; it writes no source of its own. Nothing starts it at login: its menu entry starts its user
+# service, app-dev.lizardbyte.app.Sunshine.service, which serves until you stop it or log out. While
+# it runs, its streaming ports (47984, 47989 and 48010 over TCP, 47998 to 48000 and 48002 over UDP)
+# listen on every network the machine is on, and a stream goes only to a client paired with the PIN
+# you type into its web page; UPnP, which would open those ports on the router to the internet,
+# stays off. Its web page (https://localhost:47990) listens on every network too, and with
+# Sunshine's default it answers the LAN, whose admin account runs commands as you. A setting owns
+# origin_web_ui_allowed = pc in sunshine.conf, the key = value file Sunshine itself rewrites as you
+# change its settings, leaving its other lines alone, so the page and its API answer this machine
+# alone. One request is the exception, Sunshine's own: until the first sign-in is set, setting it
+# skips the address check, so someone on the network who sets it before you locks you out of the
+# page (sunshine --creds sets yours again), and still can't use it.
 # https://docs.lizardbyte.dev/projects/sunshine/latest/md_docs_2getting__started.html
 name = "Sunshine"
 category = "games"
@@ -34,6 +41,12 @@ keeps = """\
 Your Sunshine sign-in, paired clients, apps and settings stay in ~/.config/sunshine: install \
 Sunshine again and your clients are still paired."""
 
+# HAZARD: Sunshine runs /usr/bin/sunshine, which a removal takes, and keeps the uinput devices
+# its streams made while it runs.
+[[ready]]
+check = ["./closed"]
+says = "Sunshine is running: quit it from its tray icon, then try again"
+
 [[action]]
 name = "Install Sunshine"
 kind = "deb"
@@ -41,3 +54,10 @@ package = "sunshine"
 version = "2026.914.233613-1+ubuntu26.04"
 amd64 = { url = "https://github.com/LizardByte/Sunshine/releases/download/v2026.914.233613/sunshine_2026.914.233613-1+ubuntu26.04_amd64.deb", sha256 = "b8a8ceeeb2b3f30a18a994ad268c94e0c91170f33a864c7aad31eed927ad7d47" }
 arm64 = { url = "https://github.com/LizardByte/Sunshine/releases/download/v2026.914.233613/sunshine_2026.914.233613-1+ubuntu26.04_arm64.deb", sha256 = "174fa9123362c93eac164554a0651ecab17d64d9525fccd9974964fceec553af" }
+
+[[action]]
+name = "Keep Sunshine's web page to this machine"
+kind = "setting"
+file = "~/.config/sunshine/sunshine.conf"
+key = "origin_web_ui_allowed"
+value = "pc"
