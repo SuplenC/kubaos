@@ -4,14 +4,15 @@
 # file is read before the rest of sshd_config.d and sshd_config, so it outranks the same settings
 # there, but a Match block, there or in a later file, can still set them again for the connections
 # it matches. An sshd already running reads it at once (./reload-sshd: ssh.service's reload,
-# sshd -t then a HUP), and a configuration sshd -t refuses fails the install, whose rollback takes
-# the drop-in out. Its removal reloads sshd again once the drop-in is gone, so the user's own
-# configuration applies; one sshd -t refuses then leaves the running sshd as it was, keys alone.
+# sshd -t then a HUP, then a mark in /run/kubaos that the reload went through), and a
+# configuration sshd -t refuses fails the install, whose rollback takes the drop-in out. Its
+# removal reloads sshd again once the drop-in is gone, so the user's own configuration applies,
+# and takes the mark; one sshd -t refuses then leaves the running sshd as it was, keys alone.
 # The package's postinst enables and starts ssh.socket on a first install: TCP 22 on every network,
 # sshd started on the first connection. Where sshd doesn't start at boot yet (the package there
-# with its socket off), a step enables and starts the socket, and the removal disables it again;
-# one that does already, through the socket or through ssh.service enabled the classic way, which
-# holds port 22 itself, is left as it is. A machine is never locked out by it: logging in at the
+# with its socket off), a step enables and starts the socket, and the removal disables it again
+# and stops the sshd it started; one that does already, through the socket or through ssh.service
+# enabled the classic way, which holds port 22 itself, is left as it is. A machine is never locked out by it: logging in at the
 # machine doesn't go through sshd. With no key in ~/.ssh/authorized_keys nobody can log in over
 # SSH, which the last step says, as a notification where the install can show one and as a note
 # on every update until a key is there; it changes nothing, so its undo is nothing.
@@ -36,7 +37,7 @@ This machine's host keys stay in /etc/ssh, so other machines still know it, and 
 name = "Have sshd read your own configuration again once the app goes"
 kind = "run"
 root = true
-undo = ["./reload-sshd", "--if-it-can"]
+undo = ["./reload-sshd", "/run/kubaos/openssh-server-reloaded", "--after-removal"]
 
 [[action]]
 name = "Turn passwords and root logins off for SSH"
@@ -49,8 +50,12 @@ mode = "644"
 name = "Have a running sshd take keys alone at once"
 kind = "run"
 root = true
-do = ["./reload-sshd"]
-check = ["./reloaded", "/etc/ssh/sshd_config.d/00-kubaos-key-only.conf"]
+do = ["./reload-sshd", "/run/kubaos/openssh-server-reloaded"]
+check = [
+  "./reloaded",
+  "/etc/ssh/sshd_config.d/00-kubaos-key-only.conf",
+  "/run/kubaos/openssh-server-reloaded",
+]
 undo = ["true"]
 
 [[action]]

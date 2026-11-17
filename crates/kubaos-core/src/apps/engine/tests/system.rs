@@ -77,9 +77,25 @@ fn postinsts(world: &World) {
     }
 }
 
+/// Where the fake machine keeps the SSH server's mark that a reload went through, outside the
+/// machine's own folders, as `/run` empties at every boot.
+fn mark(world: &World) -> PathBuf {
+    world
+        .host
+        .sandbox()
+        .log()
+        .with_file_name("run/kubaos/openssh-server-reloaded")
+}
+
+/// A file of the sandbox's beside its log, through which a test tells `systemctl` what to say.
+fn told(world: &World, name: &str) -> PathBuf {
+    world.host.sandbox().log().with_file_name(name)
+}
+
 /// A `systemctl` that answers `is-enabled`, `is-active` and `show -p ActiveState` from the fake
-/// machine's units (the `units` file it writes before each script), and logs whether the drop-in
-/// was there as it reloads sshd.
+/// machine's units (the `units` file it writes before each script); `ExecMainStartTimestamp` from
+/// `ssh-started`, when a test wrote it; and, reloading sshd, fails while `reload-fails` is there,
+/// and logs whether the drop-in was there.
 fn systemctl_reads_the_units(world: &World) {
     let sandbox = world.host.sandbox();
     let units = sandbox.log().with_file_name("units");
@@ -93,12 +109,19 @@ field() {{ grep "^$scope:$1 " "$units" 2>/dev/null | cut -d' ' -f"$2"; }}
 case "$1" in
 is-enabled) s=$(field "$2" 2); echo "${{s:-disabled}}"; [ "$s" = enabled ] ;;
 is-active) s=$(field "$2" 3); echo "${{s:-inactive}}"; [ "$s" = active ] ;;
-show) case "$*" in *ActiveState*) s=$(field "$2" 3); echo "${{s:-inactive}}" ;; esac ;;
+show)
+	case "$*" in
+	*ActiveState*) s=$(field "$2" 3); echo "${{s:-inactive}}" ;;
+	*ExecMainStartTimestamp*) cat '{started}' 2>/dev/null || echo ;;
+	esac ;;
 try-reload-or-restart)
+	if [ -e '{fails}' ]; then echo 'Job for ssh.service failed.' >&2; exit 1; fi
 	if [ -e '{drop_in}' ]; then w=with; else w=without; fi
 	echo "sshd reloaded $w the drop-in" >>'{log}' ;;
 esac"#,
             units = units.display(),
+            started = told(world, "ssh-started").display(),
+            fails = told(world, "reload-fails").display(),
             drop_in = world.system_path(DROP_IN).display(),
             log = sandbox.log().display(),
         ),
@@ -121,10 +144,14 @@ fn system_world(id: &str) -> World {
         world.write_app(id, &text.replace(DROPBOX_REPO, &file.display().to_string()));
     }
     if id == "openssh-server" {
-        let check = format!("\"./reloaded\", \"{DROP_IN}\"");
+        let check = format!("  \"{DROP_IN}\",\n");
         assert!(text.contains(&check), "{text}");
-        let fake = format!("\"./reloaded\", \"{}\"", world.system_path(DROP_IN).display());
-        world.write_app(id, &text.replace(&check, &fake));
+        let fake = format!("  \"{}\",\n", world.system_path(DROP_IN).display());
+        let text = text.replace(&check, &fake).replace(
+            "/run/kubaos/openssh-server-reloaded",
+            &mark(&world).display().to_string(),
+        );
+        world.write_app(id, &text);
     }
     world
 }
@@ -146,6 +173,7 @@ fn systemctl_calls(world: &World) -> Vec<String> {
             c.starts_with("systemctl enable")
                 || c.starts_with("systemctl disable")
                 || c.starts_with("systemctl try-")
+                || c.starts_with("systemctl stop")
                 || c.starts_with("sshd reloaded")
         })
         .collect()
@@ -440,7 +468,11 @@ fn an_ssh_server_there_with_its_socket_off_listens_while_the_app_is_installed() 
     run(&world, |e| e.remove_with("openssh-server", &Picks::default())).unwrap();
 
     let calls = systemctl_calls(&world);
-    assert_eq!(calls[1], "systemctl disable --now ssh.socket", "{calls:#?}");
+    assert_eq!(
+        calls[1..3],
+        ["systemctl disable --now ssh.socket", "systemctl stop ssh.service"],
+        "the socket's sshd stops with it: {calls:#?}"
+    );
 }
 
 #[test]
@@ -475,15 +507,7 @@ fn an_sshd_its_configuration_check_refuses_fails_the_install_and_takes_the_drop_
     let world = system_world("openssh-server");
     ssh_server_there(&world, unit(true, true), unit(false, true));
     // ssh.service's reload runs sshd -t first, which refuses the user's configuration.
-    let sandbox = world.host.sandbox();
-    let body = fs::read_to_string(sandbox.bin().join("systemctl")).unwrap();
-    let body = body.replacen(
-        "try-reload-or-restart)\n",
-        "try-reload-or-restart)\n\techo 'Job for ssh.service failed.' >&2; exit 1 ;;\nnever)\n",
-        1,
-    );
-    let body = body.lines().skip(2).collect::<Vec<_>>().join("\n");
-    sandbox.stub("systemctl", &body);
+    fs::write(told(&world, "reload-fails"), "").unwrap();
     let before = world.host.snapshot();
 
     let added = run(&world, |e| e.add("openssh-server", None, &picks("openssh-server")));
@@ -491,7 +515,102 @@ fn an_sshd_its_configuration_check_refuses_fails_the_install_and_takes_the_drop_
     let err = added.unwrap_err().to_string();
     assert!(err.contains("Have a running sshd take keys alone at once"), "{err}");
     assert!(!world.system_path(DROP_IN).exists());
+    assert!(!mark(&world).exists(), "a reload that failed counts for nothing");
     assert_eq!(world.host.snapshot(), before);
+}
+
+/// The calls that reloaded sshd.
+fn reloads(world: &World) -> usize {
+    systemctl_calls(world)
+        .iter()
+        .filter(|c| *c == "systemctl try-reload-or-restart ssh.service")
+        .count()
+}
+
+#[test]
+fn a_running_sshd_that_read_the_drop_in_isnt_reloaded_again_by_the_next_update() {
+    let world = system_world("openssh-server");
+    ssh_server_there(&world, unit(true, true), unit(false, true));
+    // sshd started long before the drop-in.
+    fs::write(told(&world, "ssh-started"), "Mon 2026-01-05 10:00:00.000000 UTC\n").unwrap();
+
+    run(&world, |e| e.add("openssh-server", None, &picks("openssh-server"))).unwrap();
+    // A daemon-reload since, which forgets systemd's own record of the reload, then the update.
+    run(&world, |e| e.add("openssh-server", None, &picks("openssh-server"))).unwrap();
+
+    assert_eq!(reloads(&world), 1, "{:#?}", systemctl_calls(&world));
+    assert_eq!(root_step(&world, "openssh-server", 3), Some(State::Done));
+}
+
+#[test]
+fn an_sshd_that_started_after_the_drop_in_was_written_needs_no_reload() {
+    let world = system_world("openssh-server");
+    ssh_server_there(&world, unit(true, true), unit(false, true));
+    fs::write(told(&world, "ssh-started"), "Mon 2100-01-04 10:00:00.000000 UTC\n").unwrap();
+
+    run(&world, |e| e.add("openssh-server", None, &picks("openssh-server"))).unwrap();
+
+    assert_eq!(reloads(&world), 0, "{:#?}", systemctl_calls(&world));
+}
+
+#[test]
+fn a_reload_that_failed_on_an_update_is_tried_again_on_the_next() {
+    let world = system_world("openssh-server");
+    ssh_server_there(&world, unit(true, true), unit(false, true));
+    fs::write(told(&world, "ssh-started"), "Mon 2026-01-05 10:00:00.000000 UTC\n").unwrap();
+    run(&world, |e| e.add("openssh-server", None, &picks("openssh-server"))).unwrap();
+    // A release rewrites the drop-in after sshd read it, and sshd -t refuses the result.
+    let drop_in = fs::File::options()
+        .append(true)
+        .open(world.system_path(DROP_IN))
+        .unwrap();
+    let later = fs::metadata(mark(&world)).unwrap().modified().unwrap() + std::time::Duration::from_millis(1);
+    drop_in.set_modified(later).unwrap();
+    fs::write(told(&world, "reload-fails"), "").unwrap();
+
+    run(&world, |e| e.add("openssh-server", None, &picks("openssh-server"))).unwrap_err();
+
+    assert_eq!(reloads(&world), 2);
+    fs::remove_file(told(&world, "reload-fails")).unwrap();
+
+    run(&world, |e| e.add("openssh-server", None, &picks("openssh-server"))).unwrap();
+
+    assert_eq!(reloads(&world), 3, "{:#?}", systemctl_calls(&world));
+    assert!(fs::metadata(mark(&world)).unwrap().modified().unwrap() > later);
+}
+
+#[test]
+fn sshd_counts_as_started_by_something_by_the_states_of_systemctl_is_enabled_that_say_so() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    fs::create_dir_all(&home).unwrap();
+    let sandbox = crate::sandbox::Sandbox::new(&tmp.path().join("sandbox"), &home, "tester");
+    let listening = shipped("openssh-server").join("listening");
+    for (state, started) in [
+        ("enabled", true),
+        ("enabled-runtime", true),
+        ("alias", true),
+        ("indirect", true),
+        ("generated", true),
+        ("static", true),
+        ("disabled", false),
+        ("masked", false),
+        ("masked-runtime", false),
+        ("linked", false),
+        ("transient", false),
+        ("not-found", false),
+    ] {
+        for unit in ["ssh.socket", "ssh.service"] {
+            sandbox.stub(
+                "systemctl",
+                &format!(r#"if [ "$2" = {unit} ]; then echo {state}; else echo disabled; fi; [ {state} = enabled ]"#),
+            );
+
+            let ran = sandbox.command(&listening).output().unwrap();
+
+            assert_eq!(ran.status.success(), started, "{unit} {state}: {ran:?}");
+        }
+    }
 }
 
 #[test]
