@@ -401,3 +401,28 @@ fn an_apts_pattern_of_versions_is_a_version_with_stars() {
     assert!(matches!(apt(""), Err(ActionError::InvalidVersions { .. })));
     assert!(matches!(apt("1 2"), Err(ActionError::InvalidVersions { .. })));
 }
+
+#[test]
+fn a_conf_setting_takes_one_bare_key_and_other_files_dotted_ones() {
+    let setting = |file: &str, key: &str| {
+        action(&format!(
+            "name = \"Set\"\nkind = \"setting\"\nfile = \"{file}\"\nkey = \"{key}\"\nvalue = \"pc\"\n"
+        ))
+    };
+
+    assert!(setting("~/.config/sunshine/sunshine.conf", "origin_web_ui_allowed").is_ok());
+    assert!(setting("~/.config/tool/config.toml", "ui.theme").is_ok());
+    for key in ["ui.theme", "a=b", "# note", " padded"] {
+        assert!(
+            matches!(
+                setting("~/.config/sunshine/sunshine.conf", key),
+                Err(ActionError::InvalidKey { .. })
+            ),
+            "{key:?}"
+        );
+    }
+    assert!(matches!(
+        setting("~/.config/tool/config.ini", "theme"),
+        Err(ActionError::InvalidSettingFile { .. })
+    ));
+}
