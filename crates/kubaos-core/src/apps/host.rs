@@ -144,6 +144,7 @@ pub enum Downgrade {
 pub enum Compression {
     Gzip,
     Zstd,
+    Xz,
 }
 
 /// tar's arguments that unpack `archive` into `into`, as [`Host::untar`] says.
@@ -164,6 +165,7 @@ impl Compression {
         match self {
             Self::Gzip => "--gzip",
             Self::Zstd => "--zstd",
+            Self::Xz => "--xz",
         }
     }
 }

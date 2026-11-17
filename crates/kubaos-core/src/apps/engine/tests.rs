@@ -1768,15 +1768,19 @@ fn tarball(text: &str) -> Vec<u8> {
     packed(text, "tar-gz")
 }
 
-/// An archive of `unpack` (`tar-gz` or `tar-zst`) holding `bin/tool` with `text`, made by the tar
-/// of a sandbox.
+/// An archive of `unpack` (`tar-gz`, `tar-zst` or `tar-xz`) holding `bin/tool` with `text`, made by
+/// the tar of a sandbox.
 fn packed(text: &str, unpack: &str) -> Vec<u8> {
     let src = tempfile::tempdir().unwrap();
     fs::create_dir_all(src.path().join("bin")).unwrap();
     fs::write(src.path().join("bin/tool"), text).unwrap();
     let sandbox = Sandbox::new(&src.path().join("sandbox"), src.path(), "kuba");
     let archive = src.path().join("tool.tar");
-    let compress = if unpack == "tar-zst" { "--zstd" } else { "--gzip" };
+    let compress = match unpack {
+        "tar-zst" => "--zstd",
+        "tar-xz" => "--xz",
+        _ => "--gzip",
+    };
     let made = sandbox
         .command("tar")
         .args(["-c", compress, "-f"])
@@ -1792,7 +1796,7 @@ fn packed(text: &str, unpack: &str) -> Vec<u8> {
 
 #[test]
 fn a_release_that_bumps_a_download_at_the_same_path_downloads_it_again() {
-    for unpack in ["file", "tar-gz", "tar-zst"] {
+    for unpack in ["file", "tar-gz", "tar-zst", "tar-xz"] {
         let world = World::new(&[("tool", &fixed_download("1.1", unpack))]);
         for version in ["1.1", "1.3"] {
             let bytes = match unpack {

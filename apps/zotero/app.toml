@@ -1,6 +1,7 @@
 # Zotero from nixpkgs, through the User flake. Zotero keeps no apt repository and Ubuntu doesn't
 # package it. nixpkgs' is 9.0, a major release behind Zotero's 10; Zotero's own build is a
-# .tar.xz, which no download action unpacks, with no checksum published beside it to pin.
+# .tar.xz with no checksum published for it (its updater's manifest pins only its .mar update
+# files), so nothing but the download itself would vouch for a pin.
 # https://www.zotero.org/download/
 name = "Zotero"
 category = "office"

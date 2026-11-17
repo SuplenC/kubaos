@@ -1176,3 +1176,20 @@ fn the_licence_check_finds_a_picture_naming_no_licence_and_a_licence_without_its
         ]
     );
 }
+
+#[test]
+fn a_tar_xz_download_needs_no_step_installing_xz_as_every_machine_has_it() {
+    // tar's --xz runs xz, which the base installs on every machine: a group that is always on,
+    // for both architectures, from Ubuntu's archive. The catalog check asks for no apt step of
+    // xz-utils before a `tar-xz` download, as it asks for zstd's before a `tar-zst` one.
+    let manifest = Manifest::read(&repo_root().join(MANIFEST)).unwrap().unwrap();
+
+    let base = manifest.groups().iter().find(|g| {
+        g.packages.iter().any(|p| p == "xz-utils") && g.optional.is_none() && g.arch.is_none() && g.repo.is_none()
+    });
+
+    assert!(
+        base.is_some(),
+        "no group of {MANIFEST} installs xz-utils on every machine"
+    );
+}
