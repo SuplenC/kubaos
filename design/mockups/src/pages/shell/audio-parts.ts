@@ -128,14 +128,15 @@ export const FOLLOWS = "Default";
 /** An app with a stream: its name, its icon, the device it plays to or records from, its level. */
 export interface App {
   readonly name: string;
-  readonly picture: string;
+  /** Its icon; with none, its tile shows its initial. */
+  readonly picture?: string;
   /** The device it is moved to, or none while it follows its side's. */
   readonly device?: Device;
   readonly level: number;
   readonly muted?: boolean;
 }
 
-const [KUBAOS, PLATE, DISC, STAR, WIDE] = APP_ICONS;
+const [KUBAOS, PLATE, DISC, , WIDE] = APP_ICONS;
 
 export const PLAYING: readonly App[] = [
   { name: "Spotify", picture: DISC!.picture, level: 0.7 },
@@ -148,7 +149,7 @@ export const RECORDING: readonly App[] = [{ name: "Discord", picture: PLATE!.pic
 export const MANY: readonly App[] = [
   ...PLAYING,
   { name: "Discord", picture: PLATE!.picture, device: HEADSET, level: 0.8 },
-  { name: "mpv", picture: STAR!.picture, level: 1 },
+  { name: "mpv", level: 1 },
   { name: "Steam", picture: WIDE!.picture, device: SCREEN, level: 0.35, muted: true },
   { name: "Chromium", picture: KUBAOS!.picture, level: 0.55 },
 ];
@@ -529,7 +530,7 @@ function movedTo(app: App, device: Device | undefined): App {
 
 /** One app's row: its tile, its name over its device centred on it, then its slider across, its icon muting it. */
 function appRow(app: App, side: readonly Device[], following: Device, input: boolean, state?: "lit" | "open", moved?: (device: Device | undefined) => void): HTMLElement {
-  const tile = iconTile({ glyph: input ? "mic" : "volume_up", size: "Md", picture: app.picture });
+  const tile = iconTile({ name: app.name, size: "Md", ...(app.picture ? { picture: app.picture } : {}) });
   const words = stack(0, "start", filling(clamped(app.name, "body_strong")), appPicker(app, side, following, state, moved));
   const head = row("s12", "centre", tile, filling(words));
   const level = slider({

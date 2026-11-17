@@ -258,7 +258,7 @@ export default page<Shown>({
         },
       },
     ],
-    missingPicture: [{ name: "An app with no icon", for: "its tile keeps the symbol", sample: draw({ playing: [{ ...PLAYING[0]!, picture: "" }, PLAYING[1]!] }) }],
+    missingPicture: [{ name: "An app with no icon", for: "its initial on the tile", sample: draw({ playing: [{ name: "mpv", level: 0.7 }, PLAYING[1]!] }) }],
     counts: [
       { name: "Nothing playing", for: `the Apps card: ${NO_APPS.output}`, sample: draw({ playing: [] }) },
       { name: "No app recording", for: `Input: ${NO_APPS.input}`, sample: draw({ tab: 1, recording: [] }) },

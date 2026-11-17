@@ -10,7 +10,9 @@
 // one edge; a shape fits `space.s4` inside it. Either is kept whole, never cropped or stretched.
 //
 // An app with no symbol shows its initial in the symbol's place: the first character of its name,
-// upper-cased, in the type style whose symbol box is the tile's, centred on its ink's box.
+// upper-cased, in the type style whose symbol box is the tile's, centred on its ink's box. Where an
+// app stands as a 16 symbol with no tile (a menu item, a bar's circle), `smallInitial` draws it
+// the same way in `label`.
 //
 // The symbol, or the initial, shows until the picture has loaded and been measured, and stays when
 // it can't be read or draws nothing, so a row keeps the room a picture takes whether or not one
@@ -212,6 +214,36 @@ export function initial(name: string): string {
 /** The letter in each size's type style: the style whose symbol box is the tile's symbol's. */
 const INITIAL_STYLE = { Sm: "body_strong", Md: "subheading", Lg: "headline" } as const satisfies Record<TileSize, TypeStyle>;
 
+/**
+ * `name`'s initial in `style`, in the colour role `color`, its line centred on its ink's box: the
+ * letter that stands in for an app's picture and symbol, on a tile or in a 16 symbol's box.
+ */
+export function initialLetter(name: string, style: TypeStyle, color: string): HTMLElement {
+  const letter = text(initial(name), style, color);
+  // The letter's line is the symbol's box tall, so it sits where the symbol would, centred on
+  // its ink's box: Geist's caps sit high in their line, and a capital's weight (an L's foot)
+  // would set it off its middle.
+  centreOnInk(letter, style, letter.textContent ?? "");
+  return letter;
+}
+
+/**
+ * `name`'s initial in a 16 symbol's box, in `label`, whose symbol is 16, in `color`, a CSS colour as
+ * a symbol beside it takes: an app with no picture where a 16 symbol or picture stands for it, a
+ * menu item's or a bar's circle.
+ */
+export function smallInitial(name: string, color: string): HTMLElement {
+  const letter = initialLetter(name, "label", "on_surface");
+  letter.style.color = color;
+  // The letter stands where a symbol would: the geometry check reads its box as the symbol's, as
+  // it reads a drawn one, and the letter as paint inside it.
+  delete letter.dataset.probe;
+  const box = document.createElement("span");
+  box.className = "k-small-initial";
+  box.append(letter);
+  return probe(box, { role: "icon", name: "initial" });
+}
+
 export function iconTile(options: TileOptions): HTMLElement {
   const { side, icon: size } = TILE_MEASURES[options.size];
   const tile = document.createElement("span");
@@ -227,11 +259,7 @@ export function iconTile(options: TileOptions): HTMLElement {
     shown.classList.add("k-icon-tile-count");
     tile.append(shown);
   } else if (options.glyph === undefined) {
-    // The letter's line is the symbol's box tall, so it sits where the symbol would, centred on
-    // its ink's box: Geist's caps sit high in their line, and a capital's weight (an L's foot)
-    // would set it off its middle.
-    const letter = text(initial(options.name ?? ""), INITIAL_STYLE[options.size], ink);
-    centreOnInk(letter, INITIAL_STYLE[options.size], letter.textContent ?? "");
+    const letter = initialLetter(options.name ?? "", INITIAL_STYLE[options.size], ink);
     letter.classList.add("k-icon-tile-initial");
     tile.append(letter);
   } else tile.append(icon(options.glyph, "var(--icon)", `var(--color-${ink})`));

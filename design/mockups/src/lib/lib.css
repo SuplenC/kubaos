@@ -759,6 +759,22 @@
   top: round(nearest, calc((var(--side) - var(--t-line)) / 2), 1px);
 }
 
+/* An app's initial in a 16 symbol's box (`smallInitial`, `lib/icon-tile.ts`): `label`'s line is the
+   box tall, so the letter is centred down by its ink and across on its advance, as on a tile. */
+.k-small-initial {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--icon-s16);
+  height: var(--icon-s16);
+}
+
+.k-small-initial > .k-text {
+  position: absolute;
+  left: round(nearest, calc((var(--icon-s16) - round(up, calc(var(--natural) * var(--px) - 0.001px), 1px)) / 2), 1px);
+  top: 0;
+}
+
 /* An app's picture, scaled so its drawing's box fits `--fit` whole, the box snapped to whole
    device pixels and centred as the symbol is; the picture's own margin runs past the box, and the
    tile clips it. The shares (`--box-*`, `--picture-*`, of the box's long side) are its

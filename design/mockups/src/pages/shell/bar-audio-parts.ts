@@ -8,6 +8,7 @@
 import "./bar.css";
 import { badgedIcon } from "../../lib/badge.ts";
 import { icon } from "../../lib/icon.ts";
+import { smallInitial } from "../../lib/icon-tile.ts";
 import { type MenuEntry, menu } from "../../lib/menu.ts";
 import { pill } from "../../lib/pill.ts";
 import { popover } from "../../lib/tooltip.ts";
@@ -104,7 +105,8 @@ export function mutePill(options: MuteOptions = {}): HTMLElement {
 /** A player MPRIS knows: its app's name and icon. */
 export interface Player {
   readonly app: string;
-  readonly picture: string;
+  /** Its app's icon; with none, the app's initial stands in. */
+  readonly picture?: string;
 }
 
 const [KUBAOS, PLATE, DISC, STAR] = APP_ICONS;
@@ -134,9 +136,9 @@ export interface PlayingOptions {
   readonly onPlay?: () => void;
 }
 
-/** An app's picture at the bar's 16, as the tray draws one; with none, a note's symbol in its place. */
+/** An app's picture at the bar's 16, as the tray draws one; with none, the app's initial in its place. */
 function appPicture(player: Player): Element {
-  if (!player.picture) return glyph("music_note", "on_surface_variant");
+  if (!player.picture) return smallInitial(player.app, "var(--color-on_surface_variant)");
   const image = document.createElement("img");
   image.className = "shell-tray-picture";
   image.src = player.picture;
@@ -165,7 +167,7 @@ export function nowPlaying(options: PlayingOptions = {}): HTMLElement {
 /** The players Menu's entries: every player with its icon, the active one checked, then Show <app>. */
 export function playerEntries(players: readonly Player[], active: number): MenuEntry[] {
   const app = players[active]?.app ?? "";
-  return [...players.map((player, index) => ({ label: player.app, ...(player.picture ? { picture: player.picture } : { icon: "music_note" }), checked: index === active })), "separator", { label: `Show ${app}`, icon: "app_window" }];
+  return [...players.map((player, index) => ({ label: player.app, ...(player.picture ? { picture: player.picture } : { initial: true }), checked: index === active })), "separator", { label: `Show ${app}`, icon: "app_window" }];
 }
 
 export interface PlayersMenuOptions {

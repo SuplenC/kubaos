@@ -20,6 +20,7 @@
 // keeps it.
 
 import { icon } from "./icon.ts";
+import { smallInitial } from "./icon-tile.ts";
 import { keycap, keys } from "./keycap.ts";
 import { divider, filling, row, stack } from "./layout.ts";
 import { FIXED_HEIGHT, probe, variant } from "./probe.ts";
@@ -39,6 +40,11 @@ export interface MenuItemSpec {
   readonly trailing?: string;
   /** An app's own icon in the symbol's place, at the symbol's size: a player's app. */
   readonly picture?: string;
+  /**
+   * The item stands for an app with no picture: the label's initial in the symbol's place, in
+   * `label`, as an IconTile shows one.
+   */
+  readonly initial?: boolean;
   /** The keys that do the same, as `Ctrl+C`: one keycap each. */
   readonly keys?: string;
   /** Whether it shows a check, and whether it is ticked; none for an item that never does. */
@@ -93,7 +99,7 @@ export function menuItem(spec: MenuItemSpec, current = false, pinned?: ItemPinne
     item.prepend(sweep);
     if (spec.holding !== undefined) item.style.setProperty("--hold", String(spec.holding));
   }
-  const words_ = variant((spec.icon || spec.picture) && "icon", spec.checked !== undefined && "check", (spec.danger || spec.held) && "danger", spec.submenu && "submenu", spec.description && "two-line");
+  const words_ = variant((spec.icon || spec.picture || spec.initial) && "icon", spec.checked !== undefined && "check", (spec.danger || spec.held) && "danger", spec.submenu && "submenu", spec.description && "two-line");
   // A described item grows a line where its description wraps, so its height is its content's.
   return probe(item, { role: "component", name: "MenuItem", variant: words_, fixed: spec.description ? { width: false, height: false } : FIXED_HEIGHT });
 }
@@ -104,6 +110,7 @@ function content(spec: MenuItemSpec, ink: string, muted: string): HTMLElement {
   words.style.color = ink;
   const parts: Element[] = [];
   if (spec.picture) parts.push(picture(spec.picture));
+  else if (spec.initial) parts.push(smallInitial(spec.label, ink));
   else if (spec.icon) parts.push(icon(spec.icon, "var(--icon-s16)", ink));
   const room = document.createElement("span");
   room.className = "k-menu-words";

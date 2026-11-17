@@ -119,7 +119,7 @@ function live(): HTMLElement {
 }
 
 const ONE: readonly Player[] = PLAYERS.slice(0, 1);
-const FIVE: readonly Player[] = [...PLAYERS, LONG_PLAYER, { app: "mpv", picture: PLAYERS[1]!.picture }];
+const FIVE: readonly Player[] = [...PLAYERS, LONG_PLAYER, { app: "mpv" }];
 
 /** A row's cell: the mute pill or now playing, pinned on its first circle, or open. */
 function muteCell(state: State): HTMLElement {
@@ -187,7 +187,7 @@ export default page<State>({
         sample: (words: string) => nowPlayingOpen({ players: [{ ...PLAYERS[0]!, app: words }, PLAYERS[1]!] }),
       },
     ],
-    missingPicture: [{ name: "A player with no icon", for: "`music_note` in its place, here and in the Menu", sample: () => nowPlayingOpen({ players: [{ app: "mpv", picture: "" }, PLAYERS[0]!] }) }],
+    missingPicture: [{ name: "A player with no icon", for: "its app's initial, here and in the Menu", sample: () => nowPlayingOpen({ players: [{ app: "mpv" }, PLAYERS[0]!] }) }],
     counts: [
       { name: "No player", for: "now playing is gone", sample: () => end({}, null) },
       { name: "One player", for: "the Menu opens all the same", sample: () => nowPlayingOpen({ players: ONE }) },

@@ -115,6 +115,7 @@ export default page({
     { name: "Choices", for: "one of a few, checked; each item keeps the check's room", sample: () => onPopover(choices(3), 3) },
     { name: "MenuItem, with keys", for: "a shortcut's keys as keycaps at its end", sample: () => alone({ label: "Copy path", icon: "content_paste", keys: "Ctrl+C" }) },
     { name: "MenuItem, danger", for: "destroys something: in `error`", sample: () => alone({ label: "Quit", icon: "logout", danger: true }) },
+    { name: "MenuItem, an app with no icon", for: "its initial in `label` in the symbol's place", sample: () => alone({ label: "mpv", initial: true, checked: false }) },
     { name: "MenuItem, opening a submenu", for: "a chevron at its end: the tray's VPN Connections", sample: () => alone({ label: "VPN Connections", submenu: true }) },
     { name: "MenuItem, held", for: "can't be taken back: held `duration.hold`, `error` sweeping across", sample: liveHold },
     { name: "Held, part-way", for: "the sweep at 40%: words `on_error` under it", sample: () => alone({ ...HOLD, holding: 0.4 }, true, "lit") },
