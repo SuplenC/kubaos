@@ -1,0 +1,31 @@
+# Grok in a window of its own: xAI has no Grok app for Linux, only its website.
+# https://grok.com/
+name = "Grok"
+category = "ai"
+tags = ["chat", "assistant", "xai", "grok", "web app"]
+summary = "xAI's chatbot in a window of its own. Edgy by design, like a teenager with a data centre."
+# xAI's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Grok is xAI's AI assistant. Its website, here in a window of its own, answers questions, writes \
+and edits text and code, searches the web and posts on X, reads the pictures you give it and \
+makes images, in chats it keeps with your account."""
+description_from = "kubaos"
+# Ours: xAI's logo isn't under a licence that allows copying it. The window's own icon is the
+# same picture.
+icon = "grok.svg"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/grok: install Grok again and you're still \
+signed in. Your chats live on xAI's servers anyway."""
+
+[[ready]]
+check = ["./closed", "grok"]
+says = "Grok's window is open: close it, then try again"
+
+[[action]]
+name = "Put Grok in a window of its own"
+kind = "web_app"
+id = "grok"
+title = "Grok"
+url = "https://grok.com/"
+icon = "grok.svg"
