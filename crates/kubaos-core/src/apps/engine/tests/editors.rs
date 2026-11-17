@@ -199,7 +199,20 @@ fn toolbox_starts_once_from_where_it_updates_itself_and_its_removal_keeps_the_id
 fn toolbox_running_is_left_alone_until_it_is_quit() {
     let world = toolbox_world();
     let before = world.host.snapshot();
-    world.host.sandbox().stub("pgrep", "exit 0");
+    // pgrep as the machine answers it while Toolbox runs from its folder: the scripts' pattern is
+    // matched against Toolbox's command line, as `pgrep -f` matches, and a process name, which the
+    // kernel cuts at 15 characters, matches nothing.
+    let running = world
+        .host_home()
+        .join(".local/share/JetBrains/Toolbox/bin/jetbrains-toolbox");
+    world.host.sandbox().stub(
+        "pgrep",
+        &format!(
+            "full=; for a; do [ \"$a\" = -f ] && full=1; pattern=$a; done\n\
+             [ -n \"$full\" ] && printf '%s --minimize\\n' '{}' | grep -Eq -- \"$pattern\"",
+            running.display()
+        ),
+    );
 
     let refused = run(&world, |e| e.add(TOOLBOX, None, &Picks::default())).unwrap_err();
 
