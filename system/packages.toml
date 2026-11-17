@@ -259,6 +259,21 @@ key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xBC
 fingerprint = "BC7345F522079769F5BBE987EFC71127F425E228"
 keyring = "/etc/apt/keyrings/obs-studio.gpg"
 
+# ppa:inkscape.dev/stable, the Launchpad PPA of Inkscape's developers, for the
+# app of the catalog (apps/inkscape/). Its package writes no source of its own.
+[repo.inkscape]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x56BDFFD2F1C96B3D1575E3B85C9A0B86CD2FCB38"
+fingerprint = "56BDFFD2F1C96B3D1575E3B85C9A0B86CD2FCB38"
+keyring = "/etc/apt/keyrings/inkscape.gpg"
+
+# darktable's repository on openSUSE's Build Service, graphics:darktable, for
+# the app of the catalog (apps/darktable/), a flat one with amd64 only. Its
+# key expires on 2028-12-09. Its package writes no source of its own.
+[repo.darktable]
+key_url = "https://download.opensuse.org/repositories/graphics:/darktable/xUbuntu_26.04/Release.key"
+fingerprint = "3247B7519EDBEAB422E900A3040524A84C70D8B5"
+keyring = "/etc/apt/keyrings/darktable.gpg"
+
 # ppa:cppiber/hyprland, the Launchpad PPA of Constantin Piber.
 [repo.cppiber-hyprland]
 key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xA54D23B62FF3FCC76EFF71E8FDBAAA1CF0CCF48E"

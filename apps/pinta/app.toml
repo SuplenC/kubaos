@@ -1,0 +1,23 @@
+# Pinta from nixpkgs, through the User flake. Pinta keeps no apt repository, Ubuntu 26.04 doesn't
+# package it, and its own Linux builds are Flatpak's.
+# https://www.pinta-project.com/releases/
+name = "Pinta"
+category = "graphics"
+tags = ["paint", "drawing", "image editor", "simple", "screenshots"]
+summary = "Paint.NET for Linux. For when GIMP is a lot and you only want to draw a box round something."
+# Its AppStream metainfo, CC0-1.0 (github.com/PintaProject/Pinta).
+description = """\
+Pinta is a image editing, drawing and painting application with a simple yet powerful interface. \
+Pinta has a wide range of drawing tools, including: freehand, rectangles, circles and lines. It \
+also has over 35 effects to apply to your images, and also has the ability to create unlimited \
+layers to help organize your creativity."""
+description_from = "https://github.com/PintaProject/Pinta/blob/3.1.2/xdg/com.github.PintaProject.Pinta.metainfo.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "pinta"
+keeps = """\
+Your settings stay in ~/.config/Pinta: install Pinta again and they're there."""
+
+[[action]]
+name = "Install Pinta"
+kind = "nix"
+packages = ["pinta"]

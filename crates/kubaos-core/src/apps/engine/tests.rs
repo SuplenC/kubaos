@@ -2247,6 +2247,7 @@ mod ai;
 mod communication;
 mod devtools;
 mod editors;
+mod graphics;
 mod media;
 mod office;
 mod requires;

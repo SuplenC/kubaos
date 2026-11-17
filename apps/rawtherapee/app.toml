@@ -1,0 +1,48 @@
+# RawTherapee from the AppImage of its GitHub release, pinned to the sha256 GitHub publishes for
+# the asset. RawTherapee keeps no apt repository, and Ubuntu 26.04 and nixpkgs are a release
+# behind, while a raw developer's releases are what bring new cameras. The AppImage can't update
+# itself, so a release of KubaOS moves the pin on. Its runtime is the older one, which mounts it
+# through FUSE 2's library with the fusermount FUSE 3 ships. The desktop entry is ours, not the
+# AppImage's: its Exec runs the AppImage and its Icon is Colloid's.
+# https://github.com/RawTherapee/RawTherapee/releases
+name = "RawTherapee"
+category = "graphics"
+tags = ["photo", "raw", "photography", "developer", "demosaicing"]
+summary = "Raw photo developing for people who read about demosaicing for fun. Every knob, no catalogue."
+# Its AppStream metainfo is under CC-BY-SA-4.0, which asks every copy to carry its licence, so
+# this is ours.
+description = """\
+RawTherapee develops raw photos from most digital cameras, and edits JPEG, TIFF and PNG \
+files too. It works without a catalogue: a file browser, an editor, and a queue that develops \
+many photos at once. It offers a choice of demosaicing methods, noise reduction, sharpening, \
+lens and colour corrections and local adjustments, and keeps every edit in a .pp3 file beside \
+the photo, never touching the original."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# AppImage is there.
+icon = "com.rawtherapee.RawTherapee"
+keeps = """\
+Your settings and processing profiles stay in ~/.config/RawTherapee, and its thumbnails in \
+~/.cache/RawTherapee: install RawTherapee again and they're all there. Each photo's edits are \
+also in the .pp3 file beside it."""
+
+[[action]]
+name = "Install FUSE, which the AppImage mounts itself with"
+kind = "apt"
+packages = ["fuse3", "libfuse2t64"]
+
+[[action]]
+name = "Download RawTherapee"
+kind = "download"
+to = "~/.local/opt/rawtherapee/RawTherapee.AppImage"
+version = "5.13"
+unpack = "file"
+amd64 = { url = "https://github.com/RawTherapee/RawTherapee/releases/download/5.13/RawTherapee_5.13_x86_64_release.AppImage", sha256 = "746a3509a234804c3a5f66649006ac29ac67f193a8559d2297357949a890b097" }
+arm64 = { url = "https://github.com/RawTherapee/RawTherapee/releases/download/5.13/RawTherapee_5.13_arm64_release.AppImage", sha256 = "9e424633272a49bb47afe4bf065604858acf9de77c4d80e0f6557024492e2b55" }
+
+[[action]]
+name = "Put RawTherapee in the Command menu"
+kind = "file"
+to = "~/.local/share/applications/rawtherapee.desktop"
+from = "rawtherapee.desktop"
+template = true

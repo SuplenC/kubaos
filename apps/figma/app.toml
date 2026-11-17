@@ -1,0 +1,31 @@
+# Figma in a window of its own: Figma has no app for Linux, only its website.
+# https://www.figma.com/
+name = "Figma"
+category = "graphics"
+tags = ["design", "prototyping", "ui", "mockups", "whiteboard", "web app"]
+summary = "The design tool your whole team rents. No Linux app, so here's its website in a window."
+# Figma's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Figma is a collaborative design tool. Its website, here in a window of its own, designs \
+interfaces and prototypes them, keeps a team's components and styles in shared libraries, \
+hands designs to developers with their measurements and code, and draws diagrams and \
+whiteboards in FigJam, in files that live with your Figma account."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix); the window's own icon is the same one.
+icon = "figma"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/figma: install Figma again and you're \
+still signed in. Your files live on Figma's servers anyway."""
+
+[[ready]]
+check = ["./closed", "figma"]
+says = "Figma's window is open: close it, then try again"
+
+[[action]]
+name = "Put Figma in a window of its own"
+kind = "web_app"
+id = "figma"
+title = "Figma"
+url = "https://www.figma.com/files/"
+icon = "figma"
