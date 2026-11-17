@@ -300,13 +300,32 @@ async function main(): Promise<void> {
   if (!existsSync(path.join(dist, "index.html"))) throw new Error(`no built site in ${dist}: run \`just mockups-build\``);
   const origin = await serve(dist);
   const browser = await chromium.launch({ executablePath: chromiumPath() });
+  const errors: string[] = [];
+  const collectors: NodeJS.Timeout[] = [];
   try {
-    const errors: string[] = [];
     const open = async () => {
       // A context each, so a page's pointer, focus and hover are its own.
       const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, reducedMotion: "no-preference" });
       const page = await context.newPage();
       page.on("pageerror", (error) => errors.push(error.message));
+      page.on("crash", () => errors.push(`the page crashed at ${page.url()}`));
+      // The players restyle their samples every frame, and what that leaves behind is the
+      // renderer's garbage, which Chromium collects along with the script heap's: that heap stays
+      // so small that it hardly ever does. Left alone, a page of many players grows by a gigabyte
+      // every quarter of a minute, and five of them run a 16 GB runner out of memory; collected
+      // every second, each stays near 300 MB.
+      const session = await context.newCDPSession(page);
+      let collecting = false;
+      collectors.push(
+        setInterval(() => {
+          if (collecting) return;
+          collecting = true;
+          session
+            .send("HeapProfiler.collectGarbage")
+            .catch(() => undefined)
+            .finally(() => (collecting = false));
+        }, 1000),
+      );
       return page;
     };
     // `all` draws every move in a player of its own, at its sample's own size.
@@ -325,11 +344,17 @@ async function main(): Promise<void> {
     const tabs = [first, ...(await Promise.all(settings.slice(1).map(open)))];
     await Promise.all(
       settings.map(async ([query, set], i) => {
-        for (const { level, slug } of pages) await testPage(tabs[i]!, origin, level, slug, `${base}&${query}`, set);
+        for (const { level, slug } of pages) {
+          // Five run at once: a throw names its page and settings.
+          await testPage(tabs[i]!, origin, level, slug, `${base}&${query}`, set).catch((error: unknown) => {
+            throw new Error(`${slug} (${query}): ${error instanceof Error ? error.message : String(error)}`);
+          });
+        }
       }),
     );
-    check(errors.length === 0, `the page failed: ${errors.join("; ")}`);
   } finally {
+    for (const collector of collectors) clearInterval(collector);
+    check(errors.length === 0, `the page failed: ${errors.join("; ")}`);
     await browser.close();
   }
   if (failures > 0) {
