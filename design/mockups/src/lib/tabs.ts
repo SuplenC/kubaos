@@ -24,9 +24,10 @@
 // a pick on one that isn't disabled lays the stretch under it at once.
 //
 // A choice may carry a tip, what picking it means: the library's Tooltip, the choice's name as its
-// title and the tip as its muted body under it, floating `space.s8` above the well while the pointer is on the choice or the keyboard is, lined up
-// with the well's start, or its end for a choice in the row's second half, so the card stays over
-// the row. It takes no room, so nothing round the row moves as it comes and goes.
+// title and the tip as its muted body under it, anchored to the choice as any tooltip is to its
+// control: `space.s8` above it while the pointer or the keyboard is on it, from its start, or its
+// end for a choice in the row's second half, so the card stays over the row. It takes no room, so
+// nothing round the row moves as it comes and goes.
 
 import { iconInLine } from "./button.ts";
 import { type Pinned, pin } from "./control.ts";

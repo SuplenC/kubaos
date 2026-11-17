@@ -2334,14 +2334,14 @@
   transition: none;
 }
 
-/* A choice's tip: its Tooltip `space.s8` above the well, lined up with the well's edge on the
-   choice's side (the well's padding past the choice's box), fading in and out over `short` as the
-   choice is lit. */
+/* A choice's tip: its Tooltip anchored to the choice as any tooltip is to its control, `space.s8`
+   above the choice and from its start, or its end in the row's second half, fading in and out over
+   `short` as the choice is lit. */
 .k-tab > .k-tooltip {
   position: absolute;
   z-index: 3;
-  bottom: calc(100% + var(--space-s4) + var(--space-s8));
-  left: calc(-1 * var(--space-s4));
+  bottom: calc(100% + var(--space-s8));
+  left: 0;
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--motion-short) var(--easing-standard);
@@ -2349,7 +2349,7 @@
 
 .k-tab > .k-tooltip[data-held="end"] {
   left: auto;
-  right: calc(-1 * var(--space-s4));
+  right: 0;
 }
 
 .k-tab:is(:hover, :focus-visible, [data-pinned]) > .k-tooltip,

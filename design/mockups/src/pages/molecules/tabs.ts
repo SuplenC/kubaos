@@ -136,8 +136,8 @@ export default page({
     { name: "Views", for: "a few views of one thing: the control center", sample: () => row(SECTIONS, 2) },
     { name: "With symbols", for: "a symbol helps tell them apart: Calls, Music", sample: () => row(MODES, 0) },
     { name: "Segmented control", for: "a setting's few values side by side", sample: () => row(MOTION, 1) },
-    { name: "A tip, first choice", for: "what Calls means, from the row's start", sample: () => tipped(0) },
-    { name: "A tip, last choice", for: "what Music means, from the row's end", sample: () => tipped(1) },
+    { name: "A tip, first choice", for: "what Calls means, from its choice's start", sample: () => tipped(0) },
+    { name: "A tip, last choice", for: "what Music means, from its choice's end", sample: () => tipped(1) },
     { name: "A choice disabled", for: "a view that can't open now: Input in Music mode", sample: () => row(MUSIC_SIDES, 0) },
     {
       name: "Nothing picked",
