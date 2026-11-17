@@ -10,10 +10,12 @@
 //! - The seam it implements: `host.rs`.
 
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fs;
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -22,11 +24,14 @@ use std::process::Stdio;
 use super::AptPlan;
 use super::AptSimulation;
 use super::Compression;
+use super::DkmsInstall;
 use super::DkmsStatus;
 use super::Downgrade;
 use super::Host;
 use super::HostError;
+use super::Known;
 use super::Mok;
+use super::Removal;
 use super::SecureBoot;
 use super::UNIT_PROPERTIES;
 use super::UnitState;
@@ -50,6 +55,10 @@ const KERNEL_MODULES: &str = "/lib/modules";
 /// with (`mok_certificate`).
 const DKMS_FRAMEWORK: &str = "/etc/dkms/framework.conf";
 const DKMS_FRAMEWORK_D: &str = "/etc/dkms/framework.conf.d";
+
+/// The exit code of `dkms install` for a kernel the module's `dkms.conf` leaves out
+/// (`BUILD_EXCLUSIVE_KERNEL`, `_MIN`, `_MAX`, `_CONFIG`, `_ARCH`).
+const DKMS_EXCLUDED: i32 = 77;
 
 /// Where DKMS keeps the MOK's certificate when its configuration names none: Ubuntu's shim-signed
 /// MOK, then DKMS's own default.
@@ -165,6 +174,50 @@ impl SystemHost {
                 stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
             })
         }
+    }
+
+    /// The certificate DKMS's configuration files `configs` name through a variable, worked out as
+    /// DKMS works it out: each sourced by bash in turn, `kernelver` and `arch` set as DKMS sets
+    /// them for `kernel`, nothing else of this process's environment. Only files root owns and no
+    /// one else may write are sourced, as root reads them.
+    fn mok_through_dkms(&self, configs: &[PathBuf], kernel: &str) -> Result<PathBuf, HostError> {
+        for config in configs {
+            let meta = fs::symlink_metadata(config).map_err(HostError::io(config))?;
+            if meta.uid() != 0 || meta.mode() & 0o022 != 0 || meta.file_type().is_symlink() {
+                return Err(HostError::Mok {
+                    why: format!(
+                        "{} isn't a file root alone may write, so it isn't sourced",
+                        config.display()
+                    ),
+                });
+            }
+        }
+        let machine = match self.arch.as_str() {
+            "arm64" => "aarch64",
+            _ => "x86_64",
+        };
+        let output = self
+            .command("bash")
+            .args(mok_source_args(configs, kernel, machine))
+            .output()
+            .map_err(|source| HostError::Spawn {
+                program: "bash".to_owned(),
+                source,
+            })?;
+        let named = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        if !output.status.success() || !named.starts_with('/') {
+            return Err(HostError::Mok {
+                why: format!(
+                    "sourcing {} for {kernel} names {named:?}",
+                    configs
+                        .iter()
+                        .map(|c| c.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            });
+        }
+        Ok(PathBuf::from(named))
     }
 
     fn systemctl(&self, scope: Scope) -> Command {
@@ -308,14 +361,31 @@ impl Host for SystemHost {
         .map(drop)
     }
 
-    fn apt_remove(&mut self, packages: &[String]) -> Result<(), HostError> {
-        Self::out(
-            self.command("apt-get")
-                .args(["remove", "-y"])
-                .args(APT_OPTIONS)
-                .args(packages),
-        )
-        .map(drop)
+    fn apt_remove(&mut self, packages: &[String], removal: Removal) -> Result<(), HostError> {
+        let mut command = self.command("apt-get");
+        match removal {
+            Removal::KeepConfig => command.args(["remove", "-y"]),
+            Removal::Purge => command.args(["purge", "-y"]),
+            Removal::PurgeEssential => command.args(["purge", "-y", "--allow-remove-essential"]),
+        };
+        Self::out(command.args(APT_OPTIONS).args(packages)).map(drop)
+    }
+
+    fn important(&mut self, packages: &[String]) -> Result<BTreeSet<String>, HostError> {
+        if packages.is_empty() {
+            return Ok(BTreeSet::new());
+        }
+        // dpkg-query exits 1 when it knows none of them, which is an answer, not a failure.
+        let output = self
+            .command("dpkg-query")
+            .args(["-W", "-f=${Package}\t${Architecture}\t${Essential}\t${Protected}\n"])
+            .args(packages)
+            .output()
+            .map_err(|source| HostError::Spawn {
+                program: "dpkg-query".to_owned(),
+                source,
+            })?;
+        Ok(important(&String::from_utf8_lossy(&output.stdout), &self.arch))
     }
 
     fn fetch(&mut self, url: &str, sha256: &str, to: &Path) -> Result<(), HostError> {
@@ -446,7 +516,7 @@ impl Host for SystemHost {
         Self::out(self.command("dpkg").args([verb, arch])).map(drop)
     }
 
-    fn arch_packages(&mut self, arch: &str) -> Result<BTreeSet<String>, HostError> {
+    fn arch_packages(&mut self, arch: &str) -> Result<BTreeMap<String, Known>, HostError> {
         let shown = Self::out(
             self.command("dpkg-query")
                 .args(["-W", "-f=${db:Status-Abbrev}\t${Package}\t${Architecture}\n"]),
@@ -481,12 +551,18 @@ impl Host for SystemHost {
         Self::out(self.command("dkms").args(["add", "-m", module, "-v", version])).map(drop)
     }
 
-    fn dkms_install(&mut self, module: &str, version: &str, kernel: &str) -> Result<(), HostError> {
-        Self::out(
+    fn dkms_install(&mut self, module: &str, version: &str, kernel: &str) -> Result<DkmsInstall, HostError> {
+        match Self::out(
             self.command("dkms")
                 .args(["install", "--force", "-m", module, "-v", version, "-k", kernel]),
-        )
-        .map(drop)
+        ) {
+            Ok(_) => Ok(DkmsInstall::Installed),
+            Err(HostError::Failed {
+                code: Some(DKMS_EXCLUDED),
+                ..
+            }) => Ok(DkmsInstall::Excluded),
+            Err(e) => Err(e),
+        }
     }
 
     fn dkms_remove(&mut self, module: &str, version: &str) -> Result<(), HostError> {
@@ -505,7 +581,7 @@ impl Host for SystemHost {
         }
     }
 
-    fn mok(&mut self) -> Result<Option<Mok>, HostError> {
+    fn mok(&mut self, kernel: &str) -> Result<Option<Mok>, HostError> {
         let mut configs = vec![PathBuf::from(DKMS_FRAMEWORK)];
         if let Ok(entries) = fs::read_dir(DKMS_FRAMEWORK_D) {
             let mut more: Vec<PathBuf> = entries
@@ -516,11 +592,12 @@ impl Host for SystemHost {
             more.sort();
             configs.extend(more);
         }
+        configs.retain(|p| p.is_file());
         let texts: Vec<String> = configs.iter().filter_map(|p| fs::read_to_string(p).ok()).collect();
-        let named = mok_certificate(texts.iter().map(String::as_str));
-        let candidates: Vec<PathBuf> = match named {
-            Some(path) => vec![path],
-            None => MOK_CERTIFICATES.iter().map(PathBuf::from).collect(),
+        let candidates: Vec<PathBuf> = match mok_certificate(texts.iter().map(String::as_str)) {
+            Named::Path(path) => vec![path],
+            Named::Variable => vec![self.mok_through_dkms(&configs, kernel)?],
+            Named::Nothing => MOK_CERTIFICATES.iter().map(PathBuf::from).collect(),
         };
         let Some(certificate) = candidates.into_iter().find(|p| p.is_file()) else {
             return Ok(None);
@@ -570,12 +647,17 @@ impl Host for SystemHost {
     }
 
     fn module_users(&mut self, module: &str) -> Result<Option<u32>, HostError> {
-        let path = PathBuf::from(format!("/sys/module/{}/refcnt", module.replace('-', "_")));
-        match fs::read_to_string(&path) {
-            Ok(text) => Ok(text.trim().parse().ok()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(HostError::io(&path)(e)),
+        let dir = PathBuf::from(format!("/sys/module/{}", module.replace('-', "_")));
+        if !dir.is_dir() {
+            return Ok(None);
         }
+        let refcnt = dir.join("refcnt");
+        let held = match fs::read_to_string(&refcnt) {
+            Ok(text) => text.trim().parse().unwrap_or(0),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => 0,
+            Err(e) => return Err(HostError::io(&refcnt)(e)),
+        };
+        Ok(Some(held + bound_devices(&dir)))
     }
 
     fn unload(&mut self, module: &str) -> Result<(), HostError> {
@@ -652,15 +734,20 @@ fn package_name(name: &str, of: &str, arch: &str) -> String {
 
 /// The packages of `of` in what `dpkg-query -W` shows, `<status>\t<package>\t<architecture>` a
 /// line, on a machine of `arch`: every one dpkg has in a state other than not installed (its
-/// status's second letter `n`), as dpkg refuses to drop an architecture while it has one.
-fn known_of_arch(shown: &str, of: &str, arch: &str) -> BTreeSet<String> {
+/// status's second letter `n`), as dpkg refuses to drop an architecture while it has one, each
+/// with whether only its configuration is left (`c`).
+fn known_of_arch(shown: &str, of: &str, arch: &str) -> BTreeMap<String, Known> {
     shown
         .lines()
         .filter_map(|line| {
             let mut fields = line.split('\t');
             let (status, name, its) = (fields.next()?, fields.next()?, fields.next()?);
-            let known = status.chars().nth(1).is_some_and(|c| c != 'n');
-            (known && its == of).then(|| package_name(name, its, arch))
+            let known = match status.chars().nth(1)? {
+                'n' => return None,
+                'c' => Known::ConfigFiles,
+                _ => Known::Installed,
+            };
+            (its == of).then(|| (package_name(name, its, arch), known))
         })
         .collect()
 }
@@ -689,18 +776,84 @@ fn dkms_status(shown: &str, module: &str, version: &str) -> DkmsStatus {
     status
 }
 
-/// The MOK certificate DKMS's configuration files `texts`, in the order DKMS reads them, name
-/// (`mok_certificate=`, the last one read); none when they don't, or name it through a variable,
-/// which only DKMS fills in.
-fn mok_certificate<'a>(texts: impl Iterator<Item = &'a str>) -> Option<PathBuf> {
-    let mut named = None;
+/// How DKMS's configuration names the MOK's certificate.
+#[derive(Debug, PartialEq, Eq)]
+enum Named {
+    /// It doesn't: DKMS's default.
+    Nothing,
+    Path(PathBuf),
+    /// Through a variable (`$kernelver`), which only sourcing the files works out.
+    Variable,
+}
+
+/// How DKMS's configuration files `texts`, in the order DKMS reads them, name the MOK's
+/// certificate (`mok_certificate=`, the last one read).
+fn mok_certificate<'a>(texts: impl Iterator<Item = &'a str>) -> Named {
+    let mut named = Named::Nothing;
     for line in texts.flat_map(str::lines) {
         if let Some(value) = line.trim().strip_prefix("mok_certificate=") {
             let value = value.trim().trim_matches('"').trim_matches('\'');
-            named = (!value.is_empty() && !value.contains('$')).then(|| PathBuf::from(value));
+            named = if value.contains(['$', '`']) {
+                Named::Variable
+            } else if value.is_empty() {
+                Named::Nothing
+            } else {
+                Named::Path(PathBuf::from(value))
+            };
         }
     }
     named
+}
+
+/// bash's arguments that source `configs` in turn, as DKMS does, with `kernelver` and `arch`
+/// set as DKMS sets them for `kernel` on a `machine` (`uname -m`), and print the
+/// `mok_certificate` they name.
+fn mok_source_args(configs: &[PathBuf], kernel: &str, machine: &str) -> Vec<OsString> {
+    let script =
+        "kernelver=$1 arch=$2; shift 2; for f; do . \"$f\" || exit 1; done; printf '%s' \"${mok_certificate-}\"";
+    let mut args: Vec<OsString> = vec![
+        "-c".into(),
+        script.into(),
+        "kubaos-mok".into(),
+        kernel.into(),
+        machine.into(),
+    ];
+    args.extend(configs.iter().map(|c| c.as_os_str().to_owned()));
+    args
+}
+
+/// The devices bound to the drivers of the loaded module whose `/sys/module` folder is `dir`:
+/// its `drivers/` links each to a driver's folder, where each bound device is a link.
+fn bound_devices(dir: &Path) -> u32 {
+    let Ok(drivers) = fs::read_dir(dir.join("drivers")) else {
+        return 0;
+    };
+    let mut bound = 0;
+    for driver in drivers.flatten() {
+        let Ok(entries) = fs::read_dir(driver.path()) else {
+            continue;
+        };
+        let devices = entries
+            .flatten()
+            .filter(|entry| entry.file_name() != "module" && entry.file_type().is_ok_and(|t| t.is_symlink()));
+        bound += u32::try_from(devices.count()).unwrap_or(u32::MAX);
+    }
+    bound
+}
+
+/// The packages apt marks important in what `dpkg-query -W` shows,
+/// `<package>\t<architecture>\t<Essential>\t<Protected>` a line, on a machine of `arch`.
+fn important(shown: &str, arch: &str) -> BTreeSet<String> {
+    shown
+        .lines()
+        .filter_map(|line| {
+            let fields: Vec<&str> = line.split('\t').collect();
+            let [name, of, essential, protected] = fields[..] else {
+                return None;
+            };
+            (essential == "yes" || protected == "yes").then(|| package_name(name, of, arch))
+        })
+        .collect()
 }
 
 /// The serial `openssl x509 -serial` printed (`serial=0A1B…`), as `modinfo` names a key: hex

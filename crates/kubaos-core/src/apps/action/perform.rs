@@ -13,6 +13,7 @@
 //!
 //! - The journal and who owns what: `journal.rs`. The order of a run: `engine.rs`.
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fs;
 use std::io;
@@ -34,9 +35,12 @@ use super::version_matches;
 use crate::apps::host::AptPlan;
 use crate::apps::host::AptSimulation;
 use crate::apps::host::Compression;
+use crate::apps::host::DkmsInstall;
 use crate::apps::host::Downgrade;
 use crate::apps::host::Host;
 use crate::apps::host::HostError;
+use crate::apps::host::Known;
+use crate::apps::host::Removal;
 use crate::apps::host::SecureBoot;
 use crate::apps::host::UnitState;
 use crate::apps::journal::Claim;
@@ -106,6 +110,18 @@ impl PerformError {
             source,
         }
     }
+}
+
+/// What an undo knows beyond its step's own record.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Undoing<'a> {
+    /// The packages the app's steps installed or pulled in, its `package:` and `dep:` claims as
+    /// they name them (`libc6:i386`), but those handed to other apps: what an `architecture`
+    /// step's undo may take with the architecture.
+    pub brought: &'a [String],
+    /// A changed action of the same thing replaces the step's, and stands: the module a `dkms`
+    /// step loaded may be the new version's, which stays loaded.
+    pub replacing: bool,
 }
 
 /// What a step finds before it changes anything.
@@ -538,6 +554,8 @@ struct Built {
     missing: Vec<String>,
     /// No kernel has its headers.
     no_kernel: bool,
+    /// The kernels with their headers.
+    kernels: Vec<String>,
 }
 
 impl Built {
@@ -550,9 +568,9 @@ impl Built {
 fn dkms_built(host: &mut dyn Host, module: &str, version: &str) -> Result<Built, PerformError> {
     let status = host.dkms_status(module, version).map_err(PerformError::Host)?;
     let kernels = host.kernels().map_err(PerformError::Host)?;
-    let mok = host.mok().map_err(PerformError::Host)?;
     let mut missing = Vec::new();
     for kernel in &kernels {
+        let mok = host.mok(kernel).map_err(PerformError::Host)?;
         let signed = match &mok {
             Some(mok) => host
                 .module_signer(module, kernel)
@@ -568,6 +586,7 @@ fn dkms_built(host: &mut dyn Host, module: &str, version: &str) -> Result<Built,
         added: status.added,
         missing,
         no_kernel: kernels.is_empty(),
+        kernels: kernels.into_iter().collect(),
     })
 }
 
@@ -648,7 +667,11 @@ pub fn says(action: &Action, host: &mut dyn Host) -> Result<Option<String>, Perf
 /// What the user must do for Secure Boot to load `module`, which DKMS signed with the MOK: none
 /// while Secure Boot is off or takes the MOK. The boot screen that enrols it is the user's.
 fn mok_note(host: &mut dyn Host, module: &str) -> Result<Option<String>, PerformError> {
-    let mok = host.mok().map_err(PerformError::Host)?;
+    // The newest kernel's, which the machine boots next.
+    let mok = match host.kernels().map_err(PerformError::Host)?.last() {
+        Some(kernel) => host.mok(kernel).map_err(PerformError::Host)?,
+        None => None,
+    };
     let certificate = mok.as_ref().map(|m| m.certificate.display().to_string());
     let state = host
         .secure_boot(mok.as_ref().map(|m| m.certificate.as_path()))
@@ -672,12 +695,15 @@ fn mok_note(host: &mut dyn Host, module: &str) -> Result<Option<String>, Perform
 
 /// Does a `dkms` step: its source put in place when `look` found it missing or another pin's, the
 /// module added to DKMS's tree, then built and installed for each kernel with its headers that
-/// lacks it, or has it unsigned while DKMS has a MOK. It fails when a kernel still lacks it signed.
-fn apply_dkms(action: &Action, host: &mut dyn Host, look: &Look) -> Result<(), PerformError> {
+/// lacks it, or has it unsigned while DKMS has a MOK, and for every one when the source is new, as
+/// a kernel's build is of the source that was there. It fails when a kernel still lacks it signed,
+/// but for one its `dkms.conf` leaves out, which the note names.
+fn apply_dkms(action: &Action, host: &mut dyn Host, look: &Look) -> Result<Option<String>, PerformError> {
     let Kind::Dkms { module, version, .. } = &action.kind else {
-        return Ok(());
+        return Ok(None);
     };
-    if !owned_names(&look.claims, "path:").is_empty() {
+    let placed = !owned_names(&look.claims, "path:").is_empty();
+    if placed {
         place_dkms_source(action, host)?;
     }
     if !host.dkms_status(module, version).map_err(PerformError::Host)?.added {
@@ -687,18 +713,31 @@ fn apply_dkms(action: &Action, host: &mut dyn Host, look: &Look) -> Result<(), P
     if built.no_kernel {
         return Err(PerformError::NoKernelHeaders { module: module.clone() });
     }
-    for kernel in &built.missing {
-        host.dkms_install(module, version, kernel).map_err(PerformError::Host)?;
+    let kernels = if placed { &built.kernels } else { &built.missing };
+    let mut excluded = Vec::new();
+    for kernel in kernels {
+        if host.dkms_install(module, version, kernel).map_err(PerformError::Host)? == DkmsInstall::Excluded {
+            excluded.push(kernel.clone());
+        }
     }
     let built = dkms_built(host, module, version)?;
-    if built.missing.is_empty() {
-        Ok(())
-    } else {
-        Err(PerformError::Unsigned {
+    let missing: Vec<String> = built.missing.into_iter().filter(|k| !excluded.contains(k)).collect();
+    if !missing.is_empty() {
+        return Err(PerformError::Unsigned {
             module: module.clone(),
-            kernels: built.missing,
-        })
+            kernels: missing,
+        });
     }
+    Ok(match excluded.as_slice() {
+        [] => None,
+        [kernel] => Some(format!(
+            "{module} isn't built for {kernel}: its dkms.conf leaves that kernel out."
+        )),
+        _ => Some(format!(
+            "{module} isn't built for {}: its dkms.conf leaves those kernels out.",
+            excluded.join(", ")
+        )),
+    })
 }
 
 /// Puts a `dkms` step's source in `/usr/src/<module>-<version>`: the pinned tarball downloaded
@@ -752,21 +791,26 @@ fn place_dkms_source(action: &Action, host: &mut dyn Host) -> Result<(), Perform
     result
 }
 
-/// Undoes a `dkms` step: with `registered` (its claim of the module in DKMS's tree), the module
-/// unloaded when it is loaded and nothing uses it, then taken out of DKMS's tree and every kernel;
-/// then `paths`, its source, and `dirs`, the folders it made. A module something still uses stays
-/// loaded until the machine restarts, which the note says.
+/// Undoes a `dkms` step from its owned `claims`: with the module's in DKMS's tree, the module
+/// unloaded when it is loaded and nothing uses it (nothing holds it and no device is bound to its
+/// drivers), then taken out of DKMS's tree and every kernel; then its source and the folders it
+/// made. A module in use stays loaded until the machine restarts, which the note says; one a
+/// version bump is `replacing` is never unloaded, as the new version's build is the one it uses.
 fn undo_dkms(
     host: &mut dyn Host,
     module: &str,
     version: &str,
-    registered: &[String],
-    paths: &[String],
-    dirs: Vec<String>,
+    claims: &[Claim],
+    replacing: bool,
 ) -> Result<Option<String>, PerformError> {
     let mut note = None;
-    if !registered.is_empty() {
-        match host.module_users(module).map_err(PerformError::Host)? {
+    if !owned_names(claims, "dkms:").is_empty() {
+        let users = if replacing {
+            None
+        } else {
+            host.module_users(module).map_err(PerformError::Host)?
+        };
+        match users {
             Some(0) => host.unload(module).map_err(PerformError::Host)?,
             Some(_) => {
                 note = Some(format!(
@@ -779,10 +823,10 @@ fn undo_dkms(
             host.dkms_remove(module, version).map_err(PerformError::Host)?;
         }
     }
-    for path in paths {
-        remove_path(&host.place(Path::new(path)))?;
+    for path in owned_names(claims, "path:") {
+        remove_path(&host.place(Path::new(&path)))?;
     }
-    remove_dirs(host, dirs);
+    remove_dirs(host, owned_names(claims, "dir:"));
     Ok(note)
 }
 
@@ -838,7 +882,8 @@ fn has_file(host: &dyn Host, path: &Path, text: &str, mode: u32) -> bool {
         && fs::metadata(&placed).is_ok_and(|m| m.permissions().mode() & 0o777 == mode)
 }
 
-/// Does `action`, which `look`, just taken, found not done. Before apt installs anything,
+/// Does `action`, which `look`, just taken, found not done, and returns what the user has to know
+/// of what it did. Before apt installs anything,
 /// `record` is given the claims of the packages it would newly install beyond the action's own,
 /// `dep:<name>`, so the journal holds them before they are there.
 ///
@@ -851,9 +896,12 @@ pub fn apply(
     host: &mut dyn Host,
     look: &Look,
     record: &mut dyn FnMut(&[Claim]) -> Result<(), JournalError>,
-) -> Result<(), PerformError> {
+) -> Result<Option<String>, PerformError> {
     let owned = |prefix: &str| owned_names(&look.claims, prefix);
-    match &action.kind {
+    if let Kind::Dkms { .. } = &action.kind {
+        return apply_dkms(action, host, look);
+    }
+    let applied = match &action.kind {
         Kind::Apt {
             repo,
             packages,
@@ -867,24 +915,7 @@ pub fn apply(
             &owned("package:"),
             record,
         ),
-        Kind::Deb { package, .. } => {
-            let download = action.download(host.arch()).ok_or_else(|| PerformError::Unavailable {
-                arch: host.arch().to_owned(),
-            })?;
-            let dir = tempfile::Builder::new()
-                .prefix("kubaos-apps-")
-                .tempdir()
-                .map_err(PerformError::io(Path::new("a temporary folder")))?;
-            // apt reads a local .deb as its own _apt user.
-            fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).map_err(PerformError::io(dir.path()))?;
-            let deb = dir.path().join("app.deb");
-            host.fetch(&download.url, &download.sha256, &deb)
-                .map_err(PerformError::Host)?;
-            fs::set_permissions(&deb, fs::Permissions::from_mode(0o644)).map_err(PerformError::io(&deb))?;
-            let simulated = host.apt_simulate(AptPlan::Deb(&deb)).map_err(PerformError::Host)?;
-            record_dependencies(simulated, std::slice::from_ref(package), record)?;
-            host.deb_install(&deb).map_err(PerformError::Host)
-        }
+        Kind::Deb { package, .. } => apply_deb(action, host, package, record),
         Kind::Nix { .. } => host.nix_add(&owned("nix:")).map_err(PerformError::Host),
         Kind::Download { to, unpack, strip, .. } => {
             let download = action.download(host.arch()).ok_or_else(|| PerformError::Unavailable {
@@ -948,10 +979,37 @@ pub fn apply(
         }
         Kind::Linger {} => host.set_linger(true).map_err(PerformError::Host),
         Kind::Architecture { architecture } => add_architecture(host, architecture),
-        Kind::Dkms { .. } => apply_dkms(action, host, look),
+        Kind::Dkms { .. } => Ok(()),
         Kind::Run { .. } if action.removal_only() => Ok(()),
         Kind::Run { run, .. } => run_recorded(host, action, run)?.map_err(PerformError::Host),
-    }
+    };
+    applied.map(|()| None)
+}
+
+/// Installs a `deb` step's pinned `.deb` of `package`, downloaded and checked, its dependencies
+/// recorded first as `apt`'s are.
+fn apply_deb(
+    action: &Action,
+    host: &mut dyn Host,
+    package: &str,
+    record: &mut dyn FnMut(&[Claim]) -> Result<(), JournalError>,
+) -> Result<(), PerformError> {
+    let download = action.download(host.arch()).ok_or_else(|| PerformError::Unavailable {
+        arch: host.arch().to_owned(),
+    })?;
+    let dir = tempfile::Builder::new()
+        .prefix("kubaos-apps-")
+        .tempdir()
+        .map_err(PerformError::io(Path::new("a temporary folder")))?;
+    // apt reads a local .deb as its own _apt user.
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).map_err(PerformError::io(dir.path()))?;
+    let deb = dir.path().join("app.deb");
+    host.fetch(&download.url, &download.sha256, &deb)
+        .map_err(PerformError::Host)?;
+    fs::set_permissions(&deb, fs::Permissions::from_mode(0o644)).map_err(PerformError::io(&deb))?;
+    let simulated = host.apt_simulate(AptPlan::Deb(&deb)).map_err(PerformError::Host)?;
+    record_dependencies(simulated, &[package.to_owned()], record)?;
+    host.deb_install(&deb).map_err(PerformError::Host)
 }
 
 /// An `apt` action's install of `missing`, its packages `look` found not there, from `repo`
@@ -1024,6 +1082,7 @@ pub fn undo(
     host: &mut dyn Host,
     claims: &[Claim],
     prior: &Prior,
+    undoing: Undoing<'_>,
 ) -> Result<Option<String>, PerformError> {
     let owned = |prefix: &str| owned_names(claims, prefix);
     let undone = match &action.kind {
@@ -1036,9 +1095,9 @@ pub fn undo(
             let ours: Vec<String> = installed_as(host, &owned("package:"), Some(versions))?
                 .into_iter()
                 .collect();
-            undo_packages(host, &ours, &owned("dep:"))
+            undo_packages(host, &ours, &owned("dep:"), removal(action))
         }
-        Kind::Apt { .. } | Kind::Deb { .. } => undo_packages(host, &owned("package:"), &owned("dep:")),
+        Kind::Apt { .. } | Kind::Deb { .. } => undo_packages(host, &owned("package:"), &owned("dep:"), removal(action)),
         Kind::Nix { .. } => {
             let mine = owned("nix:");
             if mine.is_empty() {
@@ -1114,10 +1173,10 @@ pub fn undo(
             if owned("arch:").is_empty() {
                 return Ok(None);
             }
-            return undo_architecture(host, architecture);
+            return undo_architecture(host, architecture, undoing.brought);
         }
         Kind::Dkms { module, version, .. } => {
-            return undo_dkms(host, module, version, &owned("dkms:"), &owned("path:"), owned("dir:"));
+            return undo_dkms(host, module, version, claims, undoing.replacing);
         }
         Kind::Run { undo, .. } => {
             if owned("run").is_empty() {
@@ -1136,32 +1195,95 @@ fn add_architecture(host: &mut dyn Host, arch: &str) -> Result<(), PerformError>
     host.apt_update().map_err(PerformError::Host)
 }
 
-/// Takes `arch` away from dpkg, which an app's step added, once dpkg has no package of it: one
-/// the user installed, or one another app's removal kept as something needs it, keeps the
-/// architecture, and the note says which.
-fn undo_architecture(host: &mut dyn Host, arch: &str) -> Result<Option<String>, PerformError> {
-    let left: Vec<String> = host
-        .arch_packages(arch)
-        .map_err(PerformError::Host)?
-        .into_iter()
-        .collect();
-    if let Some(first) = left.first() {
-        return Ok(Some(match left.len() {
-            1 => format!("dpkg keeps taking {arch} packages, as {first} is still installed."),
-            n => format!(
-                "dpkg keeps taking {arch} packages, as {n} of them are still installed: {}.",
-                left.join(", ")
-            ),
-        }));
+/// Takes `arch` away from dpkg, which an app's step added. First what the app `brought` of it
+/// goes, purged: a package its removal left with only its configuration (`rc`, as `libc6:i386`
+/// with its conffiles), and one it left installed, as apt marks it important (`libgcc-s1:i386`,
+/// Protected) or something of the app's own still needed it then, while removing them takes
+/// nothing else and the user hasn't installed one by name since. A package dpkg still has of the
+/// architecture, installed or with its configuration, keeps it, and the note says which.
+fn undo_architecture(host: &mut dyn Host, arch: &str, brought: &[String]) -> Result<Option<String>, PerformError> {
+    let known = host.arch_packages(arch).map_err(PerformError::Host)?;
+    let ours: Vec<String> = known.keys().filter(|p| brought.contains(*p)).cloned().collect();
+    let installed: Vec<String> = ours.iter().filter(|p| known[*p] == Known::Installed).cloned().collect();
+    let theirs = host.manual(&installed).map_err(PerformError::Host)?;
+    let ours: Vec<String> = ours.into_iter().filter(|p| !theirs.contains(p)).collect();
+    let installed: Vec<String> = installed.into_iter().filter(|p| !theirs.contains(p)).collect();
+    let free = installed.is_empty()
+        || host
+            .apt_simulate(AptPlan::Remove(&installed))
+            .map_err(PerformError::Host)?
+            .removes
+            .iter()
+            .all(|p| installed.contains(p));
+    let purged: Vec<String> = if free {
+        ours
+    } else {
+        ours.into_iter().filter(|p| !installed.contains(p)).collect()
+    };
+    if !purged.is_empty() {
+        // HAZARD: only an architecture's packages beside the machine's own may go past apt's
+        // Essential mark: nothing of the machine's own architecture needs them.
+        host.apt_remove(&purged, Removal::PurgeEssential)
+            .map_err(PerformError::Host)?;
     }
-    host.set_foreign_arch(arch, false).map_err(PerformError::Host)?;
-    Ok(None)
+    let left = host.arch_packages(arch).map_err(PerformError::Host)?;
+    if left.is_empty() {
+        host.set_foreign_arch(arch, false).map_err(PerformError::Host)?;
+        return Ok(None);
+    }
+    Ok(Some(kept_note(arch, &left)))
+}
+
+/// What a note says of `left`, the packages of `arch` that keep dpkg taking it, by whether each is
+/// installed or has only its configuration left.
+fn kept_note(arch: &str, left: &BTreeMap<String, Known>) -> String {
+    let with = |known: Known| -> Vec<&str> {
+        left.iter()
+            .filter(|(_, k)| **k == known)
+            .map(|(p, _)| p.as_str())
+            .collect()
+    };
+    let (installed, configured) = (with(Known::Installed), with(Known::ConfigFiles));
+    match (installed.as_slice(), configured.as_slice()) {
+        ([one], []) => format!("dpkg keeps taking {arch} packages, as {one} is still installed."),
+        (many, []) => format!(
+            "dpkg keeps taking {arch} packages, as {} of them are still installed: {}.",
+            many.len(),
+            many.join(", ")
+        ),
+        ([], [one]) => format!("dpkg keeps taking {arch} packages, as {one}'s configuration is still there."),
+        ([], many) => format!(
+            "dpkg keeps taking {arch} packages, as {} of them still have their configuration there: {}.",
+            many.len(),
+            many.join(", ")
+        ),
+        (installed, configured) => format!(
+            "dpkg keeps taking {arch} packages, as some of them are still installed ({}) and others still have their configuration there ({}).",
+            installed.join(", "),
+            configured.join(", ")
+        ),
+    }
+}
+
+/// How an `apt` or `deb` step's undo leaves its packages' configuration: purged with `purge`.
+fn removal(action: &Action) -> Removal {
+    match action.kind {
+        Kind::Apt { purge: true, .. } => Removal::Purge,
+        _ => Removal::KeepConfig,
+    }
 }
 
 /// Removes `mine`, the packages a step installed, and of `dependencies`, those it pulled in, the
-/// ones nothing else on the machine needs and the user hasn't installed by name since: apt
-/// simulates each removal first, and never takes a package that isn't the step's.
-fn undo_packages(host: &mut dyn Host, mine: &[String], dependencies: &[String]) -> Result<(), PerformError> {
+/// ones nothing else on the machine needs, the user hasn't installed by name since, and apt will
+/// remove: one it marks important (Essential or Protected, as `libgcc-s1:i386` is) stays, as apt
+/// refuses its removal though its simulation shows it. apt simulates each removal first, and never
+/// takes a package that isn't the step's; `removal` keeps or purges their configuration.
+fn undo_packages(
+    host: &mut dyn Host,
+    mine: &[String],
+    dependencies: &[String],
+    removal: Removal,
+) -> Result<(), PerformError> {
     let all: Vec<String> = mine.iter().chain(dependencies).cloned().collect();
     let installed = host.installed(&all).map_err(PerformError::Host)?;
     let there: Vec<String> = mine.iter().filter(|p| installed.contains(*p)).cloned().collect();
@@ -1179,13 +1301,17 @@ fn undo_packages(host: &mut dyn Host, mine: &[String], dependencies: &[String]) 
     }
     // One the user has since installed by name is theirs now, and stays.
     let theirs = host.manual(&pulled).map_err(PerformError::Host)?;
-    let pulled: Vec<String> = pulled.into_iter().filter(|p| !theirs.contains(p)).collect();
+    let important = host.important(&pulled).map_err(PerformError::Host)?;
+    let pulled: Vec<String> = pulled
+        .into_iter()
+        .filter(|p| !theirs.contains(p) && !important.contains(p))
+        .collect();
     let mut gone = there;
     gone.extend(unneeded(host, &gone, pulled)?);
     if gone.is_empty() {
         return Ok(());
     }
-    host.apt_remove(&gone).map_err(PerformError::Host)
+    host.apt_remove(&gone, removal).map_err(PerformError::Host)
 }
 
 /// The packages of `dependencies` that go with `packages` taking nothing else with them. One that

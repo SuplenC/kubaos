@@ -16,11 +16,14 @@ use std::rc::Rc;
 use super::AptPlan;
 use super::AptSimulation;
 use super::Compression;
+use super::DkmsInstall;
 use super::DkmsStatus;
 use super::Downgrade;
 use super::Host;
 use super::HostError;
+use super::Known;
 use super::Mok;
+use super::Removal;
 use super::SecureBoot;
 use super::UnitState;
 use super::untar_args;
@@ -121,6 +124,19 @@ pub struct State {
     pub secure_boot: SecureBoot,
     /// Loaded kernel modules, by name, to how many use them.
     pub loaded: BTreeMap<String, u32>,
+    /// Loaded kernel modules, by name, to how many devices are bound to their drivers, which the
+    /// modules' own count leaves out.
+    pub bound: BTreeMap<String, u32>,
+    /// Kernels the modules' `dkms.conf` leaves out (`BUILD_EXCLUSIVE_*`).
+    pub excluded: BTreeSet<String>,
+    /// Packages whose control fields say `Essential: yes` or `Protected: yes`, which apt refuses
+    /// to remove without `--allow-remove-essential`, though its simulation shows the removal.
+    pub protected: BTreeSet<String>,
+    /// Package to its conffiles: a removal leaves them and the package in `rc`, a purge takes
+    /// them.
+    pub conffiles: BTreeMap<String, Vec<String>>,
+    /// Packages removed with their configuration left (`rc`).
+    pub rc: BTreeSet<String>,
     /// Package to the installed packages installing it removes, as Docker's `docker-ce` removes
     /// Ubuntu's `docker.io`.
     pub conflicts: BTreeMap<String, BTreeSet<String>>,
@@ -322,6 +338,9 @@ impl FakeHost {
             depends: BTreeMap::new(),
             preinst_groups: BTreeMap::new(),
             package_units: BTreeMap::new(),
+            protected: BTreeSet::new(),
+            conffiles: BTreeMap::new(),
+            excluded: BTreeSet::new(),
             ..self.state.borrow().clone()
         };
         let _ = write!(out, "{state:#?}");
@@ -536,6 +555,7 @@ impl Host for FakeHost {
             let units = state.package_units.get(&p).cloned().unwrap_or_default();
             state.units.extend(units);
             let version = state.candidates.get(&p).cloned().unwrap_or_else(|| "1.0".to_owned());
+            state.rc.remove(&p);
             state.dpkg.insert(p, version);
         }
         state.dpkg.extend(moving);
@@ -578,27 +598,67 @@ impl Host for FakeHost {
         for dependency in state.missing(&[package.to_owned()]) {
             state.dpkg.insert(dependency, "1.0".to_owned());
         }
+        state.rc.remove(package);
         state.dpkg.insert(package.to_owned(), version.to_owned());
         state.log.push(format!("deb install {package} {version}"));
         Ok(())
     }
 
-    fn apt_remove(&mut self, packages: &[String]) -> Result<(), HostError> {
+    fn apt_remove(&mut self, packages: &[String], removal: Removal) -> Result<(), HostError> {
         // As apt does with dpkg's lock held: it fails before it changes anything.
         for p in packages {
             self.fails(&format!("apt-remove:{p}"))?;
         }
         let gone = self.apt_simulate(AptPlan::Remove(packages))?.removes;
         let mut state = self.state.borrow_mut();
+        // apt's simulation shows the removal of an important package; the removal itself refuses.
+        if removal != Removal::PurgeEssential && gone.iter().any(|p| state.protected.contains(p)) {
+            return Err(HostError::Failed {
+                command: format!("apt-get remove -y {}", packages.join(" ")),
+                code: Some(100),
+                stderr: "E: Essential packages were removed and -y was used without --allow-remove-essential."
+                    .to_owned(),
+            });
+        }
+        let purge = removal != Removal::KeepConfig;
         for p in &gone {
             state.dpkg.remove(p);
             let units = state.package_units.get(p).cloned().unwrap_or_default();
             for unit in units.keys() {
                 state.units.remove(unit);
             }
+            if state.conffiles.contains_key(p) && !purge {
+                state.rc.insert(p.clone());
+            }
         }
-        state.log.push(format!("apt remove {}", packages.join(" ")));
+        if purge {
+            let purged: Vec<String> = gone
+                .iter()
+                .chain(packages.iter().filter(|p| state.rc.contains(*p)))
+                .cloned()
+                .collect();
+            for p in purged {
+                state.rc.remove(&p);
+                // dpkg takes a conffile and the copies of it it made beside it.
+                for path in state.conffiles.get(&p).cloned().unwrap_or_default() {
+                    for suffix in ["", ".dpkg-dist", ".dpkg-old"] {
+                        let _ = fs::remove_file(self.place(Path::new(&format!("{path}{suffix}"))));
+                    }
+                }
+            }
+        }
+        let verb = if purge { "purge" } else { "remove" };
+        state.log.push(format!("apt {verb} {}", packages.join(" ")));
         Ok(())
+    }
+
+    fn important(&mut self, packages: &[String]) -> Result<BTreeSet<String>, HostError> {
+        let state = self.state.borrow();
+        Ok(packages
+            .iter()
+            .filter(|p| state.dpkg.contains_key(*p) && state.protected.contains(*p))
+            .cloned()
+            .collect())
     }
 
     fn fetch(&mut self, url: &str, sha256: &str, to: &Path) -> Result<(), HostError> {
@@ -764,15 +824,15 @@ impl Host for FakeHost {
         Ok(())
     }
 
-    fn arch_packages(&mut self, arch: &str) -> Result<BTreeSet<String>, HostError> {
+    fn arch_packages(&mut self, arch: &str) -> Result<BTreeMap<String, Known>, HostError> {
         let suffix = format!(":{arch}");
-        Ok(self
-            .state
-            .borrow()
-            .dpkg
-            .keys()
-            .filter(|p| p.ends_with(&suffix))
-            .cloned()
+        let state = self.state.borrow();
+        let installed = state.dpkg.keys().map(|p| (p, Known::Installed));
+        let configured = state.rc.iter().map(|p| (p, Known::ConfigFiles));
+        Ok(installed
+            .chain(configured)
+            .filter(|(p, _)| p.ends_with(&suffix))
+            .map(|(p, known)| (p.clone(), known))
             .collect())
     }
 
@@ -812,8 +872,11 @@ impl Host for FakeHost {
         Ok(())
     }
 
-    fn dkms_install(&mut self, module: &str, version: &str, kernel: &str) -> Result<(), HostError> {
+    fn dkms_install(&mut self, module: &str, version: &str, kernel: &str) -> Result<DkmsInstall, HostError> {
         self.fails(&format!("dkms-install:{module}"))?;
+        if self.state.borrow().excluded.contains(kernel) {
+            return Ok(DkmsInstall::Excluded);
+        }
         // A DKMS whose signing is set up wrong installs the module unsigned.
         let unsigned = self.state.borrow().fail.contains("dkms-sign");
         let mut state = self.state.borrow_mut();
@@ -827,7 +890,7 @@ impl Host for FakeHost {
         };
         kernels.insert(kernel.to_owned(), signer);
         state.log.push(format!("dkms install {module}/{version} {kernel}"));
-        Ok(())
+        Ok(DkmsInstall::Installed)
     }
 
     fn dkms_remove(&mut self, module: &str, version: &str) -> Result<(), HostError> {
@@ -849,7 +912,7 @@ impl Host for FakeHost {
             .flatten())
     }
 
-    fn mok(&mut self) -> Result<Option<Mok>, HostError> {
+    fn mok(&mut self, _kernel: &str) -> Result<Option<Mok>, HostError> {
         Ok(self.state.borrow().mok.clone().map(|serial| Mok {
             certificate: PathBuf::from("/var/lib/shim-signed/mok/MOK.der"),
             serial,
@@ -861,7 +924,12 @@ impl Host for FakeHost {
     }
 
     fn module_users(&mut self, module: &str) -> Result<Option<u32>, HostError> {
-        Ok(self.state.borrow().loaded.get(&module.replace('-', "_")).copied())
+        let name = module.replace('-', "_");
+        let state = self.state.borrow();
+        Ok(state
+            .loaded
+            .get(&name)
+            .map(|held| held + state.bound.get(&name).copied().unwrap_or(0)))
     }
 
     fn unload(&mut self, module: &str) -> Result<(), HostError> {

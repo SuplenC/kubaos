@@ -341,3 +341,107 @@ fn a_new_version_takes_the_old_ones_place_and_its_source() {
     let state = world.host.state.borrow();
     assert_eq!(state.dkms.keys().collect::<Vec<_>>(), ["hid-pad/1.1"]);
 }
+
+#[test]
+fn a_new_source_at_the_same_version_is_built_again_for_every_kernel() {
+    let world = pad(&[("pad", PAD)]);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .kernels
+        .insert("7.0.0-42-generic".to_owned());
+    world.install("pad", true).0.unwrap();
+    let tarball = world.host.state.borrow().downloads["https://example.com/pad-1.0.tar.gz"]
+        .1
+        .clone();
+    world.host.state.borrow_mut().downloads.insert(
+        "https://example.com/pad-1.0-fixed.tar.gz".to_owned(),
+        ("4".repeat(64), tarball),
+    );
+    world.write_app(
+        "pad",
+        &PAD.replace("pad-1.0.tar.gz", "pad-1.0-fixed.tar.gz")
+            .replace(&"2".repeat(64), &"4".repeat(64)),
+    );
+    let from = world.host.state.borrow().log.len();
+
+    world.install("pad", true).0.unwrap();
+
+    let log = world.host.state.borrow().log[from..].to_vec();
+    for kernel in [KERNEL, "7.0.0-42-generic"] {
+        assert!(
+            log.contains(&format!("dkms install hid-pad/1.0 {kernel}")),
+            "{kernel}: {log:#?}"
+        );
+    }
+}
+
+#[test]
+fn a_module_with_a_controller_bound_to_its_driver_stays_loaded() {
+    let world = pad(&[("pad", PAD)]);
+    world.install("pad", true).0.unwrap();
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.loaded.insert("hid_pad".to_owned(), 0);
+        state.bound.insert("hid_pad".to_owned(), 1);
+    }
+
+    let (result, events) = world.remove("pad");
+
+    result.unwrap();
+    assert!(world.host.state.borrow().loaded.contains_key("hid_pad"));
+    assert!(
+        notes(&events)
+            .contains(&"hid-pad stays loaded until the machine restarts, as something uses it now.".to_owned()),
+        "{:#?}",
+        events.0
+    );
+}
+
+#[test]
+fn a_version_bump_never_unloads_the_module_it_replaced() {
+    let world = pad(&[("pad", PAD)]);
+    world.install("pad", true).0.unwrap();
+    world.host.state.borrow_mut().loaded.insert("hid_pad".to_owned(), 0);
+    let tarball = world.host.state.borrow().downloads["https://example.com/pad-1.0.tar.gz"]
+        .1
+        .clone();
+    world.host.state.borrow_mut().downloads.insert(
+        "https://example.com/pad-1.1.tar.gz".to_owned(),
+        ("3".repeat(64), tarball),
+    );
+    world.write_app(
+        "pad",
+        &PAD.replace("version = \"1.0\"", "version = \"1.1\"")
+            .replace("pad-1.0.tar.gz", "pad-1.1.tar.gz")
+            .replace(&"2".repeat(64), &"3".repeat(64)),
+    );
+
+    world.install("pad", true).0.unwrap();
+
+    let state = world.host.state.borrow();
+    assert!(state.loaded.contains_key("hid_pad"), "{:#?}", state.log);
+    assert_eq!(state.dkms.keys().collect::<Vec<_>>(), ["hid-pad/1.1"]);
+}
+
+#[test]
+fn a_kernel_the_conf_leaves_out_is_skipped_with_a_note() {
+    let world = pad(&[("pad", PAD)]);
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.kernels.insert("5.10.0-old".to_owned());
+        state.excluded.insert("5.10.0-old".to_owned());
+    }
+
+    let (result, events) = world.install("pad", true);
+
+    result.unwrap();
+    assert!(signed(&world, KERNEL));
+    assert!(
+        notes(&events)
+            .contains(&"hid-pad isn't built for 5.10.0-old: its dkms.conf leaves that kernel out.".to_owned()),
+        "{:#?}",
+        events.0
+    );
+}

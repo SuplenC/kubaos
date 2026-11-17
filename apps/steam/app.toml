@@ -6,7 +6,9 @@
 # repository with two keyrings, failing every apt run: the second step puts a steam-stable.list
 # of comments there first, which dpkg keeps as it finds it, writing Valve's beside it as
 # steam-stable.list.dpkg-dist, a name apt never reads. A Steam installed by hand has Valve's own:
-# it stays, and repo setup turns its lines off.
+# it stays, and repo setup turns its lines off. Its removal purges the packages, so dpkg forgets
+# the conffiles too: a Steam installed by hand later gets Valve's source as a new install does,
+# rather than dpkg keeping the file KubaOS took away taken away.
 # The client's libraries are the two steam-libs packages: steam-launcher only recommends them,
 # and an install takes no recommendations. steam-libs-i386 brings the 32-bit OpenGL drivers
 # (libgl1 and libgl1-mesa-dri, as i386 packages); Vulkan, which Proton draws every Windows game
@@ -51,6 +53,7 @@ name = "Install Steam"
 kind = "apt"
 repo = "steam"
 arch = "amd64"
+purge = true
 packages = [
   "steam-launcher",
   "steam-libs-amd64",

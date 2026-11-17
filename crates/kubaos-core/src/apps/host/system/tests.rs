@@ -1,16 +1,21 @@
 use std::fs;
 use std::path::Path;
 
+use super::Named;
 use super::SystemHost;
+use super::bound_devices;
 use super::candidate;
 use super::certificate_serial;
 use super::dkms_status;
 use super::enrolment;
+use super::important;
 use super::known_of_arch;
 use super::mok_certificate;
+use super::mok_source_args;
 use super::simulation;
 use crate::apps::host::Downgrade;
 use crate::apps::host::Host;
+use crate::apps::host::Known;
 use crate::sandbox;
 use crate::sandbox::Sandbox;
 
@@ -123,7 +128,14 @@ fn an_architectures_packages_are_those_dpkg_has_installed_or_configured() {
 
     let known = known_of_arch(shown, "i386", "amd64");
 
-    assert_eq!(known, ["libc6:i386".to_owned(), "libgl1:i386".to_owned()].into());
+    assert_eq!(
+        known,
+        [
+            ("libc6:i386".to_owned(), Known::Installed),
+            ("libgl1:i386".to_owned(), Known::ConfigFiles)
+        ]
+        .into()
+    );
 }
 
 #[test]
@@ -149,12 +161,12 @@ fn the_mok_is_the_certificate_dkms_configuration_names_last() {
     let ours = "mok_certificate=\"/var/lib/shim-signed/mok/MOK.der\"\n";
     let variable = "mok_certificate=/keys/$kernelver.der\n";
 
-    assert_eq!(mok_certificate([framework].into_iter()), None);
+    assert_eq!(mok_certificate([framework].into_iter()), Named::Nothing);
     assert_eq!(
         mok_certificate([framework, ours].into_iter()),
-        Some(Path::new("/var/lib/shim-signed/mok/MOK.der").to_path_buf())
+        Named::Path(Path::new("/var/lib/shim-signed/mok/MOK.der").to_path_buf())
     );
-    assert_eq!(mok_certificate([ours, variable].into_iter()), None);
+    assert_eq!(mok_certificate([ours, variable].into_iter()), Named::Variable);
 }
 
 #[test]
@@ -174,4 +186,53 @@ fn mokutil_says_whether_the_key_is_enrolled_queued_or_neither() {
     );
     assert_eq!(enrolment("MOK.der is not enrolled\n"), SecureBoot::NotEnrolled);
     assert_eq!(enrolment("Failed to read MokListRT\n"), SecureBoot::Unknown);
+}
+
+#[test]
+fn a_certificate_named_through_kernelver_is_the_one_dkms_works_out_for_the_kernel() {
+    let dir = tempfile::tempdir().unwrap();
+    let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "kuba");
+    let framework = dir.path().join("framework.conf");
+    let more = dir.path().join("signing.conf");
+    fs::write(&framework, "mok_certificate=/var/lib/dkms/mok.pub\n").unwrap();
+    fs::write(&more, "mok_certificate=\"/keys/$kernelver/$arch.der\"\n").unwrap();
+
+    let out = sandbox
+        .command("bash")
+        .args(mok_source_args(&[framework, more], "7.0.0-43-generic", "x86_64"))
+        .output()
+        .unwrap();
+
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "/keys/7.0.0-43-generic/x86_64.der"
+    );
+}
+
+#[test]
+fn an_essential_or_protected_package_is_important_on_any_architecture() {
+    let shown = "libgcc-s1\ti386\t\tyes\nlibc6\ti386\t\t\nbash\tamd64\tyes\t\nzenity\tamd64\t\t\n";
+
+    assert_eq!(
+        important(shown, "amd64"),
+        ["bash".to_owned(), "libgcc-s1:i386".to_owned()].into()
+    );
+}
+
+#[test]
+fn a_modules_users_count_the_devices_bound_to_its_drivers() {
+    let dir = tempfile::tempdir().unwrap();
+    let module = dir.path().join("module/hid_xpadneo");
+    let driver = dir.path().join("bus/hid/drivers/xpadneo");
+    fs::create_dir_all(module.join("drivers")).unwrap();
+    fs::create_dir_all(&driver).unwrap();
+    std::os::unix::fs::symlink(&driver, module.join("drivers/hid:xpadneo")).unwrap();
+    std::os::unix::fs::symlink(&module, driver.join("module")).unwrap();
+    fs::write(driver.join("bind"), "").unwrap();
+    assert_eq!(bound_devices(&module), 0);
+
+    std::os::unix::fs::symlink(dir.path(), driver.join("0005:045E:0B13.0001")).unwrap();
+
+    assert_eq!(bound_devices(&module), 1);
 }

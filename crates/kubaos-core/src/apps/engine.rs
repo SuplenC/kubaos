@@ -369,17 +369,7 @@ impl<'h> Keeper<'h> {
             && !windows
             && !look.done
         {
-            if old.as_ref().is_none_or(|e| e.state == State::Skipped) {
-                journal.put(Entry {
-                    step,
-                    state: State::Skipped,
-                    claims: Vec::new(),
-                    prior: journal::Prior::default(),
-                    action: action.clone(),
-                    replaced: None,
-                });
-                journal.save(&self.journals).map_err(StepError::Journal)?;
-            }
+            self.skip(&mut journal, step, &action, old.as_ref())?;
             return Ok(Outcome::Skipped { says: says.clone() });
         }
         let (claims, replaced) = carry(old.as_ref(), &look);
@@ -426,7 +416,7 @@ impl<'h> Keeper<'h> {
         journal.save(&self.journals).map_err(StepError::Journal)?;
         let journals = &self.journals;
         let action = entry.action.clone();
-        perform::apply(&action, &mut *self.host, &look, &mut |claims| {
+        let note = perform::apply(&action, &mut *self.host, &look, &mut |claims| {
             for claim in claims {
                 if !entry.claims.contains(claim) {
                     entry.claims.push(claim.clone());
@@ -436,12 +426,30 @@ impl<'h> Keeper<'h> {
             journal.save(journals)
         })
         .map_err(StepError::Perform)?;
+        self.notes.extend(note);
         entry.state = State::Done;
         journal.put(entry);
         journal.save(&self.journals).map_err(StepError::Journal)?;
         self.finish_replaced(&mut journal, id, step)?;
         self.say(&journal, step);
         Ok(Outcome::Done)
+    }
+
+    /// Records step `step`, `action`, which opens a window in a run that may not, as skipped,
+    /// unless its entry `old` holds more.
+    fn skip(&self, journal: &mut Journal, step: usize, action: &Action, old: Option<&Entry>) -> Result<(), StepError> {
+        if old.is_none_or(|e| e.state == State::Skipped) {
+            journal.put(Entry {
+                step,
+                state: State::Skipped,
+                claims: Vec::new(),
+                prior: journal::Prior::default(),
+                action: action.clone(),
+                replaced: None,
+            });
+            journal.save(&self.journals).map_err(StepError::Journal)?;
+        }
+        Ok(())
     }
 
     /// Keeps what the user has to know of step `step` of `journal`, which stands, for the run's
@@ -542,7 +550,7 @@ impl<'h> Keeper<'h> {
         let Some(replaced) = entry.replaced.take() else {
             return Ok(());
         };
-        self.undo_entry(id, &replaced, &mut Vec::new())?;
+        self.undo_entry(id, &replaced, &mut Vec::new(), true)?;
         journal.put(entry);
         journal.save(&self.journals).map_err(StepError::Journal)
     }
@@ -750,14 +758,20 @@ impl<'h> Keeper<'h> {
             ..entry.clone()
         });
         journal.save(&self.journals).map_err(StepError::Journal)?;
-        self.undo_entry(id, entry, handed)?;
+        self.undo_entry(id, entry, handed, false)?;
         journal.drop_step(step);
         journal.save(&self.journals).map_err(StepError::Journal)
     }
 
     /// Undoes `entry` of the app `id`; a claim another app holds unowned passes to it instead,
     /// once the undo of the rest went through, each one handed over added to `handed`.
-    fn undo_entry(&mut self, id: &str, entry: &Entry, handed: &mut Vec<Handed>) -> Result<(), StepError> {
+    fn undo_entry(
+        &mut self,
+        id: &str,
+        entry: &Entry,
+        handed: &mut Vec<Handed>,
+        replacing: bool,
+    ) -> Result<(), StepError> {
         // A found step owns nothing, unless another app's removal has handed it a claim since.
         if entry.state != State::Skipped {
             let owners = Owners::load(&[&self.journals]).map_err(StepError::Journal)?;
@@ -776,8 +790,16 @@ impl<'h> Keeper<'h> {
             }
             // HAZARD: handed over before an undo that then fails, a claim would be owned by both
             // apps, and the first to go would take it from the other.
-            let note =
-                perform::undo(&entry.action, &mut *self.host, &mine, &entry.prior).map_err(StepError::Perform)?;
+            let brought = match entry.action.kind {
+                Kind::Architecture { .. } => self.brought(id)?,
+                _ => Vec::new(),
+            };
+            let undoing = perform::Undoing {
+                brought: &brought,
+                replacing,
+            };
+            let note = perform::undo(&entry.action, &mut *self.host, &mine, &entry.prior, undoing)
+                .map_err(StepError::Perform)?;
             self.notes.extend(note);
             for (holder, held) in passing {
                 if let Some(prior) =
@@ -792,9 +814,41 @@ impl<'h> Keeper<'h> {
             }
         }
         match &entry.replaced {
-            Some(replaced) => self.undo_entry(id, replaced, handed),
+            Some(replaced) => self.undo_entry(id, replaced, handed, true),
             None => Ok(()),
         }
+    }
+
+    /// The packages the app `id`'s steps of this side installed or pulled in, by their owned
+    /// `package:` and `dep:` claims: those its journal holds, and those of the steps this run
+    /// undid, but the claims those undos handed to other apps.
+    fn brought(&self, id: &str) -> Result<Vec<String>, StepError> {
+        let journal = Journal::read(&self.journals, id).map_err(StepError::Journal)?;
+        let handed: Vec<&str> = self
+            .undone
+            .iter()
+            .filter(|u| u.app == id)
+            .flat_map(|u| &u.handed)
+            .map(|h| h.claim.as_str())
+            .collect();
+        let entries = journal
+            .iter()
+            .flat_map(|j| &j.entries)
+            .chain(self.undone.iter().filter(|u| u.app == id).map(|u| &u.entry));
+        let mut brought = Vec::new();
+        for claim in entries.flat_map(|e| &e.claims).filter(|c| c.owned) {
+            let Some(package) = claim
+                .claim
+                .strip_prefix("package:")
+                .or_else(|| claim.claim.strip_prefix("dep:"))
+            else {
+                continue;
+            };
+            if !handed.contains(&format!("package:{package}").as_str()) && !brought.iter().any(|b| b == package) {
+                brought.push(package.to_owned());
+            }
+        }
+        Ok(brought)
     }
 }
 
