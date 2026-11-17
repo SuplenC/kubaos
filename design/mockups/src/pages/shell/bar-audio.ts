@@ -2,13 +2,15 @@
 // draw them, with the players Menu that now playing's icon opens. The status pill beside them has
 // lost its volume symbol to the mute pill.
 
-import { row } from "../../lib/layout.ts";
+import { hint } from "../../lib/hint.ts";
+import { row, stack } from "../../lib/layout.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { HEADSET, shot as panelShot } from "./audio-parts.ts";
 import {
   type CirclePinned,
   LONG_PLAYER,
+  HINTS,
   mutePill,
   type MuteOptions,
   nowPlaying,
@@ -24,6 +26,18 @@ type State = "rest" | "lit" | "pressed" | "open";
 /** The right end of the bar from now playing on: now playing, the mute pill, the bell, status. */
 function end(mute: MuteOptions = {}, playing?: Parameters<typeof nowPlaying>[0] | null): HTMLElement {
   return row("s8", "centre", ...(playing === null ? [] : [nowPlaying(playing ?? {})]), mutePill(mute), bellPill(), statusPill());
+}
+
+/**
+ * The bar's end with a mute circle pinned lit, over a room as tall as its Hint and the gap to it, so
+ * the bubble floating under the circle stays inside the sample. The room is a copy of the bubble, unseen.
+ */
+function hinted(mute: MuteOptions, words: string): HTMLElement {
+  const room = hint(words);
+  room.style.visibility = "hidden";
+  room.setAttribute("aria-hidden", "true");
+  for (const each of [room, ...room.querySelectorAll<HTMLElement | SVGElement>("[data-probe]")]) delete each.dataset.probe;
+  return stack("s8", "start", end(mute), room);
 }
 
 /**
@@ -147,6 +161,8 @@ export default page<State>({
     { name: "An app recording", for: "the microphone's dot on the mic", sample: () => mutePill({ input: { recording: true } }) },
     { name: "Recording, mic muted", for: "crossed; no dot, nothing is heard", sample: () => mutePill({ input: { recording: true, muted: true } }) },
     { name: "Output low", for: "its symbol by the level", sample: () => mutePill({ level: 0.2 }) },
+    { name: "Volume's hint", for: "lit: where the output stands", sample: () => hinted({ pinned: { side: "output", state: "lit" } }, HINTS.volume("62%")) },
+    { name: "Mic muted, its hint", for: "lit: the mic's side, muted", sample: () => hinted({ input: { muted: true }, pinned: { side: "input", state: "lit" } }, HINTS.micMuted) },
     { name: "Playing", for: "pause on the accent's fill", sample: () => nowPlaying() },
     { name: "Paused", for: "play on the accent's fill", sample: () => nowPlaying({ playing: false }) },
     { name: "Beside status", for: "now playing, mute, bell, status", sample: () => end({ input: { recording: true } }) },
@@ -173,7 +189,7 @@ export default page<State>({
     ]),
     looks: {
       rest: "symbols on the pill, no fill but play's",
-      lit: "pointer: the circle's state layer at `opacity.hover`",
+      lit: "pointer: the state layer at `opacity.hover`; a mute circle's Hint",
       pressed: "the circle at `opacity.press`",
       open: "right-click: the Audio panel; the icon: its Menu",
     },

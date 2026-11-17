@@ -1793,6 +1793,11 @@
   width: 100%;
   padding: 0 var(--end);
   border-radius: inherit;
+}
+
+/* Its content is cut at its edge only while its width is eased: at rest it cuts nothing, so the
+   hint of a press target inside it (an audio pill's circle) floats whole under it. */
+.k-pill[style*="--from"] > .k-pill-clip {
   overflow: clip;
 }
 

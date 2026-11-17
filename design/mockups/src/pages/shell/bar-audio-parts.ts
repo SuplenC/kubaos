@@ -3,12 +3,15 @@
 // level, a right-click the Audio panel) and now playing (the active player's icon, which opens the
 // players Menu under it, then previous, play or pause on the accent's fill, next). Each press target
 // is a circle a chip tall in a pill `space.s4` in, `space.s4` apart, lit by its state layer as the
-// tray's circles are; the pill itself takes no tube. The data is the shots' stand-ins'.
+// tray's circles are; the pill itself takes no tube. Each of the mute pill's circles says where its
+// side stands in a Hint under it while it is lit, as the bar's pills do. The data is the shots'
+// stand-ins'.
 
 import "./bar.css";
 import { badgedIcon } from "../../lib/badge.ts";
 import { icon } from "../../lib/icon.ts";
 import { smallInitial } from "../../lib/icon-tile.ts";
+import { withHint } from "../../lib/hint.ts";
 import { type MenuEntry, menu } from "../../lib/menu.ts";
 import { pill } from "../../lib/pill.ts";
 import { popover } from "../../lib/tooltip.ts";
@@ -25,6 +28,8 @@ export interface CircleOptions {
   readonly onPress?: () => void;
   /** Its accessible name: what a press does. */
   readonly label: string;
+  /** What it stands at, in a Hint under it while it is lit: "Volume 62%". */
+  readonly hint?: string;
 }
 
 /** One press target in an audio pill: `content` centred in a circle a chip tall, with its state layer. */
@@ -37,7 +42,7 @@ export function pillCircle(content: Element, options: CircleOptions): HTMLElemen
   if (options.pinned) item.dataset.pinned = options.pinned;
   item.append(content);
   if (options.onPress) item.addEventListener("click", options.onPress);
-  return item;
+  return options.hint ? withHint(item, options.hint) : item;
 }
 
 /** A symbol at the bar's 16 in a colour role. */
@@ -66,6 +71,8 @@ export interface MuteOptions {
   readonly input?: Side;
   /** The output's level 0 to 1, which picks its symbol. */
   readonly level?: number;
+  /** The mic's level 0 to 1, which its hint says. */
+  readonly inputLevel?: number;
   /** Given way in the narrowest bar: the mic's circle alone, the output left to its keys and the OSD. */
   readonly micOnly?: boolean;
   /** A circle pinned: which side, and how. */
@@ -73,6 +80,17 @@ export interface MuteOptions {
   readonly onOutput?: () => void;
   readonly onInput?: () => void;
 }
+
+// The locale's percentage: a value is never put together from a number and a sign by hand.
+const PERCENT = new Intl.NumberFormat("en-GB", { style: "percent", maximumFractionDigits: 0 });
+
+/** What each side's circle says in its Hint, a message per state, the level its placeholder. */
+export const HINTS = {
+  volume: (level: string) => `Volume ${level}`,
+  volumeMuted: "Volume muted",
+  mic: (level: string) => `Mic ${level}`,
+  micMuted: "Mic muted",
+} as const;
 
 /** The output's symbol for `level`, as the OSD and the sliders pick it. */
 export function volumeIcon(level: number, muted = false): string {
@@ -91,9 +109,11 @@ export function mutePill(options: MuteOptions = {}): HTMLElement {
   const dotted = (input.recording ?? false) && !(input.muted ?? false);
   const inGlyph = badgedIcon({ name: input.muted ? "mic_off" : "mic", color: input.muted ? "error" : "on_surface_variant", badged: dotted, meaning: "microphone" });
   const pinnedOf = (side: "output" | "input") => (options.pinned?.side === side ? { pinned: options.pinned.state } : {});
+  const outHint = output.muted ? HINTS.volumeMuted : HINTS.volume(PERCENT.format(level));
+  const inHint = input.muted ? HINTS.micMuted : HINTS.mic(PERCENT.format(options.inputLevel ?? 0.8));
   const circles = [
-    pillCircle(outGlyph, { label: output.muted ? "Unmute the output" : "Mute the output", ...pinnedOf("output"), ...(options.onOutput ? { onPress: options.onOutput } : {}) }),
-    pillCircle(inGlyph, { label: input.muted ? "Unmute the mic" : "Mute the mic", ...pinnedOf("input"), ...(options.onInput ? { onPress: options.onInput } : {}) }),
+    pillCircle(outGlyph, { label: output.muted ? "Unmute the output" : "Mute the output", hint: outHint, ...pinnedOf("output"), ...(options.onOutput ? { onPress: options.onOutput } : {}) }),
+    pillCircle(inGlyph, { label: input.muted ? "Unmute the mic" : "Mute the mic", hint: inHint, ...pinnedOf("input"), ...(options.onInput ? { onPress: options.onInput } : {}) }),
   ];
   const made = circlesPill(options.micOnly ? circles.slice(1) : circles);
   made.classList.add("shell-mute-pill");
