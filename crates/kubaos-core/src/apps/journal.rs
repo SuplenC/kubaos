@@ -530,31 +530,49 @@ pub fn give_back(dir: &Path, holder: &str, claim: &str, prior: &Prior) -> Result
 /// a release before it would fail to read a journal with one.
 const ROLLED_BACK_MARK: &str = "-removal-rolled-back";
 
-/// Why the app `id`'s last removal was rolled back, by the mark beside the user journals in
-/// `dir`: the step it couldn't undo and the error. None when it wasn't, or the mark can't be read.
-pub fn rolled_back(dir: &Path, id: &str) -> Option<String> {
-    fs::read_to_string(dir.join(format!("{id}{ROLLED_BACK_MARK}")))
-        .ok()
-        .map(|text| text.trim_end().to_owned())
+/// An app's last removal, which couldn't undo a step and was rolled back.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct RolledBack {
+    /// Every step it undid stands again. Not so while the rollback runs, or when a step couldn't
+    /// be done again: the next update finishes it.
+    pub whole: bool,
+    /// The step it couldn't undo, and why.
+    pub why: String,
 }
 
-/// Marks beside the user journals in `dir` that the app `id`'s last removal was rolled back, and
-/// `why`; `None` takes the mark away.
+/// The first line of a mark of a rollback that put everything back; any other is one that
+/// didn't, or is still running.
+const WHOLE: &str = "whole";
+
+/// The app `id`'s last removal, rolled back, by the mark beside the user journals in `dir`. None
+/// when it wasn't, or the mark can't be read.
+pub fn rolled_back(dir: &Path, id: &str) -> Option<RolledBack> {
+    let text = fs::read_to_string(dir.join(format!("{id}{ROLLED_BACK_MARK}"))).ok()?;
+    let (first, why) = text.split_once('\n').unwrap_or((text.as_str(), ""));
+    Some(RolledBack {
+        whole: first == WHOLE,
+        why: why.trim_end().to_owned(),
+    })
+}
+
+/// Marks beside the user journals in `dir` that the app `id`'s last removal was rolled back, as
+/// `rolled`; `None` takes the mark away.
 ///
 /// # Errors
 ///
 /// [`JournalError::Write`] when the mark can't be written or taken away.
-pub fn mark_rolled_back(dir: &Path, id: &str, why: Option<&str>) -> Result<(), JournalError> {
+pub fn mark_rolled_back(dir: &Path, id: &str, rolled: Option<&RolledBack>) -> Result<(), JournalError> {
     let path = dir.join(format!("{id}{ROLLED_BACK_MARK}"));
     let write = |source| JournalError::Write {
         path: path.clone(),
         source,
     };
-    match why {
-        Some(why) => {
+    match rolled {
+        Some(rolled) => {
             fs::create_dir_all(dir).map_err(write)?;
             let tmp = dir.join(format!(".{id}{ROLLED_BACK_MARK}.new"));
-            write_new(&tmp, format!("{why}\n").as_bytes()).map_err(write)?;
+            let first = if rolled.whole { WHOLE } else { "part" };
+            write_new(&tmp, format!("{first}\n{}\n", rolled.why).as_bytes()).map_err(write)?;
             fs::rename(&tmp, &path).map_err(write)
         }
         None => match fs::remove_file(&path) {

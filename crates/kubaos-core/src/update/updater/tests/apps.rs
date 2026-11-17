@@ -423,8 +423,8 @@ fn a_removal_rolled_back_keeps_its_app_picked_and_one_removed_before_it_stays_ou
     assert_eq!(desk.state, AppState::Installed);
     assert!(
         desk.removal_rolled_back
-            .as_deref()
-            .is_some_and(|why| why.starts_with("Install Desk: ")),
+            .as_ref()
+            .is_some_and(|m| m.whole && m.why.starts_with("Install Desk: ")),
         "{desk:?}"
     );
 }

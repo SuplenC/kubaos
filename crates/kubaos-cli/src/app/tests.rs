@@ -5,12 +5,17 @@ use kubaos_core::apps::Catalog;
 use kubaos_core::apps::Picks;
 use kubaos_core::apps::Status;
 use kubaos_core::apps::folder::Category;
+use kubaos_core::apps::journal::RolledBack;
 use kubaos_core::apps::status::AppStatus;
 use kubaos_core::apps::status::SetupInfo;
 use kubaos_core::apps::status::listing;
 
+use super::About;
+use super::Owned;
+use super::Showing;
 use super::list_markdown;
 use super::list_text;
+use super::show_text;
 use super::table;
 
 fn app(id: &str, name: &str, picked: bool, state: AppState, version: Option<&str>) -> AppStatus {
@@ -35,7 +40,10 @@ fn app(id: &str, name: &str, picked: bool, state: AppState, version: Option<&str
 #[test]
 fn an_app_whose_removal_was_rolled_back_says_so_under_its_line() {
     let mut desk = app("desk", "Desk", true, AppState::Installed, Some("1.0"));
-    desk.removal_rolled_back = Some("Install Desk: apt is busy".into());
+    desk.removal_rolled_back = Some(RolledBack {
+        whole: true,
+        why: "Install Desk: apt is busy".into(),
+    });
     let status = Status {
         arch: "amd64".into(),
         apps: vec![desk],
@@ -257,4 +265,81 @@ fn a_catalog_dir_is_only_for_the_markdown_table() {
     assert!(parse(&["app", "list", "--catalog", "apps"]).is_err());
     assert!(parse(&["app", "list", "--json", "--catalog", "apps"]).is_err());
     assert!(parse(&["app", "list", "--markdown", "--catalog", "apps"]).is_ok());
+}
+
+/// Desk, installed, as `kubaos app show` has it, its last removal rolled back as `rolled`.
+fn desk_shown(rolled: RolledBack) -> String {
+    let tags = vec!["work".to_owned()];
+    show_text(&Showing {
+        about: About {
+            id: "desk",
+            name: "Desk",
+            category: "office",
+            tags: &tags,
+            summary: "A desk",
+            description: "A desktop app.",
+            description_from: "https://example.com/desk",
+        },
+        setup: None,
+        complete: rolled.whole,
+        brought_by: Vec::new(),
+        removal_rolled_back: Some(rolled),
+        steps: vec![Owned {
+            step: 1,
+            name: "Install Desk".into(),
+            side: "root",
+            state: "done".into(),
+            owns: vec!["package:desk".into()],
+            found: Vec::new(),
+        }],
+    })
+}
+
+#[test]
+fn show_says_a_rolled_back_removal_left_everything_only_when_it_did() {
+    let whole = desk_shown(RolledBack {
+        whole: true,
+        why: "Install Desk: apt is busy".into(),
+    });
+    let part = desk_shown(RolledBack {
+        whole: false,
+        why: "Install Desk: apt is busy".into(),
+    });
+
+    assert!(
+        whole.contains(
+            "\nIts last removal was rolled back, so it's all still here. What stopped it: Install Desk: apt is busy\n"
+        ),
+        "{whole}"
+    );
+    assert!(
+        part.contains(
+            "\nIts last removal was rolled back only in part: some steps aren't back yet, and kubaos update puts \
+             them back. What stopped it: Install Desk: apt is busy\n"
+        ),
+        "{part}"
+    );
+    assert!(!part.contains("all still here"), "{part}");
+}
+
+#[test]
+fn the_status_says_a_rollback_in_part_is_for_the_next_update_to_finish() {
+    let mut desk = app("desk", "Desk", true, AppState::Missing, None);
+    desk.removal_rolled_back = Some(RolledBack {
+        whole: false,
+        why: "Install Desk: apt is busy".into(),
+    });
+    let status = Status {
+        arch: "amd64".into(),
+        apps: vec![desk],
+        unknown: Vec::new(),
+    };
+
+    assert!(
+        table(&status).contains(
+            "  its last removal was rolled back in part, kubaos update finishes it: Install Desk: apt is busy\n"
+        ),
+        "{}",
+        table(&status)
+    );
 }

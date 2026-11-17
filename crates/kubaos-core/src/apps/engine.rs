@@ -563,10 +563,13 @@ impl<'h> Keeper<'h> {
                 .map_err(StepError::Journal)?
                 .unwrap_or_else(|| Journal::new(id, setup));
             if journal.entry(step).is_none() {
-                let state = if undone.entry.state == State::Skipped {
-                    State::Skipped
-                } else {
-                    State::Undoing
+                // Being undone, the step done again keeps what it owned; one that owned nothing
+                // keeps its state, so a step KubaOS did stays done.
+                let owned = undone.entry.claims.iter().any(|c| c.owned);
+                let state = match undone.entry.state {
+                    State::Skipped => State::Skipped,
+                    _ if owned => State::Undoing,
+                    state => state,
                 };
                 journal.put(Entry { state, ..undone.entry });
                 journal.save(&self.journals).map_err(StepError::Journal)?;
@@ -1020,7 +1023,7 @@ impl<'a> Engine<'a> {
         journal.setup = setup.map(str::to_owned);
         journal.complete = true;
         journal.save(self.user.journals()).map_err(EngineError::Journal)?;
-        journal::mark_rolled_back(self.user.journals(), id, None).map_err(EngineError::Journal)?;
+        self.forget_rollback(id);
         Ok(finished)
     }
 
@@ -1144,6 +1147,7 @@ impl<'a> Engine<'a> {
         let user_journal = Journal::read(self.user.journals(), id).map_err(EngineError::Journal)?;
         let root_journal = Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?;
         if user_journal.is_none() && root_journal.is_none() {
+            self.forget_rollback(id);
             return Ok(Finished::default());
         }
         let owns = [&user_journal, &root_journal]
@@ -1155,6 +1159,7 @@ impl<'a> Engine<'a> {
         let root_records = root_journal.as_ref().is_some_and(|j| !j.entries.is_empty());
         if !owns && !root_records {
             Journal::forget(self.user.journals(), id).map_err(EngineError::Journal)?;
+            self.forget_rollback(id);
             return Ok(Finished {
                 left: true,
                 ..Finished::default()
@@ -1215,7 +1220,7 @@ impl<'a> Engine<'a> {
             total: count,
         });
         Journal::forget(self.user.journals(), id).map_err(EngineError::Journal)?;
-        journal::mark_rolled_back(self.user.journals(), id, None).map_err(EngineError::Journal)?;
+        self.forget_rollback(id);
         finished.left = !owns;
         if let Some(folder) = &folder {
             let picked = setup.as_deref().and_then(|s| folder.setup(s));
@@ -1242,8 +1247,12 @@ impl<'a> Engine<'a> {
         name: String,
         source: StepError,
     ) -> EngineError {
-        let why = format!("{name}: {}", crate::update::event::chain(&source));
-        let mut recorded = journal::mark_rolled_back(self.user.journals(), id, Some(&why)).is_ok();
+        let mut rolled = journal::RolledBack {
+            whole: false,
+            why: format!("{name}: {}", crate::update::event::chain(&source)),
+        };
+        // Marked as not whole until every step stands, so a run stopped during it says so.
+        let mut recorded = journal::mark_rolled_back(self.user.journals(), id, Some(&rolled)).is_ok();
         self.sink.event(&UpdateEvent::Note {
             text: format!("{name} couldn't be undone, so I'm putting back what the removal took."),
         });
@@ -1304,6 +1313,10 @@ impl<'a> Engine<'a> {
             journal.save(self.user.journals())
         });
         recorded &= header.is_ok();
+        if whole {
+            rolled.whole = true;
+            recorded &= journal::mark_rolled_back(self.user.journals(), id, Some(&rolled)).is_ok();
+        }
         if !recorded {
             self.warn(format!(
                 "the rollback of {id}'s removal couldn't be recorded in its journal: kubaos app show {id} may not say it"
@@ -1314,6 +1327,17 @@ impl<'a> Engine<'a> {
             EngineError::RemovalRolledBack { name, source }
         } else {
             EngineError::RemovalHalfRolledBack { name, source }
+        }
+    }
+
+    /// Takes away the mark that the app `id`'s last removal was rolled back, once an install or a
+    /// removal went through; one that can't be is a warning, as the run itself is done.
+    fn forget_rollback(&mut self, id: &str) {
+        if let Err(e) = journal::mark_rolled_back(self.user.journals(), id, None) {
+            self.warn(format!(
+                "the mark that {id}'s last removal was rolled back couldn't be taken away: {}",
+                crate::update::event::chain(&e)
+            ));
         }
     }
 
