@@ -344,7 +344,7 @@ impl<'h> Keeper<'h> {
         journal.setup = setup.map(str::to_owned);
         let mut old = journal.entry(step).cloned();
         if let Some(entry) = old.take_if(|e| !e.action.same_thing(&action)) {
-            self.undo_journaled(&mut journal, id, &entry, &mut Vec::new())?;
+            self.set_aside(&mut journal, id, &entry)?;
         }
         let look = perform::look(&action, &mut *self.host, recorded(old.as_ref())).map_err(StepError::Perform)?;
         if let Kind::Run { window: Some(says), .. } = &action.kind
@@ -602,6 +602,19 @@ impl<'h> Keeper<'h> {
             .map_err(|e| StepError::Perform(PerformError::Host(e)))
     }
 
+    /// Takes `entry` out of `journal` for another thing its step now holds: undone, or, for a `run`
+    /// that only undoes, forgotten.
+    fn set_aside(&mut self, journal: &mut Journal, id: &str, entry: &Entry) -> Result<(), StepError> {
+        // HAZARD: a `run` that only undoes is forgotten, never undone, here: the app stays, and its
+        // undo (Proton VPN's kill switch turned off) is for a removal. The folder's own such step,
+        // at whatever number, records it again.
+        if entry.action.removal_only() {
+            journal.drop_step(entry.step);
+            return journal.save(&self.journals).map_err(StepError::Journal);
+        }
+        self.undo_journaled(journal, id, entry, &mut Vec::new())
+    }
+
     /// Marks `entry` as being undone, undoes it, and takes it out of `journal`; a run stopped
     /// during the undo leaves it marked, never looking settled.
     fn undo_journaled(
@@ -740,11 +753,14 @@ fn adopted(action: &Action, look: perform::Look, lingered_off: bool) -> (Vec<Cla
 
 /// What the step's entry `old` says its path holds: what its action put there, when the app owns
 /// the path and the step is done; unknown, when a run stopped during it. A `run` that only undoes
-/// has no path, and its entry, the app's, is all its check reads.
+/// has no path, and its entry is all its check reads: done and the app's, or found.
 fn recorded(old: Option<&Entry>) -> Recorded<'_> {
     let Some(old) = old else {
         return Recorded::Nothing;
     };
+    if old.action.removal_only() && old.state == State::Found {
+        return Recorded::Found;
+    }
     let undoes = old.action.removal_only() && old.claims.iter().any(|c| c.owned && c.claim == "run");
     if !undoes && !old.claims.iter().any(|c| c.owned && c.claim.starts_with("path:")) {
         return Recorded::Nothing;
@@ -892,6 +908,8 @@ struct Undoable {
     name: String,
     kind_is_nix: bool,
     kind_is_run: bool,
+    /// A `run` that only undoes, which a rollback that keeps the app leaves recorded.
+    removal_only: bool,
 }
 
 impl<'a> Engine<'a> {
@@ -986,6 +1004,7 @@ impl<'a> Engine<'a> {
                 name: action.name.clone(),
                 kind_is_nix: matches!(action.kind, Kind::Nix { .. }),
                 kind_is_run: matches!(action.kind, Kind::Run { .. }),
+                removal_only: action.removal_only(),
             };
             let new = !journaled.contains(&(undoable.side, step));
             match outcome {
@@ -1584,6 +1603,11 @@ impl<'a> Engine<'a> {
     /// Undoes `undoables`, newest first, reporting each; one that fails is a warning, and the rest
     /// still go. With `forget`, the journals go too: the app wasn't installed when the run began.
     fn undo_all(&mut self, id: &str, total: usize, mut undoables: Vec<Undoable>, forget: bool) {
+        // HAZARD: a rollback that keeps the app keeps its `run` that only undoes recorded: its
+        // undo is for the app's removal, and it changed nothing to take back.
+        if !forget {
+            undoables.retain(|u| !u.removal_only);
+        }
         undoables.sort_by_key(|u| std::cmp::Reverse(u.step));
         let mut clean = true;
         for undoable in &undoables {
@@ -1632,6 +1656,7 @@ impl<'a> Engine<'a> {
                     name: e.action.name.clone(),
                     kind_is_nix: matches!(e.action.kind, Kind::Nix { .. }),
                     kind_is_run: matches!(e.action.kind, Kind::Run { .. }),
+                    removal_only: e.action.removal_only(),
                 }));
             }
         }

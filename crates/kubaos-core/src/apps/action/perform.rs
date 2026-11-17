@@ -117,6 +117,9 @@ pub enum Recorded<'a> {
     Done(&'a Action),
     /// The app's step was stopped while this action changed its path: what it holds is unknown.
     Unsettled(&'a Action),
+    /// The app's `run` that only undoes, recorded as found: the app is there by other means, and
+    /// the step owns nothing.
+    Found,
 }
 
 /// Whether the download `had` put there is the one `want` pins for `arch`: the same bytes,
@@ -459,7 +462,7 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             let holds = match recorded {
                 Recorded::Done(had) if had.path() == action.path() => same_download(had, action, host.arch()),
                 Recorded::Unsettled(had) => had.path() != action.path(),
-                Recorded::Done(_) | Recorded::Nothing => true,
+                Recorded::Done(_) | Recorded::Nothing | Recorded::Found => true,
             };
             let moved_on = *self_updates && !*in_place && !there && newer_version_there(host, &path, version);
             // A `to` naming no `@VERSION@` is the vendor's updater's to rewrite in place once it is
@@ -503,16 +506,18 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
     }
 }
 
-/// A `run`'s check: its `check` exits 0; for one with `undo` alone, its own settled entry, as the
-/// step is the app's once recorded.
+/// A `run`'s check: its `check` exits 0; for one with `undo` alone, its own settled entry. Recorded
+/// done, the step is the app's; recorded found, the app is there by other means, and the step
+/// owns nothing, as a found app's steps own nothing; not recorded, it is the app's once recorded.
 fn look_run(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Result<Look, PerformError> {
     let Kind::Run { check, .. } = &action.kind else {
         return Ok(Look::default());
     };
     if action.removal_only() {
+        let found = matches!(recorded, Recorded::Found);
         return Ok(Look {
-            done: matches!(recorded, Recorded::Done(_)),
-            claims: vec![Claim::new("run", true)],
+            done: found || matches!(recorded, Recorded::Done(_)),
+            claims: vec![Claim::new("run", !found)],
             prior: Prior::default(),
         });
     }
