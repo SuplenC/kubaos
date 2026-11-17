@@ -2,8 +2,8 @@ import QtQuick
 import QtTest
 import "../../config/quickshell/modules/menu/words.js" as Words
 
-// What a Result row's tile draws from an Item's icon: a picture, the symbol it names, its
-// Extension's symbol, or an app's initial.
+// What a Result row's tile and the detail pane draw from an Item's icon: a picture, the symbol it
+// names, its Extension's symbol, or an app's initial.
 TestCase {
     name: "MenuWords"
 
@@ -18,7 +18,6 @@ TestCase {
         compare(Words.tileGlyph(icon, "kubaos"), "");
         compare(Words.rowName(icon, "Install Claude Code"), "Claude Code");
         compare(Words.iconSource(icon, name => `theme:${name}`), "");
-        compare(Words.itemGlyph(icon, "kubaos"), "bolt", "the detail pane's big symbol: the menu's default, as the KubaOS Extension has no symbol of its own there");
     }
 
     function test_a_symbol_the_icon_names_is_drawn_and_an_empty_one_falls_back_to_the_extension_s() {
@@ -29,6 +28,6 @@ TestCase {
 
     function test_an_item_of_another_extension_keeps_its_extension_s_symbol() {
         compare(Words.tileGlyph("", "calculator"), "calculate");
-        compare(Words.itemGlyph("", "apps"), "desktop_windows", "the detail pane's big symbol");
+        compare(Words.itemGlyph("", "apps"), "desktop_windows", "an app's Extension's own symbol, which its tile never draws");
     }
 }

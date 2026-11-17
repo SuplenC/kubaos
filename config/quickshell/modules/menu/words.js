@@ -33,17 +33,17 @@ function itemGlyph(icon, extension) {
 // of the catalog with no logo and no symbol, its Item's title being "Install <name>".
 const initialPrefix = "initial:";
 
-// The symbol a Result row's tile draws, as `itemGlyph`, but none for an app that names none: a
-// desktop app, or one of the catalog whose icon is its initial. Its tile shows the initial of
-// `rowName` instead, its picture loading too.
+// The symbol a Result row's tile and the detail pane draw, as `itemGlyph`, but none for an app
+// that names none: a desktop app, or one of the catalog whose icon is its initial. Its tile, and
+// the pane's lg one, show the initial of `rowName` instead, its picture loading too.
 function tileGlyph(icon, extension) {
     if (icon.startsWith(initialPrefix) || (extension === "apps" && !icon.startsWith(symbolPrefix)))
         return "";
     return itemGlyph(icon, extension);
 }
 
-// The name a Result row's tile takes its initial from: the one an `initial:` icon carries, else
-// the Item's title, a desktop app's name.
+// The name a Result row's tile and the pane's take their initial from: the one an `initial:` icon
+// carries, else the Item's title, a desktop app's name.
 function rowName(icon, title) {
     return icon.startsWith(initialPrefix) ? icon.slice(initialPrefix.length) : title;
 }

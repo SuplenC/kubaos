@@ -65,6 +65,8 @@ export type ListRowSpec = RowTaking & {
   /** A symbol before the subtitle, `small`'s: the lock of a secured network. */
   readonly subtitleIcon?: string;
   readonly icon?: string;
+  /** On a tile: an app's name, whose initial takes the place of `icon`'s symbol, as the app names none. */
+  readonly initial?: string;
   /** The symbol on an icon tile: sm beside one line, md beside two. */
   readonly tile?: boolean;
   /** An app's own icon on the tile, `icon` its placeholder while it is missing. */
@@ -125,7 +127,7 @@ function lead(spec: ListRowSpec): Element | null {
   const two = twoLines(spec);
   if (spec.tile) {
     const tile = iconTile({
-      glyph: spec.icon,
+      ...(spec.initial === undefined ? { glyph: spec.icon } : { name: spec.initial }),
       size: two ? "Md" : "Sm",
       ...(spec.picture ? { picture: spec.picture } : {}),
       ...(spec.photo ? { photo: spec.photo } : {}),

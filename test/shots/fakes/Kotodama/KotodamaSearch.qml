@@ -161,6 +161,13 @@ ListModel {
             subtitle: "Every token and component, live",
             icon: "",
             extension: "kubaos"
+        },
+        // A desktop app whose theme has no icon for it: shown by its initial.
+        {
+            title: "Krita",
+            subtitle: "Digital painting",
+            icon: "krita",
+            extension: "apps"
         }
     ]
 

@@ -97,3 +97,4 @@ menu-pushed              menu           MenuShot    -                 pushed
 menu-form-long           menu           MenuShot    -                 form-long
 menu-actions-end         menu           MenuShot    -                 actions-end
 menu-form-scrolled       menu           MenuShot    -                 form-scrolled
+menu-initial             menu           MenuShot    -                 initial

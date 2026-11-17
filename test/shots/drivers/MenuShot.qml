@@ -14,7 +14,8 @@ import qs.modules.menu
 // with more Actions than the panel has room for), pushed (a list View pushed, held where its slide
 // starts, at full opacity), form-long (a form View with more fields than the body has room for),
 // actions-end (the same, the keys on its last Action), form-scrolled (the long form, the keys on
-// its last field).
+// its last field), initial ("krita" typed: an app with no icon, shown by its initial on its row's
+// tile and the pane's).
 QtObject {
     id: driver
 
@@ -147,7 +148,7 @@ QtObject {
         driver.menu = driver.menuComponent.createObject(null);
         driver.backdrop.createObject(driver.menu.contentItem);
         driver.capture.window = driver.menu;
-        driver.menu.show("fi");
+        driver.menu.show(driver.state === "initial" ? "krita" : "fi");
         driver.typed.start();
     }
 }

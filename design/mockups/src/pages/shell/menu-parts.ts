@@ -62,6 +62,11 @@ export interface Item {
   readonly extension: string;
   /** An app's own icon, a stand-in from the library's pictures. */
   readonly picture?: string;
+  /**
+   * The app whose initial stands for it, as `initial:<name>` names it: a catalog app with no logo
+   * and no symbol. A desktop app with no picture shows its title's.
+   */
+  readonly initial?: string;
   readonly alias?: string;
   /** Why it can't run, shown in its subtitle's place, the row dimmed. */
   readonly unavailable?: string;
@@ -115,14 +120,24 @@ const hintsOf = (index: number): readonly KeyHint[] =>
         ["⌃K", "Actions"],
       ];
 
+/**
+ * The name whose initial stands on `item`'s tile, as `words.js`'s `tileGlyph` and `rowName` pick
+ * it: an app names no symbol, so a desktop app shows its title's, its picture loading too.
+ */
+function initialOf(item: Item): string | undefined {
+  return item.initial ?? (item.extension === "apps" ? item.title : undefined);
+}
+
 /** `item` as a Result, its title's match of `typed` lit. */
 export function result(item: Item, index: number, typed = ""): Result {
   const at = typed === "" ? -1 : item.title.toLowerCase().indexOf(typed.toLowerCase());
+  const initial = initialOf(item);
   const row: ListRowSpec = {
     title: item.title,
     ...(at >= 0 ? { matched: [{ start: at, end: at + typed.length }] } : {}),
     subtitle: item.unavailable ?? item.subtitle,
     icon: glyph(item.extension),
+    ...(initial !== undefined ? { initial } : {}),
     ...(item.picture ? { picture: item.picture } : {}),
     ...(item.alias ? { detail: item.alias } : {}),
     ...(item.unavailable ? { disabled: true } : {}),
