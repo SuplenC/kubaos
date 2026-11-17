@@ -65,6 +65,20 @@ function measured(picture: string): HTMLElement {
   return stack("s12", "start", found(picture), row("s16", "start", ...MODES.map(tiles)));
 }
 
+/** Names with no picture and no symbol: one word, several, a lowercase start and another script. */
+const NAMES = ["Blender", "LM Studio", "k9s", "日本語入力"] as const;
+
+/** A tile of `size` with a picture, one with a symbol and one per name with its initial, each over its name. */
+function initials(size: TileSize): HTMLElement {
+  const named = (tile: HTMLElement, name: string) => stack("s8", "centre", tile, label(name, "small", "on_surface_variant"));
+  const tiles = () => [
+    named(iconTile({ size, picture: appIcon, name: "KubaOS" }), "KubaOS"),
+    named(iconTile({ glyph: "terminal", size }), "a symbol"),
+    ...NAMES.map((name) => named(iconTile({ name, size }), name)),
+  ];
+  return row("s16", "start", ...MODES.map((mode) => painted(settings().theme, mode, row("s16", "start", ...tiles()))));
+}
+
 type MatrixState = "rest" | "loading";
 
 const ROWS: readonly { name: string; options: TileOptions }[] = [
@@ -90,6 +104,7 @@ export default page({
     { name: "Danger", for: "a critical notification", sample: () => iconTile({ glyph: "warning", size: "Md", danger: true }) },
     ...APP_ICONS.map((app) => ({ name: app.name, for: app.for, sample: () => measured(app.picture) })),
     { name: "A photo", for: "covers the tile", sample: () => iconTile({ glyph: "notifications", size: "Md", photo }) },
+    ...TILE_SIZES.map((size) => ({ name: `Initials, ${size.toLowerCase()}`, for: "no picture and no symbol", sample: () => initials(size) })),
   ],
   sizes: nonEmpty(TILE_SIZES.map((size) => ({ name: size.toLowerCase(), for: BESIDE[size], sample: () => besideWords(size) }))),
   states: {
@@ -99,7 +114,7 @@ export default page({
       pressed: "takes no press",
       disabled: "dims with its row",
       selected: "the look is the row's",
-      empty: "always a symbol",
+      empty: "a symbol, else the name's initial",
       error: "an unreadable picture leaves the symbol",
     },
     rows: nonEmpty(ROWS.map(({ name, options }) => ({ name, cell: (state: MatrixState) => iconTile({ ...options, pending: state === "loading" }) }))),
@@ -113,6 +128,7 @@ export default page({
     text: [{ name: "The words beside it", words: NAME, sample: (words: string) => within("var(--size-panel)", besideWords("Md", {}, words)) }],
     missingPicture: [
       { name: "No picture", for: "the symbol", sample: () => iconTile({ glyph: "notifications", size: "Md" }) },
+      { name: "No picture, no symbol", for: "the name's initial", sample: () => iconTile({ name: "k9s", size: "Md" }) },
       { name: "Can't be read", for: "the symbol stays", sample: () => iconTile({ glyph: "notifications", size: "Md", picture: NOWHERE }) },
     ],
     counts: [

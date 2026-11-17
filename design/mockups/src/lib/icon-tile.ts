@@ -14,7 +14,7 @@
 
 import { icon } from "./icon.ts";
 import { probe, variant } from "./probe.ts";
-import { text } from "./text.ts";
+import { centreOnInk, text, type TypeStyle } from "./text.ts";
 import { number } from "./tokens.ts";
 
 export const TILE_SIZES = ["Sm", "Md", "Lg"] as const;
@@ -28,7 +28,10 @@ export const TILE_MEASURES: Record<TileSize, { readonly side: string; readonly i
 };
 
 export interface TileOptions {
-  readonly glyph: string;
+  /** The symbol the app or the sender names; with none, the initial of `name` takes its place. */
+  readonly glyph?: string;
+  /** An app's name, whose first character, upper-cased, stands in for a symbol it doesn't name. */
+  readonly name?: string;
   readonly size: TileSize;
   /** An app's icon: what it draws fills the tile as a plate, or sits inside it as a shape. */
   readonly picture?: string;
@@ -194,6 +197,17 @@ function appIcon(source: string, pending: boolean): HTMLImageElement {
   return picture;
 }
 
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/** The first character of `name`, upper-cased: one letter, in whatever script the name is in. */
+export function initial(name: string): string {
+  const [first] = graphemes.segment(name.trim());
+  return first ? first.segment.toUpperCase() : "";
+}
+
+/** The letter in each size's type style: the style whose symbol box is the tile's symbol's. */
+const INITIAL_STYLE = { Sm: "body_strong", Md: "subheading", Lg: "headline" } as const satisfies Record<TileSize, TypeStyle>;
+
 export function iconTile(options: TileOptions): HTMLElement {
   const { side, icon: size } = TILE_MEASURES[options.size];
   const tile = document.createElement("span");
@@ -208,9 +222,17 @@ export function iconTile(options: TileOptions): HTMLElement {
     const shown = text(words, "body_strong", ink);
     shown.classList.add("k-icon-tile-count");
     tile.append(shown);
+  } else if (options.glyph === undefined) {
+    // The letter's line is the symbol's box tall, so it sits where the symbol would, centred on
+    // its ink's box: Geist's caps sit high in their line, and a capital's weight (an L's foot)
+    // would set it off its middle.
+    const letter = text(initial(options.name ?? ""), INITIAL_STYLE[options.size], ink);
+    centreOnInk(letter, INITIAL_STYLE[options.size], letter.textContent ?? "");
+    letter.classList.add("k-icon-tile-initial");
+    tile.append(letter);
   } else tile.append(icon(options.glyph, "var(--icon)", `var(--color-${ink})`));
   const pending = options.pending ?? false;
   if (options.photo) tile.append(photo(options.photo, pending));
   else if (options.picture) tile.append(appIcon(options.picture, pending));
-  return probe(tile, { role: "component", name: "IconTile", variant: variant(options.size, options.count !== undefined && "count"), fixed: { width: true, height: true } });
+  return probe(tile, { role: "component", name: "IconTile", variant: variant(options.size, options.count !== undefined ? "count" : options.glyph === undefined && "initials"), fixed: { width: true, height: true } });
 }

@@ -726,8 +726,9 @@
   height: var(--icon);
 }
 
-/* A count in the symbol's place, centred on whole device pixels as the symbol is. */
-.k-icon-tile > .k-icon-tile-count {
+/* A count or an app's initial in the symbol's place, centred on whole device pixels as the symbol
+   is: across on its advance, down on its line, which is the symbol's box tall and centred on its ink. */
+.k-icon-tile > :is(.k-icon-tile-count, .k-icon-tile-initial) {
   position: absolute;
   left: round(down, calc((var(--side) - round(up, calc(var(--natural) * var(--px) - 0.001px), 1px)) / 2), 1px);
   top: round(down, calc((var(--side) - var(--t-line)) / 2), 1px);
@@ -762,7 +763,7 @@
 }
 
 .k-icon-tile > img:not([data-loaded]),
-.k-icon-tile:has(> img[data-loaded]) > .k-icon {
+.k-icon-tile:has(> img[data-loaded]) > :is(.k-icon, .k-icon-tile-initial) {
   visibility: hidden;
 }
 

@@ -193,6 +193,50 @@ export function inkMass(style: TypeStyle, words: string): Mass {
   return mass;
 }
 
+/**
+ * The middle of `words`' ink in `style`, top to bottom, in ems above the baseline, below it
+ * counted: where a lone glyph on a square looks centred. A capital's is half its cap height,
+ * whatever its strokes weigh, so B, L and K sit alike; an ideograph's takes in what it draws below
+ * the baseline.
+ */
+function inkMiddle(style: TypeStyle, words: string): number {
+  scale ??= document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  if (!scale) throw new Error("no 2D canvas to weigh text with");
+  scale.font = font(style).font.replace(/[\d.]+px/, `${WEIGHED_AT}px`);
+  const width = Math.max(1, Math.ceil(scale.measureText(words).width));
+  const height = WEIGHED_AT * 2;
+  const baseline = Math.round(WEIGHED_AT * 1.5);
+  scale.canvas.width = width;
+  scale.canvas.height = height;
+  scale.font = font(style).font.replace(/[\d.]+px/, `${WEIGHED_AT}px`);
+  scale.fillStyle = "#000";
+  scale.textBaseline = "alphabetic";
+  scale.fillText(words, 0, baseline);
+  const pixels = scale.getImageData(0, 0, width, height).data;
+  let top = height;
+  let bottom = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (pixels[(y * width + x) * 4 + 3]! < 128) continue;
+      top = Math.min(top, y);
+      bottom = y;
+      break;
+    }
+  }
+  if (bottom < 0) return 0;
+  return (baseline - (top + bottom + 1) / 2) / WEIGHED_AT;
+}
+
+/**
+ * Centres `element`'s line for the eye on the box of its ink rather than its mass: a lone glyph
+ * on a tile, as an app's initial, where the eye reads the glyph's outline, not its weight.
+ */
+export function centreOnInk(element: HTMLElement, style: TypeStyle, words: string): void {
+  const middle = inkMiddle(style, words);
+  element.style.setProperty("--mass", String(middle));
+  element.dataset.mass = String(middle);
+}
+
 /** The size `style` is drawn at, in logical pixels. */
 function sizeOf(style: TypeStyle): number {
   const meter = font(style);
