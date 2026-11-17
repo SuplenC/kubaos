@@ -18,21 +18,15 @@ use crate::apps::picks::Picks;
 use crate::unfree::Unfree;
 use crate::update::event::UpdateEvent;
 
-const APPS: [&str; 14] = [
-    "cascadia-mono-nerd-font",
+const APPS: [&str; 8] = [
     "dropbox",
-    "fira-code-nerd-font",
     "gparted",
-    "inter-font",
-    "iosevka-nerd-font",
     "localsend",
-    "meslo-lg-nerd-font",
     "mission-center",
     "nextcloud",
     "openssh-server",
     "syncthing",
     "tailscale",
-    "victor-mono-nerd-font",
 ];
 
 const DROPBOX_REPO: &str = "/etc/default/dropbox-repo";

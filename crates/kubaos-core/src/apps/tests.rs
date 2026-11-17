@@ -468,7 +468,7 @@ fn shipped() -> Catalog {
 }
 
 /// Every app of the shipped catalog, by id, in the catalog's order.
-const SHIPPED: [&str; 135] = [
+const SHIPPED: [&str; 129] = [
     "1password",
     "aider",
     "alacritty",
@@ -482,7 +482,6 @@ const SHIPPED: [&str; 135] = [
     "brave",
     "bruno",
     "calibre",
-    "cascadia-mono-nerd-font",
     "chatgpt",
     "chromium",
     "claude-code",
@@ -502,7 +501,6 @@ const SHIPPED: [&str; 135] = [
     "ente-auth",
     "excalidraw",
     "figma",
-    "fira-code-nerd-font",
     "firefox",
     "gamescope",
     "geforce-now",
@@ -518,8 +516,6 @@ const SHIPPED: [&str; 135] = [
     "heroic",
     "inkscape",
     "insomnia",
-    "inter-font",
-    "iosevka-nerd-font",
     "jellyfin-desktop",
     "jetbrains-toolbox",
     "joplin",
@@ -540,7 +536,6 @@ const SHIPPED: [&str; 135] = [
     "lutris",
     "mangohud",
     "mattermost",
-    "meslo-lg-nerd-font",
     "microsoft-edge",
     "microsoft-teams",
     "minecraft-launcher",
@@ -585,7 +580,6 @@ const SHIPPED: [&str; 135] = [
     "todoist",
     "tor-browser",
     "upscayl",
-    "victor-mono-nerd-font",
     "virt-manager",
     "vivaldi",
     "vlc",
