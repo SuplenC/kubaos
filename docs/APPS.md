@@ -31,8 +31,8 @@ These run on XWayland:
 | Minecraft Launcher | Mojang's launcher is X11 alone. |
 | ONLYOFFICE | Its bundled Qt 5 has no Wayland plugin. |
 | RawTherapee | Its AppImage sets `GDK_BACKEND=x11` as it starts, over the session's, for a crash its GTK had on Wayland. |
-| VLC | VLC 3's Wayland window never worked properly; VideoLAN removed it in 3.0.24. Wayland output is VLC 4's. |
 | Steam | Steam's client is X11 alone; its games run on XWayland or in gamescope. |
+| VLC | VLC 3's Wayland window never worked properly; VideoLAN removed it in 3.0.24. Wayland output is VLC 4's. |
 | Wine | Wine 11's Wayland driver is experimental, so it stays behind the X11 one, which wins while XWayland runs. `Graphics="wayland,x11"` under `HKCU\Software\Wine\Drivers` puts a prefix on it. |
 | Zoom | It ships Qt's Wayland plugin, but starts on X11 unless `xwayland=false` is set in `~/.config/zoomus.conf`, a file of Zoom's own settings no step edits. Set it there to try Wayland; its screen sharing then needs `enableWaylandShare=true` too. |
 

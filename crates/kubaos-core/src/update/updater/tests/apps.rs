@@ -582,6 +582,35 @@ fn a_picked_app_refused_over_a_file_of_the_users_own_names_the_remedy_at_every_u
 }
 
 #[test]
+fn a_picked_app_refused_over_another_apps_path_says_the_next_update_tries_again() {
+    let w = world();
+    let rival = w.sys.catalog().join("rival");
+    put(
+        &rival.join("app.toml"),
+        &format!(
+            "{ABOUT}name = \"Rival\"\nsummary = \"Desk's rival\"\n\n[[action]]\nname = \"Start it at login\"\n\
+             kind = \"file\"\nto = \"/etc/xdg/autostart/desk.desktop\"\ntext = \"[Desktop Entry]\\nExec=rival\\n\"\n"
+        ),
+    );
+    lock_down(&rival);
+    let mut picks = Picks::default();
+    picks.add("desk");
+    picks.add("rival");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = fake(&w, &[]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert!(has(&m, "desk"));
+    let warned = warnings(&events);
+    let refused: Vec<&&str> = warned.iter().filter(|w| w.contains("belongs to desk")).collect();
+    assert_eq!(refused.len(), 1, "{warned:?}");
+    assert!(refused[0].ends_with("; the next update tries again"), "{warned:?}");
+    assert!(!refused[0].contains("then run kubaos update"), "{warned:?}");
+}
+
+#[test]
 fn the_status_reads_the_journals_the_picks_and_dpkg() {
     let w = world();
     let mut m = fake(&w, &[]);

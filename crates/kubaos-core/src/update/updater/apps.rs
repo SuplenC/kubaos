@@ -503,11 +503,13 @@ fn app_error(what: String, source: EngineError) -> UpdateError {
     }
 }
 
-/// Reports an app the update couldn't install as a warning, through the engine's sink. A refusal
-/// stands at every update until the user settles what it names, so it asks for that first.
+/// Reports an app the update couldn't install as a warning, through the engine's sink. A file of
+/// the user's own where a step writes stands at every update until the user deletes or renames
+/// it, so that warning asks for it first.
 fn engine_warning(engine: &mut Engine<'_>, e: &UpdateError) {
-    let refused = matches!(e, UpdateError::App { source, .. } if matches!(**source, EngineError::Refused { .. }));
-    let then = if refused {
+    let yours =
+        matches!(e, UpdateError::App { source, .. } if matches!(**source, EngineError::Refused { yours: true, .. }));
+    let then = if yours {
         ", then run kubaos update"
     } else {
         "; the next update tries again"

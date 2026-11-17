@@ -93,6 +93,7 @@ impl Engine<'_> {
             return Err(EngineError::Refused {
                 app: id.to_owned(),
                 why: vec![format!("it requires itself through {}", visiting.join(", "))],
+                yours: false,
             });
         }
         let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
@@ -109,6 +110,7 @@ impl Engine<'_> {
                             "it requires {}, which the catalog doesn't have",
                             requirement.id()
                         )],
+                        yours: false,
                     });
                 }
                 Err(e) => return Err(EngineError::Folder(e)),
@@ -145,6 +147,7 @@ impl Engine<'_> {
         Err(EngineError::Refused {
             app: app.name.clone(),
             why: vec![why],
+            yours: false,
         })
     }
 

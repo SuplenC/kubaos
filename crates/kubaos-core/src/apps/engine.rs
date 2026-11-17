@@ -143,7 +143,13 @@ pub enum EngineError {
         source: Box<StepError>,
     },
     #[error("{app} can't be installed: {}", why.join("; "))]
-    Refused { app: String, why: Vec<String> },
+    Refused {
+        app: String,
+        why: Vec<String>,
+        /// One of `why` is a file of the user's own where a step writes, which stands until the
+        /// user deletes or renames it.
+        yours: bool,
+    },
     #[error("{app} is needed by {}: remove that first", by.join(", "))]
     Needed { app: String, by: Vec<String> },
     #[error("{app} isn't installed")]
@@ -152,6 +158,17 @@ pub enum EngineError {
     NothingToConfigure { app: String },
     #[error("{app} changed with this release: kubaos update brings it up to date, then configure it")]
     Outdated { app: String },
+}
+
+/// What stands in the way of one side's steps of an install, found before anything runs.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Refusals {
+    /// One sentence a refused step: the step's name, then why.
+    pub why: Vec<String>,
+    /// One of them is a file of the user's own where a step writes, which stands until the user
+    /// deletes or renames it; the others (a path or key another app owns, a settings file that
+    /// can't be read) are the catalog's or another app's.
+    pub yours: bool,
 }
 
 /// One side's steps of the apps' installs: the user's in this process, root's in the root helper.
@@ -281,10 +298,10 @@ impl<'h> Keeper<'h> {
     ///
     /// The step that couldn't be resolved or the journals that couldn't be read; the refusals
     /// are the answer, one a step.
-    pub fn preflight(&mut self, id: &str, setup: Option<&str>) -> Result<Vec<String>, StepError> {
+    pub fn preflight(&mut self, id: &str, setup: Option<&str>) -> Result<Refusals, StepError> {
         let (_, steps) = self.steps(id, setup)?;
         let owners = Owners::load(&[&self.journals]).map_err(StepError::Journal)?;
-        let mut refused = Vec::new();
+        let mut refused = Refusals::default();
         for (_, action) in steps {
             let writes = action.path().is_some()
                 || matches!(
@@ -298,7 +315,10 @@ impl<'h> Keeper<'h> {
                 .map_err(StepError::Perform)
                 .and_then(|look| self.may_write(&owners, id, &look.claims));
             if let Err(e) = checked {
-                refused.push(format!("{}: {}", action.name, crate::update::event::chain(&e)));
+                refused.yours |= matches!(e, StepError::Yours { .. });
+                refused
+                    .why
+                    .push(format!("{}: {}", action.name, crate::update::event::chain(&e)));
             }
         }
         Ok(refused)
@@ -1753,7 +1773,7 @@ impl<'a> Engine<'a> {
         match self.root.call(&request) {
             Ok(Reply::Ready) => {}
             Ok(Reply::Failed { why }) => return Err(failed(why)),
-            Ok(Reply::Refused { why }) => return Err(failed(why.join("; "))),
+            Ok(Reply::Refused { why, .. }) => return Err(failed(why.join("; "))),
             Ok(Reply::Step { .. }) => return Err(failed("the root helper answered out of turn".to_owned())),
             Err(e) => return Err(EngineError::Root(e)),
         }
@@ -1788,11 +1808,12 @@ impl<'a> Engine<'a> {
     }
 
     fn preflight(&mut self, id: &str, setup: Option<&str>, root: bool) -> Result<(), EngineError> {
-        let refuse = |why: Vec<String>| EngineError::Refused {
+        let refuse = |refused: Refusals| EngineError::Refused {
             app: id.to_owned(),
-            why,
+            why: refused.why,
+            yours: refused.yours,
         };
-        let mut why = self.user.preflight(id, setup).map_err(|source| EngineError::Step {
+        let mut refused = self.user.preflight(id, setup).map_err(|source| EngineError::Step {
             name: "Checking what the app would change".to_owned(),
             source: Box::new(source),
         })?;
@@ -1801,13 +1822,25 @@ impl<'a> Engine<'a> {
                 app: id.to_owned(),
                 setup: setup.map(str::to_owned),
             }) {
-                Ok(Reply::Refused { why: root_why }) => why.extend(root_why),
-                Ok(Reply::Failed { why: e }) => return Err(refuse(vec![e])),
+                Ok(Reply::Refused { why, yours }) => {
+                    refused.why.extend(why);
+                    refused.yours |= yours;
+                }
+                Ok(Reply::Failed { why }) => {
+                    return Err(refuse(Refusals {
+                        why: vec![why],
+                        yours: false,
+                    }));
+                }
                 Err(e) => return Err(EngineError::Root(e)),
                 Ok(_) => {}
             }
         }
-        if why.is_empty() { Ok(()) } else { Err(refuse(why)) }
+        if refused.why.is_empty() {
+            Ok(())
+        } else {
+            Err(refuse(refused))
+        }
     }
 
     fn root_step(&mut self, request: &Request) -> Result<Outcome, StepError> {
@@ -1824,7 +1857,7 @@ impl<'a> Engine<'a> {
                 Ok(outcome)
             }
             Ok(Reply::Failed { why }) => Err(StepError::RootFailed { why }),
-            Ok(Reply::Refused { why }) => Err(StepError::RootRefused { why }),
+            Ok(Reply::Refused { why, .. }) => Err(StepError::RootRefused { why }),
             Ok(Reply::Ready) => Err(StepError::RootOutOfTurn),
             Err(e) => Err(StepError::RootLost(e)),
         }
@@ -1992,7 +2025,7 @@ impl<'a> Engine<'a> {
             let why = match self.root.call(&request) {
                 Ok(Reply::Ready) => continue,
                 Ok(Reply::Failed { why }) => why,
-                Ok(Reply::Refused { why }) => why.join("; "),
+                Ok(Reply::Refused { why, .. }) => why.join("; "),
                 Ok(Reply::Step { .. }) => "the root helper answered out of turn".to_owned(),
                 Err(e) => return Err(EngineError::Root(e)),
             };

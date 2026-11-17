@@ -227,9 +227,10 @@ fn a_spotify_menu_entry_of_the_users_own_is_never_written_over_and_the_refusal_s
 
     let result = run(&world, |e| e.add("spotify", None, &picks("spotify")));
 
-    let Err(EngineError::Refused { why, .. }) = result else {
+    let Err(EngineError::Refused { why, yours, .. }) = result else {
         panic!("Spotify was installed over the user's entry: {result:?}");
     };
+    assert!(yours, "the refusal is over a file of the user's");
     assert!(
         why.iter()
             .any(|w| w.contains("is yours") && w.contains("delete or rename it")),
