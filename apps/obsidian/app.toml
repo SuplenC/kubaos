@@ -1,7 +1,7 @@
 # Obsidian from nixpkgs, through the User flake, which marks it unfree. Obsidian keeps no apt
 # repository and Ubuntu doesn't package it. Obsidian updates its app itself, downloading each
-# release's app.asar into ~/.config/obsidian, so nixpkgs' package, a release or two behind, still
-# runs the newest Obsidian.
+# release's obsidian-<version>.asar into ~/.config/obsidian, so nixpkgs' package, a release or two
+# behind (1.13.7, where upstream is at 1.15.1), still runs the newest Obsidian.
 # https://obsidian.md/download
 name = "Obsidian"
 category = "office"
