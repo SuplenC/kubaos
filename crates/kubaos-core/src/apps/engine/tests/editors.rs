@@ -53,7 +53,14 @@ fn every_packaged_editor_and_terminal_installs_on_the_fake_machine_and_its_remov
                         }
                     }
                     Kind::Nix { packages, .. } => assert!(packages.iter().all(|p| state.nix.contains(p)), "{id}"),
-                    other => panic!("{id}: a packaged editor is its package, not {other:?}"),
+                    // The app's own icon, an .svg of its folder, put in the user's icon theme.
+                    Kind::File {
+                        to, from: Some(from), ..
+                    } if app.icon.as_deref() == Some(from) => {
+                        let to = to.replace("~/", "");
+                        assert!(world.host_home().join(to).is_file(), "{id}: {from} isn't in place");
+                    }
+                    other => panic!("{id}: a packaged editor is its package or its icon, not {other:?}"),
                 }
             }
         }

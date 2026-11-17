@@ -916,6 +916,12 @@ esac"#,
     fs::create_dir_all(home.join(".local/bin")).unwrap();
     std::os::unix::fs::symlink(runtime.join("t3"), home.join(".local/bin/t3")).unwrap();
     put(&home.join(".config/systemd/user/t3code.service"), "[Service]\n");
+    // The icon KubaOS's install put in the theme, as it stays through T3's own updates.
+    let icon = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/t3-code/t3-code.svg");
+    put(
+        &home.join(".local/share/icons/hicolor/scalable/apps/t3-code.svg"),
+        &fs::read_to_string(icon).unwrap(),
+    );
     put(
         &home.join(".t3/userdata/desktop-settings.json"),
         "{\n  \"localEnvironmentEnabled\": false\n}\n",

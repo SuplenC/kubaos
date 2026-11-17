@@ -9,6 +9,8 @@ summary = "An open-source coding agent that takes any model you throw at it. Bri
 description = """\
 The open source AI coding agent."""
 description_from = "https://github.com/anomalyco/opencode/blob/v1.19.5/README.md"
+# opencode's icon, MIT, on KubaOS's tile (opencode.svg's header): no icon theme has opencode.
+icon = "opencode.svg"
 keeps = """\
 Your settings stay in ~/.config/opencode, and your sign-ins and sessions in \
 ~/.local/share/opencode: install opencode again and they're all there."""
