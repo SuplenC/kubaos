@@ -341,6 +341,8 @@ pub enum Unpack {
     TarGz,
     /// A zstd-compressed tarball, unpacked into the path as a folder: `tar-zst`.
     TarZst,
+    /// An xz-compressed tarball, unpacked into the path as a folder: `tar-xz`.
+    TarXz,
 }
 
 /// A systemd manager.

@@ -140,6 +140,7 @@ pub const TOOLS: &[&str] = &[
     "tar",
     "gzip",
     "zstd",
+    "xz",
     "jq",
     "mktemp",
     "date",

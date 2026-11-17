@@ -1084,12 +1084,12 @@ fn download_to(
                     fs::rename(&file, path).map_err(PerformError::io(path))
                 }
             }
-            Unpack::TarGz | Unpack::TarZst => {
+            Unpack::TarGz | Unpack::TarZst | Unpack::TarXz => {
                 fs::create_dir(&stage).map_err(PerformError::io(&stage))?;
-                let compression = if unpack == Unpack::TarZst {
-                    Compression::Zstd
-                } else {
-                    Compression::Gzip
+                let compression = match unpack {
+                    Unpack::TarZst => Compression::Zstd,
+                    Unpack::TarXz => Compression::Xz,
+                    Unpack::TarGz | Unpack::File => Compression::Gzip,
                 };
                 host.untar(&file, &stage, compression, strip)
                     .map_err(PerformError::Host)?;
