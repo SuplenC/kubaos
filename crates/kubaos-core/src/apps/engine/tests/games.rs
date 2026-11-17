@@ -31,6 +31,18 @@ const APPS: [&str; 12] = [
 
 const MINECRAFT: &str = "minecraft-launcher";
 
+/// `sunshine --creds <user> <password>` as Sunshine's own does it: the sign-in written into the
+/// state file of its folder, the password hashed with a new salt, the file's other keys kept.
+const SUNSHINE_CREDS: &str = r#"[ "$1" = --creds ] || exit 7
+dir="${XDG_CONFIG_HOME:-$HOME/.config}/sunshine"
+mkdir -p "$dir"
+state="$dir/sunshine_state.json"
+[ -f "$state" ] || echo '{}' >"$state"
+salt=$(head -c 12 /dev/urandom | base64 | tr -dc A-Za-z0-9)
+hash=$(printf '%s%s' "$3" "$salt" | sha256sum | cut -d ' ' -f 1 | tr a-f A-F)
+jq --arg u "$2" --arg s "$salt" --arg p "$hash" '.username=$u | .salt=$s | .password=$p' "$state" >"$state.new"
+mv "$state.new" "$state""#;
+
 fn picks(id: &str) -> Picks {
     let mut picks = Picks::default();
     picks.add(id);
@@ -64,6 +76,7 @@ fn minecraft_tarball(world: &World) -> Vec<u8> {
 /// for amd64.
 fn served(id: &str) -> World {
     let world = world(id);
+    world.host.sandbox().stub("sunshine", SUNSHINE_CREDS);
     let catalog = Catalog::load(&world.catalog).unwrap();
     for action in catalog.get(id).unwrap().all_actions() {
         let body = match &action.kind {
@@ -103,7 +116,11 @@ fn in_place(world: &World, app: &Folder) {
                     folder.display()
                 );
             }
-            Kind::File { to, .. } => assert!(home_or_system(to).is_file(), "{id}: {to}"),
+            Kind::File { to, .. } | Kind::Output { path: to } => {
+                assert!(home_or_system(to).is_file(), "{id}: {to}");
+            }
+            // Each app's own test checks what its runs did.
+            Kind::Run { .. } => {}
             Kind::Setting { file, key, .. } => {
                 let text = fs::read_to_string(home_or_system(file)).unwrap();
                 assert!(
@@ -281,4 +298,117 @@ fn sunshine_running_is_left_alone_until_it_is_quit() {
         "{refused}"
     );
     assert_eq!(world.host.snapshot(), installed);
+}
+
+/// Sunshine's state file and the password its install saved, in `world`'s home.
+fn sunshine_sign_in(world: &World) -> (std::path::PathBuf, std::path::PathBuf) {
+    let home = world.host_home();
+    (
+        home.join(".config/sunshine/sunshine_state.json"),
+        home.join(".config/kubaos/sunshine/password"),
+    )
+}
+
+#[test]
+fn sunshines_web_page_has_your_sign_in_before_it_first_starts_and_its_removal_takes_it() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let world = served("sunshine");
+    let before = world.host.snapshot();
+    let (state, saved) = sunshine_sign_in(&world);
+
+    run(&world, |e| e.add("sunshine", None, &picks("sunshine"))).unwrap();
+
+    let sign_in: serde_json::Value = serde_json::from_str(&fs::read_to_string(&state).unwrap()).unwrap();
+    let user = world.host.sandbox().command("id").arg("-un").output().unwrap().stdout;
+    assert_eq!(
+        sign_in["username"],
+        String::from_utf8(user).unwrap().trim(),
+        "the login name"
+    );
+    let password = fs::read_to_string(&saved).unwrap();
+    let password = password.trim_end();
+    assert!(
+        password.len() >= 32 && password.chars().all(|c| c.is_ascii_alphanumeric()),
+        "{password:?}"
+    );
+    assert_eq!(fs::metadata(&saved).unwrap().permissions().mode() & 0o777, 0o600);
+    let calls = fs::read_to_string(world.host.sandbox().log()).unwrap();
+    assert!(calls.lines().any(|l| l.starts_with("sunshine --creds ")), "{calls}");
+    let salted = world
+        .host
+        .sandbox()
+        .command("sh")
+        .arg("-c")
+        .arg("printf '%s%s' \"$1\" \"$2\" | sha256sum")
+        .arg("sh")
+        .arg(password)
+        .arg(sign_in["salt"].as_str().unwrap())
+        .output()
+        .unwrap()
+        .stdout;
+    assert_eq!(
+        sign_in["password"].as_str().unwrap().to_lowercase(),
+        String::from_utf8(salted).unwrap()[..64],
+        "the saved password is the page's"
+    );
+
+    run(&world, |e| e.remove_with("sunshine", &Picks::default())).unwrap();
+
+    assert!(!saved.exists() && !state.exists());
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn a_sunshine_sign_in_already_there_is_adopted_and_left_alone() {
+    let world = served("sunshine");
+    let (state, saved) = sunshine_sign_in(&world);
+    fs::create_dir_all(state.parent().unwrap()).unwrap();
+    let mine =
+        "{\"username\": \"mine\", \"salt\": \"pepper\", \"password\": \"ABC\", \"root\": {\"named_devices\": []}}\n";
+    fs::write(&state, mine).unwrap();
+
+    run(&world, |e| e.add("sunshine", None, &picks("sunshine"))).unwrap();
+
+    assert_eq!(fs::read_to_string(&state).unwrap(), mine);
+    assert!(!saved.exists(), "no password of KubaOS's for a sign-in it didn't set");
+    let calls = fs::read_to_string(world.host.sandbox().log()).unwrap_or_default();
+    let creds = calls.lines().any(|l| l.starts_with("sunshine "));
+    assert!(!creds, "Sunshine's command never ran");
+
+    run(&world, |e| e.remove_with("sunshine", &Picks::default())).unwrap();
+
+    assert_eq!(fs::read_to_string(&state).unwrap(), mine);
+}
+
+#[test]
+fn a_sunshine_sign_in_you_changed_and_your_paired_clients_stay_after_its_removal() {
+    let world = served("sunshine");
+    let (state, saved) = sunshine_sign_in(&world);
+
+    run(&world, |e| e.add("sunshine", None, &picks("sunshine"))).unwrap();
+    // The user pairs a client, then changes the password in Sunshine's page.
+    let mut sign_in: serde_json::Value = serde_json::from_str(&fs::read_to_string(&state).unwrap()).unwrap();
+    sign_in["root"] = serde_json::json!({ "named_devices": [{ "name": "Steam Deck" }] });
+    let paired = sign_in.clone();
+    sign_in["password"] = serde_json::json!("0".repeat(64));
+    let changed = serde_json::to_string_pretty(&sign_in).unwrap();
+    fs::write(&state, &changed).unwrap();
+
+    run(&world, |e| e.remove_with("sunshine", &Picks::default())).unwrap();
+
+    assert!(!saved.exists(), "the saved password goes with the app");
+    assert_eq!(fs::read_to_string(&state).unwrap(), changed);
+
+    // Its own sign-in, still the one it set, goes; the paired client stays.
+    fs::remove_file(&state).unwrap();
+    run(&world, |e| e.add("sunshine", None, &picks("sunshine"))).unwrap();
+    let mut set: serde_json::Value = serde_json::from_str(&fs::read_to_string(&state).unwrap()).unwrap();
+    set["root"] = paired["root"].clone();
+    fs::write(&state, serde_json::to_string(&set).unwrap()).unwrap();
+
+    run(&world, |e| e.remove_with("sunshine", &Picks::default())).unwrap();
+
+    let left: serde_json::Value = serde_json::from_str(&fs::read_to_string(&state).unwrap()).unwrap();
+    assert_eq!(left, serde_json::json!({ "root": paired["root"] }));
 }
