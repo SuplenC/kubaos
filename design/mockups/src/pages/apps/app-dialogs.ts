@@ -170,6 +170,7 @@ function drawn(call: Call, identity: Identity, landed: boolean) {
   const head = surface.querySelector<HTMLElement>(".k-dialog-column > .k-row")!;
   const symbol = head.firstElementChild!;
   if (identity === "symbol" && call.app) symbol.replaceWith(iconTile({ name: call.app, size: "Sm" }));
+  else if (call.hidden) symbol.replaceWith(iconInLine("lock", "heading", "var(--color-primary)"));
   else if (call.icon) symbol.replaceWith(iconInLine(call.icon, "heading", "var(--color-primary)"));
   else symbol.replaceWith(iconInLine(kind.icon, "heading", `var(--color-${kind.role})`));
   if (identity === "line" && call.app) head.before(callerLine(call.app), gap("s12"));
@@ -337,7 +338,7 @@ export default page({
     ],
     counts: [
       { name: "One word", for: "a message of one word", sample: () => onDesktop({ ...INFO, text: "Done." }) },
-      { name: "Scrolls inside", for: "a long message: the middle scrolls", sample: () => onDesktop({ ...STEAM_ERROR, text: `${STEAM_ERROR.text} ${STEAM_ERROR.text} ${STEAM_ERROR.text}` }) },
+      { name: "Scrolls inside", for: "a long message: the middle scrolls", sample: () => onDesktop({ ...STEAM_ERROR, text: Array.from({ length: 7 }, () => STEAM_ERROR.text).join("\n\n") }) },
       { name: "A long path", for: "breaks where it must", sample: () => onDesktop(PATH) },
       { name: "Markup", for: "`<b>`, `<i>`, `<a>`, `&amp;`", sample: () => onDesktop(MARKUP) },
       { name: "Long button labels", for: "they stack, OK on top", sample: () => onDesktop(LONG_LABELS) },

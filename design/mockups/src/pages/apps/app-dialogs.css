@@ -39,3 +39,9 @@
 .app-dialog-log {
   width: var(--size-dialog);
 }
+
+/* Draft: an icon tile's tint is the dialog's own fill at night, so on a dialog it steps down to
+   `surface_container` to show; a question for the tile's page. */
+.app-dialog .k-icon-tile {
+  --tint: var(--color-surface_container) !important;
+}
