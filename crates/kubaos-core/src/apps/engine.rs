@@ -18,6 +18,7 @@
 //! - The actions: `action.rs`. The journal's format: `journal.rs`. The root helper's requests:
 //!   `root.rs`.
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
@@ -484,6 +485,28 @@ impl<'h> Keeper<'h> {
         Ok(Outcome::Undone)
     }
 
+    /// Sets the vendor repository of root's settled `apt` step `step` of the app `id` up again,
+    /// as root's journal records it, so a key of it that nears its expiry is fetched again.
+    ///
+    /// # Errors
+    ///
+    /// [`StepError::NoStep`] when the journal has no such step, else the setup that failed.
+    pub fn refresh(&mut self, id: &str, step: usize) -> Result<(), StepError> {
+        let journal = Journal::read(&self.journals, id).map_err(StepError::Journal)?;
+        let repo = journal
+            .as_ref()
+            .and_then(|j| j.entry(step))
+            .and_then(set_up_repo)
+            .map(str::to_owned)
+            .ok_or_else(|| StepError::NoStep {
+                app: id.to_owned(),
+                step,
+            })?;
+        self.host
+            .apt_repo(&repo)
+            .map_err(|e| StepError::Perform(PerformError::Host(e)))
+    }
+
     /// Marks `entry` as being undone, undoes it, and takes it out of `journal`; a run stopped
     /// during the undo leaves it marked, never looking settled.
     fn undo_journaled(&mut self, journal: &mut Journal, id: &str, entry: &Entry) -> Result<(), StepError> {
@@ -527,6 +550,35 @@ impl<'h> Keeper<'h> {
             None => Ok(()),
         }
     }
+}
+
+/// The vendor repository a journal's `entry` set up: a settled `apt` step's. Its check holds the
+/// repository to being set up as KubaOS sets it up, so a step found done stands for one too.
+fn set_up_repo(entry: &Entry) -> Option<&str> {
+    match &entry.action.kind {
+        Kind::Apt { repo: Some(repo), .. } if matches!(entry.state, State::Done | State::Found) => Some(repo),
+        _ => None,
+    }
+}
+
+/// The vendor repositories the root journals in `dir` record an `apt` step setting up, each with
+/// the app and the step of the first that does.
+///
+/// # Errors
+///
+/// [`JournalError`] when a journal can't be read.
+pub fn recorded_repos(dir: &Path) -> Result<BTreeMap<String, (String, usize)>, JournalError> {
+    let mut repos = BTreeMap::new();
+    for journal in Journal::all(dir)? {
+        for entry in &journal.entries {
+            if let Some(repo) = set_up_repo(entry) {
+                repos
+                    .entry(repo.to_owned())
+                    .or_insert_with(|| (journal.app.clone(), entry.step));
+            }
+        }
+    }
+    Ok(repos)
 }
 
 /// The file KubaOS's older setups left beside the journals, `<id>-linger-was-off`, while
@@ -1319,6 +1371,68 @@ impl<'a> Engine<'a> {
             journal.save(self.user.journals()).map_err(EngineError::Journal)?;
         }
         Ok(switch)
+    }
+
+    /// Fetches again the signing key of each vendor repository the apps' root journals record
+    /// setting up whose key nears its expiry (`fetch_key`'s 30 days), by setting the repository up
+    /// again through root. Which are due is read from the keyrings first, from the user's side,
+    /// so a run with none due asks for no root. Returns the repositories whose key no longer
+    /// nears its expiry; one that still does is a warning, for the next run to try again.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Journal`] when root's journals can't be read, [`EngineError::Declined`]
+    /// when the password wasn't given, else the keyrings or the root helper that couldn't be
+    /// reached.
+    pub fn refresh_keys(&mut self) -> Result<Vec<String>, EngineError> {
+        self.locked(Self::refresh_keys_locked)
+    }
+
+    fn refresh_keys_locked(&mut self) -> Result<Vec<String>, EngineError> {
+        let recorded = recorded_repos(&self.root_journals).map_err(EngineError::Journal)?;
+        let unread = |e| EngineError::Step {
+            name: "Reading the apt repositories' keys".to_owned(),
+            source: Box::new(StepError::Perform(PerformError::Host(e))),
+        };
+        let repos: Vec<String> = recorded.keys().cloned().collect();
+        let due: Vec<String> = self
+            .user
+            .host()
+            .apt_keys_due(&repos)
+            .map_err(unread)?
+            .into_iter()
+            .collect();
+        if due.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.start_root()?;
+        let mut failed = BTreeSet::new();
+        for repo in &due {
+            let (app, step) = &recorded[repo];
+            let request = Request::Refresh {
+                app: app.clone(),
+                step: *step,
+            };
+            let why = match self.root.call(&request) {
+                Ok(Reply::Ready) => continue,
+                Ok(Reply::Failed { why }) => why,
+                Ok(Reply::Refused { why }) => why.join("; "),
+                Ok(Reply::Step { .. }) => "the root helper answered out of turn".to_owned(),
+                Err(e) => return Err(EngineError::Root(e)),
+            };
+            self.warn(format!(
+                "the {repo} repository's signing key nears its expiry and couldn't be fetched again: {why}"
+            ));
+            failed.insert(repo.clone());
+        }
+        let still = self.user.host().apt_keys_due(&due).map_err(unread)?;
+        for repo in still.iter().filter(|r| !failed.contains(*r)) {
+            self.warn(format!(
+                "the {repo} repository's signing key nears its expiry, and its vendor has no newer one yet: \
+                 the next update tries again"
+            ));
+        }
+        Ok(due.into_iter().filter(|r| !still.contains(r)).collect())
     }
 
     /// Reports `text` as a warning of the run.

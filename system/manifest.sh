@@ -18,6 +18,7 @@
 #                               them to whatever owns them now
 #   repo_setup REPO...          the vendor repo's key and sources file
 #   repo_refresh REPO...        the same, where a repo that fails is a warning
+#   repo_key_due REPO           repo_setup would fetch its key or its next key again
 #
 # Install and record go through lib.sh's run and sudo_run, so --dry-run
 # changes nothing. A group that isn't wanted is skipped with a line saying why.
@@ -157,6 +158,15 @@ repo_files() {
     [[ -n "$keyring" ]] || continue
     untrust_global_keyring "$APT_TRUSTED_D/$keyring" "${own[@]}"
   done
+}
+
+# repo_key_due REPO: repo_files would fetch the repo's key, or its next key, again (key_stale):
+# one that nears its expiry. Reads the keyrings, which everyone may, and changes nothing.
+repo_key_due() {
+  local repo="$1" next
+  key_stale "$(manifest_value "repo.$repo" keyring)" "$(manifest_value "repo.$repo" fingerprint)" && return 0
+  next="$(manifest_value "repo.$repo" next_fingerprint)"
+  [[ -n "$next" ]] && key_stale "$(manifest_value "repo.$repo" next_keyring)" "$next"
 }
 
 # repo_refresh REPO...: repo_files for each repo, each in a shell of its own, so one that fails

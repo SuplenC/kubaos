@@ -2257,6 +2257,7 @@ mod communication;
 mod devtools;
 mod editors;
 mod graphics;
+mod keys;
 mod media;
 mod office;
 mod requires;

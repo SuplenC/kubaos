@@ -244,6 +244,18 @@ impl Host for SystemHost {
             .is_some_and(|r| r.in_place(repo, Path::new("/"))))
     }
 
+    fn apt_keys_due(&mut self, repos: &[String]) -> Result<BTreeSet<String>, HostError> {
+        if repos.is_empty() {
+            return Ok(BTreeSet::new());
+        }
+        let shown = Self::out(
+            self.command(self.checkout.join("system/apt-repo.sh"))
+                .arg("--keys-due")
+                .args(repos),
+        )?;
+        Ok(shown.lines().map(str::to_owned).collect())
+    }
+
     fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError> {
         let mut command = self.command("apt-get");
         command.arg("-s");
