@@ -115,8 +115,8 @@ const KEYS_PRESS: Move = {
   name: "The keys press",
   what: "Pressed, each cap lifts its fill and swells its glow over `micro`, and settles over `short`.",
   tracks: [
-    { part: "pressed", on: "the keys", target: ".setup-kotodama-keys > .k-key-prompt-cap", property: "--kotodama-press", from: 0, to: 1, duration: "micro", curve: "standard" },
-    { part: "let go", on: "the keys", target: ".setup-kotodama-keys > .k-key-prompt-cap", property: "--kotodama-press", from: 1, to: 0, duration: "short", cue: "micro", curve: "standard" },
+    { part: "pressed", on: "the keys", target: ".setup-kotodama-keys > .k-key-prompt-cap", property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" },
+    { part: "let go", on: "the keys", target: ".setup-kotodama-keys > .k-key-prompt-cap", property: "--press", from: 1, to: 0, duration: "short", cue: "micro", curve: "standard" },
   ],
   reduced: "same",
   back: "cuts",

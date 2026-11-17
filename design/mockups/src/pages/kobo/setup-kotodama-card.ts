@@ -16,7 +16,7 @@ import { chip } from "../../lib/chip.ts";
 import { field, setValue } from "../../lib/field.ts";
 import { icon } from "../../lib/icon.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
-import { type KeyHint, keycap, keyHints, keyPrompt, keys } from "../../lib/keycap.ts";
+import { type KeyHint, keycap, keyHints, keyPrompt, keys, pressKeys } from "../../lib/keycap.ts";
 import { divider, fill, filling, fillingHeight, gap, grid, row, splitColumns, stack } from "../../lib/layout.ts";
 import { type ListRowSpec, listWith } from "../../lib/list.ts";
 import { commandMenu, type MenuMeasures, menuMeasures } from "../../lib/list-detail.ts";
@@ -767,17 +767,9 @@ export function kotodamaCard(view: string): KotodamaCard {
   /** The keys on Try it, while it is shown: they press as the keys are pressed. */
   let prompt: HTMLElement | null = null;
 
-  /**
-   * The keys pressed: each cap's fill lifts and its glow swells to `focus.pressed_glow` times its
-   * own over `micro`, then settles over `short`, as a pressed control does. No motion, so reduced
-   * motion keeps it.
-   */
+  /** The keys pressed, from the keyboard or a click: Try it's KeyPrompt shows the press. */
   const press = () => {
-    if (!prompt?.isConnected) return;
-    const total = ms("micro") + ms("short");
-    for (const cap of prompt.querySelectorAll<HTMLElement>(".k-key-prompt-cap")) {
-      cap.animate([{ "--kotodama-press": 0 }, { "--kotodama-press": 1, offset: ms("micro") / total }, { "--kotodama-press": 0 }], { duration: total, easing: curve("standard") });
-    }
+    if (prompt?.isConnected) pressKeys(prompt);
   };
 
   /**
