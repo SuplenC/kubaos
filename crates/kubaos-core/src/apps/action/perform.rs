@@ -532,12 +532,7 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             let there = host.place(&path).symlink_metadata().is_ok();
             Ok(at_path(host, &path, there))
         }
-        Kind::Setting {
-            file,
-            section,
-            key,
-            value,
-        } => look_setting(host, &Place::new(host, file, section.as_deref()), key, value),
+        Kind::Setting { .. } => look_setting(host, &action.kind),
         Kind::Unit { .. } | Kind::Group { .. } | Kind::Linger {} => look_machine(action, host, &user),
         Kind::Architecture { architecture } => look_architecture(host, architecture),
         Kind::Dkms { .. } => look_dkms(action, host, recorded),
@@ -963,12 +958,7 @@ pub fn apply(
             symlink(target, &path).map_err(PerformError::io(&path))
         }
         Kind::Output { path } => make_parents(&host.place(&logical(host, path))),
-        Kind::Setting {
-            file,
-            section,
-            key,
-            value,
-        } => apply_setting(&Place::new(host, file, section.as_deref()), key, value),
+        Kind::Setting { .. } => apply_setting(host, &action.kind),
         Kind::Unit {
             unit,
             scope,
@@ -1095,7 +1085,6 @@ fn record_dependencies(
 ///
 /// [`PerformError`] for the change the machine refused, or a removal apt would take further
 /// than the action's own packages.
-#[expect(clippy::too_many_lines, reason = "one arm for each kind of action")]
 pub fn undo(
     action: &Action,
     host: &mut dyn Host,
@@ -1139,16 +1128,11 @@ pub fn undo(
             remove_dirs(host, owned("dir:"));
             Ok(())
         }
-        Kind::Setting {
-            file,
-            section,
-            key,
-            value,
-        } => {
+        Kind::Setting { .. } => {
             if owned("key:").is_empty() {
                 return Ok(None);
             }
-            undo_setting(&Place::new(host, file, section.as_deref()), key, value, prior)?;
+            undo_setting(host, &action.kind, prior)?;
             remove_dirs(host, owned("dir:"));
             Ok(())
         }
@@ -1724,19 +1708,37 @@ fn reload_unit_file(host: &mut dyn Host, path: &Path) -> Result<(), PerformError
     Ok(())
 }
 
-/// Where a setting is: its file, as the action names it and as the host has it, and the INI
-/// section its key is under, if any.
-struct Place<'a> {
+/// A `setting` step: its file, as the action names it and as the host has it, the INI section
+/// its key is under, if any, its key and its value.
+struct SettingStep<'a> {
     path: PathBuf,
     placed: PathBuf,
     section: Option<&'a str>,
+    key: &'a str,
+    value: &'a toml::Value,
 }
 
-impl<'a> Place<'a> {
-    fn new(host: &dyn Host, file: &str, section: Option<&'a str>) -> Self {
+impl<'a> SettingStep<'a> {
+    /// The step `kind` is, when it is a `setting`.
+    fn of(host: &dyn Host, kind: &'a Kind) -> Option<Self> {
+        let Kind::Setting {
+            file,
+            section,
+            key,
+            value,
+        } = kind
+        else {
+            return None;
+        };
         let path = logical(host, file);
         let placed = host.place(&path);
-        Self { path, placed, section }
+        Some(Self {
+            path,
+            placed,
+            section: section.as_deref(),
+            key,
+            value,
+        })
     }
 
     /// The file's settings and its text; none when it isn't there.
@@ -1759,10 +1761,11 @@ impl<'a> Place<'a> {
     }
 
     /// The claim on the key, its section named so two sections' keys of one name are two keys.
-    fn claim(&self, key: &str) -> String {
+    fn claim(&self) -> String {
+        let (path, key) = (self.path.display(), self.key);
         match self.section {
-            Some(section) => format!("key:{}#[{section}]{key}", self.path.display()),
-            None => format!("key:{}#{key}", self.path.display()),
+            Some(section) => format!("key:{path}#[{section}]{key}"),
+            None => format!("key:{path}#{key}"),
         }
     }
 
@@ -1776,12 +1779,15 @@ impl<'a> Place<'a> {
     }
 }
 
-fn look_setting(host: &dyn Host, place: &Place<'_>, key: &str, value: &toml::Value) -> Result<Look, PerformError> {
-    let path = &place.path;
-    let found = place.read()?;
+fn look_setting(host: &dyn Host, kind: &Kind) -> Result<Look, PerformError> {
+    let Some(step) = SettingStep::of(host, kind) else {
+        return Ok(Look::default());
+    };
+    let (path, key) = (&step.path, step.key);
+    let found = step.read()?;
     let exists = found.is_some();
-    let (settings, text) = found.unwrap_or_else(|| (place.empty(), String::new()));
-    let done = settings.has(path, key, value).map_err(PerformError::Settings)?;
+    let (settings, text) = found.unwrap_or_else(|| (step.empty(), String::new()));
+    let done = settings.has(path, key, step.value).map_err(PerformError::Settings)?;
     let old = settings.get(path, key).map_err(PerformError::Settings)?;
     let tables = settings.tables(path, key).map_err(PerformError::Settings)?;
     let mut claims = Vec::new();
@@ -1789,7 +1795,7 @@ fn look_setting(host: &dyn Host, place: &Place<'_>, key: &str, value: &toml::Val
         claims = at_path(host, path, false).claims;
         claims.retain(|c| c.claim.starts_with("dir:"));
     }
-    claims.push(Claim::new(place.claim(key), !done));
+    claims.push(Claim::new(step.claim(), !done));
     Ok(Look {
         done,
         claims,
@@ -1803,41 +1809,47 @@ fn look_setting(host: &dyn Host, place: &Place<'_>, key: &str, value: &toml::Val
     })
 }
 
-fn apply_setting(place: &Place<'_>, key: &str, value: &toml::Value) -> Result<(), PerformError> {
-    let (mut settings, _) = place.read()?.unwrap_or_else(|| (place.empty(), String::new()));
-    let written = settings::written(&settings, value);
+fn apply_setting(host: &dyn Host, kind: &Kind) -> Result<(), PerformError> {
+    let Some(step) = SettingStep::of(host, kind) else {
+        return Ok(());
+    };
+    let (mut settings, _) = step.read()?.unwrap_or_else(|| (step.empty(), String::new()));
+    let written = settings::written(&settings, step.value);
     settings
-        .set(&place.path, key, Some(&written), usize::MAX)
+        .set(&step.path, step.key, Some(&written), usize::MAX)
         .map_err(PerformError::Settings)?;
-    place.write(&settings)
+    step.write(&settings)
 }
 
 /// Puts a setting back. While the file is exactly as the step left it, it gets its old text back
 /// whole, so its layout and key order are the user's again; once something else changed it, only
-/// the key goes back. A key changed since, or a file that is no longer settings this action can
-/// read, stays as it is.
-fn undo_setting(place: &Place<'_>, key: &str, value: &toml::Value, prior: &Prior) -> Result<(), PerformError> {
-    let path = &place.path;
-    let Ok(Some((mut settings, text))) = place.read() else {
+/// the key goes back, its old value as the file had it. A key changed since, or a file that is no
+/// longer settings this action can read, stays as it is.
+fn undo_setting(host: &dyn Host, kind: &Kind, prior: &Prior) -> Result<(), PerformError> {
+    let Some(step) = SettingStep::of(host, kind) else {
         return Ok(());
     };
-    if !settings.has(path, key, value).unwrap_or(false) {
+    let (path, key) = (&step.path, step.key);
+    let Ok(Some((mut settings, text))) = step.read() else {
+        return Ok(());
+    };
+    if !settings.has(path, key, step.value).unwrap_or(false) {
         return Ok(());
     }
-    let written = settings::written(&settings, value);
+    let written = settings::written(&settings, step.value);
     if let Some(old) = &prior.text
-        && let Ok(mut left) = place.parse(old)
+        && let Ok(mut left) = step.parse(old)
         && left.set(path, key, Some(&written), usize::MAX).is_ok()
         && left.render() == text
     {
-        return write_file(&place.placed, old, place.mode());
+        return write_file(&step.placed, old, step.mode());
     }
     let keep = prior.tables.unwrap_or(usize::MAX);
     settings
         .set(path, key, prior.value.as_deref(), keep)
         .map_err(PerformError::Settings)?;
     if prior.file == Some(false) && settings.is_empty() {
-        return remove_path(&place.placed);
+        return remove_path(&step.placed);
     }
-    place.write(&settings)
+    step.write(&settings)
 }

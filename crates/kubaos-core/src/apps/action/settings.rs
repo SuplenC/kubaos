@@ -19,6 +19,8 @@
 mod conf;
 mod ini;
 mod json;
+#[cfg(test)]
+mod tests;
 
 use std::path::Path;
 use std::path::PathBuf;
@@ -264,13 +266,12 @@ impl Settings {
                 conf.set(key, value);
             }
             Self::Ini { text, section } => {
+                // A value the step writes is checked with its folder (`is_ini_value`); one put
+                // back is the file's own text, written back as it was.
                 if let Some(value) = value
-                    && !is_plain_ini(value)
+                    && value.contains(['\n', '\r'])
                 {
-                    return Err(unreadable(
-                        "a value is one line, unquoted and with no `\\`, `,`, `;` or `#`, which Qt reads otherwise"
-                            .into(),
-                    ));
+                    return Err(unreadable("a value is one line".into()));
                 }
                 text.set(section, key, value, keep > 0);
             }
@@ -288,11 +289,28 @@ fn through<'a>(path: &'a Path, key: &'a str) -> impl Fn(Through) -> SettingsErro
     }
 }
 
-/// Whether `value` reads back as written from an INI file as Qt's `QSettings` reads it: one line,
-/// with no quotes or escapes, no `,` making a list, no `;` or `#` starting a comment, no `@`
-/// starting a typed value, and no spaces around it, which reading trims.
-fn is_plain_ini(value: &str) -> bool {
-    !value.contains(['\n', '\r', '"', '\\', ',', ';', '#']) && !value.starts_with('@') && value.trim() == value
+/// Whether an INI file's section or key `name` is one Qt's `QSettings` writes as it is:
+/// `[A-Za-z0-9_.-]`, which it never percent-escapes.
+pub fn is_ini_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'-'))
+}
+
+/// Whether `value`, bare as an INI file has it, is text Qt's `QSettings` writes as it is, so Zoom
+/// saving its settings leaves the step done: no `"` or `\`, which it escapes, no `,`, `;` or `=`,
+/// for which it quotes the value, no control character, which it escapes, no leading `@`, which
+/// starts a typed value, and no spaces around it, which it quotes.
+pub fn is_ini_value(value: &toml::Value) -> bool {
+    let text = match value {
+        toml::Value::String(text) => text.clone(),
+        other => other.to_string(),
+    };
+    !text.contains(['"', '\\', ',', ';', '='])
+        && !text.contains(char::is_control)
+        && !text.starts_with('@')
+        && text.trim() == text
 }
 
 /// `value` as `format` writes it: TOML's or JSON's text of it, or a `.conf`'s or an INI file's
@@ -367,63 +385,5 @@ fn set_toml(
     set_toml(next, rest, last, value, keep.saturating_sub(1));
     if keep == 0 && next.is_empty() {
         here.remove(first);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use super::Settings;
-    use super::SettingsError;
-    use super::written;
-
-    #[test]
-    fn an_ini_setting_round_trips_and_its_undo_takes_the_section_it_made() {
-        let path = Path::new("/home/u/.config/zoomus.conf");
-        let mut settings = Settings::parse(path, Some("General"), "[AS]\nshowframewindow=true\n").unwrap();
-        let value = toml::Value::Boolean(false);
-        let tables = settings.tables(path, "xwayland").unwrap();
-
-        let text = written(&settings, &value);
-        settings.set(path, "xwayland", Some(&text), usize::MAX).unwrap();
-        assert!(settings.has(path, "xwayland", &value).unwrap());
-        settings.set(path, "xwayland", None, tables).unwrap();
-
-        assert_eq!(tables, 0);
-        assert_eq!(settings.render(), "[AS]\nshowframewindow=true\n");
-    }
-
-    #[test]
-    fn an_ini_value_qt_would_read_otherwise_is_refused() {
-        let path = Path::new("/home/u/.config/zoomus.conf");
-        let mut settings = Settings::empty(path, Some("General"));
-
-        for value in [
-            "\"quoted\"",
-            "a,b",
-            "a;b",
-            "a\\b",
-            "@ByteArray(x)",
-            " padded",
-            "two\nlines",
-        ] {
-            assert!(
-                matches!(
-                    settings.set(path, "key", Some(value), usize::MAX),
-                    Err(SettingsError::Unreadable { .. })
-                ),
-                "{value:?}"
-            );
-        }
-        assert!(settings.is_empty());
-    }
-
-    #[test]
-    fn a_conf_without_a_section_stays_flat_and_refuses_a_header() {
-        let path = Path::new("/home/u/.config/sunshine/sunshine.conf");
-
-        assert!(Settings::parse(path, None, "[General]\nkey = pc\n").is_err());
-        assert!(Settings::parse(path, Some("General"), "[General]\nkey = pc\n").is_ok());
     }
 }

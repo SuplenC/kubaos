@@ -438,7 +438,7 @@ fn a_section_makes_a_conf_setting_an_ini_ones_whose_key_may_have_dots() {
 
     assert!(setting("~/.config/zoomus.conf", "General", "xwayland").is_ok());
     assert!(setting("~/.config/zoomus.conf", "chat.recent", "conf.webserver").is_ok());
-    for section in ["", "a]b", "[General", " General"] {
+    for section in ["", "a]b", "[General", " General", "chat recent", "a/b"] {
         assert!(
             matches!(
                 setting("~/.config/zoomus.conf", section, "xwayland"),
@@ -451,7 +451,7 @@ fn a_section_makes_a_conf_setting_an_ini_ones_whose_key_may_have_dots() {
         setting("~/.config/tool/config.toml", "General", "xwayland"),
         Err(ActionError::InvalidSection { .. })
     ));
-    for key in ["", "a=b", "; note", "[x", " padded"] {
+    for key in ["", "a=b", "; note", "[x", " padded", "a/b", "%2B"] {
         assert!(
             matches!(
                 setting("~/.config/zoomus.conf", "General", key),
@@ -459,6 +459,22 @@ fn a_section_makes_a_conf_setting_an_ini_ones_whose_key_may_have_dots() {
             ),
             "{key:?}"
         );
+    }
+}
+
+#[test]
+fn an_ini_settings_value_is_text_qt_writes_as_it_is() {
+    let setting = |value: &str| {
+        action(&format!(
+            "name = \"Set\"\nkind = \"setting\"\nfile = \"~/.config/zoomus.conf\"\nsection = \"General\"\n\
+             key = \"k\"\nvalue = {value}\n"
+        ))
+    };
+
+    assert!(setting("false").is_ok());
+    assert!(setting("\"wayland\"").is_ok());
+    for value in [r#""a,b""#, r#""a=b""#, r#""@x""#, r#"" padded""#, r#""tab\t""#] {
+        assert!(matches!(setting(value), Err(ActionError::InvalidIniValue)), "{value}");
     }
 }
 

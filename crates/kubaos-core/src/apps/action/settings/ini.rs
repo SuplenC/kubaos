@@ -1,12 +1,19 @@
-//! An INI settings file with sections edited in place, as Zoom's `zoomus.conf` is: Qt's
-//! `QSettings` writes it, `[General]` and the other sections each a header line followed by
-//! `key=value` lines. A line starting with `;` or `#` is a comment, and a value is the text after
-//! a key's first `=`, trimmed. A key's value is replaced where it stands, a line is added after
-//! its section's last line or a section at the end of the file, or a line or an emptied section is
-//! taken out, and every other line, blank and comment lines included, stays as it was.
+//! An INI settings file with sections edited in place, as Zoom's `zoomus.conf` is, which Qt's
+//! `QSettings` writes: `[section]` header lines, each followed by its `key=value` lines. The lines
+//! are read as Qt reads them where it matters for one key:
 //!
-//! Keys before the first header belong to no section, and a section there twice is one section,
-//! as `QSettings` reads it.
+//! - a line starting with `;` is a comment, and a `;` later in a line, outside quotes and not after
+//!   a `\`, ends its value, the rest a comment kept as it is; `#` is no comment;
+//! - the keys before the first header and those under a `[general]` header, in any case, are one
+//!   section, General;
+//! - a key there twice has its last line's value;
+//! - a byte order mark at the start is left out of the first line.
+//!
+//! A value is the text from the key's first `=` to its end, trimmed. A key's value is replaced
+//! where it stands, a line is added after its section's last line or a section at the end of the
+//! file, or a line, or the section a step appended, is taken out, and every other line, blank and
+//! comment lines included, stays as it was. A value continued on the next line, after a `\` or
+//! inside quotes, is refused with its file.
 //!
 //! # Owns
 //!
@@ -16,10 +23,15 @@
 //!
 //! - The format-independent setting: `settings.rs`.
 
+#[cfg(test)]
+mod tests;
+
 use std::ops::Range;
 
 /// What goes between a key and its value when the file has no setting to copy it from: Qt's.
 const SEPARATOR: &str = "=";
+
+const BOM: char = '\u{feff}';
 
 /// One INI settings file's text.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -27,8 +39,8 @@ pub struct IniText {
     text: String,
 }
 
-/// One line of the file: where it starts, where its text ends before its line break, where the
-/// next line starts, and what it is.
+/// One line of the file: where it starts (past a byte order mark), where its text ends before its
+/// line break, where the next line starts, and what it is.
 struct Line<'a> {
     start: usize,
     end: usize,
@@ -46,6 +58,8 @@ enum What<'a> {
         key: &'a str,
         value: Range<usize>,
     },
+    /// A line Qt can't read as one setting.
+    Other,
 }
 
 impl IniText {
@@ -55,23 +69,18 @@ impl IniText {
     }
 
     /// `text`, when each of its lines is blank, a comment, a `[section]` header or a `key=value`
-    /// setting.
+    /// setting on one line.
     ///
     /// # Errors
     ///
     /// The first line that is none of them.
     pub fn parse(text: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        for raw in text.lines() {
-            let line = raw.trim();
-            if line.is_empty() || is_comment(line) || header(line).is_some() {
-                continue;
-            }
-            match line.split_once('=') {
-                Some((key, _)) if !key.trim().is_empty() => {}
-                _ => return Err(format!("{line:?} isn't a `[section]` or a `key=value` line").into()),
-            }
+        let ini = Self { text: text.to_owned() };
+        if let Some(line) = ini.lines().find(|l| matches!(l.what, What::Other)) {
+            let line = &ini.text[line.start..line.end];
+            return Err(format!("{line:?} isn't a `[section]` or a one-line `key=value`").into());
         }
-        Ok(Self { text: text.to_owned() })
+        Ok(ini)
     }
 
     /// The file's text.
@@ -81,51 +90,39 @@ impl IniText {
 
     /// Whether it has nothing but blank space.
     pub fn is_empty(&self) -> bool {
-        self.text.trim().is_empty()
+        self.text.trim_start_matches(BOM).trim().is_empty()
     }
 
-    /// Whether `section` has a header.
+    /// Whether `section` is there: a header of it, or for General, a key before the first header.
     pub fn has_section(&self, section: &str) -> bool {
-        self.lines()
-            .any(|l| matches!(l.what, What::Header(name) if name == section))
-    }
-
-    /// The value of `key`'s first line in `section`, when it has one.
-    pub fn get(&self, section: &str, key: &str) -> Option<String> {
-        self.lines().find_map(|l| match l.what {
-            What::Setting {
-                section: Some(s),
-                key: k,
-                value,
-            } if s == section && k == key => Some(self.text[value].to_owned()),
-            _ => None,
+        self.lines().any(|l| match l.what {
+            What::Header(name) => same_section(Some(name), section),
+            What::Setting { section: None, .. } => same_section(None, section),
+            _ => false,
         })
     }
 
-    /// Sets `key` in `section` to `value` on its first line, or on a new line after the section's
+    /// The value of `key`'s last line in `section`, the one Qt reads, when it has one.
+    pub fn get(&self, section: &str, key: &str) -> Option<String> {
+        self.found(section, key)
+            .last()
+            .map(|(_, _, value)| self.text[value.clone()].to_owned())
+    }
+
+    /// Sets `key` in `section` to `value` on its last line, or on a new line after the section's
     /// last, making the section at the end of the file when it has none, and takes out the key's
     /// other lines in it. `None` takes out every line of the key in the section, then, unless
-    /// `keep_section`, the section's header once nothing but blank lines is under it, with the
-    /// blank line before it that set it apart. `value` is one line.
+    /// `keep_section`, the section's header a step appended, once nothing but blank lines is under
+    /// it. `value` is one line.
     pub fn set(&mut self, section: &str, key: &str, value: Option<&str>, keep_section: bool) {
-        let found: Vec<(usize, usize, Range<usize>)> = self
-            .lines()
-            .filter_map(|l| match l.what {
-                What::Setting {
-                    section: Some(s),
-                    key: k,
-                    value,
-                } if s == section && k == key => Some((l.start, l.past, value)),
-                _ => None,
-            })
-            .collect();
+        let found = self.found(section, key);
         let newline = if self.text.contains("\r\n") { "\r\n" } else { "\n" };
         let separator = self.separator().to_owned();
         let mut text = self.text.clone();
         // From the last line up, so the earlier lines' places stay right.
         for (i, (start, past, old)) in found.iter().cloned().enumerate().rev() {
             match value {
-                Some(value) if i == 0 => {
+                Some(value) if i == found.len() - 1 => {
                     // An empty value after a spaced `=` gets the space a written one has before it.
                     let space = old.is_empty() && separator.ends_with(' ') && !text[..old.start].ends_with(' ');
                     text.replace_range(old, &format!("{}{value}", if space { " " } else { "" }));
@@ -139,12 +136,27 @@ impl IniText {
                 let line = format!("{key}{separator}{value}");
                 self.add(section, &line, newline);
             }
-            None if !keep_section => self.remove_empty(section),
+            None if !keep_section => self.remove_appended(section),
             _ => {}
         }
     }
 
+    /// Where each line of `key` in `section` starts, where the next line starts, and its value.
+    fn found(&self, section: &str, key: &str) -> Vec<(usize, usize, Range<usize>)> {
+        self.lines()
+            .filter_map(|l| match l.what {
+                What::Setting {
+                    section: here,
+                    key: k,
+                    value,
+                } if k == key && same_section(here, section) => Some((l.start, l.past, value)),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// `line` after the last line of `section` that isn't blank, or in a new section at the end.
+    /// Before the first header, only a setting is General's: a comment there may be the file's.
     fn add(&mut self, section: &str, line: &str, newline: &str) {
         let mut last = None;
         let mut current = None;
@@ -152,7 +164,12 @@ impl IniText {
             if let What::Header(name) = l.what {
                 current = Some(name);
             }
-            if current == Some(section) && !matches!(l.what, What::Blank) {
+            let ours = match (current, &l.what) {
+                (_, What::Blank) | (None, What::Comment | What::Header(_) | What::Other) => false,
+                (None, What::Setting { .. }) => same_section(None, section),
+                (Some(name), _) => same_section(Some(name), section),
+            };
+            if ours {
                 last = Some((l.end, l.past));
             }
         }
@@ -167,7 +184,7 @@ impl IniText {
             self.text.insert_str(at, &format!("{line}{newline}"));
             return;
         }
-        if !self.text.is_empty() {
+        if !self.is_empty() {
             if !self.text.ends_with('\n') {
                 self.text.push_str(newline);
             }
@@ -178,28 +195,23 @@ impl IniText {
         }
     }
 
-    /// Takes out each header of `section` with nothing but blank lines under it, and the blank
-    /// line before it.
-    fn remove_empty(&mut self, section: &str) {
+    /// Takes out the header of `section` as a step appends it: the file's last header, nothing
+    /// but blank lines after it, with the blank line before it that set it apart. A header
+    /// anywhere else, empty or not, was there before or is Qt's, and stays.
+    fn remove_appended(&mut self, section: &str) {
         let lines: Vec<Line<'_>> = self.lines().collect();
-        let mut gone = Vec::new();
-        for (i, line) in lines.iter().enumerate() {
-            if !matches!(line.what, What::Header(name) if name == section) {
-                continue;
-            }
-            let under = lines[i + 1..].iter().take_while(|l| !matches!(l.what, What::Header(_)));
-            if under.into_iter().any(|l| !matches!(l.what, What::Blank)) {
-                continue;
-            }
-            let start = match i.checked_sub(1).map(|b| &lines[b]) {
-                Some(before) if matches!(before.what, What::Blank) => before.start,
-                _ => line.start,
-            };
-            gone.push(start..line.past);
+        let Some(i) = lines.iter().rposition(|l| !matches!(l.what, What::Blank)) else {
+            return;
+        };
+        if !matches!(lines[i].what, What::Header(name) if same_section(Some(name), section)) {
+            return;
         }
-        for range in gone.into_iter().rev() {
-            self.text.replace_range(range, "");
-        }
+        let start = match i.checked_sub(1).map(|b| &lines[b]) {
+            Some(before) if matches!(before.what, What::Blank) => before.start,
+            _ => lines[i].start,
+        };
+        let past = lines[i].past;
+        self.text.replace_range(start..past, "");
     }
 
     /// What the file's first setting has between its key and its value, else Qt's `=`.
@@ -220,26 +232,25 @@ impl IniText {
         let mut start = 0;
         let mut section = None;
         self.text.split_inclusive('\n').map(move |raw| {
-            let here = start;
+            let mut here = start;
             start += raw.len();
-            let line = raw.trim_end_matches(['\n', '\r']);
+            let mut line = raw.trim_end_matches(['\n', '\r']);
+            if here == 0
+                && let Some(rest) = line.strip_prefix(BOM)
+            {
+                here = BOM.len_utf8();
+                line = rest;
+            }
             let trimmed = line.trim();
             let what = if trimmed.is_empty() {
                 What::Blank
-            } else if is_comment(trimmed) {
+            } else if trimmed.starts_with(';') {
                 What::Comment
             } else if let Some(name) = header(trimmed) {
                 section = Some(name);
                 What::Header(name)
-            } else if let Some((key, value)) = line.split_once('=') {
-                let at = here + line.len() - value.trim_start().len();
-                What::Setting {
-                    section,
-                    key: key.trim(),
-                    value: at..at + value.trim().len(),
-                }
             } else {
-                What::Comment
+                setting(line, here, section)
             };
             Line {
                 start: here,
@@ -251,136 +262,57 @@ impl IniText {
     }
 }
 
-fn is_comment(line: &str) -> bool {
-    line.starts_with([';', '#'])
+/// `line`, at `here` in the text, as Qt reads a setting: its key up to the first `=` that no `\`
+/// escapes, its value from there to a `;` outside quotes, or the line's end.
+fn setting<'a>(line: &'a str, here: usize, section: Option<&'a str>) -> What<'a> {
+    let bytes = line.as_bytes();
+    let mut equals = None;
+    let mut end = bytes.len();
+    let mut quoted = false;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            // A `\` last on the line continues the value on the next one.
+            b'\\' if i + 1 == bytes.len() => return What::Other,
+            b'\\' => i += 1,
+            b'"' => quoted = !quoted,
+            b'=' if equals.is_none() => equals = Some(i),
+            b';' if !quoted => {
+                end = i;
+                break;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    let Some(equals) = equals.filter(|&e| e < end) else {
+        return What::Other;
+    };
+    let key = line[..equals].trim();
+    if quoted || key.is_empty() {
+        return What::Other;
+    }
+    let value = &line[equals + 1..end];
+    let at = here + equals + 1 + (value.len() - value.trim_start().len());
+    What::Setting {
+        section,
+        key,
+        value: at..at + value.trim().len(),
+    }
+}
+
+/// Whether a header's `found` name, or none before the first header, is `wanted`: General is
+/// the keys before any header and a `[general]` in any case, as Qt reads them.
+fn same_section(found: Option<&str>, wanted: &str) -> bool {
+    let general = |name: &str| name.eq_ignore_ascii_case("general");
+    match found {
+        None => general(wanted),
+        Some(name) if general(wanted) => general(name),
+        Some(name) => name == wanted,
+    }
 }
 
 /// The section a trimmed `[section]` line names.
 fn header(line: &str) -> Option<&str> {
     line.strip_prefix('[')?.strip_suffix(']').map(str::trim)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::IniText;
-
-    /// A `zoomus.conf` as Zoom 6 writes it: Qt's `[General]` first, `key=value` with no spaces,
-    /// Qt's quoting and `@ByteArray`, and a section of its own after a blank line.
-    const ZOOM: &str = "[General]\nGeoLocation=\"Europe/Warsaw\"\nautoPlayGif=false\n\
-                        conf.webserver=@ByteArray(https://zoom.us)\nxwayland=true\n\n\
-                        [AS]\nshowframewindow=true\n";
-
-    #[test]
-    fn a_set_changes_only_the_keys_value_and_keeps_every_other_byte() {
-        let mut ini = IniText::parse(ZOOM).unwrap();
-
-        ini.set("General", "xwayland", Some("false"), true);
-
-        assert_eq!(ini.text(), ZOOM.replace("xwayland=true", "xwayland=false"));
-        assert_eq!(ini.get("General", "xwayland").as_deref(), Some("false"));
-        assert_eq!(ini.get("AS", "xwayland"), None);
-    }
-
-    #[test]
-    fn a_new_key_goes_after_its_sections_last_line_and_its_removal_leaves_the_text_as_it_was() {
-        let mut ini = IniText::parse(ZOOM).unwrap();
-
-        ini.set("General", "enableWaylandShare", Some("true"), true);
-        assert_eq!(
-            ini.text(),
-            ZOOM.replace("xwayland=true\n", "xwayland=true\nenableWaylandShare=true\n")
-        );
-        ini.set("General", "enableWaylandShare", None, true);
-
-        assert_eq!(ini.text(), ZOOM);
-    }
-
-    #[test]
-    fn a_missing_section_is_made_at_the_end_and_taken_out_with_its_blank_line_once_empty() {
-        let mine = "[AS]\nshowframewindow=true";
-        let mut ini = IniText::parse(mine).unwrap();
-
-        ini.set("General", "xwayland", Some("false"), true);
-        assert_eq!(ini.text(), "[AS]\nshowframewindow=true\n\n[General]\nxwayland=false\n");
-        assert!(ini.has_section("General"));
-        ini.set("General", "xwayland", None, false);
-
-        assert_eq!(ini.text(), "[AS]\nshowframewindow=true\n");
-        assert!(!ini.has_section("General"));
-    }
-
-    #[test]
-    fn an_empty_file_gets_the_section_and_the_key_and_is_empty_again_after() {
-        let mut ini = IniText::empty();
-
-        ini.set("General", "xwayland", Some("false"), false);
-        assert_eq!(ini.text(), "[General]\nxwayland=false\n");
-        ini.set("General", "xwayland", None, false);
-
-        assert!(ini.is_empty());
-    }
-
-    #[test]
-    fn a_section_kept_stays_when_its_last_key_goes() {
-        let mut ini = IniText::parse("[General]\nxwayland=false\n").unwrap();
-
-        ini.set("General", "xwayland", None, true);
-
-        assert_eq!(ini.text(), "[General]\n");
-    }
-
-    #[test]
-    fn a_key_goes_under_a_section_that_ends_the_file_without_a_line_break() {
-        let mut ini = IniText::parse("[General]\nautoPlayGif=false").unwrap();
-
-        ini.set("General", "xwayland", Some("false"), true);
-
-        assert_eq!(ini.text(), "[General]\nautoPlayGif=false\nxwayland=false\n");
-    }
-
-    #[test]
-    fn a_key_there_twice_is_set_on_its_first_line_and_taken_out_whole() {
-        let mut ini = IniText::parse("[General]\na=1\nb=2\na=3\n[Other]\na=9\n").unwrap();
-
-        ini.set("General", "a", Some("4"), true);
-        assert_eq!(ini.text(), "[General]\na=4\nb=2\n[Other]\na=9\n");
-        ini.set("General", "a", None, true);
-
-        assert_eq!(ini.text(), "[General]\nb=2\n[Other]\na=9\n");
-    }
-
-    #[test]
-    fn the_files_own_spacing_and_line_endings_are_used_for_a_new_line() {
-        let mut ini = IniText::parse("; mine\r\n[General]\r\nname = den\r\n").unwrap();
-
-        ini.set("General", "xwayland", Some("false"), true);
-
-        assert_eq!(ini.text(), "; mine\r\n[General]\r\nname = den\r\nxwayland = false\r\n");
-    }
-
-    #[test]
-    fn a_key_before_any_header_or_in_another_section_isnt_the_sections() {
-        let ini = IniText::parse("xwayland=true\n[AS]\nxwayland=true\n").unwrap();
-
-        assert_eq!(ini.get("General", "xwayland"), None);
-        assert!(!ini.has_section("General"));
-    }
-
-    #[test]
-    fn an_empty_value_is_found_empty_and_set_after_its_equals_sign() {
-        let mut ini = IniText::parse("[General]\nxwayland=\nname = \n").unwrap();
-
-        assert_eq!(ini.get("General", "xwayland").as_deref(), Some(""));
-        ini.set("General", "xwayland", Some("false"), true);
-        ini.set("General", "name", Some("den"), true);
-
-        assert_eq!(ini.text(), "[General]\nxwayland=false\nname = den\n");
-    }
-
-    #[test]
-    fn a_line_that_isnt_a_setting_or_a_section_is_refused() {
-        assert!(IniText::parse("[General]\nxwayland\n").is_err());
-        assert!(IniText::parse("= false\n").is_err());
-        assert!(IniText::parse("  ; indented comment\n# another\n\n[General]\nkey=\n").is_ok());
-    }
 }

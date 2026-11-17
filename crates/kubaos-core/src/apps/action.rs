@@ -117,11 +117,15 @@ pub enum ActionError {
     #[error("a setting's file is a .json, .toml or .conf file in the home; {value:?} isn't")]
     InvalidSettingFile { value: String },
     #[error(
-        "{value:?} is not a setting's key: dot-separated names, one bare name in a .conf or under an INI file's section"
+        "{value:?} is not a setting's key: dot-separated names, one bare name in a .conf, letters, digits, `_`, `.` and `-` under an INI file's section"
     )]
     InvalidKey { value: String },
-    #[error("{value:?} is not an INI file's section: a name in a .conf, with no brackets or line breaks")]
+    #[error("{value:?} is not an INI file's section: a name in a .conf of letters, digits, `_`, `.` and `-`")]
     InvalidSection { value: String },
+    #[error(
+        "an INI file's value is text Qt writes as it is: no quotes, `\\`, `,`, `;`, `=`, control characters, leading `@` or spaces around it"
+    )]
+    InvalidIniValue,
     #[error("a setting's value is a string, a number or a boolean")]
     InvalidValue,
     #[error("{path:?} isn't text, so it can't be a template")]
@@ -774,7 +778,6 @@ impl Action {
         })
     }
 
-    #[expect(clippy::too_many_lines, reason = "one arm for each kind of action, each a call")]
     fn check(&self) -> Result<(), ActionError> {
         if self.name.trim().is_empty() {
             return Err(ActionError::NoName);
@@ -838,12 +841,7 @@ impl Action {
                     return Err(ActionError::Empty { key: "target" });
                 }
             }
-            Kind::Setting {
-                file,
-                section,
-                key,
-                value,
-            } => check_setting(file, section.as_deref(), key, value)?,
+            Kind::Setting { .. } => check_setting(&self.kind)?,
             Kind::Unit {
                 unit, enable, start, ..
             } => {
@@ -1056,28 +1054,36 @@ fn file_text(
     Ok((text, false))
 }
 
-fn check_setting(file: &str, section: Option<&str>, key: &str, value: &toml::Value) -> Result<(), ActionError> {
+/// Whether a `setting` step's file, section, key and value are well formed.
+fn check_setting(kind: &Kind) -> Result<(), ActionError> {
+    let Kind::Setting {
+        file,
+        section,
+        key,
+        value,
+    } = kind
+    else {
+        return Ok(());
+    };
     let home = file.starts_with("~/") && check_path(file).is_ok();
     let extension = Path::new(file).extension().and_then(|e| e.to_str());
     if !home || !matches!(extension, Some("json" | "toml" | "conf")) {
-        return Err(ActionError::InvalidSettingFile { value: file.to_owned() });
+        return Err(ActionError::InvalidSettingFile { value: file.clone() });
     }
     if let Some(section) = section
-        && (extension != Some("conf") || !is_ini_section(section))
+        && (extension != Some("conf") || !settings::is_ini_name(section))
     {
-        return Err(ActionError::InvalidSection {
-            value: section.to_owned(),
-        });
+        return Err(ActionError::InvalidSection { value: section.clone() });
     }
     let fits = match (section, extension) {
-        (Some(_), _) => is_ini_key(key),
+        (Some(_), _) => settings::is_ini_name(key),
         // A flat `.conf`'s keys have no tables above them: a dot would read as one, and `=`, `#`
         // or a line break would end the key.
         (None, Some("conf")) => !key.is_empty() && !key.contains(['.', '=', '#', '\n', '\r']) && key.trim() == key,
         (None, _) => !key.split('.').any(str::is_empty),
     };
     if !fits {
-        return Err(ActionError::InvalidKey { value: key.to_owned() });
+        return Err(ActionError::InvalidKey { value: key.clone() });
     }
     if !matches!(
         value,
@@ -1085,19 +1091,10 @@ fn check_setting(file: &str, section: Option<&str>, key: &str, value: &toml::Val
     ) {
         return Err(ActionError::InvalidValue);
     }
+    if section.is_some() && !settings::is_ini_value(value) {
+        return Err(ActionError::InvalidIniValue);
+    }
     Ok(())
-}
-
-/// Whether `section` is a name an INI header holds: no brackets, which would end or nest the
-/// header, and no line breaks or spaces around it, which reading trims.
-fn is_ini_section(section: &str) -> bool {
-    !section.is_empty() && !section.contains(['[', ']', '\n', '\r']) && section.trim() == section
-}
-
-/// Whether `key` is a key an INI line holds: `=` would end it, a line break the line, a leading
-/// `[`, `;` or `#` would read as a header or a comment, and reading trims spaces around it.
-fn is_ini_key(key: &str) -> bool {
-    !key.is_empty() && !key.contains(['=', '\n', '\r']) && !key.starts_with(['[', ';', '#']) && key.trim() == key
 }
 
 /// Whether an `apt` step's packages, repository, architecture and versions are well formed.

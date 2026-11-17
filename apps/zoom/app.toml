@@ -26,12 +26,11 @@ arch = "amd64"
 unfree = true
 packages = ["zoom-us"]
 
-# Zoom ships Qt's Wayland plugin but starts on XWayland unless its own settings file says
-# `xwayland=false` under `[General]`; screen sharing on Wayland then needs `enableWaylandShare=true`
-# there too, which hands the capture to PipeWire through the desktop portal. Zoom rewrites the
-# whole file as it runs, so each step finds its key by section and name, wherever it stands.
+# Zoom ships Qt's Wayland plugin, but its launcher starts it on XWayland unless its own settings
+# file says `xwayland=false` under `[General]`: ZoomLauncher reads the key as a boolean that is
+# true when it is missing. Zoom rewrites the whole file as it runs, so the step finds its key by
+# section and name, wherever it stands. Screen capture on Wayland is Zoom's own setting.
 # https://wiki.archlinux.org/title/Zoom_Meetings#Running_on_Wayland_without_Xwayland
-# https://wiki.archlinux.org/title/Zoom_Meetings#Wayland
 [[action]]
 name = "Start Zoom on Wayland"
 kind = "setting"
@@ -39,11 +38,3 @@ file = "~/.config/zoomus.conf"
 section = "General"
 key = "xwayland"
 value = false
-
-[[action]]
-name = "Share your screen from Zoom on Wayland"
-kind = "setting"
-file = "~/.config/zoomus.conf"
-section = "General"
-key = "enableWaylandShare"
-value = true
