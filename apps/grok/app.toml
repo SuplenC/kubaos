@@ -10,8 +10,8 @@ Grok is xAI's AI assistant. Its website, here in a window of its own, answers qu
 and edits text and code, searches the web and X, reads the pictures you give it and \
 makes images, in chats it keeps with your account."""
 description_from = "kubaos"
-# Ours: xAI's logo isn't under a licence that allows copying it. The window's own icon is the
-# same picture.
+# Grok's icon, xAI's trademark, used to identify the app (grok.svg's header names its
+# source). The window's own icon is the same picture.
 icon = "grok.svg"
 requires = ["google-chrome"]
 keeps = """\

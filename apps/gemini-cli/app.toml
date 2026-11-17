@@ -11,6 +11,9 @@ description = """\
 Gemini CLI (`gemini`) is an open-source terminal agent maintained for enterprise Gemini Code \
 Assist workflows on Google Cloud."""
 description_from = "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/README.md"
+# Gemini's icon, Google's trademark, used to identify the app, on a tile (gemini.svg's header names
+# its source): no icon theme has Gemini CLI.
+icon = "gemini.svg"
 keeps = """\
 Your sign-in and settings stay in ~/.gemini: install Gemini CLI again and you're still signed \
 in."""

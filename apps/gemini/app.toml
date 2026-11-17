@@ -10,8 +10,8 @@ Gemini is Google's AI assistant. Its website, here in a window of its own, answe
 writes and edits text and code, reads the files and pictures you give it, searches the web and \
 makes images, in chats it keeps with your Google account."""
 description_from = "kubaos"
-# Ours: Google's logo isn't under a licence that allows copying it. The window's own icon is the
-# same picture.
+# Gemini's icon, Google's trademark, used to identify the app (gemini.svg's header names its
+# source). The window's own icon is the same picture.
 icon = "gemini.svg"
 requires = ["google-chrome"]
 keeps = """\
