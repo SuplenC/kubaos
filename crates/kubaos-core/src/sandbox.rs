@@ -188,9 +188,8 @@ impl Sandbox {
         fs::set_permissions(sandbox.runtime(), fs::Permissions::from_mode(0o700))
             .expect("make the runtime folder its owner's");
         fs::write(sandbox.log(), "").expect("start the stand-ins' log");
-        let real = env::var_os("PATH").unwrap_or_default();
         for tool in TOOLS {
-            if let Some(found) = env::split_paths(&real).map(|dir| dir.join(tool)).find(|p| p.is_file()) {
+            if let Some(found) = real_tool(tool) {
                 symlink(found, sandbox.bin().join(tool)).expect("link a tool into the sandbox");
             }
         }
@@ -336,6 +335,20 @@ impl Sandbox {
             .env("DBUS_SYSTEM_BUS_ADDRESS", NOWHERE)
             .stdin(Stdio::null())
     }
+}
+
+/// The shell a script's `#!/bin/sh` runs, which the sandbox's `sh` is too: Ubuntu's is dash,
+/// a dev shell's `PATH` puts bash first, and the two differ (a `command -v` that finds nothing
+/// exits 127 in dash, 1 in bash), so a test's `sh -c` would depend on the shell it ran from.
+const SYSTEM_SHELL: &str = "/bin/sh";
+
+/// `tool` as the real `PATH` finds it; `sh` is [`SYSTEM_SHELL`] where the machine has one.
+fn real_tool(tool: &str) -> Option<PathBuf> {
+    if tool == "sh" && Path::new(SYSTEM_SHELL).is_file() {
+        return Some(PathBuf::from(SYSTEM_SHELL));
+    }
+    let real = env::var_os("PATH").unwrap_or_default();
+    env::split_paths(&real).map(|dir| dir.join(tool)).find(|p| p.is_file())
 }
 
 /// `program` with `args`, run to its end in a sandbox of its own that lasts the call, for a test's

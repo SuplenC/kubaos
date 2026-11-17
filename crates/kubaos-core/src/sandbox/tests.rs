@@ -93,9 +93,21 @@ fn a_command_taken_out_is_not_found() {
     let (_dir, sandbox) = sandbox();
     sandbox.without("nix");
 
-    let (code, _, _) = sh(&sandbox, "command -v nix");
+    let (found, shown, _) = sh(&sandbox, "command -v nix");
+    let (ran, _, err) = sh(&sandbox, "nix --version");
 
-    assert_eq!(code, Some(1));
+    assert_ne!(found, Some(0));
+    assert_eq!(shown, "");
+    assert_eq!(ran, Some(127), "{err}");
+}
+
+#[test]
+fn the_sandboxs_shell_is_the_one_a_scripts_shebang_runs() {
+    let (_dir, sandbox) = sandbox();
+
+    let linked = fs::read_link(sandbox.bin().join("sh")).unwrap();
+
+    assert_eq!(linked, Path::new(SYSTEM_SHELL));
 }
 
 #[test]

@@ -40,9 +40,14 @@ trap 'rm -rf "$parent"' EXIT
 decoy="$parent/decoy"
 mkdir "$decoy"
 printf 'decoy\n' >"$decoy/README"
-git -C "$decoy" init -q
-git -C "$decoy" add README
-git -C "$decoy" -c user.name=decoy -c user.email=decoy@kubaos commit -q -m decoy
+# With no configuration of the developer's: a global commit.gpgsign would ask a security key.
+decoy_git() {
+  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$decoy" \
+    -c user.name=decoy -c user.email=decoy@kubaos -c commit.gpgsign=false "$@"
+}
+decoy_git init -q
+decoy_git add README
+decoy_git commit -q -m decoy
 
 # Every file and folder with its mode and size, and every file's content.
 snapshot() {

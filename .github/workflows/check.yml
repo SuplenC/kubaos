@@ -221,9 +221,9 @@ jobs:
       - name: Build the devshell
         run: nix develop --command true
 
-      # Only Kōbō's tests build, not the workspace's.
+      # Only Kōbō's tests build, not the workspace's (`-p`).
       - name: Tests
-        run: nix develop --command cargo nextest run -p kubaos-kobo -E "$SLOW_TEST"
+        run: nix develop --command just nextest -p kubaos-kobo -E "$SLOW_TEST"
 
       - name: Compile cache stats
         if: ${{ !cancelled() }}
