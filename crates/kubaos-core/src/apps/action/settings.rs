@@ -227,9 +227,11 @@ impl Settings {
             }
             Self::Conf(conf) => {
                 if let Some(value) = value
-                    && value.contains(['\n', '\r'])
+                    && value.contains(['\n', '\r', '#'])
                 {
-                    return Err(unreadable("a value is one line".into()));
+                    return Err(unreadable(
+                        "a value is one line with no #, which starts a comment".into(),
+                    ));
                 }
                 conf.set(key, value);
             }

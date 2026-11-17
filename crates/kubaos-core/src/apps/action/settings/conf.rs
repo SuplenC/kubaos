@@ -1,7 +1,9 @@
 //! A flat `key = value` settings file edited in place, as Sunshine's `sunshine.conf` is: one
-//! setting a line, `#` starting a comment line, the value the line's text after the first `=`,
-//! unquoted. A key's line is replaced, added at the end or taken out, and every other line, blank
-//! and comment lines included, stays as it was.
+//! setting a line, unquoted, and a `#` anywhere starting a comment to the end of its line, as
+//! Sunshine's own reader cuts it. A value is the text between the first `=` and the comment,
+//! trimmed. A key's value is replaced where it stands, its line's comment kept, or a line is added
+//! at the end or taken out, and every other line, blank and comment lines included, stays as it
+//! was.
 //!
 //! # Owns
 //!
@@ -44,8 +46,8 @@ impl ConfText {
     /// The first line that is none of them.
     pub fn parse(text: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         for line in text.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
+            let line = uncommented(line).trim();
+            if line.is_empty() {
                 continue;
             }
             match line.split_once('=') {
@@ -73,8 +75,9 @@ impl ConfText {
             .map(|l| self.text[l.value].to_owned())
     }
 
-    /// Sets `key` to `value` on its first line, or on a new last line, and takes out its other
-    /// lines; `None` takes out every line of it.
+    /// Sets `key` to `value` on its first line, the line's comment kept, or on a new last line,
+    /// and takes out its other lines; `None` takes out every line of it. `value` is one line with
+    /// no `#`, which would start a comment.
     pub fn set(&mut self, key: &str, value: Option<&str>) {
         let found: Vec<(usize, usize, Range<usize>)> = self
             .lines()
@@ -86,8 +89,15 @@ impl ConfText {
         for (i, (start, end, old)) in found.iter().cloned().enumerate().rev() {
             match value {
                 Some(value) if i == 0 => {
-                    let spaced = old.is_empty() && !text[..old.start].ends_with(char::is_whitespace);
-                    let value = if spaced { format!(" {value}") } else { value.to_owned() };
+                    // An empty value stands between the `=` and a comment or the line's end: it
+                    // gets the spaces a written one has around it.
+                    let before = old.is_empty() && !text[..old.start].ends_with(char::is_whitespace);
+                    let after = old.is_empty() && text[old.end..].starts_with('#');
+                    let value = format!(
+                        "{}{value}{}",
+                        if before { " " } else { "" },
+                        if after { " " } else { "" }
+                    );
                     text.replace_range(old, &value);
                 }
                 _ => {
@@ -117,21 +127,26 @@ impl ConfText {
             let here = start;
             start += raw.len();
             let line = raw.trim_end_matches(['\n', '\r']);
-            let trimmed = line.trim_start();
-            if trimmed.is_empty() || trimmed.starts_with('#') {
+            let setting = uncommented(line);
+            let (key, value) = setting.split_once('=')?;
+            let key = key.trim();
+            if key.is_empty() {
                 return None;
             }
-            let (key, value) = line.split_once('=')?;
-            let after = &line[key.len() + 1..];
-            let at = here + line.len() - after.trim_start().len();
+            let at = here + setting.len() - value.trim_start().len();
             Some(Line {
                 start: here,
                 end: here + line.len(),
-                key: key.trim(),
+                key,
                 value: at..at + value.trim().len(),
             })
         })
     }
+}
+
+/// `line` up to its comment: the text before its first `#`.
+fn uncommented(line: &str) -> &str {
+    line.split_once('#').map_or(line, |(setting, _)| setting)
 }
 
 #[cfg(test)]
@@ -172,9 +187,31 @@ mod tests {
     }
 
     #[test]
+    fn a_comment_after_a_value_is_left_out_of_it_and_kept_as_the_value_changes() {
+        let mut conf = ConfText::parse("origin_web_ui_allowed = pc # mine\nport=47989# base\n").unwrap();
+
+        assert_eq!(conf.get("origin_web_ui_allowed").as_deref(), Some("pc"));
+        assert_eq!(conf.get("port").as_deref(), Some("47989"));
+        conf.set("port", Some("48000"));
+
+        assert_eq!(conf.text(), "origin_web_ui_allowed = pc # mine\nport=48000# base\n");
+    }
+
+    #[test]
+    fn an_empty_value_before_a_comment_is_set_with_spaces_around_it() {
+        let mut conf = ConfText::parse("key = # to do\n").unwrap();
+
+        assert_eq!(conf.get("key").as_deref(), Some(""));
+        conf.set("key", Some("pc"));
+
+        assert_eq!(conf.text(), "key = pc # to do\n");
+    }
+
+    #[test]
     fn a_line_that_isnt_a_setting_is_refused() {
         assert!(ConfText::parse("[section]\n").is_err());
         assert!(ConfText::parse("= pc\n").is_err());
+        assert!(ConfText::parse("key # = pc\n").is_err());
         assert!(ConfText::parse("  # indented comment\n\nkey =\n").is_ok());
     }
 

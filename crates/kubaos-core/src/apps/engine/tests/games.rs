@@ -412,3 +412,18 @@ fn a_sunshine_sign_in_you_changed_and_your_paired_clients_stay_after_its_removal
     let left: serde_json::Value = serde_json::from_str(&fs::read_to_string(&state).unwrap()).unwrap();
     assert_eq!(left, serde_json::json!({ "root": paired["root"] }));
 }
+
+#[test]
+fn a_sunshine_conf_line_already_set_keeps_your_comment_and_stays_after_the_removal() {
+    let world = served("sunshine");
+    let conf = world.host_home().join(".config/sunshine/sunshine.conf");
+    fs::create_dir_all(conf.parent().unwrap()).unwrap();
+    let mine = "origin_web_ui_allowed = pc # this machine only\n";
+    fs::write(&conf, mine).unwrap();
+
+    run(&world, |e| e.add("sunshine", None, &picks("sunshine"))).unwrap();
+    assert_eq!(fs::read_to_string(&conf).unwrap(), mine);
+    run(&world, |e| e.remove_with("sunshine", &Picks::default())).unwrap();
+
+    assert_eq!(fs::read_to_string(&conf).unwrap(), mine);
+}
