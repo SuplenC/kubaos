@@ -25,7 +25,8 @@ const symbolPrefix = "symbol:";
 
 // The symbol an Item's tile draws: the one its icon names, else its Extension's.
 function itemGlyph(icon, extension) {
-    return icon.startsWith(symbolPrefix) ? icon.slice(symbolPrefix.length) : glyph(extension);
+    const named = icon.startsWith(symbolPrefix) ? icon.slice(symbolPrefix.length) : "";
+    return named !== "" ? named : glyph(extension);
 }
 
 // Where an Item's picture is: a path as a file URL, an icon theme's name looked up; none for no

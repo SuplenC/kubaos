@@ -2156,9 +2156,47 @@ fn an_apps_png_icon_is_installed_into_the_themes_folder_of_its_size_and_journale
         ),
         "{entry:?}"
     );
-    // Installed again, the icon is there as recorded, so nothing is done.
+    // Installed again, the icon is there as recorded, so nothing is done: the file isn't written
+    // again and its entry records the same bytes.
+    let written = fs::metadata(&icon).unwrap().modified().unwrap();
     world.install("tool", true).0.unwrap();
     assert_eq!(fs::read(&icon).unwrap(), png);
+    assert_eq!(fs::metadata(&icon).unwrap().modified().unwrap(), written);
+    let again = world.journals("tool").0.unwrap();
+    assert_eq!(again.entries[1].action.kind, journal.entries[1].action.kind);
+}
+
+#[test]
+fn a_binary_icon_whose_journal_holds_no_base64_is_written_again_from_the_catalog_and_goes_with_its_app() {
+    let world = world_with_icon("tool.png", &crate::apps::folder::picture::png(128, 128));
+    let before = world.host.snapshot();
+    world.install("tool", true).0.unwrap();
+    let icon = world
+        .host_home()
+        .join(".local/share/icons/hicolor/128x128/apps/tool.png");
+    let file = Journal::file(&world.user_journals, "tool");
+    let journal = fs::read_to_string(&file).unwrap();
+    let Some(crate::apps::action::Kind::File { text: Some(base64), .. }) = world
+        .journals("tool")
+        .0
+        .unwrap()
+        .entries
+        .iter()
+        .find(|e| e.step == 2)
+        .map(|e| e.action.kind.clone())
+    else {
+        panic!("no icon step");
+    };
+    assert!(journal.contains(&base64));
+    fs::write(&file, journal.replace(&base64, "not base64!")).unwrap();
+    fs::remove_file(&icon).unwrap();
+
+    world.install("tool", true).0.unwrap();
+    assert_eq!(fs::read(&icon).unwrap(), crate::apps::folder::picture::png(128, 128));
+    assert!(fs::read_to_string(&file).unwrap().contains(&base64));
+
+    world.remove("tool").0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
 }
 
 #[test]
