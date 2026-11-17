@@ -84,6 +84,8 @@ fn use_of(duration: Duration) -> &'static str {
         Duration::SwapFade => "A twin panel's arriving content fading in.",
         Duration::CaretHold => "The caret's glow holding after the last key.",
         Duration::CaretFade => "The caret's glow fading once typing stops.",
+        Duration::PeakHold => "A live meter's peak tick holding at the highest level.",
+        Duration::PeakFall => "A live meter's peak tick falling the whole bar back.",
         Duration::Hold => "A held button held until it acts.",
         Duration::Hum => "Half a skeleton's breath.",
         Duration::Toast => "A toast staying once it has arrived.",

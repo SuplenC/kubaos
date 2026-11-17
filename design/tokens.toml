@@ -653,6 +653,17 @@ use = "The caret's glow holding after the last key."
 ms = 800
 use = "The caret's glow fading after typing stops, down to nothing."
 
+# A live meter's peak tick (a mic's level): it holds at the highest level lately, then
+# falls the whole bar back over `peak_fall`, never under the level, so a voice's peaks
+# stay readable between its words.
+[duration.peak_hold]
+ms = 800
+use = "A live meter's peak tick holding at the highest level lately."
+
+[duration.peak_fall]
+ms = 1200
+use = "A live meter's peak tick falling the whole bar back."
+
 [duration.hum]
 ms = 1200
 use = "Half a skeleton's breath: its glass warming or cooling."

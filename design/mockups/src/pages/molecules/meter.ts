@@ -178,10 +178,10 @@ function silent(): HTMLElement {
 
 const PEAK: Move = {
   name: "A live level, its peak falling",
-  what: "The level jumps with no easing; the tick holds for `slow`, then falls the whole bar per `scene`, on `linear`.",
+  what: "The level jumps with no easing; the tick holds for `peak_hold`, then falls the whole bar per `peak_fall`, on `linear`.",
   tracks: [
     { part: "the level", on: "a live meter", target: ".k-meter-part", property: "--reach", from: 1, to: 0, duration: "instant", curve: "linear" },
-    { part: "the peak tick", on: "a live meter", target: ".k-meter", property: "--meter-peak", from: 1, to: 0, duration: "scene", cue: "slow", curve: "linear" },
+    { part: "the peak tick", on: "a live meter", target: ".k-meter", property: "--meter-peak", from: 1, to: 0, duration: "peak_fall", cue: "peak_hold", curve: "linear" },
   ],
   reduced: "same",
   back: "cuts",

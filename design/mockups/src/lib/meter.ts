@@ -7,8 +7,8 @@
 // keeps the bar's rounded ends. A new reading eases each part over `short` on `linear`.
 //
 // A live meter is a mic's level as it comes, one `primary` part with no easing, and a peak tick: a
-// `stroke.thin` line across the bar at the highest level lately, which holds for `slow` and then
-// falls back at the whole bar per `scene`, never under the level. Muted, it is the track alone.
+// `stroke.thin` line across the bar at the highest level lately, which holds for `peak_hold` and
+// then falls back at the whole bar per `peak_fall`, never under the level. Muted, it is the track alone.
 // Disabled, with no mic to hear, it is the track alone dimmed as a disabled slider's track is.
 //
 // A sparkline is the last minute of a reading as a line in the thin stroke, in whole device pixels,
@@ -101,7 +101,7 @@ export function liveMeter(level = 0, peak = level): LiveMeter {
 
   /** Where the tick is at `now`: the peak held, or falling from it, never under `under`. */
   function peakAt(now: number, under: number): number {
-    const fallen = Math.max(0, now - since - duration("slow")) / duration("scene");
+    const fallen = Math.max(0, now - since - duration("peak_hold")) / duration("peak_fall");
     return Math.max(under, top - fallen);
   }
 
