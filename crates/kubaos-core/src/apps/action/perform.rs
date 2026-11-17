@@ -1196,12 +1196,16 @@ fn add_architecture(host: &mut dyn Host, arch: &str) -> Result<(), PerformError>
 }
 
 /// Takes `arch` away from dpkg, which an app's step added. First what the app `brought` of it
-/// goes, purged: a package its removal left with only its configuration (`rc`, as `libc6:i386`
-/// with its conffiles), and one it left installed, as apt marks it important (`libgcc-s1:i386`,
-/// Protected) or something of the app's own still needed it then, while removing them takes
-/// nothing else and the user hasn't installed one by name since. A package dpkg still has of the
-/// architecture, installed or with its configuration, keeps it, and the note says which.
+/// goes, purged by dpkg: a package its removal left with only its configuration (`rc`, as
+/// `libc6:i386` with its conffiles), and one it left installed, as apt marks it important
+/// (`libgcc-s1:i386`, Protected) or something of the app's own still needed it then, while
+/// removing them takes nothing else and the user hasn't installed one by name since. A package
+/// dpkg still has of the architecture, installed or with its configuration, keeps it, and the
+/// note says which. The machine's own architecture is dpkg's always, and stays.
 fn undo_architecture(host: &mut dyn Host, arch: &str, brought: &[String]) -> Result<Option<String>, PerformError> {
+    if arch == host.arch() {
+        return Ok(None);
+    }
     let known = host.arch_packages(arch).map_err(PerformError::Host)?;
     let ours: Vec<String> = known.keys().filter(|p| brought.contains(*p)).cloned().collect();
     let installed: Vec<String> = ours.iter().filter(|p| known[*p] == Known::Installed).cloned().collect();
@@ -1221,10 +1225,11 @@ fn undo_architecture(host: &mut dyn Host, arch: &str, brought: &[String]) -> Res
         ours.into_iter().filter(|p| !installed.contains(p)).collect()
     };
     if !purged.is_empty() {
-        // HAZARD: only an architecture's packages beside the machine's own may go past apt's
-        // Essential mark: nothing of the machine's own architecture needs them.
-        host.apt_remove(&purged, Removal::PurgeEssential)
-            .map_err(PerformError::Host)?;
+        // HAZARD: dpkg, not apt: the dry run above isn't the purge, and a package the user
+        // installs between the two that needs one of these would be one apt's `-y` takes too,
+        // where dpkg refuses. Only an architecture's packages beside the machine's own may go
+        // past the Essential and Protected marks: nothing of the machine's own needs them.
+        host.dpkg_purge(&purged).map_err(PerformError::Host)?;
     }
     let left = host.arch_packages(arch).map_err(PerformError::Host)?;
     if left.is_empty() {
@@ -1310,6 +1315,15 @@ fn undo_packages(
     gone.extend(unneeded(host, &gone, pulled)?);
     if gone.is_empty() {
         return Ok(());
+    }
+    // The removal is apt's, whose hooks take the snapshots around it (snapper's), so it isn't
+    // dpkg's, which would refuse rather than cascade. The last dry run is of exactly what goes,
+    // right before it: a package installed earlier that needs one of them refuses the removal,
+    // and one apt's `-y` could still take is one installed in the gap between the two apt runs.
+    let taken = host.apt_simulate(AptPlan::Remove(&gone)).map_err(PerformError::Host)?;
+    let others: Vec<String> = taken.removes.into_iter().filter(|p| !gone.contains(p)).collect();
+    if !others.is_empty() {
+        return Err(PerformError::AptTakes { packages: others });
     }
     host.apt_remove(&gone, removal).map_err(PerformError::Host)
 }

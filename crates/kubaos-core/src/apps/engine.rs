@@ -759,6 +759,7 @@ impl<'h> Keeper<'h> {
         });
         journal.save(&self.journals).map_err(StepError::Journal)?;
         self.undo_entry(id, entry, handed, false)?;
+        keep_brought(journal, entry, handed);
         journal.drop_step(step);
         journal.save(&self.journals).map_err(StepError::Journal)
     }
@@ -820,8 +821,9 @@ impl<'h> Keeper<'h> {
     }
 
     /// The packages the app `id`'s steps of this side installed or pulled in, by their owned
-    /// `package:` and `dep:` claims: those its journal holds, and those of the steps this run
-    /// undid, but the claims those undos handed to other apps.
+    /// `package:` and `dep:` claims and the `brought:` claims an undone step left on its
+    /// `architecture` step: those its journal holds, and those of the steps this run undid, but
+    /// the claims those undos handed to other apps.
     fn brought(&self, id: &str) -> Result<Vec<String>, StepError> {
         let journal = Journal::read(&self.journals, id).map_err(StepError::Journal)?;
         let handed: Vec<&str> = self
@@ -836,11 +838,15 @@ impl<'h> Keeper<'h> {
             .flat_map(|j| &j.entries)
             .chain(self.undone.iter().filter(|u| u.app == id).map(|u| &u.entry));
         let mut brought = Vec::new();
-        for claim in entries.flat_map(|e| &e.claims).filter(|c| c.owned) {
+        for claim in entries
+            .flat_map(|e| &e.claims)
+            .filter(|c| c.owned || c.claim.starts_with("brought:"))
+        {
             let Some(package) = claim
                 .claim
                 .strip_prefix("package:")
                 .or_else(|| claim.claim.strip_prefix("dep:"))
+                .or_else(|| claim.claim.strip_prefix("brought:"))
             else {
                 continue;
             };
@@ -849,6 +855,43 @@ impl<'h> Keeper<'h> {
             }
         }
         Ok(brought)
+    }
+}
+
+/// Records on `journal`'s `architecture` steps the packages `entry`, a step about to leave the
+/// journal, installed or pulled in and didn't hand to another app (`handed`), as `brought:<name>`
+/// claims, which own nothing: the architecture's undo purges what of them is left, and the
+/// journal keeps them, so a run stopped between the two undos leaves the next one knowing them.
+fn keep_brought(journal: &mut Journal, entry: &Entry, handed: &[Handed]) {
+    let packages: Vec<String> = entry
+        .claims
+        .iter()
+        .filter(|c| {
+            c.owned
+                && !handed
+                    .iter()
+                    .any(|h| h.claim == c.claim.replacen("dep:", "package:", 1))
+        })
+        .filter_map(|c| {
+            c.claim
+                .strip_prefix("package:")
+                .or_else(|| c.claim.strip_prefix("dep:"))
+        })
+        .map(|p| format!("brought:{p}"))
+        .collect();
+    if packages.is_empty() {
+        return;
+    }
+    for arch in journal
+        .entries
+        .iter_mut()
+        .filter(|e| matches!(e.action.kind, Kind::Architecture { .. }))
+    {
+        for claim in &packages {
+            if !arch.claims.iter().any(|c| &c.claim == claim) {
+                arch.claims.push(Claim::new(claim.clone(), false));
+            }
+        }
     }
 }
 

@@ -181,9 +181,6 @@ pub enum Removal {
     KeepConfig,
     /// Purged with the package (`apt-get purge`).
     Purge,
-    /// Purged, Essential and Protected packages too (`--allow-remove-essential`): only for a
-    /// foreign architecture's packages an app brought, which nothing of the machine's needs.
-    PurgeEssential,
 }
 
 /// How dpkg has a package.
@@ -342,9 +339,19 @@ pub trait Host {
     ///
     /// # Errors
     ///
-    /// When apt fails, or would remove a package it marks Essential or Protected but under
-    /// [`Removal::PurgeEssential`].
+    /// When apt fails, or would remove a package it marks Essential or Protected.
     fn apt_remove(&mut self, packages: &[String], removal: Removal) -> Result<(), HostError>;
+
+    /// `packages` purged by dpkg itself, Essential and Protected ones too (`dpkg --purge
+    /// --force-remove-essential --force-remove-protected`), and nothing else: dpkg refuses, and
+    /// changes nothing, while a package outside them depends on one of them, where apt would
+    /// remove that package too. Only for a foreign architecture's packages an app brought, which
+    /// nothing of the machine's own architecture needs.
+    ///
+    /// # Errors
+    ///
+    /// When dpkg fails or refuses.
+    fn dpkg_purge(&mut self, packages: &[String]) -> Result<(), HostError>;
 
     /// Which of `packages`, installed, apt won't remove without `--allow-remove-essential`:
     /// those whose control fields say `Essential: yes` or `Protected: yes`, of any

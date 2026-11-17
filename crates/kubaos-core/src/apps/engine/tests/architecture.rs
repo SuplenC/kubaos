@@ -313,3 +313,90 @@ fn a_dependency_the_user_installed_by_name_since_stays_and_keeps_the_architectur
         events.0
     );
 }
+
+#[test]
+fn a_package_the_user_installed_on_the_runtime_keeps_it_and_the_architecture() {
+    let world = World::new(&[("game", GAME)]);
+    with_i386_runtime(&world);
+    world.install("game", true).0.unwrap();
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.dpkg.insert("libmine:i386".to_owned(), "1.0".to_owned());
+        state.manual.insert("libmine:i386".to_owned());
+        state
+            .depends
+            .insert("libmine:i386".to_owned(), ["libc6:i386".to_owned()].into());
+    }
+
+    let (result, events) = world.remove("game");
+
+    result.unwrap();
+    let state = world.host.state.borrow();
+    for package in ["libmine:i386", "libc6:i386", "libgcc-s1:i386"] {
+        assert!(state.dpkg.contains_key(package), "{package}");
+    }
+    assert!(state.foreign.contains("i386"));
+    drop(state);
+    assert!(
+        events.0.contains(&UpdateEvent::Note {
+            text: "dpkg keeps taking i386 packages, as 3 of them are still installed: libc6:i386, libgcc-s1:i386, libmine:i386."
+                .to_owned()
+        }),
+        "{:#?}",
+        events.0
+    );
+}
+
+#[test]
+fn a_removal_stopped_between_the_packages_and_the_architecture_finishes_both() {
+    let world = World::new(&[("game", GAME)]);
+    with_i386_runtime(&world);
+    let before = world.host.snapshot();
+    world.install("game", true).0.unwrap();
+    let mut root = world.root();
+    let stopped = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        world.run(
+            &mut root,
+            &mut super::StopAt("Let dpkg install 32-bit packages"),
+            true,
+            |e| e.remove("game"),
+        )
+    }));
+    assert!(stopped.is_err());
+    assert!(
+        world.host.state.borrow().dpkg.contains_key("libgcc-s1:i386"),
+        "left by the packages' undo"
+    );
+
+    world.remove("game").0.unwrap();
+
+    assert!(!takes_i386(&world));
+    assert_eq!(world.host.snapshot(), before);
+    assert_eq!(world.journals("game"), (None, None));
+}
+
+#[test]
+fn the_machines_own_architecture_is_never_taken_away() {
+    use crate::apps::action::Action;
+    use crate::apps::action::perform;
+    use crate::apps::host::fake::FakeHost;
+    use crate::apps::journal::Claim;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut host = FakeHost::new(dir.path());
+    let table: toml::Table =
+        toml::from_str("name = \"X\"\nkind = \"architecture\"\narchitecture = \"amd64\"\n").unwrap();
+    let action = Action::from_folder(table).unwrap();
+
+    let note = perform::undo(
+        &action,
+        &mut host,
+        &[Claim::new("arch:amd64", true)],
+        &crate::apps::journal::Prior::default(),
+        perform::Undoing::default(),
+    )
+    .unwrap();
+
+    assert_eq!(note, None);
+    assert!(host.state.borrow().log.is_empty(), "{:#?}", host.state.borrow().log);
+}

@@ -6,12 +6,13 @@ use super::SystemHost;
 use super::bound_devices;
 use super::candidate;
 use super::certificate_serial;
+use super::dkms_certificate;
 use super::dkms_status;
 use super::enrolment;
 use super::important;
 use super::known_of_arch;
-use super::mok_certificate;
 use super::mok_source_args;
+use super::signing_named;
 use super::simulation;
 use crate::apps::host::Downgrade;
 use crate::apps::host::Host;
@@ -156,17 +157,38 @@ fn dkms_status_says_whether_the_module_is_added_and_for_which_kernels_it_is_inst
 }
 
 #[test]
-fn the_mok_is_the_certificate_dkms_configuration_names_last() {
-    let framework = "# mok_certificate=/var/lib/dkms/mok.pub\n";
-    let ours = "mok_certificate=\"/var/lib/shim-signed/mok/MOK.der\"\n";
+fn the_signing_key_and_certificate_are_what_dkms_configuration_sets_last() {
+    let framework = "# mok_certificate=/var/lib/dkms/mok.pub\nmok_signing_key=/keys/old.key\n";
+    let ours = "mok_signing_key=\"/keys/mok.key\"\nmok_certificate='/keys/mok.der'\n";
     let variable = "mok_certificate=/keys/$kernelver.der\n";
+    let values = |key: &str, certificate: &str| Named::Values {
+        key: key.to_owned(),
+        certificate: certificate.to_owned(),
+    };
 
-    assert_eq!(mok_certificate([framework].into_iter()), Named::Nothing);
+    assert_eq!(signing_named([""].into_iter()), values("", ""));
+    assert_eq!(signing_named([framework].into_iter()), values("/keys/old.key", ""));
     assert_eq!(
-        mok_certificate([framework, ours].into_iter()),
-        Named::Path(Path::new("/var/lib/shim-signed/mok/MOK.der").to_path_buf())
+        signing_named([framework, ours].into_iter()),
+        values("/keys/mok.key", "/keys/mok.der")
     );
-    assert_eq!(mok_certificate([ours, variable].into_iter()), Named::Variable);
+    assert_eq!(signing_named([ours, variable].into_iter()), Named::Variable);
+}
+
+#[test]
+fn dkms_signs_with_shim_signeds_mok_without_a_key_and_its_own_without_a_certificate() {
+    assert_eq!(
+        dkms_certificate("", "/keys/mok.der"),
+        Path::new("/var/lib/shim-signed/mok/MOK.der")
+    );
+    assert_eq!(
+        dkms_certificate("/keys/mok.key", ""),
+        Path::new("/var/lib/dkms/mok.pub")
+    );
+    assert_eq!(
+        dkms_certificate("/keys/mok.key", "/keys/mok.der"),
+        Path::new("/keys/mok.der")
+    );
 }
 
 #[test]
@@ -194,7 +216,11 @@ fn a_certificate_named_through_kernelver_is_the_one_dkms_works_out_for_the_kerne
     let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "kuba");
     let framework = dir.path().join("framework.conf");
     let more = dir.path().join("signing.conf");
-    fs::write(&framework, "mok_certificate=/var/lib/dkms/mok.pub\n").unwrap();
+    fs::write(
+        &framework,
+        "mok_certificate=/var/lib/dkms/mok.pub\nmok_signing_key=/keys/mok.key\n",
+    )
+    .unwrap();
     fs::write(&more, "mok_certificate=\"/keys/$kernelver/$arch.der\"\n").unwrap();
 
     let out = sandbox
@@ -206,7 +232,7 @@ fn a_certificate_named_through_kernelver_is_the_one_dkms_works_out_for_the_kerne
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
-        "/keys/7.0.0-43-generic/x86_64.der"
+        "/keys/mok.key\0/keys/7.0.0-43-generic/x86_64.der"
     );
 }
 
@@ -235,4 +261,21 @@ fn a_modules_users_count_the_devices_bound_to_its_drivers() {
     std::os::unix::fs::symlink(dir.path(), driver.join("0005:045E:0B13.0001")).unwrap();
 
     assert_eq!(bound_devices(&module), 1);
+}
+
+#[test]
+fn a_variable_dkms_configuration_sets_empty_reads_as_unset() {
+    let dir = tempfile::tempdir().unwrap();
+    let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "kuba");
+    let framework = dir.path().join("framework.conf");
+    fs::write(&framework, "mok_certificate=\"$unset_by_anyone\"\n").unwrap();
+
+    let out = sandbox
+        .command("bash")
+        .args(mok_source_args(&[framework], "7.0.0-43-generic", "x86_64"))
+        .output()
+        .unwrap();
+
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "\0");
+    assert_eq!(dkms_certificate("", ""), Path::new("/var/lib/shim-signed/mok/MOK.der"));
 }

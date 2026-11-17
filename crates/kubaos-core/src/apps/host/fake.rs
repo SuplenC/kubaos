@@ -612,7 +612,7 @@ impl Host for FakeHost {
         let gone = self.apt_simulate(AptPlan::Remove(packages))?.removes;
         let mut state = self.state.borrow_mut();
         // apt's simulation shows the removal of an important package; the removal itself refuses.
-        if removal != Removal::PurgeEssential && gone.iter().any(|p| state.protected.contains(p)) {
+        if gone.iter().any(|p| state.protected.contains(p)) {
             return Err(HostError::Failed {
                 command: format!("apt-get remove -y {}", packages.join(" ")),
                 code: Some(100),
@@ -620,7 +620,7 @@ impl Host for FakeHost {
                     .to_owned(),
             });
         }
-        let purge = removal != Removal::KeepConfig;
+        let purge = removal == Removal::Purge;
         for p in &gone {
             state.dpkg.remove(p);
             let units = state.package_units.get(p).cloned().unwrap_or_default();
@@ -649,6 +649,36 @@ impl Host for FakeHost {
         }
         let verb = if purge { "purge" } else { "remove" };
         state.log.push(format!("apt {verb} {}", packages.join(" ")));
+        Ok(())
+    }
+
+    fn dpkg_purge(&mut self, packages: &[String]) -> Result<(), HostError> {
+        self.fails("dpkg-purge")?;
+        let mut state = self.state.borrow_mut();
+        // dpkg refuses, changing nothing, while a package outside them depends on one of them.
+        let needed = state.dpkg.keys().filter(|p| !packages.contains(*p)).find(|p| {
+            state
+                .depends
+                .get(*p)
+                .is_some_and(|d| d.iter().any(|d| packages.contains(d)))
+        });
+        if let Some(needs) = needed {
+            return Err(HostError::Failed {
+                command: format!("dpkg --purge {}", packages.join(" ")),
+                code: Some(2),
+                stderr: format!("dpkg: dependency problems prevent removal: {needs} depends on one of them"),
+            });
+        }
+        for p in packages {
+            state.dpkg.remove(p);
+            state.rc.remove(p);
+            for path in state.conffiles.get(p).cloned().unwrap_or_default() {
+                for suffix in ["", ".dpkg-dist", ".dpkg-old"] {
+                    let _ = fs::remove_file(self.place(Path::new(&format!("{path}{suffix}"))));
+                }
+            }
+        }
+        state.log.push(format!("dpkg purge {}", packages.join(" ")));
         Ok(())
     }
 
