@@ -26,12 +26,9 @@ const APPS: [&str; 9] = [
     "yubico-authenticator",
 ];
 
-/// The system units each VPN's package ships, which its postinst enables and starts.
+/// The system units of each VPN's package that its steps keep as its postinst sets them.
 const UNITS: [(&str, &[&str]); 3] = [
-    (
-        "mullvad-vpn",
-        &["mullvad-daemon.service", "mullvad-early-boot-blocking.service"],
-    ),
+    ("mullvad-vpn", &["mullvad-daemon.service"]),
     ("proton-vpn", &["me.proton.vpn.split_tunneling.service"]),
     (
         "nordvpn",
@@ -274,6 +271,29 @@ fn nordvpn_puts_you_in_its_group_before_its_package_and_takes_both_away() {
     run(&world, |e| e.remove_with("nordvpn", &Picks::default())).unwrap();
 
     assert!(!world.host.state.borrow().groups.contains_key("nordvpn"));
+}
+
+#[test]
+fn mullvads_early_boot_blocker_you_turned_off_stays_off_through_an_update() {
+    let world = security_world("mullvad-vpn");
+    run(&world, |e| e.add("mullvad-vpn", None, &picks("mullvad-vpn"))).unwrap();
+    // Mullvad's blocker, turned off by hand after the install.
+    let blocker = "system:mullvad-early-boot-blocking.service".to_owned();
+    world.host.state.borrow_mut().units.insert(
+        blocker.clone(),
+        Unit {
+            exists: true,
+            ..Unit::default()
+        },
+    );
+
+    run(&world, |e| e.add("mullvad-vpn", None, &picks("mullvad-vpn"))).unwrap();
+
+    assert!(
+        !world.host.state.borrow().units[&blocker].enabled,
+        "{:#?}",
+        world.host.state.borrow().log
+    );
 }
 
 #[test]

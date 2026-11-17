@@ -1,12 +1,18 @@
 # Mullvad VPN from Mullvad's signed apt repository, whose key system/packages.toml pins
 # ([repo.mullvad]), for amd64 and arm64. Its package writes no source of its own. Its postinst
 # enables and starts its daemon, mullvad-daemon.service, which runs the tunnel (WireGuard, as
-# wg0-mullvad) and its own firewall, an nftables table of its own, and enables
-# mullvad-early-boot-blocking.service, which blocks the network at boot until the daemon is up
-# while "Lockdown mode" is on; it also puts an AppArmor profile in place for the window's Electron
-# sandbox, which its removal takes away. The two unit steps are what the package sets up, so each
-# update checks them as any step. Its removal signs this machine out of your account, takes its
-# units away, and leaves its settings in /etc/mullvad-vpn and its logs in /var/log/mullvad-vpn.
+# wg0-mullvad) and its own firewall, an nftables table of its own; the unit step is that, so each
+# update checks it as any step. The postinst also puts an AppArmor profile in place for the
+# window's Electron sandbox, which its removal takes away, and enables
+# mullvad-early-boot-blocking.service, which the daemon's unit pulls in: at every boot, whatever
+# Mullvad's settings, it blocks all traffic but the LAN's (and that only with "Local network
+# sharing" on) until the daemon starts and puts its own rules up, so if the daemon fails to start
+# the machine stays offline. `sudo systemctl disable mullvad-early-boot-blocking.service` turns it
+# off and `sudo "/opt/Mullvad VPN/resources/mullvad-setup" reset-firewall` lifts a block that
+# stayed up; Mullvad's postinst enables it again with each of its updates. It is Mullvad's: no
+# step of KubaOS's turns it on, so an update of KubaOS leaves it as you set it. Its removal signs
+# this machine out of your account, takes its units away, and leaves its settings in
+# /etc/mullvad-vpn and its logs in /var/log/mullvad-vpn.
 # KubaOS's Proxy and Mullvad each block what leaves outside their own tunnel: with the Proxy's kill
 # switch up Mullvad can't reach its servers, and with Mullvad connected or in lockdown the Proxy's
 # VPN can't reach IT's. Use one at a time.
@@ -43,10 +49,3 @@ unit = "mullvad-daemon.service"
 scope = "system"
 enable = true
 start = true
-
-[[action]]
-name = "Let Mullvad block the network at boot until it connects"
-kind = "unit"
-unit = "mullvad-early-boot-blocking.service"
-scope = "system"
-enable = true
