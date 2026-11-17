@@ -149,7 +149,7 @@ fn in_place(world: &World, id: &str) {
                 let path = world.host_home().join(to.strip_prefix("~/").unwrap());
                 assert!(path.is_file(), "{id}: {}", path.display());
             }
-            Kind::Run { .. } if id == "1password" => {}
+            Kind::Run { .. } if id == "1password" || id == "proton-vpn" => {}
             other => panic!("{id}: a security app is its package, .deb, units, group or icon, not {other:?}"),
         }
     }
@@ -290,6 +290,47 @@ fn nordvpn_puts_you_in_its_group_after_its_preinst_and_leaves_the_group_to_its_p
     run(&world, |e| e.remove_with("nordvpn", &Picks::default())).unwrap();
 
     assert_eq!(members(&world), Some(BTreeSet::from([guessed().1])));
+}
+
+#[test]
+fn proton_vpns_removal_turns_its_kill_switch_off_before_its_packages_go() {
+    let world = security_world("proton-vpn");
+    // The machine's nftables, a table a line: Proton's firewall kill switch's two and another
+    // program's.
+    let tables = world.host_home().join("../../nftables");
+    fs::write(&tables, "inet proton_vpn_ks\nip6 proton_vpn_ks_ipv6\ninet filter\n").unwrap();
+    let f = tables.display();
+    let sandbox = world.host.sandbox();
+    sandbox.stub(
+        "nft",
+        &format!(
+            "case $1 in\n\
+             list) grep -qx \"$3 $4\" '{f}' ;;\n\
+             delete) grep -vx \"$3 $4\" '{f}' >'{f}.new'; mv '{f}.new' '{f}' ;;\n\
+             esac"
+        ),
+    );
+    // Proton's own command, which fails as when its service couldn't be reached.
+    sandbox.stub("python3", "exit 1");
+    run(&world, |e| e.add("proton-vpn", None, &picks("proton-vpn"))).unwrap();
+    let from = world.host.state.borrow().log.len();
+
+    run(&world, |e| e.remove_with("proton-vpn", &Picks::default())).unwrap();
+
+    assert_eq!(fs::read_to_string(&tables).unwrap(), "inet filter\n");
+    assert!(
+        sandbox
+            .calls()
+            .contains(&"python3 -I -m proton.vpn.killswitch.disable".to_owned()),
+        "{:#?}",
+        sandbox.calls()
+    );
+    let log = world.log_since(from);
+    let at = |what: &str| log.iter().position(|l| l.starts_with(what));
+    assert!(
+        at("run ./kill-switch-off").is_some_and(|off| at("apt remove").is_some_and(|gone| off < gone)),
+        "{log:#?}"
+    );
 }
 
 #[test]
