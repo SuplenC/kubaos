@@ -1,0 +1,27 @@
+# Prism Launcher from Ubuntu's archive (multiverse), 10.0.5, where upstream and nixpkgs are at
+# 11.1.1. Prism keeps no apt repository. Minecraft draws through OpenGL, and a Nix build reaches
+# the GPU only through the Mesa `home/desktop.nix` gives Nix apps, with no NVIDIA driver; Ubuntu's
+# uses the machine's own. Minecraft's versions, mods and modpacks come from Prism's and their
+# authors' servers, not from the launcher's release. It runs each Minecraft on the Java its version
+# asks for, which Prism downloads on first start, so no Java is installed.
+# https://prismlauncher.org/download/linux/
+name = "Prism Launcher"
+category = "games"
+tags = ["games", "minecraft", "mods", "modpacks", "launcher", "fabric", "forge"]
+summary = "Minecraft instances, mods and modpacks, each in its own box. Mojang's launcher, minus the pain."
+# From its AppStream metainfo, CC0-1.0 (PrismLauncher/PrismLauncher), its first paragraph.
+description = """\
+Prism Launcher is a custom launcher for Minecraft that focuses on predictability, long term \
+stability and simplicity."""
+description_from = "https://github.com/PrismLauncher/PrismLauncher/blob/10.0.5/program_info/org.prismlauncher.PrismLauncher.metainfo.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix), the name Prism's package gives, so the
+# Command menu shows it before the package is installed.
+icon = "org.prismlauncher.PrismLauncher"
+keeps = """\
+Your instances, worlds, accounts and the Java it downloaded stay in ~/.local/share/PrismLauncher: \
+install Prism Launcher again and they're all there."""
+
+[[action]]
+name = "Install Prism Launcher"
+kind = "apt"
+packages = ["prismlauncher"]

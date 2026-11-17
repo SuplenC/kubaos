@@ -1,0 +1,36 @@
+# RetroArch from Ubuntu's archive, 1.22.2, upstream's latest. Ubuntu's build hides the core
+# downloader and reads its cores from /usr/lib, so the cores are packages too: the step takes
+# every console core Ubuntu builds for 26.04, mGBA (Game Boy Advance), SameBoy (Game Boy and
+# Color), bsnes-mercury's balanced build (Super Nintendo) and Genesis Plus GX (Mega Drive, Master
+# System, Game Gear, Mega-CD; from multiverse). A core of your own goes in a folder you name under
+# Settings, Directory. It draws through the machine's own drivers, OpenGL or Vulkan.
+# https://www.retroarch.com/?page=platforms
+name = "RetroArch"
+category = "games"
+tags = ["games", "emulator", "retro", "libretro", "console", "snes", "game boy", "mega drive"]
+summary = "Your childhood's consoles in one app. Its menus are the hardest boss."
+# From its AppStream metainfo, CC0-1.0 (libretro/RetroArch): its first paragraph, then the second's
+# last sentence.
+description = """\
+RetroArch enables you to run classic games on a wide range of computers and consoles through \
+its slick graphical interface. Settings are also unified so configuration is done once and for \
+all. RetroArch has advanced features like shaders, netplay, rewinding, next-frame response times, \
+runahead, and more!"""
+description_from = "https://github.com/libretro/RetroArch/blob/v1.22.2/com.libretro.RetroArch.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "retroarch"
+keeps = """\
+Your settings, playlists, saves and save states stay in ~/.config/retroarch, and your games \
+wherever you keep them: install RetroArch again and they're all there."""
+
+[[action]]
+name = "Install RetroArch and its cores"
+kind = "apt"
+packages = [
+  "retroarch",
+  "libretro-mgba",
+  "libretro-sameboy",
+  "libretro-bsnes-mercury-balanced",
+  "libretro-genesisplusgx",
+]
