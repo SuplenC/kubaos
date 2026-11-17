@@ -7,7 +7,7 @@ summary = "xAI's chatbot in a window of its own. Edgy by design, like a teenager
 # xAI's own words aren't under a licence that allows copying them, so this is ours.
 description = """\
 Grok is xAI's AI assistant. Its website, here in a window of its own, answers questions, writes \
-and edits text and code, searches the web and posts on X, reads the pictures you give it and \
+and edits text and code, searches the web and X, reads the pictures you give it and \
 makes images, in chats it keeps with your account."""
 description_from = "kubaos"
 # Ours: xAI's logo isn't under a licence that allows copying it. The window's own icon is the
