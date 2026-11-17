@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Navicat Premium Lite 18
+Exec="@HOME@/.local/opt/navicat-premium-lite/navicat" -uri %u
+NoDisplay=true
+Terminal=false
+StartupNotify=true
+StartupWMClass=navicat
+MimeType=x-scheme-handler/navicat;x-scheme-handler/navicat+mysql;x-scheme-handler/navicat+pgsql;x-scheme-handler/navicat+mssql;x-scheme-handler/navicat+ora;x-scheme-handler/navicat+sqlite;x-scheme-handler/navicat+mariadb;x-scheme-handler/navicat+mongodb;x-scheme-handler/navicat+redis;x-scheme-handler/navicat+snowflake;

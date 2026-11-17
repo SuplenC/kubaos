@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Runs Navicat Premium Lite on the system's Qt 6 and its Wayland plugin, natively on
+# Wayland: the Qt 6.8 Navicat bundles has only the X11 backend, and `./unpack` left it out.
+# `QT_QPA_PLATFORMTHEME` is unset, as the desktop's theme plugin is built for another Qt than the
+# one this runs on. `LD_LIBRARY_PATH` is the one Navicat's own AppRun sets, the drivers Navicat
+# downloads into ~/.config/navicat included. Navicat writes its menu entries with `WRAPPER` as
+# their command, as AppRun sets it.
+set -euo pipefail
+app="@HOME@/.local/opt/navicat-premium-lite/app"
+config="$HOME/.config/navicat/Premium/lib"
+cd "$app"
+export WRAPPER="@HOME@/.local/opt/navicat-premium-lite/navicat"
+export LD_LIBRARY_PATH="$app/usr/lib:$config/sqlite:$config/oci:$app/usr/lib/oci:$app/usr/lib/obci:$app/usr/lib/pq-g:$app/usr/lib/pq-h"
+export QT_PLUGIN_PATH=/usr/lib/x86_64-linux-gnu/qt6/plugins
+export QT_QPA_PLATFORM=wayland
+unset QT_QPA_PLATFORMTHEME
+exec -a "$WRAPPER" "$app/usr/bin/navicat" "$@"
