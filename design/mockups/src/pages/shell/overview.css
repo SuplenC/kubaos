@@ -189,6 +189,8 @@
     opacity var(--motion-short) var(--easing-standard);
 }
 
+/* A number on the frame's glass, as the bar draws its workspaces on its own pill: it reads on any
+   picture, by night and by day. The screen's shown one sits on the indicator. */
 .ov-ws-number {
   display: flex;
   align-items: center;
@@ -196,6 +198,7 @@
   width: var(--size-chip);
   height: var(--size-chip);
   border-radius: var(--radius-full);
+  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
 }
 
 .ov-ws-number[data-shown] {
@@ -406,11 +409,17 @@
   background: rgb(from var(--color-surface) r g b / var(--opacity-focus));
 }
 
+/* A waiting group's name on the same glass, as the bar names a borrowed group. */
 .ov-label {
   position: absolute;
   left: 0;
   top: 0;
-  display: block;
+  display: flex;
+  align-items: center;
+  height: var(--size-chip);
+  padding: 0 var(--space-s8);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
   translate: var(--ov-x) var(--ov-y);
   opacity: var(--ov-arrive);
   transition:

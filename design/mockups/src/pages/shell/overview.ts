@@ -212,7 +212,7 @@ export default page<Shown>({
       { part: "Number under", token: "space-s8" },
       { part: "Number and delete row", token: "size-control_sm" },
       { part: "Number", token: "size-chip" },
-      { part: "Name over a section", token: "type-label-line" },
+      { part: "Name over a section", token: "size-chip" },
       { part: "Miniature corners", token: "radius-control" },
       { part: "Window corners", token: "radius-surface" },
       { part: "Window gaps", token: "space-s8" },

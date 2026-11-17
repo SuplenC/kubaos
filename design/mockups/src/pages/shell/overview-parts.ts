@@ -165,7 +165,7 @@ function arrange(width: number, height: number, specs: readonly SectionSpec[]): 
   const gap = L("space-s24");
   const tag = L("space-s8") + L("size-control_sm");
   const apart = L("space-s32");
-  const label = L("type-label-line") + L("space-s8");
+  const label = L("size-chip") + L("space-s8");
   const aspect = height / width;
   const roomW = width - 2 * margin;
   const roomH = height - 2 * margin;
