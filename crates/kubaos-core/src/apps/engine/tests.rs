@@ -1744,8 +1744,14 @@ fn a_web_apps_window_is_named_as_chrome_names_an_app_window_on_wayland() {
 /// A download to a path without its version, `unpack` as given, pinned to `version`.
 fn fixed_download(version: &str, unpack: &str) -> String {
     let sha = version.replace('.', "").repeat(32);
+    let zstd = if unpack == "tar-zst" {
+        "[[action]]\nname = \"Install zstd\"\nkind = \"apt\"\npackages = [\"zstd\"]\n"
+    } else {
+        ""
+    };
     app(&format!(
         r#"
+{zstd}
 [[action]]
 name = "Download the tool"
 kind = "download"

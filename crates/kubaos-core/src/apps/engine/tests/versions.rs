@@ -10,11 +10,17 @@ use super::packed;
 use crate::apps::host::fake::Unit;
 
 /// A runtime unpacked to `~/.vendor/versions/<version>`, a GPU library unpacked into its `lib/gpu`,
-/// a link to the runtime's program and a user unit running it, all of `version`.
+/// a link to the runtime's program and a user unit running it, all of `version`; zstd, which
+/// unpacks them, first.
 fn runtime(version: &str) -> String {
     let (main, gpu) = shas(version);
     app(&format!(
         r#"
+[[action]]
+name = "Install zstd"
+kind = "apt"
+packages = ["zstd"]
+
 [[action]]
 name = "Download the runtime"
 kind = "download"
@@ -83,7 +89,7 @@ fn a_download_into_another_downloads_folder_owns_only_what_it_adds_and_the_app_g
     assert_eq!(fs::read_to_string(folder.join("bin/tool")).unwrap(), "tool 1.1");
     assert_eq!(fs::read_to_string(folder.join("lib/gpu/bin/tool")).unwrap(), "gpu 1.1");
     let journal = world.journals("runtime").0.unwrap();
-    let gpu = journal.entries.iter().find(|e| e.step == 2).unwrap();
+    let gpu = journal.entries.iter().find(|e| e.step == 3).unwrap();
     let owned: Vec<&str> = gpu
         .claims
         .iter()
