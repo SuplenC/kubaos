@@ -238,6 +238,16 @@ pub trait Host {
     /// When the package manifest can't be read.
     fn apt_repo_ready(&mut self, repo: &str) -> Result<bool, HostError>;
 
+    /// Which of the vendor repositories `repos` of the package manifest have a key, or a next
+    /// key, that [`Host::apt_repo`] would fetch again (`fetch_key`'s rule: missing, not the pinned
+    /// fingerprint's alone, or expiring within 30 days), read from the keyrings, which everyone
+    /// may, with nothing changed. A repository the manifest lacks is never due.
+    ///
+    /// # Errors
+    ///
+    /// When the keyrings can't be read.
+    fn apt_keys_due(&mut self, repos: &[String]) -> Result<BTreeSet<String>, HostError>;
+
     /// What apt would install and remove to carry out `plan`, from a simulation that changes
     /// nothing.
     ///

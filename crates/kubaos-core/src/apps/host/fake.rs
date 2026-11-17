@@ -110,6 +110,9 @@ pub struct State {
     pub fail: BTreeSet<String>,
     /// The machine is arm64's, not amd64's.
     pub arm64: bool,
+    /// Vendor repositories whose key nears its expiry, until a setup of the repository fetches
+    /// it again.
+    pub keys_due: BTreeSet<String>,
     /// Every change made, in order.
     pub log: Vec<String>,
 }
@@ -355,7 +358,9 @@ impl Host for FakeHost {
     }
 
     fn apt_repo(&mut self, repo: &str) -> Result<(), HostError> {
+        self.fails(&format!("apt-repo:{repo}"))?;
         self.state.borrow_mut().repos.insert(repo.to_owned());
+        self.state.borrow_mut().keys_due.remove(repo);
         if let Some((manifest, text)) = self.state.borrow().repo_files.get(repo) {
             let sources = self.place(Path::new(&format!("/etc/apt/sources.list.d/{repo}.sources")));
             for (path, text) in std::iter::once((sources, text.as_str()))
@@ -374,6 +379,11 @@ impl Host for FakeHost {
             Some((manifest, _)) => manifest.in_place(repo, &self.system),
             None => state.repos.contains(repo),
         })
+    }
+
+    fn apt_keys_due(&mut self, repos: &[String]) -> Result<BTreeSet<String>, HostError> {
+        let state = self.state.borrow();
+        Ok(repos.iter().filter(|r| state.keys_due.contains(*r)).cloned().collect())
     }
 
     fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError> {

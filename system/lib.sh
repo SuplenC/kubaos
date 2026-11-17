@@ -274,6 +274,12 @@ key_expiry() {
   key_end "$1" | awk '{ print strftime("%Y-%m-%d", $1, 1); dated = 1 } END { if (!dated) print "never" }'
 }
 
+# key_stale FILE FINGERPRINT: fetch_key would fetch the key at FILE again: FILE isn't there,
+# isn't the fingerprint's alone (key_is), or doesn't last (key_lasts).
+key_stale() {
+  ! { [[ -f "$1" ]] && key_is "$1" "$2" && key_lasts "$1"; }
+}
+
 # key_outlasts NEW OLD: the key in NEW works at least as long as the one in OLD.
 key_outlasts() {
   local new old

@@ -432,6 +432,38 @@ fn an_update_installs_the_picked_apps_through_sudo_and_a_second_starts_no_root()
 }
 
 #[test]
+fn an_update_fetches_a_key_nearing_its_expiry_of_a_repository_an_app_set_up_again_and_only_then_asks_for_root() {
+    let w = world();
+    let mut picks = Picks::default();
+    picks.add("agent");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = fake(&w, &[]);
+    w.reporting(&mut m, &mut Vec::new()).update(yes()).unwrap();
+    let installed = root_starts(&m);
+    let mut quiet = Vec::new();
+    w.reporting(&mut m, &mut quiet).update(yes()).unwrap();
+    assert_eq!(root_starts(&m), installed, "an update with no key due asked for root");
+    host(&m).state.borrow_mut().keys_due.insert("vendor".to_owned());
+
+    let mut events = Vec::new();
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert_eq!(root_starts(&m), installed + 1);
+    assert!(host(&m).state.borrow().keys_due.is_empty());
+    let keys: Vec<&str> = warnings(&events).into_iter().filter(|w| w.contains("key")).collect();
+    assert!(keys.is_empty(), "{keys:?}");
+    let detail = events.iter().find_map(|e| match e {
+        crate::update::event::UpdateEvent::PhaseFinished {
+            phase: Phase::Apps,
+            detail,
+            ..
+        } => detail.clone(),
+        _ => None,
+    });
+    assert_eq!(detail.as_deref(), Some("the signing key of vendor fetched again"));
+}
+
+#[test]
 fn an_update_without_picks_runs_nothing_for_the_apps() {
     let w = world();
     let mut m = fake(&w, &[]);

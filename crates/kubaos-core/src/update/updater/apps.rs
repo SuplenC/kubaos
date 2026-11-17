@@ -302,7 +302,9 @@ impl<M: Machine> Updater<'_, M> {
     /// nixpkgs packages: each step of each checked, a step not done (a picked app the machine
     /// lacks, a step a release added or changed, one the user undid) done, through sudo, with no
     /// window. An app a picked setup no longer requires, and nothing else needs, goes, listed
-    /// removed. No picks start no phase. A failure is a warning: the next update tries again.
+    /// removed. Then the key of each vendor repository the apps set up that nears its expiry is
+    /// fetched again, in the same root session, which a run with none due never starts. No picks
+    /// start no phase. A failure is a warning: the next update tries again.
     pub(super) fn reconcile_apps(&mut self) -> AppChanges {
         let picks = match Picks::read(&self.user.app_picks()) {
             Ok(picks) => picks,
@@ -321,39 +323,14 @@ impl<M: Machine> Updater<'_, M> {
                 return AppChanges::default();
             }
         };
-        for id in status::unknown(&catalog, &picks) {
-            self.j.warn(format!(
-                "{id} is picked in apps.toml, but this release's catalog has no such app"
-            ));
-        }
-        let journals = self.user.app_journals();
-        let platform = self.platform();
-        let mut wanted: Vec<(&Folder, Option<String>, bool)> = Vec::new();
-        for app in catalog.apps().iter().filter(|app| picks.has(&app.id)) {
-            let journal = Journal::read(&journals, &app.id).ok().flatten();
-            let setup = status::picked_setup(app, &picks, journal.as_ref());
-            if app.has_setups() && setup.is_none() {
-                let setups: Vec<&str> = app.setups.iter().map(|s| s.id.as_str()).collect();
-                self.j.warn(format!(
-                    "{id} is picked with no setup, so nothing installs it: kubaos app add {id} --setup <{setups}>",
-                    id = app.id,
-                    setups = setups.join("|"),
-                ));
-                continue;
-            }
-            if let Some(why) = unavailable(&catalog, app, setup, platform) {
-                self.j.warn(format!("{why}, so the update leaves it"));
-                continue;
-            }
-            let complete = journal.is_some_and(|j| j.complete);
-            wanted.push((app, setup.map(|s| s.id.clone()), complete));
-        }
+        let wanted = self.picked_apps(&catalog, &picks);
         if wanted.is_empty() {
             return AppChanges::default();
         }
         self.j.phase_start(Phase::Apps);
         let mut changes = AppChanges::default();
         let mut ok = true;
+        let mut refreshed = Vec::new();
         let ran = self.with_engine(Root::Sudo, false, |engine| {
             for (app, setup, complete) in &wanted {
                 let name = name_in(app, setup.as_deref()).to_owned();
@@ -381,6 +358,16 @@ impl<M: Machine> Updater<'_, M> {
                     }
                 }
             }
+            match engine.refresh_keys() {
+                Ok(repos) => refreshed = repos,
+                Err(e) => {
+                    ok = false;
+                    engine.warn(format!(
+                        "the app repositories' keys weren't checked: {}; the next update tries again",
+                        chain(&e)
+                    ));
+                }
+            }
             Ok::<_, UpdateError>(())
         });
         if let Err(e) = ran {
@@ -390,14 +377,55 @@ impl<M: Machine> Updater<'_, M> {
                 chain(&e)
             ));
         }
+        let mut details = Vec::new();
         if !changes.installed.is_empty() {
-            self.j.detail(format!("{} installed", changes.installed.join(", ")));
+            details.push(format!("{} installed", changes.installed.join(", ")));
         }
         if !changes.removed.is_empty() {
-            self.j.detail(format!("{} removed", changes.removed.join(", ")));
+            details.push(format!("{} removed", changes.removed.join(", ")));
+        }
+        if !refreshed.is_empty() {
+            details.push(format!("the signing key of {} fetched again", refreshed.join(", ")));
+        }
+        if !details.is_empty() {
+            self.j.detail(details.join("; "));
         }
         self.j.phase_end_optional(ok);
         changes
+    }
+
+    /// The apps of `catalog` an update installs for `picks`, each with its setup and whether its
+    /// journal says it is complete; a pick the catalog lacks, one with no setup and one this
+    /// machine can't have are warnings.
+    fn picked_apps<'c>(&mut self, catalog: &'c Catalog, picks: &Picks) -> Vec<(&'c Folder, Option<String>, bool)> {
+        for id in status::unknown(catalog, picks) {
+            self.j.warn(format!(
+                "{id} is picked in apps.toml, but this release's catalog has no such app"
+            ));
+        }
+        let journals = self.user.app_journals();
+        let platform = self.platform();
+        let mut wanted = Vec::new();
+        for app in catalog.apps().iter().filter(|app| picks.has(&app.id)) {
+            let journal = Journal::read(&journals, &app.id).ok().flatten();
+            let setup = status::picked_setup(app, picks, journal.as_ref());
+            if app.has_setups() && setup.is_none() {
+                let setups: Vec<&str> = app.setups.iter().map(|s| s.id.as_str()).collect();
+                self.j.warn(format!(
+                    "{id} is picked with no setup, so nothing installs it: kubaos app add {id} --setup <{setups}>",
+                    id = app.id,
+                    setups = setups.join("|"),
+                ));
+                continue;
+            }
+            if let Some(why) = unavailable(catalog, app, setup, platform) {
+                self.j.warn(format!("{why}, so the update leaves it"));
+                continue;
+            }
+            let complete = journal.is_some_and(|j| j.complete);
+            wanted.push((app, setup.map(|s| s.id.clone()), complete));
+        }
+        wanted
     }
 
     /// This machine, with the setting of the user's nixpkgs for unfree packages.

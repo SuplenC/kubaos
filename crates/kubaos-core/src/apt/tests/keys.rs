@@ -95,6 +95,30 @@ impl Machine {
             .unwrap()
     }
 
+    /// `system/apt-repo.sh --keys-due` of the repository pinned to `fingerprint` with its key at
+    /// the keyring, and of `gone`, a repository the manifest lacks.
+    fn due(&self, fingerprint: &str) -> Output {
+        let system = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../system");
+        let manifest = self.dir.path().join("packages.toml");
+        fs::write(
+            &manifest,
+            format!(
+                "[repo.vendor]\nkey_url = \"https://vendor.example/key.asc\"\nfingerprint = \"{fingerprint}\"\n\
+                 keyring = \"{}\"\n",
+                self.keyring().display()
+            ),
+        )
+        .unwrap();
+        self.sandbox
+            .command("bash")
+            .arg(system.join("apt-repo.sh"))
+            .args(["--keys-due", "vendor", "gone"])
+            .env("APT_MANIFEST", manifest)
+            .env_remove("GNUPGHOME")
+            .output()
+            .unwrap()
+    }
+
     fn fetched(&self) -> bool {
         self.sandbox.calls().iter().any(|call| call.starts_with("curl "))
     }
@@ -275,4 +299,49 @@ fn a_global_keyring_holding_only_the_vendors_keys_is_removed_and_one_with_anothe
     left.sort();
     assert_eq!(left, ["shared.gpg", "someone.gpg"], "{}", text(&out));
     assert!(text(&out).contains("shared.gpg trusts"), "{}", text(&out));
+}
+
+#[test]
+fn a_stored_key_nearing_its_expiry_is_due_and_saying_so_changes_nothing() {
+    let m = Machine::new(NEAR, Some("vendor-2027.asc"));
+    m.serves("vendor-2029.asc");
+    let before = fs::read(m.keyring()).unwrap();
+
+    let out = m.due(VENDOR);
+
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "vendor\n");
+    assert_eq!(fs::read(m.keyring()).unwrap(), before);
+    let calls = m.sandbox.calls();
+    assert!(
+        !calls.iter().any(|c| c.starts_with("curl ") || c.starts_with("sudo ")),
+        "{calls:?}"
+    );
+    assert!(!m.dir.path().join("home/.gnupg/pubring.kbx").exists());
+}
+
+#[test]
+fn a_stored_key_that_lasts_is_not_due() {
+    let m = Machine::new(EARLY, Some("vendor-2027.asc"));
+
+    let out = m.due(VENDOR);
+
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "");
+}
+
+#[test]
+fn a_missing_key_or_one_of_another_fingerprint_is_due() {
+    let missing = Machine::new(EARLY, None);
+    let other = Machine::new(EARLY, Some("other.asc"));
+
+    let (missing, other) = (missing.due(VENDOR), other.due(VENDOR));
+
+    assert_eq!(
+        String::from_utf8_lossy(&missing.stdout),
+        "vendor\n",
+        "{}",
+        text(&missing)
+    );
+    assert_eq!(String::from_utf8_lossy(&other.stdout), "vendor\n", "{}", text(&other));
 }
