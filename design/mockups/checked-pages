@@ -6,6 +6,7 @@
 # with the reason in its pull request (docs/DESIGN.md, "The mockups").
 backdrop
 badge
+bar-audio
 button
 checkbox
 divider

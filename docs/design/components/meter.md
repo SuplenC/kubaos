@@ -10,4 +10,6 @@ A reading in parts on a progress bar's track: 8 tall, a pill, each part a share 
 
 A reading steps by its threshold in `sysmon.toml`: `primary` while fine, `warning` within its margin of the threshold (10 for memory and the CPU's temperature, 5 for a disk and the battery's draw), `error` past it; its figure beside it takes the same step, and cache keeps `tertiary`. Those are the fixed palette's roles, the same on every wallpaper.
 
-*Not built yet: `kubaos-ui`'s meter doesn't ease a new reading.*
+**Live.** A mic's level as it comes, the Audio panel's under the mic's slider: one `primary` part that jumps to each level with no easing, and a peak tick, a `stroke.thin` line in `primary` the bar's height at the highest level lately, clipped to the pill so at either end it takes the round end. The tick holds for `peak_hold` (800), then falls the whole bar per `peak_fall` (1200) on `linear`, never under the level, so a voice's peaks stay readable between its words. Muted, it is the track alone, with no tick. Disabled, with no mic to hear (none at all, or a headset in Music mode), its track dims as a disabled slider's does (`opacity.disabled_content` of the track's own), empty, and it takes no level.
+
+*Not built yet: `kubaos-ui`'s meter doesn't ease a new reading, and neither library has the live variant.*

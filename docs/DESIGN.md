@@ -157,7 +157,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
 | Radii (`[radius]`) | five roles, small 4, row 8, control 12, content 16, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
-| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 28, compact 24, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; a collapsible's rail's strip 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the disk passphrase prompt's) 320; column 560; rail 236 (Kōbō's); an app's sidebar 264, its find box 320; a canvas page's settings beside its canvas 400, from a page 1000 wide; an app's window 1120 × 720, at least 720 × 480; log 232; scrollbar 4; the shell's panel 392 and bar 40; the lock's wallpaper's blur once it is awake, 8; a wallpaper's thumbnail 256 × 160; sparkline 48; the mockups' motion plot, from 0 to 1, 160 |
+| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, three-line row 72, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 28, compact 24, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; a collapsible's rail's strip 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the disk passphrase prompt's) 320; column 560; rail 236 (Kōbō's); an app's sidebar 264, its find box 320; a canvas page's settings beside its canvas 400, from a page 1000 wide; an app's window 1120 × 720, at least 720 × 480; log 232; scrollbar 4; the shell's panel 392 and bar 40; the lock's wallpaper's blur once it is awake, 8; a wallpaper's thumbnail 256 × 160; sparkline 48; the mockups' motion plot, from 0 to 1, 160 |
 | Container padding (`[container]`) | 16 under 640, 24 from 640, 32 from 1024 |
 | Aspect ratios (`[aspect]`) | wallpaper 16:10, dialog 5:2 (its least height), a canvas page's canvas 50:21 (42% of its width tall) |
 
@@ -188,7 +188,7 @@ Dense, never cramped (principle 8): room that holds nothing is a bug, as an edge
 
 - **Bands are their content and a step of space.** A footer, a toolbar or a header band is as tall as what is in it and one spacing step above and below, and no taller: the specimen's bar is a 32 control with 16 above and below.
 - **No side gutter past the container padding.** Content runs to the container padding at either side; it may stop short (a column of text at `column`, 560), but nothing pads it in further.
-- **Rows are their type's natural height**: a `ListRow` is 44 (`row`) or 56 (`row_two_line`), a line of text its style's line. A row taller than that holds air.
+- **Rows are their type's natural height**: a `ListRow` is 44 (`row`) or 56 (`row_two_line`), a menu item or a select option whose description wraps to its second line 72 (`row_three_line`), a line of text its style's line. A row taller than that holds air.
 - **A page's or a panel's content runs out where it ends.** A panel that scrolls shows no "more content" strip besides its scroll; a panel shows all of its content or scrolls, never both.
 - The `container-padding` rule fails a page or a container whose content sits further in than its padding at the left, or runs into it at the right. An empty band is measured by eye in the shots: a band's height can't be told from a deliberate gap by the boxes alone, so no rule judges it.
 
@@ -372,11 +372,11 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Skeleton` | `line`, `circle` or `block` | none | small, full, or the caller's |
 | `ListRow` | `one-line` or `two-line`; `icon` or `tile` | height | row, nested 8 in a content box |
 | `Field` | `icon` | height | control |
-| `Select` | `icon` | height | control |
+| `Select` | `icon`, `two-line` | height | control |
 | `Popover` | none | none, holds content | control |
 | `Tooltip` | none | width | control, its popover's |
 | `Menu` | none | none | none |
-| `MenuItem` | `icon`, `check`, `danger` | height | row, nested 4 in a popover |
+| `MenuItem` | `icon`, `check`, `danger`, `two-line` | height | row, nested 4 in a popover |
 | `Prompt` | `menu` | width | surface, its popover's; none in a menu |
 | `Table` | none | none | none |
 | `TableRow` | none | height | row |

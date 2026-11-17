@@ -14,7 +14,7 @@ A symbol and its own value (a system monitor reading, the battery's share, the r
 
 On an `interactive` pill, `tooltip` shows in a `Hint` under it while the pointer is on it, moved sideways as far as keeps it whole inside the window, 8 from its edge, and kept there as its words change (the status pill's).
 
-When its content changes width, the pill eases to the new width over `medium` on `standard_decel`, as a list reorders, and cuts its content at its own edge meanwhile, so nothing draws over its neighbours. Content that animates its own width every frame isn't put in a pill, whose ease would trail behind it: the workspaces draw a pill of their own.
+When its content changes width, the pill eases to the new width over `medium` on `standard_decel`, as a list reorders, and cuts its content at its own edge meanwhile, so nothing draws over its neighbours. At rest it cuts nothing, so the hint of a press target inside it (an audio pill's circle) floats whole under it. Content that animates its own width every frame isn't put in a pill, whose ease would trail behind it: the workspaces draw a pill of their own.
 
 It isn't a `Chip` (a fact or a pick inside a surface, 24 tall) or a `Badge` (a count or a dot on a symbol's corner): it is the bar's own group, as tall as the bar's controls.
 

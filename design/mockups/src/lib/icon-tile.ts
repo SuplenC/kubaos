@@ -10,7 +10,9 @@
 // one edge; a shape fits `space.s4` inside it. Either is kept whole, never cropped or stretched.
 //
 // An app with no symbol shows its initial in the symbol's place: the first character of its name,
-// upper-cased, in the type style whose symbol box is the tile's, centred on its ink's box.
+// upper-cased, in the type style whose symbol box is the tile's, centred on its ink's box. Where an
+// app stands as a 16 symbol with no tile (a menu item, a bar's circle), `smallInitial` draws it
+// the same way in `label`.
 //
 // The symbol, or the initial, shows until the picture has loaded and been measured, and stays when
 // it can't be read or draws nothing, so a row keeps the room a picture takes whether or not one
@@ -56,11 +58,14 @@ export interface TileOptions {
 
 /** What an app's icon draws, as its measurement found it. */
 export interface Drawing {
-  /** The box of its pixels more opaque than `icon_tile.ink`, as shares of the picture's sides. */
+  /**
+   * The box it is placed by, as shares of the picture's sides: a plate's solid pixels (more opaque
+   * than `icon_tile.opaque`), a shape's every drawn pixel (more opaque than `icon_tile.ink`).
+   */
   readonly box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
   /** The picture's width over its height. */
   readonly aspect: number;
-  /** The share of the box its pixels more opaque than `icon_tile.opaque` cover. */
+  /** The share of their own box its pixels more opaque than `icon_tile.opaque` cover. */
   readonly coverage: number;
   /** Square and covered enough to fill the tile; a shape sits inside it. */
   readonly plate: boolean;
@@ -113,37 +118,40 @@ function read(picture: HTMLImageElement): Drawing | null {
   } catch {
     return null;
   }
-  const ink = number("icon_tile-ink") * 255;
-  let left = width;
-  let top = height;
-  let right = -1;
-  let bottom = -1;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (alpha[(y * width + x) * 4 + 3]! <= ink) continue;
-      left = Math.min(left, x);
-      right = Math.max(right, x);
-      top = Math.min(top, y);
-      bottom = Math.max(bottom, y);
+  /** The box of the pixels more opaque than `over`, and how many they are; null for none. */
+  const boxOver = (over: number) => {
+    let left = width;
+    let top = height;
+    let right = -1;
+    let bottom = -1;
+    let count = 0;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (alpha[(y * width + x) * 4 + 3]! <= over) continue;
+        count++;
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
     }
-  }
-  if (right < 0) return null;
-  const opaque = number("icon_tile-opaque") * 255;
-  let covered = 0;
-  for (let y = top; y <= bottom; y++) {
-    for (let x = left; x <= right; x++) {
-      if (alpha[(y * width + x) * 4 + 3]! > opaque) covered++;
-    }
-  }
-  const boxWidth = right - left + 1;
-  const boxHeight = bottom - top + 1;
-  const coverage = covered / (boxWidth * boxHeight);
-  const square = Math.min(boxWidth, boxHeight) / Math.max(boxWidth, boxHeight) >= number("icon_tile-square");
+    return right < 0 ? null : { left, top, width: right - left + 1, height: bottom - top + 1, count };
+  };
+  const drawn = boxOver(number("icon_tile-ink") * 255);
+  if (!drawn) return null;
+  // A plate is judged, and placed, by its solid pixels alone: the soft shadow many themes draw under
+  // one reaches further on one side, and a box that took it in would sit the plate off the tile's
+  // centre, the tile's corners cutting some of its corners and not the others.
+  const solid = boxOver(number("icon_tile-opaque") * 255);
+  const squareness = solid ? Math.min(solid.width, solid.height) / Math.max(solid.width, solid.height) : 0;
+  const coverage = solid ? solid.count / (solid.width * solid.height) : 0;
+  const plate = squareness >= number("icon_tile-square") && coverage >= number("icon_tile-plate");
+  const box = plate ? solid! : drawn;
   return {
-    box: { x: left / width, y: top / height, width: boxWidth / width, height: boxHeight / height },
+    box: { x: box.left / width, y: box.top / height, width: box.width / width, height: box.height / height },
     aspect: naturalWidth / naturalHeight,
     coverage,
-    plate: square && coverage >= number("icon_tile-plate"),
+    plate,
   };
 }
 
@@ -212,6 +220,36 @@ export function initial(name: string): string {
 /** The letter in each size's type style: the style whose symbol box is the tile's symbol's. */
 const INITIAL_STYLE = { Sm: "body_strong", Md: "subheading", Lg: "headline" } as const satisfies Record<TileSize, TypeStyle>;
 
+/**
+ * `name`'s initial in `style`, in the colour role `color`, its line centred on its ink's box: the
+ * letter that stands in for an app's picture and symbol, on a tile or in a 16 symbol's box.
+ */
+export function initialLetter(name: string, style: TypeStyle, color: string): HTMLElement {
+  const letter = text(initial(name), style, color);
+  // The letter's line is the symbol's box tall, so it sits where the symbol would, centred on
+  // its ink's box: Geist's caps sit high in their line, and a capital's weight (an L's foot)
+  // would set it off its middle.
+  centreOnInk(letter, style, letter.textContent ?? "");
+  return letter;
+}
+
+/**
+ * `name`'s initial in a 16 symbol's box, in `label`, whose symbol is 16, in `color`, a CSS colour as
+ * a symbol beside it takes: an app with no picture where a 16 symbol or picture stands for it, a
+ * menu item's or a bar's circle.
+ */
+export function smallInitial(name: string, color: string): HTMLElement {
+  const letter = initialLetter(name, "label", "on_surface");
+  letter.style.color = color;
+  // The letter stands where a symbol would: the geometry check reads its box as the symbol's, as
+  // it reads a drawn one, and the letter as paint inside it.
+  delete letter.dataset.probe;
+  const box = document.createElement("span");
+  box.className = "k-small-initial";
+  box.append(letter);
+  return probe(box, { role: "icon", name: "initial" });
+}
+
 export function iconTile(options: TileOptions): HTMLElement {
   const { side, icon: size } = TILE_MEASURES[options.size];
   const tile = document.createElement("span");
@@ -227,11 +265,7 @@ export function iconTile(options: TileOptions): HTMLElement {
     shown.classList.add("k-icon-tile-count");
     tile.append(shown);
   } else if (options.glyph === undefined) {
-    // The letter's line is the symbol's box tall, so it sits where the symbol would, centred on
-    // its ink's box: Geist's caps sit high in their line, and a capital's weight (an L's foot)
-    // would set it off its middle.
-    const letter = text(initial(options.name ?? ""), INITIAL_STYLE[options.size], ink);
-    centreOnInk(letter, INITIAL_STYLE[options.size], letter.textContent ?? "");
+    const letter = initialLetter(options.name ?? "", INITIAL_STYLE[options.size], ink);
     letter.classList.add("k-icon-tile-initial");
     tile.append(letter);
   } else tile.append(icon(options.glyph, "var(--icon)", `var(--color-${ink})`));

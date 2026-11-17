@@ -759,6 +759,22 @@
   top: round(nearest, calc((var(--side) - var(--t-line)) / 2), 1px);
 }
 
+/* An app's initial in a 16 symbol's box (`smallInitial`, `lib/icon-tile.ts`): `label`'s line is the
+   box tall, so the letter is centred down by its ink and across on its advance, as on a tile. */
+.k-small-initial {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--icon-s16);
+  height: var(--icon-s16);
+}
+
+.k-small-initial > .k-text {
+  position: absolute;
+  left: round(nearest, calc((var(--icon-s16) - round(up, calc(var(--natural) * var(--px) - 0.001px), 1px)) / 2), 1px);
+  top: 0;
+}
+
 /* An app's picture, scaled so its drawing's box fits `--fit` whole, the box snapped to whole
    device pixels and centred as the symbol is; the picture's own margin runs past the box, and the
    tile clips it. The shares (`--box-*`, `--picture-*`, of the box's long side) are its
@@ -1633,6 +1649,21 @@
   transition: none;
 }
 
+/* A select with a tooltip fills the anchor, and lights it as any control does; open, its list
+   is what it shows, so the card goes. */
+.k-tip-anchor > .k-select-room {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.k-tip-anchor:has(> .k-select-room:not([data-open]) > .k-control:is(:hover, :focus-visible, [data-pinned])) > .k-tooltip {
+  opacity: 1;
+}
+
+.k-tip-anchor:has(> .k-select-room > .k-control[data-pinned]) > .k-tooltip {
+  transition: none;
+}
+
 /* One line, or `--lines`, in the room the text is given, the last ending in an ellipsis where the
    words don't fit; never wider than its words. */
 .k-text[data-clamped] {
@@ -1762,6 +1793,11 @@
   width: 100%;
   padding: 0 var(--end);
   border-radius: inherit;
+}
+
+/* Its content is cut at its edge only while its width is eased: at rest it cuts nothing, so the
+   hint of a press target inside it (an audio pill's circle) floats whole under it. */
+.k-pill[style*="--from"] > .k-pill-clip {
   overflow: clip;
 }
 
@@ -2065,6 +2101,26 @@
   visibility: visible;
 }
 
+/* A knob slider (balance): no fill, its icon and words on the track. The knob is the fill's circle
+   less `space.s4` round it, centred on the value as the fill's round end is, its left edge on a
+   whole device pixel, over the icon and the words; it is the fill's tone and lifts as the fill
+   does, lit and held. */
+.k-slider[data-knob] > .k-slider-fill {
+  display: none;
+}
+
+.k-slider-knob {
+  --knob: calc(var(--side) - 2 * var(--space-s4));
+  position: absolute;
+  top: var(--space-s4);
+  left: round(nearest, calc(var(--side) / 2 + (100% - var(--side)) * var(--slider-shown) - var(--knob) / 2), 1px);
+  width: var(--knob);
+  height: var(--knob);
+  border-radius: var(--radius-full);
+  background: rgb(from color-mix(in srgb, var(--tone), var(--bright) calc(var(--lift) * 100%)) r g b / var(--dim));
+  pointer-events: none;
+}
+
 /* The icon's button, where the icon steps or toggles: the circle at the fill's start, holding the
    icon. At rest nothing shows it is a button. Lit, it is a Filled icon button in the fill's tone:
    its circle lifts toward the bright end as the fill does, by `opacity.press` lit and
@@ -2131,11 +2187,18 @@
    as the spinner's arc, the tone by day with none, and solid glass (`primary_glass`) while the
    signs are off. The rail is `tabs.rail` thick at night and `tabs.rail_day` by day, in whole device
    pixels. The focus tube is the whole well's edge, drawn under the rail. Disabled, every part is at
-   `opacity.disabled_content`, with no glow. */
+   `opacity.disabled_content`, with no glow. A choice can be disabled alone; when that choice is
+   the pick, the well itself takes the keyboard, so it draws no outline of its own.
+   The well is as wide as the room it is given: the whole width across a stack, a page or a
+   block, and along a row its widest choice (`--widest`, measured) times the count, or the rest of
+   the row where the page fills it (`layout.ts`' `filling`). It is never narrower than that, so it
+   grows past a room too narrow for it rather than cut a choice's words. */
 .k-tabs {
   position: relative;
-  display: inline-flex;
+  display: flex;
   flex: none;
+  min-width: calc(var(--count) * var(--widest, 0px) + 2 * var(--space-s4));
+  outline: none;
   box-sizing: border-box;
   height: var(--size-control_sm);
   padding: var(--space-s4);
@@ -2154,8 +2217,29 @@
   --dim: var(--opacity-disabled_content);
 }
 
-.k-tabs:has(> .k-tab:focus-visible) > .k-ring {
+.k-tabs:is(:has(> .k-tab:focus-visible), [data-stranded]:focus-visible) > .k-ring {
   --lit: 1;
+}
+
+/* Across a stack: the whole width, whatever the stack's own alignment. */
+.k-stack > .k-tabs {
+  align-self: stretch;
+}
+
+/* Filling a row: the rest of it, still never narrower than its choices. */
+.k-row > .k-tabs[data-fill] {
+  min-width: calc(var(--count) * var(--widest, 0px) + 2 * var(--space-s4));
+}
+
+/* No pick: no stretch lit, the rail alone. */
+.k-tabs[data-none] > .k-tabs-lit {
+  visibility: hidden;
+}
+
+/* A pick that is disabled: its stretch dims with its words and burns no glow. */
+.k-tabs[data-stranded] > .k-tabs-lit {
+  --dim: var(--opacity-disabled_content);
+  --rail-signs: 0;
 }
 
 .k-tabs[aria-disabled="true"] > .k-ring {
@@ -2219,27 +2303,35 @@
   --words: rgb(from var(--picked-words) r g b / var(--dim));
 }
 
-/* Filling its room: the choices share the well equally, their words centred, so the last one ends
-   at the well's own end. Each share is whole device pixels, the spare ones one each to the first
-   choices, as `kubaos-ui`'s grid splits a width (`grid::weighted`). */
-.k-tabs[data-fill] {
-  display: flex;
-  flex: 1 1 auto;
-}
-
-.k-tabs[data-fill] > .k-tab {
+/* The choices share the well equally, their words centred, so the last one ends at the well's own
+   end. Each share is whole device pixels, the spare ones one each to the first choices, as
+   `kubaos-ui`'s grid splits a width (`grid::weighted`). The words start on a whole device pixel,
+   the odd one after them, as `kubaos_ui::snap::centre` places a box: their width is the text's,
+   rounded up as `.k-text` draws it, and the symbol's with its gap (`--glyph`). */
+.k-tabs > .k-tab {
   --share: round(down, calc(100% / var(--count)), 1px);
   flex: none;
   width: calc(var(--share) + clamp(0px, 100% - var(--share) * var(--count) - var(--index) * 1px, 1px));
-  justify-content: center;
+  justify-content: flex-start;
+}
+
+.k-tabs > .k-tab > .k-tab-words {
+  --content: calc(round(up, calc(var(--words) * var(--px) - 0.001px), 1px) + var(--glyph, 0px));
+  margin-left: max(0px, round(down, calc((100% - var(--content)) / 2), 1px));
 }
 
 .k-tab[aria-selected="true"] {
   --picked: 1;
 }
 
+/* A choice disabled alone dims its words, picked or not, and burns no glow round them. */
 .k-tab:disabled {
   cursor: default;
+}
+
+.k-tabs:not([aria-disabled="true"]) > .k-tab:disabled {
+  --dim: var(--opacity-disabled_content);
+  --rail-signs: 0;
 }
 
 .k-tab.k-control {
@@ -2251,6 +2343,34 @@
 
 .k-tab.k-control[data-pinned],
 [data-sequence] .k-tab.k-control {
+  transition: none;
+}
+
+/* A choice's tip: its Tooltip anchored to the choice as any tooltip is to its control, `space.s8`
+   above the choice and from its start, or its end in the row's second half, fading in and out over
+   `short` as the choice is lit. */
+.k-tab > .k-tooltip {
+  position: absolute;
+  z-index: 3;
+  bottom: calc(100% + var(--space-s8));
+  left: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.k-tab > .k-tooltip[data-held="end"] {
+  left: auto;
+  right: 0;
+}
+
+.k-tab:is(:hover, :focus-visible, [data-pinned]) > .k-tooltip,
+.k-tab > .k-tooltip[data-shown] {
+  opacity: 1;
+}
+
+.k-tab[data-pinned] > .k-tooltip,
+.k-tab > .k-tooltip[data-shown] {
   transition: none;
 }
 
@@ -2409,7 +2529,8 @@
    pressed, the container lifts to
    `secondary_container_pressed` over `micro`. At rest its content is `on_surface`, or `error` on a
    danger item, whose keycaps keep their own colours; disabled, `on_surface` at
-   `opacity.disabled_content`. */
+   `opacity.disabled_content`. Its description and trailing symbol are `on_surface_variant`, and
+   lit `on_secondary_container` at `opacity.subdued_text`, a list row's subtitle's. */
 .k-menu-item {
   position: relative;
   display: flex;
@@ -2424,6 +2545,7 @@
   --press: 0;
   --rest-ink: var(--color-on_surface);
   --ink: color-mix(in srgb, var(--rest-ink), var(--color-on_secondary_container) calc(var(--lit) * 100%));
+  --muted: color-mix(in srgb, var(--color-on_surface_variant), rgb(from var(--color-on_secondary_container) r g b / var(--opacity-subdued_text)) calc(var(--lit) * 100%));
   --container: color-mix(in srgb, var(--color-secondary_container), var(--color-secondary_container_pressed) calc(var(--press) * 100%));
   background: color-mix(in srgb, transparent, var(--container) calc(var(--lit) * 100%));
   transition:
@@ -2431,9 +2553,20 @@
     --press var(--motion-micro) var(--easing-standard);
 }
 
+/* An item with a description under its words: a two-line row's height, as a list's, or a
+   three-line row's where the description wraps to its second line. */
+.k-menu-item[data-lines="two"] {
+  height: var(--size-row_two_line);
+}
+
+.k-menu-item[data-lines="three"] {
+  height: var(--size-row_three_line);
+}
+
 /* A danger item lights in the error itself, not the accent's container, so under the pointer and
    the keyboard it reads as what it is: a step that destroys something. */
 .k-menu-item[data-danger] {
+  --muted: var(--ink);
   --rest-ink: var(--color-error);
   --ink: color-mix(in srgb, var(--rest-ink), var(--color-on_error) calc(var(--lit) * 100%));
   --container: color-mix(in srgb, var(--color-error), var(--color-error_pressed) calc(var(--press) * 100%));
@@ -2456,6 +2589,7 @@
   cursor: default;
   --lit: 0;
   --ink: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --muted: var(--ink);
 }
 
 /* A disabled item's keys dim with its words, so the shortcut doesn't read as working. */
@@ -2471,6 +2605,15 @@
 
 .k-menu-words {
   display: block;
+}
+
+/* An app's icon in the symbol's box, kept whole. */
+.k-menu-picture {
+  display: block;
+  flex: none;
+  width: var(--icon-s16);
+  height: var(--icon-s16);
+  object-fit: contain;
 }
 
 .k-menu-keys {
@@ -2548,7 +2691,8 @@
 }
 
 /* A select's room (`lib/select.ts`): a shut select's height in the flow, whatever the select does.
-   Its list's visible part, `--drop`, is `--rows` small controls and the list's padding. It opens
+   Its list's visible part, `--drop`, is `--rows` options (small controls, or two-line rows where
+   the options carry descriptions) and the list's padding. It opens
    over `medium` on `emphasized_decel` and folds over `short` on `emphasized_accel`; a pick folds it
    a `micro` later, once the option has shown pressed. With reduced motion it opens and folds at
    once. A sample of the open state takes the open surface's height in the flow. */
@@ -2558,7 +2702,7 @@
   flex: none;
   align-self: stretch;
   height: var(--size-control_md);
-  --drop: calc(var(--rows) * var(--size-control_sm) + 2 * var(--space-s4));
+  --drop: calc(var(--rows) * var(--select-option, var(--size-control_sm)) + 2 * var(--space-s4));
   transition: --select-open var(--motion-short) var(--easing-emphasized_accel);
 }
 
@@ -2721,11 +2865,11 @@
 
 /* The picked option's words are `primary_lit`, as a picked tab's, with the label glow round them at
    night while the signs are on; highlighted, they take the highlight's colours. */
-.k-select-list > .k-menu-item[data-picked] {
+:is(.k-select-list, .k-select-menu) > .k-menu-item[data-picked] {
   --rest-ink: var(--color-primary_lit);
 }
 
-.k-select-list > .k-menu-item[data-picked] .k-menu-words {
+:is(.k-select-list, .k-select-menu) > .k-menu-item[data-picked] .k-menu-words {
   filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--signs) * (1 - var(--lit)))));
 }
 
@@ -2743,6 +2887,124 @@
 .k-select-room[data-up] .k-select-rule {
   top: auto;
   bottom: var(--size-control_md);
+}
+
+/* The value row's symbol, the pick's: as wide as the symbol. */
+.k-select-lead {
+  display: flex;
+  flex: none;
+}
+
+.k-select-lead[hidden] {
+  display: none;
+}
+
+/* An inline select's room (`look: "inline"`): as wide as its words, a line of `small` tall, its
+   Menu hanging from it. It opens over `short` on `emphasized_decel` and folds over `micro` on
+   `emphasized_accel`, a popover's; a pick folds it a `micro` later, once the option has shown
+   pressed. A sample of the open state keeps the Menu in the flow under it. */
+.k-select-room[data-look="inline"] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: auto;
+  box-sizing: border-box;
+  max-width: 100%;
+  height: auto;
+  transition: --select-open var(--motion-micro) var(--easing-emphasized_accel);
+}
+
+.k-select-room[data-look="inline"][data-open] {
+  transition: --select-open var(--motion-short) var(--easing-emphasized_decel);
+}
+
+.k-select-room[data-look="inline"][data-taken] {
+  transition: --select-open var(--motion-micro) var(--easing-emphasized_accel) var(--motion-micro);
+}
+
+/* The words and the chevron, `on_surface_variant`; lit, both `primary_lit`, a lit Text button's
+   words. No box, no line and no glow: the colour alone says it is lit. */
+.k-select-inline {
+  display: flex;
+  max-width: 100%;
+  outline: none;
+  cursor: pointer;
+  --value: color-mix(in srgb, var(--color-on_surface_variant), var(--color-primary_lit) calc(var(--lit) * 100%));
+  --mark: var(--value);
+}
+
+/* Its words and chevron shrink to its room, the words cut with an ellipsis, never running past it. */
+.k-select-inline > .k-row {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.k-select-room[data-look="inline"]:is([data-open], [data-folding]) > .k-select-inline {
+  --lit: 1;
+}
+
+.k-select-inline[aria-disabled="true"] {
+  cursor: default;
+  --value: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+/* Its Menu, `space.s4` under the words (over them, growing up), moved back by the popover's padding
+   and an option's, and its symbol and gap where options have one, so its options' words start
+   where the pick's do. */
+.k-select-popover {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + var(--space-s4));
+  left: calc(-1 * var(--select-back));
+  opacity: var(--select-open);
+}
+
+.k-select-room[data-look="inline"] {
+  --select-back: calc(var(--space-s4) + var(--space-s8) + var(--select-symbol, 0px));
+}
+
+.k-select-room[data-icons] {
+  --select-symbol: calc(var(--icon-s16) + var(--space-s8));
+}
+
+/* Shut, the Menu takes no box at all: a hidden one would still stretch what scrolls round it. */
+.k-select-room:not([data-open], [data-folding]) > .k-select-popover {
+  display: none;
+}
+
+.k-select-room[data-look="inline"][data-up] > .k-select-popover {
+  top: auto;
+  bottom: calc(100% + var(--space-s4));
+}
+
+/* Drawn open in a sample's flow, the Menu floats as a live one does and the room keeps its height
+   (`--drop`, the Menu's) and the gap to it below the words, or above them growing up, so the
+   sample holds the Menu and nothing round it moves. */
+.k-select-room[data-look="inline"][data-shown] {
+  padding-bottom: calc(var(--space-s4) + var(--drop));
+}
+
+.k-select-room[data-look="inline"][data-shown] > .k-select-popover {
+  top: calc(100% - var(--drop));
+}
+
+.k-select-room[data-look="inline"][data-shown][data-up] {
+  padding-top: calc(var(--space-s4) + var(--drop));
+  padding-bottom: 0;
+}
+
+.k-select-room[data-look="inline"][data-shown][data-up] > .k-select-popover {
+  top: 0;
+  bottom: auto;
+}
+
+.k-select-menu {
+  --most: 8;
+  max-height: calc(var(--select-option, var(--size-control_sm)) * var(--most));
+}
+
+.k-select-menu > .k-menu-item[data-taken] {
+  --press: 1;
 }
 
 /* How far a collapsible is open, 0 to 1. */

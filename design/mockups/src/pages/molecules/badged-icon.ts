@@ -55,6 +55,7 @@ export default page({
     { name: "A count", for: "how many: security updates waiting", sample: () => badgedIcon({ name: "system_update_alt", badged: true, count: 3 }) },
     { name: "A dot", for: "new or wrong, no number: a failed proxy", sample: () => badgedIcon({ name: "vpn_lock", badged: true }) },
     { name: "In the accent", for: "unread, not wrong", sample: () => badgedIcon({ name: "notifications", badged: true, accent: true }) },
+    { name: "A fixed meaning", for: "only a dot: the mic an app records from, `microphone`", sample: () => badgedIcon({ name: "mic", badged: true, meaning: "microphone" }) },
     { name: "No badge", for: "the symbol alone, its box as wide", sample: () => badgedIcon({ name: "notifications" }) },
   ],
   sizes: nonEmpty(BADGED_SIZES.map((size) => ({ name: size.slice(1), for: BESIDE[size], sample: () => counts(size) }))),

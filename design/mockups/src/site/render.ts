@@ -135,7 +135,7 @@ function renderComponent(page: Page): Part[] {
       measured.status,
       ...shelves(measured.samples),
     ),
-    part("Variants", ...shelves(variants("", page.variants, "Variants"), variants("Sizes", page.sizes))),
+    part("Variants", ...shelves(variants("", page.variants, "Variants"), variants("Sizes", page.sizes), ...(page.groups ?? []).map((group) => variants(group.title, group.rows)))),
     part("Motion", motion(page.motion)),
     partOr("Keyboard", page.keyboard, (keys) => [keyboard(keys)]),
     part("Content", ...shelves(...content(page.content))),

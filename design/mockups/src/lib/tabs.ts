@@ -1,8 +1,10 @@
 // One of a few views or values, picked along a rail of neon: `kubaos-ui`'s `tabs::tabs`,
 // `KubaOS.Components`' `Tabs` (`docs/design/components/tabs.md`). The choices sit in one well, a
 // pill as tall as a small control, with an unlit rail along its bottom edge; the picked choice's
-// stretch of the rail is lit, and its words are the accent. The same well is a setting's segmented
-// control (Always, On AC, Never). `.k-tabs` in `lib.css` draws it.
+// stretch of the rail is lit, and its words are the accent. The well is as wide as the room it is
+// given, its choices sharing it equally with their words centred, and never narrower than its
+// widest choice's share times the count, so no words are cut. The same well is a setting's
+// segmented control (Always, On AC, Never). `.k-tabs` in `lib.css` draws it.
 //
 // A pick sends the lit stretch from the old choice to the new one: its leading edge goes over
 // `short` and its trailing edge follows a `micro` later over `medium`, both on `emphasized_decel`,
@@ -13,7 +15,19 @@
 // The row is one stop for Tab, on the picked choice, and the focus tube lights the whole well's
 // edge: ← and → (h and l) pick the neighbour, round from either end, and the keyboard follows the
 // pick. Disabled, everything dims, the pick still shown, and the row takes no press and is no stop
-// for Tab.
+// for Tab. A single choice disabled dims alone and takes no press, and the arrows pass over it. A
+// pick that is disabled stays picked, dimmed with its stretch, until the owner moves it; the stop
+// for Tab is then the well itself, and an arrow picks the nearest choice that isn't disabled.
+//
+// A row may have no pick (`picked: null`): no stretch is lit and every choice's words rest. It is
+// for a row that doesn't apply, disabled, as Calls and Music are for a device that isn't Bluetooth;
+// a pick on one that isn't disabled lays the stretch under it at once.
+//
+// A choice may carry a tip, what picking it means: the library's Tooltip, the choice's name as its
+// title and the tip as its muted body under it, anchored to the choice as any tooltip is to its
+// control: `space.s8` above it while the pointer or the keyboard is on it, from its start, or its
+// end for a choice in the row's second half, so the card stays over the row. It takes no room, so
+// nothing round the row moves as it comes and goes.
 
 import { iconInLine } from "./button.ts";
 import { type Pinned, pin } from "./control.ts";
@@ -21,17 +35,26 @@ import { focusRing } from "./focus.ts";
 import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
 import { text } from "./text.ts";
+import { tooltip } from "./tooltip.ts";
 import { raw } from "./tokens.ts";
 import { CHROME, settings } from "../site/settings.ts";
 
 export interface Tab {
   readonly label: string;
   readonly icon?: string;
+  /** Dimmed, no press, passed over by the arrows: Input while a headset is in Music mode. */
+  readonly disabled?: boolean;
+  /**
+   * What picking it means, the body of a Tooltip over the row, under the choice's name as its title,
+   * while the pointer or the keyboard is on it.
+   */
+  readonly tip?: string;
 }
 
 export interface TabsOptions {
   readonly choices: readonly Tab[];
-  readonly picked?: number;
+  /** The picked choice, the first by default; null for none, on a row that doesn't apply. */
+  readonly picked?: number | null;
   readonly disabled?: boolean;
   /**
    * The row pinned in a state: lit or lit with the signs off, as the keyboard on the row lights
@@ -43,13 +66,10 @@ export interface TabsOptions {
    * and the move's player takes them to the picked one.
    */
   readonly from?: number;
+  /** The choice whose tip is drawn shown, as under the pointer: a sample of it. */
+  readonly tipShown?: number;
   /** What a pick does besides picking: the view it shows. */
   readonly onPick?: (index: number) => void;
-  /**
-   * The well as wide as the room it is given, its choices sharing it equally with their words
-   * centred: a setting's row, where the well ends in line with the controls under it.
-   */
-  readonly fill?: boolean;
 }
 
 /** A lit stretch's two edges along the well, in CSS pixels from its left edge. */
@@ -57,6 +77,19 @@ interface Edges {
   readonly left: number;
   readonly right: number;
 }
+
+/** Each row's own way of disabling a choice from outside, by its well. */
+const disablers = new WeakMap<Element, (index: number, disabled: boolean) => void>();
+
+/**
+ * Disables or enables choice `index` of the row `well` from outside, as its owner's state changes:
+ * Input while a headset is in Music mode. A pick that becomes disabled stays picked.
+ */
+export function setTabDisabled(well: Element, index: number, disabled: boolean): void {
+  disablers.get(well)?.(index, disabled);
+}
+
+let made = 0;
 
 /** The duration token `name` in milliseconds under the speed setting. */
 function duration(name: string): number {
@@ -66,14 +99,14 @@ function duration(name: string): number {
 export function tabs(options: TabsOptions): HTMLElement {
   const count = options.choices.length;
   const clamp = (index: number) => Math.max(0, Math.min(count - 1, index));
-  let picked = clamp(options.picked ?? 0);
+  let picked = options.picked === null ? -1 : clamp(options.picked ?? 0);
   const from = options.from === undefined ? null : clamp(options.from);
 
+  const id = `k-tabs-${made++}`;
   const well = document.createElement("span");
   well.className = "k-tabs";
   well.setAttribute("role", "tablist");
   if (options.disabled) well.setAttribute("aria-disabled", "true");
-  if (options.fill) well.dataset.fill = "";
   well.style.setProperty("--count", String(count));
   if (options.pinned !== "pressed") pin(well, options.pinned);
   focusRing(well, "full", "accent", false);
@@ -84,23 +117,51 @@ export function tabs(options: TabsOptions): HTMLElement {
     each.type = "button";
     each.setAttribute("role", "tab");
     each.style.setProperty("--index", String(index));
-    each.disabled = options.disabled ?? false;
+    each.disabled = (options.disabled ?? false) || (choice.disabled ?? false);
     const words = text(choice.label, "button_small");
     words.style.color = "var(--words)";
     const glyph = choice.icon ? iconInLine(choice.icon, "button_small", "var(--words)") : null;
     const content = row("s4", "start", ...(glyph ? [glyph, words] : [words]));
+    // What the stylesheet centres the words by: the text's advance, and the symbol with its gap.
+    each.style.setProperty("--words", words.style.getPropertyValue("--natural"));
+    if (glyph) each.style.setProperty("--glyph", "calc(var(--type-button_small-icon) + var(--space-s4))");
     content.classList.add("k-tab-words");
     each.append(content);
+    if (choice.tip) {
+      const tip = tooltip(choice.label, choice.tip);
+      tip.id = `${id}-tip-${index}`;
+      tip.setAttribute("role", "tooltip");
+      // Read out as the choice's description, never as part of its name.
+      tip.setAttribute("aria-hidden", "true");
+      tip.dataset.held = index >= count / 2 ? "end" : "start";
+      tip.toggleAttribute("data-shown", options.tipShown === index);
+      each.setAttribute("aria-describedby", tip.id);
+      each.append(tip);
+    }
     each.addEventListener("click", () => pick(index, false));
-    each.addEventListener("keydown", (event) => {
-      const by = event.key === "ArrowLeft" || event.key === "h" ? -1 : event.key === "ArrowRight" || event.key === "l" ? 1 : 0;
-      if (by === 0) return;
-      event.preventDefault();
-      pick((picked + by + count) % count, true);
-    });
     return each;
   });
-  if (options.pinned === "pressed") pin(buttons[(picked + 1) % count]!, "pressed");
+  const off = options.choices.map((choice) => choice.disabled ?? false);
+  const open = (index: number) => !options.disabled && !off[index];
+  well.addEventListener("keydown", (event) => {
+    const by = event.key === "ArrowLeft" || event.key === "h" ? -1 : event.key === "ArrowRight" || event.key === "l" ? 1 : 0;
+    if (by === 0) return;
+    event.preventDefault();
+    const next = beside(by);
+    if (next !== null) pick(next, true);
+  });
+
+  /** The nearest choice from the pick toward `by`'s side that isn't disabled, round from either end. */
+  function beside(by: -1 | 1): number | null {
+    for (let step = 1; step < count; step++) {
+      const index = (((picked + by * step) % count) + count) % count;
+      if (open(index)) return index;
+    }
+    return null;
+  }
+
+  const pressed = [1, 2, 3].map((step) => (picked + step) % count).find((index) => index !== picked && open(index));
+  if (options.pinned === "pressed" && pressed !== undefined) pin(buttons[pressed]!, "pressed");
   if (from !== null && from !== picked) buttons[from]!.dataset.was = "";
 
   const rail = document.createElement("span");
@@ -109,13 +170,21 @@ export function tabs(options: TabsOptions): HTMLElement {
   lit.className = "k-tabs-lit";
   well.append(...buttons, rail, lit);
 
-  /** Marks the pick on every choice: its words, its stop for Tab and what it reads out. */
+  /**
+   * Marks the pick on every choice: its words, its stop for Tab and what it reads out. A disabled
+   * pick can't take the keyboard, so the well takes the row's stop in its place.
+   */
   function mark(): void {
     for (const [index, each] of buttons.entries()) {
       const current = index === picked;
       each.setAttribute("aria-selected", String(current));
-      each.tabIndex = current && !options.disabled ? 0 : -1;
+      each.tabIndex = current && open(index) ? 0 : -1;
     }
+    well.toggleAttribute("data-none", picked < 0);
+    const stranded = !options.disabled && picked >= 0 && !open(picked);
+    well.toggleAttribute("data-stranded", stranded);
+    if (stranded) well.tabIndex = 0;
+    else well.removeAttribute("tabindex");
   }
 
   // Where a choice's stretch of the rail runs is its words' width, which only layout knows: the
@@ -189,24 +258,56 @@ export function tabs(options: TabsOptions): HTMLElement {
   }
 
   function pick(index: number, focus: boolean): void {
-    if (focus) buttons[index]?.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
-    if (index === picked) return;
-    const start = where();
+    if (index === picked || !open(index)) return;
+    // From no pick the stretch has nowhere to travel from: it starts where it lands.
+    const start = picked < 0 ? under(index) : where();
     picked = index;
     mark();
+    if (focus) buttons[index]?.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
     travel(start, under(picked));
     fly();
     options.onPick?.(index);
   }
 
+  /**
+   * The widest choice, its words and its sides, as `--widest`: every share is at least that, so the
+   * well grows past a room too narrow for it rather than cut a choice's words. It is set a frame
+   * after the words are laid out, so the well's own resize is seen in the next frame's turn.
+   */
+  function measure(): void {
+    const most = Math.max(
+      ...buttons.map((each) => {
+        const style = getComputedStyle(each);
+        const words = each.querySelector<HTMLElement>(".k-tab-words")?.offsetWidth ?? 0;
+        return words + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
+      }),
+    );
+    const widest = `${Math.ceil(most)}px`;
+    if (well.style.getPropertyValue("--widest") !== widest) well.style.setProperty("--widest", widest);
+  }
+
   /** Lays the stretch on the pick, or for a move's sample its travel from `from`, whenever the well's size changes. */
   function lay(): void {
-    if (!well.isConnected || flying.some((each) => each.playState === "running")) return;
+    if (!well.isConnected || picked < 0 || flying.some((each) => each.playState === "running")) return;
     const end = under(picked);
     travel(from !== null && from !== picked ? under(from) : end, end);
   }
 
+  disablers.set(well, (index, disabled) => {
+    const button = buttons[index];
+    if (!button || off[index] === disabled) return;
+    const had = document.activeElement === button || document.activeElement === well;
+    off[index] = disabled;
+    button.disabled = (options.disabled ?? false) || disabled;
+    mark();
+    // The row keeps the keyboard it had: on the well while its pick is disabled, back on the pick after.
+    const holder = picked >= 0 && open(picked) ? buttons[picked] : well;
+    if (had) holder?.focus({ focusVisible: true, preventScroll: true } as FocusOptions);
+  });
+
   mark();
   new ResizeObserver(lay).observe(well);
+  const words = new ResizeObserver(() => requestAnimationFrame(measure));
+  for (const each of buttons) words.observe(each.querySelector(".k-tab-words")!);
   return probe(well, { role: "component", name: "Tabs", variant: "", fixed: FIXED_HEIGHT });
 }
