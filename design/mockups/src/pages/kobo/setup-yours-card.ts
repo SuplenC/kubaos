@@ -119,8 +119,12 @@ export function yoursAt(view: string): Yours {
       return base(["developer"], 2, { hand: handPicked() });
     case "go-none":
       return base([], 2);
+    case "go-all":
+      return base(all, 2);
     case "go-gaming":
       return base(["gaming"], 2);
+    case "go-setup-only":
+      return base(["gaming"], 2, { hand: new Map(APPS.filter((each) => each.profiles.includes("gaming")).map((each) => [each.id, false])) });
     case "installing":
       return installedUpTo(base(all, 2, { phase: "installing" }), 7);
     case "done": {
@@ -400,10 +404,14 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
 
   const progress = (): HTMLElement | null => {
     if (state.phase !== "installing") return null;
-    // The setup is one step of the install among the apps, so the bar counts it with them.
-    const total = steps(state).length;
-    const bar = progressBar({ fraction: total === 0 ? 0 : state.installed.size / total });
-    return stack("s4", "start", filling(bar), filling(row("s8", "centre", text("Installing", "small", "on_surface_variant"), fill(), text(`${state.installed.size} of ${total}`, "small", "on_surface_variant"))));
+    // The bar counts apps, as the figure above it does; Gaming's setup moves on its own chip. With
+    // no app to count, the bar is the setup's.
+    const all = kept(state);
+    const total = all.length;
+    const done = all.filter((each) => state.installed.has(each.id)).length;
+    const fraction = total === 0 ? (state.installed.has(GAMING_SETUP.id) ? 1 : 0) : done / total;
+    const count = total === 0 ? [] : [fill(), text(`${done} of ${total}`, "small", "on_surface_variant")];
+    return stack("s4", "start", filling(progressBar({ fraction })), filling(row("s8", "centre", text("Installing", "small", "on_surface_variant"), ...count)));
   };
 
   /** An app's chip at Go: its symbol while it waits, then where its install is. */
@@ -454,16 +462,28 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     const vscode = all.some((each) => each.id === "vscode");
     const setup = tuned(state);
     const nothing = count === 0 && !setup;
-    const figure = state.phase === "done" ? `${apps(all.filter((each) => state.installed.has(each.id)).length)} in` : nothing ? "Nothing" : apps(count);
+    // Gaming's setup alone, every one of its apps unticked, is the figure itself.
+    const alone = count === 0 && setup;
+    const figure = alone ? (state.phase === "done" ? `${GAMING_SETUP.title} in` : GAMING_SETUP.title) : state.phase === "done" ? `${apps(all.filter((each) => state.installed.has(each.id)).length)} in` : nothing ? "Nothing" : apps(count);
+    // With apps, the setup rides in the sentence under their count.
+    const also = setup && !alone;
     const lede = state.failed
       ? `${app(state.failed.app).name} didn't make it. The rest are on the machine.`
       : state.phase === "done"
-        ? "Find them with Super, then their name."
+        ? alone
+          ? "The machine is tuned for games."
+          : also
+            ? "and the machine tuned for games. Find them with Super, then their name."
+            : "Find them with Super, then their name."
         : state.phase === "installing"
-          ? "going on in the background. Carry on with Git and the rest while they land."
+          ? alone
+            ? "going on in the background. Carry on with Git and the rest while it lands."
+            : `${also ? "and the gaming setup " : ""}going on in the background. Carry on with Git and the rest while they land.`
           : nothing
             ? "No apps: you get KubaOS as it comes, a terminal, a browser and the basics. Back to pick some, or carry on."
-            : "go on this machine, in the background: carry on with Git and the rest while they land.";
+            : alone
+              ? "goes on this machine, in the background: carry on with Git and the rest while it lands."
+              : `${also ? "and the gaming setup " : ""}go on this machine, in the background: carry on with Git and the rest while they land.`;
     const big = text(figure, "display", "primary_lit");
     big.classList.add("setup-yours-figure");
     const left = stack("s8", "start", big, filling(wrapped(lede, "body_large", "on_surface_variant")), ...(vscode && state.phase === "choosing" ? [filling(wrapped(`VS Code included. ${VSCODE.ticked}`, "small", "primary"))] : []));
