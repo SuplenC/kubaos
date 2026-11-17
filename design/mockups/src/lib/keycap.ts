@@ -9,12 +9,16 @@
 //
 // A KeyPrompt is the one place keys are drawn to be pressed now: the keys a surface asks for, large,
 // each `size.control_lg` tall in `button_large` on the high container, in the primary's tube and
-// glowing at night as a lit control does, a `+` in `subheading` between them. It is still a picture:
-// it takes no focus and nothing presses it.
+// glowing at night as a lit control does, a `+` in `subheading` between them. It takes no focus,
+// but it answers its keys: pressed, each key's fill lifts a step and its glow swells to
+// `focus.pressed_glow` times its own, as a pressed control's does.
 
+import { milliseconds } from "../site/recipe.ts";
+import { settings } from "../site/settings.ts";
 import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
 import { advance, text } from "./text.ts";
+import { cubic } from "./tokens.ts";
 
 /** `key`, as it is written on the keyboard (`Esc`, `K`, `↵`), on a keycap. */
 export function keycap(key: string): HTMLElement {
@@ -90,8 +94,13 @@ export function keyHints(hints: readonly KeyHint[], options: KeyHintsOptions = {
   return probe(line, { role: "component", name: "KeyHints", variant: "", fixed: { width: false, height: false } });
 }
 
+export interface KeyPromptOptions {
+  /** Held in a state for a sample: its keys pressed. */
+  readonly pinned?: "pressed";
+}
+
 /** The keys of `combination`, large and lit, a `+` between each two, `space.s12` apart. */
-export function keyPrompt(combination: string): HTMLElement {
+export function keyPrompt(combination: string, options: KeyPromptOptions = {}): HTMLElement {
   const parts = keys(combination).flatMap((key, at) => {
     const cap = document.createElement("span");
     cap.className = "k-key-prompt-cap";
@@ -100,7 +109,21 @@ export function keyPrompt(combination: string): HTMLElement {
   });
   const line = row("s12", "centre", ...parts);
   line.classList.add("k-key-prompt");
+  if (options.pinned) line.dataset.pinned = options.pinned;
   return probe(line, { role: "component", name: "KeyPrompt", variant: "", fixed: { width: false, height: true } });
+}
+
+/**
+ * Plays a KeyPrompt's keys being pressed, as its keys are: `--press` up to 1 over `micro`, then
+ * back over `short`. It moves nothing, so reduce motion keeps it.
+ */
+export function pressKeys(prompt: HTMLElement): void {
+  const speed = settings().speed;
+  const down = milliseconds("micro") / speed;
+  const total = down + milliseconds("short") / speed;
+  for (const cap of prompt.querySelectorAll<HTMLElement>(".k-key-prompt-cap")) {
+    cap.animate([{ "--press": 0 }, { "--press": 1, offset: down / total }, { "--press": 0 }], { duration: total, easing: `cubic-bezier(${cubic("easing-standard").join(", ")})` });
+  }
 }
 
 /** `parts` on one line, `space.s4` apart, centred down it: a keycap inline with words. */

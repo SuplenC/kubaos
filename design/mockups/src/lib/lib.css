@@ -1369,8 +1369,11 @@
 }
 
 /* A KeyPrompt's key (`keyPrompt` in `lib/keycap.ts`): the keys to press now, each a large key in
-   the primary's tube, glowing at night as a lit control does and not by day. */
+   the primary's tube, glowing at night as a lit control does and not by day. Pressed (`--press`,
+   0 to 1), its fill lifts to the highest container and its glow swells to `focus.pressed_glow`
+   times its own, as a pressed control's does. */
 .k-key-prompt-cap {
+  --press: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1379,11 +1382,15 @@
   min-width: var(--size-control_lg);
   padding: 0 var(--space-s20);
   border-radius: var(--radius-control);
-  background: var(--color-surface_container_high);
+  background: color-mix(in srgb, var(--color-surface_container_high), var(--color-surface_container_highest) calc(var(--press) * 100%));
   box-shadow:
     inset 0 0 0 var(--focus-tube) var(--color-primary),
-    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day)))),
-    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * (1 - var(--day))));
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day)) * (1 + (var(--focus-pressed_glow) - 1) * var(--press)))),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * (1 - var(--day)) * (1 + (var(--focus-pressed_glow) - 1) * var(--press))));
+}
+
+.k-key-prompt[data-pinned="pressed"] > .k-key-prompt-cap {
+  --press: 1;
 }
 
 /* Key hints given a room: a hint past it wraps onto a line of its own, which is cut away, and so

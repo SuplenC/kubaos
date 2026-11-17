@@ -2,8 +2,10 @@
 // yours's are. What: the one key, what to type and Enter, beside the Command menu playing three asks
 // by itself. Why: one question asked of Start and Kotodama at the same moment, raced, each clock
 // running until its answer lands. Yours: the keys that open it, what it finds, the web's
-// place, each applied to the menu as it is made. Try it: three tries that tick off, beside the
-// menu itself, the real Command menu's parts (`lib/list-detail.ts`).
+// place, each applied to the menu as it is made, its keys opening the menu from there. Try it: the
+// keys picked, large, and two lines saying the menu is already set; its keys, or a click on them,
+// open the menu over the whole screen as it opens on the desktop, the real Command menu's parts
+// (`lib/list-detail.ts`).
 //
 // Its parts are the library's. What is its own is content: the examples' rows, the race's grid,
 // the other menu and its ad (a parody, drawn from library parts), and Yours's two columns.
@@ -14,17 +16,16 @@ import { chip } from "../../lib/chip.ts";
 import { field, setValue } from "../../lib/field.ts";
 import { icon } from "../../lib/icon.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
-import { type KeyHint, keycap, keyHints, keyPrompt, keys } from "../../lib/keycap.ts";
+import { type KeyHint, keycap, keyHints, keyPrompt, keys, pressKeys } from "../../lib/keycap.ts";
 import { divider, fill, filling, fillingHeight, gap, grid, row, splitColumns, stack } from "../../lib/layout.ts";
 import { type ListRowSpec, listWith } from "../../lib/list.ts";
-import { commandMenu, type MenuMeasures } from "../../lib/list-detail.ts";
+import { commandMenu, type MenuMeasures, menuMeasures } from "../../lib/list-detail.ts";
 import { scroll } from "../../lib/scroll.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { RECHECK, type RailPage, type RailStatus } from "../../lib/step-rail.ts";
 import { setStep, stepper } from "../../lib/stepper.ts";
 import { orderList } from "../../lib/order-list.ts";
 import { tabs } from "../../lib/tabs.ts";
-import { type Task, task } from "../../lib/task.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { toastRoom } from "../../lib/toast.ts";
 import { floatingTooltip, term, termed, tooltip } from "../../lib/tooltip.ts";
@@ -39,25 +40,13 @@ import { AD, defaultSettings, type Found, LANDS, type MenuSettings, OPENS_WITH, 
 export const STEPS = ["What", "Why", "Yours", "Try it"] as const;
 export type StepIndex = 0 | 1 | 2 | 3;
 
-/** The three tries: what to do, the words typed if any, and what it shows. */
-const TRIES = [
-  { id: "open", before: "Open it", typed: "", after: "", line: "Super + Space" },
-  { id: "wifi", before: "Try", typed: "wifi", after: ", then Enter", line: "A setting, no Settings app" },
-  { id: "sum", before: "Try", typed: "12*7", after: "", line: "Sums answer as you type" },
-] as const;
-
-type TryId = (typeof TRIES)[number]["id"];
-
-/** Where the card is: its step, its settings, what was tried, and the menu open or shut. */
+/** Where the card is: its step, its settings, and the menu open or shut over the screen. */
 export interface Kotodama {
   step: StepIndex;
   /** A step turn's first state: the step left, drawn leaving over this one. */
   readonly from?: StepIndex;
   readonly settings: MenuSettings;
-  readonly tried: Set<TryId>;
   open: boolean;
-  /** What is typed in the menu on Try it. */
-  query: string;
   /** The race held this many milliseconds after the key: a sample of it mid-way. */
   readonly raceAt?: number;
   /** The ad's asked word with its answer shown, as under the pointer: a sample of the tip. */
@@ -73,9 +62,7 @@ export function kotodamaAt(view: string): Kotodama {
   const base = (step: StepIndex, more: Partial<Kotodama> = {}): Kotodama => ({
     step,
     settings: defaultSettings(),
-    tried: new Set(),
     open: false,
-    query: "",
     passed: false,
     ...(from === undefined ? {} : { from: Number(from) as StepIndex }),
     ...more,
@@ -99,14 +86,15 @@ export function kotodamaAt(view: string): Kotodama {
     }
     case "try":
       return base(3);
+    case "try-alt": {
+      const state = base(3);
+      state.settings.key = "alt-space";
+      return state;
+    }
     case "try-open":
-      return base(3, { open: true, tried: new Set(["open"]) });
-    case "try-typed":
-      return base(3, { open: true, query: "wifi", tried: new Set(["open"]) });
-    case "try-ticked":
-      return base(3, { open: true, query: "12*7", tried: new Set(["open", "wifi", "sum"]) });
+      return base(3, { open: true });
     case "done":
-      return base(3, { passed: true, tried: new Set(["open", "wifi", "sum"]) });
+      return base(3, { passed: true });
     default:
       return base(0);
   }
@@ -442,13 +430,15 @@ export interface KotodamaCard {
   readonly page: (skipped: () => boolean) => RailPage;
   /** The keys the rail lists at its foot for the step shown. */
   readonly hints: () => readonly KeyHint[];
+  /** Given the screen it is drawn on: a view that starts with the menu open lays it over it. */
+  readonly over: (screen: Element) => void;
 }
 
 const WORDS: Record<StepIndex, string> = {
   0: "The Command menu. One key, wherever you are: type what you want, Enter does it.",
   1: "One key for everything on this machine, and nothing off it. No ads, no news, no weather nobody asked for.",
-  2: "Changes apply as you make them. Super + Space tries them, here or on the next step.",
-  3: "Your turn. Three tries, or none: Next works either way.",
+  2: "The keys that open it, what it finds, and what it does when nothing here matches.",
+  3: "Nothing left to set.",
 };
 
 /** What's examples: what to type, what it is, and its symbol. */
@@ -698,8 +688,14 @@ export function kotodamaCard(view: string): KotodamaCard {
   // ---------------------------------------------------------------- Yours --
 
   const yours = (): HTMLElement => {
-    // Each setting applies to the menu at once; it is tried in the menu itself, on Try it or with
-    // its keys from here, so this step shows no preview of its own.
+    // Each setting applies to the menu at once; it is tried in the menu itself, with its keys from
+    // here, so this step shows no preview of its own: its foot says so, the keys picked in it.
+    const live = document.createElement("span");
+    const say = () =>
+      live.replaceChildren(
+        row("s8", "centre", icon("info", "var(--type-small-icon)", "var(--color-on_surface_variant)"), row("s4", "centre", text("Changes are live as you make them. Press", "small", "on_surface_variant"), caps(KEY_OF[prefs.key]), text("any time to try.", "small", "on_surface_variant"))),
+      );
+    say();
 
     // Top, across the body: the keys that open it, three cards side by side.
     const cards = OPENS_WITH.map((each) => {
@@ -713,6 +709,7 @@ export function kotodamaCard(view: string): KotodamaCard {
       queueMicrotask(() => {
         const at = cards.findIndex((each) => each.getAttribute("aria-checked") === "true");
         if (at >= 0) prefs.key = OPENS_WITH[at]!.id;
+        say();
         recheck();
       }),
     );
@@ -762,76 +759,131 @@ export function kotodamaCard(view: string): KotodamaCard {
     }).observe(split);
     // One rhythm: `space.s24` between sections, `space.s8` between a title and its controls. The
     // whole step scrolls as one where it is taller than the room.
-    return scrolling(stack("s24", "start", filling(section("Opens with", keysGroup)), filling(split)));
+    // The settings scroll; the line stays under them, as much room above it as the template leaves
+    // under it, over the band, as Make it yours's newcomer's line does.
+    return stack(0, "start", fillingHeight(filling(scrolling(stack("s24", "start", filling(section("Opens with", keysGroup)), filling(split))))), gap("s24"), filling(live));
   };
 
   // --------------------------------------------------------------- Try it --
 
-  let openMenu = () => undefined as void;
+  /** The keys on Try it, while it is shown: they press as the keys are pressed. */
+  let prompt: HTMLElement | null = null;
 
+  /** The keys pressed, from the keyboard or a click: Try it's KeyPrompt shows the press. */
+  const press = () => {
+    if (prompt?.isConnected) pressKeys(prompt);
+  };
+
+  /**
+   * Try it arriving: its caps rise `space.s8` into place and fade in over `long`, a `micro` apart,
+   * the `+` between them in its turn, as the step itself slides in; the two lines follow a `micro`
+   * after the last. Reduced, they come with the step.
+   */
+  const arrive = (group: HTMLElement) => {
+    if (settings().reduced) return;
+    const parts = [...(prompt?.children ?? [])] as HTMLElement[];
+    const lines = [...group.querySelectorAll<HTMLElement>(".setup-kotodama-line")];
+    parts.forEach((part, at) => part.animate([{ opacity: 0, "--kotodama-rise": 1 }, { opacity: 1, "--kotodama-rise": 0 }], { duration: ms("long"), delay: ms("short") + at * ms("micro"), easing: curve("emphasized_decel"), fill: "backwards" }));
+    for (const each of lines) each.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms("long"), delay: ms("short") + parts.length * ms("micro"), easing: curve("emphasized_decel"), fill: "backwards" });
+  };
+
+  /**
+   * The closing page: the keys picked on Yours, large, and two lines under them; nothing to do on
+   * it. The group stands two fifths of the way down its room, where the menu itself opens, so it
+   * reads as centred rather than sagging below the middle.
+   */
   const tryIt = (): HTMLElement => {
-    const tasks = new Map<TryId, Task>();
-    const tryCard = (each: (typeof TRIES)[number]) => {
-      const made = task({
-        before: each.before,
-        ...(each.typed ? { typed: each.typed } : {}),
-        ...(each.after ? { after: each.after } : {}),
-        line: each.line,
-        done: state.tried.has(each.id),
-        onPress: () => {
-          openMenu();
-          if (each.typed) void menu.type(each.typed);
-        },
-      });
-      tasks.set(each.id, made);
-      return filling(made.element);
-    };
-    const tick = (id: TryId) => {
-      if (state.tried.has(id)) return;
-      state.tried.add(id);
-      tasks.get(id)?.tick();
-      recheck();
-    };
-    const menu = standIn(prefs, {
-      live: true,
-      query: state.query,
-      ran: (each, typed) => {
-        if (each.item?.id === "wifi") tick("wifi");
-        if (each.answer && typed.replace(/\s/g, "") === "12*7") tick("sum");
-      },
-      onEscape: () => shut(),
+    prompt = keyPrompt(KEY_OF[prefs.key]);
+    prompt.classList.add("setup-kotodama-keys");
+    prompt.addEventListener("click", () => {
+      press();
+      menu.open();
     });
+    const headline = text("It's already yours.", "headline");
+    const line = text("Every change was live as you made it. Press it any time, here or anywhere.", "body_large", "on_surface_variant");
+    headline.classList.add("setup-kotodama-line");
+    line.classList.add("setup-kotodama-line");
+    const group = stack(0, "centre", prompt, gap("s40"), headline, gap("s12"), line);
+    group.classList.add("setup-kotodama-close");
     const holder = document.createElement("span");
-    holder.className = "setup-kotodama-try";
-    // The shut menu's room, its keys big, a click opening it this once.
-    const invitation = stack("s16", "centre", keyPrompt(KEY_OF[prefs.key]), text("Press it. Or click here, this once.", "small", "on_surface_variant"));
-    invitation.classList.add("setup-kotodama-invitation");
-    invitation.addEventListener("click", () => openMenu());
+    holder.className = "setup-kotodama-closing";
+    holder.append(group);
+    // Two fifths of the room the group leaves stand above it, rounded down to a whole device pixel
+    // as `menuMeasures` places the menu: the group lands where the menu opens, on the pixel grid.
+    // The room's height is the step's and the group's is its content's, so it is worked out here.
+    const placing = new ResizeObserver(() => {
+      const spare = holder.clientHeight - group.offsetHeight;
+      const above = `${Math.max(0, Math.floor((spare * 2) / 5))}px`;
+      if (group.style.marginTop !== above) group.style.marginTop = above;
+    });
+    placing.observe(holder);
+    placing.observe(group);
+    return holder;
+  };
+
+  // ------------------------------------------------------- The menu, open --
+
+  /**
+   * The menu open over the whole screen, as on the desktop: at `menuMeasures`'s place for the
+   * screen it is on, centred across it two fifths of the way down; its keys open it from any step,
+   * Esc or a click beside it shuts it.
+   */
+  const menu = (() => {
+    const layer = document.createElement("span");
+    layer.className = "setup-kotodama-over";
+    const at = document.createElement("span");
+    at.className = "setup-kotodama-at";
+    layer.append(at);
+    let inside: StandIn | null = null;
+    let watched: Element | null = null;
+    const place = new ResizeObserver(() => {
+      const screen = layer.parentElement;
+      if (!screen) return;
+      const scale = scaleOf(screen as HTMLElement);
+      const width = screen.clientWidth / scale;
+      const height = screen.clientHeight / scale;
+      const measures = menuMeasures(width, height, true);
+      at.style.left = `${Math.round(((width - measures.width) / 2) * scale)}px`;
+      at.style.top = `${Math.round(measures.top * scale)}px`;
+      at.style.width = `${Math.round(measures.width * scale)}px`;
+      at.style.height = `${Math.round(measures.height * scale)}px`;
+    });
     const shut = () => {
       state.open = false;
-      holder.replaceChildren(invitation);
+      layer.remove();
+      element?.focus({ preventScroll: true });
     };
-    openMenu = () => {
-      if (!state.open) {
-        state.open = true;
-        holder.replaceChildren(menu.box);
-        if (!settings().reduced) menu.box.animate(prefs.slides ? [{ opacity: 0, translate: "0 calc(-1 * var(--space-s8))" }, { opacity: 1, translate: "0 0" }] : [{ opacity: 0 }, { opacity: 1 }], { duration: ms("medium"), easing: curve("emphasized_decel") });
+    layer.addEventListener("click", (event) => {
+      if (event.target === layer) shut();
+    });
+    const open = (animated = true, on?: Element) => {
+      const screen = on ?? element?.closest(".setup-room") ?? element;
+      if (!screen) return;
+      state.open = true;
+      if (!layer.isConnected) {
+        // A fresh menu each time, as the desktop's is: nothing typed, the first Result current.
+        inside = standIn(prefs, { live: true, onEscape: shut });
+        at.replaceChildren(inside.box);
+        screen.append(layer);
+        if (watched !== screen) {
+          place.observe(screen);
+          watched = screen;
+        }
+        if (animated && !settings().reduced) at.animate(prefs.slides ? [{ opacity: 0, translate: "0 calc(-1 * var(--space-s8))" }, { opacity: 1, translate: "0 0" }] : [{ opacity: 0 }, { opacity: 1 }], { duration: ms("medium"), easing: curve("emphasized_decel") });
+        else if (animated) at.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms("short"), easing: curve("standard") });
       }
-      tick("open");
-      requestAnimationFrame(() => menu.focus());
+      const focus = inside;
+      requestAnimationFrame(() => focus?.focus());
     };
-    holder.append(state.open ? menu.box : invitation);
-    const tip = row("s8", "start", icon("info", "var(--type-small-icon)", "var(--color-on_surface_variant)"), filling(wrapped("The menu shows up wherever you are: on top of any app, on the screen you're on.", "small", "on_surface_variant")));
-    // The tries at the top, the note at the column's foot: the tries' stack takes the height between.
-    const left = stack("s12", "start", fillingHeight(filling(stack("s12", "start", ...TRIES.map(tryCard)))), filling(tip));
-    return splitColumns([2, 3], "s24", [filling(left), filling(fillingHeight(holder))], { fillHeight: true });
-  };
+    return { open };
+  })();
 
   // ----------------------------------------------------------------- Steps --
 
   const stepView = (at: StepIndex): HTMLElement => {
     stop();
     stop = () => undefined;
+    if (at !== 3) prompt = null;
     const view = at === 0 ? what() : at === 1 ? why() : at === 2 ? yours() : tryIt();
     const holder = document.createElement("span");
     holder.className = "setup-kotodama-step";
@@ -853,6 +905,7 @@ export function kotodamaCard(view: string): KotodamaCard {
     if (line) setStep(line, to, backTo);
     element?.querySelector(".k-header")?.replaceWith(headerFor(to));
     turn(left, next, forward);
+    if (to === 3) arrive(next);
     recheck();
   };
   const backTo = (to: number) => show(to as StepIndex);
@@ -871,16 +924,17 @@ export function kotodamaCard(view: string): KotodamaCard {
       const opens = (prefs.key === "super-space" && space && event.metaKey) || (prefs.key === "alt-space" && space && event.altKey);
       if (!opens) return;
       event.preventDefault();
-      // The menu is the one on Try it: the keys bring it there from any step, open.
-      if (state.step !== 3) show(3);
-      openMenu();
+      // The menu opens over the screen from any step, as it does on the desktop: the settings
+      // made on Yours are in it already.
+      press();
+      menu.open();
     });
     window.addEventListener("keyup", (event) => {
       if (!here() || (event.key !== "Meta" && event.key !== "OS") || !alone) return;
       alone = false;
       if (prefs.key !== "super") return;
-      if (state.step !== 3) show(3);
-      openMenu();
+      press();
+      menu.open();
     });
   };
 
@@ -912,20 +966,23 @@ export function kotodamaCard(view: string): KotodamaCard {
   const status = (): RailStatus => ({ state: { is: state.passed ? "done" : "todo" } });
 
   const NEXT: Record<StepIndex, string> = { 0: "Next: why", 1: "Next: yours", 2: "Next: try it", 3: "Next: Git" };
-  const NOTE: Record<StepIndex, () => string> = {
-    0: () => "Nothing here is required",
-    1: () => "Enter races them again",
-    2: () => "Defaults are fine. Really",
-    3: () => (state.tried.size === 3 ? "3 of 3 tried. That's the whole trick" : `${state.tried.size} of 3 tried`),
+  const NOTE: Record<StepIndex, string | undefined> = {
+    0: "Nothing here is required",
+    1: "Enter races them again",
+    2: "Defaults are fine. Really",
+    3: undefined,
   };
 
   return {
     state,
     body: draw,
+    over: (screen) => {
+      if (state.open) menu.open(false, screen);
+    },
     hints: (): readonly KeyHint[] => {
       if (state.step === 1) return [["Enter", "race again"], ["Esc", "back a step"]];
       if (state.step === 2) return [["Space", "switch it"], ["Alt+↑↓", "move an engine"], ["Tab", "next field"]];
-      if (state.step === 3) return [[KEY_OF[prefs.key], "open it"], ["Enter", "run it"], ["Esc", "close it"]];
+      if (state.step === 3) return state.open ? [["↑ ↓", "pick a Result"], ["Enter", "run it"], ["Esc", "close it"]] : [[KEY_OF[prefs.key], "open it"]];
       return [[KEY_OF[prefs.key], "open it"], ["↑ ↓", "pick a Result"], ["Enter", "run it"]];
     },
     page: (skipped) => ({
@@ -934,7 +991,7 @@ export function kotodamaCard(view: string): KotodamaCard {
       status,
       next: () => NEXT[state.step],
       skip: () => (state.passed ? undefined : skipped() ? "Later" : "Skip"),
-      note: () => NOTE[state.step](),
+      note: () => NOTE[state.step],
       back: () => {
         if (state.step === 0) return false;
         show((state.step - 1) as StepIndex);

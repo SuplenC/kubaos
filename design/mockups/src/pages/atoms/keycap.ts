@@ -1,9 +1,11 @@
 // The Keycap page, with KeyHints and KeyPrompt: `docs/design/components/keycap.md`. A key drawn as
-// a key, a line of keys with what each does, and the keys to press now, large. A keycap is a picture of a key, not a control: it rests, by
-// night and by day, and never lights.
+// a key, a line of keys with what each does, and the keys to press now, large. A keycap is a
+// picture of a key, not a control: it rests, by night and by day, and never lights. A prompt's
+// keys answer their keys: pressed, they lift and glow brighter.
 
 import type { Words } from "../../lib/content.ts";
 import { inline, type KeyHint, keycap, keyHints, keyPrompt } from "../../lib/keycap.ts";
+import type { Move } from "../../site/page.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
@@ -36,11 +38,26 @@ function caps(): HTMLElement {
   return stack("s16", "start", inline(...["Esc", "Tab", "Enter", "↵", "K", "Ctrl"].map(keycap)), keyHints([["← →", ""], ["+", ""]]));
 }
 
-export default page({
+type Shown = "rest" | "pressed";
+
+/** A prompt's keys pressed: `--press` up over `micro`, back over `short`, the glow swelling with it. */
+const PRESSED: Move = {
+  name: "A prompt's keys pressed",
+  what: "Each key's fill lifts and its glow swells to `focus.pressed_glow` over `micro`, then settles over `short`.",
+  tracks: [
+    { part: "pressed", on: "the prompt", target: ".k-key-prompt-cap", property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" },
+    { part: "let go", on: "the prompt", target: ".k-key-prompt-cap", property: "--press", from: 1, to: 0, duration: "short", cue: "micro", curve: "standard" },
+  ],
+  reduced: "same",
+  back: "cuts",
+  sample: () => keyPrompt("Super+Space"),
+};
+
+export default page<Shown>({
   level: "atoms",
   slug: "keycap",
   title: "Keycap, KeyHints and KeyPrompt",
-  lede: "A key drawn as a key, and keys side by side with what each does.",
+  lede: "A key drawn as a key, keys side by side with what each does, and the keys to press now.",
   code: { rust: "keycap::keycap(look, key), keycap::key_hints(look, hints)", qml: "Keycap, KeyHints" },
   stage: {
     live: () => row("s64", "start", stack("s24", "start", keyHints(MENU), keyHints(KOBO), sentence()), caps()),
@@ -57,13 +74,13 @@ export default page({
       sample: () => stack("s8", "start", keyHints(MENU, { room: "calc(180 * var(--px))" }), keyHints(MENU)),
     },
     { name: "Key prompt", for: "the keys to press now, large and lit", sample: () => row("s32", "centre", keyPrompt("Super+Space"), keyPrompt("Esc")) },
+    { name: "Key prompt: pressed", for: "its keys lift and glow brighter", sample: () => keyPrompt("Super+Space", { pinned: "pressed" }) },
   ],
   sizes: doesntApply("one size: `size.keycap` tall, a line of body text."),
   states: {
-    shown: ["rest"],
+    shown: ["rest", "pressed"],
     absent: {
       lit: "a picture of a key: it never lights",
-      pressed: "what the key does shows the press",
       disabled: "a key that does nothing here isn't shown",
       selected: "it holds no choice",
       loading: "its key comes with its surface",
@@ -76,9 +93,11 @@ export default page({
       { name: "A glyph", cell: () => keycap("↵") },
       { name: "A long key", cell: () => keycap("Backspace") },
       { name: "Key hints", cell: () => keyHints(KOBO) },
+      { name: "Key prompt", cell: (state: Shown) => keyPrompt("Esc", state === "pressed" ? { pinned: "pressed" } : {}) },
     ],
     looks: {
-      rest: "`keycap` type on `surface_container_highest`, a hairline and a foot",
+      rest: "`keycap` type on the highest container; a prompt lit",
+      pressed: "a keycap as at rest; a prompt's keys lift and glow",
     },
   },
   focus: doesntApply("not a control and not neon: no line and no glow."),
@@ -98,7 +117,7 @@ export default page({
   motion: {
     arrives: doesntApply("it comes with its surface; hints swap at once with the selection."),
     leaves: doesntApply("it goes with its surface."),
-    between: powerMoves(() => keyHints(MENU)),
+    between: [PRESSED, ...powerMoves(() => keyHints(MENU))],
   },
   keyboard: doesntApply("it names a key: no focus and no key of its own."),
   measures: {

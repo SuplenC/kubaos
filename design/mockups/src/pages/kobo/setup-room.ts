@@ -461,6 +461,8 @@ export function setupRoom(options: SetupOptions): HTMLElement {
     });
   }
   if (options.opening) requestAnimationFrame(() => void play(element, tracksNow(place.at === "arrival" ? OPENS : place.at === "ending" ? ARRIVES : OPENS_CARD)));
+  // Kotodama's menu, where its view starts open, lies over this whole screen from the first draw.
+  if (place.at === "card" && place.card === "kotodama") kotodama.over(element);
   return element;
 }
 

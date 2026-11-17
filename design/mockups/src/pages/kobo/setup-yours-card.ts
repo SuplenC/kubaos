@@ -1,6 +1,6 @@
 // First boot's Make it yours card, as an organism of library parts, in three steps of its own on a
-// Stepper under its title. What for: the three profiles as lit lg choice cards, any of them or
-// none. Your apps: every app of the catalogue by category, a category index beside them that
+// Stepper under its title. What for: the four profiles as lit lg choice cards, any of them or
+// none; Gaming also brings the machine's setup for games. Your apps: every app of the catalogue by category, a category index beside them that
 // follows the scroll, the apps the picks brought ticked and lit in a wave as the step arrives, each
 // tick saying where it came from. Go: how many apps and which, by category, then Install; then the
 // install running in the background, finished, or an app that failed.
@@ -28,7 +28,7 @@ import { bezier, milliseconds } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
 import { body } from "./kobo-parts.ts";
 import { CARDS } from "./setup-cards.ts";
-import { type App, APPS, app, type Category, CATEGORIES, PROFILES, type ProfileId, VSCODE } from "./setup-data.ts";
+import { type App, APPS, app, type Category, CATEGORIES, GAMING_SETUP, PROFILES, type ProfileId, VSCODE } from "./setup-data.ts";
 
 /** The card's steps, by their index. */
 export const STEPS = ["What for", "Your apps", "Go"] as const;
@@ -61,6 +61,16 @@ export function kept(state: Yours): readonly App[] {
   return APPS.filter((each) => on(state, each));
 }
 
+/** Whether Gaming's setup goes on: with the Gaming card lit, and only then. */
+export function tuned(state: Yours): boolean {
+  return state.picked.has("gaming");
+}
+
+/** What the install does, in its order: Gaming's setup first, as Steam needs its 32-bit drivers, then the apps. */
+function steps(state: Yours): readonly string[] {
+  return [...(tuned(state) ? [GAMING_SETUP.id] : []), ...kept(state).map((each) => each.id)];
+}
+
 /** The picks that brought an app, when the hand hasn't changed it. */
 function broughtBy(state: Yours, each: App): readonly ProfileId[] {
   return state.hand.has(each.id) ? [] : each.profiles.filter((p) => state.picked.has(p));
@@ -86,15 +96,17 @@ export function yoursAt(view: string): Yours {
     ...(from === undefined ? {} : { from: Number(from) as StepIndex }),
     ...more,
   });
-  const all: ProfileId[] = ["developer", "designer", "casual"];
+  const all: ProfileId[] = PROFILES.map((each) => each.id);
   const handPicked = () => new Map([["vscode", true], ["discord", true]]);
   const installedUpTo = (state: Yours, count: number) => {
-    for (const each of kept(state).slice(0, count)) state.installed.add(each.id);
+    for (const each of steps(state).slice(0, count)) state.installed.add(each);
     return state;
   };
   switch (name) {
     case "developer":
       return base(["developer"], 0);
+    case "gaming":
+      return base(["gaming"], 0);
     case "all":
       return base(all, 0);
     case "apps":
@@ -107,15 +119,21 @@ export function yoursAt(view: string): Yours {
       return base(["developer"], 2, { hand: handPicked() });
     case "go-none":
       return base([], 2);
+    case "go-all":
+      return base(all, 2);
+    case "go-gaming":
+      return base(["gaming"], 2);
+    case "go-setup-only":
+      return base(["gaming"], 2, { hand: new Map(APPS.filter((each) => each.profiles.includes("gaming")).map((each) => [each.id, false])) });
     case "installing":
       return installedUpTo(base(all, 2, { phase: "installing" }), 7);
     case "done": {
       const state = base(all, 2, { phase: "done" });
-      return installedUpTo(state, kept(state).length);
+      return installedUpTo(state, steps(state).length);
     }
     case "failed": {
       const state = base(all, 2, { phase: "done", failed: { app: "steam", error: "Steam didn't install: Valve's server timed out", hint: "The rest are in. Try it again, or carry on without it." } });
-      for (const each of kept(state)) if (each.id !== "steam") state.installed.add(each.id);
+      for (const each of steps(state)) if (each !== "steam") state.installed.add(each);
       return state;
     }
     default:
@@ -226,10 +244,10 @@ export interface YoursCard {
 
 /** The log of the install, as far as it has gone. */
 function installLog(state: Yours): readonly LogLine[] {
-  const lines: LogLine[] = [{ level: "info", text: `$ kubaos apps install ${kept(state).map((each) => each.id).join(" ")}` }];
-  for (const each of kept(state)) {
-    if (state.installed.has(each.id)) lines.push({ level: "info", text: `ok  ${each.id}` });
-    else if (state.failed?.app === each.id) lines.push({ level: "error", text: `${each.id}: ${state.failed.error}` });
+  const lines: LogLine[] = [{ level: "info", text: `$ kubaos apps install ${steps(state).join(" ")}` }];
+  for (const each of steps(state)) {
+    if (state.installed.has(each)) lines.push({ level: "info", text: `ok  ${each}` });
+    else if (state.failed?.app === each) lines.push({ level: "error", text: `${each}: ${state.failed.error}` });
   }
   return lines;
 }
@@ -256,11 +274,13 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     const cards = PROFILES.map((profile) => {
       const brings = APPS.filter((each) => each.profiles.includes(profile.id));
       // The first apps only it brings, then a count of the rest: what the pick means, at a glance.
-      const own = brings.filter((each) => each.profiles.length < PROFILES.length).slice(0, 4);
-      const foot = [...own.map((each) => ({ glyph: each.icon, label: each.name })), { glyph: "add", label: `and ${brings.length - own.length} more` }];
+      // Gaming's setup leads its foot, so every card's foot holds as many lines.
+      const setup = profile.id === "gaming" ? [{ glyph: GAMING_SETUP.icon, label: GAMING_SETUP.title }] : [];
+      const own = brings.filter((each) => each.profiles.length === 1).slice(0, 4 - setup.length);
+      const foot = [...setup, ...own.map((each) => ({ glyph: each.icon, label: each.name })), { glyph: "add", label: `and ${brings.length - own.length} more` }];
       return choiceCard({ glyph: profile.icon, title: profile.title, subtitle: profile.line, size: "Lg", picks: "many", mark: false, picked: state.picked.has(profile.id), foot });
     });
-    const group = choiceGroup("many", 3, cards);
+    const group = choiceGroup("many", PROFILES.length, cards);
     group.classList.add("setup-yours-profiles");
     const sync = () =>
       queueMicrotask(() => {
@@ -384,9 +404,14 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
 
   const progress = (): HTMLElement | null => {
     if (state.phase !== "installing") return null;
-    const total = kept(state).length;
-    const bar = progressBar({ fraction: total === 0 ? 0 : state.installed.size / total });
-    return stack("s4", "start", filling(bar), filling(row("s8", "centre", text("Installing", "small", "on_surface_variant"), fill(), text(`${state.installed.size} of ${total}`, "small", "on_surface_variant"))));
+    // The bar counts apps, as the figure above it does; Gaming's setup moves on its own chip. With
+    // no app to count, the bar is the setup's.
+    const all = kept(state);
+    const total = all.length;
+    const done = all.filter((each) => state.installed.has(each.id)).length;
+    const fraction = total === 0 ? (state.installed.has(GAMING_SETUP.id) ? 1 : 0) : done / total;
+    const count = total === 0 ? [] : [fill(), text(`${done} of ${total}`, "small", "on_surface_variant")];
+    return stack("s4", "start", filling(progressBar({ fraction })), filling(row("s8", "centre", text("Installing", "small", "on_surface_variant"), ...count)));
   };
 
   /** An app's chip at Go: its symbol while it waits, then where its install is. */
@@ -394,8 +419,23 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     const yours = state.hand.get(each.id) === true;
     if (state.installed.has(each.id)) return chip({ label: each.name, kind: "Accent", icon: "check" });
     if (state.failed?.app === each.id) return chip({ label: each.name, kind: "Warning", icon: "error" });
-    if (state.phase === "installing" && kept(state).find((one) => !state.installed.has(one.id))?.id === each.id) return chip({ label: each.name, kind: "Neutral", icon: "progress_activity" });
+    if (installingNow(each.id)) return chip({ label: each.name, kind: "Neutral", icon: "progress_activity" });
     return chip({ label: each.name, kind: yours ? "Cold" : "Neutral", icon: each.icon });
+  };
+
+  const installingNow = (id: string) => state.phase === "installing" && steps(state).find((one) => !state.installed.has(one)) === id;
+
+  /**
+   * Gaming's setup at Go: a group of its own before the apps' categories, its chip moving as an
+   * app's does, and a line naming what it sets up.
+   */
+  const setupGroup = (): HTMLElement => {
+    const { id, title, line, icon: glyph, pieces } = GAMING_SETUP;
+    const marker = state.installed.has(id)
+      ? chip({ label: line, kind: "Accent", icon: "check" })
+      : chip({ label: line, kind: "Neutral", icon: installingNow(id) ? "progress_activity" : glyph });
+    const named = `${pieces.slice(0, -1).join(", ")} and ${pieces.at(-1)}.`;
+    return stack("s8", "start", row("s8", "centre", icon(glyph, "var(--type-label-icon)", "var(--color-on_surface_variant)"), text(title, "label", "on_surface_variant")), filling(flow("s8", marker)), filling(wrapped(named, "small", "on_surface_variant")));
   };
 
   /**
@@ -406,10 +446,11 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     const ids = kept(state).map((each) => each.id);
     const facts = [
       { label: "Packages", value: ids.join(" ") },
+      ...(tuned(state) ? [{ label: GAMING_SETUP.title, value: `${GAMING_SETUP.packages.join(" ")}; Proton comes with Steam` }] : []),
       { label: "From", value: "Flathub, and Ubuntu's archive for the command-line tools" },
     ];
     const lines = state.phase === "choosing" ? null : installLog(state);
-    const command = `${spec.command} ${ids.join(" ")}`;
+    const command = `${spec.command} ${steps(state).join(" ")}`;
     const content = stack("s16", "start", filling(descriptionList(facts)), filling(stack("s8", "start", text("The same in a terminal", "label", "on_surface_variant"), wrapped(command, "mono"))), ...(lines ? [filling(log(lines).box)] : []));
     const summary = lines ? `${lines.length} lines of log` : "Packages, command";
     return hangs(collapsible({ title: "Under the hood", summary, content, open: (options.hood ?? false) || state.failed !== undefined }));
@@ -419,22 +460,37 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     const all = kept(state);
     const count = all.length;
     const vscode = all.some((each) => each.id === "vscode");
-    const figure = state.phase === "done" ? `${apps(state.installed.size)} in` : count === 0 ? "Nothing" : apps(count);
+    const setup = tuned(state);
+    const nothing = count === 0 && !setup;
+    // Gaming's setup alone, every one of its apps unticked, is the figure itself.
+    const alone = count === 0 && setup;
+    const figure = alone ? (state.phase === "done" ? `${GAMING_SETUP.title} in` : GAMING_SETUP.title) : state.phase === "done" ? `${apps(all.filter((each) => state.installed.has(each.id)).length)} in` : nothing ? "Nothing" : apps(count);
+    // With apps, the setup rides in the sentence under their count.
+    const also = setup && !alone;
     const lede = state.failed
       ? `${app(state.failed.app).name} didn't make it. The rest are on the machine.`
       : state.phase === "done"
-        ? "Find them with Super, then their name."
+        ? alone
+          ? "The machine is tuned for games."
+          : also
+            ? "and the machine tuned for games. Find them with Super, then their name."
+            : "Find them with Super, then their name."
         : state.phase === "installing"
-          ? "going on in the background. Carry on with Git and the rest while they land."
-          : count === 0
+          ? alone
+            ? "going on in the background. Carry on with Git and the rest while it lands."
+            : `${also ? "and the gaming setup " : ""}going on in the background. Carry on with Git and the rest while they land.`
+          : nothing
             ? "No apps: you get KubaOS as it comes, a terminal, a browser and the basics. Back to pick some, or carry on."
-            : "go on this machine, in the background: carry on with Git and the rest while they land.";
-    const big = text(figure, "display", "primary_lit");
+            : alone
+              ? "goes on this machine, in the background: carry on with Git and the rest while it lands."
+              : `${also ? "and the gaming setup " : ""}go on this machine, in the background: carry on with Git and the rest while they land.`;
+    // A count fits its column on one line; the setup's name, alone, wraps in a laptop's narrow one.
+    const big = alone ? wrapped(figure, "display", "primary_lit") : text(figure, "display", "primary_lit");
     big.classList.add("setup-yours-figure");
     const left = stack("s8", "start", big, filling(wrapped(lede, "body_large", "on_surface_variant")), ...(vscode && state.phase === "choosing" ? [filling(wrapped(`VS Code included. ${VSCODE.ticked}`, "small", "primary"))] : []));
     const bar = progress();
     if (bar) left.append(gap("s8"), filling(bar));
-    const groups = CATEGORIES.filter((category) => all.some((each) => each.category === category.id)).map((category) =>
+    const categories = CATEGORIES.filter((category) => all.some((each) => each.category === category.id)).map((category) =>
       stack("s8", "start", row("s8", "centre", icon(category.icon, "var(--type-label-icon)", "var(--color-on_surface_variant)"), text(category.title, "label", "on_surface_variant")), filling(flow("s8", ...all.filter((each) => each.category === category.id).map(appChip)))),
     );
     const failure = state.failed ? [filling(errorBlock({ message: `Fuck. ${state.failed.error}.`, hint: state.failed.hint }))] : [];
@@ -443,9 +499,10 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     // says what skipping gives.
     const later = wrapped(spec.skip, "small", "on_surface_variant");
     later.classList.add("setup-later");
-    const under = count > 0 ? [...(state.phase === "choosing" ? [filling(later)] : []), filling(hood())] : [];
+    const groups = [...(setup ? [setupGroup()] : []), ...categories];
+    const under = !nothing ? [...(state.phase === "choosing" ? [filling(later)] : []), filling(hood())] : [];
     if (under.length > 0) left.append(gap("s16"), stack("s24", "start", ...under));
-    const columns = count === 0 ? filling(left) : filling(splitColumns([1, 2], "s40", [left, stack("s16", "start", ...groups.map((each) => filling(each)))]));
+    const columns = nothing ? filling(left) : filling(splitColumns([1, 2], "s40", [left, stack("s16", "start", ...groups.map((each) => filling(each)))]));
     const content = stack("s24", "start", ...failure, columns);
     const { box } = scroll(padded(content), { height: "100%", above: "s24", below: "s24", noGutter: true, fade: "s24", footFade: true });
     box.classList.add("kobo-scrolls");
@@ -512,21 +569,21 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
   };
 
   const tick = () => {
-    const next = kept(state).find((each) => !state.installed.has(each.id) && each.id !== state.failed?.app);
+    const next = steps(state).find((each) => !state.installed.has(each) && each !== state.failed?.app);
     if (!next) {
       state.phase = "done";
       redraw();
       handle.onFinished(state.failed !== undefined);
       return;
     }
-    state.installed.add(next.id);
+    state.installed.add(next);
     redraw();
     timer = window.setTimeout(tick, ms("medium"));
   };
 
   const install = (): boolean => {
     if (state.phase === "installing") return false;
-    const count = kept(state).filter((each) => !state.installed.has(each.id)).length;
+    const count = steps(state).filter((each) => !state.installed.has(each)).length;
     if (count === 0) return false;
     delete state.failed;
     state.phase = "installing";
@@ -550,7 +607,8 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     if (state.phase !== "choosing") return { label: "Continue" };
     if (state.step === 0) return { label: count > 0 ? "Next: your apps" : "Next: pick apps myself" };
     if (state.step === 1) return { label: "Next: check and go" };
-    return count > 0 ? { label: `Install ${apps(count)}`, icon: "download" } : { label: "Continue" };
+    if (count > 0) return { label: `Install ${apps(count)}`, icon: "download" };
+    return tuned(state) ? { label: "Install", icon: "download" } : { label: "Continue" };
   };
 
   const note = (): string | undefined => {
@@ -594,7 +652,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
           show((state.step + 1) as StepIndex);
           return true;
         }
-        if (state.phase === "choosing" && kept(state).length === 0) {
+        if (state.phase === "choosing" && steps(state).length === 0) {
           // Nothing to install, said and seen: the card is done as it is.
           state.phase = "done";
           recheck();

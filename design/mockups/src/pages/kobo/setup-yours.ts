@@ -1,5 +1,5 @@
-// First boot's Make it yours card, in three steps of its own. What for: Developer, Designer and
-// Everyday as lit cards, any of them, all three or none. Your apps: every app of the catalogue by
+// First boot's Make it yours card, in three steps of its own. What for: Everyday, Gaming, Developer
+// and Designer as lit cards, any of them, all four or none. Your apps: every app of the catalogue by
 // category, an index beside them, the picks' apps lit in a wave, each tick saying where it came
 // from. Go: how many and which, then Install, which runs in the background while first boot goes on.
 
@@ -22,7 +22,7 @@ const CARD = "the card";
 const at = (view: string) => () => setupRoom({ place: { at: "card", card: "yours" }, views: { yours: view } });
 
 /** The Developer card, picked, on What for. */
-const DEVELOPER = ".setup-yours-profiles > .k-choice-card:nth-child(1)";
+const DEVELOPER = ".setup-yours-profiles > .k-choice-card:nth-child(3)";
 
 const strike = (curve: "neon.strike" | "standard", duration: "strike" | "short"): Track[] => [
   { part: "the card's light", on: CARD, target: DEVELOPER, property: "--choice-burn", from: 0, to: 1, duration, curve },
@@ -144,14 +144,18 @@ export default page<Shown>({
   variants: [
     { name: "What for: nothing lit", for: "the newcomer's line; pick apps myself", sample: CELLS.empty },
     { name: "What for: Developer", for: "its card lit; 13 picked for you", sample: CELLS.selected },
-    { name: "What for: all three", for: "all lit", sample: atCard("yours", "all") },
+    { name: "What for: Gaming", for: "its setup leads its foot; 5 picked for you", sample: atCard("yours", "gaming") },
+    { name: "What for: all four", for: "all lit", sample: atCard("yours", "all") },
     { name: "Your apps", for: "Developer's lit; Discord yours", sample: CELLS.rest },
     { name: "Your apps: nothing", for: "every app, none ticked", sample: atCard("yours", "apps-none") },
     { name: "VS Code ticked", for: "its line has an opinion", sample: atCard("yours", "vscode") },
     { name: "Go", for: "the count and the apps", sample: atCard("yours", "go") },
     { name: "Go: no apps", for: "said plainly; Continue", sample: atCard("yours", "go-none") },
-    { name: "Installing", for: "7 of 30 in; carry on", sample: CELLS.loading },
-    { name: "Installed", for: "every app in", sample: atCard("yours", "done") },
+    { name: "Go: Gaming", for: "its apps, and the gaming setup said under their count", sample: atCard("yours", "go-gaming") },
+    { name: "Go: all four", for: "29 apps and the gaming setup", sample: atCard("yours", "go-all") },
+    { name: "Go: the gaming setup alone", for: "Gaming's apps unticked; Install", sample: atCard("yours", "go-setup-only") },
+    { name: "Installing", for: "the setup in, 6 of 29 apps; carry on", sample: CELLS.loading },
+    { name: "Installed", for: "every app in, the machine tuned for games", sample: atCard("yours", "done") },
     { name: "An app failed", for: "the cause; Try Steam again", sample: CELLS.error },
     { name: "From the Command menu", for: "the card alone, in a window", sample: aloneAt("yours", "apps") },
   ],
@@ -182,7 +186,7 @@ export default page<Shown>({
     counts: [
       { name: "No app", for: "nothing picked", sample: atCard("yours", "go-none") },
       { name: "Fifteen apps", for: "Developer and two", sample: atCard("yours", "go") },
-      { name: "Thirty apps", for: "all three", sample: CELLS.loading },
+      { name: "Twenty-nine apps", for: "all four, and the gaming setup", sample: CELLS.loading },
     ],
   },
   motion: {
