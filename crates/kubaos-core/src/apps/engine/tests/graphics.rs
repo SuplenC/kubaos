@@ -183,8 +183,8 @@ fn excalidraws_window_names_the_one_copy_of_its_icon_the_install_puts_in_the_the
 
 const BLENDER: &str = "blender";
 
-/// A Blender release, packed as Blender packs it (`blender-<version>-linux-x64/`, its program, desktop
-/// entry and icons at the top), by the tar of `world`'s sandbox.
+/// A Blender release, packed as Blender packs it (`blender-<version>-linux-x64/`, its program,
+/// desktop entry and icons at the top), by the tar of `world`'s sandbox.
 fn blender_tarball(world: &World) -> Vec<u8> {
     let src = tempfile::tempdir().unwrap();
     let folder = src.path().join("blender-5.3.0-linux-x64");
@@ -247,7 +247,12 @@ fn blender_links_its_program_entry_and_icons_from_its_version_and_its_removal_ke
         ),
     ] {
         let link = home.join(link);
-        assert_eq!(fs::read_link(&link).unwrap(), version.join(target), "{}", link.display());
+        assert_eq!(
+            fs::read_link(&link).unwrap(),
+            version.join(target),
+            "{}",
+            link.display()
+        );
         assert!(link.is_file(), "{} points at the unpacked release", link.display());
     }
     // What Blender makes as you use it.
