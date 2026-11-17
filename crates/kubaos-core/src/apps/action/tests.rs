@@ -49,6 +49,32 @@ fn a_self_updating_download_goes_to_a_folder_named_for_its_version_or_one_its_up
 }
 
 #[test]
+fn a_download_its_updater_rewrites_in_place_names_no_version_but_through_version() {
+    let words = Words {
+        user: "kuba".to_owned(),
+        home: "/home/kuba".into(),
+        arch: "amd64".to_owned(),
+        version: None,
+    };
+    let resolve = |to: &str, self_updates: bool| {
+        action(&format!(
+            "name = \"Get\"\nkind = \"download\"\nto = \"{to}\"\nversion = \"1.0\"\nunpack = \"tar-gz\"\n\
+             self_updates = {self_updates}\namd64 = {{ url = \"https://example.com/t\", sha256 = \"{sha}\" }}\n",
+            sha = "a".repeat(64)
+        ))
+        .unwrap()
+        .resolve(&words, Path::new("/nowhere"))
+    };
+
+    assert!(resolve("~/.vendor/tool-@VERSION@", true).is_ok());
+    assert!(resolve("~/.vendor/tool-1.0", false).is_ok());
+    assert!(matches!(
+        resolve("~/.vendor/tool-1.0", true),
+        Err(ActionError::SelfUpdatesNamesVersion { .. })
+    ));
+}
+
+#[test]
 fn a_run_without_its_undo_is_refused() {
     let result = action("name = \"Install\"\nkind = \"run\"\ndo = [\"t3\", \"install\"]\ncheck = [\"true\"]\n");
 
