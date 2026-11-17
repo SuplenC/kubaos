@@ -10,8 +10,8 @@ Perplexity is an AI search engine. Its website, here in a window of its own, ans
 with a written answer built from a web search, each claim linked to the page it came from, and \
 keeps your searches as threads you can ask follow-up questions in, with your Perplexity account."""
 description_from = "kubaos"
-# Ours: Perplexity's logo isn't under a licence that allows copying it. The window's own icon is
-# the same picture.
+# Perplexity's icon, Perplexity AI's trademark, used to identify the app (perplexity.svg's header names its
+# source). The window's own icon is the same picture.
 icon = "perplexity.svg"
 requires = ["google-chrome"]
 keeps = """\

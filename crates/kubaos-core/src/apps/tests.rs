@@ -1190,8 +1190,8 @@ fn licences_named(comment: &str) -> Vec<String> {
 }
 
 /// What is wrong with the licence notices of the apps' files under `root`: a picture that names
-/// no licence in its header comment, or a licence a header names whose text isn't in
-/// `LICENSES/`.
+/// no licence in its header comment, nor is a vendor's logo naming its source, or a licence a
+/// header names whose text isn't in `LICENSES/`.
 fn licence_problems(root: &Path) -> Vec<String> {
     let mut problems = Vec::new();
     let mut files: Vec<PathBuf> = Vec::new();
@@ -1217,8 +1217,9 @@ fn licence_problems(root: &Path) -> Vec<String> {
             ));
             continue;
         };
-        let licences = licences_named(&header_comment(&text));
-        if picture && licences.is_empty() {
+        let header = header_comment(&text);
+        let licences = licences_named(&header);
+        if picture && licences.is_empty() && !is_trademark_notice(&header) {
             problems.push(format!("{shown}: its header comment names no licence"));
         }
         for licence in licences.iter().filter(|l| !OURS.contains(&l.as_str())) {
@@ -1230,6 +1231,12 @@ fn licence_problems(root: &Path) -> Vec<String> {
         }
     }
     problems
+}
+
+/// Whether `header` is a vendor's logo's notice in place of a licence: the mark is its owner's
+/// trademark, shipped to identify the app, and the header names the address it was taken from.
+fn is_trademark_notice(header: &str) -> bool {
+    header.contains("trademark, used to identify") && header.contains("https://")
 }
 
 fn walk(dir: &Path) -> Vec<PathBuf> {
@@ -1253,7 +1260,7 @@ fn every_third_party_file_of_an_app_names_its_licence_and_the_repo_ships_its_tex
 }
 
 #[test]
-fn the_licence_check_finds_a_picture_naming_no_licence_and_a_licence_without_its_text() {
+fn the_licence_check_finds_a_picture_naming_no_licence_nor_a_logos_source_and_a_licence_without_its_text() {
     let root = tempfile::tempdir().unwrap();
     let app = root.path().join("apps/chat");
     fs::create_dir_all(&app).unwrap();
@@ -1277,6 +1284,16 @@ fn the_licence_check_finds_a_picture_naming_no_licence_and_a_licence_without_its
         "# Chat's stack, CC-BY-4.0, as KubaOS runs it.\nservices: {}\n",
     )
     .unwrap();
+    fs::write(
+        app.join("logo.svg"),
+        "<!-- Chat's icon, Chat Inc.'s trademark, used to identify the app: https://chat.example/favicon.svg. -->\n<svg/>\n",
+    )
+    .unwrap();
+    fs::write(
+        app.join("unsourced.svg"),
+        "<!-- Chat's icon, Chat Inc.'s trademark, used to identify the app. -->\n<svg/>\n",
+    )
+    .unwrap();
     fs::write(app.join("up"), "#!/bin/sh\n# up: start it.\nexit 0\n").unwrap();
 
     let problems = licence_problems(root.path());
@@ -1287,6 +1304,7 @@ fn the_licence_check_finds_a_picture_naming_no_licence_and_a_licence_without_its
             "apps/chat/bare.svg: its header comment names no licence",
             "apps/chat/gpl.svg: GPL-3.0-or-later, whose text isn't in LICENSES/GPL-3.0-or-later.txt",
             "apps/chat/stack.yaml: CC-BY-4.0, whose text isn't in LICENSES/CC-BY-4.0.txt",
+            "apps/chat/unsourced.svg: its header comment names no licence",
         ]
     );
 }

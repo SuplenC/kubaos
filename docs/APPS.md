@@ -12,6 +12,10 @@ just apps-list                   # in a checkout: the table, from that checkout'
 
 `kubaos app list --json` is the list for a program, in the same order (`docs/CONTRACTS.md`, "The Apps catalog").
 
+## Icons
+
+An app's icon is, in this order: Colloid's, the system's icon theme, named by the app; else the vendor's official logo or app icon as an `.svg` in its folder, on a white rounded tile unless it is a full-bleed tile already, its header naming where it was taken from and that it is the vendor's trademark, used to identify the app; else original art; else none (`docs/CONTRACTS.md`, "An app's folder").
+
 ## The table's columns
 
 One row an app, by category in the catalog's order (Browsers, Development, AI, Communication, Media, Graphics, Office, Security, System, Games), then by id.

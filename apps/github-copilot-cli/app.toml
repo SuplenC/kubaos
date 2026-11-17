@@ -11,6 +11,9 @@ GitHub Copilot CLI brings GitHub's Copilot coding agent to the terminal. It work
 project it is started in, editing files and running commands once you allow it, and reaches \
 your repositories, issues and pull requests on GitHub. It needs a GitHub Copilot subscription."""
 description_from = "kubaos"
+# GitHub Copilot's mark, GitHub's trademark, used to identify the app, on a tile
+# (github-copilot.svg's header names its source): no icon theme has Copilot CLI.
+icon = "github-copilot.svg"
 keeps = """\
 Your sign-in, settings and past sessions stay in ~/.copilot: install Copilot CLI again and \
 you're still signed in."""

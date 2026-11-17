@@ -12,8 +12,8 @@ own, run on Microsoft's servers and stream to this window, played with a control
 some, the keyboard and mouse. Its website, here in a window of its own, signs in with your \
 Microsoft account."""
 description_from = "kubaos"
-# Our own icon, a gamepad on a cloud (xbox-cloud-gaming.svg's header): Colloid draws no Xbox mark,
-# and Microsoft's isn't licensed for copying. The install puts it in hicolor as
+# The Xbox sphere, Microsoft's trademark, used to identify the app, on a tile
+# (xbox-cloud-gaming.svg's header names its source): Colloid draws no Xbox mark. The install puts it in hicolor as
 # xbox-cloud-gaming.svg, and the window's entry names it there, so it is one copy.
 icon = "xbox-cloud-gaming.svg"
 requires = ["google-chrome"]
