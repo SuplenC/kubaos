@@ -1,9 +1,9 @@
 <!-- Neovide's logo, its project's mark, from neovide/neovide 0.17.2 (assets/neovide.svg, https://github.com/neovide/neovide), MIT, Copyright (c) 2023 Neovide Contributors, on KubaOS's white rounded tile, unchanged, so it matches the catalog's other icons and reads on a dark menu and a light one. -->
 <svg height="500" viewBox="0 0 500 500" width="500" xmlns="http://www.w3.org/2000/svg">
-<defs><clipPath id="kubaos-tile"><rect x="20" y="20" width="460" height="460" rx="110"/></clipPath></defs>
+<defs><clipPath id="kubaos-tile"><rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625"/></clipPath></defs>
 <g clip-path="url(#kubaos-tile)">
-<rect x="20" y="20" width="460" height="460" rx="110" fill="#fff"/>
-<svg x="85" y="85" width="330" height="330" viewBox="0 0 256 256.00001" xmlns:sketch="http://www.bohemiancoding.com/sketch/ns" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:svg="http://www.w3.org/2000/svg">
+<rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625" fill="#fff"/>
+<svg x="93.0707" y="93.0707" width="313.859" height="313.859" viewBox="0 0 256 256.00001" xmlns:sketch="http://www.bohemiancoding.com/sketch/ns" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:svg="http://www.w3.org/2000/svg">
 <metadata
      id="metadata442">
     <rdf:RDF>

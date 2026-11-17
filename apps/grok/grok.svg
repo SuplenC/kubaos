@@ -1,9 +1,9 @@
 <!-- Grok's icon, xAI's mark: xAI's trademark, used to identify the app. https://grok.com/images/favicon.svg, its own dark tile, which its white mark needs, placed, unchanged, on KubaOS's rounded tile, clipped to its shape, so it matches the catalog's other icons. -->
 <svg height="500" viewBox="0 0 500 500" width="500" xmlns="http://www.w3.org/2000/svg">
-<defs><clipPath id="kubaos-tile"><rect x="20" y="20" width="460" height="460" rx="110"/></clipPath></defs>
+<defs><clipPath id="kubaos-tile"><rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625"/></clipPath></defs>
 <g clip-path="url(#kubaos-tile)">
-<rect x="20" y="20" width="460" height="460" rx="110" fill="#050505"/>
-<svg x="50" y="50" width="400" height="400" viewBox="0 0 512 512" fill="none">
+<rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625" fill="#050505"/>
+<svg x="59.7826" y="59.7826" width="380.435" height="380.435" viewBox="0 0 512 512" fill="none">
 <g clip-path="url(#clip0_304_111)">
 <foreignObject x="-24" y="-22" width="560" height="560"><div xmlns="http://www.w3.org/1999/xhtml" style="backdrop-filter:blur(16px);clip-path:url(#bgblur_1_304_111_clip_path);height:100%;width:100%"></div></foreignObject><g filter="url(#filter0_d_304_111)" data-figma-bg-blur-radius="32">
 <path d="M0 256C0 166.392 0 121.587 17.439 87.3615C32.7787 57.2556 57.2556 32.7787 87.3615 17.439C121.587 0 166.392 0 256 0C345.608 0 390.413 0 424.638 17.439C454.744 32.7787 479.221 57.2556 494.561 87.3615C512 121.587 512 166.392 512 256C512 345.608 512 390.413 494.561 424.638C479.221 454.744 454.744 479.221 424.638 494.561C390.413 512 345.608 512 256 512C166.392 512 121.587 512 87.3615 494.561C57.2556 479.221 32.7787 454.744 17.439 424.638C0 390.413 0 345.608 0 256Z" fill="#050505"/>
