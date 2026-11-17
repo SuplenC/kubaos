@@ -222,3 +222,46 @@ fn toolbox_running_is_left_alone_until_it_is_quit() {
     );
     assert_eq!(world.host.snapshot(), before);
 }
+
+#[test]
+fn a_release_bumping_toolboxs_pin_never_downloads_over_the_toolbox_that_updated_itself() {
+    let world = toolbox_world();
+    let mut picks = Picks::default();
+    picks.add(TOOLBOX);
+    run(&world, |e| e.add(TOOLBOX, None, &picks)).unwrap();
+    let program = world
+        .host_home()
+        .join(".local/share/JetBrains/Toolbox/bin/jetbrains-toolbox");
+    fs::write(&program, "#!/bin/sh\n# Toolbox 4.0, from its own updater\n").unwrap();
+    // A later release of KubaOS pins an older Toolbox than the one it updated itself to.
+    let bumped_url = "https://download.jetbrains.com/toolbox/jetbrains-toolbox-3.10.0.1.tar.gz";
+    let bumped_sha = "c".repeat(64);
+    let text = fs::read_to_string(world.catalog.join(TOOLBOX).join("app.toml")).unwrap();
+    let catalog = Catalog::load(&world.catalog).unwrap();
+    let Kind::Download { version, amd64, .. } = &catalog.get(TOOLBOX).unwrap().actions[0].kind else {
+        panic!("Toolbox's first step is its download");
+    };
+    let pin = amd64.as_ref().unwrap();
+    world.write_app(
+        TOOLBOX,
+        &text
+            .replace(&format!("version = \"{version}\""), "version = \"3.10.0.1\"")
+            .replace(&pin.url, bumped_url)
+            .replace(&pin.sha256, &bumped_sha),
+    );
+    world
+        .host
+        .state
+        .borrow_mut()
+        .downloads
+        .insert(bumped_url.to_owned(), (bumped_sha, toolbox_tarball()));
+
+    run(&world, |e| e.add(TOOLBOX, None, &picks)).unwrap();
+
+    assert_eq!(
+        fs::read_to_string(&program).unwrap(),
+        "#!/bin/sh\n# Toolbox 4.0, from its own updater\n"
+    );
+    let fetched = world.host.state.borrow().log.iter().any(|l| l.ends_with(bumped_url));
+    assert!(!fetched, "the bumped pin is never downloaded");
+}
