@@ -168,8 +168,7 @@ fn which_security_apps_a_machine_can_have_follows_its_architecture() {
     assert_eq!(on("amd64", Unfree::Allowed), APPS);
     // None of them is unfree in nixpkgs: 1Password comes from its own repository.
     assert_eq!(on("amd64", Unfree::Refused), APPS);
-    // 1Password builds its app for amd64 alone, nixpkgs Proton Pass, and Proton its VPN's core
-    // library at the version the window needs.
+    // 1Password builds its app for amd64 alone, and nixpkgs Proton Pass.
     assert_eq!(
         on("arm64", Unfree::Allowed),
         [
@@ -178,6 +177,7 @@ fn which_security_apps_a_machine_can_have_follows_its_architecture() {
             "keepassxc",
             "mullvad-vpn",
             "nordvpn",
+            "proton-vpn",
             "yubico-authenticator",
         ]
     );
