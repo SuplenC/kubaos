@@ -25,7 +25,7 @@ The one list of KubaOS's apt packages, `system/packages.toml`, which the install
 _Avoid_: Package list, base packages
 
 **Held package**:
-A package of the user's own list (`kubaos.d/packages.toml`, a **Suite**'s packages) that a switch couldn't build, kept at the version the home had while the rest of the home switches; every switch tries it again, and it stops being held once it builds.
+A package of the user's own list (`kubaos.d/packages.toml`, a **Suite**'s packages) that a switch couldn't build, kept at the version the home had while the rest of the home switches. A switch builds it again only once its build changes, every update and "Try held packages again" build it again regardless, and it stops being held once it builds.
 _Avoid_: Pinned package, skipped package; apt's holds (`apt-mark hold`), which are a **Package group**'s and another thing
 
 **Package group**:

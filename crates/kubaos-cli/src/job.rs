@@ -143,10 +143,14 @@ pub fn main(cmd: JobCmd) -> ExitCode {
 }
 
 /// `kubaos switch`: the switch `to` asks for, checked against the preview in effect, queued and
-/// waited for as `mode` says.
+/// waited for as `mode` says. `--retry-held` alone switches the home as it stands, keeping a
+/// preview, as a package's switch does: it asks only for the held packages to be built again.
 pub fn switch_to(paths: &Paths, mode: SwitchMode, to: &SwitchTo, held: HeldBuilds) -> ExitCode {
     if rustix::process::geteuid().is_root() {
         return usage_error("run kubaos switch as yourself, not root: it switches your home");
+    }
+    if held.retry_held && to.from.is_none() && !to.release {
+        return switch_on(paths, mode, &queue(paths).retrying_held());
     }
     let host = match host(paths) {
         Ok(host) => host,
@@ -205,6 +209,11 @@ pub fn switch(paths: &Paths, mode: SwitchMode) -> ExitCode {
     if rustix::process::geteuid().is_root() {
         return usage_error("run kubaos switch as yourself, not root: it switches your home");
     }
+    switch_on(paths, mode, &queue(paths))
+}
+
+/// [`switch`] on `queue`.
+fn switch_on(paths: &Paths, mode: SwitchMode, queue: &Queue) -> ExitCode {
     let host = match host(paths) {
         Ok(host) => host,
         Err(code) => return code,
@@ -217,7 +226,7 @@ pub fn switch(paths: &Paths, mode: SwitchMode) -> ExitCode {
         Ok(None) => {}
         Err(e) => return report(e),
     }
-    run(&queue(paths), &host, mode, Target::Current)
+    run(queue, &host, mode, Target::Current)
 }
 
 /// Whether a switch to the release is queued or running.

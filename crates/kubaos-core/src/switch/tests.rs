@@ -28,6 +28,18 @@ use crate::held::Holds;
 use crate::preview::Checkout;
 use crate::preview::PreviewFile;
 
+/// How a fake build ends.
+#[derive(Clone, Copy, Debug, Default)]
+enum BuildEnd {
+    /// Nix names each derivation that failed.
+    #[default]
+    Reported,
+    /// Outputs are missing, and Nix names no derivation.
+    Silent,
+    /// A signal kills it.
+    Killed,
+}
+
 /// A host that records what the queue asks of it instead of running systemd and home-manager.
 #[derive(Default)]
 struct FakeHost {
@@ -58,6 +70,8 @@ struct FakeHost {
     unbuildable: Vec<String>,
     /// The installables of each build.
     built: Mutex<Vec<Vec<String>>>,
+    /// How each build ends.
+    build_end: BuildEnd,
     /// The listed packages the home has.
     current: CurrentHome,
 }
@@ -117,17 +131,31 @@ impl Host for FakeHost {
         self.listed.clone().ok_or_else(|| HostError::exited("nix", Some(1)))
     }
 
-    fn build(
-        &self,
-        mut log: &File,
-        installables: &[String],
-        outputs: &[String],
-    ) -> Result<BTreeSet<String>, HostError> {
+    fn build(&self, mut log: &File, installables: &[String]) -> Result<BTreeSet<String>, HostError> {
         self.built.lock().unwrap().push(installables.to_vec());
         writeln!(log, "building the listed packages").unwrap();
-        Ok(outputs
+        match self.build_end {
+            BuildEnd::Reported => {}
+            BuildEnd::Silent => return Ok(BTreeSet::new()),
+            BuildEnd::Killed => return Err(HostError::exited("nix", None)),
+        }
+        Ok(installables
             .iter()
-            .filter(|output| self.unbuildable.contains(output))
+            .filter_map(|installable| installable.split_once('^').map(|(drv, _)| drv.to_owned()))
+            .filter(|drv| {
+                let name = drv
+                    .trim_start_matches("/nix/store/")
+                    .rsplit_once('-')
+                    .map(|(name, _)| name);
+                name.is_some_and(|name| self.unbuildable.contains(&output(name)))
+            })
+            .collect())
+    }
+
+    fn missing(&self, paths: &[String]) -> Result<BTreeSet<String>, HostError> {
+        Ok(paths
+            .iter()
+            .filter(|path| self.unbuildable.contains(path))
             .cloned()
             .collect())
     }
@@ -780,7 +808,7 @@ fn discord_installed() -> CurrentHome {
 fn discord_held(version: &str) -> Holds {
     let hold = Hold {
         path: DISCORD_OLD.to_owned(),
-        failed: Some(drv("discord", version)),
+        failed: drv("discord", version),
     };
     Holds::from([("discord".to_owned(), hold)])
 }
@@ -880,13 +908,12 @@ fn an_updates_switch_builds_every_held_package_again() {
 }
 
 #[test]
-fn a_failed_package_the_home_does_not_have_is_not_held_and_the_switch_goes_on() {
+fn a_failed_package_the_home_does_not_have_fails_the_job_before_the_switch() {
     let tmp = tempfile::tempdir().unwrap();
     let (queue, file) = holding(tmp.path(), &["discord"]);
     let id = queue.enqueue().unwrap();
     let host = FakeHost {
         current: CurrentHome::Nothing,
-        failing: vec![1],
         ..discord_unbuildable("1")
     };
 
@@ -894,12 +921,92 @@ fn a_failed_package_the_home_does_not_have_is_not_held_and_the_switch_goes_on() 
 
     let job = queue.job(&id).unwrap();
     assert_eq!(job.state, JobState::Failed);
+    assert_eq!(
+        job.error.as_deref(),
+        Some("discord couldn't be built, and your home has no version of it to keep")
+    );
     assert!(job.held.is_empty());
     assert!(!file.state().held_file().exists());
+    assert_eq!(host.switches.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn a_build_killed_before_it_ends_changes_no_hold_and_the_switch_runs() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord", "jq"]);
+    let id = queue.enqueue().unwrap();
+    let host = FakeHost {
+        build_end: BuildEnd::Killed,
+        ..discord_unbuildable("1")
+    };
+
+    queue.work(&host).unwrap();
+
+    assert!(queue.job(&id).unwrap().held.is_empty());
+    assert!(!file.state().held_file().exists());
     assert_eq!(host.switches.load(Ordering::SeqCst), 1);
-    assert!(
-        log_of(&queue, &id).contains("kubaos: discord couldn't be built, and your home has no version of it to keep")
-    );
+    assert!(log_of(&queue, &id).contains("kubaos: no hold changes"));
+}
+
+#[test]
+fn outputs_missing_that_nix_did_not_say_failed_hold_nothing_new() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord", "jq"]);
+    file.write(&discord_held("1")).unwrap();
+    let id = queue.enqueue_to(Target::Release).unwrap();
+    let queue = queue.retrying_held();
+    let host = FakeHost {
+        build_end: BuildEnd::Silent,
+        unbuildable: vec![output("discord"), output("jq")],
+        ..discord_unbuildable("1")
+    };
+
+    queue.work(&host).unwrap();
+
+    assert_eq!(queue.job(&id).unwrap().held, ["discord"]);
+    assert_eq!(file.read().unwrap(), discord_held("1"));
+    let log = log_of(&queue, &id);
+    assert!(log.contains("without saying why"), "{log}");
+}
+
+#[test]
+fn a_held_package_that_no_longer_evaluates_loses_its_hold_so_the_switch_says_why() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord"]);
+    file.write(&discord_held("1")).unwrap();
+    let id = queue.enqueue().unwrap();
+    let host = FakeHost {
+        listed: Some(vec![Evaluated {
+            name: "discord".to_owned(),
+            found: None,
+        }]),
+        ..discord_unbuildable("1")
+    };
+
+    queue.work(&host).unwrap();
+
+    assert!(queue.job(&id).unwrap().held.is_empty());
+    assert!(!file.state().held_file().exists());
+    assert_eq!(host.switches.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn an_unchanged_hold_whose_outputs_turned_up_loses_its_hold_without_a_build() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = holding(tmp.path(), &["discord"]);
+    file.write(&discord_held("1")).unwrap();
+    let id = queue.enqueue().unwrap();
+    let host = FakeHost {
+        listed: Some(vec![listed("discord", "1")]),
+        unbuildable: Vec::new(),
+        ..discord_unbuildable("1")
+    };
+
+    queue.work(&host).unwrap();
+
+    assert!(host.built.lock().unwrap().is_empty());
+    assert!(queue.job(&id).unwrap().held.is_empty());
+    assert!(!file.state().held_file().exists());
 }
 
 #[test]
@@ -972,7 +1079,8 @@ fn the_pre_build_builds_kubaos_from_the_checkout_the_switch_does() {
 fn the_systemd_host_evaluates_builds_and_checks_the_listed_packages() {
     let host = super::Systemd::new("/usr/bin/kubaos", "/h/.config/kubaos/home");
 
-    let listed = host.listed_command(Some(Path::new("/h/Projects/kubaos")));
+    let names = ["kuba".to_owned(), "kuba@kuba-pc".to_owned(), "odd\"$name".to_owned()];
+    let listed = host.listed_command(Some(Path::new("/h/Projects/kubaos")), &names);
 
     assert_eq!(
         listed[..8],
@@ -988,8 +1096,10 @@ fn the_systemd_host_evaluates_builds_and_checks_the_listed_packages() {
         ]
     );
     assert_eq!(listed[8], "--apply");
-    assert!(listed[9].to_string_lossy().contains("kubaos.listedPackages"));
-    assert_eq!(host.listed_command(None).len(), 6);
+    let apply = listed[9].to_string_lossy();
+    assert!(apply.contains("kubaos.listedPackages"), "{apply}");
+    assert!(apply.contains(r#"[ "kuba" "kuba@kuba-pc" "odd\"\$name" ]"#), "{apply}");
+    assert_eq!(host.listed_command(None, &names).len(), 6);
     assert_eq!(
         super::Systemd::build_command(&["/nix/store/b-discord.drv^out".to_owned()]),
         [

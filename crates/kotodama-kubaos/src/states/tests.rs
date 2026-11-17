@@ -288,6 +288,24 @@ fn do_not_disturb_is_its_state_files_on_and_unknown_without_the_shell() {
 }
 
 #[test]
+fn held_is_on_while_the_user_flakes_hold_file_holds_a_package() {
+    let machine = Machine::new();
+
+    let missing = machine.read();
+    machine.write(
+        "config/kubaos/home/kubaos.d/held.toml",
+        "[held.discord]\npath = \"/nix/store/84k7g556fj4ib11413jna62l3hgfzyna-discord-1.0.159\"\nfailed = \"/nix/store/b2q-discord.drv\"\n",
+    );
+    let holding = machine.read();
+    machine.write("config/kubaos/home/kubaos.d/held.toml", "held = 1\n");
+    let broken = machine.read();
+
+    assert_eq!(missing.get(HELD), Some(&on(false)));
+    assert_eq!(holding.get(HELD), Some(&on(true)));
+    assert_eq!(broken.get(HELD), None);
+}
+
+#[test]
 fn a_live_preview_is_on_while_its_record_names_one() {
     let machine = Machine::new();
 
@@ -499,6 +517,7 @@ fn every_file_a_state_is_read_from_is_watched() {
         "config/kubaos/desktop/update/no-nix",
         "config/kubaos/desktop/power/power.toml",
         "config/kubaos/home/kubaos.d/nixpkgs.toml",
+        "config/kubaos/home/kubaos.d/held.toml",
         "config/kubaos/home/kubaos.d/suites/test.toml",
         "config/kubaos/desktop/network/proxy.toml",
         "config/kubaos/desktop/wallpapers/depth.toml",
@@ -521,6 +540,7 @@ fn a_state_name_is_one_of_the_probes_or_a_package_group() {
     assert_eq!(values(DND), Some(Values::Bool));
     assert_eq!(values(UNFREE), Some(Values::Bool));
     assert_eq!(values(PREVIEW), Some(Values::Bool));
+    assert_eq!(values(HELD), Some(Values::Bool));
     assert_eq!(values(BLUETOOTH_UNNAMED), Some(Values::Bool));
     assert_eq!(values(FIRMWARE), Some(Values::Bool));
     assert_eq!(values(SCHEDULER), Some(Values::Words(&["kernel", "lavd"])));

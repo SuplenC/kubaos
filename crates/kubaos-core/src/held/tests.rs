@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
+use super::Build;
 use super::CurrentHome;
 use super::Decision;
 use super::Evaluated;
@@ -13,14 +14,17 @@ use super::Holds;
 use super::Outcome;
 use super::Prebuilt;
 use super::decide;
+use super::failed_derivations;
 use super::message;
 use super::package_name;
 use super::prebuilt;
 use super::unchanged;
+use super::unkept_message;
 use crate::state::StateDir;
 
 const DISCORD_OLD: &str = "/nix/store/84k7g556fj4ib11413jna62l3hgfzyna-discord-1.0.159";
 const DISCORD_NEW: &str = "/nix/store/gkm5zlch3916yfzbswzas38d5ysvl917-discord-1.0.159";
+const DISCORD_DRV: &str = "/nix/store/b2qzjq7gkvybdpdf7hh2hsi6x3cpag3s-discord-1.0.159.drv";
 
 fn found(drv: &str, outputs: &[(&str, &str)], pname: &str) -> Found {
     Found {
@@ -33,6 +37,10 @@ fn found(drv: &str, outputs: &[(&str, &str)], pname: &str) -> Found {
     }
 }
 
+fn discord() -> Found {
+    found(DISCORD_DRV, &[("out", DISCORD_NEW)], "discord")
+}
+
 fn evaluated(name: &str, found: Found) -> Evaluated {
     Evaluated {
         name: name.to_owned(),
@@ -40,51 +48,56 @@ fn evaluated(name: &str, found: Found) -> Evaluated {
     }
 }
 
-fn package(name: &str, built: bool, pname: Option<&str>) -> Prebuilt {
-    let outcome = if built {
-        Outcome::Built
-    } else {
-        Outcome::Failed { drv: None }
-    };
+fn prebuilt_as(name: &str, outcome: Outcome, found: Option<Found>) -> Prebuilt {
     Prebuilt {
         name: name.to_owned(),
         outcome,
-        pname: pname.map(str::to_owned),
+        found,
     }
 }
 
-fn failed(name: &str, drv: &str) -> Prebuilt {
-    Prebuilt {
-        name: name.to_owned(),
-        outcome: Outcome::Failed {
-            drv: Some(drv.to_owned()),
-        },
-        pname: Some(name.to_owned()),
-    }
-}
-
+/// Holds of `pairs`, each since the derivation `failed`.
 fn holds(pairs: &[(&str, &str)]) -> Holds {
     pairs
         .iter()
         .map(|(n, p)| {
             let hold = Hold {
                 path: (*p).to_owned(),
-                failed: None,
+                failed: DISCORD_DRV.to_owned(),
             };
             ((*n).to_owned(), hold)
         })
         .collect()
 }
 
+fn held_since(drv: &str) -> Holds {
+    let hold = Hold {
+        path: DISCORD_OLD.to_owned(),
+        failed: drv.to_owned(),
+    };
+    Holds::from([("discord".to_owned(), hold)])
+}
+
 fn recorded(pairs: &[(&str, &str)]) -> CurrentHome {
     CurrentHome::Recorded(pairs.iter().map(|(n, p)| ((*n).to_owned(), (*p).to_owned())).collect())
 }
 
+fn discord_failed() -> Build {
+    Build {
+        missing: BTreeSet::from([DISCORD_NEW.to_owned()]),
+        failed: BTreeSet::from([DISCORD_DRV.to_owned()]),
+    }
+}
+
 #[test]
-fn the_message_names_the_package_as_listed() {
+fn the_messages_name_the_package_as_listed() {
     assert_eq!(
         message("discord"),
         "discord stays at its current version: it couldn't be built"
+    );
+    assert_eq!(
+        unkept_message("discord"),
+        "discord couldn't be built, and your home has no version of it to keep"
     );
 }
 
@@ -103,81 +116,92 @@ fn a_derivation_builds_the_outputs_the_home_installs() {
 }
 
 #[test]
-fn a_package_built_when_none_of_its_outputs_is_missing() {
-    let listed = [
-        evaluated(
-            "discord",
-            found("/nix/store/b2q-discord.drv", &[("out", DISCORD_NEW)], "discord"),
-        ),
-        evaluated(
-            "jq",
-            found("/nix/store/j-jq.drv", &[("bin", "/nix/store/j-jq-bin")], "jq"),
-        ),
-    ];
+fn nix_names_the_derivations_that_failed_and_the_package_whose_fetch_failed() {
+    let stderr = "\
+building '/nix/store/xxizsc33mlz3ii71dzafvgrmf584nlpa-full.distro.drv'...
+error: Cannot build '/nix/store/xxizsc33mlz3ii71dzafvgrmf584nlpa-full.distro.drv'.
+       Reason: builder failed with exit code 1.
+error: Cannot build '/nix/store/b2qzjq7gkvybdpdf7hh2hsi6x3cpag3s-discord-1.0.159.drv'.
+       Reason: 14 dependencies failed.
+       Output paths:
+         /nix/store/gkm5zlch3916yfzbswzas38d5ysvl917-discord-1.0.159
+error: builder for '/nix/store/aaa-old.drv' failed with exit code 2
+warning: '/nix/store/bbb-not-an-error.drv' is just a warning
+";
 
-    let prebuilt = prebuilt(&listed, &BTreeSet::from([DISCORD_NEW.to_owned()]), &BTreeSet::new());
+    let failed = failed_derivations(stderr);
+
+    assert_eq!(
+        failed,
+        BTreeSet::from([
+            "/nix/store/aaa-old.drv".to_owned(),
+            DISCORD_DRV.to_owned(),
+            "/nix/store/xxizsc33mlz3ii71dzafvgrmf584nlpa-full.distro.drv".to_owned(),
+        ])
+    );
+}
+
+#[test]
+fn a_package_nix_says_failed_failed_and_one_with_its_outputs_built() {
+    let jq = found("/nix/store/j-jq.drv", &[("bin", "/nix/store/j-jq-bin")], "jq");
+    let listed = [evaluated("discord", discord()), evaluated("jq", jq.clone())];
+
+    let prebuilt = prebuilt(&listed, &discord_failed(), &BTreeSet::new()).unwrap();
 
     assert_eq!(
         prebuilt,
         [
-            failed("discord", "/nix/store/b2q-discord.drv"),
-            package("jq", true, Some("jq"))
+            prebuilt_as("discord", Outcome::Failed, Some(discord())),
+            prebuilt_as("jq", Outcome::Built, Some(jq)),
         ]
     );
 }
 
 #[test]
-fn a_package_that_does_not_evaluate_did_not_build() {
-    let prebuilt = prebuilt(
-        &[Evaluated {
-            name: "gone".to_owned(),
-            found: None,
-        }],
-        &BTreeSet::new(),
-        &BTreeSet::new(),
-    );
+fn outputs_missing_that_nix_did_not_say_failed_are_no_failure_to_hold() {
+    let build = Build {
+        missing: BTreeSet::from([DISCORD_NEW.to_owned()]),
+        failed: BTreeSet::new(),
+    };
 
-    assert_eq!(prebuilt, [package("gone", false, None)]);
+    let err = prebuilt(&[evaluated("discord", discord())], &build, &BTreeSet::new()).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "the build stopped before it built discord, without saying why"
+    );
 }
 
 #[test]
-fn a_package_of_two_home_configurations_built_only_when_it_built_for_both() {
-    let listed = [
-        evaluated("jq", found("/nix/store/a-jq.drv", &[("out", "/nix/store/a-jq")], "jq")),
-        evaluated("jq", found("/nix/store/b-jq.drv", &[("out", "/nix/store/b-jq")], "jq")),
-    ];
+fn a_package_that_does_not_evaluate_is_unevaluated() {
+    let gone = Evaluated {
+        name: "gone".to_owned(),
+        found: None,
+    };
 
-    let prebuilt = prebuilt(
-        &listed,
-        &BTreeSet::from(["/nix/store/b-jq".to_owned()]),
-        &BTreeSet::new(),
-    );
+    let prebuilt = prebuilt(&[gone], &Build::default(), &BTreeSet::new()).unwrap();
 
-    assert_eq!(prebuilt, [failed("jq", "/nix/store/b-jq.drv")]);
+    assert_eq!(prebuilt, [prebuilt_as("gone", Outcome::Unevaluated, None)]);
 }
 
 #[test]
-fn a_package_that_failed_and_that_the_home_has_is_held_at_its_store_path() {
-    let prebuilt = [
-        package("discord", false, Some("discord")),
-        package("jq", true, Some("jq")),
-    ];
-    let current = recorded(&[("discord", DISCORD_OLD), ("jq", "/nix/store/j-jq")]);
+fn a_package_that_failed_and_that_the_home_has_is_held_with_its_failed_derivation() {
+    let prebuilt = [prebuilt_as("discord", Outcome::Failed, Some(discord()))];
 
-    let decision = decide(&prebuilt, &current, &Holds::new());
+    let decision = decide(&prebuilt, &recorded(&[("discord", DISCORD_OLD)]), &Holds::new());
 
     assert_eq!(
         decision,
         Decision {
-            held: holds(&[("discord", DISCORD_OLD)]),
+            held: held_since(DISCORD_DRV),
             unkept: Vec::new()
         }
     );
 }
 
 #[test]
-fn a_package_that_failed_and_that_the_home_lacks_is_not_held() {
-    let prebuilt = [package("discord", false, Some("discord"))];
+fn a_package_that_failed_and_that_the_home_lacks_is_unkept() {
+    let prebuilt = [prebuilt_as("discord", Outcome::Failed, Some(discord()))];
 
     for current in [recorded(&[("jq", "/nix/store/j-jq")]), CurrentHome::Nothing] {
         let decision = decide(&prebuilt, &current, &Holds::new());
@@ -188,12 +212,17 @@ fn a_package_that_failed_and_that_the_home_lacks_is_not_held() {
 }
 
 #[test]
-fn a_package_that_builds_is_never_held() {
-    let prebuilt = [package("discord", true, Some("discord"))];
+fn a_held_package_that_no_longer_evaluates_or_that_builds_loses_its_hold() {
+    let current = recorded(&[("discord", DISCORD_OLD)]);
 
-    let decision = decide(&prebuilt, &recorded(&[("discord", DISCORD_OLD)]), &Holds::new());
+    for outcome in [Outcome::Unevaluated, Outcome::Built] {
+        let found = (outcome == Outcome::Built).then(discord);
+        let prebuilt = [prebuilt_as("discord", outcome, found)];
 
-    assert_eq!(decision, Decision::default());
+        let decision = decide(&prebuilt, &current, &held_since(DISCORD_DRV));
+
+        assert_eq!(decision, Decision::default());
+    }
 }
 
 #[test]
@@ -203,10 +232,48 @@ fn a_generation_without_the_record_has_the_one_path_of_the_same_package() {
         DISCORD_OLD.to_owned(),
         "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-hm-session-vars.sh".to_owned(),
     ]);
+    let newer = found("/nix/store/n3w-discord-1.0.160.drv", &[("out", DISCORD_NEW)], "discord");
 
-    let decision = decide(&[package("discord", false, Some("discord"))], &current, &Holds::new());
+    let decision = decide(
+        &[prebuilt_as("discord", Outcome::Failed, Some(newer))],
+        &current,
+        &Holds::new(),
+    );
 
-    assert_eq!(decision.held, holds(&[("discord", DISCORD_OLD)]));
+    assert_eq!(decision.held["discord"].path, DISCORD_OLD);
+}
+
+#[test]
+fn a_generation_without_the_record_holds_a_multi_output_package_at_its_main_output() {
+    let main = "/nix/store/0mygjlbcn7lhq0zvz7jvyqmzv2nvj7s6-postgresql-17.12";
+    let current = CurrentHome::Unrecorded(vec![
+        main.to_owned(),
+        "/nix/store/hn37fswnp3x9vinr83z4q7y7vpb385v9-postgresql-17.12-man".to_owned(),
+    ]);
+    let outputs = [
+        ("out", "/nix/store/new-postgresql-17.13"),
+        ("man", "/nix/store/new-postgresql-17.13-man"),
+    ];
+    let same = found(
+        "/nix/store/k8a6g93hxqnnj05pk9yv39pll8i467zv-postgresql-17.12.drv",
+        &outputs,
+        "postgresql",
+    );
+    let newer = found(
+        "/nix/store/z9z9z9z9z9z9z9z9z9z9z9z9z9z9z9z9-postgresql-17.13.drv",
+        &outputs,
+        "postgresql",
+    );
+
+    for found in [same, newer] {
+        let decision = decide(
+            &[prebuilt_as("postgresql_17", Outcome::Failed, Some(found))],
+            &current,
+            &Holds::new(),
+        );
+
+        assert_eq!(decision.held["postgresql_17"].path, main);
+    }
 }
 
 #[test]
@@ -215,8 +282,13 @@ fn a_generation_without_the_record_and_two_versions_of_a_package_holds_neither()
         DISCORD_OLD.to_owned(),
         "/nix/store/cccccccccccccccccccccccccccccccc-discord-1.0.158".to_owned(),
     ]);
+    let newer = found("/nix/store/n3w-discord-1.0.160.drv", &[("out", DISCORD_NEW)], "discord");
 
-    let decision = decide(&[package("discord", false, Some("discord"))], &current, &Holds::new());
+    let decision = decide(
+        &[prebuilt_as("discord", Outcome::Failed, Some(newer))],
+        &current,
+        &Holds::new(),
+    );
 
     assert!(decision.held.is_empty());
     assert_eq!(decision.unkept, ["discord"]);
@@ -228,6 +300,47 @@ fn a_store_name_loses_its_version_as_nix_parses_it() {
     assert_eq!(package_name("discord-ptb-0.0.170"), "discord-ptb");
     assert_eq!(package_name("yubioath-flutter-7.3.3"), "yubioath-flutter");
     assert_eq!(package_name("hm-session-vars.sh"), "hm-session-vars.sh");
+}
+
+#[test]
+fn a_held_package_whose_derivation_is_the_one_that_failed_is_unchanged() {
+    let listed = [evaluated("discord", discord())];
+
+    assert_eq!(
+        unchanged(&listed, &held_since(DISCORD_DRV)),
+        BTreeSet::from(["discord".to_owned()])
+    );
+}
+
+#[test]
+fn a_held_package_with_another_derivation_is_built_again() {
+    let newer = found("/nix/store/n3w-discord-1.0.160.drv", &[("out", DISCORD_NEW)], "discord");
+
+    assert!(unchanged(&[evaluated("discord", newer)], &held_since(DISCORD_DRV)).is_empty());
+}
+
+#[test]
+fn an_unchanged_package_still_missing_keeps_its_hold_as_it_was() {
+    let build = Build {
+        missing: BTreeSet::from([DISCORD_NEW.to_owned()]),
+        failed: BTreeSet::new(),
+    };
+    let skipped = BTreeSet::from(["discord".to_owned()]);
+
+    let prebuilt = prebuilt(&[evaluated("discord", discord())], &build, &skipped).unwrap();
+    let decision = decide(&prebuilt, &CurrentHome::Nothing, &held_since(DISCORD_DRV));
+
+    assert_eq!(prebuilt[0].outcome, Outcome::Unchanged);
+    assert_eq!(decision.held, held_since(DISCORD_DRV));
+}
+
+#[test]
+fn an_unchanged_package_whose_outputs_turned_up_built() {
+    let skipped = BTreeSet::from(["discord".to_owned()]);
+
+    let prebuilt = prebuilt(&[evaluated("discord", discord())], &Build::default(), &skipped).unwrap();
+
+    assert_eq!(prebuilt[0].outcome, Outcome::Built);
 }
 
 fn held_file(dir: &Path) -> HeldFile {
@@ -301,78 +414,6 @@ fn a_hold_written_in_a_flake_under_git_is_in_the_index_and_leaves_it_when_remove
 }
 
 #[test]
-fn a_record_reads_as_each_listed_package_to_its_path() {
-    let record = r#"{"discord":"/nix/store/84k7g556fj4ib11413jna62l3hgfzyna-discord-1.0.159"}"#;
-
-    let paths: BTreeMap<String, String> = serde_json::from_str(record).unwrap();
-
-    assert_eq!(
-        CurrentHome::Recorded(paths).path_of("discord", None).as_deref(),
-        Some(DISCORD_OLD)
-    );
-}
-
-const DISCORD_DRV: &str = "/nix/store/b2qzjq7gkvybdpdf7hh2hsi6x3cpag3s-discord-1.0.159.drv";
-
-fn held_since(drv: &str) -> Holds {
-    let hold = Hold {
-        path: DISCORD_OLD.to_owned(),
-        failed: Some(drv.to_owned()),
-    };
-    Holds::from([("discord".to_owned(), hold)])
-}
-
-#[test]
-fn a_failed_package_is_held_with_the_derivation_that_failed() {
-    let decision = decide(
-        &[failed("discord", DISCORD_DRV)],
-        &recorded(&[("discord", DISCORD_OLD)]),
-        &Holds::new(),
-    );
-
-    assert_eq!(decision.held, held_since(DISCORD_DRV));
-}
-
-#[test]
-fn a_held_package_whose_derivation_is_the_one_that_failed_is_unchanged() {
-    let listed = [evaluated(
-        "discord",
-        found(DISCORD_DRV, &[("out", DISCORD_NEW)], "discord"),
-    )];
-
-    assert_eq!(
-        unchanged(&listed, &held_since(DISCORD_DRV)),
-        BTreeSet::from(["discord".to_owned()])
-    );
-}
-
-#[test]
-fn a_held_package_with_another_derivation_or_none_recorded_is_built_again() {
-    let listed = [evaluated(
-        "discord",
-        found("/nix/store/n3w-discord-1.0.160.drv", &[("out", DISCORD_NEW)], "discord"),
-    )];
-
-    assert!(unchanged(&listed, &held_since(DISCORD_DRV)).is_empty());
-    assert!(unchanged(&listed, &holds(&[("discord", DISCORD_OLD)])).is_empty());
-}
-
-#[test]
-fn an_unchanged_package_is_not_built_and_keeps_its_hold_as_it_was() {
-    let listed = [evaluated(
-        "discord",
-        found(DISCORD_DRV, &[("out", DISCORD_NEW)], "discord"),
-    )];
-    let skipped = BTreeSet::from(["discord".to_owned()]);
-
-    let prebuilt = prebuilt(&listed, &BTreeSet::new(), &skipped);
-    let decision = decide(&prebuilt, &CurrentHome::Nothing, &held_since(DISCORD_DRV));
-
-    assert_eq!(prebuilt[0].outcome, Outcome::Unchanged);
-    assert_eq!(decision.held, held_since(DISCORD_DRV));
-}
-
-#[test]
 fn a_hold_and_its_failed_derivation_read_back_from_the_file() {
     let tmp = tempfile::tempdir().unwrap();
     let file = held_file(tmp.path());
@@ -386,5 +427,17 @@ fn a_hold_and_its_failed_derivation_read_back_from_the_file() {
             "[held.discord]\npath = \"{DISCORD_OLD}\"\nfailed = \"{DISCORD_DRV}\"\n"
         )),
         "{text}"
+    );
+}
+
+#[test]
+fn a_record_reads_as_each_listed_package_to_its_path() {
+    let record = format!(r#"{{"discord":"{DISCORD_OLD}"}}"#);
+
+    let paths: BTreeMap<String, String> = serde_json::from_str(&record).unwrap();
+
+    assert_eq!(
+        CurrentHome::Recorded(paths).path_of("discord", &discord()).as_deref(),
+        Some(DISCORD_OLD)
     );
 }

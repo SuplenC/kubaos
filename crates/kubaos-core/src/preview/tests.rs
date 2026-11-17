@@ -55,7 +55,11 @@ impl Host for FakeHost {
         panic!("planning never builds")
     }
 
-    fn build(&self, _log: &File, _installables: &[String], _outputs: &[String]) -> Result<BTreeSet<String>, HostError> {
+    fn build(&self, _log: &File, _installables: &[String]) -> Result<BTreeSet<String>, HostError> {
+        panic!("planning never builds")
+    }
+
+    fn missing(&self, _paths: &[String]) -> Result<BTreeSet<String>, HostError> {
         panic!("planning never builds")
     }
 

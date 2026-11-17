@@ -50,6 +50,7 @@ use std::fs;
 use std::fs::File;
 use std::fs::TryLockError;
 use std::io;
+use std::io::BufRead;
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
@@ -257,8 +258,8 @@ pub trait Host {
     /// [`HostError`] when the evaluation fails.
     fn evaluate(&self, path: &Path) -> Result<(), HostError>;
 
-    /// Evaluates every package the state directory lists, as the switch from `from` will see it,
-    /// in each home configuration, Nix's messages going to `log`.
+    /// Evaluates every package the state directory lists, as the switch from `from` will see it:
+    /// in the home configuration `home-manager switch` picks, Nix's messages going to `log`.
     ///
     /// # Errors
     ///
@@ -266,12 +267,20 @@ pub trait Host {
     fn listed(&self, log: &File, from: Option<&Path>) -> Result<Vec<Evaluated>, HostError>;
 
     /// Builds `installables` as far as each builds, the build's output going to `log`, and
-    /// returns which of `outputs` are still missing from the store.
+    /// returns the derivations Nix said failed ([`held::failed_derivations`]).
     ///
     /// # Errors
     ///
-    /// [`HostError`] when a program could not run. A package that fails to build is no error.
-    fn build(&self, log: &File, installables: &[String], outputs: &[String]) -> Result<BTreeSet<String>, HostError>;
+    /// [`HostError`] when Nix could not run or was killed. A package that fails to build is no
+    /// error.
+    fn build(&self, log: &File, installables: &[String]) -> Result<BTreeSet<String>, HostError>;
+
+    /// Which of `paths` are missing from the store.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError`] when the store could not be asked.
+    fn missing(&self, paths: &[String]) -> Result<BTreeSet<String>, HostError>;
 
     /// The listed packages the home has now, from the home-manager generation it is on.
     ///
@@ -562,7 +571,10 @@ impl Queue {
             ));
         }
         let Some(from) = from else {
-            job.held = self.hold(host, &log, None, retry);
+            let holding = self.hold(host, &log, None, retry);
+            let unkept = holding.unkept_error();
+            job.held = holding.held;
+            unkept?;
             host.switch(log, None).map_err(|e| error_chain(&e))?;
             if let Some(file) = &self.previews
                 && target == Target::Release
@@ -574,7 +586,10 @@ impl Queue {
         let checkout = host
             .describe(&from)
             .map_err(|e| format!("reading the checkout {}: {}", from.display(), error_chain(&e)))?;
-        job.held = self.hold(host, &log, Some(&from), retry);
+        let holding = self.hold(host, &log, Some(&from), retry);
+        let unkept = holding.unkept_error();
+        job.held = holding.held;
+        unkept?;
         host.switch(log, Some(&from)).map_err(|e| error_chain(&e))?;
         let Some(file) = &self.previews else {
             return Ok(());
@@ -595,35 +610,34 @@ impl Queue {
     /// Builds the listed packages as the switch from `from` will see them, and holds each that
     /// failed at the version the home has, writing `held.toml`; each step and each hold is a line
     /// of `log`. A held package whose derivation is still the one that failed isn't built again
-    /// unless `retry` is [`Retry::All`]. Returns the packages the switch installs held, by name.
+    /// unless `retry` is [`Retry::All`]. Returns the packages the switch installs held, and those
+    /// that failed with no version to keep.
     ///
-    /// Nothing here fails the job: when the packages don't evaluate, the build can't run or the
+    /// When the packages don't evaluate, the build stops for another reason than a package or the
     /// file can't be written, the holds stay as they were, and the switch goes on to succeed or
     /// fail as it would.
-    fn hold(&self, host: &impl Host, log: &File, from: Option<&Path>, retry: Retry) -> Vec<String> {
+    fn hold(&self, host: &impl Host, log: &File, from: Option<&Path>, retry: Retry) -> Holding {
         let Some(file) = &self.held else {
-            return Vec::new();
+            return Holding::default();
         };
         let before = file.read().unwrap_or_else(|e| {
             note(log, &format!("not reading the held packages: {}", error_chain(&e)));
             Holds::new()
         });
+        let kept = |before: Holds| Holding {
+            held: before.into_keys().collect(),
+            unkept: Vec::new(),
+        };
         let listed = file.state().declared().map_or(true, |declared| !declared.is_empty());
         if !listed && before.is_empty() {
-            return Vec::new();
+            return Holding::default();
         }
         note(log, "building the packages kubaos.d lists before the switch");
         let prebuilt = match Self::prebuild(host, log, from, retry, &before) {
             Ok(prebuilt) => prebuilt,
             Err(e) => {
-                note(
-                    log,
-                    &format!(
-                        "the packages kubaos.d lists weren't built, so no hold changes: {}",
-                        error_chain(&e)
-                    ),
-                );
-                return before.into_keys().collect();
+                note(log, &format!("no hold changes: {e}"));
+                return kept(before);
             }
         };
         let current = host.current_home().unwrap_or_else(|e| {
@@ -632,10 +646,7 @@ impl Queue {
         });
         let decision = held::decide(&prebuilt, &current, &before);
         for name in &decision.unkept {
-            note(
-                log,
-                &format!("{name} couldn't be built, and your home has no version of it to keep"),
-            );
+            note(log, &held::unkept_message(name));
         }
         for (name, hold) in &decision.held {
             note(log, &format!("{} (kept at {})", held::message(name), hold.path));
@@ -648,25 +659,59 @@ impl Queue {
         }
         if let Err(e) = file.write(&decision.held) {
             note(log, &format!("the holds stay as they were: {}", error_chain(&e)));
-            return before.into_keys().collect();
+            return Holding {
+                unkept: decision.unkept,
+                ..kept(before)
+            };
         }
-        decision.held.into_keys().collect()
+        Holding {
+            held: decision.held.into_keys().collect(),
+            unkept: decision.unkept,
+        }
     }
 
     /// Evaluates the listed packages and builds them, leaving out the held ones `before` names
-    /// whose derivation hasn't changed since it failed unless `retry` is [`Retry::All`].
+    /// whose derivation hasn't changed since it failed and whose outputs are still missing, unless
+    /// `retry` is [`Retry::All`].
     fn prebuild(
         host: &impl Host,
         log: &File,
         from: Option<&Path>,
         retry: Retry,
         before: &Holds,
-    ) -> Result<Vec<Prebuilt>, HostError> {
-        let evaluated = host.listed(log, from)?;
-        let skipped = match retry {
+    ) -> Result<Vec<Prebuilt>, String> {
+        let chain = |e: HostError| error_chain(&e);
+        let evaluated = host
+            .listed(log, from)
+            .map_err(|e| format!("the packages kubaos.d lists don't evaluate: {}", chain(e)))?;
+        let outputs_of = |names: &dyn Fn(&str) -> bool| -> Vec<&Found> {
+            evaluated
+                .iter()
+                .filter(|one| names(&one.name))
+                .filter_map(|one| one.found.as_ref())
+                .collect()
+        };
+        let unchanged = match retry {
             Retry::All => BTreeSet::new(),
             Retry::Changed => held::unchanged(&evaluated, before),
         };
+        let mut build = held::Build::default();
+        let unchanged_found = outputs_of(&|name| unchanged.contains(name));
+        if !unchanged_found.is_empty() {
+            build.missing = host.missing(&outputs(&unchanged_found)).map_err(chain)?;
+        }
+        // An unchanged hold whose outputs turned up in the store (a cache, a build by hand) needs
+        // no build: the check finds it built.
+        let skipped: BTreeSet<String> = evaluated
+            .iter()
+            .filter(|one| unchanged.contains(&one.name))
+            .filter(|one| {
+                one.found
+                    .as_ref()
+                    .is_some_and(|found| found.outputs.values().any(|path| build.missing.contains(path)))
+            })
+            .map(|one| one.name.clone())
+            .collect();
         for name in &skipped {
             note(
                 log,
@@ -676,19 +721,13 @@ impl Queue {
                 ),
             );
         }
-        let found: Vec<&Found> = evaluated
-            .iter()
-            .filter(|one| !skipped.contains(&one.name))
-            .filter_map(|one| one.found.as_ref())
-            .collect();
-        let invalid = if found.is_empty() {
-            BTreeSet::new()
-        } else {
-            let installables: Vec<String> = found.iter().map(|found| found.installable()).collect();
-            let outputs: Vec<String> = found.iter().flat_map(|found| found.outputs.values().cloned()).collect();
-            host.build(log, &installables, &outputs)?
-        };
-        Ok(held::prebuilt(&evaluated, &invalid, &skipped))
+        let to_build = outputs_of(&|name| !unchanged.contains(name));
+        if !to_build.is_empty() {
+            let installables: Vec<String> = to_build.iter().map(|found| found.installable()).collect();
+            build.failed = host.build(log, &installables).map_err(chain)?;
+            build.missing.extend(host.missing(&outputs(&to_build)).map_err(chain)?);
+        }
+        held::prebuilt(&evaluated, &build, &skipped).map_err(|e| e.to_string())
     }
 
     /// Fails every queued job that will never run: its worker unit is gone, and no other worker
@@ -890,6 +929,32 @@ impl Queue {
     }
 }
 
+/// What a job's pre-build held, and the packages it couldn't hold.
+#[derive(Debug, Default)]
+struct Holding {
+    /// The packages the switch installs held, by name.
+    held: Vec<String>,
+    /// The packages that failed and that the home has no version of.
+    unkept: Vec<String>,
+}
+
+impl Holding {
+    /// The job's error when a package failed with no version to keep: the switch would build it
+    /// again and fail the same way.
+    fn unkept_error(&self) -> Result<(), String> {
+        if self.unkept.is_empty() {
+            return Ok(());
+        }
+        let messages: Vec<String> = self.unkept.iter().map(|name| held::unkept_message(name)).collect();
+        Err(messages.join("; "))
+    }
+}
+
+/// The outputs the home installs of `found`, one list.
+fn outputs(found: &[&Found]) -> Vec<String> {
+    found.iter().flat_map(|found| found.outputs.values().cloned()).collect()
+}
+
 /// The real host: worker units through `systemd-run --user`, switches through `home-manager`.
 #[derive(Clone, Debug)]
 pub struct Systemd {
@@ -973,16 +1038,39 @@ impl Systemd {
         argv
     }
 
-    /// The evaluation [`Host::listed`] starts with: every home configuration's listed packages
-    /// (`kubaos.listedPackages`, `home/state.nix`), with KubaOS from the checkout `from` when it
-    /// is a preview, as a JSON list of [`Evaluated`].
-    pub fn listed_command(&self, from: Option<&Path>) -> Vec<OsString> {
+    /// The evaluation [`Host::listed`] runs: the listed packages (`kubaos.listedPackages`,
+    /// `home/state.nix`) of the home configuration `home-manager switch` picks from `names`, with
+    /// KubaOS from the checkout `from` when it is a preview, as a JSON list of [`Evaluated`].
+    pub fn listed_command(&self, from: Option<&Path>, names: &[String]) -> Vec<OsString> {
         let mut installable = self.flake.as_os_str().to_owned();
         installable.push("#homeConfigurations");
         let mut argv: Vec<OsString> = vec!["nix".into(), "eval".into(), "--json".into(), installable];
         argv.extend(from.map(override_args).into_iter().flatten());
-        argv.extend(["--apply".into(), LISTED.into()]);
+        let names: Vec<String> = names.iter().map(|name| nix_string(name)).collect();
+        let apply = LISTED.replace("@NAMES@", &names.join(" "));
+        argv.extend(["--apply".into(), apply.into()]);
         argv
+    }
+
+    /// The names `home-manager switch` looks the home configuration up by, the last one the flake
+    /// has winning: `$USER`, then `$USER@` with the fully qualified, the plain and the short host
+    /// name, as home-manager's own script tries them.
+    fn configuration_names() -> Vec<String> {
+        let Some(user) = std::env::var("USER").ok().filter(|user| !user.is_empty()) else {
+            return Vec::new();
+        };
+        let mut names = vec![user.clone()];
+        for flag in ["-f", "", "-s"] {
+            let argv: Vec<OsString> = ["hostname", flag]
+                .into_iter()
+                .filter(|arg| !arg.is_empty())
+                .map(OsString::from)
+                .collect();
+            if let Ok(host) = output(&argv) {
+                names.push(format!("{user}@{}", host.trim()));
+            }
+        }
+        names
     }
 
     /// The build [`Host::build`] runs: the outputs the home installs of every listed package,
@@ -1034,11 +1122,16 @@ impl Systemd {
     }
 }
 
-/// The function `nix eval` applies to the user flake's home configurations: each listed package of
-/// each, with its derivation, the outputs the home installs and its name without the version, or
-/// `null` for one the user's nixpkgs lacks or that doesn't evaluate. A home from a KubaOS without
-/// `kubaos.listedPackages` lists none.
-const LISTED: &str = r#"configs: builtins.concatMap (home:
+/// The function `nix eval` applies to the user flake's home configurations, `@NAMES@` the
+/// configuration's names to try ([`Systemd::configuration_names`]): each listed package of the
+/// last one the flake has, with its derivation, the outputs the home installs and its name without
+/// the version, or `null` for one the user's nixpkgs lacks or that doesn't evaluate. A home from a
+/// KubaOS without `kubaos.listedPackages` lists none, and so does a flake without any of the names.
+const LISTED: &str = r#"configs:
+  let
+    names = builtins.filter (name: configs ? ${name}) [ @NAMES@ ];
+    homes = if names == [ ] then [ ] else [ configs.${builtins.elemAt names (builtins.length names - 1)} ];
+  in builtins.concatMap (home:
   let listed = home.config.kubaos.listedPackages or { };
   in map (name:
     let
@@ -1055,7 +1148,23 @@ const LISTED: &str = r#"configs: builtins.concatMap (home:
       tried = builtins.tryEval (builtins.deepSeq found found);
     in { inherit name; found = if tried.success then tried.value else null; })
     (builtins.attrNames listed))
-  (builtins.attrValues configs)"#;
+  homes"#;
+
+/// `text` as a Nix string literal: quoted, with the characters Nix reads in one escaped.
+fn nix_string(text: &str) -> String {
+    let mut quoted = String::from("\"");
+    for c in text.chars() {
+        match c {
+            '\\' | '"' | '$' => {
+                quoted.push('\\');
+                quoted.push(c);
+            }
+            _ => quoted.push(c),
+        }
+    }
+    quoted.push('"');
+    quoted
+}
 
 /// The arguments that override the user flake's `kubaos` input to the checkout `from`. The lock
 /// file is never written: it keeps the release, which `--release` goes back to.
@@ -1130,24 +1239,44 @@ impl Host for Systemd {
     }
 
     fn listed(&self, log: &File, from: Option<&Path>) -> Result<Vec<Evaluated>, HostError> {
-        let printed = output_to(&self.listed_command(from), log_stdio(log, "nix")?)?;
+        let argv = self.listed_command(from, &Self::configuration_names());
+        let printed = output_to(&argv, log_stdio(log, "nix")?)?;
         serde_json::from_str(&printed).map_err(|source| HostError::Answer {
             program: "nix eval".to_owned(),
             source,
         })
     }
 
-    fn build(&self, log: &File, installables: &[String], outputs: &[String]) -> Result<BTreeSet<String>, HostError> {
-        // A package that fails to build fails the build; the check below finds which.
-        match run(
-            &Self::build_command(installables),
-            log_stdio(log, "nix")?,
-            log_stdio(log, "nix")?,
-        ) {
-            Ok(()) | Err(HostError::Exited { .. }) => {}
-            Err(e) => return Err(e),
+    fn build(&self, log: &File, installables: &[String]) -> Result<BTreeSet<String>, HostError> {
+        let argv = Self::build_command(installables);
+        let program = "nix";
+        let mut child = kubaos_git::clear(&mut Command::new(&argv[0]))
+            .args(&argv[1..])
+            .stdin(Stdio::null())
+            .stdout(log_stdio(log, program)?)
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| HostError::spawn(program, e))?;
+        let mut stderr = String::new();
+        if let Some(pipe) = child.stderr.take() {
+            for line in io::BufReader::new(pipe).lines() {
+                let line = line.map_err(|e| HostError::spawn(program, e))?;
+                note_raw(log, &line);
+                stderr.push_str(&line);
+                stderr.push('\n');
+            }
         }
-        let missing = output_to(&Self::missing_command(outputs), log_stdio(log, "nix-store")?)?;
+        let status = child.wait().map_err(|e| HostError::spawn(program, e))?;
+        // A package that fails to build fails the build, which Nix's messages name; a build
+        // killed by a signal says nothing of the packages it didn't get to.
+        if status.code().is_none() {
+            return Err(HostError::exited(program, None));
+        }
+        Ok(held::failed_derivations(&stderr))
+    }
+
+    fn missing(&self, paths: &[String]) -> Result<BTreeSet<String>, HostError> {
+        let missing = output(&Self::missing_command(paths))?;
         Ok(missing.lines().map(str::to_owned).collect())
     }
 
@@ -1181,8 +1310,13 @@ fn log_stdio(log: &File, program: &str) -> Result<Stdio, HostError> {
 
 /// Writes `line` to a job's log as KubaOS's own: a log that can't be written loses the line, never
 /// the switch.
-fn note(mut log: &File, line: &str) {
-    let _ = writeln!(log, "kubaos: {line}");
+fn note(log: &File, line: &str) {
+    note_raw(log, &format!("kubaos: {line}"));
+}
+
+/// Writes `line` to a job's log as it is.
+fn note_raw(mut log: &File, line: &str) {
+    let _ = writeln!(log, "{line}");
 }
 
 /// Whether a unit in systemd's `ActiveState` `state` still has, or is about to have, a process.

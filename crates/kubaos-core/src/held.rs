@@ -2,18 +2,21 @@
 //! store path the home has, so one package that won't build never holds back the rest of the home.
 //!
 //! Before every switch, the switch job builds the listed packages as the user's nixpkgs has them
-//! (`kubaos.listedPackages`, `home/state.nix`), keeping going past a failure. A package that failed
-//! and that the home has now, by the record its generation keeps
-//! (`~/.local/share/kubaos/installed.json`), is held: `held.toml` in the state directory names it
-//! with that store path and the derivation that failed, and `home/state.nix` installs the path in
-//! place of the attribute. A package that failed and that the home doesn't have has no version to
-//! keep, and fails the switch as it would without this.
+//! in the home configuration the switch builds (`kubaos.listedPackages`, `home/state.nix`),
+//! keeping going past a failure. A package Nix says failed ([`failed_derivations`]) and that the
+//! home has now, by the record its generation keeps (`~/.local/share/kubaos/installed.json`), is
+//! held: `held.toml` in the state directory names it with that store path and the derivation that
+//! failed, and `home/state.nix` installs the path in place of the attribute. A package that failed
+//! and that the home doesn't have has no version to keep, and the job fails before the switch. A
+//! package that doesn't evaluate is never held: the switch fails on it, saying why. Outputs
+//! missing that Nix didn't say failed (the build was killed, the daemon went away) hold nothing
+//! new ([`Unexplained`]).
 //!
 //! A held package whose derivation is still the one that failed isn't built again: its build would
 //! fail the same way, and a download that times out costs minutes on every switch. It stays held
-//! as it was ([`unchanged`]). The switch an update runs, and `kubaos switch --retry-held`, build
-//! every held package again ([`Retry`]). A held package that builds loses its hold, and the file
-//! goes with the last hold.
+//! as it was ([`unchanged`]), until its outputs turn up in the store. The switch an update runs,
+//! and `kubaos switch --retry-held`, build every held package again ([`Retry`]). A held package
+//! that builds loses its hold, and the file goes with the last hold.
 //!
 //! ```toml
 //! [held.discord]
@@ -27,7 +30,8 @@
 //! - Which held packages a switch doesn't build again ([`unchanged`]), and which packages it holds
 //!   ([`decide`]), from what the pre-build found ([`prebuilt`]) and what the home has
 //!   ([`CurrentHome`]).
-//! - What a person reads about a held package ([`message`]).
+//! - What a person reads about a held package ([`message`]) and one it can't keep
+//!   ([`unkept_message`]).
 //!
 //! # Not here
 //!
@@ -62,10 +66,9 @@ const HEADER: &str = "\
 pub struct Hold {
     /// The store path it keeps, which `home/state.nix` installs.
     pub path: String,
-    /// The derivation whose build failed, when it evaluated; a switch builds the package again
-    /// only once its derivation is another.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub failed: Option<String>,
+    /// The derivation whose build failed; a switch builds the package again only once its
+    /// derivation is another.
+    pub failed: String,
 }
 
 /// The held packages, by name as the state directory lists them.
@@ -87,7 +90,7 @@ pub fn message(name: &str) -> String {
     format!("{name} stays at its current version: it couldn't be built")
 }
 
-/// One listed package as the pre-build's evaluation found it in one home configuration.
+/// One listed package as the pre-build's evaluation found it.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct Evaluated {
     pub name: String,
@@ -115,21 +118,43 @@ impl Found {
     }
 }
 
-/// The held packages of `before` the pre-build leaves out: those whose every derivation in
-/// `evaluated` is the one that failed when they were held.
+/// The held packages of `before` the pre-build doesn't build again: those whose derivation is
+/// still the one that failed when they were held.
 pub fn unchanged(evaluated: &[Evaluated], before: &Holds) -> BTreeSet<String> {
-    before
+    evaluated
         .iter()
-        .filter(|(name, hold)| {
-            let mut drvs = evaluated
-                .iter()
-                .filter(|one| one.name == **name)
-                .map(|one| one.found.as_ref().map(|found| &found.drv))
-                .peekable();
-            drvs.peek().is_some() && hold.failed.is_some() && drvs.all(|drv| drv == hold.failed.as_ref())
+        .filter(|one| {
+            let drv = one.found.as_ref().map(|found| &found.drv);
+            before.get(&one.name).is_some_and(|hold| drv == Some(&hold.failed))
         })
-        .map(|(name, _)| name.clone())
+        .map(|one| one.name.clone())
         .collect()
+}
+
+/// The derivations `nix build`'s messages, `stderr`, say failed: each `.drv` an `error:` line
+/// names, as in `error: Cannot build '<drv>'.` and `error: builder for '<drv>' failed`. A
+/// package whose fetch failed is named too, since its own build then can't run.
+pub fn failed_derivations(stderr: &str) -> BTreeSet<String> {
+    let mut failed = BTreeSet::new();
+    for line in stderr.lines().map(str::trim_start) {
+        let Some(rest) = line.strip_prefix("error:") else {
+            continue;
+        };
+        for quoted in rest.split('\'').skip(1).step_by(2) {
+            if quoted.starts_with('/') && Path::new(quoted).extension().is_some_and(|e| e == "drv") {
+                failed.insert(quoted.to_owned());
+            }
+        }
+    }
+    failed
+}
+
+/// What the pre-build's `nix build` left: the outputs still missing from the store, and the
+/// derivations it said failed ([`failed_derivations`]).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Build {
+    pub missing: BTreeSet<String>,
+    pub failed: BTreeSet<String>,
 }
 
 /// How the pre-build ended for one listed package.
@@ -137,54 +162,67 @@ pub fn unchanged(evaluated: &[Evaluated], before: &Holds) -> BTreeSet<String> {
 pub enum Outcome {
     /// Every output the home installs is in the store.
     Built,
-    /// It didn't build, or didn't evaluate: `drv` is a derivation of it that failed, when it
-    /// evaluated.
-    Failed { drv: Option<String> },
-    /// It is held, and its derivation is the one that failed then, so it wasn't built.
+    /// Nix said its derivation failed, and its outputs are missing.
+    Failed,
+    /// It doesn't evaluate: the user's nixpkgs has no such package, or refuses it. It is never
+    /// held, so the switch says why.
+    Unevaluated,
+    /// It is held, its derivation is the one that failed then, and its outputs are still
+    /// missing, so it wasn't built.
     Unchanged,
 }
 
-/// What the pre-build found of one listed package, over every home configuration.
+/// What the pre-build found of one listed package.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Prebuilt {
     pub name: String,
     pub outcome: Outcome,
-    /// The package's name without its version, when it evaluated.
-    pub pname: Option<String>,
+    /// Its derivation, when it evaluated.
+    pub found: Option<Found>,
 }
 
+/// Outputs of the listed packages are missing after the build, and Nix didn't say their builds
+/// failed: the build stopped for another reason (a signal, the daemon, the disk), so nothing it
+/// left says which packages can't be built.
+#[derive(Debug, thiserror::Error)]
+#[error("the build stopped before it built {}, without saying why", .0.join(", "))]
+pub struct Unexplained(Vec<String>);
+
 /// Each listed package of `evaluated` with how its pre-build ended: those in `skipped` weren't
-/// built, and a package built when every configuration's derivation of it evaluated and none of
-/// their outputs is in `invalid`, the paths still missing after the build.
-pub fn prebuilt(evaluated: &[Evaluated], invalid: &BTreeSet<String>, skipped: &BTreeSet<String>) -> Vec<Prebuilt> {
-    let mut by_name: BTreeMap<&str, Prebuilt> = BTreeMap::new();
+/// built, and `build` is what the build of the others left.
+///
+/// # Errors
+///
+/// [`Unexplained`] when a package that was built has outputs missing that Nix didn't say failed.
+pub fn prebuilt(
+    evaluated: &[Evaluated],
+    build: &Build,
+    skipped: &BTreeSet<String>,
+) -> Result<Vec<Prebuilt>, Unexplained> {
+    let mut prebuilt = Vec::new();
+    let mut unexplained = Vec::new();
     for one in evaluated {
-        let entry = by_name.entry(&one.name).or_insert_with(|| Prebuilt {
-            name: one.name.clone(),
-            outcome: if skipped.contains(&one.name) {
-                Outcome::Unchanged
-            } else {
-                Outcome::Built
-            },
-            pname: None,
-        });
-        if entry.pname.is_none() {
-            entry.pname = one.found.as_ref().map(|found| found.pname.clone());
-        }
-        if entry.outcome != Outcome::Built {
-            continue;
-        }
-        match &one.found {
-            None => entry.outcome = Outcome::Failed { drv: None },
-            Some(found) if found.outputs.values().any(|path| invalid.contains(path)) => {
-                entry.outcome = Outcome::Failed {
-                    drv: Some(found.drv.clone()),
-                };
+        let outcome = match &one.found {
+            None => Outcome::Unevaluated,
+            Some(found) if found.outputs.values().all(|path| !build.missing.contains(path)) => Outcome::Built,
+            Some(_) if skipped.contains(&one.name) => Outcome::Unchanged,
+            Some(found) if build.failed.contains(&found.drv) => Outcome::Failed,
+            Some(_) => {
+                unexplained.push(one.name.clone());
+                continue;
             }
-            Some(_) => {}
-        }
+        };
+        prebuilt.push(Prebuilt {
+            name: one.name.clone(),
+            outcome,
+            found: one.found.clone(),
+        });
     }
-    by_name.into_values().collect()
+    if unexplained.is_empty() {
+        Ok(prebuilt)
+    } else {
+        Err(Unexplained(unexplained))
+    }
 }
 
 /// The listed packages the home has now.
@@ -201,59 +239,76 @@ pub enum CurrentHome {
 }
 
 impl CurrentHome {
-    /// The store path the home has of the package `name`, whose name without its version is
-    /// `pname`. A generation without the record has it when exactly one of its paths is that
-    /// package at some version.
-    fn path_of(&self, name: &str, pname: Option<&str>) -> Option<String> {
-        match self {
-            Self::Nothing => None,
-            Self::Recorded(paths) => paths.get(name).cloned(),
-            Self::Unrecorded(paths) => {
-                let pname = pname?;
-                let mut matching = paths
-                    .iter()
-                    .filter(|path| store_name(path).is_some_and(|name| package_name(name) == pname));
-                let first = matching.next()?;
-                matching.next().is_none().then(|| first.clone())
-            }
+    /// The store path the home has of the package `name`, whose derivation is `found`. A
+    /// generation without the record has the path named as the derivation is; else the one path
+    /// of the same package at another version, an output other than `out` left out
+    /// (`postgresql-17.12-man`).
+    fn path_of(&self, name: &str, found: &Found) -> Option<String> {
+        let paths = match self {
+            Self::Nothing => return None,
+            Self::Recorded(paths) => return paths.get(name).cloned(),
+            Self::Unrecorded(paths) => paths,
+        };
+        let drv_name = store_name(&found.drv).and_then(|name| name.strip_suffix(".drv"));
+        if let Some(exact) = paths.iter().find(|path| store_name(path) == drv_name) {
+            return Some(exact.clone());
         }
+        let other_output = |name: &str| {
+            found
+                .outputs
+                .keys()
+                .any(|output| output != "out" && name.ends_with(&format!("-{output}")))
+        };
+        let mut matching = paths.iter().filter(|path| {
+            store_name(path).is_some_and(|name| package_name(name) == found.pname && !other_output(name))
+        });
+        let first = matching.next()?;
+        matching.next().is_none().then(|| first.clone())
     }
 }
 
 /// Which packages a switch holds.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Decision {
-    /// The packages that didn't build and keep the store path the home has.
+    /// The packages that failed and keep the store path the home has.
     pub held: Holds,
-    /// The packages that didn't build and that the home doesn't have: nothing to keep, so the
-    /// switch fails on them.
+    /// The packages that failed and that the home doesn't have: nothing to keep, so the switch
+    /// can't go on.
     pub unkept: Vec<String>,
 }
 
 /// Holds each package of `prebuilt` that failed at the store path `current` has of it, and keeps
-/// the hold of `before` of each that wasn't built because it was unchanged.
+/// the hold of `before` of each that wasn't built because it was unchanged. A package that built
+/// or doesn't evaluate is held no more.
 pub fn decide(prebuilt: &[Prebuilt], current: &CurrentHome, before: &Holds) -> Decision {
     let mut decision = Decision::default();
     for package in prebuilt {
-        let failed = match &package.outcome {
-            Outcome::Built => continue,
-            Outcome::Unchanged => match before.get(&package.name) {
-                Some(hold) => {
-                    decision.held.insert(package.name.clone(), hold.clone());
-                    continue;
-                }
-                None => None,
-            },
-            Outcome::Failed { drv } => drv.clone(),
+        let (Outcome::Failed | Outcome::Unchanged, Some(found)) = (&package.outcome, &package.found) else {
+            continue;
         };
-        match current.path_of(&package.name, package.pname.as_deref()) {
+        if package.outcome == Outcome::Unchanged
+            && let Some(hold) = before.get(&package.name)
+        {
+            decision.held.insert(package.name.clone(), hold.clone());
+            continue;
+        }
+        match current.path_of(&package.name, found) {
             Some(path) => {
-                decision.held.insert(package.name.clone(), Hold { path, failed });
+                let hold = Hold {
+                    path,
+                    failed: found.drv.clone(),
+                };
+                decision.held.insert(package.name.clone(), hold);
             }
             None => decision.unkept.push(package.name.clone()),
         }
     }
     decision
+}
+
+/// What a person reads about the failed package `name` that the home has no version of.
+pub fn unkept_message(name: &str) -> String {
+    format!("{name} couldn't be built, and your home has no version of it to keep")
 }
 
 /// The name part of a store path, after its hash: `discord-1.0.159`.
@@ -312,6 +367,22 @@ struct Table {
     held: Holds,
 }
 
+/// The held packages of the state directory `state`; none without `held.toml`.
+///
+/// # Errors
+///
+/// [`ReadError`] when the file exists but cannot be read, or is not a `[held]` table of holds.
+pub fn read(state: &StateDir) -> Result<Holds, ReadError> {
+    let path = state.held_file();
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Holds::new()),
+        Err(e) => return Err(ReadError::read(&path)(e)),
+    };
+    let file: Table = toml::from_str(&text).map_err(ReadError::parse(&path))?;
+    Ok(file.held)
+}
+
 impl HeldFile {
     /// `held.toml` in `state`, with `lock` as the edit lock (`Paths::edit_lock`).
     #[must_use]
@@ -334,14 +405,7 @@ impl HeldFile {
     /// [`ReadError`] when the file exists but cannot be read, or is not a `[held]` table of
     /// strings.
     pub fn read(&self) -> Result<Holds, ReadError> {
-        let path = self.state.held_file();
-        let text = match fs::read_to_string(&path) {
-            Ok(text) => text,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Holds::new()),
-            Err(e) => return Err(ReadError::read(&path)(e)),
-        };
-        let file: Table = toml::from_str(&text).map_err(ReadError::parse(&path))?;
-        Ok(file.held)
+        read(&self.state)
     }
 
     /// Makes the file hold `holds`, removing it when there are none, and records it in git.
