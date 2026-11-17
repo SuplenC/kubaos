@@ -58,11 +58,14 @@ export interface TileOptions {
 
 /** What an app's icon draws, as its measurement found it. */
 export interface Drawing {
-  /** The box of its pixels more opaque than `icon_tile.ink`, as shares of the picture's sides. */
+  /**
+   * The box it is placed by, as shares of the picture's sides: a plate's solid pixels (more opaque
+   * than `icon_tile.opaque`), a shape's every drawn pixel (more opaque than `icon_tile.ink`).
+   */
   readonly box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
   /** The picture's width over its height. */
   readonly aspect: number;
-  /** The share of the box its pixels more opaque than `icon_tile.opaque` cover. */
+  /** The share of their own box its pixels more opaque than `icon_tile.opaque` cover. */
   readonly coverage: number;
   /** Square and covered enough to fill the tile; a shape sits inside it. */
   readonly plate: boolean;
@@ -115,37 +118,40 @@ function read(picture: HTMLImageElement): Drawing | null {
   } catch {
     return null;
   }
-  const ink = number("icon_tile-ink") * 255;
-  let left = width;
-  let top = height;
-  let right = -1;
-  let bottom = -1;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (alpha[(y * width + x) * 4 + 3]! <= ink) continue;
-      left = Math.min(left, x);
-      right = Math.max(right, x);
-      top = Math.min(top, y);
-      bottom = Math.max(bottom, y);
+  /** The box of the pixels more opaque than `over`, and how many they are; null for none. */
+  const boxOver = (over: number) => {
+    let left = width;
+    let top = height;
+    let right = -1;
+    let bottom = -1;
+    let count = 0;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (alpha[(y * width + x) * 4 + 3]! <= over) continue;
+        count++;
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
     }
-  }
-  if (right < 0) return null;
-  const opaque = number("icon_tile-opaque") * 255;
-  let covered = 0;
-  for (let y = top; y <= bottom; y++) {
-    for (let x = left; x <= right; x++) {
-      if (alpha[(y * width + x) * 4 + 3]! > opaque) covered++;
-    }
-  }
-  const boxWidth = right - left + 1;
-  const boxHeight = bottom - top + 1;
-  const coverage = covered / (boxWidth * boxHeight);
-  const square = Math.min(boxWidth, boxHeight) / Math.max(boxWidth, boxHeight) >= number("icon_tile-square");
+    return right < 0 ? null : { left, top, width: right - left + 1, height: bottom - top + 1, count };
+  };
+  const drawn = boxOver(number("icon_tile-ink") * 255);
+  if (!drawn) return null;
+  // A plate is judged, and placed, by its solid pixels alone: the soft shadow many themes draw under
+  // one reaches further on one side, and a box that took it in would sit the plate off the tile's
+  // centre, the tile's corners cutting some of its corners and not the others.
+  const solid = boxOver(number("icon_tile-opaque") * 255);
+  const squareness = solid ? Math.min(solid.width, solid.height) / Math.max(solid.width, solid.height) : 0;
+  const coverage = solid ? solid.count / (solid.width * solid.height) : 0;
+  const plate = squareness >= number("icon_tile-square") && coverage >= number("icon_tile-plate");
+  const box = plate ? solid! : drawn;
   return {
-    box: { x: left / width, y: top / height, width: boxWidth / width, height: boxHeight / height },
+    box: { x: box.left / width, y: box.top / height, width: box.width / width, height: box.height / height },
     aspect: naturalWidth / naturalHeight,
     coverage,
-    plate: square && coverage >= number("icon_tile-plate"),
+    plate,
   };
 }
 
