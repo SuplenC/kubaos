@@ -52,8 +52,8 @@ Item {
     K.IconTile {
         x: K.Tokens.space.s12
         y: (row.height - K.Tokens.size.control_md) / 2
-        icon: Words.itemGlyph(row.icon, row.extension)
-        name: row.title
+        icon: Words.tileGlyph(row.icon, row.extension)
+        name: Words.rowName(row.icon, row.title)
         source: row.iconSource
         opacity: row.dim
     }
