@@ -25,6 +25,7 @@ use kotodama_protocol::Action;
 use kotodama_protocol::Item;
 use kotodama_protocol::ItemKind;
 use kotodama_protocol::NamespacedKind;
+use kubaos_core::update::record::SystemPaths;
 use kubaos_user_layer::App;
 
 use crate::run::Runner;
@@ -150,11 +151,19 @@ impl WallpaperSets {
     }
 }
 
-/// The folder of the sets: `KUBAOS_WALLPAPERS`, else [`DEFAULT_SETS_DIR`].
+/// The folder of the sets: `KUBAOS_WALLPAPERS`, else [`DEFAULT_SETS_DIR`] under the machine's
+/// root ([`SystemPaths::from_env`]).
 pub fn sets_dir() -> PathBuf {
     std::env::var_os("KUBAOS_WALLPAPERS")
         .filter(|value| !value.is_empty())
-        .map_or_else(|| PathBuf::from(DEFAULT_SETS_DIR), PathBuf::from)
+        .map_or_else(
+            || {
+                SystemPaths::from_env()
+                    .root()
+                    .join(DEFAULT_SETS_DIR.trim_start_matches('/'))
+            },
+            PathBuf::from,
+        )
 }
 
 /// The sets file, `~/.config/kubaos/desktop/wallpapers/sets`; none without a config home.

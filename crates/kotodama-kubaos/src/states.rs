@@ -390,7 +390,7 @@ pub struct Places {
 impl Places {
     /// The places of this machine and session.
     pub fn from_env() -> Places {
-        let machine = SystemPaths::machine();
+        let machine = SystemPaths::from_env();
         Places {
             apt_choices: machine.apt_choices(),
             apt_manifest: machine.manifest(),

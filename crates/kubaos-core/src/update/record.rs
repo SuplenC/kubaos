@@ -54,6 +54,11 @@ pub const APT_PIN: &str = "etc/apt/preferences.d/kubaos-hyprland";
 /// The release's Hyprland pin, inside the checkout.
 pub const RELEASE_PIN: &str = "system/files/apt/preferences.d/kubaos-hyprland";
 
+/// The variable that moves a reader's [`SystemPaths::from_env`] off `/`: the tests' sandbox
+/// (`crate::sandbox`) sets it to an empty folder of its own, so a program a test starts reads no
+/// machine's catalog, manifest or journals.
+pub const ROOT_VAR: &str = "KUBAOS_SYSTEM_ROOT";
+
 /// The machine-wide paths of updates, under a root: `/` on the machine, the target's mount point
 /// during an install, a temporary folder in tests.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -66,6 +71,16 @@ impl SystemPaths {
     #[must_use]
     pub fn machine() -> Self {
         Self::under("/")
+    }
+
+    /// The paths a process of the user's that only reads them uses: under [`ROOT_VAR`]'s folder
+    /// where it names one, else [`Self::machine`]'s. A program that runs as root, or changes the
+    /// machine, takes [`Self::machine`]: what its environment says never moves it.
+    #[must_use]
+    pub fn from_env() -> Self {
+        std::env::var_os(ROOT_VAR)
+            .filter(|root| !root.is_empty())
+            .map_or_else(Self::machine, Self::under)
     }
 
     /// The paths under `root`.
