@@ -73,7 +73,7 @@ value = "pc"
 # only a click on its menu entry in the moment since its package went in could start it first.
 # A sign-in already there makes the step found, and no password file is written or claimed.
 [[action]]
-name = "Sign Sunshine in as you before a stranger does, password in ~/.config/kubaos/sunshine/password"
+name = "Sign Sunshine in as you before a stranger does, with a new password in ~/.config/kubaos/sunshine/password"
 kind = "run"
 do = ["./sign-in"]
 check = ["./signed-in"]

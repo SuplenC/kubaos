@@ -92,11 +92,6 @@ pub struct Journal {
     /// journal has it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub brought_by: Vec<String>,
-    /// The last removal stopped at a step it couldn't undo and was rolled back: that step and
-    /// why. Only the user's journal has it; the next install that completes clears it, and a
-    /// removal that goes through takes the journal away with it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub removal_rolled_back: Option<String>,
     #[serde(default, rename = "entry")]
     pub entries: Vec<Entry>,
 }
@@ -276,7 +271,6 @@ impl Journal {
             complete: false,
             root_adoption: None,
             brought_by: Vec::new(),
-            removal_rolled_back: None,
             entries: Vec::new(),
         }
     }
@@ -336,8 +330,8 @@ impl Journal {
         Ok(journals)
     }
 
-    /// Writes it whole, through a file renamed into place; with no entries, not complete and no
-    /// removal rolled back to tell of, takes it and its folder away instead.
+    /// Writes it whole, through a file renamed into place; with no entries, not complete and
+    /// brought by no app, takes it and its folder away instead.
     ///
     /// # Errors
     ///
@@ -348,7 +342,7 @@ impl Journal {
             path: path.clone(),
             source,
         };
-        if self.entries.is_empty() && !self.complete && self.removal_rolled_back.is_none() {
+        if self.entries.is_empty() && !self.complete && self.brought_by.is_empty() {
             return Self::forget(dir, &self.app);
         }
         let folder = dir.join(&self.app);
@@ -491,23 +485,83 @@ pub fn write_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
 /// # Errors
 ///
 /// [`JournalError`] when that journal can't be read or written.
-pub fn hand_over(dir: &Path, holder: &str, claim: &str, prior: &Prior) -> Result<bool, JournalError> {
+pub fn hand_over(dir: &Path, holder: &str, claim: &str, prior: &Prior) -> Result<Option<Prior>, JournalError> {
     let Some(mut journal) = Journal::read(dir, holder)? else {
-        return Ok(false);
+        return Ok(None);
     };
-    let mut found = false;
+    let mut had = None;
     for entry in &mut journal.entries {
         if let Some(c) = entry.claims.iter_mut().find(|c| c.claim == claim && !c.owned) {
             c.owned = true;
+            had = Some(entry.prior.clone());
             entry.prior.take_from(prior);
-            found = true;
             break;
         }
     }
-    if found {
+    if had.is_some() {
         journal.save(dir)?;
     }
-    Ok(found)
+    Ok(had)
+}
+
+/// Takes back from the app `holder`'s journal in `dir` the claim `claim` a [`hand_over`] gave it:
+/// its step finds it again, with `prior`, the prior state it had before. A claim the holder
+/// doesn't own, or a holder with no journal, is left as it is.
+///
+/// # Errors
+///
+/// [`JournalError`] when that journal can't be read or written.
+pub fn give_back(dir: &Path, holder: &str, claim: &str, prior: &Prior) -> Result<(), JournalError> {
+    let Some(mut journal) = Journal::read(dir, holder)? else {
+        return Ok(());
+    };
+    for entry in &mut journal.entries {
+        if let Some(c) = entry.claims.iter_mut().find(|c| c.claim == claim && c.owned) {
+            c.owned = false;
+            entry.prior = prior.clone();
+            return journal.save(dir);
+        }
+    }
+    Ok(())
+}
+
+/// What a mark beside the journals in `dir` that the app `id`'s last removal was rolled back is
+/// named: a file of its own beside the journal, as `journal.toml` refuses keys it doesn't know and
+/// a release before it would fail to read a journal with one.
+const ROLLED_BACK_MARK: &str = "-removal-rolled-back";
+
+/// Why the app `id`'s last removal was rolled back, by the mark beside the user journals in
+/// `dir`: the step it couldn't undo and the error. None when it wasn't, or the mark can't be read.
+pub fn rolled_back(dir: &Path, id: &str) -> Option<String> {
+    fs::read_to_string(dir.join(format!("{id}{ROLLED_BACK_MARK}")))
+        .ok()
+        .map(|text| text.trim_end().to_owned())
+}
+
+/// Marks beside the user journals in `dir` that the app `id`'s last removal was rolled back, and
+/// `why`; `None` takes the mark away.
+///
+/// # Errors
+///
+/// [`JournalError::Write`] when the mark can't be written or taken away.
+pub fn mark_rolled_back(dir: &Path, id: &str, why: Option<&str>) -> Result<(), JournalError> {
+    let path = dir.join(format!("{id}{ROLLED_BACK_MARK}"));
+    let write = |source| JournalError::Write {
+        path: path.clone(),
+        source,
+    };
+    match why {
+        Some(why) => {
+            fs::create_dir_all(dir).map_err(write)?;
+            let tmp = dir.join(format!(".{id}{ROLLED_BACK_MARK}.new"));
+            write_new(&tmp, format!("{why}\n").as_bytes()).map_err(write)?;
+            fs::rename(&tmp, &path).map_err(write)
+        }
+        None => match fs::remove_file(&path) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => Err(write(e)),
+            _ => Ok(()),
+        },
+    }
 }
 
 /// Takes the lock at `path`, which one run holds while it changes the machine's apps.

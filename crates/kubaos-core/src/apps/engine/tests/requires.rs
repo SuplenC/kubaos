@@ -446,6 +446,9 @@ fn a_brought_app_that_cant_be_removed_is_a_warning_once_the_app_asked_for_is_gon
         2,
         "the removal stopped at the package and was rolled back: {neovim_root:?}"
     );
+    let neovim = world.journals("neovim").0.unwrap();
+    assert_eq!(neovim.brought_by, ["lazyvim"], "the rollback keeps who brought it");
+    assert!(neovim.complete, "{neovim:?}");
     let warned = events.0.iter().any(|e| {
         matches!(e, UpdateEvent::Warning { text }
             if text.starts_with("Neovim was there only for LazyVim, and couldn't be removed: ")

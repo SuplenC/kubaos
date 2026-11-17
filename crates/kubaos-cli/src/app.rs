@@ -48,6 +48,7 @@ use kubaos_core::apps::Status;
 use kubaos_core::apps::folder::FolderError;
 use kubaos_core::apps::folder::Source;
 use kubaos_core::apps::folder::WRITTEN_BY_KUBAOS;
+use kubaos_core::apps::journal;
 use kubaos_core::apps::journal::Journal;
 use kubaos_core::apps::journal::JournalError;
 use kubaos_core::apps::status::Listed;
@@ -362,6 +363,13 @@ fn table(status: &Status) -> String {
             let _ = write!(line, "  {version}");
         }
         let _ = writeln!(out, "{}", line.trim_end());
+        if let Some(why) = &app.removal_rolled_back {
+            let _ = writeln!(
+                out,
+                "  {:<11} {:<6}  {:<width$}  its last removal was rolled back: {why}",
+                "", "", ""
+            );
+        }
     }
     for id in &status.unknown {
         let _ = writeln!(out, "  {id}: picked, but this release's catalog has no such app");
@@ -391,6 +399,9 @@ struct Showing<'a> {
     /// The apps whose install brought it, which it goes with.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     brought_by: Vec<String>,
+    /// Its last removal couldn't undo a step and was rolled back: that step and why.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    removal_rolled_back: Option<String>,
     /// Every step of both journals, by step.
     steps: Vec<Owned>,
 }
@@ -456,6 +467,7 @@ fn shown<'a>(folder: &'a Folder, paths: &Paths) -> Result<Showing<'a>, JournalEr
         },
         setup: user.as_ref().and_then(|j| j.setup.clone()),
         brought_by: user.as_ref().map(|j| j.brought_by.clone()).unwrap_or_default(),
+        removal_rolled_back: journal::rolled_back(&paths.app_journals(), &folder.id),
         complete: user.is_some_and(|j| j.complete),
         steps,
     })
@@ -530,6 +542,12 @@ fn show_text(shown: &Showing) -> String {
             out,
             "Installed for {}: it goes with the last of them, unless you add it yourself.",
             shown.brought_by.join(", ")
+        );
+    }
+    if let Some(why) = &shown.removal_rolled_back {
+        let _ = writeln!(
+            out,
+            "Its last removal was rolled back, so it's all still here. What stopped it: {why}"
         );
     }
     for step in &shown.steps {

@@ -24,6 +24,7 @@ use super::untar_args;
 use crate::apps::action::Scope;
 use crate::apps::action::Side;
 use crate::apps::engine::Keeper;
+use crate::apps::engine::Undone;
 use crate::apps::root::Reply;
 use crate::apps::root::Request;
 use crate::apps::root::RootError;
@@ -47,6 +48,9 @@ pub struct FakeRoot {
     pub requests: Vec<String>,
     /// `start` and each request's line, shared with whoever made it, which outlives it.
     pub calls: Rc<RefCell<Vec<String>>>,
+    /// What root's keeper undid in the run, kept between requests as the helper's one keeper
+    /// keeps it.
+    pub undone: Vec<Undone>,
 }
 
 impl RootSide for FakeRoot {
@@ -70,8 +74,12 @@ impl RootSide for FakeRoot {
 
 impl FakeRoot {
     pub fn serve(&mut self, line: &str) -> Reply {
-        let keeper = Keeper::new(&mut self.host, Side::Root, &self.catalog, &self.journals);
-        Server::new(keeper, &self.catalog, self.owner).handle(line)
+        let keeper = Keeper::new(&mut self.host, Side::Root, &self.catalog, &self.journals)
+            .with_undone(std::mem::take(&mut self.undone));
+        let mut server = Server::new(keeper, &self.catalog, self.owner);
+        let reply = server.handle(line);
+        self.undone = server.into_keeper().take_undone();
+        reply
     }
 }
 

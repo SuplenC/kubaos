@@ -404,6 +404,32 @@ fn remove_drops_the_pick_and_undoes_the_journal_through_polkit() {
 }
 
 #[test]
+fn a_removal_rolled_back_keeps_its_app_picked_and_one_removed_before_it_stays_out() {
+    let w = world();
+    let mut m = fake(&w, &[]);
+    w.updater(&mut m).add_apps(&names(&["agent", "desk"]), None).unwrap();
+    // apt can't take Desk's package, as with dpkg's lock held.
+    host(&m).state.borrow_mut().fail.insert("apt-remove:desk".to_owned());
+
+    let err = w.updater(&mut m).remove_apps(&names(&["agent", "desk"])).unwrap_err();
+
+    let why = crate::update::event::chain(&err);
+    assert!(why.contains("the removal was rolled back"), "{why}");
+    assert_eq!(picked(&w), names(&["desk"]));
+    assert_eq!(user_journal(&w, "agent"), None);
+    assert!(has(&m, "desk"));
+    let status = w.updater(&mut m).app_status().unwrap();
+    let desk = status.get("desk").unwrap();
+    assert_eq!(desk.state, AppState::Installed);
+    assert!(
+        desk.removal_rolled_back
+            .as_deref()
+            .is_some_and(|why| why.starts_with("Install Desk: ")),
+        "{desk:?}"
+    );
+}
+
+#[test]
 fn an_update_installs_the_picked_apps_through_sudo_and_a_second_starts_no_root() {
     let w = world();
     let mut picks = Picks::default();

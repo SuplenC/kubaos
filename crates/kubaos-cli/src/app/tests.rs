@@ -27,8 +27,27 @@ fn app(id: &str, name: &str, picked: bool, state: AppState, version: Option<&str
         setup: None,
         setups: Vec::new(),
         configurable: false,
+        removal_rolled_back: None,
         available: vec![true],
     }
+}
+
+#[test]
+fn an_app_whose_removal_was_rolled_back_says_so_under_its_line() {
+    let mut desk = app("desk", "Desk", true, AppState::Installed, Some("1.0"));
+    desk.removal_rolled_back = Some("Install Desk: apt is busy".into());
+    let status = Status {
+        arch: "amd64".into(),
+        apps: vec![desk],
+        unknown: Vec::new(),
+    };
+
+    assert_eq!(
+        table(&status),
+        "KubaOS's apps (amd64)\n\
+         \n  installed   picked  desk  Desk  1.0\
+         \n                            its last removal was rolled back: Install Desk: apt is busy\n"
+    );
 }
 
 #[test]
