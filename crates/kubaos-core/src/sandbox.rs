@@ -10,10 +10,13 @@
 //! found, so a script that reaches for one fails, loudly, rather than run the real one. The session
 //! and system buses point at a socket that isn't there, and `XDG_RUNTIME_DIR` is a folder of the
 //! sandbox's own, so even a program called by its full path finds no user manager, logind or polkit
-//! to talk to. `HOME` and the `XDG_*` folders are the test's. None of git's variables gets in, so a
-//! git a test runs, there or from the code it tests, finds the repository it is given and never the
-//! one the tests run in (`git rebase --exec` sets `GIT_DIR` for its command, and a test's
-//! `git init` once re-initialised the developer's checkout as a bare repository).
+//! to talk to. `HOME` and the `XDG_*` folders are the test's. KubaOS's machine-wide files are an
+//! empty folder of the sandbox's own ([`crate::update::record::ROOT_VAR`]), so a program that reads
+//! the Apps catalog, the package manifest or root's journals finds none, never the machine's. None
+//! of git's variables gets in, so a git a test runs, there or from the code it tests, finds the
+//! repository it is given and never the one the tests run in (`git rebase --exec` sets `GIT_DIR`
+//! for its command, and a test's `git init` once re-initialised the developer's checkout as a bare
+//! repository).
 //!
 //! # Owns
 //!
@@ -35,6 +38,8 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
 use std::process::Stdio;
+
+use crate::update::record::ROOT_VAR;
 
 /// A D-Bus address with no bus behind it, for the session's and the system's.
 pub const NOWHERE: &str = "unix:path=/nonexistent";
@@ -189,7 +194,7 @@ impl Sandbox {
             home: home.to_path_buf(),
             user: user.into(),
         };
-        for dir in [sandbox.bin(), sandbox.tmp(), sandbox.root.join("xdg")] {
+        for dir in [sandbox.bin(), sandbox.tmp(), sandbox.root.join("xdg"), sandbox.system()] {
             fs::create_dir_all(dir).expect("make the sandbox's folders");
         }
         fs::create_dir_all(sandbox.runtime()).expect("make the sandbox's runtime folder");
@@ -228,6 +233,13 @@ impl Sandbox {
 
     fn tmp(&self) -> PathBuf {
         self.root.join("tmp")
+    }
+
+    /// The root of KubaOS's machine-wide files, empty unless a test writes a fixture there: its
+    /// `usr/share/kubaos/apps` is the Apps catalog a program in the sandbox reads.
+    #[must_use]
+    pub fn system(&self) -> PathBuf {
+        self.root.join("system")
     }
 
     /// `name`'s stand-in replaced by one that logs its call, then runs `body`, a POSIX shell
@@ -337,6 +349,7 @@ impl Sandbox {
             .env("XDG_CACHE_HOME", self.home.join(".cache"))
             .env("XDG_CONFIG_DIRS", &xdg)
             .env("XDG_DATA_DIRS", &xdg)
+            .env(ROOT_VAR, self.system())
             .env("DBUS_SESSION_BUS_ADDRESS", NOWHERE)
             .env("DBUS_SYSTEM_BUS_ADDRESS", NOWHERE)
             .stdin(Stdio::null())

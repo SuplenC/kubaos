@@ -49,6 +49,20 @@ fn the_environment_holds_no_route_to_the_session() {
 }
 
 #[test]
+fn kubaos_machine_wide_files_are_an_empty_folder_of_the_sandboxs_own() {
+    let (dir, sandbox) = sandbox();
+
+    let (code, out, _) = sh(
+        &sandbox,
+        &format!("printf '%s\\n' \"${ROOT_VAR}\"; ls -A \"${ROOT_VAR}\""),
+    );
+
+    assert_eq!(code, Some(0));
+    assert_eq!(out.lines().collect::<Vec<_>>(), [sandbox.system().to_string_lossy()]);
+    assert!(sandbox.system().starts_with(dir.path()));
+}
+
+#[test]
 fn a_command_with_effects_is_a_stand_in_that_logs_its_call() {
     let (_dir, sandbox) = sandbox();
 

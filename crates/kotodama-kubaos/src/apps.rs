@@ -124,7 +124,7 @@ impl AppFiles {
     /// The files of this machine and user; none without a home.
     pub fn from_env() -> Option<Self> {
         let paths = Paths::from_env().ok()?;
-        Some(Self::new(&SystemPaths::machine(), &paths))
+        Some(Self::new(&SystemPaths::from_env(), &paths))
     }
 
     /// The apps' user journals' folder, which the watch needs to exist: an app's journal folder
