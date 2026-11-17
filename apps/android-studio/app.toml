@@ -2,9 +2,9 @@
 # download page. Google keeps no apt repository and Ubuntu doesn't package it; nixpkgs' Android
 # Studio is a year behind and can't update itself. It builds for amd64 only. Studio updates itself
 # in place, patching the folder it runs from: the download unpacks it to a folder of the user's,
-# and a release of KubaOS leaves this pin as it is, as a new pin would put an older Studio over the
-# one it updated to. The desktop entry is ours, named as the one Studio would make, so the two are
-# one file.
+# and is `self_updates`: done while it is there, a new pin reaches new installs only and never puts
+# an older Studio over the one it updated to. The desktop entry is ours, named as the one Studio
+# would make, so the two are one file.
 # https://developer.android.com/studio
 name = "Android Studio"
 category = "development"
@@ -36,6 +36,7 @@ to = "~/.local/share/android-studio"
 version = "2026.2.2.9"
 unpack = "tar-gz"
 strip = 1
+self_updates = true
 amd64 = { url = "https://dl.google.com/dl/android/studio/ide-zips/2026.2.2.9/android-studio-rabbit2-patch1-linux.tar.gz", sha256 = "11ecbf0e6dc0f04a1353f797e45bf239a3ff1a82221539b1b8cdd7eab0d8d8ea" }
 
 [[action]]

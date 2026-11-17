@@ -2,9 +2,8 @@
 # recommendations, so the step names what a virtual machine of today needs beside them: qemu-img
 # for its disks, SPICE for its display, UEFI firmware and a TPM, which Windows 11 asks for. amd64
 # only: an arm64 machine needs other firmware, which one list of packages for both can't say.
-# libvirt's package enables libvirtd at boot; like Docker's daemon, it starts on its first use
-# instead, through libvirtd.socket, so it adds no wait to the way to the desktop. A virtual machine
-# set to start with the machine starts once something first asks libvirt.
+# libvirtd starts as Ubuntu's package sets it, at boot, so a virtual machine set to start with the
+# machine starts with it.
 # https://ubuntu.com/server/docs/how-to/virtualisation/virtual-machine-manager/
 name = "Virtual Machine Manager"
 category = "development"
@@ -49,17 +48,3 @@ name = "Let you use KVM without sudo"
 kind = "group"
 group = "kvm"
 
-[[action]]
-name = "Keep libvirt out of the boot"
-kind = "unit"
-unit = "libvirtd.service"
-scope = "system"
-enable = false
-
-[[action]]
-name = "Start libvirt on its first use"
-kind = "unit"
-unit = "libvirtd.socket"
-scope = "system"
-enable = true
-start = true

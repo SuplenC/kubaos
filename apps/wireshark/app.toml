@@ -1,8 +1,8 @@
 # Wireshark from Ubuntu's archive, as current as its own repository. Capturing as a user is
 # wireshark-common's debconf question, which an install with no one to ask answers no: the first
 # step answers yes, so its package gives dumpcap the two capabilities capturing needs and lets the
-# wireshark group run it, then puts you in the group. The user's own answer, yes or no, is found
-# and left as it is.
+# wireshark group run it, then puts you in the group. A question the user answered, yes or no,
+# is theirs: debconf marks it seen, and the step leaves it and owns nothing.
 # https://www.wireshark.org/docs/wsug_html_chunked/ChBuildInstallUnixInstallBins.html
 name = "Wireshark"
 category = "development"

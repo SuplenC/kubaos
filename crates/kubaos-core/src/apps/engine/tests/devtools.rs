@@ -96,6 +96,11 @@ fn every_packaged_developer_tool_installs_on_the_fake_machine_and_its_removal_le
                     }
                     Kind::Deb { package, version, .. } => assert_eq!(&state.dpkg[package], version, "{id}"),
                     Kind::Nix { packages, .. } => assert!(packages.iter().all(|p| state.nix.contains(p)), "{id}"),
+                    // The icon of the app's folder, in the theme.
+                    Kind::File { to, .. } if to.starts_with("~/.local/share/icons/") => {
+                        let icon = world.host_home().join(to.trim_start_matches("~/"));
+                        assert!(icon.is_file(), "{id}: {}", icon.display());
+                    }
                     other => panic!("{id}: a packaged developer tool has no {other:?}"),
                 }
             }
@@ -162,19 +167,17 @@ fn libvirt_as_packaged(world: &World) {
 }
 
 #[test]
-fn virt_manager_starts_libvirt_on_its_first_use_and_puts_back_what_it_found_as_it_goes() {
+fn virt_manager_leaves_libvirt_starting_at_boot_and_puts_its_groups_back_as_it_goes() {
     let world = world("virt-manager");
     libvirt_as_packaged(&world);
     let before = world.host.snapshot();
+    let units = world.host.state.borrow().units.clone();
 
     run(&world, |e| e.add("virt-manager", None, &picks("virt-manager"))).unwrap();
 
     {
         let state = world.host.state.borrow();
-        let service = state.units["system:libvirtd.service"];
-        let socket = state.units["system:libvirtd.socket"];
-        assert!(!service.enabled, "libvirtd is out of the boot");
-        assert!(socket.enabled && socket.active, "its socket starts it");
+        assert_eq!(state.units, units, "libvirtd starts at boot, as Ubuntu sets it");
         for group in ["libvirt", "kvm"] {
             assert!(state.groups[group].contains("kuba"), "{group}");
         }
@@ -183,7 +186,6 @@ fn virt_manager_starts_libvirt_on_its_first_use_and_puts_back_what_it_found_as_i
     run(&world, |e| e.remove_with("virt-manager", &Picks::default())).unwrap();
 
     let state = world.host.state.borrow();
-    assert!(state.units["system:libvirtd.service"].enabled);
     assert!(state.groups.contains_key("kvm"), "kvm is systemd's, and stays");
     assert!(!state.groups.contains_key("libvirt"));
     drop(state);
@@ -191,16 +193,17 @@ fn virt_manager_starts_libvirt_on_its_first_use_and_puts_back_what_it_found_as_i
 }
 
 #[test]
-fn gnome_boxes_needs_kvm_and_keeps_the_libvirtd_its_package_brings_out_of_the_boot() {
+fn gnome_boxes_needs_kvm_and_leaves_the_libvirtd_its_package_brings_as_it_is() {
     let world = world("gnome-boxes");
     libvirt_as_packaged(&world);
     let before = world.host.snapshot();
+    let units = world.host.state.borrow().units.clone();
 
     run(&world, |e| e.add("gnome-boxes", None, &picks("gnome-boxes"))).unwrap();
 
     {
         let state = world.host.state.borrow();
-        assert!(!state.units["system:libvirtd.service"].enabled);
+        assert_eq!(state.units, units, "libvirtd starts at boot, as Ubuntu sets it");
         assert!(state.groups["kvm"].contains("kuba"));
         assert!(!state.groups.contains_key("libvirt"), "Boxes runs its machines as you");
     }
@@ -216,33 +219,47 @@ fn debconf(world: &World) -> PathBuf {
     world.host_home().join("../../debconf")
 }
 
-/// debconf as `debconf-set-selections` and `debconf-communicate` answer for one package's
-/// questions, and dpkg saying whether wireshark-common is configured.
+/// debconf as `debconf-set-selections`, `debconf-communicate` and `dpkg-reconfigure` treat one
+/// package's questions: an answer set is marked seen, as `debconf-set-selections` marks it, and
+/// configuring the package again marks its questions unseen, as `dpkg-reconfigure` does; and dpkg
+/// saying whether wireshark-common is configured.
 fn wireshark_world(installed: bool) -> World {
     let world = world("wireshark");
     let answers = debconf(&world);
     fs::create_dir_all(&answers).unwrap();
+    let dir = answers.display();
     let sandbox = world.host.sandbox();
     sandbox.stub(
         "debconf-set-selections",
         &format!(
-            "read -r _ question _ value\nprintf '%s\\n' \"$value\" >'{}'/\"${{question##*/}}\"",
-            answers.display()
+            "read -r _ question _ value\nf='{dir}'/\"${{question##*/}}\"\n\
+             printf '%s\\n' \"$value\" >\"$f\"; echo true >\"$f.seen\""
         ),
     );
     sandbox.stub(
         "debconf-communicate",
         &format!(
-            "read -r _ question\nf='{}'/\"${{question##*/}}\"\n\
-             if [ -f \"$f\" ]; then printf '0 %s\\n' \"$(cat \"$f\")\"; \
-             else printf \"10 %s doesn't exist\\n\" \"$question\"; fi",
-            answers.display()
+            "read -r command question flag value\nf='{dir}'/\"${{question##*/}}\"\n\
+             if [ ! -f \"$f\" ]; then printf \"10 %s doesn't exist\\n\" \"$question\"; exit 10; fi\n\
+             case $command in\n\
+             GET) printf '0 %s\\n' \"$(cat \"$f\")\" ;;\n\
+             FGET) printf '0 %s\\n' \"$(cat \"$f.seen\" 2>/dev/null || echo false)\" ;;\n\
+             FSET) echo \"$value\" >\"$f.seen\"; echo 0 ;;\n\
+             esac"
         ),
     );
+    sandbox.stub("dpkg-reconfigure", &format!("rm -f '{dir}'/*.seen"));
     if installed {
         sandbox.stub("dpkg-query", "printf 'ii '");
     }
     world
+}
+
+/// The user's own answer to wireshark-common's question, given before KubaOS installs it.
+fn answered(world: &World, value: &str) {
+    let question = debconf(world).join("install-setuid");
+    fs::write(&question, format!("{value}\n")).unwrap();
+    fs::write(question.with_extension("seen"), "true\n").unwrap();
 }
 
 fn answer(world: &World) -> Option<String> {
@@ -282,18 +299,46 @@ fn wireshark_answers_its_question_yes_before_its_package_lands_and_no_once_it_is
     run(&world, |e| e.remove_with("wireshark", &Picks::default())).unwrap();
 
     assert_eq!(answer(&world).as_deref(), Some("false"), "back to its default");
+    let seen = fs::read_to_string(debconf(&world).join("install-setuid.seen")).unwrap();
+    assert_eq!(seen.trim(), "false", "unseen, so a later install answers it again");
     assert_eq!(world.host.snapshot(), before);
 }
 
 #[test]
 fn a_wireshark_the_user_answered_yes_for_keeps_the_answer_when_it_goes() {
     let world = wireshark_world(false);
-    fs::write(debconf(&world).join("install-setuid"), "true\n").unwrap();
+    answered(&world, "true");
 
     run(&world, |e| e.add("wireshark", None, &picks("wireshark"))).unwrap();
     run(&world, |e| e.remove_with("wireshark", &Picks::default())).unwrap();
 
     assert_eq!(answer(&world).as_deref(), Some("true"));
+    let calls = world.host.sandbox().calls();
+    assert!(
+        !calls.iter().any(|c| c.starts_with("debconf-set-selections")),
+        "{calls:#?}"
+    );
+}
+
+#[test]
+fn a_wireshark_the_user_answered_no_for_keeps_the_no() {
+    let world = wireshark_world(true);
+    answered(&world, "false");
+
+    run(&world, |e| e.add("wireshark", None, &picks("wireshark"))).unwrap();
+
+    assert_eq!(answer(&world).as_deref(), Some("false"), "the user's no stays");
+    let calls = world.host.sandbox().calls();
+    assert!(
+        !calls
+            .iter()
+            .any(|c| c.starts_with("debconf-set-selections") || c.starts_with("dpkg-reconfigure")),
+        "{calls:#?}"
+    );
+
+    run(&world, |e| e.remove_with("wireshark", &Picks::default())).unwrap();
+
+    assert_eq!(answer(&world).as_deref(), Some("false"));
     let calls = world.host.sandbox().calls();
     assert!(
         !calls.iter().any(|c| c.starts_with("debconf-set-selections")),
@@ -418,6 +463,43 @@ fn android_studio_running_is_left_alone_until_it_is_quit() {
         "{refused}"
     );
     assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn a_release_bumping_studios_pin_never_downloads_over_the_studio_that_updated_itself() {
+    let world = studio_world();
+    run(&world, |e| e.add(STUDIO, None, &picks(STUDIO))).unwrap();
+    let program = world.host_home().join(".local/share/android-studio/bin/studio");
+    let updated = "#!/bin/sh\n# Studio, patched by its own updater\n";
+    fs::write(&program, updated).unwrap();
+    // A later release of KubaOS pins an older Studio than the one it updated itself to.
+    let bumped_url = "https://dl.google.com/dl/android/studio/ide-zips/2026.1.1.1/android-studio-older-linux.tar.gz";
+    let bumped_sha = "c".repeat(64);
+    let text = fs::read_to_string(world.catalog.join(STUDIO).join("app.toml")).unwrap();
+    let catalog = Catalog::load(&world.catalog).unwrap();
+    let Kind::Download { version, amd64, .. } = &catalog.get(STUDIO).unwrap().actions[0].kind else {
+        panic!("Studio's first step is its download");
+    };
+    let pin = amd64.as_ref().unwrap();
+    world.write_app(
+        STUDIO,
+        &text
+            .replace(&format!("version = \"{version}\""), "version = \"2026.1.1.1\"")
+            .replace(&pin.url, bumped_url)
+            .replace(&pin.sha256, &bumped_sha),
+    );
+    world
+        .host
+        .state
+        .borrow_mut()
+        .downloads
+        .insert(bumped_url.to_owned(), (bumped_sha, studio_tarball()));
+
+    run(&world, |e| e.add(STUDIO, None, &picks(STUDIO))).unwrap();
+
+    assert_eq!(fs::read_to_string(&program).unwrap(), updated);
+    let fetched = world.host.state.borrow().log.iter().any(|l| l.ends_with(bumped_url));
+    assert!(!fetched, "the bumped pin is never downloaded");
 }
 
 #[test]

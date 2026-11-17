@@ -14,6 +14,8 @@ description = """\
 Podman Desktop is an open source graphical tool enabling you to seamlessly work with containers \
 and Kubernetes from your local environment."""
 description_from = "https://github.com/podman-desktop/podman-desktop/blob/v1.30.5/.flatpak-appdata.xml"
+# Podman Desktop's own icon, Apache-2.0 (podman-desktop.svg's header): Colloid has none.
+icon = "podman-desktop.svg"
 keeps = """\
 Your containers and images stay in ~/.local/share/containers, and Podman Desktop's settings in \
 ~/.local/share/containers/podman-desktop: install it again and they're all there."""
