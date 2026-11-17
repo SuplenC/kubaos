@@ -202,6 +202,11 @@ pub enum Kind {
         /// replaces.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         versions: Option<String>,
+        /// Its undo purges its packages and what it pulled in, rather than keeping their
+        /// configuration: for a package whose conffiles are KubaOS's business, as Steam's apt
+        /// source is.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        purge: bool,
         /// The packages it installs on amd64 alone, beside `packages`: what one architecture
         /// needs that the other has no package of (a virtual machine's firmware). Resolving puts
         /// the machine's into `packages`, so a journal records one list.
@@ -762,6 +767,7 @@ impl Action {
                 versions,
                 amd64,
                 arm64,
+                ..
             } => {
                 check_apt(packages, repo.as_deref(), arch.as_deref(), versions.as_deref())?;
                 for own in [amd64, arm64].into_iter().flatten() {

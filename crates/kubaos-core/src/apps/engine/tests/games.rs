@@ -80,6 +80,37 @@ fn minecraft_tarball(world: &World) -> Vec<u8> {
     fs::read(archive).unwrap()
 }
 
+/// Steam's packages as Valve's and Ubuntu's repositories have them: `steam-launcher`'s conffiles,
+/// its sources lists, and `steam-libs-i386` pulling in i386's compiler runtime, which apt marks
+/// Protected, and C library, whose configuration a removal leaves.
+fn steam_packages(world: &World) {
+    let mut state = world.host.state.borrow_mut();
+    state.conffiles.insert(
+        "steam-launcher".to_owned(),
+        vec![
+            STEAM_LIST.to_owned(),
+            "/etc/apt/sources.list.d/steam-beta.list".to_owned(),
+        ],
+    );
+    state.depends.insert(
+        "steam-libs-i386:i386".to_owned(),
+        [
+            "libgcc-s1:i386".to_owned(),
+            "libc6:i386".to_owned(),
+            "libgl1:i386".to_owned(),
+        ]
+        .into(),
+    );
+    state
+        .depends
+        .insert("libgcc-s1:i386".to_owned(), ["libc6:i386".to_owned()].into());
+    state.protected.insert("libgcc-s1:i386".to_owned());
+    state.conffiles.insert(
+        "libc6:i386".to_owned(),
+        vec!["/etc/ld.so.conf.d/i386-linux-gnu.conf".to_owned()],
+    );
+}
+
 /// A kernel of the fake machine, with its headers, and the serial of the MOK DKMS signs with.
 const KERNEL: &str = "7.0.0-43-generic";
 const MOK: &str = "1A:21:AB:C9";
@@ -117,6 +148,7 @@ fn served(id: &str) -> World {
     // Steam's steps name its steam-stable.list as an argument, which its scripts write as they
     // are, so its folder names the fake machine's instead, in a sources folder that is there.
     if id == "steam" {
+        steam_packages(&world);
         let list = world.system_path(STEAM_LIST);
         fs::create_dir_all(list.parent().unwrap()).unwrap();
         let text = fs::read_to_string(world.catalog.join(id).join("app.toml")).unwrap();
@@ -607,7 +639,11 @@ fn steams_removal_takes_valves_copy_of_its_source_and_keeps_the_library() {
 
     assert!(!list.exists() && !valves.exists());
     assert!(library.is_file(), "the library stays");
-    assert!(!world.host.state.borrow().foreign.contains("i386"));
+    let state = world.host.state.borrow();
+    assert!(!state.foreign.contains("i386"));
+    assert!(state.rc.is_empty(), "purged: dpkg forgets steam-launcher's conffiles");
+    assert!(!state.dpkg.contains_key("libgcc-s1:i386"));
+    drop(state);
     fs::remove_dir_all(world.host_home().join(".local")).unwrap();
     assert_eq!(world.host.snapshot(), before);
 }
@@ -618,13 +654,27 @@ fn the_source_of_a_steam_installed_by_hand_stays_and_so_does_i386() {
     let list = world.system_path(STEAM_LIST);
     let valves = "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] https://repo.steampowered.com/steam/ stable steam\n";
     fs::write(&list, valves).unwrap();
-    world.host.state.borrow_mut().foreign.insert("i386".to_owned());
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.foreign.insert("i386".to_owned());
+        for package in [
+            "steam-launcher",
+            "steam-libs-amd64",
+            "steam-libs-i386:i386",
+            "mesa-vulkan-drivers",
+            "mesa-vulkan-drivers:i386",
+        ] {
+            state.dpkg.insert(package.to_owned(), "1.0".to_owned());
+        }
+    }
 
     run(&world, |e| e.add("steam", None, &picks("steam"))).unwrap();
     run(&world, |e| e.remove_with("steam", &Picks::default())).unwrap();
 
     assert_eq!(fs::read_to_string(&list).unwrap(), valves);
-    assert!(world.host.state.borrow().foreign.contains("i386"));
+    let state = world.host.state.borrow();
+    assert!(state.foreign.contains("i386"));
+    assert!(state.dpkg.contains_key("steam-launcher"), "a Steam KubaOS found stays");
 }
 
 #[test]

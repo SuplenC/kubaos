@@ -7,7 +7,8 @@
 //! # Owns
 //!
 //! - [`Host`], [`HostError`], [`UnitState`], [`AptPlan`], [`AptSimulation`], [`Downgrade`],
-//!   [`DkmsStatus`], [`Mok`] and [`SecureBoot`]. The real machine: [`SystemHost`].
+//!   [`Removal`], [`Known`], [`DkmsStatus`], [`DkmsInstall`], [`Mok`] and [`SecureBoot`]. The real
+//!   machine: [`SystemHost`].
 //!
 //! # Not here
 //!
@@ -17,6 +18,7 @@
 pub mod fake;
 pub mod system;
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::io;
@@ -56,6 +58,8 @@ pub enum HostError {
     Nix(#[source] Box<dyn std::error::Error + Send + Sync>),
     #[error("the package manifest")]
     Manifest(#[source] crate::apt::manifest::ManifestError),
+    #[error("the certificate DKMS signs with can't be worked out from its configuration: {why}")]
+    Mok { why: String },
 }
 
 impl HostError {
@@ -168,6 +172,35 @@ impl Compression {
             Self::Xz => "--xz",
         }
     }
+}
+
+/// How an apt removal leaves a package's configuration.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Removal {
+    /// Kept (`apt-get remove`).
+    KeepConfig,
+    /// Purged with the package (`apt-get purge`).
+    Purge,
+    /// Purged, Essential and Protected packages too (`--allow-remove-essential`): only for a
+    /// foreign architecture's packages an app brought, which nothing of the machine's needs.
+    PurgeEssential,
+}
+
+/// How dpkg has a package.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Known {
+    /// Installed, or in any state but not installed and configuration left.
+    Installed,
+    /// Removed, its configuration files left (`rc`).
+    ConfigFiles,
+}
+
+/// What a `dkms install` for one kernel did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DkmsInstall {
+    Installed,
+    /// The module's `dkms.conf` leaves the kernel out.
+    Excluded,
 }
 
 /// What DKMS has of a module at a version.
@@ -304,12 +337,23 @@ pub trait Host {
     /// When apt fails.
     fn deb_install(&mut self, deb: &Path) -> Result<(), HostError>;
 
-    /// `packages` removed, their configuration kept.
+    /// `packages` removed, their configuration kept or purged as `removal` says; packages with
+    /// only their configuration left are purged by a purge.
     ///
     /// # Errors
     ///
-    /// When apt fails.
-    fn apt_remove(&mut self, packages: &[String]) -> Result<(), HostError>;
+    /// When apt fails, or would remove a package it marks Essential or Protected but under
+    /// [`Removal::PurgeEssential`].
+    fn apt_remove(&mut self, packages: &[String], removal: Removal) -> Result<(), HostError>;
+
+    /// Which of `packages`, installed, apt won't remove without `--allow-remove-essential`:
+    /// those whose control fields say `Essential: yes` or `Protected: yes`, of any
+    /// architecture, as apt marks them important.
+    ///
+    /// # Errors
+    ///
+    /// When dpkg can't be asked.
+    fn important(&mut self, packages: &[String]) -> Result<BTreeSet<String>, HostError>;
 
     /// `url` downloaded to `to`, kept only when its sha256 is `sha256`.
     ///
@@ -453,13 +497,14 @@ pub trait Host {
     /// When dpkg fails.
     fn set_foreign_arch(&mut self, arch: &str, on: bool) -> Result<(), HostError>;
 
-    /// The packages of `arch` dpkg has, installed or with their configuration left, as the
-    /// engine names them (`libc6:i386`): while one is there, dpkg keeps the architecture.
+    /// The packages of `arch` dpkg knows, as the engine names them (`libc6:i386`), each
+    /// installed or with only its configuration left: while one is there, dpkg keeps the
+    /// architecture.
     ///
     /// # Errors
     ///
     /// When dpkg can't be asked.
-    fn arch_packages(&mut self, arch: &str) -> Result<BTreeSet<String>, HostError>;
+    fn arch_packages(&mut self, arch: &str) -> Result<BTreeMap<String, Known>, HostError>;
 
     /// apt's lists read again from the sources (`apt-get update`).
     ///
@@ -492,12 +537,13 @@ pub trait Host {
     fn dkms_add(&mut self, module: &str, version: &str) -> Result<(), HostError>;
 
     /// `module` at `version` built, signed as DKMS signs, and installed for `kernel`, over what
-    /// it installed before (`dkms install --force`).
+    /// it installed before (`dkms install --force`); or not, for a kernel its `dkms.conf` leaves
+    /// out (`BUILD_EXCLUSIVE_*`, dkms's exit code 77).
     ///
     /// # Errors
     ///
     /// When dkms fails.
-    fn dkms_install(&mut self, module: &str, version: &str, kernel: &str) -> Result<(), HostError>;
+    fn dkms_install(&mut self, module: &str, version: &str, kernel: &str) -> Result<DkmsInstall, HostError>;
 
     /// `module` at `version` taken out of DKMS's tree and every kernel (`dkms remove --all`).
     ///
@@ -514,12 +560,14 @@ pub trait Host {
     /// When modinfo can't be started.
     fn module_signer(&mut self, module: &str, kernel: &str) -> Result<Option<String>, HostError>;
 
-    /// The MOK DKMS signs with, as its configuration names it; none until DKMS has made one.
+    /// The MOK DKMS signs modules for `kernel` with, as its configuration names it (which may
+    /// name it through `$kernelver`); none until DKMS has made one.
     ///
     /// # Errors
     ///
-    /// When the certificate can't be read.
-    fn mok(&mut self) -> Result<Option<Mok>, HostError>;
+    /// When the configuration names it in a way that can't be worked out, or the certificate
+    /// can't be read.
+    fn mok(&mut self, kernel: &str) -> Result<Option<Mok>, HostError>;
 
     /// Whether Secure Boot is on, and whether it takes `certificate`, the MOK's.
     ///
@@ -528,7 +576,9 @@ pub trait Host {
     /// When mokutil can't be started.
     fn secure_boot(&mut self, certificate: Option<&Path>) -> Result<SecureBoot, HostError>;
 
-    /// How many users the loaded kernel module `module` has; none when it isn't loaded.
+    /// How many users the loaded kernel module `module` has, the modules and handles holding it
+    /// and the devices bound to its drivers (a HID driver's controllers, which its count leaves
+    /// out); none when it isn't loaded.
     ///
     /// # Errors
     ///
