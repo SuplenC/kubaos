@@ -1,0 +1,43 @@
+# Tailscale from its signed apt repository, whose key system/packages.toml pins
+# ([repo.tailscale]), for amd64 and arm64. Its package writes no source of its own, and starts
+# tailscaled as it installs without enabling it; the second step enables it, so it runs at boot for
+# as long as the app is installed, and its removal disables it again (the package's own removal
+# then masks the unit, and an install unmasks it). Signing in is yours: `sudo tailscale up` (or
+# `--operator=$USER`, to run `tailscale` without sudo afterwards), as no step can pick your account.
+# What tailscaled opens: WireGuard on UDP 41641 on every network (PORT in /etc/default/tailscaled,
+# the package's), so peers reach this machine directly, and once you're signed in the tailscale0
+# interface, where your tailnet reaches this machine as its ACLs allow; its own API is the root's
+# socket /run/tailscale/tailscaled.sock. Tailscale SSH, Serve and Funnel stay off until you turn
+# them on.
+# https://pkgs.tailscale.com/stable/#ubuntu-resolute
+name = "Tailscale"
+category = "system"
+tags = ["vpn", "wireguard", "mesh", "network", "remote access", "tailnet"]
+summary = "All your machines on one private network, wherever they are. WireGuard without the homework."
+# Tailscale's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Tailscale puts your devices on one private network, a tailnet, over WireGuard: each one reaches \
+the others directly, through NAT and firewalls, from wherever it is, and you sign in with an \
+account you already have. Its daemon, tailscaled, runs at boot; `sudo tailscale up` signs this \
+machine in, and the tailnet's own settings decide who reaches what."""
+description_from = "kubaos"
+# Tailscale's mark on a tile (tailscale.svg), as Colloid draws none.
+icon = "tailscale"
+keeps = """\
+This machine's sign-in and node key stay in /var/lib/tailscale: install Tailscale again and it's \
+back on your tailnet as the same machine. Remove it from the tailnet in Tailscale's admin console \
+if it isn't coming back."""
+
+[[action]]
+name = "Install Tailscale"
+kind = "apt"
+repo = "tailscale"
+packages = ["tailscale"]
+
+[[action]]
+name = "Start Tailscale's daemon, now and at boot"
+kind = "unit"
+unit = "tailscaled.service"
+scope = "system"
+enable = true
+start = true

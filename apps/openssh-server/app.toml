@@ -1,0 +1,52 @@
+# The OpenSSH server from Ubuntu's archive, for logging in to this machine with a key and nothing
+# else. The first step, before the package, writes /etc/ssh/sshd_config.d/00-kubaos-key-only.conf:
+# no passwords, no keyboard-interactive prompts, no root; sshd keeps the first value it reads, and
+# the file comes first there, so sshd never runs taking a password. Then ssh.socket, enabled and
+# started: TCP 22 on every network, sshd started on the first connection. Its removal stops and
+# disables it again only if this app enabled it. A machine is never locked out by it: logging in
+# at the machine doesn't go through sshd. With no key in ~/.ssh/authorized_keys nobody can log in
+# over SSH, which the last step says, as a notification where the install can show one and as a
+# note on every update until a key is there; it changes nothing, so its undo is nothing.
+# https://documentation.ubuntu.com/server/how-to/security/openssh-server/
+name = "OpenSSH server"
+category = "system"
+tags = ["ssh", "remote", "server", "login", "keys"]
+summary = "Lets you in over SSH with a key and nothing else. Password guessers can knock somewhere else."
+# OpenSSH's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+OpenSSH's server, sshd, lets you log in to this machine from another one over SSH, run commands \
+and copy files with scp, sftp or rsync. Here it takes keys alone: passwords, keyboard-interactive \
+prompts and root are off, so a login needs a public key listed in ~/.ssh/authorized_keys. It \
+listens on TCP port 22."""
+description_from = "kubaos"
+keeps = """\
+This machine's host keys stay in /etc/ssh, so other machines still know it, and your \
+~/.ssh/authorized_keys stays as it is."""
+
+[[action]]
+name = "Turn passwords and root logins off for SSH"
+kind = "file"
+to = "/etc/ssh/sshd_config.d/00-kubaos-key-only.conf"
+from = "00-kubaos-key-only.conf"
+mode = "644"
+
+[[action]]
+name = "Install the OpenSSH server"
+kind = "apt"
+packages = ["openssh-server"]
+
+[[action]]
+name = "Listen for SSH on port 22, now and at boot"
+kind = "unit"
+unit = "ssh.socket"
+scope = "system"
+enable = true
+start = true
+
+[[action]]
+name = "Make sure a key can log in, as passwords can't"
+kind = "run"
+do = ["./ask-for-a-key"]
+check = ["./has-a-key"]
+undo = ["true"]
+window = "Nobody can log in over SSH until ~/.ssh/authorized_keys lists a key, as passwords are off: copy in the public key of the machine you'll log in from"

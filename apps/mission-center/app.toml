@@ -1,0 +1,22 @@
+# Mission Center from nixpkgs, through the User flake: 1.1.0, where upstream is at 1.2.0. Ubuntu doesn't package it
+# and its developers build Flatpak and AppImage alone. nixpkgs builds it for amd64 and arm64, with
+# its own magpie, the helper that reads the machine's statistics.
+# https://search.nixos.org/packages?show=mission-center
+name = "Mission Center"
+category = "system"
+tags = ["monitor", "task manager", "processes", "cpu", "memory", "gpu"]
+summary = "Task Manager, minus the Windows. CPU, memory, disks, network, GPU, and which app is hogging them."
+# From its AppStream metainfo, CC0-1.0 (mission-center-devs/mission-center).
+description = """\
+Monitor your CPU, Memory, Disk, Network and GPU usage, accompanied by a per app and process \
+breakdown of these statistics"""
+description_from = "https://gitlab.com/mission-center-devs/mission-center/-/blob/main/data/io.missioncenter.MissionCenter.metainfo.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "io.missioncenter.MissionCenter"
+keeps = "Your settings stay in dconf, under io.missioncenter.MissionCenter: install Mission Center again and they're there."
+
+[[action]]
+name = "Install Mission Center"
+kind = "nix"
+packages = ["mission-center"]
