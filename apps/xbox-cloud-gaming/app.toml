@@ -1,0 +1,33 @@
+# Xbox Cloud Gaming in a window of its own: Microsoft makes no Xbox app for Linux, only its
+# website, which plays in Chrome.
+# https://www.xbox.com/play
+name = "Xbox Cloud Gaming"
+category = "games"
+tags = ["games", "cloud gaming", "streaming", "xbox", "game pass", "xcloud", "web app"]
+summary = "Game Pass, streamed into a window. Bring a controller; Microsoft brings the input lag."
+# Microsoft's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Xbox Cloud Gaming is Microsoft's game streaming service: games of Xbox Game Pass, and some you \
+own, run on Microsoft's servers and stream to this window, played with a controller or, for \
+some, the keyboard and mouse. Its website, here in a window of its own, signs in with your \
+Microsoft account."""
+description_from = "kubaos"
+# Colloid's generic games icon: Colloid draws no Xbox mark, and Microsoft's isn't licensed for
+# copying.
+icon = "applications-games"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/xbox-cloud-gaming: install Xbox Cloud Gaming \
+again and you're still signed in. Your saves live on Microsoft's servers anyway."""
+
+[[ready]]
+check = ["./closed", "xbox-cloud-gaming"]
+says = "Xbox Cloud Gaming's window is open: close it, then try again"
+
+[[action]]
+name = "Put Xbox Cloud Gaming in a window of its own"
+kind = "web_app"
+id = "xbox-cloud-gaming"
+title = "Xbox Cloud Gaming"
+url = "https://www.xbox.com/play"
+icon = "applications-games"

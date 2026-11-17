@@ -1,0 +1,27 @@
+# Moonlight from nixpkgs, through the User flake, at upstream's latest release. Its authors build
+# a .deb only for ARM boards (their Cloudsmith repository has no amd64 packages), an AppImage for
+# amd64 alone, and Ubuntu doesn't package it. It decodes the stream on the GPU through the Mesa
+# `home/desktop.nix` gives Nix apps, VA-API or Vulkan, on AMD and Intel; with NVIDIA's own driver,
+# which a Nix build can't reach, it decodes on the CPU, smoothly at 1080p, less so above. The
+# icon is Moonlight's own, on a tile: Colloid has none.
+# https://github.com/moonlight-stream/moonlight-docs/wiki/Installing-Moonlight-Qt
+name = "Moonlight"
+category = "games"
+tags = ["games", "streaming", "remote play", "sunshine", "gamestream", "couch"]
+summary = "Streams games from your gaming PC to this one. The beast stays in the other room."
+# From its AppStream metainfo, CC0-1.0 (moonlight-stream/moonlight-qt), its first sentence.
+description = """\
+Moonlight can stream games and other applications from another PC with Sunshine or GeForce \
+Experience software installed."""
+description_from = "https://github.com/moonlight-stream/moonlight-qt/blob/v6.2.0/app/deploy/linux/com.moonlight_stream.Moonlight.appdata.xml"
+# Moonlight's logo, GPL-3.0-only, on a tile (moonlight.svg's header), put in the theme as
+# "moonlight", the name its desktop entry gives.
+icon = "moonlight.svg"
+keeps = """\
+The hosts you paired and Moonlight's settings stay in ~/.config/Moonlight Game Streaming \
+Project: install Moonlight again and they're still paired."""
+
+[[action]]
+name = "Install Moonlight"
+kind = "nix"
+packages = ["moonlight-qt"]

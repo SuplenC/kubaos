@@ -2293,6 +2293,7 @@ mod ai;
 mod communication;
 mod devtools;
 mod editors;
+mod games;
 mod graphics;
 mod keys;
 mod media;

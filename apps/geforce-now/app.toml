@@ -1,0 +1,34 @@
+# GeForce NOW in a window of its own: NVIDIA's Linux app comes only as a Flatpak, which KubaOS
+# doesn't install, and its website plays in Chrome.
+# https://play.geforcenow.com/
+name = "GeForce NOW"
+category = "games"
+tags = ["games", "cloud gaming", "streaming", "nvidia", "rtx", "web app"]
+summary = "NVIDIA's gaming rig in the cloud, in a window. A graphics card you rent by the hour."
+# NVIDIA's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+GeForce NOW is NVIDIA's cloud gaming service: the games you own on Steam, Epic, Ubisoft and \
+other stores run on NVIDIA's servers and stream to this window, with a free tier and paid ones \
+for longer sessions and faster hardware. Its website, here in a window of its own, signs in with \
+your NVIDIA account."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix): its GeForce NOW mark, drawn for a
+# desktop client; the window's own icon is the same one.
+icon = "io.github.hmlendea.geforcenow-electron"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/geforce-now: install GeForce NOW again and \
+you're still signed in. Your games and saves live with the stores and on NVIDIA's servers \
+anyway."""
+
+[[ready]]
+check = ["./closed", "geforce-now"]
+says = "GeForce NOW's window is open: close it, then try again"
+
+[[action]]
+name = "Put GeForce NOW in a window of its own"
+kind = "web_app"
+id = "geforce-now"
+title = "GeForce NOW"
+url = "https://play.geforcenow.com/"
+icon = "io.github.hmlendea.geforcenow-electron"
