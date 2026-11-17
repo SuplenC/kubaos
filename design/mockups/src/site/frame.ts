@@ -143,7 +143,9 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
   if (role.role === "layout" && style.flexDirection.endsWith("-reverse")) children.reverse();
   let kept = children;
   while (kept.length === 1 && kept[0]!.role === "box" && !marked(kept[0]!) && same(kept[0]!.bounds, bounds)) kept = kept[0]!.children;
-  if (role.role === "box" && !marked(role) && kept.length === 1 && same(kept[0]!.bounds, bounds)) {
+  // A box whose one child is placed out of the flow over it (a select's surface in its room) is
+  // what its layout lays out, so it stays: standing in for that child would leave the layout a gap.
+  if (role.role === "box" && !marked(role) && kept.length === 1 && kept[0]!.over !== true && same(kept[0]!.bounds, bounds)) {
     into.push(kept[0]!);
     return;
   }
