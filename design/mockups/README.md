@@ -10,7 +10,7 @@ In `nix develop`, which provides Node, the tokens' generator and Chromium:
 |---|---|
 | `just mockups` | Serves the site with hot reload at the address Vite prints. A change to `design/tokens.toml` regenerates `src/tokens.css` and the page follows it. |
 | `just mockup-shot PAGE [STATE…]` | Captures a page's states, each drawn alone, as PNGs ("Solo mode", below). |
-| `just mockup-preview [CHECKOUT] [PORT]` | Serves a checkout's site with hot reload on 5175 as a user unit, so it follows an agent's edits and commits live; `just mockup-preview-stop` stops it ("Live preview", below). |
+| `just mockup-preview [CHECKOUT] [PORT]` | Points the review address, 5174, at a checkout's site with hot reload, so it follows an agent's edits and commits live; `just mockup-preview-stop` stops it ("Live preview", below). |
 | `just mockups-build` | Type-checks, holds each registered custom property to one registration (`scripts/property-check.ts`) and builds it static into `dist/`, then draws each page in headless Chromium to write its moves' recipes into `dist/motion/PAGE.json`. |
 | `just mockups-check [PAGE…]` | Draws the pages named, or every page, at every scale, light and dark, and holds its boxes to the geometry rules and each mocked component to its twin on the specimen's pages (`docs/DESIGN.md`, "The mockups"), then holds every motion player to its recipe (`scripts/player-test.ts`). `just design-check` runs it on the pages listed in `checked-pages`, which CI holds a pull request that changes one of the mockups' inputs (`docs/TESTING.md`, "CI") and every push to `main` to; a page joins that list once it passes with no finding and no difference. |
 | `just shots mockups` | Renders the pages' shots, before and after (`docs/agents/design-pr-loop.md`). |
@@ -68,7 +68,7 @@ Chromium is fed every response through Node (`throughNode`, `scripts/browser.ts`
 
 ## Live preview
 
-`just mockup-preview CHECKOUT` serves that checkout's site (this one by default) with hot reload on 5175, as the transient user unit `kubaos-mockups-preview`, replacing a preview already running there, and prints the address once the site answers; its first start builds the tokens' generator in that checkout. An agent's edits and commits in that checkout reach the open page as they land. A second argument picks another port (unit `kubaos-mockups-preview-PORT`); `just mockup-preview-stop [PORT]` stops it.
+There is one address for looking at the mockups, http://localhost:5174/, served by the transient user unit `kubaos-mockups`. `just mockup-preview CHECKOUT` points it at that checkout's site (this one by default) with hot reload, replacing the site served there, and prints the address once the site answers; its first start builds the tokens' generator in that checkout. An agent's edits and commits in that checkout reach the open page as they land. When the draft has landed, the same recipe with the review checkout puts main's site back. A second argument serves on another port beside it (unit `kubaos-mockups-PORT`); `just mockup-preview-stop [PORT]` stops it.
 
 ## How a page is laid out
 
