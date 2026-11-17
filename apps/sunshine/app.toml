@@ -17,9 +17,15 @@
 # Sunshine's default it answers the LAN, whose admin account runs commands as you. A setting owns
 # origin_web_ui_allowed = pc in sunshine.conf, the key = value file Sunshine itself rewrites as you
 # change its settings, leaving its other lines alone, so the page and its API answer this machine
-# alone. One request is the exception, Sunshine's own: until the first sign-in is set, setting it
-# skips the address check, so someone on the network who sets it before you locks you out of the
-# page (sunshine --creds sets yours again), and still can't use it.
+# alone. Sunshine itself gives the page's first sign-in to whoever asks for it, from any address,
+# until one is set, so the install sets one before anything can start Sunshine, which nothing does
+# until you pick its menu entry: Sunshine's own sunshine --creds, with your login name and a random
+# 32-character password, saved readable by you alone in ~/.config/kubaos/sunshine/password, a path
+# the app owns, so its removal takes it. The page has no open first-sign-in window. A sign-in
+# already there is yours: it is adopted and left alone. The removal takes the sign-in it set while
+# it is still that one, keeping your paired clients; one you changed in the page stays. Sunshine
+# takes the password as an argument, its one way, so it shows in the process list for the moment the
+# command runs.
 # https://docs.lizardbyte.dev/projects/sunshine/latest/md_docs_2getting__started.html
 name = "Sunshine"
 category = "games"
@@ -38,8 +44,9 @@ description_from = "https://github.com/LizardByte/Sunshine/blob/v2026.914.233613
 # theme by the name its package's desktop entry gives.
 icon = "dev.lizardbyte.app.Sunshine.svg"
 keeps = """\
-Your Sunshine sign-in, paired clients, apps and settings stay in ~/.config/sunshine: install \
-Sunshine again and your clients are still paired."""
+Your paired clients, apps and settings stay in ~/.config/sunshine: install Sunshine again and \
+your clients are still paired. The sign-in KubaOS set goes, with its password in \
+~/.config/kubaos/sunshine/password; one you set or changed yourself stays."""
 
 # HAZARD: Sunshine runs /usr/bin/sunshine, which a removal takes, and keeps the uinput devices
 # its streams made while it runs.
@@ -61,3 +68,17 @@ kind = "setting"
 file = "~/.config/sunshine/sunshine.conf"
 key = "origin_web_ui_allowed"
 value = "pc"
+
+[[action]]
+name = "Keep your Sunshine password in ~/.config/kubaos/sunshine/password, not on a sticky note"
+kind = "output"
+path = "~/.config/kubaos/sunshine/password"
+
+# Before anything can start Sunshine: no unit is enabled and no autostart entry is written, so
+# only a click on its menu entry in the moment since its package went in could start it first.
+[[action]]
+name = "Set Sunshine's sign-in to you, before some stranger on the Wi-Fi does"
+kind = "run"
+do = ["./sign-in"]
+check = ["./signed-in"]
+undo = ["./sign-out"]

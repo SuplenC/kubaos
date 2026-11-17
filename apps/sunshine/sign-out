@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Takes away the sign-in ./sign-in set, while it is still the one whose password it saved: one the
+# user changed in Sunshine's page stays. Paired clients and the rest of Sunshine's state stay; a
+# state file left with nothing in it goes, as Sunshine starts the same without one.
+set -euo pipefail
+saved="$HOME/.config/kubaos/sunshine/password"
+state="$HOME/.config/sunshine/sunshine_state.json"
+[[ -f $saved && -f $state ]] || exit 0
+password="$(head -n 1 "$saved")"
+salt="$(jq -r '.salt // empty' "$state")"
+stored="$(jq -r '.password // empty' "$state")"
+hash="$(printf '%s%s' "$password" "$salt" | sha256sum | cut -d ' ' -f 1)"
+[[ -n $salt && ${stored,,} == "$hash" ]] || exit 0
+left="$(jq 'del(.username, .password, .salt)' "$state")"
+if [[ $left == "{}" ]]; then
+  rm -f "$state"
+  exit 0
+fi
+tmp="$(mktemp "$state.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+cp -p "$state" "$tmp"
+printf '%s\n' "$left" >"$tmp"
+mv "$tmp" "$state"
