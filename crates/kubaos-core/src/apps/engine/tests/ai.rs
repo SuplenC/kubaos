@@ -281,6 +281,7 @@ fn ollama_installs_in_each_setup_as_a_service_on_this_machine_and_goes_whole() {
         for line in [
             "ExecStart=/opt/ollama/0.40.16/bin/ollama serve",
             "DynamicUser=yes",
+            "ExecStartPre=-+/usr/bin/nvidia-modprobe -u -c=0",
             "StateDirectory=ollama",
             "SupplementaryGroups=render video",
             "Environment=OLLAMA_HOST=127.0.0.1:11434",
