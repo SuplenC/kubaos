@@ -35,7 +35,10 @@ let
   # Files outside the crates that a crate reads when it builds: what it
   # embeds, and the tokens its build script writes its module from.
   embeds = {
-    kubaos-core = [ ../install/firstboot ];
+    kubaos-core = [
+      ../install/firstboot
+      ../design/tokens.toml
+    ];
     kubaos-ui = [ ../design/tokens.toml ];
     kubaos-cursor = [ ../design/tokens.toml ];
     kubaos-kobo = [ ../design/tokens.toml ];

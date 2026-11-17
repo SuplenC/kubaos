@@ -221,6 +221,24 @@ fn the_icon_is_the_folders_or_a_generic_one() {
 }
 
 #[test]
+fn an_app_with_a_symbol_hands_the_menu_its_kubaos_symbol() {
+    let gauge = r#"
+name = "Gauge"
+summary = "Frames a second"
+tags = ["overlay"]
+symbol = "gauge"
+
+[[action]]
+name = "Install Gauge"
+kind = "apt"
+packages = ["gauge"]
+"#;
+    let apps = apps_of(&[("gauge", gauge)], "amd64", &[], None);
+
+    assert_eq!(item(&apps, "app-install:gauge").icon.as_deref(), Some("symbol:speed"));
+}
+
+#[test]
 fn removing_asks_first_and_installing_asks_only_for_root() {
     let apps = apps(&["claude-code=2.1"]);
 

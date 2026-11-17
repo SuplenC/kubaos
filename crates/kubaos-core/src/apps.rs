@@ -30,6 +30,7 @@ pub mod journal;
 pub mod picks;
 pub mod root;
 pub mod status;
+pub mod symbols;
 pub mod version;
 
 pub use self::catalog::Catalog;

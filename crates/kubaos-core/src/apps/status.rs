@@ -110,6 +110,10 @@ pub struct AppStatus {
     pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// The KubaOS Symbol drawn in place of a picture, by the name the shell gives it, for an app
+    /// with no logo.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
     pub picked: bool,
     pub state: AppState,
     /// The installed version of its first apt or `.deb` package, when dpkg was asked.
@@ -228,6 +232,7 @@ impl Status {
                 category: app.category,
                 tags: app.tags.clone(),
                 icon: app.icon_shown(),
+                symbol: app.symbol_shown().map(str::to_owned),
                 picked,
                 state,
                 version: version.filter(|_| state.is_installed()),

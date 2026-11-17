@@ -26,6 +26,7 @@ fn app(id: &str, name: &str, picked: bool, state: AppState, version: Option<&str
         category: Category::Development,
         tags: vec!["code".into()],
         icon: None,
+        symbol: None,
         picked,
         state,
         version: version.map(str::to_owned),

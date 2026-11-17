@@ -1629,6 +1629,7 @@ arrow_back = { tabler = "arrow-left" }
 arrow_downward = { tabler = "arrow-down" }
 arrow_forward = { tabler = "arrow-right" }
 arrow_upward = { tabler = "arrow-up" }
+aspect_ratio = { tabler = "aspect-ratio" }
 badge = { tabler = "id-badge-2" }
 balance = { tabler = "scale" }
 battery_0_bar = { tabler = "battery" }
@@ -1740,6 +1741,8 @@ signal_wifi_4_bar = { tabler = "wifi" }
 smartphone = { tabler = "device-mobile" }
 speaker = { tabler = "device-speaker" }
 speaker_group = { tabler = "devices" }
+speed = { tabler = "gauge" }
+sports_esports = { tabler = "device-gamepad-2" }
 star = { tabler = "star" }
 star_filled = { drawn = "Tabler's star, filled, its outline kept so it is the outline star's size" }
 stop = { tabler = "player-stop" }
