@@ -6,8 +6,8 @@
 // 24 symbol (`heading`'s) beside a `heading` title on one row, the `body` `space.s12` under them,
 // what it lists or asks for (a labelled field) `space.s16` under the body, each across the whole
 // width, and its button bar (`lib/button-bar.ts`) `space.s24` under the last, Cancel's label on
-// the edge and the last button's box as far past the right one as Cancel's is past the left, the
-// bar hanging as far into the padding under it, so its boxes sit alike on three sides. A
+// the edge and the last button's box as far past the right one as Cancel's is past the left, and
+// the dialog's padding under that bar `space.s12`, so its boxes sit alike on three sides. A
 // Danger dialog shows the warning sign in `error` with an edge of `error`, and its action is a
 // Danger button.
 //
@@ -43,7 +43,7 @@ import { type Action, buttonBar, type Tone } from "./button-bar.ts";
 import { raise } from "./elevation.ts";
 import { iconTile } from "./icon-tile.ts";
 import { divider, filling, gap, row, stack } from "./layout.ts";
-import { probe } from "./probe.ts";
+import { probe, variant } from "./probe.ts";
 import { captionedBar, progressBar } from "./progress.ts";
 import { markup, text, wrapped } from "./text.ts";
 import { length } from "./tokens.ts";
@@ -222,7 +222,8 @@ export function dialog(options: DialogOptions): Dialog {
     event.stopPropagation();
   });
 
-  probe(surface, { role: "component", name: "Dialog", variant: options.tone ?? "Normal", fixed: { width: true, height: false } });
+  // A caller line moves every part under it, so a dialog with one is told apart from one without.
+  probe(surface, { role: "component", name: "Dialog", variant: variant(options.tone ?? "Normal", caller && "caller"), fixed: { width: true, height: false } });
   return result;
 }
 

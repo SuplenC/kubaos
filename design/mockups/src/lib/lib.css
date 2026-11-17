@@ -3179,6 +3179,13 @@
   align-self: stretch;
 }
 
+/* Under a button bar whose ends hang (`lib/button-bar.ts`), the dialog's padding at its foot is
+   the distance its end buttons' boxes keep from its sides, `space.s12`, so the buttons sit alike on
+   three sides. A stacked bar, or one with no Cancel, keeps the whole `space.s24`. */
+.k-dialog:has(> .k-dialog-column > .k-button-bar:not([data-stacked]) > [data-hangs] > .k-button[data-kind="Text"]:not([data-icon-only]):first-child) {
+  padding-bottom: var(--space-s12);
+}
+
 /* The room the dialog's least height leaves over, above the buttons and under the middle's own
    `space.s24`. */
 .k-dialog-column > .k-dialog-spare {
@@ -3247,11 +3254,6 @@
   margin-inline-end: calc(-1 * var(--hang-end, var(--hang, 1)) * var(--text-padding));
 }
 
-/* The same bar hangs its foot as far into its surface's padding, so the gap under the buttons'
-   boxes is the gap beside the end ones: one measure on three sides. */
-.k-button-bar:not([data-stacked]):has(> [data-hangs] > .k-button[data-kind="Text"]:not([data-icon-only]):first-child) {
-  margin-block-end: calc(-1 * var(--hang-end, var(--hang, 1)) * var(--text-padding));
-}
 
 /* A Collapsible on a page or in a card (`hangs` on it) hangs its header's `space.s12` the same
    way, so its chevron is on the content's edge, in line with the fields round it, and its

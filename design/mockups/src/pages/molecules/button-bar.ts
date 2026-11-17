@@ -93,7 +93,7 @@ export default page({
       { name: "One", for: "alone, at the end", sample: () => inRoom(ALONE) },
       { name: "Two", for: "Cancel and the action", sample: () => inRoom(ONE) },
       { name: "Three", for: "Cancel and two actions", sample: () => inRoom(TWO) },
-      { name: "Three in a small room", for: "stacked, Enter's on top, each full width", sample: () => inRoom({ ...TWO, actions: [TWO.actions[0]!, { label: shown(ACTION), icon: "restart_alt" }] }, PANEL) },
+      { name: "Three in a small room", for: "stacked, Enter's on top, each full width", sample: () => inRoom({ ...TWO, actions: [TWO.actions[0]!, { label: ACTION.long, icon: "restart_alt" }] }, PANEL) },
     ],
   },
   motion: {

@@ -164,7 +164,8 @@ function unsupported(): HTMLElement {
       { level: "info", text: "$ echo $?" },
       { level: "info", text: "255" },
     ],
-    { height: "var(--size-control_lg)", unwrapped: true },
+    // Its four lines whole: the log is `space.s12` in above and below them.
+    { height: "calc(4 * var(--type-mono-line) + 2 * var(--space-s12))", unwrapped: true },
   ).box;
   return within("var(--size-dialog)", shown);
 }
