@@ -116,8 +116,16 @@ pub enum ActionError {
     InvalidMode { value: String },
     #[error("a setting's file is a .json, .toml or .conf file in the home; {value:?} isn't")]
     InvalidSettingFile { value: String },
-    #[error("{value:?} is not a setting's key: dot-separated names, one bare name in a .conf")]
+    #[error(
+        "{value:?} is not a setting's key: dot-separated names, one bare name in a .conf, letters, digits, `_`, `.` and `-` under an INI file's section"
+    )]
     InvalidKey { value: String },
+    #[error("{value:?} is not an INI file's section: a name in a .conf of letters, digits, `_`, `.` and `-`")]
+    InvalidSection { value: String },
+    #[error(
+        "an INI file's value is text Qt writes as it is: no quotes, `\\`, `,`, `;`, `=`, control characters, leading `@` or spaces around it"
+    )]
+    InvalidIniValue,
     #[error("a setting's value is a string, a number or a boolean")]
     InvalidValue,
     #[error("{path:?} isn't text, so it can't be a template")]
@@ -288,10 +296,12 @@ pub enum Kind {
         to: String,
         target: String,
     },
-    /// A key in an app's JSON, TOML or flat `key = value` `.conf` settings, the file's other keys
-    /// kept.
+    /// A key in an app's JSON, TOML or flat `key = value` `.conf` settings, or under `section` of
+    /// an INI `.conf`, the file's other keys kept.
     Setting {
         file: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        section: Option<String>,
         key: String,
         value: toml::Value,
     },
@@ -612,7 +622,20 @@ impl Action {
             | (Kind::File { to: a, .. }, Kind::File { to: b, .. })
             | (Kind::Symlink { to: a, .. }, Kind::Symlink { to: b, .. })
             | (Kind::Output { path: a }, Kind::Output { path: b }) => a == b,
-            (Kind::Setting { file: a, key: x, .. }, Kind::Setting { file: b, key: y, .. }) => a == b && x == y,
+            (
+                Kind::Setting {
+                    file: file_a,
+                    section: section_a,
+                    key: key_a,
+                    ..
+                },
+                Kind::Setting {
+                    file: file_b,
+                    section: section_b,
+                    key: key_b,
+                    ..
+                },
+            ) => file_a == file_b && section_a == section_b && key_a == key_b,
             (Kind::Unit { unit: a, scope: x, .. }, Kind::Unit { unit: b, scope: y, .. }) => a == b && x == y,
             _ => false,
         }
@@ -677,8 +700,14 @@ impl Action {
                     target,
                 }
             }
-            Kind::Setting { file, key, value } => Kind::Setting {
+            Kind::Setting {
+                file,
+                section,
+                key,
+                value,
+            } => Kind::Setting {
                 file: fill(file, None),
+                section: section.clone(),
                 key: key.clone(),
                 value: value.clone(),
             },
@@ -792,27 +821,19 @@ impl Action {
             }
             Kind::File {
                 to, from, text, mode, ..
-            } => {
-                check_path(to)?;
-                match (from, text) {
-                    (Some(from), None) if is_folder_file(from) => {}
-                    (Some(from), None) => return Err(ActionError::InvalidFrom { value: from.clone() }),
-                    (None, Some(_)) => {}
-                    _ => return Err(ActionError::FileSource),
-                }
-                if let Some(mode) = mode
-                    && parse_mode(mode).is_none()
-                {
-                    return Err(ActionError::InvalidMode { value: mode.clone() });
-                }
-            }
+            } => check_file(to, from.as_deref(), text.is_some(), mode.as_deref())?,
             Kind::Symlink { to, target } => {
                 check_path(to)?;
                 if target.is_empty() {
                     return Err(ActionError::Empty { key: "target" });
                 }
             }
-            Kind::Setting { file, key, value } => check_setting(file, key, value)?,
+            Kind::Setting {
+                file,
+                section,
+                key,
+                value,
+            } => check_setting(file, section.as_deref(), key, value)?,
             Kind::Unit {
                 unit, enable, start, ..
             } => {
@@ -1025,18 +1046,46 @@ fn file_text(
     Ok((text, false))
 }
 
-fn check_setting(file: &str, key: &str, value: &toml::Value) -> Result<(), ActionError> {
+/// Whether a `file` step's path, source and mode are well formed: one source, `from` a file of
+/// the folder or `text`.
+fn check_file(to: &str, from: Option<&str>, text: bool, mode: Option<&str>) -> Result<(), ActionError> {
+    check_path(to)?;
+    match (from, text) {
+        (Some(from), false) if is_folder_file(from) => {}
+        (Some(from), false) => return Err(ActionError::InvalidFrom { value: from.to_owned() }),
+        (None, true) => {}
+        _ => return Err(ActionError::FileSource),
+    }
+    if let Some(mode) = mode
+        && parse_mode(mode).is_none()
+    {
+        return Err(ActionError::InvalidMode { value: mode.to_owned() });
+    }
+    Ok(())
+}
+
+/// Whether a `setting` step's file, section, key and value are well formed.
+fn check_setting(file: &str, section: Option<&str>, key: &str, value: &toml::Value) -> Result<(), ActionError> {
     let home = file.starts_with("~/") && check_path(file).is_ok();
     let extension = Path::new(file).extension().and_then(|e| e.to_str());
     if !home || !matches!(extension, Some("json" | "toml" | "conf")) {
         return Err(ActionError::InvalidSettingFile { value: file.to_owned() });
     }
-    // A `.conf`'s keys are flat, one name with no tables above it: a dot would read as one, and
-    // `=`, `#` or a line break would end the key.
-    let flat = extension == Some("conf");
-    if (flat && (key.is_empty() || key.contains(['.', '=', '#', '\n', '\r']) || key.trim() != key))
-        || (!flat && key.split('.').any(str::is_empty))
+    if let Some(section) = section
+        && (extension != Some("conf") || !settings::is_ini_name(section))
     {
+        return Err(ActionError::InvalidSection {
+            value: section.to_owned(),
+        });
+    }
+    let fits = match (section, extension) {
+        (Some(_), _) => settings::is_ini_name(key),
+        // A flat `.conf`'s keys have no tables above them: a dot would read as one, and `=`, `#`
+        // or a line break would end the key.
+        (None, Some("conf")) => !key.is_empty() && !key.contains(['.', '=', '#', '\n', '\r']) && key.trim() == key,
+        (None, _) => !key.split('.').any(str::is_empty),
+    };
+    if !fits {
         return Err(ActionError::InvalidKey { value: key.to_owned() });
     }
     if !matches!(
@@ -1044,6 +1093,9 @@ fn check_setting(file: &str, key: &str, value: &toml::Value) -> Result<(), Actio
         toml::Value::String(_) | toml::Value::Integer(_) | toml::Value::Float(_) | toml::Value::Boolean(_)
     ) {
         return Err(ActionError::InvalidValue);
+    }
+    if section.is_some() && !settings::is_ini_value(value) {
+        return Err(ActionError::InvalidIniValue);
     }
     Ok(())
 }

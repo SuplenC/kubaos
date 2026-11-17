@@ -428,6 +428,57 @@ fn a_conf_setting_takes_one_bare_key_and_other_files_dotted_ones() {
 }
 
 #[test]
+fn a_section_makes_a_conf_setting_an_ini_ones_whose_key_may_have_dots() {
+    let setting = |file: &str, section: &str, key: &str| {
+        action(&format!(
+            "name = \"Set\"\nkind = \"setting\"\nfile = \"{file}\"\nsection = \"{section}\"\nkey = \"{key}\"\n\
+             value = false\n"
+        ))
+    };
+
+    assert!(setting("~/.config/zoomus.conf", "General", "xwayland").is_ok());
+    assert!(setting("~/.config/zoomus.conf", "chat.recent", "conf.webserver").is_ok());
+    for section in ["", "a]b", "[General", " General", "chat recent", "a/b"] {
+        assert!(
+            matches!(
+                setting("~/.config/zoomus.conf", section, "xwayland"),
+                Err(ActionError::InvalidSection { .. })
+            ),
+            "{section:?}"
+        );
+    }
+    assert!(matches!(
+        setting("~/.config/tool/config.toml", "General", "xwayland"),
+        Err(ActionError::InvalidSection { .. })
+    ));
+    for key in ["", "a=b", "; note", "[x", " padded", "a/b", "%2B"] {
+        assert!(
+            matches!(
+                setting("~/.config/zoomus.conf", "General", key),
+                Err(ActionError::InvalidKey { .. })
+            ),
+            "{key:?}"
+        );
+    }
+}
+
+#[test]
+fn an_ini_settings_value_is_text_qt_writes_as_it_is() {
+    let setting = |value: &str| {
+        action(&format!(
+            "name = \"Set\"\nkind = \"setting\"\nfile = \"~/.config/zoomus.conf\"\nsection = \"General\"\n\
+             key = \"k\"\nvalue = {value}\n"
+        ))
+    };
+
+    assert!(setting("false").is_ok());
+    assert!(setting("\"wayland\"").is_ok());
+    for value in [r#""a,b""#, r#""a=b""#, r#""@x""#, r#"" padded""#, r#""tab\t""#] {
+        assert!(matches!(setting(value), Err(ActionError::InvalidIniValue)), "{value}");
+    }
+}
+
+#[test]
 fn an_architecture_is_roots_and_one_dpkg_installs_beside_the_machines() {
     let i386 = action("name = \"X\"\nkind = \"architecture\"\narchitecture = \"i386\"\n").unwrap();
     let bogus = action("name = \"X\"\nkind = \"architecture\"\narchitecture = \"x86\"\n");
