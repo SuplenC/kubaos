@@ -1,8 +1,10 @@
 // The Dialog and Scrim page: `docs/design/components/dialog.md`. A question over a dimmed screen,
 // raised to the ladder's step 3; a Danger one for a step that destroys something, and a prompt for
-// what only you can type. Never shorter than 5:2 of its width, nor taller than its room less 48
-// above and below, past which its middle scrolls. The keyboard goes into it, goes round it, and
-// goes back as it closes.
+// what only you can type; its kind (Info, Warning, Error) told by its symbol alone. Another
+// program's dialog names its caller over the title, takes markup or its own lines, can make Cancel
+// the default and can answer itself on a timed bar. Never shorter than 5:2 of its width, nor taller
+// than its room less 48 above and below, past which its middle scrolls. The keyboard goes into it,
+// goes round it, and goes back as it closes.
 
 import { button } from "../../lib/button.ts";
 import type { Words } from "../../lib/content.ts";
@@ -50,6 +52,26 @@ const LONG: DialogOptions = {
   lists: FILES,
   dismiss: "Cancel",
   actions: [{ label: "Delete 40 files", kind: "Danger", icon: "warning" }],
+};
+
+/** Another program's news: OK alone. */
+const NEWS: DialogOptions = { title: "Backup", body: "Backup finished: 12,480 files, 38.2 GB, in 4 min 12 s.", actions: [{ label: "OK" }] };
+const WARNING: DialogOptions = { kind: "Warning", title: "Lutris", body: "Wine 9.0 is not installed. The game may not start.", actions: [{ label: "OK" }] };
+const ERROR: DialogOptions = {
+  kind: "Error",
+  title: "Steam - Fatal Error",
+  body: "Steam requires the 32-bit graphics driver, which is missing or broken.",
+  caller: { name: "Steam" },
+  actions: [{ label: "OK" }],
+};
+
+/** Another program's question, its caller named over the title. */
+const CALLED: DialogOptions = {
+  title: "Restart",
+  body: "Updates are installed. Restart now?",
+  caller: { name: "update.sh" },
+  dismiss: "Cancel",
+  actions: [{ label: "Restart" }],
 };
 
 const DANGER: DialogOptions = {
@@ -206,6 +228,19 @@ export default page({
     { name: "A prompt", for: "what only you can type", sample: () => still(prompt()) },
     { name: "A prompt, answered wrong", for: "the field Invalid; the dialog and keyboard stay", sample: () => still(prompt(true)) },
     { name: "Waiting", for: "the action disabled until it can be taken", sample: () => still(prompt(false, true)) },
+    { name: "Info", for: "news or a question: `info` in `primary`", sample: () => still(NEWS) },
+    { name: "Warning", for: "the warning sign in `warning`; tone stays Normal", sample: () => still(WARNING) },
+    { name: "Error", for: "`error` in its role; not Danger, OK stays Filled", sample: () => still(ERROR) },
+    { name: "A caller", for: "another program's app, named over the title", sample: () => still(CALLED) },
+    { name: "The title names the caller", for: "the caller line left out", sample: () => still({ ...CALLED, title: "update.sh:" }) },
+    { name: "Cancel the default", for: "the keyboard lands on Cancel; Enter backs out", sample: () => still({ ...CALLED, defaultCancel: true }) },
+    { name: "Answers itself", for: "a timed bar and its caption under the body", sample: () => still({ ...CALLED, timeout: { left: 18, of: 30 } }) },
+    {
+      name: "Markup",
+      for: "`<b>`, `<i>`, `<a>` and the entities",
+      sample: () => still({ ...NEWS, markup: true, body: 'Installed <b>14 updates</b>, <i>one needs a restart</i>. Notes at <a href="https://kubaos.dev/notes">kubaos.dev/notes</a> &amp; in the log.' }),
+    },
+    { name: "Its own lines", for: "`noWrap`: the caller's lines, in `mono`", sample: () => still({ ...NEWS, noWrap: true, body: "nvme0n1   2.0 TB   41% used\nsda       4.0 TB   87% used" }) },
   ],
   sizes: doesntApply("one width, `size.dialog`; as tall as it holds, within `aspect.dialog` and its room."),
   states: {
@@ -258,13 +293,14 @@ export default page({
       { keys: ["Esc"], does: "does what Cancel does" },
     ],
     order: "What it asks, Cancel, then the actions, round; a disabled action is skipped, nothing behind is a stop.",
-    lands: "Opening: what it asks, else Cancel on Danger, else the last action. Closing: back on what opened it.",
+    lands: "Opening: what it asks, else Cancel on Danger or when Cancel is the default, else the last action. Closing: back on what opened it.",
   },
   measures: {
     samples: nonEmpty([
       { name: "A prompt", for: "width, padding, title, and the gaps down to the buttons", sample: () => still(prompt()) },
       { name: "A question", for: "Cancel at the start, two actions at the end", sample: () => still(QUESTION) },
       { name: "Short", for: "its least height", sample: () => still(SHORT) },
+      { name: "A caller, answering itself", for: "the caller line, the timed bar and its caption", sample: () => still({ ...CALLED, timeout: { left: 18, of: 30 } }) },
       { name: "Long", for: "its most height, the rules at the middle's edges", sample: () => capped(LONG, 0.5) },
     ]),
     measures: [
@@ -273,6 +309,9 @@ export default page({
       { part: "Clear of its room", token: "space-s48" },
       { part: "Inset, above the buttons", token: "space-s24" },
       { part: "Buttons' hang at sides and foot", token: "space-s12" },
+      { part: "Caller line to the title", token: "space-s12" },
+      { part: "Caller's tile", token: "size-control_sm" },
+      { part: "Body to the timed bar", token: "space-s16" },
       { part: "Gaps by the title", token: "space-s12" },
       { part: "Above what it asks", token: "space-s16" },
       { part: "Between buttons", token: "space-s8" },

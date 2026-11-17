@@ -417,8 +417,8 @@
   transition: translate var(--motion-long) var(--easing-emphasized_decel);
 }
 
-/* Its button bar starts after the bar's own controls, not at the pill's edge, and the pill's
-   `space.s8` has no room for Done to hang: Done's box stays on the edge. */
+/* The pill's `space.s8` is less than twice a button's reach, so Done, at its end, doesn't hang
+   (ButtonBar's rule): its box stays on the edge. */
 .gl-bar .k-button-bar {
   --hang-end: 0;
 }

@@ -370,6 +370,45 @@ export function refit(root: ParentNode): void {
   for (const element of root.querySelectorAll<HTMLElement>("[data-clamped='lines']")) fittings.get(element)?.();
 }
 
+/** Pango's markup entities, as their characters. */
+function unescapeMarkup(words: string): string {
+  return words.replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&quot;", '"').replaceAll("&apos;", "'").replaceAll("&amp;", "&");
+}
+
+/** `words` in Pango's markup as the characters they show, the tags left out. */
+export function markupText(words: string): string {
+  return unescapeMarkup(words.replaceAll(/<[^>]+>/g, ""));
+}
+
+/**
+ * `words` in Pango's markup, wrapped as `wrapped` is: the subset other programs send (zenity's
+ * `--text`), `<b>` in `body_strong`'s weight and the text's own colour, `<i>` slanted, `<a href>` in
+ * `cold`, underlined, and the entities. Any other tag shows as written. The box is measured by the
+ * characters it shows.
+ */
+export function markup(words: string, style: TypeStyle, color = "on_surface"): HTMLElement {
+  const element = wrapped(markupText(words), style, color);
+  const parts: Node[] = [];
+  const open: HTMLElement[] = [];
+  const add = (node: Node) => (open.length > 0 ? open.at(-1)!.append(node) : parts.push(node));
+  let at = 0;
+  for (const match of words.matchAll(/<(\/?)(b|i|a)(?:\s+href="([^"]*)")?>/g)) {
+    if (match.index > at) add(document.createTextNode(unescapeMarkup(words.slice(at, match.index))));
+    at = match.index + match[0].length;
+    if (match[1]) open.pop();
+    else {
+      const run = document.createElement(match[2] === "a" ? "a" : "span");
+      run.className = `k-markup-${match[2]}`;
+      if (match[3]) (run as HTMLAnchorElement).href = match[3];
+      add(run);
+      open.push(run);
+    }
+  }
+  if (at < words.length) add(document.createTextNode(unescapeMarkup(words.slice(at))));
+  element.replaceChildren(...parts);
+  return element;
+}
+
 /** A run of a text's characters, from `start` up to `end`, drawn in another colour. */
 export interface Run {
   readonly start: number;

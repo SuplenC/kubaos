@@ -11,6 +11,18 @@
 // Danger dialog shows the warning sign in `error` with an edge of `error`, and its action is a
 // Danger button.
 //
+// Its kind is what it tells, by its symbol in that kind's fixed role: Info (a question, or news)
+// `info` in `primary`, Warning the warning sign in `warning`, Error `error` in `error`. An Error
+// dialog is not a Danger one: nothing is destroyed by answering it, so its rim and its buttons are
+// a Normal dialog's. Where another program asks (zenity), a caller line over the title names it:
+// the app's small IconTile and its name in `label`, `space.s12` above the title row, left out when
+// the title says the name already (the name, in any case, with nothing after it but punctuation).
+//
+// The body is the program's words: plain, or in Pango's markup (`<b>`, `<i>`, `<a href>` and its
+// entities, `lib/text.ts`'s `markup`), or kept to the caller's own lines in `mono` (`noWrap`), a
+// line longer than the dialog still breaking. A dialog that answers itself after a while shows the
+// time left as a timed bar with its caption, `space.s16` under the body, emptying to its end.
+//
 // It is never shorter than `aspect.dialog` of its width: a dialog that asks little gains the room
 // above its buttons, which stay at its foot, and its words stay at the top. It is never taller
 // than its room less `space.s48` above and below, so the dimmed screen shows round it; past that
@@ -20,7 +32,8 @@
 //
 // The scrim dims everything behind it and takes every press, which does nothing; the dialog sits
 // in its middle on whole device pixels. Opening, the keyboard goes into the dialog, onto what it
-// asks for, else Cancel on a Danger dialog, else the last action; Tab and Shift+Tab go round it
+// asks for, else Cancel on a Danger dialog or one that makes Cancel the default, else the last
+// action; Tab and Shift+Tab go round it
 // and never leave, scrolling what they land on into view; the arrows and the page keys scroll a
 // middle too tall to show whole; Esc is its dismiss button; closing gives the keyboard back to
 // what opened it.
@@ -28,18 +41,49 @@
 import { iconInLine } from "./button.ts";
 import { type Action, buttonBar, type Tone } from "./button-bar.ts";
 import { raise } from "./elevation.ts";
+import { iconTile } from "./icon-tile.ts";
 import { divider, filling, gap, row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
-import { text, wrapped } from "./text.ts";
+import { captionedBar, progressBar } from "./progress.ts";
+import { markup, text, wrapped } from "./text.ts";
 import { length } from "./tokens.ts";
 
 export type { Action, Tone } from "./button-bar.ts";
 
+/** What a dialog tells, by its symbol: news or a question, a warning, or an error. */
+export type DialogKind = "Info" | "Warning" | "Error";
+
+/** Each kind's symbol and the fixed role it is drawn in. */
+const KIND_SYMBOLS: Record<DialogKind, { readonly icon: string; readonly role: string }> = {
+  Info: { icon: "info", role: "primary" },
+  Warning: { icon: "warning", role: "warning" },
+  Error: { icon: "error", role: "error" },
+};
+
+/** The app another program's dialog asks for: its name, and its icon where it has one. */
+export interface Caller {
+  readonly name: string;
+  readonly picture?: string;
+}
+
 export interface DialogOptions {
   readonly tone?: Tone;
+  /** Info unless named: Warning and Error change the symbol and its role, not the tone. */
+  readonly kind?: DialogKind;
+  /** A symbol of its own in place of Info's, in `primary`. */
   readonly icon?: string;
   readonly title: string;
   readonly body: string;
+  /** The body is Pango's markup: `<b>`, `<i>`, `<a href>` and its entities. */
+  readonly markup?: boolean;
+  /** The body keeps its own lines, in `mono`. */
+  readonly noWrap?: boolean;
+  /** The app that asks, named over the title unless the title names it. */
+  readonly caller?: Caller;
+  /** The keyboard lands on the dismiss button, so Enter backs out. */
+  readonly defaultCancel?: boolean;
+  /** It answers itself: the seconds left of how many, a timed bar and its caption. */
+  readonly timeout?: { readonly left: number; readonly of: number };
   /** What it is about, a line each under the body: the files it deletes. */
   readonly lists?: readonly string[];
   /** What it asks for, between the body and the buttons: a labelled field. */
@@ -79,9 +123,14 @@ export function dialog(options: DialogOptions): Dialog {
   surface.setAttribute("role", danger ? "alertdialog" : "dialog");
   surface.setAttribute("aria-modal", "true");
   surface.toggleAttribute("data-danger", danger);
-  const tint = danger ? "error" : "primary";
-  const symbol = iconInLine(danger ? "warning" : (options.icon ?? "info"), "heading", `var(--color-${tint})`);
-  const body = wrapped(options.body, "body", "on_surface_variant");
+  const kind = KIND_SYMBOLS[options.kind ?? "Info"];
+  const symbol = danger
+    ? iconInLine("warning", "heading", "var(--color-error)")
+    : options.icon && (options.kind ?? "Info") === "Info"
+      ? iconInLine(options.icon, "heading", "var(--color-primary)")
+      : iconInLine(kind.icon, "heading", `var(--color-${kind.role})`);
+  const body = options.markup ? markup(options.body, "body", "on_surface_variant") : wrapped(options.body, "body", "on_surface_variant");
+  body.toggleAttribute("data-no-wrap", options.noWrap ?? false);
   const middle: Element[] = [body];
   if (options.lists) {
     const listed = stack(0, "start", ...options.lists.map((each) => text(each, "body")));
@@ -89,6 +138,12 @@ export function dialog(options: DialogOptions): Dialog {
   }
   if (options.asks) {
     middle.push(gap("s16"), options.asks);
+  }
+  if (options.timeout) {
+    const { left, of } = options.timeout;
+    const timed = captionedBar(progressBar({ fraction: left / of, timed: true }), { words: `Closes in ${left} s`, icon: "timer" });
+    timed.classList.add("k-dialog-timeout");
+    middle.push(gap("s16"), timed);
   }
   const scroller = stack(0, "start", ...middle);
   scroller.classList.add("k-dialog-scroll");
@@ -108,7 +163,8 @@ export function dialog(options: DialogOptions): Dialog {
     : undefined;
   const dismiss = bar?.dismiss ?? null;
   const actions = bar?.actions ?? [];
-  const column = stack(0, "start", head, gap("s12"), room);
+  const caller = options.caller && !namesCaller(options.title, options.caller.name) ? callerLine(options.caller) : undefined;
+  const column = stack(0, "start", ...(caller ? [caller, gap("s12")] : []), head, gap("s12"), room);
   column.classList.add("k-dialog-column");
   if (bar) {
     // What the dialog's least height leaves over goes here, above its buttons.
@@ -122,11 +178,12 @@ export function dialog(options: DialogOptions): Dialog {
 
   const result: Dialog = { element: surface, land, onAnswer: () => undefined };
 
-  /** Where the keyboard lands: what it asks for, else Cancel on a Danger dialog, else the last action. */
+  /** Where the keyboard lands: what it asks for, else Cancel on a Danger dialog or one that makes
+   *  Cancel the default, else the last action. */
   function landing(): HTMLElement | undefined {
     const asked = options.asks ? stops(options.asks)[0] : undefined;
     const last = [...actions].reverse().find((each) => !each.disabled);
-    return asked ?? (danger ? (dismiss ?? last) : (last ?? dismiss ?? undefined));
+    return asked ?? (danger || options.defaultCancel ? (dismiss ?? last) : (last ?? dismiss ?? undefined));
   }
 
   function land(): void {
@@ -167,6 +224,24 @@ export function dialog(options: DialogOptions): Dialog {
 
   probe(surface, { role: "component", name: "Dialog", variant: options.tone ?? "Normal", fixed: { width: true, height: false } });
   return result;
+}
+
+/** The caller line: the app's small tile and its name, in `label`. */
+function callerLine(caller: Caller): HTMLElement {
+  const tile = iconTile({ name: caller.name, size: "Sm", ...(caller.picture ? { picture: caller.picture } : {}) });
+  const line = row("s8", "centre", tile, text(caller.name, "label", "on_surface_variant"));
+  line.classList.add("k-dialog-caller");
+  return line;
+}
+
+/**
+ * Whether `title` says no more than `name`: the same name, trimmed and in any case, or the name with
+ * nothing after it but punctuation. Then the title carries the name and the caller line goes.
+ */
+export function namesCaller(title: string, name: string): boolean {
+  const app = name.trim().toLowerCase();
+  const said = title.trim().toLowerCase();
+  return said.startsWith(app) && /^[\s\p{P}]*$/u.test(said.slice(app.length));
 }
 
 /**

@@ -218,9 +218,9 @@ export function iconTile(options: TileOptions): HTMLElement {
   tile.className = "k-icon-tile";
   tile.style.setProperty("--side", `var(--${side})`);
   tile.style.setProperty("--icon", `var(--${size})`);
-  const tint = options.danger ? "error" : "surface_container_highest";
   const ink = options.danger ? "on_error" : options.accent ? "primary" : "on_surface_variant";
-  tile.style.setProperty("--tint", `var(--color-${tint})`);
+  // The tint is the stylesheet's, which knows the surface the tile is on; a critical one's is `error`.
+  if (options.danger) tile.style.setProperty("--tint", "var(--color-error)");
   if (options.count !== undefined) {
     const words = options.count > 99 ? "99+" : String(options.count);
     const shown = text(words, "body_strong", ink);

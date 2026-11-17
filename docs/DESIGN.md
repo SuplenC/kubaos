@@ -614,7 +614,7 @@ A new surface implements the whole map, not the keys it happens to need. Today n
 - **Focus never moves layout.** The tube and its glow take no space; a focused control is the same box as a resting one. The geometry check compares them.
 - **One place at a time.** The app owns where focus is and passes it to components as a flag; a list shows its focused row by its own selection, and the tube lights the list's well.
 - **The disk passphrase prompt** is the one exception: Plymouth draws it from pictures (`branding/boot.py`), with a plain ring `stroke.thin` wide 4 outside its field.
-- **Focus starts on the first thing to do**: the field to type in, or the `Filled` button. Opening a dialog moves focus into it, onto its last action unless it names another (a `Danger` dialog starts on Cancel, a prompt in its field); Tab goes round its field and buttons and never leaves it; closing it puts focus back where it was, and Esc closes it as its dismiss button does. The app owns focus, so it does this: Kōbō's power menu names Cancel, so Enter twice in a row never takes the machine down.
+- **Focus starts on the first thing to do**: the field to type in, or the `Filled` button. Opening a dialog moves focus into it, onto its last action unless it names another (a `Danger` dialog, or one that makes Cancel the default, starts on Cancel, a prompt in its field); Tab goes round its field and buttons and never leaves it; closing it puts focus back where it was, and Esc closes it as its dismiss button does. The app owns focus, so it does this: Kōbō's power menu names Cancel, so Enter twice in a row never takes the machine down.
 - Focus moves over `short` with `standard`: one control fades back to rest as the next lights up.
 
 ### Scaling

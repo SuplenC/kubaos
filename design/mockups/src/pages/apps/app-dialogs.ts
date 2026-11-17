@@ -1,37 +1,31 @@
 // Apps' dialogs (`zenity`): the program KubaOS installs as `zenity`, so that Chrome, Steam, Wine and
-// scripts asking a question get the library's Dialog instead of GNOME's. A draft: it shows the
-// modes callers use (`--question`, `--info`, `--warning`, `--error`, `--entry`), their options and
-// the text they send, floated and centred over the desktop as Hyprland places the window.
+// scripts asking a question get the library's Dialog instead of GNOME's. It answers the modes
+// callers use (`--question`, `--info`, `--warning`, `--error`, `--entry`) with their options and the
+// text they send, in a window Hyprland floats and centres over the dimmed desktop, as polkit's.
 //
-// What the library's Dialog lacks is drawn here as draft parts, each marked: the kind's symbol in
-// its fixed role, the body's Pango markup, `--no-wrap`, and the line naming the app that asks.
+// The page maps zenity's command line onto Dialog's options and draws nothing of its own: the kind's
+// symbol, the caller line, the markup body, `--no-wrap`, `--default-cancel` and `--timeout` are all
+// Dialog's (`lib/dialog.ts`).
 
-import "./app-dialogs.css";
 import { backdrop } from "../../lib/backdrop.ts";
-import { iconInLine } from "../../lib/button.ts";
 import type { Words } from "../../lib/content.ts";
-import { type Action, type DialogOptions, dialog } from "../../lib/dialog.ts";
+import { type Action, type DialogKind, type DialogOptions, dialog } from "../../lib/dialog.ts";
 import { field } from "../../lib/field.ts";
-import { iconTile } from "../../lib/icon-tile.ts";
-import { gap, row } from "../../lib/layout.ts";
+import { within } from "../../lib/layout.ts";
 import { log } from "../../lib/log.ts";
-import { captionedBar, progressBar } from "../../lib/progress.ts";
-import { text } from "../../lib/text.ts";
-import { doesntApply, nonEmpty, page } from "../../site/page.ts";
+import { markupText } from "../../lib/text.ts";
+import { type Easing, doesntApply, type Move, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
 import { ALL } from "../../site/settings.ts";
 import { barScreen } from "../shell/bar-parts.ts";
 import { NARROW_WIDTH, SCREEN_WIDTH, TALL } from "../shell/screen-parts.ts";
 
 /** zenity's modes this program answers. */
-type Kind = "question" | "info" | "warning" | "error" | "entry";
-
-/** How a caller is named on the dialog: the decision this draft puts to Kuba. */
-type Identity = "line" | "symbol" | "none";
+type Mode = "question" | "info" | "warning" | "error" | "entry";
 
 /** One call of `zenity`, as its options give it. */
 interface Call {
-  readonly kind: Kind;
-  /** `--title`; none, and the kind's own word stands in. */
+  readonly kind: Mode;
+  /** `--title`; with none, the app's name stands in, else the mode's word. */
   readonly title?: string;
   /** `--text`, in Pango's markup. */
   readonly text: string;
@@ -52,13 +46,13 @@ interface Call {
   readonly timeout?: { readonly of: number; readonly left: number };
 }
 
-/** The kind's word, its symbol and that symbol's fixed role: no colour of the dialog's own. */
-const KINDS: Record<Kind, { readonly word: string; readonly icon: string; readonly role: string }> = {
-  question: { word: "Question", icon: "info", role: "primary" },
-  info: { word: "Information", icon: "info", role: "primary" },
-  warning: { word: "Warning", icon: "warning", role: "warning" },
-  error: { word: "Error", icon: "error", role: "error" },
-  entry: { word: "Entry", icon: "draw", role: "primary" },
+/** Each mode's word, where no title or app stands in, and the Dialog kind it is drawn as. */
+const MODES: Record<Mode, { readonly word: string; readonly kind: DialogKind }> = {
+  question: { word: "Question", kind: "Info" },
+  info: { word: "Information", kind: "Info" },
+  warning: { word: "Warning", kind: "Warning" },
+  error: { word: "Error", kind: "Error" },
+  entry: { word: "Entry", kind: "Info" },
 };
 
 /** Chrome's own words when another Chrome holds the profile (from memory, not checked). */
@@ -98,118 +92,41 @@ const TIMED: Call = { kind: "question", app: "update.sh", title: "Restart", text
 const WINE: Call = { kind: "warning", app: "Wine", text: "Wine could not find a Gecko package, which is needed for applications embedding HTML. Install it?" };
 const NOBODY: Call = { kind: "warning", text: WINE.text };
 
-/**
- * Draft part: a body in Pango's markup, the subset callers send: `<b>`, `<i>`, `<a href>` and the
- * entities. Anything else shows as written.
- */
-function markup(words: string, into: HTMLElement): void {
-  const parts: Node[] = [];
-  const tags = /<(\/?)(b|i|a)(?:\s+href="([^"]*)")?>/g;
-  const stack: HTMLElement[] = [];
-  let at = 0;
-  const add = (node: Node) => (stack.at(-1) ?? { append: (child: Node) => parts.push(child) }).append(node);
-  for (const match of words.matchAll(tags)) {
-    if (match.index > at) add(document.createTextNode(unescape(words.slice(at, match.index))));
-    at = match.index + match[0].length;
-    if (match[1]) stack.pop();
-    else {
-      const run = document.createElement(match[2] === "a" ? "a" : "span");
-      run.className = `app-dialog-${match[2]}`;
-      if (match[3]) (run as HTMLAnchorElement).href = match[3];
-      add(run);
-      stack.push(run);
-    }
-  }
-  if (at < words.length) add(document.createTextNode(unescape(words.slice(at))));
-  into.replaceChildren(...parts);
-}
-
-function unescape(words: string): string {
-  return words.replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&quot;", '"').replaceAll("&apos;", "'").replaceAll("&amp;", "&");
-}
-
-/** The words `markup` draws, without the tags: what the body is measured by. */
-function plain(words: string): string {
-  return unescape(words.replaceAll(/<[^>]+>/g, ""));
-}
-
-/** Draft part: the line over the title naming the app that asks, its tile and its name. */
-function callerLine(app: string): HTMLElement {
-  const line = row("s8", "centre", iconTile({ name: app, size: "Sm" }), text(app, "label", "on_surface_variant"));
-  line.classList.add("app-dialog-caller");
-  return line;
-}
-
-/**
- * Whether `title` says no more than `app`: the same name, trimmed and in any case, or the name with
- * nothing after it but punctuation. Then the title carries the name and the caller line goes.
- */
-function namesApp(title: string, app: string): boolean {
-  const name = app.trim().toLowerCase();
-  const said = title.trim().toLowerCase();
-  return said.startsWith(name) && /^[\s\p{P}]*$/u.test(said.slice(name.length));
-}
-
-/** The library's Dialog for `call`, its draft parts put in. */
-function drawn(call: Call, identity: Identity, landed: boolean) {
-  const kind = KINDS[call.kind];
-  const title = call.title ?? (identity !== "none" && call.app ? call.app : kind.word);
-  const asking = call.kind === "entry";
-  const actions: Action[] = [
-    ...(call.extra ? [{ label: call.extra, kind: "Tonal" as const }] : []),
-    { label: call.ok ?? "OK" },
-  ];
-  const hasCancel = call.kind === "question" || asking;
-  const asks = asking
-    ? field({ ...(call.hidden ? { secret: true, icon: "key" } : {}), ...(call.value ? { value: call.value } : {}) })
-    : call.timeout
-      ? captionedBar(progressBar({ fraction: call.timeout.left / call.timeout.of, timed: true }), { words: `Answers by itself in ${call.timeout.left} s`, icon: "timer" })
-      : undefined;
+/** `call` as Dialog's options: zenity's command line, mapped. */
+function drawn(call: Call, landed: boolean) {
+  const mode = MODES[call.kind];
+  const entry = call.kind === "entry";
+  const actions: Action[] = [...(call.extra ? [{ label: call.extra, kind: "Tonal" as const }] : []), { label: call.ok ?? "OK" }];
+  const marked = markupText(call.text) !== call.text;
   const options: DialogOptions = {
-    title,
-    body: plain(call.text),
-    ...(asks ? { asks } : {}),
-    ...(hasCancel ? { dismiss: call.cancel ?? "Cancel" } : {}),
+    kind: mode.kind,
+    title: call.title ?? call.app ?? mode.word,
+    body: call.text,
+    ...(marked ? { markup: true } : {}),
+    ...(call.noWrap ? { noWrap: true } : {}),
+    ...(call.app ? { caller: { name: call.app } } : {}),
+    ...(call.hidden ? { icon: "lock" } : call.icon ? { icon: call.icon } : entry ? { icon: "draw" } : {}),
+    ...(entry ? { asks: field({ ...(call.hidden ? { secret: true, icon: "key" } : {}), ...(call.value ? { value: call.value } : {}) }) } : {}),
+    ...(call.timeout ? { timeout: call.timeout } : {}),
+    ...(call.kind === "question" || entry ? { dismiss: call.cancel ?? "Cancel" } : {}),
+    ...(call.defaultCancel ? { defaultCancel: true } : {}),
     actions,
-    landed: landed && !call.defaultCancel,
+    landed,
   };
-  const shown = dialog(options);
-  const surface = shown.element;
-  surface.classList.add("app-dialog");
-  // Draft part: the kind's symbol in its fixed role, or the caller's own, or the app's tile.
-  const head = surface.querySelector<HTMLElement>(".k-dialog-column > .k-row")!;
-  const symbol = head.firstElementChild!;
-  if (identity === "symbol" && call.app) symbol.replaceWith(iconTile({ name: call.app, size: "Sm" }));
-  else if (call.hidden) symbol.replaceWith(iconInLine("lock", "heading", "var(--color-primary)"));
-  else if (call.icon) symbol.replaceWith(iconInLine(call.icon, "heading", "var(--color-primary)"));
-  else symbol.replaceWith(iconInLine(kind.icon, "heading", `var(--color-${kind.role})`));
-  if (identity === "line" && call.app && !namesApp(title, call.app)) head.before(callerLine(call.app), gap("s12"));
-  const body = surface.querySelector<HTMLElement>(".k-dialog-scroll > .k-text")!;
-  if (call.text !== plain(call.text)) markup(call.text, body);
-  body.toggleAttribute("data-no-wrap", call.noWrap ?? false);
-  if (call.defaultCancel) {
-    const cancel = surface.querySelector<HTMLElement>(".k-button-bar button")!;
-    if (landed) cancel.dataset.pinned = "lit";
-    surface.dataset.defaultCancel = "";
-  }
-  return shown;
+  return dialog(options);
 }
 
 interface Placed {
-  readonly identity?: Identity;
   readonly landed?: boolean;
-  readonly dimmed?: boolean;
   readonly width?: number;
 }
 
-/** `call`'s dialog floated in the middle of the desktop, as Hyprland centres the window. */
+/** `call`'s dialog floated in the middle of the dimmed desktop, as Hyprland centres the window. */
 function onDesktop(call: Call, placed: Placed = {}): HTMLElement {
   const width = placed.width ?? SCREEN_WIDTH;
   const under = barScreen(width, TALL).element;
-  const shown = drawn(call, placed.identity ?? "line", placed.landed ?? true).element;
-  const screen = backdrop({ width: `calc(${width} * var(--px))`, height: TALL, scrim: "dim", content: shown, under });
-  screen.toggleAttribute("data-undimmed", placed.dimmed === false);
-  return screen;
+  const shown = drawn(call, placed.landed ?? true).element;
+  return backdrop({ width: `calc(${width} * var(--px))`, height: TALL, scrim: "dim", content: shown, under });
 }
 
 /** The callers the live stage asks in turn. */
@@ -223,7 +140,7 @@ function live(): HTMLElement {
   const ask = () => {
     const call = TURNS[turn % TURNS.length]!;
     const under = barScreen(SCREEN_WIDTH, TALL).element;
-    const shown = drawn(call, "line", false);
+    const shown = drawn(call, false);
     shown.onAnswer = () => {
       turn += 1;
       const desk = barScreen(SCREEN_WIDTH, TALL).element;
@@ -232,10 +149,7 @@ function live(): HTMLElement {
     };
     holder.replaceChildren(backdrop({ width: `calc(${SCREEN_WIDTH} * var(--px))`, height: TALL, scrim: "dim", content: shown.element, under }));
     if (ALL) return;
-    requestAnimationFrame(() => {
-      if (call.defaultCancel) shown.element.querySelector<HTMLElement>(".k-button-bar button")?.focus({ focusVisible: true } as FocusOptions);
-      else shown.land();
-    });
+    requestAnimationFrame(() => shown.land());
   };
   ask();
   return holder;
@@ -252,9 +166,49 @@ function unsupported(): HTMLElement {
     ],
     { height: "var(--size-control_lg)", unwrapped: true },
   ).box;
-  shown.classList.add("app-dialog-log");
-  return shown;
+  return within("var(--size-dialog)", shown);
 }
+
+const DIM = "the dim";
+const FADE = "the dialog's fade";
+const RISE = "the dialog's rise";
+
+/** The window arriving as polkit's dialog does: the dim and the dialog fade in, the dialog rising. */
+function arriving(reduced: boolean): NonEmpty<Track<Easing>> {
+  const duration = reduced ? "short" : "long";
+  const tracks: Track<Easing>[] = [
+    { part: DIM, on: "a question", target: ".k-backdrop-layers", property: "opacity", from: 0, to: 1, duration, curve: "emphasized_decel" },
+    { part: FADE, on: "a question", target: ".k-dialog", property: "opacity", from: 0, to: 1, duration, curve: "emphasized_decel" },
+  ];
+  if (!reduced) tracks.push({ part: RISE, on: "a question", target: ".k-dialog", property: "--dialog-rise", from: 1, to: 0, duration, curve: "emphasized_decel" });
+  return nonEmpty(tracks);
+}
+
+function leaving(reduced: boolean): NonEmpty<Track<Easing>> {
+  const duration = reduced ? "short" : "medium";
+  return [
+    { part: DIM, on: "a question", target: ".k-backdrop-layers", property: "opacity", from: 1, to: 0, duration, curve: "emphasized_accel" },
+    { part: FADE, on: "a question", target: ".k-dialog", property: "opacity", from: 1, to: 0, duration, curve: "emphasized_accel" },
+  ];
+}
+
+const ARRIVES: Move = {
+  name: "Asking",
+  what: "An app calls zenity: the desktop dims and the dialog rises in, the keyboard on its default.",
+  tracks: arriving(false),
+  reduced: arriving(true),
+  back: "cuts",
+  sample: () => onDesktop(STEAM_QUESTION_CALLER),
+};
+
+const LEAVES: Move = {
+  name: "Answered",
+  what: "Answered, closed or timed out: the dialog and the dim fade off; zenity exits after.",
+  tracks: leaving(false),
+  reduced: leaving(true),
+  back: "cuts",
+  sample: () => onDesktop(STEAM_QUESTION_CALLER),
+};
 
 const LONG_TITLE: Words = { short: "Steam", long: "Steam - Unable to connect to the Steam network, check your connection" };
 const LONG_TEXT: Words = { short: "Done.", long: STEAM_ERROR.text };
@@ -279,6 +233,8 @@ const NO_WRAP: Call = {
   noWrap: true,
 };
 const LONG_LABELS: Call = { ...CHROME, extra: "Open a new profile instead" };
+/** Steam's question under a title that adds to its name, so the caller line shows. */
+const STEAM_QUESTION_CALLER: Call = { ...STEAM_QUESTION, title: "Steam - Windows games" };
 
 export default page({
   level: "apps",
@@ -299,7 +255,6 @@ export default page({
     { name: "Entry", for: "`--entry`: the field, Enter answers OK", sample: () => onDesktop(ENTRY) },
     { name: "Hidden entry", for: "`--hide-text`: a password's field", sample: () => onDesktop(PASSWORD) },
     { name: "Timeout", for: "`--timeout`: the timed bar empties; exit 5", sample: () => onDesktop(TIMED) },
-    { name: "Not dimmed", for: "decision: the desktop left undimmed", sample: () => onDesktop(STEAM_QUESTION, { dimmed: false }) },
     { name: "Unsupported mode", for: "no window; stderr says why, exit 255", sample: unsupported },
   ],
   sizes: [
@@ -339,12 +294,11 @@ export default page({
       { name: "The message", words: LONG_TEXT, sample: (words) => onDesktop({ ...STEAM_ERROR, text: words }) },
     ],
     missingPicture: [
-      { name: "A title, the app known", for: "caller line over the title", sample: () => onDesktop(STEAM_QUESTION) },
+      { name: "A title, the app known", for: "caller line over the title", sample: () => onDesktop(STEAM_QUESTION_CALLER) },
       { name: "No title, the app known", for: "the app's name stands in", sample: () => onDesktop(WINE) },
       { name: "No title, no app", for: "the kind's word stands in", sample: () => onDesktop(NOBODY) },
       { name: "The caller's icon", for: "`--icon-name`: its symbol in the kind's place", sample: () => onDesktop({ ...INFO, icon: "deployed_code" }) },
-      { name: "Option B: the app's tile", for: "decision: the tile in the symbol's place", sample: () => onDesktop(STEAM_QUESTION, { identity: "symbol" }) },
-      { name: "Option C: the title alone", for: "decision: as zenity does, no app named", sample: () => onDesktop(STEAM_QUESTION, { identity: "none" }) },
+      { name: "The title names the app", for: "the caller line goes; the title says it", sample: () => onDesktop(STEAM_QUESTION) },
     ],
     counts: [
       { name: "One word", for: "a message of one word", sample: () => onDesktop({ ...INFO, text: "Done." }) },
@@ -356,8 +310,8 @@ export default page({
     ],
   },
   motion: {
-    arrives: doesntApply("as Polkit's: the dim and the dialog fade in, the dialog rising `space.s16`."),
-    leaves: doesntApply("as Polkit's: both fade off; zenity exits once they are gone."),
+    arrives: [ARRIVES],
+    leaves: [LEAVES],
     between: doesntApply("it doesn't change while open, but for the timed bar."),
   },
   keyboard: {
@@ -371,7 +325,7 @@ export default page({
   },
   measures: {
     samples: nonEmpty([
-      { name: "Question", for: "the caller line, the title, the buttons", sample: () => onDesktop(STEAM_QUESTION) },
+      { name: "Question", for: "the caller line, the title, the buttons", sample: () => onDesktop(STEAM_QUESTION_CALLER) },
       { name: "Timeout", for: "the timed bar in the asking slot", sample: () => onDesktop(TIMED) },
     ]),
     measures: [
