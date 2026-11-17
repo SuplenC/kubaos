@@ -78,14 +78,39 @@ Singleton {
         return (id - 1) % slots + 1;
     }
 
-    // A monitor's block. Until Hyprland has written the file, the block of the
-    // workspace it shows.
-    function blockOfMonitor(monitor: HyprlandMonitor): int {
-        const block = blocks[monitor?.name ?? ""];
+    // The block of the screen named `name`, whose Hyprland monitor is `monitor`, looked up by name
+    // so a screen Hyprland doesn't list yet still finds its own. Until Hyprland has written the
+    // file, the block of the workspace the monitor shows; once it has, -1 for a screen the file
+    // doesn't list yet, which holds no block.
+    function blockOfScreen(name: string, monitor: HyprlandMonitor): int {
+        const block = blocks[name];
         if (block !== undefined)
             return block;
+        if (screenLines.length > 0)
+            return -1;
         const active = monitor?.activeWorkspace?.id ?? 1;
         return active > 0 ? blockOf(active) : 0;
+    }
+
+    // The ids of the workspaces that hold windows, sorted, each between commas. Worked out once
+    // here and kept as a string, which signals only when its text changes, so a window event
+    // reaches the bar's cells only when the set changes: each cell scanning the windows itself
+    // took about 1.2 ms of script per window event across three screens, the set about 30 µs.
+    // Each window's own workspace counts, not a workspace's list of windows: a workspace
+    // renumbered away from keeps its list, and the object is reused when Hyprland creates that id
+    // again.
+    readonly property string occupiedIds: {
+        const ids = [];
+        for (const toplevel of Hyprland.toplevels.values) {
+            const id = toplevel.workspace?.id;
+            if (id !== undefined && !ids.includes(id))
+                ids.push(id);
+        }
+        return `,${ids.sort((a, b) => a - b).join(",")},`;
+    }
+
+    function occupied(id: int): bool {
+        return root.occupiedIds.includes(`,${id},`);
     }
 
     // Works for empty (not yet created) workspaces too, unlike HyprlandWorkspace.activate().
@@ -156,6 +181,36 @@ Singleton {
         onTriggered: Hyprland.refreshToplevels()
     }
 
+    // Hyprland's workspaces, screens and windows read again once its workspace and screen events
+    // have held still for a moment, as one burst. Quickshell (v0.3.2) puts a workspace switch on
+    // the focused screen whichever screen it happened on, and moves the workspace there with it:
+    // the reconcile in `config/hypr/workspaces.lua` switching a screen that just arrived would leave the
+    // workspace on the focused screen's bar. A list asked for before an event and read after it
+    // can drop a screen just added or leave windows on a renumbered workspace's old object, and a
+    // read asked for while one is in flight is dropped. The read after the burst puts all of it
+    // right, and an ordinary switch costs one burst of three reads, a window event none.
+    //
+    // Each move and switch the reconcile makes starts the wait again, so the read follows its last
+    // one whatever the interval. `medium` outlasts the reconcile's own wait for the screens to
+    // settle (250 ms, `SETTLE_MS` there), so a screen arriving and its reconcile are read once.
+    //
+    // HAZARD: the workspaces before the screens. The workspace list makes again a screen that
+    // Quickshell dropped, from the one each workspace names, and only then can the screen list,
+    // which makes none, fill in what it shows. Hyprland answers in the order asked.
+    Timer {
+        id: settledRead
+
+        interval: K.Tokens.duration.medium
+        onTriggered: {
+            Hyprland.refreshWorkspaces();
+            Hyprland.refreshMonitors();
+            Hyprland.refreshToplevels();
+        }
+    }
+
+    // The events after which `settledRead` reads again.
+    readonly property var unsettling: ["workspacev2", "focusedmon", "moveworkspacev2", "monitoraddedv2", "monitorremoved", "changeworkspaceid"]
+
     // The ids Hyprland has renumbered away from (`changeworkspaceid`, which
     // `dot.workspaces.move_to_monitor` causes), as a set. Quickshell (v0.3.2)
     // keys a workspace by the id it first saw and never changes it, so the
@@ -200,6 +255,8 @@ Singleton {
         target: Hyprland
 
         function onRawEvent(event: HyprlandEvent): void {
+            if (root.unsettling.includes(event.name))
+                settledRead.restart();
             if (event.name === "screencast") {
                 root.shares = Dnd.screencast(root.shares, event.data);
             } else if (event.name === "fullscreen") {

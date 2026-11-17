@@ -17,7 +17,7 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 | `SUPER + h/j/k/l` | Focus the window left, below, above, right. `+ SHIFT` moves the window, `+ CTRL` resizes it |
 | `SUPER + ←/↓/↑/→` | Focus the screen that way |
 | `SUPER + 1..0` | Workspace 1-10 of the focused screen, or of the waiting group it shows. `+ SHIFT` takes the window along, `+ SHIFT + ALT` sends it without following |
-| `SUPER + SHIFT + CTRL + →` | Move the window to a new workspace after the group's last |
+| `SUPER + SHIFT + CTRL + →` | Move the window to a new workspace after the group's last; a window already alone there stays |
 | `SUPER + Tab` / `SUPER + CTRL + →/←` | Next / previous workspace on the focused screen, through the groups waiting there, as the three-finger swipe does (`+ SHIFT` on Tab for previous); `SUPER + CTRL + Tab` its former one |
 | `SUPER + CTRL + ALT + →/←` | First workspace of the next / previous group on the focused screen |
 | `SUPER + ALT + Tab` | Next window in a group (`+ SHIFT` for previous) |

@@ -2,7 +2,8 @@ pragma Singleton
 import QtQuick
 
 // Stand-in for Hyprland's IPC: one monitor with workspaces 1, 2, 3, 11 and 12, the second one
-// focused, and three windows. Workspaces are plain objects: a QML type can't declare `id`.
+// focused, and three windows. Workspaces are plain objects: a QML type can't declare `id`. A logic
+// test replaces `spaces` to create and destroy workspaces.
 QtObject {
     id: hyprland
 
@@ -10,7 +11,7 @@ QtObject {
         activeWorkspace: hyprland.spaces[1]
     }
     readonly property HyprlandMonitor focusedMonitor: hyprland.monitor
-    readonly property var spaces: [1, 2, 3, 11, 12].map(n => ({
+    property var spaces: [1, 2, 3, 11, 12].map(n => ({
                 id: n,
                 name: `${n}`,
                 monitor: hyprland.monitor,

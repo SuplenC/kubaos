@@ -37,12 +37,14 @@ Item {
 
     required property ShellScreen screen
     readonly property HyprlandMonitor monitor: Hypr.monitorOf(screen)
-    readonly property int block: Hypr.blockOfMonitor(monitor)
+    readonly property int block: Hypr.blockOfScreen(screen?.name ?? "", monitor)
     readonly property int activeId: monitor?.activeWorkspace?.id ?? 0
-    // Lists of ids, one per group, in block order.
+    // Lists of ids, one per group, in block order. A screen with no block yet has no group of
+    // its own, only the workspaces Hyprland shows on it.
     readonly property var groups: {
         const sets = {};
-        sets[block] = [block * Hypr.slots + 1];
+        if (block >= 0)
+            sets[block] = [block * Hypr.slots + 1];
         for (const workspace of Hyprland.workspaces.values) {
             const id = workspace.id;
             const owner = Hypr.blockOf(id);
@@ -90,7 +92,7 @@ Item {
                 });
             group.forEach((id, at) => {
                 const last = at === group.length - 1;
-                const ghost = last && at > 0 && id !== activeId && !occupied(id);
+                const ghost = last && at > 0 && id !== activeId && !Hypr.occupied(id);
                 result.push({
                     key: `${id}`,
                     kind: ghost ? "ghost" : "cell",
@@ -128,18 +130,19 @@ Item {
     readonly property real groupNameMax: K.Tokens.space.s48 * 2
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property var kanji: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
-    readonly property var roles: ["kind", "borrowed", "head", "tail", "label"]
+    readonly property var roles: ["kind", "workspace", "borrowed", "head", "tail", "label"]
+    // `entries` as text, one line per entry, which `shapes` follows. `entries` is a new array on
+    // every evaluation and signals on every workspace switch, and a pass of `sync()` that changes
+    // nothing takes about 220 µs; the text, about 20 µs to make, signals only when what the pill
+    // draws changes. A name holds no tab or line break: the state file it comes from splits on
+    // them.
+    readonly property string entriesText: entries.map(entry => `${entry.key}\t${entry.kind}\t${entry.workspace}\t${entry.borrowed}\t${entry.head}\t${entry.tail}\t${entry.label}`).join("\n")
+    // The keys of the entries that have shrunk out, removed together at the end of the turn.
+    property var gone: []
     property bool ready: false
-    // With KUBAOS_WORKSPACES_PROBE=1, the groups and the shown workspace are logged on every
-    // change, for `workspaces_hotplug_bar` in `test/lib/e2e.sh`.
+    // With KUBAOS_WORKSPACES_PROBE=1, the groups, the shown workspace and where the indicator is
+    // placed are logged on every change, for `workspaces_hotplug_bar` in `test/lib/e2e.sh`.
     readonly property bool probed: Quickshell.env("KUBAOS_WORKSPACES_PROBE") === "1"
-
-    // By each window's own workspace, not a workspace's list of windows: a
-    // workspace renumbered away from keeps its list, and the object is reused
-    // when Hyprland creates that id again.
-    function occupied(id: int): bool {
-        return Hyprland.toplevels.values.some(t => t.workspace?.id === id);
-    }
 
     // What the cell of workspace `id` draws: its number, or its kanji.
     function numberText(id: int): string {
@@ -173,8 +176,9 @@ Item {
         return kind === "gap" ? groupGap : cell;
     }
 
-    function indexOfKey(key: string): int {
-        for (let i = 0; i < shapes.count; i++) {
+    // The row of `key` in `shapes`, from row `from` on.
+    function indexOfKey(key: string, from: int): int {
+        for (let i = from; i < shapes.count; i++) {
             if (shapes.get(i).key === key)
                 return i;
         }
@@ -182,7 +186,8 @@ Item {
     }
 
     // Brings `shapes` in line with `entries`. An entry that is no longer
-    // wanted stays in place, marked leaving, until it has shrunk out.
+    // wanted stays in place, marked leaving, until it has shrunk out. The rows
+    // before `at` are placed or leaving, so an entry's row is at `at` or after.
     function sync(): void {
         const wanted = new Set(entries.map(entry => entry.key));
         for (let i = 0; i < shapes.count; i++) {
@@ -193,7 +198,7 @@ Item {
         for (const entry of entries) {
             while (at < shapes.count && !wanted.has(shapes.get(at).key))
                 at++;
-            const found = indexOfKey(entry.key);
+            const found = indexOfKey(entry.key, at);
             if (found < 0) {
                 shapes.insert(at, Object.assign({
                     leaving: false
@@ -201,11 +206,12 @@ Item {
             } else {
                 if (found !== at)
                     shapes.move(found, at, 1);
+                const row = shapes.get(at);
                 for (const role of roles) {
-                    if (shapes.get(at)[role] !== entry[role])
+                    if (row[role] !== entry[role])
                         shapes.setProperty(at, role, entry[role]);
                 }
-                if (shapes.get(at).leaving)
+                if (row.leaving)
                     shapes.setProperty(at, "leaving", false);
             }
             at++;
@@ -213,17 +219,34 @@ Item {
     }
 
     function probe(): void {
-        console.info(`workspaces probe: ${screen.name} ${JSON.stringify(groups)}`);
+        console.info(`workspaces probe: ${screen?.name} ${JSON.stringify(groups)}`);
     }
 
     function probeActive(): void {
-        console.info(`active workspace probe: ${screen.name} ${activeId}`);
+        console.info(`active workspace probe: ${screen?.name} ${activeId}`);
     }
 
+    // Where the indicator is placed for the active workspace, "none" while it isn't drawn.
+    function probeIndicator(target: real): void {
+        console.info(`indicator probe: ${screen?.name} ${activeId} ${target < 0 ? "none" : target}`);
+    }
+
+    // Removes the entry of `key` once the turn ends, with every other entry that shrank out in
+    // it. Its Timer would be deleted inside its own handler, and `Qt.callLater` calls a function
+    // asked for several times in a turn only once, with the last arguments.
     function drop(key: string): void {
-        const index = indexOfKey(key);
-        if (index >= 0 && shapes.get(index).leaving)
-            shapes.remove(index);
+        gone.push(key);
+        Qt.callLater(root.dropGone);
+    }
+
+    function dropGone(): void {
+        const keys = gone;
+        gone = [];
+        for (const key of keys) {
+            const index = indexOfKey(key, 0);
+            if (index >= 0 && shapes.get(index).leaving)
+                shapes.remove(index);
+        }
     }
 
     // The style a cell's number is drawn in: semibold in a workspace with
@@ -237,7 +260,7 @@ Item {
 
     implicitWidth: cells.implicitWidth + K.Tokens.space.s4 * 2
     implicitHeight: K.Tokens.size.control_sm
-    onEntriesChanged: sync()
+    onEntriesTextChanged: sync()
     onGroupsChanged: {
         if (probed)
             probe();
@@ -301,6 +324,7 @@ Item {
     }
 
     WheelHandler {
+        enabled: root.ids.length > 0
         onWheel: event => {
             const steps = event.angleDelta.y > 0 ? 1 : -1;
             Hypr.step(root.monitor, -steps, root.ids[(root.slot - steps + root.ids.length) % root.ids.length]);
@@ -411,6 +435,8 @@ Item {
             // cells before it glides with them.
             function place(): void {
                 const target = root.activeX;
+                if (root.probed)
+                    root.probeIndicator(target);
                 if (target < 0)
                     return;
                 const stretch = root.activeId !== lastId;
@@ -483,12 +509,12 @@ Item {
                     readonly property bool isGhost: kind === "ghost"
                     readonly property bool isLabel: kind === "label"
                     readonly property bool isActive: !isGap && !isLabel && workspace === root.activeId
-                    readonly property bool occupied: root.occupied(workspace)
+                    readonly property bool occupied: Hypr.occupied(workspace)
 
                     Timer {
                         running: shape.leaving
                         interval: root.glide
-                        onTriggered: Qt.callLater(root.drop, shape.key)
+                        onTriggered: root.drop(shape.key)
                     }
 
                     Rectangle {
