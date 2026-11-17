@@ -29,7 +29,8 @@ Item {
     // layout's star.
     property bool accent: false
 
-    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
+    // The window's device pixel ratio; a test sets another to place the tile at that scale.
+    property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property int side: root.size === "Sm" ? Tokens.size.control_sm : root.size === "Lg" ? Tokens.size.control_lg : Tokens.size.control_md
     readonly property int glyph: root.size === "Sm" ? Tokens.type.body.icon : root.size === "Lg" ? Tokens.type.headline.icon : Tokens.icon.two_line
     readonly property color ink: root.danger ? Tokens.color.on_error : root.accent ? Tokens.color.primary : Tokens.color.on_surface_variant
@@ -40,7 +41,7 @@ Item {
     readonly property var probe: ({
             role: "component",
             name: "IconTile",
-            variant: root.letter === "" ? root.size : `${root.size} initials`,
+            variant: root.icon === "" ? `${root.size} initials` : root.size,
             fixed: {
                 width: true,
                 height: true
@@ -50,20 +51,59 @@ Item {
     implicitWidth: root.side
     implicitHeight: root.side
 
-    // The first character of `name`, upper-cased, with the marks that combine with it: one letter,
-    // in whatever script the name is in. Qt's JavaScript has no grapheme segmenter, and its
-    // strings index UTF-16 units, so a character past the BMP is read by its code point.
+    // The first character of `name`, upper-cased, as a reader sees one: a base and the marks
+    // that combine with it (हि, ที่), a flag's two regional indicators, an emoji with its skin tone
+    // or its joined sequence (👨‍👩‍👧). iced segments by Unicode's extended graphemes; Qt's
+    // JavaScript has no segmenter and no `\p{M}`, so the rule is written out for the scripts an
+    // app's name is in, and its strings index UTF-16 units, so it walks code points.
     function initial(name: string): string {
-        const trimmed = name.trim();
-        if (trimmed === "")
-            return "";
-        let first = String.fromCodePoint(trimmed.codePointAt(0));
-        for (const mark of trimmed.slice(first.length)) {
-            if (!/[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe00-\ufe0f\ufe20-\ufe2f\u200d]/.test(mark))
-                break;
-            first += mark;
+        const points = name.trim();
+        const cps = [];
+        for (let at = 0; at < points.length;) {
+            const cp = points.codePointAt(at);
+            cps.push(cp);
+            at += cp > 0xffff ? 2 : 1;
         }
-        return first.toUpperCase();
+        if (cps.length === 0)
+            return "";
+        let end = 1;
+        if (root.regional(cps[0]) && cps.length > 1 && root.regional(cps[1]))
+            end = 2;
+        while (end < cps.length) {
+            if (cps[end] === 0x200d && end + 1 < cps.length)
+                end += 2;
+            else if (root.joins(cps[end]))
+                end += 1;
+            else
+                break;
+        }
+        return String.fromCodePoint(...cps.slice(0, end)).toUpperCase();
+    }
+
+    // A flag's half.
+    function regional(cp: int): bool {
+        return cp >= 0x1f1e6 && cp <= 0x1f1ff;
+    }
+
+    // A code point that joins the one before it: a combining mark, a vowel sign or virama of the
+    // Indic scripts, a Thai or Lao mark, a variation selector, a skin tone or an emoji tag.
+    function joins(cp: int): bool {
+        const ranges = [[0x0300, 0x036f], [0x0483, 0x0489], [0x0591, 0x05c7], [0x0610, 0x061a], [0x064b, 0x065f], [0x0670, 0x0670], [0x06d6, 0x06ed], [0x0e31, 0x0e31], [0x0e34, 0x0e3a], [0x0e47, 0x0e4e], [0x0eb1, 0x0eb1], [0x0eb4, 0x0ebc], [0x0ec8, 0x0ece], [0x1160, 0x11ff], [0x1ab0, 0x1aff], [0x1dc0, 0x1dff], [0x20d0, 0x20ff], [0x302a, 0x302f], [0x3099, 0x309a], [0xfe00, 0xfe0f], [0xfe20, 0xfe2f], [0x1f3fb, 0x1f3ff], [0xe0020, 0xe007f], [0xe0100, 0xe01ef]];
+        if (ranges.some(([low, high]) => cp >= low && cp <= high))
+            return true;
+        // Devanagari to Malayalam share one layout: in each block of 128, the signs sit at these
+        // offsets, the avagraha (3D) and OM (50) being letters.
+        if (cp < 0x0900 || cp > 0x0d7f)
+            return false;
+        const offset = cp & 0x7f;
+        return offset <= 0x03 || (offset >= 0x3a && offset <= 0x4f && offset !== 0x3d) || (offset >= 0x51 && offset <= 0x57) || offset === 0x62 || offset === 0x63;
+    }
+
+    // Whether `letter` is a kana or a kanji, which M PLUS 1 draws and Geist doesn't: CJK's
+    // ideographs to Extension B and past, its compatibility ones, and full- and half-width kana.
+    function japanese(letter: string): bool {
+        const cp = letter.codePointAt(0) ?? 0;
+        return (cp >= 0x3040 && cp <= 0x30ff) || (cp >= 0x3400 && cp <= 0x4dbf) || (cp >= 0x4e00 && cp <= 0x9fff) || (cp >= 0xf900 && cp <= 0xfaff) || (cp >= 0xff66 && cp <= 0xff9f) || (cp >= 0x20000 && cp <= 0x3134f);
     }
 
     Rectangle {
@@ -84,19 +124,20 @@ Item {
     // The initial, centred across on its advance and down on its ink, on whole device pixels as
     // iced places it: its box is the style's line tall and centred on the tile, and its baseline
     // sits where the middle of its ink lands in the middle of that line. Worked in device pixels,
-    // half of an odd count going after the box.
+    // the odd one of an odd count going before the box. Made only while it shows: a Command menu
+    // row with an app's icon, made on every keystroke, carries none.
     Loader {
-        active: root.letter !== ""
-        visible: !root.pictured
+        active: root.letter !== "" && !root.pictured
 
         sourceComponent: Item {
             objectName: "initial"
 
             // The letter's style in the family that draws it: M PLUS 1 for a kana or a kanji,
-            // which Geist doesn't draw, as iced falls back to it. Qt's own fallback skips a font
-            // that covers part of a language, and the kanji kubaos-ui bundles are a subset.
+            // which Geist doesn't draw, as iced picks it. Qt's own fallback skips a font that
+            // covers part of a language, as the kanji kubaos-ui bundles are, and on a machine with
+            // another CJK font installed would draw it in that one.
             readonly property QtObject font: QtObject {
-                readonly property string family: /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(root.letter) ? Tokens.font.jp : root.letterStyle.family
+                readonly property string family: root.japanese(root.letter) ? Tokens.font.jp : root.letterStyle.family
                 readonly property int weight: root.letterStyle.weight
                 readonly property int size: root.letterStyle.size
                 readonly property int line: root.letterStyle.line

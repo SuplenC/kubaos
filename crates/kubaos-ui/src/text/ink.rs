@@ -14,14 +14,12 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
+use iced::Font;
 use iced::advanced::graphics::text::cosmic_text;
 use iced::advanced::graphics::text::font_system;
 use iced::advanced::graphics::text::to_attributes;
 use iced::advanced::graphics::text::to_shaping;
 use iced::advanced::text::Shaping;
-
-use crate::text::font;
-use crate::tokens::Type;
 
 /// The size the ink is drawn at to be measured, in pixels: a row of it is under a pixel of the
 /// largest style it places, as the mockup's `inkMiddle` (`design/mockups/src/lib/text.ts`) draws
@@ -31,46 +29,40 @@ const WEIGHED_AT: f32 = 64.0;
 /// The alpha from which a pixel counts as ink: half covered, as the mockup reads its canvas.
 const INKED: u8 = 128;
 
-/// Every middle measured, by style and words.
+/// Every middle measured, by font and words.
 static MIDDLES: LazyLock<Middles> = LazyLock::new(Middles::default);
 
 #[derive(Default)]
-struct Middles(Mutex<HashMap<(Type, String), f32>>);
+struct Middles(Mutex<HashMap<(Font, String), f32>>);
 
 impl Middles {
-    fn of(&self, style: Type, words: &str) -> f32 {
-        let key = (style, words.to_owned());
+    fn of(&self, font: Font, words: &str) -> f32 {
+        let key = (font, words.to_owned());
         if let Some(known) = self.0.lock().expect("ink middles mutex poisoned").get(&key) {
             return *known;
         }
-        let measured = measure(style, words);
+        let measured = measure(font, words);
         self.0.lock().expect("ink middles mutex poisoned").insert(key, measured);
         measured
     }
 }
 
-/// The middle of `words`' ink in `style`, top to bottom, in ems above the baseline, below it
+/// The middle of `words`' ink in `font`, top to bottom, in ems above the baseline, below it
 /// counted: where a lone glyph on a square looks centred. A capital's is half its cap height,
 /// whatever its strokes weigh, so B, L and K sit alike; an ideograph's takes in what it draws below
 /// the baseline. Words that draw nothing give 0.
-pub(crate) fn middle(style: Type, words: &str) -> f32 {
-    MIDDLES.of(style, words)
+pub(crate) fn middle(font: Font, words: &str) -> f32 {
+    MIDDLES.of(font, words)
 }
 
 /// The rows `words` ink at [`WEIGHED_AT`], read from the glyphs' rasters, as ems above the
 /// baseline.
-fn measure(style: Type, words: &str) -> f32 {
+fn measure(font: Font, words: &str) -> f32 {
     let mut system = font_system().write().expect("font system lock poisoned");
     let raw = system.raw();
     let mut buffer = cosmic_text::Buffer::new(raw, cosmic_text::Metrics::new(WEIGHED_AT, WEIGHED_AT * 2.0));
     buffer.set_size(raw, None, None);
-    buffer.set_text(
-        raw,
-        words,
-        &to_attributes(font(style)),
-        to_shaping(Shaping::Auto, words),
-        None,
-    );
+    buffer.set_text(raw, words, &to_attributes(font), to_shaping(Shaping::Auto, words), None);
     buffer.shape_until_scroll(raw, false);
     let mut swash = cosmic_text::SwashCache::new();
     let mut inked: Option<(i32, i32)> = None;

@@ -38,6 +38,7 @@ TestCase {
         app.name = "Blender";
         app.icon = "";
         app.source = "";
+        app.dpr = 1;
     }
 
     // Regression: #252.
@@ -64,13 +65,32 @@ TestCase {
         compare(app.probe.variant, "Md initials");
     }
 
+    // The names and initials kubaos-ui's tests check too, a line each: the name, a tab, the
+    // initial.
+    function initials(): var {
+        const request = new XMLHttpRequest();
+        request.open("GET", Qt.resolvedUrl("../../crates/kubaos-ui/src/component/icon_tile/initials.tsv"), false);
+        request.send();
+        return request.responseText.split("\n").filter(line => line !== "" && !line.startsWith("#")).map(line => line.split("\t"));
+    }
+
     function test_an_initial_is_one_character_in_whatever_script_the_name_is_in() {
-        const cases = [["日本語入力", "日"], ["éclair", "É"], ["e\u0301clair", "E\u0301"], ["𝒜lpha", "𝒜"], ["ßeta", "SS"], ["", ""]];
+        const cases = suite.initials();
+
+        verify(cases.length > 10, "the shared table was read");
         for (const [name, initial] of cases) {
             app.name = name;
 
-            compare(app.letter, initial, name);
+            compare(app.letter, initial, JSON.stringify(name));
         }
+    }
+
+    function test_an_empty_name_still_shows_initials_with_no_letter() {
+        app.name = "  ";
+
+        compare(app.letter, "");
+        compare(app.probe.variant, "Md initials");
+        tryVerify(() => findChild(app, "initial") === null, 1000, "no letter is made");
     }
 
     function test_a_symbol_takes_the_initial_s_place() {
@@ -84,17 +104,23 @@ TestCase {
         app.source = suite.photo;
 
         verify(!app.pictured);
+        verify(findChild(app, "initial") !== null, "the initial holds the place while it loads");
         tryVerify(() => app.pictured, 5000, "the icon takes the tile once it has loaded");
-        compare(app.letter, "B", "the initial stays, hidden, for when the icon goes");
+        tryVerify(() => findChild(app, "initial") === null, 1000, "and the initial is gone");
+        compare(app.letter, "B", "to come back when the icon goes");
     }
 
-    function test_an_initial_sits_on_whole_device_pixels_inside_its_tile() {
-        const letter = findChild(app, "initial");
+    function test_an_initial_sits_on_whole_device_pixels_inside_its_tile_at_every_scale() {
+        for (const dpr of [1, 1.25, 1.5, 2]) {
+            app.dpr = dpr;
+            const letter = findChild(app, "initial");
 
-        verify(letter !== null);
-        verify(letter.x > 0 && letter.x + letter.width < app.width, "centred across");
-        compare(letter.height, K.Tokens.type.subheading.line);
-        compare(Math.round(letter.x * app.dpr), letter.x * app.dpr);
-        compare(Math.round(letter.y * app.dpr), letter.y * app.dpr);
+            verify(letter !== null);
+            verify(letter.x > 0 && letter.x + letter.width < app.width, `centred across at ${dpr}`);
+            compare(letter.height, K.Tokens.type.subheading.line);
+            fuzzyCompare(letter.x * dpr, Math.round(letter.x * dpr), 1e-6, `x at ${dpr}`);
+            fuzzyCompare(letter.y * dpr, Math.round(letter.y * dpr), 1e-6, `y at ${dpr}`);
+            fuzzyCompare(letter.width * dpr, Math.round(letter.width * dpr), 1e-6, `width at ${dpr}`);
+        }
     }
 }

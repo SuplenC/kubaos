@@ -359,7 +359,7 @@ Everything a person sees is built from a few levels, each made only from the one
 
 ### What the geometry check compares
 
-Each component reports its shared name, its variant (the words below that apply, in this order, joined by spaces) and the measures it fixes. The corner column is its radius role; the `Hint`, which isn't probed, is row. The `identical` rule holds every instance of one name and variant to the same fixed measures, at every scale, with its icons and label in the same place along them; a label of other words may sit elsewhere across when its middle is within half a device pixel of the other's, as an `IconTile`'s initial is centred whatever the letter. A measure a component doesn't fix follows its content or its parent. `KubaOS.Components` reports the same names, words and measures. `kubaos-specimen`'s tests fail when this table and the code disagree.
+Each component reports its shared name, its variant (the words below that apply, in this order, joined by spaces) and the measures it fixes. The corner column is its radius role; the `Hint`, which isn't probed, is row. The `identical` rule holds every instance of one name and variant to the same fixed measures, at every scale, with its icons and label in the same place along them; the one exception is the `initials` variant, whose letter is centred across whatever its width, so its middle, not its left edge, is held to within half a device pixel. A text with no words places nothing. A measure a component doesn't fix follows its content or its parent. `KubaOS.Components` reports the same names, words and measures. `kubaos-specimen`'s tests fail when this table and the code disagree.
 
 <!-- variants:start -->
 | Name | Variant words | Fixed | Corner |

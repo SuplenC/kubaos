@@ -103,21 +103,44 @@ fn letter(node: &Node) -> Option<&Node> {
     node.children.iter().find_map(letter)
 }
 
+/// The names and initials both libraries' tests check, a line each: the name, a tab, the initial.
+const INITIALS: &str = include_str!("initials.tsv");
+
 #[test]
 fn an_initial_is_the_first_character_of_the_name_upper_cased() {
-    let cases = [
-        ("Blender", "B"),
-        ("  k9s", "K"),
-        ("日本語入力", "日"),
-        ("e\u{301}clair", "E\u{301}"),
-        ("𝒜lpha", "𝒜"),
-        ("ßeta", "SS"),
-        ("", ""),
-    ];
+    let cases: Vec<(&str, &str)> = INITIALS
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .map(|line| line.split_once('\t').expect("a name and its initial"))
+        .collect();
 
+    assert!(cases.len() > 10, "{cases:?}");
     for (name, expected) in cases {
-        assert_eq!(initial(name), expected, "{name}");
+        assert_eq!(initial(name), expected, "{name:?}");
     }
+}
+
+#[test]
+fn an_empty_name_still_shows_initials_with_no_letter() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+
+    let tile = tree(initial_tile("  ", TileSize::Sm).view(&look));
+
+    assert!(
+        matches!(&tile.role, Role::Component { variant, .. } if variant == "Sm initials"),
+        "{:?}",
+        tile.role
+    );
+    assert!(letter(&tile).is_none(), "{tile:?}");
+}
+
+#[test]
+fn a_kana_or_kanji_initial_is_drawn_in_the_japanese_family() {
+    assert!(super::initial::japanese("日"));
+    assert!(super::initial::japanese("ｶ"));
+    assert!(super::initial::japanese("\u{20b9f}"));
+    assert!(!super::initial::japanese("B"));
+    assert!(!super::initial::japanese("हि"));
 }
 
 #[test]

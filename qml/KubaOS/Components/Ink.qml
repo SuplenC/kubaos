@@ -15,6 +15,8 @@ QtObject {
     // style it places.
     // design-allow(size): a size glyphs are measured at, never drawn: iced's and the mockup's.
     readonly property int weighedAt: 64
+    // The most middles kept; past it they are all let go, as `Advances` lets its widths go.
+    readonly property int kept: 4096
 
     // One `FontMetrics` per font, by its family and weight.
     property var fonts: ({})
@@ -37,6 +39,8 @@ QtObject {
             return known;
         const box = ink.metricsFor(font, style).tightBoundingRect(words);
         const measured = box.height > 0 ? -(box.y + box.height / 2) / ink.weighedAt : 0;
+        if (ink.middles.size >= ink.kept)
+            ink.middles.clear();
         ink.middles.set(key, measured);
         return measured;
     }

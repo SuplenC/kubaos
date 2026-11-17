@@ -33,9 +33,11 @@ use kubaos_geometry::Role;
 use unicode_segmentation::UnicodeSegmentation as _;
 
 use crate::scale::Scale;
+use crate::text::family_font;
 use crate::text::font;
 use crate::text::ink;
 use crate::text::line_height;
+use crate::tokens::Family;
 use crate::tokens::Type;
 
 type Paragraph = <Renderer as text::Renderer>::Paragraph;
@@ -75,10 +77,23 @@ struct InitialState {
     middle: f32,
 }
 
-/// `logical` pixels in whole device pixels at `scale`: the tokens' sizes are whole at every
-/// supported scale.
+/// `logical` pixels on the nearest whole device pixel at `scale`, in device pixels.
 fn device(scale: Scale, logical: f32) -> f32 {
     scale.to_device(logical).round()
+}
+
+/// Whether `letter` is a kana or a kanji, which M PLUS 1 draws and Geist doesn't: CJK's
+/// ideographs to Extension B and past, its compatibility ones, and full- and half-width kana.
+pub(super) fn japanese(letter: &str) -> bool {
+    letter.chars().next().is_some_and(|c| {
+        matches!(c,
+            '\u{3040}'..='\u{30ff}'
+            | '\u{3400}'..='\u{4dbf}'
+            | '\u{4e00}'..='\u{9fff}'
+            | '\u{f900}'..='\u{faff}'
+            | '\u{ff66}'..='\u{ff9f}'
+            | '\u{20000}'..='\u{3134f}')
+    })
 }
 
 /// Half of `spare` device pixels, a tie going up, as CSS's `round(nearest)` does in the mockup.
@@ -87,13 +102,23 @@ fn half_up(spare: f32) -> f32 {
 }
 
 impl Initial {
+    /// The font the letter is drawn in: its style's, or M PLUS 1 for a kana or a kanji, named
+    /// rather than left to the fallback, which on a machine with another CJK font draws it there.
+    fn font(&self) -> iced::Font {
+        if japanese(&self.letter) {
+            family_font(Family::Jp, self.style.weight())
+        } else {
+            font(self.style)
+        }
+    }
+
     fn shaped(&self) -> text::Text<&str, iced::Font> {
         text::Text {
             content: &self.letter,
             bounds: Size::INFINITE,
             size: Pixels(f32::from(self.style.size())),
             line_height: line_height(self.style),
-            font: font(self.style),
+            font: self.font(),
             align_x: text::Alignment::Default,
             align_y: alignment::Vertical::Top,
             shaping: text::Shaping::Auto,
@@ -123,7 +148,7 @@ impl<M> Widget<M, Theme, Renderer> for Initial {
         let state = tree.state.downcast_mut::<InitialState>();
         if state.letter != self.letter {
             state.shown.update(self.shaped());
-            state.middle = ink::middle(self.style, &self.letter);
+            state.middle = ink::middle(self.font(), &self.letter);
             state.letter.clone_from(&self.letter);
         }
         let room = limits.max();
@@ -142,6 +167,9 @@ impl<M> Widget<M, Theme, Renderer> for Initial {
         let Some(letter) = layout.children().next() else {
             return;
         };
+        if self.letter.is_empty() {
+            return;
+        }
         let bounds = letter.bounds();
         let natural = tree.state.downcast_ref::<InitialState>().shown.min_bounds();
         let mut role = Role::Text {
@@ -174,8 +202,9 @@ impl<M> Widget<M, Theme, Renderer> for Initial {
         let state = tree.state.downcast_ref::<InitialState>();
         let scale = self.scale;
         let bounds = letter.bounds();
-        let line = device(scale, f32::from(self.style.line()));
-        let size = device(scale, f32::from(self.style.size()));
+        // The size isn't rounded: 14 is 17.5 at 1.25, as the mockup and QML weigh it.
+        let line = scale.to_device(f32::from(self.style.line()));
+        let size = scale.to_device(f32::from(self.style.size()));
         let baseline = device(scale, bounds.y) + (line / 2.0 + state.middle * size + 0.5).floor();
         let paragraph = state.shown.raw();
         let laid = paragraph
