@@ -1741,7 +1741,9 @@ terminal = { tabler = "terminal-2" }
 thermostat = { tabler = "temperature" }
 timer = { tabler = "stopwatch" }
 travel_explore = { tabler = "world-search" }
+tv = { tabler = "device-tv" }
 upgrade = { tabler = "arrow-big-up-lines" }
+usb = { tabler = "usb" }
 visibility = { tabler = "eye" }
 visibility_off = { tabler = "eye-off" }
 volume_down = { tabler = "volume-2" }

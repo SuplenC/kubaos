@@ -3,9 +3,9 @@ import Quickshell
 import KubaOS.Components as K
 import qs.services
 
-// The Audio tab: the outputs under an Output label, then the inputs under an Input label. Enter
-// makes the selected device the default of its kind, which carries the check; the keys skip the
-// labels.
+// The Audio tab: the outputs under an Output label, then the inputs under an Input label, each
+// row's icon and subtitle naming how the device is attached. Enter makes the selected device the
+// default of its kind, which carries the check; the keys skip the labels.
 K.ScrollingList {
     id: root
 
@@ -59,6 +59,16 @@ K.ScrollingList {
 
             readonly property bool output: entry.modelData.isSink === true
             readonly property bool isDefault: entry.modelData === Audio.sink || entry.modelData === Audio.source
+            readonly property string connection: Audio.connectionName(entry.modelData)
+            // The connection, then the default's note; one message each, so a translation can
+            // order them.
+            readonly property string subtitle: {
+                if (!entry.isDefault)
+                    return entry.connection;
+                if (entry.connection === "")
+                    return entry.output ? qsTr("Default output") : qsTr("Default input");
+                return entry.output ? qsTr("%1 · Default output").arg(entry.connection) : qsTr("%1 · Default input").arg(entry.connection);
+            }
             // A label after rows stands 12 clear of them, with the 4 the list puts between rows.
             readonly property int labelRoom: entry.index > 0 ? K.Tokens.space.s12 : 0
 
@@ -69,9 +79,9 @@ K.ScrollingList {
                 id: deviceRow
 
                 K.ListRow {
-                    icon: entry.output ? (entry.isDefault ? "speaker" : "speaker_group") : (entry.isDefault ? "mic" : "mic_external_on")
+                    icon: Audio.connectionIcon(entry.modelData)
                     title: Audio.label(entry.modelData)
-                    subtitle: entry.isDefault ? (entry.output ? "Default output" : "Default input") : ""
+                    subtitle: entry.subtitle
                     checkable: true
                     checked: entry.isDefault
                     selected: entry.ListView.isCurrentItem && entry.ListView.view.highlightShown

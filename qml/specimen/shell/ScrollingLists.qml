@@ -33,16 +33,22 @@ K.Section {
             bottomMargin: well.inset
             currentIndex: well.current
             highlightShown: well.focused
-            model: ["Speakers", "Headphones", "HDMI 1 (LG UltraFine)", "USB audio", "Bluetooth (WH-1000XM4)"]
+            model: [
+                { title: "Speakers", connection: "Built-in", icon: "speaker" },
+                { title: "Headphones", connection: "Built-in", icon: "speaker" },
+                { title: "LG UltraFine", connection: "HDMI", icon: "tv" },
+                { title: "USB audio", connection: "USB", icon: "usb" },
+                { title: "WH-1000XM4", connection: "Bluetooth", icon: "bluetooth" }
+            ]
 
             delegate: K.ListRow {
-                required property string modelData
+                required property var modelData
                 required property int index
 
                 width: ListView.view.width
-                icon: index === 0 ? "speaker" : "speaker_group"
-                title: modelData
-                subtitle: index === 0 ? "Default output" : ""
+                icon: modelData.icon
+                title: modelData.title
+                subtitle: index === 0 ? `${modelData.connection} · Default output` : modelData.connection
                 checkable: true
                 checked: index === 0
                 selected: ListView.isCurrentItem && ListView.view.highlightShown

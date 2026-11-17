@@ -1,8 +1,8 @@
 pragma Singleton
 import QtQuick
 
-// Stand-in for Audio: two outputs, the laptop's speakers at 62%, and two inputs, the laptop's
-// microphone the default at 80%. The devices are objects, as PipeWire's nodes are, so a row's device
+// Stand-in for Audio: two outputs, the laptop's speakers at 62% and a Bluetooth headset, and two
+// inputs, the laptop's microphone the default at 80% and the headset's. The devices are objects, as PipeWire's nodes are, so a row's device
 // is the default one by identity.
 QtObject {
     id: root
@@ -10,6 +10,8 @@ QtObject {
     component Device: QtObject {
         property string description
         property bool isSink
+        property string connectionName: "Built-in"
+        property string connectionIcon: isSink ? "speaker" : "mic"
     }
 
     readonly property Device speakers: Device {
@@ -18,6 +20,8 @@ QtObject {
     }
     readonly property Device headphones: Device {
         description: "WH-1000XM4"
+        connectionName: "Bluetooth"
+        connectionIcon: "bluetooth"
         isSink: true
     }
     readonly property Device microphone: Device {
@@ -26,6 +30,8 @@ QtObject {
     }
     readonly property Device headset: Device {
         description: "WH-1000XM4"
+        connectionName: "Bluetooth"
+        connectionIcon: "bluetooth"
         isSink: false
     }
 
@@ -65,5 +71,13 @@ QtObject {
 
     function label(node: var): string {
         return node.description;
+    }
+
+    function connectionName(node: var): string {
+        return node.connectionName;
+    }
+
+    function connectionIcon(node: var): string {
+        return node.connectionIcon;
     }
 }

@@ -57,6 +57,49 @@ Singleton {
         return node?.description || node?.nickname || node?.name || "Unknown device";
     }
 
+    // How the device is attached: "bluetooth", "usb", "hdmi", "builtin", or "" for a virtual one.
+    // A Bluetooth headset's nodes are loopbacks WirePlumber makes, without the device's
+    // `device.api`, so they are known by their `bluez_` names.
+    function connection(node: PwNode): string {
+        const props = node?.properties ?? {};
+        const api = props["device.api"] ?? "";
+        if (api === "bluez5" || (node?.name ?? "").startsWith("bluez_"))
+            return "bluetooth";
+        if (api === "")
+            return "";
+        if (props["device.bus"] === "usb")
+            return "usb";
+        if ((props["device.profile.name"] ?? "").includes("hdmi"))
+            return "hdmi";
+        return "builtin";
+    }
+
+    function connectionName(node: PwNode): string {
+        switch (connection(node)) {
+        case "bluetooth":
+            return qsTr("Bluetooth");
+        case "usb":
+            return qsTr("USB");
+        case "hdmi":
+            return qsTr("HDMI");
+        case "builtin":
+            return qsTr("Built-in");
+        }
+        return "";
+    }
+
+    function connectionIcon(node: PwNode): string {
+        switch (connection(node)) {
+        case "bluetooth":
+            return "bluetooth";
+        case "usb":
+            return "usb";
+        case "hdmi":
+            return "tv";
+        }
+        return node?.isSink ? "speaker" : "mic";
+    }
+
     // Nodes only report volume and mute while bound.
     PwObjectTracker {
         objects: [...root.sinks, ...root.sources]
