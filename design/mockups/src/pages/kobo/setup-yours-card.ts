@@ -28,7 +28,7 @@ import { bezier, milliseconds } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
 import { body } from "./kobo-parts.ts";
 import { CARDS } from "./setup-cards.ts";
-import { type App, APPS, app, type Category, CATEGORIES, PROFILES, type ProfileId, VSCODE } from "./setup-data.ts";
+import { type App, APPS, app, type Category, CATEGORIES, GAMING_SETUP, PROFILES, type ProfileId, VSCODE } from "./setup-data.ts";
 
 /** The card's steps, by their index. */
 export const STEPS = ["What for", "Your apps", "Go"] as const;
@@ -86,7 +86,7 @@ export function yoursAt(view: string): Yours {
     ...(from === undefined ? {} : { from: Number(from) as StepIndex }),
     ...more,
   });
-  const all: ProfileId[] = ["developer", "designer", "casual"];
+  const all: ProfileId[] = PROFILES.map((each) => each.id);
   const handPicked = () => new Map([["vscode", true], ["discord", true]]);
   const installedUpTo = (state: Yours, count: number) => {
     for (const each of kept(state).slice(0, count)) state.installed.add(each.id);
@@ -95,6 +95,8 @@ export function yoursAt(view: string): Yours {
   switch (name) {
     case "developer":
       return base(["developer"], 0);
+    case "gaming":
+      return base(["gaming"], 0);
     case "all":
       return base(all, 0);
     case "apps":
@@ -107,6 +109,8 @@ export function yoursAt(view: string): Yours {
       return base(["developer"], 2, { hand: handPicked() });
     case "go-none":
       return base([], 2);
+    case "go-gaming":
+      return base(["gaming"], 2);
     case "installing":
       return installedUpTo(base(all, 2, { phase: "installing" }), 7);
     case "done": {
@@ -256,11 +260,13 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
     const cards = PROFILES.map((profile) => {
       const brings = APPS.filter((each) => each.profiles.includes(profile.id));
       // The first apps only it brings, then a count of the rest: what the pick means, at a glance.
-      const own = brings.filter((each) => each.profiles.length < PROFILES.length).slice(0, 4);
-      const foot = [...own.map((each) => ({ glyph: each.icon, label: each.name })), { glyph: "add", label: `and ${brings.length - own.length} more` }];
+      // Gaming's setup leads its foot, so every card's foot holds as many lines.
+      const setup = profile.id === "gaming" ? [{ glyph: GAMING_SETUP.icon, label: GAMING_SETUP.title }] : [];
+      const own = brings.filter((each) => each.profiles.length === 1).slice(0, 4 - setup.length);
+      const foot = [...setup, ...own.map((each) => ({ glyph: each.icon, label: each.name })), { glyph: "add", label: `and ${brings.length - own.length} more` }];
       return choiceCard({ glyph: profile.icon, title: profile.title, subtitle: profile.line, size: "Lg", picks: "many", mark: false, picked: state.picked.has(profile.id), foot });
     });
-    const group = choiceGroup("many", 3, cards);
+    const group = choiceGroup("many", PROFILES.length, cards);
     group.classList.add("setup-yours-profiles");
     const sync = () =>
       queueMicrotask(() => {

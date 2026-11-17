@@ -5,7 +5,7 @@
 // mockup reads as the real thing would.
 
 /** What the person uses the machine for. Any number of them, none included. */
-export type ProfileId = "developer" | "designer" | "casual";
+export type ProfileId = "developer" | "designer" | "casual" | "gaming";
 
 export interface Profile {
   readonly id: ProfileId;
@@ -15,12 +15,28 @@ export interface Profile {
   readonly icon: string;
 }
 
-/** In the order the cards stand. */
+/** In the order the cards stand: the answers most people give first. */
 export const PROFILES: readonly Profile[] = [
+  { id: "casual", title: "Everyday", line: "Music, films, chat, office.", icon: "sofa" },
+  { id: "gaming", title: "Gaming", line: "Steam, Windows games, tuned.", icon: "gamepad" },
   { id: "developer", title: "Developer", line: "Code, terminals, containers.", icon: "code" },
   { id: "designer", title: "Designer", line: "Pictures, vectors, 3D.", icon: "palette" },
-  { id: "casual", title: "Everyday", line: "Music, films, chat, office.", icon: "sofa" },
 ];
+
+/**
+ * What Gaming brings besides its apps: the machine set up for games. No app of the catalogue and no
+ * tick of its own: it comes with the Gaming card and goes with it.
+ */
+export const GAMING_SETUP = {
+  id: "gaming-setup",
+  title: "Gaming setup",
+  line: "Tuned for games",
+  icon: "gamepad",
+  /** The pieces, said as the person knows them. */
+  pieces: ["GameMode", "MangoHud", "Gamescope", "32-bit graphics drivers", "Proton via Steam"],
+  /** What it installs; Proton comes through Steam, so it has no package here. */
+  packages: ["gamemode", "mangohud", "gamescope", "libgl1-mesa-dri:i386", "mesa-vulkan-drivers:i386"],
+} as const;
 
 export type CategoryId = "editors" | "terminals" | "dev" | "browsers" | "design" | "media" | "chat" | "office" | "games" | "passwords";
 
@@ -62,6 +78,8 @@ export const VSCODE = { line: "Phones home to Microsoft. Works anyway.", ticked:
 const D = "developer";
 const G = "designer";
 const C = "casual";
+// G is the designer's, so Gaming plays as P.
+const P = "gaming";
 
 const a = (category: CategoryId, id: string, name: string, line: string, icon: string, profiles: readonly ProfileId[] = []): App => ({ id, name, category, line, icon, profiles });
 
@@ -104,11 +122,11 @@ export const APPS: readonly App[] = [
   a("media", "spotify", "Spotify", "Music and podcasts", "music", [C]),
   a("media", "vlc", "VLC", "Plays any video you throw at it", "movie", [C]),
   a("media", "mpv", "mpv", "A player with no buttons, on purpose", "play_arrow"),
-  a("media", "obs", "OBS Studio", "Record or stream your screen", "video", [G]),
+  a("media", "obs", "OBS Studio", "Record or stream your screen", "video", [G, P]),
   a("media", "kdenlive", "Kdenlive", "Cut and edit video", "scissors"),
   a("media", "audacity", "Audacity", "Record and edit sound", "wave_sine"),
   a("chat", "signal", "Signal", "Private messages, on every device", "message_circle", [C]),
-  a("chat", "discord", "Discord", "Voice and chat with your people", "message", [C]),
+  a("chat", "discord", "Discord", "Voice and chat with your people", "message", [C, P]),
   a("chat", "telegram", "Telegram", "Chats and channels", "message"),
   a("chat", "slack", "Slack", "Work chat. Sorry", "message"),
   a("chat", "element", "Element", "Matrix: chat you can host yourself", "message_circle"),
@@ -117,9 +135,9 @@ export const APPS: readonly App[] = [
   a("office", "obsidian", "Obsidian", "Notes in Markdown files", "notes", [D, G]),
   a("office", "calibre", "Calibre", "Your e-book library", "books"),
   a("office", "zotero", "Zotero", "Papers and citations, sorted", "books"),
-  a("games", "steam", "Steam", "Games, Windows ones too", "gamepad", [C]),
-  a("games", "heroic", "Heroic", "Epic and GOG games", "gamepad"),
-  a("games", "lutris", "Lutris", "Every other game, set up", "gamepad"),
+  a("games", "steam", "Steam", "Games, Windows ones too", "gamepad", [P]),
+  a("games", "heroic", "Heroic", "Epic and GOG games", "gamepad", [P]),
+  a("games", "lutris", "Lutris", "Every other game, set up", "gamepad", [P]),
   a("games", "retroarch", "RetroArch", "Old consoles, one app", "gamepad"),
   a("passwords", "bitwarden", "Bitwarden", "Passwords and SSH keys", "lock", [D, G, C]),
   a("passwords", "keepassxc", "KeePassXC", "Passwords in a file you keep", "key"),

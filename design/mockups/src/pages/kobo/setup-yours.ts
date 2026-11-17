@@ -22,7 +22,7 @@ const CARD = "the card";
 const at = (view: string) => () => setupRoom({ place: { at: "card", card: "yours" }, views: { yours: view } });
 
 /** The Developer card, picked, on What for. */
-const DEVELOPER = ".setup-yours-profiles > .k-choice-card:nth-child(1)";
+const DEVELOPER = ".setup-yours-profiles > .k-choice-card:nth-child(3)";
 
 const strike = (curve: "neon.strike" | "standard", duration: "strike" | "short"): Track[] => [
   { part: "the card's light", on: CARD, target: DEVELOPER, property: "--choice-burn", from: 0, to: 1, duration, curve },
