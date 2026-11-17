@@ -179,6 +179,12 @@ export default page<Shown>({
     missingPicture: [
       { name: "No icon of its own", for: "its Extension's symbol on the tile", sample: () => panel({ query: "", results: results("", ITEMS.slice(4, 9)) }) },
       { name: "No Extension symbol", for: "a bolt", sample: () => panel({ query: "", results: results("", [{ title: "Rebuild the index", subtitle: "Kotodama", extension: "kotodama" }]) }) },
+      { name: "An app with no icon", for: "its initial on its tile, and on the pane's lg tile", sample: () => panel({ query: "", results: results("", [{ title: "Krita", subtitle: "Digital painting", extension: "apps" }]) }) },
+      {
+        name: "A catalog app with no logo",
+        for: "its initial on its tile, and on the pane's lg tile",
+        sample: () => panel({ query: "", results: results("", [{ title: "Install Zed", subtitle: "Code editor", extension: "kubaos", initial: "Zed" }]) }),
+      },
     ],
     counts: [
       { name: "None", for: "the empty state; the pane's Nothing selected", sample: () => panel({ query: "fiq", results: [] }) },
@@ -223,6 +229,7 @@ export default page<Shown>({
       { part: "Footer", token: "size-control_sm" },
       { part: "Corners", token: "radius-surface" },
       { part: "Pane: symbol", token: "icon-s48" },
+      { part: "Pane: an app's initial tile", token: "size-control_lg" },
       { part: "Pane: symbol to title", token: "space-s16" },
       { part: "Pane: words to Actions", token: "space-s24" },
       { part: "Intro card's lines", token: "space-s8" },

@@ -13,6 +13,7 @@ import { type KeyHint, keycap, keyHints, keys } from "./keycap.ts";
 import { emptyState } from "./empty-state.ts";
 import { field } from "./field.ts";
 import { icon } from "./icon.ts";
+import { iconTile } from "./icon-tile.ts";
 import { container, divider, fill, filling, fillingHeight, flow, gap, header, page, row, stack } from "./layout.ts";
 import { type ListRowSpec, scaleOf, scrolled, scrollingList } from "./list.ts";
 import { probe, workedOut } from "./probe.ts";
@@ -96,13 +97,21 @@ export function menuMeasures(screenWidth: number, screenHeight: number, fit = fa
   return { width, height, rows, body, pane, top: onGrid((screenHeight - height) * 0.4) };
 }
 
-/** What the pane shows of a Result: its symbol, words and kind, its Actions, and its keys. */
+/**
+ * The pane's mark: the Result's symbol, or for an app shown by its initial, the lg IconTile with
+ * that initial, its row's tile at the pane's size.
+ */
+function paneMark(row: ListRowSpec): Element {
+  if (row.initial !== undefined && !row.picture) return iconTile({ name: row.initial, size: "Lg" });
+  return icon(row.icon ?? "search", "var(--icon-s48)", "var(--color-primary)");
+}
+
+/** What the pane shows of a Result: its mark, words and kind, its Actions, and its keys. */
 function paneContent(result: Result): HTMLElement {
-  const glyph = result.row.icon ?? "search";
   const top = stack(
     0,
     "start",
-    icon(glyph, "var(--icon-s48)", "var(--color-primary)"),
+    paneMark(result.row),
     gap("s16"),
     clamped(result.row.title, "heading", "on_surface", 3),
     gap("s4"),
