@@ -1,0 +1,41 @@
+/* Apps' dialogs (`app-dialogs.ts`): its draft parts, built from the tokens. */
+
+/* Draft: the desktop left undimmed under the dialog, the decision put beside Polkit's dim. */
+.k-backdrop[data-undimmed] .k-backdrop-scrim {
+  opacity: 0;
+}
+
+/* Draft: Pango's markup in the body. Bold is `body_strong`'s weight in the body's colour; italic
+   is the font's own slant; a link is the cold accent, underlined, as the terminal draws links. */
+.app-dialog .app-dialog-b {
+  font-weight: var(--type-body_strong-weight);
+  color: var(--color-on_surface);
+}
+
+.app-dialog .app-dialog-i {
+  font-style: italic;
+}
+
+.app-dialog .app-dialog-a {
+  color: var(--color-cold);
+  text-decoration: underline;
+}
+
+/* Draft: `--no-wrap` keeps the caller's lines, in mono so a table of them lines up; a line
+   longer than the dialog still breaks. */
+.app-dialog .k-text[data-no-wrap] {
+  white-space: pre-wrap;
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+}
+
+/* The caller line sits on the content edge, above the title. */
+.app-dialog .app-dialog-caller {
+  align-self: start;
+}
+
+/* The terminal a script ran zenity from, a dialog wide. */
+.app-dialog-log {
+  width: var(--size-dialog);
+}
