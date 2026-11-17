@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick
+import Quickshell.Hyprland
 
 // Stand-in for Hypr. The drivers set `focusedScreen` to the screen they shoot.
 QtObject {
@@ -18,6 +19,11 @@ QtObject {
 
     function slotOf(id: int): int {
         return (id - 1) % 10 + 1;
+    }
+
+    // The stand-in's one monitor, whichever the screen.
+    function monitorOf(screen: var): var {
+        return Hyprland.monitor;
     }
 
     function blockOfMonitor(monitor: var): int {

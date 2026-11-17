@@ -7,8 +7,8 @@ RUNTIME_DIR/hypr/SIGNATURE for a Quickshell started with
 HYPRLAND_INSTANCE_SIGNATURE=SIGNATURE and KUBAOS_WORKSPACES_PROBE=1, and writes
 the per-screen workspace state file in STATE_DIR/kubaos/hypr. QS_LOG is
 Quickshell's log, where the bar's probe lines (`workspaces probe: SCREEN
-GROUPS` and `active window probe: SCREEN "TITLE"`) tell it the bar has caught
-up.
+GROUPS`, `active workspace probe: SCREEN ID` and `active window probe: SCREEN
+"TITLE"`) tell it the bar has caught up.
 
 The session's one screen, HEADLESS-1, is the primary: the laptop panel's
 block 0, with workspaces 1 and 2, holding the waiting groups of two desk
@@ -26,8 +26,13 @@ does it:
    group on the primary. The answer is held back until the bar has shown the
    moves, then sent.
 
-It exits 0 once Quickshell has read the answer, and 1, with the reason on
-stderr, when a step doesn't happen in time. The bar's state after it is the
+Then Hyprland drops the primary and lists it again, as it does a laptop panel
+whose lid closes and opens, while the session's screen stays: Quickshell
+deletes its monitor and makes another, and the bar shows no workspace, then
+workspace 1 again.
+
+It exits 0 once the bar has, and 1, with the reason on stderr, when a step
+doesn't happen in time. The bar's state after it is the
 last probe line of each kind in QS_LOG.
 """
 
@@ -174,6 +179,19 @@ class Hyprland:
             f"monitoraddedv2>>{monitor_id},{name},{description}",
         )
 
+    def unplug(self, name):
+        with self.lock:
+            self.monitors = [m for m in self.monitors if m["name"] != name]
+        self.emit(f"monitorremoved>>{name}")
+
+    def replug(self, monitor):
+        with self.lock:
+            self.monitors.append(monitor)
+        self.emit(
+            f"monitoradded>>{monitor['name']}",
+            f"monitoraddedv2>>{monitor['id']},{monitor['name']},{monitor['description']}",
+        )
+
     def move(self, workspace, name):
         with self.lock:
             self.workspaces[workspace] = name
@@ -211,6 +229,10 @@ def wait_for_probe(log, since, probe, what):
 
 def groups_probe(groups):
     return f"workspaces probe: {PRIMARY} {groups}"
+
+
+def active_probe(workspace):
+    return f"active workspace probe: {PRIMARY} {workspace}"
 
 
 def title_probe(title):
@@ -266,6 +288,14 @@ def main():
     hyprland.release.set()
     wait(hyprland.held_read, "Quickshell reading the answer sent before the moves")
     time.sleep(SETTLE_S)
+
+    since = log_end(log)
+    primary = hyprland.monitors[0]
+    hyprland.unplug(PRIMARY)
+    wait_for_probe(log, since, active_probe(0), "the bar showing no workspace while Hyprland lists no primary")
+    since = log_end(log)
+    hyprland.replug(primary)
+    wait_for_probe(log, since, active_probe(1), "the bar showing workspace 1 once Hyprland lists the primary again")
 
 
 if __name__ == "__main__":

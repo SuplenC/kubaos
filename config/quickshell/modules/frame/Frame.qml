@@ -39,7 +39,7 @@ Scope {
     PanelWindow {
         id: root
 
-        readonly property HyprlandMonitor monitor: Hyprland.monitorFor(screen)
+        readonly property HyprlandMonitor monitor: Hypr.monitorOf(screen)
         readonly property bool fullscreen: monitor?.activeWorkspace?.hasFullscreen ?? false
         readonly property bool focused: Panels.screen === screen
         // The open panel on this screen ("" if none). All of them are modal.

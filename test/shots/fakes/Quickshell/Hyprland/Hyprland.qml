@@ -50,10 +50,6 @@ QtObject {
 
     signal rawEvent(var event)
 
-    function monitorFor(screen: var): HyprlandMonitor {
-        return hyprland.monitor;
-    }
-
     function dispatch(request: string): void {
         console.log(`hyprland: dispatch ${request}`);
     }

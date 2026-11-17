@@ -765,9 +765,11 @@ c_workspaces() {
 # stands in for Hyprland and sends the groups waiting on the primary, and the
 # focused window's workspace among them, to the new screens, with Quickshell
 # reading the workspace list it asked for before the moves only after their
-# events. The primary's bar shows its own group alone, and no title.
+# events. The primary's bar shows its own group alone, and no title. Then the
+# stand-in drops the primary and lists it again, the session's screen staying,
+# and the bar shows the primary's workspace again.
 workspaces_hotplug_bar() {
-  local signature=kubaos-e2e-hotplug state="$USER_HOME/.local/state" fake groups title bad=0
+  local signature=kubaos-e2e-hotplug state="$USER_HOME/.local/state" fake groups title active bad=0
   local screens="$state/kubaos/hypr/workspace-screens"
   session_start sway 1920x1080 1
   # The stand-in reads the log from before Quickshell starts.
@@ -797,6 +799,8 @@ workspaces_hotplug_bar() {
     groups="${groups#workspaces probe: HEADLESS-1 }"
     title="$(grep -o 'active window probe: HEADLESS-1 .*' "$QS_LOG" | tail -1)"
     title="${title#active window probe: HEADLESS-1 }"
+    active="$(grep -o 'active workspace probe: HEADLESS-1 .*' "$QS_LOG" | tail -1)"
+    active="${active#active workspace probe: HEADLESS-1 }"
     if [[ $groups == '[[1,2,4,5]]' ]]; then
       echo "ok   after a hotplug the primary's bar shows its own group alone, the workspace list read after the moves' events"
     else
@@ -807,6 +811,12 @@ workspaces_hotplug_bar() {
       echo "ok   the focused window's title leaves the primary's bar with its workspace"
     else
       echo "FAIL after a hotplug the primary's bar shows the title $title of a window on another screen"
+      bad=1
+    fi
+    if [[ $active == 1 ]]; then
+      echo "ok   the bar shows the screen's workspace again after Hyprland dropped the screen and listed it again"
+    else
+      echo "FAIL after Hyprland dropped the primary and listed it again its bar shows workspace $active, not 1"
       bad=1
     fi
   fi

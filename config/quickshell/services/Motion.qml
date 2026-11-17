@@ -3,7 +3,6 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import Quickshell.Hyprland
 import Quickshell.Services.UPower
 import qs.settings
 
@@ -46,7 +45,7 @@ Singleton {
     // A fullscreen window on this screen's active workspace hides the
     // wallpaper completely. Hyprland only; other compositors say false.
     function covered(screen: ShellScreen): bool {
-        return Hyprland.monitorFor(screen)?.activeWorkspace?.hasFullscreen ?? false;
+        return Hypr.monitorOf(screen)?.activeWorkspace?.hasFullscreen ?? false;
     }
 
     function desktopOn(screen: ShellScreen): bool {

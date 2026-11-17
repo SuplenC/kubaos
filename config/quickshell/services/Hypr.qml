@@ -22,6 +22,14 @@ Singleton {
     // The ShellScreen of the monitor Hyprland considers focused.
     readonly property ShellScreen focusedScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0] ?? null
 
+    // The Hyprland monitor of `screen`, null while Hyprland lists none under its name. Found in
+    // the list by name, so a binding on it follows the list. `Hyprland.monitorFor` answers once:
+    // null for a screen Wayland announces before Hyprland's event for it is read, and an object
+    // Quickshell deletes when the monitor goes, though the screen may stay or come back.
+    function monitorOf(screen: ShellScreen): HyprlandMonitor {
+        return Hyprland.monitors.values.find(monitor => monitor.name === screen?.name) ?? null;
+    }
+
     // The lines "block<TAB>connector<TAB>position<TAB>screen" of the state
     // file, and "<TAB>name" for a group the user named, as fields; a
     // position no screen holds has an empty connector.

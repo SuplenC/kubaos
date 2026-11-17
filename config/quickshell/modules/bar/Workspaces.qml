@@ -36,7 +36,7 @@ Item {
     id: root
 
     required property ShellScreen screen
-    readonly property HyprlandMonitor monitor: Hyprland.monitorFor(screen)
+    readonly property HyprlandMonitor monitor: Hypr.monitorOf(screen)
     readonly property int block: Hypr.blockOfMonitor(monitor)
     readonly property int activeId: monitor?.activeWorkspace?.id ?? 0
     // Lists of ids, one per group, in block order.
@@ -130,8 +130,8 @@ Item {
     readonly property var kanji: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
     readonly property var roles: ["kind", "borrowed", "head", "tail", "label"]
     property bool ready: false
-    // With KUBAOS_WORKSPACES_PROBE=1, the groups are logged on every change, for
-    // `workspaces_hotplug_bar` in `test/lib/e2e.sh`.
+    // With KUBAOS_WORKSPACES_PROBE=1, the groups and the shown workspace are logged on every
+    // change, for `workspaces_hotplug_bar` in `test/lib/e2e.sh`.
     readonly property bool probed: Quickshell.env("KUBAOS_WORKSPACES_PROBE") === "1"
 
     // By each window's own workspace, not a workspace's list of windows: a
@@ -216,6 +216,10 @@ Item {
         console.info(`workspaces probe: ${screen.name} ${JSON.stringify(groups)}`);
     }
 
+    function probeActive(): void {
+        console.info(`active workspace probe: ${screen.name} ${activeId}`);
+    }
+
     function drop(key: string): void {
         const index = indexOfKey(key);
         if (index >= 0 && shapes.get(index).leaving)
@@ -238,11 +242,17 @@ Item {
         if (probed)
             probe();
     }
+    onActiveIdChanged: {
+        if (probed)
+            probeActive();
+    }
     Component.onCompleted: {
         sync();
         ready = true;
-        if (probed)
+        if (probed) {
             probe();
+            probeActive();
+        }
     }
 
     ListModel {
