@@ -45,15 +45,21 @@ const USB: AudioOptions = { device: USB_HEADSET };
 /** A default with no mic and none picked for Input: the screen. */
 const NO_MIC: AudioOptions = { device: SCREEN, inputDevice: null };
 
+/** A machine with nothing that plays: the default's Select and the output's disabled. */
+const NO_OUTPUT: AudioOptions = { machine: [BUILT_IN_MIC], playing: [] };
+/** A machine with nothing that records: the speakers alone. */
+const NO_INPUT: AudioOptions = { machine: [SPEAKERS] };
+
 /** The Input tab with an app recording, as its Apps card shows one. */
 const INPUT: AudioOptions = { tab: 1, recording: RECORDING };
 
 /**
  * A panel in a state for each of the subtitle's cases, in their order; balance has a sample for each
- * side. Each state is the case's own: the first case that holds for it.
+ * side, and the default's case one for a side moved and one for an app. Each state is the case's
+ * own: the first case that holds for it.
  */
 const SAID: readonly AudioOptions[] = [
-  { machine: [BUILT_IN_MIC], playing: [] },
+  NO_OUTPUT,
   { outputMuted: true, inputMuted: true },
   { outputMuted: true },
   { inputMuted: true, recording: RECORDING },
@@ -65,6 +71,7 @@ const SAID: readonly AudioOptions[] = [
   { output: 1.25 },
   { output: 0 },
   { outputDevice: HEADSET },
+  { playing: [{ ...PLAYING[0]!, device: HEADSET }, PLAYING[1]!] },
   { balance: 0.35 },
   { balance: 0.65 },
   {},
@@ -208,6 +215,8 @@ export default page<Shown>({
     { name: "Music mode, another mic", for: "Input enabled, the built-in mic picked", sample: draw({ ...MUSIC, inputDevice: BUILT_IN_MIC, ...INPUT }) },
     { name: "USB headset, Input", for: "Calls and Music disabled, no codec", sample: draw({ ...USB, ...INPUT }) },
     { name: "A default with no mic", for: `Input: No mic on ${SCREEN.name}`, sample: draw({ ...NO_MIC, tab: 1 }) },
+    { name: "No output device", for: "the default's and Output's Selects disabled", sample: draw(NO_OUTPUT) },
+    { name: "No mic at all, Input", for: `disabled: No mic on ${SPEAKERS.name}`, sample: draw({ ...NO_INPUT, tab: 1 }) },
     { name: "Output on another device", for: "the speakers over the headset", sample: draw({ ...CALLS, outputDevice: SPEAKERS }) },
     { name: "An app's device, lit", for: "its words and chevron in the accent", sample: draw({ appPicker: "lit" }) },
     { name: "An app's device, open", for: "its Menu under the words", sample: draw({ appPicker: "open" }) },
@@ -225,7 +234,7 @@ export default page<Shown>({
     absent: {
       pressed: "its parts press on their own pages",
       loading: "it opens once PipeWire answers; never half drawn",
-      error: "no device: the Select says so; see questions",
+      error: "no device: its Select disabled, saying so",
     },
     rows: nonEmpty(ROWS.map(({ name, options }) => ({ name, cell: cell(options) }))),
     looks: {

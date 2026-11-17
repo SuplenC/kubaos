@@ -301,7 +301,7 @@ export const SUBTITLES: readonly Subtitle[] = [
   { when: "Headset in Calls mode", holds: (h) => h.mode === "calls", line: () => "Ring ring, ready to talk" },
   { when: "Boosted past 100%", holds: (h) => h.level > 1, line: () => "Neighbours have been notified" },
   { when: "Volume at 0", holds: (h) => h.level === 0, line: () => "Technically on" },
-  { when: "Something off the default", holds: (h) => h.moved, line: () => "One ear here, one mouth there" },
+  { when: "Moved off the default", holds: (h) => h.moved, line: () => "One ear here, one mouth there" },
   { when: "Balance off centre", holds: (h) => offCentre(h.balance), line: (h) => `Leaning ${h.balance < 0.5 ? "left" : "right"} a little` },
   { when: "Something is playing", holds: (h) => h.playing !== undefined, line: (h) => `${h.playing!.name} has the floor` },
   { when: "Noise suppression on", holds: (h) => h.noise, line: () => "The dog is now on mute" },
@@ -432,7 +432,7 @@ export function linkOf(device: Device, codec?: string): string {
  * picked, its tooltip over it. A choice with no mic ends in the crossed-out mic.
  */
 function defaultPicker(devices: Devices, codec: string | undefined, shown: boolean, open = false): HTMLElement {
-  if (!devices.outputs) return select({ options: [], placeholder: NO_OUTPUT });
+  if (!devices.outputs) return select({ options: [], placeholder: NO_OUTPUT, disabled: true });
   const choices = defaultChoices(devices.machine);
   const listed = choices.some((each) => each.output === devices.default) ? choices : [devices.choice, ...choices];
   const pick = select({
@@ -447,7 +447,7 @@ function defaultPicker(devices: Devices, codec: string | undefined, shown: boole
   return anchor;
 }
 
-/** What the default's Select and the output's say on a machine with nothing that plays. */
+/** What the default's Select and the output's say, disabled, on a machine with nothing that plays. */
 const NO_OUTPUT = "No output device";
 
 /** A Bluetooth headset's codecs in its mode, each with what it is good for, `codec` picked. */
@@ -465,7 +465,7 @@ function codecPicker(device: Device, mode: Mode, codec: string | undefined, open
 /**
  * A side's Device card's Select: "Default · <device>" first, with the default's symbol, then every
  * other device of that side, the built-in speakers and mic apart. A default that has nothing for the
- * side leaves it unpicked, saying so.
+ * side leaves it unpicked, saying so, and with no other device to pick it is disabled.
  */
 function sidePicker(devices: Devices, input: boolean, told?: (change: AudioOptions) => void): HTMLElement {
   const fits = (each: Device) => (input ? each.records : each.plays);
@@ -482,6 +482,7 @@ function sidePicker(devices: Devices, input: boolean, told?: (change: AudioOptio
       ...names(all),
       picked,
       placeholder: input ? `No mic on ${devices.choice.name}` : NO_OUTPUT,
+      ...(all.length === 0 ? { disabled: true } : {}),
       ...(told ? { onPick: (index: number) => {
         if (index !== picked) moved(all[index] ?? null);
       } } : {}),
