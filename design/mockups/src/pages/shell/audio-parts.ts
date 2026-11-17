@@ -576,7 +576,7 @@ function appsCard(apps: readonly App[], devices: Devices, input: boolean, state?
 
 /** The Output tab: its Device card (the output's own device, balance) and the Apps card. */
 function outputTab(options: AudioOptions, devices: Devices, told?: (change: AudioOptions) => void): HTMLElement {
-  const knob = slider({ icon: "balance", size: "Compact", knob: true, ...(devices.outputs ? {} : { disabled: true }), value: options.balance ?? 0.5, sticky: 0.5, number: sideOf, ...(told ? { changed: (balance: number) => told({ balance }) } : {}) });
+  const knob = slider({ icon: "arrow_range", size: "Compact", knob: true, ...(devices.outputs ? {} : { disabled: true }), value: options.balance ?? 0.5, sticky: 0.5, number: sideOf, ...(told ? { changed: (balance: number) => told({ balance }) } : {}) });
   return stack("s12", "start", cardOf("Device", sidePicker(devices, false, told), knob), filling(appsCard(options.playing ?? PLAYING, devices, false, options.appPicker, told)));
 }
 

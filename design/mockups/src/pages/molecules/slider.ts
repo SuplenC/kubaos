@@ -64,7 +64,7 @@ function sideOf(at: number): string {
 
 /** Balance: a knob either side of the centre, held there within `size.slider_hold`. */
 function balance(size: SliderSize = "Regular", extra: Partial<SliderOptions> = {}): SliderOptions {
-  return { icon: "balance", size, knob: true, value: 0.5, sticky: 0.5, number: sideOf, ...extra };
+  return { icon: "arrow_range", size, knob: true, value: 0.5, sticky: 0.5, number: sideOf, ...extra };
 }
 
 /** Balance 30% to the left. */
