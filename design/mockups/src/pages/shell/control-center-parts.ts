@@ -365,8 +365,8 @@ export function btOff(kind: "off" | "blocked" | "none" = "off"): HTMLElement {
 // Output.
 
 export const OUTPUTS: readonly ListRowSpec[] = [
-  { title: "Built-in Audio Analog Stereo", subtitle: "Default output", icon: "speaker", checked: true },
-  { title: "WH-1000XM4", icon: "speaker_group", checked: false },
+  { title: "Built-in Audio Analog Stereo", subtitle: "Built-in · Default output", icon: "speaker", checked: true },
+  { title: "WH-1000XM4", subtitle: "Bluetooth", icon: "bluetooth", checked: false },
 ];
 
 /** The outputs in their well, the default checked, `space.s12` above the first and below the last. */
