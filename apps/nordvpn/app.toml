@@ -3,13 +3,15 @@
 # nordvpn-gui, its window, which the first only recommends. Its packages write no source of their
 # own; NordVPN's install script and its nordvpn-release package trust its key for every repository,
 # which repo setup takes away. Only the nordvpn group may talk to the daemon (its socket,
-# /run/nordvpn/nordvpnd.sock): the first step makes the group and puts you in it before the
-# package, whose preinst would otherwise make it and add whoever it guesses ran the install, then
-# leave it behind on removal; log out and in for it to count. Its postinst enables and starts
-# nordvpnd.socket and nordvpnd.service, and enables nordvpnd-killswitch.service, which puts its kill
-# switch up at boot while it is on; the unit steps are those, so each update checks them as any
-# step. Its firewall and kill switch are nftables rules of its own. Its removal takes its units
-# and /var/lib/nordvpn away, and with it your sign-in.
+# /run/nordvpn/nordvpnd.sock). The package's preinst makes the group, and on an install empties it
+# and adds the user it guesses ran the install (sudo's caller, the login's, else uid 1000's), so
+# the step after the package puts you in it; log out and in for it to count. The group is the
+# package's, and stays after its removal: the step's undo takes you out of it only where the step
+# put you in. Its postinst enables and starts nordvpnd.socket and nordvpnd.service, and enables
+# nordvpnd-killswitch.service, which puts its kill switch up at boot while it is on; the unit steps
+# are those, so each update checks them as any step. Its firewall and kill switch are nftables
+# rules of its own. Its removal takes its units and /var/lib/nordvpn away, and with it your
+# sign-in.
 # KubaOS's Proxy and NordVPN each block what leaves outside their own tunnel: with the Proxy's kill
 # switch up NordVPN can't reach its servers, and with NordVPN's on the Proxy's VPN can't reach IT's.
 # Use one at a time.
@@ -33,15 +35,15 @@ Your window's settings stay in ~/.config/nordvpn. NordVPN's own removal takes it
 settings in /var/lib/nordvpn with it: sign in again when you install it again."""
 
 [[action]]
-name = "Let you control NordVPN without sudo"
-kind = "group"
-group = "nordvpn"
-
-[[action]]
 name = "Install NordVPN"
 kind = "apt"
 repo = "nordvpn"
 packages = ["nordvpn", "nordvpn-gui"]
+
+[[action]]
+name = "Let you control NordVPN without sudo"
+kind = "group"
+group = "nordvpn"
 
 [[action]]
 name = "Listen for NordVPN's daemon"

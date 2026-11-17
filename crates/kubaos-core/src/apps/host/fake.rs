@@ -114,6 +114,10 @@ pub struct State {
     pub depends: BTreeMap<String, BTreeSet<String>>,
     /// Packages apt marks installed by hand, as `apt install` on one makes it.
     pub manual: BTreeSet<String>,
+    /// Package to the group its preinst makes on install, empties and puts one user in, a guess of
+    /// its own rather than the machine's user, as the `nordvpn` package does: the group and the
+    /// user.
+    pub preinst_groups: BTreeMap<String, (String, String)>,
     /// Operations that fail: `enable:<unit>`, `apt:<package>`, `fetch:<url>`, `groupdel:<group>`.
     pub fail: BTreeSet<String>,
     /// The machine is arm64's, not amd64's.
@@ -281,6 +285,7 @@ impl FakeHost {
             fail: BTreeSet::new(),
             conflicts: BTreeMap::new(),
             depends: BTreeMap::new(),
+            preinst_groups: BTreeMap::new(),
             ..self.state.borrow().clone()
         };
         let _ = write!(out, "{state:#?}");
@@ -474,6 +479,9 @@ impl Host for FakeHost {
             }
         }
         for p in state.missing(packages) {
+            if let Some((group, user)) = state.preinst_groups.get(&p).cloned() {
+                state.groups.insert(group, BTreeSet::from([user]));
+            }
             let version = state.candidates.get(&p).cloned().unwrap_or_else(|| "1.0".to_owned());
             state.dpkg.insert(p, version);
         }

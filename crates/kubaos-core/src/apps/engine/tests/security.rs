@@ -1,5 +1,6 @@
 //! The security and VPN apps of the shipped catalog, installed and removed on the fake machine.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
@@ -248,29 +249,30 @@ fn a_1password_cli_still_installed_keeps_its_group_when_1password_goes() {
 }
 
 #[test]
-fn nordvpn_puts_you_in_its_group_before_its_package_and_takes_both_away() {
+fn nordvpn_puts_you_in_its_group_after_its_preinst_and_leaves_the_group_to_its_package() {
     let world = security_world("nordvpn");
-
-    let catalog = Catalog::load(&world.catalog).unwrap();
-    let kinds: Vec<&Kind> = catalog
-        .get("nordvpn")
-        .unwrap()
-        .actions
-        .iter()
-        .map(|a| &a.kind)
-        .collect();
-    assert!(
-        matches!(kinds[..2], [Kind::Group { .. }, Kind::Apt { .. }]),
-        "the group before the package: {kinds:#?}"
-    );
+    // NordVPN's preinst on an install, which puts in the group the user it guesses, not you.
+    let guessed = || ("nordvpn".to_owned(), "someone".to_owned());
+    world
+        .host
+        .state
+        .borrow_mut()
+        .preinst_groups
+        .insert("nordvpn".to_owned(), guessed());
+    let members = |world: &World| world.host.state.borrow().groups.get("nordvpn").cloned();
 
     run(&world, |e| e.add("nordvpn", None, &picks("nordvpn"))).unwrap();
 
-    assert!(world.host.state.borrow().groups["nordvpn"].contains("kuba"));
+    assert_eq!(
+        members(&world),
+        Some(BTreeSet::from(["kuba".to_owned(), "someone".to_owned()])),
+        "{:#?}",
+        world.host.state.borrow().log
+    );
 
     run(&world, |e| e.remove_with("nordvpn", &Picks::default())).unwrap();
 
-    assert!(!world.host.state.borrow().groups.contains_key("nordvpn"));
+    assert_eq!(members(&world), Some(BTreeSet::from([guessed().1])));
 }
 
 #[test]
