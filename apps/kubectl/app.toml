@@ -13,6 +13,8 @@ The Kubernetes command-line tool, kubectl, allows you to run commands against Ku
 clusters. You can use kubectl to deploy applications, inspect and manage cluster resources, and \
 view logs."""
 description_from = "https://kubernetes.io/docs/tasks/tools/"
+# Kubernetes' logo, Apache-2.0, on a tile (kubernetes.svg's header): no icon theme has kubectl.
+icon = "kubernetes.svg"
 keeps = """\
 Your clusters and their credentials stay in ~/.kube/config, and kubectl's cache in ~/.kube/cache: \
 install kubectl again and it talks to them all."""

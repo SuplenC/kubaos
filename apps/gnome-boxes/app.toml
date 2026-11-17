@@ -3,8 +3,9 @@
 # package's recommendations, so the step names what a virtual machine of today needs beside them:
 # qemu-img for its disks, SPICE for its display, UEFI firmware and a TPM, which Windows 11 asks
 # for. amd64 only: an arm64 machine needs other firmware, which one list of packages for both
-# can't say. Its package brings the machine's libvirtd too, enabled at boot; Boxes never uses it,
-# so it starts on its first use instead, through the libvirtd.socket the package enables.
+# can't say. Its package brings the machine's libvirtd too, which Boxes never uses; it starts as
+# Ubuntu's package sets it, at boot, so Virtual Machine Manager's machines beside it start as they
+# would without Boxes.
 # https://apps.gnome.org/Boxes/
 name = "GNOME Boxes"
 category = "development"
@@ -39,9 +40,3 @@ name = "Let you use KVM without sudo"
 kind = "group"
 group = "kvm"
 
-[[action]]
-name = "Keep libvirt out of the boot"
-kind = "unit"
-unit = "libvirtd.service"
-scope = "system"
-enable = false

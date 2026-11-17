@@ -12,6 +12,7 @@ to make it easier to navigate, observe and manage your applications in the wild.
 watches Kubernetes for changes and offers subsequent commands to interact with your observed \
 resources."""
 description_from = "https://github.com/derailed/k9s/blob/v0.51.0/README.md"
+# No icon: k9s publishes its logo only as a PNG, and the catalog's icons are SVGs.
 keeps = """\
 Your k9s settings, skins and aliases stay in ~/.config/k9s, and its state in ~/.local/share/k9s \
 and ~/.local/state/k9s. Your clusters are in your kubeconfig, which was never k9s's."""

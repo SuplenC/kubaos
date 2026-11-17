@@ -1,5 +1,7 @@
-# Distrobox from Ubuntu's archive, a patch release behind upstream's and as current as nixpkgs',
-# with Podman to run its containers. An install takes no package's recommendations, so the step
+# Distrobox from Ubuntu's archive, 1.8.2.4, with Podman to run its containers. nixpkgs and upstream
+# have 1.8.2.5, a patch release of fixes for other distributions' containers and the docs; Ubuntu's
+# archive comes before nixpkgs in the catalog's order of sources, and a patch behind is still
+# current, so it stays the source. An install takes no package's recommendations, so the step
 # names passt, which a container of the user's needs for its network.
 # https://distrobox.it/
 name = "Distrobox"
@@ -14,6 +16,9 @@ display, sound, USB devices and network, so a program from Arch, Fedora, Alpine 
 release of Ubuntu runs as if it were installed here. Programs installed in a container can be put \
 in the menu and on the command line. It runs its containers with Podman, as you, without root."""
 description_from = "kubaos"
+# Distrobox's logo mark, GPL-3.0-only, on a tile (distrobox.svg's header): Colloid has none, and the
+# package's own icon arrives only with it.
+icon = "distrobox.svg"
 keeps = """\
 Your containers and their images stay in ~/.local/share/containers: install Distrobox again and \
 distrobox list finds them. distrobox rm takes one away for good."""

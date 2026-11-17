@@ -1,7 +1,11 @@
 # Wine from WineHQ's signed apt repository, whose key system/packages.toml pins ([repo.winehq]).
 # Its build for Ubuntu 26.04 is amd64 only and runs in Wine's WoW64 mode, 32-bit Windows
 # programs on 64-bit Linux libraries, so it needs no i386 architecture in dpkg. Its packages write
-# no source of their own.
+# no source of their own. Wine loads much of what Windows programs ask of it from libraries its
+# package only recommends, and an install takes no recommendations, so the step names each of
+# them by Ubuntu's name: fonts and text (FreeType, fontconfig), TLS (GnuTLS), printing (CUPS),
+# game controllers (SDL2), webcams (libv4l), databases (ODBC), old OpenGL (GLU), Kerberos, ISDN
+# (CAPI) and the X extensions its X11 driver uses.
 # https://gitlab.winehq.org/wine/wine/-/wikis/Debian-Ubuntu
 name = "Wine"
 category = "development"
@@ -28,4 +32,26 @@ name = "Install Wine"
 kind = "apt"
 repo = "winehq"
 arch = "amd64"
-packages = ["winehq-stable"]
+packages = [
+  "winehq-stable",
+  "libcapi20-3t64",
+  "libcups2t64",
+  "libdbus-1-3",
+  "libfontconfig1",
+  "libfreetype6",
+  "libglu1-mesa",
+  "libgnutls30t64",
+  "libgssapi-krb5-2",
+  "libkrb5-3",
+  "libodbc2",
+  "libsdl2-2.0-0",
+  "libv4l-0t64",
+  "libxcomposite1",
+  "libxcursor1",
+  "libxfixes3",
+  "libxi6",
+  "libxinerama1",
+  "libxrandr2",
+  "libxrender1",
+  "libxxf86vm1",
+]
