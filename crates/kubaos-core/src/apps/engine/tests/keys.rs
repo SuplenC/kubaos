@@ -63,6 +63,26 @@ fn no_key_nearing_its_expiry_asks_for_no_root() {
 }
 
 #[test]
+fn a_line_the_keys_check_printed_that_names_no_recorded_repository_is_a_warning() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    world.install("fixture", true).0.unwrap();
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.keys_due.insert("fixture".to_owned());
+        state.keys_stray.insert("W: something odd".to_owned());
+    }
+    let mut root = world.root();
+
+    let (refreshed, events) = refresh(&world, &mut root);
+
+    assert_eq!(refreshed, ["fixture"]);
+    let warnings = warnings(&events);
+    assert_eq!(warnings.len(), 1, "{warnings:?}");
+    assert!(warnings[0].contains("W: something odd"), "{warnings:?}");
+    assert_eq!(root.requests, [r#"{"op":"refresh","app":"fixture","step":1}"#]);
+}
+
+#[test]
 fn a_key_that_couldnt_be_fetched_again_is_a_warning_and_stays_due() {
     let world = World::new(&[("fixture", FIXTURE)]);
     world.install("fixture", true).0.unwrap();
