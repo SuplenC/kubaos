@@ -45,6 +45,12 @@ pub enum ManifestError {
     InvalidPackage { group: String, name: String },
     #[error("{value:?} has a backslash or a quote, which the scripts' reader can't take")]
     Escaped { value: String },
+    #[error("repo {repo} names some of its next key's next_key_url, next_fingerprint and next_keyring, not all three")]
+    HalfNextKey { repo: String },
+    #[error(
+        "repo {repo}: {name:?} is not a keyring's file name in /etc/apt/trusted.gpg.d (a .gpg or .asc of letters, digits, ., _ and -, not starting with .)"
+    )]
+    InvalidGlobalKeyring { repo: String, name: String },
     #[error("group {group} has a when_on or when_off script but isn't optional")]
     ScriptNotOptional { group: String },
 }
@@ -124,7 +130,66 @@ pub struct Repo {
     pub fingerprint: String,
     /// Where the key is stored, as the sources file's `Signed-By` names it.
     pub keyring: String,
+    /// The key the vendor signs the repository with once `fingerprint`'s expires, its three keys
+    /// set together: the sources file's `Signed-By` names both keyrings, so the repository verifies
+    /// before and after the vendor moves to it.
+    #[serde(default)]
+    pub next_key_url: Option<String>,
+    #[serde(default)]
+    pub next_fingerprint: Option<String>,
+    #[serde(default)]
+    pub next_keyring: Option<String>,
+    /// Files of `/etc/apt/trusted.gpg.d` the vendor's own setup writes, where apt trusts their
+    /// keys for every repository: repo setup removes each whose keys are all `fingerprint` or one
+    /// of `global_fingerprints`, as the sources file names the repository's key itself.
+    #[serde(default)]
+    pub global_keyrings: Vec<String>,
+    /// The vendor's older keys, which its setup trusts in `global_keyrings` beside its own.
+    #[serde(default)]
+    pub global_fingerprints: Vec<String>,
 }
+
+impl Repo {
+    /// The keyrings its sources file is signed by: its key's, then its next key's.
+    pub fn keyrings(&self) -> impl Iterator<Item = &str> {
+        std::iter::once(self.keyring.as_str()).chain(self.next_keyring.as_deref())
+    }
+
+    /// Whether the repository `name` is set up as repo setup leaves it on the machine whose `/` is
+    /// `root`: `/etc/apt/sources.list.d/<name>.sources` is there and not turned off with
+    /// `Enabled: no`, each of its `Signed-By` fields names its primary keyring and nothing outside
+    /// [`Repo::keyrings`], and each keyring it names is a file. A vendor that writes the file again
+    /// with the one key its build signs with, as Vivaldi's postinst and daily job do, leaves it in
+    /// place; a vendor's own source of the repository is another file, or signed by another
+    /// keyring, so it isn't this.
+    #[must_use]
+    pub fn in_place(&self, name: &str, root: &Path) -> bool {
+        let at = |path: &str| root.join(path.trim_start_matches('/'));
+        let Ok(text) = fs::read_to_string(at(&format!("{SOURCES_D}/{name}.sources"))) else {
+            return false;
+        };
+        let field = |key: &'static str| {
+            text.lines()
+                .filter_map(move |line| line.strip_prefix(key))
+                .map(str::trim)
+        };
+        if field("Enabled:").any(|value| value.eq_ignore_ascii_case("no")) {
+            return false;
+        }
+        let mut signed = field("Signed-By:").peekable();
+        signed.peek().is_some()
+            && signed.all(|value| {
+                let named: Vec<&str> = value.split_whitespace().collect();
+                named.contains(&self.keyring.as_str())
+                    && named
+                        .iter()
+                        .all(|k| self.keyrings().any(|ours| ours == *k) && at(k).is_file())
+            })
+    }
+}
+
+/// Where apt reads its sources files, and repo setup writes a repository's.
+const SOURCES_D: &str = "/etc/apt/sources.list.d";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -190,8 +255,23 @@ impl Manifest {
     }
 
     fn check(&self) -> Result<(), ManifestError> {
-        for repo in self.repos.values() {
-            for value in [&repo.key_url, &repo.fingerprint, &repo.keyring] {
+        for (name, repo) in &self.repos {
+            let next = [&repo.next_key_url, &repo.next_fingerprint, &repo.next_keyring];
+            if next.iter().any(|v| v.is_some()) && !next.iter().all(|v| v.is_some()) {
+                return Err(ManifestError::HalfNextKey { repo: name.clone() });
+            }
+            if let Some(keyring) = repo.global_keyrings.iter().find(|k| !is_keyring_name(k)) {
+                return Err(ManifestError::InvalidGlobalKeyring {
+                    repo: name.clone(),
+                    name: keyring.clone(),
+                });
+            }
+            let values = [&repo.key_url, &repo.fingerprint, &repo.keyring]
+                .into_iter()
+                .chain(next.into_iter().flatten())
+                .chain(&repo.global_keyrings)
+                .chain(&repo.global_fingerprints);
+            for value in values {
                 unescaped(value)?;
             }
         }
@@ -264,6 +344,17 @@ pub fn is_package_name(name: &str) -> bool {
         .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
         && name.len() >= 2
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '+' | '-' | '.'))
+}
+
+/// Whether `name` is a keyring's file name of `/etc/apt/trusted.gpg.d`: letters, digits, `.`,
+/// `_` and `-` only, so the shell can't split or glob it, not starting with `.`, and a `.gpg` or
+/// `.asc`, as apt reads no other there.
+fn is_keyring_name(name: &str) -> bool {
+    let stem = name.strip_suffix(".gpg").or_else(|| name.strip_suffix(".asc"));
+    stem.is_some_and(|s| !s.is_empty() && !s.starts_with('.'))
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
 }
 
 fn unescaped(value: &str) -> Result<(), ManifestError> {

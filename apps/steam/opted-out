@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Exits 0 when steam-stable.list is there, KubaOS's or the one Steam's package or the user wrote,
+# which repo setup turns off: either keeps Steam's package from adding its repository.
+# Usage: ./opted-out <path of steam-stable.list>
+set -euo pipefail
+[[ -e "$1" ]]

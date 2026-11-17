@@ -1,0 +1,31 @@
+# Gemini in a window of its own: Google has no Gemini app for Linux, only its website.
+# https://gemini.google.com/
+name = "Gemini"
+category = "ai"
+tags = ["chat", "assistant", "google", "gemini", "web app"]
+summary = "Google's chatbot in a window of its own. Free, because you're the product."
+# Google's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Gemini is Google's AI assistant. Its website, here in a window of its own, answers questions, \
+writes and edits text and code, reads the files and pictures you give it, searches the web and \
+makes images, in chats it keeps with your Google account."""
+description_from = "kubaos"
+# Gemini's icon, Google's trademark, used to identify the app (gemini.svg's header names its
+# source). The window's own icon is the same picture.
+icon = "gemini.svg"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/gemini: install Gemini again and you're \
+still signed in. Your chats live on Google's servers anyway."""
+
+[[ready]]
+check = ["./closed", "gemini"]
+says = "Gemini's window is open: close it, then try again"
+
+[[action]]
+name = "Put Gemini in a window of its own"
+kind = "web_app"
+id = "gemini"
+title = "Gemini"
+url = "https://gemini.google.com/"
+icon = "gemini.svg"

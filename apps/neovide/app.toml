@@ -1,0 +1,24 @@
+# Neovide from nixpkgs, through the User flake. It keeps no apt repository and Ubuntu doesn't
+# package it. It runs the Neovim on PATH, which every KubaOS machine has, with your Neovim config.
+# https://neovide.dev/installation.html
+name = "Neovide"
+category = "development"
+tags = ["editor", "neovim", "vim", "gui", "rust"]
+summary = "Neovim in a window, with smooth scrolling and a cursor that leaves a trail. Useless and gorgeous."
+# The opening of its README, MIT, Copyright (c) 2023 Neovide Contributors
+# (github.com/neovide/neovide).
+description = """\
+This is a simple graphical user interface for Neovim (an aggressively refactored and updated Vim \
+editor). Where possible there are some graphical improvements, but functionally it should act \
+like the terminal UI."""
+description_from = "https://github.com/neovide/neovide/blob/0.16.2/README.md"
+# Neovide's logo, MIT, on KubaOS's tile (neovide.svg's header): no icon theme has Neovide.
+icon = "neovide.svg"
+keeps = """\
+Your Neovide settings stay in ~/.config/neovide, and Neovim's config is Neovim's, untouched: \
+install Neovide again and it's all there."""
+
+[[action]]
+name = "Install Neovide"
+kind = "nix"
+packages = ["neovide"]

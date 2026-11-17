@@ -46,17 +46,18 @@ use kotodama_protocol::ItemKind;
 use kotodama_protocol::Job;
 use kotodama_protocol::JobState;
 use kotodama_protocol::NamespacedKind;
-use kubaos_core::apps;
 use kubaos_core::apps::Catalog;
 use kubaos_core::apps::CatalogError;
 use kubaos_core::apps::Picks;
 use kubaos_core::apps::PicksError;
+use kubaos_core::apps::Platform;
 use kubaos_core::apps::Status;
 use kubaos_core::apps::journal::JournalError;
 use kubaos_core::apps::status::AppStatus;
 use kubaos_core::apps::status::SetupInfo;
 use kubaos_core::apt::Dpkg;
 use kubaos_core::apt::dpkg;
+use kubaos_core::state::NIXPKGS_FILE;
 use kubaos_core::state::Paths;
 use kubaos_core::update::event::AppEvent;
 use kubaos_core::update::event::UpdateEvent;
@@ -88,6 +89,10 @@ const JOB_PREFIX: &str = "app-";
 /// The icon of an app whose folder names none.
 const ICON: &str = "system-software-install";
 
+/// What starts an Item's icon that is a KubaOS Symbol, not an icon theme's name or a path: the
+/// menu's row draws the rest as its tile's symbol.
+const SYMBOL_PREFIX: &str = "symbol:";
+
 /// Where the apps' status is read from.
 #[derive(Clone, Debug)]
 pub struct AppFiles {
@@ -97,6 +102,9 @@ pub struct AppFiles {
     journals: PathBuf,
     /// Root's journals of the apps, which say whether an app KubaOS took in owns anything.
     root_journals: PathBuf,
+    /// The User flake's state directory, whose `nixpkgs.toml` says whether an app with unfree
+    /// nixpkgs packages can be installed.
+    state_dir: PathBuf,
 }
 
 impl AppFiles {
@@ -109,6 +117,7 @@ impl AppFiles {
             picks: paths.app_picks(),
             journals: paths.app_journals(),
             root_journals: system.app_journals(),
+            state_dir: paths.state_dir().root().to_path_buf(),
         }
     }
 
@@ -138,11 +147,13 @@ impl AppFiles {
             picks: real(&self.picks),
             journals: self.journals.canonicalize().unwrap_or_else(|_| self.journals.clone()),
             root_journals: self.root_journals.clone(),
+            state_dir: self.state_dir.canonicalize().unwrap_or_else(|_| self.state_dir.clone()),
         }
     }
 
-    /// The folders whose change can change which apps are on the machine or picked: dpkg's
-    /// database's, which has the versions, the picks', the journals' folder, where an app's
+    /// The folders whose change can change which apps are on the machine, picked or available:
+    /// dpkg's database's, which has the versions, the picks', the User flake's state directory,
+    /// whose `nixpkgs.toml` lets unfree packages in or not, the journals' folder, where an app's
     /// folder comes and goes with its install and removal, and each app's folder in it, whose
     /// journal its install and removal rename into place. Read again after each change, so an
     /// app's folder made since is watched.
@@ -151,6 +162,7 @@ impl AppFiles {
         let mut dirs: Vec<PathBuf> = [
             parent(Path::new(DPKG_STATUS)),
             parent(&self.picks),
+            Some(self.state_dir.clone()),
             Some(self.journals.clone()),
         ]
         .into_iter()
@@ -169,11 +181,13 @@ impl AppFiles {
         dirs
     }
 
-    /// Whether a change to `path` can change which apps are on the machine or picked: dpkg's
-    /// database, the picks, or anything in the journals' folder but its lock.
+    /// Whether a change to `path` can change which apps are on the machine, picked or available:
+    /// dpkg's database, the picks, `nixpkgs.toml`, or anything in the journals' folder but its
+    /// lock.
     pub fn changes(&self, path: &Path) -> bool {
         path == Path::new(DPKG_STATUS)
             || path == self.picks
+            || path == self.state_dir.join(NIXPKGS_FILE)
             || (path.starts_with(&self.journals) && path != self.journals.join(LOCK))
     }
 }
@@ -263,7 +277,7 @@ impl Apps {
             &picks,
             &files.journals,
             &files.root_journals,
-            apps::arch(),
+            Platform::this_machine(&files.state_dir),
             Some(&dpkg),
         )
         .map_err(ReadError::Journal)?;
@@ -818,6 +832,16 @@ fn share(n: usize, of: usize) -> f32 {
     if of == 0 { 0.0 } else { n as f32 / of as f32 }
 }
 
+/// An app's Item's icon: its picture, else its symbol as `symbol:<name>`, which the menu's row
+/// draws as a KubaOS Symbol, else the Extension's own.
+fn item_icon(app: &AppStatus) -> String {
+    match (&app.icon, &app.symbol) {
+        (Some(icon), _) => icon.clone(),
+        (None, Some(symbol)) => format!("{SYMBOL_PREFIX}{symbol}"),
+        (None, None) => ICON.to_owned(),
+    }
+}
+
 /// An app's Item, found by its id and each word of it as well as its name, "app" and `words`.
 fn item(id: String, title: String, subtitle: String, app: &AppStatus, words: &[&str], action: Action) -> Item {
     let keywords = std::iter::once(app.id.as_str())
@@ -832,7 +856,7 @@ fn item(id: String, title: String, subtitle: String, app: &AppStatus, words: &[&
         identity: None,
         title,
         subtitle: Some(subtitle),
-        icon: Some(app.icon.clone().unwrap_or_else(|| ICON.to_owned())),
+        icon: Some(item_icon(app)),
         names: Vec::new(),
         keywords,
         hidden: false,

@@ -1,0 +1,98 @@
+# Ollama from the archives of its GitHub release, each pinned to the sha256 the release's
+# sha256sum.txt publishes (and GitHub's own digest of the asset). Ubuntu doesn't package it, and
+# nixpkgs' ollama, from the User flake, would be a program of the user's profile run by a system
+# service, its CUDA and ROCm builds looking for the GPU's driver where NixOS keeps it, not Ubuntu.
+# The main archive holds the program and its CPU and NVIDIA CUDA libraries; AMD's ROCm libraries
+# are a second archive of a gigabyte, all of it under lib/ollama/rocm_v7_2/, which the `amd` setup
+# unpacks into the main one's folder. Each version lands in a folder of its own, which the link on
+# PATH and the service's unit name.
+# https://github.com/ollama/ollama/releases/tag/v0.40.16
+name = "Ollama"
+category = "ai"
+tags = ["llm", "local models", "models", "server", "offline", "gpu"]
+summary = "Language models on your own box. No cloud, no meter, just your GPU sweating like it owes you money."
+# Ollama's README is under the MIT licence, which asks for its notice with every copy, so this
+# is ours.
+description = """\
+Ollama downloads open language models and runs them on this machine, on its graphics card where \
+it can. Its server keeps the models and answers on this machine's own address, port 11434, \
+through its own API and one compatible with OpenAI's, so editors, chat apps and scripts can use \
+them; `ollama run` chats with a model in the terminal."""
+description_from = "kubaos"
+icon = "ollama"
+keeps = """\
+Your models stay in /var/lib/ollama, the service's own folder: install Ollama again and \
+they're all there."""
+
+[[action]]
+name = "Install zstd, which unpacks Ollama's archives"
+kind = "apt"
+packages = ["zstd"]
+
+[[action]]
+name = "Download Ollama"
+kind = "download"
+to = "/opt/ollama/@VERSION@"
+version = "0.40.16"
+unpack = "tar-zst"
+amd64 = { url = "https://github.com/ollama/ollama/releases/download/v0.40.16/ollama-linux-amd64.tar.zst", sha256 = "87bfafb2acbc89b2e6a1be0a9043de6aa75fb450696f86bc426e65fc448f788d" }
+arm64 = { url = "https://github.com/ollama/ollama/releases/download/v0.40.16/ollama-linux-arm64.tar.zst", sha256 = "e45b8e6dcb86cb9f3057396351655079c9a4879b4ced2678c9350d375dcbc224" }
+
+[[action]]
+name = "Put ollama on your PATH"
+kind = "symlink"
+to = "/usr/local/bin/ollama"
+target = "/opt/ollama/@VERSION@/bin/ollama"
+
+[setup.standard]
+name = "Ollama"
+summary = "On the CPU, or on an NVIDIA graphics card through CUDA"
+
+[[setup.standard.action]]
+name = "Put Ollama's service in place"
+kind = "file"
+to = "/etc/systemd/system/ollama.service"
+from = "ollama.service"
+template = true
+mode = "644"
+
+[[setup.standard.action]]
+name = "Start Ollama's server"
+kind = "unit"
+unit = "ollama.service"
+scope = "system"
+enable = true
+start = true
+
+[setup.amd]
+name = "Ollama for AMD graphics cards"
+summary = "With AMD's ROCm libraries for Radeon cards, another gigabyte to download"
+
+# Every file of the ROCm archive is under lib/ollama/rocm_v7_2/, which the main archive hasn't:
+# this step owns that folder alone. AMD builds ROCm for amd64 alone.
+[[setup.amd.action]]
+name = "Download AMD's ROCm libraries into Ollama"
+kind = "download"
+to = "/opt/ollama/@VERSION@/lib/ollama/rocm_v7_2"
+version = "0.40.16"
+unpack = "tar-zst"
+strip = 3
+amd64 = { url = "https://github.com/ollama/ollama/releases/download/v0.40.16/ollama-linux-amd64-rocm.tar.zst", sha256 = "50ba6b7d9f4ae9b143c5c20496bf82be597dab0a06a50276b637e22150226f9b" }
+
+# The service's steps are each setup's own, after the ROCm download, so the server starts with
+# the libraries it will find.
+[[setup.amd.action]]
+name = "Put Ollama's service in place"
+kind = "file"
+to = "/etc/systemd/system/ollama.service"
+from = "ollama.service"
+template = true
+mode = "644"
+
+[[setup.amd.action]]
+name = "Start Ollama's server"
+kind = "unit"
+unit = "ollama.service"
+scope = "system"
+enable = true
+start = true

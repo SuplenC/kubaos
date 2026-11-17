@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://repo.librewolf.net
+Suites: librewolf
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/librewolf.gpg

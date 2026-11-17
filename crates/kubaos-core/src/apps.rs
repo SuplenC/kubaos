@@ -30,6 +30,7 @@ pub mod journal;
 pub mod picks;
 pub mod root;
 pub mod status;
+pub mod symbols;
 pub mod version;
 
 pub use self::catalog::Catalog;
@@ -40,6 +41,35 @@ pub use self::picks::Picks;
 pub use self::picks::PicksError;
 pub use self::status::AppState;
 pub use self::status::Status;
+use crate::unfree;
+use crate::unfree::Unfree;
+
+/// What a machine can install an app's steps from: its architecture, as dpkg names it, and whether
+/// its user's nixpkgs takes unfree packages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Platform<'a> {
+    pub arch: &'a str,
+    pub unfree: Unfree,
+}
+
+impl<'a> Platform<'a> {
+    /// A machine of `arch` whose user's nixpkgs takes what `unfree` says.
+    #[must_use]
+    pub fn new(arch: &'a str, unfree: Unfree) -> Self {
+        Self { arch, unfree }
+    }
+
+    /// This machine, its user's setting read from the User flake's state directory `state_dir`.
+    /// A `nixpkgs.toml` that doesn't read fails the home's build, which says why; this goes on
+    /// with the default.
+    #[must_use]
+    pub fn this_machine(state_dir: &std::path::Path) -> Platform<'static> {
+        Platform {
+            arch: arch(),
+            unfree: unfree::Setting::read(state_dir).unwrap_or_default(),
+        }
+    }
+}
 
 /// The machine's architecture, as dpkg names it. The `kubaos` binary is built for the machine's
 /// own architecture, so this needs no `dpkg --print-architecture`: the Command menu asks for the

@@ -1,0 +1,50 @@
+# virt-manager, QEMU with KVM and libvirt, from Ubuntu's archive. An install takes no package's
+# recommendations, so the step names what a virtual machine of today needs beside them: qemu-img
+# for its disks, SPICE for its display, UEFI firmware and a TPM, which Windows 11 asks for. Each
+# architecture runs its own kind of virtual machine on KVM, with its own QEMU and firmware: OVMF
+# on amd64, AAVMF (qemu-efi-aarch64) on arm64.
+# libvirtd starts as Ubuntu's package sets it, at boot, so a virtual machine set to start with the
+# machine starts with it.
+# https://ubuntu.com/server/docs/how-to/virtualisation/virtual-machine-manager/
+name = "Virtual Machine Manager"
+category = "development"
+tags = ["virtual machines", "vm", "kvm", "qemu", "libvirt", "virt-manager"]
+summary = "Full virtual machines on KVM, every knob exposed. Windows in a box, right where it belongs."
+# From its AppStream metainfo, CC0-1.0 (github.com/virt-manager/virt-manager).
+description = """\
+Virtual Machine Manager provides a graphical tool for administering virtual machines for KVM, \
+Xen, and LXC. Start, stop, add or remove virtual devices, connect to a graphical or serial \
+console, and see resource usage statistics for existing VMs on local or remote machines. Uses \
+libvirt as the backend management API."""
+description_from = "https://github.com/virt-manager/virt-manager/blob/v5.1.0/data/virt-manager.appdata.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "virt-manager"
+keeps = """\
+Your virtual machines stay: their definitions in /etc/libvirt/qemu and their disks in \
+/var/lib/libvirt/images. Install virt-manager again and they're all there."""
+
+[[action]]
+name = "Install virt-manager, QEMU and libvirt"
+kind = "apt"
+packages = [
+  "virt-manager",
+  "libvirt-daemon-system",
+  "qemu-utils",
+  "qemu-system-modules-spice",
+  "gir1.2-spiceclientgtk-3.0",
+  "swtpm-tools",
+]
+amd64 = { packages = ["qemu-system-x86", "ovmf"] }
+arm64 = { packages = ["qemu-system-arm", "qemu-efi-aarch64"] }
+
+[[action]]
+name = "Let you run the machine's virtual machines without sudo"
+kind = "group"
+group = "libvirt"
+
+[[action]]
+name = "Let you use KVM without sudo"
+kind = "group"
+group = "kvm"
+

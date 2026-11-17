@@ -1,0 +1,31 @@
+# darktable from the signed repository its project builds on openSUSE's Build Service,
+# graphics:darktable, the packages darktable's install page names for Ubuntu, whose key
+# system/packages.toml pins ([repo.darktable]). Ubuntu 26.04 and nixpkgs are a feature release
+# behind, and a raw developer's releases are what bring new cameras. The repository builds
+# amd64 alone. Its package writes no source of its own.
+# https://www.darktable.org/install/
+name = "darktable"
+category = "graphics"
+tags = ["photo", "raw", "photography", "darkroom", "lightroom", "catalog"]
+summary = "Lightroom without Adobe. A darkroom for your raw files, with more sliders than sense."
+# Its AppStream metainfo, CC0-1.0 (github.com/darktable-org/darktable).
+description = """\
+darktable manages your camera raw files and images in a database, lets you view them through \
+lighttable mode and develop/enhance them in darkroom mode. Other modes besides lighttable and \
+darkroom are a map for geotagging, tethering, print and a slideshow. darktable supports most \
+modern cameras' raw formats, and does all of its processing at very high precision."""
+description_from = "https://github.com/darktable-org/darktable/blob/release-5.6.2/data/org.darktable.darktable.appdata.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "darktable"
+keeps = """\
+Your library (the catalogue of your photos, their edits and tags), styles and presets stay in \
+~/.config/darktable, and its thumbnails in ~/.cache/darktable: install darktable again and \
+they're all there. Each photo's edits are also in the .xmp file beside it."""
+
+[[action]]
+name = "Install darktable"
+kind = "apt"
+repo = "darktable"
+arch = "amd64"
+packages = ["darktable"]

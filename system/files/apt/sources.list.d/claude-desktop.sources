@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://downloads.claude.ai/claude-desktop/apt/stable
+Suites: stable
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/claude-desktop.gpg

@@ -9,10 +9,13 @@
 //!
 //! - The seam it implements: `host.rs`.
 
+use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fs;
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -20,16 +23,52 @@ use std::process::Stdio;
 
 use super::AptPlan;
 use super::AptSimulation;
+use super::Compression;
+use super::DkmsInstall;
+use super::DkmsStatus;
+use super::Downgrade;
 use super::Host;
 use super::HostError;
+use super::Known;
+use super::Mok;
+use super::Removal;
+use super::SecureBoot;
 use super::UNIT_PROPERTIES;
 use super::UnitState;
+use super::untar_args;
 use crate::apps::action::RUN_PATH;
 use crate::apps::action::Scope;
+use crate::apps::version::compare;
+use crate::apt::Manifest;
+use crate::apt::manifest::MANIFEST;
 use crate::packages::Packages;
+use crate::unfree::Setting;
+use crate::unfree::Unfree;
 
 /// Root's home, the `HOME` of what root runs.
 const ROOT_HOME: &str = "/root";
+
+/// Where the installed kernels' modules are, a folder a kernel, `build` in it its headers.
+const KERNEL_MODULES: &str = "/lib/modules";
+
+/// DKMS's configuration, and the folder of the files that add to it, which name the MOK it signs
+/// with (`mok_certificate`).
+const DKMS_FRAMEWORK: &str = "/etc/dkms/framework.conf";
+const DKMS_FRAMEWORK_D: &str = "/etc/dkms/framework.conf.d";
+
+/// The exit code of `dkms install` for a kernel the module's `dkms.conf` leaves out
+/// (`BUILD_EXCLUSIVE_KERNEL`, `_MIN`, `_MAX`, `_CONFIG`, `_ARCH`).
+const DKMS_EXCLUDED: i32 = 77;
+
+/// DKMS's folder of configuration, which root alone may write for its files to be sourced.
+const DKMS_CONFIG: &str = "/etc/dkms";
+
+/// The MOK's certificate DKMS signs with on Ubuntu when its configuration sets no signing key:
+/// shim-signed's, whatever `mok_certificate` says (`prepare_mok` in `/usr/sbin/dkms`, 3.2).
+const SHIM_MOK: &str = "/var/lib/shim-signed/mok/MOK.der";
+
+/// The certificate DKMS signs with when its configuration sets a signing key and no certificate.
+const DKMS_MOK: &str = "/var/lib/dkms/mok.pub";
 
 /// The options every apt-get install and remove takes: unattended, keeping changed configuration.
 const APT_OPTIONS: [&str; 4] = [
@@ -143,6 +182,59 @@ impl SystemHost {
         }
     }
 
+    /// The signing key and certificate DKMS's configuration files `configs` set through a variable,
+    /// worked out as DKMS works them out: each file sourced by bash in turn, `kernelver` and
+    /// `arch` set as DKMS sets them for `kernel`, nothing else of this process's environment, each
+    /// empty when unset. Only files root owns and no one else may write are sourced, in folders
+    /// root owns and no one else may write, as root reads them.
+    fn signing_through_dkms(&self, configs: &[PathBuf], kernel: &str) -> Result<(String, String), HostError> {
+        let folders = [Path::new(DKMS_CONFIG), Path::new(DKMS_FRAMEWORK_D)];
+        let present = folders.into_iter().filter(|f| f.symlink_metadata().is_ok());
+        for path in present.chain(configs.iter().map(PathBuf::as_path)) {
+            let meta = fs::symlink_metadata(path).map_err(HostError::io(path))?;
+            if meta.uid() != 0 || meta.mode() & 0o022 != 0 || meta.file_type().is_symlink() {
+                return Err(HostError::Mok {
+                    why: format!(
+                        "{} isn't root's alone to write, or is a link, so DKMS's configuration isn't sourced",
+                        path.display()
+                    ),
+                });
+            }
+        }
+        let machine = match self.arch.as_str() {
+            "arm64" => "aarch64",
+            _ => "x86_64",
+        };
+        let output = self
+            .command("bash")
+            .args(mok_source_args(configs, kernel, machine))
+            .output()
+            .map_err(|source| HostError::Spawn {
+                program: "bash".to_owned(),
+                source,
+            })?;
+        let shown = String::from_utf8_lossy(&output.stdout).into_owned();
+        let parsed = shown.split_once('\0').map(|(k, c)| (k.to_owned(), c.to_owned()));
+        match parsed {
+            Some((key, certificate))
+                if output.status.success() && (certificate.is_empty() || certificate.starts_with('/')) =>
+            {
+                Ok((key, certificate))
+            }
+            _ => Err(HostError::Mok {
+                why: format!(
+                    "sourcing {} for {kernel} sets {:?}",
+                    configs
+                        .iter()
+                        .map(|c| c.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    shown.replace('\0', " ")
+                ),
+            }),
+        }
+    }
+
     fn systemctl(&self, scope: Scope) -> Command {
         let mut command = self.command("systemctl");
         if scope == Scope::User {
@@ -226,6 +318,27 @@ impl Host for SystemHost {
         Self::out(self.command(self.checkout.join("system/apt-repo.sh")).arg(repo)).map(drop)
     }
 
+    fn apt_repo_ready(&mut self, repo: &str) -> Result<bool, HostError> {
+        let path = self.checkout.join(MANIFEST);
+        let manifest = Manifest::read(&path).map_err(HostError::Manifest)?.unwrap_or_default();
+        Ok(manifest
+            .repos()
+            .get(repo)
+            .is_some_and(|r| r.in_place(repo, Path::new("/"))))
+    }
+
+    fn apt_keys_due(&mut self, repos: &[String]) -> Result<BTreeSet<String>, HostError> {
+        if repos.is_empty() {
+            return Ok(BTreeSet::new());
+        }
+        let shown = Self::out(
+            self.command(self.checkout.join("system/apt-repo.sh"))
+                .arg("--keys-due")
+                .args(repos),
+        )?;
+        Ok(shown.lines().map(str::to_owned).collect())
+    }
+
     fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError> {
         let mut command = self.command("apt-get");
         command.arg("-s");
@@ -237,17 +350,20 @@ impl Host for SystemHost {
         Ok(simulation(&Self::out(&mut command)?, &self.arch))
     }
 
-    fn apt_install(&mut self, packages: &[String]) -> Result<(), HostError> {
+    fn apt_install(&mut self, packages: &[String], downgrade: Downgrade) -> Result<(), HostError> {
         if packages.is_empty() {
             return Ok(());
         }
-        Self::out(
-            self.command("apt-get")
-                .args(["install", "-y", "--no-install-recommends"])
-                .args(APT_OPTIONS)
-                .args(packages),
-        )
-        .map(drop)
+        let mut command = self.command("apt-get");
+        command.args(["install", "-y", "--no-install-recommends"]);
+        if downgrade == Downgrade::Allow {
+            command.arg("--allow-downgrades");
+        }
+        Self::out(command.args(APT_OPTIONS).args(packages)).map(drop)
+    }
+
+    fn untar(&mut self, archive: &Path, into: &Path, compression: Compression, strip: u32) -> Result<(), HostError> {
+        Self::out(self.command("tar").args(untar_args(archive, into, compression, strip))).map(drop)
     }
 
     fn deb_install(&mut self, deb: &Path) -> Result<(), HostError> {
@@ -260,14 +376,39 @@ impl Host for SystemHost {
         .map(drop)
     }
 
-    fn apt_remove(&mut self, packages: &[String]) -> Result<(), HostError> {
+    fn apt_remove(&mut self, packages: &[String], removal: Removal) -> Result<(), HostError> {
+        let mut command = self.command("apt-get");
+        match removal {
+            Removal::KeepConfig => command.args(["remove", "-y"]),
+            Removal::Purge => command.args(["purge", "-y"]),
+        };
+        Self::out(command.args(APT_OPTIONS).args(packages)).map(drop)
+    }
+
+    fn dpkg_purge(&mut self, packages: &[String]) -> Result<(), HostError> {
         Self::out(
-            self.command("apt-get")
-                .args(["remove", "-y"])
-                .args(APT_OPTIONS)
+            self.command("dpkg")
+                .args(["--purge", "--force-remove-essential", "--force-remove-protected"])
                 .args(packages),
         )
         .map(drop)
+    }
+
+    fn important(&mut self, packages: &[String]) -> Result<BTreeSet<String>, HostError> {
+        if packages.is_empty() {
+            return Ok(BTreeSet::new());
+        }
+        // dpkg-query exits 1 when it knows none of them, which is an answer, not a failure.
+        let output = self
+            .command("dpkg-query")
+            .args(["-W", "-f=${Package}\t${Architecture}\t${Essential}\t${Protected}\n"])
+            .args(packages)
+            .output()
+            .map_err(|source| HostError::Spawn {
+                program: "dpkg-query".to_owned(),
+                source,
+            })?;
+        Ok(important(&String::from_utf8_lossy(&output.stdout), &self.arch))
     }
 
     fn fetch(&mut self, url: &str, sha256: &str, to: &Path) -> Result<(), HostError> {
@@ -292,6 +433,10 @@ impl Host for SystemHost {
     fn nix_list(&mut self) -> Result<BTreeSet<String>, HostError> {
         let names = self.nix()?.list().map_err(|e| HostError::Nix(Box::new(e)))?;
         Ok(names.into_iter().collect())
+    }
+
+    fn unfree(&mut self) -> Result<Unfree, HostError> {
+        Setting::read(self.nix()?.state().root()).map_err(|e| HostError::Nix(Box::new(e)))
     }
 
     fn nix_add(&mut self, names: &[String]) -> Result<(), HostError> {
@@ -362,6 +507,10 @@ impl Host for SystemHost {
         Self::out(self.systemctl(scope).args([verb, unit])).map(drop)
     }
 
+    fn restart(&mut self, scope: Scope, unit: &str) -> Result<(), HostError> {
+        Self::out(self.systemctl(scope).args(["try-restart", unit])).map(drop)
+    }
+
     fn lingers(&mut self) -> Result<bool, HostError> {
         let shown =
             Self::out(
@@ -374,6 +523,169 @@ impl Host for SystemHost {
     fn set_linger(&mut self, on: bool) -> Result<(), HostError> {
         let verb = if on { "enable-linger" } else { "disable-linger" };
         Self::out(self.command("loginctl").args([verb, &self.user])).map(drop)
+    }
+
+    fn foreign_arches(&mut self) -> Result<BTreeSet<String>, HostError> {
+        let shown = Self::out(self.command("dpkg").arg("--print-foreign-architectures"))?;
+        Ok(shown.split_whitespace().map(str::to_owned).collect())
+    }
+
+    fn set_foreign_arch(&mut self, arch: &str, on: bool) -> Result<(), HostError> {
+        let verb = if on {
+            "--add-architecture"
+        } else {
+            "--remove-architecture"
+        };
+        Self::out(self.command("dpkg").args([verb, arch])).map(drop)
+    }
+
+    fn arch_packages(&mut self, arch: &str) -> Result<BTreeMap<String, Known>, HostError> {
+        let shown = Self::out(
+            self.command("dpkg-query")
+                .args(["-W", "-f=${db:Status-Abbrev}\t${Package}\t${Architecture}\n"]),
+        )?;
+        Ok(known_of_arch(&shown, arch, &self.arch))
+    }
+
+    fn apt_update(&mut self) -> Result<(), HostError> {
+        Self::out(self.command("apt-get").args(["update", "-q"])).map(drop)
+    }
+
+    fn kernels(&mut self) -> Result<BTreeSet<String>, HostError> {
+        let dir = Path::new(KERNEL_MODULES);
+        let entries = match fs::read_dir(dir) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(BTreeSet::new()),
+            Err(e) => return Err(HostError::io(dir)(e)),
+        };
+        Ok(entries
+            .flatten()
+            .filter(|entry| entry.path().join("build").is_dir())
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .collect())
+    }
+
+    fn dkms_status(&mut self, module: &str, version: &str) -> Result<DkmsStatus, HostError> {
+        let shown = Self::out(self.command("dkms").args(["status", "-m", module, "-v", version]))?;
+        Ok(dkms_status(&shown, module, version))
+    }
+
+    fn dkms_add(&mut self, module: &str, version: &str) -> Result<(), HostError> {
+        Self::out(self.command("dkms").args(["add", "-m", module, "-v", version])).map(drop)
+    }
+
+    fn dkms_install(&mut self, module: &str, version: &str, kernel: &str) -> Result<DkmsInstall, HostError> {
+        match Self::out(
+            self.command("dkms")
+                .args(["install", "--force", "-m", module, "-v", version, "-k", kernel]),
+        ) {
+            Ok(_) => Ok(DkmsInstall::Installed),
+            Err(HostError::Failed {
+                code: Some(DKMS_EXCLUDED),
+                ..
+            }) => Ok(DkmsInstall::Excluded),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn dkms_remove(&mut self, module: &str, version: &str) -> Result<(), HostError> {
+        Self::out(
+            self.command("dkms")
+                .args(["remove", "-m", module, "-v", version, "--all"]),
+        )
+        .map(drop)
+    }
+
+    fn module_signer(&mut self, module: &str, kernel: &str) -> Result<Option<String>, HostError> {
+        match Self::out(self.command("modinfo").args(["-k", kernel, "-F", "sig_key", module])) {
+            Ok(shown) => Ok(Some(shown.trim().to_owned()).filter(|key| !key.is_empty())),
+            Err(HostError::Failed { .. }) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn mok(&mut self, kernel: &str) -> Result<Option<Mok>, HostError> {
+        let mut configs = vec![PathBuf::from(DKMS_FRAMEWORK)];
+        if let Ok(entries) = fs::read_dir(DKMS_FRAMEWORK_D) {
+            let mut more: Vec<PathBuf> = entries
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| p.extension().is_some_and(|e| e == "conf"))
+                .collect();
+            more.sort();
+            configs.extend(more);
+        }
+        configs.retain(|p| p.is_file());
+        let texts: Vec<String> = configs.iter().filter_map(|p| fs::read_to_string(p).ok()).collect();
+        let (key, certificate) = match signing_named(texts.iter().map(String::as_str)) {
+            Named::Values { key, certificate } => (key, certificate),
+            Named::Variable => self.signing_through_dkms(&configs, kernel)?,
+        };
+        // One that isn't there yet DKMS makes as it signs the next module.
+        let certificate = dkms_certificate(&key, &certificate);
+        if !certificate.is_file() {
+            return Ok(None);
+        }
+        let mut serial = None;
+        for form in ["DER", "PEM"] {
+            let shown = self
+                .command("openssl")
+                .args(["x509", "-inform", form, "-noout", "-serial", "-in"])
+                .arg(&certificate)
+                .output()
+                .map_err(|source| HostError::Spawn {
+                    program: "openssl".to_owned(),
+                    source,
+                })?;
+            if shown.status.success() {
+                serial = certificate_serial(&String::from_utf8_lossy(&shown.stdout));
+                break;
+            }
+        }
+        Ok(serial.map(|serial| Mok { certificate, serial }))
+    }
+
+    fn secure_boot(&mut self, certificate: Option<&Path>) -> Result<SecureBoot, HostError> {
+        let said = |command: &mut Command| -> Result<String, HostError> {
+            let output = command.output().map_err(|source| HostError::Spawn {
+                program: "mokutil".to_owned(),
+                source,
+            })?;
+            Ok(format!(
+                "{}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ))
+        };
+        // mokutil exits 1 for a key that is enrolled or queued, so its words say, not its code.
+        let state = said(self.command("mokutil").arg("--sb-state"))?;
+        if !state.contains("SecureBoot enabled") {
+            return Ok(SecureBoot::Off);
+        }
+        let Some(certificate) = certificate else {
+            return Ok(SecureBoot::Unknown);
+        };
+        Ok(enrolment(&said(
+            self.command("mokutil").arg("--test-key").arg(certificate),
+        )?))
+    }
+
+    fn module_users(&mut self, module: &str) -> Result<Option<u32>, HostError> {
+        let dir = PathBuf::from(format!("/sys/module/{}", module.replace('-', "_")));
+        if !dir.is_dir() {
+            return Ok(None);
+        }
+        let refcnt = dir.join("refcnt");
+        let held = match fs::read_to_string(&refcnt) {
+            Ok(text) => text.trim().parse().unwrap_or(0),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => 0,
+            Err(e) => return Err(HostError::io(&refcnt)(e)),
+        };
+        Ok(Some(held + bound_devices(&dir)))
+    }
+
+    fn unload(&mut self, module: &str) -> Result<(), HostError> {
+        Self::out(self.command("modprobe").args(["-r", module])).map(drop)
     }
 
     fn run(&mut self, argv: &[String], dir: &Path) -> Result<(), HostError> {
@@ -394,19 +706,33 @@ impl Host for SystemHost {
 }
 
 /// What `apt-get -s` printed: `Remv <package> [<version>]` for each package it would remove, and
-/// `Inst <package> (<version> …)` for each it would newly install; an upgrade is
-/// `Inst <package> [<old version>] (…)`, of a package that is there already. A package of
-/// another architecture than `arch`, the machine's, keeps its `:<arch>`, as it is another package.
+/// `Inst <package> (<version> …)` for each it would newly install; a package that is there already
+/// is `Inst <package> [<old version>] (<new version> …)`, an upgrade or, when the new version sorts
+/// below the old one, a downgrade. A package of another architecture than `arch`, the machine's,
+/// keeps its `:<arch>`, as it is another package.
 fn simulation(shown: &str, arch: &str) -> AptSimulation {
-    let name = |rest: &str| rest.split_whitespace().next().map(|word| qualified(word, arch));
     let mut simulation = AptSimulation::default();
     for line in shown.lines() {
-        if let Some(rest) = line.strip_prefix("Remv ") {
-            simulation.removes.extend(name(rest));
-        } else if let Some(rest) = line.strip_prefix("Inst ")
-            && !rest.split_whitespace().nth(1).is_some_and(|w| w.starts_with('['))
-        {
-            simulation.installs.extend(name(rest));
+        let mut words = line.split_whitespace();
+        let (Some(verb), Some(package)) = (words.next(), words.next()) else {
+            continue;
+        };
+        let package = qualified(package, arch);
+        match (verb, words.next()) {
+            ("Remv", _) => {
+                simulation.removes.insert(package);
+            }
+            ("Inst", Some(old)) if old.starts_with('[') => {
+                let old = old.trim_start_matches('[').trim_end_matches(']');
+                let new = words.next().map(|w| w.trim_start_matches('('));
+                if new.is_some_and(|new| compare(new, old) == Ordering::Less) {
+                    simulation.downgrades.insert(package);
+                }
+            }
+            ("Inst", _) => {
+                simulation.installs.insert(package);
+            }
+            _ => {}
         }
     }
     simulation
@@ -427,6 +753,178 @@ fn package_name(name: &str, of: &str, arch: &str) -> String {
         name.to_owned()
     } else {
         format!("{name}:{of}")
+    }
+}
+
+/// The packages of `of` in what `dpkg-query -W` shows, `<status>\t<package>\t<architecture>` a
+/// line, on a machine of `arch`: every one dpkg has in a state other than not installed (its
+/// status's second letter `n`), as dpkg refuses to drop an architecture while it has one, each
+/// with whether only its configuration is left (`c`).
+fn known_of_arch(shown: &str, of: &str, arch: &str) -> BTreeMap<String, Known> {
+    shown
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split('\t');
+            let (status, name, its) = (fields.next()?, fields.next()?, fields.next()?);
+            let known = match status.chars().nth(1)? {
+                'n' => return None,
+                'c' => Known::ConfigFiles,
+                _ => Known::Installed,
+            };
+            (its == of).then(|| (package_name(name, its, arch), known))
+        })
+        .collect()
+}
+
+/// What `dkms status -m <module> -v <version>` shows of them: a line a kernel,
+/// `<module>/<version>, <kernel>, <arch>: installed`, or `<module>/<version>: added` before any is
+/// built.
+fn dkms_status(shown: &str, module: &str, version: &str) -> DkmsStatus {
+    let mut status = DkmsStatus::default();
+    let ours = format!("{module}/{version}");
+    for line in shown.lines() {
+        let Some((head, state)) = line.split_once(": ") else {
+            continue;
+        };
+        let mut parts = head.split(", ");
+        if parts.next().map(str::trim) != Some(ours.as_str()) {
+            continue;
+        }
+        status.added = true;
+        if let Some(kernel) = parts.next()
+            && state.trim_start().starts_with("installed")
+        {
+            status.installed.insert(kernel.trim().to_owned());
+        }
+    }
+    status
+}
+
+/// What DKMS's configuration sets of its signing key and certificate.
+#[derive(Debug, PartialEq, Eq)]
+enum Named {
+    /// Each as written, empty when unset.
+    Values { key: String, certificate: String },
+    /// One through a variable (`$kernelver`), which only sourcing the files works out.
+    Variable,
+}
+
+/// What DKMS's configuration files `texts`, in the order DKMS reads them, set of
+/// `mok_signing_key` and `mok_certificate`, the last of each one read.
+fn signing_named<'a>(texts: impl Iterator<Item = &'a str>) -> Named {
+    let (mut key, mut certificate) = (String::new(), String::new());
+    for line in texts.flat_map(str::lines) {
+        let line = line.trim();
+        let (slot, value) = if let Some(value) = line.strip_prefix("mok_signing_key=") {
+            (&mut key, value)
+        } else if let Some(value) = line.strip_prefix("mok_certificate=") {
+            (&mut certificate, value)
+        } else {
+            continue;
+        };
+        let value = value.trim().trim_matches('"').trim_matches('\'');
+        if value.contains(['$', '`']) {
+            return Named::Variable;
+        }
+        value.clone_into(slot);
+    }
+    Named::Values { key, certificate }
+}
+
+/// The certificate DKMS signs with, from what its configuration sets, as `prepare_mok` in DKMS
+/// 3.2 on Ubuntu has it: no signing key is shim-signed's key and certificate, whatever
+/// `mok_certificate` says; a signing key with no certificate is DKMS's own `mok.pub`.
+fn dkms_certificate(key: &str, certificate: &str) -> PathBuf {
+    if key.is_empty() {
+        PathBuf::from(SHIM_MOK)
+    } else if certificate.is_empty() {
+        PathBuf::from(DKMS_MOK)
+    } else {
+        PathBuf::from(certificate)
+    }
+}
+
+/// bash's arguments that source `configs` in turn, as DKMS does, with `kernelver` and `arch`
+/// set as DKMS sets them for `kernel` on a `machine` (`uname -m`), and print the
+/// `mok_signing_key` and `mok_certificate` they set, a NUL between.
+fn mok_source_args(configs: &[PathBuf], kernel: &str, machine: &str) -> Vec<OsString> {
+    let script = "kernelver=$1 arch=$2; shift 2; for f; do . \"$f\" || exit 1; done; printf '%s\\0%s' \"${mok_signing_key-}\" \"${mok_certificate-}\"";
+    let mut args: Vec<OsString> = vec![
+        "-c".into(),
+        script.into(),
+        "kubaos-mok".into(),
+        kernel.into(),
+        machine.into(),
+    ];
+    args.extend(configs.iter().map(|c| c.as_os_str().to_owned()));
+    args
+}
+
+/// The devices bound to the drivers of the loaded module whose `/sys/module` folder is `dir`:
+/// its `drivers/` links each to a driver's folder, where each bound device is a link.
+fn bound_devices(dir: &Path) -> u32 {
+    let Ok(drivers) = fs::read_dir(dir.join("drivers")) else {
+        return 0;
+    };
+    let mut bound = 0;
+    for driver in drivers.flatten() {
+        let Ok(entries) = fs::read_dir(driver.path()) else {
+            continue;
+        };
+        let devices = entries
+            .flatten()
+            .filter(|entry| entry.file_name() != "module" && entry.file_type().is_ok_and(|t| t.is_symlink()));
+        bound += u32::try_from(devices.count()).unwrap_or(u32::MAX);
+    }
+    bound
+}
+
+/// The packages apt marks important in what `dpkg-query -W` shows,
+/// `<package>\t<architecture>\t<Essential>\t<Protected>` a line, on a machine of `arch`.
+fn important(shown: &str, arch: &str) -> BTreeSet<String> {
+    shown
+        .lines()
+        .filter_map(|line| {
+            let fields: Vec<&str> = line.split('\t').collect();
+            let [name, of, essential, protected] = fields[..] else {
+                return None;
+            };
+            (essential == "yes" || protected == "yes").then(|| package_name(name, of, arch))
+        })
+        .collect()
+}
+
+/// The serial `openssl x509 -serial` printed (`serial=0A1B…`), as `modinfo` names a key: hex
+/// pairs, uppercase, joined by `:`.
+fn certificate_serial(shown: &str) -> Option<String> {
+    let hex = shown.trim().strip_prefix("serial=")?;
+    if hex.is_empty() || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let hex = if hex.len() % 2 == 1 {
+        format!("0{hex}")
+    } else {
+        hex.to_owned()
+    };
+    let pairs: Vec<String> = hex
+        .to_ascii_uppercase()
+        .as_bytes()
+        .chunks(2)
+        .map(|pair| String::from_utf8_lossy(pair).into_owned())
+        .collect();
+    Some(pairs.join(":"))
+}
+
+/// What `mokutil --test-key` said of the MOK, Secure Boot being on.
+fn enrolment(said: &str) -> SecureBoot {
+    if said.contains("is already enrolled") || said.contains("is already in db") {
+        SecureBoot::Enrolled
+    } else if said.contains("already in the enrollment request") {
+        SecureBoot::Queued
+    } else if said.contains("is not enrolled") {
+        SecureBoot::NotEnrolled
+    } else {
+        SecureBoot::Unknown
     }
 }
 

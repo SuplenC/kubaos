@@ -39,6 +39,11 @@ impl FetchError {
     }
 }
 
+/// How often curl tries a failed fetch again, waiting 1, 2, 4, 8, 16 and 32 seconds between: a
+/// mirror such as Launchpad's answers 503 for a minute or so at a time, and a check that fails
+/// on that says nothing about the catalog.
+const RETRIES: &str = "6";
+
 fn curl() -> Command {
     let mut command = Command::new("curl");
     command.args([
@@ -47,7 +52,7 @@ fn curl() -> Command {
         "--fail",
         "--location",
         "--retry",
-        "3",
+        RETRIES,
         "--max-time",
         MAX_TIME,
     ]);
@@ -97,33 +102,53 @@ pub fn sha256(url: &str) -> Result<String, FetchError> {
     Ok(hex(&hasher.finalize()))
 }
 
-/// The HTTP status `url` ends on, after its redirects.
+/// Where a URL ends, after its redirects.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Answer {
+    pub status: u16,
+    /// Cloudflare answered with its bot challenge (`cf-mitigated: challenge`), which a browser
+    /// passes and curl can't.
+    pub challenged: bool,
+}
+
+/// The HTTP status `url` ends on, after its redirects, and whether it is Cloudflare's challenge.
 ///
 /// # Errors
 ///
 /// [`FetchError`] when curl can't run or can't reach the server.
-pub fn status(url: &str) -> Result<u16, FetchError> {
+pub fn status(url: &str) -> Result<Answer, FetchError> {
     let output = Command::new("curl")
         .args([
             "--silent",
             "--show-error",
             "--location",
             "--retry",
-            "3",
+            RETRIES,
             "--max-time",
             "60",
         ])
-        .args(["--output", "/dev/null", "--write-out", "%{http_code}", "--"])
+        .args([
+            "--output",
+            "/dev/null",
+            "--write-out",
+            "%{http_code} %header{cf-mitigated}",
+            "--",
+        ])
         .arg(url)
         .output()
         .map_err(FetchError::Spawn)?;
     if !output.status.success() {
         return Err(FetchError::failed(&output.stderr));
     }
-    String::from_utf8_lossy(&output.stdout)
-        .trim()
+    let written = String::from_utf8_lossy(&output.stdout);
+    let (code, mitigated) = written.trim().split_once(' ').unwrap_or((written.trim(), ""));
+    let status = code
         .parse()
-        .map_err(|_| FetchError::Failed(format!("no status from {url}")))
+        .map_err(|_| FetchError::Failed(format!("no status from {url}")))?;
+    Ok(Answer {
+        status,
+        challenged: mitigated.trim().eq_ignore_ascii_case("challenge"),
+    })
 }
 
 /// GitHub's API at `path` (`repos/OWNER/REPO/…`), as JSON. `GITHUB_TOKEN`, when set, goes to curl

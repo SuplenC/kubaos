@@ -5,7 +5,7 @@
 //!
 //! - [`Catalog`]: loading the folders, finding an app, the packages its apps install, checking each
 //!   app's requirements (apps of the catalog with one way to be set up, no cycle) and its vendor
-//!   repositories against the package manifest.
+//!   repositories against the package manifest, and the architectures an app installs on.
 //!
 //! # Not here
 //!
@@ -17,13 +17,16 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
+use super::action::ARCHES;
 use super::action::Kind;
 use super::folder::APP_FILE;
 use super::folder::Folder;
 use super::folder::FolderError;
 use super::folder::FolderSetup;
 use super::folder::is_app_id;
+use crate::apps::Platform;
 use crate::apt::Manifest;
+use crate::unfree::Unfree;
 
 /// The catalog's folder, inside the release's checkout.
 pub const CATALOG: &str = "apps";
@@ -103,6 +106,20 @@ impl Catalog {
         let catalog = Self::new(apps);
         catalog.check_requires()?;
         Ok(catalog)
+    }
+
+    /// Reads the catalog in `dir`, as [`Catalog::load`], from a folder that must be there: one
+    /// named by hand, where a missing folder is a typo, not a release without apps.
+    ///
+    /// # Errors
+    ///
+    /// As [`Catalog::load`], and [`CatalogError::Read`] when `dir` is missing.
+    pub fn load_existing(dir: &Path) -> Result<Self, CatalogError> {
+        fs::metadata(dir).map_err(|source| CatalogError::Read {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+        Self::load(dir)
     }
 
     /// Checks that every app an app requires, in any setup, is one of the catalog's with one way
@@ -192,14 +209,30 @@ impl Catalog {
             .filter(|app| app.packages().iter().any(|p| packages.iter().any(|q| q == p)))
     }
 
-    /// Whether an install of `app` in `setup` has something for a machine of `arch`: every step
-    /// of its own, and of every app it requires, through what those require.
-    pub fn available(&self, app: &Folder, setup: Option<&FolderSetup>, arch: &str) -> bool {
-        app.available(arch, setup)
+    /// Whether an install of `app` in `setup` has something for `platform`: every step of its
+    /// own, and of every app it requires, through what those require.
+    pub fn available(&self, app: &Folder, setup: Option<&FolderSetup>, platform: Platform<'_>) -> bool {
+        app.available(platform, setup)
             && app.requires(setup).all(|r| {
                 self.get(r.id())
-                    .is_some_and(|required| self.available(required, None, arch))
+                    .is_some_and(|required| self.available(required, None, platform))
             })
+    }
+
+    /// The architectures `app` installs on, in one setup at least, of the ones the catalog knows.
+    /// An unfree package counts as let in: whether it is, is the user's to change at any time.
+    pub fn arches(&self, app: &Folder) -> Vec<&'static str> {
+        ARCHES
+            .into_iter()
+            .filter(|arch| {
+                let platform = Platform::new(arch, Unfree::Allowed);
+                if app.has_setups() {
+                    app.setups.iter().any(|s| self.available(app, Some(s), platform))
+                } else {
+                    self.available(app, None, platform)
+                }
+            })
+            .collect()
     }
 
     /// The apps that require `id` in any of their setups, in id order.

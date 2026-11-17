@@ -1,0 +1,29 @@
+# Distrobox from Ubuntu's archive, 1.8.2.4, with Podman to run its containers. nixpkgs and upstream
+# have 1.8.2.5, a patch release of fixes for other distributions' containers and the docs; Ubuntu's
+# archive comes before nixpkgs in the catalog's order of sources, and a patch behind is still
+# current, so it stays the source. An install takes no package's recommendations, so the step
+# names passt, which a container of the user's needs for its network.
+# https://distrobox.it/
+name = "Distrobox"
+category = "development"
+tags = ["containers", "distro", "podman", "toolbox", "arch", "fedora"]
+summary = "Any Linux distro in a container, wired into your home. Arch without reinstalling a damn thing."
+# Distrobox's own words are under the GPL, which asks for its whole text with every copy, so this
+# is ours.
+description = """\
+Distrobox makes containers of any Linux distribution that share this machine's home folder, \
+display, sound, USB devices and network, so a program from Arch, Fedora, Alpine or another \
+release of Ubuntu runs as if it were installed here. Programs installed in a container can be put \
+in the menu and on the command line. It runs its containers with Podman, as you, without root."""
+description_from = "kubaos"
+# Distrobox's logo mark, GPL-3.0-only, on a tile (distrobox.svg's header): Colloid has none, and the
+# package's own icon arrives only with it.
+icon = "distrobox.svg"
+keeps = """\
+Your containers and their images stay in ~/.local/share/containers: install Distrobox again and \
+distrobox list finds them. distrobox rm takes one away for good."""
+
+[[action]]
+name = "Install Distrobox and Podman"
+kind = "apt"
+packages = ["distrobox", "podman", "passt"]

@@ -3,11 +3,11 @@
 //!
 //! An app is installed when its user journal says its install is complete, in the setup that
 //! journal names, and its journals own something; one they own nothing of is found: on the
-//! machine, KubaOS's to leave. An app with no journal whose own packages dpkg has (installed by
-//! hand, or before KubaOS kept journals) is installed when it is picked, as taking it in will
-//! make it KubaOS's, and found when not. That is two small files an app at most and the one dpkg
-//! query the caller made, with no check run, so a status read stays cheap; a version is its
-//! first package's.
+//! machine, KubaOS's to leave. An app with no journal whose own packages dpkg has, at a version
+//! its action takes as the app's (installed by hand, or before KubaOS kept journals), is
+//! installed when it is picked, as taking it in will make it KubaOS's, and found when not. That is
+//! two small files an app at most and the one dpkg query the caller made, with no check run, so a
+//! status read stays cheap; a version is its first package's.
 //!
 //! # Owns
 //!
@@ -22,13 +22,17 @@ use std::path::Path;
 
 use serde::Serialize;
 
+use super::action::version_matches;
 use super::catalog::Catalog;
 use super::folder::Category;
 use super::folder::Folder;
 use super::folder::FolderSetup;
+use super::folder::Requirement;
+use super::folder::Source;
 use super::journal::Journal;
 use super::journal::JournalError;
 use super::picks::Picks;
+use crate::apps::Platform;
 use crate::apt::Dpkg;
 
 /// Where one app stands.
@@ -76,14 +80,22 @@ pub struct SetupInfo {
     pub id: String,
     pub name: String,
     pub summary: String,
+    /// The apps it requires besides the app's own, by id.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<String>,
+    /// Where an install in it takes the app from, the app's own actions included.
+    pub sources: Vec<Source>,
 }
 
-impl From<&FolderSetup> for SetupInfo {
-    fn from(setup: &FolderSetup) -> Self {
+impl SetupInfo {
+    /// `setup` of `app`.
+    pub fn of(app: &Folder, setup: &FolderSetup) -> Self {
         Self {
             id: setup.id.clone(),
             name: setup.name.clone(),
             summary: setup.summary.clone(),
+            requires: setup.requires.iter().map(|r| r.id().to_owned()).collect(),
+            sources: app.sources(Some(setup)),
         }
     }
 }
@@ -98,6 +110,10 @@ pub struct AppStatus {
     pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// The KubaOS Symbol drawn in place of a picture, by the name the shell gives it, for an app
+    /// with no logo.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
     pub picked: bool,
     pub state: AppState,
     /// The installed version of its first apt or `.deb` package, when dpkg was asked.
@@ -113,6 +129,10 @@ pub struct AppStatus {
     /// configure` runs alone again.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub configurable: bool,
+    /// Its last removal couldn't undo a step and was rolled back: that step and why, and
+    /// whether the rollback put everything back.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub removal_rolled_back: Option<super::journal::RolledBack>,
     /// Whether each setup, or the app without setups, has something for this machine: by
     /// `setups`' order, or one value for an app without setups.
     #[serde(skip)]
@@ -152,7 +172,7 @@ pub struct Status {
 
 impl Status {
     /// The status of the apps of `catalog` with `picks`, installed as the user journals in
-    /// `journals` and root's in `root_journals` say, on a machine of `arch`, with the packages
+    /// `journals` and root's in `root_journals` say, on `platform`, with the packages
     /// and versions `dpkg` has when given.
     ///
     /// # Errors
@@ -163,9 +183,10 @@ impl Status {
         picks: &Picks,
         journals: &Path,
         root_journals: &Path,
-        arch: &str,
+        platform: Platform<'_>,
         dpkg: Option<&Dpkg>,
     ) -> Result<Self, JournalError> {
+        let arch = platform.arch;
         let mut apps = Vec::new();
         for app in catalog.apps() {
             let journal = Journal::read(journals, &app.id)?;
@@ -173,10 +194,10 @@ impl Status {
             let available: Vec<bool> = if app.has_setups() {
                 app.setups
                     .iter()
-                    .map(|s| catalog.available(app, Some(s), arch))
+                    .map(|s| catalog.available(app, Some(s), platform))
                     .collect()
             } else {
-                vec![catalog.available(app, None, arch)]
+                vec![catalog.available(app, None, platform)]
             };
             let picked = picks.has(&app.id);
             let owns = match installed {
@@ -210,13 +231,15 @@ impl Status {
                 summary: app.summary.clone(),
                 category: app.category,
                 tags: app.tags.clone(),
-                icon: app.icon.clone(),
+                icon: app.icon_shown(),
+                symbol: app.symbol_shown().map(str::to_owned),
                 picked,
                 state,
                 version: version.filter(|_| state.is_installed()),
                 setup: installed.and_then(|j| j.setup.clone()),
-                setups: app.setups.iter().map(SetupInfo::from).collect(),
+                setups: app.setups.iter().map(|s| SetupInfo::of(app, s)).collect(),
                 configurable,
+                removal_rolled_back: super::journal::rolled_back(journals, &app.id),
                 available,
             });
         }
@@ -233,10 +256,15 @@ impl Status {
     }
 }
 
-/// Whether dpkg has every package of `app`'s own actions for `arch`, and it has any.
+/// Whether dpkg has every package of `app`'s own actions for `arch`, at a version that is the
+/// app's, and it has any.
 fn has_packages(app: &Folder, arch: &str, dpkg: &Dpkg) -> bool {
     let packages = app.own_packages(arch);
-    !packages.is_empty() && packages.iter().all(|p| dpkg.has(p))
+    !packages.is_empty()
+        && packages.iter().all(|(package, versions)| {
+            dpkg.get(package)
+                .is_some_and(|i| versions.is_none_or(|v| version_matches(v, &i.version)))
+        })
 }
 
 /// One app of the catalog as `kubaos app list` shows it, with no fact of the machine, so the list
@@ -255,13 +283,23 @@ pub struct Listed<'a> {
     /// The setups it offers, by id; none for an app with one way only.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub setups: Vec<SetupInfo>,
+    /// The apps it requires in every setup, by id; a setup's own are its [`SetupInfo`]'s.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<&'a str>,
+    /// Where its install takes it from, in the catalog's order of sources; an app with setups
+    /// says it in each [`SetupInfo`] instead.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub sources: Vec<Source>,
+    /// The architectures it installs on, in one setup at least.
+    pub arches: Vec<&'static str>,
 }
 
-/// Every app of `catalog`, by id, and whether it is picked.
+/// Every app of `catalog` by category, in [`Category`]'s order, then by id, and whether it is
+/// picked.
 pub fn listing<'a>(catalog: &'a Catalog, picks: &'a Picks) -> Vec<Listed<'a>> {
-    catalog
-        .apps()
-        .iter()
+    let mut apps: Vec<&Folder> = catalog.apps().iter().collect();
+    apps.sort_by_key(|app| app.category);
+    apps.into_iter()
         .map(|app| Listed {
             id: &app.id,
             name: &app.name,
@@ -270,7 +308,14 @@ pub fn listing<'a>(catalog: &'a Catalog, picks: &'a Picks) -> Vec<Listed<'a>> {
             tags: &app.tags,
             picked: picks.has(&app.id),
             setup: picks.setup(&app.id),
-            setups: app.setups.iter().map(SetupInfo::from).collect(),
+            setups: app.setups.iter().map(|s| SetupInfo::of(app, s)).collect(),
+            requires: app.requires.iter().map(Requirement::id).collect(),
+            sources: if app.has_setups() {
+                Vec::new()
+            } else {
+                app.sources(None)
+            },
+            arches: catalog.arches(app),
         })
         .collect()
 }

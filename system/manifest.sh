@@ -17,6 +17,8 @@
 #   record_drop PKG...          take packages out of the record, which hands
 #                               them to whatever owns them now
 #   repo_setup REPO...          the vendor repo's key and sources file
+#   repo_refresh REPO...        the same, where a repo that fails is a warning
+#   repo_key_due REPO           repo_setup would fetch its key or its next key again
 #
 # Install and record go through lib.sh's run and sudo_run, so --dry-run
 # changes nothing. A group that isn't wanted is skipped with a line saying why.
@@ -129,16 +131,67 @@ choice_set() {
 }
 
 repo_setup() {
-  local repo sources
-  for repo in "$@"; do
-    sources="$MANIFEST_SYSTEM_DIR/files/apt/sources.list.d/$repo.sources"
-    [[ -f "$sources" ]] || die "no $sources for repo $repo"
-    [[ -d /etc/apt/keyrings ]] || sudo_run install -d -m 0755 /etc/apt/keyrings
-    fetch_key "$(manifest_value "repo.$repo" key_url)" "$(manifest_value "repo.$repo" keyring)" \
-      "$(manifest_value "repo.$repo" fingerprint)"
-    add_apt_source "$repo" "$(render_template "$sources" "ARCH=$(arch)")"
-  done
+  local repo
+  for repo in "$@"; do repo_files "$repo"; done
   apt_update_if_dirty
+}
+
+# repo_files REPO: the repo's key, its next key when the manifest pins one, and its sources file,
+# without refreshing apt's lists; then the vendor's own keyrings of /etc/apt/trusted.gpg.d the
+# manifest names (global_keyrings) go, once the source names the key itself.
+repo_files() {
+  local repo="$1" sources next
+  sources="$MANIFEST_SYSTEM_DIR/files/apt/sources.list.d/$repo.sources"
+  [[ -f "$sources" ]] || die "no $sources for repo $repo"
+  [[ -d /etc/apt/keyrings ]] || sudo_run install -d -m 0755 /etc/apt/keyrings
+  fetch_key "$(manifest_value "repo.$repo" key_url)" "$(manifest_value "repo.$repo" keyring)" \
+    "$(manifest_value "repo.$repo" fingerprint)"
+  next="$(manifest_value "repo.$repo" next_fingerprint)"
+  if [[ -n "$next" ]]; then
+    fetch_key "$(manifest_value "repo.$repo" next_key_url)" "$(manifest_value "repo.$repo" next_keyring)" "$next"
+  fi
+  add_apt_source "$repo" "$(render_template "$sources" "ARCH=$(arch)")"
+  local keyring own keyrings
+  mapfile -t own < <(manifest_value "repo.$repo" fingerprint; manifest_value "repo.$repo" global_fingerprints)
+  mapfile -t keyrings < <(manifest_value "repo.$repo" global_keyrings)
+  for keyring in "${keyrings[@]}"; do
+    [[ -n "$keyring" ]] || continue
+    untrust_global_keyring "$APT_TRUSTED_D/$keyring" "${own[@]}"
+  done
+}
+
+# repo_key_due REPO: repo_files would fetch the repo's key, or its next key, again (key_stale):
+# one that nears its expiry. Reads the keyrings, which everyone may, and changes nothing.
+repo_key_due() {
+  local repo="$1" next
+  key_stale "$(manifest_value "repo.$repo" keyring)" "$(manifest_value "repo.$repo" fingerprint)" && return 0
+  next="$(manifest_value "repo.$repo" next_fingerprint)"
+  [[ -n "$next" ]] && key_stale "$(manifest_value "repo.$repo" next_keyring)" "$next"
+}
+
+# repo_refresh REPO...: repo_files for each repo, each in a shell of its own, so one that fails
+# (a key server that doesn't answer, a key that isn't the pinned one) is a warning and the rest
+# are still set up; then one apt update, when a sources file changed, whose failure is a warning
+# too. For `kubaos update`'s migrations, which a vendor's repository must never stop.
+repo_refresh() {
+  local repo changed
+  changed="$(mktemp)"
+  for repo in "$@"; do
+    # The child installs the repo's key and system/files/apt/sources.list.d/<repo>.sources, and
+    # marks a change on its way out, however it ends: a step after the sources file was written
+    # (turning off the vendor's own source) may fail, and the file still wants apt's lists
+    # refreshed.
+    # shellcheck disable=SC2016 # The child expands its own arguments.
+    if ! bash -euo pipefail -c 'source "$1/lib.sh"; DRY_RUN=$2 REPO_CHANGED=$4
+      trap '\''((APT_DIRTY == 0)) || echo 1 >"$REPO_CHANGED"'\'' EXIT
+      repo_files "$3"' _ "$MANIFEST_SYSTEM_DIR" "$DRY_RUN" "$repo" "$changed" >&2; then
+      warn "apt repository $repo not refreshed; its source stays as it was"
+    fi
+  done
+  if [[ -s "$changed" ]] && ! sudo_run apt-get update; then
+    warn "apt update failed; the next one reads the changed sources"
+  fi
+  rm -f "$changed"
 }
 
 # record_installed GROUP PKG...: add the packages that are installed now to

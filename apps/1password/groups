@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Makes the three groups 1Password's packages give their helpers, as system groups, before the
+# packages do: the browser helper and the MCP server are setgid onepassword and onepassword-mcp,
+# the CLI onepassword-cli, so the app can tell them from any other program. A group there already
+# is left as it is. Nobody is put in them; a member could pass for the helpers.
+# Usage: ./groups
+set -euo pipefail
+for group in onepassword onepassword-mcp onepassword-cli; do
+  getent group "$group" >/dev/null || groupadd --system "$group"
+done

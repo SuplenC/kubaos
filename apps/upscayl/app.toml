@@ -1,0 +1,25 @@
+# Upscayl from nixpkgs, through the User flake, which wraps its release's AppImage, so amd64 alone.
+# Upscayl keeps no apt repository and Ubuntu doesn't package it. It upscales on the GPU through
+# Vulkan, which a Nix app finds through /run/opengl-driver, where KubaOS puts Mesa's drivers: AMD
+# and Intel graphics are used; NVIDIA's own driver isn't there, so on NVIDIA it runs on the CPU.
+# https://github.com/upscayl/upscayl
+name = "Upscayl"
+category = "graphics"
+tags = ["upscale", "ai", "image", "enhance", "super resolution", "photo"]
+summary = "AI upscaling on your own machine. Zoom, enhance, like on TV, except now it sort of works."
+# Its metainfo says one line; this is ours.
+description = """\
+Upscayl enlarges and sharpens pictures with AI models that run on your own graphics card \
+through Vulkan, nothing uploaded. It upscales one image or a whole folder of them, with a choice \
+of models for photos, digital art and sharpening, and models of your own."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "upscayl"
+keeps = """\
+Your settings stay in ~/.config/Upscayl: install Upscayl again and they're there."""
+
+[[action]]
+name = "Install Upscayl"
+kind = "nix"
+arch = "amd64"
+packages = ["upscayl"]

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Done: JetBrains Toolbox has made its menu entry, as it does on its first start.
+set -euo pipefail
+[[ -f "$HOME/.local/share/applications/jetbrains-toolbox.desktop" ]]

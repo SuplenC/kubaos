@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Starts JetBrains Toolbox from the folder it lives in and waits for the menu entry it makes as it
+# first starts. Its window opens; it then stays in the tray.
+set -euo pipefail
+entry="$HOME/.local/share/applications/jetbrains-toolbox.desktop"
+setsid -f "$HOME/.local/share/JetBrains/Toolbox/bin/jetbrains-toolbox" >/dev/null 2>&1 </dev/null
+tries=0
+while [[ ! -f "$entry" ]]; do
+  if ((tries >= 240)); then
+    echo "JetBrains Toolbox made no menu entry in 2 minutes: its log is in ~/.local/share/JetBrains/Toolbox/logs" >&2
+    exit 1
+  fi
+  tries=$((tries + 1))
+  sleep 0.5
+done

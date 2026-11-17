@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Ardour
+GenericName=Digital Audio Workstation
+Comment=Record, mix and master multi-track audio
+Exec=env FLTK_BACKEND=x11 pw-jack /usr/bin/ardour %f
+Icon=ardour
+Terminal=false
+Categories=AudioVideo;Audio;Recorder;X-AudioEditing;
+Keywords=audio;sound;jack;daw;multitrack;lv2;midi;
+MimeType=application/x-ardour;

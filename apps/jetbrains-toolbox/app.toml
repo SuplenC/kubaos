@@ -1,0 +1,54 @@
+# JetBrains Toolbox from the tarball of its release, pinned to the sha256 JetBrains publishes beside
+# it. JetBrains keeps no apt repository and Ubuntu doesn't package it; nixpkgs' starts it with its
+# updater turned off and is releases behind. Toolbox keeps itself in
+# ~/.local/share/JetBrains/Toolbox/bin, copying itself there on its first start when it runs from
+# anywhere else, and updates itself there: the download unpacks it straight there, so it runs
+# where it lives and its own entries point at a path that stays. It updates itself in place there,
+# so the download is `self_updates`: done while it is there, a new pin reaches new installs only and
+# never puts an older Toolbox over the one it updated to. Its menu entry and its start-at-login
+# entry are its own, made as it first starts.
+# https://www.jetbrains.com/help/toolbox-app/installation.html
+name = "JetBrains Toolbox"
+category = "development"
+tags = ["ide", "jetbrains", "intellij", "pycharm", "rider", "webstorm"]
+summary = "Installs and updates JetBrains' IDEs. Bring RAM: the IDEs eat it by the gigabyte, greedy bastards."
+# JetBrains' own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+JetBrains Toolbox installs JetBrains' IDEs (IntelliJ IDEA, PyCharm, WebStorm, GoLand, Rider, \
+CLion, RustRover and the rest) and keeps them, and itself, up to date. It opens your projects in \
+the right IDE, keeps several versions side by side, rolls one back, and signs in once with your \
+JetBrains Account for every IDE's licence. It lives in the tray."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before it
+# is there.
+icon = "jetbrains-toolbox"
+keeps = """\
+Your IDEs stay in ~/.local/share/JetBrains/Toolbox/apps, with their launchers and menu entries, \
+their settings in ~/.config/JetBrains and ~/.local/share/JetBrains, and Toolbox's settings in \
+~/.local/share/JetBrains/Toolbox: install Toolbox again and it finds them all."""
+
+# HAZARD: Toolbox runs from the folder a removal takes, and writes its entries back as it quits.
+[[ready]]
+check = ["./closed"]
+says = "JetBrains Toolbox is running: quit it from its tray icon, then try again"
+
+[[action]]
+name = "Download JetBrains Toolbox"
+kind = "download"
+to = "~/.local/share/JetBrains/Toolbox/bin"
+version = "3.9.1.89198"
+unpack = "tar-gz"
+strip = 2
+self_updates = true
+amd64 = { url = "https://download.jetbrains.com/toolbox/jetbrains-toolbox-3.9.1.89198.tar.gz", sha256 = "43add3c33c9b86ee560adc8579261e8e26465a101b281720937c6d1d4967b3e4" }
+arm64 = { url = "https://download.jetbrains.com/toolbox/jetbrains-toolbox-3.9.1.89198-arm64.tar.gz", sha256 = "090c11b7c44053bda95adbb4b9d4d09fde09fe91145ebca681290b2c156a9cab" }
+
+# Toolbox makes its menu entry and its start-at-login entry as it first starts; nothing else can,
+# as it names the paths it updates itself to.
+[[action]]
+name = "Start JetBrains Toolbox"
+kind = "run"
+do = ["./first-start"]
+check = ["./started"]
+undo = ["./forget"]
+window = "Start JetBrains Toolbox once: run ~/.local/share/JetBrains/Toolbox/bin/jetbrains-toolbox"

@@ -682,8 +682,9 @@ fn read_apps(files: AppFiles, events: Sender<Event<Own>>) -> Option<AppsReader> 
     Some(reader)
 }
 
-/// Watches dpkg's database, the picks and the apps' journals, asking `apps` for a reading on each
-/// change to one of them, and the journals' folders again after it, for an app's folder made
+/// Watches dpkg's database, the picks, the apps' journals and the User flake's state directory
+/// (its `nixpkgs.toml` says whether an unfree app can install), asking `apps` for a reading on
+/// each change to one of them, and the journals' folders again after it, for an app's folder made
 /// since. Without a watch the app Items keep what was read last, until the next config or app Job.
 fn watch_apps(files: &AppFiles, apps: AppsReader) -> Option<Watcher> {
     // The engine makes the folder with an app's first journal; made here, the watch waits in it.

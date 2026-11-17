@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Ready: no process of the user's runs from Android Studio's folder, Studio or its Java runtime.
+# Usage: ./closed
+set -euo pipefail
+! pgrep -u "$(id -u)" -f '/\.local/share/android-studio/' >/dev/null

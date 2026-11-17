@@ -91,6 +91,8 @@ tempfile = "3"
 # the two differ.
 kotodama-extension = { git = "https://github.com/SuplenC/kotodama", rev = "1644c20bf20d7aa844b62308f72fabb75c983417" }
 kotodama-protocol = { git = "https://github.com/SuplenC/kotodama", rev = "1644c20bf20d7aa844b62308f72fabb75c983417" }
+# The Daemon, for its ranking: the Extension's tests rank its Items as the menu does.
+kotodamad = { git = "https://github.com/SuplenC/kotodama", rev = "1644c20bf20d7aa844b62308f72fabb75c983417" }
 
 # The lints of docs/agents/code-quality.md, which every crate takes with
 # `[lints] workspace = true`. `just lint` runs clippy with -D warnings, so

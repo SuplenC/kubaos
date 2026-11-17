@@ -1,0 +1,5 @@
+# Read by Slack's daily job (/etc/cron.daily/slack). KubaOS sets up Slack's repository itself,
+# signed by Slack's key alone (/etc/apt/sources.list.d/slack.sources), so the job neither adds
+# it again nor trusts the key for every repository.
+repo_add_once="false"
+repo_reenable_on_distupgrade="false"

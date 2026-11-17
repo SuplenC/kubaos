@@ -1,0 +1,26 @@
+# Mattermost's desktop app from Mattermost's signed apt repository, whose key system/packages.toml
+# pins ([repo.mattermost]).
+# https://docs.mattermost.com/collaborate/install-desktop-app.html
+name = "Mattermost"
+category = "communication"
+tags = ["chat", "team", "work", "self-hosted", "messaging"]
+summary = "Team chat on a server you run. Slack, if Slack minded its own damn business."
+# From its AppStream metainfo, CC0-1.0 (flathub/com.mattermost.Desktop), without the sentence
+# about the server's build.
+description = """\
+Mattermost is a secure collaboration platform that is open, flexible, and deeply integrated with \
+the tools you love. An alternative to SaaS collaboration solutions, Mattermost is built \
+explicitly for developer teams, tools, and workflows."""
+description_from = "https://github.com/flathub/com.mattermost.Desktop/blob/master/com.mattermost.Desktop.appdata.xml"
+# Colloid has none: the icon the package installs (hicolor), so the menu shows it once the app is
+# there.
+icon = "mattermost-desktop"
+keeps = """\
+Your servers' sign-ins and settings stay in ~/.config/Mattermost: install Mattermost again and \
+you're still signed in."""
+
+[[action]]
+name = "Install Mattermost"
+kind = "apt"
+repo = "mattermost"
+packages = ["mattermost-desktop"]

@@ -1,0 +1,25 @@
+# GitHub Desktop from nixpkgs, through the User flake, which builds it from GitHub's own source.
+# GitHub builds it for macOS and Windows only and keeps no apt repository; the community's Linux
+# fork last released in February 2025, and its apt repository's certificate no longer matches its
+# name.
+# https://github.com/desktop/desktop
+name = "GitHub Desktop"
+category = "development"
+tags = ["git", "github", "version control", "commits", "pull requests"]
+summary = "Git with buttons, from GitHub. They don't build it for Linux, so nixpkgs builds it for them."
+# From its AppStream metainfo, CC0-1.0 (flathub/io.github.shiftey.Desktop), its first paragraph.
+description = """\
+Focus on what matters instead of fighting with Git. Whether you're new to Git or a seasoned user, \
+GitHub Desktop simplifies your development workflow."""
+description_from = "https://github.com/flathub/io.github.shiftey.Desktop/blob/master/io.github.shiftey.Desktop.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "github-desktop"
+keeps = """\
+Your sign-in and settings stay in ~/.config/GitHub Desktop, and your repositories wherever you \
+cloned them: install GitHub Desktop again and it's still signed in."""
+
+[[action]]
+name = "Install GitHub Desktop"
+kind = "nix"
+packages = ["github-desktop"]

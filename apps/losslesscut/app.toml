@@ -1,0 +1,26 @@
+# LosslessCut from nixpkgs, through the User flake: 3.64.0, its release's AppImage repackaged,
+# where upstream is at 3.70.2. LosslessCut keeps no apt repository and Ubuntu doesn't package it.
+# It cuts with the FFmpeg it carries. nixpkgs builds it for amd64 alone.
+# https://github.com/mifi/lossless-cut
+name = "LosslessCut"
+category = "media"
+tags = ["video", "trim", "cut", "lossless", "ffmpeg", "gopro"]
+summary = "Trims video without re-encoding. Two hours of GoPro, three good seconds, done in a blink."
+# From its AppStream metainfo, CC0-1.0 (mifi/lossless-cut), its first three sentences.
+description = """\
+Simple and ultra fast cross platform tool for lossless trimming/cutting of video and audio files. \
+Great for saving space by rough cutting your large video files taken from a video camera, GoPro, \
+drone, etc. It lets you quickly extract the good parts from your videos and discard many \
+gigabytes of data without doing a slow re-encode and thereby losing quality."""
+description_from = "https://github.com/mifi/lossless-cut/blob/v3.64.0/no.mifi.losslesscut.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "no.mifi.losslesscut"
+keeps = """\
+Your videos stay where they are, and LosslessCut's settings in ~/.config/LosslessCut: install \
+LosslessCut again and they're there."""
+
+[[action]]
+name = "Install LosslessCut"
+kind = "nix"
+arch = "amd64"
+packages = ["losslesscut-bin"]

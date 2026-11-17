@@ -532,7 +532,7 @@ impl Engine<'_> {
         let steps = folder.steps(setup).map_err(EngineError::Folder)?;
         let of = steps.len();
         let root = Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?;
-        let words = self.user.words();
+        let words = self.user.words().with_version(folder.version());
         let outdated = std::iter::once(&journal)
             .chain(root.as_ref())
             .flat_map(|j| &j.entries)
@@ -566,7 +566,9 @@ impl Engine<'_> {
             });
             self.sink.event(&UpdateEvent::Progress { done, total });
             let new = journal.entry(*step).is_none();
-            match self.user.step(id, setup, *step, self.windows) {
+            let outcome = self.user.step(id, setup, *step, self.windows);
+            self.user_notes();
+            match outcome {
                 Ok(Outcome::Found) => self.report(id, *step, of, &action.name, ActionState::Found),
                 Ok(Outcome::Skipped { says }) => {
                     self.report(id, *step, of, &action.name, ActionState::Skipped);
@@ -607,5 +609,7 @@ fn undoable(step: usize, action: &Action) -> Undoable {
         side: action.side(),
         name: action.name.clone(),
         kind_is_nix: matches!(action.kind, Kind::Nix { .. }),
+        kind_is_run: matches!(action.kind, Kind::Run { .. }),
+        removal_only: action.removal_only(),
     }
 }

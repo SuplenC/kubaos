@@ -3,6 +3,7 @@ use std::path::Path;
 use super::Category;
 use super::Folder;
 use super::FolderError;
+use super::picture;
 
 const ABOUT: &str = r#"name = "Sketch"
 category = "graphics"
@@ -48,6 +49,46 @@ fn a_description_is_copied_from_an_https_url_or_written_by_kubaos() {
 
     assert!(!ours.description_copied());
     assert!(matches!(elsewhere, Err(FolderError::InvalidSource(_))), "{elsewhere:?}");
+}
+
+#[test]
+fn an_svg_icon_of_the_folder_is_put_in_the_icon_theme_after_the_apps_own_install_steps() {
+    let folder = parse(&format!("{ABOUT}icon = \"sketch.svg\"\n")).unwrap();
+
+    let steps = folder.steps(None).unwrap();
+    assert_eq!(steps.len(), 2);
+    assert_eq!(folder.shared_steps(), 2);
+    assert_eq!(steps[1].name, "Put Sketch's icon in place");
+    assert_eq!(
+        steps[1].kind,
+        super::Kind::File {
+            to: "~/.local/share/icons/hicolor/scalable/apps/sketch.svg".to_owned(),
+            from: Some("sketch.svg".to_owned()),
+            text: None,
+            template: false,
+            mode: Some("644".to_owned()),
+            vendor_keys: false,
+            binary: false,
+        }
+    );
+    assert_eq!(folder.icon_shown().as_deref(), Some("/catalog/sketch/sketch.svg"));
+}
+
+#[test]
+fn a_theme_icon_is_named_as_it_is_and_installs_nothing() {
+    let folder = parse(&format!("{ABOUT}icon = \"sketch\"\n")).unwrap();
+
+    assert_eq!(folder.steps(None).unwrap().len(), 1);
+    assert_eq!(folder.icon_shown().as_deref(), Some("sketch"));
+}
+
+#[test]
+fn an_icon_that_is_neither_a_picture_of_the_folder_nor_a_theme_name_is_refused() {
+    for icon in ["sketch.xpm", "../sketch.svg", "art/sketch.svg", "-sketch"] {
+        let result = parse(&format!("{ABOUT}icon = \"{icon}\"\n"));
+
+        assert!(matches!(result, Err(FolderError::InvalidIcon(_))), "{icon}: {result:?}");
+    }
 }
 
 #[test]
@@ -192,4 +233,212 @@ fn a_configure_step_writes_only_the_apps_own_folder_of_the_user_layer_as_the_use
             "{action}: {result:?}"
         );
     }
+}
+
+/// A download of `version` to `to`, as an action.
+fn download(to: &str, version: &str) -> String {
+    format!(
+        "[[action]]\nname = \"Download\"\nkind = \"download\"\nto = \"{to}\"\nversion = \"{version}\"\n\
+         unpack = \"tar-gz\"\namd64 = {{ url = \"https://x.example/a\", sha256 = \"{}\" }}\n",
+        "a".repeat(64)
+    )
+}
+
+#[test]
+fn a_zstd_tarball_comes_after_an_apt_step_installing_zstd_in_the_same_install() {
+    let zst = download("~/.v/@VERSION@", "1.0").replace("tar-gz", "tar-zst");
+    let zstd = "[[action]]\nname = \"Install zstd\"\nkind = \"apt\"\npackages = [\"zstd\"]\n";
+    let setup = |id: &str, actions: &str| format!("\n[setup.{id}]\nname = \"{id}\"\nsummary = \"{id}\"\n{actions}");
+    let in_setup = |text: &str, id: &str| text.replace("[[action]]", &format!("[[setup.{id}.action]]"));
+
+    let first = format!("{ABOUT}{zstd}{zst}");
+    let after = format!("{ABOUT}{zst}{zstd}");
+    let without = format!("{ABOUT}{zst}");
+    // One setup installs zstd, the other doesn't: each install is checked on its own.
+    let one_setup = format!(
+        "{ABOUT}{}{}",
+        setup("a", &in_setup(&format!("{zstd}{zst}"), "a")),
+        setup("b", &in_setup(&zst, "b"))
+    );
+    let app_wide = format!(
+        "{ABOUT}{zstd}{}{}",
+        setup("a", &in_setup(&zst, "a")),
+        setup("b", &in_setup(&zst, "b"))
+    );
+
+    assert_eq!(folder_version(&first).as_deref(), Some("1.0"));
+    assert_eq!(folder_version(&app_wide).as_deref(), Some("1.0"));
+    for refused in [after, without, one_setup] {
+        let result = Folder::parse("sketch", Path::new("/catalog/sketch"), &refused);
+        assert!(matches!(result, Err(FolderError::ZstdFirst { .. })), "{result:?}");
+    }
+}
+
+#[test]
+fn an_apps_downloads_are_of_one_version_whatever_the_setup() {
+    let two = format!(
+        "{ABOUT}{}\n[setup.a]\nname = \"A\"\nsummary = \"a\"\n[[setup.a.action]]\n{}\n[setup.b]\nname = \"B\"\nsummary = \"b\"\n",
+        download("~/.v/@VERSION@", "1.0"),
+        download("~/.v/@VERSION@/gpu", "1.1").trim_start_matches("[[action]]\n"),
+    );
+
+    let result = Folder::parse("sketch", Path::new("/catalog/sketch"), &two);
+
+    assert!(
+        matches!(result, Err(FolderError::DownloadVersions { .. })),
+        "{result:?}"
+    );
+}
+
+#[test]
+fn a_step_inside_a_downloads_folder_comes_after_the_download() {
+    let before = format!(
+        "{ABOUT}[[action]]\nname = \"Link\"\nkind = \"symlink\"\nto = \"~/.v/@VERSION@/bin/x\"\ntarget = \"x\"\n{}",
+        download("~/.v/@VERSION@", "1.0")
+    );
+    let after = format!(
+        "{ABOUT}{}{}",
+        download("~/.v/@VERSION@", "1.0"),
+        download("~/.v/@VERSION@/gpu", "1.0")
+    );
+
+    let refused = Folder::parse("sketch", Path::new("/catalog/sketch"), &before);
+
+    assert!(
+        matches!(refused, Err(FolderError::InsideDownload { .. })),
+        "{refused:?}"
+    );
+    assert_eq!(folder_version(&after).as_deref(), Some("1.0"));
+}
+
+fn folder_version(text: &str) -> Option<String> {
+    Folder::parse("sketch", Path::new("/catalog/sketch"), text)
+        .unwrap()
+        .version()
+        .map(str::to_owned)
+}
+
+#[test]
+fn a_package_of_another_architecture_comes_after_the_step_that_adds_it() {
+    let apt = "[[action]]\nname = \"Install\"\nkind = \"apt\"\npackages = [\"libgl1:i386\"]\n";
+    let arch = "[[action]]\nname = \"Take i386\"\nkind = \"architecture\"\narchitecture = \"i386\"\n";
+    let parse = |actions: &str| Folder::parse("sketch", Path::new("/catalog/sketch"), &format!("{ABOUT}{actions}"));
+
+    let before = parse(&format!("{arch}{apt}"));
+    let after = parse(&format!("{apt}{arch}"));
+    let none = parse(apt);
+
+    assert!(before.is_ok(), "{before:?}");
+    for refused in [after, none] {
+        assert!(
+            matches!(&refused, Err(FolderError::ArchitectureFirst { arch, .. }) if arch == "i386"),
+            "{refused:?}"
+        );
+    }
+}
+
+/// Sketch's folder in a temporary catalog, with `icon` as its picture `bytes`.
+fn with_picture(icon: &str, bytes: &[u8]) -> (tempfile::TempDir, Result<Folder, FolderError>) {
+    let catalog = tempfile::tempdir().unwrap();
+    let dir = catalog.path().join("sketch");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join(icon), bytes).unwrap();
+    let folder = Folder::parse("sketch", &dir, &format!("{ABOUT}icon = \"{icon}\"\n{ACTION}"));
+    (catalog, folder)
+}
+
+#[test]
+fn a_png_icon_is_put_in_the_icon_themes_folder_of_its_size() {
+    let (_catalog, folder) = with_picture("sketch.png", &picture::png(256, 256));
+    let folder = folder.unwrap();
+
+    let steps = folder.steps(None).unwrap();
+    assert_eq!(steps.len(), 2);
+    assert!(
+        matches!(&steps[1].kind, super::Kind::File { to, from: Some(from), .. }
+            if to == "~/.local/share/icons/hicolor/256x256/apps/sketch.png" && from == "sketch.png"),
+        "{:?}",
+        steps[1].kind
+    );
+    assert_eq!(
+        folder.icon_shown(),
+        Some(folder.dir.join("sketch.png").display().to_string())
+    );
+}
+
+#[test]
+fn a_jpeg_icon_is_shown_from_the_folder_and_installs_nothing() {
+    for icon in ["sketch.jpg", "sketch.jpeg"] {
+        let (_catalog, folder) = with_picture(icon, &picture::jpeg(512, 512));
+        let folder = folder.unwrap();
+
+        assert_eq!(
+            folder.steps(None).unwrap().len(),
+            1,
+            "{icon}: the icon theme reads no JPEG"
+        );
+        assert_eq!(folder.icon_shown(), Some(folder.dir.join(icon).display().to_string()));
+    }
+}
+
+#[test]
+fn a_picture_icon_that_isnt_square_or_a_png_of_a_size_the_theme_lacks_is_refused() {
+    let (_c, tall) = with_picture("sketch.png", &picture::png(128, 256));
+    let (_c2, wide) = with_picture("sketch.jpg", &picture::jpeg(512, 256));
+    let (_c3, odd) = with_picture("sketch.png", &picture::png(100, 100));
+    let (_c4, not_png) = with_picture("sketch.png", b"<svg/>");
+
+    assert!(
+        matches!(
+            tall,
+            Err(FolderError::IconNotSquare {
+                width: 128,
+                height: 256,
+                ..
+            })
+        ),
+        "{tall:?}"
+    );
+    assert!(
+        matches!(
+            wide,
+            Err(FolderError::IconNotSquare {
+                width: 512,
+                height: 256,
+                ..
+            })
+        ),
+        "{wide:?}"
+    );
+    assert!(matches!(odd, Err(FolderError::IconSize { size: 100, .. })), "{odd:?}");
+    assert!(
+        matches!(not_png, Err(FolderError::UnreadableIcon { .. })),
+        "{not_png:?}"
+    );
+}
+
+#[test]
+fn a_symbol_names_a_tabler_icon_of_kubaos_symbols_and_installs_nothing() {
+    let folder = parse(&format!("{ABOUT}symbol = \"aspect-ratio\"\n")).unwrap();
+
+    assert_eq!(folder.steps(None).unwrap().len(), 1, "a symbol is drawn, not installed");
+    assert_eq!(folder.symbol_shown(), Some("aspect_ratio"));
+    assert_eq!(folder.icon_shown(), None);
+}
+
+#[test]
+fn a_symbol_kubaos_symbols_dont_ship_or_beside_an_icon_is_refused() {
+    let unknown = parse(&format!("{ABOUT}symbol = \"rocket-off\"\n"));
+    let kubaos_name = parse(&format!("{ABOUT}symbol = \"aspect_ratio\"\n"));
+    let both = parse(&format!("{ABOUT}icon = \"sketch\"\nsymbol = \"gauge\"\n"));
+
+    assert!(
+        matches!(&unknown, Err(FolderError::UnknownSymbol(s)) if s == "rocket-off"),
+        "{unknown:?}"
+    );
+    assert!(
+        matches!(kubaos_name, Err(FolderError::UnknownSymbol(_))),
+        "{kubaos_name:?}"
+    );
+    assert!(matches!(both, Err(FolderError::IconAndSymbol)), "{both:?}");
 }

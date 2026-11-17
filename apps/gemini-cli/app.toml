@@ -1,0 +1,24 @@
+# Gemini CLI from nixpkgs, through the User flake. Google keeps no apt repository for it and
+# Ubuntu doesn't package it.
+# https://github.com/google-gemini/gemini-cli
+name = "Gemini CLI"
+category = "ai"
+tags = ["coding agent", "google", "gemini", "terminal"]
+summary = "Google's Gemini as a terminal agent, now for paying teams. Free users got the door."
+# The opening of Gemini CLI's README, Apache-2.0, Copyright 2025 Google LLC
+# (github.com/google-gemini/gemini-cli).
+description = """\
+Gemini CLI (`gemini`) is an open-source terminal agent maintained for enterprise Gemini Code \
+Assist workflows on Google Cloud."""
+description_from = "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/README.md"
+# Gemini's icon, Google's trademark, used to identify the app, on a tile (gemini.svg's header names
+# its source): no icon theme has Gemini CLI.
+icon = "gemini.svg"
+keeps = """\
+Your sign-in and settings stay in ~/.gemini: install Gemini CLI again and you're still signed \
+in."""
+
+[[action]]
+name = "Install Gemini CLI"
+kind = "nix"
+packages = ["gemini-cli"]

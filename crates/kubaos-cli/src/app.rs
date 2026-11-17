@@ -1,7 +1,7 @@
 //! `kubaos app`: the Apps catalog, the few apps KubaOS installs well, and the user's picks of
 //! them (`~/.config/kubaos/apps.toml`).
 //!
-//!   kubaos app list [--json]
+//!   kubaos app list [--json | --markdown]
 //!   kubaos app show ID [--json]
 //!   kubaos app add ID... [--setup SETUP] [--json]
 //!   kubaos app remove ID... [--json]
@@ -9,8 +9,9 @@
 //!   kubaos app status [--json]
 //!   kubaos app adopt
 //!
-//! `list` is the catalog and which apps are picked, read from the catalog and the picks and
-//! nothing else, for the Command menu. `show` is one app: what it is, and what it owns on this
+//! `list` is the catalog by category and which apps are picked, read from the catalog and the
+//! picks and nothing else, for the Command menu; `--markdown` is the catalog alone as a table, for
+//! the docs. `show` is one app: what it is, and what it owns on this
 //! machine, step by step, from its journals. `status` adds where each app stands, from the
 //! journals and one dpkg query for the versions. `add` picks apps and installs them, every step
 //! checked and those not done done, after the apps it requires, which aren't picked; an app with
@@ -25,7 +26,7 @@
 //!
 //! # Owns
 //!
-//! - The command line of `app`, its list and its status table.
+//! - The command line of `app`, its list, its Markdown table of the catalog and its status table.
 //!
 //! # Not here
 //!
@@ -33,6 +34,8 @@
 //!   and the root helper: `kubaos_core::update`'s `updater/apps.rs`.
 
 use std::fmt::Write as _;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::SystemTime;
 
@@ -43,9 +46,12 @@ use kubaos_core::apps::Folder;
 use kubaos_core::apps::Picks;
 use kubaos_core::apps::Status;
 use kubaos_core::apps::folder::FolderError;
+use kubaos_core::apps::folder::Source;
 use kubaos_core::apps::folder::WRITTEN_BY_KUBAOS;
+use kubaos_core::apps::journal;
 use kubaos_core::apps::journal::Journal;
 use kubaos_core::apps::journal::JournalError;
+use kubaos_core::apps::status::Listed;
 use kubaos_core::apps::status::listing;
 use kubaos_core::state::Paths;
 use kubaos_core::update::Updater;
@@ -64,8 +70,20 @@ pub enum AppCmd {
     /// The apps of the catalog, and which you picked.
     List {
         /// Write it as JSON, for the Command menu.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "markdown")]
         json: bool,
+        /// Write the catalog as a Markdown table, for the docs: just apps-list.
+        #[arg(long)]
+        markdown: bool,
+        /// Read the catalog in DIR, as a checkout's apps/, instead of this release's.
+        #[arg(
+            long,
+            value_name = "DIR",
+            hide = true,
+            requires = "markdown",
+            conflicts_with = "json"
+        )]
+        catalog: Option<PathBuf>,
     },
     /// One app: what it is, and what it owns on this machine.
     Show {
@@ -114,7 +132,11 @@ pub enum AppCmd {
 
 pub fn main(cmd: AppCmd) -> ExitCode {
     match cmd {
-        AppCmd::List { json } => list(json),
+        AppCmd::List {
+            json,
+            markdown,
+            catalog,
+        } => list(json, markdown, catalog.as_deref()),
         AppCmd::Add { ids, setup, json } => change(&ids, Change::Add(setup.as_deref()), json),
         AppCmd::Remove { ids, json } => change(&ids, Change::Remove, json),
         AppCmd::Configure { ids, json } => change(&ids, Change::Configure, json),
@@ -128,14 +150,23 @@ pub fn main(cmd: AppCmd) -> ExitCode {
     clippy::print_stdout,
     reason = "The list is the command's output, written whole as it ends its own lines."
 )]
-fn list(json: bool) -> ExitCode {
+fn list(json: bool, markdown: bool, catalog: Option<&Path>) -> ExitCode {
+    let read = match catalog {
+        Some(dir) => Catalog::load_existing(dir),
+        None => Catalog::load(&SystemPaths::machine().catalog()),
+    };
+    let catalog = match read {
+        Ok(catalog) => catalog,
+        Err(e) => return job::report(e),
+    };
+    // The table is the catalog's alone: it reads no picks, so it renders anywhere.
+    if markdown {
+        print!("{}", list_markdown(&listing(&catalog, &Picks::default())));
+        return ExitCode::SUCCESS;
+    }
     let paths = match Paths::from_env() {
         Ok(paths) => paths,
         Err(e) => return usage_error(e),
-    };
-    let catalog = match Catalog::load(&SystemPaths::machine().catalog()) {
-        Ok(catalog) => catalog,
-        Err(e) => return job::report(e),
     };
     let picks = match Picks::read(&paths.app_picks()) {
         Ok(picks) => picks,
@@ -149,11 +180,26 @@ fn list(json: bool) -> ExitCode {
         );
         return ExitCode::SUCCESS;
     }
+    print!("{}", list_text(&listed));
+    ExitCode::SUCCESS
+}
+
+/// The list as `kubaos app list` prints it: a heading a category, then one line an app with its
+/// summary and one a setup, the ids lined up across the categories.
+fn list_text(listed: &[Listed]) -> String {
     let width = listed.iter().map(|a| a.id.len()).max().unwrap_or(0);
     let mut text = String::new();
-    for app in &listed {
+    let mut category = None;
+    for app in listed {
+        if category != Some(app.category) {
+            if category.is_some() {
+                text.push('\n');
+            }
+            let _ = writeln!(text, "{}", app.category.title());
+            category = Some(app.category);
+        }
         let mark = if app.picked { "picked" } else { "" };
-        let _ = writeln!(text, "{:<6}  {:<width$}  {}: {}", mark, app.id, app.name, app.summary);
+        let _ = writeln!(text, "  {:<6}  {:<width$}  {}: {}", mark, app.id, app.name, app.summary);
         for setup in &app.setups {
             let mark = if app.setup == Some(setup.id.as_str()) {
                 "picked"
@@ -162,13 +208,92 @@ fn list(json: bool) -> ExitCode {
             };
             let _ = writeln!(
                 text,
-                "{:<6}  {:<width$}    --setup {}: {}, {}",
+                "  {:<6}  {:<width$}    --setup {}: {}, {}",
                 mark, "", setup.id, setup.name, setup.summary
             );
         }
     }
-    print!("{text}");
-    ExitCode::SUCCESS
+    text
+}
+
+/// The list as `kubaos app list --markdown` prints it: a table with a row an app, by category
+/// (`docs/APPS.md` says what each column means).
+fn list_markdown(listed: &[Listed]) -> String {
+    let mut text = String::from(
+        "| App | Category | Setups | Requires | Summary | Source | Architectures |\n\
+         | --- | --- | --- | --- | --- | --- | --- |\n",
+    );
+    for app in listed {
+        let setups: Vec<String> = app.setups.iter().map(|s| format!("`{}`", s.id)).collect();
+        let mut requires = Vec::new();
+        if !app.requires.is_empty() {
+            requires.push(ids(app.requires.iter().copied()));
+        }
+        for setup in app.setups.iter().filter(|s| !s.requires.is_empty()) {
+            requires.push(format!(
+                "{}: {}",
+                setup.id,
+                ids(setup.requires.iter().map(String::as_str))
+            ));
+        }
+        let sources = if app.setups.is_empty() {
+            sources(&app.sources)
+        } else {
+            let each: Vec<String> = app
+                .setups
+                .iter()
+                .map(|s| format!("{}: {}", s.id, sources(&s.sources)))
+                .collect();
+            each.join("; ")
+        };
+        let _ = writeln!(
+            text,
+            "| {} (`{}`) | {} | {} | {} | {} | {} | {} |",
+            cell(app.name),
+            app.id,
+            app.category.title(),
+            or_none(&setups.join(", ")),
+            or_none(&requires.join("; ")),
+            cell(app.summary),
+            or_none(&sources),
+            or_none(&app.arches.join(", ")),
+        );
+    }
+    text
+}
+
+/// App ids as code, joined.
+fn ids<'a>(ids: impl Iterator<Item = &'a str>) -> String {
+    ids.map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ")
+}
+
+/// Where an install takes an app from, as the table says it.
+fn sources(sources: &[Source]) -> String {
+    sources.iter().map(source).collect::<Vec<_>>().join(", ")
+}
+
+/// One source, as the table says it.
+fn source(source: &Source) -> String {
+    match source {
+        Source::AptRepo { repo } => format!("apt repo (`{repo}`)"),
+        Source::Archive => "Ubuntu archive".to_owned(),
+        Source::Nixpkgs => "nixpkgs".to_owned(),
+        Source::Deb => "pinned .deb".to_owned(),
+        Source::Download => "pinned download".to_owned(),
+        Source::Dkms => "pinned DKMS module".to_owned(),
+        Source::ContainerImages => "pinned container images".to_owned(),
+        Source::WebApp => "web app".to_owned(),
+    }
+}
+
+/// `text` as a table cell: a `|` in it would end the cell.
+fn cell(text: &str) -> String {
+    text.replace('|', "\\|")
+}
+
+/// An empty cell as a dash, which reads as "none" where a blank reads as missing.
+fn or_none(text: &str) -> &str {
+    if text.is_empty() { "—" } else { text }
 }
 
 #[derive(Clone, Copy)]
@@ -239,6 +364,16 @@ fn table(status: &Status) -> String {
             let _ = write!(line, "  {version}");
         }
         let _ = writeln!(out, "{}", line.trim_end());
+        if let Some(rolled) = &app.removal_rolled_back {
+            let _ = writeln!(
+                out,
+                "  {:<11} {:<6}  {:<width$}  {}",
+                "",
+                "",
+                "",
+                rolled_back_line(rolled)
+            );
+        }
     }
     for id in &status.unknown {
         let _ = writeln!(out, "  {id}: picked, but this release's catalog has no such app");
@@ -268,6 +403,10 @@ struct Showing<'a> {
     /// The apps whose install brought it, which it goes with.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     brought_by: Vec<String>,
+    /// Its last removal couldn't undo a step and was rolled back: that step and why, and
+    /// whether the rollback put everything back.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    removal_rolled_back: Option<journal::RolledBack>,
     /// Every step of both journals, by step.
     steps: Vec<Owned>,
 }
@@ -333,6 +472,7 @@ fn shown<'a>(folder: &'a Folder, paths: &Paths) -> Result<Showing<'a>, JournalEr
         },
         setup: user.as_ref().and_then(|j| j.setup.clone()),
         brought_by: user.as_ref().map(|j| j.brought_by.clone()).unwrap_or_default(),
+        removal_rolled_back: journal::rolled_back(&paths.app_journals(), &folder.id),
         complete: user.is_some_and(|j| j.complete),
         steps,
     })
@@ -364,6 +504,18 @@ fn show(id: &str, json: bool) -> ExitCode {
     }
     print!("{}", show_text(&shown));
     ExitCode::SUCCESS
+}
+
+/// The line under an app in `kubaos app status` whose last removal was rolled back.
+fn rolled_back_line(rolled: &journal::RolledBack) -> String {
+    if rolled.whole {
+        format!("its last removal was rolled back: {}", rolled.why)
+    } else {
+        format!(
+            "its last removal was rolled back in part, kubaos update finishes it: {}",
+            rolled.why
+        )
+    }
 }
 
 /// An app as `kubaos app show` prints it.
@@ -408,6 +560,14 @@ fn show_text(shown: &Showing) -> String {
             "Installed for {}: it goes with the last of them, unless you add it yourself.",
             shown.brought_by.join(", ")
         );
+    }
+    if let Some(rolled) = &shown.removal_rolled_back {
+        let said = if rolled.whole {
+            "Its last removal was rolled back, so it's all still here."
+        } else {
+            "Its last removal was rolled back only in part: some steps aren't back yet, and kubaos update puts them back."
+        };
+        let _ = writeln!(out, "{said} What stopped it: {}", rolled.why);
     }
     for step in &shown.steps {
         let _ = writeln!(out, "  {}. {} ({}, {})", step.step, step.name, step.side, step.state);

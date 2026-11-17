@@ -1,0 +1,26 @@
+# kubectl from the Kubernetes project's signed apt repository, whose key system/packages.toml pins
+# ([repo.kubernetes]). The project keeps a repository for each minor version, and kubectl talks
+# to clusters one minor version either side of its own: the source names the newest, so a release
+# of KubaOS moves it on as Kubernetes does. Its package writes no source of its own.
+# https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
+name = "kubectl"
+category = "development"
+tags = ["kubernetes", "k8s", "cluster", "cli", "containers"]
+summary = "The Kubernetes command line. YAML goes in, and with any luck prod stays up."
+# The Kubernetes documentation, CC-BY-4.0, The Kubernetes Authors (github.com/kubernetes/website).
+description = """\
+The Kubernetes command-line tool, kubectl, allows you to run commands against Kubernetes \
+clusters. You can use kubectl to deploy applications, inspect and manage cluster resources, and \
+view logs."""
+description_from = "https://kubernetes.io/docs/tasks/tools/"
+# Kubernetes' logo, Apache-2.0, on a tile (kubernetes.svg's header): no icon theme has kubectl.
+icon = "kubernetes.svg"
+keeps = """\
+Your clusters and their credentials stay in ~/.kube/config, and kubectl's cache in ~/.kube/cache: \
+install kubectl again and it talks to them all."""
+
+[[action]]
+name = "Install kubectl"
+kind = "apt"
+repo = "kubernetes"
+packages = ["kubectl"]

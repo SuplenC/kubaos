@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Done: sshd is started by something already, through ssh.socket or through ssh.service, which
+# holds port 22 itself when enabled the classic way, so the socket is never started against it.
+# A unit is started by something when systemctl is-enabled says enabled, enabled-runtime (until
+# the next boot), alias (another name of an enabled unit), indirect (enabled through another
+# unit), generated (a generator's, as Ubuntu's sshd-socket-generator writes) or static (no
+# [Install] of its own: another unit starts it). disabled, masked, linked and the rest aren't.
+set -euo pipefail
+for unit in ssh.socket ssh.service; do
+  case "$(systemctl is-enabled "$unit" 2>/dev/null)" in
+  enabled | enabled-runtime | alias | indirect | generated | static) exit 0 ;;
+  esac
+done
+exit 1

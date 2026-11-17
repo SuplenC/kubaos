@@ -60,6 +60,14 @@ pub enum Request {
     },
     /// One step of root's journal of the app, undone.
     Undo { app: String, step: usize },
+    /// A root step this run undid, done again for a removal rolled back, from root's own record
+    /// of the undo.
+    Redo {
+        app: String,
+        #[serde(default)]
+        setup: Option<String>,
+        step: usize,
+    },
     /// Root's steps of an app the machine had before it had a journal, recorded from what their
     /// checks find, nothing run: owned when KubaOS put the app there.
     Adopt {
@@ -68,6 +76,9 @@ pub enum Request {
         setup: Option<String>,
         owned: bool,
     },
+    /// The vendor repository a settled `apt` step of root's journal of the app set up, set up
+    /// again, so a key that nears its expiry is fetched again.
+    Refresh { app: String, step: usize },
 }
 
 /// Root's answer.
@@ -78,6 +89,9 @@ pub enum Reply {
     Ready,
     Step {
         outcome: Outcome,
+        /// What the user has to know of the step: what it left to them, what its undo kept.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        notes: Vec<String>,
     },
     /// The request isn't one the helper takes, or the install may not write what it writes.
     Refused {
@@ -223,6 +237,11 @@ impl<'h> Server<'h> {
         }
     }
 
+    /// Its keeper, given back once the requests are answered.
+    pub fn into_keeper(self) -> Keeper<'h> {
+        self.keeper
+    }
+
     /// Answers one request line.
     pub fn handle(&mut self, line: &str) -> Reply {
         let refuse = |why: String| Reply::Refused { why: vec![why] };
@@ -233,8 +252,9 @@ impl<'h> Server<'h> {
         let (app, setup) = match &request {
             Request::Preflight { app, setup, .. }
             | Request::Step { app, setup, .. }
-            | Request::Adopt { app, setup, .. } => (app, setup.as_deref()),
-            Request::Undo { app, .. } => (app, None),
+            | Request::Adopt { app, setup, .. }
+            | Request::Redo { app, setup, .. } => (app, setup.as_deref()),
+            Request::Undo { app, .. } | Request::Refresh { app, .. } => (app, None),
         };
         if !is_app_id(app) {
             return refuse(format!("{app:?} is not an app id"));
@@ -244,9 +264,14 @@ impl<'h> Server<'h> {
         {
             return refuse(format!("{setup:?} is not a setup id"));
         }
-        // An undo of an app the catalog dropped reads only root's journal, which root alone writes.
-        let dropped = matches!(request, Request::Undo { .. }) && !self.catalog.join(app).exists();
-        if !dropped && let Err(why) = self.root_only(app) {
+        // An undo of an app the catalog dropped, and a refresh, read only root's journal, which
+        // root alone writes; a refresh runs the release's repository setup all the same.
+        let checked = match &request {
+            Request::Refresh { .. } => self.release_only(),
+            Request::Undo { .. } if !self.catalog.join(app).exists() => Ok(()),
+            _ => self.root_only(app),
+        };
+        if let Err(why) = checked {
             return refuse(why);
         }
         match request {
@@ -261,15 +286,32 @@ impl<'h> Server<'h> {
                 step,
                 windows,
             } => match self.keeper.step(&app, setup.as_deref(), step, windows) {
-                Ok(outcome) => Reply::Step { outcome },
+                Ok(outcome) => Reply::Step {
+                    outcome,
+                    notes: self.keeper.take_notes(),
+                },
                 Err(e) => answer(&e),
             },
             Request::Undo { app, step } => match self.keeper.undo(&app, step) {
-                Ok(outcome) => Reply::Step { outcome },
+                Ok(outcome) => Reply::Step {
+                    outcome,
+                    notes: self.keeper.take_notes(),
+                },
+                Err(e) => answer(&e),
+            },
+            Request::Redo { app, setup, step } => match self.keeper.redo(&app, setup.as_deref(), step) {
+                Ok(outcome) => Reply::Step {
+                    outcome,
+                    notes: self.keeper.take_notes(),
+                },
                 Err(e) => answer(&e),
             },
             Request::Adopt { app, setup, owned } => match self.keeper.adopt(&app, setup.as_deref(), owned) {
                 Ok(_) => Reply::Ready,
+                Err(e) => answer(&e),
+            },
+            Request::Refresh { app, step } => match self.keeper.refresh(&app, step) {
+                Ok(()) => Reply::Ready,
                 Err(e) => answer(&e),
             },
         }
@@ -302,6 +344,13 @@ impl<'h> Server<'h> {
         if !folder.join(super::folder::APP_FILE).is_file() {
             return Err(format!("the catalog has no app {app}"));
         }
+        self.release_only()?;
+        under(&folder, self.owner)
+    }
+
+    /// Checks that the release's checkout, its catalog and `system/`, and the repository setup
+    /// root runs are the owner's and no one else may write them.
+    fn release_only(&self) -> Result<(), String> {
         let checkout = self.catalog.parent().unwrap_or(&self.catalog).to_path_buf();
         let system = checkout.join("system");
         for path in [
@@ -312,7 +361,7 @@ impl<'h> Server<'h> {
         ] {
             owned_by(&path, self.owner)?;
         }
-        under(&folder, self.owner)
+        Ok(())
     }
 }
 

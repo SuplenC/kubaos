@@ -1,0 +1,28 @@
+# GParted from Ubuntu's archive, 1.8.0, where nixpkgs has 1.8.1: it changes disks as root, through
+# the polkit action and the pkexec its package brings, which a Nix build, outside the machine's
+# polkit, can't do as well. /usr/sbin/gparted asks for your password through KubaOS's polkit agent,
+# then runs as root on the X server XWayland gives the session. Of the file system tools it
+# suggests, the steps take those of the disks people carry around: FAT (dosfstools, and mtools for
+# its labels), exFAT and NTFS, beside ext4's and btrfs's, which every machine has. GParted greys
+# out what a missing one (XFS, UDF, ...) can't do and names its package.
+# https://gparted.org/
+name = "GParted"
+category = "system"
+tags = ["partitions", "disks", "format", "resize", "partition editor"]
+summary = "Resizes, moves and formats partitions. One wrong click wipes a disk, so look twice before Apply."
+# Its AppStream metainfo is under the GFDL, which asks for its notice with every copy, so this is
+# ours.
+description = """\
+GParted is a partition editor: it creates, deletes, resizes, moves, copies, checks and labels \
+partitions and the file systems on them, without losing their data, on internal disks, USB \
+sticks and memory cards alike. Nothing changes until you apply the queued operations, and it \
+runs as root, so it asks for your password as it starts."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "gparted"
+
+[[action]]
+name = "Install GParted"
+kind = "apt"
+packages = ["gparted", "dosfstools", "mtools", "exfatprogs", "ntfs-3g"]

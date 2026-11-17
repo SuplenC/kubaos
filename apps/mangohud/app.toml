@@ -1,0 +1,26 @@
+# MangoHud from Ubuntu's archive, 0.8.2-rc2, where upstream is at 0.8.4. It is a Vulkan layer and
+# an OpenGL library loaded into each game, so it must be the machine's own: Steam's and Heroic's
+# containers take the layers of /usr, and a Nix build's libraries can't load into a game built
+# against Ubuntu's. Only 64-bit games show it; a 32-bit one needs mangohud:i386, from the i386
+# architecture, which KubaOS doesn't add. `mangohud <game>` shows it on one game; Steam's launch
+# options take `mangohud %command%`.
+# https://github.com/flightlessmango/MangoHud#installation---pre-packaged-binaries
+name = "MangoHud"
+category = "games"
+tags = ["games", "overlay", "fps", "frametime", "benchmark", "vulkan", "opengl"]
+summary = "FPS, frame times and temperatures on top of your game. Now you know exactly how shit it runs."
+# The opening of its README, MIT (flightlessmango/MangoHud).
+description = """\
+A Vulkan and OpenGL overlay for monitoring FPS, temperatures, CPU/GPU load and more."""
+description_from = "https://github.com/flightlessmango/MangoHud/blob/v0.8.2-rc2/README.md"
+# A symbol, Tabler's: Colloid draws no icon for MangoHud, and MangoHud publishes no logo of its
+# own.
+symbol = "gauge"
+keeps = """\
+Your MangoHud settings stay in ~/.config/MangoHud: install it again and the overlay looks as you \
+left it."""
+
+[[action]]
+name = "Install MangoHud"
+kind = "apt"
+packages = ["mangohud"]

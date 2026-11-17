@@ -1,0 +1,22 @@
+# Aider from nixpkgs (aider-chat), through the User flake. Its project keeps no apt repository
+# and Ubuntu doesn't package it.
+# https://aider.chat/
+name = "Aider"
+category = "ai"
+tags = ["coding agent", "pair programming", "terminal", "git", "models"]
+summary = "AI pair programming in the terminal. Commits every change, so blame it in git."
+# The opening of Aider's README, Apache-2.0 (github.com/Aider-AI/aider), whose licence names no
+# copyright holder of its own.
+description = """\
+Aider lets you pair program with LLMs to start a new project or build on your existing codebase."""
+description_from = "https://github.com/Aider-AI/aider/blob/v0.86.0/README.md"
+# Aider's icon, Apache-2.0, on KubaOS's tile (aider.svg's header): no icon theme has Aider.
+icon = "aider.svg"
+keeps = """\
+Your settings in ~/.aider.conf.yml and the chat history Aider keeps in each project \
+(.aider.chat.history.md) stay: install Aider again and they're all there."""
+
+[[action]]
+name = "Install Aider"
+kind = "nix"
+packages = ["aider-chat"]

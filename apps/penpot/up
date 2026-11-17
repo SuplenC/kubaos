@@ -2,8 +2,9 @@
 # Brings Penpot's stack up, pulling its pinned images, and waits until it is healthy. The install
 # runs it, and so does kubaos-penpot.service each time the window starts the stack. The secret its
 # sessions are signed with is made once, for this machine. Each pinned image the machine hasn't yet
-# is listed in pulled-images before it is pulled: those are the stack's, which `./down` removes;
-# one that was there is the user's. Both files are readable by root alone, as compose runs as root.
+# is listed in pulled-images before it is pulled, once: those are the stack's, which `./down`
+# removes; one that was there is the user's, and so is one Docker can't say it lacks. Both files
+# are readable by root alone, as compose runs as root.
 # Usage: ./up
 set -eu
 umask 077
@@ -15,7 +16,20 @@ if [ ! -s "$dir/secret.env" ]; then
 	mv "$dir/secret.env.new" "$dir/secret.env"
 fi
 for image in $(compose config --images); do
-	if ! docker image inspect "$image" >/dev/null 2>&1; then
+	if said=$(docker image inspect --format '{{.Id}}' "$image" 2>&1); then
+		continue
+	fi
+	# Only Docker's answer that it has no such image makes it one to pull: any other (a daemon
+	# not answering) says nothing of the image, which may be the user's, so the start fails.
+	case $said in
+	*"No such image"*) ;;
+	*)
+		printf "Docker can't say whether it has %s: %s\n" "$image" "$said" >&2
+		exit 1
+		;;
+	esac
+	# Once, however many starts fail before the pull.
+	if ! grep -qxF -- "$image" "$dir/pulled-images" 2>/dev/null; then
 		printf '%s\n' "$image" >>"$dir/pulled-images"
 	fi
 done

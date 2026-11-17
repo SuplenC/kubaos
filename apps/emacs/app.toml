@@ -1,0 +1,28 @@
+# GNU Emacs from Ubuntu's archive, its pure GTK build, which draws on Wayland itself rather than
+# through XWayland. Emacs 31.1 is out; Ubuntu and nixpkgs both have 30.2, so the archive, first in
+# KubaOS's order, is as current as any package of it. Its package registers it as the system's
+# `editor` at priority 0, below Vim's, so it changes no default.
+# https://www.gnu.org/software/emacs/
+name = "GNU Emacs"
+category = "development"
+tags = ["editor", "lisp", "org", "gnu", "elisp"]
+summary = "A Lisp machine that happens to edit text. Your left pinky will never fucking forgive you."
+# Its AppStream metainfo is under the GFDL, which asks for its whole text with every copy, so this
+# is ours.
+description = """\
+GNU Emacs is an extensible, customizable text editor built around an interpreter for Emacs Lisp. \
+Its modes edit and colour most kinds of files, and the same Lisp brings Org for notes and plans, \
+a mail and news reader, a file manager, a debugger and a terminal. Its documentation and \
+tutorial are built in. This is its pure GTK build, which draws on Wayland itself."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "emacs"
+keeps = """\
+Your config and packages stay in ~/.config/emacs, or ~/.emacs.d and ~/.emacs where an older \
+setup made them: install Emacs again and they're all there."""
+
+[[action]]
+name = "Install GNU Emacs"
+kind = "apt"
+packages = ["emacs-pgtk"]

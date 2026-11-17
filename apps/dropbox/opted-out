@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Exits 0 when /etc/default/dropbox-repo is there, KubaOS's or one the user wrote: either keeps
+# Dropbox's package from adding its repository.
+# Usage: ./opted-out <path of dropbox-repo>
+set -euo pipefail
+[[ -e "$1" ]]

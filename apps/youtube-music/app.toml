@@ -1,0 +1,31 @@
+# YouTube Music in a window of its own: Google makes no app for Linux.
+# https://music.youtube.com/
+name = "YouTube Music"
+category = "media"
+tags = ["music", "streaming", "youtube", "playlists", "web app"]
+summary = "YouTube's music, in a window of its own. Play one song and the algorithm picks the next fifty."
+# Google's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+YouTube Music is Google's music streaming service: songs, albums, playlists and radio, with \
+the music videos, live recordings and covers that are only on YouTube. Its website, here in a \
+window of its own, plays from your Google account's library."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix): its YouTube Music mark, drawn for a
+# desktop client; the window's own icon is the same one.
+icon = "youtube-music-desktop-app"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/youtube-music: install YouTube Music again \
+and you're still signed in. Your library lives on Google's servers anyway."""
+
+[[ready]]
+check = ["./closed", "youtube-music"]
+says = "YouTube Music's window is open: close it, then try again"
+
+[[action]]
+name = "Put YouTube Music in a window of its own"
+kind = "web_app"
+id = "youtube-music"
+title = "YouTube Music"
+url = "https://music.youtube.com/"
+icon = "youtube-music-desktop-app"

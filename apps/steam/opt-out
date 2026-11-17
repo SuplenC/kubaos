@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Writes the file whose being there keeps Steam's package from adding its repository: its
+# steam-stable.list is a conffile, which dpkg, finding a file at its path as it installs the
+# package, keeps as it is, writing the package's beside it as steam-stable.list.dpkg-dist, a name
+# apt never reads. Without it, apt would have the repository twice, from KubaOS's steam.sources and
+# from Valve's file, each with its own keyring, and fail every run.
+# Usage: ./opt-out <path of steam-stable.list>
+set -euo pipefail
+[[ -e "$1" ]] && exit 0
+cat >"$1" <<'TEXT'
+# KubaOS sets Steam's repository up in steam.sources, with keys for it alone. This file
+# being here keeps Steam's package from adding the repository a second time.
+TEXT
+chmod 644 "$1"

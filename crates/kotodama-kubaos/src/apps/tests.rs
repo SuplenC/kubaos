@@ -8,12 +8,14 @@ use std::time::Duration;
 use kotodama_protocol::JobState;
 use kubaos_core::apps::Catalog;
 use kubaos_core::apps::Picks;
+use kubaos_core::apps::Platform;
 use kubaos_core::apps::Status;
 use kubaos_core::apps::journal::Adoption;
 use kubaos_core::apps::journal::Journal;
 use kubaos_core::apt::Dpkg;
 use kubaos_core::apt::dpkg;
 use kubaos_core::state::Paths;
+use kubaos_core::unfree::Unfree;
 
 use super::*;
 use crate::fake::FakeRunner;
@@ -127,7 +129,7 @@ fn apps_of(folders: &[(&str, &str)], arch: &str, installed: &[&str], setup: Opti
             &Picks::default(),
             &journals,
             &journals.join("root"),
-            arch,
+            Platform::new(arch, Unfree::Allowed),
             Some(&dpkg),
         )
         .unwrap(),
@@ -216,6 +218,24 @@ fn the_icon_is_the_folders_or_a_generic_one() {
         Some("google-chrome")
     );
     assert_eq!(item(&apps, "app-install:claude-code").icon.as_deref(), Some(ICON));
+}
+
+#[test]
+fn an_app_with_a_symbol_hands_the_menu_its_kubaos_symbol() {
+    let gauge = r#"
+name = "Gauge"
+summary = "Frames a second"
+tags = ["overlay"]
+symbol = "gauge"
+
+[[action]]
+name = "Install Gauge"
+kind = "apt"
+packages = ["gauge"]
+"#;
+    let apps = apps_of(&[("gauge", gauge)], "amd64", &[], None);
+
+    assert_eq!(item(&apps, "app-install:gauge").icon.as_deref(), Some("symbol:speed"));
 }
 
 #[test]
@@ -745,6 +765,17 @@ fn the_watch_covers_dpkg_the_picks_and_each_apps_journal() {
 }
 
 #[test]
+fn turning_unfree_packages_on_or_off_is_watched_as_it_changes_which_apps_can_be_installed() {
+    let dir = tempfile::tempdir().unwrap();
+    let files = files(dir.path(), &[("google-chrome", CHROME)]);
+    let state_dir = paths(dir.path()).state_dir().root().to_path_buf();
+
+    assert!(files.watched_dirs().contains(&state_dir));
+    assert!(files.changes(&state_dir.join("nixpkgs.toml")));
+    assert!(!files.changes(&state_dir.join("packages.toml")));
+}
+
+#[test]
 fn the_journals_folder_is_watched_before_any_app_has_one() {
     // Regression: right after the update that brought journals, their folder wasn't there, and
     // the menu never heard of the first one.
@@ -809,7 +840,7 @@ fn an_app_installed_by_other_means_has_no_remove_item() {
             &Picks::default(),
             &journals,
             &journals.join("root"),
-            "amd64",
+            Platform::new("amd64", Unfree::Allowed),
             Some(&dpkg),
         )
         .unwrap(),
@@ -945,4 +976,146 @@ fn the_setup_an_app_is_in_is_its_journals() {
     let apps = Apps::read(&files, &runner).unwrap();
 
     assert_eq!(ids(&apps), ["app-remove:lab", "app-install:lab:desktop"]);
+}
+
+/// The Items of the shipped catalog on an amd64 machine: every app's Install Items with none
+/// installed, then every app's Remove Item with all of them installed by KubaOS.
+fn shipped_items() -> Vec<Item> {
+    let dir = tempfile::tempdir().unwrap();
+    let catalog = Catalog::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps")).unwrap();
+    let journals = dir.path().join("journals");
+    let read = |journals: &Path| {
+        let status = Status::read(
+            &catalog,
+            &Picks::default(),
+            journals,
+            &journals.join("root"),
+            Platform::new("amd64", Unfree::Allowed),
+            Some(&Dpkg::default()),
+        )
+        .unwrap();
+        Apps::new(&status).items()
+    };
+    let mut items = read(&journals);
+    for app in catalog.apps() {
+        let setup = app.setups.first().map(|s| s.id.as_str());
+        installed_journal(&journals, &app.id, setup);
+    }
+    items.extend(read(&journals));
+    items
+}
+
+/// Google Chrome's own Item, as Kotodama's apps Extension makes it from Chrome's desktop entry:
+/// its name the title, its generic name a keyword and the subtitle, its desktop id a weak keyword.
+fn open_google_chrome() -> Item {
+    Item {
+        id: "google-chrome".to_owned(),
+        kind: ItemKind::App {
+            desktop_id: "google-chrome.desktop".to_owned(),
+        },
+        identity: Some("app:google-chrome.desktop".to_owned()),
+        title: "Google Chrome".to_owned(),
+        subtitle: Some("Web Browser".to_owned()),
+        icon: Some("google-chrome".to_owned()),
+        names: Vec::new(),
+        keywords: vec!["Web Browser".to_owned()],
+        hidden: false,
+        app_only: false,
+        weak_keywords: vec!["google-chrome".to_owned()],
+        yields: false,
+        actions: vec![Action::new("open", "Open")],
+    }
+}
+
+/// How well `item` matches `query` in the Daemon's ranking: `None` when it doesn't.
+fn tier(item: &Item, query: &str) -> Option<kotodamad::rank::Tier> {
+    let haystack = kotodamad::rank::Haystack::new(item);
+    kotodamad::rank::Tiers::default().texts(
+        haystack.texts(),
+        &kotodamad::rank::Query::new(query),
+        kotodamad::rank::Matched::ALL,
+    )
+}
+
+#[test]
+fn no_install_or_remove_item_of_the_catalog_ranks_above_opening_google_chrome() {
+    let items = shipped_items();
+    let chrome = open_google_chrome();
+
+    for query in ["browser", "chrome", "google", "web"] {
+        let open = tier(&chrome, query);
+        assert!(open.is_some(), "{query} finds Google Chrome");
+        for item in &items {
+            // On an equal match an app ranks before an action, so a tie leaves Chrome first.
+            assert!(
+                tier(item, query) <= open,
+                "{query}: {} ({:?}) above Google Chrome ({open:?})",
+                item.title,
+                tier(item, query)
+            );
+        }
+    }
+}
+
+#[test]
+fn typing_chrome_or_google_ranks_google_chromes_items_above_chromiums() {
+    let items = shipped_items();
+    let of = |id: &str| -> Vec<&Item> { items.iter().filter(|i| i.id.rsplit(':').next() == Some(id)).collect() };
+    let (chrome, chromium) = (of("google-chrome"), of("chromium"));
+    assert_eq!((chrome.len(), chromium.len()), (2, 2), "an Install and a Remove each");
+
+    for query in ["chrome", "google"] {
+        for theirs in &chromium {
+            for ours in &chrome {
+                assert!(
+                    tier(ours, query) > tier(theirs, query),
+                    "{query}: {} ({:?}) not above {} ({:?})",
+                    ours.title,
+                    tier(ours, query),
+                    theirs.title,
+                    tier(theirs, query)
+                );
+            }
+        }
+    }
+}
+
+/// Ghostty's own Item, as Kotodama's apps Extension makes it from its desktop entry: its name the
+/// title, its comment the subtitle, its keywords keywords, its desktop id a weak keyword.
+fn open_ghostty() -> Item {
+    Item {
+        id: "com.mitchellh.ghostty".to_owned(),
+        kind: ItemKind::App {
+            desktop_id: "com.mitchellh.ghostty.desktop".to_owned(),
+        },
+        identity: Some("app:com.mitchellh.ghostty.desktop".to_owned()),
+        title: "Ghostty".to_owned(),
+        subtitle: Some("A terminal emulator".to_owned()),
+        icon: Some("com.mitchellh.ghostty".to_owned()),
+        names: Vec::new(),
+        keywords: vec!["terminal".to_owned(), "tty".to_owned(), "pty".to_owned()],
+        hidden: false,
+        app_only: false,
+        weak_keywords: vec!["com.mitchellh.ghostty".to_owned()],
+        yields: false,
+        actions: vec![Action::new("open", "Open")],
+    }
+}
+
+#[test]
+fn no_install_or_remove_item_of_the_catalog_ranks_above_opening_ghostty() {
+    // Ghostty is KubaOS's terminal; a catalog terminal is one to install beside it.
+    let items = shipped_items();
+    let ghostty = open_ghostty();
+
+    let open = tier(&ghostty, "terminal");
+    assert!(open.is_some(), "terminal finds Ghostty");
+    for item in &items {
+        assert!(
+            tier(item, "terminal") <= open,
+            "terminal: {} ({:?}) above Ghostty ({open:?})",
+            item.title,
+            tier(item, "terminal")
+        );
+    }
 }

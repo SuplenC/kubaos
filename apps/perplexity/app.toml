@@ -1,0 +1,31 @@
+# Perplexity in a window of its own: Perplexity has no app for Linux, only its website.
+# https://www.perplexity.ai/
+name = "Perplexity"
+category = "ai"
+tags = ["search", "answers", "assistant", "chat", "web app"]
+summary = "Search that answers instead of linking. Cites its sources, so you can check when it's bullshitting."
+# Perplexity's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Perplexity is an AI search engine. Its website, here in a window of its own, answers a question \
+with a written answer built from a web search, each claim linked to the page it came from, and \
+keeps your searches as threads you can ask follow-up questions in, with your Perplexity account."""
+description_from = "kubaos"
+# Perplexity's icon, Perplexity AI's trademark, used to identify the app (perplexity.svg's header names its
+# source). The window's own icon is the same picture.
+icon = "perplexity.svg"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/perplexity: install Perplexity again and \
+you're still signed in. Your threads live on Perplexity's servers anyway."""
+
+[[ready]]
+check = ["./closed", "perplexity"]
+says = "Perplexity's window is open: close it, then try again"
+
+[[action]]
+name = "Put Perplexity in a window of its own"
+kind = "web_app"
+id = "perplexity"
+title = "Perplexity"
+url = "https://www.perplexity.ai/"
+icon = "perplexity.svg"

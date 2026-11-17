@@ -235,13 +235,74 @@ key_is() {
   [[ "$fprs" == "$2" ]]
 }
 
+# How long before a stored vendor key expires fetch_key fetches it again, in days: a vendor
+# extends a subkey's expiry, or adds a new one, ahead of it, and apt refuses their repository
+# once it has passed.
+KEY_REFRESH_DAYS=30
+
+# key_lasts FILE: the key in FILE neither has expired nor expires within KEY_REFRESH_DAYS: its
+# primary key doesn't, and a key of it that signs (a signing subkey, or the primary key when it
+# signs) doesn't either. A vendor's key keeps its expired subkeys beside the one that replaced
+# them, so one key that signs is enough; a revoked one counts for nothing.
+key_lasts() {
+  local until
+  until=$(($(date +%s) + KEY_REFRESH_DAYS * 86400))
+  gpg --show-keys --with-colons "$1" 2>/dev/null | awk -F: -v until="$until" '
+    function lasts() { return $7 == "" || $7 + 0 >= until }
+    $1 == "pub" { primary = lasts() && $2 != "r" }
+    ($1 == "pub" || $1 == "sub") && $12 ~ /s/ && $2 != "r" && lasts() { signs = 1 }
+    END { exit !(primary && signs) }'
+}
+
+# key_end FILE: when the key in FILE stops working, in seconds since the epoch, the earlier of
+# its primary key's expiry and its longest-lasting signing key's; nothing when it never does.
+key_end() {
+  gpg --show-keys --with-colons "$1" 2>/dev/null | awk -F: '
+    $1 == "pub" { primary = $7 }
+    ($1 == "pub" || $1 == "sub") && $12 ~ /s/ && $2 != "r" {
+      if ($7 == "") forever = 1; else if ($7 + 0 > signs) signs = $7 + 0
+    }
+    END {
+      end = forever ? "" : signs
+      if (primary != "" && (end == "" || primary + 0 < end)) end = primary
+      if (end != "") print end
+    }'
+}
+
+# key_expiry FILE: the date key_end gives, or "never".
+key_expiry() {
+  key_end "$1" | awk '{ print strftime("%Y-%m-%d", $1, 1); dated = 1 } END { if (!dated) print "never" }'
+}
+
+# key_stale FILE FINGERPRINT: fetch_key would fetch the key at FILE again: FILE isn't there,
+# isn't the fingerprint's alone (key_is), or doesn't last (key_lasts).
+key_stale() {
+  ! { [[ -f "$1" ]] && key_is "$1" "$2" && key_lasts "$1"; }
+}
+
+# key_outlasts NEW OLD: the key in NEW works at least as long as the one in OLD.
+key_outlasts() {
+  local new old
+  new="$(key_end "$1")" old="$(key_end "$2")"
+  [[ -z $new ]] || { [[ -n $old ]] && ((new >= old)); }
+}
+
 # fetch_key URL DEST FINGERPRINT: download an OpenPGP key, check its
-# fingerprint, store it dearmored at DEST (for apt Signed-By).
+# fingerprint, store it dearmored at DEST (for apt Signed-By). A key stored
+# there already is kept while it is the fingerprint's and lasts (key_lasts);
+# one about to expire is fetched again, as the vendor's newer copy of it has
+# the new expiry or subkey, and the pinned fingerprint is required all the same.
+# A refetch that fails, isn't the fingerprint's, or expires sooner than the stored
+# copy keeps the stored one with a warning: it may still work for weeks.
 fetch_key() {
-  local url="$1" dest="$2" fpr="$3" tmp
+  local url="$1" dest="$2" fpr="$3" tmp stored=0
   if [[ -f "$dest" ]] && key_is "$dest" "$fpr"; then
-    ok "key $fpr present at $dest"
-    return 0
+    if key_lasts "$dest"; then
+      ok "key $fpr present at $dest"
+      return 0
+    fi
+    stored=1
+    info "key $fpr at $dest expires $(key_expiry "$dest"): fetching it again"
   fi
   if ((DRY_RUN)); then
     run curl -fsSL "$url" -o "<tmp>"
@@ -249,18 +310,67 @@ fetch_key() {
     return 0
   fi
   tmp="$(mktemp -d)"
-  curl -fsSL "$url" -o "$tmp/key"
+  if ! curl -fsSL "$url" -o "$tmp/key"; then
+    rm -rf "$tmp"
+    if ((stored)); then
+      warn "couldn't fetch $url: keeping the key at $dest, which expires $(key_expiry "$dest")"
+      return 0
+    fi
+    die "couldn't fetch the key $fpr from $url"
+  fi
   if ! key_is "$tmp/key" "$fpr"; then
     rm -rf "$tmp"
+    if ((stored)); then
+      warn "the key from $url is not (only) $fpr, refusing to trust it: keeping the key at $dest, which expires $(key_expiry "$dest")"
+      return 0
+    fi
     die "key from $url is not (only) $fpr, refusing to trust it"
   fi
+  if ((stored)) && ! key_outlasts "$tmp/key" "$dest"; then
+    warn "the key $fpr from $url expires $(key_expiry "$tmp/key"), before the one at $dest: keeping that, which expires $(key_expiry "$dest")"
+    rm -rf "$tmp"
+    return 0
+  fi
+  key_lasts "$tmp/key" || warn "the key $fpr from $url expires $(key_expiry "$tmp/key"): apt refuses its repository once it has"
   gpg --dearmor <"$tmp/key" >"$tmp/key.gpg" 2>/dev/null || cp "$tmp/key" "$tmp/key.gpg"
   sudo_run install -D -m 0644 "$tmp/key.gpg" "$dest"
   rm -rf "$tmp"
 }
 
-# Where apt reads its sources; the tests point it at a folder of their own after sourcing this.
-APT_SOURCES_D=/etc/apt/sources.list.d
+# Where apt reads its sources. The tests, which never run as root, point it at a folder of
+# their own; as root it is always the system's, whatever the environment says.
+if ((EUID == 0)); then
+  APT_SOURCES_D=/etc/apt/sources.list.d
+  APT_TRUSTED_D=/etc/apt/trusted.gpg.d
+else
+  APT_SOURCES_D="${APT_SOURCES_D:-/etc/apt/sources.list.d}"
+  APT_TRUSTED_D="${APT_TRUSTED_D:-/etc/apt/trusted.gpg.d}"
+fi
+
+# untrust_global_keyring FILE FINGERPRINT...: remove FILE, a keyring of APT_TRUSTED_D, where apt
+# trusts its keys for every repository, when each of its primary keys is one of the FINGERPRINTs:
+# a vendor's own setup put it there, and the repository's sources file names the vendor's key
+# itself. A keyring holding any other key, or one gpg can't read, isn't the vendor's alone and
+# stays, with a warning.
+untrust_global_keyring() {
+  local file="$1" fprs fpr
+  shift
+  [[ -f "$file" ]] || return 0
+  fprs="$(gpg --show-keys --with-colons "$file" 2>/dev/null |
+    awk -F: '$1 == "pub" {want = 1; next} want && $1 == "fpr" {print $10; want = 0}')" || fprs=
+  if [[ -z "$fprs" ]]; then
+    warn "$file isn't a keyring gpg can read: leaving it"
+    return 0
+  fi
+  for fpr in $fprs; do
+    if [[ " $* " != *" $fpr "* ]]; then
+      warn "$file trusts $fpr, which isn't the vendor's, for every repository: leaving it"
+      return 0
+    fi
+  done
+  info "$file trusted the vendor's key for every repository; removing it"
+  sudo_run rm -f "$file"
+}
 
 # add_apt_source NAME CONTENT: write $APT_SOURCES_D/NAME.sources, then turn off every other
 # source of its URIs (disable_other_sources).

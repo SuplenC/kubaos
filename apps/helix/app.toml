@@ -1,0 +1,23 @@
+# Helix from nixpkgs, through the User flake. Ubuntu's package, hx, is the same release, but it
+# ships no syntax grammars (it builds them with git and a C compiler on the user's machine) and
+# makes itself the system's `editor` over Vim's; nixpkgs' comes with its grammars built and
+# changes nothing else.
+# https://docs.helix-editor.com/package-managers.html
+name = "Helix"
+category = "development"
+tags = ["editor", "modal", "terminal", "vim", "kakoune", "rust"]
+summary = "Vim's keys, backwards: select first, then act. Your muscle memory will scream bloody murder."
+# From its AppStream metainfo, CC0-1.0.
+description = """\
+Helix is a terminal-based text editor inspired by Kakoune / Neovim and written in Rust."""
+description_from = "https://github.com/helix-editor/helix/blob/25.07.1/contrib/Helix.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "helix"
+keeps = """\
+Your config, keymaps and themes stay in ~/.config/helix: install Helix again and they're all \
+there."""
+
+[[action]]
+name = "Install Helix"
+kind = "nix"
+packages = ["helix"]

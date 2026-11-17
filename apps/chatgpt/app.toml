@@ -1,0 +1,30 @@
+# ChatGPT in a window of its own: OpenAI has no ChatGPT app for Linux, only its website.
+# https://chatgpt.com/
+name = "ChatGPT"
+category = "ai"
+tags = ["chat", "assistant", "openai", "gpt", "web app"]
+summary = "OpenAI's chatbot in a window of its own. Confidently wrong at least once a day."
+# OpenAI's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+ChatGPT is OpenAI's AI assistant. Its website, here in a window of its own, answers questions, \
+writes and edits text and code, reads the files and pictures you give it, searches the web and \
+makes images, in chats it keeps with your OpenAI account."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix); the window's own icon is the same one.
+icon = "openai"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/chatgpt: install ChatGPT again and you're \
+still signed in. Your chats live on OpenAI's servers anyway."""
+
+[[ready]]
+check = ["./closed", "chatgpt"]
+says = "ChatGPT's window is open: close it, then try again"
+
+[[action]]
+name = "Put ChatGPT in a window of its own"
+kind = "web_app"
+id = "chatgpt"
+title = "ChatGPT"
+url = "https://chatgpt.com/"
+icon = "openai"

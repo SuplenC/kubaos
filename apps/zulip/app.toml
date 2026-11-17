@@ -1,0 +1,28 @@
+# Zulip's desktop app from Zulip's signed apt repository, whose key system/packages.toml pins
+# ([repo.zulip-desktop], which says why it has the package's name for it). Zulip builds it for
+# amd64 only.
+# https://zulip.com/help/desktop-app-install-guide
+name = "Zulip"
+category = "communication"
+tags = ["chat", "team", "threads", "topics", "open source"]
+summary = "Team chat sorted by topic, so fifty conversations don't melt into one long soup."
+# From its AppStream metainfo, CC0-1.0 (flathub/org.zulip.Zulip).
+description = """\
+Zulip is a powerful, open source group chat application that combines the immediacy of \
+real-time chat with the productivity benefits of threaded conversations. Zulip is used by open \
+source projects, Fortune 500 companies, large standards bodies, and others who need a real-time \
+chat system that allows users to easily process hundreds or thousands of messages a day."""
+description_from = "https://github.com/flathub/org.zulip.Zulip/blob/master/org.zulip.Zulip.metainfo.xml"
+# Colloid has none: the icon the package installs (hicolor), so the menu shows it once the app is
+# there.
+icon = "zulip"
+keeps = """\
+Your organizations' sign-ins and settings stay in ~/.config/Zulip: install Zulip again and \
+you're still signed in."""
+
+[[action]]
+name = "Install Zulip"
+kind = "apt"
+repo = "zulip-desktop"
+arch = "amd64"
+packages = ["zulip"]

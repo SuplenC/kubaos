@@ -1,6 +1,6 @@
 //! A `setting`'s file, edited in its own format: TOML through `toml_edit`, so its layout, comments
-//! and types (dates included) stay as they were, and JSON in place in its text, so nothing but
-//! the key changes.
+//! and types (dates included) stay as they were, and JSON and a flat `key = value` `.conf` in
+//! place in their text, so nothing but the key changes.
 //!
 //! A file that isn't settings of its format, or a key whose path goes through a value that isn't
 //! a table, is refused: a `setting` changes one key and never writes over what it can't read.
@@ -9,16 +9,19 @@
 //!
 //! - [`Settings`]: reading, querying and changing one settings file's text.
 //! - The JSON file's text: `settings/json.rs`.
+//! - The `.conf` file's text: `settings/conf.rs`.
 //!
 //! # Not here
 //!
 //! - A `setting`'s do, check and undo: `perform.rs`.
 
+mod conf;
 mod json;
 
 use std::path::Path;
 use std::path::PathBuf;
 
+use self::conf::ConfText;
 use self::json::Found;
 use self::json::JsonText;
 use self::json::Through;
@@ -44,11 +47,18 @@ pub enum SettingsError {
 pub enum Settings {
     Toml(toml_edit::DocumentMut),
     Json(JsonText),
+    /// Flat `key = value` lines, whose keys hold no tables.
+    Conf(ConfText),
 }
 
-/// Whether `path` is a TOML file; else it is JSON.
+/// Whether `path` is a TOML file.
 pub fn is_toml(path: &Path) -> bool {
     path.extension().is_some_and(|e| e == "toml")
+}
+
+/// Whether `path` is a flat `key = value` file; else it is JSON or TOML.
+pub fn is_conf(path: &Path) -> bool {
+    path.extension().is_some_and(|e| e == "conf")
 }
 
 impl Settings {
@@ -56,6 +66,8 @@ impl Settings {
     pub fn empty(path: &Path) -> Self {
         if is_toml(path) {
             Self::Toml(toml_edit::DocumentMut::new())
+        } else if is_conf(path) {
+            Self::Conf(ConfText::empty())
         } else {
             Self::Json(JsonText::empty())
         }
@@ -74,6 +86,9 @@ impl Settings {
         if is_toml(path) {
             return text.parse().map(Self::Toml).map_err(|e| unreadable(Box::new(e)));
         }
+        if is_conf(path) {
+            return ConfText::parse(text).map(Self::Conf).map_err(unreadable);
+        }
         JsonText::parse(text).map(Self::Json).map_err(unreadable)
     }
 
@@ -82,6 +97,7 @@ impl Settings {
         match self {
             Self::Toml(doc) => doc.to_string(),
             Self::Json(json) => json.text().to_owned(),
+            Self::Conf(conf) => conf.text().to_owned(),
         }
     }
 
@@ -90,6 +106,7 @@ impl Settings {
         match self {
             Self::Toml(doc) => doc.is_empty(),
             Self::Json(json) => json.is_empty(),
+            Self::Conf(conf) => conf.is_empty(),
         }
     }
 
@@ -117,6 +134,7 @@ impl Settings {
                 }
             }
             Self::Json(json) => found = json.tables(above).map_err(through)?,
+            Self::Conf(_) => {}
         }
         Ok(found)
     }
@@ -155,6 +173,7 @@ impl Settings {
                 Some(Found::Object) => Err(table()),
                 Some(Found::Value(value)) => Ok(Some(value)),
             },
+            Self::Conf(conf) => Ok(conf.get(key)),
         }
     }
 
@@ -171,6 +190,7 @@ impl Settings {
             Self::Toml(_) => text.parse::<toml_edit::Value>().is_ok_and(|v| same(&v, value)),
             Self::Json(_) => serde_json::from_str::<serde_json::Value>(&text)
                 .is_ok_and(|v| serde_json::to_value(value).is_ok_and(|want| v == want)),
+            Self::Conf(_) => text == written(self, value),
         })
     }
 
@@ -205,6 +225,16 @@ impl Settings {
                     None => json.remove(&above, last, keep).map_err(through)?,
                 }
             }
+            Self::Conf(conf) => {
+                if let Some(value) = value
+                    && value.contains(['\n', '\r', '#'])
+                {
+                    return Err(unreadable(
+                        "a value is one line with no #, which starts a comment".into(),
+                    ));
+                }
+                conf.set(key, value);
+            }
         }
         Ok(())
     }
@@ -219,11 +249,16 @@ fn through<'a>(path: &'a Path, key: &'a str) -> impl Fn(Through) -> SettingsErro
     }
 }
 
-/// `value` as `format` writes it: TOML's or JSON's text of it.
+/// `value` as `format` writes it: TOML's or JSON's text of it, or a `.conf`'s bare text, a string
+/// unquoted.
 pub fn written(settings: &Settings, value: &toml::Value) -> String {
     match settings {
         Settings::Toml(_) => value.to_string(),
         Settings::Json(_) => serde_json::to_string(value).unwrap_or_default(),
+        Settings::Conf(_) => match value {
+            toml::Value::String(text) => text.clone(),
+            other => other.to_string(),
+        },
     }
 }
 

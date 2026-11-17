@@ -1,0 +1,31 @@
+# Devin Desktop, the editor that was Windsurf, from its signed apt repository, whose key
+# system/packages.toml pins ([repo.windsurf]). Built for amd64 only. The repository's windsurf
+# package is now an empty one that brings devin-desktop. Of what it recommends, apt's
+# --no-install-recommends leaves out bubblewrap, which its agent's sandbox runs commands in, so
+# the step installs it; socat is on every machine already, the sign-in is kept by gnome-keyring,
+# also there, without libsecret-tools' secret-tool command, and libvulkan1 only speeds up drawing.
+# https://windsurf.com/download/editor?os=linux
+name = "Devin Desktop"
+category = "ai"
+tags = ["editor", "ide", "code", "coding agent", "windsurf", "vscode"]
+summary = "Windsurf, renamed after its new owner's agent. Same VS Code fork, shinier badge."
+# Cognition's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Devin Desktop, formerly Windsurf, is a code editor built on VS Code with an AI agent built in. \
+Its agent, Cascade, works across a project, editing files, running commands and keeping track \
+of what you do, and its completions suggest the next edit as you type. VS Code's extensions \
+work in it."""
+description_from = "kubaos"
+# Devin's mark, Cognition's trademark, used to identify the app, on KubaOS's tile (devin.svg's
+# header names its source): no icon theme has Devin Desktop.
+icon = "devin.svg"
+keeps = """\
+Your settings and sign-in stay in ~/.config/Devin, and your extensions in ~/.devin: install \
+Devin Desktop again and they're all there."""
+
+[[action]]
+name = "Install Devin Desktop"
+kind = "apt"
+repo = "windsurf"
+arch = "amd64"
+packages = ["devin-desktop", "bubblewrap"]

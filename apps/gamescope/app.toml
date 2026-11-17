@@ -1,0 +1,24 @@
+# Gamescope from Ubuntu's archive (multiverse), 3.16.20, where upstream is at 3.17.0 and nixpkgs at
+# 3.16.23. It is a compositor drawing through the GPU, so it needs the machine's own drivers,
+# which a Nix build only reaches as Mesa, with no NVIDIA driver. It runs nested, a window of
+# Hyprland's: `gamescope -W 2560 -H 1440 -- <game>`, or `gamescope -- %command%` in Steam's launch
+# options. Of what the package recommends, seatd isn't installed: it is for starting Gamescope
+# from a console with no desktop, which KubaOS doesn't do.
+# https://github.com/ValveSoftware/gamescope
+name = "Gamescope"
+category = "games"
+tags = ["games", "compositor", "upscaling", "fsr", "hdr", "steam deck", "frame limit"]
+summary = "Valve's micro-compositor for games: upscaling, frame limits, HDR. The Steam Deck's secret sauce."
+# Its README is under a licence that asks for its notice with every copy, so this is ours.
+description = """\
+Gamescope is the micro-compositor of Valve's Steam Deck, here as a window of the desktop. A game \
+it runs draws at the resolution you give it and is scaled to the window, with AMD's FSR or \
+NVIDIA's NIS; it caps the frame rate and passes HDR through."""
+description_from = "kubaos"
+# A symbol, Tabler's: Colloid draws no icon for Gamescope, and Valve publishes no logo for it.
+symbol = "aspect-ratio"
+
+[[action]]
+name = "Install Gamescope"
+kind = "apt"
+packages = ["gamescope"]

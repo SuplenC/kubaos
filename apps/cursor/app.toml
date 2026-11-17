@@ -1,0 +1,27 @@
+# Cursor from Anysphere's signed apt repository, whose key system/packages.toml pins
+# ([repo.cursor]). Cursor's own package writes the same sources file on every upgrade and deletes
+# it with the key as it is removed; the one KubaOS writes is the same, word for word.
+# https://cursor.com/download
+name = "Cursor"
+category = "ai"
+tags = ["editor", "ide", "code", "coding agent", "vscode"]
+summary = "VS Code with an AI agent bolted on, then the bolts sold to you monthly."
+# Anysphere's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Cursor is a code editor built on VS Code, with AI agents built in. It completes and rewrites \
+code as you type, and its agents plan and make changes across a project, run commands and review \
+them, with the models of several providers. VS Code's extensions, themes and keybindings work \
+in it."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "cursor"
+keeps = """\
+Your settings and sign-in stay in ~/.config/Cursor, and your extensions in ~/.cursor: install \
+Cursor again and they're all there."""
+
+[[action]]
+name = "Install Cursor"
+kind = "apt"
+repo = "cursor"
+packages = ["cursor"]

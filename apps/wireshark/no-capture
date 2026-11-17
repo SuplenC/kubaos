@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Answers wireshark-common's debconf question no, its default, unseen as an install with no one to
+# ask leaves it, so a later install answers it again; configures a wireshark-common still there
+# again, so dumpcap is root's alone once more.
+# Usage: ./no-capture
+set -euo pipefail
+echo 'wireshark-common wireshark-common/install-setuid boolean false' | debconf-set-selections
+echo 'FSET wireshark-common/install-setuid seen false' | debconf-communicate wireshark-common >/dev/null
+if dpkg-query -W -f '${db:Status-Abbrev}' wireshark-common 2>/dev/null | grep -q '^ii'; then
+  dpkg-reconfigure --frontend noninteractive wireshark-common
+fi

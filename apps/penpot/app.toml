@@ -59,11 +59,13 @@ mode = "644"
 
 # As root, not as the user: the user joins the docker group in Docker's install, and a session
 # gets its groups at login, so a user's `docker compose` here would be refused until the next
-# one. Root needs no group, and compose talks to the daemon the same for either.
+# one. Root needs no group, and compose talks to the daemon the same for either. It pulls
+# Penpot's images, each pinned by digest in the stack: what this setup installs Penpot from.
 [[setup.local.action]]
 name = "Start Penpot's containers"
 kind = "run"
 root = true
+source = "container_images"
 do = ["./up"]
 check = ["./up-to-date"]
 undo = ["./down"]

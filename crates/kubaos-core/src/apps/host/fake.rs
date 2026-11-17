@@ -3,6 +3,7 @@
 //! all to compare. What a `run` starts runs in the machine's [`Sandbox`], never on the real one.
 
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -14,18 +15,32 @@ use std::rc::Rc;
 
 use super::AptPlan;
 use super::AptSimulation;
+use super::Compression;
+use super::DkmsInstall;
+use super::DkmsStatus;
+use super::Downgrade;
 use super::Host;
 use super::HostError;
+use super::Known;
+use super::Mok;
+use super::Removal;
+use super::SecureBoot;
 use super::UnitState;
+use super::untar_args;
 use crate::apps::action::Scope;
 use crate::apps::action::Side;
 use crate::apps::engine::Keeper;
+use crate::apps::engine::Undone;
 use crate::apps::root::Reply;
 use crate::apps::root::Request;
 use crate::apps::root::RootError;
 use crate::apps::root::RootSide;
 use crate::apps::root::Server;
+use crate::apps::version::compare;
+use crate::apt::manifest::Repo;
+use crate::sandbox;
 use crate::sandbox::Sandbox;
+use crate::unfree::Unfree;
 
 /// Root's side of the fake machine, its requests sent as JSON lines through the real server.
 #[derive(Debug)]
@@ -39,6 +54,9 @@ pub struct FakeRoot {
     pub requests: Vec<String>,
     /// `start` and each request's line, shared with whoever made it, which outlives it.
     pub calls: Rc<RefCell<Vec<String>>>,
+    /// What root's keeper undid in the run, kept between requests as the helper's one keeper
+    /// keeps it.
+    pub undone: Vec<Undone>,
 }
 
 impl RootSide for FakeRoot {
@@ -62,8 +80,12 @@ impl RootSide for FakeRoot {
 
 impl FakeRoot {
     pub fn serve(&mut self, line: &str) -> Reply {
-        let keeper = Keeper::new(&mut self.host, Side::Root, &self.catalog, &self.journals);
-        Server::new(keeper, &self.catalog, self.owner).handle(line)
+        let keeper = Keeper::new(&mut self.host, Side::Root, &self.catalog, &self.journals)
+            .with_undone(std::mem::take(&mut self.undone));
+        let mut server = Server::new(keeper, &self.catalog, self.owner);
+        let reply = server.handle(line);
+        self.undone = server.into_keeper().take_undone();
+        reply
     }
 }
 
@@ -75,15 +97,46 @@ pub struct State {
     /// Package to the version apt would install.
     pub candidates: BTreeMap<String, String>,
     pub repos: BTreeSet<String>,
+    /// Repositories set up as files, as the real machine sets them up: to its manifest entry and
+    /// its sources file. Setting one up writes the file and its keyrings, and it is ready by
+    /// [`Repo::in_place`] on the machine's files; the rest are ready once in `repos`.
+    pub repo_files: BTreeMap<String, (Repo, String)>,
     /// A download's URL to its sha256 and its bytes. A `.deb`'s bytes are `deb <package>
     /// <version>`.
     pub downloads: BTreeMap<String, (String, Vec<u8>)>,
     pub nix: BTreeSet<String>,
+    /// Whether the user's nixpkgs takes unfree packages.
+    pub unfree: Unfree,
     /// Group to its members.
     pub groups: BTreeMap<String, BTreeSet<String>>,
     /// `<scope>:<unit>` to its state.
     pub units: BTreeMap<String, Unit>,
     pub linger: bool,
+    /// The architectures dpkg takes packages of beside the machine's.
+    pub foreign: BTreeSet<String>,
+    /// The kernels installed with their headers, which DKMS builds for.
+    pub kernels: BTreeSet<String>,
+    /// DKMS's tree: `<module>/<version>` to the kernels it is installed for, each with the key
+    /// that signed it, none for one unsigned.
+    pub dkms: BTreeMap<String, BTreeMap<String, Option<String>>>,
+    /// The MOK's serial, once DKMS has one; what `dkms install` signs with.
+    pub mok: Option<String>,
+    pub secure_boot: SecureBoot,
+    /// Loaded kernel modules, by name, to how many use them.
+    pub loaded: BTreeMap<String, u32>,
+    /// Loaded kernel modules, by name, to how many devices are bound to their drivers, which the
+    /// modules' own count leaves out.
+    pub bound: BTreeMap<String, u32>,
+    /// Kernels the modules' `dkms.conf` leaves out (`BUILD_EXCLUSIVE_*`).
+    pub excluded: BTreeSet<String>,
+    /// Packages whose control fields say `Essential: yes` or `Protected: yes`, which apt refuses
+    /// to remove without `--allow-remove-essential`, though its simulation shows the removal.
+    pub protected: BTreeSet<String>,
+    /// Package to its conffiles: a removal leaves them and the package in `rc`, a purge takes
+    /// them.
+    pub conffiles: BTreeMap<String, Vec<String>>,
+    /// Packages removed with their configuration left (`rc`).
+    pub rc: BTreeSet<String>,
     /// Package to the installed packages installing it removes, as Docker's `docker-ce` removes
     /// Ubuntu's `docker.io`.
     pub conflicts: BTreeMap<String, BTreeSet<String>>,
@@ -92,13 +145,65 @@ pub struct State {
     pub depends: BTreeMap<String, BTreeSet<String>>,
     /// Packages apt marks installed by hand, as `apt install` on one makes it.
     pub manual: BTreeSet<String>,
+    /// Package to the group its preinst makes on install, empties and puts one user in, a guess of
+    /// its own rather than the machine's user, as the `nordvpn` package does: the group and the
+    /// user.
+    pub preinst_groups: BTreeMap<String, (String, String)>,
+    /// Package to its units as its postinst leaves them on a first install (`<scope>:<unit>` to
+    /// the unit), as openssh-server's enables and starts `ssh.socket`; removing the package takes
+    /// them, as its unit files go with it.
+    pub package_units: BTreeMap<String, BTreeMap<String, Unit>>,
     /// Operations that fail: `enable:<unit>`, `apt:<package>`, `fetch:<url>`, `groupdel:<group>`.
     pub fail: BTreeSet<String>,
+    /// The machine is arm64's, not amd64's.
+    pub arm64: bool,
+    /// Vendor repositories whose key nears its expiry, until a setup of the repository fetches
+    /// it again.
+    pub keys_due: BTreeSet<String>,
+    /// Lines the keys' check prints besides the repositories it was asked about.
+    pub keys_stray: BTreeSet<String>,
     /// Every change made, in order.
     pub log: Vec<String>,
 }
 
 impl State {
+    /// Refuses, as apt does, a package of an architecture dpkg doesn't take: apt has no list of
+    /// it, so it can't locate the package.
+    fn knows(&self, packages: &[String]) -> Result<(), HostError> {
+        match packages
+            .iter()
+            .find(|p| p.split_once(':').is_some_and(|(_, arch)| !self.foreign.contains(arch)))
+        {
+            Some(p) => Err(HostError::Failed {
+                command: "apt-get install".to_owned(),
+                code: Some(100),
+                stderr: format!("E: Unable to locate package {p}"),
+            }),
+            None => Ok(()),
+        }
+    }
+
+    /// The installed packages among `packages` and what they depend on, through what that
+    /// depends on, whose candidate sorts below the version dpkg has: what apt would move down.
+    fn downgraded(&self, packages: &[String]) -> BTreeSet<String> {
+        let mut seen: BTreeSet<String> = BTreeSet::new();
+        let mut next: Vec<String> = packages.to_vec();
+        while let Some(package) = next.pop() {
+            if !seen.insert(package.clone()) {
+                continue;
+            }
+            next.extend(self.depends.get(&package).into_iter().flatten().cloned());
+        }
+        seen.into_iter()
+            .filter(|p| {
+                let (Some(installed), Some(candidate)) = (self.dpkg.get(p), self.candidates.get(p)) else {
+                    return false;
+                };
+                compare(candidate, installed) == Ordering::Less
+            })
+            .collect()
+    }
+
     /// `packages` and what they depend on, through what that depends on, that dpkg hasn't.
     fn missing(&self, packages: &[String]) -> BTreeSet<String> {
         let mut needed: BTreeSet<String> = BTreeSet::new();
@@ -220,18 +325,39 @@ impl FakeHost {
                 let unit = Unit { exited: false, ..*unit };
                 (key.clone(), unit)
             })
+            // A unit nothing has, neither loaded, enabled nor running, is no unit.
+            .filter(|(_, unit)| *unit != Unit::default())
             .collect();
         let state = State {
             units,
             log: Vec::new(),
             repos: BTreeSet::new(),
+            repo_files: BTreeMap::new(),
             fail: BTreeSet::new(),
             conflicts: BTreeMap::new(),
             depends: BTreeMap::new(),
+            preinst_groups: BTreeMap::new(),
+            package_units: BTreeMap::new(),
+            protected: BTreeSet::new(),
+            conffiles: BTreeMap::new(),
+            excluded: BTreeSet::new(),
             ..self.state.borrow().clone()
         };
         let _ = write!(out, "{state:#?}");
         out
+    }
+
+    /// The machine's units where a test's `systemctl` stand-in can read them, `units` beside the
+    /// sandbox's log: a line a unit, `<scope>:<unit> enabled|disabled active|inactive`, as a
+    /// script a `run` starts sees the same machine the engine does.
+    fn show_units(&self) {
+        let mut text = String::new();
+        for (key, unit) in &self.state.borrow().units {
+            let enabled = if unit.enabled { "enabled" } else { "disabled" };
+            let active = if unit.active { "active" } else { "inactive" };
+            let _ = writeln!(text, "{key} {enabled} {active}");
+        }
+        fs::write(self.sandbox.log().with_file_name("units"), text).unwrap();
     }
 
     fn fails(&self, op: &str) -> Result<(), HostError> {
@@ -277,7 +403,7 @@ impl Host for FakeHost {
     }
 
     fn arch(&self) -> &'static str {
-        "amd64"
+        if self.state.borrow().arm64 { "arm64" } else { "amd64" }
     }
 
     fn place(&self, path: &Path) -> PathBuf {
@@ -315,8 +441,33 @@ impl Host for FakeHost {
     }
 
     fn apt_repo(&mut self, repo: &str) -> Result<(), HostError> {
+        self.fails(&format!("apt-repo:{repo}"))?;
         self.state.borrow_mut().repos.insert(repo.to_owned());
+        self.state.borrow_mut().keys_due.remove(repo);
+        if let Some((manifest, text)) = self.state.borrow().repo_files.get(repo) {
+            let sources = self.place(Path::new(&format!("/etc/apt/sources.list.d/{repo}.sources")));
+            for (path, text) in std::iter::once((sources, text.as_str()))
+                .chain(manifest.keyrings().map(|k| (self.place(Path::new(k)), "key")))
+            {
+                fs::create_dir_all(path.parent().unwrap()).map_err(HostError::io(&path))?;
+                fs::write(&path, text).map_err(HostError::io(&path))?;
+            }
+        }
         Ok(())
+    }
+
+    fn apt_repo_ready(&mut self, repo: &str) -> Result<bool, HostError> {
+        let state = self.state.borrow();
+        Ok(match state.repo_files.get(repo) {
+            Some((manifest, _)) => manifest.in_place(repo, &self.system),
+            None => state.repos.contains(repo),
+        })
+    }
+
+    fn apt_keys_due(&mut self, repos: &[String]) -> Result<BTreeSet<String>, HostError> {
+        let state = self.state.borrow();
+        let due = repos.iter().filter(|r| state.keys_due.contains(*r));
+        Ok(due.chain(&state.keys_stray).cloned().collect())
     }
 
     fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError> {
@@ -349,10 +500,11 @@ impl Host for FakeHost {
                 }
                 return Ok(AptSimulation {
                     removes: gone.into_iter().filter(|p| state.dpkg.contains_key(p)).collect(),
-                    installs: BTreeSet::new(),
+                    ..AptSimulation::default()
                 });
             }
         };
+        state.knows(&installing)?;
         Ok(AptSimulation {
             removes: installing
                 .iter()
@@ -362,14 +514,34 @@ impl Host for FakeHost {
                 .cloned()
                 .collect(),
             installs: state.missing(&installing),
+            downgrades: state.downgraded(&installing),
         })
     }
 
-    fn apt_install(&mut self, packages: &[String]) -> Result<(), HostError> {
+    fn apt_install(&mut self, packages: &[String], downgrade: Downgrade) -> Result<(), HostError> {
         for p in packages {
             self.fails(&format!("apt:{p}"))?;
         }
+        self.state.borrow().knows(packages)?;
         let mut state = self.state.borrow_mut();
+        // apt moves an installed package asked for by name to its candidate, as it does a
+        // distribution's build of a name a pinned repository also has; `-y` refuses to move one
+        // down unless allowed, before it changes anything.
+        let moving: Vec<(String, String)> = packages
+            .iter()
+            .filter_map(|p| Some((p.clone(), state.dpkg.get(p)?.clone(), state.candidates.get(p)?.clone())))
+            .map(|(p, installed, candidate)| {
+                if downgrade == Downgrade::Refuse && compare(&candidate, &installed) == Ordering::Less {
+                    Err(HostError::Failed {
+                        command: "apt-get install".to_owned(),
+                        code: Some(100),
+                        stderr: "E: Packages were downgraded and -y was used without --allow-downgrades.".to_owned(),
+                    })
+                } else {
+                    Ok((p, candidate))
+                }
+            })
+            .collect::<Result<_, _>>()?;
         for p in packages {
             let conflicts = state.conflicts.get(p).cloned().unwrap_or_default();
             for gone in conflicts {
@@ -377,10 +549,39 @@ impl Host for FakeHost {
             }
         }
         for p in state.missing(packages) {
-            state.dpkg.insert(p, "1.0".to_owned());
+            if let Some((group, user)) = state.preinst_groups.get(&p).cloned() {
+                state.groups.insert(group, BTreeSet::from([user]));
+            }
+            let units = state.package_units.get(&p).cloned().unwrap_or_default();
+            state.units.extend(units);
+            let version = state.candidates.get(&p).cloned().unwrap_or_else(|| "1.0".to_owned());
+            state.rc.remove(&p);
+            state.dpkg.insert(p, version);
         }
+        state.dpkg.extend(moving);
         state.log.push(format!("apt install {}", packages.join(" ")));
         Ok(())
+    }
+
+    fn untar(&mut self, archive: &Path, into: &Path, compression: Compression, strip: u32) -> Result<(), HostError> {
+        let output = self
+            .sandbox
+            .command("tar")
+            .args(untar_args(archive, into, compression, strip))
+            .output()
+            .map_err(|source| HostError::Spawn {
+                program: "tar".to_owned(),
+                source,
+            })?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(HostError::Failed {
+                command: format!("tar -x {}", archive.display()),
+                code: output.status.code(),
+                stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+            })
+        }
     }
 
     fn deb_install(&mut self, deb: &Path) -> Result<(), HostError> {
@@ -397,19 +598,97 @@ impl Host for FakeHost {
         for dependency in state.missing(&[package.to_owned()]) {
             state.dpkg.insert(dependency, "1.0".to_owned());
         }
+        state.rc.remove(package);
         state.dpkg.insert(package.to_owned(), version.to_owned());
         state.log.push(format!("deb install {package} {version}"));
         Ok(())
     }
 
-    fn apt_remove(&mut self, packages: &[String]) -> Result<(), HostError> {
+    fn apt_remove(&mut self, packages: &[String], removal: Removal) -> Result<(), HostError> {
+        // As apt does with dpkg's lock held: it fails before it changes anything.
+        for p in packages {
+            self.fails(&format!("apt-remove:{p}"))?;
+        }
         let gone = self.apt_simulate(AptPlan::Remove(packages))?.removes;
         let mut state = self.state.borrow_mut();
+        // apt's simulation shows the removal of an important package; the removal itself refuses.
+        if gone.iter().any(|p| state.protected.contains(p)) {
+            return Err(HostError::Failed {
+                command: format!("apt-get remove -y {}", packages.join(" ")),
+                code: Some(100),
+                stderr: "E: Essential packages were removed and -y was used without --allow-remove-essential."
+                    .to_owned(),
+            });
+        }
+        let purge = removal == Removal::Purge;
         for p in &gone {
             state.dpkg.remove(p);
+            let units = state.package_units.get(p).cloned().unwrap_or_default();
+            for unit in units.keys() {
+                state.units.remove(unit);
+            }
+            if state.conffiles.contains_key(p) && !purge {
+                state.rc.insert(p.clone());
+            }
         }
-        state.log.push(format!("apt remove {}", packages.join(" ")));
+        if purge {
+            let purged: Vec<String> = gone
+                .iter()
+                .chain(packages.iter().filter(|p| state.rc.contains(*p)))
+                .cloned()
+                .collect();
+            for p in purged {
+                state.rc.remove(&p);
+                // dpkg takes a conffile and the copies of it it made beside it.
+                for path in state.conffiles.get(&p).cloned().unwrap_or_default() {
+                    for suffix in ["", ".dpkg-dist", ".dpkg-old"] {
+                        let _ = fs::remove_file(self.place(Path::new(&format!("{path}{suffix}"))));
+                    }
+                }
+            }
+        }
+        let verb = if purge { "purge" } else { "remove" };
+        state.log.push(format!("apt {verb} {}", packages.join(" ")));
         Ok(())
+    }
+
+    fn dpkg_purge(&mut self, packages: &[String]) -> Result<(), HostError> {
+        self.fails("dpkg-purge")?;
+        let mut state = self.state.borrow_mut();
+        // dpkg refuses, changing nothing, while a package outside them depends on one of them.
+        let needed = state.dpkg.keys().filter(|p| !packages.contains(*p)).find(|p| {
+            state
+                .depends
+                .get(*p)
+                .is_some_and(|d| d.iter().any(|d| packages.contains(d)))
+        });
+        if let Some(needs) = needed {
+            return Err(HostError::Failed {
+                command: format!("dpkg --purge {}", packages.join(" ")),
+                code: Some(2),
+                stderr: format!("dpkg: dependency problems prevent removal: {needs} depends on one of them"),
+            });
+        }
+        for p in packages {
+            state.dpkg.remove(p);
+            state.rc.remove(p);
+            for path in state.conffiles.get(p).cloned().unwrap_or_default() {
+                for suffix in ["", ".dpkg-dist", ".dpkg-old"] {
+                    let _ = fs::remove_file(self.place(Path::new(&format!("{path}{suffix}"))));
+                }
+            }
+        }
+        state.log.push(format!("dpkg purge {}", packages.join(" ")));
+        Ok(())
+    }
+
+    fn important(&mut self, packages: &[String]) -> Result<BTreeSet<String>, HostError> {
+        let state = self.state.borrow();
+        Ok(packages
+            .iter()
+            .filter(|p| state.dpkg.contains_key(*p) && state.protected.contains(*p))
+            .cloned()
+            .collect())
     }
 
     fn fetch(&mut self, url: &str, sha256: &str, to: &Path) -> Result<(), HostError> {
@@ -438,6 +717,10 @@ impl Host for FakeHost {
 
     fn nix_list(&mut self) -> Result<BTreeSet<String>, HostError> {
         Ok(self.state.borrow().nix.clone())
+    }
+
+    fn unfree(&mut self) -> Result<Unfree, HostError> {
+        Ok(self.state.borrow().unfree)
     }
 
     fn nix_add(&mut self, names: &[String]) -> Result<(), HostError> {
@@ -489,9 +772,15 @@ impl Host for FakeHost {
         Ok(())
     }
 
-    fn unit_state(&mut self, scope: Scope, unit: &str) -> Result<UnitState, HostError> {
-        let key = Self::unit(scope, unit);
-        let unit = self.state.borrow().units.get(&key).copied().unwrap_or_default();
+    fn unit_state(&mut self, scope: Scope, name: &str) -> Result<UnitState, HostError> {
+        let key = Self::unit(scope, name);
+        let mut unit = self.state.borrow().units.get(&key).copied().unwrap_or_default();
+        // systemd loads a unit whose file is in its unit folder.
+        let folder = match scope {
+            Scope::System => self.place(Path::new("/etc/systemd/system")),
+            Scope::User => self.home.join(".config/systemd/user"),
+        };
+        unit.exists = unit.exists || folder.join(name).is_file();
         Ok(UnitState::from_show(&unit.show()))
     }
 
@@ -522,6 +811,16 @@ impl Host for FakeHost {
         Ok(())
     }
 
+    fn restart(&mut self, scope: Scope, unit: &str) -> Result<(), HostError> {
+        let key = Self::unit(scope, unit);
+        let mut state = self.state.borrow_mut();
+        if let Some(unit) = state.units.get_mut(&key) {
+            unit.exited = true;
+        }
+        state.log.push(format!("restart {unit}"));
+        Ok(())
+    }
+
     fn lingers(&mut self) -> Result<bool, HostError> {
         Ok(self.state.borrow().linger)
     }
@@ -532,10 +831,155 @@ impl Host for FakeHost {
         Ok(())
     }
 
+    fn foreign_arches(&mut self) -> Result<BTreeSet<String>, HostError> {
+        Ok(self.state.borrow().foreign.clone())
+    }
+
+    fn set_foreign_arch(&mut self, arch: &str, on: bool) -> Result<(), HostError> {
+        self.fails(&format!("arch:{arch}"))?;
+        if !on && !self.arch_packages(arch)?.is_empty() {
+            return Err(HostError::Failed {
+                command: format!("dpkg --remove-architecture {arch}"),
+                code: Some(2),
+                stderr: format!("dpkg: error: cannot remove architecture '{arch}' currently in use by the database"),
+            });
+        }
+        let mut state = self.state.borrow_mut();
+        if on {
+            state.foreign.insert(arch.to_owned());
+        } else {
+            state.foreign.remove(arch);
+        }
+        state.log.push(format!("arch {arch} {on}"));
+        Ok(())
+    }
+
+    fn arch_packages(&mut self, arch: &str) -> Result<BTreeMap<String, Known>, HostError> {
+        let suffix = format!(":{arch}");
+        let state = self.state.borrow();
+        let installed = state.dpkg.keys().map(|p| (p, Known::Installed));
+        let configured = state.rc.iter().map(|p| (p, Known::ConfigFiles));
+        Ok(installed
+            .chain(configured)
+            .filter(|(p, _)| p.ends_with(&suffix))
+            .map(|(p, known)| (p.clone(), known))
+            .collect())
+    }
+
+    fn apt_update(&mut self) -> Result<(), HostError> {
+        self.fails("apt-update")?;
+        self.log("apt update");
+        Ok(())
+    }
+
+    fn kernels(&mut self) -> Result<BTreeSet<String>, HostError> {
+        Ok(self.state.borrow().kernels.clone())
+    }
+
+    fn dkms_status(&mut self, module: &str, version: &str) -> Result<DkmsStatus, HostError> {
+        let state = self.state.borrow();
+        Ok(match state.dkms.get(&format!("{module}/{version}")) {
+            Some(kernels) => DkmsStatus {
+                added: true,
+                installed: kernels.keys().cloned().collect(),
+            },
+            None => DkmsStatus::default(),
+        })
+    }
+
+    fn dkms_add(&mut self, module: &str, version: &str) -> Result<(), HostError> {
+        let conf = self.place(Path::new(&format!("/usr/src/{module}-{version}/dkms.conf")));
+        if !conf.is_file() {
+            return Err(HostError::Failed {
+                command: format!("dkms add -m {module} -v {version}"),
+                code: Some(2),
+                stderr: format!("Error! Could not find module source directory: {}", conf.display()),
+            });
+        }
+        let mut state = self.state.borrow_mut();
+        state.dkms.entry(format!("{module}/{version}")).or_default();
+        state.log.push(format!("dkms add {module}/{version}"));
+        Ok(())
+    }
+
+    fn dkms_install(&mut self, module: &str, version: &str, kernel: &str) -> Result<DkmsInstall, HostError> {
+        self.fails(&format!("dkms-install:{module}"))?;
+        if self.state.borrow().excluded.contains(kernel) {
+            return Ok(DkmsInstall::Excluded);
+        }
+        // A DKMS whose signing is set up wrong installs the module unsigned.
+        let unsigned = self.state.borrow().fail.contains("dkms-sign");
+        let mut state = self.state.borrow_mut();
+        let signer = if unsigned { None } else { state.mok.clone() };
+        let Some(kernels) = state.dkms.get_mut(&format!("{module}/{version}")) else {
+            return Err(HostError::Failed {
+                command: format!("dkms install -m {module} -v {version}"),
+                code: Some(3),
+                stderr: "Error! This module/version combo is not added".to_owned(),
+            });
+        };
+        kernels.insert(kernel.to_owned(), signer);
+        state.log.push(format!("dkms install {module}/{version} {kernel}"));
+        Ok(DkmsInstall::Installed)
+    }
+
+    fn dkms_remove(&mut self, module: &str, version: &str) -> Result<(), HostError> {
+        self.fails(&format!("dkms-remove:{module}"))?;
+        let mut state = self.state.borrow_mut();
+        state.dkms.remove(&format!("{module}/{version}"));
+        state.log.push(format!("dkms remove {module}/{version}"));
+        Ok(())
+    }
+
+    fn module_signer(&mut self, module: &str, kernel: &str) -> Result<Option<String>, HostError> {
+        let prefix = format!("{module}/");
+        let state = self.state.borrow();
+        Ok(state
+            .dkms
+            .iter()
+            .filter(|(key, _)| key.starts_with(&prefix))
+            .find_map(|(_, kernels)| kernels.get(kernel).cloned())
+            .flatten())
+    }
+
+    fn mok(&mut self, _kernel: &str) -> Result<Option<Mok>, HostError> {
+        Ok(self.state.borrow().mok.clone().map(|serial| Mok {
+            certificate: PathBuf::from("/var/lib/shim-signed/mok/MOK.der"),
+            serial,
+        }))
+    }
+
+    fn secure_boot(&mut self, _certificate: Option<&Path>) -> Result<SecureBoot, HostError> {
+        Ok(self.state.borrow().secure_boot)
+    }
+
+    fn module_users(&mut self, module: &str) -> Result<Option<u32>, HostError> {
+        let name = module.replace('-', "_");
+        let state = self.state.borrow();
+        Ok(state
+            .loaded
+            .get(&name)
+            .map(|held| held + state.bound.get(&name).copied().unwrap_or(0)))
+    }
+
+    fn unload(&mut self, module: &str) -> Result<(), HostError> {
+        let mut state = self.state.borrow_mut();
+        state.loaded.remove(&module.replace('-', "_"));
+        state.log.push(format!("unload {module}"));
+        Ok(())
+    }
+
     fn run(&mut self, argv: &[String], dir: &Path) -> Result<(), HostError> {
+        self.show_units();
         let (program, rest) = argv.split_first().unwrap();
         let program = match program.strip_prefix("./") {
-            Some(script) => dir.join(script),
+            Some(script) => {
+                // The engine writes a run's scripts on this test's thread, while other tests'
+                // threads start processes.
+                let script = dir.join(script);
+                sandbox::settle(&script);
+                script
+            }
             None => PathBuf::from(program),
         };
         let output = self

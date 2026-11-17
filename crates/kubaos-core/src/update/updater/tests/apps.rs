@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::fs::PermissionsExt;
@@ -14,10 +15,13 @@ use super::warnings;
 use super::yes;
 use crate::apps::AppState;
 use crate::apps::Picks;
+use crate::apps::action::Kind;
 use crate::apps::host::Host;
 use crate::apps::host::fake::FakeHost;
 use crate::apps::journal::Adoption;
 use crate::apps::journal::Journal;
+use crate::apps::journal::State;
+use crate::sandbox;
 use crate::update::UpdateError;
 use crate::update::event::AppChanges;
 use crate::update::event::Phase;
@@ -159,8 +163,8 @@ fn lock_down(dir: &Path) {
 }
 
 fn script(path: &Path, body: &str) {
-    put(path, &format!("#!/bin/sh\n{body}\n"));
-    fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    sandbox::program(path, &format!("#!/bin/sh\n{body}\n"));
 }
 
 fn put(path: &Path, text: &str) {
@@ -325,6 +329,38 @@ fn an_id_the_catalog_lacks_is_refused_before_anything_changes() {
 }
 
 #[test]
+fn an_app_with_unfree_nixpkgs_is_refused_while_the_user_refuses_unfree_and_nothing_changes() {
+    let w = world();
+    let chat = w.sys.catalog().join("chat");
+    put(
+        &chat.join("app.toml"),
+        &format!(
+            "{ABOUT}name = \"Chat\"\nsummary = \"Talk\"\n\n[[action]]\nname = \"Install Chat\"\nkind = \"nix\"\n\
+             packages = [\"discord\"]\nunfree = true\n"
+        ),
+    );
+    lock_down(&chat);
+    put(
+        &w.user.state_dir().root().join("nixpkgs.toml"),
+        "allow_unfree = false\n",
+    );
+    let mut m = fake(&w, &[]);
+    let before = host(&m).snapshot();
+
+    let err = w.updater(&mut m).add_apps(&names(&["chat"]), None).unwrap_err();
+    let status = w.updater(&mut m).app_status().unwrap();
+
+    assert!(matches!(err, UpdateError::Unfree { ref id } if id == "chat"), "{err:?}");
+    assert!(err.to_string().contains("kubaos package unfree on"), "{err}");
+    assert!(picked(&w).is_empty());
+    assert_eq!(host(&m).snapshot(), before);
+    assert_eq!(status.get("chat").unwrap().state, AppState::Unavailable);
+    put(&w.user.state_dir().root().join("nixpkgs.toml"), "allow_unfree = true\n");
+    let status = w.updater(&mut m).app_status().unwrap();
+    assert_eq!(status.get("chat").unwrap().state, AppState::Available);
+}
+
+#[test]
 fn a_declined_password_changes_nothing_and_puts_the_picks_back() {
     let w = world();
     let mut m = fake(&w, &[]);
@@ -368,6 +404,32 @@ fn remove_drops_the_pick_and_undoes_the_journal_through_polkit() {
 }
 
 #[test]
+fn a_removal_rolled_back_keeps_its_app_picked_and_one_removed_before_it_stays_out() {
+    let w = world();
+    let mut m = fake(&w, &[]);
+    w.updater(&mut m).add_apps(&names(&["agent", "desk"]), None).unwrap();
+    // apt can't take Desk's package, as with dpkg's lock held.
+    host(&m).state.borrow_mut().fail.insert("apt-remove:desk".to_owned());
+
+    let err = w.updater(&mut m).remove_apps(&names(&["agent", "desk"])).unwrap_err();
+
+    let why = crate::update::event::chain(&err);
+    assert!(why.contains("the removal was rolled back"), "{why}");
+    assert_eq!(picked(&w), names(&["desk"]));
+    assert_eq!(user_journal(&w, "agent"), None);
+    assert!(has(&m, "desk"));
+    let status = w.updater(&mut m).app_status().unwrap();
+    let desk = status.get("desk").unwrap();
+    assert_eq!(desk.state, AppState::Installed);
+    assert!(
+        desk.removal_rolled_back
+            .as_ref()
+            .is_some_and(|m| m.whole && m.why.starts_with("Install Desk: ")),
+        "{desk:?}"
+    );
+}
+
+#[test]
 fn an_update_installs_the_picked_apps_through_sudo_and_a_second_starts_no_root() {
     let w = world();
     let mut picks = Picks::default();
@@ -396,6 +458,38 @@ fn an_update_installs_the_picked_apps_through_sudo_and_a_second_starts_no_root()
 }
 
 #[test]
+fn an_update_fetches_a_key_nearing_its_expiry_of_a_repository_an_app_set_up_again_and_only_then_asks_for_root() {
+    let w = world();
+    let mut picks = Picks::default();
+    picks.add("agent");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = fake(&w, &[]);
+    w.reporting(&mut m, &mut Vec::new()).update(yes()).unwrap();
+    let installed = root_starts(&m);
+    let mut quiet = Vec::new();
+    w.reporting(&mut m, &mut quiet).update(yes()).unwrap();
+    assert_eq!(root_starts(&m), installed, "an update with no key due asked for root");
+    host(&m).state.borrow_mut().keys_due.insert("vendor".to_owned());
+
+    let mut events = Vec::new();
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert_eq!(root_starts(&m), installed + 1);
+    assert!(host(&m).state.borrow().keys_due.is_empty());
+    let keys: Vec<&str> = warnings(&events).into_iter().filter(|w| w.contains("key")).collect();
+    assert!(keys.is_empty(), "{keys:?}");
+    let detail = events.iter().find_map(|e| match e {
+        crate::update::event::UpdateEvent::PhaseFinished {
+            phase: Phase::Apps,
+            detail,
+            ..
+        } => detail.clone(),
+        _ => None,
+    });
+    assert_eq!(detail.as_deref(), Some("the signing key of vendor fetched again"));
+}
+
+#[test]
 fn an_update_without_picks_runs_nothing_for_the_apps() {
     let w = world();
     let mut m = fake(&w, &[]);
@@ -405,6 +499,37 @@ fn an_update_without_picks_runs_nothing_for_the_apps() {
 
     assert!(root_helpers(&m).is_empty());
     assert!(!phases(&events).contains(&Phase::Apps));
+}
+
+#[test]
+fn a_picked_app_unfree_while_the_user_refuses_unfree_warns_why_and_the_update_goes_on() {
+    let w = world();
+    let chat = w.sys.catalog().join("chat");
+    put(
+        &chat.join("app.toml"),
+        &format!(
+            "{ABOUT}name = \"Chat\"\nsummary = \"Talk\"\n\n[[action]]\nname = \"Install Chat\"\nkind = \"nix\"\n\
+             packages = [\"discord\"]\nunfree = true\n"
+        ),
+    );
+    lock_down(&chat);
+    put(
+        &w.user.state_dir().root().join("nixpkgs.toml"),
+        "allow_unfree = false\n",
+    );
+    let mut picks = Picks::default();
+    picks.add("chat");
+    picks.add("desk");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = fake(&w, &[]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    let about_chat: Vec<_> = warnings(&events).into_iter().filter(|w| w.contains("chat")).collect();
+    assert_eq!(about_chat.len(), 1, "{about_chat:?}");
+    assert!(about_chat[0].contains("kubaos package unfree on"), "{about_chat:?}");
+    assert!(has(&m, "desk"));
 }
 
 #[test]
@@ -791,6 +916,12 @@ esac"#,
     fs::create_dir_all(home.join(".local/bin")).unwrap();
     std::os::unix::fs::symlink(runtime.join("t3"), home.join(".local/bin/t3")).unwrap();
     put(&home.join(".config/systemd/user/t3code.service"), "[Service]\n");
+    // The icon KubaOS's install put in the theme, as it stays through T3's own updates.
+    let icon = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/t3-code/t3-code.svg");
+    put(
+        &home.join(".local/share/icons/hicolor/scalable/apps/t3-code.svg"),
+        &fs::read_to_string(icon).unwrap(),
+    );
     put(
         &home.join(".t3/userdata/desktop-settings.json"),
         "{\n  \"localEnvironmentEnabled\": false\n}\n",
@@ -1063,6 +1194,492 @@ fn an_update_after_a_reboot_leaves_chromes_colouring_service_alone() {
     assert_eq!(root_starts(&m), starts, "root was asked to colour Chrome again");
 }
 
+#[test]
+fn a_browser_from_its_vendors_repository_sets_the_repository_up_and_goes_whole() {
+    let w = world();
+    let browsers = [
+        ("firefox", "mozilla", "firefox"),
+        ("microsoft-edge", "microsoft-edge", "microsoft-edge-stable"),
+        ("vivaldi", "vivaldi", "vivaldi-stable"),
+        ("librewolf", "librewolf", "librewolf"),
+    ];
+    for (id, _, _) in browsers {
+        with_app(&w, id);
+    }
+    let mut m = fake(&w, &[]);
+    host(&m)
+        .state
+        .borrow_mut()
+        .candidates
+        .insert("firefox".to_owned(), "160.0~build1".to_owned());
+    let pin = host(&m).place(Path::new("/etc/apt/preferences.d/kubaos-firefox"));
+
+    for (id, repo, package) in browsers {
+        w.updater(&mut m).add_apps(&names(&[id]), None).unwrap();
+
+        assert!(host(&m).state.borrow().repos.contains(repo), "{id}");
+        assert!(has(&m, package), "{id}");
+    }
+    assert_eq!(
+        fs::read_to_string(&pin).unwrap(),
+        fs::read_to_string(w.sys.catalog().join("firefox/kubaos-firefox.pref")).unwrap()
+    );
+
+    for (id, _, package) in browsers {
+        w.updater(&mut m).remove_apps(&names(&[id])).unwrap();
+
+        assert!(!has(&m, package), "{id}");
+        assert!(user_journal(&w, id).is_none(), "{id}");
+    }
+    assert!(!pin.exists(), "the pin goes with Firefox");
+}
+
+#[test]
+fn firefox_takes_the_place_of_ubuntus_snap_firefox_and_goes_whole() {
+    let w = world();
+    with_app(&w, "firefox");
+    let mut m = fake(&w, &[]);
+    {
+        let host = host(&m);
+        let mut state = host.state.borrow_mut();
+        state
+            .dpkg
+            .insert("firefox".to_owned(), "1:1snap1-0ubuntu9.1".to_owned());
+        state.candidates.insert("firefox".to_owned(), "160.0~build1".to_owned());
+    }
+
+    w.updater(&mut m).add_apps(&names(&["firefox"]), None).unwrap();
+
+    let version = host(&m).state.borrow().dpkg.get("firefox").cloned();
+    assert_eq!(version.as_deref(), Some("160.0~build1"));
+    let journal = root_journal(&w, "firefox").unwrap();
+    assert!(
+        journal
+            .entries
+            .iter()
+            .flat_map(|e| &e.claims)
+            .any(|c| c.claim == "package:firefox" && c.owned),
+        "{journal:?}"
+    );
+
+    w.updater(&mut m).remove_apps(&names(&["firefox"])).unwrap();
+
+    assert!(!has(&m, "firefox"));
+}
+
+#[test]
+fn tor_browser_brave_and_chromium_install_and_go_whole() {
+    let w = world();
+    let browsers = [
+        ("tor-browser", "torbrowser-launcher"),
+        ("brave", "brave"),
+        ("chromium", "chromium"),
+    ];
+    for (id, _) in browsers {
+        with_app(&w, id);
+    }
+    let mut m = fake(&w, &[]);
+    let there = |m: &Fake, package: &str| has(m, package) || host(m).state.borrow().nix.contains(package);
+
+    for (id, package) in browsers {
+        w.updater(&mut m).add_apps(&names(&[id]), None).unwrap();
+
+        assert!(there(&m, package), "{id}");
+        assert!(user_journal(&w, id).is_some_and(|j| j.complete), "{id}");
+    }
+    assert!(has(&m, "torbrowser-launcher"), "the launcher is apt's");
+    assert!(
+        host(&m)
+            .state
+            .borrow()
+            .nix
+            .is_superset(&names(&["brave", "chromium"]).into_iter().collect())
+    );
+
+    for (id, package) in browsers {
+        w.updater(&mut m).remove_apps(&names(&[id])).unwrap();
+
+        assert!(!there(&m, package), "{id}");
+        assert!(user_journal(&w, id).is_none() && root_journal(&w, id).is_none(), "{id}");
+    }
+}
+
+/// A sandbox where `curl` saves the URL it is given as the key it downloads, failing for a URL
+/// with `fails` in it, and `gpg` answers for such a key with the fingerprint the package manifest
+/// pins for its URL, and for a keyring holding one of a repo's `global_fingerprints` as its text
+/// with that one: a key fetch that works, without the network or the machine's keyrings.
+fn key_sandbox(dir: &Path, fails: &str) -> crate::sandbox::Sandbox {
+    let manifest =
+        crate::apt::Manifest::read(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../system/packages.toml"))
+            .unwrap()
+            .unwrap();
+    let mut answers = String::new();
+    for repo in manifest.repos().values() {
+        let keys = [
+            (Some(&repo.key_url), Some(&repo.fingerprint)),
+            (repo.next_key_url.as_ref(), repo.next_fingerprint.as_ref()),
+        ];
+        for (url, fingerprint) in keys {
+            if let (Some(url), Some(fingerprint)) = (url, fingerprint) {
+                let _ = writeln!(answers, "[ \"$url\" != '{url}' ] || f={fingerprint}");
+            }
+        }
+        // A vendor's older key, in a keyring that holds its fingerprint as its text.
+        for fingerprint in &repo.global_fingerprints {
+            let _ = writeln!(answers, "[ \"$url\" != '{fingerprint}' ] || f={fingerprint}");
+        }
+    }
+    let home = dir.join("home");
+    fs::create_dir_all(&home).unwrap();
+    let sandbox = crate::sandbox::Sandbox::new(&dir.join("sandbox"), &home, "kuba");
+    sandbox.stub("dpkg", "echo amd64");
+    sandbox.stub(
+        "curl",
+        &format!(
+            "out=; url=\nwhile [ $# -gt 0 ]; do case \"$1\" in -o) out=$2; shift ;; -*) ;; *) url=$1 ;; esac; shift; done\n\
+             case \"$url\" in *{fails}*) exit 22 ;; esac\nprintf '%s' \"$url\" >\"$out\""
+        ),
+    );
+    sandbox.stub(
+        "gpg",
+        &format!(
+            "case \"$*\" in *--dearmor*) cat; exit 0 ;; esac\nfor last; do :; done\nurl=$(cat \"$last\") || exit 2\nf=\n\
+             {answers}[ -n \"$f\" ] || exit 2\necho 'pub:-:4096:1:0000000000000000:::::::'\necho \"fpr:::::::::$f:\""
+        ),
+    );
+    sandbox
+}
+
+#[test]
+fn the_browser_repos_migration_refreshes_only_the_repositories_kubaos_set_up_and_never_fails() {
+    let w = world();
+    for id in ["firefox", "vivaldi", "librewolf"] {
+        with_app(&w, id);
+    }
+    let mut m = fake(&w, &[]);
+    w.updater(&mut m)
+        .add_apps(&names(&["firefox", "vivaldi", "librewolf"]), None)
+        .unwrap();
+    let dir = w.tmp.path().join("migration");
+    let sources = dir.join("sources.list.d");
+    let edge = "Types: deb\nURIs: https://packages.microsoft.com/repos/edge-stable\nSigned-By: /usr/share/keyrings/microsoft-edge.gpg\n";
+    put(&sources.join("microsoft-edge.sources"), edge);
+    let sandbox = key_sandbox(&dir, "librewolf");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let migration = fs::read_dir(root.join("migrations/system"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.to_string_lossy().ends_with("-browser-repos.sh"))
+        .unwrap();
+
+    let out = sandbox
+        .command("bash")
+        .args(["-euo", "pipefail"])
+        .arg(&migration)
+        .env("KUBAOS_DIR", &root)
+        .env("APT_SOURCES_D", &sources)
+        .env("KUBAOS_APP_JOURNALS", w.sys.app_journals())
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    let calls = sandbox.calls();
+    let wrote = |file: &str| {
+        calls
+            .iter()
+            .any(|c| c.starts_with("sudo install -D -m 0644 ") && c.ends_with(&format!(" {file}")))
+    };
+    let at = |name: &str| sources.join(name).display().to_string();
+    assert!(
+        wrote(&at("mozilla.sources")) && wrote(&at("vivaldi.sources")),
+        "{calls:#?}"
+    );
+    assert!(
+        wrote("/usr/share/keyrings/vivaldi-16BD9233.gpg") && wrote("/usr/share/keyrings/vivaldi-5220E3E9.gpg"),
+        "both of Vivaldi's keys: {calls:#?}"
+    );
+    assert!(
+        !calls.iter().any(|c| c.contains("microsoft")),
+        "Edge was installed by hand, so its source is Microsoft's: {calls:#?}"
+    );
+    assert_eq!(
+        fs::read_to_string(sources.join("microsoft-edge.sources")).unwrap(),
+        edge
+    );
+    assert!(!wrote(&at("librewolf.sources")), "{calls:#?}");
+    assert!(stderr.contains("apt repository librewolf not refreshed"), "{stderr}");
+    let updates = calls.iter().filter(|c| *c == "sudo apt-get update").count();
+    assert_eq!(updates, 1, "one apt update for every repository: {calls:#?}");
+}
+
+#[test]
+fn the_communication_repos_migration_refreshes_only_what_kubaos_set_up_and_untrusts_slacks_keys() {
+    let w = world();
+    for id in ["signal", "slack", "element", "zulip"] {
+        with_app(&w, id);
+    }
+    let mut m = fake(&w, &[]);
+    w.updater(&mut m)
+        .add_apps(&names(&["signal", "slack", "element"]), None)
+        .unwrap();
+    let dir = w.tmp.path().join("migration");
+    let sources = dir.join("sources.list.d");
+    let zulips_own =
+        "Types: deb\nURIs: https://download.zulip.com/desktop/apt\nSigned-By: /usr/share/keyrings/zulip-desktop.asc\n";
+    put(&sources.join("zulip-desktop.sources"), zulips_own);
+    let trusted = dir.join("trusted.gpg.d");
+    let manifest =
+        crate::apt::Manifest::read(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../system/packages.toml"))
+            .unwrap()
+            .unwrap();
+    let slack = &manifest.repos()["slack"];
+    put(&trusted.join("slack-desktop.gpg"), &slack.key_url);
+    put(&trusted.join("packagecloud.gpg"), &slack.global_fingerprints[0]);
+    put(&trusted.join("someone.gpg"), "https://example.com/someone.asc");
+    let sandbox = key_sandbox(&dir, "element");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let migration = fs::read_dir(root.join("migrations/system"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.to_string_lossy().ends_with("-communication-repos.sh"))
+        .unwrap();
+
+    let out = sandbox
+        .command("bash")
+        .args(["-euo", "pipefail"])
+        .arg(&migration)
+        .env("KUBAOS_DIR", &root)
+        .env("APT_SOURCES_D", &sources)
+        .env("APT_TRUSTED_D", &trusted)
+        .env("KUBAOS_APP_JOURNALS", w.sys.app_journals())
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    let calls = sandbox.calls();
+    let wrote = |file: &str| {
+        calls
+            .iter()
+            .any(|c| c.starts_with("sudo install -D -m 0644 ") && c.ends_with(&format!(" {file}")))
+    };
+    let at = |name: &str| sources.join(name).display().to_string();
+    assert!(
+        wrote(&at("signal.sources")) && wrote(&at("slack.sources")),
+        "{calls:#?}"
+    );
+    assert!(
+        !wrote(&at("zulip-desktop.sources")),
+        "Zulip was installed by hand: {calls:#?}"
+    );
+    assert_eq!(
+        fs::read_to_string(sources.join("zulip-desktop.sources")).unwrap(),
+        zulips_own
+    );
+    assert!(!wrote(&at("element.sources")), "{calls:#?}");
+    assert!(stderr.contains("apt repository element not refreshed"), "{stderr}");
+    let removed: Vec<&str> = calls.iter().filter_map(|c| c.strip_prefix("sudo rm -f ")).collect();
+    let gone = |name: &str| trusted.join(name).display().to_string();
+    assert_eq!(
+        removed,
+        [gone("slack-desktop.gpg"), gone("packagecloud.gpg")],
+        "Slack's keys, trusted for every repository, go; another's stays"
+    );
+    let updates = calls.iter().filter(|c| *c == "sudo apt-get update").count();
+    assert_eq!(updates, 1, "one apt update for every repository: {calls:#?}");
+}
+
+/// The root journal's entry of the app `id`'s `apt` step.
+fn apt_entry(w: &World, id: &str) -> crate::apps::journal::Entry {
+    root_journal(w, id)
+        .unwrap()
+        .entries
+        .into_iter()
+        .find(|e| matches!(e.action.kind, Kind::Apt { .. }))
+        .unwrap()
+}
+
+/// Agent, picked, on a machine an older release put it on, its repository set up or not.
+fn agent_from_before(w: &World, repo_set_up: bool) -> Fake {
+    let mut picks = Picks::default();
+    picks.add("agent");
+    picks.write(&w.user.app_picks()).unwrap();
+    let m = fake(w, &["agent"]);
+    if repo_set_up {
+        host(&m).state.borrow_mut().repos.insert("vendor".to_owned());
+    }
+    m
+}
+
+#[test]
+fn an_app_kubaos_put_there_from_its_set_up_repository_is_taken_in_owned_and_nothing_runs() {
+    let w = world();
+    let mut m = agent_from_before(&w, true);
+    w.updater(&mut m).adopt_apps().unwrap();
+    let before = host(&m).snapshot();
+
+    w.updater(&mut m).update(yes()).unwrap();
+
+    assert_eq!(host(&m).snapshot(), before);
+    assert_eq!(host(&m).state.borrow().repos, ["vendor".to_owned()].into());
+    let entry = apt_entry(&w, "agent");
+    assert_eq!(entry.state, State::Done);
+    assert!(entry.claims.iter().all(|c| c.owned), "{entry:?}");
+}
+
+#[test]
+fn an_app_kubaos_put_there_without_its_repository_set_up_has_it_set_up_and_its_packages_stay_owned() {
+    let w = world();
+    let mut m = agent_from_before(&w, false);
+    let taken = w.updater(&mut m).adopt_apps().unwrap();
+    assert_eq!(taken, ["Agent"]);
+
+    w.updater(&mut m).update(yes()).unwrap();
+
+    assert!(host(&m).state.borrow().repos.contains("vendor"));
+    let entry = apt_entry(&w, "agent");
+    assert_eq!(entry.state, State::Done);
+    assert!(entry.claims.iter().all(|c| c.owned), "{entry:?}");
+    w.updater(&mut m).remove_apps(&names(&["agent"])).unwrap();
+    assert!(!has(&m, "agent"), "KubaOS put it there, so its removal takes it");
+}
+
+/// Slack's daily job's `slack.list`, as a Slack installed by hand has it.
+const SLACKS_OWN_LIST: &str = "### THIS FILE IS AUTOMATICALLY CONFIGURED ###\n\
+     deb [arch=amd64] https://packagecloud.io/slacktechnologies/slack/debian/ jessie main\n";
+
+#[test]
+fn a_slack_installed_by_hand_is_set_up_from_kubaos_repository_and_its_global_keys_go() {
+    let w = world();
+    with_app(&w, "slack");
+    let mut m = fake(&w, &["slack-desktop"]);
+    put(
+        &host(&m).place(Path::new("/etc/default/slack")),
+        "repo_add_once=\"false\"\nrepo_reenable_on_distupgrade=\"true\"\n",
+    );
+
+    w.updater(&mut m).add_apps(&names(&["slack"]), None).unwrap();
+
+    assert!(
+        host(&m).state.borrow().repos.contains("slack"),
+        "its repository wasn't set up"
+    );
+    assert!(has(&m, "slack-desktop"));
+    let entry = apt_entry(&w, "slack");
+    assert_eq!(entry.state, State::Done, "KubaOS set its repository up");
+    assert!(
+        entry.claims.iter().all(|c| !c.owned),
+        "the package was the user's: {entry:?}"
+    );
+    assert_eq!(
+        w.updater(&mut m).app_status().unwrap().get("slack").unwrap().state,
+        AppState::Found
+    );
+    w.updater(&mut m).update(yes()).unwrap();
+    assert_eq!(
+        apt_entry(&w, "slack").state,
+        State::Done,
+        "an update that checks it keeps it KubaOS's"
+    );
+
+    // What the real machine runs to set the repository up, system/apt-repo.sh slack, on a
+    // machine where Slack's job ran.
+    let dir = w.tmp.path().join("setup");
+    let sources = dir.join("sources.list.d");
+    put(&sources.join("slack.list"), SLACKS_OWN_LIST);
+    let trusted = dir.join("trusted.gpg.d");
+    let manifest =
+        crate::apt::Manifest::read(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../system/packages.toml"))
+            .unwrap()
+            .unwrap();
+    let slack = &manifest.repos()["slack"];
+    put(&trusted.join("slack-desktop.gpg"), &slack.key_url);
+    put(&trusted.join("packagecloud.gpg"), &slack.global_fingerprints[0]);
+    let sandbox = key_sandbox(&dir, "nothing");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+
+    let out = sandbox
+        .command(root.join("system/apt-repo.sh"))
+        .arg("slack")
+        .env("APT_SOURCES_D", &sources)
+        .env("APT_TRUSTED_D", &trusted)
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    let calls = sandbox.calls();
+    let wrote = |path: &Path| {
+        calls
+            .iter()
+            .any(|c| c.starts_with("sudo install -D -m 0644 ") && c.ends_with(&format!(" {}", path.display())))
+    };
+    assert!(wrote(&sources.join("slack.sources")), "{calls:#?}");
+    assert!(wrote(&sources.join("slack.list")), "slack.list turned off: {calls:#?}");
+    let removed: Vec<&str> = calls.iter().filter_map(|c| c.strip_prefix("sudo rm -f ")).collect();
+    let gone = |name: &str| trusted.join(name).display().to_string();
+    assert_eq!(removed, [gone("slack-desktop.gpg"), gone("packagecloud.gpg")]);
+
+    // Its journal names the repository KubaOS set up, so a release's migration refreshes it.
+    let set_up = sandbox
+        .command("bash")
+        .args([
+            "-c",
+            "source \"$1/migrations/lib.sh\"; kubaos_app_set_up_repo slack slack",
+            "-",
+        ])
+        .arg(&root)
+        .env("KUBAOS_APP_JOURNALS", w.sys.app_journals())
+        .status()
+        .unwrap();
+    assert!(set_up.success());
+}
+
+#[test]
+fn zen_is_its_pinned_appimage_with_an_entry_that_runs_it_and_its_profile_stays() {
+    let w = world();
+    let folder = with_app(&w, "zen-browser");
+    let app: toml::Table = toml::from_str(&fs::read_to_string(folder.join("app.toml")).unwrap()).unwrap();
+    let download = app["action"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["kind"].as_str() == Some("download"))
+        .unwrap();
+    let pin = |key: &str| download["amd64"][key].as_str().unwrap().to_owned();
+    let mut m = fake(&w, &[]);
+    host(&m)
+        .state
+        .borrow_mut()
+        .downloads
+        .insert(pin("url"), (pin("sha256"), b"an AppImage".to_vec()));
+    let home = host(&m).home().to_path_buf();
+    let appimage = home.join(".local/opt/zen-browser/zen.AppImage");
+    let entry = home.join(".local/share/applications/zen.desktop");
+
+    w.updater(&mut m).add_apps(&names(&["zen-browser"]), None).unwrap();
+
+    assert!(has(&m, "fuse3"));
+    assert_eq!(fs::read(&appimage).unwrap(), b"an AppImage");
+    assert_eq!(fs::metadata(&appimage).unwrap().permissions().mode() & 0o111, 0o111);
+    let desktop = fs::read_to_string(&entry).unwrap();
+    assert!(
+        desktop.contains(&format!("\nExec=\"{}\" %u\n", appimage.display())),
+        "{desktop}"
+    );
+    assert!(!desktop.contains('@'), "{desktop}");
+    let profile = home.join(".config/zen/profiles.ini");
+    put(&profile, "[General]\n");
+
+    w.updater(&mut m).remove_apps(&names(&["zen-browser"])).unwrap();
+
+    assert!(!appimage.exists() && !entry.exists());
+    assert!(!home.join(".local/opt/zen-browser").exists());
+    assert!(!has(&m, "fuse3"), "FUSE goes with the app that brought it");
+    assert!(profile.exists(), "the profile is the user's");
+}
+
 /// Agent's kit: it requires Agent, and writes KubaOS's defaults for it in a configure step.
 const KIT: &str = r#"
 name = "Kit"
@@ -1213,4 +1830,46 @@ fn an_update_lists_the_app_a_picked_setup_change_left_behind_as_removed() {
     assert!(!has(&m, "agent"));
     assert_eq!(user_journal(&w, "rig").unwrap().setup.as_deref(), Some("bare"));
     assert_eq!(changes.removed, names(&["Agent"]));
+}
+
+mod ai;
+mod devtools;
+mod editors;
+mod games;
+mod graphics;
+mod media;
+mod office;
+mod security;
+mod system;
+
+#[test]
+fn vivaldi_rewriting_its_sources_file_with_its_one_key_leaves_the_next_update_nothing_to_do() {
+    let w = world();
+    with_app(&w, "vivaldi");
+    let mut m = fake(&w, &[]);
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let manifest = crate::apt::Manifest::read(&root.join("system/packages.toml"))
+        .unwrap()
+        .unwrap();
+    let ours = fs::read_to_string(root.join("system/files/apt/sources.list.d/vivaldi.sources")).unwrap();
+    host(&m).state.borrow_mut().repo_files.insert(
+        "vivaldi".to_owned(),
+        (manifest.repos()["vivaldi"].clone(), ours.clone()),
+    );
+    w.updater(&mut m).add_apps(&names(&["vivaldi"]), None).unwrap();
+    // Vivaldi's postinst and daily cron job write the file again, naming the one key that build
+    // signs with.
+    let sources = host(&m).place(Path::new("/etc/apt/sources.list.d/vivaldi.sources"));
+    let vivaldis_own = ours.replace(" /usr/share/keyrings/vivaldi-5220E3E9.gpg", "");
+    assert_ne!(vivaldis_own, ours);
+    put(&sources, &vivaldis_own);
+    let starts = root_starts(&m);
+    let before = host(&m).snapshot();
+    let log = host(&m).state.borrow().log.len();
+
+    w.updater(&mut m).update(yes()).unwrap();
+
+    assert_eq!(root_starts(&m), starts, "the update asked for root");
+    assert_eq!(host(&m).state.borrow().log[log..], [] as [String; 0]);
+    assert_eq!(host(&m).snapshot(), before);
 }

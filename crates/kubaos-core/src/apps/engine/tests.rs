@@ -12,8 +12,11 @@ use crate::apps::action::Side;
 use crate::apps::host::fake::FakeHost;
 use crate::apps::host::fake::FakeRoot;
 use crate::apps::host::fake::Unit;
+use crate::apps::journal;
 use crate::apps::journal::Journal;
 use crate::apps::root::Reply;
+use crate::sandbox::Sandbox;
+use crate::unfree::Unfree;
 use crate::update::event::ActionState;
 use crate::update::event::Sink;
 use crate::update::event::UpdateEvent;
@@ -236,6 +239,7 @@ impl World {
             started: false,
             requests: Vec::new(),
             calls: std::rc::Rc::default(),
+            undone: Vec::new(),
         }
     }
 
@@ -614,6 +618,12 @@ fn the_root_helper_refuses_anything_but_a_root_step_of_a_catalog_app() {
         r#"{"op":"adopt","app":"nothing","owned":true}"#,
         r#"{"op":"adopt","app":"../etc","owned":true}"#,
         r#"{"op":"adopt","app":"fixture","owned":true,"step":1}"#,
+        r#"{"op":"redo","app":"../etc","step":1}"#,
+        r#"{"op":"redo","app":"nothing","step":1}"#,
+        r#"{"op":"redo","app":"fixture","setup":"../x","step":1}"#,
+        r#"{"op":"redo","app":"fixture","setup":"other","step":1}"#,
+        r#"{"op":"redo","app":"fixture","step":2}"#,
+        r#"{"op":"redo","app":"fixture","step":1,"entry":{}}"#,
     ] {
         let reply = root.serve(line);
         assert!(refused(reply.clone()), "{line} was taken: {reply:?}");
@@ -623,6 +633,11 @@ fn the_root_helper_refuses_anything_but_a_root_step_of_a_catalog_app() {
     fs::set_permissions(world.catalog.join("fixture"), fs::Permissions::from_mode(0o777)).unwrap();
     let reply = root.serve(r#"{"op":"step","app":"fixture","step":1,"windows":false}"#);
     assert!(refused(reply.clone()), "a folder others may write was run: {reply:?}");
+    let reply = root.serve(r#"{"op":"redo","app":"fixture","step":1}"#);
+    assert!(
+        refused(reply.clone()),
+        "a folder others may write was done again: {reply:?}"
+    );
     fs::set_permissions(world.catalog.join("fixture"), fs::Permissions::from_mode(0o755)).unwrap();
 
     let repo = world.catalog.parent().unwrap().join("system/apt-repo.sh");
@@ -753,7 +768,7 @@ impl World {
     }
 
     /// A file of the app `id`'s folder.
-    fn folder_file(&self, id: &str, name: &str, text: &str) {
+    fn folder_file(&self, id: &str, name: &str, text: impl AsRef<[u8]>) {
         let path = self.catalog.join(id).join(name);
         fs::write(&path, text).unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
@@ -1029,24 +1044,120 @@ fn a_new_download_version_replaces_the_old_one_and_goes_whole_with_the_app() {
 }
 
 #[test]
-fn an_undo_that_stopped_partway_is_marked_and_done_again_by_the_next_install() {
+fn a_root_undo_that_stopped_partway_is_done_again_by_the_removals_rollback() {
     let world = World::new(&[("grouped", GROUPED)]);
     world.install("grouped", true).0.unwrap();
     world.host.state.borrow_mut().fail.insert("groupdel:grouped".to_owned());
 
     let (removed, _) = world.remove("grouped");
 
-    assert!(matches!(removed, Err(EngineError::Undo { .. })), "{removed:?}");
-    let root = world.journals("grouped").1.unwrap();
-    assert_eq!(root.entry(2).unwrap().state, crate::apps::journal::State::Undoing);
-    assert!(!world.host.state.borrow().groups["grouped"].contains("kuba"));
-
-    world.host.state.borrow_mut().fail.clear();
-    world.install("grouped", true).0.unwrap();
-
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
     assert!(world.host.state.borrow().groups["grouped"].contains("kuba"));
     let root = world.journals("grouped").1.unwrap();
     assert_eq!(root.entry(2).unwrap().state, crate::apps::journal::State::Done);
+}
+
+#[test]
+fn a_removal_that_fails_partway_is_rolled_back_and_leaves_the_app_as_it_was() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    fs::create_dir_all(world.settings().parent().unwrap()).unwrap();
+    fs::write(world.settings(), "{\"theme\": \"dark\"}").unwrap();
+    world.install("fixture", true).0.unwrap();
+    let installed = world.host.snapshot();
+    let (user, root) = world.journals("fixture");
+    // apt can't remove the package, as with dpkg's lock held: the last step undone fails.
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:fixture-tool".to_owned());
+
+    let (removed, events) = world.remove("fixture");
+
+    let Err(EngineError::RemovalRolledBack { name, .. }) = &removed else {
+        panic!("not rolled back: {removed:?}");
+    };
+    assert_eq!(name, "Install the tool");
+    assert_eq!(world.host.snapshot(), installed, "the app is as it was");
+    let (user_after, root_after) = world.journals("fixture");
+    let user_after = user_after.unwrap();
+    assert!(user_after.complete);
+    let mark = journal::rolled_back(&world.user_journals, "fixture");
+    assert!(
+        mark.as_ref()
+            .is_some_and(|m| m.whole && m.why.starts_with("Install the tool: ")),
+        "{mark:?}"
+    );
+    let steps = |j: &Journal| j.entries.iter().map(|e| (e.step, e.state)).collect::<Vec<_>>();
+    assert_eq!(steps(&user_after), steps(&user.unwrap()));
+    assert_eq!(steps(&root_after.unwrap()), steps(&root.unwrap()));
+    // Undone newest first, the failed one last; done again oldest first.
+    let order: Vec<(usize, ActionState)> = events.steps().into_iter().collect();
+    assert_eq!(
+        order,
+        [
+            (4, ActionState::Undoing),
+            (4, ActionState::Undone),
+            (3, ActionState::Undoing),
+            (3, ActionState::Undone),
+            (2, ActionState::Undoing),
+            (2, ActionState::Undone),
+            (1, ActionState::Undoing),
+            (1, ActionState::Failed),
+            (1, ActionState::Done),
+            (2, ActionState::Done),
+            (3, ActionState::Done),
+            (4, ActionState::Done),
+        ]
+    );
+
+    // Once apt can, the removal goes through, and an install no longer tells of the rollback.
+    world.host.state.borrow_mut().fail.clear();
+    world.install("fixture", true).0.unwrap();
+    assert_eq!(journal::rolled_back(&world.user_journals, "fixture"), None);
+    world.remove("fixture").0.unwrap();
+    assert_eq!(world.journals("fixture"), (None, None));
+}
+
+#[test]
+fn a_step_a_rollback_cant_do_again_is_a_warning_and_the_next_install_finishes_it() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    world.install("fixture", true).0.unwrap();
+    let installed = world.host.snapshot();
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.fail.insert("apt-remove:fixture-tool".to_owned());
+        state.fail.insert("enable:fixture.service".to_owned());
+    }
+
+    let (removed, events) = world.remove("fixture");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalHalfRolledBack { .. })),
+        "{removed:?}"
+    );
+    let warned = events.0.iter().any(|e| {
+        matches!(e, UpdateEvent::Warning { text }
+            if text.starts_with("Start the service: rolling the removal back, it couldn't be done again: "))
+    });
+    assert!(warned, "{:?}", events.0);
+    let user = world.journals("fixture").0.unwrap();
+    assert!(!user.complete, "{user:?}");
+    assert!(journal::rolled_back(&world.user_journals, "fixture").is_some_and(|m| !m.whole));
+    // The steps after the one it couldn't do again were still done again.
+    assert!(world.settings().is_file());
+
+    world.host.state.borrow_mut().fail.clear();
+    world.install("fixture", true).0.unwrap();
+
+    assert_eq!(world.host.snapshot(), installed);
+    let user = world.journals("fixture").0.unwrap();
+    assert!(user.complete);
+    assert_eq!(journal::rolled_back(&world.user_journals, "fixture"), None);
 }
 
 #[test]
@@ -1114,7 +1225,7 @@ fn a_removal_that_would_take_a_package_the_user_installed_since_is_refused() {
 
     let (result, _) = world.remove("grouped");
 
-    let Err(EngineError::Undo { source, .. }) = result else {
+    let Err(EngineError::RemovalRolledBack { source, .. }) = result else {
         panic!("the removal went through: {result:?}");
     };
     assert!(source.to_string().contains("also remove user-app"), "{source}");
@@ -1383,6 +1494,11 @@ start = true
 fn a_removal_runs_the_recorded_undo_script_after_the_app_left_the_catalog() {
     let tool = app(r#"
 [[action]]
+name = "Install its runtime"
+kind = "apt"
+packages = ["tool-runtime"]
+
+[[action]]
 name = "Install the tool"
 kind = "run"
 do = ["./install"]
@@ -1544,6 +1660,104 @@ icon = "sketch.svg"
 }
 
 #[test]
+fn an_unfree_nix_step_is_refused_while_the_users_nixpkgs_refuses_unfree_and_lists_nothing() {
+    let chat = app(r#"
+[[action]]
+name = "Install Chat"
+kind = "nix"
+packages = ["discord"]
+unfree = true
+"#);
+    let world = World::new(&[("chat", &chat)]);
+    world.host.state.borrow_mut().unfree = Unfree::Refused;
+    let before = world.host.snapshot();
+
+    let err = world.install("chat", true).0.unwrap_err();
+
+    assert!(err.to_string().contains("Install Chat"), "{err}");
+    assert!(world.host.state.borrow().nix.is_empty());
+    assert_eq!(world.host.snapshot(), before);
+
+    world.host.state.borrow_mut().unfree = Unfree::Allowed;
+    world.install("chat", true).0.unwrap();
+    assert!(world.host.state.borrow().nix.contains("discord"));
+}
+
+#[test]
+fn a_nix_step_for_another_architecture_is_refused_and_lists_nothing() {
+    let zoom = app(r#"
+[[action]]
+name = "Install Zoom"
+kind = "nix"
+arch = "arm64"
+packages = ["zoom-us"]
+"#);
+    let world = World::new(&[("zoom", &zoom)]);
+
+    world.install("zoom", true).0.unwrap_err();
+
+    assert!(world.host.state.borrow().nix.is_empty());
+}
+
+#[test]
+fn a_web_app_naming_a_theme_icon_points_its_entry_at_it_and_copies_nothing() {
+    let web = app(r#"
+[[action]]
+name = "Open it in a window of its own"
+kind = "web_app"
+id = "chat"
+title = "Chat"
+url = "https://chat.example/"
+icon = "whatsapp"
+"#);
+    let world = World::new(&[("chat", &web)]);
+    let before = world.host.snapshot();
+
+    world.install("chat", true).0.unwrap();
+
+    let home = world.host_home();
+    let entry = fs::read_to_string(home.join(".local/share/applications/kubaos-web-chat.desktop")).unwrap();
+    assert!(entry.contains("\nIcon=whatsapp\n"), "{entry}");
+    assert!(!home.join(".local/share/icons").exists());
+
+    world.remove("chat").0.unwrap();
+
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn a_web_app_moving_from_its_svg_to_a_theme_icon_takes_the_copied_icon_away() {
+    let svg = app(r#"
+[[action]]
+name = "Open it in a window of its own"
+kind = "web_app"
+id = "chat"
+title = "Chat"
+url = "https://chat.example/"
+icon = "chat.svg"
+"#);
+    let world = World::new(&[("chat", &svg)]);
+    world.folder_file("chat", "chat.svg", "<svg/>\n");
+    world.install("chat", true).0.unwrap();
+    let icon = world
+        .host_home()
+        .join(".local/share/icons/hicolor/scalable/apps/kubaos-web-chat.svg");
+    assert!(icon.is_file());
+
+    world.write_app("chat", &svg.replace("icon = \"chat.svg\"", "icon = \"whatsapp\""));
+    world.install("chat", true).0.unwrap();
+
+    assert!(!icon.exists());
+    let entry = fs::read_to_string(
+        world
+            .host_home()
+            .join(".local/share/applications/kubaos-web-chat.desktop"),
+    )
+    .unwrap();
+    assert!(entry.contains("\nIcon=whatsapp\n"), "{entry}");
+}
+
+#[test]
 fn a_web_apps_browser_folder_is_the_users_and_outlasts_a_removal_and_a_reinstall() {
     let web = app(r#"
 [[action]]
@@ -1639,8 +1853,14 @@ fn a_web_apps_window_is_named_as_chrome_names_an_app_window_on_wayland() {
 /// A download to a path without its version, `unpack` as given, pinned to `version`.
 fn fixed_download(version: &str, unpack: &str) -> String {
     let sha = version.replace('.', "").repeat(32);
+    let zstd = if unpack == "tar-zst" {
+        "[[action]]\nname = \"Install zstd\"\nkind = \"apt\"\npackages = [\"zstd\"]\n"
+    } else {
+        ""
+    };
     app(&format!(
         r#"
+{zstd}
 [[action]]
 name = "Download the tool"
 kind = "download"
@@ -1654,32 +1874,43 @@ amd64 = {{ url = "https://example.com/tool-{version}", sha256 = "{sha}" }}
 
 /// A gzipped tarball holding `bin/tool` with `text`.
 fn tarball(text: &str) -> Vec<u8> {
+    packed(text, "tar-gz")
+}
+
+/// An archive of `unpack` (`tar-gz`, `tar-zst` or `tar-xz`) holding `bin/tool` with `text`, made by
+/// the tar of a sandbox.
+fn packed(text: &str, unpack: &str) -> Vec<u8> {
     let src = tempfile::tempdir().unwrap();
     fs::create_dir_all(src.path().join("bin")).unwrap();
     fs::write(src.path().join("bin/tool"), text).unwrap();
-    let archive = src.path().join("tool.tar.gz");
-    let made = crate::sandbox::output(
-        "tar",
-        [
-            std::ffi::OsStr::new("-czf"),
-            archive.as_os_str(),
-            std::ffi::OsStr::new("-C"),
-            src.path().as_os_str(),
-            std::ffi::OsStr::new("bin"),
-        ],
-    );
-    assert!(made.status.success());
+    let sandbox = Sandbox::new(&src.path().join("sandbox"), src.path(), "kuba");
+    let archive = src.path().join("tool.tar");
+    let compress = match unpack {
+        "tar-zst" => "--zstd",
+        "tar-xz" => "--xz",
+        _ => "--gzip",
+    };
+    let made = sandbox
+        .command("tar")
+        .args(["-c", compress, "-f"])
+        .arg(&archive)
+        .arg("-C")
+        .arg(src.path())
+        .arg("bin")
+        .status()
+        .unwrap();
+    assert!(made.success());
     fs::read(archive).unwrap()
 }
 
 #[test]
 fn a_release_that_bumps_a_download_at_the_same_path_downloads_it_again() {
-    for unpack in ["file", "tar-gz"] {
+    for unpack in ["file", "tar-gz", "tar-zst", "tar-xz"] {
         let world = World::new(&[("tool", &fixed_download("1.1", unpack))]);
         for version in ["1.1", "1.3"] {
             let bytes = match unpack {
                 "file" => format!("tool {version}").into_bytes(),
-                _ => tarball(&format!("tool {version}")),
+                _ => packed(&format!("tool {version}"), unpack),
             };
             let sha = version.replace('.', "").repeat(32);
             world
@@ -1710,6 +1941,104 @@ fn a_release_that_bumps_a_download_at_the_same_path_downloads_it_again() {
         world.remove("tool").0.unwrap();
         assert_eq!(world.host.snapshot(), before, "{unpack}");
     }
+}
+
+#[test]
+fn a_self_updating_download_its_updater_rewrites_in_place_is_never_downloaded_over() {
+    let self_updating =
+        |version: &str| fixed_download(version, "file").replace("unpack =", "self_updates = true\nunpack =");
+    let world = World::new(&[("tool", &self_updating("1.1"))]);
+    for version in ["1.1", "1.3"] {
+        let sha = version.replace('.', "").repeat(32);
+        world.host.state.borrow_mut().downloads.insert(
+            format!("https://example.com/tool-{version}"),
+            (sha, format!("tool {version}").into_bytes()),
+        );
+    }
+    world.install("tool", true).0.unwrap();
+    let tool = world.host_home().join(".vendor/tool");
+    fs::write(&tool, "tool 2.0, from its own updater").unwrap();
+    world.write_app("tool", &self_updating("1.3"));
+
+    world.install("tool", true).0.unwrap();
+
+    assert_eq!(fs::read_to_string(&tool).unwrap(), "tool 2.0, from its own updater");
+    let fetched = world.host.state.borrow().log.iter().any(|l| l.ends_with("tool-1.3"));
+    assert!(!fetched);
+    world.remove("tool").0.unwrap();
+    assert!(!tool.exists());
+}
+
+#[test]
+fn a_record_that_words_the_same_download_differently_is_rewritten_while_the_app_is_open() {
+    let open_check = "[[ready]]\ncheck = [\"test\", \"!\", \"-e\", \"@HOME@/tool-open\"]\nsays = \"Tool is running\"\n";
+    let tool = format!(
+        "{}{open_check}",
+        fixed_download("1.1", "file").replace("unpack =", "self_updates = true\nunpack =")
+    );
+    let world = World::new(&[("tool", &tool)]);
+    world.host.state.borrow_mut().downloads.insert(
+        "https://example.com/tool-1.1".to_owned(),
+        ("11".repeat(32), b"tool 1.1".to_vec()),
+    );
+    world.install("tool", true).0.unwrap();
+    // A journal from before the record said the updater rewrites the download in place.
+    let mut journal = world.journals("tool").0.unwrap();
+    for entry in &mut journal.entries {
+        if let crate::apps::action::Kind::Download { in_place, .. } = &mut entry.action.kind {
+            *in_place = false;
+        }
+    }
+    journal.save(&world.user_journals).unwrap();
+    fs::write(world.host_home().join("tool-open"), "").unwrap();
+    let mut root = world.root();
+    let mut events = Events::default();
+
+    world
+        .run(&mut root, &mut events, true, |e| e.install("tool", None))
+        .unwrap();
+
+    assert!(!root.started, "root was asked for");
+    let journal = world.journals("tool").0.unwrap();
+    assert!(journal.entries.iter().any(|e| matches!(
+        e.action.kind,
+        crate::apps::action::Kind::Download { in_place: true, .. }
+    )));
+}
+
+#[test]
+fn a_self_updating_download_of_a_folder_its_version_is_part_of_is_downloaded_again_when_its_pin_changes() {
+    // `tool-@VERSION@` names the version in a folder of its own, not in place: a new build of
+    // the same version replaces the old one, as for any download.
+    let pinned = |url: &str, sha: &str| {
+        fixed_download("1.1", "file")
+            .replace(
+                "to = \"~/.vendor/tool\"",
+                "to = \"~/.vendor/tool-@VERSION@\"\nself_updates = true",
+            )
+            .replace("https://example.com/tool-1.1", url)
+            .replace(&"11".repeat(32), sha)
+    };
+    let (first, second) = ("a".repeat(64), "b".repeat(64));
+    let world = World::new(&[("tool", &pinned("https://example.com/tool-1.1", &first))]);
+    for (url, sha, text) in [
+        ("https://example.com/tool-1.1", &first, "tool 1.1"),
+        ("https://example.com/tool-1.1-rebuilt", &second, "tool 1.1, rebuilt"),
+    ] {
+        world
+            .host
+            .state
+            .borrow_mut()
+            .downloads
+            .insert(url.to_owned(), (sha.clone(), text.as_bytes().to_vec()));
+    }
+    world.install("tool", true).0.unwrap();
+    world.write_app("tool", &pinned("https://example.com/tool-1.1-rebuilt", &second));
+
+    world.install("tool", true).0.unwrap();
+
+    let tool = world.host_home().join(".vendor/tool-1.1");
+    assert_eq!(fs::read_to_string(tool).unwrap(), "tool 1.1, rebuilt");
 }
 
 #[test]
@@ -1771,6 +2100,198 @@ fn world_with_dependencies(apps: &[(&str, &str)]) -> World {
             .insert("tool".to_owned(), ["libtool".to_owned(), "libc".to_owned()].into());
     }
     world
+}
+
+#[test]
+fn an_apps_svg_icon_is_installed_into_the_icon_theme_journaled_and_goes_with_it() {
+    let tool = app("icon = \"tool.svg\"\n\n[[action]]\nname = \"Keep it running\"\nkind = \"linger\"\n");
+    let world = World::new(&[("tool", &tool)]);
+    let svg = "<!-- The tool's logo, MIT. -->\n<svg/>\n";
+    world.folder_file("tool", "tool.svg", svg);
+    let before = world.host.snapshot();
+
+    world.install("tool", true).0.unwrap();
+
+    let icon = world
+        .host_home()
+        .join(".local/share/icons/hicolor/scalable/apps/tool.svg");
+    assert_eq!(fs::read_to_string(&icon).unwrap(), svg);
+    let journal = world.journals("tool").0.unwrap();
+    let entry = journal.entries.iter().find(|e| e.step == 2).unwrap();
+    assert!(
+        matches!(&entry.action.kind, crate::apps::action::Kind::File { text: Some(t), .. } if t == svg),
+        "{entry:?}"
+    );
+    world.remove("tool").0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+/// A machine whose `tool` has the picture `bytes` as its icon `name`.
+fn world_with_icon(name: &str, bytes: &[u8]) -> World {
+    let tool = app(&format!(
+        "icon = \"{name}\"\n\n[[action]]\nname = \"Keep it running\"\nkind = \"linger\"\n"
+    ));
+    let world = World::new(&[("tool", &tool)]);
+    world.folder_file("tool", name, bytes);
+    world
+}
+
+#[test]
+fn an_apps_png_icon_is_installed_into_the_themes_folder_of_its_size_and_journaled_as_its_bytes() {
+    let png = crate::apps::folder::picture::png(128, 128);
+    let world = world_with_icon("tool.png", &png);
+
+    world.install("tool", true).0.unwrap();
+
+    let icon = world
+        .host_home()
+        .join(".local/share/icons/hicolor/128x128/apps/tool.png");
+    assert_eq!(fs::read(&icon).unwrap(), png);
+    assert_eq!(fs::metadata(&icon).unwrap().permissions().mode() & 0o777, 0o644);
+    let journal = world.journals("tool").0.unwrap();
+    let entry = journal.entries.iter().find(|e| e.step == 2).unwrap();
+    assert!(
+        matches!(
+            &entry.action.kind,
+            crate::apps::action::Kind::File {
+                binary: true,
+                text: Some(_),
+                ..
+            }
+        ),
+        "{entry:?}"
+    );
+    // Installed again, the icon is there as recorded, so nothing is done: the file isn't written
+    // again and its entry records the same bytes.
+    let written = fs::metadata(&icon).unwrap().modified().unwrap();
+    world.install("tool", true).0.unwrap();
+    assert_eq!(fs::read(&icon).unwrap(), png);
+    assert_eq!(fs::metadata(&icon).unwrap().modified().unwrap(), written);
+    let again = world.journals("tool").0.unwrap();
+    assert_eq!(again.entries[1].action.kind, journal.entries[1].action.kind);
+}
+
+#[test]
+fn a_binary_icon_whose_journal_holds_no_base64_is_written_again_from_the_catalog_and_goes_with_its_app() {
+    let world = world_with_icon("tool.png", &crate::apps::folder::picture::png(128, 128));
+    let before = world.host.snapshot();
+    world.install("tool", true).0.unwrap();
+    let icon = world
+        .host_home()
+        .join(".local/share/icons/hicolor/128x128/apps/tool.png");
+    let file = Journal::file(&world.user_journals, "tool");
+    let journal = fs::read_to_string(&file).unwrap();
+    let Some(crate::apps::action::Kind::File { text: Some(base64), .. }) = world
+        .journals("tool")
+        .0
+        .unwrap()
+        .entries
+        .iter()
+        .find(|e| e.step == 2)
+        .map(|e| e.action.kind.clone())
+    else {
+        panic!("no icon step");
+    };
+    assert!(journal.contains(&base64));
+    fs::write(&file, journal.replace(&base64, "not base64!")).unwrap();
+    fs::remove_file(&icon).unwrap();
+
+    world.install("tool", true).0.unwrap();
+    assert_eq!(fs::read(&icon).unwrap(), crate::apps::folder::picture::png(128, 128));
+    assert!(fs::read_to_string(&file).unwrap().contains(&base64));
+
+    world.remove("tool").0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn an_apps_png_icon_goes_with_it_and_leaves_the_machine_as_before() {
+    let world = world_with_icon("tool.png", &crate::apps::folder::picture::png(128, 128));
+    let before = world.host.snapshot();
+
+    world.install("tool", true).0.unwrap();
+    world.remove("tool").0.unwrap();
+
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn an_apps_jpeg_icon_puts_nothing_in_the_icon_theme_which_reads_no_jpeg() {
+    let world = world_with_icon("tool.jpg", &crate::apps::folder::picture::jpeg(256, 256));
+    let before = world.host.snapshot();
+
+    world.install("tool", true).0.unwrap();
+
+    let journal = world.journals("tool").0.unwrap();
+    assert_eq!(journal.entries.len(), 1, "{journal:?}");
+    assert!(!world.host_home().join(".local/share/icons").exists());
+    world.remove("tool").0.unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn an_apps_jpeg_icon_goes_with_it_and_leaves_the_machine_as_before() {
+    let world = world_with_icon("tool.jpeg", &crate::apps::folder::picture::jpeg(256, 256));
+    let before = world.host.snapshot();
+
+    world.install("tool", true).0.unwrap();
+    world.remove("tool").0.unwrap();
+
+    assert_eq!(world.host.snapshot(), before);
+    assert_eq!(world.journals("tool"), (None, None));
+}
+
+/// A machine with Ubuntu's snap `firefox` (`1:1snap1`), which sorts above the vendor's 160.0, and
+/// `libnss3`, which the vendor's firefox needs, at 3.110 from the user's own pin, where apt would
+/// take it down to 3.98.
+fn world_with_a_pinned_dependency() -> World {
+    let firefox = app(r#"
+[[action]]
+name = "Install Firefox"
+kind = "apt"
+packages = ["firefox"]
+versions = "*~build*"
+"#);
+    let world = World::new(&[("firefox", &firefox)]);
+    {
+        let mut state = world.host.state.borrow_mut();
+        state
+            .dpkg
+            .insert("firefox".to_owned(), "1:1snap1-0ubuntu9.1".to_owned());
+        state.candidates.insert("firefox".to_owned(), "160.0~build1".to_owned());
+        state.dpkg.insert("libnss3".to_owned(), "2:3.110-1".to_owned());
+        state.candidates.insert("libnss3".to_owned(), "2:3.98-1".to_owned());
+        state
+            .depends
+            .insert("firefox".to_owned(), ["libnss3".to_owned()].into());
+    }
+    world
+}
+
+#[test]
+fn an_install_that_would_move_down_a_package_other_than_its_own_is_refused_naming_it() {
+    let world = world_with_a_pinned_dependency();
+    let before = world.host.snapshot();
+
+    let error = world.install("firefox", true).0.unwrap_err();
+
+    let shown = crate::update::event::chain(&error);
+    assert!(shown.contains("would move libnss3 down"), "{shown}");
+    assert!(!shown.contains("firefox down"), "{shown}");
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn an_install_moves_its_own_package_down_to_replace_another_build_of_it() {
+    let world = world_with_a_pinned_dependency();
+    world.host.state.borrow_mut().depends.clear();
+
+    world.install("firefox", true).0.unwrap();
+
+    assert_eq!(
+        world.host.state.borrow().dpkg.get("firefox").map(String::as_str),
+        Some("160.0~build1")
+    );
 }
 
 #[test]
@@ -1992,4 +2513,284 @@ fn a_removal_shows_each_step_it_undoes_by_name() {
     assert!(events.0.contains(&UpdateEvent::Progress { done: 4, total: 4 }));
 }
 
+mod ai;
+mod architecture;
+mod communication;
+mod devtools;
+mod dkms;
+mod editors;
+mod games;
+mod graphics;
+mod keys;
+mod media;
+mod office;
 mod requires;
+mod security;
+mod system;
+mod undo_only;
+mod versions;
+
+/// The claim `claim` of the app `id`'s journals: whether it owns it, when a step claims it.
+fn owns(world: &World, id: &str, claim: &str) -> Option<bool> {
+    let (user, root) = world.journals(id);
+    user.into_iter()
+        .chain(root)
+        .flat_map(|j| j.entries)
+        .flat_map(|e| e.claims)
+        .find(|c| c.claim == claim)
+        .map(|c| c.owned)
+}
+
+#[test]
+fn a_shared_package_stays_the_removed_apps_while_its_undo_fails_and_the_other_app_never_takes_it() {
+    let world = World::new(&[("grouped", GROUPED), ("rival", RIVAL)]);
+    world.install("grouped", true).0.unwrap();
+    world.install("rival", true).0.unwrap();
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:grouped-engine".to_owned());
+
+    let (removed, _) = world.remove("grouped");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert_eq!(owns(&world, "grouped", "package:shared-tool"), Some(true));
+    assert_eq!(
+        owns(&world, "rival", "package:shared-tool"),
+        Some(false),
+        "never handed over"
+    );
+    // The rival's removal leaves the package the other app still needs.
+    world.host.state.borrow_mut().fail.clear();
+    world.remove("rival").0.unwrap();
+    assert!(world.host.state.borrow().dpkg.contains_key("shared-tool"));
+    world.remove("grouped").0.unwrap();
+    assert!(!world.host.state.borrow().dpkg.contains_key("shared-tool"));
+}
+
+#[test]
+fn a_rollback_takes_back_a_claim_its_removal_handed_over_and_the_step_owns_it_again() {
+    let late = app(r#"
+[[action]]
+name = "Install the engine"
+kind = "apt"
+packages = ["late-engine"]
+
+[[action]]
+name = "Install the shared tool"
+kind = "apt"
+packages = ["shared-tool"]
+"#);
+    let world = World::new(&[("late", &late), ("rival", RIVAL)]);
+    world.install("late", true).0.unwrap();
+    world.install("rival", true).0.unwrap();
+    let (_, root) = world.journals("late");
+    // The shared tool's step goes first, handing the package to the rival; then the engine's
+    // removal fails.
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:late-engine".to_owned());
+
+    let (removed, _) = world.remove("late");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert_eq!(owns(&world, "late", "package:shared-tool"), Some(true));
+    assert_eq!(owns(&world, "rival", "package:shared-tool"), Some(false));
+    let states = |j: Journal| j.entries.iter().map(|e| (e.step, e.state)).collect::<Vec<_>>();
+    assert_eq!(states(world.journals("late").1.unwrap()), states(root.unwrap()));
+}
+
+#[test]
+fn a_rollback_leaves_a_step_that_opens_a_window_to_a_note_and_says_a_run_ran_again() {
+    let paired = app(r#"
+[[action]]
+name = "Install the engine"
+kind = "apt"
+packages = ["paired-engine"]
+
+[[action]]
+name = "Install the tool"
+kind = "run"
+do = ["./install"]
+check = ["./installed"]
+undo = ["./uninstall"]
+
+[[action]]
+name = "Pair the app"
+kind = "run"
+do = ["./pair"]
+check = ["./paired"]
+undo = ["./unpair"]
+window = "Open the app and pair it"
+"#);
+    let world = World::new(&[("paired", &paired)]);
+    world.script("paired", "install", "touch \"$HOME/installed\"");
+    world.script("paired", "installed", "test -e \"$HOME/installed\"");
+    world.script("paired", "uninstall", "rm -f \"$HOME/installed\"");
+    world.script("paired", "pair", "touch \"$HOME/paired\"");
+    world.script("paired", "paired", "test -e \"$HOME/paired\"");
+    world.script("paired", "unpair", "rm -f \"$HOME/paired\"");
+    world.install("paired", true).0.unwrap();
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:paired-engine".to_owned());
+
+    let (removed, events) = world.remove("paired");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert!(!world.host_home().join("paired").exists(), "no window opened");
+    assert!(world.host_home().join("installed").exists());
+    assert!(events.0.contains(&UpdateEvent::Note {
+        text: "Open the app and pair it".to_owned()
+    }));
+    assert!(events.0.contains(&UpdateEvent::Note {
+        text: "Install the tool: I ran it again to put it back, so what it makes is new.".to_owned()
+    }));
+    let user = world.journals("paired").0.unwrap();
+    assert_eq!(
+        user.entry(3).unwrap().state,
+        crate::apps::journal::State::Undoing,
+        "left for the user"
+    );
+}
+
+#[test]
+fn a_stopped_runs_undoing_entry_is_done_again_by_the_next_install() {
+    let world = World::new(&[("grouped", GROUPED)]);
+    world.install("grouped", true).0.unwrap();
+    // A removal stopped during the group's undo: the entry marked, the membership gone.
+    let mut root = world.journals("grouped").1.unwrap();
+    let mut entry = root.entry(2).unwrap().clone();
+    entry.state = crate::apps::journal::State::Undoing;
+    root.put(entry);
+    root.save(&world.root_journals).unwrap();
+    world
+        .host
+        .state
+        .borrow_mut()
+        .groups
+        .get_mut("grouped")
+        .unwrap()
+        .remove("kuba");
+
+    world.install("grouped", true).0.unwrap();
+
+    assert!(world.host.state.borrow().groups["grouped"].contains("kuba"));
+    let root = world.journals("grouped").1.unwrap();
+    assert_eq!(root.entry(2).unwrap().state, crate::apps::journal::State::Done);
+}
+
+/// A sink that reads the rollback mark of `app` as the first step a rollback does again is
+/// reported, after the step that failed.
+struct MarkAtFirstRedo {
+    journals: PathBuf,
+    app: &'static str,
+    failed: bool,
+    redone: bool,
+    seen: Option<journal::RolledBack>,
+}
+
+impl Sink for MarkAtFirstRedo {
+    fn event(&mut self, event: &UpdateEvent) {
+        let UpdateEvent::Action(action) = event else {
+            return;
+        };
+        match action.state {
+            ActionState::Failed => self.failed = true,
+            ActionState::Done if self.failed && !self.redone => {
+                self.redone = true;
+                self.seen = journal::rolled_back(&self.journals, self.app);
+            }
+            _ => {}
+        }
+    }
+}
+
+#[test]
+fn the_rollback_is_marked_as_not_whole_before_its_first_step_is_done_again() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    world.install("fixture", true).0.unwrap();
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:fixture-tool".to_owned());
+    let mut sink = MarkAtFirstRedo {
+        journals: world.user_journals.clone(),
+        app: "fixture",
+        failed: false,
+        redone: false,
+        seen: None,
+    };
+    let mut root = world.root();
+
+    let removed = world.run(&mut root, &mut sink, true, |e| e.remove("fixture"));
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert!(sink.redone, "a step was done again");
+    let seen = sink.seen.expect("marked by then");
+    assert!(!seen.whole && seen.why.starts_with("Install the tool: "), "{seen:?}");
+    assert!(journal::rolled_back(&world.user_journals, "fixture").is_some_and(|m| m.whole));
+}
+
+#[test]
+fn a_step_kubaos_did_that_owns_nothing_is_done_again_as_done() {
+    let early = app(r#"
+[[action]]
+name = "Install the engine"
+kind = "apt"
+packages = ["early-engine"]
+
+[[action]]
+name = "Install the tool"
+kind = "apt"
+repo = "fixture"
+packages = ["fixture-tool"]
+"#);
+    let world = World::new(&[("early", &early)]);
+    // The tool is there already: the step sets its repository up and owns nothing.
+    world
+        .host
+        .state
+        .borrow_mut()
+        .dpkg
+        .insert("fixture-tool".to_owned(), "1.0".to_owned());
+    world.install("early", true).0.unwrap();
+    let state = |world: &World| world.journals("early").1.unwrap().entry(2).unwrap().state;
+    assert_eq!(state(&world), crate::apps::journal::State::Done);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:early-engine".to_owned());
+
+    let (removed, _) = world.remove("early");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert_eq!(state(&world), crate::apps::journal::State::Done);
+}

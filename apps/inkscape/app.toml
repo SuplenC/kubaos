@@ -1,0 +1,56 @@
+# Inkscape from its developers' signed Launchpad PPA, ppa:inkscape.dev/stable, whose key
+# system/packages.toml pins ([repo.inkscape]). It builds each stable release for Ubuntu 26.04 on
+# amd64 and arm64, a patch release ahead of Ubuntu's archive, and its epoch sorts it above
+# Ubuntu's build. Its package writes no source of its own. Its extensions (the Extensions menu,
+# and the formats it saves and opens through them) are Python, and apt's --no-install-recommends
+# would leave out the modules they need, which the package only recommends: the step installs
+# those and GTK's bindings their dialogs open with, not ImageMagick, Perl or the spell checker.
+# https://inkscape.org/release/
+name = "Inkscape"
+category = "graphics"
+tags = ["vector graphics", "svg", "illustration", "drawing", "logos", "illustrator"]
+summary = "Vector drawing in honest SVG. Illustrator, minus the subscription and the guilt trip."
+# Its AppStream metainfo, CC0-1.0 (gitlab.com/inkscape/inkscape), without its closing line about
+# the project's own community.
+description = """\
+A Free and open source vector graphics editor. It offers a rich set of features and is widely \
+used for both artistic and technical illustrations such as cartoons, clip art, logos, \
+typography, diagramming and flowcharting. It uses vector graphics to allow for sharp printouts \
+and renderings at unlimited resolution and is not bound to a fixed number of pixels like raster \
+graphics. Inkscape uses the standardized SVG file format as its main format, which is supported \
+by many other applications including web browsers. Inkscape supports many advanced SVG features \
+(markers, clones, alpha blending, etc.) and great care is taken in designing a streamlined \
+interface. It is very easy to edit nodes, perform complex path operations, trace bitmaps and \
+much more."""
+description_from = "https://gitlab.com/inkscape/inkscape/-/blob/INKSCAPE_1_4_4/org.inkscape.Inkscape.appdata.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "inkscape"
+keeps = """\
+Your preferences, extensions, templates and palettes stay in ~/.config/inkscape: install \
+Inkscape again and they're all there."""
+
+[[action]]
+name = "Install Inkscape"
+kind = "apt"
+repo = "inkscape"
+packages = [
+  "inkscape",
+  "python3-lxml",
+  "python3-numpy",
+  "python3-tinycss2",
+  "python3-cssselect",
+  "python3-packaging",
+  "python3-pyparsing",
+  "python3-scour",
+  "python3-pil",
+  "python3-requests",
+  "python3-cachecontrol",
+  "python3-bs4",
+  "python3-appdirs",
+  "python3-filelock",
+  "python3-zstandard",
+  "python3-gi",
+  "python3-gi-cairo",
+  "gir1.2-gtk-3.0",
+]

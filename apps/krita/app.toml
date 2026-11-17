@@ -1,0 +1,30 @@
+# Krita from Ubuntu's archive: Krita keeps no apt repository, and Ubuntu 26.04 ships the 6.0
+# series upstream is on, built for arm64 as well, where Krita's own AppImage is amd64's alone.
+# apt's --no-install-recommends would leave out the two packages Krita recommends, PyQt6, which
+# its Python plugins run on, and Qt Multimedia's QML module, so the step installs them.
+# https://krita.org/en/download/
+name = "Krita"
+category = "graphics"
+tags = ["painting", "drawing", "illustration", "comics", "tablet", "art"]
+summary = "A painting studio made by artists. Your drawing tablet finally has a reason to exist."
+# Its AppStream metainfo, CC0-1.0 (invent.kde.org/graphics/krita).
+description = """\
+Krita is the full-featured digital art studio. It is perfect for sketching and painting, and \
+presents an end–to–end solution for creating digital painting files from scratch by masters. \
+Krita is a great choice for creating concept art, comics, textures for rendering and matte \
+paintings. Krita supports many colorspaces like RGB and CMYK at 8 and 16 bits integer channels, \
+as well as 16 and 32 bits floating point channels. Have fun painting with the advanced brush \
+engines, amazing filters and many handy features that make Krita enormously productive."""
+description_from = "https://invent.kde.org/graphics/krita/-/blob/v6.0.4.1/krita/org.kde.krita.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "krita"
+keeps = """\
+Your brushes, bundles and resources stay in ~/.local/share/krita, and your settings and \
+shortcuts in ~/.config/kritarc and ~/.config/kritashortcutsrc: install Krita again and they're \
+all there."""
+
+[[action]]
+name = "Install Krita"
+kind = "apt"
+packages = ["krita", "python3-pyqt6", "qml6-module-qtmultimedia"]

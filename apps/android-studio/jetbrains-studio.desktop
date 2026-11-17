@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Android Studio
+GenericName=Android IDE
+Comment=Build apps for Android
+Exec="@HOME@/.local/share/android-studio/bin/studio" %f
+Icon=android-studio
+Terminal=false
+StartupNotify=true
+StartupWMClass=jetbrains-studio
+Categories=Development;IDE;
+Keywords=android;ide;kotlin;java;gradle;

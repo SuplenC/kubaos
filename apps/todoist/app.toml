@@ -1,0 +1,30 @@
+# Todoist's website in a window of its own, where it keeps itself current.
+# https://app.todoist.com/
+name = "Todoist"
+category = "office"
+tags = ["tasks", "to-do", "planner", "productivity", "web app"]
+summary = "Your to-do list, in a window of its own. Writing the tasks down was the easy half."
+# Todoist's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Todoist is a to-do list and task manager: tasks with due dates, recurring dates, priorities and \
+labels, sorted into projects, and shared with others. Its website, here in a window of its \
+own, keeps them in your Todoist account."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix); the window's own icon is the same one.
+icon = "todoist"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/todoist: install Todoist again and \
+you're still signed in. Your tasks live on Todoist's servers anyway."""
+
+[[ready]]
+check = ["./closed", "todoist"]
+says = "Todoist's window is open: close it, then try again"
+
+[[action]]
+name = "Put Todoist in a window of its own"
+kind = "web_app"
+id = "todoist"
+title = "Todoist"
+url = "https://app.todoist.com/"
+icon = "todoist"

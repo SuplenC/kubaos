@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://dl.winehq.org/wine-builds/ubuntu
+Suites: resolute
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/winehq.gpg

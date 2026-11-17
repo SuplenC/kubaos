@@ -56,6 +56,11 @@ to = "~/.config/kubaos/lazyvim/defaults.lua"
 text = "vim.o.number = true\n"
 
 [[action]]
+name = "Install what its plugins build with"
+kind = "apt"
+packages = ["ripgrep"]
+
+[[action]]
 name = "Sync its plugins"
 kind = "run"
 do = ["./sync"]
@@ -160,7 +165,7 @@ fn installing_lazyvim_installs_neovim_first_through_its_own_folder_and_journal()
 
     assert_eq!(names(&result.unwrap()), ["Neovim", "LazyVim"]);
     assert_eq!(events.apps(), ["Neovim 1/2", "LazyVim 2/2"]);
-    assert_eq!(world.host.state.borrow().dpkg["neovim"], "1.0");
+    assert_eq!(world.host.state.borrow().dpkg["neovim"], "0.10.2-1");
     assert!(world.home_file(".config/nvim/init.lua").is_file());
     let (neovim, neovim_root) = world.journals("neovim");
     let neovim = neovim.unwrap();
@@ -336,6 +341,7 @@ fn the_configure_stage_runs_after_the_install_and_alone_again_on_its_own() {
             "Install Neovim",
             "Write its system-wide defaults",
             "Write its config",
+            "Install what its plugins build with",
             "Sync its plugins",
             "Write KubaOS's defaults",
         ]
@@ -353,7 +359,7 @@ fn the_configure_stage_runs_after_the_install_and_alone_again_on_its_own() {
             _ => None,
         })
         .collect();
-    assert_eq!(ran, [(3, 3)]);
+    assert_eq!(ran, [(4, 4)]);
 }
 
 #[test]
@@ -437,9 +443,12 @@ fn a_brought_app_that_cant_be_removed_is_a_warning_once_the_app_asked_for_is_gon
     let neovim_root = world.journals("neovim").1.unwrap();
     assert_eq!(
         neovim_root.entries.len(),
-        1,
-        "the removal stopped at the package: {neovim_root:?}"
+        2,
+        "the removal stopped at the package and was rolled back: {neovim_root:?}"
     );
+    let neovim = world.journals("neovim").0.unwrap();
+    assert_eq!(neovim.brought_by, ["lazyvim"], "the rollback keeps who brought it");
+    assert!(neovim.complete, "{neovim:?}");
     let warned = events.0.iter().any(|e| {
         matches!(e, UpdateEvent::Warning { text }
             if text.starts_with("Neovim was there only for LazyVim, and couldn't be removed: ")

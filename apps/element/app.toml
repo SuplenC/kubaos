@@ -1,0 +1,30 @@
+# Element Desktop from Element's signed apt repository, whose key system/packages.toml pins
+# ([repo.element]). The keyring package it recommends isn't installed: the repository's key is
+# KubaOS's to keep.
+# https://element.io/download
+name = "Element"
+category = "communication"
+tags = ["matrix", "chat", "messenger", "encrypted", "federated"]
+summary = "Matrix chat, encrypted and federated. Run your own server, you magnificent nerd."
+# From its AppStream metainfo, CC0-1.0 (flathub/im.riot.Riot), the lines about the Flatpak and
+# Wayland left out.
+description = """\
+More than group chat: communication. Communicate with your team and out of network colleagues \
+more efficiently: use dedicated rooms which persist information from their creation and \
+forever. Forget group emails: join or create rooms per topic, per team, per event. Decide the \
+level of transparency you want to provide across the organisation or project. Cut through the \
+noise by creating notifications that are customised by you and for you. Grab the attention of \
+your colleague by calling out their name and don't miss a thing with keyword alerts."""
+description_from = "https://github.com/flathub/im.riot.Riot/blob/master/im.riot.Riot.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "element-desktop"
+keeps = """\
+Your sign-in, encryption keys and settings stay in ~/.config/Element: install Element again and \
+you're still signed in."""
+
+[[action]]
+name = "Install Element"
+kind = "apt"
+repo = "element"
+packages = ["element-desktop"]

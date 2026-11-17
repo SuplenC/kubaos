@@ -1,0 +1,58 @@
+# Proton VPN from Proton's signed apt repository, whose key system/packages.toml pins
+# ([repo.protonvpn-stable]): proton-vpn-gnome-desktop, the package Proton's instructions install,
+# which brings the window (4.19), the protonvpn command and the daemon, for amd64 and arm64: the
+# one native package among them, its core library (python3-proton-vpn-api-core 6), Proton builds
+# for both. The app's packages write no source of their own; Proton's own setup, its
+# protonvpn-stable-release package, ships the same sources file and key, and the repository's is
+# that file, word for word. It connects through NetworkManager, WireGuard or OpenVPN
+# (network-manager-openvpn, on every machine), with a tunnel of its own (Proton's NetworkManager
+# plugin, nm-protun); its core library also brings network-manager-openvpn-gnome, the OpenVPN
+# plugin's GTK editor, and libnftnl11. Its kill switch is NetworkManager connections of its own
+# (pvpn-killswitch and its kin, on dummy interfaces), saved to disk while it is permanent; behind a
+# flag of Proton's it is two nftables tables instead, inet proton_vpn_ks and ip6
+# proton_vpn_ks_ipv6, put up through me.proton.vpn.kill_switch, a D-Bus service of root's, and
+# kept at boot by proton-vpn-kill-switch-boot.service. Proton's removal leaves either up, and its
+# service keeps the tables when it stops, so the last step turns the kill switch off before the
+# packages go (./kill-switch-off). Its daemon, me.proton.vpn.split_tunneling.service, which
+# its postinst enables and starts, keeps split tunnelling, and with it python3-bpfcc and LLVM come
+# in.
+# KubaOS's Proxy and Proton VPN each block what leaves outside their own tunnel: with the Proxy's
+# kill switch up Proton VPN can't reach its servers, and with Proton's on the Proxy's VPN can't
+# reach IT's. Use one at a time.
+# https://protonvpn.com/support/linux-vpn-debian-ubuntu
+name = "Proton VPN"
+category = "security"
+tags = ["vpn", "wireguard", "openvpn", "privacy", "proton", "kill switch"]
+summary = "Proton's VPN, free plan included. Your ISP sees a tunnel, and Proton swears it sees nothing."
+# Proton's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Proton VPN sends your traffic through Proton's servers over WireGuard or OpenVPN, with a kill \
+switch, split tunnelling, NetShield's blocking of ads, trackers and malware, Secure Core's route \
+through a second country, and port forwarding. Its free plan has no data limit and no ads."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), the name Proton's package gives, so the
+# Command menu shows it before the package is installed.
+icon = "proton-vpn-logo"
+keeps = """\
+Your settings stay in ~/.config/Proton/VPN, and your sign-in in your keyring: install Proton \
+VPN again and it's still signed in."""
+
+[[action]]
+name = "Install Proton VPN"
+kind = "apt"
+repo = "protonvpn-stable"
+packages = ["proton-vpn-gnome-desktop"]
+
+[[action]]
+name = "Start Proton VPN's daemon"
+kind = "unit"
+unit = "me.proton.vpn.split_tunneling.service"
+scope = "system"
+enable = true
+start = true
+
+[[action]]
+name = "Turn Proton VPN's kill switch off when it goes"
+kind = "run"
+root = true
+undo = ["./kill-switch-off", "/"]

@@ -1,0 +1,35 @@
+# Heroic from the .deb of its GitHub release, pinned to the sha256 GitHub publishes for each
+# asset. Heroic keeps no apt repository and Ubuntu doesn't package it. nixpkgs has it, a patch
+# release behind, but the games a Nix build starts reach the GPU only through the Mesa
+# `home/desktop.nix` gives Nix apps, with no NVIDIA driver and no 32-bit one; the .deb's games
+# draw through the machine's own drivers. The .deb doesn't update itself, so a
+# release of KubaOS moves the pin on; its package writes no source of its own. Its postinst puts
+# an AppArmor profile in /etc/apparmor.d, which its removal takes away. A 32-bit Windows game runs
+# through Wine's WoW64 builds (GE-Proton's among them); a runner that wants 32-bit Linux libraries
+# needs the i386 architecture, which KubaOS doesn't add.
+# https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher/releases/tag/v2.22.4
+name = "Heroic"
+category = "games"
+tags = ["games", "epic", "gog", "amazon", "launcher", "proton", "wine"]
+summary = "Your Epic, GOG and Amazon games, minus Epic's launcher. Claim the free one every Thursday."
+# From its AppStream metainfo, CC0-1.0 (flathub/com.heroicgameslauncher.hgl), its first paragraph,
+# without the words that speak as Heroic.
+description = """\
+Heroic is an Open Source Games Launcher. Right now it supports launching games from the Epic \
+Games Store using Legendary, GOG Games using gogdl and Amazon Games using Nile."""
+description_from = "https://github.com/flathub/com.heroicgameslauncher.hgl/blob/master/com.heroicgameslauncher.hgl.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), the name Heroic's package gives, so the
+# Command menu shows it before the package is installed.
+icon = "heroic"
+keeps = """\
+Your games stay in ~/Games/Heroic with their Wine prefixes, and your store sign-ins, settings and \
+the Wine and Proton builds Heroic downloaded in ~/.config/heroic: install Heroic again and \
+they're all there."""
+
+[[action]]
+name = "Install Heroic"
+kind = "deb"
+package = "heroic"
+version = "2.22.4"
+amd64 = { url = "https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher/releases/download/v2.22.4/Heroic-2.22.4-linux-amd64.deb", sha256 = "46aa36778f16d98a86823fc42fcb7ef47efab346ff19380165201aa373ebf70a" }
+arm64 = { url = "https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher/releases/download/v2.22.4/Heroic-2.22.4-linux-arm64.deb", sha256 = "b6f7348a9ccc656a88009ae018fff1628afc64dd3b6326e6b6db1d32cdd2ea93" }

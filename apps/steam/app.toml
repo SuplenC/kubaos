@@ -1,0 +1,63 @@
+# Steam from Valve's signed apt repository, whose keys system/packages.toml pins ([repo.steam]).
+# Valve builds its client for amd64 alone, and the client is 32-bit: dpkg takes i386 packages
+# first, as the architecture's own step, which Steam shares with any other app that needs i386.
+# Valve's steam-launcher ships the repository's source itself, as the conffile
+# /etc/apt/sources.list.d/steam-stable.list, naming a keyring of its own, and apt refuses one
+# repository with two keyrings, failing every apt run: the second step puts a steam-stable.list
+# of comments there first, which dpkg keeps as it finds it, writing Valve's beside it as
+# steam-stable.list.dpkg-dist, a name apt never reads. A Steam installed by hand has Valve's own:
+# it stays, and repo setup turns its lines off. Its removal purges the packages, so dpkg forgets
+# the conffiles too: a Steam installed by hand later gets Valve's source as a new install does,
+# rather than dpkg keeping the file KubaOS took away taken away.
+# The client's libraries are the two steam-libs packages: steam-launcher only recommends them,
+# and an install takes no recommendations. steam-libs-i386 brings the 32-bit OpenGL drivers
+# (libgl1 and libgl1-mesa-dri, as i386 packages); Vulkan, which Proton draws every Windows game
+# through, is only recommended, so the step names Mesa's Vulkan drivers of both architectures,
+# which bring the Vulkan loader. With NVIDIA's driver, its own 32-bit libraries come from its
+# packages (libnvidia-gl-<version>:i386), which no step can name, as the version is the driver's.
+# Ubuntu's steam-installer (multiverse) is Debian's packaging of the same launcher, a release
+# behind Valve's and conflicting with it; Valve's repository comes first.
+# https://repo.steampowered.com/steam/
+name = "Steam"
+category = "games"
+tags = ["games", "store", "proton", "valve", "launcher"]
+summary = "Valve's store and launcher, with Proton for the Windows games. Your backlog grows at every sale."
+# From its AppStream metainfo, CC0-1.0 (flathub/com.valvesoftware.Steam).
+description = """\
+Steam is a software distribution service with an online store, automated installation, automatic \
+updates, achievements, SteamCloud synchronized savegame and screenshot functionality, and many \
+social features."""
+description_from = "https://github.com/flathub/com.valvesoftware.Steam/blob/master/com.valvesoftware.Steam.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "steam"
+keeps = """\
+Your games, saves and sign-in stay in ~/.local/share/Steam, reached through ~/.steam, and any \
+library folder you added stays where you put it: install Steam again and they're all there."""
+
+[[action]]
+name = "Let dpkg install 32-bit packages"
+kind = "architecture"
+architecture = "i386"
+
+[[action]]
+name = "Keep Steam's package from adding its repository again"
+kind = "run"
+root = true
+do = ["./opt-out", "/etc/apt/sources.list.d/steam-stable.list"]
+check = ["./opted-out", "/etc/apt/sources.list.d/steam-stable.list"]
+undo = ["./opt-in", "/etc/apt/sources.list.d/steam-stable.list"]
+
+[[action]]
+name = "Install Steam"
+kind = "apt"
+repo = "steam"
+arch = "amd64"
+purge = true
+packages = [
+  "steam-launcher",
+  "steam-libs-amd64",
+  "steam-libs-i386:i386",
+  "mesa-vulkan-drivers",
+  "mesa-vulkan-drivers:i386",
+]

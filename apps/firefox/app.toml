@@ -1,0 +1,35 @@
+# Firefox from Mozilla's signed apt repository, whose key system/packages.toml pins
+# ([repo.mozilla]), never Ubuntu's package, which installs the snap. A pin in apt's preferences,
+# written before the package, makes Mozilla's the one apt picks.
+# https://support.mozilla.org/en-US/kb/install-firefox-linux#w_install-firefox-deb-package-for-debian-based-distributions
+name = "Firefox"
+category = "browsers"
+tags = ["browser", "web", "internet", "mozilla", "gecko"]
+summary = "Mozilla's browser, the real .deb, not the snap. The last big one Google doesn't own."
+# From its AppStream metainfo, CC0-1.0, the sentences that say what it is.
+description = """\
+When it comes to your life online, you have a choice: accept the factory settings or put your \
+privacy first. Firefox is a web browser designed to be fast, easy to use, customizable and \
+private."""
+description_from = "https://github.com/mozilla-firefox/firefox/blob/main/browser/installer/linux/app/flatpak/files/share/appdata/org.mozilla.firefox.appdata.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "firefox"
+keeps = """\
+Your profile (bookmarks, passwords, history) stays in ~/.config/mozilla/firefox, or \
+~/.mozilla/firefox where an older Firefox made it: install Firefox again and it's all there."""
+
+[[action]]
+name = "Prefer Mozilla's Firefox to Ubuntu's snap"
+kind = "file"
+to = "/etc/apt/preferences.d/kubaos-firefox"
+from = "kubaos-firefox.pref"
+
+# Mozilla's builds are versioned `<version>~build<n>`; Ubuntu's firefox, which installs the snap,
+# is `1:1snap1-…`, and is not Firefox installed.
+[[action]]
+name = "Install Firefox"
+kind = "apt"
+repo = "mozilla"
+packages = ["firefox"]
+versions = "*~build*"

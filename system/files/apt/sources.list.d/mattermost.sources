@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://deb.packages.mattermost.com
+Suites: stable
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/mattermost.gpg

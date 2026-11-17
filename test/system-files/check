@@ -8,17 +8,19 @@
 #
 # Also holds system/files.map to the tree: every file under system/files/ has
 # a line, every line matches a file, and every installer it names exists and
-# mentions the file. The branch's changes are REPO's working tree, untracked
-# files too, against its merge base with REV (origin/main); a migration counts
-# when it is new since then and names one of the file's installers, its path
-# under system/files/ or its name. Needs bash and git.
+# installs the file: its code, not a comment, names the file or its folder, or
+# calls a function of system/*.sh that does. The branch's changes are REPO's
+# working tree, untracked files too, against its merge base with REV
+# (origin/main); a migration counts when it is new since then and names one of
+# the file's installers, its path under system/files/ or its name. Needs bash
+# and git.
 set -euo pipefail
 
 base_ref=origin/main
 while (($#)); do
   case "$1" in
     --base) base_ref="${2:?--base takes a revision}"; shift ;;
-    -h | --help) sed -n '2,14p' "$0" | cut -c3-; exit 0 ;;
+    -h | --help) sed -n '2,16p' "$0" | cut -c3-; exit 0 ;;
     -*) echo "test/system-files/check: unknown option $1" >&2; exit 2 ;;
     *) break ;;
   esac
@@ -55,6 +57,113 @@ function_text() {
   awk -v f="$1" '$0 ~ "^" f "\\(\\) *\\{" { on = 1 } on { print } on && /^}/ { exit }' "$REPO"/system/*.sh
 }
 
+# without_shell_text [strings] <<<TEXT: TEXT without its comments, a line's
+# own or one trailing its code; with `strings`, without the text of its quoted
+# strings too, but for the code in them: a double-quoted string's $(...), and
+# a single-quoted script a `-c` runs (`bash -c '...'`, its '\'' splices
+# included), as a child that sources system/*.sh calls its functions. A here
+# document's body is text, as a string's is (an apostrophe in it quotes
+# nothing, a # in it starts no comment), and an unquoted one's $(...) is code.
+# A guess at shell's own reading, enough for the code of system/*.sh.
+without_shell_text() {
+  awk -v strings="${1:-}" '
+    BEGIN { q = ""; sub_depth = 0; script = 0; pending = 0; body = 0 }
+    # The $(...) of a line of an unquoted here document, the rest left out.
+    function substitutions(line,   out, i, c, depth) {
+      out = ""
+      depth = 0
+      for (i = 1; i <= length(line); i++) {
+        c = substr(line, i, 1)
+        if (depth == 0) {
+          if (c == "$" && substr(line, i + 1, 1) == "(") { depth = 1; out = out "$("; i++ }
+        } else {
+          if (c == "(") depth++
+          else if (c == ")") depth--
+          out = out c
+        }
+      }
+      return out
+    }
+    body {
+      line = $0
+      if (strip[body]) sub(/^\t+/, "", line)
+      if (line == delim[body]) {
+        if (++body > pending) { body = 0; pending = 0 }
+        print $0
+        next
+      }
+      if (strings == "") print $0
+      else if (quoted[body]) print ""
+      else print substitutions($0)
+      next
+    }
+    {
+      out = ""
+      n = length($0)
+      for (i = 1; i <= n; i++) {
+        c = substr($0, i, 1)
+        if (q == "\047") {
+          if (c == "\047") { q = ""; out = out c } else if (strings == "" || script) out = out c
+        } else if (q == "\"" && sub_depth == 0) {
+          if (c == "\\") { if (strings == "") out = out c substr($0, i + 1, 1); i++ }
+          else if (c == "\"") { q = ""; out = out c }
+          else if (c == "$" && substr($0, i + 1, 1) == "(") { sub_depth = 1; out = out "$("; i++ }
+          else if (strings == "") out = out c
+        } else if (q == "\"") {
+          if (c == "(") sub_depth++
+          else if (c == ")") sub_depth--
+          out = out c
+        } else if (c == "#" && (i == 1 || substr($0, i - 1, 1) ~ /[[:space:];&|(]/)) {
+          break
+        } else {
+          if (c == "\\") { out = out c substr($0, i + 1, 1); i++; continue }
+          # A here document: its delimiter, a word, quoted or not, after << or <<-
+          # (not <<<, a string of its own); its body starts on the next line.
+          if (c == "<" && substr($0, i + 1, 1) == "<" && substr($0, i + 2, 1) != "<" &&
+              match(substr($0, i + 2), /^-?[ \t]*(\047[A-Za-z_][A-Za-z0-9_]*\047|"[A-Za-z_][A-Za-z0-9_]*"|\\?[A-Za-z_][A-Za-z0-9_]*)/)) {
+            word = substr($0, i + 2, RLENGTH)
+            pending++
+            strip[pending] = word ~ /^-/
+            sub(/^-?[ \t]*/, "", word)
+            quoted[pending] = word ~ /^[\047"\\]/
+            gsub(/[\047"\\]/, "", word)
+            delim[pending] = word
+          }
+          if (c == "\047") script = out ~ /-c[[:space:]]*$/ || (script && out ~ /\047\\\047$/)
+          if (c == "\047" || c == "\"") q = c
+          out = out c
+        }
+      }
+      print out
+      if (pending && !body) body = 1
+    }'
+}
+
+# TEXT without its comments: a path a comment names installs nothing.
+code_of() {
+  without_shell_text <<<"$1"
+}
+
+# The functions system/*.sh defines.
+mapfile -t defined < <(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)() *{.*/\1/p' "$REPO"/system/*.sh | sort -u)
+
+# installs CODE PATH [SEEN...]: CODE names PATH, or calls a function of
+# system/*.sh whose code does, through the functions that one calls; SEEN are
+# those already followed.
+installs() {
+  local code="$1" path="$2" calls f
+  shift 2
+  installer_mentions "$code" "$path" && return 0
+  # A function's name inside a string calls nothing.
+  calls="$(without_shell_text strings <<<"$code")"
+  for f in "${defined[@]}"; do
+    [[ " $* " == *" $f "* ]] && continue
+    [[ $calls =~ (^|[^A-Za-z0-9_])$f([^A-Za-z0-9_]|$) ]] || continue
+    installs "$(code_of "$(function_text "$f")")" "$path" "$@" "$f" && return 0
+  done
+  return 1
+}
+
 is_keyword() { [[ $1 == update || $1 == in-place || $1 == source || $1 == image ]]; }
 
 # installer_mentions TEXT PATH: TEXT names PATH under system/files/, or the
@@ -87,7 +196,7 @@ for f in "${present[@]}"; do
       text="$(function_text "$w")"
       [[ -n $text ]] || { fail "system/files.map: no system/*.sh defines $w, which installs system/files/$f"; continue; }
     fi
-    installer_mentions "$text" "$f" || fail "system/files.map: $w doesn't install system/files/$f"
+    installs "$(code_of "$text")" "$f" "$w" || fail "system/files.map: $w doesn't install system/files/$f"
   done
 done
 for e in "${entries[@]}"; do

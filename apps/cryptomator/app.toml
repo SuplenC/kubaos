@@ -1,0 +1,30 @@
+# Cryptomator from its lead developer's signed Launchpad PPA, ppa:sebastian-stenzel/cryptomator,
+# whose key system/packages.toml pins ([repo.cryptomator]). Ubuntu's archive has none. It builds
+# each release for Ubuntu 26.04 on amd64 and arm64, with Java inside, and its package writes no
+# source of its own. It shows an unlocked vault as a folder through FUSE (fuse3, a dependency);
+# what it recommends, GVfs and the GNOME keyring it keeps vault passwords in, is on every machine.
+# https://docs.cryptomator.org/desktop/setup/#linux
+name = "Cryptomator"
+category = "security"
+tags = ["encryption", "vault", "cloud", "files", "dropbox", "privacy"]
+summary = "Encrypts your files before Dropbox gets a look. The cloud gets gibberish, you get files."
+# From its AppStream metainfo, FSFAP (cryptomator/cryptomator), its first paragraph.
+description = """\
+Cryptomator provides easy-to-use, transparent, client-side encryption for your cloud. It \
+protects your documents from unauthorized access and prying eyes, while you will still be able \
+to view and edit your documents locally. By not requiring any registration or account and \
+performing all encryption locally, it gives you back control over your data and ensures your \
+privacy."""
+description_from = "https://github.com/cryptomator/cryptomator/blob/1.19.6/dist/linux/common/org.cryptomator.Cryptomator.metainfo.xml"
+# Cryptomator's logo, GPL-3.0-or-later, on a tile (cryptomator.svg's header): no icon theme has it.
+icon = "cryptomator.svg"
+keeps = """\
+Your vaults are folders of your own, where you made them, Cryptomator's settings stay in \
+~/.config/Cryptomator, and the vault passwords you saved in your keyring: install it again and \
+it opens them as before."""
+
+[[action]]
+name = "Install Cryptomator"
+kind = "apt"
+repo = "cryptomator"
+packages = ["cryptomator"]

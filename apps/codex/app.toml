@@ -1,0 +1,21 @@
+# Codex CLI from nixpkgs, through the User flake. OpenAI keeps no apt repository and Ubuntu
+# doesn't package it.
+# https://github.com/openai/codex
+name = "Codex CLI"
+category = "ai"
+tags = ["coding agent", "openai", "codex", "terminal"]
+summary = "OpenAI's Codex in your terminal. It writes the diff, you read it. Actually read it."
+# The opening of Codex's README, Apache-2.0, Copyright 2025 OpenAI (github.com/openai/codex).
+description = """\
+Codex CLI is a coding agent from OpenAI that runs locally on your computer."""
+description_from = "https://github.com/openai/codex/blob/rust-v0.169.0/README.md"
+# Colloid's OpenAI icon, the system's icon theme (home/curated.nix).
+icon = "openai"
+keeps = """\
+Your sign-in, settings and past sessions stay in ~/.codex: install Codex again and you're still \
+signed in."""
+
+[[action]]
+name = "Install Codex CLI"
+kind = "nix"
+packages = ["codex"]

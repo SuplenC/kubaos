@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Exits 0 when spotify.list is there, KubaOS's or one Spotify's package or the user wrote, which
+# repo setup turns off: either keeps Spotify's package from adding its repository.
+# Usage: ./opted-out <path of spotify.list>
+set -euo pipefail
+[[ -e "$1" ]]

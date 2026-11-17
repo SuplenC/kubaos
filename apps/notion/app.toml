@@ -1,0 +1,30 @@
+# Notion in a window of its own: Notion makes no app for Linux.
+# https://www.notion.com/
+name = "Notion"
+category = "office"
+tags = ["notes", "docs", "wiki", "databases", "workspace", "web app"]
+summary = "Docs, wikis and databases made of blocks. Reorganising it is your team's second job."
+# Notion's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Notion is a workspace of pages made of blocks: documents, wikis, task boards and databases, \
+shared with a team and edited together. Its website, here in a window of its own, keeps \
+everything in your Notion account."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix); the window's own icon is the same one.
+icon = "notion"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/notion: install Notion again and you're \
+still signed in. Your pages live on Notion's servers anyway."""
+
+[[ready]]
+check = ["./closed", "notion"]
+says = "Notion's window is open: close it, then try again"
+
+[[action]]
+name = "Put Notion in a window of its own"
+kind = "web_app"
+id = "notion"
+title = "Notion"
+url = "https://www.notion.com/"
+icon = "notion"

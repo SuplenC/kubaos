@@ -1,0 +1,33 @@
+# Proton Pass from the .deb Proton publishes, pinned to its sha256, which matched the package
+# after its sha512 matched the one Proton lists for the release in its updater's manifest (over
+# HTTPS; Proton signs no .deb of Pass). Proton keeps no apt repository for it and builds no arm64
+# .deb; nixpkgs' Proton Pass is releases behind, and Proton refuses a client that's too old. The
+# package has no maintainer scripts, so it adds no source or key. Pass doesn't update itself on
+# Linux, where its updater stops as it starts, so a new pin brings each release.
+# https://proton.me/download/PassDesktop/linux/x64/version.json
+name = "Proton Pass"
+category = "security"
+tags = ["passwords", "password manager", "proton", "aliases", "passkeys", "totp"]
+summary = "Proton's password manager, with a fresh email alias for every sketchy sign-up form."
+# From its AppStream metainfo, CC0-1.0 (flathub/me.proton.Pass), its first two paragraphs.
+description = """\
+Get the password manager created by the scientists who met at CERN behind Proton Mail, the \
+world’s largest encrypted email provider. Proton Pass is open source, end-to-end encrypted, and \
+protected by Swiss privacy laws. Pass offers more than other free password managers and has no \
+ads or data collection. You can use it for free forever on all your devices to create and store \
+unlimited passwords, autofill logins, generate 2FA codes, create email aliases, secure your \
+notes, and more."""
+description_from = "https://github.com/flathub/me.proton.Pass/blob/master/me.proton.Pass.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "protonpass-desktop"
+keeps = """\
+Your vaults live in your Proton account, and this machine's sign-in and settings stay in \
+~/.config/Proton Pass: install Proton Pass again and it's still signed in."""
+
+[[action]]
+name = "Install Proton Pass"
+kind = "deb"
+package = "proton-pass"
+version = "1.43.1"
+amd64 = { url = "https://proton.me/download/pass/linux/proton-pass_1.43.1_amd64.deb", sha256 = "f223898aa65d4dadef8db209fe8dbe03120960edd1402620aeb32aa3591d7062" }

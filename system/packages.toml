@@ -25,7 +25,9 @@
 # app of the catalog's (apps/<id>/app.toml). Its sources file is
 # `system/files/apt/sources.list.d/<name>.sources` (`@ARCH@` becomes the
 # machine's architecture), signed by the key at `key_url`, which must have
-# exactly the primary key `fingerprint`, stored in `keyring`.
+# exactly the primary key `fingerprint`, stored in `keyring`. A repository whose
+# vendor is moving to a new key also pins that one, with `next_key_url`,
+# `next_fingerprint` and `next_keyring`, and its sources file names both keyrings.
 #
 # Keep to this much TOML: tables, strings without escapes, true and false,
 # and arrays of strings. The scripts read it with awk.
@@ -55,6 +57,330 @@ keyring = "/usr/share/keyrings/google-chrome.gpg"
 key_url = "https://downloads.claude.ai/keys/claude-code.asc"
 fingerprint = "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
 keyring = "/etc/apt/keyrings/claude-code.gpg"
+
+# Mozilla's repository of Firefox, for the app of the catalog (apps/firefox/).
+# Mozilla's own instructions write mozilla.list; repo setup turns that line off.
+[repo.mozilla]
+key_url = "https://packages.mozilla.org/apt/repo-signing-key.gpg"
+fingerprint = "35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3"
+keyring = "/etc/apt/keyrings/mozilla.gpg"
+
+# Microsoft's repository of Edge, for the app of the catalog
+# (apps/microsoft-edge/). Edge's own postinst rewrites microsoft-edge.sources on
+# every upgrade; ours is byte-identical to what it writes, its doubled
+# Architectures line included, so the two never fight over the file. The postinst
+# writes its own copy of the key at the same keyring path, which matches the
+# pinned one by fingerprint, not byte for byte, so repo setup keeps it. Built for
+# amd64 only.
+[repo.microsoft-edge]
+key_url = "https://packages.microsoft.com/keys/microsoft.asc"
+fingerprint = "BC528686B50D79E339D3721CEB3E94ADBE1229CF"
+keyring = "/usr/share/keyrings/microsoft-edge.gpg"
+
+# Vivaldi's repository, for the app of the catalog (apps/vivaldi/). Built for
+# amd64 only. Its key (16BD9233) expires on 2027-02-07; Vivaldi's postinst
+# already puts its next one (5220E3E9, until 2028-02-15) at the next keyring's
+# path. Our vivaldi.sources names both keyrings, and differs from Vivaldi's own
+# only in that line, until Vivaldi's postinst rewrites it: every install and
+# upgrade of vivaldi-stable writes the file again, naming the one key that build
+# signs with (16BD9233 today), and /etc/default/vivaldi's repo_add_once doesn't
+# stop it once the file exists. Once Vivaldi rotates, its postinst writes the
+# new key itself; KubaOS's repo setup always writes both, never the expired key
+# alone. Vivaldi publishes the next key only inside its .deb: the fingerprint is
+# the one its postinst carries, fetched from Ubuntu's key server.
+[repo.vivaldi]
+key_url = "https://repo.vivaldi.com/archive/linux_signing_key.pub"
+fingerprint = "8D1FA52AEF58A09D889DD4221256C34716BD9233"
+keyring = "/usr/share/keyrings/vivaldi-16BD9233.gpg"
+next_key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x7C7CB2D56F7D2A950BCCAB4EBCE0DE545220E3E9"
+next_fingerprint = "7C7CB2D56F7D2A950BCCAB4EBCE0DE545220E3E9"
+next_keyring = "/usr/share/keyrings/vivaldi-5220E3E9.gpg"
+
+# LibreWolf's repository, for the app of the catalog (apps/librewolf/).
+[repo.librewolf]
+key_url = "https://repo.librewolf.net/pubkey.gpg"
+fingerprint = "662E3CDD6FE329002D0CA5BB40339DD82B12EF16"
+keyring = "/etc/apt/keyrings/librewolf.gpg"
+
+# Anthropic's repository of Claude Desktop, for the app of the catalog
+# (apps/claude-desktop/), signed by the same key as Claude Code's. Claude
+# Desktop's postinst writes claude-desktop.list only while no other source has
+# the repository, so it leaves this one alone.
+[repo.claude-desktop]
+key_url = "https://downloads.claude.ai/claude-desktop/key.asc"
+fingerprint = "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
+keyring = "/etc/apt/keyrings/claude-desktop.gpg"
+
+# Anysphere's repository of Cursor, for the app of the catalog (apps/cursor/).
+# Cursor's postinst rewrites cursor.sources on every upgrade, and its postrm
+# deletes it and the key; ours is byte-identical to what it writes, at the same
+# keyring path, so the two never fight over the file. The postinst writes the
+# key only where there is none, so the pinned one stays.
+[repo.cursor]
+key_url = "https://downloads.cursor.com/keys/anysphere.asc"
+fingerprint = "380FF4BCDC34A4BD92A3565342A1772E62E492D6"
+keyring = "/usr/share/keyrings/anysphere.gpg"
+
+# Cognition's repository of Devin Desktop, which was Windsurf, for the app of
+# the catalog (apps/devin-desktop/). Built for amd64 only. Its package writes
+# no source of its own.
+[repo.windsurf]
+key_url = "https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/windsurf.gpg"
+fingerprint = "EE2C46CC44E1578C23135B0E9E608A1B9FD62A3F"
+keyring = "/etc/apt/keyrings/windsurf.gpg"
+# Signal's repository, for the app of the catalog (apps/signal/). It has
+# amd64 only.
+[repo.signal]
+key_url = "https://updates.signal.org/desktop/apt/keys.asc"
+fingerprint = "DBA36B5181D0C816F630E889D980A17457F6FB06"
+keyring = "/etc/apt/keyrings/signal.gpg"
+
+# Slack's repository on packagecloud, for the app of the catalog
+# (apps/slack/), signed by Slack's own key there. It has amd64 only. The
+# daily job of a Slack installed by hand (/etc/cron.daily/slack) puts that key,
+# and packagecloud's old one (418A7F2F, expired in 2019), in
+# /etc/apt/trusted.gpg.d, where apt trusts them for every repository; repo
+# setup removes the two.
+[repo.slack]
+key_url = "https://packagecloud.io/slacktechnologies/slack/gpgkey"
+fingerprint = "DB085A08CA13B8ACB917E0F6D938EC0D038651BD"
+keyring = "/etc/apt/keyrings/slack.gpg"
+global_keyrings = ["slack-desktop.gpg", "packagecloud.gpg"]
+global_fingerprints = ["418A7F2FB0E1E6E7EABF6FE8C2E73424D59097AB"]
+
+# Element's repository, for the app of the catalog (apps/element/).
+[repo.element]
+key_url = "https://packages.element.io/debian/element-io-archive-keyring.gpg"
+fingerprint = "12D4CD600C2240A9F4A82071D7B0B66941D01538"
+keyring = "/etc/apt/keyrings/element.gpg"
+
+# Mattermost's repository, for the app of the catalog (apps/mattermost/).
+[repo.mattermost]
+key_url = "https://deb.packages.mattermost.com/pubkey.gpg"
+fingerprint = "A1B31D46F0F3A10B02CF2D44F8F2C31744774B28"
+keyring = "/etc/apt/keyrings/mattermost.gpg"
+
+# Zulip's desktop repository, for the app of the catalog (apps/zulip/). It
+# has amd64 only. The zulip package ships zulip-desktop.sources as a
+# conffile, signed by a keyring at another path; named the same, this source
+# is that file, which dpkg keeps as it finds it, so apt never sees the
+# repository twice with two keys.
+[repo.zulip-desktop]
+key_url = "https://download.zulip.com/desktop/apt/zulip-desktop.asc"
+fingerprint = "69AD12704E71A4803DCA3A682424BE5AE9BD10D9"
+keyring = "/etc/apt/keyrings/zulip-desktop.gpg"
+
+# Microsoft's repository of Visual Studio Code, for the app of the catalog
+# (apps/vscode/). VS Code's postinst writes vscode.sources unless another source
+# has the repository, and its postrm deletes it and the key; ours is
+# byte-identical to what the postinst writes, at the same keyring path, so the
+# two never fight over the file.
+[repo.vscode]
+key_url = "https://packages.microsoft.com/keys/microsoft.asc"
+fingerprint = "BC528686B50D79E339D3721CEB3E94ADBE1229CF"
+keyring = "/usr/share/keyrings/microsoft.gpg"
+
+# Sublime HQ's repository of Sublime Text, for the app of the catalog
+# (apps/sublime-text/). Its sublimehq-pub.gpg holds three keys, and its
+# Release is signed by its 2017 key and by the 2025 one; this pins the 2025
+# key, from the key server, as a key file must hold the pinned key alone. Its
+# package writes no source of its own.
+[repo.sublime-text]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xEBC733B78AAB352DC773BF857FE2FA12CF6E38F2"
+fingerprint = "EBC733B78AAB352DC773BF857FE2FA12CF6E38F2"
+keyring = "/etc/apt/keyrings/sublime-text.gpg"
+
+# DBeaver's repository of DBeaver Community, for the app of the catalog
+# (apps/dbeaver/), a flat one with amd64 only. Its package writes no source of
+# its own.
+[repo.dbeaver]
+key_url = "https://dbeaver.io/debs/dbeaver.gpg.key"
+fingerprint = "BDFB19F681514B43875D16FA132C13A8A330F403"
+keyring = "/etc/apt/keyrings/dbeaver.gpg"
+
+# Bruno's repository, for the app of the catalog (apps/bruno/). It has amd64
+# only and is served over plain HTTP; apt checks its index against this key.
+# Its InRelease is signed by a subkey of the pinned key. Its package writes no
+# source of its own.
+[repo.bruno]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xE598552E09C999055FEFA7159FA6017ECABE0266"
+fingerprint = "E598552E09C999055FEFA7159FA6017ECABE0266"
+keyring = "/etc/apt/keyrings/bruno.gpg"
+
+# Mirantis' repository of Lens, for the app of the catalog (apps/lens/). It
+# has amd64 only. Its package writes no source of its own.
+[repo.lens]
+key_url = "https://downloads.k8slens.dev/keys/gpg"
+fingerprint = "958F4ED752DE9C0FE68C177A666A7D882011D3CE"
+keyring = "/etc/apt/keyrings/lens.gpg"
+
+# The Kubernetes project's repository of kubectl, for the app of the catalog
+# (apps/kubectl/), a flat one for each minor version, all signed by the same
+# key; the source names the newest. Its package writes no source of its own.
+[repo.kubernetes]
+key_url = "https://pkgs.k8s.io/core:/stable:/v1.37/deb/Release.key"
+fingerprint = "DE15B14486CD377B9E876E1A234654DA9A296436"
+keyring = "/etc/apt/keyrings/kubernetes.gpg"
+
+# WineHQ's repository, for the app of the catalog (apps/wine/). Its build for
+# Ubuntu 26.04 has amd64 only, in Wine's WoW64 mode, so it needs no i386 in
+# dpkg. Its packages write no source of their own.
+[repo.winehq]
+key_url = "https://dl.winehq.org/wine-builds/winehq.key"
+fingerprint = "D43F640145369C51D786DDEA76F1A20FF987672F"
+keyring = "/etc/apt/keyrings/winehq.gpg"
+
+# Valve's repository of the Steam client, for the app of the catalog
+# (apps/steam/). It has amd64 and i386 packages, and its sources file names
+# both, as Steam's client needs 32-bit libraries. Its Release is signed by
+# Valve's 2012 key; the 2025 key beside it in Valve's steam.gpg is the one Valve
+# is moving to, so both are pinned, each from Ubuntu's key server, as a key file
+# must hold the pinned key alone. steam-launcher ships steam-stable.list, a
+# conffile naming a keyring of its own: the app puts a file of comments at that
+# path first, which dpkg keeps.
+[repo.steam]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xBA1816EF8E75005FCF5E27A1F24AEA9FB05498B7"
+fingerprint = "BA1816EF8E75005FCF5E27A1F24AEA9FB05498B7"
+keyring = "/etc/apt/keyrings/steam.gpg"
+next_key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xDB23C56BF0F377FD02970A2A84706F31879D59CB"
+next_fingerprint = "DB23C56BF0F377FD02970A2A84706F31879D59CB"
+next_keyring = "/etc/apt/keyrings/steam-2025.gpg"
+
+# Ascensio's repository of ONLYOFFICE Desktop Editors, for the app of the
+# catalog (apps/onlyoffice/). Its package writes no source of its own. The
+# repository also carries a ttf-mscorefonts-installer newer than Ubuntu's,
+# which the app's apt pin (apps/onlyoffice/kubaos-onlyoffice.pref) keeps out.
+[repo.onlyoffice]
+key_url = "https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE"
+fingerprint = "E09CA29F6E178040EF22B4098320CA65CB2DE8E5"
+keyring = "/etc/apt/keyrings/onlyoffice.gpg"
+
+# Spotify's repository, for the app of the catalog (apps/spotify/). It has amd64
+# only. Spotify signs it with a key a year, each one's fingerprint in its file's
+# name (pubkey_<fingerprint>.asc); this one expires 2027-02-14. Spotify's package
+# copies the key into /etc/apt/trusted.gpg.d, where apt trusts it for every
+# repository: the app keeps a new install from doing it, and repo setup removes
+# the copy a Spotify installed by hand made.
+[repo.spotify]
+key_url = "https://download.spotify.com/debian/pubkey_5384CE82BA52C83A.asc"
+fingerprint = "E1096BCBFF6D418796DE78515384CE82BA52C83A"
+keyring = "/etc/apt/keyrings/spotify.gpg"
+global_keyrings = ["spotify-2025-11-21-5384CE82BA52C83A.gpg"]
+
+# ppa:obsproject/obs-studio, the OBS Project's Launchpad PPA, for the app of the
+# catalog (apps/obs-studio/). It builds OBS Studio for amd64 only, and its
+# package writes no source of its own.
+[repo.obs-studio]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xBC7345F522079769F5BBE987EFC71127F425E228"
+fingerprint = "BC7345F522079769F5BBE987EFC71127F425E228"
+keyring = "/etc/apt/keyrings/obs-studio.gpg"
+
+# Tailscale's repository, for the app of the catalog (apps/tailscale/), for
+# amd64 and arm64. Its package writes no source of its own; the keyring
+# package it recommends, tailscale-archive-keyring, isn't installed.
+[repo.tailscale]
+key_url = "https://pkgs.tailscale.com/stable/ubuntu/resolute.noarmor.gpg"
+fingerprint = "2596A99EAAB33821893C0A79458CA832957F5868"
+keyring = "/etc/apt/keyrings/tailscale.gpg"
+
+# Syncthing's repository, its stable-v2 channel, for the app of the catalog
+# (apps/syncthing/), a release series ahead of Ubuntu's archive. Its index is
+# signed by this key and by an older one too, which apt doesn't need. Its
+# package writes no source of its own.
+[repo.syncthing]
+key_url = "https://syncthing.net/release-key.gpg"
+fingerprint = "FBA2E162F2F44657B38F0309E5665F9BD5970C47"
+keyring = "/etc/apt/keyrings/syncthing.gpg"
+
+# ppa:nextcloud-devs/client, the Launchpad PPA of Nextcloud's desktop client
+# developers, for the app of the catalog (apps/nextcloud/), a release series
+# ahead of Ubuntu's archive. It builds the client for amd64 only. Its package
+# writes no source of its own.
+[repo.nextcloud]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x1FCD77DD0DBEF5699AD2610160EE47FBAD3DD469"
+fingerprint = "1FCD77DD0DBEF5699AD2610160EE47FBAD3DD469"
+keyring = "/etc/apt/keyrings/nextcloud.gpg"
+
+# Dropbox's repository, for the app of the catalog (apps/dropbox/), amd64 only,
+# at the plain-HTTP address Dropbox's own package writes, so repo setup turns
+# off the source a Dropbox installed by hand added; its index is checked
+# against the pinned key. The package adds that source, with a key of its own
+# in /etc/apt/keyrings/dropbox.asc, unless /etc/default/dropbox-repo is there,
+# which the app writes first.
+[repo.dropbox]
+key_url = "https://linux.dropbox.com/fedora/rpm-public-key.asc"
+fingerprint = "1C61A2656FB57B7E4DE0F4C1FC918B335044912E"
+keyring = "/etc/apt/keyrings/dropbox.gpg"
+
+# ppa:inkscape.dev/stable, the Launchpad PPA of Inkscape's developers, for the
+# app of the catalog (apps/inkscape/). Its package writes no source of its own.
+[repo.inkscape]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x56BDFFD2F1C96B3D1575E3B85C9A0B86CD2FCB38"
+fingerprint = "56BDFFD2F1C96B3D1575E3B85C9A0B86CD2FCB38"
+keyring = "/etc/apt/keyrings/inkscape.gpg"
+
+# darktable's repository on openSUSE's Build Service, graphics:darktable, for
+# the app of the catalog (apps/darktable/), a flat one with amd64 only. Its
+# key expires on 2028-12-09. Its package writes no source of its own.
+[repo.darktable]
+key_url = "https://download.opensuse.org/repositories/graphics:/darktable/xUbuntu_26.04/Release.key"
+fingerprint = "3247B7519EDBEAB422E900A3040524A84C70D8B5"
+keyring = "/etc/apt/keyrings/darktable.gpg"
+
+# AgileBits' repository of 1Password, for the app of the catalog
+# (apps/1password/). 1Password builds it for amd64 only. Its package's postinst
+# writes 1password.sources and fetches the key again on every install and
+# upgrade; ours is byte-identical to what it writes, at the same keyring path,
+# so the two never fight over the file.
+[repo.1password]
+key_url = "https://downloads.1password.com/linux/keys/1password.asc"
+fingerprint = "3FEF9748469ADBE15DA7CA80AC2D62742012EA22"
+keyring = "/usr/share/keyrings/1password-archive-keyring.gpg"
+
+# ppa:phoerious/keepassxc, the Launchpad PPA of KeePassXC's lead developer, for
+# the app of the catalog (apps/keepassxc/), a release ahead of Ubuntu's
+# archive. Its package writes no source of its own.
+[repo.keepassxc]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xD89C66D0E31FEA2874EBD20561922AB60068FCD6"
+fingerprint = "D89C66D0E31FEA2874EBD20561922AB60068FCD6"
+keyring = "/etc/apt/keyrings/keepassxc.gpg"
+
+# ppa:sebastian-stenzel/cryptomator, the Launchpad PPA of Cryptomator's lead
+# developer, for the app of the catalog (apps/cryptomator/). Ubuntu's archive
+# has no Cryptomator. Its package writes no source of its own.
+[repo.cryptomator]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xCD045438B0D383A4039EA86F892C15CD130FEB9A"
+fingerprint = "CD045438B0D383A4039EA86F892C15CD130FEB9A"
+keyring = "/etc/apt/keyrings/cryptomator.gpg"
+
+# Mullvad's repository, for the app of the catalog (apps/mullvad-vpn/). Its
+# package writes no source of its own.
+[repo.mullvad]
+key_url = "https://repository.mullvad.net/deb/mullvad-keyring.asc"
+fingerprint = "A1198702FC3E0A09A9AE5B75D5A1D4F266DE8DDF"
+keyring = "/etc/apt/keyrings/mullvad.gpg"
+
+# Proton's repository of Proton VPN, for the app of the catalog
+# (apps/proton-vpn/). Proton's own setup is its protonvpn-stable-release
+# package, whose conffile protonvpn-stable.sources and keyring this source is
+# byte for byte, at the same paths, so dpkg keeps it as it finds it and apt sees
+# the repository once. Its key expires on 2027-03-03. The app's packages write
+# no source of their own.
+[repo.protonvpn-stable]
+key_url = "https://repo.protonvpn.com/debian/public_key.asc"
+fingerprint = "84B0D3492C76C9C6F5873C18EDA3E22630349F1C"
+keyring = "/usr/share/keyrings/protonvpn-stable-archive-keyring.gpg"
+
+# NordVPN's repository, for the app of the catalog (apps/nordvpn/). Its
+# package writes no source of its own, but NordVPN's own setups trust its key
+# for every repository: its install script as
+# /etc/apt/trusted.gpg.d/nordvpn_public.asc, its nordvpn-release package as
+# nordvpn-keyring.gpg there. Repo setup removes the two.
+[repo.nordvpn]
+key_url = "https://repo.nordvpn.com/gpg/nordvpn_public.asc"
+fingerprint = "BC5480EFEC5C081CE5BCFBE26B219E535C964CA1"
+keyring = "/etc/apt/keyrings/nordvpn.gpg"
+global_keyrings = ["nordvpn_public.asc", "nordvpn-keyring.gpg"]
 
 # ppa:cppiber/hyprland, the Launchpad PPA of Constantin Piber.
 [repo.cppiber-hyprland]

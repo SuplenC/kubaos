@@ -426,7 +426,9 @@ fn an_action_is_shown_by_whether_a_suite_is_installed() {
 fn with_claude_code(text: &str) -> Extension<FakeBus, FakeRunner> {
     use kubaos_core::apps::Catalog;
     use kubaos_core::apps::Picks;
+    use kubaos_core::apps::Platform;
     use kubaos_core::apps::Status;
+    use kubaos_core::unfree::Unfree;
 
     let dir = tempfile::tempdir().expect("a temporary folder");
     let folder = dir.path().join("apps/claude-code");
@@ -445,7 +447,7 @@ fn with_claude_code(text: &str) -> Extension<FakeBus, FakeRunner> {
         &Picks::default(),
         &dir.path().join("journals"),
         &dir.path().join("root-journals"),
-        "amd64",
+        Platform::new("amd64", Unfree::Allowed),
         None,
     )
     .expect("the status");

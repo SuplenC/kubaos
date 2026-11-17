@@ -1,0 +1,27 @@
+# Audacity from Ubuntu's archive, 3.7.7, the last of Audacity 3, as nixpkgs' is; Audacity 4, its
+# rewrite, comes as an AppImage alone. It plays and records through ALSA, which PipeWire's ALSA
+# plugin carries to PipeWire, and reads MP3, AAC and the rest through Ubuntu's FFmpeg.
+# https://www.audacityteam.org/download/linux/
+name = "Audacity"
+category = "media"
+tags = ["audio", "editor", "recording", "podcast", "sound", "wav", "mp3"]
+summary = "Record, cut and clean up audio. The podcast you keep talking about starts here, allegedly."
+# From its AppStream metainfo, CC0-1.0 (audacity/audacity), its paragraphs and list joined into
+# sentences.
+description = """\
+Audacity is the world's most popular audio editing and recording app. You can use Audacity to \
+record live audio, convert tapes and records into digital recordings or CDs, edit WAV, AIFF, \
+FLAC, MP2, MP3 or Ogg Vorbis sound files, cut, copy, splice or mix sounds together, change the \
+speed or pitch of a recording, and apply a wide range of other effects to audio recordings."""
+description_from = "https://github.com/audacity/audacity/blob/Audacity-3.7.7/help/audacity.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "audacity"
+keeps = """\
+Your projects stay where you saved them, and Audacity's settings, macros and plugins in \
+~/.config/audacity and ~/.local/share/audacity: install Audacity again and they're there."""
+
+[[action]]
+name = "Install Audacity"
+kind = "apt"
+packages = ["audacity"]

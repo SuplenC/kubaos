@@ -1,12 +1,14 @@
-//! apt repositories read from outside apt: a sources file, a signed `InRelease` checked with `gpg`
-//! against one key, and the `Packages` indexes it lists, each held to its sha256 there.
+//! apt repositories read from outside apt: a sources file, a signed release file checked with
+//! `gpg` against the repository's pinned keys, and the `Packages` indexes it lists, each held to
+//! its sha256 there.
 //!
 //! # Owns
 //!
 //! - Parsing a deb822 sources file ([`Sources`]), a release file's checksums ([`Release`]) and a
 //!   `Packages` index's newest version of each package ([`newest`]).
-//! - A key's primary fingerprints ([`fingerprints`]) and an `InRelease` verified with it
-//!   ([`verify`]), in a `gpg` home of their own, so no keyring of the machine's is read or written.
+//! - A key's primary fingerprints ([`fingerprints`]) and a release file verified with the keys, an
+//!   `InRelease` or a `Release` and its `Release.gpg` ([`verify`]), in a `gpg` home of their own,
+//!   so no keyring of the machine's is read or written.
 //! - A repository's index for one component and architecture ([`index`]).
 //!
 //! # Not here
@@ -57,7 +59,10 @@ impl AptError {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Sources {
     pub uri: String,
+    /// A path ending in `/` for a flat repository, whose release file and one `Packages` index
+    /// sit in that folder of the URI.
     pub suite: String,
+    /// None for a flat repository.
     pub components: Vec<String>,
     /// Empty when the file names none, or `@ARCH@`, which the install fills with the machine's.
     pub architectures: Vec<String>,
@@ -68,14 +73,21 @@ impl Sources {
     ///
     /// # Errors
     ///
-    /// [`AptError::Invalid`] when it has no `URIs`, `Suites` or `Components`.
+    /// [`AptError::Invalid`] when it has no `URIs` or `Suites`, or no `Components` for a suite
+    /// that isn't flat.
     pub fn parse(text: &str) -> Result<Self, AptError> {
         let mut sources = Self::default();
         for line in text.lines().filter(|line| !line.starts_with('#')) {
             let Some((key, value)) = line.split_once(':') else {
                 continue;
             };
-            let words = || value.split_whitespace().map(str::to_owned);
+            // apt takes a list's words apart at commas as well as spaces.
+            let words = || {
+                value
+                    .split(|c: char| c.is_whitespace() || c == ',')
+                    .filter(|word| !word.is_empty())
+                    .map(str::to_owned)
+            };
             match key.trim() {
                 "URIs" => sources.uri = words().next().unwrap_or_default(),
                 "Suites" => sources.suite = words().next().unwrap_or_default(),
@@ -84,7 +96,7 @@ impl Sources {
                 _ => {}
             }
         }
-        if sources.uri.is_empty() || sources.suite.is_empty() || sources.components.is_empty() {
+        if sources.uri.is_empty() || sources.suite.is_empty() || (!sources.flat() && sources.components.is_empty()) {
             return Err(AptError::Invalid(
                 "the sources file lacks URIs, Suites or Components".to_owned(),
             ));
@@ -97,9 +109,22 @@ impl Sources {
         self.architectures.is_empty() || self.architectures.iter().any(|each| each == arch)
     }
 
-    /// The URL of the suite's folder, `…/dists/<suite>`.
+    /// Whether it names a flat repository: a suite that is a path, ending in `/`.
+    pub fn flat(&self) -> bool {
+        self.suite.ends_with('/')
+    }
+
+    /// The URL of the folder that holds the suite's release file: `…/dists/<suite>`, or a flat
+    /// repository's path under the URI.
     pub fn dists(&self) -> String {
-        format!("{}/dists/{}", self.uri.trim_end_matches('/'), self.suite)
+        let uri = self.uri.trim_end_matches('/');
+        if !self.flat() {
+            return format!("{uri}/dists/{}", self.suite);
+        }
+        match self.suite.trim_matches('/') {
+            "" => uri.to_owned(),
+            path => format!("{uri}/{path}"),
+        }
     }
 }
 
@@ -110,6 +135,11 @@ pub struct Release {
 }
 
 impl Release {
+    /// Whether it lists the index `base`, plain or gzipped.
+    pub fn lists(&self, base: &str) -> bool {
+        self.sha256.contains_key(base) || self.sha256.contains_key(&format!("{base}.gz"))
+    }
+
     /// Parses a release file's `SHA256` section; the other fields are passed over.
     pub fn parse(text: &str) -> Self {
         let mut sha256 = BTreeMap::new();
@@ -131,8 +161,9 @@ impl Release {
     }
 }
 
-/// The newest version of each package a `Packages` index lists, in dpkg's order.
-pub fn newest(packages: &str) -> BTreeMap<String, String> {
+/// The newest version of each package a `Packages` index lists for `arch` (its own, or `all`), in
+/// dpkg's order.
+pub fn newest(packages: &str, arch: &str) -> BTreeMap<String, String> {
     let mut found: BTreeMap<String, String> = BTreeMap::new();
     for stanza in packages.split("\n\n") {
         let field = |name: &str| {
@@ -143,6 +174,9 @@ pub fn newest(packages: &str) -> BTreeMap<String, String> {
         let (Some(package), Some(version)) = (field("Package"), field("Version")) else {
             continue;
         };
+        if field("Architecture").is_some_and(|of| of != arch && of != "all") {
+            continue;
+        }
         let newer = found
             .get(package)
             .is_none_or(|known| version::compare(version, known).is_gt());
@@ -197,26 +231,32 @@ fn primary_fingerprints(listing: &str) -> Vec<String> {
     found
 }
 
-/// An `InRelease` whose signature checked out: the primary key that made it and the text signed.
+/// A release file whose signature checked out: the primary key that made it and the text signed.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Verified {
     pub primary: String,
     pub text: String,
 }
 
-/// Checks the signature of `inrelease` against the keys in `keys` (an armoured or binary key file)
-/// and nothing else, and returns the signed text.
+/// How a suite signs its release file: an `InRelease` signed inline, or a `Release` with its
+/// signature beside it in `Release.gpg`, which apt reads when the suite has no `InRelease`.
+#[derive(Clone, Copy, Debug)]
+pub enum Signed<'a> {
+    Inline(&'a [u8]),
+    Detached { release: &'a [u8], signature: &'a [u8] },
+}
+
+/// Checks the signature of a release file against the keys in `keys` (an armoured or binary key
+/// file, or several one after another) and nothing else, and returns the signed text.
 ///
 /// # Errors
 ///
 /// [`AptError`] when gpg can't run, or the signature isn't good and made by a key of `keys`.
-pub fn verify(keys: &[u8], inrelease: &[u8]) -> Result<Verified, AptError> {
+pub fn verify(keys: &[u8], signed: Signed<'_>) -> Result<Verified, AptError> {
     let home = tempfile::tempdir().map_err(AptError::Gpg)?;
     let key = home.path().join("key");
-    let signed = home.path().join("InRelease");
     let text = home.path().join("Release");
     fs::write(&key, keys).map_err(AptError::Gpg)?;
-    fs::write(&signed, inrelease).map_err(AptError::Gpg)?;
     let imported = gpg(home.path())
         .arg("--import")
         .arg(&key)
@@ -227,22 +267,34 @@ pub fn verify(keys: &[u8], inrelease: &[u8]) -> Result<Verified, AptError> {
             String::from_utf8_lossy(&imported.stderr).trim().to_owned(),
         ));
     }
-    let output = gpg(home.path())
-        .args(["--status-fd", "1", "--output"])
-        .arg(&text)
-        .arg("--decrypt")
-        .arg(&signed)
-        .output()
-        .map_err(AptError::Gpg)?;
+    let mut command = gpg(home.path());
+    command.args(["--status-fd", "1"]);
+    match signed {
+        Signed::Inline(inrelease) => {
+            let file = home.path().join("InRelease");
+            fs::write(&file, inrelease).map_err(AptError::Gpg)?;
+            command.arg("--output").arg(&text).arg("--decrypt").arg(file);
+        }
+        Signed::Detached { release, signature } => {
+            let file = home.path().join("Release.gpg");
+            fs::write(&text, release).map_err(AptError::Gpg)?;
+            fs::write(&file, signature).map_err(AptError::Gpg)?;
+            command.arg("--verify").arg(file).arg(&text);
+        }
+    }
+    let output = command.output().map_err(AptError::Gpg)?;
     let status = String::from_utf8_lossy(&output.stdout);
     let primary = status.lines().find_map(|line| {
         let fields: Vec<&str> = line.strip_prefix("[GNUPG:] VALIDSIG ")?.split(' ').collect();
         fields.last().map(|fpr| fpr.to_ascii_uppercase())
     });
     // An expired or revoked key's signature has a VALIDSIG too, but an EXPKEYSIG or REVKEYSIG
-    // where a good one has GOODSIG.
+    // where a good one has GOODSIG. A file signed by more keys than are pinned has an ERRSIG for
+    // each other one, and gpg fails; apt takes it, as one good signature by a key it trusts is
+    // what it asks for. A bad signature by any key is refused.
     let good = status.lines().any(|line| line.starts_with("[GNUPG:] GOODSIG "));
-    let (true, true, Some(primary)) = (output.status.success(), good, primary) else {
+    let bad = status.lines().any(|line| line.starts_with("[GNUPG:] BADSIG "));
+    let (true, false, Some(primary)) = (good, bad, primary) else {
         let said = status
             .lines()
             .filter_map(|line| line.strip_prefix("[GNUPG:] "))
@@ -269,25 +321,59 @@ fn gpg(home: &Path) -> Command {
     command
 }
 
-/// The newest version of each package in `component` for `arch`, from the index `release` lists
-/// under `dists`, held to its sha256 there: `Packages.gz` where the suite has it, else `Packages`.
+/// The newest version of each package for `arch` in the suite under `dists`, over every index
+/// `release` lists of its `components` for `arch` and for `all`, or a flat repository's one index
+/// when there are none, each held to its sha256 there.
 ///
 /// # Errors
 ///
-/// [`AptError`] when the suite lists no index for it, or the index can't be fetched, doesn't
-/// match its sha256 or can't be read.
+/// [`AptError`] when the suite lists no index of a component for `arch`, or an index can't be
+/// fetched, doesn't match its sha256 or can't be read.
 pub fn index(
     dists: &str,
     release: &Release,
-    component: &str,
+    components: &[&str],
     arch: &str,
 ) -> Result<BTreeMap<String, String>, AptError> {
-    let base = format!("{component}/binary-{arch}/Packages");
+    let mut indexes = Vec::new();
+    if components.is_empty() {
+        indexes.push("Packages".to_owned());
+    }
+    for component in components {
+        let listed: Vec<String> = [arch, "all"]
+            .iter()
+            .map(|of| format!("{component}/binary-{of}/Packages"))
+            .filter(|base| release.lists(base))
+            .collect();
+        if listed.is_empty() {
+            return Err(AptError::Invalid(format!(
+                "the suite lists no {component}/binary-{arch}/Packages index"
+            )));
+        }
+        indexes.extend(listed);
+    }
+    let mut found: BTreeMap<String, String> = BTreeMap::new();
+    for base in indexes {
+        for (package, version) in packages(dists, release, &base, arch)? {
+            let newer = found
+                .get(&package)
+                .is_none_or(|known| version::compare(&version, known).is_gt());
+            if newer {
+                found.insert(package, version);
+            }
+        }
+    }
+    Ok(found)
+}
+
+/// One index of the suite, `base` or `base.gz` where the suite has it, held to its sha256 there:
+/// its newest version of each package for `arch`.
+fn packages(dists: &str, release: &Release, base: &str, arch: &str) -> Result<BTreeMap<String, String>, AptError> {
     let gz = format!("{base}.gz");
     let (path, gzipped) = if release.sha256.contains_key(&gz) {
         (gz, true)
-    } else if release.sha256.contains_key(&base) {
-        (base, false)
+    } else if release.sha256.contains_key(base) {
+        (base.to_owned(), false)
     } else {
         return Err(AptError::Invalid(format!("the suite lists no {base} index")));
     };
@@ -296,7 +382,7 @@ pub fn index(
     let got = fetch::hex(&Sha256::digest(&body));
     if release.sha256.get(&path) != Some(&got) {
         return Err(AptError::Invalid(format!(
-            "{path}'s sha256 {got} isn't the one InRelease lists"
+            "{path}'s sha256 {got} isn't the one the release file lists"
         )));
     }
     let text = if gzipped {
@@ -308,18 +394,35 @@ pub fn index(
     } else {
         String::from_utf8(body).map_err(|e| AptError::Invalid(format!("{path}: {e}")))?
     };
-    Ok(newest(&text))
+    Ok(newest(&text, arch))
 }
 
-/// Fetches `InRelease` from `dists` and verifies it with `keys`.
+/// Fetches `InRelease` from `dists` and verifies it with `keys`; for a suite with none, `Release`
+/// and its `Release.gpg`, as apt does.
 ///
 /// # Errors
 ///
-/// [`AptError`] when it can't be fetched or its signature doesn't verify with `keys`.
+/// [`AptError`] when neither can be fetched, or the signature doesn't verify with `keys`.
 pub fn release(dists: &str, keys: &[u8]) -> Result<(Verified, Release), AptError> {
     let url = format!("{dists}/InRelease");
-    let inrelease = fetch::get(&url).map_err(AptError::fetch(&url))?;
-    let verified = verify(keys, &inrelease)?;
+    let verified = match fetch::get(&url) {
+        Ok(inrelease) => verify(keys, Signed::Inline(&inrelease))?,
+        Err(missing) => {
+            let detached = format!("{dists}/Release");
+            let signature = format!("{detached}.gpg");
+            // The InRelease's error is the one to report when the suite has neither.
+            let (Ok(release), Ok(signature)) = (fetch::get(&detached), fetch::get(&signature)) else {
+                return Err(AptError::fetch(&url)(missing));
+            };
+            verify(
+                keys,
+                Signed::Detached {
+                    release: &release,
+                    signature: &signature,
+                },
+            )?
+        }
+    };
     let release = Release::parse(&verified.text);
     Ok((verified, release))
 }

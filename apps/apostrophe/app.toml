@@ -1,0 +1,27 @@
+# Apostrophe from Ubuntu's archive, 3.4, a release behind upstream's 3.5; nixpkgs has 3.4 too. It
+# exports through pandoc, which its package brings.
+# https://apps.gnome.org/Apostrophe/
+name = "Apostrophe"
+category = "office"
+tags = ["markdown", "writing", "editor", "distraction free", "gnome"]
+summary = "A Markdown editor that hides everything but the words. Now the blank page is all yours."
+# From its AppStream metainfo, CC0-1.0 (gitlab.gnome.org/World/apostrophe), its feature list
+# joined into sentences.
+description = """\
+Focus on your writing with a clean, distraction-free markdown editor. It has a UI tailored to \
+comfortable writing, a distraction-free mode, dark, light and sepia themes, everything you \
+expect from a text editor, such as spellchecking or document statistics, and a live preview of \
+what you write. It exports to all kind of formats: PDF, Word/Libreoffice, LaTeX, or even HTML \
+slideshows."""
+description_from = "https://gitlab.gnome.org/World/apostrophe/-/blob/v3.4/data/org.gnome.gitlab.somas.Apostrophe.metainfo.xml.in.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "org.gnome.gitlab.somas.Apostrophe"
+keeps = """\
+Your documents stay where you saved them, and Apostrophe's settings in GNOME's settings \
+database: install Apostrophe again and they're there."""
+
+[[action]]
+name = "Install Apostrophe"
+kind = "apt"
+packages = ["apostrophe"]

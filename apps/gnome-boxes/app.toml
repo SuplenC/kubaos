@@ -1,0 +1,41 @@
+# GNOME Boxes from Ubuntu's archive. Boxes runs its virtual machines as you, through your
+# session's libvirt, so you need KVM's group and nothing of libvirt's. An install takes no
+# package's recommendations, so the step names what a virtual machine of today needs beside them:
+# qemu-img for its disks, SPICE for its display, UEFI firmware and a TPM, which Windows 11 asks
+# for. Each architecture runs its own kind of virtual machine on KVM, with its own QEMU and
+# firmware: OVMF on amd64, AAVMF (qemu-efi-aarch64) on arm64. Its package brings the machine's
+# libvirtd too, which Boxes never uses; it starts as Ubuntu's package sets it, at boot, so Virtual
+# Machine Manager's machines beside it start as they would without Boxes.
+# https://apps.gnome.org/Boxes/
+name = "GNOME Boxes"
+category = "development"
+tags = ["virtual machines", "vm", "kvm", "qemu", "boxes"]
+summary = "Pick an OS, get a virtual machine. VMs for people with better things to do than XML."
+# From its AppStream metainfo, CC0-1.0 (gitlab.gnome.org/GNOME/gnome-boxes), its first paragraph.
+description = """\
+Select an operating system and let Boxes download and install it for you in a virtual machine."""
+description_from = "https://gitlab.gnome.org/GNOME/gnome-boxes/-/blob/49.1/data/org.gnome.Boxes.metainfo.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "org.gnome.Boxes"
+keeps = """\
+Your virtual machines stay: their disks in ~/.local/share/gnome-boxes and their definitions in \
+~/.config/libvirt. Install Boxes again and they're all there."""
+
+[[action]]
+name = "Install GNOME Boxes and QEMU"
+kind = "apt"
+packages = [
+  "gnome-boxes",
+  "qemu-utils",
+  "qemu-system-modules-spice",
+  "swtpm-tools",
+]
+amd64 = { packages = ["qemu-system-x86", "ovmf"] }
+arm64 = { packages = ["qemu-system-arm", "qemu-efi-aarch64"] }
+
+[[action]]
+name = "Let you use KVM without sudo"
+kind = "group"
+group = "kvm"
+

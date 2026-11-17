@@ -1,0 +1,44 @@
+# Zen from the AppImage of its GitHub release, pinned to the sha256 GitHub publishes for the
+# asset. Zen has no apt repository, Ubuntu doesn't package it and nixpkgs has no zen-browser.
+# The AppImage can't update itself, so a release of KubaOS moves the pin on. Its runtime mounts
+# it with FUSE 3's fusermount3. The desktop entry is ours, not the AppImage's: its Exec runs the
+# AppImage, its Icon is Colloid's and its actions are the options Zen's command line takes.
+# https://github.com/zen-browser/desktop/releases
+name = "Zen Browser"
+category = "browsers"
+tags = ["browser", "web", "internet", "firefox", "vertical tabs"]
+summary = "Firefox with vertical tabs and a haircut. Pretty as hell, and doesn't it know it."
+# Its AppStream metainfo is under the MIT licence, which asks for its notice with every copy, so
+# this is ours.
+description = """\
+Zen is a web browser built on Firefox. It puts the tabs in a sidebar, groups them into \
+workspaces, shows two pages side by side in a split view and keeps web panels open beside the \
+page, and its look is customizable with themes and mods. Firefox's extensions run in it."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# AppImage is there.
+icon = "zen-browser"
+keeps = """\
+Your profile (bookmarks, passwords, history) stays in ~/.config/zen, or ~/.zen where an older \
+Zen made it: install Zen again and it's all there."""
+
+[[action]]
+name = "Install FUSE, which the AppImage mounts itself with"
+kind = "apt"
+packages = ["fuse3"]
+
+[[action]]
+name = "Download Zen"
+kind = "download"
+to = "~/.local/opt/zen-browser/zen.AppImage"
+version = "1.24.2b"
+unpack = "file"
+amd64 = { url = "https://github.com/zen-browser/desktop/releases/download/1.24.2b/zen-x86_64.AppImage", sha256 = "2e73140a2adf6b0bb5669396339d2c0e7a119408a392a5a807d87810f1a99bf5" }
+arm64 = { url = "https://github.com/zen-browser/desktop/releases/download/1.24.2b/zen-aarch64.AppImage", sha256 = "228d42846c7ec9eff24e7ec571bda26fb872ee44ed7baa4af929f7fda8e562e1" }
+
+[[action]]
+name = "Put Zen in the Command menu"
+kind = "file"
+to = "~/.local/share/applications/zen.desktop"
+from = "zen.desktop"
+template = true

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Done: Sunshine's web page has a sign-in, whoever set it, so one already there is left as it is.
+set -euo pipefail
+state="$HOME/.config/sunshine/sunshine_state.json"
+[[ -f $state ]] && jq -e 'has("username") and has("password") and has("salt")' "$state" >/dev/null

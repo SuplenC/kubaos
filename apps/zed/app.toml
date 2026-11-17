@@ -1,0 +1,24 @@
+# Zed from nixpkgs, through the User flake. Zed keeps no apt repository, Ubuntu doesn't package it,
+# and its own installer is a script piped into a shell. nixpkgs builds it with its updater off, so
+# it moves with the flake.
+# https://zed.dev/docs/linux
+name = "Zed"
+category = "development"
+tags = ["editor", "ide", "code", "rust", "collaboration"]
+summary = "A Rust code editor drawn on your GPU. Opens before you've finished blinking, the smug bastard."
+# The first paragraph of its AppStream metainfo, whose metadata is under the MIT licence
+# (github.com/zed-industries/zed).
+description = """\
+Productive coding starts with a tool that stays out of your way. Zed blends the power of an IDE \
+with the speed of a lightweight editor for productivity you can feel under your fingertips."""
+description_from = "https://github.com/zed-industries/zed/blob/v1.25.3/crates/zed/resources/flatpak/zed.metainfo.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "zed"
+keeps = """\
+Your settings and keymap stay in ~/.config/zed, and your extensions and history in \
+~/.local/share/zed: install Zed again and they're all there."""
+
+[[action]]
+name = "Install Zed"
+kind = "nix"
+packages = ["zed-editor"]

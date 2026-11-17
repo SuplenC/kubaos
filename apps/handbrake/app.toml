@@ -1,0 +1,25 @@
+# HandBrake from Ubuntu's archive, 1.11.0, a patch release behind upstream's 1.11.2; nixpkgs has
+# 1.10.2. Its package links x264, x265, SVT-AV1 and Ubuntu's FFmpeg, and encodes on Intel's GPUs
+# through oneVPL: nothing restricted to add. An encrypted DVD needs libdvdcss, which Ubuntu only
+# builds on the machine (libdvd-pkg), so it isn't installed.
+# https://handbrake.fr/docs/en/latest/get-handbrake/download-and-install.html
+name = "HandBrake"
+category = "media"
+tags = ["video", "converter", "transcoder", "encoder", "h264", "hevc", "av1"]
+summary = "Shrinks any video into one your phone will play. Your fans will spin for the whole film."
+# From its AppStream metainfo, CC0-1.0 (HandBrake/HandBrake), its first paragraph.
+description = """\
+HandBrake is a tool for converting video from nearly any format to a selection of modern, widely \
+supported codecs."""
+description_from = "https://github.com/HandBrake/HandBrake/blob/1.11.0/gtk/data/fr.handbrake.ghb.metainfo.xml.in.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "fr.handbrake.ghb"
+keeps = """\
+Your presets and queue stay in ~/.config/ghb, and the videos you made where you saved them: \
+install HandBrake again and they're there."""
+
+[[action]]
+name = "Install HandBrake"
+kind = "apt"
+packages = ["handbrake"]

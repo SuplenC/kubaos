@@ -5,17 +5,21 @@ use std::path::PathBuf;
 
 use super::Catalog;
 use super::Picks;
+use super::Platform;
 use super::Status;
 use super::action::Kind;
 use super::action::Words;
 use super::catalog::CATALOG;
 use super::catalog::CatalogError;
+use super::folder::FolderError;
 use super::journal::Journal;
 use super::status::AppState;
 use super::status::listing;
 use crate::apt::Dpkg;
 use crate::apt::Manifest;
 use crate::apt::manifest::MANIFEST;
+use crate::sandbox;
+use crate::unfree::Unfree;
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -118,6 +122,31 @@ fn an_app_that_isnt_valid_is_named() {
 }
 
 #[test]
+fn the_status_shows_an_svg_icon_by_its_path_in_the_catalog_whether_or_not_the_app_is_there() {
+    let (_dir, catalog) = catalog_of(&[(
+        "agent",
+        app("Agent", AGENT).replace("name = \"Agent\"", "name = \"Agent\"\nicon = \"agent.svg\""),
+    )]);
+    let journals = tempfile::tempdir().unwrap();
+
+    let status = Status::read(
+        &catalog,
+        &Picks::default(),
+        journals.path(),
+        &journals.path().join("root"),
+        Platform::new("amd64", Unfree::Allowed),
+        None,
+    )
+    .unwrap();
+
+    let dir = &catalog.get("agent").unwrap().dir;
+    assert_eq!(
+        status.get("agent").unwrap().icon.as_deref(),
+        Some(dir.join("agent.svg").to_str().unwrap())
+    );
+}
+
+#[test]
 fn an_installed_app_is_one_whose_user_journal_is_complete() {
     let (_dir, catalog) = catalog_of(&[
         ("agent", app("Agent", AGENT)),
@@ -156,7 +185,7 @@ fn an_installed_app_is_one_whose_user_journal_is_complete() {
         &picks,
         journals.path(),
         &journals.path().join("root"),
-        "amd64",
+        Platform::new("amd64", Unfree::Allowed),
         Some(&dpkg),
     )
     .unwrap();
@@ -167,6 +196,68 @@ fn an_installed_app_is_one_whose_user_journal_is_complete() {
     assert_eq!(state("tool"), AppState::Unavailable);
     assert_eq!(status.get("agent").unwrap().version.as_deref(), Some("1.2"));
     assert_eq!(status.get("half").unwrap().version, None);
+}
+
+#[test]
+fn an_unfree_nix_app_is_unavailable_while_the_users_nixpkgs_refuses_unfree_and_so_is_one_requiring_it() {
+    let chat = "[[action]]\nname = \"Install Chat\"\nkind = \"nix\"\npackages = [\"discord\"]\nunfree = true\n";
+    let free = "[[action]]\nname = \"Install Free\"\nkind = \"nix\"\npackages = [\"element-desktop\"]\n";
+    let (_dir, catalog) = catalog_of(&[
+        ("chat", app("Chat", chat)),
+        ("free", app("Free", free)),
+        ("bot", app("Bot", &format!("requires = [\"chat\"]\n{AGENT}"))),
+    ]);
+    let journals = tempfile::tempdir().unwrap();
+    let read = |unfree| {
+        Status::read(
+            &catalog,
+            &Picks::default(),
+            journals.path(),
+            &journals.path().join("root"),
+            Platform::new("amd64", unfree),
+            None,
+        )
+        .unwrap()
+    };
+
+    let allowed = read(Unfree::Allowed);
+    let refused = read(Unfree::Refused);
+
+    for id in ["chat", "free", "bot"] {
+        assert_eq!(allowed.get(id).unwrap().state, AppState::Available, "{id}");
+    }
+    assert_eq!(refused.get("chat").unwrap().state, AppState::Unavailable);
+    assert_eq!(refused.get("bot").unwrap().state, AppState::Unavailable);
+    assert_eq!(refused.get("free").unwrap().state, AppState::Available);
+}
+
+#[test]
+fn a_nix_step_for_one_architecture_has_nothing_for_another() {
+    let zoom = "[[action]]\nname = \"Install Zoom\"\nkind = \"nix\"\narch = \"amd64\"\npackages = [\"zoom-us\"]\n";
+    let (_dir, catalog) = catalog_of(&[("zoom", app("Zoom", zoom))]);
+    let zoom = catalog.get("zoom").unwrap();
+
+    assert!(catalog.available(zoom, None, Platform::new("amd64", Unfree::Allowed)));
+    assert!(!catalog.available(zoom, None, Platform::new("arm64", Unfree::Allowed)));
+    let wrong = app("Zoom", &zoom_with_arch("riscv64"));
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("zoom")).unwrap();
+    fs::write(dir.path().join("zoom/app.toml"), wrong).unwrap();
+    assert!(Catalog::load(dir.path()).is_err());
+}
+
+#[test]
+fn an_unfree_nix_app_lists_the_architectures_it_installs_on_whatever_the_user_lets_in() {
+    let zoom = "[[action]]\nname = \"Install Zoom\"\nkind = \"nix\"\narch = \"amd64\"\npackages = [\"zoom-us\"]\nunfree = true\n";
+    let (_dir, catalog) = catalog_of(&[("zoom", app("Zoom", zoom))]);
+
+    let list = serde_json::to_value(listing(&catalog, &Picks::default())).unwrap();
+
+    assert_eq!(list[0]["arches"], serde_json::json!(["amd64"]));
+}
+
+fn zoom_with_arch(arch: &str) -> String {
+    format!("[[action]]\nname = \"Install Zoom\"\nkind = \"nix\"\narch = \"{arch}\"\npackages = [\"zoom-us\"]\n")
 }
 
 #[test]
@@ -191,7 +282,7 @@ fn an_app_kubaos_owns_nothing_of_is_found_and_one_with_no_journal_is_read_from_d
         &picks,
         journals.path(),
         &journals.path().join("root"),
-        "amd64",
+        Platform::new("amd64", Unfree::Allowed),
         Some(&dpkg),
     )
     .unwrap();
@@ -209,6 +300,34 @@ fn an_app_kubaos_owns_nothing_of_is_found_and_one_with_no_journal_is_read_from_d
 }
 
 #[test]
+fn ubuntus_snap_firefox_is_not_firefox_and_mozillas_is() {
+    let catalog = shipped();
+    let journals = tempfile::tempdir().unwrap();
+    let mut picks = Picks::default();
+    picks.add("firefox");
+    let state = |dpkg: &str, picks: &Picks| {
+        let dpkg = Dpkg::parse(dpkg);
+        let status = Status::read(
+            &catalog,
+            picks,
+            journals.path(),
+            &journals.path().join("root"),
+            Platform::new("amd64", Unfree::Allowed),
+            Some(&dpkg),
+        )
+        .unwrap();
+        status.get("firefox").unwrap().state
+    };
+    let snap = "installed install firefox 1:1snap1-0ubuntu9.1\n";
+    let mozillas = "installed install firefox 160.0~build1\n";
+
+    assert_eq!(state(snap, &Picks::default()), AppState::Available);
+    assert_eq!(state(snap, &picks), AppState::Missing);
+    assert_eq!(state(mozillas, &Picks::default()), AppState::Found);
+    assert_eq!(state(mozillas, &picks), AppState::Installed);
+}
+
+#[test]
 fn the_list_and_the_status_say_what_each_app_is_in_json() {
     let (_dir, catalog) = catalog_of(&[("agent", app("Agent", AGENT))]);
     let picks = Picks::default();
@@ -221,7 +340,7 @@ fn the_list_and_the_status_say_what_each_app_is_in_json() {
             &picks,
             journals.path(),
             &journals.path().join("root"),
-            "amd64",
+            Platform::new("amd64", Unfree::Allowed),
             None,
         )
         .unwrap(),
@@ -232,6 +351,91 @@ fn the_list_and_the_status_say_what_each_app_is_in_json() {
     assert_eq!(list[0]["tags"][0], "fixture");
     assert_eq!(status["apps"][0]["summary"], "An app for the tests");
     assert_eq!(status["apps"][0]["state"], "available");
+}
+
+/// An app of `category` whose `about` follows its name.
+fn app_in(name: &str, category: &str, rest: &str) -> String {
+    format!(
+        "name = \"{name}\"\ncategory = \"{category}\"\ntags = [\"fixture\"]\nsummary = \"{name}, for the tests\"\n\
+         description = \"An app the tests list.\"\ndescription_from = \"kubaos\"\n{rest}"
+    )
+}
+
+#[test]
+fn the_list_groups_the_apps_by_category_and_says_where_each_comes_from_and_runs() {
+    let (_dir, catalog) = catalog_of(&[
+        (
+            "chat",
+            app_in(
+                "Chat",
+                "communication",
+                "requires = [\"browser\"]\n[[action]]\nname = \"Window\"\nkind = \"web_app\"\nid = \"chat\"\n\
+                 title = \"Chat\"\nurl = \"https://chat.example/\"\nicon = \"chat.svg\"\n",
+            ),
+        ),
+        (
+            "browser",
+            app_in(
+                "Browser",
+                "browsers",
+                "[[action]]\nname = \"Install it\"\nkind = \"apt\"\nrepo = \"vendor\"\narch = \"amd64\"\npackages = [\"browser\"]\n",
+            ),
+        ),
+        (
+            "editor",
+            app_in(
+                "Editor",
+                "development",
+                "[[action]]\nname = \"Install it\"\nkind = \"apt\"\npackages = [\"editor\"]\n\
+                 [[action]]\nname = \"Its plugins\"\nkind = \"nix\"\npackages = [\"editor-plugins\"]\n\
+                 [[action]]\nname = \"Again\"\nkind = \"apt\"\npackages = [\"editor-extra\"]\n",
+            ),
+        ),
+        (
+            "atlas",
+            app_in(
+                "Atlas",
+                "development",
+                "[setup.web]\nname = \"Atlas\"\nsummary = \"in a window\"\nrequires = [\"browser\"]\n\
+                 [[setup.web.action]]\nname = \"Window\"\nkind = \"web_app\"\nid = \"atlas\"\ntitle = \"Atlas\"\n\
+                 url = \"https://atlas.example/\"\nicon = \"atlas.svg\"\n\
+                 [setup.local]\nname = \"Atlas here\"\nsummary = \"on this machine\"\n\
+                 [[setup.local.action]]\nname = \"Install it\"\nkind = \"deb\"\npackage = \"atlas\"\nversion = \"1.0\"\n\
+                 arm64 = { url = \"https://atlas.example/atlas-arm64.deb\", sha256 = \"{}\" }\n",
+            )
+            .replace("{}", &"0".repeat(64)),
+        ),
+    ]);
+
+    let picks = Picks::default();
+    let listed = listing(&catalog, &picks);
+    let list = serde_json::to_value(&listed).unwrap();
+
+    let ids: Vec<&str> = listed.iter().map(|a| a.id).collect();
+    assert_eq!(ids, ["browser", "atlas", "editor", "chat"]);
+    assert_eq!(
+        list[0]["sources"],
+        serde_json::json!([{ "kind": "apt_repo", "repo": "vendor" }])
+    );
+    assert_eq!(list[0]["arches"], serde_json::json!(["amd64"]));
+    assert!(list[0].get("requires").is_none(), "{}", list[0]);
+    assert!(list[1].get("sources").is_none(), "{}", list[1]);
+    assert_eq!(list[1]["setups"][0]["sources"], serde_json::json!([{ "kind": "deb" }]));
+    assert_eq!(
+        list[1]["setups"][1]["sources"],
+        serde_json::json!([{ "kind": "web_app" }])
+    );
+    assert_eq!(list[1]["arches"], serde_json::json!(["amd64", "arm64"]));
+    assert_eq!(list[1]["setups"][0]["id"], "local");
+    assert!(list[1]["setups"][0].get("requires").is_none(), "{}", list[1]);
+    assert_eq!(list[1]["setups"][1]["requires"], serde_json::json!(["browser"]));
+    assert_eq!(
+        list[2]["sources"],
+        serde_json::json!([{ "kind": "archive" }, { "kind": "nixpkgs" }])
+    );
+    assert_eq!(list[2]["arches"], serde_json::json!(["amd64", "arm64"]));
+    assert_eq!(list[3]["requires"], serde_json::json!(["browser"]));
+    assert_eq!(list[3]["arches"], serde_json::json!(["amd64"]));
 }
 
 #[test]
@@ -263,6 +467,143 @@ fn shipped() -> Catalog {
     Catalog::load(&repo_root().join(CATALOG)).unwrap()
 }
 
+/// Every app of the shipped catalog, by id, in the catalog's order.
+const SHIPPED: [&str; 133] = [
+    "1password",
+    "aider",
+    "alacritty",
+    "android-studio",
+    "anki",
+    "apostrophe",
+    "ardour",
+    "audacity",
+    "bitwarden",
+    "blender",
+    "brave",
+    "bruno",
+    "calibre",
+    "chatgpt",
+    "chromium",
+    "claude-code",
+    "claude-desktop",
+    "codex",
+    "cryptomator",
+    "cursor",
+    "darktable",
+    "dbeaver",
+    "devin-desktop",
+    "discord",
+    "distrobox",
+    "docker",
+    "dropbox",
+    "element",
+    "emacs",
+    "ente-auth",
+    "excalidraw",
+    "figma",
+    "firefox",
+    "gamescope",
+    "geforce-now",
+    "gemini",
+    "gemini-cli",
+    "gimp",
+    "github-copilot-cli",
+    "github-desktop",
+    "gnome-boxes",
+    "google-chrome",
+    "gparted",
+    "grok",
+    "handbrake",
+    "helix",
+    "heroic",
+    "inkscape",
+    "insomnia",
+    "jellyfin-desktop",
+    "jetbrains-toolbox",
+    "joplin",
+    "k9s",
+    "kdenlive",
+    "keepassxc",
+    "kitty",
+    "krita",
+    "kubectl",
+    "lens",
+    "libreoffice",
+    "librewolf",
+    "linear",
+    "lm-studio",
+    "localsend",
+    "logseq",
+    "losslesscut",
+    "lutris",
+    "mangohud",
+    "mattermost",
+    "microsoft-edge",
+    "microsoft-teams",
+    "minecraft-launcher",
+    "mission-center",
+    "moonlight",
+    "mpv",
+    "mullvad-vpn",
+    "neovide",
+    "nextcloud",
+    "nordvpn",
+    "notion",
+    "obs-studio",
+    "obsidian",
+    "ollama",
+    "onlyoffice",
+    "opencode",
+    "openssh-server",
+    "penpot",
+    "perplexity",
+    "pinta",
+    "podman-desktop",
+    "postman",
+    "prismlauncher",
+    "proton-mail-bridge",
+    "proton-pass",
+    "proton-vpn",
+    "protonup-qt",
+    "qalculate",
+    "rawtherapee",
+    "retroarch",
+    "shotcut",
+    "signal",
+    "slack",
+    "spotify",
+    "steam",
+    "sublime-text",
+    "sunshine",
+    "syncthing",
+    "t3-code",
+    "tailscale",
+    "telegram",
+    "thunderbird",
+    "todoist",
+    "tor-browser",
+    "upscayl",
+    "virt-manager",
+    "vivaldi",
+    "vlc",
+    "voxtype",
+    "vscode",
+    "wezterm",
+    "whatsapp",
+    "wine",
+    "wireshark",
+    "xbox-cloud-gaming",
+    "xournalpp",
+    "xpadneo",
+    "youtube-music",
+    "yubico-authenticator",
+    "zed",
+    "zen-browser",
+    "zoom",
+    "zotero",
+    "zulip",
+];
+
 #[test]
 fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
     let root = repo_root();
@@ -272,17 +613,7 @@ fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
 
     catalog.check_repos(&manifest).unwrap();
     let ids: Vec<&str> = catalog.apps().iter().map(|a| a.id.as_str()).collect();
-    assert_eq!(
-        ids,
-        [
-            "bitwarden",
-            "claude-code",
-            "docker",
-            "google-chrome",
-            "penpot",
-            "t3-code"
-        ]
-    );
+    assert_eq!(ids, SHIPPED);
     for app in catalog.apps() {
         for action in app.all_actions() {
             if let Kind::Apt { repo: Some(repo), .. } = &action.kind {
@@ -294,6 +625,42 @@ fn every_shipped_app_validates_and_its_repos_are_the_manifests() {
 }
 
 #[test]
+fn every_repositorys_sources_file_is_signed_by_the_key_the_manifest_pins() {
+    let root = repo_root();
+    let manifest = Manifest::read(&root.join(MANIFEST)).unwrap().unwrap();
+
+    for (name, repo) in manifest.repos() {
+        let sources = fs::read_to_string(root.join(format!("system/files/apt/sources.list.d/{name}.sources"))).unwrap();
+        let signed_by: Vec<&str> = sources
+            .lines()
+            .filter_map(|l| l.strip_prefix("Signed-By:"))
+            .map(str::trim)
+            .collect();
+        let keyrings: Vec<&str> = repo.keyrings().collect();
+        assert_eq!(signed_by, [keyrings.join(" ")], "{name}");
+    }
+}
+
+#[test]
+fn firefoxs_pin_is_there_before_apt_picks_a_firefox() {
+    // Ubuntu's firefox, which installs the snap, has an epoch, so without the pin apt takes it.
+    let catalog = shipped();
+    let firefox = catalog.get("firefox").unwrap();
+
+    let kinds: Vec<&Kind> = firefox.all_actions().map(|a| &a.kind).collect();
+
+    assert!(
+        matches!(kinds[..], [Kind::File { to, .. }, Kind::Apt { repo: Some(repo), .. }]
+            if to == "/etc/apt/preferences.d/kubaos-firefox" && repo == "mozilla"),
+        "{kinds:?}"
+    );
+    let pin = fs::read_to_string(firefox.dir.join("kubaos-firefox.pref")).unwrap();
+    assert!(
+        pin.contains("Package: firefox ") && pin.contains("Pin: origin packages.mozilla.org\nPin-Priority: 1000\n")
+    );
+}
+
+#[test]
 fn every_shipped_step_resolves_on_both_architectures_with_its_files_there() {
     for app in shipped().apps() {
         for arch in ["amd64", "arm64"] {
@@ -301,6 +668,7 @@ fn every_shipped_step_resolves_on_both_architectures_with_its_files_there() {
                 user: "kuba".to_owned(),
                 home: PathBuf::from("/home/kuba"),
                 arch: arch.to_owned(),
+                version: app.version().map(str::to_owned),
             };
             for action in app.all_actions() {
                 action
@@ -416,7 +784,7 @@ fn penpot_opens_in_a_window_and_requires_chrome_and_docker_for_its_local_stack()
     assert_eq!(compose_run, (vec!["./up".to_owned()], true, vec!["./down".to_owned()]));
     for arch in ["amd64", "arm64"] {
         assert_eq!(
-            catalog.available(penpot, penpot.setup("web"), arch),
+            catalog.available(penpot, penpot.setup("web"), Platform::new(arch, Unfree::Allowed)),
             arch == "amd64",
             "{arch}: Chrome is built for amd64 alone"
         );
@@ -495,8 +863,7 @@ fn penpot_script(name: &str, into: &Path, dir: &Path) -> PathBuf {
     let from = "dir=/etc/kubaos/penpot\n";
     assert!(text.contains(from), "{name} keeps the stack in /etc/kubaos/penpot");
     let path = into.join(name);
-    fs::write(&path, text.replace(from, &format!("dir={}\n", dir.display()))).unwrap();
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    sandbox::program(&path, &text.replace(from, &format!("dir={}\n", dir.display())));
     path
 }
 
@@ -523,7 +890,11 @@ fn penpots_removal_takes_the_images_its_install_pulled_and_keeps_the_ones_the_ma
             r#"images='{images}'
 file() {{ printf '%s/%s' "$images" "$(printf %s "$1" | tr '/:@' '___')"; }}
 case "$1 $2" in
-"image inspect") [ -e "$(file "$3")" ]; exit ;;
+"image inspect")
+	for image; do :; done
+	[ -e "$(file "$image")" ] && exit 0
+	echo "Error response from daemon: No such image: $image" >&2
+	exit 1 ;;
 "image rm") rm "$(file "$3")"; exit ;;
 esac
 for arg; do
@@ -559,4 +930,404 @@ exit 1"#,
     assert!(!pulled.exists(), "the image the install pulled stayed");
     assert!(had.exists(), "the image the machine had went");
     assert!(!dir.join("pulled-images").exists() && !dir.join("secret.env").exists());
+}
+
+/// A sandbox whose `docker` lacks every image and answers an image's inspect with `inspect`, a
+/// shell command, and whose `up` fails, as a start that can't pull does; with Penpot's `up` in it,
+/// its stack's folder `dir`.
+fn penpot_up_against(tmp: &Path, dir: &Path, inspect: &str) -> (crate::sandbox::Sandbox, PathBuf) {
+    let home = tmp.join("home");
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(dir).unwrap();
+    let sandbox = crate::sandbox::Sandbox::new(&tmp.join("sandbox"), &home, "tester");
+    sandbox.stub(
+        "docker",
+        &format!(
+            r#"case "$1 $2" in
+"image inspect") {inspect} ;;
+esac
+for arg; do
+	case $arg in
+	config) printf '%s\n' 'penpotapp/frontend:2.19.2' 'postgres:15'; exit 0 ;;
+	up) exit 1 ;;
+	esac
+done
+exit 1"#
+        ),
+    );
+    fs::write(dir.join("secret.env"), "PENPOT_SECRET_KEY=earlier\n").unwrap();
+    (sandbox, penpot_script("up", tmp, dir))
+}
+
+#[test]
+fn penpots_up_lists_no_image_while_docker_cant_say_whether_it_has_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("penpot");
+    let (sandbox, up) = penpot_up_against(
+        tmp.path(),
+        &dir,
+        "echo 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?' >&2; exit 1",
+    );
+
+    let ran = sandbox.command(&up).output().unwrap();
+
+    assert!(!ran.status.success(), "{ran:?}");
+    let said = String::from_utf8_lossy(&ran.stderr);
+    assert!(said.contains("Cannot connect to the Docker daemon"), "{said}");
+    assert!(
+        !dir.join("pulled-images").exists(),
+        "an image the user may have was listed"
+    );
+    assert!(
+        !sandbox.calls().iter().any(|c| c.contains(" up ")),
+        "{:#?}",
+        sandbox.calls()
+    );
+}
+
+#[test]
+fn penpots_up_lists_an_image_docker_lacks_once_however_many_starts_fail() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("penpot");
+    let (sandbox, up) = penpot_up_against(
+        tmp.path(),
+        &dir,
+        r#"for image; do :; done; echo "Error response from daemon: No such image: $image" >&2; exit 1"#,
+    );
+
+    for _ in 0..2 {
+        let ran = sandbox.command(&up).output().unwrap();
+        assert!(!ran.status.success(), "the pull fails offline: {ran:?}");
+    }
+
+    assert_eq!(
+        fs::read_to_string(dir.join("pulled-images")).unwrap(),
+        "penpotapp/frontend:2.19.2\npostgres:15\n"
+    );
+}
+
+#[test]
+fn a_catalog_named_by_hand_must_be_there() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let err = Catalog::load_existing(&dir.path().join("typo")).unwrap_err();
+
+    assert!(matches!(err, CatalogError::Read { .. }), "{err:?}");
+    assert_eq!(Catalog::load_existing(dir.path()).unwrap(), Catalog::default());
+}
+
+/// A setup `local` whose install runs `./up`, with `rest` after `kind = "run"`, beside a web setup.
+fn stack_app(rest: &str) -> String {
+    app_in(
+        "Stack",
+        "graphics",
+        &format!(
+            "[setup.web]\nname = \"Stack\"\nsummary = \"in a window\"\n\
+             [[setup.web.action]]\nname = \"Window\"\nkind = \"web_app\"\nid = \"stack\"\ntitle = \"Stack\"\n\
+             url = \"https://stack.example/\"\nicon = \"stack.svg\"\n\
+             [setup.local]\nname = \"Stack here\"\nsummary = \"on this machine\"\n\
+             [[setup.local.action]]\nname = \"Start it\"\nkind = \"run\"\nroot = true\ndo = [\"./up\"]\n\
+             check = [\"./up-to-date\"]\nundo = [\"./down\"]\n{rest}\
+             [[setup.local.action]]\nname = \"Window\"\nkind = \"web_app\"\nid = \"stack-local\"\n\
+             title = \"Stack\"\nurl = \"http://localhost:9001/\"\nicon = \"stack.svg\"\n"
+        ),
+    )
+}
+
+#[test]
+fn a_run_that_installs_the_app_is_its_setups_source() {
+    let (_dir, catalog) = catalog_of(&[("stack", stack_app("source = \"container_images\"\n"))]);
+
+    let list = serde_json::to_value(listing(&catalog, &Picks::default())).unwrap();
+
+    assert!(list[0].get("sources").is_none(), "{}", list[0]);
+    assert_eq!(list[0]["setups"][0]["id"], "local");
+    assert_eq!(
+        list[0]["setups"][0]["sources"],
+        serde_json::json!([{ "kind": "container_images" }])
+    );
+    assert_eq!(
+        list[0]["setups"][1]["sources"],
+        serde_json::json!([{ "kind": "web_app" }])
+    );
+}
+
+#[test]
+fn an_install_whose_source_nothing_names_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("stack")).unwrap();
+    fs::write(dir.path().join("stack/app.toml"), stack_app("")).unwrap();
+
+    let err = Catalog::load(dir.path()).unwrap_err();
+
+    let CatalogError::App { source, .. } = &err else {
+        panic!("{err:?}");
+    };
+    assert!(matches!(**source, FolderError::NoSource(_)), "{source:?}");
+}
+
+#[test]
+fn a_run_names_its_source_only_as_the_installs_only_source() {
+    let configure = "source = \"container_images\"\nstage = \"configure\"\n";
+    let beside = "source = \"container_images\"\n\
+                  [[setup.local.action]]\nname = \"Engine\"\nkind = \"apt\"\npackages = [\"engine\"]\n";
+    for rest in [configure, beside] {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("stack")).unwrap();
+        fs::write(dir.path().join("stack/app.toml"), stack_app(rest)).unwrap();
+
+        let err = Catalog::load(dir.path()).unwrap_err();
+
+        let CatalogError::App { source, .. } = &err else {
+            panic!("{err:?}");
+        };
+        assert!(matches!(**source, FolderError::StraySource(_)), "{rest}: {source:?}");
+    }
+}
+
+#[test]
+fn a_run_names_only_a_source_the_catalog_knows() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("stack")).unwrap();
+    fs::write(dir.path().join("stack/app.toml"), stack_app("source = \"floppies\"\n")).unwrap();
+
+    assert!(Catalog::load(dir.path()).is_err());
+}
+
+#[test]
+fn a_configure_step_is_no_source() {
+    let (_dir, catalog) = catalog_of(&[(
+        "notes",
+        app_in(
+            "Notes",
+            "office",
+            &format!(
+                "[[action]]\nname = \"Install it\"\nkind = \"apt\"\npackages = [\"notes\"]\n\
+                 [[action]]\nname = \"Its theme\"\nstage = \"configure\"\nkind = \"download\"\n\
+                 to = \"~/.config/kubaos/notes/theme\"\nversion = \"1\"\nunpack = \"file\"\n\
+                 amd64 = {{ url = \"https://notes.example/theme\", sha256 = \"{}\" }}\n",
+                "0".repeat(64)
+            ),
+        ),
+    )]);
+
+    let list = serde_json::to_value(listing(&catalog, &Picks::default())).unwrap();
+
+    assert_eq!(list[0]["sources"], serde_json::json!([{ "kind": "archive" }]));
+}
+
+#[test]
+fn penpots_local_stack_comes_from_pinned_images_and_its_web_setup_from_the_website() {
+    let catalog = shipped();
+
+    let list = serde_json::to_value(listing(&catalog, &Picks::default())).unwrap();
+
+    let penpot = list.as_array().unwrap().iter().find(|a| a["id"] == "penpot").unwrap();
+    assert_eq!(penpot["setups"][0]["id"], "local");
+    assert_eq!(
+        penpot["setups"][0]["sources"],
+        serde_json::json!([{ "kind": "container_images" }])
+    );
+    assert_eq!(
+        penpot["setups"][1]["sources"],
+        serde_json::json!([{ "kind": "web_app" }])
+    );
+}
+
+/// The licences of the repository itself, whose texts are `LICENSE-MIT` and `LICENSE-APACHE` at
+/// its root: a file under one of them needs nothing in `LICENSES/`.
+const OURS: [&str; 2] = ["MIT", "Apache-2.0"];
+
+/// The beginnings of the SPDX identifiers a header comment names a licence by.
+const SPDX_PREFIXES: [&str; 13] = [
+    "MPL-",
+    "GPL-",
+    "LGPL-",
+    "AGPL-",
+    "CC-BY",
+    "CC0-",
+    "OFL-",
+    "BSD-",
+    "EPL-",
+    "Apache-",
+    "MIT",
+    "ISC",
+    "Unlicense",
+];
+
+/// The comment a file starts with: an SVG's or an XML file's first `<!-- … -->`, else its first
+/// run of `#` or `//` lines, a shebang skipped.
+fn header_comment(text: &str) -> String {
+    let rest = text.trim_start();
+    let rest = match rest.strip_prefix("<?xml") {
+        Some(after) => after.split_once("?>").map_or("", |(_, r)| r).trim_start(),
+        None => rest,
+    };
+    if let Some(after) = rest.strip_prefix("<!--") {
+        return after.split_once("-->").map_or("", |(c, _)| c).to_owned();
+    }
+    rest.lines()
+        .skip_while(|line| line.starts_with("#!"))
+        .map_while(|line| {
+            let line = line.trim_start();
+            line.strip_prefix('#').or_else(|| line.strip_prefix("//"))
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The SPDX licence identifiers `comment` names.
+fn licences_named(comment: &str) -> Vec<String> {
+    let mut found: Vec<String> = comment
+        .split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '+')))
+        .map(|word| word.trim_end_matches('.'))
+        .filter(|word| SPDX_PREFIXES.iter().any(|prefix| word.starts_with(prefix)))
+        .map(str::to_owned)
+        .collect();
+    found.sort();
+    found.dedup();
+    found
+}
+
+/// What is wrong with the licence notices of the apps' files under `root`: a picture that names
+/// no licence in its header comment, nor is a vendor's logo naming its source, or a licence a
+/// header names whose text isn't in `LICENSES/`.
+fn licence_problems(root: &Path) -> Vec<String> {
+    let mut problems = Vec::new();
+    let mut files: Vec<PathBuf> = Vec::new();
+    for app in fs::read_dir(root.join("apps")).unwrap() {
+        let app = app.unwrap().path();
+        if app.is_dir() {
+            files.extend(walk(&app));
+        }
+    }
+    files.sort();
+    for file in files {
+        if file.file_name().is_some_and(|n| n == "app.toml") {
+            continue;
+        }
+        let shown = file.strip_prefix(root).unwrap_or(&file).display().to_string();
+        let picture = file
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| matches!(e, "svg" | "png" | "jpg" | "jpeg" | "webp" | "ico"));
+        let bytes = fs::read(&file).unwrap();
+        let header = match String::from_utf8(bytes) {
+            Ok(text) => header_comment(&text),
+            Err(binary) => match crate::apps::folder::picture::comment(binary.as_bytes()) {
+                Some(comment) if picture => comment,
+                _ => {
+                    problems.push(format!(
+                        "{shown}: not text, so it can't name its licence; a PNG or a JPEG names it in its comment"
+                    ));
+                    continue;
+                }
+            },
+        };
+        let licences = licences_named(&header);
+        if picture && licences.is_empty() && !is_trademark_notice(&header) {
+            problems.push(format!("{shown}: its header comment names no licence"));
+        }
+        for licence in licences.iter().filter(|l| !OURS.contains(&l.as_str())) {
+            if !root.join("LICENSES").join(format!("{licence}.txt")).is_file() {
+                problems.push(format!(
+                    "{shown}: {licence}, whose text isn't in LICENSES/{licence}.txt"
+                ));
+            }
+        }
+    }
+    problems
+}
+
+/// Whether `header` is a vendor's logo's notice in place of a licence: the mark is its owner's
+/// trademark, shipped to identify the app, and the header names the address it was taken from.
+fn is_trademark_notice(header: &str) -> bool {
+    header.contains("trademark, used to identify") && header.contains("https://")
+}
+
+fn walk(dir: &Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            found.extend(walk(&path));
+        } else {
+            found.push(path);
+        }
+    }
+    found
+}
+
+#[test]
+fn every_third_party_file_of_an_app_names_its_licence_and_the_repo_ships_its_text() {
+    let problems = licence_problems(&repo_root());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+#[test]
+fn the_licence_check_finds_a_picture_naming_no_licence_nor_a_logos_source_and_a_licence_without_its_text() {
+    let root = tempfile::tempdir().unwrap();
+    let app = root.path().join("apps/chat");
+    fs::create_dir_all(&app).unwrap();
+    fs::create_dir_all(root.path().join("LICENSES")).unwrap();
+    fs::write(root.path().join("LICENSES/MPL-2.0.txt"), "").unwrap();
+    fs::write(app.join("app.toml"), "name = \"Chat\"\n").unwrap();
+    fs::write(app.join("bare.svg"), "<svg/>\n").unwrap();
+    fs::write(app.join("ours.svg"), "<!-- KubaOS's, MIT OR Apache-2.0. -->\n<svg/>\n").unwrap();
+    fs::write(
+        app.join("theirs.svg"),
+        "<!-- Chat's logo, MPL-2.0, unmodified. -->\n<svg/>\n",
+    )
+    .unwrap();
+    fs::write(
+        app.join("gpl.svg"),
+        "<!-- From a theme, GPL-3.0-or-later. -->\n<svg/>\n",
+    )
+    .unwrap();
+    fs::write(
+        app.join("stack.yaml"),
+        "# Chat's stack, CC-BY-4.0, as KubaOS runs it.\nservices: {}\n",
+    )
+    .unwrap();
+    fs::write(
+        app.join("logo.svg"),
+        "<!-- Chat's icon, Chat Inc.'s trademark, used to identify the app: https://chat.example/favicon.svg. -->\n<svg/>\n",
+    )
+    .unwrap();
+    fs::write(
+        app.join("unsourced.svg"),
+        "<!-- Chat's icon, Chat Inc.'s trademark, used to identify the app. -->\n<svg/>\n",
+    )
+    .unwrap();
+    fs::write(app.join("up"), "#!/bin/sh\n# up: start it.\nexit 0\n").unwrap();
+
+    let problems = licence_problems(root.path());
+
+    assert_eq!(
+        problems,
+        [
+            "apps/chat/bare.svg: its header comment names no licence",
+            "apps/chat/gpl.svg: GPL-3.0-or-later, whose text isn't in LICENSES/GPL-3.0-or-later.txt",
+            "apps/chat/stack.yaml: CC-BY-4.0, whose text isn't in LICENSES/CC-BY-4.0.txt",
+            "apps/chat/unsourced.svg: its header comment names no licence",
+        ]
+    );
+}
+
+#[test]
+fn a_tar_xz_download_needs_no_step_installing_xz_as_every_machine_has_it() {
+    // tar's --xz runs xz, which the base installs on every machine: a group that is always on,
+    // for both architectures, from Ubuntu's archive. The catalog check asks for no apt step of
+    // xz-utils before a `tar-xz` download, as it asks for zstd's before a `tar-zst` one.
+    let manifest = Manifest::read(&repo_root().join(MANIFEST)).unwrap().unwrap();
+
+    let base = manifest.groups().iter().find(|g| {
+        g.packages.iter().any(|p| p == "xz-utils") && g.optional.is_none() && g.arch.is_none() && g.repo.is_none()
+    });
+
+    assert!(
+        base.is_some(),
+        "no group of {MANIFEST} installs xz-utils on every machine"
+    );
 }

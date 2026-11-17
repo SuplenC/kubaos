@@ -1,0 +1,28 @@
+# ProtonUp-Qt from nixpkgs, through the User flake: 2.14.0, where upstream is at 2.16.0. Its
+# author keeps no apt repository and Ubuntu doesn't package it. It draws nothing on the GPU: it
+# downloads Wine and Proton builds into the other launchers' folders. nixpkgs builds it for amd64
+# alone.
+# https://davidotek.github.io/protonup-qt/
+name = "ProtonUp-Qt"
+category = "games"
+tags = ["games", "proton", "ge-proton", "wine", "compatibility", "lutris", "heroic"]
+summary = "Downloads GE-Proton and friends for your launchers. For when Valve's Proton almost works."
+# Its AppStream metainfo is under the FSF's all-permissive licence, which asks for its notice with
+# every copy, so this is ours.
+description = """\
+ProtonUp-Qt installs and updates the Wine- and Proton-based compatibility tools that run Windows \
+games on Linux, GE-Proton, Wine-GE, Luxtorpeda and others, into the folders of the launchers \
+that use them: Steam, Lutris, Heroic and Bottles."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), the name its desktop entry gives, so the
+# Command menu shows it before the package is installed.
+icon = "net.davidotek.pupgui2"
+keeps = """\
+The compatibility tools you installed stay in the launchers' folders, which they belong to, and \
+ProtonUp-Qt's settings in ~/.config/pupgui: install it again and they're there."""
+
+[[action]]
+name = "Install ProtonUp-Qt"
+kind = "nix"
+arch = "amd64"
+packages = ["protonup-qt"]

@@ -1,0 +1,6 @@
+Types: deb
+URIs: http://linux.dropbox.com/ubuntu
+Suites: resolute
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/dropbox.gpg

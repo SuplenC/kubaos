@@ -1,0 +1,48 @@
+# Logseq from the AppImage of its GitHub release, pinned to the sha256 its SHA256SUMS.txt
+# publishes (and GitHub's own digest of the asset). Logseq keeps no apt repository and Ubuntu
+# doesn't package it; nixpkgs' is 0.10, the release before Logseq 2.0. The AppImage updates itself
+# where it lies (electron-updater, resources/app-update.yml, from the same releases), so the
+# download is `self_updates`: a new pin reaches new installs only. Its runtime mounts it with
+# whichever fusermount is on PATH, FUSE 3's here. The desktop entry is ours, not the AppImage's:
+# its Exec runs the AppImage, its Icon is Colloid's.
+# https://github.com/logseq/logseq/releases/tag/2.0.2
+name = "Logseq"
+category = "office"
+tags = ["notes", "outliner", "journal", "knowledge base", "markdown", "org"]
+summary = "An outline of bullets that link to other bullets. Every thought a block, every block a rabbit hole."
+# Its AppStream metainfo is under the FSF's all-permissive licence, which asks for its notice with
+# every copy, so this is ours.
+description = """\
+Logseq is a privacy-first, open source outliner for notes and knowledge. Every note is a block \
+in an outline, linked to other blocks and pages, with a journal for each day, queries, \
+flashcards and a whiteboard. Its graphs are kept on this machine, as a database or as folders of \
+Markdown and Org files."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# AppImage is there.
+icon = "logseq"
+keeps = """\
+Your graphs stay where Logseq keeps them, in ~/logseq or the folders you picked, and its settings \
+in ~/.config/Logseq and ~/.logseq: install Logseq again and it opens them."""
+
+[[action]]
+name = "Install FUSE, which the AppImage mounts itself with"
+kind = "apt"
+packages = ["fuse3"]
+
+[[action]]
+name = "Download Logseq"
+kind = "download"
+to = "~/.local/opt/logseq/Logseq.AppImage"
+version = "2.0.2"
+unpack = "file"
+self_updates = true
+amd64 = { url = "https://github.com/logseq/logseq/releases/download/2.0.2/Logseq-linux-x86_64-2.0.2.AppImage", sha256 = "1335725626f6cbfbf3b00b7743a60356d2d7dad123cf00bbf974a9beef556870" }
+arm64 = { url = "https://github.com/logseq/logseq/releases/download/2.0.2/Logseq-linux-arm64-2.0.2.AppImage", sha256 = "371d1c9e66e6ade39e71bc60ab4d49458c83812f143b939ae26ba39663651634" }
+
+[[action]]
+name = "Put Logseq in the Command menu"
+kind = "file"
+to = "~/.local/share/applications/logseq.desktop"
+from = "logseq.desktop"
+template = true

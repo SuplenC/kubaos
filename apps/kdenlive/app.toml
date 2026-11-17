@@ -1,0 +1,29 @@
+# Kdenlive from Ubuntu's archive, 25.12.3. Kdenlive's PPA has no build for 26.04, and nixpkgs'
+# 26.04.3 is a release ahead, not worth a KDE app outside the system's Qt, theme and drivers. It
+# renders through MLT and Ubuntu's FFmpeg, every common codec, and decodes on the GPU through
+# VA-API. Of what the package recommends, the step takes frei0r's and SWH's effects, which most of
+# its video and audio effects are, and mediainfo, which reads a clip's details.
+# https://kdenlive.org/download/
+name = "Kdenlive"
+category = "media"
+tags = ["video", "editor", "nle", "timeline", "effects", "kde"]
+summary = "KDE's video editor: tracks, effects, titles, proxies. The render bar is where evenings go."
+# From its AppStream metainfo, CC0-1.0 (KDE/kdenlive), its first paragraph.
+description = """\
+Kdenlive is a video editing application with support for many audio and video formats. It offers \
+advanced editing features, a variety of effects and transitions, color correction, audio \
+post-production and subtitling tools. Additionally, it provides the flexibility to render into \
+practically any format of your choice."""
+description_from = "https://invent.kde.org/multimedia/kdenlive/-/blob/v25.12.3/data/org.kde.kdenlive.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "org.kde.kdenlive"
+keeps = """\
+Your projects stay where you saved them, Kdenlive's settings in ~/.config/kdenliverc and its \
+effects, titles and render presets in ~/.local/share/kdenlive: install Kdenlive again and \
+they're all there."""
+
+[[action]]
+name = "Install Kdenlive"
+kind = "apt"
+packages = ["kdenlive", "frei0r-plugins", "swh-plugins", "mediainfo"]

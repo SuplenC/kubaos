@@ -1,0 +1,26 @@
+# LocalSend from nixpkgs, through the User flake: 1.17.0, where upstream is at 1.18.2. LocalSend
+# keeps no apt repository and Ubuntu doesn't package it; nixpkgs builds it for amd64 and arm64.
+# While it's open it listens on TCP 53317 on every network (HTTPS, with a certificate of its own)
+# and finds other devices through multicasts to 224.0.0.167, UDP 53317; a file someone sends lands
+# only once you accept it, unless you turn Quick Save on. Nothing listens while it's closed.
+# https://search.nixos.org/packages?show=localsend
+name = "LocalSend"
+category = "system"
+tags = ["share", "files", "airdrop", "transfer", "local network"]
+summary = "AirDrop for everything that isn't an iPhone. Files cross your network, not somebody's cloud."
+# From its AppStream metainfo, CC0-1.0 (flathub/org.localsend.localsend_app).
+description = """\
+This app allows you to send files and messages over the local LAN network. In contrast to most \
+alternatives, no external servers are needed. Everything happens locally in the wifi network."""
+description_from = "https://github.com/flathub/org.localsend.localsend_app/blob/master/org.localsend.localsend_app.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "localsend"
+keeps = """\
+Your settings and this device's name stay in ~/.local/share/org.localsend.localsend_app, and what \
+you received where you saved it: install LocalSend again and it's the same device."""
+
+[[action]]
+name = "Install LocalSend"
+kind = "nix"
+packages = ["localsend"]

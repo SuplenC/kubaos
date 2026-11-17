@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Exits 0 when wireshark-common's debconf question needs no answer of ours: it is answered yes, or
+# the user answered it, yes or no (its `seen` flag; an install with no one to ask leaves it unseen).
+# Usage: ./captures
+set -euo pipefail
+ask() { echo "$1" | debconf-communicate wireshark-common || true; }
+[[ "$(ask 'GET wireshark-common/install-setuid')" == '0 true' ]] && exit 0
+[[ "$(ask 'FGET wireshark-common/install-setuid seen')" == '0 true' ]]

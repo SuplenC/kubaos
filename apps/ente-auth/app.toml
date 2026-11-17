@@ -1,0 +1,27 @@
+# Ente Auth from nixpkgs, through the User flake, built from Ente's source: 4.4.17, where Ente's
+# release is 4.4.26. Ente keeps no apt repository and Ubuntu's archive has none, so nixpkgs comes
+# before the release's .deb, which is amd64's alone; nixpkgs builds it for amd64 and arm64.
+# https://search.nixos.org/packages?show=ente-auth
+name = "Ente Auth"
+category = "security"
+tags = ["2fa", "totp", "otp", "authenticator", "ente", "encrypted"]
+summary = "Your 2FA codes, end-to-end encrypted and synced. A lost phone stops being a lockout."
+# From its AppStream metainfo, CC0-1.0 (ente-io/ente), without the line that speaks as Ente.
+description = """\
+Auth provides end-to-end encrypted cloud backups so you don't have to worry about losing your \
+tokens. Auth has an app for every platform. Mobile, desktop and web. Your codes sync across all \
+your devices, end-to-end encrypted. Auth also comes with Offline mode, tags, icons, pins, \
+import/export and more"""
+description_from = "https://github.com/ente-io/ente/blob/auth-v4.4.26/mobile/apps/auth/linux/packaging/enteauth.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "ente_auth"
+keeps = """\
+Your codes live in your Ente account, end-to-end encrypted, and this machine's sign-in and \
+settings stay in ~/.local/share/io.ente.auth and your keyring: install Ente Auth again and \
+it's still signed in."""
+
+[[action]]
+name = "Install Ente Auth"
+kind = "nix"
+packages = ["ente-auth"]

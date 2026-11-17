@@ -1,0 +1,28 @@
+# Joplin from nixpkgs, through the User flake. Joplin keeps no apt repository, Ubuntu doesn't
+# package it, and its own installer is a script piped into a shell.
+# https://joplinapp.org/help/install/
+name = "Joplin"
+category = "office"
+tags = ["notes", "markdown", "to-do", "sync", "evernote"]
+summary = "Notes and to-dos, synced through a cloud you already pay for. Evernote, minus the paywall."
+# From its AppStream metainfo, CC0-1.0 (flathub/net.cozic.joplin_desktop), its first and third
+# paragraphs.
+description = """\
+Joplin is a free, open source note taking and to-do application, which can handle a large number \
+of notes organised into notebooks. The notes are searchable, can be copied, tagged and modified \
+either from the applications directly or from your own text editor. The notes are in Markdown \
+format. The notes can be synchronised with various cloud services including Nextcloud, Dropbox, \
+OneDrive, WebDAV or the file system (for example with a network directory). When synchronising \
+the notes, notebooks, tags and other metadata are saved to plain text files which can be easily \
+inspected, backed up and moved around."""
+description_from = "https://github.com/flathub/net.cozic.joplin_desktop/blob/master/net.cozic.joplin_desktop.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "joplin"
+keeps = """\
+Your notes, notebooks and settings stay in ~/.config/joplin-desktop: install Joplin again and \
+they're all there."""
+
+[[action]]
+name = "Install Joplin"
+kind = "nix"
+packages = ["joplin-desktop"]

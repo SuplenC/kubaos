@@ -1,0 +1,7 @@
+# Installed to /etc/apt/preferences.d/kubaos-onlyoffice by ONLYOFFICE's app (apps/onlyoffice).
+# Ascensio's repository carries more than the editors, among them a ttf-mscorefonts-installer
+# newer than Ubuntu's, which apt would otherwise take from it. Below Ubuntu's 500, a package of
+# this repository is installed and upgraded only where no other source has it.
+Package: *
+Pin: origin download.onlyoffice.com
+Pin-Priority: 100

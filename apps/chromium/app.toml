@@ -1,0 +1,23 @@
+# Chromium from nixpkgs, through the User flake. Ubuntu's chromium-browser only installs the
+# snap, and the Chromium project publishes no build of its own for Linux.
+# https://search.nixos.org/packages?show=chromium
+name = "Chromium"
+category = "browsers"
+tags = ["browser", "web", "internet", "open source"]
+summary = "Chrome without Google's logo and with a bit less Google. Only a bit, mind."
+# From its AppStream metainfo, CC0-1.0, without the line that speaks as the project.
+description = """\
+Chromium is an open-source browser project that aims to build a safer, faster, and more stable \
+way to experience the web."""
+description_from = "https://github.com/flathub/org.chromium.Chromium/blob/master/org.chromium.Chromium.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "chromium"
+keeps = """\
+Your profile (bookmarks, passwords, history) stays in ~/.config/chromium: install Chromium again \
+and it's all there."""
+
+[[action]]
+name = "Install Chromium"
+kind = "nix"
+packages = ["chromium"]

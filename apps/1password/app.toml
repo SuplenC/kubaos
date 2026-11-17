@@ -1,0 +1,44 @@
+# 1Password and its CLI from AgileBits' signed apt repository, whose key system/packages.toml pins
+# ([repo.1password]). 1Password builds the app for amd64 only. Its postinst writes the repository's
+# sources file and fetches its key again on every install and upgrade; the one KubaOS writes is the
+# same, word for word, at the same paths. The postinst also makes the setgid groups of its browser
+# helper and MCP server, fills in the polkit policy that lets your login password unlock it and
+# authorize the CLI and SSH agent (/usr/share/polkit-1/actions/com.1password.1Password.policy,
+# naming the machine's first ten users, which its removal takes away), and writes a debsig policy
+# and an example browser allowlist it never removes: the first step makes the groups before the
+# packages do and, as it is undone after them, takes those away. Browser integration works with
+# the browsers 1Password knows (Chrome, Firefox, Edge, Brave); any other, LibreWolf or Vivaldi,
+# goes in /etc/1password/custom_allowed_browsers by its program's name, as 1Password's
+# documentation says.
+# The CLI talks to the app once "Integrate with 1Password CLI" is on in its Developer settings.
+# https://support.1password.com/install-linux/
+name = "1Password"
+category = "security"
+tags = ["passwords", "password manager", "passkeys", "ssh", "vault", "cli"]
+summary = "Passwords, passkeys and SSH keys behind the one password you'll remember. Billed yearly."
+# From its AppStream metainfo, CC0-1.0 (flathub/com.onepassword.OnePassword).
+description = """\
+1Password remembers your passwords for you, and keeps them safe and secure behind the one \
+password that only you know."""
+description_from = "https://github.com/flathub/com.onepassword.OnePassword/blob/master/com.onepassword.OnePassword.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "1password"
+keeps = """\
+Your vaults live in your 1Password account, and this machine's sign-in and settings stay in \
+~/.config/1Password: install 1Password again and it's still signed in."""
+
+[[action]]
+name = "Make the groups of 1Password's helpers"
+kind = "run"
+root = true
+do = ["./groups"]
+check = ["./grouped"]
+undo = ["./ungroup", "/"]
+
+[[action]]
+name = "Install 1Password and its CLI"
+kind = "apt"
+repo = "1password"
+arch = "amd64"
+packages = ["1password", "1password-cli"]

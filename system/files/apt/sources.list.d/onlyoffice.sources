@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://download.onlyoffice.com/repo/debian
+Suites: squeeze
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/onlyoffice.gpg

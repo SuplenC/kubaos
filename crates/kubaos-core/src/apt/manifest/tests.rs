@@ -123,6 +123,50 @@ fn a_script_on_a_group_that_cant_be_turned_off_is_refused() {
 }
 
 #[test]
+fn a_repos_next_key_is_all_three_of_its_keys_or_none() {
+    let repo = "[repo.v]\nkey_url = \"https://v/k\"\nfingerprint = \"AB\"\nkeyring = \"/etc/apt/keyrings/v.gpg\"\n";
+    let whole = format!(
+        "{repo}next_key_url = \"https://v/n\"\nnext_fingerprint = \"CD\"\nnext_keyring = \"/etc/apt/keyrings/v-next.gpg\"\n"
+    );
+    let half = format!("{repo}next_fingerprint = \"CD\"\n");
+
+    let manifest = Manifest::parse(&whole).unwrap();
+    let err = Manifest::parse(&half).unwrap_err();
+
+    let keyrings: Vec<&str> = manifest.repos()["v"].keyrings().collect();
+    assert_eq!(keyrings, ["/etc/apt/keyrings/v.gpg", "/etc/apt/keyrings/v-next.gpg"]);
+    assert!(matches!(err, ManifestError::HalfNextKey { ref repo } if repo == "v"));
+}
+
+#[test]
+fn a_repos_global_keyring_is_a_file_name_of_trusted_gpg_d() {
+    let repo = "[repo.v]\nkey_url = \"https://v/k\"\nfingerprint = \"AB\"\nkeyring = \"/etc/apt/keyrings/v.gpg\"\n";
+    let good = format!("{repo}global_keyrings = [\"v.gpg\", \"v-old.asc\"]\nglobal_fingerprints = [\"CD\"]\n");
+
+    let manifest = Manifest::parse(&good).unwrap();
+
+    assert_eq!(manifest.repos()["v"].global_keyrings, ["v.gpg", "v-old.asc"]);
+    for bad in [
+        "../sources.list",
+        "/etc/apt/trusted.gpg",
+        "v",
+        ".gpg",
+        "sub/v.gpg",
+        ".v.gpg",
+        "v w.gpg",
+        "*.gpg",
+        "v$x.gpg",
+        "v\tw.gpg",
+    ] {
+        let err = Manifest::parse(&format!("{repo}global_keyrings = [\"{bad}\"]\n")).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::InvalidGlobalKeyring { ref name, .. } if name == bad),
+            "{bad}: {err}"
+        );
+    }
+}
+
+#[test]
 fn an_unknown_key_is_refused() {
     let text = "[group.x]\nsummary = \"x\"\npakages = [\"curl\"]\npackages = []\n";
 
@@ -174,12 +218,30 @@ fn the_release_manifest_parses_and_each_repo_has_its_sources_file() {
 fn rust_dump(manifest: &Manifest) -> BTreeSet<String> {
     let mut lines = BTreeSet::new();
     for (name, repo) in manifest.repos() {
+        let next = [
+            ("next_key_url", &repo.next_key_url),
+            ("next_fingerprint", &repo.next_fingerprint),
+            ("next_keyring", &repo.next_keyring),
+        ]
+        .into_iter()
+        .filter_map(|(key, value)| Some((key, value.as_ref()?)));
         for (key, value) in [
             ("key_url", &repo.key_url),
             ("fingerprint", &repo.fingerprint),
             ("keyring", &repo.keyring),
-        ] {
+        ]
+        .into_iter()
+        .chain(next)
+        {
             lines.insert(format!("repo.{name}\t{key}\t{value}"));
+        }
+        for (key, values) in [
+            ("global_keyrings", &repo.global_keyrings),
+            ("global_fingerprints", &repo.global_fingerprints),
+        ] {
+            for value in values {
+                lines.insert(format!("repo.{name}\t{key}\t{value}"));
+            }
         }
     }
     for group in manifest.groups() {
@@ -250,4 +312,88 @@ fn the_scripts_read_comments_inline_arrays_and_split_arrays_as_the_updater_does(
     std::fs::write(&path, SMALL).unwrap();
 
     assert_eq!(shell_dump(&path), rust_dump(&Manifest::parse(SMALL).unwrap()));
+}
+
+#[test]
+fn a_repo_is_in_place_once_its_own_sources_file_is_signed_by_its_primary_keyring_and_no_other_and_they_are_there() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let text = "[repo.v]\nkey_url = \"https://v/k\"\nfingerprint = \"AB\"\nkeyring = \"/etc/apt/keyrings/v.gpg\"\n";
+    let manifest = Manifest::parse(text).unwrap();
+    let repo = &manifest.repos()["v"];
+    let sources = root.join("etc/apt/sources.list.d");
+    std::fs::create_dir_all(&sources).unwrap();
+    std::fs::create_dir_all(root.join("etc/apt/keyrings")).unwrap();
+    let ours = "Types: deb\nURIs: https://v/apt\nSigned-By: /etc/apt/keyrings/v.gpg\n";
+
+    assert!(!repo.in_place("v", root), "nothing there");
+    std::fs::write(sources.join("v.list"), "deb https://v/apt stable main\n").unwrap();
+    assert!(!repo.in_place("v", root), "the vendor's own list");
+    std::fs::write(
+        sources.join("v.sources"),
+        "Types: deb\nURIs: https://v/apt\nSigned-By: /usr/share/keyrings/v.asc\n",
+    )
+    .unwrap();
+    std::fs::write(root.join("etc/apt/keyrings/v.gpg"), "key").unwrap();
+    assert!(
+        !repo.in_place("v", root),
+        "the vendor's own sources file, its keyring another"
+    );
+    std::fs::write(sources.join("v.sources"), ours).unwrap();
+    assert!(repo.in_place("v", root));
+    std::fs::remove_file(root.join("etc/apt/keyrings/v.gpg")).unwrap();
+    assert!(!repo.in_place("v", root), "its keyring gone");
+
+    let next = format!(
+        "{text}next_key_url = \"https://v/k2\"\nnext_fingerprint = \"CD\"\nnext_keyring = \"/etc/apt/keyrings/v-next.gpg\"\n"
+    );
+    let manifest = Manifest::parse(&next).unwrap();
+    let repo = &manifest.repos()["v"];
+    std::fs::write(root.join("etc/apt/keyrings/v.gpg"), "key").unwrap();
+    std::fs::write(root.join("etc/apt/keyrings/v-next.gpg"), "key").unwrap();
+    assert!(
+        repo.in_place("v", root),
+        "signed by its key alone, as a vendor writes the file again"
+    );
+    let both = "Types: deb\nURIs: https://v/apt\nSigned-By: /etc/apt/keyrings/v.gpg /etc/apt/keyrings/v-next.gpg\n";
+    std::fs::write(sources.join("v.sources"), both).unwrap();
+    assert!(repo.in_place("v", root));
+    std::fs::write(
+        sources.join("v.sources"),
+        "Types: deb\nURIs: https://v/apt\nSigned-By: /etc/apt/keyrings/v-next.gpg\n",
+    )
+    .unwrap();
+    assert!(!repo.in_place("v", root), "not signed by its primary key");
+    std::fs::write(root.join("etc/apt/keyrings/stray.gpg"), "key").unwrap();
+    std::fs::write(
+        sources.join("v.sources"),
+        "Types: deb\nURIs: https://v/apt\nSigned-By: /etc/apt/keyrings/v.gpg /etc/apt/keyrings/stray.gpg\n",
+    )
+    .unwrap();
+    assert!(!repo.in_place("v", root), "a vendor's stray key");
+    std::fs::write(sources.join("v.sources"), format!("{both}Enabled: no\n")).unwrap();
+    assert!(!repo.in_place("v", root), "turned off");
+    std::fs::write(sources.join("v.sources"), both).unwrap();
+    std::fs::remove_file(root.join("etc/apt/keyrings/v-next.gpg")).unwrap();
+    assert!(!repo.in_place("v", root), "a keyring it names gone");
+}
+
+#[test]
+fn every_shipped_repo_is_in_place_once_repo_setup_wrote_its_sources_file_and_keys() {
+    let manifest = Manifest::read(&repo_root().join(MANIFEST)).unwrap().unwrap();
+    for (name, repo) in manifest.repos() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let sources = root.join("etc/apt/sources.list.d");
+        std::fs::create_dir_all(&sources).unwrap();
+        let shipped = repo_root().join(format!("system/files/apt/sources.list.d/{name}.sources"));
+        std::fs::copy(&shipped, sources.join(format!("{name}.sources"))).unwrap();
+        for keyring in repo.keyrings() {
+            let at = root.join(keyring.trim_start_matches('/'));
+            std::fs::create_dir_all(at.parent().unwrap()).unwrap();
+            std::fs::write(at, "key").unwrap();
+        }
+
+        assert!(repo.in_place(name, root), "{name}");
+    }
 }

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Ready: JetBrains Toolbox isn't running for this user.
+set -euo pipefail
+! pgrep -u "$(id -u)" -f '/JetBrains/Toolbox/bin/jetbrains-toolbox' >/dev/null

@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://repository.spotify.com
+Suites: stable
+Components: non-free
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/spotify.gpg

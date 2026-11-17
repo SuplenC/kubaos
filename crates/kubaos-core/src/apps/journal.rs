@@ -183,8 +183,10 @@ impl State {
 
 /// One thing a step changed or found: `path:/…`, `dir:/…` (a folder it made for a path),
 /// `key:<file>#<key>`, `package:<name>`, `dep:<name>` (a package apt pulled in for the step's),
-/// `nix:<name>`, `member:<group>:<user>`, `group:<name>`, `unit:<scope>:<name>`, `linger:<user>`
-/// or `run`.
+/// `nix:<name>`, `member:<group>:<user>`, `group:<name>`, `unit:<scope>:<name>`, `linger:<user>`,
+/// `arch:<architecture>` (one dpkg takes packages of beside the machine's), `brought:<name>` (on an
+/// `architecture` step, never owned: a package another step of the app installed or pulled in,
+/// whose own entry went), `dkms:<module>/<version>` (a module in DKMS's tree) or `run`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Claim {
@@ -330,8 +332,8 @@ impl Journal {
         Ok(journals)
     }
 
-    /// Writes it whole, through a file renamed into place; with no entries and not complete, takes
-    /// it and its folder away instead.
+    /// Writes it whole, through a file renamed into place; with no entries, not complete and
+    /// brought by no app, takes it and its folder away instead.
     ///
     /// # Errors
     ///
@@ -342,7 +344,7 @@ impl Journal {
             path: path.clone(),
             source,
         };
-        if self.entries.is_empty() && !self.complete {
+        if self.entries.is_empty() && !self.complete && self.brought_by.is_empty() {
             return Self::forget(dir, &self.app);
         }
         let folder = dir.join(&self.app);
@@ -434,8 +436,12 @@ impl Owners {
     }
 
     /// The app other than `app` that holds `claim` without owning it: the one it passes to when
-    /// `app` goes.
+    /// `app` goes. A `run` claim is its step's own, never another app's, though every app's is
+    /// spelt the same.
     pub fn holder<'a>(&'a self, claim: &str, app: &'a str) -> Option<&'a str> {
+        if claim == "run" {
+            return None;
+        }
         self.others(app)
             .find(|(_, c)| !c.owned && c.claim == claim)
             .map(|(id, _)| id)
@@ -485,23 +491,101 @@ pub fn write_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
 /// # Errors
 ///
 /// [`JournalError`] when that journal can't be read or written.
-pub fn hand_over(dir: &Path, holder: &str, claim: &str, prior: &Prior) -> Result<bool, JournalError> {
+pub fn hand_over(dir: &Path, holder: &str, claim: &str, prior: &Prior) -> Result<Option<Prior>, JournalError> {
     let Some(mut journal) = Journal::read(dir, holder)? else {
-        return Ok(false);
+        return Ok(None);
     };
-    let mut found = false;
+    let mut had = None;
     for entry in &mut journal.entries {
         if let Some(c) = entry.claims.iter_mut().find(|c| c.claim == claim && !c.owned) {
             c.owned = true;
+            had = Some(entry.prior.clone());
             entry.prior.take_from(prior);
-            found = true;
             break;
         }
     }
-    if found {
+    if had.is_some() {
         journal.save(dir)?;
     }
-    Ok(found)
+    Ok(had)
+}
+
+/// Takes back from the app `holder`'s journal in `dir` the claim `claim` a [`hand_over`] gave it:
+/// its step finds it again, with `prior`, the prior state it had before. A claim the holder
+/// doesn't own, or a holder with no journal, is left as it is.
+///
+/// # Errors
+///
+/// [`JournalError`] when that journal can't be read or written.
+pub fn give_back(dir: &Path, holder: &str, claim: &str, prior: &Prior) -> Result<(), JournalError> {
+    let Some(mut journal) = Journal::read(dir, holder)? else {
+        return Ok(());
+    };
+    for entry in &mut journal.entries {
+        if let Some(c) = entry.claims.iter_mut().find(|c| c.claim == claim && c.owned) {
+            c.owned = false;
+            entry.prior = prior.clone();
+            return journal.save(dir);
+        }
+    }
+    Ok(())
+}
+
+/// What a mark beside the journals in `dir` that the app `id`'s last removal was rolled back is
+/// named: a file of its own beside the journal, as `journal.toml` refuses keys it doesn't know and
+/// a release before it would fail to read a journal with one.
+const ROLLED_BACK_MARK: &str = "-removal-rolled-back";
+
+/// An app's last removal, which couldn't undo a step and was rolled back.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct RolledBack {
+    /// Every step it undid stands again. Not so while the rollback runs, or when a step couldn't
+    /// be done again: the next update finishes it.
+    pub whole: bool,
+    /// The step it couldn't undo, and why.
+    pub why: String,
+}
+
+/// The first line of a mark of a rollback that put everything back; any other is one that
+/// didn't, or is still running.
+const WHOLE: &str = "whole";
+
+/// The app `id`'s last removal, rolled back, by the mark beside the user journals in `dir`. None
+/// when it wasn't, or the mark can't be read.
+pub fn rolled_back(dir: &Path, id: &str) -> Option<RolledBack> {
+    let text = fs::read_to_string(dir.join(format!("{id}{ROLLED_BACK_MARK}"))).ok()?;
+    let (first, why) = text.split_once('\n').unwrap_or((text.as_str(), ""));
+    Some(RolledBack {
+        whole: first == WHOLE,
+        why: why.trim_end().to_owned(),
+    })
+}
+
+/// Marks beside the user journals in `dir` that the app `id`'s last removal was rolled back, as
+/// `rolled`; `None` takes the mark away.
+///
+/// # Errors
+///
+/// [`JournalError::Write`] when the mark can't be written or taken away.
+pub fn mark_rolled_back(dir: &Path, id: &str, rolled: Option<&RolledBack>) -> Result<(), JournalError> {
+    let path = dir.join(format!("{id}{ROLLED_BACK_MARK}"));
+    let write = |source| JournalError::Write {
+        path: path.clone(),
+        source,
+    };
+    match rolled {
+        Some(rolled) => {
+            fs::create_dir_all(dir).map_err(write)?;
+            let tmp = dir.join(format!(".{id}{ROLLED_BACK_MARK}.new"));
+            let first = if rolled.whole { WHOLE } else { "part" };
+            write_new(&tmp, format!("{first}\n{}\n", rolled.why).as_bytes()).map_err(write)?;
+            fs::rename(&tmp, &path).map_err(write)
+        }
+        None => match fs::remove_file(&path) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => Err(write(e)),
+            _ => Ok(()),
+        },
+    }
 }
 
 /// Takes the lock at `path`, which one run holds while it changes the machine's apps.

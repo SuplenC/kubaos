@@ -1,0 +1,27 @@
+# Brave from nixpkgs, through the User flake. Brave's apt repository needs its brave-keyring
+# package, which either links Brave's keys into /etc/apt/trusted.gpg.d, trusting them for every
+# repository, or, when the source names its own keyring, deletes that keyring as it is removed,
+# leaving a source apt can't verify: neither keeps the pinned key. Ubuntu doesn't package Brave.
+# https://search.nixos.org/packages?show=brave
+name = "Brave"
+category = "browsers"
+tags = ["browser", "web", "internet", "chromium", "ad blocker", "privacy"]
+summary = "Chromium that blocks the ads, then tries to sell you crypto. Turn that shit off first."
+# From its AppStream metainfo, CC0-1.0.
+description = """\
+Brave is on a mission to fix the web by giving users a safer, faster and better browsing \
+experience while growing support for content creators through a new attention-based ecosystem \
+of rewards. Browse faster by blocking ads and trackers that violate your privacy and cost you \
+time and money."""
+description_from = "https://github.com/flathub/com.brave.Browser/blob/master/com.brave.Browser.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "brave-browser"
+keeps = """\
+Your profile (bookmarks, passwords, history) stays in ~/.config/BraveSoftware: install Brave \
+again and it's all there."""
+
+[[action]]
+name = "Install Brave"
+kind = "nix"
+packages = ["brave"]

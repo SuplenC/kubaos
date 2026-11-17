@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://repo.steampowered.com/steam/
+Suites: stable
+Components: steam
+Architectures: amd64 i386
+Signed-By: /etc/apt/keyrings/steam.gpg /etc/apt/keyrings/steam-2025.gpg

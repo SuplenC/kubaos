@@ -1,0 +1,30 @@
+# GIMP from Ubuntu's archive: GIMP keeps no apt repository, and Ubuntu 26.04 ships the 3.2 series
+# upstream is on, kept up with security fixes, where nixpkgs is still on 3.0. apt's
+# --no-install-recommends would leave out Ghostscript, the one package GIMP recommends, which it
+# opens PDF and PostScript files with, so the step installs it.
+# https://www.gimp.org/downloads/
+name = "GIMP"
+category = "graphics"
+tags = ["image editor", "photo", "retouching", "painting", "raster", "photoshop"]
+summary = "The free photo editor. Took twenty years to get non-destructive filters, and here they are."
+# Its AppStream metainfo, CC0-1.0 (gitlab.gnome.org/GNOME/gimp).
+description = """\
+GIMP is an acronym for GNU Image Manipulation Program. It is Community-driven Free Software for \
+high-end image creation and manipulation. It has many capabilities. It can be used as a paint \
+program, an expert quality photo retouching program, image composition, an online batch \
+processing system, a mass production image renderer, an image format converter, etc. GIMP is \
+expandable and extensible. It is designed to be augmented with plug-ins and extensions to do just \
+about anything. The advanced scripting interface allows everything from the simplest task to the \
+most complex image manipulation procedures to be easily scripted."""
+description_from = "https://gitlab.gnome.org/GNOME/gimp/-/blob/GIMP_3_2_8/desktop/org.gimp.GIMP.appdata.xml.in.in.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "gimp"
+keeps = """\
+Your settings, brushes, patterns, plug-ins and scripts stay in ~/.config/GIMP: install GIMP \
+again and they're all there."""
+
+[[action]]
+name = "Install GIMP"
+kind = "apt"
+packages = ["gimp", "ghostscript"]

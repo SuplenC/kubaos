@@ -1,0 +1,25 @@
+# k9s from nixpkgs, through the User flake, at upstream's latest release. Its authors keep no apt
+# repository and Ubuntu doesn't package it.
+# https://k9scli.io/topics/install/
+name = "k9s"
+category = "development"
+tags = ["kubernetes", "k8s", "terminal", "cluster", "pods", "tui"]
+summary = "Your Kubernetes clusters in a terminal UI. Watch your pods crash in real time, in colour."
+# The opening of its README, Apache-2.0 (github.com/derailed/k9s).
+description = """\
+K9s provides a terminal UI to interact with your Kubernetes clusters. The aim of this project is \
+to make it easier to navigate, observe and manage your applications in the wild. K9s continually \
+watches Kubernetes for changes and offers subsequent commands to interact with your observed \
+resources."""
+description_from = "https://github.com/derailed/k9s/blob/v0.51.0/README.md"
+# k9s's logo, Apache-2.0, on KubaOS's tile (k9s.png's comment): k9s publishes it only as a PNG,
+# and no icon theme has k9s.
+icon = "k9s.png"
+keeps = """\
+Your k9s settings, skins and aliases stay in ~/.config/k9s, and its state in ~/.local/share/k9s \
+and ~/.local/state/k9s. Your clusters are in your kubeconfig, which was never k9s's."""
+
+[[action]]
+name = "Install k9s"
+kind = "nix"
+packages = ["k9s"]

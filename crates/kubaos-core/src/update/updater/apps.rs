@@ -24,10 +24,11 @@ use std::ffi::OsString;
 use super::UpdateError;
 use super::Updater;
 use super::release_of;
-use crate::apps;
 use crate::apps::Catalog;
 use crate::apps::Folder;
+use crate::apps::FolderSetup;
 use crate::apps::Picks;
+use crate::apps::Platform;
 use crate::apps::Status;
 use crate::apps::action::Side;
 use crate::apps::engine::Engine;
@@ -36,6 +37,7 @@ use crate::apps::engine::Keeper;
 use crate::apps::journal::Journal;
 use crate::apps::status;
 use crate::packages::Packages;
+use crate::unfree::Unfree;
 use crate::update::changelog::Changelog;
 use crate::update::event::AppChanges;
 use crate::update::event::Command;
@@ -84,7 +86,7 @@ impl<M: Machine> Updater<'_, M> {
             &picks,
             &self.user.app_journals(),
             &self.sys.app_journals(),
-            apps::arch(),
+            self.platform(),
             Some(&dpkg),
         )
         .map_err(UpdateError::AppJournal)
@@ -165,7 +167,7 @@ impl<M: Machine> Updater<'_, M> {
             Ok((lock, installed))
         })?;
         let catalog = Catalog::load(&self.sys.catalog()).map_err(UpdateError::Catalog)?;
-        let chosen = chosen_setups(&catalog, ids, change, setup)?;
+        let chosen = chosen_setups(&catalog, ids, change, setup, self.platform())?;
         let path = self.user.app_picks();
         let before = Picks::read(&path).map_err(UpdateError::Picks)?;
         let mut picks = before.clone();
@@ -189,7 +191,17 @@ impl<M: Machine> Updater<'_, M> {
         let apps = self.phase(Phase::Apps, |u| {
             let done = u.run_changes(&catalog, (&before, &picks), ids, &chosen, change);
             if done.is_err() && changed {
-                before.write(&path).map_err(UpdateError::Picks)?;
+                // The picks go back to what the machine has: an app whose removal was rolled
+                // back is there and stays picked, and one removed before the failure stays out.
+                let mut back = before.clone();
+                if change == Change::Remove {
+                    for id in ids {
+                        if !u.has_journal(id) {
+                            back.remove(id);
+                        }
+                    }
+                }
+                back.write(&path).map_err(UpdateError::Picks)?;
             }
             done
         })?;
@@ -217,6 +229,13 @@ impl<M: Machine> Updater<'_, M> {
         };
         self.j.emit(&UpdateEvent::Summary(summary));
         Ok(())
+    }
+
+    /// Whether either side has a journal of the app `id`: it is on the machine, or partly.
+    fn has_journal(&self, id: &str) -> bool {
+        [self.user.app_journals(), self.sys.app_journals()]
+            .iter()
+            .any(|dir| !matches!(Journal::read(dir, id), Ok(None)))
     }
 
     /// Installs, removes or configures each app of `ids`, in its `chosen` setup, through pkexec,
@@ -300,7 +319,9 @@ impl<M: Machine> Updater<'_, M> {
     /// nixpkgs packages: each step of each checked, a step not done (a picked app the machine
     /// lacks, a step a release added or changed, one the user undid) done, through sudo, with no
     /// window. An app a picked setup no longer requires, and nothing else needs, goes, listed
-    /// removed. No picks start no phase. A failure is a warning: the next update tries again.
+    /// removed. Then the key of each vendor repository the apps set up that nears its expiry is
+    /// fetched again, in the same root session, which a run with none due never starts. No picks
+    /// start no phase. A failure is a warning: the next update tries again.
     pub(super) fn reconcile_apps(&mut self) -> AppChanges {
         let picks = match Picks::read(&self.user.app_picks()) {
             Ok(picks) => picks,
@@ -319,37 +340,14 @@ impl<M: Machine> Updater<'_, M> {
                 return AppChanges::default();
             }
         };
-        for id in status::unknown(&catalog, &picks) {
-            self.j.warn(format!(
-                "{id} is picked in apps.toml, but this release's catalog has no such app"
-            ));
-        }
-        let journals = self.user.app_journals();
-        let mut wanted: Vec<(&Folder, Option<String>, bool)> = Vec::new();
-        for app in catalog.apps().iter().filter(|app| picks.has(&app.id)) {
-            let journal = Journal::read(&journals, &app.id).ok().flatten();
-            let setup = status::picked_setup(app, &picks, journal.as_ref());
-            if app.has_setups() && setup.is_none() {
-                let setups: Vec<&str> = app.setups.iter().map(|s| s.id.as_str()).collect();
-                self.j.warn(format!(
-                    "{id} is picked with no setup, so nothing installs it: kubaos app add {id} --setup <{setups}>",
-                    id = app.id,
-                    setups = setups.join("|"),
-                ));
-                continue;
-            }
-            if !catalog.available(app, setup, apps::arch()) {
-                continue;
-            }
-            let complete = journal.is_some_and(|j| j.complete);
-            wanted.push((app, setup.map(|s| s.id.clone()), complete));
-        }
+        let wanted = self.picked_apps(&catalog, &picks);
         if wanted.is_empty() {
             return AppChanges::default();
         }
         self.j.phase_start(Phase::Apps);
         let mut changes = AppChanges::default();
         let mut ok = true;
+        let mut refreshed = Vec::new();
         let ran = self.with_engine(Root::Sudo, false, |engine| {
             for (app, setup, complete) in &wanted {
                 let name = name_in(app, setup.as_deref()).to_owned();
@@ -377,6 +375,16 @@ impl<M: Machine> Updater<'_, M> {
                     }
                 }
             }
+            match engine.refresh_keys() {
+                Ok(repos) => refreshed = repos,
+                Err(e) => {
+                    ok = false;
+                    engine.warn(format!(
+                        "the app repositories' keys weren't checked: {}; the next update tries again",
+                        chain(&e)
+                    ));
+                }
+            }
             Ok::<_, UpdateError>(())
         });
         if let Err(e) = ran {
@@ -386,14 +394,60 @@ impl<M: Machine> Updater<'_, M> {
                 chain(&e)
             ));
         }
+        let mut details = Vec::new();
         if !changes.installed.is_empty() {
-            self.j.detail(format!("{} installed", changes.installed.join(", ")));
+            details.push(format!("{} installed", changes.installed.join(", ")));
         }
         if !changes.removed.is_empty() {
-            self.j.detail(format!("{} removed", changes.removed.join(", ")));
+            details.push(format!("{} removed", changes.removed.join(", ")));
+        }
+        if !refreshed.is_empty() {
+            details.push(format!("the signing key of {} fetched again", refreshed.join(", ")));
+        }
+        if !details.is_empty() {
+            self.j.detail(details.join("; "));
         }
         self.j.phase_end_optional(ok);
         changes
+    }
+
+    /// The apps of `catalog` an update installs for `picks`, each with its setup and whether its
+    /// journal says it is complete; a pick the catalog lacks, one with no setup and one this
+    /// machine can't have are warnings.
+    fn picked_apps<'c>(&mut self, catalog: &'c Catalog, picks: &Picks) -> Vec<(&'c Folder, Option<String>, bool)> {
+        for id in status::unknown(catalog, picks) {
+            self.j.warn(format!(
+                "{id} is picked in apps.toml, but this release's catalog has no such app"
+            ));
+        }
+        let journals = self.user.app_journals();
+        let platform = self.platform();
+        let mut wanted = Vec::new();
+        for app in catalog.apps().iter().filter(|app| picks.has(&app.id)) {
+            let journal = Journal::read(&journals, &app.id).ok().flatten();
+            let setup = status::picked_setup(app, picks, journal.as_ref());
+            if app.has_setups() && setup.is_none() {
+                let setups: Vec<&str> = app.setups.iter().map(|s| s.id.as_str()).collect();
+                self.j.warn(format!(
+                    "{id} is picked with no setup, so nothing installs it: kubaos app add {id} --setup <{setups}>",
+                    id = app.id,
+                    setups = setups.join("|"),
+                ));
+                continue;
+            }
+            if let Some(why) = unavailable(catalog, app, setup, platform) {
+                self.j.warn(format!("{why}, so the update leaves it"));
+                continue;
+            }
+            let complete = journal.is_some_and(|j| j.complete);
+            wanted.push((app, setup.map(|s| s.id.clone()), complete));
+        }
+        wanted
+    }
+
+    /// This machine, with the setting of the user's nixpkgs for unfree packages.
+    fn platform(&self) -> Platform<'static> {
+        Platform::this_machine(self.user.state_dir().root())
     }
 
     /// Runs `work` with the engine: this user's side in this process, root's through the helper
@@ -460,6 +514,7 @@ fn chosen_setups(
     ids: &[String],
     change: Change,
     setup: Option<&str>,
+    platform: Platform<'_>,
 ) -> Result<Vec<Option<String>>, UpdateError> {
     let mut chosen = Vec::with_capacity(ids.len());
     for id in ids {
@@ -483,11 +538,8 @@ fn chosen_setups(
                 setups: setups(),
             })?),
         };
-        if !catalog.available(app, picked, apps::arch()) {
-            return Err(UpdateError::Unavailable {
-                id: id.clone(),
-                arch: apps::arch().to_owned(),
-            });
+        if let Some(why) = unavailable(catalog, app, picked, platform) {
+            return Err(why);
         }
         chosen.push(picked.map(|s| s.id.clone()));
     }
@@ -499,4 +551,27 @@ fn chosen_setups(
         });
     }
     Ok(chosen)
+}
+
+/// Why `app` in `setup` can't install on `platform`: [`UpdateError::Unfree`] when letting unfree
+/// packages in would do, else [`UpdateError::Unavailable`]; `None` when it can.
+fn unavailable(
+    catalog: &Catalog,
+    app: &Folder,
+    setup: Option<&FolderSetup>,
+    platform: Platform<'_>,
+) -> Option<UpdateError> {
+    if catalog.available(app, setup, platform) {
+        return None;
+    }
+    Some(
+        if catalog.available(app, setup, Platform::new(platform.arch, Unfree::Allowed)) {
+            UpdateError::Unfree { id: app.id.clone() }
+        } else {
+            UpdateError::Unavailable {
+                id: app.id.clone(),
+                arch: platform.arch.to_owned(),
+            }
+        },
+    )
 }

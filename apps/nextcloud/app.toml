@@ -1,0 +1,39 @@
+# The Nextcloud desktop client from ppa:nextcloud-devs/client, the PPA of its developers, whose key
+# system/packages.toml pins ([repo.nextcloud]): 35.0, where Ubuntu's archive has 4.0. It builds the
+# client for amd64 only on 26.04 (its arm64 index has the translations and file manager plugins
+# alone). Its package writes no source of its own, and needs none of the file managers'
+# integrations it suggests. It keeps its account passwords in the keyring (gnome-keyring, the
+# base's). It writes its own start-at-login entry, ~/.config/autostart/Nextcloud.desktop, as it
+# first starts; the second step makes it the app's, so a removal takes it, while an entry already
+# there stays.
+# https://launchpad.net/~nextcloud-devs/+archive/ubuntu/client
+name = "Nextcloud"
+category = "system"
+tags = ["sync", "files", "cloud", "self-hosted", "nextcloud"]
+summary = "Syncs your folders with your own Nextcloud. Dropbox for people who run a server, and mention it."
+# Its AppStream metainfo is under BSD-2-Clause (its .license file), which asks for its notice with
+# every copy, so this is ours.
+description = """\
+The Nextcloud desktop client keeps folders on this machine in sync with your Nextcloud server: \
+a file you add, change or delete on either side does the same on the other, and on every other \
+device signed in to the account. It can keep files online only, downloaded as you open them, and \
+runs from the tray."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), the name Nextcloud's package gives, so the
+# Command menu shows it before the package is installed.
+icon = "com.nextcloud.desktopclient.nextcloud"
+keeps = """\
+Your synced folders stay where you put them, the accounts and settings in ~/.config/Nextcloud, \
+and their passwords in your keyring: install Nextcloud again and it's still signed in."""
+
+[[action]]
+name = "Install Nextcloud"
+kind = "apt"
+repo = "nextcloud"
+arch = "amd64"
+packages = ["nextcloud-desktop"]
+
+[[action]]
+name = "Make room for Nextcloud's start-at-login entry"
+kind = "output"
+path = "~/.config/autostart/Nextcloud.desktop"

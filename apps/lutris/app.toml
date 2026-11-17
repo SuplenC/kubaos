@@ -1,0 +1,30 @@
+# Lutris from Ubuntu's archive (multiverse), 0.5.22, upstream's latest; its own PPA builds the same
+# release. Lutris downloads its runners itself (Wine and Proton builds, emulators, Valve's Steam
+# Linux Runtime) into the home, so the machine's Wine isn't needed. Of what the package
+# recommends, the step takes game controllers (python3-evdev), the icons and versions of Windows
+# programs (python3-pefile) and Battle.net's game list (python3-protobuf); not winetricks, whose
+# package brings Ubuntu's own Wine beside WineHQ's: Lutris fetches its own. A 32-bit Windows game
+# runs through Wine's WoW64 builds; a runner that wants 32-bit Linux libraries needs the i386
+# architecture, which KubaOS doesn't add.
+# https://lutris.net/downloads
+name = "Lutris"
+category = "games"
+tags = ["games", "launcher", "wine", "proton", "emulators", "gog", "epic", "battlenet"]
+summary = "One launcher for every store and emulator. Someone else's install script did the suffering."
+# From its AppStream metainfo, CC0-1.0 (lutris/lutris).
+description = """\
+Lutris helps you install and play video games from all eras and from most gaming systems. By \
+leveraging and combining existing emulators, engine re-implementations and compatibility layers, \
+it gives you a central interface to launch all your games."""
+description_from = "https://github.com/lutris/lutris/blob/v0.5.22/share/metainfo/net.lutris.Lutris.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "net.lutris.Lutris"
+keeps = """\
+Your games stay in ~/Games with their Wine prefixes, and Lutris's library, runners and settings \
+in ~/.local/share/lutris and ~/.config/lutris: install Lutris again and it finds them all."""
+
+[[action]]
+name = "Install Lutris"
+kind = "apt"
+packages = ["lutris", "python3-evdev", "python3-pefile", "python3-protobuf"]

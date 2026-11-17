@@ -170,6 +170,81 @@ test_an_installer_no_script_defines_fails() {
   expect_fail "no system/*.sh defines install_nothing"
 }
 
+test_an_installer_naming_the_file_only_in_a_comment_fails() {
+  new_repo
+  printf '%s\n' '' '# install_note: puts udev/91-noted.rules in place.' 'install_note() {' \
+    '  # udev/91-noted.rules goes to /etc/udev/rules.d/.' '  true' '}' >>"$M/system/lib.sh"
+  printf 'x\n' >"$M/system/files/udev/91-noted.rules"
+  printf 'udev/91-noted.rules install_note\n' >>"$M/system/files.map"
+  expect_fail "install_note doesn't install system/files/udev/91-noted.rules"
+}
+
+test_an_installer_that_calls_the_one_naming_the_file_installs_it() {
+  new_repo
+  printf '%s\n' '' 'install_noted() {' '  install_root_file "$FILES_DIR/udev/91-noted.rules" /etc/udev/rules.d/91-noted.rules 0644' '}' \
+    'install_both() {' '  bash -c '"'"'install_noted'"'"'' '}' >>"$M/system/lib.sh"
+  printf 'x\n' >"$M/system/files/udev/91-noted.rules"
+  printf 'udev/91-noted.rules install_both\n' >>"$M/system/files.map"
+  migration noted install_both
+  expect_pass
+}
+
+test_an_installer_calling_the_one_naming_the_file_in_a_strings_substitution_installs_it() {
+  new_repo
+  printf '%s\n' '' 'install_noted() {' '  install_root_file "$FILES_DIR/udev/91-noted.rules" /etc/udev/rules.d/91-noted.rules 0644' '}' \
+    'install_both() {' '  printf "%s\\n" "done: $(install_noted)"' '}' >>"$M/system/lib.sh"
+  printf 'x\n' >"$M/system/files/udev/91-noted.rules"
+  printf 'udev/91-noted.rules install_both\n' >>"$M/system/files.map"
+  migration noted install_both
+  expect_pass
+}
+
+test_an_installer_naming_the_file_only_in_a_trailing_comment_fails() {
+  new_repo
+  printf '%s\n' '' 'install_note() {' '  true # puts udev/91-noted.rules in place' '}' >>"$M/system/lib.sh"
+  printf 'x\n' >"$M/system/files/udev/91-noted.rules"
+  printf 'udev/91-noted.rules install_note\n' >>"$M/system/files.map"
+  expect_fail "install_note doesn't install system/files/udev/91-noted.rules"
+}
+
+test_an_installer_naming_the_one_that_installs_the_file_only_in_a_string_fails() {
+  new_repo
+  printf '%s\n' '' 'install_noted() {' '  install_root_file "$FILES_DIR/udev/91-noted.rules" /etc/udev/rules.d/91-noted.rules 0644' '}' \
+    'install_said() {' '  echo "run install_noted by hand"' "  echo 'or install_noted'" '}' >>"$M/system/lib.sh"
+  printf 'x\n' >"$M/system/files/udev/91-noted.rules"
+  printf 'udev/91-noted.rules install_said\n' >>"$M/system/files.map"
+  expect_fail "install_said doesn't install system/files/udev/91-noted.rules"
+}
+
+test_an_apostrophe_in_a_here_document_quotes_nothing_after_it() {
+  new_repo
+  printf '%s\n' '' 'install_noted() {' '  install_root_file "$FILES_DIR/udev/91-noted.rules" /etc/udev/rules.d/91-noted.rules 0644' '}' \
+    'install_both() {' '  cat <<EOF' "Don't stop." 'EOF' '  install_noted' '}' >>"$M/system/lib.sh"
+  printf 'x\n' >"$M/system/files/udev/91-noted.rules"
+  printf 'udev/91-noted.rules install_both\n' >>"$M/system/files.map"
+  migration noted install_both
+  expect_pass
+}
+
+test_a_comment_after_an_apostrophe_in_a_here_document_installs_nothing() {
+  new_repo
+  printf '%s\n' '' 'install_note() {' "  cat <<-'EOF'" "	It's noted." '	EOF' '  # puts udev/91-noted.rules in place' '  true' '}' \
+    >>"$M/system/lib.sh"
+  printf 'x\n' >"$M/system/files/udev/91-noted.rules"
+  printf 'udev/91-noted.rules install_note\n' >>"$M/system/files.map"
+  expect_fail "install_note doesn't install system/files/udev/91-noted.rules"
+}
+
+test_a_here_documents_substitution_calls_the_installer() {
+  new_repo
+  printf '%s\n' '' 'install_noted() {' '  install_root_file "$FILES_DIR/udev/91-noted.rules" /etc/udev/rules.d/91-noted.rules 0644' '}' \
+    'install_both() {' '  cat <<EOF' 'It'"'"'s $(install_noted).' 'EOF' '}' >>"$M/system/lib.sh"
+  printf 'x\n' >"$M/system/files/udev/91-noted.rules"
+  printf 'udev/91-noted.rules install_both\n' >>"$M/system/files.map"
+  migration noted install_both
+  expect_pass
+}
+
 for t in $(declare -F | awk '$3 ~ /^test_/ { print $3 }'); do
   # Not in a condition, so a test stops at its first failed command.
   set +e

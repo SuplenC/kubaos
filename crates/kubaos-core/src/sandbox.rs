@@ -4,14 +4,14 @@
 //!
 //! Its `PATH` is one folder, the sandbox's `bin`, and nothing else. In it, every command an app's
 //! script or a host can call that changes the machine or the session (systemd, logind, apt, dpkg,
-//! pkexec, sudo, T3, Docker, the group tools, the openers) is a stand-in that logs its call and
-//! changes nothing, and the harmless tools a script needs (a shell, coreutils, jq, tar, sed, awk,
-//! grep, python) are links to the real ones. Any other command is not found, so a script that
-//! reaches for one fails, loudly, rather than run the real one. The session and system buses
-//! point at a socket that isn't there, and `XDG_RUNTIME_DIR` is a folder of the sandbox's own,
-//! so even a program called by its full path finds no user manager, logind or polkit to talk to.
-//! `HOME` and the `XDG_*` folders are the test's. None of git's variables gets in, so a git a
-//! test runs, there or from the code it tests, finds the repository it is given and never the
+//! debconf, pkexec, sudo, T3, Docker, the group tools, the openers, nftables, NetworkManager) is a
+//! stand-in that logs its call and changes nothing, and the harmless tools a script needs (a shell,
+//! coreutils, jq, tar, sed, awk, grep, python) are links to the real ones. Any other command is not
+//! found, so a script that reaches for one fails, loudly, rather than run the real one. The session
+//! and system buses point at a socket that isn't there, and `XDG_RUNTIME_DIR` is a folder of the
+//! sandbox's own, so even a program called by its full path finds no user manager, logind or polkit
+//! to talk to. `HOME` and the `XDG_*` folders are the test's. None of git's variables gets in, so a
+//! git a test runs, there or from the code it tests, finds the repository it is given and never the
 //! one the tests run in (`git rebase --exec` sets `GIT_DIR` for its command, and a test's
 //! `git init` once re-initialised the developer's checkout as a bare repository).
 //!
@@ -19,6 +19,7 @@
 //!
 //! - [`Sandbox`], the stand-ins ([`STUBBED`]) and the tools ([`TOOLS`]), and [`output`] and
 //!   [`git`], a one-off command in a sandbox of its own.
+//! - Writing a program a test starts so that it starts at once ([`program`], [`settle`]).
 //!
 //! # Not here
 //!
@@ -59,6 +60,9 @@ pub const STUBBED: &[&str] = &[
     "apt-key",
     "dpkg",
     "dpkg-query",
+    "dpkg-reconfigure",
+    "debconf-set-selections",
+    "debconf-communicate",
     "pkexec",
     "sudo",
     "su",
@@ -92,6 +96,8 @@ pub const STUBBED: &[&str] = &[
     "reboot",
     "shutdown",
     "poweroff",
+    "nft",
+    "nmcli",
 ];
 
 /// The stand-ins that answer as a machine where nothing matches: no process found.
@@ -140,6 +146,8 @@ pub const TOOLS: &[&str] = &[
     "xargs",
     "tar",
     "gzip",
+    "zstd",
+    "xz",
     "jq",
     "mktemp",
     "date",
@@ -232,15 +240,13 @@ impl Sandbox {
         let path = self.bin().join(name);
         let _ = fs::remove_file(&path);
         let log = self.log();
-        fs::write(
+        program(
             &path,
-            format!(
+            &format!(
                 "#!/bin/sh\nprintf '%s\\n' \"${{0##*/}}${{*:+ $*}}\" >>'{}'\n{body}\n",
                 log.display()
             ),
-        )
-        .expect("write a stand-in");
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).expect("make a stand-in run");
+        );
     }
 
     /// `name`, the real program on this process's `PATH`, linked into the sandbox in place of any
@@ -396,6 +402,55 @@ pub fn git(dir: &Path, args: &[&str]) -> String {
         String::from_utf8_lossy(&out.stderr)
     );
     String::from_utf8_lossy(&out.stdout).trim().to_owned()
+}
+
+/// Writes `text` to `path` as a program anyone may run and its owner alone write, and
+/// [`settle`]s it, so a test can start it at once.
+///
+/// # Panics
+///
+/// When it can't be written.
+pub fn program(path: &Path, text: &str) {
+    fs::write(path, text).expect("write a program");
+    fs::set_permissions(path, fs::Permissions::from_mode(0o755)).expect("make a program run");
+    settle(path);
+}
+
+/// `path`, a program this process wrote, replaced by a copy `cp` makes, of the same mode, which
+/// no process holds open for writing.
+///
+/// A process forked on another thread holds every file this process has open, from its fork
+/// until its own exec closes them (they are all close-on-exec). A program written on one thread
+/// while another starts a process is, for that moment, open for writing in the new process, and
+/// starting it then fails with "Text file busy" (`ETXTBSY`). `cargo test` runs a crate's tests
+/// as threads of one process, and they write scripts and start processes all the time. Writing
+/// under another name and renaming it into place doesn't help: the forked process holds the same
+/// file. A copy `cp` makes is a file only `cp` ever opened, and `cp` has exited.
+///
+/// # Panics
+///
+/// When it can't be copied.
+pub fn settle(path: &Path) {
+    let name = path.file_name().expect("a program's name").to_string_lossy();
+    let copy = path.with_file_name(format!(".{name}.settled"));
+    let cp = real_tool("cp").expect("cp on PATH");
+    let out = Command::new(cp)
+        .env_clear()
+        .arg("--")
+        .arg(path)
+        .arg(&copy)
+        .stdin(Stdio::null())
+        .output()
+        .expect("run cp");
+    assert!(
+        out.status.success(),
+        "cp {}: {}",
+        path.display(),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let mode = fs::metadata(path).expect("read a program's mode").permissions().mode();
+    fs::set_permissions(&copy, fs::Permissions::from_mode(mode)).expect("give the copy its mode");
+    fs::rename(&copy, path).expect("put the copy in place");
 }
 
 #[cfg(test)]

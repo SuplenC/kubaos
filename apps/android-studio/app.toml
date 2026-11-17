@@ -1,0 +1,47 @@
+# Android Studio from Google's tarball, pinned to the sha256 Google publishes beside it on the
+# download page. Google keeps no apt repository and Ubuntu doesn't package it; nixpkgs' Android
+# Studio is a year behind and can't update itself. It builds for amd64 only. Studio updates itself
+# in place, patching the folder it runs from: the download unpacks it to a folder of the user's,
+# and is `self_updates`: done while it is there, a new pin reaches new installs only and never puts
+# an older Studio over the one it updated to. The desktop entry is ours, named as the one Studio
+# would make, so the two are one file.
+# https://developer.android.com/studio
+name = "Android Studio"
+category = "development"
+tags = ["android", "ide", "kotlin", "java", "mobile", "emulator"]
+summary = "Google's IDE for Android apps. Bring RAM, and a coffee for every Gradle sync."
+# From its AppStream metainfo, CC0-1.0 (flathub/com.google.AndroidStudio), its first sentences.
+description = """\
+Android Studio is the official Integrated Development Environment (IDE) for Android app \
+development. Based on the powerful code editor and developer tools from IntelliJ IDEA, Android \
+Studio offers even more features that enhance your productivity when building Android apps."""
+description_from = "https://github.com/flathub/com.google.AndroidStudio/blob/master/com.google.AndroidStudio.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before it
+# is there.
+icon = "android-studio"
+keeps = """\
+Your projects stay in ~/AndroidStudioProjects, the Android SDK and its emulator images in \
+~/Android/Sdk, your virtual devices in ~/.android, and Studio's settings in ~/.config/Google and \
+~/.local/share/Google: install Android Studio again and it finds them all."""
+
+# HAZARD: Studio runs from the folder a removal takes.
+[[ready]]
+check = ["./closed"]
+says = "Android Studio is open: quit it, then try again"
+
+[[action]]
+name = "Download Android Studio"
+kind = "download"
+to = "~/.local/share/android-studio"
+version = "2026.2.2.9"
+unpack = "tar-gz"
+strip = 1
+self_updates = true
+amd64 = { url = "https://dl.google.com/dl/android/studio/ide-zips/2026.2.2.9/android-studio-rabbit2-patch1-linux.tar.gz", sha256 = "11ecbf0e6dc0f04a1353f797e45bf239a3ff1a82221539b1b8cdd7eab0d8d8ea" }
+
+[[action]]
+name = "Put Android Studio in the Command menu"
+kind = "file"
+to = "~/.local/share/applications/jetbrains-studio.desktop"
+from = "jetbrains-studio.desktop"
+template = true
