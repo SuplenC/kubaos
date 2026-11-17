@@ -283,7 +283,11 @@ impl<'h> Keeper<'h> {
         let owners = Owners::load(&[&self.journals]).map_err(StepError::Journal)?;
         let mut refused = Vec::new();
         for (_, action) in steps {
-            let writes = action.path().is_some() || matches!(action.kind, Kind::Setting { .. } | Kind::WebApp { .. });
+            let writes = action.path().is_some()
+                || matches!(
+                    action.kind,
+                    Kind::Setting { .. } | Kind::WebApp { .. } | Kind::Dkms { .. }
+                );
             if !writes {
                 continue;
             }
@@ -361,7 +365,6 @@ impl<'h> Keeper<'h> {
         }
         let recorded = self.recorded_for(&journal, &action, old.as_ref())?;
         let look = perform::look(&action, &mut *self.host, recorded).map_err(StepError::Perform)?;
-        self.notes.extend(look.note.clone().filter(|_| look.done));
         if let Kind::Run { window: Some(says), .. } = &action.kind
             && !windows
             && !look.done
@@ -402,6 +405,7 @@ impl<'h> Keeper<'h> {
                 journal.save(&self.journals).map_err(StepError::Journal)?;
             }
             self.finish_replaced(&mut journal, id, step)?;
+            self.say(&journal, step);
             return Ok(if old.is_some() {
                 Outcome::Settled
             } else {
@@ -436,7 +440,18 @@ impl<'h> Keeper<'h> {
         journal.put(entry);
         journal.save(&self.journals).map_err(StepError::Journal)?;
         self.finish_replaced(&mut journal, id, step)?;
+        self.say(&journal, step);
         Ok(Outcome::Done)
+    }
+
+    /// Keeps what the user has to know of step `step` of `journal`, which stands, for the run's
+    /// notes. One the machine can't be asked for is left unsaid: the step stands all the same.
+    fn say(&mut self, journal: &Journal, step: usize) {
+        if let Some(entry) = journal.entry(step)
+            && let Ok(Some(note)) = perform::says(&entry.action, &mut *self.host)
+        {
+            self.notes.push(note);
+        }
     }
 
     /// Records the steps of this side of the app `id` in `setup` that check done, without
@@ -781,6 +796,15 @@ impl<'h> Keeper<'h> {
             None => Ok(()),
         }
     }
+}
+
+/// Whether a step of `kind` is what puts an app's program on the machine, whose being there says
+/// the app is: a package, or a module DKMS builds.
+fn puts_it_there(kind: &Kind) -> bool {
+    matches!(
+        kind,
+        Kind::Apt { .. } | Kind::Deb { .. } | Kind::Nix { .. } | Kind::Dkms { .. }
+    )
 }
 
 /// The vendor repository a journal's `entry` set up: a settled `apt` step's. Its check holds the
@@ -1486,9 +1510,9 @@ impl<'a> Engine<'a> {
 
     /// Takes in the app `id` when the machine has it and no journal does: an app installed before
     /// KubaOS kept journals, by an older release of it or by hand. Nothing runs but checks. The
-    /// app is there when every package step of its own actions (`apt`, `deb`, `nix`; every step,
-    /// for an app with none) checks done, an `apt` step's packages installed whether or not its
-    /// repository is set up yet; it is there in the first setup, by id, whose own steps
+    /// app is there when every package step of its own actions (`apt`, `deb`, `nix`, `dkms`; every
+    /// step, for an app with none) checks done, an `apt` step's packages installed whether or
+    /// not its repository is set up yet; it is there in the first setup, by id, whose own steps
     /// that open no window all check done, else in the one with no steps of its own. Its user
     /// journal is then complete in that setup, its user steps recorded as [`Keeper::adopt`]
     /// says, `owned` when KubaOS put it there; root's steps are recorded by root on the first run
@@ -1552,11 +1576,7 @@ impl<'a> Engine<'a> {
             Ok(true)
         };
         let shared: Vec<&Action> = folder.actions.iter().collect();
-        let packages: Vec<&Action> = shared
-            .iter()
-            .copied()
-            .filter(|a| matches!(a.kind, Kind::Apt { .. } | Kind::Deb { .. } | Kind::Nix { .. }))
-            .collect();
+        let packages: Vec<&Action> = shared.iter().copied().filter(|a| puts_it_there(&a.kind)).collect();
         let anchor = if packages.is_empty() { &shared } else { &packages };
         if !done(anchor, &mut self.user)? {
             return Ok(None);

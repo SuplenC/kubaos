@@ -22,9 +22,12 @@ use std::process::Stdio;
 use super::AptPlan;
 use super::AptSimulation;
 use super::Compression;
+use super::DkmsStatus;
 use super::Downgrade;
 use super::Host;
 use super::HostError;
+use super::Mok;
+use super::SecureBoot;
 use super::UNIT_PROPERTIES;
 use super::UnitState;
 use super::untar_args;
@@ -39,6 +42,18 @@ use crate::unfree::Unfree;
 
 /// Root's home, the `HOME` of what root runs.
 const ROOT_HOME: &str = "/root";
+
+/// Where the installed kernels' modules are, a folder a kernel, `build` in it its headers.
+const KERNEL_MODULES: &str = "/lib/modules";
+
+/// DKMS's configuration, and the folder of the files that add to it, which name the MOK it signs
+/// with (`mok_certificate`).
+const DKMS_FRAMEWORK: &str = "/etc/dkms/framework.conf";
+const DKMS_FRAMEWORK_D: &str = "/etc/dkms/framework.conf.d";
+
+/// Where DKMS keeps the MOK's certificate when its configuration names none: Ubuntu's shim-signed
+/// MOK, then DKMS's own default.
+const MOK_CERTIFICATES: [&str; 2] = ["/var/lib/shim-signed/mok/MOK.der", "/var/lib/dkms/mok.pub"];
 
 /// The options every apt-get install and remove takes: unattended, keeping changed configuration.
 const APT_OPTIONS: [&str; 4] = [
@@ -441,6 +456,130 @@ impl Host for SystemHost {
         Self::out(self.command("apt-get").args(["update", "-q"])).map(drop)
     }
 
+    fn kernels(&mut self) -> Result<BTreeSet<String>, HostError> {
+        let dir = Path::new(KERNEL_MODULES);
+        let entries = match fs::read_dir(dir) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(BTreeSet::new()),
+            Err(e) => return Err(HostError::io(dir)(e)),
+        };
+        Ok(entries
+            .flatten()
+            .filter(|entry| entry.path().join("build").is_dir())
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .collect())
+    }
+
+    fn dkms_status(&mut self, module: &str, version: &str) -> Result<DkmsStatus, HostError> {
+        let shown = Self::out(self.command("dkms").args(["status", "-m", module, "-v", version]))?;
+        Ok(dkms_status(&shown, module, version))
+    }
+
+    fn dkms_add(&mut self, module: &str, version: &str) -> Result<(), HostError> {
+        Self::out(self.command("dkms").args(["add", "-m", module, "-v", version])).map(drop)
+    }
+
+    fn dkms_install(&mut self, module: &str, version: &str, kernel: &str) -> Result<(), HostError> {
+        Self::out(
+            self.command("dkms")
+                .args(["install", "--force", "-m", module, "-v", version, "-k", kernel]),
+        )
+        .map(drop)
+    }
+
+    fn dkms_remove(&mut self, module: &str, version: &str) -> Result<(), HostError> {
+        Self::out(
+            self.command("dkms")
+                .args(["remove", "-m", module, "-v", version, "--all"]),
+        )
+        .map(drop)
+    }
+
+    fn module_signer(&mut self, module: &str, kernel: &str) -> Result<Option<String>, HostError> {
+        match Self::out(self.command("modinfo").args(["-k", kernel, "-F", "sig_key", module])) {
+            Ok(shown) => Ok(Some(shown.trim().to_owned()).filter(|key| !key.is_empty())),
+            Err(HostError::Failed { .. }) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn mok(&mut self) -> Result<Option<Mok>, HostError> {
+        let mut configs = vec![PathBuf::from(DKMS_FRAMEWORK)];
+        if let Ok(entries) = fs::read_dir(DKMS_FRAMEWORK_D) {
+            let mut more: Vec<PathBuf> = entries
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| p.extension().is_some_and(|e| e == "conf"))
+                .collect();
+            more.sort();
+            configs.extend(more);
+        }
+        let texts: Vec<String> = configs.iter().filter_map(|p| fs::read_to_string(p).ok()).collect();
+        let named = mok_certificate(texts.iter().map(String::as_str));
+        let candidates: Vec<PathBuf> = match named {
+            Some(path) => vec![path],
+            None => MOK_CERTIFICATES.iter().map(PathBuf::from).collect(),
+        };
+        let Some(certificate) = candidates.into_iter().find(|p| p.is_file()) else {
+            return Ok(None);
+        };
+        let mut serial = None;
+        for form in ["DER", "PEM"] {
+            let shown = self
+                .command("openssl")
+                .args(["x509", "-inform", form, "-noout", "-serial", "-in"])
+                .arg(&certificate)
+                .output()
+                .map_err(|source| HostError::Spawn {
+                    program: "openssl".to_owned(),
+                    source,
+                })?;
+            if shown.status.success() {
+                serial = certificate_serial(&String::from_utf8_lossy(&shown.stdout));
+                break;
+            }
+        }
+        Ok(serial.map(|serial| Mok { certificate, serial }))
+    }
+
+    fn secure_boot(&mut self, certificate: Option<&Path>) -> Result<SecureBoot, HostError> {
+        let said = |command: &mut Command| -> Result<String, HostError> {
+            let output = command.output().map_err(|source| HostError::Spawn {
+                program: "mokutil".to_owned(),
+                source,
+            })?;
+            Ok(format!(
+                "{}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ))
+        };
+        // mokutil exits 1 for a key that is enrolled or queued, so its words say, not its code.
+        let state = said(self.command("mokutil").arg("--sb-state"))?;
+        if !state.contains("SecureBoot enabled") {
+            return Ok(SecureBoot::Off);
+        }
+        let Some(certificate) = certificate else {
+            return Ok(SecureBoot::Unknown);
+        };
+        Ok(enrolment(&said(
+            self.command("mokutil").arg("--test-key").arg(certificate),
+        )?))
+    }
+
+    fn module_users(&mut self, module: &str) -> Result<Option<u32>, HostError> {
+        let path = PathBuf::from(format!("/sys/module/{}/refcnt", module.replace('-', "_")));
+        match fs::read_to_string(&path) {
+            Ok(text) => Ok(text.trim().parse().ok()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(HostError::io(&path)(e)),
+        }
+    }
+
+    fn unload(&mut self, module: &str) -> Result<(), HostError> {
+        Self::out(self.command("modprobe").args(["-r", module])).map(drop)
+    }
+
     fn run(&mut self, argv: &[String], dir: &Path) -> Result<(), HostError> {
         let Some((program, rest)) = argv.split_first() else {
             return Ok(());
@@ -522,6 +661,78 @@ fn known_of_arch(shown: &str, of: &str, arch: &str) -> BTreeSet<String> {
             (known && its == of).then(|| package_name(name, its, arch))
         })
         .collect()
+}
+
+/// What `dkms status -m <module> -v <version>` shows of them: a line a kernel,
+/// `<module>/<version>, <kernel>, <arch>: installed`, or `<module>/<version>: added` before any is
+/// built.
+fn dkms_status(shown: &str, module: &str, version: &str) -> DkmsStatus {
+    let mut status = DkmsStatus::default();
+    let ours = format!("{module}/{version}");
+    for line in shown.lines() {
+        let Some((head, state)) = line.split_once(": ") else {
+            continue;
+        };
+        let mut parts = head.split(", ");
+        if parts.next().map(str::trim) != Some(ours.as_str()) {
+            continue;
+        }
+        status.added = true;
+        if let Some(kernel) = parts.next()
+            && state.trim_start().starts_with("installed")
+        {
+            status.installed.insert(kernel.trim().to_owned());
+        }
+    }
+    status
+}
+
+/// The MOK certificate DKMS's configuration files `texts`, in the order DKMS reads them, name
+/// (`mok_certificate=`, the last one read); none when they don't, or name it through a variable,
+/// which only DKMS fills in.
+fn mok_certificate<'a>(texts: impl Iterator<Item = &'a str>) -> Option<PathBuf> {
+    let mut named = None;
+    for line in texts.flat_map(str::lines) {
+        if let Some(value) = line.trim().strip_prefix("mok_certificate=") {
+            let value = value.trim().trim_matches('"').trim_matches('\'');
+            named = (!value.is_empty() && !value.contains('$')).then(|| PathBuf::from(value));
+        }
+    }
+    named
+}
+
+/// The serial `openssl x509 -serial` printed (`serial=0A1B…`), as `modinfo` names a key: hex
+/// pairs, uppercase, joined by `:`.
+fn certificate_serial(shown: &str) -> Option<String> {
+    let hex = shown.trim().strip_prefix("serial=")?;
+    if hex.is_empty() || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let hex = if hex.len() % 2 == 1 {
+        format!("0{hex}")
+    } else {
+        hex.to_owned()
+    };
+    let pairs: Vec<String> = hex
+        .to_ascii_uppercase()
+        .as_bytes()
+        .chunks(2)
+        .map(|pair| String::from_utf8_lossy(pair).into_owned())
+        .collect();
+    Some(pairs.join(":"))
+}
+
+/// What `mokutil --test-key` said of the MOK, Secure Boot being on.
+fn enrolment(said: &str) -> SecureBoot {
+    if said.contains("is already enrolled") || said.contains("is already in db") {
+        SecureBoot::Enrolled
+    } else if said.contains("already in the enrollment request") {
+        SecureBoot::Queued
+    } else if said.contains("is not enrolled") {
+        SecureBoot::NotEnrolled
+    } else {
+        SecureBoot::Unknown
+    }
 }
 
 /// The candidate `apt-cache policy` shows, none when it shows `(none)` or no package.

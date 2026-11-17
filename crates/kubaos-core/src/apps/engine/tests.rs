@@ -2397,6 +2397,7 @@ mod ai;
 mod architecture;
 mod communication;
 mod devtools;
+mod dkms;
 mod editors;
 mod games;
 mod graphics;

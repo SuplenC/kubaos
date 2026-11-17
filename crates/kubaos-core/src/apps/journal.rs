@@ -184,7 +184,8 @@ impl State {
 /// One thing a step changed or found: `path:/…`, `dir:/…` (a folder it made for a path),
 /// `key:<file>#<key>`, `package:<name>`, `dep:<name>` (a package apt pulled in for the step's),
 /// `nix:<name>`, `member:<group>:<user>`, `group:<name>`, `unit:<scope>:<name>`, `linger:<user>`,
-/// `arch:<architecture>` (one dpkg takes packages of beside the machine's) or `run`.
+/// `arch:<architecture>` (one dpkg takes packages of beside the machine's),
+/// `dkms:<module>/<version>` (a module in DKMS's tree) or `run`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Claim {

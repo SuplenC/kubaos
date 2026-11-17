@@ -280,6 +280,7 @@ fn source(source: &Source) -> String {
         Source::Nixpkgs => "nixpkgs".to_owned(),
         Source::Deb => "pinned .deb".to_owned(),
         Source::Download => "pinned download".to_owned(),
+        Source::Dkms => "pinned DKMS module".to_owned(),
         Source::ContainerImages => "pinned container images".to_owned(),
         Source::WebApp => "web app".to_owned(),
     }
