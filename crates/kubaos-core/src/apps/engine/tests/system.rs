@@ -410,8 +410,8 @@ fn a_fresh_ssh_server_takes_keys_alone_and_listens_through_the_socket_its_packag
     );
     assert_eq!(
         kinds(&world, "openssh-server"),
-        ["run", "file", "run", "apt", "run", "run"],
-        "the drop-in is there before sshd, and the removal's reload comes after it goes"
+        ["run", "file", "run", "apt", "run", "run", "file"],
+        "the drop-in is there before sshd, the removal's reload comes after it goes, and Puffy last"
     );
     // The package's postinst enabled and started ssh.socket, so the step found it.
     let socket = world.host.state.borrow().units["system:ssh.socket"];

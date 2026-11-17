@@ -28,6 +28,9 @@ and copy files with scp, sftp or rsync. Here it takes keys alone: passwords, key
 prompts and root are off, so a login needs a public key listed in ~/.ssh/authorized_keys. It \
 listens on TCP port 22."""
 description_from = "kubaos"
+# Puffy, OpenSSH's mascot, OpenBSD's trademark, used to identify the app, on KubaOS's tile
+# (openssh-server.png's comment names its source): no icon theme has the OpenSSH server.
+icon = "openssh-server.png"
 keeps = """\
 This machine's host keys stay in /etc/ssh, so other machines still know it, and your \
 ~/.ssh/authorized_keys stays as it is."""
