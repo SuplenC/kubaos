@@ -60,9 +60,15 @@ const DKMS_FRAMEWORK_D: &str = "/etc/dkms/framework.conf.d";
 /// (`BUILD_EXCLUSIVE_KERNEL`, `_MIN`, `_MAX`, `_CONFIG`, `_ARCH`).
 const DKMS_EXCLUDED: i32 = 77;
 
-/// Where DKMS keeps the MOK's certificate when its configuration names none: Ubuntu's shim-signed
-/// MOK, then DKMS's own default.
-const MOK_CERTIFICATES: [&str; 2] = ["/var/lib/shim-signed/mok/MOK.der", "/var/lib/dkms/mok.pub"];
+/// DKMS's folder of configuration, which root alone may write for its files to be sourced.
+const DKMS_CONFIG: &str = "/etc/dkms";
+
+/// The MOK's certificate DKMS signs with on Ubuntu when its configuration sets no signing key:
+/// shim-signed's, whatever `mok_certificate` says (`prepare_mok` in `/usr/sbin/dkms`, 3.2).
+const SHIM_MOK: &str = "/var/lib/shim-signed/mok/MOK.der";
+
+/// The certificate DKMS signs with when its configuration sets a signing key and no certificate.
+const DKMS_MOK: &str = "/var/lib/dkms/mok.pub";
 
 /// The options every apt-get install and remove takes: unattended, keeping changed configuration.
 const APT_OPTIONS: [&str; 4] = [
@@ -174,18 +180,21 @@ impl SystemHost {
         }
     }
 
-    /// The certificate DKMS's configuration files `configs` name through a variable, worked out as
-    /// DKMS works it out: each sourced by bash in turn, `kernelver` and `arch` set as DKMS sets
-    /// them for `kernel`, nothing else of this process's environment. Only files root owns and no
-    /// one else may write are sourced, as root reads them.
-    fn mok_through_dkms(&self, configs: &[PathBuf], kernel: &str) -> Result<PathBuf, HostError> {
-        for config in configs {
-            let meta = fs::symlink_metadata(config).map_err(HostError::io(config))?;
+    /// The signing key and certificate DKMS's configuration files `configs` set through a variable,
+    /// worked out as DKMS works them out: each file sourced by bash in turn, `kernelver` and
+    /// `arch` set as DKMS sets them for `kernel`, nothing else of this process's environment, each
+    /// empty when unset. Only files root owns and no one else may write are sourced, in folders
+    /// root owns and no one else may write, as root reads them.
+    fn signing_through_dkms(&self, configs: &[PathBuf], kernel: &str) -> Result<(String, String), HostError> {
+        let folders = [Path::new(DKMS_CONFIG), Path::new(DKMS_FRAMEWORK_D)];
+        let present = folders.into_iter().filter(|f| f.symlink_metadata().is_ok());
+        for path in present.chain(configs.iter().map(PathBuf::as_path)) {
+            let meta = fs::symlink_metadata(path).map_err(HostError::io(path))?;
             if meta.uid() != 0 || meta.mode() & 0o022 != 0 || meta.file_type().is_symlink() {
                 return Err(HostError::Mok {
                     why: format!(
-                        "{} isn't a file root alone may write, so it isn't sourced",
-                        config.display()
+                        "{} isn't root's alone to write, or is a link, so DKMS's configuration isn't sourced",
+                        path.display()
                     ),
                 });
             }
@@ -202,20 +211,26 @@ impl SystemHost {
                 program: "bash".to_owned(),
                 source,
             })?;
-        let named = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-        if !output.status.success() || !named.starts_with('/') {
-            return Err(HostError::Mok {
+        let shown = String::from_utf8_lossy(&output.stdout).into_owned();
+        let parsed = shown.split_once('\0').map(|(k, c)| (k.to_owned(), c.to_owned()));
+        match parsed {
+            Some((key, certificate))
+                if output.status.success() && (certificate.is_empty() || certificate.starts_with('/')) =>
+            {
+                Ok((key, certificate))
+            }
+            _ => Err(HostError::Mok {
                 why: format!(
-                    "sourcing {} for {kernel} names {named:?}",
+                    "sourcing {} for {kernel} sets {:?}",
                     configs
                         .iter()
                         .map(|c| c.display().to_string())
                         .collect::<Vec<_>>()
-                        .join(", ")
+                        .join(", "),
+                    shown.replace('\0', " ")
                 ),
-            });
+            }),
         }
-        Ok(PathBuf::from(named))
     }
 
     fn systemctl(&self, scope: Scope) -> Command {
@@ -364,9 +379,17 @@ impl Host for SystemHost {
         match removal {
             Removal::KeepConfig => command.args(["remove", "-y"]),
             Removal::Purge => command.args(["purge", "-y"]),
-            Removal::PurgeEssential => command.args(["purge", "-y", "--allow-remove-essential"]),
         };
         Self::out(command.args(APT_OPTIONS).args(packages)).map(drop)
+    }
+
+    fn dpkg_purge(&mut self, packages: &[String]) -> Result<(), HostError> {
+        Self::out(
+            self.command("dpkg")
+                .args(["--purge", "--force-remove-essential", "--force-remove-protected"])
+                .args(packages),
+        )
+        .map(drop)
     }
 
     fn important(&mut self, packages: &[String]) -> Result<BTreeSet<String>, HostError> {
@@ -592,14 +615,15 @@ impl Host for SystemHost {
         }
         configs.retain(|p| p.is_file());
         let texts: Vec<String> = configs.iter().filter_map(|p| fs::read_to_string(p).ok()).collect();
-        let candidates: Vec<PathBuf> = match mok_certificate(texts.iter().map(String::as_str)) {
-            Named::Path(path) => vec![path],
-            Named::Variable => vec![self.mok_through_dkms(&configs, kernel)?],
-            Named::Nothing => MOK_CERTIFICATES.iter().map(PathBuf::from).collect(),
+        let (key, certificate) = match signing_named(texts.iter().map(String::as_str)) {
+            Named::Values { key, certificate } => (key, certificate),
+            Named::Variable => self.signing_through_dkms(&configs, kernel)?,
         };
-        let Some(certificate) = candidates.into_iter().find(|p| p.is_file()) else {
+        // One that isn't there yet DKMS makes as it signs the next module.
+        let certificate = dkms_certificate(&key, &certificate);
+        if !certificate.is_file() {
             return Ok(None);
-        };
+        }
         let mut serial = None;
         for form in ["DER", "PEM"] {
             let shown = self
@@ -774,41 +798,55 @@ fn dkms_status(shown: &str, module: &str, version: &str) -> DkmsStatus {
     status
 }
 
-/// How DKMS's configuration names the MOK's certificate.
+/// What DKMS's configuration sets of its signing key and certificate.
 #[derive(Debug, PartialEq, Eq)]
 enum Named {
-    /// It doesn't: DKMS's default.
-    Nothing,
-    Path(PathBuf),
-    /// Through a variable (`$kernelver`), which only sourcing the files works out.
+    /// Each as written, empty when unset.
+    Values { key: String, certificate: String },
+    /// One through a variable (`$kernelver`), which only sourcing the files works out.
     Variable,
 }
 
-/// How DKMS's configuration files `texts`, in the order DKMS reads them, name the MOK's
-/// certificate (`mok_certificate=`, the last one read).
-fn mok_certificate<'a>(texts: impl Iterator<Item = &'a str>) -> Named {
-    let mut named = Named::Nothing;
+/// What DKMS's configuration files `texts`, in the order DKMS reads them, set of
+/// `mok_signing_key` and `mok_certificate`, the last of each one read.
+fn signing_named<'a>(texts: impl Iterator<Item = &'a str>) -> Named {
+    let (mut key, mut certificate) = (String::new(), String::new());
     for line in texts.flat_map(str::lines) {
-        if let Some(value) = line.trim().strip_prefix("mok_certificate=") {
-            let value = value.trim().trim_matches('"').trim_matches('\'');
-            named = if value.contains(['$', '`']) {
-                Named::Variable
-            } else if value.is_empty() {
-                Named::Nothing
-            } else {
-                Named::Path(PathBuf::from(value))
-            };
+        let line = line.trim();
+        let (slot, value) = if let Some(value) = line.strip_prefix("mok_signing_key=") {
+            (&mut key, value)
+        } else if let Some(value) = line.strip_prefix("mok_certificate=") {
+            (&mut certificate, value)
+        } else {
+            continue;
+        };
+        let value = value.trim().trim_matches('"').trim_matches('\'');
+        if value.contains(['$', '`']) {
+            return Named::Variable;
         }
+        value.clone_into(slot);
     }
-    named
+    Named::Values { key, certificate }
+}
+
+/// The certificate DKMS signs with, from what its configuration sets, as `prepare_mok` in DKMS
+/// 3.2 on Ubuntu has it: no signing key is shim-signed's key and certificate, whatever
+/// `mok_certificate` says; a signing key with no certificate is DKMS's own `mok.pub`.
+fn dkms_certificate(key: &str, certificate: &str) -> PathBuf {
+    if key.is_empty() {
+        PathBuf::from(SHIM_MOK)
+    } else if certificate.is_empty() {
+        PathBuf::from(DKMS_MOK)
+    } else {
+        PathBuf::from(certificate)
+    }
 }
 
 /// bash's arguments that source `configs` in turn, as DKMS does, with `kernelver` and `arch`
 /// set as DKMS sets them for `kernel` on a `machine` (`uname -m`), and print the
-/// `mok_certificate` they name.
+/// `mok_signing_key` and `mok_certificate` they set, a NUL between.
 fn mok_source_args(configs: &[PathBuf], kernel: &str, machine: &str) -> Vec<OsString> {
-    let script =
-        "kernelver=$1 arch=$2; shift 2; for f; do . \"$f\" || exit 1; done; printf '%s' \"${mok_certificate-}\"";
+    let script = "kernelver=$1 arch=$2; shift 2; for f; do . \"$f\" || exit 1; done; printf '%s\\0%s' \"${mok_signing_key-}\" \"${mok_certificate-}\"";
     let mut args: Vec<OsString> = vec![
         "-c".into(),
         script.into(),

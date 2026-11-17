@@ -84,7 +84,7 @@ fn apt_shows_a_protected_packages_removal_and_then_refuses_it_as_apt_does() {
     let err = removed.unwrap_err().to_string();
     assert!(err.contains("Essential packages were removed"), "{err}");
     assert!(host.state.borrow().dpkg.contains_key("libgcc-s1:i386"));
-    host.apt_remove(&gone, Removal::PurgeEssential).unwrap();
+    host.dpkg_purge(&gone).unwrap();
     assert!(host.state.borrow().dpkg.is_empty());
 }
 
@@ -117,4 +117,25 @@ fn a_removal_leaves_a_package_with_conffiles_configured_and_a_purge_takes_them()
     host.apt_remove(&libc, Removal::Purge).unwrap();
     assert!(host.arch_packages("i386").unwrap().is_empty());
     assert!(!conffile.exists());
+}
+
+#[test]
+fn dpkg_refuses_to_purge_a_package_something_else_needs_and_changes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut host = FakeHost::new(dir.path());
+    {
+        let mut state = host.state.borrow_mut();
+        for p in ["libc6:i386", "libgcc-s1:i386", "libmine:i386"] {
+            state.dpkg.insert(p.to_owned(), "1.0".to_owned());
+        }
+        state
+            .depends
+            .insert("libmine:i386".to_owned(), ["libc6:i386".to_owned()].into());
+    }
+    let before = host.snapshot();
+
+    let refused = host.dpkg_purge(&["libc6:i386".to_owned(), "libgcc-s1:i386".to_owned()]);
+
+    assert!(refused.unwrap_err().to_string().contains("dpkg"));
+    assert_eq!(host.snapshot(), before);
 }
