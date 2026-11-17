@@ -1771,6 +1771,7 @@ fn an_update_lists_the_app_a_picked_setup_change_left_behind_as_removed() {
 mod ai;
 mod devtools;
 mod editors;
+mod graphics;
 mod media;
 mod office;
 

@@ -1,0 +1,34 @@
+# Excalidraw in a window of its own: Excalidraw is a website, with no app for Linux.
+# https://excalidraw.com/
+name = "Excalidraw"
+category = "graphics"
+tags = ["whiteboard", "diagrams", "sketch", "drawing", "collaboration", "web app"]
+summary = "A whiteboard that draws like a napkin. Your architecture finally looks as sketchy as it is."
+# The project's own words are its README's, whose MIT licence asks for its notice with every
+# copy, so this is ours.
+description = """\
+Excalidraw is a virtual whiteboard for sketching hand-drawn-looking diagrams. Its website, here \
+in a window of its own, draws shapes, arrows and text on an infinite canvas, keeps libraries of \
+shapes, shares a drawing live with others through an end-to-end encrypted link, and exports to \
+PNG, SVG and its own .excalidraw files."""
+description_from = "kubaos"
+# Excalidraw's icon, MIT, on its own tile (excalidraw.svg's header): no icon theme has it. The
+# install puts it in hicolor as excalidraw.svg, and the window's entry names it there, so it is
+# one copy.
+icon = "excalidraw.svg"
+requires = ["google-chrome"]
+keeps = """\
+Your drawings stay in the window's own storage, in ~/.local/share/kubaos/web-apps/excalidraw: \
+install Excalidraw again and they're there. Drawings you saved as files are your own."""
+
+[[ready]]
+check = ["./closed", "excalidraw"]
+says = "Excalidraw's window is open: close it, then try again"
+
+[[action]]
+name = "Put Excalidraw in a window of its own"
+kind = "web_app"
+id = "excalidraw"
+title = "Excalidraw"
+url = "https://excalidraw.com/"
+icon = "excalidraw"
