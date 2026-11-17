@@ -230,6 +230,22 @@ key_url = "https://dl.winehq.org/wine-builds/winehq.key"
 fingerprint = "D43F640145369C51D786DDEA76F1A20FF987672F"
 keyring = "/etc/apt/keyrings/winehq.gpg"
 
+# Valve's repository of the Steam client, for the app of the catalog
+# (apps/steam/). It has amd64 and i386 packages, and its sources file names
+# both, as Steam's client needs 32-bit libraries. Its Release is signed by
+# Valve's 2012 key; the 2025 key beside it in Valve's steam.gpg is the one Valve
+# is moving to, so both are pinned, each from Ubuntu's key server, as a key file
+# must hold the pinned key alone. steam-launcher ships steam-stable.list, a
+# conffile naming a keyring of its own: the app puts a file of comments at that
+# path first, which dpkg keeps.
+[repo.steam]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xBA1816EF8E75005FCF5E27A1F24AEA9FB05498B7"
+fingerprint = "BA1816EF8E75005FCF5E27A1F24AEA9FB05498B7"
+keyring = "/etc/apt/keyrings/steam.gpg"
+next_key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xDB23C56BF0F377FD02970A2A84706F31879D59CB"
+next_fingerprint = "DB23C56BF0F377FD02970A2A84706F31879D59CB"
+next_keyring = "/etc/apt/keyrings/steam-2025.gpg"
+
 # Ascensio's repository of ONLYOFFICE Desktop Editors, for the app of the
 # catalog (apps/onlyoffice/). Its package writes no source of its own. The
 # repository also carries a ttf-mscorefonts-installer newer than Ubuntu's,

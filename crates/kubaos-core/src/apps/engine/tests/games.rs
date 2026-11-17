@@ -18,7 +18,7 @@ use crate::apps::picks::Picks;
 use crate::unfree::Unfree;
 use crate::update::event::UpdateEvent;
 
-const APPS: [&str; 12] = [
+const APPS: [&str; 13] = [
     "gamescope",
     "geforce-now",
     "heroic",
@@ -29,11 +29,14 @@ const APPS: [&str; 12] = [
     "prismlauncher",
     "protonup-qt",
     "retroarch",
+    "steam",
     "sunshine",
     "xbox-cloud-gaming",
 ];
 
 const MINECRAFT: &str = "minecraft-launcher";
+
+const STEAM_LIST: &str = "/etc/apt/sources.list.d/steam-stable.list";
 
 /// `sunshine --creds <user> <password>` as Sunshine's own does it: the sign-in written into the
 /// state file of its folder, the password hashed with a new salt, the file's other keys kept.
@@ -81,6 +84,14 @@ fn minecraft_tarball(world: &World) -> Vec<u8> {
 fn served(id: &str) -> World {
     let world = world(id);
     world.host.sandbox().stub("sunshine", SUNSHINE_CREDS);
+    // Steam's steps name its steam-stable.list as an argument, which its scripts write as they
+    // are, so its folder names the fake machine's instead, in a sources folder that is there.
+    if id == "steam" {
+        let list = world.system_path(STEAM_LIST);
+        fs::create_dir_all(list.parent().unwrap()).unwrap();
+        let text = fs::read_to_string(world.catalog.join(id).join("app.toml")).unwrap();
+        world.write_app(id, &text.replace(STEAM_LIST, &list.display().to_string()));
+    }
     let catalog = Catalog::load(&world.catalog).unwrap();
     for action in catalog.get(id).unwrap().all_actions() {
         let body = match &action.kind {
@@ -125,6 +136,7 @@ fn in_place(world: &World, app: &Folder) {
             }
             // Each app's own test checks what its runs did.
             Kind::Run { .. } => {}
+            Kind::Architecture { architecture } => assert!(state.foreign.contains(architecture), "{id}"),
             Kind::Setting { file, key, .. } => {
                 let text = fs::read_to_string(home_or_system(file)).unwrap();
                 assert!(
@@ -183,8 +195,8 @@ fn which_games_a_machine_can_have_follows_its_architecture() {
     assert_eq!(on("amd64", Unfree::Allowed), APPS);
     // None of them is unfree in nixpkgs.
     assert_eq!(on("amd64", Unfree::Refused), APPS);
-    // Mojang builds its launcher for amd64 alone, nixpkgs ProtonUp-Qt, and the two cloud services'
-    // windows need Chrome, which Google builds for amd64 alone.
+    // Mojang builds its launcher for amd64 alone, nixpkgs ProtonUp-Qt, Valve its Steam client, and
+    // the two cloud services' windows need Chrome, which Google builds for amd64 alone.
     assert_eq!(
         on("arm64", Unfree::Allowed),
         [
@@ -504,4 +516,70 @@ fn an_adopted_sunshine_sign_in_is_found_and_no_step_claims_a_password_file() {
         .map(|c| c.claim.as_str())
         .collect();
     assert!(claims.iter().all(|c| !c.contains("password")), "{claims:?}");
+}
+
+#[test]
+fn steam_takes_i386_and_opts_out_of_its_packages_source_before_the_package_lands() {
+    let world = served("steam");
+
+    run(&world, |e| e.add("steam", None, &picks("steam"))).unwrap();
+
+    let state = world.host.state.borrow();
+    assert!(state.foreign.contains("i386"));
+    assert!(state.repos.contains("steam"));
+    for package in ["steam-launcher", "steam-libs-i386:i386", "mesa-vulkan-drivers:i386"] {
+        assert!(state.dpkg.contains_key(package), "{package}");
+    }
+    let at = |what: &str| state.log.iter().position(|l| l.starts_with(what));
+    assert!(at("arch i386 true") < at("run ./opt-out"), "{:#?}", state.log);
+    assert!(
+        at("run ./opt-out") < at("apt install steam-launcher"),
+        "{:#?}",
+        state.log
+    );
+    let list = fs::read_to_string(world.system_path(STEAM_LIST)).unwrap();
+    assert!(list.lines().all(|l| l.starts_with('#')), "{list}");
+}
+
+#[test]
+fn steams_removal_takes_valves_copy_of_its_source_and_keeps_the_library() {
+    let world = served("steam");
+    let before = world.host.snapshot();
+    run(&world, |e| e.add("steam", None, &picks("steam"))).unwrap();
+    // What dpkg leaves beside the conffile it found, and what Steam makes as you play.
+    let list = world.system_path(STEAM_LIST);
+    let valves = list.with_extension("list.dpkg-dist");
+    fs::write(
+        &valves,
+        "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] https://repo.steampowered.com/steam/ stable steam\n",
+    )
+    .unwrap();
+    let library = world
+        .host_home()
+        .join(".local/share/Steam/steamapps/libraryfolders.vdf");
+    fs::create_dir_all(library.parent().unwrap()).unwrap();
+    fs::write(&library, "").unwrap();
+
+    run(&world, |e| e.remove_with("steam", &Picks::default())).unwrap();
+
+    assert!(!list.exists() && !valves.exists());
+    assert!(library.is_file(), "the library stays");
+    assert!(!world.host.state.borrow().foreign.contains("i386"));
+    fs::remove_dir_all(world.host_home().join(".local")).unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn the_source_of_a_steam_installed_by_hand_stays_and_so_does_i386() {
+    let world = served("steam");
+    let list = world.system_path(STEAM_LIST);
+    let valves = "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] https://repo.steampowered.com/steam/ stable steam\n";
+    fs::write(&list, valves).unwrap();
+    world.host.state.borrow_mut().foreign.insert("i386".to_owned());
+
+    run(&world, |e| e.add("steam", None, &picks("steam"))).unwrap();
+    run(&world, |e| e.remove_with("steam", &Picks::default())).unwrap();
+
+    assert_eq!(fs::read_to_string(&list).unwrap(), valves);
+    assert!(world.host.state.borrow().foreign.contains("i386"));
 }
