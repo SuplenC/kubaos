@@ -80,6 +80,8 @@ pub enum App {
     Workspaces,
     /// `kubaos update`'s switches: the firmware phase.
     Update,
+    /// The audio switches: noise suppression, echo cancellation, new devices taking over.
+    Audio,
     Ghostty,
     Foot,
     Tmux,
@@ -96,7 +98,7 @@ pub enum App {
 }
 
 impl App {
-    pub const ALL: [App; 27] = [
+    pub const ALL: [App; 28] = [
         App::Hypr,
         App::Quickshell,
         App::Cursor,
@@ -111,6 +113,7 @@ impl App {
         App::Network,
         App::Workspaces,
         App::Update,
+        App::Audio,
         App::Ghostty,
         App::Foot,
         App::Tmux,
@@ -143,6 +146,7 @@ impl App {
             App::Network => "network",
             App::Workspaces => "workspaces",
             App::Update => "update",
+            App::Audio => "audio",
             App::Ghostty => "ghostty",
             App::Foot => "foot",
             App::Tmux => "tmux",
@@ -174,7 +178,8 @@ impl App {
             | App::Phone
             | App::Network
             | App::Workspaces
-            | App::Update => Group::Desktop,
+            | App::Update
+            | App::Audio => Group::Desktop,
             App::Ghostty | App::Foot | App::Tmux | App::Zsh | App::Fastfetch => Group::Terminal,
             App::Nvim => Group::Editor,
             App::Git | App::Lazygit | App::Yazi | App::Bat | App::Bacon | App::Fuzzel => Group::Tools,
