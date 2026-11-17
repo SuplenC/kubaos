@@ -484,7 +484,8 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
             : alone
               ? "goes on this machine, in the background: carry on with Git and the rest while it lands."
               : `${also ? "and the gaming setup " : ""}go on this machine, in the background: carry on with Git and the rest while they land.`;
-    const big = text(figure, "display", "primary_lit");
+    // A count fits its column on one line; the setup's name, alone, wraps in a laptop's narrow one.
+    const big = alone ? wrapped(figure, "display", "primary_lit") : text(figure, "display", "primary_lit");
     big.classList.add("setup-yours-figure");
     const left = stack("s8", "start", big, filling(wrapped(lede, "body_large", "on_surface_variant")), ...(vscode && state.phase === "choosing" ? [filling(wrapped(`VS Code included. ${VSCODE.ticked}`, "small", "primary"))] : []));
     const bar = progress();

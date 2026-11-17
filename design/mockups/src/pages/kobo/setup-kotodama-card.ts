@@ -950,7 +950,6 @@ export function kotodamaCard(view: string): KotodamaCard {
     }
     shown = stepView(state.step);
     room.append(shown);
-    if (state.step === 3 && state.from !== undefined) arrive(shown);
     const content = stack("s24", "start", filling(line), fillingHeight(filling(room)));
     element = body(spec.accent, spec.title, WORDS[state.step], content, false);
     element.classList.add("setup-kotodama");
