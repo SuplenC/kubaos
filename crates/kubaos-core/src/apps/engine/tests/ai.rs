@@ -143,6 +143,7 @@ fn every_ai_app_installs_on_the_fake_machine_and_its_removal_leaves_it_as_before
                         let to = to.replace("~/", "");
                         assert!(world.host_home().join(to).is_file(), "{id}: {from} isn't in place");
                     }
+                    Kind::File { to, .. } if id == "voxtype" && to == "~/.config/systemd/user/voxtype.service" => {}
                     other => panic!("{id}: an AI app is its package, its window or its icon, not {other:?}"),
                 }
             }
@@ -154,6 +155,34 @@ fn every_ai_app_installs_on_the_fake_machine_and_its_removal_leaves_it_as_before
         assert_eq!(world.host.snapshot(), before, "{id}");
         assert_eq!(world.journals(id), (None, None), "{id}");
     }
+}
+
+#[test]
+fn voxtypes_service_is_put_in_place_unenabled_and_goes_with_it() {
+    let world = world("voxtype");
+    let mut picks = Picks::default();
+    picks.add("voxtype");
+    let unit = world.host_home().join(".config/systemd/user/voxtype.service");
+    let wants = world
+        .host_home()
+        .join(".config/systemd/user/graphical-session.target.wants");
+
+    run(&world, |e| e.add("voxtype", None, &picks)).unwrap();
+
+    let text = fs::read_to_string(&unit).unwrap();
+    // The profile's wrapper, whose PATH brings the tools it types with, and never a store path a
+    // garbage collection takes away.
+    assert!(
+        text.contains("\nExecStart=%h/.nix-profile/bin/voxtype daemon\n"),
+        "{text}"
+    );
+    assert!(text.contains("\nWantedBy=graphical-session.target\n"), "{text}");
+    assert!(!text.contains("/nix/store"), "{text}");
+    assert!(!wants.exists(), "installed only, never enabled");
+
+    run(&world, |e| e.remove_with("voxtype", &Picks::default())).unwrap();
+
+    assert!(!unit.exists());
 }
 
 #[test]
