@@ -1,5 +1,6 @@
 //! The editors and terminals of the shipped catalog, installed and removed on the fake machine.
 
+use std::ffi::OsStr;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -135,15 +136,17 @@ fn toolbox_tarball() -> Vec<u8> {
     fs::write(bin.join("jetbrains-toolbox"), program).unwrap();
     fs::set_permissions(bin.join("jetbrains-toolbox"), fs::Permissions::from_mode(0o755)).unwrap();
     let archive = src.path().join("toolbox.tar.gz");
-    let made = std::process::Command::new("tar")
-        .arg("-czf")
-        .arg(&archive)
-        .arg("-C")
-        .arg(src.path())
-        .arg("jetbrains-toolbox-3.9.1.89198")
-        .status()
-        .unwrap();
-    assert!(made.success());
+    let made = crate::sandbox::output(
+        "tar",
+        [
+            OsStr::new("-czf"),
+            archive.as_os_str(),
+            OsStr::new("-C"),
+            src.path().as_os_str(),
+            OsStr::new("jetbrains-toolbox-3.9.1.89198"),
+        ],
+    );
+    assert!(made.status.success());
     fs::read(archive).unwrap()
 }
 
