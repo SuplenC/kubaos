@@ -655,16 +655,18 @@ export function audioPanel(options: AudioOptions = {}): Panel {
     page.subtitle(subtitleOf(state));
   } : undefined;
   const output = outputSlider(state, !devices.outputs, told);
-  const inputMuted = () => (state.inputMuted ?? false) || micInMusic(devices);
+  const inputMuted = () => state.inputMuted ?? false;
+  /** No mic to hear, or a headset's own in Music mode, which has none: the mic's slider and its meter are disabled. */
+  const micGone = () => noMic(devices) || micInMusic(devices);
   const meterOf = liveMeter(state.meter?.level ?? 0.46, state.meter?.peak ?? 0.68);
   if (inputMuted()) meterOf.mute(true);
-  if (noMic(devices)) meterOf.disable(true);
-  /** The mic's slider turned: its meter, and the subtitle, which a headset in Music mode leaves be. */
+  if (micGone()) meterOf.disable(true);
+  /** The mic's slider turned: its meter, and the subtitle. */
   const micTurned = (on: boolean) => {
     meterOf.mute(on);
-    if (!micInMusic(devices)) told?.({ inputMuted: on });
+    told?.({ inputMuted: on });
   };
-  let mic = micSlider(state.input ?? 0.8, inputMuted(), noMic(devices), live ? micTurned : undefined);
+  let mic = micSlider(state.input ?? 0.8, inputMuted(), micGone(), live ? micTurned : undefined);
   const room = document.createElement("span");
   room.className = "audio-tab";
   const picker = tabs({
@@ -699,10 +701,11 @@ export function audioPanel(options: AudioOptions = {}): Panel {
     const codecs = filling(codecPicker(devices.default, mode, undefined));
     codec?.replaceWith(codecs);
     codec = codecs;
-    const fresh = filling(micSlider(state.input ?? 0.8, inputMuted(), noMic(devices), micTurned));
+    const fresh = filling(micSlider(state.input ?? 0.8, inputMuted(), micGone(), micTurned));
     mic.replaceWith(fresh);
     mic = fresh;
     meterOf.mute(inputMuted());
+    meterOf.disable(micGone());
     setTabDisabled(picker, 1, micInMusic(devices));
     if (tab === 1) show();
     page.subtitle(subtitleOf(state));
