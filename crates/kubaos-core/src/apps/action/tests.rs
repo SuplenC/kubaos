@@ -2,6 +2,7 @@ use std::path::Path;
 
 use super::Action;
 use super::ActionError;
+use super::Kind;
 use super::Side;
 use super::Stage;
 use super::Words;
@@ -50,28 +51,62 @@ fn a_self_updating_download_goes_to_a_folder_named_for_its_version_or_one_its_up
 
 #[test]
 fn a_download_its_updater_rewrites_in_place_names_no_version_but_through_version() {
-    let words = Words {
-        user: "kuba".to_owned(),
-        home: "/home/kuba".into(),
-        arch: "amd64".to_owned(),
-        version: None,
-    };
-    let resolve = |to: &str, self_updates: bool| {
+    let download = |to: &str, self_updates: bool| {
         action(&format!(
             "name = \"Get\"\nkind = \"download\"\nto = \"{to}\"\nversion = \"1.0\"\nunpack = \"tar-gz\"\n\
              self_updates = {self_updates}\namd64 = {{ url = \"https://example.com/t\", sha256 = \"{sha}\" }}\n",
             sha = "a".repeat(64)
         ))
+    };
+
+    assert!(download("~/.vendor/tool-@VERSION@", true).is_ok());
+    assert!(download("~/.vendor/tool-1.0", false).is_ok());
+    assert!(matches!(
+        download("~/.vendor/tool-1.0", true),
+        Err(ActionError::SelfUpdatesNamesVersion { .. })
+    ));
+}
+
+#[test]
+fn a_user_naming_the_version_leaves_a_download_rewritten_in_place() {
+    let words = Words {
+        user: "dev1.0".to_owned(),
+        home: "/home/dev1.0".into(),
+        arch: "amd64".to_owned(),
+        version: None,
+    };
+    let resolve = |to: &str| {
+        action(&format!(
+            "name = \"Get\"\nkind = \"download\"\nto = \"{to}\"\nversion = \"1.0\"\nunpack = \"tar-gz\"\n\
+             self_updates = true\namd64 = {{ url = \"https://example.com/t\", sha256 = \"{sha}\" }}\n",
+            sha = "a".repeat(64)
+        ))
         .unwrap()
         .resolve(&words, Path::new("/nowhere"))
     };
+    let in_place = |action: &Action| matches!(action.kind, Kind::Download { in_place: true, .. });
 
-    assert!(resolve("~/.vendor/tool-@VERSION@", true).is_ok());
-    assert!(resolve("~/.vendor/tool-1.0", false).is_ok());
-    assert!(matches!(
-        resolve("~/.vendor/tool-1.0", true),
-        Err(ActionError::SelfUpdatesNamesVersion { .. })
+    let under_home = resolve("~/.vendor/@USER@/tool").unwrap();
+    let user = resolve("/opt/@USER@/tool").unwrap();
+    let versioned = resolve("/opt/@USER@/tool-@VERSION@").unwrap();
+
+    assert!(in_place(&under_home), "{under_home:?}");
+    assert!(in_place(&user), "{user:?}");
+    assert!(!in_place(&versioned), "{versioned:?}");
+}
+
+#[test]
+fn a_folder_setting_what_only_a_journal_records_is_refused() {
+    let result = action(&format!(
+        "name = \"Get\"\nkind = \"download\"\nto = \"~/.vendor/tool-@VERSION@\"\nversion = \"1.0\"\n\
+         unpack = \"tar-gz\"\nin_place = true\namd64 = {{ url = \"https://example.com/t\", sha256 = \"{sha}\" }}\n",
+        sha = "a".repeat(64)
     ));
+
+    assert!(
+        matches!(result, Err(ActionError::JournalOnly { key: "in_place" })),
+        "{result:?}"
+    );
 }
 
 #[test]

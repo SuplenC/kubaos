@@ -450,6 +450,7 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             to,
             version,
             self_updates,
+            in_place,
             ..
         } => {
             let path = logical(host, to);
@@ -459,13 +460,10 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
                 Recorded::Unsettled(had) => had.path() != action.path(),
                 Recorded::Done(_) | Recorded::Nothing => true,
             };
-            let moved_on = *self_updates && !there && newer_version_there(host, &path, version);
+            let moved_on = *self_updates && !*in_place && !there && newer_version_there(host, &path, version);
             // A `to` naming no `@VERSION@` is the vendor's updater's to rewrite in place once it is
-            // there: a new pin would put an older build back over its newer one. Resolving fills
-            // the version in, and refuses a self-updating `to` naming it any other way, so the
-            // version in the path is `@VERSION@` filled in.
-            let versioned = to.contains(version.as_str());
-            let updated_in_place = *self_updates && !versioned && there && !matches!(recorded, Recorded::Unsettled(_));
+            // there: a new pin would put an older build back over its newer one.
+            let updated_in_place = *in_place && there && !matches!(recorded, Recorded::Unsettled(_));
             Ok(at_path(host, &path, (there && holds) || moved_on || updated_in_place))
         }
         Kind::File { .. } => Ok(look_file(host, &action.kind)),

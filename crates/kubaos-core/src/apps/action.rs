@@ -210,6 +210,12 @@ pub enum Kind {
         /// the pin, which the updater may have removed.
         #[serde(default)]
         self_updates: bool,
+        /// A self-updating `to` naming no `@VERSION@`, which the vendor's updater rewrites in
+        /// place, set as the action resolves from the folder's `to`: the filled one may hold the
+        /// version's text in the home or the user's name. The journal's own; a folder never sets
+        /// it.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        in_place: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         amd64: Option<Download>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -394,7 +400,7 @@ impl Action {
     ///
     /// [`ActionError`] for an action that isn't valid.
     pub fn from_folder(table: toml::Table) -> Result<Self, ActionError> {
-        for key in ["scripts", "svg"] {
+        for key in ["scripts", "svg", "in_place"] {
             if table.contains_key(key) {
                 return Err(ActionError::JournalOnly { key });
             }
@@ -419,6 +425,16 @@ impl Action {
                     }
                 }
                 Ok(())
+            }
+            // A look tells a `to` its updater rewrites in place from one of its version's folder
+            // by `@VERSION@`, so one naming no `@VERSION@` names no version either.
+            Kind::Download {
+                to,
+                version,
+                self_updates: true,
+                ..
+            } if !to.contains("@VERSION@") && to.contains(version.as_str()) => {
+                Err(ActionError::SelfUpdatesNamesVersion { value: to.clone() })
             }
             _ => Ok(()),
         }
@@ -548,7 +564,7 @@ impl Action {
     pub fn resolve(&self, words: &Words, folder: &Path) -> Result<Self, ActionError> {
         let fill = |text: &str, version: Option<&str>| words.fill(text, version);
         let kind = match &self.kind {
-            Kind::Download { .. } => resolve_download(words, &self.kind)?,
+            Kind::Download { .. } => resolve_download(words, &self.kind),
             Kind::File {
                 to,
                 from,
@@ -743,25 +759,22 @@ impl Action {
     }
 }
 
-/// A download as it runs: its `to` with its words and version filled in.
-fn resolve_download(words: &Words, kind: &Kind) -> Result<Kind, ActionError> {
+/// A download as it runs: its `to` with its words and version filled in, and whether its
+/// updater rewrites it in place, read before the filling.
+fn resolve_download(words: &Words, kind: &Kind) -> Kind {
     let mut kind = kind.clone();
     if let Kind::Download {
         to,
         version,
         self_updates,
+        in_place,
         ..
     } = &mut kind
     {
-        let path = words.fill(to, Some(version));
-        // A look tells a `to` its updater rewrites in place from one of its version's folder by
-        // the version in the filled path, so one naming no `@VERSION@` names no version either.
-        if *self_updates && !to.contains("@VERSION@") && path.contains(version.as_str()) {
-            return Err(ActionError::SelfUpdatesNamesVersion { value: to.clone() });
-        }
-        *to = path;
+        *in_place = *self_updates && !to.contains("@VERSION@");
+        *to = words.fill(to, Some(version));
     }
-    Ok(kind)
+    kind
 }
 
 /// A `file`'s text as it is written: its `from` read, filled in for a template, which may name
