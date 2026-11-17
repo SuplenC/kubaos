@@ -87,8 +87,8 @@ fn a_run_that_only_undoes_needs_no_root_once_recorded() {
     assert!(!turned_off(&world));
 }
 
-#[test]
-fn an_adopted_app_owns_its_run_that_only_undoes_so_its_removal_runs_it() {
+/// The guard installed by hand, taken in: `owned` when the user picked it, else found.
+fn guard_by_hand(owned: bool) -> World {
     let world = guard();
     world
         .host
@@ -100,15 +100,116 @@ fn an_adopted_app_owns_its_run_that_only_undoes_so_its_removal_runs_it() {
     let mut events = Events::default();
     world
         .run(&mut root, &mut events, true, |e| {
-            assert!(e.adopt("guard", true, None).unwrap().is_some(), "not taken in");
+            assert!(e.adopt("guard", owned, None).unwrap().is_some(), "not taken in");
             Ok(super::super::Finished::default())
         })
         .unwrap();
+    world
+}
+
+#[test]
+fn a_picked_app_installed_by_hand_owns_its_run_that_only_undoes_so_its_removal_runs_it() {
+    let world = guard_by_hand(true);
+    world.install("guard", true).0.unwrap();
+
+    assert_eq!(the_run(&world).state, State::Done);
 
     world.remove("guard").0.unwrap();
 
     assert!(turned_off(&world));
     assert!(!world.host.state.borrow().dpkg.contains_key("guard"));
+}
+
+#[test]
+fn a_found_app_keeps_its_run_that_only_undoes_found_through_an_install_and_its_removal_runs_nothing() {
+    // Taken in as found, as `kubaos app add` takes in what it finds before installing it.
+    let world = guard_by_hand(false);
+    world.install("guard", true).0.unwrap();
+
+    let entry = the_run(&world);
+    assert_eq!(entry.state, State::Found);
+    assert!(entry.claims.iter().all(|c| !c.owned), "{entry:?}");
+    let mut root = world.root();
+    let mut events = Events::default();
+    world
+        .run(&mut root, &mut events, true, |e| e.install("guard", None))
+        .unwrap();
+    assert!(!root.started, "root was asked for");
+
+    world.remove("guard").0.unwrap();
+
+    assert!(!turned_off(&world));
+    assert!(world.host.state.borrow().dpkg.contains_key("guard"));
+}
+
+/// Its run that only undoes, as `world`'s guard now has it, at step `step`.
+fn the_run_at(world: &World, step: usize) -> crate::apps::journal::Entry {
+    let root = Journal::read(&world.root_journals, "guard").unwrap().unwrap();
+    root.entry(step).unwrap().clone()
+}
+
+#[test]
+fn a_step_put_before_a_run_that_only_undoes_moves_it_without_running_its_undo() {
+    let world = guard();
+    world.install("guard", true).0.unwrap();
+    let extra = "[[action]]\nname = \"Install the extra\"\nkind = \"apt\"\npackages = [\"guard-extra\"]\n\n";
+    world.write_app(
+        "guard",
+        &GUARD.replacen(
+            "[[action]]\nname = \"Turn",
+            &format!("{extra}[[action]]\nname = \"Turn"),
+            1,
+        ),
+    );
+
+    world.install("guard", true).0.unwrap();
+
+    assert!(!turned_off(&world));
+    assert_eq!(the_run_at(&world, 3).state, State::Done);
+
+    world.remove("guard").0.unwrap();
+
+    assert!(turned_off(&world));
+}
+
+#[test]
+fn a_run_that_only_undoes_moved_from_root_to_the_user_runs_no_undo_until_the_removal() {
+    let world = guard();
+    world.install("guard", true).0.unwrap();
+    world.write_app("guard", &GUARD.replace("root = true\n", ""));
+
+    world.install("guard", true).0.unwrap();
+
+    assert!(!turned_off(&world));
+
+    world.remove("guard").0.unwrap();
+
+    assert!(turned_off(&world));
+}
+
+#[test]
+fn an_update_that_fails_after_adding_a_run_that_only_undoes_keeps_it_and_runs_no_undo() {
+    let before_it = GUARD[..GUARD.find("[[action]]\nname = \"Turn").unwrap()].to_owned();
+    let world = World::new(&[("guard", &before_it)]);
+    world.script("guard", "off", "systemctl stop guard.service");
+    world.install("guard", true).0.unwrap();
+    let failing = "\n[[action]]\nname = \"Start the guard\"\nkind = \"unit\"\nunit = \"guard.service\"\nscope = \"system\"\nenable = true\n";
+    world.write_app("guard", &format!("{GUARD}{failing}"));
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("enable:guard.service".to_owned());
+
+    assert!(world.install("guard", true).0.is_err(), "the update went through");
+
+    assert!(!turned_off(&world));
+    assert!(world.host.state.borrow().dpkg.contains_key("guard"));
+
+    world.remove("guard").0.unwrap();
+
+    assert!(turned_off(&world));
 }
 
 #[test]
