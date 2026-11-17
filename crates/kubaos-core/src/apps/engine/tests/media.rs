@@ -2,6 +2,7 @@
 
 use std::fs;
 
+use super::super::EngineError;
 use super::World;
 use super::ai::run;
 use super::ai::shipped;
@@ -198,4 +199,42 @@ fn ardours_menu_entry_takes_the_packages_place_and_starts_it_through_pipewires_j
     );
     let state = world.host.state.borrow();
     assert!(state.dpkg.contains_key("pipewire-jack"), "pw-jack is pipewire-jack's");
+}
+
+/// The menu entry KubaOS writes for Spotify, which takes the package's place.
+const SPOTIFY_ENTRY: &str = ".local/share/applications/spotify.desktop";
+
+#[test]
+fn spotify_starts_on_wayland_from_the_menu_and_its_removal_takes_the_entry_back() {
+    let world = media_world("spotify");
+    let entry = world.host_home().join(SPOTIFY_ENTRY);
+
+    run(&world, |e| e.add("spotify", None, &picks("spotify"))).unwrap();
+
+    let text = fs::read_to_string(&entry).unwrap();
+    assert!(text.contains("\nExec=env -u DISPLAY spotify %U\n"), "{text}");
+    run(&world, |e| e.remove_with("spotify", &Picks::default())).unwrap();
+    assert!(!entry.exists(), "the package's own entry is the menu's again");
+}
+
+#[test]
+fn a_spotify_menu_entry_of_the_users_own_is_never_written_over_and_the_refusal_says_what_to_do() {
+    let world = media_world("spotify");
+    let entry = world.host_home().join(SPOTIFY_ENTRY);
+    fs::create_dir_all(entry.parent().unwrap()).unwrap();
+    fs::write(&entry, "[Desktop Entry]\nName=Mine\n").unwrap();
+    let before = world.host.snapshot();
+
+    let result = run(&world, |e| e.add("spotify", None, &picks("spotify")));
+
+    let Err(EngineError::Refused { why, .. }) = result else {
+        panic!("Spotify was installed over the user's entry: {result:?}");
+    };
+    assert!(
+        why.iter()
+            .any(|w| w.contains("is yours") && w.contains("delete or rename it")),
+        "{why:?}"
+    );
+    assert_eq!(world.host.snapshot(), before);
+    assert_eq!(fs::read_to_string(&entry).unwrap(), "[Desktop Entry]\nName=Mine\n");
 }

@@ -7,7 +7,9 @@
 # hand has both already: its spotify.list stays and repo setup turns its line off, and its copy of
 # the key goes as the repository is set up (system/packages.toml). Spotify plays local files
 # through an FFmpeg older than Ubuntu's (it asks for libavcodec 61 at the newest), so those
-# don't play; streaming needs nothing more.
+# don't play; streaming needs nothing more. Spotify draws on X11 whenever DISPLAY is set, which
+# XWayland sets in the session, and on Wayland only without it: the menu entry KubaOS writes, with
+# the id of the package's own so it takes its place, starts it with DISPLAY unset.
 # https://www.spotify.com/us/download/linux/
 name = "Spotify"
 category = "media"
@@ -49,3 +51,9 @@ kind = "apt"
 repo = "spotify"
 arch = "amd64"
 packages = ["spotify-client"]
+
+[[action]]
+name = "Start Spotify on Wayland"
+kind = "file"
+to = "~/.local/share/applications/spotify.desktop"
+from = "spotify.desktop"

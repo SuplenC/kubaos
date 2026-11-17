@@ -555,6 +555,33 @@ fn an_app_that_fails_to_install_warns_and_the_update_goes_on() {
 }
 
 #[test]
+fn a_picked_app_refused_over_a_file_of_the_users_own_names_the_remedy_at_every_update() {
+    let w = world();
+    let mut picks = Picks::default();
+    picks.add("desk");
+    picks.write(&w.user.app_picks()).unwrap();
+    let mut m = fake(&w, &[]);
+    let mine = host(&m).place(Path::new("/etc/xdg/autostart/desk.desktop"));
+    put(&mine, "[Desktop Entry]\nExec=my-desk\n");
+
+    for _ in 0..2 {
+        let mut events = Vec::new();
+        w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+        let warned = warnings(&events);
+        assert!(
+            warned.iter().any(|w| w.contains("is yours")
+                && w.contains("delete or rename it")
+                && w.ends_with(", then run kubaos update")),
+            "{warned:?}"
+        );
+        assert!(!has(&m, "desk"));
+    }
+    assert_eq!(fs::read_to_string(&mine).unwrap(), "[Desktop Entry]\nExec=my-desk\n");
+    assert_eq!(picked(&w), names(&["desk"]));
+}
+
+#[test]
 fn the_status_reads_the_journals_the_picks_and_dpkg() {
     let w = world();
     let mut m = fake(&w, &[]);

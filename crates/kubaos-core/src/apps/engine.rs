@@ -81,7 +81,10 @@ pub enum StepError {
     Folder(FolderError),
     #[error("{} belongs to {owner}", path.display())]
     Owned { path: PathBuf, owner: String },
-    #[error("{} is yours: KubaOS never writes over a file it didn't put there", path.display())]
+    #[error(
+        "{} is yours, and KubaOS never writes over a file it didn't put there: delete or rename it",
+        path.display()
+    )]
     Yours { path: PathBuf },
     #[error("{key} belongs to {owner}")]
     KeyOwned { key: String, owner: String },

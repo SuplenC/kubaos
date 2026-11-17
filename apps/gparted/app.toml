@@ -1,10 +1,12 @@
 # GParted from Ubuntu's archive, 1.8.0, where nixpkgs has 1.8.1: it changes disks as root, through
 # the polkit action and the pkexec its package brings, which a Nix build, outside the machine's
 # polkit, can't do as well. /usr/sbin/gparted asks for your password through KubaOS's polkit agent,
-# then runs as root on the X server XWayland gives the session. Of the file system tools it
-# suggests, the steps take those of the disks people carry around: FAT (dosfstools, and mtools for
-# its labels), exFAT and NTFS, beside ext4's and btrfs's, which every machine has. GParted greys
-# out what a missing one (XFS, UDF, ...) can't do and names its package.
+# then runs itself as root through pkexec, whose polkit action lets a GUI through by passing root
+# DISPLAY and XAUTHORITY alone, so it draws on the X server XWayland gives the session; Ubuntu
+# builds it without its xhost grant. Of the file system tools it suggests, the steps take those
+# of the disks people carry around: FAT (dosfstools, and mtools for its labels), exFAT and NTFS,
+# beside ext4's and btrfs's, which every machine has. GParted greys out what a missing one (XFS,
+# UDF, ...) can't do and names its package.
 # https://gparted.org/
 name = "GParted"
 category = "system"
