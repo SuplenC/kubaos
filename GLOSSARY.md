@@ -24,6 +24,10 @@ _Avoid_: Dev mode, test build, override
 The one list of KubaOS's apt packages, `system/packages.toml`, which the install and every update read, so the machine's apt packages follow the release as its Nix packages do.
 _Avoid_: Package list, base packages
 
+**Held package**:
+A package of the user's own list (`kubaos.d/packages.toml`, a **Suite**'s packages) that a switch couldn't build, kept at the version the home had while the rest of the home switches; every switch tries it again, and it stops being held once it builds.
+_Avoid_: Pinned package, skipped package; apt's holds (`apt-mark hold`), which are a **Package group**'s and another thing
+
 **Package group**:
 A named set of the **Package manifest**'s packages for one feature (the file manager, Hyprland, the security key); an optional one the user can turn off or on for good.
 _Avoid_: Feature flag, bundle

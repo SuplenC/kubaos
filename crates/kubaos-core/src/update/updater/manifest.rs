@@ -204,6 +204,7 @@ impl<M: Machine> Updater<'_, M> {
             programs: Vec::new(),
             suites: SuiteChanges::default(),
             reloaded: Vec::new(),
+            held: Vec::new(),
             firmware: Firmware::default(),
             restart: Restart::None,
             restart_reason: None,

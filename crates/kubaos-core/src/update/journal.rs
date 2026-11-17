@@ -73,6 +73,8 @@ pub struct Journal<'a> {
     pub reloaded: Vec<String>,
     /// The user flake's inputs `nix flake update` moved.
     pub inputs: Vec<String>,
+    /// The packages the switch held at the version the home had, since they couldn't be built.
+    pub held: Vec<String>,
 }
 
 /// The Apps catalog's engine reports through the journal, as the updater does.
@@ -104,6 +106,7 @@ impl<'a> Journal<'a> {
             count: None,
             reloaded: Vec::new(),
             inputs: Vec::new(),
+            held: Vec::new(),
         }
     }
 

@@ -249,12 +249,13 @@ pub trait Machine {
     fn run(&mut self, cmd: &Cmd, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError>;
 
     /// Switches the user's home to the user flake, through the switch queue, handing each line of
-    /// the switch's output to `on_line`.
+    /// the switch's output to `on_line`. Returns the packages the switch held at the version the
+    /// home had, since they couldn't be built (`crate::held`).
     ///
     /// # Errors
     ///
     /// [`MachineError::Switch`] when the switch fails.
-    fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError>;
+    fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<Vec<String>, MachineError>;
 
     /// The live preview the home is on (`crate::preview`), as a line names it, or `None` while it
     /// is the release.

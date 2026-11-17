@@ -454,6 +454,10 @@ pub struct Summary {
     pub suites: SuiteChanges,
     /// What the running session reloaded or restarted after the switch (`scripts/dot-session`).
     pub reloaded: Vec<String>,
+    /// The packages the switch held at the version the home had, since they couldn't be built
+    /// (`crate::held`), by name as the state directory lists them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub held: Vec<String>,
     /// What the firmware phase applied, staged, left waiting and failed at.
     #[serde(default, skip_serializing_if = "Firmware::is_empty")]
     pub firmware: Firmware,

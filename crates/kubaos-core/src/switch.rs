@@ -13,6 +13,10 @@
 //! that switches to a checkout records the preview when it succeeds, and one to the release clears
 //! it, both under the switch lock.
 //!
+//! Before it switches, a job builds the packages the state directory lists, as the switch will see
+//! them, and holds each one that fails at the version the home has (`held.rs`), so the rest of the
+//! home still switches. The job records the packages it held, and its log names each.
+//!
 //! A job records the name of its worker unit. A job still queued whose unit is gone, while no
 //! worker holds the lock, will never run (its program failed to start, say), and [`Queue::reap`]
 //! fails it; following a job and listing the jobs both reap.
@@ -27,15 +31,18 @@
 //!
 //! - The job files, the queue order and the switch lock.
 //! - What each job switches to, and keeping the preview file in step with the switches that ran.
+//! - The pre-build before each switch, and keeping `held.toml` in step with it.
 //! - Following a job's output until it ends.
 //! - [`Host`], the seam to systemd and home-manager, and [`Systemd`], the real one.
 //!
 //! # Not here
 //!
 //! - What a switch applies: the user flake and its state directory (`state.rs`).
+//! - Which packages a pre-build holds, and `held.toml`'s format: `held.rs`.
 //! - Which switch a `kubaos switch` asks for, and the preview record: `preview.rs`.
 //! - The `kubaos switch` and `kubaos job` commands: `kubaos-cli`.
 
+use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fmt;
@@ -46,6 +53,7 @@ use std::io;
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
@@ -61,10 +69,16 @@ use std::time::UNIX_EPOCH;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::held;
+use crate::held::CurrentHome;
+use crate::held::Evaluated;
+use crate::held::HeldFile;
+use crate::held::Prebuilt;
 use crate::preview;
 use crate::preview::Checkout;
 use crate::preview::Preview;
 use crate::preview::PreviewFile;
+use crate::state::GENERATION_RECORD;
 use crate::state::lock_file;
 use crate::state::write_atomic;
 
@@ -186,6 +200,10 @@ pub struct Job {
     /// What it switches to.
     #[serde(default)]
     pub target: Target,
+    /// The listed packages it installed at the version the home had, since they couldn't be
+    /// built (`held.rs`), by name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub held: Vec<String>,
 }
 
 /// What the queue needs from the machine: starting a worker unit, the switch itself, and reading
@@ -230,6 +248,22 @@ pub trait Host {
     ///
     /// [`HostError`] when the evaluation fails.
     fn evaluate(&self, path: &Path) -> Result<(), HostError>;
+
+    /// Builds every package the state directory lists, as the switch from `from` will see it, as
+    /// far as each builds, the build's output going to `log`, and returns which of them built.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError`] when the packages could not be evaluated, or a program could not run. A
+    /// package that fails to build is no error.
+    fn prebuild(&self, log: &File, from: Option<&Path>) -> Result<Vec<Prebuilt>, HostError>;
+
+    /// The listed packages the home has now, from the home-manager generation it is on.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError`] when the generation's record or its packages could not be read.
+    fn current_home(&self) -> Result<CurrentHome, HostError>;
 }
 
 /// A program the [`Host`] ran failed.
@@ -246,6 +280,20 @@ pub enum HostError {
     /// It ran and exited with an error, or was killed (no code).
     #[error("{program} exited with {}", code.map_or_else(|| "a signal".to_owned(), |c| format!("code {c}")))]
     Exited { program: String, code: Option<i32> },
+    /// It printed something other than the answer it was asked for.
+    #[error("reading what {program} printed")]
+    Answer {
+        program: String,
+        #[source]
+        source: serde_json::Error,
+    },
+    /// A file it reads could not be.
+    #[error("reading {}", path.display())]
+    Read {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
 }
 
 impl HostError {
@@ -319,6 +367,9 @@ pub struct Queue {
     /// The preview file the jobs keep in step; without one, previews aren't recorded and
     /// [`Target::Current`] is the user flake as locked.
     previews: Option<PreviewFile>,
+    /// The hold file the jobs keep in step with their pre-builds; without one, a job builds
+    /// nothing before its switch and holds nothing.
+    held: Option<HeldFile>,
 }
 
 impl Queue {
@@ -328,6 +379,7 @@ impl Queue {
         Self {
             dir: dir.into(),
             previews: None,
+            held: None,
         }
     }
 
@@ -335,6 +387,14 @@ impl Queue {
     #[must_use]
     pub fn previews(mut self, file: PreviewFile) -> Self {
         self.previews = Some(file);
+        self
+    }
+
+    /// The same queue, building the listed packages before each switch and holding those that
+    /// fail in `file` (`held.rs`).
+    #[must_use]
+    pub fn holding(mut self, file: HeldFile) -> Self {
+        self.held = Some(file);
         self
     }
 
@@ -369,6 +429,7 @@ impl Queue {
             finished_at: None,
             error: None,
             target,
+            held: Vec::new(),
         };
         self.write_job(&job)?;
         Ok(id)
@@ -434,7 +495,7 @@ impl Queue {
                 .append(true)
                 .open(&log_path)
                 .map_err(QueueError::io(&log_path))?;
-            let result = self.run_job(host, &job.target, log);
+            let result = self.run_job(host, &job.target, &mut job.held, log);
             job.finished_at = Some(now_ms());
             match result {
                 Ok(()) => job.state = JobState::Succeeded,
@@ -449,9 +510,10 @@ impl Queue {
         Ok(ran)
     }
 
-    /// Runs one job's switch to `target`, and records the preview it makes or clears when it
-    /// succeeds. The caller holds the switch lock, so the preview file has one writer at a time.
-    fn run_job(&self, host: &impl Host, target: &Target, log: File) -> Result<(), String> {
+    /// Runs one job's pre-build and switch to `target`, puts the packages it held in `held`, and
+    /// records the preview it makes or clears when it succeeds. The caller holds the switch lock,
+    /// so the preview file has one writer at a time.
+    fn run_job(&self, host: &impl Host, target: &Target, held: &mut Vec<String>, log: File) -> Result<(), String> {
         // Only the home as it stands depends on the record: the release empties it whatever it
         // holds, and a checkout replaces it, so a record that doesn't read never blocks the way
         // out.
@@ -472,6 +534,7 @@ impl Queue {
             ));
         }
         let Some(from) = from else {
+            *held = self.hold(host, &log, None);
             host.switch(log, None).map_err(|e| error_chain(&e))?;
             if let Some(file) = &self.previews
                 && *target == Target::Release
@@ -483,6 +546,7 @@ impl Queue {
         let checkout = host
             .describe(&from)
             .map_err(|e| format!("reading the checkout {}: {}", from.display(), error_chain(&e)))?;
+        *held = self.hold(host, &log, Some(&from));
         host.switch(log, Some(&from)).map_err(|e| error_chain(&e))?;
         let Some(file) = &self.previews else {
             return Ok(());
@@ -498,6 +562,65 @@ impl Queue {
             since,
         };
         file.write(&preview).map_err(|e| error_chain(&e))
+    }
+
+    /// Builds the listed packages as the switch from `from` will see them, and holds each that
+    /// failed at the version the home has, writing `held.toml`; each step and each hold is a line
+    /// of `log`. Returns the packages the switch installs held, by name.
+    ///
+    /// Nothing here fails the job: when the packages don't evaluate or the file can't be written,
+    /// the holds stay as they were, and the switch goes on to succeed or fail as it would.
+    fn hold(&self, host: &impl Host, log: &File, from: Option<&Path>) -> Vec<String> {
+        let Some(file) = &self.held else {
+            return Vec::new();
+        };
+        let before = file.read().unwrap_or_else(|e| {
+            note(log, &format!("not reading the held packages: {}", error_chain(&e)));
+            held::Holds::new()
+        });
+        let listed = file.state().declared().map_or(true, |declared| !declared.is_empty());
+        if !listed && before.is_empty() {
+            return Vec::new();
+        }
+        note(log, "building the packages kubaos.d lists before the switch");
+        let prebuilt = match host.prebuild(log, from) {
+            Ok(prebuilt) => prebuilt,
+            Err(e) => {
+                note(
+                    log,
+                    &format!(
+                        "the packages kubaos.d lists don't evaluate, so no hold changes: {}",
+                        error_chain(&e)
+                    ),
+                );
+                return before.into_keys().collect();
+            }
+        };
+        let current = host.current_home().unwrap_or_else(|e| {
+            note(log, &format!("not reading what your home has: {}", error_chain(&e)));
+            CurrentHome::Nothing
+        });
+        let decision = held::decide(&prebuilt, &current);
+        for name in &decision.unkept {
+            note(
+                log,
+                &format!("{name} couldn't be built, and your home has no version of it to keep"),
+            );
+        }
+        for (name, path) in &decision.held {
+            note(
+                log,
+                &format!("{} (kept at {path}; the next switch tries again)", held::message(name)),
+            );
+        }
+        for package in prebuilt.iter().filter(|p| p.built && before.contains_key(&p.name)) {
+            note(log, &format!("{} builds again: it is no longer held", package.name));
+        }
+        if let Err(e) = file.write(&decision.held) {
+            note(log, &format!("the holds stay as they were: {}", error_chain(&e)));
+            return before.into_keys().collect();
+        }
+        decision.held.into_keys().collect()
     }
 
     /// Fails every queued job that will never run: its worker unit is gone, and no other worker
@@ -704,6 +827,8 @@ impl Queue {
 pub struct Systemd {
     kubaos: PathBuf,
     flake: PathBuf,
+    /// home-manager's GC root to the generation the home is on (`Paths::home_generation`).
+    generation: Option<PathBuf>,
 }
 
 impl Systemd {
@@ -713,7 +838,16 @@ impl Systemd {
         Self {
             kubaos: kubaos.into(),
             flake: flake.into(),
+            generation: None,
         }
+    }
+
+    /// The same host, reading what the home has from the generation `root` links to
+    /// (`Paths::home_generation`). Without it, the home has no listed package to keep.
+    #[must_use]
+    pub fn generation(mut self, root: impl Into<PathBuf>) -> Self {
+        self.generation = Some(root.into());
+        self
     }
 
     /// The `systemd-run` command that starts the worker unit for `job`, passing `env` on.
@@ -771,6 +905,50 @@ impl Systemd {
         argv
     }
 
+    /// The evaluation [`Host::prebuild`] starts with: every home configuration's listed packages
+    /// (`kubaos.listedPackages`, `home/state.nix`), with KubaOS from the checkout `from` when it
+    /// is a preview, as a JSON list of [`Evaluated`].
+    pub fn listed_command(&self, from: Option<&Path>) -> Vec<OsString> {
+        let mut installable = self.flake.as_os_str().to_owned();
+        installable.push("#homeConfigurations");
+        let mut argv: Vec<OsString> = vec!["nix".into(), "eval".into(), "--json".into(), installable];
+        argv.extend(from.map(override_args).into_iter().flatten());
+        argv.extend(["--apply".into(), LISTED.into()]);
+        argv
+    }
+
+    /// The build [`Host::prebuild`] runs: the outputs the home installs of every listed package,
+    /// as far as each builds.
+    pub fn build_command(installables: &[String]) -> Vec<OsString> {
+        let mut argv: Vec<OsString> = ["nix", "build", "--no-link", "--keep-going"]
+            .into_iter()
+            .map(OsString::from)
+            .collect();
+        argv.extend(installables.iter().map(OsString::from));
+        argv
+    }
+
+    /// The check after the build: it prints each of `paths` that is not in the store.
+    pub fn missing_command(paths: &[String]) -> Vec<OsString> {
+        let mut argv: Vec<OsString> = ["nix-store", "--check-validity", "--print-invalid"]
+            .into_iter()
+            .map(OsString::from)
+            .collect();
+        argv.extend(paths.iter().map(OsString::from));
+        argv
+    }
+
+    /// The query of the store paths a generation's packages' environment refers to, for a
+    /// generation without the record of its listed packages.
+    pub fn references_command(generation: &Path) -> Vec<OsString> {
+        vec![
+            "nix-store".into(),
+            "--query".into(),
+            "--references".into(),
+            generation.join("home-path").into_os_string(),
+        ]
+    }
+
     /// The `git worktree list` a branch given to `--from` is looked up in ([`preview::resolve`]).
     pub fn worktrees_command(repo: &Path) -> Vec<OsString> {
         let mut argv: Vec<OsString> = vec!["git".into(), "-C".into(), repo.as_os_str().to_owned()];
@@ -787,6 +965,29 @@ impl Systemd {
         output(&Self::worktrees_command(repo))
     }
 }
+
+/// The function `nix eval` applies to the user flake's home configurations: each listed package of
+/// each, with its derivation, the outputs the home installs and its name without the version, or
+/// `null` for one the user's nixpkgs lacks or that doesn't evaluate. A home from a KubaOS without
+/// `kubaos.listedPackages` lists none.
+const LISTED: &str = r#"configs: builtins.concatMap (home:
+  let listed = home.config.kubaos.listedPackages or { };
+  in map (name:
+    let
+      package = listed.${name};
+      found =
+        if package ? drvPath then {
+          drv = package.drvPath;
+          outputs = builtins.listToAttrs (map (output: {
+            name = output;
+            value = package.${output}.outPath;
+          }) (package.meta.outputsToInstall or [ package.outputName or "out" ]));
+          pname = (builtins.parseDrvName package.name).name;
+        } else null;
+      tried = builtins.tryEval (builtins.deepSeq found found);
+    in { inherit name; found = if tried.success then tried.value else null; })
+    (builtins.attrNames listed))
+  (builtins.attrValues configs)"#;
 
 /// The arguments that override the user flake's `kubaos` input to the checkout `from`. The lock
 /// file is never written: it keeps the release, which `--release` goes back to.
@@ -859,6 +1060,67 @@ impl Host for Systemd {
         // Nix's errors reach the terminal: they say why the checkout doesn't evaluate.
         run(&self.evaluate_command(path), Stdio::null(), Stdio::inherit())
     }
+
+    fn prebuild(&self, log: &File, from: Option<&Path>) -> Result<Vec<Prebuilt>, HostError> {
+        let printed = output_to(&self.listed_command(from), log_stdio(log, "nix")?)?;
+        let evaluated: Vec<Evaluated> = serde_json::from_str(&printed).map_err(|source| HostError::Answer {
+            program: "nix eval".to_owned(),
+            source,
+        })?;
+        let found: Vec<_> = evaluated.iter().filter_map(|one| one.found.as_ref()).collect();
+        if found.is_empty() {
+            return Ok(held::prebuilt(&evaluated, &BTreeSet::new()));
+        }
+        let installables: Vec<String> = found.iter().map(|found| found.installable()).collect();
+        // A package that fails to build fails the build; the check below finds which.
+        match run(
+            &Self::build_command(&installables),
+            log_stdio(log, "nix")?,
+            log_stdio(log, "nix")?,
+        ) {
+            Ok(()) | Err(HostError::Exited { .. }) => {}
+            Err(e) => return Err(e),
+        }
+        let paths: Vec<String> = found.iter().flat_map(|found| found.outputs.values().cloned()).collect();
+        let invalid: BTreeSet<String> = output_to(&Self::missing_command(&paths), log_stdio(log, "nix-store")?)?
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        Ok(held::prebuilt(&evaluated, &invalid))
+    }
+
+    fn current_home(&self) -> Result<CurrentHome, HostError> {
+        let Some(root) = self.generation.as_deref().filter(|root| root.exists()) else {
+            return Ok(CurrentHome::Nothing);
+        };
+        let record = root.join(GENERATION_RECORD);
+        match fs::read(&record) {
+            Ok(bytes) => serde_json::from_slice(&bytes)
+                .map(CurrentHome::Recorded)
+                .map_err(|source| HostError::Answer {
+                    program: record.display().to_string(),
+                    source,
+                }),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                let paths = output(&Self::references_command(root))?;
+                Ok(CurrentHome::Unrecorded(paths.lines().map(str::to_owned).collect()))
+            }
+            Err(source) => Err(HostError::Read { path: record, source }),
+        }
+    }
+}
+
+/// `log` as the output of `program`.
+fn log_stdio(log: &File, program: &str) -> Result<Stdio, HostError> {
+    log.try_clone()
+        .map(Stdio::from)
+        .map_err(|e| HostError::spawn(program, e))
+}
+
+/// Writes `line` to a job's log as KubaOS's own: a log that can't be written loses the line, never
+/// the switch.
+fn note(mut log: &File, line: &str) {
+    let _ = writeln!(log, "kubaos: {line}");
 }
 
 /// Whether a unit in systemd's `ActiveState` `state` still has, or is about to have, a process.
@@ -890,6 +1152,11 @@ fn run(argv: &[OsString], stdout: Stdio, stderr: Stdio) -> Result<(), HostError>
 /// Runs `argv` to the end with stdin closed, stderr dropped and none of git's variables (it may
 /// be git: [`Systemd::worktrees`]), returning what it printed.
 fn output(argv: &[OsString]) -> Result<String, HostError> {
+    output_to(argv, Stdio::null())
+}
+
+/// [`output`], its stderr going to `stderr`.
+fn output_to(argv: &[OsString], stderr: Stdio) -> Result<String, HostError> {
     let Some((executable, rest)) = argv.split_first() else {
         return Err(HostError::spawn("", io::Error::other("empty command")));
     };
@@ -897,7 +1164,7 @@ fn output(argv: &[OsString]) -> Result<String, HostError> {
     let out = kubaos_git::clear(&mut Command::new(executable))
         .args(rest)
         .stdin(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(stderr)
         .output()
         .map_err(|e| HostError::spawn(&program, e))?;
     if !out.status.success() {

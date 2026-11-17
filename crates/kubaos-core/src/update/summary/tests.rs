@@ -47,6 +47,7 @@ fn quiet() -> Summary {
         }],
         suites: SuiteChanges::default(),
         reloaded: vec!["reloaded Hyprland".into()],
+        held: Vec::new(),
         firmware: Firmware::default(),
         restart: Restart::None,
         restart_reason: None,
@@ -98,8 +99,9 @@ fn an_update_that_moved_nothing_changed_nothing_whatever_the_session_reloaded() 
 
 #[test]
 fn any_moved_part_or_a_needed_restart_is_a_change() {
-    let changes: [fn(&mut Summary); 6] = [
+    let changes: [fn(&mut Summary); 7] = [
         |s| s.to.commit = "9f8e7d6".into(),
+        |s| s.held = vec!["discord".into()],
         |s| s.packages = 1,
         |s| s.inputs = vec!["nixpkgs".into()],
         |s| s.migrations = vec!["1792765570-backlight-rule.sh".into()],
@@ -126,6 +128,23 @@ fn the_notification_puts_the_reboot_first_and_one_line_a_part_after_it() {
          1 Nix package changed\n\
          Bitwarden 2026.10.1 → 2026.12.0\n\
          Firmware: 1 staged for the reboot"
+    );
+    assert!(notification.urgent);
+}
+
+#[test]
+fn a_held_package_is_a_line_of_its_own_and_makes_the_notification_urgent() {
+    let summary = Summary {
+        held: vec!["discord".into()],
+        ..quiet()
+    };
+
+    let notification = summary.notification();
+
+    assert_eq!(notification.title, "KubaOS updated, still at Shinjuku 0.1.0");
+    assert_eq!(
+        notification.body,
+        "discord stays at its current version: it couldn't be built"
     );
     assert!(notification.urgent);
 }

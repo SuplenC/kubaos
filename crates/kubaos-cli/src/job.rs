@@ -34,6 +34,8 @@ use std::time::Duration;
 
 use clap::Args;
 use clap::Subcommand;
+use kubaos_core::held;
+use kubaos_core::held::HeldFile;
 use kubaos_core::preview;
 use kubaos_core::preview::Notice;
 use kubaos_core::preview::PlanError;
@@ -101,9 +103,11 @@ pub struct SwitchTo {
     release: bool,
 }
 
-/// The switch jobs' queue, keeping the preview file in step with them.
+/// The switch jobs' queue, keeping the preview file and the held packages in step with them.
 fn queue(paths: &Paths) -> Queue {
-    Queue::new(paths.jobs()).previews(PreviewFile::new(paths.preview()))
+    Queue::new(paths.jobs())
+        .previews(PreviewFile::new(paths.preview()))
+        .holding(HeldFile::new(&paths.state_dir(), paths.edit_lock()))
 }
 
 pub fn main(cmd: JobCmd) -> ExitCode {
@@ -261,7 +265,7 @@ fn run(paths: &Paths, host: &Systemd, mode: SwitchMode, target: Target) -> ExitC
 
 fn host(paths: &Paths) -> Result<Systemd, ExitCode> {
     match std::env::current_exe() {
-        Ok(exe) => Ok(Systemd::new(exe, paths.flake())),
+        Ok(exe) => Ok(Systemd::new(exe, paths.flake()).generation(paths.home_generation())),
         Err(e) => Err(report(e)),
     }
 }
@@ -274,7 +278,10 @@ fn follow(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> ExitCode {
         let _ = out.write_all(chunk.as_bytes()).and_then(|()| out.flush());
     };
     match wait(queue, id, host, print) {
-        Ok(()) => {
+        Ok(held) => {
+            for name in &held {
+                out!("{}", held::message(name));
+            }
             out!("switch {id} done");
             ExitCode::SUCCESS
         }
@@ -285,8 +292,9 @@ fn follow(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> ExitCode {
     }
 }
 
-/// Hands the job's output to `on_output` until it ends; why it failed, when it did.
-fn wait(queue: &Queue, id: &JobId, host: Option<&Systemd>, on_output: impl FnMut(&str)) -> Result<(), String> {
+/// Hands the job's output to `on_output` until it ends; the packages it held when it succeeded,
+/// why it failed when it didn't.
+fn wait(queue: &Queue, id: &JobId, host: Option<&Systemd>, on_output: impl FnMut(&str)) -> Result<Vec<String>, String> {
     let job = match host {
         Some(host) => queue.follow_worker(id, FOLLOW_POLL, host, on_output),
         None => queue.follow(id, FOLLOW_POLL, on_output),
@@ -294,8 +302,9 @@ fn wait(queue: &Queue, id: &JobId, host: Option<&Systemd>, on_output: impl FnMut
     match job {
         Ok(Job {
             state: JobState::Succeeded,
+            held,
             ..
-        }) => Ok(()),
+        }) => Ok(held),
         Ok(job) => Err(job.error.unwrap_or_else(|| "no reason recorded".to_owned())),
         Err(e) => Err(chain(&e)),
     }
@@ -312,14 +321,14 @@ pub enum SwitchIn {
 
 /// Runs one switch of the user flake as locked (the release, so it ends any preview) to its end,
 /// for a command that switches as one of its steps (an update), handing each chunk of its output
-/// to `on_output`.
+/// to `on_output`. Returns the packages it held at the version the home had.
 ///
 /// # Errors
 ///
 /// Why the switch failed.
-pub fn switch_step(paths: &Paths, place: SwitchIn, on_output: &mut dyn FnMut(&str)) -> Result<(), String> {
+pub fn switch_step(paths: &Paths, place: SwitchIn, on_output: &mut dyn FnMut(&str)) -> Result<Vec<String>, String> {
     let host = std::env::current_exe()
-        .map(|exe| Systemd::new(exe, paths.flake()))
+        .map(|exe| Systemd::new(exe, paths.flake()).generation(paths.home_generation()))
         .map_err(|e| chain(&e))?;
     let queue = queue(paths);
     if place == SwitchIn::Process {
@@ -356,7 +365,7 @@ pub fn active_preview(paths: &Paths) -> Option<String> {
 /// Why the preview could not be left.
 pub fn leave_preview(paths: &Paths, place: SwitchIn, on_output: &mut dyn FnMut(&str)) -> Result<(), String> {
     let file = PreviewFile::new(paths.preview());
-    preview::leave(&file, || switch_step(paths, place, on_output))
+    preview::leave(&file, || switch_step(paths, place, on_output).map(drop))
         .map(|_| ())
         .map_err(|e| chain(&e))
 }

@@ -17,6 +17,8 @@ use super::leave;
 use super::plan;
 use super::resolve;
 use super::worktree_for;
+use crate::held::CurrentHome;
+use crate::held::Prebuilt;
 use crate::switch::Host;
 use crate::switch::HostError;
 use crate::switch::JobId;
@@ -46,6 +48,14 @@ impl Host for FakeHost {
 
     fn switch(&self, _log: File, _from: Option<&Path>) -> Result<(), HostError> {
         panic!("planning never switches")
+    }
+
+    fn prebuild(&self, _log: &File, _from: Option<&Path>) -> Result<Vec<Prebuilt>, HostError> {
+        panic!("planning never builds")
+    }
+
+    fn current_home(&self) -> Result<CurrentHome, HostError> {
+        panic!("planning never reads the home")
     }
 
     fn describe(&self, path: &Path) -> Result<Checkout, HostError> {
