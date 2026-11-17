@@ -462,7 +462,9 @@ impl<'h> Keeper<'h> {
                     .claims
                     .iter()
                     .any(|c| c.owned && c.path().is_some_and(|p| self.host.place(p).symlink_metadata().is_ok()));
-            if !stale && !perform::there(&action, &look) {
+            // A `run` that only undoes is the app's however it came: its undo is what a removal of
+            // the app needs.
+            if !stale && !perform::there(&action, &look) && !action.removal_only() {
                 continue;
             }
             let (claims, prior) = if owned {
@@ -737,12 +739,14 @@ fn adopted(action: &Action, look: perform::Look, lingered_off: bool) -> (Vec<Cla
 }
 
 /// What the step's entry `old` says its path holds: what its action put there, when the app owns
-/// the path and the step is done; unknown, when a run stopped during it.
+/// the path and the step is done; unknown, when a run stopped during it. A `run` that only undoes
+/// has no path, and its entry, the app's, is all its check reads.
 fn recorded(old: Option<&Entry>) -> Recorded<'_> {
     let Some(old) = old else {
         return Recorded::Nothing;
     };
-    if !old.claims.iter().any(|c| c.owned && c.claim.starts_with("path:")) {
+    let undoes = old.action.removal_only() && old.claims.iter().any(|c| c.owned && c.claim == "run");
+    if !undoes && !old.claims.iter().any(|c| c.owned && c.claim.starts_with("path:")) {
         return Recorded::Nothing;
     }
     match old.state {
@@ -1078,9 +1082,10 @@ impl<'a> Engine<'a> {
 
     /// Whether a step of `side` of the install isn't settled: its journal doesn't record it as
     /// settled with the same action, word for word, or its check, run from the user's side,
-    /// doesn't say done. A root `run`'s check runs only as root, so such a step never is. With
-    /// `same_thing`, a recorded action that acts on the same thing as the step's
-    /// ([`Action::same_thing`]) will do in place of the same action word for word.
+    /// doesn't say done. A root `run`'s check runs only as root, so such a step never is, but for
+    /// one that only undoes, which its entry settles. With `same_thing`, a recorded action that
+    /// acts on the same thing as the step's ([`Action::same_thing`]) will do in place of the same
+    /// action word for word.
     fn unsettled(
         &mut self,
         folder: &Folder,
@@ -1110,7 +1115,9 @@ impl<'a> Engine<'a> {
             };
             let settled =
                 entry.is_some_and(|e| recorded_as(e) && e.state.settled(self.windows) && e.replaced.is_none());
-            if !settled || (side == Side::Root && matches!(resolved.kind, Kind::Run { .. })) {
+            let root_check =
+                side == Side::Root && matches!(resolved.kind, Kind::Run { .. }) && !resolved.removal_only();
+            if !settled || root_check {
                 return true;
             }
             // A step that opens a window, skipped in a run that may not, stays skipped.
@@ -1387,6 +1394,11 @@ impl<'a> Engine<'a> {
                         source: e,
                     })),
                 })?;
+                // A `run` that only undoes is no sign of the app either way, and the journal that
+                // takes the app in makes it the app's.
+                if resolved.removal_only() {
+                    continue;
+                }
                 // A root `run`'s check runs only as root: from here it can't say done.
                 let checkable = !(resolved.side() == Side::Root && matches!(resolved.kind, Kind::Run { .. }));
                 let look = checkable && {

@@ -2404,6 +2404,7 @@ mod media;
 mod office;
 mod requires;
 mod security;
+mod undo_only;
 mod versions;
 
 /// The claim `claim` of the app `id`'s journals: whether it owns it, when a step claims it.
