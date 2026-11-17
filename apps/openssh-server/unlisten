@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
-# Stops and disables ssh.socket again, as ./listen enabled and started it.
+# Stops and disables ssh.socket again, as ./listen enabled and started it, and stops the sshd it
+# started, ssh.service, which would otherwise keep listening on port 22.
 set -euo pipefail
 systemctl disable --now ssh.socket
+systemctl stop ssh.service
