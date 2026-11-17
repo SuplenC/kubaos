@@ -1,0 +1,31 @@
+# Wine from WineHQ's signed apt repository, whose key system/packages.toml pins ([repo.winehq]).
+# Its build for Ubuntu 26.04 is amd64 only and runs in Wine's WoW64 mode, 32-bit Windows
+# programs on 64-bit Linux libraries, so it needs no i386 architecture in dpkg. Its packages write
+# no source of their own.
+# https://gitlab.winehq.org/wine/wine/-/wikis/Debian-Ubuntu
+name = "Wine"
+category = "development"
+tags = ["windows", "exe", "compatibility", "winehq"]
+summary = "Runs Windows programs without Windows. Wine Is Not an Emulator, and it'll fucking remind you."
+# WineHQ's own words are under the LGPL, which asks for its whole text with every copy, so this is
+# ours.
+description = """\
+Wine runs Windows programs on Linux, translating their calls to Windows into calls to Linux as \
+they run, with no copy of Windows and no virtual machine. This is WineHQ's stable build, in its \
+WoW64 mode, which runs 32-bit and 64-bit programs alike. Each program's Windows lives in a \
+prefix: ~/.wine, unless WINEPREFIX names another."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "wine"
+keeps = """\
+Your Windows programs and their settings stay in their prefixes, ~/.wine and any other \
+WINEPREFIX you made, with their menu entries in ~/.local/share/applications/wine: install Wine \
+again and they run."""
+
+[[action]]
+name = "Install Wine"
+kind = "apt"
+repo = "winehq"
+arch = "amd64"
+packages = ["winehq-stable"]

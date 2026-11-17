@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Exits 0 when wireshark-common's debconf question is answered yes.
+# Usage: ./captures
+set -euo pipefail
+[[ "$(echo 'GET wireshark-common/install-setuid' | debconf-communicate wireshark-common)" == '0 true' ]]

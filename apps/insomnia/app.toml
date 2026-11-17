@@ -1,0 +1,27 @@
+# Insomnia from the .deb of its GitHub release, pinned to the sha256 GitHub publishes for the
+# asset. Kong keeps no apt repository for it any more and Ubuntu doesn't package it; nixpkgs'
+# Insomnia is a major version behind. It builds for amd64 only. The .deb doesn't update itself, so
+# a release of KubaOS moves the pin on; its package writes no source of its own.
+# https://github.com/Kong/insomnia/releases
+name = "Insomnia"
+category = "development"
+tags = ["api", "rest", "http", "graphql", "grpc", "client"]
+summary = "An API client for REST, GraphQL, gRPC and friends. Kong would love you to sign in, obviously."
+# From its AppStream metainfo, CC0-1.0 (flathub/rest.insomnia.Insomnia), its first paragraph.
+description = """\
+Insomnia is an open-source, cross-platform API client for GraphQL, REST, WebSockets, Server-sent \
+events (SSE), gRPC and any other HTTP compatible protocol."""
+description_from = "https://github.com/flathub/rest.insomnia.Insomnia/blob/master/rest.insomnia.Insomnia.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "insomnia"
+keeps = """\
+Your collections, environments and settings stay in ~/.config/Insomnia: install Insomnia again \
+and they're all there."""
+
+[[action]]
+name = "Install Insomnia"
+kind = "deb"
+package = "insomnia"
+version = "13.4.0"
+amd64 = { url = "https://github.com/Kong/insomnia/releases/download/core%4013.4.0/Insomnia.Core-13.4.0.deb", sha256 = "b566d3d6b5a59d4baf0e705f156889f5bcbcfc9822930dcb5b5a180b8e5e9d4d" }
