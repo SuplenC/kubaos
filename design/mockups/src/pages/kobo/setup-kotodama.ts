@@ -96,15 +96,16 @@ const PART = (at: number) => `.setup-kotodama-keys > :nth-child(${at})`;
  */
 const KEYS_ARRIVE: Move = {
   name: "The keys arrive",
-  what: "Each cap rises `space.s8` and fades in over `long`, a `micro` after the one before; the lines follow.",
+  what: "With the step's turn, each cap rises `space.s8` and fades in over `long`, a `micro` after the one before; the lines follow.",
   tracks: [
+    ...TO_TRY.tracks,
     ...[1, 2, 3].flatMap((at) => [
       { part: at === 2 ? "the plus" : `cap ${at === 1 ? 1 : 2}`, on: "the keys", target: PART(at), property: "opacity", from: 0, to: 1, duration: "long", cue: ["short", ...Array<"micro">(at - 1).fill("micro")] as unknown as NonEmpty<"short">, curve: "emphasized_decel" },
       { part: `${at === 2 ? "the plus" : `cap ${at === 1 ? 1 : 2}`}'s rise`, on: "the keys", target: PART(at), property: "--kotodama-rise", from: 1, to: 0, duration: "long", cue: ["short", ...Array<"micro">(at - 1).fill("micro")] as unknown as NonEmpty<"short">, curve: "emphasized_decel" },
     ]),
     { part: "the lines", on: "the words", target: ".setup-kotodama-line", property: "opacity", from: 0, to: 1, duration: "long", cue: ["short", "micro", "micro", "micro"] as unknown as NonEmpty<"short">, curve: "emphasized_decel" },
   ] as unknown as NonEmpty<Track<Easing>>,
-  reduced: [{ part: "the keys", on: "the step shown", target: ".setup-kotodama-step:not([data-leaving])", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+  reduced: TO_TRY.reduced,
   back: "cuts",
   sample: at("try<2"),
 };
@@ -151,7 +152,6 @@ export default page<Shown>({
     { name: "Yours", for: "what it finds; the keys, the engines; live, said at its foot", sample: atCard("kotodama", "yours") },
     { name: "Yours: changed", for: "Alt + Space, no web search; its foot follows", sample: atCard("kotodama", "yours-changed") },
     { name: "Try it", for: "the keys picked, large; it's already yours", sample: atCard("kotodama", "try") },
-    { name: "Try it: arriving", for: "from Yours: the keys rise in", sample: atCard("kotodama", "try<2") },
     { name: "Try it: Alt + Space", for: "another Opens with, its keys", sample: atCard("kotodama", "try-alt") },
     { name: "Try it: the menu open", for: "over the whole screen; Esc shuts it", sample: CELLS.selected },
     { name: "From the Command menu", for: "“Set up the Command menu”, in a window", sample: aloneAt("kotodama", "try") },
