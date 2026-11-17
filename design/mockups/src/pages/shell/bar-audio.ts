@@ -28,6 +28,11 @@ function end(mute: MuteOptions = {}, playing?: Parameters<typeof nowPlaying>[0] 
   return row("s8", "centre", ...(playing === null ? [] : [nowPlaying(playing ?? {})]), mutePill(mute), bellPill(), statusPill());
 }
 
+/** Opens the Audio panel's page, as a press on a side with no device opens the panel. */
+const toPanel = () => {
+  location.hash = "#/shell/audio-panel";
+};
+
 /**
  * The bar's end with a mute circle pinned lit, over a room as tall as its Hint and the gap to it, so
  * the bubble floating under the circle stays inside the sample. The room is a copy of the bubble, unseen.
@@ -113,7 +118,7 @@ function live(): HTMLElement {
     });
     mp.addEventListener("contextmenu", (event) => {
       event.preventDefault();
-      location.hash = "#/shell/audio-panel";
+      toPanel();
     });
     const circles = mp.querySelectorAll<HTMLElement>(".shell-pill-item");
     circles[0]?.addEventListener(
@@ -161,6 +166,8 @@ export default page<State>({
     { name: "An app recording", for: "the microphone's dot on the mic", sample: () => mutePill({ input: { recording: true } }) },
     { name: "Recording, mic muted", for: "crossed; no dot, nothing is heard", sample: () => mutePill({ input: { recording: true, muted: true } }) },
     { name: "Output low", for: "its symbol by the level", sample: () => mutePill({ level: 0.2 }) },
+    { name: "No output device", for: "crossed, as muted; a press opens the panel", sample: () => hinted({ output: { missing: true }, pinned: { side: "output", state: "lit" }, onPanel: toPanel }, HINTS.noOutput) },
+    { name: "No mic", for: "crossed, as muted; a press opens the panel", sample: () => hinted({ input: { missing: true }, pinned: { side: "input", state: "lit" }, onPanel: toPanel }, HINTS.noMic) },
     { name: "Volume's hint", for: "lit: where the output stands", sample: () => hinted({ pinned: { side: "output", state: "lit" } }, HINTS.volume("62%")) },
     { name: "Mic muted, its hint", for: "lit: the mic's side, muted", sample: () => hinted({ input: { muted: true }, pinned: { side: "input", state: "lit" } }, HINTS.micMuted) },
     { name: "Playing", for: "pause on the accent's fill", sample: () => nowPlaying() },
@@ -176,11 +183,11 @@ export default page<State>({
   states: {
     shown: ["rest", "lit", "pressed", "open"],
     absent: {
-      disabled: "a side with no device is still a press; see questions",
+      disabled: "a side with no device: crossed, its press opens the panel",
       selected: "the active player is checked in its Menu",
       loading: "each pill shows once PipeWire or MPRIS answers",
       empty: "no player: now playing is gone",
-      error: "no device: its symbol crossed, as muted",
+      error: "no device: a variant, crossed as muted",
     },
     rows: nonEmpty([
       { name: "Mute pill", cell: muteCell },

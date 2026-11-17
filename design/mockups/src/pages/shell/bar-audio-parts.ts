@@ -62,6 +62,8 @@ export function circlesPill(circles: readonly HTMLElement[]): HTMLElement {
 /** One side of the mute pill: muted or not, and for the input whether an app is recording. */
 export interface Side {
   readonly muted?: boolean;
+  /** No device on this side: crossed out as muted, and a press opens the Audio panel. */
+  readonly missing?: boolean;
   /** An app records from the mic: the microphone's privacy dot on its symbol's corner. */
   readonly recording?: boolean;
 }
@@ -79,6 +81,8 @@ export interface MuteOptions {
   readonly pinned?: { readonly side: "output" | "input"; readonly state: CirclePinned };
   readonly onOutput?: () => void;
   readonly onInput?: () => void;
+  /** A press on a side with no device: the Audio panel opens. */
+  readonly onPanel?: () => void;
 }
 
 // The locale's percentage: a value is never put together from a number and a sign by hand.
@@ -88,9 +92,14 @@ const PERCENT = new Intl.NumberFormat("en-GB", { style: "percent", maximumFracti
 export const HINTS = {
   volume: (level: string) => `Volume ${level}`,
   volumeMuted: "Volume muted",
+  noOutput: "No output device",
   mic: (level: string) => `Mic ${level}`,
   micMuted: "Mic muted",
+  noMic: "No mic",
 } as const;
+
+/** What a press on a side with no device does, as its accessible name. */
+const PANEL = "Open the Audio panel";
 
 /** The output's symbol for `level`, as the OSD and the sliders pick it. */
 export function volumeIcon(level: number, muted = false): string {
@@ -98,22 +107,29 @@ export function volumeIcon(level: number, muted = false): string {
 }
 
 /**
- * The output's symbol, then the mic's: each `on_surface_variant`, or crossed in `error` while muted;
- * the mic carrying the microphone's privacy dot while an app records from it, unless it is muted.
+ * The output's symbol, then the mic's: each `on_surface_variant`, or crossed in `error` while muted
+ * or with no device, whose press opens the Audio panel instead; the mic carrying the microphone's
+ * privacy dot while an app records from it, unless it is muted.
  */
 export function mutePill(options: MuteOptions = {}): HTMLElement {
   const output = options.output ?? {};
   const input = options.input ?? {};
   const level = options.level ?? 0.62;
-  const outGlyph = glyph(volumeIcon(level, output.muted), output.muted ? "error" : "on_surface_variant");
-  const dotted = (input.recording ?? false) && !(input.muted ?? false);
-  const inGlyph = badgedIcon({ name: input.muted ? "mic_off" : "mic", color: input.muted ? "error" : "on_surface_variant", badged: dotted, meaning: "microphone" });
+  const outCrossed = (output.muted ?? false) || (output.missing ?? false);
+  const inCrossed = (input.muted ?? false) || (input.missing ?? false);
+  const outGlyph = glyph(volumeIcon(level, outCrossed), outCrossed ? "error" : "on_surface_variant");
+  const dotted = (input.recording ?? false) && !inCrossed;
+  const inGlyph = badgedIcon({ name: inCrossed ? "mic_off" : "mic", color: inCrossed ? "error" : "on_surface_variant", badged: dotted, meaning: "microphone" });
   const pinnedOf = (side: "output" | "input") => (options.pinned?.side === side ? { pinned: options.pinned.state } : {});
-  const outHint = output.muted ? HINTS.volumeMuted : HINTS.volume(PERCENT.format(level));
-  const inHint = input.muted ? HINTS.micMuted : HINTS.mic(PERCENT.format(options.inputLevel ?? 0.8));
+  const outHint = output.missing ? HINTS.noOutput : output.muted ? HINTS.volumeMuted : HINTS.volume(PERCENT.format(level));
+  const inHint = input.missing ? HINTS.noMic : input.muted ? HINTS.micMuted : HINTS.mic(PERCENT.format(options.inputLevel ?? 0.8));
+  const pressOf = (missing: boolean | undefined, mute: (() => void) | undefined) => {
+    const press = missing ? options.onPanel : mute;
+    return press ? { onPress: press } : {};
+  };
   const circles = [
-    pillCircle(outGlyph, { label: output.muted ? "Unmute the output" : "Mute the output", hint: outHint, ...pinnedOf("output"), ...(options.onOutput ? { onPress: options.onOutput } : {}) }),
-    pillCircle(inGlyph, { label: input.muted ? "Unmute the mic" : "Mute the mic", hint: inHint, ...pinnedOf("input"), ...(options.onInput ? { onPress: options.onInput } : {}) }),
+    pillCircle(outGlyph, { label: output.missing ? PANEL : output.muted ? "Unmute the output" : "Mute the output", hint: outHint, ...pinnedOf("output"), ...pressOf(output.missing, options.onOutput) }),
+    pillCircle(inGlyph, { label: input.missing ? PANEL : input.muted ? "Unmute the mic" : "Mute the mic", hint: inHint, ...pinnedOf("input"), ...pressOf(input.missing, options.onInput) }),
   ];
   const made = circlesPill(options.micOnly ? circles.slice(1) : circles);
   made.classList.add("shell-mute-pill");
