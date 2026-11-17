@@ -1825,6 +1825,32 @@ fn a_release_that_bumps_a_download_at_the_same_path_downloads_it_again() {
 }
 
 #[test]
+fn a_self_updating_download_its_updater_rewrites_in_place_is_never_downloaded_over() {
+    let self_updating =
+        |version: &str| fixed_download(version, "file").replace("unpack =", "self_updates = true\nunpack =");
+    let world = World::new(&[("tool", &self_updating("1.1"))]);
+    for version in ["1.1", "1.3"] {
+        let sha = version.replace('.', "").repeat(32);
+        world.host.state.borrow_mut().downloads.insert(
+            format!("https://example.com/tool-{version}"),
+            (sha, format!("tool {version}").into_bytes()),
+        );
+    }
+    world.install("tool", true).0.unwrap();
+    let tool = world.host_home().join(".vendor/tool");
+    fs::write(&tool, "tool 2.0, from its own updater").unwrap();
+    world.write_app("tool", &self_updating("1.3"));
+
+    world.install("tool", true).0.unwrap();
+
+    assert_eq!(fs::read_to_string(&tool).unwrap(), "tool 2.0, from its own updater");
+    let fetched = world.host.state.borrow().log.iter().any(|l| l.ends_with("tool-1.3"));
+    assert!(!fetched);
+    world.remove("tool").0.unwrap();
+    assert!(!tool.exists());
+}
+
+#[test]
 fn a_download_a_run_stopped_during_is_downloaded_again() {
     let world = World::new(&[("tool", &fixed_download("1.1", "file"))]);
     for version in ["1.1", "1.3"] {

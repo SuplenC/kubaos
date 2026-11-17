@@ -76,10 +76,6 @@ pub enum ActionError {
     InvalidPath { value: String },
     #[error("{value:?} is not an https:// URL with a sha256 of 64 lowercase hex digits")]
     InvalidDownload { value: String },
-    #[error(
-        "a download that updates itself goes to a folder named for its version: {value:?} has no `@VERSION@` folder"
-    )]
-    SelfUpdatesUnversioned { value: String },
     #[error("a download needs a download for amd64 or arm64")]
     NoDownload,
     #[error("a file is `from` a file in the app's folder or `text`, one of them")]
@@ -410,11 +406,6 @@ impl Action {
     /// its words filled in.
     fn check_unresolved(&self) -> Result<(), ActionError> {
         match &self.kind {
-            Kind::Download {
-                to, self_updates: true, ..
-            } if !to.split('/').any(|part| part == "@VERSION@") => {
-                Err(ActionError::SelfUpdatesUnversioned { value: to.clone() })
-            }
             Kind::Run {
                 run, check, undo, root, ..
             } => {
