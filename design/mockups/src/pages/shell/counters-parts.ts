@@ -597,7 +597,7 @@ export type Grouping = "change" | "day" | "week" | "month";
 export type Sorting = "newest" | "oldest" | "most";
 
 const GROUPS: readonly { readonly key: Grouping; readonly label: string }[] = [
-  { key: "change", label: "Each change" },
+  { key: "change", label: "All" },
   { key: "day", label: "Day" },
   { key: "week", label: "Week" },
   { key: "month", label: "Month" },
