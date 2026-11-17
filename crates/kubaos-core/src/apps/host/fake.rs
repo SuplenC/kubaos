@@ -106,6 +106,8 @@ pub struct State {
     /// `<scope>:<unit>` to its state.
     pub units: BTreeMap<String, Unit>,
     pub linger: bool,
+    /// The architectures dpkg takes packages of beside the machine's.
+    pub foreign: BTreeSet<String>,
     /// Package to the installed packages installing it removes, as Docker's `docker-ce` removes
     /// Ubuntu's `docker.io`.
     pub conflicts: BTreeMap<String, BTreeSet<String>>,
@@ -136,6 +138,22 @@ pub struct State {
 }
 
 impl State {
+    /// Refuses, as apt does, a package of an architecture dpkg doesn't take: apt has no list of
+    /// it, so it can't locate the package.
+    fn knows(&self, packages: &[String]) -> Result<(), HostError> {
+        match packages
+            .iter()
+            .find(|p| p.split_once(':').is_some_and(|(_, arch)| !self.foreign.contains(arch)))
+        {
+            Some(p) => Err(HostError::Failed {
+                command: "apt-get install".to_owned(),
+                code: Some(100),
+                stderr: format!("E: Unable to locate package {p}"),
+            }),
+            None => Ok(()),
+        }
+    }
+
     /// The installed packages among `packages` and what they depend on, through what that
     /// depends on, whose candidate sorts below the version dpkg has: what apt would move down.
     fn downgraded(&self, packages: &[String]) -> BTreeSet<String> {
@@ -454,6 +472,7 @@ impl Host for FakeHost {
                 });
             }
         };
+        state.knows(&installing)?;
         Ok(AptSimulation {
             removes: installing
                 .iter()
@@ -471,6 +490,7 @@ impl Host for FakeHost {
         for p in packages {
             self.fails(&format!("apt:{p}"))?;
         }
+        self.state.borrow().knows(packages)?;
         let mut state = self.state.borrow_mut();
         // apt moves an installed package asked for by name to its candidate, as it does a
         // distribution's build of a name a pinned repository also has; `-y` refuses to move one
@@ -705,6 +725,47 @@ impl Host for FakeHost {
     fn set_linger(&mut self, on: bool) -> Result<(), HostError> {
         self.state.borrow_mut().linger = on;
         self.log(format!("linger {on}"));
+        Ok(())
+    }
+
+    fn foreign_arches(&mut self) -> Result<BTreeSet<String>, HostError> {
+        Ok(self.state.borrow().foreign.clone())
+    }
+
+    fn set_foreign_arch(&mut self, arch: &str, on: bool) -> Result<(), HostError> {
+        self.fails(&format!("arch:{arch}"))?;
+        if !on && !self.arch_packages(arch)?.is_empty() {
+            return Err(HostError::Failed {
+                command: format!("dpkg --remove-architecture {arch}"),
+                code: Some(2),
+                stderr: format!("dpkg: error: cannot remove architecture '{arch}' currently in use by the database"),
+            });
+        }
+        let mut state = self.state.borrow_mut();
+        if on {
+            state.foreign.insert(arch.to_owned());
+        } else {
+            state.foreign.remove(arch);
+        }
+        state.log.push(format!("arch {arch} {on}"));
+        Ok(())
+    }
+
+    fn arch_packages(&mut self, arch: &str) -> Result<BTreeSet<String>, HostError> {
+        let suffix = format!(":{arch}");
+        Ok(self
+            .state
+            .borrow()
+            .dpkg
+            .keys()
+            .filter(|p| p.ends_with(&suffix))
+            .cloned()
+            .collect())
+    }
+
+    fn apt_update(&mut self) -> Result<(), HostError> {
+        self.fails("apt-update")?;
+        self.log("apt update");
         Ok(())
     }
 

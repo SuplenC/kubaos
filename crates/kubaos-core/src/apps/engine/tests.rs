@@ -2399,6 +2399,7 @@ fn a_removal_shows_each_step_it_undoes_by_name() {
 }
 
 mod ai;
+mod architecture;
 mod communication;
 mod devtools;
 mod editors;
