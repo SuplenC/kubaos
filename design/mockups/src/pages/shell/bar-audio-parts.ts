@@ -203,7 +203,7 @@ export function nowPlaying(options: PlayingOptions = {}): HTMLElement {
 /** The players Menu's entries: every player with its icon, the active one checked, then Show <app>. */
 export function playerEntries(players: readonly Player[], active: number): MenuEntry[] {
   const app = players[active]?.app ?? "";
-  return [...players.map((player, index) => ({ label: player.app, ...(player.picture ? { picture: player.picture } : { initial: true }), checked: index === active })), "separator", { label: `Show ${app}`, icon: "app_window" }];
+  return [...players.map((player, index) => ({ label: player.app, variable: true, ...(player.picture ? { picture: player.picture } : { initial: true }), checked: index === active })), "separator", { label: `Show ${app}`, icon: "app_window", variable: true }];
 }
 
 export interface PlayersMenuOptions {

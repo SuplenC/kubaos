@@ -13,6 +13,7 @@ import { button } from "../../lib/button.ts";
 import { card } from "../../lib/card.ts";
 import { emptyState } from "../../lib/empty-state.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
+import { declare } from "../../lib/probe.ts";
 import { filling, row, stack } from "../../lib/layout.ts";
 import { list } from "../../lib/list.ts";
 import { liveMeter } from "../../lib/meter.ts";
@@ -444,6 +445,7 @@ function defaultPicker(devices: Devices, codec: string | undefined, shown: boole
   const choices = defaultChoices(devices.machine);
   const listed = choices.some((each) => each.output === devices.default) ? choices : [devices.choice, ...choices];
   const pick = select({
+    variable: true,
     options: listed.map((each) => each.name),
     icons: listed.map((each) => LINK_ICONS[each.link]),
     trailing: listed.map((each) => (each.input ? undefined : NO_MIC)),
@@ -487,6 +489,7 @@ function sidePicker(devices: Devices, input: boolean, told?: (change: AudioOptio
   if (!following) {
     const picked = chosen ? all.indexOf(chosen) : -1;
     return select({
+      variable: true,
       ...names(all),
       picked,
       placeholder: input ? `No mic on ${devices.choice.name}` : NO_OUTPUT,
@@ -499,6 +502,7 @@ function sidePicker(devices: Devices, input: boolean, told?: (change: AudioOptio
   const listed = names(all);
   const picked = chosen && chosen !== following ? 1 + all.indexOf(chosen) : 0;
   return select({
+    variable: true,
     options: [`${FOLLOWS} · ${following.name}`, ...listed.options],
     icons: [LINK_ICONS[following.link], ...listed.icons],
     picked,
@@ -516,8 +520,9 @@ function appPicker(app: App, side: readonly Device[], following: Device, state?:
   const all = app.device && !side.includes(app.device) ? [app.device, ...side] : side;
   const listed = names(all);
   const picked = app.device ? 1 + all.indexOf(app.device) : 0;
-  return select({
+  const pick = select({
     look: "inline",
+    variable: true,
     options: [FOLLOWS, ...listed.options],
     icons: [LINK_ICONS[following.link], ...listed.icons],
     picked,
@@ -527,6 +532,7 @@ function appPicker(app: App, side: readonly Device[], following: Device, state?:
         if (index !== picked) moved(index === 0 ? undefined : all[index - 1]);
       } } : {}),
   });
+  return pick;
 }
 
 /** `app` moved to `device`, or following its side's again with none. */
@@ -538,7 +544,7 @@ function movedTo(app: App, device: Device | undefined): App {
 /** One app's row: its tile, its name over its device centred on it, then its slider across, its icon muting it. */
 function appRow(app: App, side: readonly Device[], following: Device, input: boolean, state?: "lit" | "open", moved?: (device: Device | undefined) => void): HTMLElement {
   const tile = iconTile({ name: app.name, size: "Md", ...(app.picture ? { picture: app.picture } : {}) });
-  const words = stack(0, "start", filling(clamped(app.name, "body_strong")), appPicker(app, side, following, state, moved));
+  const words = stack(0, "start", filling(declare(clamped(app.name, "body_strong"), { variable: true })), appPicker(app, side, following, state, moved));
   const head = row("s12", "centre", tile, filling(words));
   const level = slider({
     icon: input ? "mic" : volumeIcon(app.level),
@@ -599,7 +605,7 @@ function optionsTab(options: AudioOptions, told?: (change: AudioOptions) => void
   const made = list([
     { title: "Noise suppression", subtitle: "Your mic, without the background", toggle: options.noise ?? true },
     { title: "Echo cancellation", subtitle: "For calls on the speakers", toggle: options.echo ?? false },
-    { title: "New devices take over", subtitle: "A headset you connect becomes the default", toggle: options.takeover ?? true },
+    { title: "New devices take over", subtitle: "A new headset becomes the default", toggle: options.takeover ?? true },
   ]);
   if (told) {
     const keys = ["noise", "echo", "takeover"] as const;
@@ -652,7 +658,7 @@ export function audioPanel(options: AudioOptions = {}): Panel {
   const told = live ? (change: AudioOptions) => {
     state = { ...state, ...change };
     devices = devicesOf(state);
-    page.subtitle(subtitleOf(state));
+    say(subtitleOf(state));
   } : undefined;
   const output = outputSlider(state, !devices.outputs, told);
   const inputMuted = () => state.inputMuted ?? false;
@@ -708,7 +714,7 @@ export function audioPanel(options: AudioOptions = {}): Panel {
     meterOf.disable(micGone());
     setTabDisabled(picker, 1, micInMusic(devices));
     if (tab === 1) show();
-    page.subtitle(subtitleOf(state));
+    say(subtitleOf(state));
   }
 
   show();
@@ -723,6 +729,13 @@ export function audioPanel(options: AudioOptions = {}): Panel {
   );
   body.classList.add("audio-body");
   const page = panelPage({ title: TITLE, subtitle: subtitleOf(state), body, ...(options.down !== undefined ? { down: options.down } : {}) });
+  /** The pun names apps and devices, so its words vary: cut with an ellipsis where they run past the band. */
+  const varies = () => declare(page.element.querySelector<HTMLElement>(".k-panel-subtitle")!, { variable: true });
+  varies();
+  function say(words: string): void {
+    page.subtitle(words);
+    varies();
+  }
   page.element.classList.add("audio-panel");
   // 1 to 3 pick a tab from anywhere in the panel, as the control center's 1 to 4 do; a disabled
   // tab's button takes no click, so Input in Music mode stays where it is.
