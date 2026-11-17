@@ -1,0 +1,36 @@
+# Ardour from Ubuntu's archive, 9.0. nixpkgs has 9.7, but a Nix build can't load Ubuntu's JACK
+# library, which is how Ardour reaches PipeWire; Ardour's own builds are paid for. Its JACK
+# backend talks to PipeWire through pipewire-jack, PipeWire's JACK library, which the machine's
+# audio doesn't otherwise use: the menu entry KubaOS writes, with the id of the package's own so
+# it takes its place, starts Ardour under pw-jack, which points it at that library alone. Its ALSA
+# backend would fight PipeWire for the card, and its PulseAudio one has no inputs. Of what the
+# package recommends, the step takes the video timeline (harvid and xjadeo), for scoring to a
+# picture. The icon is Ardour's own, on a tile: Colloid has none.
+# https://ardour.org/download.html
+name = "Ardour"
+category = "media"
+tags = ["audio", "daw", "recording", "mixing", "midi", "music", "jack"]
+summary = "A whole recording studio: tracks, plugins, a mixing desk. The band is your problem."
+# From its AppStream metainfo, CC0-1.0 (Ardour/ardour).
+description = """\
+Ardour is a multi-channel digital audio workstation, allowing you to record, edit, mix and master \
+audio and MIDI projects. It is targeted at audio engineers, musicians, soundtrack editors and \
+composers."""
+description_from = "https://github.com/Ardour/ardour/blob/9.0/gtk2_ardour/ardour.appdata.xml.in.in"
+# Ardour's mark, GPL-2.0-or-later, on a tile (ardour.svg's header), put in the theme as "ardour",
+# the name the package's entry and KubaOS's give.
+icon = "ardour.svg"
+keeps = """\
+Your sessions stay where you made them, and Ardour's settings, templates and plugin cache in \
+~/.config/ardour9: install Ardour again and it opens them."""
+
+[[action]]
+name = "Install Ardour"
+kind = "apt"
+packages = ["ardour", "ardour-video-timeline", "pipewire-jack"]
+
+[[action]]
+name = "Start Ardour through PipeWire's JACK"
+kind = "file"
+to = "~/.local/share/applications/ardour.desktop"
+from = "ardour.desktop"

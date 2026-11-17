@@ -1,0 +1,51 @@
+# Spotify from its signed apt repository, whose key system/packages.toml pins ([repo.spotify]).
+# Spotify builds it for amd64 only. Its package's postinst does two things to apt as it installs
+# and upgrades: it adds the repository as /etc/apt/sources.list.d/spotify.list, naming no key,
+# unless that file is there, and copies its key into /etc/apt/trusted.gpg.d, where apt trusts it
+# for every repository. The first step puts a spotify.list of comments in place, Spotify's own
+# opt-out; the second has dpkg leave the key's copy out of the package. A Spotify installed by
+# hand has both already: its spotify.list stays and repo setup turns its line off, and its copy of
+# the key goes as the repository is set up (system/packages.toml). Spotify plays local files
+# through an FFmpeg older than Ubuntu's (it asks for libavcodec 61 at the newest), so those
+# don't play; streaming needs nothing more.
+# https://www.spotify.com/us/download/linux/
+name = "Spotify"
+category = "media"
+tags = ["music", "streaming", "podcasts", "playlists", "audiobooks"]
+summary = "Every song ever, streamed. The band got a fraction of a cent for that, so play it twice."
+# Spotify's own words are its metainfo's, which sell features it dropped, so this is ours.
+description = """\
+Spotify is a music streaming service: millions of songs, podcasts and audiobooks, your playlists \
+and the ones it makes for you, and Spotify Connect to play on your other devices. Its app plays \
+everything with an account, free with ads or paid without, and downloads for offline listening \
+with Premium."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), the name Spotify's package gives, so the
+# Command menu shows it before the package is installed.
+icon = "spotify-client"
+keeps = """\
+Your sign-in and settings stay in ~/.config/spotify, and the songs you downloaded in \
+~/.cache/spotify: install Spotify again and you're still signed in. Your playlists live on \
+Spotify's servers anyway."""
+
+[[action]]
+name = "Keep Spotify's package from adding its repository again"
+kind = "run"
+root = true
+do = ["./opt-out", "/etc/apt/sources.list.d/spotify.list"]
+check = ["./opted-out", "/etc/apt/sources.list.d/spotify.list"]
+undo = ["./opt-in", "/etc/apt/sources.list.d/spotify.list"]
+
+[[action]]
+name = "Keep Spotify's key to its own repository"
+kind = "file"
+to = "/etc/dpkg/dpkg.cfg.d/kubaos-spotify"
+from = "kubaos-spotify.cfg"
+mode = "644"
+
+[[action]]
+name = "Install Spotify"
+kind = "apt"
+repo = "spotify"
+arch = "amd64"
+packages = ["spotify-client"]

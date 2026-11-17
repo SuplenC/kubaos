@@ -1,0 +1,32 @@
+# OBS Studio from the OBS Project's PPA (ppa:obsproject/obs-studio), whose Launchpad key
+# system/packages.toml pins ([repo.obs-studio]): 33.0, where Ubuntu's archive has 32.1. The PPA
+# builds it for amd64 only. Its package writes no source of its own, and brings its codecs (x264,
+# FDK AAC from multiverse) as dependencies. It captures the screen through PipeWire's portal, which
+# Hyprland's serves. Its virtual camera needs v4l2loopback, a DKMS module, which isn't installed.
+# https://obsproject.com/kb/linux-installation
+name = "OBS Studio"
+category = "media"
+tags = ["streaming", "recording", "screen capture", "screencast", "twitch", "video"]
+summary = "Records and streams your screen, webcam and scenes. Half of Twitch runs on it."
+# From its AppStream metainfo, CC0-1.0 (obsproject/obs-studio), its first paragraph and the
+# opening of the second.
+description = """\
+Free and open source software for video capturing, recording, and live streaming. High \
+performance real time video/audio capturing and mixing. Create scenes made up of multiple \
+sources including window captures, images, text, browser windows, webcams, capture cards and \
+more. Set up an unlimited number of scenes you can switch between seamlessly via custom \
+transitions."""
+description_from = "https://github.com/obsproject/obs-studio/blob/33.0.0/frontend/cmake/linux/com.obsproject.Studio.metainfo.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "com.obsproject.Studio"
+keeps = """\
+Your scenes, profiles and plugins stay in ~/.config/obs-studio, and your recordings where you \
+saved them: install OBS Studio again and they're all there."""
+
+[[action]]
+name = "Install OBS Studio"
+kind = "apt"
+repo = "obs-studio"
+arch = "amd64"
+packages = ["obs-studio"]

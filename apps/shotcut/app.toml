@@ -1,0 +1,27 @@
+# Shotcut from Ubuntu's archive, 26.1.30; nixpkgs' 26.2.26 is hardly newer, and upstream's
+# 26.11.15 comes only as an AppImage or a tarball that no release of KubaOS would keep up with
+# either, as Shotcut ships monthly. It works through MLT and Ubuntu's FFmpeg, every common codec,
+# and decodes on the GPU through VA-API.
+# https://shotcut.org/download/
+name = "Shotcut"
+category = "media"
+tags = ["video", "editor", "nle", "timeline", "ffmpeg"]
+summary = "A video editor that opens anything FFmpeg can, no import step. Cut first, organise never."
+# From its AppStream metainfo, CC0-1.0 (mltframework/shotcut), its second paragraph.
+description = """\
+Shotcut supports many video, audio, and image formats via FFmpeg and screen, webcam, and audio \
+capture. It uses a time-line for non-linear video editing of multiple tracks that may be composed \
+of various file formats. Scrubbing and transport control are assisted by OpenGL GPU-based \
+processing and a number of video and audio filters are available."""
+description_from = "https://github.com/mltframework/shotcut/blob/v26.1.30/packaging/linux/org.shotcut.Shotcut.metainfo.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "org.shotcut.Shotcut"
+keeps = """\
+Your projects stay where you saved them, and Shotcut's settings and presets in \
+~/.config/Meltytech and ~/.local/share/Meltytech: install Shotcut again and they're there."""
+
+[[action]]
+name = "Install Shotcut"
+kind = "apt"
+packages = ["shotcut"]
