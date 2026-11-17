@@ -96,6 +96,9 @@ pub enum Reply {
     /// The request isn't one the helper takes, or the install may not write what it writes.
     Refused {
         why: Vec<String>,
+        /// One of `why` is a file of the user's own where a step writes.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        yours: bool,
     },
     Failed {
         why: String,
@@ -244,7 +247,10 @@ impl<'h> Server<'h> {
 
     /// Answers one request line.
     pub fn handle(&mut self, line: &str) -> Reply {
-        let refuse = |why: String| Reply::Refused { why: vec![why] };
+        let refuse = |why: String| Reply::Refused {
+            why: vec![why],
+            yours: false,
+        };
         let request: Request = match serde_json::from_str(line) {
             Ok(request) => request,
             Err(e) => return refuse(format!("not a request: {e}")),
@@ -276,8 +282,11 @@ impl<'h> Server<'h> {
         }
         match request {
             Request::Preflight { app, setup } => match self.keeper.preflight(&app, setup.as_deref()) {
-                Ok(why) if why.is_empty() => Reply::Ready,
-                Ok(why) => Reply::Refused { why },
+                Ok(refused) if refused.why.is_empty() => Reply::Ready,
+                Ok(refused) => Reply::Refused {
+                    why: refused.why,
+                    yours: refused.yours,
+                },
                 Err(e) => answer(&e),
             },
             Request::Step {
@@ -403,9 +412,10 @@ fn owned_by(path: &Path, owner: u32) -> Result<(), String> {
 /// The reply to a step that didn't go through: a refusal for a request the helper doesn't take.
 fn answer(e: &StepError) -> Reply {
     match e {
-        StepError::WrongSide { .. } | StepError::NoStep { .. } | StepError::Folder(_) => {
-            Reply::Refused { why: vec![chain(e)] }
-        }
+        StepError::WrongSide { .. } | StepError::NoStep { .. } | StepError::Folder(_) => Reply::Refused {
+            why: vec![chain(e)],
+            yours: false,
+        },
         _ => Reply::Failed { why: chain(e) },
     }
 }

@@ -474,10 +474,11 @@ fn an_app_whose_path_another_app_owns_is_refused_before_anything_runs() {
 
     let (result, _) = world.install("rival", true);
 
-    let Err(EngineError::Refused { why, .. }) = result else {
+    let Err(EngineError::Refused { why, yours, .. }) = result else {
         panic!("the rival was installed: {result:?}");
     };
     assert!(why[0].contains("config.toml belongs to fixture"), "{why:?}");
+    assert!(!yours, "another app's path isn't the user's to settle");
     assert_eq!(world.host.snapshot(), before);
     assert_eq!(world.journals("rival"), (None, None));
 }
@@ -492,10 +493,11 @@ fn a_file_of_the_users_own_is_never_written_over() {
 
     let (result, _) = world.install("rival", true);
 
-    let Err(EngineError::Refused { why, .. }) = result else {
+    let Err(EngineError::Refused { why, yours, .. }) = result else {
         panic!("the rival was installed: {result:?}");
     };
     assert!(why[0].contains("is yours"), "{why:?}");
+    assert!(yours);
     assert_eq!(world.host.snapshot(), before);
 }
 

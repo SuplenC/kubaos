@@ -187,7 +187,7 @@ fn a_min_the_required_apps_source_cant_meet_is_refused_before_anything_runs() {
 
     let (result, root) = world.with(&mut events, |e| e.add("lazyvim", None, &picks(&["lazyvim"])));
 
-    let Err(EngineError::Refused { app, why }) = result else {
+    let Err(EngineError::Refused { app, why, yours }) = result else {
         panic!("the install went on: {result:?}");
     };
     assert_eq!(app, "LazyVim");
@@ -195,6 +195,7 @@ fn a_min_the_required_apps_source_cant_meet_is_refused_before_anything_runs() {
         why,
         ["it needs Neovim 0.11 or newer, and this machine would get 0.10.2-1"]
     );
+    assert!(!yours, "a catalog refusal isn't the user's to settle");
     assert_eq!(world.host.snapshot(), before);
     assert_eq!(world.journals("neovim"), (None, None));
     assert_eq!(world.journals("lazyvim"), (None, None));

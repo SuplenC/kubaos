@@ -16,6 +16,28 @@ just apps-list                   # in a checkout: the table, from that checkout'
 
 An app's icon is, in this order: Colloid's, the system's icon theme, named by the app; else the vendor's official logo or app icon as an `.svg` in its folder (a `.png` where the vendor publishes only a raster, its note in the PNG's comment), never redrawn or recoloured, placed on the catalog's rounded tile at the same visual weight as the others (white, or the vendor's own tile colour where its mark needs it), its header naming where it was taken from and that it is the vendor's trademark, used to identify the app; else original art; else none (`docs/CONTRACTS.md`, "An app's folder").
 
+## Wayland
+
+Every app with a Wayland backend comes up on it, never on XWayland (`docs/CONTRACTS.md`, "The Apps catalog", "Wayland"). The session's hints put almost all of them there. Spotify ignores them, so it gets a menu entry of KubaOS's, with the package's id, that starts it with `DISPLAY` unset. A removal takes the entry away. A menu entry of your own at `~/.local/share/applications/spotify.desktop` is never written over: Spotify's install stops and names it, and so does every update. Delete or rename your entry, then run `kubaos update`.
+
+These run on XWayland:
+
+| App | Why |
+|---|---|
+| Ardour | Its toolkit, Ardour's own fork of GTK 2, draws on X11 alone. |
+| Cryptomator | JavaFX, whose GTK launcher sets `GDK_BACKEND=x11`, has no Wayland backend. |
+| GParted | It runs as root through pkexec, whose polkit action passes root only `DISPLAY` and `XAUTHORITY`, so it draws on XWayland's X server; root never gets your Wayland socket. |
+| JetBrains Toolbox | The JetBrains Runtime's Wayland toolkit could run it (`--jvm-args` with `-Dawt.toolkit.name=WLToolkit`), but JetBrains doesn't support that for Toolbox, so it stays on X11. The IDEs it installs, and Android Studio, start on Wayland. |
+| Minecraft Launcher | Mojang's launcher is X11 alone. |
+| ONLYOFFICE | Its bundled Qt 5 has no Wayland plugin. |
+| RawTherapee | Its AppImage sets `GDK_BACKEND=x11` as it starts, over the session's, for a crash its GTK had on Wayland. |
+| Steam | Steam's client is X11 alone; its games run on XWayland or in gamescope. |
+| VLC | VLC 3's Wayland window never worked properly; VideoLAN removed it in 3.0.24. Wayland output is VLC 4's. |
+| Wine | Wine 11's Wayland driver is experimental, so it stays behind the X11 one, which wins while XWayland runs. `Graphics="wayland,x11"` under `HKCU\Software\Wine\Drivers` puts a prefix on it. |
+| Zoom | It ships Qt's Wayland plugin, but starts on X11 unless `xwayland=false` is set in `~/.config/zoomus.conf`, a file of Zoom's own settings no step edits. Set it there to try Wayland; its screen sharing then needs `enableWaylandShare=true` too. |
+
+The command-line tools, the services and the drivers open no window: they run in your terminal, behind a web page or in the kernel.
+
 ## The table's columns
 
 One row an app, by category in the catalog's order (Browsers, Development, AI, Communication, Media, Graphics, Office, Security, System, Games), then by id.
