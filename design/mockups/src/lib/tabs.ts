@@ -1,8 +1,10 @@
 // One of a few views or values, picked along a rail of neon: `kubaos-ui`'s `tabs::tabs`,
 // `KubaOS.Components`' `Tabs` (`docs/design/components/tabs.md`). The choices sit in one well, a
 // pill as tall as a small control, with an unlit rail along its bottom edge; the picked choice's
-// stretch of the rail is lit, and its words are the accent. The same well is a setting's segmented
-// control (Always, On AC, Never). `.k-tabs` in `lib.css` draws it.
+// stretch of the rail is lit, and its words are the accent. The well is as wide as the room it is
+// given, its choices sharing it equally with their words centred, and never narrower than its
+// widest choice's share times the count, so no words are cut. The same well is a setting's
+// segmented control (Always, On AC, Never). `.k-tabs` in `lib.css` draws it.
 //
 // A pick sends the lit stretch from the old choice to the new one: its leading edge goes over
 // `short` and its trailing edge follows a `micro` later over `medium`, both on `emphasized_decel`,
@@ -67,11 +69,6 @@ export interface TabsOptions {
   readonly tipShown?: number;
   /** What a pick does besides picking: the view it shows. */
   readonly onPick?: (index: number) => void;
-  /**
-   * The well as wide as the room it is given, its choices sharing it equally with their words
-   * centred: a setting's row, where the well ends in line with the controls under it.
-   */
-  readonly fill?: boolean;
 }
 
 /** A lit stretch's two edges along the well, in CSS pixels from its left edge. */
@@ -109,7 +106,6 @@ export function tabs(options: TabsOptions): HTMLElement {
   well.className = "k-tabs";
   well.setAttribute("role", "tablist");
   if (options.disabled) well.setAttribute("aria-disabled", "true");
-  if (options.fill) well.dataset.fill = "";
   well.style.setProperty("--count", String(count));
   if (options.pinned !== "pressed") pin(well, options.pinned);
   focusRing(well, "full", "accent", false);
@@ -269,6 +265,23 @@ export function tabs(options: TabsOptions): HTMLElement {
     options.onPick?.(index);
   }
 
+  /**
+   * The widest choice, its words and its sides, as `--widest`: every share is at least that, so the
+   * well grows past a room too narrow for it rather than cut a choice's words. It is set a frame
+   * after the words are laid out, so the well's own resize is seen in the next frame's turn.
+   */
+  function measure(): void {
+    const most = Math.max(
+      ...buttons.map((each) => {
+        const style = getComputedStyle(each);
+        const words = each.querySelector<HTMLElement>(".k-tab-words")?.offsetWidth ?? 0;
+        return words + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
+      }),
+    );
+    const widest = `${Math.ceil(most)}px`;
+    if (well.style.getPropertyValue("--widest") !== widest) well.style.setProperty("--widest", widest);
+  }
+
   /** Lays the stretch on the pick, or for a move's sample its travel from `from`, whenever the well's size changes. */
   function lay(): void {
     if (!well.isConnected || picked < 0 || flying.some((each) => each.playState === "running")) return;
@@ -290,5 +303,7 @@ export function tabs(options: TabsOptions): HTMLElement {
 
   mark();
   new ResizeObserver(lay).observe(well);
+  const words = new ResizeObserver(() => requestAnimationFrame(measure));
+  for (const each of buttons) words.observe(each.querySelector(".k-tab-words")!);
   return probe(well, { role: "component", name: "Tabs", variant: "", fixed: FIXED_HEIGHT });
 }

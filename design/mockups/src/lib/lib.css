@@ -2167,11 +2167,16 @@
    signs are off. The rail is `tabs.rail` thick at night and `tabs.rail_day` by day, in whole device
    pixels. The focus tube is the whole well's edge, drawn under the rail. Disabled, every part is at
    `opacity.disabled_content`, with no glow. A choice can be disabled alone; when that choice is
-   the pick, the well itself takes the keyboard, so it draws no outline of its own. */
+   the pick, the well itself takes the keyboard, so it draws no outline of its own.
+   The well is as wide as the room it is given: the whole width across a stack, a page or a
+   block, and along a row its widest choice (`--widest`, measured) times the count, or the rest of
+   the row where the page fills it (`layout.ts`' `filling`). It is never narrower than that, so it
+   grows past a room too narrow for it rather than cut a choice's words. */
 .k-tabs {
   position: relative;
-  display: inline-flex;
+  display: flex;
   flex: none;
+  min-width: calc(var(--count) * var(--widest, 0px) + 2 * var(--space-s4));
   outline: none;
   box-sizing: border-box;
   height: var(--size-control_sm);
@@ -2193,6 +2198,16 @@
 
 .k-tabs:is(:has(> .k-tab:focus-visible), [data-stranded]:focus-visible) > .k-ring {
   --lit: 1;
+}
+
+/* Across a stack: the whole width, whatever the stack's own alignment. */
+.k-stack > .k-tabs {
+  align-self: stretch;
+}
+
+/* Filling a row: the rest of it, still never narrower than its choices. */
+.k-row > .k-tabs[data-fill] {
+  min-width: calc(var(--count) * var(--widest, 0px) + 2 * var(--space-s4));
 }
 
 /* No pick: no stretch lit, the rail alone. */
@@ -2267,15 +2282,10 @@
   --words: rgb(from var(--picked-words) r g b / var(--dim));
 }
 
-/* Filling its room: the choices share the well equally, their words centred, so the last one ends
-   at the well's own end. Each share is whole device pixels, the spare ones one each to the first
-   choices, as `kubaos-ui`'s grid splits a width (`grid::weighted`). */
-.k-tabs[data-fill] {
-  display: flex;
-  flex: 1 1 auto;
-}
-
-.k-tabs[data-fill] > .k-tab {
+/* The choices share the well equally, their words centred, so the last one ends at the well's own
+   end. Each share is whole device pixels, the spare ones one each to the first choices, as
+   `kubaos-ui`'s grid splits a width (`grid::weighted`). */
+.k-tabs > .k-tab {
   --share: round(down, calc(100% / var(--count)), 1px);
   flex: none;
   width: calc(var(--share) + clamp(0px, 100% - var(--share) * var(--count) - var(--index) * 1px, 1px));

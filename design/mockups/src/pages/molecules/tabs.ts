@@ -1,5 +1,6 @@
 // The Tabs page: `docs/design/components/tabs.md`. One of a few views or values, picked along a
-// rail of neon in one well; the same well is the segmented control. The pick's lit stretch travels
+// rail of neon in one well as wide as its room, the choices sharing it equally; the same well is
+// the segmented control. The pick's lit stretch travels
 // to the new choice and flashes as it lands. A choice may be disabled alone: the audio panel's
 // Input while a headset is in Music mode. A row that doesn't apply is disabled with nothing
 // picked: Calls and Music for a device that isn't Bluetooth. A choice may carry a tip, a Tooltip
@@ -9,7 +10,7 @@ import type { Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { stack, within } from "../../lib/layout.ts";
 import { setTabDisabled, type Tab, tabs } from "../../lib/tabs.ts";
-import { wrapped } from "../../lib/text.ts";
+import { text, wrapped } from "../../lib/text.ts";
 import { tooltip } from "../../lib/tooltip.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
@@ -72,12 +73,12 @@ function sections(): HTMLElement {
 }
 
 /**
- * The audio panel's two rows, each filling the panel's room: Music disables Input under it. Input
- * picked when Music is picked stays picked and dimmed, until Output or Options is picked.
+ * The audio panel's two rows, in the panel's room: Music disables Input under it. Input picked when
+ * Music is picked stays picked and dimmed, until Output or Options is picked.
  */
 function audio(): HTMLElement {
-  const sides = tabs({ choices: SIDES, picked: 1, fill: true });
-  const modes = tabs({ choices: MODES, fill: true, onPick: (index) => setTabDisabled(sides, 1, index === 1) });
+  const sides = tabs({ choices: SIDES, picked: 1 });
+  const modes = tabs({ choices: MODES, onPick: (index) => setTabDisabled(sides, 1, index === 1) });
   return within(PANEL, stack("s16", "start", modes, sides));
 }
 
@@ -88,14 +89,6 @@ const ROWS = [
   { name: "A choice disabled", choices: MUSIC_SIDES, picked: 0 },
   { name: "The pick disabled", choices: MUSIC_SIDES, picked: 1 },
 ] as const;
-
-/** The well filling a row a menu wide, as a setting's row gives it. */
-function filling(choices: readonly Tab[], picked: number): HTMLElement {
-  const room = document.createElement("span");
-  room.className = "f-tabs-room";
-  room.append(tabs({ choices, picked, fill: true }));
-  return room;
-}
 
 type MatrixState = "rest" | "lit" | "pressed" | "disabled";
 
@@ -143,7 +136,6 @@ export default page({
     { name: "Views", for: "a few views of one thing: the control center", sample: () => row(SECTIONS, 2) },
     { name: "With symbols", for: "a symbol helps tell them apart: Calls, Music", sample: () => row(MODES, 0) },
     { name: "Segmented control", for: "a setting's few values side by side", sample: () => row(MOTION, 1) },
-    { name: "Filling its row", for: "a setting's row: the choices share the well, ending at its end", sample: () => filling(MOTION, 1) },
     { name: "A tip, first choice", for: "what Calls means, from the row's start", sample: () => tipped(0) },
     { name: "A tip, last choice", for: "what Music means, from the row's end", sample: () => tipped(1) },
     { name: "A choice disabled", for: "a view that can't open now: Input in Music mode", sample: () => row(MUSIC_SIDES, 0) },
@@ -238,7 +230,7 @@ export default page({
   measures: {
     samples: nonEmpty([
       { name: "With symbols", for: "well, padding, choice, symbol and gap, rail", sample: () => row(MODES, 1) },
-      { name: "Views", for: "the well as wide as its choices; the lit stretch", sample: () => row(SECTIONS, 2) },
+      { name: "Views", for: "the well filling a panel; the lit stretch", sample: () => within(PANEL, row(SECTIONS, 2)) },
     ]),
     measures: [
       { part: "Well height", token: "size-control_sm" },
@@ -250,6 +242,9 @@ export default page({
       { part: "Rail at night", token: "tabs-rail" },
       { part: "Rail by day", token: "tabs-rail_day" },
     ],
-    reflow: doesntApply("as wide as its choices: it never stretches, wraps or scrolls."),
+    reflow: {
+      note: "It fills its room, the choices sharing it; it never wraps, scrolls or cuts a choice.",
+      sample: () => within("100%", stack("s8", "start", row(MOTION, 1), text("Tabs as wide as the window.", "small", "on_surface_variant"))),
+    },
   },
 });

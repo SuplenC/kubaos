@@ -758,7 +758,6 @@ export function clockEditor(host: EditorHost): Editor {
 
     // Wide or portrait: the frame, the picture's crop and the clock morph from one to the other.
     const screens = tabs({
-      fill: true,
       choices: [{ label: "Wide screen" }, { label: "Portrait screen" }],
       picked: tab === "wide" ? 0 : 1,
       onPick: (index) => {
@@ -812,7 +811,6 @@ export function clockEditor(host: EditorHost): Editor {
 
     // Glow: Off, Dark, Light or Auto (the one opposing the clock's colour), and its strength.
     const glow = tabs({
-      fill: true,
       choices: [{ label: "Off" }, { label: "Dark" }, { label: "Light" }, { label: "Auto" }],
       picked: ["off", "dark", "light", "auto"].indexOf(set.glow.mode),
       disabled: !shown,
@@ -841,7 +839,6 @@ export function clockEditor(host: EditorHost): Editor {
     const date = dateOf();
     const setDate = (patch: Partial<ClockDate>) => (set.date[tab] = { ...dateOf(), ...patch });
     const align = tabs({
-      fill: true,
       choices: [{ label: "Left" }, { label: "Centre" }, { label: "Right" }],
       picked: ["left", "centre", "right"].indexOf(date.align),
       disabled: !dated,
