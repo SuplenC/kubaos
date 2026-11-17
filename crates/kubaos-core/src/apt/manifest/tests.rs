@@ -311,7 +311,7 @@ fn the_scripts_read_comments_inline_arrays_and_split_arrays_as_the_updater_does(
 }
 
 #[test]
-fn a_repo_is_in_place_once_its_own_sources_file_is_signed_by_its_keyrings_and_they_are_there() {
+fn a_repo_is_in_place_once_its_own_sources_file_is_signed_by_its_primary_keyring_and_no_other_and_they_are_there() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     let text = "[repo.v]\nkey_url = \"https://v/k\"\nfingerprint = \"AB\"\nkeyring = \"/etc/apt/keyrings/v.gpg\"\n";
@@ -347,13 +347,31 @@ fn a_repo_is_in_place_once_its_own_sources_file_is_signed_by_its_keyrings_and_th
     let repo = &manifest.repos()["v"];
     std::fs::write(root.join("etc/apt/keyrings/v.gpg"), "key").unwrap();
     std::fs::write(root.join("etc/apt/keyrings/v-next.gpg"), "key").unwrap();
-    assert!(!repo.in_place("v", root), "signed by its key alone, not the next one");
+    assert!(
+        repo.in_place("v", root),
+        "signed by its key alone, as a vendor writes the file again"
+    );
+    let both = "Types: deb\nURIs: https://v/apt\nSigned-By: /etc/apt/keyrings/v.gpg /etc/apt/keyrings/v-next.gpg\n";
+    std::fs::write(sources.join("v.sources"), both).unwrap();
+    assert!(repo.in_place("v", root));
     std::fs::write(
         sources.join("v.sources"),
-        "Types: deb\nURIs: https://v/apt\nSigned-By: /etc/apt/keyrings/v.gpg /etc/apt/keyrings/v-next.gpg\n",
+        "Types: deb\nURIs: https://v/apt\nSigned-By: /etc/apt/keyrings/v-next.gpg\n",
     )
     .unwrap();
-    assert!(repo.in_place("v", root));
+    assert!(!repo.in_place("v", root), "not signed by its primary key");
+    std::fs::write(root.join("etc/apt/keyrings/stray.gpg"), "key").unwrap();
+    std::fs::write(
+        sources.join("v.sources"),
+        "Types: deb\nURIs: https://v/apt\nSigned-By: /etc/apt/keyrings/v.gpg /etc/apt/keyrings/stray.gpg\n",
+    )
+    .unwrap();
+    assert!(!repo.in_place("v", root), "a vendor's stray key");
+    std::fs::write(sources.join("v.sources"), format!("{both}Enabled: no\n")).unwrap();
+    assert!(!repo.in_place("v", root), "turned off");
+    std::fs::write(sources.join("v.sources"), both).unwrap();
+    std::fs::remove_file(root.join("etc/apt/keyrings/v-next.gpg")).unwrap();
+    assert!(!repo.in_place("v", root), "a keyring it names gone");
 }
 
 #[test]

@@ -156,25 +156,35 @@ impl Repo {
     }
 
     /// Whether the repository `name` is set up as repo setup leaves it on the machine whose `/` is
-    /// `root`: `/etc/apt/sources.list.d/<name>.sources` is there, each of its `Signed-By` fields
-    /// names every one of [`Repo::keyrings`], and each keyring is a file. A vendor's own source of
-    /// the repository is another file, or signed by another keyring, so it isn't this.
+    /// `root`: `/etc/apt/sources.list.d/<name>.sources` is there and not turned off with
+    /// `Enabled: no`, each of its `Signed-By` fields names its primary keyring and nothing outside
+    /// [`Repo::keyrings`], and each keyring it names is a file. A vendor that writes the file again
+    /// with the one key its build signs with, as Vivaldi's postinst and daily job do, leaves it in
+    /// place; a vendor's own source of the repository is another file, or signed by another
+    /// keyring, so it isn't this.
     #[must_use]
     pub fn in_place(&self, name: &str, root: &Path) -> bool {
         let at = |path: &str| root.join(path.trim_start_matches('/'));
         let Ok(text) = fs::read_to_string(at(&format!("{SOURCES_D}/{name}.sources"))) else {
             return false;
         };
-        let mut signed = text
-            .lines()
-            .filter_map(|line| line.strip_prefix("Signed-By:"))
-            .peekable();
+        let field = |key: &'static str| {
+            text.lines()
+                .filter_map(move |line| line.strip_prefix(key))
+                .map(str::trim)
+        };
+        if field("Enabled:").any(|value| value.eq_ignore_ascii_case("no")) {
+            return false;
+        }
+        let mut signed = field("Signed-By:").peekable();
         signed.peek().is_some()
             && signed.all(|value| {
                 let named: Vec<&str> = value.split_whitespace().collect();
-                self.keyrings().all(|k| named.contains(&k))
+                named.contains(&self.keyring.as_str())
+                    && named
+                        .iter()
+                        .all(|k| self.keyrings().any(|ours| ours == *k) && at(k).is_file())
             })
-            && self.keyrings().all(|k| at(k).is_file())
     }
 }
 

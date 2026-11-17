@@ -194,9 +194,10 @@ pub trait Host {
     fn apt_repo(&mut self, repo: &str) -> Result<(), HostError>;
 
     /// Whether the vendor repository `repo` of the package manifest is set up as KubaOS sets it
-    /// up: its sources file, `<repo>.sources`, signed by the manifest's keyrings, each of them
-    /// there. A vendor's own setup of the same repository (Slack's `slack.list`, the
-    /// `zulip-desktop.sources` Zulip's package ships, signed by its own keyring) isn't.
+    /// up, as [`Repo::in_place`](crate::apt::manifest::Repo::in_place) reads it: its sources file,
+    /// `<repo>.sources`, signed by the manifest's primary keyring and none but its keyrings. A
+    /// vendor's own setup of the same repository (Slack's `slack.list`, the `zulip-desktop.
+    /// sources` Zulip's package ships, signed by its own keyring) isn't.
     ///
     /// # Errors
     ///
