@@ -11,12 +11,14 @@
 #
 # With XWayland's DISPLAY set, its Firefox picks Wayland only when MOZ_ENABLE_WAYLAND says 1, or,
 # with that unset, when GDK_BACKEND starts with "wayland", as the session's does;
-# MOZ_ENABLE_WAYLAND=0 wins over both (IsWaylandEnabled in toolkit/xre/nsAppRunner.cpp). The launcher and start-tor-browser pass their
-# environment through to it, so the X11 setup's menu entries, with the ids of the package's own so
-# they take their place, start the launcher with MOZ_ENABLE_WAYLAND=0. The Wayland setup is the
-# session's MOZ_ENABLE_WAYLAND=1, and needs nothing more.
+# MOZ_ENABLE_WAYLAND=0 wins over both (IsWaylandEnabled in toolkit/xre/nsAppRunner.cpp). The
+# launcher and start-tor-browser pass their environment through to it, so the X11 setup's menu
+# entries, with the ids of the package's own so they take their place, start the launcher with
+# MOZ_ENABLE_WAYLAND=0. The Wayland setup is the session's MOZ_ENABLE_WAYLAND=1, and needs
+# nothing more.
 # https://gitlab.torproject.org/tpo/applications/tor-browser/-/merge_requests/1144
-# https://gitlab.torproject.org/tpo/applications/tor-browser-build/-/blob/main/projects/browser/RelativeLink/start-browser
+# start-tor-browser is projects/browser/RelativeLink/start-browser in tor-browser-build:
+# https://gitlab.torproject.org/tpo/applications/tor-browser-build
 name = "Tor Browser"
 category = "browsers"
 tags = ["browser", "web", "internet", "tor", "privacy", "anonymity"]
