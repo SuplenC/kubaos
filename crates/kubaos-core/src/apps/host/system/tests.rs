@@ -1,8 +1,13 @@
 use std::fs;
+use std::path::Path;
 
 use super::SystemHost;
 use super::candidate;
+use super::certificate_serial;
+use super::dkms_status;
+use super::enrolment;
 use super::known_of_arch;
+use super::mok_certificate;
 use super::simulation;
 use crate::apps::host::Downgrade;
 use crate::apps::host::Host;
@@ -119,4 +124,54 @@ fn an_architectures_packages_are_those_dpkg_has_installed_or_configured() {
     let known = known_of_arch(shown, "i386", "amd64");
 
     assert_eq!(known, ["libc6:i386".to_owned(), "libgl1:i386".to_owned()].into());
+}
+
+#[test]
+fn dkms_status_says_whether_the_module_is_added_and_for_which_kernels_it_is_installed() {
+    let shown = "hid-xpadneo/0.10.5, 7.0.0-42-generic, x86_64: installed\n\
+                 hid-xpadneo/0.10.5, 7.0.0-43-generic, x86_64: built\n\
+                 hid-xpadneo/0.10.4, 7.0.0-43-generic, x86_64: installed\n\
+                 tuxedo-drivers/4.25.0, 7.0.0-43-generic, x86_64: installed (Original modules exist)\n";
+
+    let status = dkms_status(shown, "hid-xpadneo", "0.10.5");
+    let added = dkms_status("hid-xpadneo/0.10.5: added\n", "hid-xpadneo", "0.10.5");
+    let none = dkms_status("", "hid-xpadneo", "0.10.5");
+
+    assert!(status.added);
+    assert_eq!(status.installed, ["7.0.0-42-generic".to_owned()].into());
+    assert!(added.added && added.installed.is_empty());
+    assert!(!none.added);
+}
+
+#[test]
+fn the_mok_is_the_certificate_dkms_configuration_names_last() {
+    let framework = "# mok_certificate=/var/lib/dkms/mok.pub\n";
+    let ours = "mok_certificate=\"/var/lib/shim-signed/mok/MOK.der\"\n";
+    let variable = "mok_certificate=/keys/$kernelver.der\n";
+
+    assert_eq!(mok_certificate([framework].into_iter()), None);
+    assert_eq!(
+        mok_certificate([framework, ours].into_iter()),
+        Some(Path::new("/var/lib/shim-signed/mok/MOK.der").to_path_buf())
+    );
+    assert_eq!(mok_certificate([ours, variable].into_iter()), None);
+}
+
+#[test]
+fn a_certificates_serial_reads_as_modinfo_names_the_key() {
+    assert_eq!(certificate_serial("serial=1A2b3\n").as_deref(), Some("01:A2:B3"));
+    assert_eq!(certificate_serial("no serial"), None);
+}
+
+#[test]
+fn mokutil_says_whether_the_key_is_enrolled_queued_or_neither() {
+    use crate::apps::host::SecureBoot;
+
+    assert_eq!(enrolment("MOK.der is already enrolled\n"), SecureBoot::Enrolled);
+    assert_eq!(
+        enrolment("MOK.der is already in the enrollment request\n"),
+        SecureBoot::Queued
+    );
+    assert_eq!(enrolment("MOK.der is not enrolled\n"), SecureBoot::NotEnrolled);
+    assert_eq!(enrolment("Failed to read MokListRT\n"), SecureBoot::Unknown);
 }

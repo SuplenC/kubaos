@@ -86,6 +86,12 @@ pub enum ActionError {
     InvalidArch { value: String },
     #[error("{value:?} is not an architecture dpkg installs beside the machine's: amd64, arm64, armhf or i386")]
     InvalidForeignArch { value: String },
+    #[error("{value:?} is not a DKMS module's name: lowercase letters, digits, `-` and `_`")]
+    InvalidModule { value: String },
+    #[error("{value:?} is not a DKMS module's version: digits, letters and `.+~-`, starting with a digit")]
+    InvalidModuleVersion { value: String },
+    #[error("{value:?} is not a folder of the unpacked source: a relative path, no `.` or `..`")]
+    InvalidSourceFolder { value: String },
     #[error("an apt action for {arch} alone lists no packages of another architecture's")]
     ArchPackagesWithArch { arch: String },
     #[error("{value:?} is not a path an action writes: `~/…` in the home, or under /etc/, /opt/ or /usr/local/")]
@@ -298,6 +304,31 @@ pub enum Kind {
     Architecture {
         architecture: String,
     },
+    /// A kernel module built from a pinned source by DKMS for every kernel with its headers, and
+    /// again by DKMS for each kernel installed later, signed with the machine's Machine Owner Key
+    /// as DKMS signs: the source unpacked to `/usr/src/<module>-<version>` with KubaOS's
+    /// `dkms.conf`, registered (`dkms add`) and installed (`dkms install`).
+    Dkms {
+        /// DKMS's name for it, and the one kernel module it builds: `hid-xpadneo`.
+        module: String,
+        version: String,
+        /// A gzipped tarball of the source, over https.
+        url: String,
+        sha256: String,
+        /// The leading folders of the tarball's paths left out, as tar's `--strip-components`.
+        #[serde(default)]
+        strip: u32,
+        /// The folder of the unpacked tarball that holds the module's source, when it isn't the
+        /// tarball's top.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        folder: Option<String>,
+        /// The `dkms.conf` the source gets, a file of the app's folder, its words filled in and
+        /// `@VERSION@` the module's version.
+        conf: String,
+        /// That file's text, read from the folder as the action resolves: the journal's own.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        conf_text: Option<String>,
+    },
     /// A web app in a window of its own: a desktop entry and an icon that open `url` as a Chrome
     /// app window, in a browser folder and a profile of its own, which give the window an app id
     /// of its own.
@@ -439,7 +470,7 @@ impl Action {
     ///
     /// [`ActionError`] for an action that isn't valid.
     pub fn from_folder(table: toml::Table) -> Result<Self, ActionError> {
-        for key in ["scripts", "svg", "in_place"] {
+        for key in ["scripts", "svg", "in_place", "conf_text"] {
             if table.contains_key(key) {
                 return Err(ActionError::JournalOnly { key });
             }
@@ -514,7 +545,11 @@ impl Action {
             if path.starts_with("~/") { Side::User } else { Side::Root }
         };
         match &self.kind {
-            Kind::Apt { .. } | Kind::Deb { .. } | Kind::Group { .. } | Kind::Architecture { .. } => Side::Root,
+            Kind::Apt { .. }
+            | Kind::Deb { .. }
+            | Kind::Group { .. }
+            | Kind::Architecture { .. }
+            | Kind::Dkms { .. } => Side::Root,
             Kind::Nix { .. } | Kind::Setting { .. } | Kind::Linger {} | Kind::WebApp { .. } => Side::User,
             Kind::Download { to, .. } | Kind::File { to, .. } | Kind::Symlink { to, .. } => by_path(to),
             Kind::Output { path } => by_path(path),
@@ -559,6 +594,7 @@ impl Action {
             (Kind::Deb { package: a, .. }, Kind::Deb { package: b, .. })
             | (Kind::Group { group: a }, Kind::Group { group: b })
             | (Kind::Architecture { architecture: a }, Kind::Architecture { architecture: b })
+            | (Kind::Dkms { module: a, .. }, Kind::Dkms { module: b, .. })
             | (Kind::WebApp { id: a, .. }, Kind::WebApp { id: b, .. })
             | (Kind::File { to: a, .. }, Kind::File { to: b, .. })
             | (Kind::Symlink { to: a, .. }, Kind::Symlink { to: b, .. })
@@ -648,6 +684,15 @@ impl Action {
                 value: value.clone(),
             },
             Kind::Output { path } => Kind::Output { path: fill(path, None) },
+            Kind::Dkms { conf, version, .. } => {
+                let path = folder.join(conf);
+                let text = fs::read_to_string(&path).map_err(|source| ActionError::ReadFrom { path, source })?;
+                let mut kind = self.kind.clone();
+                if let Kind::Dkms { conf_text, .. } = &mut kind {
+                    *conf_text = Some(words.fill(&text, Some(version)));
+                }
+                kind
+            }
             Kind::WebApp {
                 id, title, url, icon, ..
             } => {
@@ -783,14 +828,13 @@ impl Action {
                     return Err(ActionError::InvalidGroup { value: group.clone() });
                 }
             }
-            Kind::Linger {} => {}
-            Kind::Architecture { architecture } => {
-                if !FOREIGN_ARCHES.contains(&architecture.as_str()) {
-                    return Err(ActionError::InvalidForeignArch {
-                        value: architecture.clone(),
-                    });
-                }
+            Kind::Dkms { .. } => check_dkms(&self.kind)?,
+            Kind::Architecture { architecture } if !FOREIGN_ARCHES.contains(&architecture.as_str()) => {
+                return Err(ActionError::InvalidForeignArch {
+                    value: architecture.clone(),
+                });
             }
+            Kind::Linger {} | Kind::Architecture { .. } => {}
             Kind::WebApp {
                 id, title, url, icon, ..
             } => check_web_app(id, title, url, icon)?,
@@ -812,21 +856,77 @@ impl Action {
         if found.is_empty() {
             return Err(ActionError::NoDownload);
         }
-        for download in found {
-            let url = is_https(&download.url);
-            let sha = download.sha256.len() == 64
-                && download
-                    .sha256
-                    .chars()
-                    .all(|c| c.is_ascii_digit() || matches!(c, 'a'..='f'));
-            if !url || !sha {
-                return Err(ActionError::InvalidDownload {
-                    value: download.url.clone(),
-                });
-            }
-        }
-        Ok(())
+        found.into_iter().try_for_each(check_pin)
     }
+}
+
+/// Whether a pinned download is an https URL with a sha256 of 64 lowercase hex digits.
+fn check_pin(download: &Download) -> Result<(), ActionError> {
+    let url = is_https(&download.url);
+    let sha = download.sha256.len() == 64
+        && download
+            .sha256
+            .chars()
+            .all(|c| c.is_ascii_digit() || matches!(c, 'a'..='f'));
+    if url && sha {
+        Ok(())
+    } else {
+        Err(ActionError::InvalidDownload {
+            value: download.url.clone(),
+        })
+    }
+}
+
+/// Whether a `dkms` step's module, version, pinned source, folder in it and `dkms.conf` are well
+/// formed: names DKMS takes in a path, `/usr/src/<module>-<version>`, and a file of the folder.
+fn check_dkms(kind: &Kind) -> Result<(), ActionError> {
+    let Kind::Dkms {
+        module,
+        version,
+        url,
+        sha256,
+        folder,
+        conf,
+        ..
+    } = kind
+    else {
+        return Ok(());
+    };
+    let module_ok = !module.is_empty()
+        && module.len() <= 64
+        && module.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
+        && module
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '-' | '_'));
+    if !module_ok {
+        return Err(ActionError::InvalidModule { value: module.clone() });
+    }
+    let version_ok = version.chars().next().is_some_and(|c| c.is_ascii_digit())
+        && version.len() <= 64
+        && version
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '+' | '~' | '-'));
+    if !version_ok {
+        return Err(ActionError::InvalidModuleVersion { value: version.clone() });
+    }
+    check_pin(&Download {
+        url: url.clone(),
+        sha256: sha256.clone(),
+    })?;
+    if let Some(folder) = folder
+        && !is_folder_path(folder)
+    {
+        return Err(ActionError::InvalidSourceFolder { value: folder.clone() });
+    }
+    if !is_folder_file(conf) {
+        return Err(ActionError::InvalidFrom { value: conf.clone() });
+    }
+    Ok(())
+}
+
+/// Where DKMS takes a module's source from: `/usr/src/<module>-<version>`.
+pub fn dkms_source(module: &str, version: &str) -> String {
+    format!("/usr/src/{module}-{version}")
 }
 
 /// An `apt` action as it runs on a machine of `arch`: that architecture's packages after its

@@ -198,6 +198,8 @@ pub enum Source {
     Deb,
     /// A vendor's download, an `AppImage` or an archive, pinned by its sha256.
     Download,
+    /// A kernel module's source, pinned by its sha256, which DKMS builds for each kernel.
+    Dkms,
     /// Container images, each pinned by its digest, which a `run` declaring them installs.
     ContainerImages,
     /// A website in a window of its own.
@@ -215,6 +217,7 @@ impl Source {
             Kind::Nix { .. } => Some(Self::Nixpkgs),
             Kind::Deb { .. } => Some(Self::Deb),
             Kind::Download { .. } => Some(Self::Download),
+            Kind::Dkms { .. } => Some(Self::Dkms),
             Kind::Run {
                 source: Some(RunSource::ContainerImages),
                 ..

@@ -25,6 +25,7 @@ use super::Action;
 use super::Kind;
 use super::Scope;
 use super::Unpack;
+use super::dkms_source;
 use super::parse_mode;
 use super::settings;
 use super::settings::Settings;
@@ -36,6 +37,7 @@ use crate::apps::host::Compression;
 use crate::apps::host::Downgrade;
 use crate::apps::host::Host;
 use crate::apps::host::HostError;
+use crate::apps::host::SecureBoot;
 use crate::apps::host::UnitState;
 use crate::apps::journal::Claim;
 use crate::apps::journal::JournalError;
@@ -86,6 +88,15 @@ pub enum PerformError {
     AptTakes { packages: Vec<String> },
     #[error("recording what it is about to install")]
     Record(#[source] JournalError),
+    #[error("no kernel has its headers to build {module} against: install linux-headers-generic")]
+    NoKernelHeaders { module: String },
+    #[error(
+        "DKMS installed {module} for {} without signing it with the Machine Owner Key, so Secure Boot would refuse it: check mok_signing_key and mok_certificate in /etc/dkms/framework.conf",
+        kernels.join(", ")
+    )]
+    Unsigned { module: String, kernels: Vec<String> },
+    #[error("the source of {module} has no folder {folder}")]
+    NoSourceFolder { module: String, folder: String },
 }
 
 impl PerformError {
@@ -105,8 +116,6 @@ pub struct Look {
     /// What it changes (owned) and what it finds there (not owned).
     pub claims: Vec<Claim>,
     pub prior: Prior,
-    /// What the user has to know of the step as it stands, said whenever a run reaches it.
-    pub note: Option<String>,
 }
 
 /// What a step's journal entry says its path holds, which a download's check can't read from
@@ -363,7 +372,6 @@ fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look
                     active: Some(state.started()),
                     ..Prior::default()
                 },
-                note: None,
             })
         }
         Kind::Group { group } => {
@@ -376,7 +384,6 @@ fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look
                     Claim::new(format!("member:{group}:{user}"), !member),
                 ],
                 prior: Prior::default(),
-                note: None,
             })
         }
         Kind::Linger {} => {
@@ -388,7 +395,6 @@ fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look
                     lingered: Some(on),
                     ..Prior::default()
                 },
-                note: None,
             })
         }
         _ => Ok(Look::default()),
@@ -452,7 +458,6 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
                 done,
                 claims: vec![Claim::new(format!("package:{package}"), have.is_none())],
                 prior: Prior::default(),
-                note: None,
             })
         }
         Kind::Nix { packages, arch, unfree } => look_nix(host, packages, arch.as_deref(), *unfree),
@@ -509,6 +514,7 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
         Kind::Setting { file, key, value } => look_setting(host, file, key, value),
         Kind::Unit { .. } | Kind::Group { .. } | Kind::Linger {} => look_machine(action, host, &user),
         Kind::Architecture { architecture } => look_architecture(host, architecture),
+        Kind::Dkms { .. } => look_dkms(action, host, recorded),
         Kind::Run { .. } => look_run(action, host, recorded),
     }
 }
@@ -524,6 +530,262 @@ fn look_architecture(host: &mut dyn Host, arch: &str) -> Result<Look, PerformErr
     })
 }
 
+/// How far DKMS has a module at a version: in its tree, and installed, signed with the MOK when
+/// there is one, for every kernel with its headers.
+struct Built {
+    added: bool,
+    /// The kernels with their headers that lack it, or have it unsigned while DKMS has a MOK.
+    missing: Vec<String>,
+    /// No kernel has its headers.
+    no_kernel: bool,
+}
+
+impl Built {
+    fn whole(&self) -> bool {
+        self.added && !self.no_kernel && self.missing.is_empty()
+    }
+}
+
+/// What DKMS has of `module` at `version`, as [`Built`] says.
+fn dkms_built(host: &mut dyn Host, module: &str, version: &str) -> Result<Built, PerformError> {
+    let status = host.dkms_status(module, version).map_err(PerformError::Host)?;
+    let kernels = host.kernels().map_err(PerformError::Host)?;
+    let mok = host.mok().map_err(PerformError::Host)?;
+    let mut missing = Vec::new();
+    for kernel in &kernels {
+        let signed = match &mok {
+            Some(mok) => host
+                .module_signer(module, kernel)
+                .map_err(PerformError::Host)?
+                .is_some_and(|key| same_key(&key, &mok.serial)),
+            None => true,
+        };
+        if !status.installed.contains(kernel) || !signed {
+            missing.push(kernel.clone());
+        }
+    }
+    Ok(Built {
+        added: status.added,
+        missing,
+        no_kernel: kernels.is_empty(),
+    })
+}
+
+/// Whether two key ids, as `modinfo` and `openssl` print a serial, are the same: case, `:` and a
+/// leading zero byte aside, as a module's signature keeps the serial's sign byte.
+fn same_key(a: &str, b: &str) -> bool {
+    let bare = |key: &str| {
+        let hex: String = key
+            .chars()
+            .filter(|c| *c != ':')
+            .collect::<String>()
+            .to_ascii_uppercase();
+        hex.trim_start_matches('0').to_owned()
+    };
+    bare(a) == bare(b)
+}
+
+/// Whether the source a `dkms` step's journal entry `had` put in place is the one `want` pins:
+/// the same download, unpacked the same way, with the same `dkms.conf`.
+fn same_source(had: &Action, want: &Action) -> bool {
+    let pin = |action: &Action| match &action.kind {
+        Kind::Dkms {
+            version,
+            url,
+            sha256,
+            strip,
+            folder,
+            conf_text,
+            ..
+        } => Some((
+            version.clone(),
+            url.clone(),
+            sha256.clone(),
+            *strip,
+            folder.clone(),
+            conf_text.clone(),
+        )),
+        _ => None,
+    };
+    pin(had).is_some() && pin(had) == pin(want)
+}
+
+/// What a `dkms` step finds: its source in `/usr/src/<module>-<version>`, from its pin when the
+/// journal says its step put it there, and the module in DKMS's tree and installed, signed with
+/// the MOK, for every kernel with its headers.
+fn look_dkms(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Result<Look, PerformError> {
+    let Kind::Dkms { module, version, .. } = &action.kind else {
+        return Ok(Look::default());
+    };
+    let path = PathBuf::from(dkms_source(module, version));
+    let there = host.place(&path).join("dkms.conf").is_file();
+    let holds = match recorded {
+        Recorded::Done(had) => same_source(had, action),
+        Recorded::Unsettled(_) => false,
+        Recorded::Nothing | Recorded::Found => true,
+    };
+    let built = dkms_built(host, module, version)?;
+    let mut look = at_path(host, &path, there && holds);
+    look.claims
+        .push(Claim::new(format!("dkms:{module}/{version}"), !built.added));
+    look.done = there && holds && built.whole();
+    Ok(look)
+}
+
+/// What the user has to know of `action`, a step that stands, said whenever a run reaches it:
+/// for a `dkms` step, what to do at the next boot while Secure Boot won't load what the MOK signs.
+///
+/// # Errors
+///
+/// [`PerformError`] when the machine can't be asked.
+pub fn says(action: &Action, host: &mut dyn Host) -> Result<Option<String>, PerformError> {
+    match &action.kind {
+        Kind::Dkms { module, .. } => mok_note(host, module),
+        _ => Ok(None),
+    }
+}
+
+/// What the user must do for Secure Boot to load `module`, which DKMS signed with the MOK: none
+/// while Secure Boot is off or takes the MOK. The boot screen that enrols it is the user's.
+fn mok_note(host: &mut dyn Host, module: &str) -> Result<Option<String>, PerformError> {
+    let mok = host.mok().map_err(PerformError::Host)?;
+    let certificate = mok.as_ref().map(|m| m.certificate.display().to_string());
+    let state = host
+        .secure_boot(mok.as_ref().map(|m| m.certificate.as_path()))
+        .map_err(PerformError::Host)?;
+    Ok(match (state, certificate) {
+        (SecureBoot::Off | SecureBoot::Enrolled, _) => None,
+        (SecureBoot::Queued, _) => Some(format!(
+            "Secure Boot is on: at the next boot, pick Enroll MOK on the blue MokManager screen and type the one-time password you chose, or {module} won't load."
+        )),
+        (SecureBoot::NotEnrolled, Some(certificate)) => Some(format!(
+            "Secure Boot is on, and the key DKMS signed {module} with isn't enrolled, so it won't load: run `sudo mokutil --import {certificate}` and pick a one-time password, then at the next boot pick Enroll MOK on the blue MokManager screen and type it."
+        )),
+        (_, Some(certificate)) => Some(format!(
+            "Secure Boot is on, and it couldn't tell whether it takes the key DKMS signed {module} with: `sudo mokutil --test-key {certificate}` says."
+        )),
+        (_, None) => Some(format!(
+            "Secure Boot is on, and DKMS has no key to sign {module} with, so it won't load."
+        )),
+    })
+}
+
+/// Does a `dkms` step: its source put in place when `look` found it missing or another pin's, the
+/// module added to DKMS's tree, then built and installed for each kernel with its headers that
+/// lacks it, or has it unsigned while DKMS has a MOK. It fails when a kernel still lacks it signed.
+fn apply_dkms(action: &Action, host: &mut dyn Host, look: &Look) -> Result<(), PerformError> {
+    let Kind::Dkms { module, version, .. } = &action.kind else {
+        return Ok(());
+    };
+    if !owned_names(&look.claims, "path:").is_empty() {
+        place_dkms_source(action, host)?;
+    }
+    if !host.dkms_status(module, version).map_err(PerformError::Host)?.added {
+        host.dkms_add(module, version).map_err(PerformError::Host)?;
+    }
+    let built = dkms_built(host, module, version)?;
+    if built.no_kernel {
+        return Err(PerformError::NoKernelHeaders { module: module.clone() });
+    }
+    for kernel in &built.missing {
+        host.dkms_install(module, version, kernel).map_err(PerformError::Host)?;
+    }
+    let built = dkms_built(host, module, version)?;
+    if built.missing.is_empty() {
+        Ok(())
+    } else {
+        Err(PerformError::Unsigned {
+            module: module.clone(),
+            kernels: built.missing,
+        })
+    }
+}
+
+/// Puts a `dkms` step's source in `/usr/src/<module>-<version>`: the pinned tarball downloaded
+/// and checked, unpacked into a staging folder beside it, its `folder` taken, `dkms.conf` written
+/// into it, no one but its owner able to write it, then moved into place whole, over one there.
+fn place_dkms_source(action: &Action, host: &mut dyn Host) -> Result<(), PerformError> {
+    let Kind::Dkms {
+        module,
+        version,
+        url,
+        sha256,
+        strip,
+        folder,
+        conf_text,
+        ..
+    } = &action.kind
+    else {
+        return Ok(());
+    };
+    let path = host.place(&PathBuf::from(dkms_source(module, version)));
+    let stage = staging(&path);
+    let file = stage.with_extension("download");
+    remove_path(&stage)?;
+    make_parents(&path)?;
+    let result = (|| {
+        write_new(&file, b"").map_err(PerformError::io(&file))?;
+        host.fetch(url, sha256, &file).map_err(PerformError::Host)?;
+        fs::create_dir(&stage).map_err(PerformError::io(&stage))?;
+        host.untar(&file, &stage, Compression::Gzip, *strip)
+            .map_err(PerformError::Host)?;
+        let tree = match folder {
+            Some(folder) => stage.join(folder),
+            None => stage.clone(),
+        };
+        if !tree.is_dir() {
+            return Err(PerformError::NoSourceFolder {
+                module: module.clone(),
+                folder: folder.clone().unwrap_or_default(),
+            });
+        }
+        write_file(
+            &tree.join("dkms.conf"),
+            conf_text.as_deref().unwrap_or_default(),
+            DEFAULT_FILE_MODE,
+        )?;
+        only_owner_writes(&tree)?;
+        replace_with(&tree, &path)
+    })();
+    let _ = fs::remove_file(&file);
+    let _ = remove_path(&stage);
+    result
+}
+
+/// Undoes a `dkms` step: with `registered` (its claim of the module in DKMS's tree), the module
+/// unloaded when it is loaded and nothing uses it, then taken out of DKMS's tree and every kernel;
+/// then `paths`, its source, and `dirs`, the folders it made. A module something still uses stays
+/// loaded until the machine restarts, which the note says.
+fn undo_dkms(
+    host: &mut dyn Host,
+    module: &str,
+    version: &str,
+    registered: &[String],
+    paths: &[String],
+    dirs: Vec<String>,
+) -> Result<Option<String>, PerformError> {
+    let mut note = None;
+    if !registered.is_empty() {
+        match host.module_users(module).map_err(PerformError::Host)? {
+            Some(0) => host.unload(module).map_err(PerformError::Host)?,
+            Some(_) => {
+                note = Some(format!(
+                    "{module} stays loaded until the machine restarts, as something uses it now."
+                ));
+            }
+            None => {}
+        }
+        if host.dkms_status(module, version).map_err(PerformError::Host)?.added {
+            host.dkms_remove(module, version).map_err(PerformError::Host)?;
+        }
+    }
+    for path in paths {
+        remove_path(&host.place(Path::new(path)))?;
+    }
+    remove_dirs(host, dirs);
+    Ok(note)
+}
+
 /// A `run`'s check: its `check` exits 0; for one with `undo` alone, its own settled entry. Recorded
 /// done, the step is the app's; recorded found, the app is there by other means, and the step
 /// owns nothing, as a found app's steps own nothing; not recorded, it is the app's once recorded.
@@ -537,7 +799,6 @@ fn look_run(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             done: found || matches!(recorded, Recorded::Done(_)),
             claims: vec![Claim::new("run", !found)],
             prior: Prior::default(),
-            note: None,
         });
     }
     let done = ran(run_recorded(host, action, check)?)?;
@@ -545,7 +806,6 @@ fn look_run(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
         done,
         claims: vec![Claim::new("run", !done)],
         prior: Prior::default(),
-        note: None,
     })
 }
 
@@ -688,6 +948,7 @@ pub fn apply(
         }
         Kind::Linger {} => host.set_linger(true).map_err(PerformError::Host),
         Kind::Architecture { architecture } => add_architecture(host, architecture),
+        Kind::Dkms { .. } => apply_dkms(action, host, look),
         Kind::Run { .. } if action.removal_only() => Ok(()),
         Kind::Run { run, .. } => run_recorded(host, action, run)?.map_err(PerformError::Host),
     }
@@ -855,6 +1116,9 @@ pub fn undo(
             }
             return undo_architecture(host, architecture);
         }
+        Kind::Dkms { module, version, .. } => {
+            return undo_dkms(host, module, version, &owned("dkms:"), &owned("path:"), owned("dir:"));
+        }
         Kind::Run { undo, .. } => {
             if owned("run").is_empty() {
                 return Ok(None);
@@ -995,7 +1259,6 @@ fn parts(prefix: &str, names: &[String], there: impl Fn(&String) -> bool) -> Loo
         done: claims.iter().all(|c| !c.owned),
         claims,
         prior: Prior::default(),
-        note: None,
     }
 }
 
@@ -1022,7 +1285,6 @@ fn look_file(host: &dyn Host, kind: &Kind) -> Look {
             done,
             claims: vec![Claim::new(format!("path:{}", path.display()), false)],
             prior: Prior::default(),
-            note: None,
         };
     }
     at_path(host, &path, done)
@@ -1092,7 +1354,6 @@ fn at_path(host: &dyn Host, path: &Path, done: bool) -> Look {
         done,
         claims,
         prior: Prior::default(),
-        note: None,
     }
 }
 
@@ -1315,7 +1576,6 @@ fn look_setting(host: &dyn Host, file: &str, key: &str, value: &toml::Value) -> 
             tables: Some(tables),
             ..Prior::default()
         },
-        note: None,
     })
 }
 

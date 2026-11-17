@@ -16,9 +16,12 @@ use std::rc::Rc;
 use super::AptPlan;
 use super::AptSimulation;
 use super::Compression;
+use super::DkmsStatus;
 use super::Downgrade;
 use super::Host;
 use super::HostError;
+use super::Mok;
+use super::SecureBoot;
 use super::UnitState;
 use super::untar_args;
 use crate::apps::action::Scope;
@@ -108,6 +111,16 @@ pub struct State {
     pub linger: bool,
     /// The architectures dpkg takes packages of beside the machine's.
     pub foreign: BTreeSet<String>,
+    /// The kernels installed with their headers, which DKMS builds for.
+    pub kernels: BTreeSet<String>,
+    /// DKMS's tree: `<module>/<version>` to the kernels it is installed for, each with the key
+    /// that signed it, none for one unsigned.
+    pub dkms: BTreeMap<String, BTreeMap<String, Option<String>>>,
+    /// The MOK's serial, once DKMS has one; what `dkms install` signs with.
+    pub mok: Option<String>,
+    pub secure_boot: SecureBoot,
+    /// Loaded kernel modules, by name, to how many use them.
+    pub loaded: BTreeMap<String, u32>,
     /// Package to the installed packages installing it removes, as Docker's `docker-ce` removes
     /// Ubuntu's `docker.io`.
     pub conflicts: BTreeMap<String, BTreeSet<String>>,
@@ -766,6 +779,95 @@ impl Host for FakeHost {
     fn apt_update(&mut self) -> Result<(), HostError> {
         self.fails("apt-update")?;
         self.log("apt update");
+        Ok(())
+    }
+
+    fn kernels(&mut self) -> Result<BTreeSet<String>, HostError> {
+        Ok(self.state.borrow().kernels.clone())
+    }
+
+    fn dkms_status(&mut self, module: &str, version: &str) -> Result<DkmsStatus, HostError> {
+        let state = self.state.borrow();
+        Ok(match state.dkms.get(&format!("{module}/{version}")) {
+            Some(kernels) => DkmsStatus {
+                added: true,
+                installed: kernels.keys().cloned().collect(),
+            },
+            None => DkmsStatus::default(),
+        })
+    }
+
+    fn dkms_add(&mut self, module: &str, version: &str) -> Result<(), HostError> {
+        let conf = self.place(Path::new(&format!("/usr/src/{module}-{version}/dkms.conf")));
+        if !conf.is_file() {
+            return Err(HostError::Failed {
+                command: format!("dkms add -m {module} -v {version}"),
+                code: Some(2),
+                stderr: format!("Error! Could not find module source directory: {}", conf.display()),
+            });
+        }
+        let mut state = self.state.borrow_mut();
+        state.dkms.entry(format!("{module}/{version}")).or_default();
+        state.log.push(format!("dkms add {module}/{version}"));
+        Ok(())
+    }
+
+    fn dkms_install(&mut self, module: &str, version: &str, kernel: &str) -> Result<(), HostError> {
+        self.fails(&format!("dkms-install:{module}"))?;
+        // A DKMS whose signing is set up wrong installs the module unsigned.
+        let unsigned = self.state.borrow().fail.contains("dkms-sign");
+        let mut state = self.state.borrow_mut();
+        let signer = if unsigned { None } else { state.mok.clone() };
+        let Some(kernels) = state.dkms.get_mut(&format!("{module}/{version}")) else {
+            return Err(HostError::Failed {
+                command: format!("dkms install -m {module} -v {version}"),
+                code: Some(3),
+                stderr: "Error! This module/version combo is not added".to_owned(),
+            });
+        };
+        kernels.insert(kernel.to_owned(), signer);
+        state.log.push(format!("dkms install {module}/{version} {kernel}"));
+        Ok(())
+    }
+
+    fn dkms_remove(&mut self, module: &str, version: &str) -> Result<(), HostError> {
+        self.fails(&format!("dkms-remove:{module}"))?;
+        let mut state = self.state.borrow_mut();
+        state.dkms.remove(&format!("{module}/{version}"));
+        state.log.push(format!("dkms remove {module}/{version}"));
+        Ok(())
+    }
+
+    fn module_signer(&mut self, module: &str, kernel: &str) -> Result<Option<String>, HostError> {
+        let prefix = format!("{module}/");
+        let state = self.state.borrow();
+        Ok(state
+            .dkms
+            .iter()
+            .filter(|(key, _)| key.starts_with(&prefix))
+            .find_map(|(_, kernels)| kernels.get(kernel).cloned())
+            .flatten())
+    }
+
+    fn mok(&mut self) -> Result<Option<Mok>, HostError> {
+        Ok(self.state.borrow().mok.clone().map(|serial| Mok {
+            certificate: PathBuf::from("/var/lib/shim-signed/mok/MOK.der"),
+            serial,
+        }))
+    }
+
+    fn secure_boot(&mut self, _certificate: Option<&Path>) -> Result<SecureBoot, HostError> {
+        Ok(self.state.borrow().secure_boot)
+    }
+
+    fn module_users(&mut self, module: &str) -> Result<Option<u32>, HostError> {
+        Ok(self.state.borrow().loaded.get(&module.replace('-', "_")).copied())
+    }
+
+    fn unload(&mut self, module: &str) -> Result<(), HostError> {
+        let mut state = self.state.borrow_mut();
+        state.loaded.remove(&module.replace('-', "_"));
+        state.log.push(format!("unload {module}"));
         Ok(())
     }
 

@@ -6,8 +6,8 @@
 //!
 //! # Owns
 //!
-//! - [`Host`], [`HostError`], [`UnitState`], [`AptPlan`], [`AptSimulation`] and [`Downgrade`]. The
-//!   real machine: [`SystemHost`].
+//! - [`Host`], [`HostError`], [`UnitState`], [`AptPlan`], [`AptSimulation`], [`Downgrade`],
+//!   [`DkmsStatus`], [`Mok`] and [`SecureBoot`]. The real machine: [`SystemHost`].
 //!
 //! # Not here
 //!
@@ -168,6 +168,39 @@ impl Compression {
             Self::Xz => "--xz",
         }
     }
+}
+
+/// What DKMS has of a module at a version.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DkmsStatus {
+    /// It is in DKMS's tree (`dkms add`), so a new kernel builds it.
+    pub added: bool,
+    /// The kernels it is installed for.
+    pub installed: BTreeSet<String>,
+}
+
+/// The Machine Owner Key DKMS signs modules with: its certificate, and that certificate's serial
+/// as `modinfo` names the key that signed a module (`sig_key`), uppercase hex pairs with `:`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Mok {
+    pub certificate: PathBuf,
+    pub serial: String,
+}
+
+/// Whether the firmware loads only signed modules, and whether it takes the MOK's.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SecureBoot {
+    /// Off: any module loads.
+    #[default]
+    Off,
+    /// On, and the MOK is enrolled.
+    Enrolled,
+    /// On, and the MOK is queued for enrolment at the next boot (`mokutil --import`).
+    Queued,
+    /// On, and the MOK is neither enrolled nor queued: modules signed with it don't load.
+    NotEnrolled,
+    /// On, with no MOK to sign with, or what mokutil said wasn't one of the above.
+    Unknown,
 }
 
 /// A change apt is asked to simulate, to learn what else it would install or remove.
@@ -434,6 +467,80 @@ pub trait Host {
     ///
     /// When apt fails.
     fn apt_update(&mut self) -> Result<(), HostError>;
+
+    /// The kernels DKMS builds modules for: those installed with their headers
+    /// (`/lib/modules/<kernel>/build`).
+    ///
+    /// # Errors
+    ///
+    /// When the kernels' folder can't be read.
+    fn kernels(&mut self) -> Result<BTreeSet<String>, HostError>;
+
+    /// What DKMS has of `module` at `version` (`dkms status`).
+    ///
+    /// # Errors
+    ///
+    /// When dkms can't be asked.
+    fn dkms_status(&mut self, module: &str, version: &str) -> Result<DkmsStatus, HostError>;
+
+    /// `module` at `version`, whose source is in `/usr/src/<module>-<version>`, added to DKMS's
+    /// tree (`dkms add`).
+    ///
+    /// # Errors
+    ///
+    /// When dkms fails.
+    fn dkms_add(&mut self, module: &str, version: &str) -> Result<(), HostError>;
+
+    /// `module` at `version` built, signed as DKMS signs, and installed for `kernel`, over what
+    /// it installed before (`dkms install --force`).
+    ///
+    /// # Errors
+    ///
+    /// When dkms fails.
+    fn dkms_install(&mut self, module: &str, version: &str, kernel: &str) -> Result<(), HostError>;
+
+    /// `module` at `version` taken out of DKMS's tree and every kernel (`dkms remove --all`).
+    ///
+    /// # Errors
+    ///
+    /// When dkms fails.
+    fn dkms_remove(&mut self, module: &str, version: &str) -> Result<(), HostError>;
+
+    /// The key that signed `module` as installed for `kernel`, as `modinfo` names it
+    /// (`sig_key`); none for one unsigned, or not there.
+    ///
+    /// # Errors
+    ///
+    /// When modinfo can't be started.
+    fn module_signer(&mut self, module: &str, kernel: &str) -> Result<Option<String>, HostError>;
+
+    /// The MOK DKMS signs with, as its configuration names it; none until DKMS has made one.
+    ///
+    /// # Errors
+    ///
+    /// When the certificate can't be read.
+    fn mok(&mut self) -> Result<Option<Mok>, HostError>;
+
+    /// Whether Secure Boot is on, and whether it takes `certificate`, the MOK's.
+    ///
+    /// # Errors
+    ///
+    /// When mokutil can't be started.
+    fn secure_boot(&mut self, certificate: Option<&Path>) -> Result<SecureBoot, HostError>;
+
+    /// How many users the loaded kernel module `module` has; none when it isn't loaded.
+    ///
+    /// # Errors
+    ///
+    /// When `/sys/module` can't be read.
+    fn module_users(&mut self, module: &str) -> Result<Option<u32>, HostError>;
+
+    /// The loaded kernel module `module`, which nothing uses, unloaded (`modprobe -r`).
+    ///
+    /// # Errors
+    ///
+    /// When modprobe fails.
+    fn unload(&mut self, module: &str) -> Result<(), HostError>;
 
     /// Runs `argv` in `dir` with [`RUN_PATH`](super::action::RUN_PATH): as the user, with their
     /// environment and home; as root, with root's own environment and none of the user's.

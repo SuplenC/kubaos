@@ -447,3 +447,61 @@ fn an_apt_package_of_another_architecture_names_one_dpkg_installs() {
     assert!(i386.is_ok(), "{i386:?}");
     assert!(matches!(bogus, Err(ActionError::InvalidPackage { .. })), "{bogus:?}");
 }
+
+#[test]
+fn a_dkms_module_is_roots_from_a_pinned_source_and_names_what_dkms_takes() {
+    let dkms = |module: &str, version: &str, folder: &str| {
+        action(&format!(
+            "name = \"X\"\nkind = \"dkms\"\nmodule = \"{module}\"\nversion = \"{version}\"\n\
+             url = \"https://example.com/m.tar.gz\"\nsha256 = \"{}\"\nfolder = \"{folder}\"\nconf = \"dkms.conf\"\n",
+            "a".repeat(64)
+        ))
+    };
+
+    assert_eq!(dkms("hid-xpadneo", "0.10.5", "hid-xpadneo").unwrap().side(), Side::Root);
+    assert!(matches!(
+        dkms("Hid", "0.10.5", "src"),
+        Err(ActionError::InvalidModule { .. })
+    ));
+    assert!(matches!(
+        dkms("hid", "v0.10.5", "src"),
+        Err(ActionError::InvalidModuleVersion { .. })
+    ));
+    assert!(matches!(
+        dkms("hid", "0.10.5", "../etc"),
+        Err(ActionError::InvalidSourceFolder { .. })
+    ));
+    let journal_only = action(&format!(
+        "name = \"X\"\nkind = \"dkms\"\nmodule = \"m\"\nversion = \"1\"\nurl = \"https://example.com/m.tar.gz\"\n\
+         sha256 = \"{}\"\nconf = \"dkms.conf\"\nconf_text = \"x\"\n",
+        "a".repeat(64)
+    ));
+    assert!(
+        matches!(journal_only, Err(ActionError::JournalOnly { key: "conf_text" })),
+        "{journal_only:?}"
+    );
+}
+
+#[test]
+fn resolving_a_dkms_module_reads_its_conf_with_its_own_version() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("dkms.conf"), "PACKAGE_VERSION=\"@VERSION@\"\n").unwrap();
+    let words = Words {
+        user: "kuba".to_owned(),
+        home: "/home/kuba".into(),
+        arch: "amd64".to_owned(),
+        version: Some("9".to_owned()),
+    };
+    let text = format!(
+        "name = \"X\"\nkind = \"dkms\"\nmodule = \"m\"\nversion = \"1.2\"\nurl = \"https://example.com/m.tar.gz\"\n\
+         sha256 = \"{}\"\nconf = \"dkms.conf\"\n",
+        "a".repeat(64)
+    );
+
+    let resolved = action(&text).unwrap().resolve(&words, dir.path()).unwrap();
+
+    let Kind::Dkms { conf_text, .. } = resolved.kind else {
+        panic!("not dkms");
+    };
+    assert_eq!(conf_text.as_deref(), Some("PACKAGE_VERSION=\"1.2\"\n"));
+}
