@@ -23,6 +23,7 @@ use std::io;
 use std::path::Path;
 
 use crate::contrast::Mode;
+use crate::model::Families;
 use crate::model::Family;
 use crate::model::Need;
 use crate::model::Rgb;
@@ -221,6 +222,17 @@ fn weight(weight: Weight) -> u16 {
     }
 }
 
+/// A style's family, then the Japanese one for the kana and kanji it doesn't draw, as iced falls
+/// back to the fonts it bundles: a browser's own fallback is the machine's, and one with no CJK
+/// font draws them in another face, at another width.
+fn family_stack(families: &Families, family: Family) -> String {
+    if family == Family::Jp {
+        format!("{:?}", families.name(family))
+    } else {
+        format!("{:?}, {:?}", families.name(family), families.name(Family::Jp))
+    }
+}
+
 fn types(out: &mut Css, tokens: &Tokens) {
     let families = &tokens.font.family;
     out.comment("Type families, by the role they play.");
@@ -233,10 +245,7 @@ fn types(out: &mut Css, tokens: &Tokens) {
         out.length(&format!("type-{name}-line"), style.line);
         out.length(&format!("type-{name}-icon"), style.icon);
         out.var(&format!("type-{name}-weight"), weight(style.weight).to_string());
-        out.var(
-            &format!("type-{name}-family"),
-            format!("{:?}", families.name(style.family)),
-        );
+        out.var(&format!("type-{name}-family"), family_stack(families, style.family));
         let features = if style.tabular { "\"tnum\" 1" } else { "normal" };
         out.var(&format!("type-{name}-features"), features);
     }

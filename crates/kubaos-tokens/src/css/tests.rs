@@ -76,10 +76,11 @@ fn type_styles_carry_their_size_line_icon_weight_family_and_figures() {
         "--type-button-line: calc(24 * var(--px));",
         "--type-button-icon: calc(20 * var(--px));",
         "--type-button-weight: 600;",
-        "--type-button-family: \"Geist\";",
+        "--type-button-family: \"Geist\", \"M PLUS 1\";",
         "--type-button-features: normal;",
         "--type-label_number-features: \"tnum\" 1;",
-        "--type-mono-family: \"Geist Mono\";",
+        "--type-mono-family: \"Geist Mono\", \"M PLUS 1\";",
+        "--type-clock_place-family: \"M PLUS 1\";",
     ] {
         assert!(lengths.contains(property), "{property}");
     }
