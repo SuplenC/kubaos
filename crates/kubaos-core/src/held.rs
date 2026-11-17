@@ -5,21 +5,28 @@
 //! (`kubaos.listedPackages`, `home/state.nix`), keeping going past a failure. A package that failed
 //! and that the home has now, by the record its generation keeps
 //! (`~/.local/share/kubaos/installed.json`), is held: `held.toml` in the state directory names it
-//! with that store path, and `home/state.nix` installs the path in place of the attribute. A
-//! package that failed and that the home doesn't have has no version to keep, and fails the switch
-//! as it would without this. Every switch decides again, so a held package that builds loses its
-//! hold, and the file goes with the last hold.
+//! with that store path and the derivation that failed, and `home/state.nix` installs the path in
+//! place of the attribute. A package that failed and that the home doesn't have has no version to
+//! keep, and fails the switch as it would without this.
+//!
+//! A held package whose derivation is still the one that failed isn't built again: its build would
+//! fail the same way, and a download that times out costs minutes on every switch. It stays held
+//! as it was ([`unchanged`]). The switch an update runs, and `kubaos switch --retry-held`, build
+//! every held package again ([`Retry`]). A held package that builds loses its hold, and the file
+//! goes with the last hold.
 //!
 //! ```toml
-//! [held]
-//! discord = "/nix/store/84k7g556fj4ib11413jna62l3hgfzyna-discord-1.0.159"
+//! [held.discord]
+//! path = "/nix/store/84k7g556fj4ib11413jna62l3hgfzyna-discord-1.0.159"
+//! failed = "/nix/store/b2qzjq7gkvybdpdf7hh2hsi6x3cpag3s-discord-1.0.159.drv"
 //! ```
 //!
 //! # Owns
 //!
 //! - `held.toml`: reading it, and writing it under the state directory's edit lock ([`HeldFile`]).
-//! - Which packages a switch holds ([`decide`]), from what the pre-build found ([`prebuilt`]) and
-//!   what the home has ([`CurrentHome`]).
+//! - Which held packages a switch doesn't build again ([`unchanged`]), and which packages it holds
+//!   ([`decide`]), from what the pre-build found ([`prebuilt`]) and what the home has
+//!   ([`CurrentHome`]).
 //! - What a person reads about a held package ([`message`]).
 //!
 //! # Not here
@@ -45,12 +52,35 @@ use crate::state::write_atomic;
 
 /// The comment `held.toml` starts with.
 const HEADER: &str = "\
-# Packages that couldn't be built at the last switch, each kept at the store path your home had.
-# Every switch tries them again and rewrites this file; it goes once none is held.
+# Packages that couldn't be built, each kept at the store path your home had. A switch tries one
+# again once its build changes, and every update tries them all; the kubaos command rewrites this
+# file, and it goes once none is held.
 ";
 
-/// The held packages: each name as the state directory lists it, to the store path it keeps.
-pub type Holds = BTreeMap<String, String>;
+/// One held package.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Hold {
+    /// The store path it keeps, which `home/state.nix` installs.
+    pub path: String,
+    /// The derivation whose build failed, when it evaluated; a switch builds the package again
+    /// only once its derivation is another.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failed: Option<String>,
+}
+
+/// The held packages, by name as the state directory lists them.
+pub type Holds = BTreeMap<String, Hold>;
+
+/// Whether a switch builds a held package whose derivation hasn't changed since it failed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Retry {
+    /// It stays held without a build: its build would fail the same way.
+    #[default]
+    Changed,
+    /// Every held package is built again, as in the switch an update runs.
+    All,
+}
 
 /// What a person reads about the held package `name`.
 pub fn message(name: &str) -> String {
@@ -85,34 +115,73 @@ impl Found {
     }
 }
 
+/// The held packages of `before` the pre-build leaves out: those whose every derivation in
+/// `evaluated` is the one that failed when they were held.
+pub fn unchanged(evaluated: &[Evaluated], before: &Holds) -> BTreeSet<String> {
+    before
+        .iter()
+        .filter(|(name, hold)| {
+            let mut drvs = evaluated
+                .iter()
+                .filter(|one| one.name == **name)
+                .map(|one| one.found.as_ref().map(|found| &found.drv))
+                .peekable();
+            drvs.peek().is_some() && hold.failed.is_some() && drvs.all(|drv| drv == hold.failed.as_ref())
+        })
+        .map(|(name, _)| name.clone())
+        .collect()
+}
+
+/// How the pre-build ended for one listed package.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Outcome {
+    /// Every output the home installs is in the store.
+    Built,
+    /// It didn't build, or didn't evaluate: `drv` is a derivation of it that failed, when it
+    /// evaluated.
+    Failed { drv: Option<String> },
+    /// It is held, and its derivation is the one that failed then, so it wasn't built.
+    Unchanged,
+}
+
 /// What the pre-build found of one listed package, over every home configuration.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Prebuilt {
     pub name: String,
-    /// Whether every output the home installs is in the store.
-    pub built: bool,
+    pub outcome: Outcome,
     /// The package's name without its version, when it evaluated.
     pub pname: Option<String>,
 }
 
-/// Each listed package of `evaluated` with whether it built: every configuration's derivation of
-/// it evaluated, and none of their outputs is in `invalid`, the paths still missing after the
-/// build.
-pub fn prebuilt(evaluated: &[Evaluated], invalid: &BTreeSet<String>) -> Vec<Prebuilt> {
+/// Each listed package of `evaluated` with how its pre-build ended: those in `skipped` weren't
+/// built, and a package built when every configuration's derivation of it evaluated and none of
+/// their outputs is in `invalid`, the paths still missing after the build.
+pub fn prebuilt(evaluated: &[Evaluated], invalid: &BTreeSet<String>, skipped: &BTreeSet<String>) -> Vec<Prebuilt> {
     let mut by_name: BTreeMap<&str, Prebuilt> = BTreeMap::new();
     for one in evaluated {
-        let built = one
-            .found
-            .as_ref()
-            .is_some_and(|found| found.outputs.values().all(|path| !invalid.contains(path)));
         let entry = by_name.entry(&one.name).or_insert_with(|| Prebuilt {
             name: one.name.clone(),
-            built: true,
+            outcome: if skipped.contains(&one.name) {
+                Outcome::Unchanged
+            } else {
+                Outcome::Built
+            },
             pname: None,
         });
-        entry.built &= built;
         if entry.pname.is_none() {
             entry.pname = one.found.as_ref().map(|found| found.pname.clone());
+        }
+        if entry.outcome != Outcome::Built {
+            continue;
+        }
+        match &one.found {
+            None => entry.outcome = Outcome::Failed { drv: None },
+            Some(found) if found.outputs.values().any(|path| invalid.contains(path)) => {
+                entry.outcome = Outcome::Failed {
+                    drv: Some(found.drv.clone()),
+                };
+            }
+            Some(_) => {}
         }
     }
     by_name.into_values().collect()
@@ -161,13 +230,25 @@ pub struct Decision {
     pub unkept: Vec<String>,
 }
 
-/// Holds each package of `prebuilt` that didn't build at the store path `current` has of it.
-pub fn decide(prebuilt: &[Prebuilt], current: &CurrentHome) -> Decision {
+/// Holds each package of `prebuilt` that failed at the store path `current` has of it, and keeps
+/// the hold of `before` of each that wasn't built because it was unchanged.
+pub fn decide(prebuilt: &[Prebuilt], current: &CurrentHome, before: &Holds) -> Decision {
     let mut decision = Decision::default();
-    for package in prebuilt.iter().filter(|package| !package.built) {
+    for package in prebuilt {
+        let failed = match &package.outcome {
+            Outcome::Built => continue,
+            Outcome::Unchanged => match before.get(&package.name) {
+                Some(hold) => {
+                    decision.held.insert(package.name.clone(), hold.clone());
+                    continue;
+                }
+                None => None,
+            },
+            Outcome::Failed { drv } => drv.clone(),
+        };
         match current.path_of(&package.name, package.pname.as_deref()) {
             Some(path) => {
-                decision.held.insert(package.name.clone(), path);
+                decision.held.insert(package.name.clone(), Hold { path, failed });
             }
             None => decision.unkept.push(package.name.clone()),
         }

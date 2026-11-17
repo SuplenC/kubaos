@@ -13,9 +13,9 @@
 # restores the directory from.
 #
 # held.toml, which only the switch writes (crates/kubaos-core/src/held.rs),
-# names the listed packages that couldn't be built at the last switch, each
-# with the store path the home had: a held package installs that path instead
-# of the attribute. Each generation records the store path it installed for
+# names the listed packages that couldn't be built, each with the store path
+# the home had (`path`, and the failed derivation the switch reads): a held
+# package installs that path instead of the attribute. Each generation records the store path it installed for
 # every listed package in ~/.local/share/kubaos/installed.json, and exposes
 # the attributes as nixpkgs has them in kubaos.listedPackages, which the
 # switch builds before it switches.
@@ -109,7 +109,7 @@ let
       found = fresh name;
     in
     if held ? ${name} then
-      storePackage name held.${name}
+      storePackage name (held.${name}.path or null)
     else if found == null then
       throw "kubaos.d: ${name} is not a package in your nixpkgs (listed in ${
         lib.concatMapStringsSep ", " toString from

@@ -133,7 +133,7 @@ fn the_notification_puts_the_reboot_first_and_one_line_a_part_after_it() {
 }
 
 #[test]
-fn a_held_package_is_a_line_of_its_own_and_makes_the_notification_urgent() {
+fn a_held_package_is_a_line_of_its_own_and_leaves_the_notification_low() {
     let summary = Summary {
         held: vec!["discord".into()],
         ..quiet()
@@ -146,7 +146,7 @@ fn a_held_package_is_a_line_of_its_own_and_makes_the_notification_urgent() {
         notification.body,
         "discord stays at its current version: it couldn't be built"
     );
-    assert!(notification.urgent);
+    assert!(!notification.urgent);
 }
 
 #[test]

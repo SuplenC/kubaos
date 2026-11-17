@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::BTreeSet;
 use std::fs;
 use std::fs::File;
 use std::path::Path;
@@ -18,7 +19,7 @@ use super::plan;
 use super::resolve;
 use super::worktree_for;
 use crate::held::CurrentHome;
-use crate::held::Prebuilt;
+use crate::held::Evaluated;
 use crate::switch::Host;
 use crate::switch::HostError;
 use crate::switch::JobId;
@@ -50,7 +51,11 @@ impl Host for FakeHost {
         panic!("planning never switches")
     }
 
-    fn prebuild(&self, _log: &File, _from: Option<&Path>) -> Result<Vec<Prebuilt>, HostError> {
+    fn listed(&self, _log: &File, _from: Option<&Path>) -> Result<Vec<Evaluated>, HostError> {
+        panic!("planning never builds")
+    }
+
+    fn build(&self, _log: &File, _installables: &[String], _outputs: &[String]) -> Result<BTreeSet<String>, HostError> {
         panic!("planning never builds")
     }
 

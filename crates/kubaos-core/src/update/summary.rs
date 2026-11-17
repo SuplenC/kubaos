@@ -23,8 +23,7 @@ pub struct Notification {
     pub title: String,
     /// One line a fact, the restart first when one is needed; empty when nothing changed.
     pub body: String,
-    /// Whether it asks for the user's attention: a restart is needed, a part failed, or a package
-    /// is held.
+    /// Whether it asks for the user's attention: a restart is needed, or a part failed.
     pub urgent: bool,
 }
 
@@ -135,8 +134,7 @@ impl Summary {
         if !self.migrations.is_empty() {
             lines.push(counted(self.migrations.len(), "1 migration ran", "{n} migrations ran"));
         }
-        let failed = !self.held.is_empty()
-            || self.firmware.with(FirmwareOutcome::Failed).next().is_some()
+        let failed = self.firmware.with(FirmwareOutcome::Failed).next().is_some()
             || self.suites.error.is_some()
             || self
                 .programs
