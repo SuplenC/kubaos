@@ -110,6 +110,48 @@ fn a_folder_setting_what_only_a_journal_records_is_refused() {
 }
 
 #[test]
+fn an_apt_actions_packages_of_one_architecture_join_its_own_on_that_architecture_alone() {
+    let text = "name = \"Install\"\nkind = \"apt\"\npackages = [\"qemu-utils\"]\n\
+                amd64 = { packages = [\"ovmf\"] }\narm64 = { packages = [\"qemu-efi-aarch64\"] }\n";
+    let on = |arch: &str| {
+        let words = Words {
+            user: "kuba".to_owned(),
+            home: "/home/kuba".into(),
+            arch: arch.to_owned(),
+            version: None,
+        };
+        let resolved = action(text).unwrap().resolve(&words, Path::new("/nowhere")).unwrap();
+        let Kind::Apt {
+            packages, amd64, arm64, ..
+        } = resolved.kind
+        else {
+            panic!("not apt");
+        };
+        assert_eq!((amd64, arm64), (None, None), "a journal records one list");
+        packages
+    };
+
+    assert_eq!(on("amd64"), ["qemu-utils", "ovmf"]);
+    assert_eq!(on("arm64"), ["qemu-utils", "qemu-efi-aarch64"]);
+}
+
+#[test]
+fn an_apt_action_for_one_architecture_lists_no_packages_of_another() {
+    let result = action(
+        "name = \"Install\"\nkind = \"apt\"\narch = \"amd64\"\npackages = [\"tool\"]\n\
+         arm64 = { packages = [\"other\"] }\n",
+    );
+    let bad =
+        action("name = \"Install\"\nkind = \"apt\"\npackages = [\"tool\"]\narm64 = { packages = [\"Not A Name\"] }\n");
+
+    assert!(
+        matches!(result, Err(ActionError::ArchPackagesWithArch { .. })),
+        "{result:?}"
+    );
+    assert!(matches!(bad, Err(ActionError::InvalidPackage { .. })), "{bad:?}");
+}
+
+#[test]
 fn a_run_without_its_undo_is_refused() {
     let result = action("name = \"Install\"\nkind = \"run\"\ndo = [\"t3\", \"install\"]\ncheck = [\"true\"]\n");
 

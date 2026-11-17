@@ -755,7 +755,13 @@ impl Folder {
     pub fn packages(&self) -> Vec<&str> {
         self.all_actions()
             .flat_map(|action| match &action.kind {
-                Kind::Apt { packages, .. } => packages.iter().map(String::as_str).collect(),
+                Kind::Apt {
+                    packages, amd64, arm64, ..
+                } => packages
+                    .iter()
+                    .chain([amd64, arm64].into_iter().flatten().flat_map(|own| &own.packages))
+                    .map(String::as_str)
+                    .collect(),
                 Kind::Deb { package, .. } => vec![package.as_str()],
                 _ => Vec::new(),
             })
@@ -773,8 +779,18 @@ impl Folder {
                 Kind::Apt {
                     packages: own,
                     versions,
+                    amd64,
+                    arm64,
                     ..
-                } => packages.extend(own.iter().map(|p| (p.as_str(), versions.as_deref()))),
+                } => {
+                    let on_arch = match arch {
+                        "amd64" => amd64.as_ref(),
+                        "arm64" => arm64.as_ref(),
+                        _ => None,
+                    };
+                    let own = own.iter().chain(on_arch.into_iter().flat_map(|o| &o.packages));
+                    packages.extend(own.map(|p| (p.as_str(), versions.as_deref())));
+                }
                 Kind::Deb { package, .. } => packages.push((package.as_str(), None)),
                 _ => {}
             }

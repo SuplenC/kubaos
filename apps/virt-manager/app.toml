@@ -1,7 +1,8 @@
 # virt-manager, QEMU with KVM and libvirt, from Ubuntu's archive. An install takes no package's
 # recommendations, so the step names what a virtual machine of today needs beside them: qemu-img
-# for its disks, SPICE for its display, UEFI firmware and a TPM, which Windows 11 asks for. amd64
-# only: an arm64 machine needs other firmware, which one list of packages for both can't say.
+# for its disks, SPICE for its display, UEFI firmware and a TPM, which Windows 11 asks for. Each
+# architecture runs its own kind of virtual machine on KVM, with its own QEMU and firmware: OVMF
+# on amd64, AAVMF (qemu-efi-aarch64) on arm64.
 # libvirtd starts as Ubuntu's package sets it, at boot, so a virtual machine set to start with the
 # machine starts with it.
 # https://ubuntu.com/server/docs/how-to/virtualisation/virtual-machine-manager/
@@ -26,17 +27,16 @@ Your virtual machines stay: their definitions in /etc/libvirt/qemu and their dis
 [[action]]
 name = "Install virt-manager, QEMU and libvirt"
 kind = "apt"
-arch = "amd64"
 packages = [
   "virt-manager",
   "libvirt-daemon-system",
-  "qemu-system-x86",
   "qemu-utils",
   "qemu-system-modules-spice",
   "gir1.2-spiceclientgtk-3.0",
-  "ovmf",
   "swtpm-tools",
 ]
+amd64 = { packages = ["qemu-system-x86", "ovmf"] }
+arm64 = { packages = ["qemu-system-arm", "qemu-efi-aarch64"] }
 
 [[action]]
 name = "Let you run the machine's virtual machines without sudo"

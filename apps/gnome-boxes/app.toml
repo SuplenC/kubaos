@@ -2,10 +2,10 @@
 # session's libvirt, so you need KVM's group and nothing of libvirt's. An install takes no
 # package's recommendations, so the step names what a virtual machine of today needs beside them:
 # qemu-img for its disks, SPICE for its display, UEFI firmware and a TPM, which Windows 11 asks
-# for. amd64 only: an arm64 machine needs other firmware, which one list of packages for both
-# can't say. Its package brings the machine's libvirtd too, which Boxes never uses; it starts as
-# Ubuntu's package sets it, at boot, so Virtual Machine Manager's machines beside it start as they
-# would without Boxes.
+# for. Each architecture runs its own kind of virtual machine on KVM, with its own QEMU and
+# firmware: OVMF on amd64, AAVMF (qemu-efi-aarch64) on arm64. Its package brings the machine's
+# libvirtd too, which Boxes never uses; it starts as Ubuntu's package sets it, at boot, so Virtual
+# Machine Manager's machines beside it start as they would without Boxes.
 # https://apps.gnome.org/Boxes/
 name = "GNOME Boxes"
 category = "development"
@@ -25,15 +25,14 @@ Your virtual machines stay: their disks in ~/.local/share/gnome-boxes and their 
 [[action]]
 name = "Install GNOME Boxes and QEMU"
 kind = "apt"
-arch = "amd64"
 packages = [
   "gnome-boxes",
-  "qemu-system-x86",
   "qemu-utils",
   "qemu-system-modules-spice",
-  "ovmf",
   "swtpm-tools",
 ]
+amd64 = { packages = ["qemu-system-x86", "ovmf"] }
+arm64 = { packages = ["qemu-system-arm", "qemu-efi-aarch64"] }
 
 [[action]]
 name = "Let you use KVM without sudo"
