@@ -370,7 +370,7 @@ const yours: Card = {
 
 /**
  * Kotodama, the Command menu, draws its own body, live (`setup-kotodama-card.ts`): what it is, why,
- * its settings, then the menu itself to try. It installs nothing and needs nothing, so every view
+ * its settings, then its keys to try it with. It installs nothing and needs nothing, so every view
  * but the last is the same need: go through it, or skip it.
  */
 const kotodama: Card = {
@@ -391,9 +391,8 @@ const kotodama: Card = {
     yours: { state: "needed", summary: "Not seen yet." },
     "yours-changed": { state: "needed", summary: "Alt + Space, no web search." },
     try: { state: "needed", summary: "Not tried yet." },
+    "try-alt": { state: "needed", summary: "Alt + Space." },
     "try-open": { state: "needed", summary: "Opened." },
-    "try-typed": { state: "needed", summary: "Opened, wifi typed." },
-    "try-ticked": { state: "needed", summary: "Tried all three." },
     done: { state: "done", summary: "Super + Space, everything in it." },
   },
   asks: () => [],
