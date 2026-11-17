@@ -1,5 +1,5 @@
 # Notion in a window of its own: Notion makes no app for Linux.
-# https://www.notion.so/
+# https://www.notion.com/
 name = "Notion"
 category = "office"
 tags = ["notes", "docs", "wiki", "databases", "workspace", "web app"]
@@ -26,5 +26,5 @@ name = "Put Notion in a window of its own"
 kind = "web_app"
 id = "notion"
 title = "Notion"
-url = "https://www.notion.so/"
+url = "https://www.notion.com/"
 icon = "notion"
