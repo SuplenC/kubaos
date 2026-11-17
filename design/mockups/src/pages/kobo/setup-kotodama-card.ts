@@ -430,6 +430,8 @@ export interface KotodamaCard {
   readonly page: (skipped: () => boolean) => RailPage;
   /** The keys the rail lists at its foot for the step shown. */
   readonly hints: () => readonly KeyHint[];
+  /** Given the screen it is drawn on: a view that starts with the menu open lays it over it. */
+  readonly over: (screen: Element) => void;
 }
 
 const WORDS: Record<StepIndex, string> = {
@@ -854,8 +856,8 @@ export function kotodamaCard(view: string): KotodamaCard {
     layer.addEventListener("click", (event) => {
       if (event.target === layer) shut();
     });
-    const open = (animated = true) => {
-      const screen = element?.closest(".setup-room") ?? element;
+    const open = (animated = true, on?: Element) => {
+      const screen = on ?? element?.closest(".setup-room") ?? element;
       if (!screen) return;
       state.open = true;
       if (!layer.isConnected) {
@@ -959,11 +961,6 @@ export function kotodamaCard(view: string): KotodamaCard {
       raceAgain();
     });
     listen();
-    // A view that starts with the menu open opens it once the card is on its screen.
-    if (state.open) {
-      const opening = () => (element?.closest(".setup-room") ? menu.open(false) : requestAnimationFrame(opening));
-      requestAnimationFrame(opening);
-    }
     return element;
   };
 
@@ -980,6 +977,9 @@ export function kotodamaCard(view: string): KotodamaCard {
   return {
     state,
     body: draw,
+    over: (screen) => {
+      if (state.open) menu.open(false, screen);
+    },
     hints: (): readonly KeyHint[] => {
       if (state.step === 1) return [["Enter", "race again"], ["Esc", "back a step"]];
       if (state.step === 2) return [["Space", "switch it"], ["Alt+↑↓", "move an engine"], ["Tab", "next field"]];
